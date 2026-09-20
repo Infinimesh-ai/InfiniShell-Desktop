@@ -157,6 +157,7 @@ fn inspect_uses_existing_parent_child_scope_validation() {
         active_turn_id: "native-turn-1".into(),
         allow_spawn: false,
         allow_message: true,
+        grok_creation_policy_bound: false,
         related_task_ids: HashSet::from(["parent".into()]),
     };
 
@@ -252,6 +253,7 @@ fn authorized_message_keeps_existing_parent_address_and_multilingual_text() {
         active_turn_id: "native-turn-1".into(),
         allow_spawn: false,
         allow_message: true,
+        grok_creation_policy_bound: false,
         related_task_ids: HashSet::from(["parent".into()]),
     };
 
@@ -1031,6 +1033,7 @@ fn leased_grok_message_uses_common_dispatcher_without_expanding_sender_relations
         active_turn_id: "native-turn-1".into(),
         allow_spawn: true,
         allow_message: true,
+        grok_creation_policy_bound: false,
         related_task_ids: HashSet::from(["parent".into()]),
     };
     let bound = bind_local_tool_call(tool.clone(), &context).unwrap();
@@ -1107,4 +1110,81 @@ fn production_lease_reply_rejects_changed_targets_and_keeps_modern_cached_result
     };
     assert_eq!(response["id"], 3);
     assert_eq!(response["result"], replies[0]["result"]);
+}
+
+#[test]
+fn catalog_registration_requires_actual_matching_discovery_and_list_writes() {
+    let mut bridge = bridge();
+    let discover = request(json!(201), json!(301), "server/discover", modern_params());
+    let list = request(json!(202), json!(302), "tools/list", modern_params());
+    let GrokMcpRequest::Immediate(discovered) = bridge.receive_registration(&discover).unwrap()
+    else {
+        panic!("注册不能生成业务工具");
+    };
+    let GrokMcpRequest::Immediate(listed) = bridge.receive_registration(&list).unwrap() else {
+        panic!("目录不能生成业务工具");
+    };
+    assert!(bridge.served_catalog_names().is_empty());
+    let mut tampered = discovered.clone();
+    tampered["result"]["result"]["ttlMs"] = json!(1);
+    bridge.record_registration_written(&tampered);
+    bridge.record_registration_written(&listed);
+    assert!(bridge.served_catalog_names().is_empty());
+    bridge.record_registration_written(&discovered);
+    assert!(bridge.served_catalog_names().is_empty());
+    bridge.record_registration_written(&listed);
+    assert_eq!(
+        bridge.served_catalog_names(),
+        vec![
+            "infinishell-local-tasks__inspect_local_tasks",
+            "infinishell-local-tasks__send_message_to_agent",
+        ]
+    );
+    let mut other = GrokMcpBridge::new(Uuid::new_v4(), LocalToolPermissions::default());
+    assert!(other.receive_registration(&discover).is_err());
+    other.record_registration_written(&discovered);
+    other.record_registration_written(&listed);
+    assert!(other.served_catalog_names().is_empty());
+}
+
+#[test]
+fn failed_discovery_and_unregistered_reply_cannot_confirm_catalog() {
+    let mut bridge = bridge();
+    let mut invalid = request(json!(201), json!(301), "server/discover", modern_params());
+    invalid["params"]["message"]["params"]["_meta"][PROTOCOL_VERSION_META] = json!("unknown");
+    let GrokMcpRequest::Immediate(reply) = bridge.receive_registration(&invalid).unwrap() else {
+        panic!("失败发现仍为协议响应");
+    };
+    bridge.record_registration_written(&reply);
+    assert!(bridge.served_catalog_names().is_empty());
+    let forged = json!({"jsonrpc":"2.0","id":999,"result":{"jsonrpc":"2.0","id":999,
+        "result":{"tools":[{"name":"run_agents"}]}}});
+    bridge.record_registration_written(&forged);
+    assert!(bridge.served_catalog_names().is_empty());
+}
+
+#[test]
+fn local_catalog_qualification_preserves_hyphens_and_rejects_ambiguous_names() {
+    assert_eq!(
+        qualify_local_catalog_name("send_message_to_agent").as_deref(),
+        Some("infinishell-local-tasks__send_message_to_agent")
+    );
+    assert_eq!(
+        qualify_local_catalog_name("2fa-enable").as_deref(),
+        Some("infinishell-local-tasks__2fa-enable")
+    );
+    for name in [
+        "",
+        "_inspect",
+        "inspect__tasks",
+        "inspect___tasks",
+        "a/b",
+        "含中文",
+        "with space",
+    ] {
+        assert!(qualify_local_catalog_name(name).is_none());
+    }
+    let allowed = "a".repeat(256 - MCP_SERVER_NAME.len() - 2);
+    assert!(qualify_local_catalog_name(&allowed).is_some());
+    assert!(qualify_local_catalog_name(&(allowed + "a")).is_none());
 }

@@ -64,6 +64,8 @@ use warp_completer::completer::{
 use warp_completer::meta::{HasSpan, Spanned};
 use warp_completer::parsers::LiteCommand;
 use warp_completer::parsers::simple::command_at_cursor_position;
+#[cfg(not(target_family = "wasm"))]
+use warp_completer::parsers::simple::{all_parsed_commands, top_level_command};
 use warp_completer::signatures::CommandRegistry;
 use warp_completer::util::parse_current_commands_and_tokens;
 use warp_core::r#async::debounce;
@@ -72,6 +74,8 @@ use warp_core::ui::theme::color::internal_colors;
 use warp_core::user_preferences::GetUserPreferences as _;
 use warp_editor::editor::NavigationKey;
 use warp_errors::{report_error, report_if_error};
+#[cfg(not(target_family = "wasm"))]
+use warp_util::path::EscapeChar;
 use warp_util::path::ShellFamily;
 pub use warpui::WindowId;
 use warpui::accessibility::{AccessibilityContent, ActionAccessibilityContent, WarpA11yRole};
@@ -270,6 +274,8 @@ use crate::terminal::cli_agent_sessions::plugin_manager::PluginModalKind;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
+#[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent_updates::CliAgentUpdatesModel;
 use crate::terminal::input::buffer_model::InputBufferModel;
 use crate::terminal::input::conversations::{
     InlineConversationMenuEvent, InlineConversationMenuView,
@@ -1569,6 +1575,8 @@ pub struct Input {
     /// If true, will submit the command in the editor to the shell upon receiving the
     /// precmd message.
     has_pending_command: bool,
+    /// 后台 CLI 不能用 shell 命令块结束证明退出；本次应用生命周期保守保留占用。
+    cli_launch_may_outlive_block: bool,
     last_word_insertion: LastWordInsertion,
 
     ai_controller: ModelHandle<BlocklistAIController>,
@@ -3679,6 +3687,7 @@ impl Input {
             debounce_input_background_tx,
             debounce_ai_query_prediction_tx,
             has_pending_command: false,
+            cli_launch_may_outlive_block: false,
             last_word_insertion,
             decorations_future_handle: None,
             autosuggestions_abort_handle: None,
@@ -6610,6 +6619,12 @@ impl Input {
         self.cached_agent_mode_hint_key = None;
     }
     fn cli_agent_rich_input_hint_text(&self, ctx: &ViewContext<Self>) -> Cow<'static, str> {
+        if CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.terminal_view_id)
+            .is_some_and(|session| session.agent == CLIAgent::Grok)
+        {
+            return Cow::Owned(crate::t!("terminal-input-grok-manual-copy-hint"));
+        }
         if self.is_locked_in_shell_mode(ctx) {
             return Cow::Owned(translate_input_key(
                 AGENT_MODE_AI_DISABLED_AUTODETECTION_DISABLED_HINT_KEY,
@@ -6915,7 +6930,9 @@ impl Input {
             return;
         }
 
-        self.try_execute_command(&command, ctx);
+        if !self.try_execute_command(&command, ctx) {
+            return;
+        }
         self.has_pending_command = false;
 
         self.editor.update(ctx, |editor, ctx| {
@@ -7079,6 +7096,116 @@ impl Input {
             .is_some()
     }
 
+    /// 本机更新器只管理本地原生安装；SSH、WSL 与容器由各自环境管理。
+    pub(crate) fn local_cli_update_session(&self, ctx: &AppContext) -> Option<Arc<Session>> {
+        if !cfg!(feature = "local_tty") || cfg!(target_family = "wasm") {
+            return None;
+        }
+        let session = self.active_session(ctx)?;
+        if !session.is_local() || session.is_ssh_wrapper_session() || session.is_wsl() {
+            return None;
+        }
+        let model = self.model.lock();
+        if model.is_shared_session_viewer()
+            || model.is_conversation_transcript_viewer()
+            || model
+                .shell_launch_state()
+                .available_shell()
+                .is_some_and(|shell| shell.is_docker_sandbox())
+        {
+            return None;
+        }
+        Some(session)
+    }
+
+    /// 在命令派发前同步登记占用，覆盖 PTY 写入到 CLI 会话注册之间的窗口。
+    pub(crate) fn try_reserve_cli_launch(
+        &mut self,
+        command: &str,
+        ctx: &mut ViewContext<Self>,
+    ) -> Result<(), String> {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            let Some(session) = self.local_cli_update_session(ctx) else {
+                return Ok(());
+            };
+            if !ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                return Ok(());
+            }
+            let escape = session.shell_family().escape_char();
+            let mut may_outlive_block = Self::has_background_separator(command, escape);
+            let agents = all_parsed_commands(command, escape)
+                .flat_map(|parsed| {
+                    let Some((first, last)) = parsed.parts.first().zip(parsed.parts.last()) else {
+                        return Vec::new();
+                    };
+                    let Some(segment) = command.get(first.span.start()..last.span.end()) else {
+                        return Vec::new();
+                    };
+                    let Some(executable) = top_level_command(segment, escape) else {
+                        return Vec::new();
+                    };
+                    // 沿用一层 shell 别名；仅解析字面命令，不执行动态展开。
+                    let resolved = session.alias_value(&executable).unwrap_or(segment);
+                    may_outlive_block |= Self::has_background_separator(resolved, escape);
+                    all_parsed_commands(resolved, escape)
+                        .filter_map(|parsed| {
+                            let first = parsed.parts.first()?;
+                            let last = parsed.parts.last()?;
+                            let executable = top_level_command(
+                                resolved.get(first.span.start()..last.span.end())?,
+                                escape,
+                            )?;
+                            let basename = executable.rsplit(['/', '\\']).next()?;
+                            // 只把可执行名称交给既有匹配器，管理命令与版本检测也占用安装。
+                            [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok]
+                                .into_iter()
+                                .find(|agent| agent.matches_command(basename, Some(escape)))
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>();
+            let retain_after_block = !agents.is_empty() && may_outlive_block;
+            // 先检查整个复合命令，再一次性登记；失败不释放此前仍有效的占用。
+            let blocked = CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+                if let Some(agent) = agents.iter().find(|agent| updates.is_updating(**agent)) {
+                    return Some(*agent);
+                }
+                for agent in agents {
+                    updates.reserve_launch(agent, self.terminal_view_id, ctx);
+                }
+                None
+            });
+            if let Some(agent) = blocked {
+                return Err(crate::t!(
+                    "settings-cli-updates-launch-blocked",
+                    agent = agent.display_name()
+                ));
+            }
+            self.cli_launch_may_outlive_block |= retain_after_block;
+        }
+        #[cfg(target_family = "wasm")]
+        let _ = (command, ctx);
+        Ok(())
+    }
+
+    pub(crate) fn cli_launch_may_outlive_block(&self) -> bool {
+        self.cli_launch_may_outlive_block
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    fn has_background_separator(command: &str, escape: EscapeChar) -> bool {
+        // 只读解析器已确认的参数范围之后的分隔符，不把引号内的 & 或 && 当作后台。
+        all_parsed_commands(command, escape).any(|parsed| {
+            parsed.parts.last().is_some_and(|last| {
+                command.get(last.span.end()..).is_some_and(|tail| {
+                    let tail = tail.trim_start();
+                    tail.starts_with('&') && !tail.starts_with("&&")
+                })
+            })
+        })
+    }
+
     /// Executes the given command if the terminal session is in a valid state to accept and
     /// execute a command. Afterwards, ensures the workflows info menu and input suggestions menu
     /// are both closed.
@@ -7115,6 +7242,20 @@ impl Input {
             }
 
             log::warn!("Tried to execute command but can_execute_command was false: {reason:?}");
+            return false;
+        }
+
+        let has_received_precmd = self
+            .model
+            .lock()
+            .block_list()
+            .active_block()
+            .has_received_precmd();
+        if has_received_precmd && let Err(message) = self.try_reserve_cli_launch(command, ctx) {
+            let window_id = ctx.window_id();
+            ToastStack::handle(ctx).update(ctx, |stack, ctx| {
+                stack.add_ephemeral_toast(DismissibleToast::error(message), window_id, ctx);
+            });
             return false;
         }
 
@@ -16090,3 +16231,7 @@ impl Input {
 #[cfg(test)]
 #[path = "input_tests.rs"]
 mod tests;
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "input_cli_update_tests.rs"]
+mod cli_update_launch_tests;

@@ -75,6 +75,7 @@ async fn turn(
         match event.kind {
             RuntimeEventKind::SessionReady {
                 effective_permissions,
+                ..
             } => {
                 record_permissions(evidence, &effective_permissions, native.as_deref())
                     .map_err(|_| "permission_mode_changed")?;
@@ -294,6 +295,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "fixed_model_missing")?),
         local_tools: None,
         selected_skills: Vec::new(),

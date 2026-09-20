@@ -155,10 +155,18 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
         "executableSha256":"953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
         "denyRules":[],"sourceRules":[],"localTools":{"allow_spawn":true,"allow_message":true}});
     let effective = json!({"permissionMode":"plan","fixedProfileVerified":true,"claudeRestrictedFilesV1":profile});
-    task.config_json =
-        json!({"cli_version":"2.1.273","permission_policy":"ClaudeRestrictedFilesV1",
+    let saved_config = |version| {
+        json!({"cli_version":version,"permission_policy":"ClaudeRestrictedFilesV1",
         "claude_profile":profile,"effective_permissions":effective})
-        .to_string();
+        .to_string()
+    };
+    for version in ["2.1.273", "2.1.278"] {
+        task.config_json = saved_config(version);
+        assert!(ceiling_from_parent(&task, "claude").is_ok());
+    }
+    task.config_json = saved_config("2.1.279");
+    assert!(ceiling_from_parent(&task, "claude").is_err());
+    task.config_json = saved_config("2.1.278");
     let ceiling = ceiling_from_parent(&task, "claude").unwrap();
     assert!(ceiling.claude_profile().is_some());
     verify_effective_permissions(
@@ -199,4 +207,78 @@ fn fixed_claude_profile_requires_the_saved_policy_and_cannot_be_inferred_from_mo
         "effective_permissions":{"permissionMode":"plan","fixedProfileVerified":true}})
     .to_string();
     assert!(ceiling_from_parent(&task, "claude").is_err());
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn fixed_grok_creation_policy_binds_parent_without_claiming_native_verification() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let profile = GrokCreationPolicyV1::compile(
+        &cwd,
+        "1.0.30",
+        "a".repeat(64),
+        "b".repeat(64),
+        Some(super::super::local_tools::LocalToolPermissions {
+            allow_spawn: true,
+            allow_message: true,
+        }),
+        super::super::PermissionPolicy::GrokRestrictedReadV1,
+    )
+    .unwrap();
+    let observed = json!({"requestedPolicy":"GrokRestrictedReadV1","appCreationPolicyApplied":true,"permissionEnforcementVerified":false,"grokCreationPolicyV1":profile});
+    let mut task = parent(observed.clone());
+    task.harness = "grok".into();
+    task.working_directory = cwd.to_string_lossy().into_owned();
+    task.config_json = json!({"cli_version":"1.0.30","permission_policy":"GrokRestrictedReadV1","grok_profile":profile,"effective_permissions":observed}).to_string();
+    let ceiling = ceiling_from_parent(&task, "grok").unwrap();
+    let child = profile.derive_child(None).unwrap();
+    verify_effective_permissions(Some(&ceiling), "grok", &cwd, &json!({"requestedPolicy":"GrokRestrictedReadV1","appCreationPolicyApplied":true,"permissionEnforcementVerified":false,"grokCreationPolicyV1":child})).unwrap();
+    assert!(verify_effective_permissions(Some(&ceiling), "grok", &cwd, &json!({"requestedPolicy":"GrokRestrictedReadV1","appCreationPolicyApplied":true,"permissionEnforcementVerified":true,"grokCreationPolicyV1":child})).is_err());
+    let mut inherited: Value = serde_json::from_str(&task.config_json).unwrap();
+    inherited["permission_policy"] = json!("Inherit");
+    task.config_json = inherited.to_string();
+    assert!(ceiling_from_parent(&task, "grok").is_err());
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn fixed_file_parent_and_child_require_the_saved_and_reported_tool_set_to_match() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let profile = GrokCreationPolicyV1::compile(
+        &cwd,
+        "1.0.30",
+        "a".repeat(64),
+        "b".repeat(64),
+        Some(super::super::local_tools::LocalToolPermissions {
+            allow_spawn: true,
+            allow_message: true,
+        }),
+        super::super::PermissionPolicy::GrokRestrictedFilesV1,
+    )
+    .unwrap();
+    let observed = json!({"requestedPolicy":"GrokRestrictedFilesV1","appCreationPolicyApplied":true,
+        "permissionEnforcementVerified":false,"grokCreationPolicyV1":profile});
+    let mut task = parent(observed.clone());
+    task.harness = "grok".into();
+    task.working_directory = cwd.to_string_lossy().into_owned();
+    let config = json!({"cli_version":"1.0.30","permission_policy":"GrokRestrictedFilesV1",
+        "grok_profile":profile,"effective_permissions":observed});
+    task.config_json = config.to_string();
+    let ceiling = ceiling_from_parent(&task, "grok").unwrap();
+    let child = profile.derive_child(None).unwrap();
+    let mut actual = json!({"requestedPolicy":"GrokRestrictedFilesV1","appCreationPolicyApplied":true,
+        "permissionEnforcementVerified":false,"grokCreationPolicyV1":child});
+    verify_effective_permissions(Some(&ceiling), "grok", &cwd, &actual).unwrap();
+    actual["requestedPolicy"] = json!("GrokRestrictedReadV1");
+    assert!(verify_effective_permissions(Some(&ceiling), "grok", &cwd, &actual).is_err());
+    let mut mismatched = config.clone();
+    mismatched["permission_policy"] = json!("GrokRestrictedReadV1");
+    task.config_json = mismatched.to_string();
+    assert!(ceiling_from_parent(&task, "grok").is_err());
+    mismatched = config;
+    mismatched["effective_permissions"]["requestedPolicy"] = json!("GrokRestrictedReadV1");
+    task.config_json = mismatched.to_string();
+    assert!(ceiling_from_parent(&task, "grok").is_err());
 }

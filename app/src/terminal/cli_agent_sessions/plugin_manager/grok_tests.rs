@@ -59,6 +59,13 @@ fn native_registry_reads_verified_installed_files() {
     assert_eq!(plugin.version, PLUGIN_VERSION);
 }
 
+const LEGACY_HOOKS: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-hooks.json");
+const LEGACY_012_README: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-readme.md");
+const LEGACY_012_NOTIFY: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-notify.cjs");
+
 const LEGACY_README: &str =
     include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.0-readme.md");
 const LEGACY_NOTIFY: &str =
@@ -67,18 +74,18 @@ const LEGACY_NOTIFY: &str =
 fn write_legacy_bundle(root: &Path) -> PathBuf {
     let source = root.join("0.1.0");
     fs::create_dir_all(&source).unwrap();
-    for (name, contents) in BUNDLED_FILES {
+    for (name, _) in BUNDLED_FILES {
         let destination = source.join(name);
         fs::create_dir_all(destination.parent().unwrap()).unwrap();
         let contents = match *name {
             ".grok-plugin/plugin.json" => {
-                let mut manifest: Value = serde_json::from_str(contents).unwrap();
+                let mut manifest: Value = serde_json::from_str(LEGACY_012_MANIFEST).unwrap();
                 manifest["version"] = json!("0.1.0");
                 serde_json::to_string(&manifest).unwrap()
             }
             "README.md" => LEGACY_README.to_owned(),
             "hooks/notify.cjs" => LEGACY_NOTIFY.to_owned(),
-            "hooks/hooks.json" => contents.to_string(),
+            "hooks/hooks.json" => LEGACY_HOOKS.to_owned(),
             name => panic!("旧版配方未定义文件：{name}"),
         };
         fs::write(destination, contents).unwrap();
@@ -175,6 +182,114 @@ fn valid_legacy_readme_does_not_allow_modified_hooks_or_extra_source_files() {
         assert!(validate_expected_tree(&old, "0.1.0").is_err());
         assert_eq!(fs::read_to_string(old.join(changed)).unwrap(), "用户内容");
     }
+}
+
+const LEGACY_011_NOTIFY: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-notify.cjs");
+const LEGACY_011_README: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-readme.md");
+const LEGACY_011_ORIGINAL_README: &str = include_str!(
+    "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-original-readme.md"
+);
+
+fn write_011_bundle(root: &Path, readme: &str) -> PathBuf {
+    let source = root.join("0.1.1");
+    for (name, _) in BUNDLED_FILES {
+        let destination = source.join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        let contents = match *name {
+            ".grok-plugin/plugin.json" => {
+                let mut manifest: Value = serde_json::from_str(LEGACY_012_MANIFEST).unwrap();
+                manifest["version"] = json!("0.1.1");
+                manifest.to_string()
+            }
+            "README.md" => readme.to_owned(),
+            "hooks/notify.cjs" => LEGACY_011_NOTIFY.to_owned(),
+            "hooks/hooks.json" => LEGACY_HOOKS.to_owned(),
+            name => panic!("旧版配方未定义文件：{name}"),
+        };
+        fs::write(destination, contents).unwrap();
+    }
+    source
+}
+
+#[test]
+fn known_011_sources_and_backups_keep_original_bytes() {
+    for readme in [LEGACY_011_ORIGINAL_README, LEGACY_011_README] {
+        let directory = tempfile::tempdir().unwrap();
+        let source = write_011_bundle(directory.path(), readme);
+        let before = validate_expected_tree(&source, "0.1.1").unwrap();
+        let backup = backup_plugin(&source, directory.path()).unwrap();
+        assert_eq!(validate_expected_tree(&backup, "0.1.1").unwrap(), before);
+        write_bundle(directory.path()).unwrap();
+        assert_eq!(validate_expected_tree(&source, "0.1.1").unwrap(), before);
+        assert!(validate_expected_tree(&source, PLUGIN_VERSION).is_err());
+    }
+}
+
+#[test]
+fn modified_011_notification_or_readme_cannot_be_upgraded_as_owned_source() {
+    for name in ["hooks/notify.cjs", "README.md"] {
+        let directory = tempfile::tempdir().unwrap();
+        let source = write_011_bundle(directory.path(), LEGACY_011_README);
+        fs::write(source.join(name), "用户修改").unwrap();
+        assert!(validate_expected_tree(&source, "0.1.1").is_err());
+        assert_eq!(fs::read_to_string(source.join(name)).unwrap(), "用户修改");
+    }
+}
+
+fn write_012_bundle(root: &Path) -> PathBuf {
+    let source = root.join("0.1.2");
+    for (name, contents) in [
+        (".grok-plugin/plugin.json", LEGACY_012_MANIFEST),
+        ("hooks/hooks.json", LEGACY_HOOKS),
+        ("hooks/notify.cjs", LEGACY_012_NOTIFY),
+        ("README.md", LEGACY_012_README),
+    ] {
+        let destination = source.join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::write(destination, contents).unwrap();
+    }
+    source
+}
+
+#[test]
+fn known_012_source_and_backup_preserve_all_four_original_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = write_012_bundle(directory.path());
+    let original = validate_expected_tree(&source, "0.1.2").unwrap();
+    for (name, digest) in LEGACY_012_SHA256 {
+        assert_eq!(format!("{:x}", Sha256::digest(&original.get(*name).unwrap().contents)), *digest);
+    }
+    let backup = backup_plugin(&source, directory.path()).unwrap();
+    write_bundle(directory.path()).unwrap();
+    assert_eq!(validate_expected_tree(&source, "0.1.2").unwrap(), original);
+    assert_eq!(validate_expected_tree(&backup, "0.1.2").unwrap(), original);
+    assert!(validate_expected_tree(&source, PLUGIN_VERSION).is_err());
+}
+
+#[test]
+fn any_modified_012_recipe_file_is_rejected_without_overwriting_user_changes() {
+    for (name, _) in LEGACY_012_SHA256 {
+        let directory = tempfile::tempdir().unwrap();
+        let source = write_012_bundle(directory.path());
+        let path = source.join(name);
+        let mut changed = fs::read(&path).unwrap();
+        changed.push(b' ');
+        fs::write(&path, &changed).unwrap();
+        assert!(validate_expected_tree(&source, "0.1.2").is_err());
+        assert_eq!(fs::read(&path).unwrap(), changed);
+    }
+}
+
+#[test]
+fn new_hooks_and_other_old_versions_cannot_form_a_012_owned_recipe() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = write_012_bundle(directory.path());
+    assert!(validate_expected_tree(&source, "0.1.1").is_err());
+    assert!(validate_expected_tree(&source, "0.0.9").is_err());
+    fs::write(source.join("hooks/hooks.json"), BUNDLED_FILES[1].1).unwrap();
+    assert!(validate_expected_tree(&source, "0.1.2").is_err());
 }
 
 #[cfg(not(target_family = "wasm"))]
@@ -593,6 +708,96 @@ mod migration_async_tests {
             *runner.calls.lock().unwrap(),
             ["uninstall", "install_current", "install_recovery"]
         );
+    }
+
+    #[tokio::test]
+    async fn upgrade_011_and_failed_install_preserve_the_original_source() {
+        for fault in [Fault::None, Fault::FailBeforeInstall] {
+            let directory = tempfile::tempdir().unwrap();
+            let home = directory.path();
+            let cache = install_fixture(home);
+            let source_root = home.join("source");
+            let old = write_011_bundle(&source_root, LEGACY_011_README);
+            for (name, _) in BUNDLED_FILES {
+                fs::copy(old.join(name), cache.join(name)).unwrap();
+            }
+            let registry_path = home.join("installed-plugins/registry.json");
+            let mut registry: Value =
+                serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+            registry["repos"]["source-one"]["kind"]["source_path"] = json!(old);
+            registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("0.1.1");
+            fs::write(registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+            let previous = installed_plugin(home).unwrap().unwrap();
+            let original = plugin_tree(&old, false).unwrap();
+            let source = write_bundle(&source_root).unwrap();
+            let runner = MockMutations::new(home, &previous, &source, fault);
+            let result = upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new(),
+            )
+            .await;
+            assert_eq!(result.is_ok(), fault == Fault::None);
+            let installed = installed_plugin(home).unwrap().unwrap();
+            assert_eq!(
+                installed.version,
+                if fault == Fault::None {
+                    PLUGIN_VERSION
+                } else {
+                    "0.1.1"
+                }
+            );
+            assert_eq!(plugin_tree(&old, false).unwrap(), original);
+            validate_expected_tree(&installed.path, &installed.version).unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn upgrade_012_and_failed_install_preserve_the_original_source() {
+        for fault in [Fault::None, Fault::FailBeforeInstall] {
+            let directory = tempfile::tempdir().unwrap();
+            let home = directory.path();
+            let cache = install_fixture(home);
+            let source_root = home.join("source");
+            let old = write_012_bundle(&source_root);
+            for (name, _) in BUNDLED_FILES {
+                fs::copy(old.join(name), cache.join(name)).unwrap();
+            }
+            let registry_path = home.join("installed-plugins/registry.json");
+            let mut registry: Value =
+                serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+            registry["repos"]["source-one"]["kind"]["source_path"] = json!(old);
+            registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("0.1.2");
+            fs::write(registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+            let previous = installed_plugin(home).unwrap().unwrap();
+            let original = plugin_tree(&old, false).unwrap();
+            let source = write_bundle(&source_root).unwrap();
+            let runner = MockMutations::new(home, &previous, &source, fault);
+            let result = upgrade_plugin(
+                home,
+                &previous,
+                &source_root,
+                &source,
+                &runner,
+                &mut String::new(),
+            )
+            .await;
+            assert_eq!(result.is_ok(), fault == Fault::None);
+            let installed = installed_plugin(home).unwrap().unwrap();
+            assert_eq!(
+                installed.version,
+                if fault == Fault::None {
+                    PLUGIN_VERSION
+                } else {
+                    "0.1.2"
+                }
+            );
+            assert_eq!(plugin_tree(&old, false).unwrap(), original);
+            validate_expected_tree(&installed.path, &installed.version).unwrap();
+        }
     }
 
     #[tokio::test]

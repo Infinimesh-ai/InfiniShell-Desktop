@@ -572,7 +572,7 @@ fn restoring_images_rejects_symlink_assets_and_store() {
 }
 
 #[test]
-fn grok_preserves_text_context_but_rejects_unverified_attachments_before_writing() {
+fn grok_preserves_text_and_selected_skill_but_rejects_images_before_writing() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let text = "中文与 English\n文件上下文：note.txt\n评审意见：保留末尾换行";
@@ -580,7 +580,7 @@ fn grok_preserves_text_context_but_rejects_unverified_attachments_before_writing
         prepare_managed_input(Harness::Grok, text.into(), &[], Vec::new(), &store).unwrap(),
         vec![InputContent::Text(text.into())]
     );
-    assert!(
+    assert_eq!(
         prepare_managed_input(
             Harness::Grok,
             text.into(),
@@ -588,7 +588,14 @@ fn grok_preserves_text_context_but_rejects_unverified_attachments_before_writing
             vec![skill(directory.path())],
             &store
         )
-        .is_err()
+        .unwrap(),
+        vec![
+            InputContent::Text(text.into()),
+            InputContent::Skill {
+                name: "local-review".into(),
+                path: directory.path().join("SKILL.md")
+            }
+        ]
     );
     assert!(!store.exists());
     assert!(

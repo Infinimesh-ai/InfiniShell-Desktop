@@ -130,6 +130,7 @@ impl LiveSession {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         } = event.kind
         else {
             return Err(format!("Claude 初始化失败：{:?}", event.kind));
@@ -222,6 +223,7 @@ async fn run_turn(
         match event.kind {
             RuntimeEventKind::SessionReady {
                 effective_permissions,
+                ..
             } => {
                 // 首次 initialize 无 ID；system/init 和权限变化可再次公布状态。
                 record_permissions(evidence, &effective_permissions, native_id.as_deref())?;
@@ -439,6 +441,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: env::var("INFINISHELL_CLAUDE_LIVE_MODEL").ok(),
         local_tools: None,
         selected_skills: Vec::new(),

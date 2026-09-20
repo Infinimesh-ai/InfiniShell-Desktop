@@ -86,6 +86,7 @@ fn skill_stream_params() -> RequestParams {
             description: "测试技能".to_owned(),
             scope: SkillScope::Home,
             provider: SkillProvider::Agents,
+            user_invocable: Default::default(),
             icon_override: None,
         }],
     }]

@@ -877,6 +877,7 @@ fn real_grok_root_coordinator() {
             permission_policy: PermissionPolicy::Inherit,
             permission_ceiling: None,
             claude_profile: None,
+            grok_profile: None,
             model: None,
             local_tools: None,
             selected_skills: Vec::new(),

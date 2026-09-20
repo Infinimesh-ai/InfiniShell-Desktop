@@ -27,8 +27,8 @@ def plain_file(path, expected_sha256, root=None, executable=False):
     return path
 
 
-def verify_installed_hook(node, node_sha256, hook, hook_sha256, private_root,
-                          expected_version, environment):
+def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_sha256,
+                          private_root, expected_version, environment):
     if os.name != "posix":
         raise ValueError("unix_controlling_terminal_required")
     import fcntl
@@ -44,6 +44,7 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, private_root,
         raise ValueError("private_hook_root_invalid")
     node = plain_file(node, node_sha256, executable=True)
     hook = plain_file(hook, hook_sha256, root)
+    worker = plain_file(worker, worker_sha256, executable=True)
     # 精确白名单同时拒绝凭据与 NODE_OPTIONS 之类的运行时注入入口。
     if set(environment) != {"HOME", "GROK_HOME", "TMPDIR", "PATH"}:
         raise ValueError("hook_environment_not_isolated")
@@ -51,12 +52,10 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, private_root,
         candidate = Path(environment[name])
         if candidate.resolve(strict=True) != candidate or not candidate.is_relative_to(root):
             raise ValueError("hook_environment_path_invalid")
-    data_root = root / "installed-hook-main-data"
-    data_root.mkdir(mode=0o700)
     session = "isolated-installed-hook-main"
     env = {**environment, "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
            "GROK_HOOK_EVENT": "session_start", "GROK_SESSION_ID": session,
-           "GROK_PLUGIN_DATA": str(data_root)}
+           "WARP_CLI_AGENT_NOTIFY_EXECUTABLE": str(worker)}
     env.pop("TMUX", None)
     payload = json.dumps({"hookEventName": "session_start", "sessionId": session}).encode()
     master, slave = pty.openpty()
@@ -117,9 +116,12 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, private_root,
             raise ValueError("installed_hook_notification_invalid")
         plain_file(node, node_sha256, executable=True)
         plain_file(hook, hook_sha256, root)
-        return {"main_entry_verified": True, "notification_channel": "unix_controlling_tty",
+        plain_file(worker, worker_sha256, executable=True)
+        return {"main_entry_verified": True,
+                "notification_channel": "native_worker_to_unix_controlling_tty",
                 "event": "session_start", "agent": "grok", "plugin_version": expected_version,
-                "hook_sha256": hook_sha256, "session_id_matches": True, "node_exit_code": 0,
+                "hook_sha256": hook_sha256, "worker_sha256": worker_sha256,
+                "session_id_matches": True, "node_exit_code": 0,
                 "stdout_bytes": 0, "stderr_bytes": 0, "credentials_provided": False,
                 "model_input_submitted": False}
     finally:

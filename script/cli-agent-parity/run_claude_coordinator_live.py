@@ -12,7 +12,7 @@ import tempfile
 import uuid
 
 import run_claude_adapter_live as base
-from prepare_claude_cli import current_platform, verify_binary
+from prepare_claude_cli import RELEASE_CATALOG, VERSION, current_platform, verify_binary, verify_version
 
 
 TEST_NAME = "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child"
@@ -277,9 +277,10 @@ def _audit_inputs(output, runtime, histories, expected, metrics):
     return observed == set(executions)
 
 
-def verified_acceptance(exit_code, output, events):
+def verified_acceptance(exit_code, output, events, expected_version=VERSION):
     """校验实际持久记录及原生工具结果；结束行的布尔声明不能单独证明通过。"""
-    if (exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output)
+    if (not isinstance(expected_version, str) or expected_version not in RELEASE_CATALOG
+            or exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output)
             or not isinstance(events, list) or any(not isinstance(row, dict) for row in events)
             or any(row.get("event") in ("acceptance_failed", "cleanup_failed") for row in events)):
         return False
@@ -348,7 +349,8 @@ def verified_acceptance(exit_code, output, events):
             return False
         for task in [parent, child, *chain["parent_generations"], *chain["child_generations"]]:
             config = json.loads(task["config_json"])
-            if (config.get("claude_profile") != profile
+            if (config.get("cli_version") != expected_version
+                    or config.get("claude_profile") != profile
                     or config.get("permission_policy") != "ClaudeRestrictedFilesV1"
                     or config.get("effective_permissions", {}).get("claudeRestrictedFilesV1") != profile
                     or config.get("effective_permissions", {}).get("fixedProfileVerified") is not True
@@ -488,9 +490,14 @@ def verified_acceptance(exit_code, output, events):
 
 def run(args):
     # 先按固定发行摘要校验；不向任意 PATH 命中的程序传入 API 环境执行 --version。
-    verified_cli = verify_binary(args.claude, current_platform())
-    api_environment = base.load_api_environment(args.api_environment_file)
+    selected_version = getattr(args, "claude_version", VERSION)
+    target = current_platform()
+    verified_cli = verify_binary(args.claude, target, selected_version)
     root = Path(tempfile.mkdtemp(prefix="infinishell-claude-coordinator-")).resolve()
+    detected = verify_version(args.claude, root, selected_version)
+    if verify_binary(args.claude, target, selected_version) != verified_cli:
+        raise ValueError("原生 Claude 在版本探测期间变化")
+    api_environment = base.load_api_environment(args.api_environment_file)
     # 每次都创建全新的 HOME／配置，不接受既有原生登录域，也不复制凭据。
     args.auth_home, args.config_dir = root / "home", root / "claude"
     args.auth_home.mkdir(mode=0o700)
@@ -516,6 +523,7 @@ def run(args):
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
         "INFINISHELL_CLAUDE_LIVE_CONFIG_DIR": str(args.config_dir),
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
+        "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(raw_artifact),
         "INFINISHELL_CLAUDE_LIVE_MODEL": args.model,
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
@@ -524,7 +532,8 @@ def run(args):
     repository = Path(__file__).resolve().parents[2]
     metadata = {
         "test": TEST_NAME, "scope": SCOPE, "platform": sys.platform,
-        "cli": verified_cli, "model": args.model,
+        "cli": verified_cli, "cli_version": detected, "requested_cli_version": selected_version,
+        "model": args.model,
         "test_binary_sha256": base.digest(args.test_binary), "supervisor_binary_sha256": base.digest(args.supervisor),
         "private_workspace": str(root), "project_settings_sha256": base.digest(settings),
         "private_workspace_preserved": True, "runner_modifies_auth_configuration": False,
@@ -565,8 +574,8 @@ def run(args):
             raise
         metadata["test_exit_code"] = process.returncode
         private_output = root / "coordinator.raw.test-output.txt"
-        with private_output.open("x", encoding="utf-8") as target:
-            target.write(output)
+        with private_output.open("x", encoding="utf-8") as output_stream:
+            output_stream.write(output)
         private_output.chmod(0o600)
         metadata["private_test_output_filename"] = private_output.name
         metadata["private_test_output_sha256"] = base.digest(private_output)
@@ -574,16 +583,18 @@ def run(args):
         raw_events = [json.loads(line) for line in raw_artifact.read_text(encoding="utf-8").splitlines() if line.strip()]
         # 验收先审核私有全树，再审核公开摘要；删除字段不能把失败记录变成通过。
         private_verified = verified_acceptance(process.returncode, output,
-            [base.sanitize_event(row, redact) for row in raw_events])
+            [base.sanitize_event(row, redact) for row in raw_events], selected_version)
         events = project_public_events(raw_events, redact)
         metadata["private_raw_evidence_sha256"] = base.digest(raw_artifact)
         metadata["private_event_count"] = len(raw_events)
         metadata["public_event_count"] = len(events)
         metadata["project_settings_unchanged"] = base.digest(settings) == metadata["project_settings_sha256"]
         metadata["denied_read_fixture_unchanged"] = base.digest(blocked) == blocked_digest
+        metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_version) == verified_cli
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
             and metadata["project_settings_unchanged"] and metadata["denied_read_fixture_unchanged"]
-            and private_verified and verified_acceptance(process.returncode, output, events))
+            and metadata["cli_binary_unchanged"]
+            and private_verified and verified_acceptance(process.returncode, output, events, selected_version))
         metadata["automatic_result_delivery_ack_verified"] = metadata["acceptance_passed"]
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         metadata["runner_error"] = redact(f"{type(error).__name__}: {error}")
@@ -604,6 +615,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-binary", type=Path, required=True)
     parser.add_argument("--claude", type=Path, required=True)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
+                        help="精确官方版本；缺省保留 2.1.273")
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--api-environment-file", type=Path, required=True)
     parser.add_argument("--model", required=True)

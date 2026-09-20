@@ -46,7 +46,9 @@ use crate::persistence::local_cli_tasks::load_task_messages;
 use crate::persistence::model::{
     LocalCliMessage, LocalCliMessageState, LocalCliReceiptKind, LocalCliTask, LocalCliTaskState,
 };
-use crate::terminal::cli_agent::{CLIAgent, CLIAgentInstallModel, CLIAgentVersionStatus};
+use crate::terminal::cli_agent::{
+    CLIAgent, CLIAgentInstallModel, CLIAgentInstallation, CLIAgentVersionStatus,
+};
 use crate::view_components::action_button::{
     ActionButton, DangerPrimaryTheme, NakedTheme, PrimaryTheme, SecondaryTheme,
 };
@@ -143,6 +145,8 @@ struct SavedLaunchOptions {
     permission_ceiling: Option<super::permissions::ParentPermissionCeiling>,
     #[serde(default)]
     claude_profile: Option<super::permissions::ClaudeRestrictedFilesV1>,
+    #[serde(default)]
+    grok_profile: Option<super::permissions::GrokCreationPolicyV1>,
     model: Option<String>,
     #[serde(default)]
     local_tools: Option<LocalToolPermissions>,
@@ -370,6 +374,8 @@ impl LocalCLITaskManagerView {
             PermissionPolicy::ReadOnly,
             PermissionPolicy::WorkspaceWrite,
             PermissionPolicy::ClaudeRestrictedFilesV1,
+            PermissionPolicy::GrokRestrictedReadV1,
+            PermissionPolicy::GrokRestrictedFilesV1,
         ]
         .into_iter()
         .map(|permission| {
@@ -536,9 +542,12 @@ impl LocalCLITaskManagerView {
                 .as_ref()
                 .map(|options| options.permission_policy)
                 .unwrap_or(PermissionPolicy::Inherit);
-            self.local_tools = saved
-                .and_then(|options| options.local_tools)
-                .unwrap_or_default();
+            self.local_tools = supported_local_tools(
+                self.harness,
+                self.permission,
+                saved.and_then(|options| options.local_tools),
+            )
+            .unwrap_or_default();
             self.directory.update(ctx, |editor, ctx| {
                 editor.set_buffer_text(&task.working_directory, ctx)
             });
@@ -697,21 +706,28 @@ impl LocalCLITaskManagerView {
         self.restore_saved_composer(task_id, recipient_generation, id, input, ctx)
     }
 
-    fn executable(&self, harness: Harness, ctx: &AppContext) -> Option<PathBuf> {
+    fn verified_installation(
+        &self,
+        harness: Harness,
+        ctx: &AppContext,
+    ) -> Option<CLIAgentInstallation> {
         let agent = match harness {
             Harness::Codex => CLIAgent::Codex,
             Harness::Claude => CLIAgent::Claude,
             Harness::Grok => CLIAgent::Grok,
             Harness::Oz | Harness::Gemini | Harness::OpenCode | Harness::Unknown => return None,
         };
-        let installation = CLIAgentInstallModel::as_ref(ctx).installation(agent)?;
+        let installation = CLIAgentInstallModel::as_ref(ctx)
+            .installation(agent)?
+            .clone();
         if !verified_version(harness, &installation.version) {
             return None;
         }
         installation
             .executable
-            .clone()
-            .filter(|path| path.is_absolute())
+            .as_ref()
+            .filter(|path| path.is_absolute())?;
+        Some(installation)
     }
 
     fn start_prepared(
@@ -727,9 +743,19 @@ impl LocalCLITaskManagerView {
         if !resume && self.selected_task.is_some() {
             return Err(crate::t!("cli-agent-task-invalid-launch"));
         }
-        let executable = self
-            .executable(self.harness, ctx)
+        let installation = self
+            .verified_installation(self.harness, ctx)
             .ok_or_else(|| crate::t!("cli-agent-managed-version-unavailable"))?;
+        if !permission_supported_for_version(
+            self.harness,
+            self.permission,
+            Some(&installation.version),
+        ) {
+            return Err(crate::t!("cli-agent-managed-version-unavailable"));
+        }
+        let executable = installation
+            .executable
+            .expect("已验证的 CLI 安装必须包含绝对路径");
         let prompt = composer
             .as_ref()
             .map(|snapshot| snapshot.text.clone())
@@ -760,6 +786,7 @@ impl LocalCLITaskManagerView {
                 permission_policy: self.permission,
                 permission_ceiling: None,
                 claude_profile: None,
+                grok_profile: None,
                 model: None,
                 selected_skills: input
                     .iter()
@@ -771,8 +798,12 @@ impl LocalCLITaskManagerView {
                         InputContent::Text(_) | InputContent::LocalImage(_) => None,
                     })
                     .collect(),
-                local_tools: (self.local_tools.allow_spawn || self.local_tools.allow_message)
-                    .then_some(self.local_tools),
+                local_tools: supported_local_tools(
+                    self.harness,
+                    self.permission,
+                    (self.local_tools.allow_spawn || self.local_tools.allow_message)
+                        .then_some(self.local_tools),
+                ),
             };
             let task = LocalCliTask {
                 version: 1,
@@ -803,8 +834,13 @@ impl LocalCLITaskManagerView {
             permission_policy: saved.permission_policy,
             permission_ceiling: saved.permission_ceiling,
             claude_profile: saved.claude_profile,
+            grok_profile: saved.grok_profile,
             model: saved.model,
-            local_tools: saved.local_tools,
+            local_tools: supported_local_tools(
+                self.harness,
+                saved.permission_policy,
+                saved.local_tools,
+            ),
             selected_skills: saved.selected_skills,
         };
         let initial_message_id = Uuid::new_v4();
@@ -1205,6 +1241,17 @@ impl LocalCLITaskManagerView {
         let preparing =
             self.managed_input.preparing.is_some() || self.managed_input.processing_images;
         let enabled = FeatureFlag::LocalCLIManagedTasks.is_enabled();
+        let installation = self.verified_installation(self.harness, ctx);
+        let selected_permission_supported = installation.as_ref().is_some_and(|installation| {
+            permission_supported_for_version(
+                self.harness,
+                self.permission,
+                Some(&installation.version),
+            )
+        });
+        let p0_grok = installation
+            .as_ref()
+            .is_some_and(|installation| grok_p0_installation(self.harness, &installation.version));
         for (key, disabled) in [
             (
                 "start",
@@ -1212,7 +1259,8 @@ impl LocalCLITaskManagerView {
                     || self.selected_task.is_some()
                     || text_empty
                     || preparing
-                    || self.executable(self.harness, ctx).is_none(),
+                    || installation.is_none()
+                    || !selected_permission_supported,
             ),
             (
                 "send",
@@ -1271,24 +1319,51 @@ impl LocalCLITaskManagerView {
                 button.set_disabled(self.selected_task.is_some(), ctx);
             });
         }
-        for (key, active) in [
-            ("allow-spawn", self.local_tools.allow_spawn),
-            ("allow-messages", self.local_tools.allow_message),
+        for (key, active, unsupported) in [
+            (
+                "allow-spawn",
+                self.local_tools.allow_spawn,
+                p0_grok
+                    || (self.harness == Harness::Grok
+                        && !matches!(
+                            self.permission,
+                            PermissionPolicy::GrokRestrictedReadV1
+                                | PermissionPolicy::GrokRestrictedFilesV1
+                        )),
+            ),
+            ("allow-messages", self.local_tools.allow_message, p0_grok),
         ] {
             self.buttons[key].update(ctx, |button, ctx| {
                 button.set_active(active, ctx);
-                button.set_disabled(
-                    self.selected_task.is_some() || self.harness == Harness::Grok,
+                button.set_disabled(self.selected_task.is_some() || unsupported, ctx);
+                button.set_tooltip(
+                    unsupported.then(|| crate::t!("cli-task-manager-grok-spawn-unavailable")),
                     ctx,
                 );
             });
         }
         for (permission, button) in &self.permission_buttons {
             button.update(ctx, |button, ctx| {
+                button.set_label(
+                    permission_name_for_version(
+                        self.harness,
+                        *permission,
+                        installation
+                            .as_ref()
+                            .map(|installation| &installation.version),
+                    ),
+                    ctx,
+                );
                 button.set_active(*permission == self.permission, ctx);
                 button.set_disabled(
                     self.selected_task.is_some()
-                        || !permission_supported(self.harness, *permission),
+                        || !permission_supported_for_version(
+                            self.harness,
+                            *permission,
+                            installation
+                                .as_ref()
+                                .map(|installation| &installation.version),
+                        ),
                     ctx,
                 );
             });
@@ -1455,7 +1530,15 @@ impl View for LocalCLITaskManagerView {
         body.add_child(self.text(crate::t!("cli-task-manager-local-only"), appearance));
         body.add_child(self.row(&["new", "refresh", "close"]));
         body.add_child(self.render_installation(ctx, appearance));
-        body.add_child(self.text(crate::t!("cli-task-manager-grok-unavailable"), appearance));
+        let grok_description = if self
+            .verified_installation(Harness::Grok, ctx)
+            .is_some_and(|installation| grok_p0_installation(Harness::Grok, &installation.version))
+        {
+            crate::t!("cli-task-manager-grok-p0-verification")
+        } else {
+            crate::t!("cli-task-manager-grok-unavailable")
+        };
+        body.add_child(self.text(grok_description, appearance));
         body.add_child(self.text(
             crate::t!("cli-task-manager-claude-verification"),
             appearance,
@@ -1487,9 +1570,21 @@ impl View for LocalCLITaskManagerView {
                 .finish(),
         );
         body.add_child(self.text(crate::t!("cli-task-manager-permission"), appearance));
-        let mut permissions = Flex::row();
+        // 固定策略名称较长，Grok 纵向排列，避免两种语言的新选项挤出面板。
+        let mut permissions = if self.harness == Harness::Grok {
+            Flex::column()
+        } else {
+            Flex::row()
+        };
+        let installation = self.verified_installation(self.harness, ctx);
         for (permission, button) in &self.permission_buttons {
-            if !permission_supported(self.harness, *permission) {
+            if !permission_supported_for_version(
+                self.harness,
+                *permission,
+                installation
+                    .as_ref()
+                    .map(|installation| &installation.version),
+            ) {
                 continue;
             }
             permissions.add_child(
@@ -1499,14 +1594,15 @@ impl View for LocalCLITaskManagerView {
             );
         }
         body.add_child(permissions.finish());
-        body.add_child(self.text(
-            if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
-                crate::t!("cli-task-manager-permission-claude-files-help")
-            } else {
-                crate::t!("cli-task-manager-permission-inherit-help")
-            },
-            appearance,
-        ));
+        if let Some(help) = permission_help_for_version(
+            self.harness,
+            self.permission,
+            installation
+                .as_ref()
+                .map(|installation| &installation.version),
+        ) {
+            body.add_child(self.text(help, appearance));
+        }
         body.add_child(self.text(crate::t!("cli-task-manager-tools-title"), appearance));
         body.add_child(self.row(&["allow-spawn", "allow-messages"]));
         body.add_child(self.text(crate::t!("cli-task-manager-tools-help"), appearance));
@@ -1761,10 +1857,18 @@ impl TypedActionView for LocalCLITaskManagerView {
             TaskManagerAction::SelectHarness(harness) => {
                 if self.selected_task.is_none() {
                     self.harness = *harness;
+                    let p0_grok =
+                        self.verified_installation(*harness, ctx)
+                            .is_some_and(|installation| {
+                                grok_p0_installation(*harness, &installation.version)
+                            });
                     self.permission = PermissionPolicy::Inherit;
-                    if *harness == Harness::Grok {
-                        self.local_tools = LocalToolPermissions::default();
-                    }
+                    self.local_tools = if p0_grok {
+                        LocalToolPermissions::default()
+                    } else {
+                        supported_local_tools(*harness, self.permission, Some(self.local_tools))
+                            .unwrap_or_default()
+                    };
                     self.input_generation = Uuid::new_v4();
                     self.managed_input.preparing = None;
                     self.prompt.update(ctx, |editor, ctx| {
@@ -1774,19 +1878,49 @@ impl TypedActionView for LocalCLITaskManagerView {
                 Ok(())
             }
             TaskManagerAction::SelectPermission(permission) => {
-                if self.selected_task.is_none() && permission_supported(self.harness, *permission) {
+                let installation = self.verified_installation(self.harness, ctx);
+                if self.selected_task.is_none()
+                    && permission_supported_for_version(
+                        self.harness,
+                        *permission,
+                        installation
+                            .as_ref()
+                            .map(|installation| &installation.version),
+                    )
+                {
                     self.permission = *permission;
+                    self.local_tools =
+                        supported_local_tools(self.harness, *permission, Some(self.local_tools))
+                            .unwrap_or_default();
                 }
                 Ok(())
             }
             TaskManagerAction::ToggleSpawn => {
-                if self.selected_task.is_none() && self.harness != Harness::Grok {
+                let p0_grok =
+                    self.verified_installation(self.harness, ctx)
+                        .is_some_and(|installation| {
+                            grok_p0_installation(self.harness, &installation.version)
+                        });
+                if self.selected_task.is_none()
+                    && !p0_grok
+                    && (self.harness != Harness::Grok
+                        || matches!(
+                            self.permission,
+                            PermissionPolicy::GrokRestrictedReadV1
+                                | PermissionPolicy::GrokRestrictedFilesV1
+                        ))
+                {
                     self.local_tools.allow_spawn = !self.local_tools.allow_spawn;
                 }
                 Ok(())
             }
             TaskManagerAction::ToggleMessages => {
-                if self.selected_task.is_none() && self.harness != Harness::Grok {
+                let p0_grok =
+                    self.verified_installation(self.harness, ctx)
+                        .is_some_and(|installation| {
+                            grok_p0_installation(self.harness, &installation.version)
+                        });
+                if self.selected_task.is_none() && !p0_grok {
                     self.local_tools.allow_message = !self.local_tools.allow_message;
                 }
                 Ok(())
@@ -2095,6 +2229,25 @@ fn merge_tasks(
     tasks.into_values().collect()
 }
 
+// 保存、恢复与切换 CLI 共用能力限制；旧配置不能重新打开未验证的子任务权限。
+fn supported_local_tools(
+    harness: Harness,
+    policy: PermissionPolicy,
+    permissions: Option<LocalToolPermissions>,
+) -> Option<LocalToolPermissions> {
+    permissions.map(|mut permissions| {
+        if harness == Harness::Grok
+            && !matches!(
+                policy,
+                PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+            )
+        {
+            permissions.allow_spawn = false;
+        }
+        permissions
+    })
+}
+
 fn resumed_task(previous: &LocalCliTask) -> Result<(LocalCliTask, SessionTarget), String> {
     // 没有已连接的协调器不代表旧 PTY 已结束；未确认的运行仍占用当前代。
     match previous.state {
@@ -2167,10 +2320,25 @@ fn input_action_with_content(
 fn verified_version(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
     match (harness, version) {
         (Harness::Codex, CLIAgentVersionStatus::Detected(version)) => version == "0.147.0",
-        (Harness::Claude, CLIAgentVersionStatus::Detected(version)) => version == "2.1.273",
-        (Harness::Grok, CLIAgentVersionStatus::Detected(version)) => version == "1.0.30",
+        (Harness::Claude, CLIAgentVersionStatus::Detected(version)) => {
+            super::claude::supported_version(version)
+        }
+        (Harness::Grok, CLIAgentVersionStatus::Detected(version)) => matches!(
+            version.as_str(),
+            super::grok::VERIFIED_VERSION | super::grok::P0_VERIFIED_VERSION
+        ),
         _ => false,
     }
+}
+
+fn grok_p0_installation(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
+    matches!(
+        (harness, version),
+        (
+            Harness::Grok,
+            CLIAgentVersionStatus::Detected(version)
+        ) if version == super::grok::P0_VERIFIED_VERSION
+    )
 }
 
 fn harness_name(harness: Harness) -> String {
@@ -2192,6 +2360,56 @@ fn permission_name(permission: PermissionPolicy) -> String {
         PermissionPolicy::ClaudeRestrictedFilesV1 => {
             crate::t!("cli-task-manager-permission-claude-files")
         }
+        PermissionPolicy::GrokRestrictedReadV1 => {
+            crate::t!("cli-task-manager-permission-grok-read")
+        }
+        PermissionPolicy::GrokRestrictedFilesV1 => {
+            crate::t!("cli-task-manager-permission-grok-files")
+        }
+    }
+}
+
+fn permission_name_for_version(
+    harness: Harness,
+    permission: PermissionPolicy,
+    version: Option<&CLIAgentVersionStatus>,
+) -> String {
+    if permission == PermissionPolicy::Inherit
+        && version.is_some_and(|version| grok_p0_installation(harness, version))
+    {
+        crate::t!("cli-task-manager-permission-grok-p0")
+    } else {
+        permission_name(permission)
+    }
+}
+
+fn permission_help(permission: PermissionPolicy) -> Option<String> {
+    match permission {
+        PermissionPolicy::Inherit => Some(crate::t!("cli-task-manager-permission-inherit-help")),
+        PermissionPolicy::ClaudeRestrictedFilesV1 => {
+            Some(crate::t!("cli-task-manager-permission-claude-files-help"))
+        }
+        PermissionPolicy::GrokRestrictedReadV1 => {
+            Some(crate::t!("cli-task-manager-permission-grok-read-help"))
+        }
+        PermissionPolicy::GrokRestrictedFilesV1 => {
+            Some(crate::t!("cli-task-manager-permission-grok-files-help"))
+        }
+        PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => None,
+    }
+}
+
+fn permission_help_for_version(
+    harness: Harness,
+    permission: PermissionPolicy,
+    version: Option<&CLIAgentVersionStatus>,
+) -> Option<String> {
+    if permission == PermissionPolicy::Inherit
+        && version.is_some_and(|version| grok_p0_installation(harness, version))
+    {
+        Some(crate::t!("cli-task-manager-permission-grok-p0-help"))
+    } else {
+        permission_help(permission)
     }
 }
 
@@ -2200,7 +2418,24 @@ fn permission_supported(harness: Harness, permission: PermissionPolicy) -> bool 
         PermissionPolicy::Inherit => true,
         PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => harness == Harness::Codex,
         PermissionPolicy::ClaudeRestrictedFilesV1 => harness == Harness::Claude,
+        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1 => {
+            harness == Harness::Grok
+        }
     }
+}
+
+fn permission_supported_for_version(
+    harness: Harness,
+    permission: PermissionPolicy,
+    version: Option<&CLIAgentVersionStatus>,
+) -> bool {
+    if !permission_supported(harness, permission) {
+        return false;
+    }
+    if version.is_some_and(|version| grok_p0_installation(harness, version)) {
+        return permission == PermissionPolicy::Inherit;
+    }
+    true
 }
 
 fn task_state_name(state: LocalCliTaskState) -> String {

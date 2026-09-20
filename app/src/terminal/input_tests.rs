@@ -9394,6 +9394,9 @@ fn test_custom_terminal_page_scroll_binding_applies_when_prompt_is_focused() {
 // Helper: open the CLI-agent rich input for the terminal view under test.
 fn open_rich_input_for_terminal(terminal: &ViewHandle<TerminalView>, app: &mut App) {
     terminal.update(app, |view, ctx| {
+        view.model
+            .lock()
+            .simulate_long_running_block(crate::terminal::CLIAgent::Claude.command_prefix(), "");
         let view_id = view.view_id();
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
             sessions.set_session(
@@ -9659,6 +9662,7 @@ fn ctrl_enter_submits_when_submit_on_ctrl_enter_is_true() {
             "Ctrl+Enter must NOT emit Event::CtrlEnter when submit_on_ctrl_enter=true"
         );
 
+        warpui::r#async::Timer::after(Duration::from_millis(100)).await;
         input.read(&app, |input, ctx| {
             assert!(
                 input.buffer_text(ctx).is_empty(),
@@ -9729,6 +9733,7 @@ fn ctrl_enter_with_selection_preserves_selection_in_submit_when_setting_is_true(
             "submitted text must equal the full buffer — selected text must not be dropped"
         );
 
+        warpui::r#async::Timer::after(Duration::from_millis(100)).await;
         input.read(&app, |input, ctx| {
             assert!(
                 input.buffer_text(ctx).is_empty(),

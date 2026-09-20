@@ -9,7 +9,7 @@ use regex::Regex;
 use thiserror::Error;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 
-use super::parser::parse_markdown_content;
+use super::parser::{SkillUserInvocable, parse_markdown_content};
 use super::skill_provider::{SkillProvider, SkillScope, get_provider_for_path, get_scope_for_path};
 
 const MAX_SKILL_DESCRIPTION_CHARS: usize = 512;
@@ -91,6 +91,13 @@ pub struct ParsedSkill {
 }
 
 impl ParsedSkill {
+    /// 从完整内容生成菜单元数据，历史和远端技能使用同一解析规则。
+    pub fn user_invocable(&self) -> SkillUserInvocable {
+        parse_markdown_content(&self.content)
+            .map(|parsed| parsed.user_invocable)
+            .unwrap_or_default()
+    }
+
     /// Returns true if this skill is bundled with InfiniShell (not a user-editable file).
     pub fn is_bundled(&self) -> bool {
         self.scope == SkillScope::Bundled

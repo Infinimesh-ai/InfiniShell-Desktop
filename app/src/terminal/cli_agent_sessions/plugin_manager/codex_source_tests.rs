@@ -4,6 +4,9 @@ use super::*;
 #[path = "codex_source_live_tests.rs"]
 mod live_tests;
 
+#[path = "codex_source_recovery_tests.rs"]
+mod recovery_tests;
+
 fn private_home() -> (TempDir, PathBuf) {
     let directory = tempfile::tempdir().unwrap();
     let home = directory.path().canonicalize().unwrap();
@@ -184,7 +187,9 @@ fn copy_plugin(home: &Path, name: &str, destination: &Path) {
 
 fn prepared(home: &Path) -> (TempDir, PathBuf, Scope, Scope) {
     materialize(home).unwrap();
-    let transaction = TempDir::new_in(home).unwrap();
+    let transactions = home.join("plugins/infinishell-transactions");
+    fs::create_dir_all(&transactions).unwrap();
+    let transaction = TempDir::new_in(transactions).unwrap();
     let staged = transaction.path().join("staged-warp");
     copy_plugin(home, "warp", &staged);
     let original = Scope::read(&config(home), "warp@codex-warp");

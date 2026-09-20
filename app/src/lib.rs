@@ -774,6 +774,11 @@ pub fn run() -> Result<()> {
 fn run_worker_command(worker: &warp_cli::WorkerCommand) -> Result<()> {
     match worker {
         #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+        warp_cli::WorkerCommand::CliAgentNotify { protocol_version } => {
+            crate::terminal::cli_agent_hook_writer::run_worker(*protocol_version)
+                .map_err(Into::into)
+        }
+        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
         warp_cli::WorkerCommand::CliAgentSupervisor { manifest, execute } => {
             crate::ai::cli_agent_runtime::managed_process::run_worker(manifest, *execute)
                 .map_err(Into::into)
@@ -2089,7 +2094,11 @@ pub(crate) fn initialize_app(
     ctx.add_singleton_model(BlocklistAIPermissions::new);
     ctx.add_singleton_model(ai::blocklist::orchestration_events::OrchestrationEventService::new);
     #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
-    ctx.add_singleton_model(ai::cli_agent_runtime::conversation_bridge::LocalCLIConversationBridge::new);
+    ctx.add_singleton_model(
+        ai::cli_agent_runtime::conversation_bridge::LocalCLIConversationBridge::new,
+    );
+    #[cfg(not(target_family = "wasm"))]
+    terminal::cli_agent::init_cli_agent_updates(ctx);
     // Zap:上游在这里还注册 `LocalAgentTaskSyncModel` 与 `OrchestrationEventStreamer`
     // 两个单例。它们分别依赖已删除的 `warp_graphql` 与云端 `server_api`
     // (`ServerApiProvider`),在本地优先形态下整条链路已下线,故不再注册。

@@ -7,11 +7,15 @@ import json
 import os
 from pathlib import Path
 import re
+import platform
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
+
+
+from codex_windows_hook_inputs import verify_codex
 
 
 TEST_NAME = ("terminal::cli_agent_sessions::plugin_manager::codex_source::tests::"
@@ -22,10 +26,14 @@ CASES = {"modified_rev3_source", "mixed_cache", "unknown_source", "disabled_targ
 
 def isolated_environment(root, codex):
     # 不继承认证、代理、shell 启动文件或进程注入配置；不读取原生登录资料。
-    environment = {key: os.environ[key] for key in ("PATH", "LANG", "LC_ALL") if key in os.environ}
+    allowed = {"PATH", "LANG", "LC_ALL", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT"}
+    environment = {key.upper(): value for key, value in os.environ.items() if key.upper() in allowed}
+    if sys.platform == "win32" and any(not environment.get(key) for key in ("SYSTEMROOT", "COMSPEC", "PATHEXT")):
+        raise ValueError("Windows 原生安装验收缺少系统环境；不得借用用户配置补齐")
     environment["PATH"] = str(codex.parent) + os.pathsep + environment.get("PATH", os.defpath)
     paths = {
         "HOME": root / "home", "USERPROFILE": root / "home", "CODEX_HOME": root / "codex",
+        "APPDATA": root / "home/AppData/Roaming", "LOCALAPPDATA": root / "home/AppData/Local",
         "XDG_CONFIG_HOME": root / "home/.config", "XDG_DATA_HOME": root / "home/.local/share",
         "XDG_CACHE_HOME": root / "home/.cache", "TMPDIR": root / "tmp",
         "TMP": root / "tmp", "TEMP": root / "tmp",
@@ -34,14 +42,15 @@ def isolated_environment(root, codex):
         path.mkdir(parents=True, mode=0o700, exist_ok=True)
         environment[key] = str(path)
     (root / "project").mkdir(mode=0o700)
-    (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8")
-    (root / ".infinishell-codex-source-probe").write_text(MARKER, encoding="utf-8")
+    (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8", newline="\n")
+    (root / ".infinishell-codex-source-probe").write_text(MARKER, encoding="utf-8", newline="\n")
     environment["INFINISHELL_CODEX_SOURCE_ROOT"] = str(root)
     return environment
 
 
-def verified_acceptance(exit_code, output, events):
-    if exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
+def verified_acceptance(exit_code, output, events, host_platform):
+    expected_platform = {"darwin": "macos", "linux": "linux", "win32": "windows"}.get(host_platform)
+    if expected_platform is None or exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
         return False
     if any(not isinstance(event, dict) for event in events):
         return False
@@ -54,28 +63,33 @@ def verified_acceptance(exit_code, output, events):
     started, probe, fixture, first, migration, repeat, repeated, *tail = events
     rejections, completed = tail[:-1], tail[-1]
     return (started.get("scope") == "production_rust_installer"
+            and started.get("schema_version") == 2 and started.get("platform") == expected_platform
             and started.get("credentials_provided") is False and started.get("model_commands_sent") == 0
             and probe.get("succeeded") is True
             and fixture.get("initial_installation") == "controlled_exact_rev3_fixture"
             and fixture.get("source_files") == 36 and fixture.get("cache_files") == 10
             and fixture.get("trust_fixture_is_not_native_authorization") is True
             and first.get("phase") == "rev3_to_rev4" and first.get("succeeded") is True
+            and first.get("native_command_invoked") is True
             and all(migration.get(key) is True for key in (
                 "rev4_source_and_cache_verified", "old_source_and_metadata_preserved",
                 "old_cache_and_transaction_preserved", "user_configuration_and_trust_preserved",
                 "disabled_orchestration_preserved"))
             and migration.get("transaction_phase") == "verified"
             and repeat.get("phase") == "repeat_rev4_install" and repeat.get("succeeded") is True
+            and repeat.get("native_command_invoked") is False
             and repeated.get("previous_recovery_material_preserved") is True
+            and all(type(event.get("case")) is str for event in rejections)
             and {event.get("case") for event in rejections} == CASES
             and all(event.get("rejected") is True and event.get("bytes_and_modes_unchanged") is True
                     and event.get("native_command_invoked") is False
                     and event.get("rev4_source_created") is False for event in rejections)
             and completed.get("passed") is True and completed.get("rejected_cases") == 4
             and completed.get("model_commands_sent") == 0
+            and completed.get("windows_product_gate_opened") is (host_platform == "win32")
             and all(completed.get(key) is False for key in (
                 "hook_authorization_performed", "native_hook_execution_verified",
-                "windows_product_gate_opened", "gui_verified")))
+                "gui_verified")))
 
 
 def digest(path):
@@ -91,8 +105,18 @@ def sanitize(text, root):
     return re.sub(r"(?:sk-[A-Za-z0-9_-]{16,}|Bearer [A-Za-z0-9_.-]+)", "<redacted>", text)
 
 
-def stop_group(process):
-    # 失败时只声明尝试终止本运行器的 Unix 进程组，不冒充监督者的完整进程树证明。
+def stop_group(process, environment):
+    # 超时仍失败；Windows taskkill 仅是收尾尝试，不冒充监督者 Job 完整进程树证明。
+    if sys.platform == "win32":
+        taskkill = Path(environment["SYSTEMROOT"]) / "System32/taskkill.exe"
+        subprocess.run([str(taskkill), "/PID", str(process.pid), "/T", "/F"], env=environment,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False, timeout=10)
+        try:
+            return process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            return process.communicate(timeout=5)
+    # Unix 保留已有进程组边界。
     for sig in (signal.SIGTERM, signal.SIGKILL):
         try:
             os.killpg(process.pid, sig)
@@ -106,17 +130,18 @@ def stop_group(process):
 
 
 def run_command(command, root, environment, timeout):
-    process = subprocess.Popen(command, cwd=root / "project", env=environment, start_new_session=True,
+    options = {"creationflags": 0x00000200} if sys.platform == "win32" else {"start_new_session": True}
+    process = subprocess.Popen(command, cwd=root / "project", env=environment, **options,
                                text=True, encoding="utf-8", errors="replace",
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
         output = process.communicate(timeout=timeout)[0]
         return process.returncode, output, False
     except subprocess.TimeoutExpired:
-        output = stop_group(process)[0]
+        output = stop_group(process, environment)[0]
         return process.returncode, output, True
     except BaseException:
-        stop_group(process)
+        stop_group(process, environment)
         raise
 
 
@@ -125,13 +150,20 @@ def artifact_paths(output):
 
 
 def validate_inputs(args, repository):
-    if sys.platform not in ("darwin", "linux"):
-        raise ValueError("当前生产插件门控仅允许 macOS/Linux；Windows 不能计为通过")
+    if sys.platform not in ("darwin", "linux", "win32"):
+        raise ValueError("当前生产插件验收仅支持 macOS、Linux 与 Windows x64")
+    if sys.platform == "win32" and platform.machine().lower() not in ("amd64", "x86_64"):
+        raise ValueError("Windows 原生通知安装仅验证 x64")
     for path in (args.test_binary, args.codex):
         if not path.is_file() or not os.access(path, os.X_OK):
             raise ValueError(f"需要可执行的原生文件：{path}")
-    if args.codex.name != "codex":
-        raise ValueError("固定 CLI 的原生可执行文件必须名为 codex，确保生产 PATH 探针选择同一文件")
+    expected_name = "codex.exe" if sys.platform == "win32" else "codex"
+    actual_name = args.codex.name.lower() if sys.platform == "win32" else args.codex.name
+    if actual_name != expected_name:
+        raise ValueError(f"固定 CLI 必须名为 {expected_name}，确保生产 PATH 探针选择同一原生文件")
+    if sys.platform == "win32":
+        # 复用已有官方摘要与无链接输入校验，不信任单独的 --version 文本。
+        verify_codex(args.codex, "x86_64")
     if not 30 <= args.timeout <= 900:
         raise ValueError("超时必须为 30–900 秒")
     paths = artifact_paths(args.output)
@@ -164,10 +196,11 @@ def run(args):
     args.output.parent.mkdir(parents=True, exist_ok=True)
     evidence_path, metadata_path, output_path = artifact_paths(args.output)
     root = Path(tempfile.mkdtemp(prefix="infinishell-codex-source-")).resolve()
-    metadata = {"schema_version": 1, "test": TEST_NAME, "scope": "production_rust_installer",
+    metadata = {"schema_version": 2, "test": TEST_NAME, "scope": "production_rust_installer",
                 "platform": sys.platform, "credentials_provided": False, "model_commands_sent": 0,
                 "native_hook_execution_verified": False, "hook_authorization_performed": False,
-                "windows_product_gate_opened": False, "app_restart_and_ui_verified": False,
+                "windows_product_gate_opened": False, "product_installer_exercised": False,
+                "app_restart_and_ui_verified": False,
                 "supervised_process_tree_cleanup_verified": False, "accepted": False}
     output, accepted = "", False
     try:
@@ -191,8 +224,10 @@ def run(args):
         events = []
         if evidence_path.exists():
             events = [json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line]
-        accepted = not timed_out and verified_acceptance(code, test_output, events)
+        accepted = not timed_out and verified_acceptance(code, test_output, events, sys.platform)
         metadata["rust_migration_acceptance_verified"] = accepted
+        metadata["product_installer_exercised"] = accepted
+        metadata["windows_product_gate_opened"] = accepted and sys.platform == "win32"
     except Exception as error:
         metadata["error"] = f"{type(error).__name__}: {error}"
     finally:

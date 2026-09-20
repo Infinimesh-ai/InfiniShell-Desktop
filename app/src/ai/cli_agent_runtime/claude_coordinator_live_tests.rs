@@ -394,6 +394,7 @@ async fn drive(
         permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: Some(model.clone()),
         local_tools: Some(LocalToolPermissions {
             allow_spawn: true,
@@ -694,6 +695,12 @@ async fn shutdown(
 #[test]
 #[ignore = "仅由显式私有API运行器执行，调用真实模型并产生费用"]
 fn real_claude_fixed_profile_parent_child() {
+    // 运行器预期值只用于安装快照；可信版本仍由真实探测与 system/init 配对后落库。
+    let expected_version = match env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION") {
+        Ok(version) if matches!(version.as_str(), "2.1.273" | "2.1.278") => version,
+        Err(env::VarError::NotPresent) => "2.1.273".to_owned(),
+        Ok(_) | Err(env::VarError::NotUnicode(_)) => panic!("未验证的 Claude 验收版本"),
+    };
     let root =
         PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").expect("必须由隔离运行器启动"))
             .canonicalize()
@@ -739,7 +746,7 @@ fn real_claude_fixed_profile_parent_child() {
                 CLIAgent::Claude,
                 CLIAgentInstallation {
                     executable: Some(executable),
-                    version: CLIAgentVersionStatus::Detected("2.1.273".into()),
+                    version: CLIAgentVersionStatus::Detected(expected_version),
                 },
             )
         });

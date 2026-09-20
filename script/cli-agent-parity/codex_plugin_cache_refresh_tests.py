@@ -354,5 +354,121 @@ class CacheRefreshCleanupTests(unittest.TestCase):
             locked.unlink()
 
 
+class BackgroundRefreshWaitTests(unittest.TestCase):
+    def files(self, home, cache_matches, revision_matches):
+        cache = home / 'private-cache'
+        cache.mkdir()
+        (cache / 'private-name').write_bytes(b'upstream')
+        expected = probe.tree_hashes(cache)
+        if not cache_matches:
+            (cache / 'private-name').write_bytes(b'patched')
+        config = '[marketplaces.codex-warp]\n'
+        if revision_matches:
+            config += f'last_revision = "{probe.PLUGIN_COMMIT}"\n'
+        (home / 'config.toml').write_text(config, encoding='utf-8')
+        return cache, expected
+
+    def listing(self, home, cache, expected, report, ticks, on_sleep=None):
+        recorder = Mock()
+        recorder.rpc.side_effect = [{'codexHome': str(home)}, {'data': []}]
+        with patch.object(probe, 'CacheRefreshRecorder', return_value=recorder), \
+                patch.object(probe.time, 'monotonic_ns', side_effect=ticks), \
+                patch.object(probe.time, 'sleep', side_effect=on_sleep):
+            try:
+                return probe.native_listing(Path('codex'), {'CODEX_HOME': str(home)}, home, report,
+                                            'cache_only_restart', cache, expected_revert=expected)
+            finally:
+                recorder.close.assert_called_once()
+
+    def test_native_refresh_can_finish_after_twenty_seconds_without_changing_success_conditions(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cache, expected = self.files(home, False, True)
+            report = {'app_server_traces': []}
+
+            def finish_refresh(delay):
+                self.assertEqual(delay, 0.02)
+                (cache / 'private-name').write_bytes(b'upstream')
+
+            self.listing(home, cache, expected, report, [0, 0, 25_000_000_000, 25_000_000_019], finish_refresh)
+            trace = report['app_server_traces'][0]
+            self.assertTrue(trace['background_reverted_to_upstream'])
+            wait = trace['background_refresh_wait']
+            self.assertEqual(wait['timeout_seconds'], 100)
+            self.assertEqual(wait['elapsed_ns'], 25_000_000_019)
+            self.assertTrue(wait['final_observation']['cache_matches_expected'])
+            self.assertEqual(wait['final_observation']['last_revision'], probe.PLUGIN_COMMIT)
+
+    def test_timeout_keeps_diagnostics_when_only_tree_or_revision_matches(self):
+        for cache_matches, revision_matches in ((True, False), (False, True)):
+            with self.subTest(cache_matches=cache_matches), tempfile.TemporaryDirectory() as temporary:
+                home = Path(temporary)
+                cache, expected = self.files(home, cache_matches, revision_matches)
+                report = {'app_server_traces': []}
+                with self.assertRaisesRegex(ValueError, '没有在期限内复现真实后台还原'):
+                    self.listing(home, cache, expected, report, [0, 0, 100_000_000_000, 100_000_000_023])
+                trace = report['app_server_traces'][0]
+                self.assertNotIn('background_reverted_to_upstream', trace)
+                self.assertNotIn('background_revision_published', trace)
+                wait = trace['background_refresh_wait']
+                self.assertEqual(wait['elapsed_ns'], 100_000_000_023)
+                observed = wait['final_observation']
+                self.assertEqual(observed['cache_matches_expected'], cache_matches)
+                self.assertEqual(observed['revision_matches_expected'], revision_matches)
+                self.assertEqual(observed['cache_file_count'], 1)
+                self.assertEqual(len(observed['cache_tree_sha256']), 64)
+                self.assertNotIn(str(home), json.dumps(wait))
+                self.assertNotIn('private-name', json.dumps(wait))
+
+    def test_snapshot_after_deadline_cannot_reclassify_timeout_as_success(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cache, expected = self.files(home, False, True)
+            report = {'app_server_traces': []}
+            with self.assertRaisesRegex(ValueError, '没有在期限内复现真实后台还原'):
+                self.listing(home, cache, expected, report, [0, 0, 100_000_000_000, 100_000_000_001],
+                             lambda delay: (cache / 'private-name').write_bytes(b'upstream'))
+            trace = report['app_server_traces'][0]
+            self.assertNotIn('background_reverted_to_upstream', trace)
+            observed = trace['background_refresh_wait']['final_observation']
+            self.assertTrue(observed['cache_matches_expected'])
+            self.assertTrue(observed['revision_matches_expected'])
+
+    def test_final_read_errors_are_safe_and_do_not_replace_original_failure(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cache, expected = self.files(home, True, False)
+            secret = 'private-path-and-secret'
+            (home / 'config.toml').write_text(f'last_revision = "{secret}', encoding='utf-8')
+            primary = PermissionError(13, secret, str(cache))
+            primary.winerror = 5
+            report = {'app_server_traces': []}
+            with patch.object(probe, 'tree_hashes', side_effect=primary):
+                with self.assertRaises(PermissionError) as raised:
+                    self.listing(home, cache, expected, report, [0, 0, 17])
+            self.assertIs(raised.exception, primary)
+            wait = report['app_server_traces'][0]['background_refresh_wait']
+            self.assertEqual(wait['elapsed_ns'], 17)
+            observed = wait['final_observation']
+            self.assertIsNone(observed['cache_tree_sha256'])
+            self.assertEqual(observed['cache_read_error'], {'type': 'PermissionError', 'errno': 13, 'winerror': 5})
+            self.assertEqual(observed['configuration_read_error'], {'type': 'TOMLDecodeError'})
+            self.assertNotIn(secret, json.dumps(wait))
+            self.assertNotIn(str(home), json.dumps(wait))
+
+    def test_invalid_revision_is_not_copied_into_diagnostics(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cache, expected = self.files(home, True, False)
+            secret = 'private-path-and-secret'
+            (home / 'config.toml').write_text(f'[marketplaces.codex-warp]\nlast_revision = "{secret}"\n',
+                                            encoding='utf-8')
+            observed = probe.background_refresh_snapshot(cache, expected, home)
+            self.assertIsNone(observed['last_revision'])
+            self.assertEqual(observed['last_revision_state'], 'invalid')
+            self.assertFalse(observed['revision_matches_expected'])
+            self.assertNotIn(secret, json.dumps(observed))
+
+
 if __name__ == '__main__':
     unittest.main()

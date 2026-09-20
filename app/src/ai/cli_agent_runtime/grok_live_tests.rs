@@ -149,6 +149,12 @@ struct LiveSession {
     final_histories: VerifiedFinalHistories,
 }
 
+#[derive(Clone, Copy)]
+enum LiveCapabilityProfile {
+    Extended,
+    P0,
+}
+
 impl Drop for LiveSession {
     fn drop(&mut self) {
         // 失败也让监督控制连接关闭，由生产清理路径回收进程树。
@@ -240,21 +246,52 @@ impl LiveSession {
         Ok(event)
     }
 
-    async fn ready(&mut self, evidence: &mut Evidence) -> Result<(), String> {
+    async fn ready(
+        &mut self,
+        evidence: &mut Evidence,
+        profile: LiveCapabilityProfile,
+    ) -> Result<(), String> {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         } = event.kind
         else {
             evidence.record(json!({"event":"initialization_failed","kind":event.kind}))?;
             return Err("Grok 未完成真实初始化".into());
         };
-        for key in ["submit", "queuedSubmit", "approval", "cancel", "resume"] {
+        let (enabled, disabled): (&[&str], &[&str]) = match profile {
+            LiveCapabilityProfile::Extended => (
+                &[
+                    "newSession",
+                    "emptyHistoryRecovery",
+                    "closeSession",
+                    "submit",
+                    "queuedSubmit",
+                    "approval",
+                    "cancel",
+                    "resume",
+                ],
+                &["steer", "localTools", "childTasks"],
+            ),
+            LiveCapabilityProfile::P0 => (
+                &["newSession", "submit", "approval", "cancel", "resume"],
+                &[
+                    "emptyHistoryRecovery",
+                    "closeSession",
+                    "queuedSubmit",
+                    "steer",
+                    "localTools",
+                    "childTasks",
+                ],
+            ),
+        };
+        for &key in enabled {
             if effective_permissions["verifiedCapabilities"][key] != true {
                 return Err("固定版本基础托管能力缺少验证声明".into());
             }
         }
-        for key in ["steer", "localTools", "childTasks"] {
+        for &key in disabled {
             if effective_permissions["verifiedCapabilities"][key] != false {
                 return Err("真实测试不得打开未验证的 SDK 或同轮追加能力".into());
             }
@@ -304,6 +341,11 @@ enum TurnMode {
         path: PathBuf,
         content: String,
     },
+    ReadApproval {
+        decision: ApprovalDecision,
+        cwd: PathBuf,
+        path: PathBuf,
+    },
     Queue {
         marker: String,
     },
@@ -321,6 +363,38 @@ fn exact_write(details: &Value, path: &Path, content: &str) -> bool {
     call["kind"] == "edit"
         && call["_meta"]["x.ai/tool"]["name"] == "write"
         && call["rawInput"] == json!({"variant":"Write","file_path":path,"content":content})
+}
+
+fn exact_read(details: &Value, cwd: &Path, path: &Path) -> bool {
+    let call = &details["toolCall"];
+    let raw = &call["rawInput"];
+    let target = raw["target_file"]
+        .as_str()
+        .map(|target| cwd.join(target))
+        .and_then(|target| target.canonicalize().ok());
+    call["kind"] == "read"
+        && call["_meta"]["x.ai/tool"]["version"].as_u64() == Some(1)
+        && call["_meta"]["x.ai/tool"]["name"] == "read_file"
+        && call["_meta"]["x.ai/tool"]["namespace"] == "grok_build"
+        && call["_meta"]["x.ai/tool"]["read_only"] == true
+        && raw.as_object().is_some_and(|raw| {
+            raw.keys().all(|key| {
+                matches!(
+                    key.as_str(),
+                    "variant" | "target_file" | "offset" | "limit" | "pages" | "format"
+                )
+            })
+        })
+        && raw["variant"] == "ReadFile"
+        && target.as_deref() == Some(path)
+        && !path.is_symlink()
+        && ["offset", "limit"].into_iter().all(|key| {
+            raw.get(key)
+                .is_none_or(|value| value.is_null() || value.as_i64() == Some(1))
+        })
+        && ["pages", "format"]
+            .into_iter()
+            .all(|key| raw.get(key).is_none_or(Value::is_null))
 }
 
 async fn run_turn(
@@ -417,7 +491,9 @@ async fn run_turn(
                             evidence.record(json!({"event":"cancel_submitted","phase":phase,
                                 "message_id":id,"turn_id":turn_id,"submitted_after_real_text":true}))?;
                         }
-                        TurnMode::Plain | TurnMode::Approval { .. } => {}
+                        TurnMode::Plain
+                        | TurnMode::Approval { .. }
+                        | TurnMode::ReadApproval { .. } => {}
                     }
                 }
             }
@@ -427,7 +503,7 @@ async fn run_turn(
                 method,
                 details,
             } => {
-                let safe = match &mode {
+                let exact_write_fixture = match &mode {
                     TurnMode::Approval { path, content, .. } => {
                         method == "session/request_permission"
                             && native_turns.get(&primary) == Some(&turn_id)
@@ -435,12 +511,34 @@ async fn run_turn(
                             && exact_write(&details, path, content)
                             && !path.exists()
                     }
-                    TurnMode::Plain | TurnMode::Queue { .. } | TurnMode::Cancel => false,
+                    TurnMode::Plain
+                    | TurnMode::ReadApproval { .. }
+                    | TurnMode::Queue { .. }
+                    | TurnMode::Cancel => false,
                 };
-                let decision = match &mode {
-                    TurnMode::Approval { decision, .. } if safe => *decision,
+                let exact_read_fixture = match &mode {
+                    TurnMode::ReadApproval { cwd, path, .. } => {
+                        method == "session/request_permission"
+                            && native_turns.get(&primary) == Some(&turn_id)
+                            && approvals.is_empty()
+                            && exact_read(&details, cwd, path)
+                    }
                     TurnMode::Plain
                     | TurnMode::Approval { .. }
+                    | TurnMode::Queue { .. }
+                    | TurnMode::Cancel => false,
+                };
+                let safe = exact_write_fixture || exact_read_fixture;
+                let decision = match &mode {
+                    TurnMode::Approval { decision, .. }
+                    | TurnMode::ReadApproval { decision, .. }
+                        if safe =>
+                    {
+                        *decision
+                    }
+                    TurnMode::Plain
+                    | TurnMode::Approval { .. }
+                    | TurnMode::ReadApproval { .. }
                     | TurnMode::Queue { .. }
                     | TurnMode::Cancel => ApprovalDecision::DenyOnce,
                 };
@@ -458,10 +556,11 @@ async fn run_turn(
                     .await?;
                 evidence.record(
                     json!({"event":"approval_requested","phase":phase,"approval_id":approval_id,
-                    "decision":decision,"exact_write_fixture":safe}),
+                    "decision":decision,"exact_write_fixture":exact_write_fixture,
+                    "exact_read_fixture":exact_read_fixture}),
                 )?;
                 if !safe {
-                    return Err("超出精确 Write 范围的工具请求已拒绝".into());
+                    return Err("超出精确读写验收范围的工具请求已拒绝".into());
                 }
             }
             RuntimeEventKind::CommandDispatched {
@@ -481,7 +580,8 @@ async fn run_turn(
                 decision,
             } => {
                 let expected_decision = match &mode {
-                    TurnMode::Approval { decision, .. } => Some(*decision),
+                    TurnMode::Approval { decision, .. }
+                    | TurnMode::ReadApproval { decision, .. } => Some(*decision),
                     TurnMode::Plain | TurnMode::Queue { .. } | TurnMode::Cancel => None,
                 };
                 if !approvals.contains(&approval_id)
@@ -556,8 +656,12 @@ async fn run_turn(
             && dispatched.len() == controls.len()
             && approvals == resolved
         {
-            if matches!(mode, TurnMode::Approval { .. }) && approvals.len() != 1 {
-                return Err("没有观察到恰好一次原生 Write 审批".into());
+            if matches!(
+                mode,
+                TurnMode::Approval { .. } | TurnMode::ReadApproval { .. }
+            ) && approvals.len() != 1
+            {
+                return Err("没有观察到恰好一次原生审批".into());
             }
             if let TurnMode::Queue { marker } = &mode {
                 let queued = queued_id
@@ -614,12 +718,15 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
     };
     let mut session = LiveSession::start(options.clone());
-    session.ready(evidence).await?;
+    session
+        .ready(evidence, LiveCapabilityProfile::Extended)
+        .await?;
     let native_id = session
         .native_id
         .clone()
@@ -711,7 +818,9 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         native_session_id: native_id.clone(),
     };
     let mut resumed = LiveSession::start(options);
-    resumed.ready(evidence).await?;
+    resumed
+        .ready(evidence, LiveCapabilityProfile::Extended)
+        .await?;
     let recovered = run_turn(&mut resumed,"resume_result","INFINISHELL_GROK_ADAPTER：不要调用工具，只回复上一会话运行中追加指令要求记住的完整 QUEUED_APPLIED 标记。".into(),TurnMode::Plain,evidence).await?;
     completed(&recovered, &marker)?;
     if resumed.native_id.as_ref() != Some(&native_id) {
@@ -725,6 +834,126 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         "app_restart_and_ui_verified":false,"parent_permission_ceiling_verified":false,
         "official_grok_model_tested":official,
         "model_path":if official { "Grok Build + 官方缓存登录" } else { "Grok Build + 自定义 Claude 后端" }}))
+}
+
+async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+    let cwd = root
+        .join("project")
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    let marker = format!("{:x}", Sha256::digest(Uuid::new_v4().as_bytes()));
+    let allow_path = cwd.join("allow.txt");
+    let deny_path = cwd.join("deny.txt");
+    for path in [&allow_path, &deny_path] {
+        if path.exists() || path.is_symlink() {
+            return Err("P0 读审批夹具路径不为空或为符号链接".into());
+        }
+        let mut file = File::options()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .map_err(|error| error.to_string())?;
+        writeln!(file, "{marker}").map_err(|error| error.to_string())?;
+    }
+    let mut options = SessionOptions {
+        executable: PathBuf::from(
+            env::var_os("INFINISHELL_GROK_LIVE_EXECUTABLE")
+                .ok_or_else(|| "缺少固定 Grok 沙箱入口".to_owned())?,
+        ),
+        cwd: cwd.clone(),
+        state_dir: root.join("state"),
+        target: SessionTarget::New,
+        generation: Uuid::new_v4(),
+        permission_policy: PermissionPolicy::Inherit,
+        permission_ceiling: None,
+        claude_profile: None,
+        grok_profile: None,
+        model: None,
+        local_tools: None,
+        selected_skills: Vec::new(),
+    };
+    let mut session = LiveSession::start(options.clone());
+    session.ready(evidence, LiveCapabilityProfile::P0).await?;
+    let native_id = session
+        .native_id
+        .clone()
+        .ok_or_else(|| "没有真实会话 ID".to_owned())?;
+    completed(
+        &run_turn(
+            &mut session,
+            "p0_read_allow",
+            "只用 read_file 读取 allow.txt 一次，参数只含 target_file=allow.txt。不要使用其他工具；成功后只输出文件唯一一行的原文，不解释。".into(),
+            TurnMode::ReadApproval {
+                decision: ApprovalDecision::AllowOnce,
+                cwd: cwd.clone(),
+                path: allow_path.canonicalize().map_err(|error| error.to_string())?,
+            },
+            evidence,
+        )
+        .await?,
+        &marker,
+    )?;
+    let denied = run_turn(
+        &mut session,
+        "p0_read_deny",
+        "只用 read_file 读取 deny.txt 一次，参数只含 target_file=deny.txt。等待审批；拒绝后不要重试或使用其他工具。".into(),
+        TurnMode::ReadApproval {
+            decision: ApprovalDecision::DenyOnce,
+            cwd: cwd.clone(),
+            path: deny_path.canonicalize().map_err(|error| error.to_string())?,
+        },
+        evidence,
+    )
+    .await?;
+    if denied.outcome != TurnOutcome::Cancelled {
+        return Err("P0 读拒绝没有原生取消终态".into());
+    }
+    let cancelled = run_turn(
+        &mut session,
+        "p0_cancel",
+        "不要调用工具，先输出 READY，然后逐个列出从 1 到 100000 的整数。".into(),
+        TurnMode::Cancel,
+        evidence,
+    )
+    .await?;
+    if cancelled.outcome != TurnOutcome::Cancelled {
+        return Err("P0 取消没有原生终态".into());
+    }
+    if session.shutdown(evidence).await? != 0 {
+        return Err("P0 新会话不得出现未验收的排队输入".into());
+    }
+
+    options.generation = Uuid::new_v4();
+    options.target = SessionTarget::Resume {
+        native_session_id: native_id.clone(),
+    };
+    let mut resumed = LiveSession::start(options);
+    resumed.ready(evidence, LiveCapabilityProfile::P0).await?;
+    completed(
+        &run_turn(
+            &mut resumed,
+            "p0_resume",
+            "不要调用工具，只回复上一会话第一轮从 allow.txt 读取到的完整 64 位十六进制文本。"
+                .into(),
+            TurnMode::Plain,
+            evidence,
+        )
+        .await?,
+        &marker,
+    )?;
+    if resumed.native_id.as_ref() != Some(&native_id) {
+        return Err("P0 恢复没有关联原会话".into());
+    }
+    if resumed.shutdown(evidence).await? != 0 {
+        return Err("P0 恢复阶段不得出现未验收的排队输入".into());
+    }
+    evidence.record(json!({"event":"acceptance_passed","scope":SCOPE,
+        "native_session_id":native_id,"verified_scope":"p0","public_product_gate_open":true,
+        "full_cli_parity_acceptance_passed":false,"queued_input_verified":false,
+        "same_turn_steering_supported":false,"read_approval_verified":true,
+        "write_approval_verified":false,"close_session_verified":false,
+        "app_restart_and_ui_verified":false,"parent_permission_ceiling_verified":false,
+        "official_grok_model_tested":true,"model_path":"Grok Build + 官方缓存登录"}))
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -770,6 +999,57 @@ async fn real_grok_managed_lifecycle() {
     );
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "必须由 Grok 1.0.34 官方隔离运行器显式启动；会消耗用户授权模型额度"]
+async fn real_grok_p0_lifecycle() {
+    assert_eq!(
+        env::var("INFINISHELL_GROK_LIVE_PROFILE").as_deref(),
+        Ok("p0-1.0.34")
+    );
+    let root =
+        PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("必须由隔离运行器启动"))
+            .canonicalize()
+            .expect("私有验收目录存在");
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-grok-live-probe")).unwrap(),
+        "isolated Grok Rust adapter verification\n"
+    );
+    assert_eq!(
+        PathBuf::from(env::var_os("GROK_HOME").expect("缺少私有 Grok HOME"))
+            .canonicalize()
+            .unwrap(),
+        root.join("home/.grok")
+    );
+    assert!(env::var_os("XAI_API_KEY").is_none());
+    assert!(env::var_os("ANTHROPIC_API_KEY").is_none());
+    assert!(env::var_os("ANTHROPIC_AUTH_TOKEN").is_none());
+    let mut evidence = Evidence {
+        file: File::create(PathBuf::from(
+            env::var_os("INFINISHELL_GROK_LIVE_ARTIFACT").expect("缺少证据路径"),
+        ))
+        .unwrap(),
+        root: root.clone(),
+    };
+    evidence
+        .record(json!({"event":"acceptance_started","scope":SCOPE,
+            "verified_scope":"p0","credential_files_read_by_probe":false,
+            "production_run_process":true,"production_run_transport":true,
+            "production_runtime_commands":true,"test_only_internal_command_switch":false,
+            "public_product_gate_open":true,"full_cli_parity_acceptance_passed":false,
+            "same_turn_steering_supported":false}))
+        .unwrap();
+    let result = exercise_p0(&root, &mut evidence).await;
+    if let Err(error) = &result {
+        evidence
+            .record(json!({"event":"acceptance_failed","reason":error}))
+            .unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "真实 Grok 1.0.34 P0 适配器验收未通过；请检查脱敏证据"
+    );
+}
+
 #[test]
 fn live_approval_guard_accepts_only_the_exact_native_write() {
     let path = env::temp_dir().join("批准中文.txt");
@@ -780,6 +1060,26 @@ fn live_approval_guard_accepts_only_the_exact_native_write() {
     details["toolCall"]["rawInput"]["content"] = json!("PARITY_APPROVAL");
     details["toolCall"]["rawInput"]["extra"] = json!(true);
     assert!(!exact_write(&details, &path, "PARITY_APPROVAL"));
+}
+
+#[test]
+fn live_p0_approval_guard_accepts_only_the_exact_native_read() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("批准读取.txt");
+    fs::write(&path, "fixture\n").unwrap();
+    let path = path.canonicalize().unwrap();
+    let mut details = json!({"toolCall":{"kind":"read","_meta":{"x.ai/tool":{
+        "version":1,"name":"read_file","namespace":"grok_build","read_only":true}},
+        "rawInput":{"variant":"ReadFile","target_file":"批准读取.txt"}}});
+    assert!(exact_read(&details, directory.path(), &path));
+    details["toolCall"]["rawInput"]["offset"] = json!(2);
+    assert!(!exact_read(&details, directory.path(), &path));
+    details["toolCall"]["rawInput"]["offset"] = json!(1);
+    details["toolCall"]["_meta"]["x.ai/tool"]["read_only"] = json!(false);
+    assert!(!exact_read(&details, directory.path(), &path));
+    details["toolCall"]["_meta"]["x.ai/tool"]["read_only"] = json!(true);
+    details["toolCall"]["rawInput"]["content"] = json!("unverified");
+    assert!(!exact_read(&details, directory.path(), &path));
 }
 
 fn response_record(

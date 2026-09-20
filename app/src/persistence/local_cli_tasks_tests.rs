@@ -1599,3 +1599,520 @@ fn ordinary_child_progress_cannot_follow_its_parent_into_a_new_generation() {
         LocalCliEnqueueOutcome::Created
     );
 }
+
+fn grok_cross_generation_mailbox_fixture() -> (SqliteConnection, LocalCliMessage, LocalCliTask) {
+    let mut connection = connection();
+    let parent = task("mailbox-parent", None);
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let mut original = task("mailbox-child", Some(&parent.task_id));
+    original.harness = "grok".into();
+    original.native_session_id = Some("mailbox-native".into());
+    let token = Uuid::new_v4();
+    original.config_json = json!({"runtime_generation":token}).to_string();
+    checkpoint(&mut connection, original.clone(), None).unwrap();
+    let mut message = LocalCliMessage {
+        version: 1,
+        message_id: Uuid::new_v4().to_string(),
+        sender_task_id: parent.task_id,
+        recipient_task_id: original.task_id.clone(),
+        sender_generation: 1,
+        recipient_generation: 1,
+        subject: "进度回复".into(),
+        body: "同一原生进程的下一轮".into(),
+        state: LocalCliMessageState::Queued,
+        receipt_kind: None,
+    };
+    insert_message(&mut connection, message.clone()).unwrap();
+    update_message_state(
+        &mut connection,
+        &message.message_id,
+        &original.task_id,
+        1,
+        LocalCliMessageState::Sent,
+    )
+    .unwrap();
+    message.state = LocalCliMessageState::Sent;
+    original.revision = 1;
+    original.state = LocalCliTaskState::Completed;
+    original.result = Some("原生完整结果".into());
+    original.terminal_evidence = Some("真实完成回执".into());
+    checkpoint(&mut connection, original.clone(), Some(1)).unwrap();
+    let mut current = original;
+    current.generation = 2;
+    current.revision = 0;
+    current.state = LocalCliTaskState::Queued;
+    current.result = None;
+    current.terminal_evidence = None;
+    current.config_json = json!({"runtime_generation":token,"grok_pending_inputs":[{
+        "message_id":message.message_id,"submission_generation":1,"runtime_generation":token,
+        "native_turn_id":"mailbox-turn","mailbox_sha256":grok_mailbox_digest(&message).unwrap()
+    }]})
+    .to_string();
+    checkpoint(&mut connection, current.clone(), Some(1)).unwrap();
+    (connection, message, current)
+}
+
+#[test]
+fn grok_mailbox_old_generation_ack_keeps_parent_and_recipient_identity() {
+    let (mut connection, message, current) = grok_cross_generation_mailbox_fixture();
+    update_message_state(
+        &mut connection,
+        &message.message_id,
+        &current.task_id,
+        1,
+        LocalCliMessageState::Acknowledged,
+    )
+    .unwrap();
+    let saved = read_message(&mut connection, &message.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.sender_task_id, "mailbox-parent");
+    assert_eq!(saved.recipient_task_id, "mailbox-child");
+    assert_eq!(saved.recipient_generation, 1);
+    assert_eq!(saved.state, LocalCliMessageState::Acknowledged);
+    assert_eq!(
+        saved.receipt_kind,
+        Some(LocalCliReceiptKind::NativeProtocol)
+    );
+    assert_eq!(
+        read_task(&mut connection, &current.task_id).unwrap(),
+        Some(current)
+    );
+}
+
+#[test]
+fn grok_mailbox_old_generation_ack_rejects_changed_body_or_source_binding() {
+    for field in ["body", "subject", "sender_generation", "sender_task_id"] {
+        let (mut connection, message, current) = grok_cross_generation_mailbox_fixture();
+        let mut value = serde_json::to_value(&message).unwrap();
+        value[field] = if field == "sender_generation" {
+            json!(2)
+        } else {
+            json!("已篡改")
+        };
+        diesel::update(
+            local_cli_messages::table
+                .filter(local_cli_messages::message_id.eq(&message.message_id)),
+        )
+        .set(local_cli_messages::data.eq(value.to_string()))
+        .execute(&mut connection)
+        .unwrap();
+        assert!(
+            update_message_state(
+                &mut connection,
+                &message.message_id,
+                &current.task_id,
+                1,
+                LocalCliMessageState::Acknowledged
+            )
+            .is_err()
+        );
+        assert_eq!(
+            read_message(&mut connection, &message.message_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            LocalCliMessageState::Sent
+        );
+    }
+}
+
+#[test]
+fn grok_mailbox_old_generation_ack_rejects_wrong_family_runtime_and_unbound_origin() {
+    for kind in [
+        "family",
+        "runtime",
+        "session",
+        "digest",
+        "missing-digest",
+        "codex",
+    ] {
+        let (mut connection, message, mut current) = grok_cross_generation_mailbox_fixture();
+        let mut config: Value = serde_json::from_str(&current.config_json).unwrap();
+        match kind {
+            "family" => {
+                let mut original = read_task_generation(&mut connection, &current.task_id, 1)
+                    .unwrap()
+                    .unwrap();
+                original.parent_task_id = Some("different-parent".into());
+                diesel::update(
+                    local_cli_task_generations::table
+                        .filter(local_cli_task_generations::task_id.eq(&original.task_id))
+                        .filter(local_cli_task_generations::generation.eq(1)),
+                )
+                .set(local_cli_task_generations::data.eq(serde_json::to_string(&original).unwrap()))
+                .execute(&mut connection)
+                .unwrap();
+            }
+            "runtime" => config["runtime_generation"] = json!(Uuid::new_v4()),
+            "session" => current.native_session_id = Some("different-native".into()),
+            "digest" => config["grok_pending_inputs"][0]["mailbox_sha256"] = json!("0".repeat(64)),
+            "missing-digest" => {
+                config["grok_pending_inputs"][0]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("mailbox_sha256");
+            }
+            "codex" => current.harness = "codex".into(),
+            unexpected => panic!("未知测试场景：{unexpected}"),
+        }
+        current.config_json = config.to_string();
+        replace_current_task_record(&mut connection, &current);
+        assert!(
+            update_message_state(
+                &mut connection,
+                &message.message_id,
+                &current.task_id,
+                1,
+                LocalCliMessageState::Acknowledged
+            )
+            .is_err(),
+            "{kind}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &message.message_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            LocalCliMessageState::Sent
+        );
+    }
+}
+
+#[test]
+fn grok_mailbox_queued_results_survive_parent_terminal_checkpoint_for_collection() {
+    for state in [
+        LocalCliTaskState::Completed,
+        LocalCliTaskState::Cancelled,
+        LocalCliTaskState::Failed,
+    ] {
+        let mut connection = connection();
+        let mut parent = task("result-parent", None);
+        parent.harness = "grok".into();
+        parent.native_session_id = Some("result-parent-native".into());
+        checkpoint(&mut connection, parent.clone(), None).unwrap();
+        let mut child = task("result-child", Some(&parent.task_id));
+        child.native_session_id = Some("result-child-native".into());
+        checkpoint(&mut connection, child.clone(), None).unwrap();
+        child.state = LocalCliTaskState::Completed;
+        child.revision = 1;
+        child.result = Some("已完成子结果".into());
+        child.terminal_evidence = Some("真实完成".into());
+        checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+        let message = insert_task_result(&mut connection, &child.task_id, 1)
+            .unwrap()
+            .unwrap();
+        parent.state = state;
+        parent.revision = 1;
+        parent.result = Some("父回合终态".into());
+        parent.terminal_evidence = Some("真实终态".into());
+        checkpoint(&mut connection, parent, Some(1)).unwrap();
+        assert_eq!(
+            read_message(&mut connection, &message.message_id).unwrap(),
+            Some(message)
+        );
+    }
+}
+
+fn grok_result_claim_fixture() -> (
+    SqliteConnection,
+    LocalCliTask,
+    LocalCliTask,
+    LocalCliMessage,
+) {
+    let mut connection = connection();
+    let mut parent = task("claim-parent", None);
+    parent.harness = "grok".into();
+    parent.native_session_id = Some("claim-native-session".into());
+    parent.config_json =
+        serde_json::json!({"runtime_generation":Uuid::new_v4(),"grok_pending_inputs":[]})
+            .to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let mut child = task("claim-child", Some(&parent.task_id));
+    child.native_session_id = Some("child-native-session".into());
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    child.state = LocalCliTaskState::Completed;
+    child.revision = 1;
+    child.result = Some("原子代可回收结果".into());
+    child.terminal_evidence = Some("原生完成".into());
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    let message = insert_task_result(&mut connection, &child.task_id, 1)
+        .unwrap()
+        .unwrap();
+    (connection, parent, child, message)
+}
+
+#[test]
+fn grok_mailbox_result_claim_requires_completed_empty_slot_and_no_uncertain_result() {
+    let (mut connection, mut parent, mut child, first) = grok_result_claim_fixture();
+    assert!(
+        claim_result(&mut connection, first.clone())
+            .unwrap()
+            .is_none()
+    );
+    parent.state = LocalCliTaskState::Completed;
+    parent.revision = 1;
+    parent.terminal_evidence = Some("父原生完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    child.generation = 2;
+    child.revision = 0;
+    child.state = LocalCliTaskState::Queued;
+    child.result = None;
+    child.terminal_evidence = None;
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    child.revision = 1;
+    child.state = LocalCliTaskState::Completed;
+    child.result = Some("子第二代结果".into());
+    child.terminal_evidence = Some("子第二代完成".into());
+    checkpoint(&mut connection, child.clone(), Some(2)).unwrap();
+    let second = insert_task_result(&mut connection, &child.task_id, 2)
+        .unwrap()
+        .unwrap();
+    let mut blocked = parent.clone();
+    let mut config: Value = serde_json::from_str(&blocked.config_json).unwrap();
+    config["grok_pending_inputs"] =
+        serde_json::json!([{"message_id":Uuid::new_v4(),"native_turn_id":"已确认尚未started"}]);
+    blocked.config_json = config.to_string();
+    replace_current_task_record(&mut connection, &blocked);
+    assert!(
+        claim_result(&mut connection, first.clone())
+            .unwrap()
+            .is_none()
+    );
+    replace_current_task_record(&mut connection, &parent);
+    assert_eq!(
+        claim_result(&mut connection, first.clone())
+            .unwrap()
+            .unwrap()
+            .state,
+        LocalCliMessageState::Sent
+    );
+    assert!(
+        claim_result(&mut connection, second.clone())
+            .unwrap()
+            .is_none(),
+        "第一结果尚未ACK时，独立领取事务也不能占第二槽"
+    );
+    assert_eq!(
+        read_message(&mut connection, &second.message_id).unwrap(),
+        Some(second)
+    );
+}
+
+#[test]
+fn grok_mailbox_result_history_rejects_failed_cancelled_resume_and_changed_native_process() {
+    for boundary in [
+        "failed",
+        "cancelled",
+        "disconnected",
+        "runtime",
+        "session",
+        "nil-runtime",
+    ] {
+        let (mut connection, mut parent, child, first) = grok_result_claim_fixture();
+        parent.state = match boundary {
+            "failed" => LocalCliTaskState::Failed,
+            "cancelled" => LocalCliTaskState::Cancelled,
+            "disconnected" => LocalCliTaskState::Disconnected,
+            "runtime" | "session" | "nil-runtime" => LocalCliTaskState::Completed,
+            _ => unreachable!("测试边界固定"),
+        };
+        parent.revision = 1;
+        parent.terminal_evidence = Some("父原生终态".into());
+        checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+        let mut current = parent.clone();
+        current.generation = 2;
+        current.revision = 0;
+        current.state = LocalCliTaskState::Queued;
+        current.result = None;
+        current.terminal_evidence = None;
+        if matches!(boundary, "runtime" | "nil-runtime") {
+            let token = if boundary == "nil-runtime" {
+                Uuid::nil()
+            } else {
+                Uuid::new_v4()
+            };
+            current.config_json =
+                serde_json::json!({"runtime_generation":token,"grok_pending_inputs":[]})
+                    .to_string();
+        } else if boundary == "session" {
+            current.native_session_id = Some("different-native-session".into());
+        }
+        checkpoint(&mut connection, current.clone(), Some(1)).unwrap();
+        assert_eq!(
+            read_message(&mut connection, &first.message_id)
+                .unwrap()
+                .unwrap()
+                .state,
+            LocalCliMessageState::Cancelled
+        );
+        current.state = LocalCliTaskState::Completed;
+        current.revision = 1;
+        current.terminal_evidence = Some("新回合真实完成".into());
+        checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+        let generations = read_task_generations(&mut connection, &parent.task_id).unwrap();
+        assert!(!grok_result_history_matches(&first, &generations, &current));
+        // 晚到的原代结果也不能绕过跨代取消检查：它必须重查完整父历史。
+        let mut late = first.clone();
+        late.message_id = Uuid::new_v4().to_string();
+        insert_message_with_origin(&mut connection, late.clone(), true).unwrap();
+        assert!(grok_mailbox_origin_matches(
+            &late,
+            &child,
+            &parent,
+            &grok_mailbox_digest(&late).unwrap()
+        ));
+        assert!(claim_result(&mut connection, late.clone()).is_err());
+        assert_eq!(
+            read_message(&mut connection, &late.message_id).unwrap(),
+            Some(late)
+        );
+    }
+}
+
+#[test]
+fn grok_mailbox_later_result_claim_verifies_original_child_parent_and_body() {
+    for mutation in [
+        "body",
+        "child-parent-generation",
+        "child-history-result",
+        "missing-parent-history",
+    ] {
+        let (mut connection, mut parent, mut child, first) = grok_result_claim_fixture();
+        parent.state = LocalCliTaskState::Completed;
+        parent.revision = 1;
+        parent.terminal_evidence = Some("父第一代完成".into());
+        checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+        let mut current = parent.clone();
+        current.generation = 2;
+        current.revision = 0;
+        current.state = LocalCliTaskState::Queued;
+        current.result = None;
+        current.terminal_evidence = None;
+        checkpoint(&mut connection, current.clone(), Some(1)).unwrap();
+        current.state = LocalCliTaskState::Completed;
+        current.revision = 1;
+        current.terminal_evidence = Some("父第二代完成".into());
+        checkpoint(&mut connection, current.clone(), Some(2)).unwrap();
+        let mut offered = first.clone();
+        match mutation {
+            "body" => offered.body.push_str("消息被篡改"),
+            "child-parent-generation" | "child-history-result" => {
+                if mutation == "child-parent-generation" {
+                    child.parent_generation = Some(2);
+                } else {
+                    child.result = Some("原结果被篡改".into());
+                }
+                diesel::update(local_cli_task_generations::table.find((&child.task_id, 1_i64)))
+                    .set(
+                        local_cli_task_generations::data.eq(serde_json::to_string(&child).unwrap()),
+                    )
+                    .execute(&mut connection)
+                    .unwrap();
+            }
+            "missing-parent-history" => {
+                diesel::delete(local_cli_task_generations::table.find((&parent.task_id, 1_i64)))
+                    .execute(&mut connection)
+                    .unwrap();
+            }
+            _ => unreachable!("测试变体固定"),
+        }
+        assert!(
+            claim_result(&mut connection, offered).is_err(),
+            "{mutation}"
+        );
+        assert_eq!(
+            read_message(&mut connection, &first.message_id).unwrap(),
+            Some(first)
+        );
+    }
+}
+
+#[test]
+fn grok_mailbox_result_claim_rechecks_worker_generation_and_runtime_before_sent() {
+    let (mut connection, mut parent, _child, message) = grok_result_claim_fixture();
+    parent.state = LocalCliTaskState::Completed;
+    parent.revision = 1;
+    parent.terminal_evidence = Some("父原生完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    for mutation in ["generation", "runtime", "revision"] {
+        let mut stale = parent.clone();
+        match mutation {
+            "generation" => stale.generation += 1,
+            "runtime" => stale.config_json =
+                serde_json::json!({"runtime_generation":Uuid::new_v4(),"grok_pending_inputs":[]})
+                    .to_string(),
+            "revision" => stale.revision += 1,
+            _ => unreachable!("测试变体固定"),
+        }
+        assert!(claim_result_if_current(&mut connection, message.clone(), Some(&stale)).is_err());
+        assert_eq!(
+            read_message(&mut connection, &message.message_id).unwrap(),
+            Some(message.clone())
+        );
+    }
+    assert_eq!(
+        claim_result_if_current(&mut connection, message, Some(&parent))
+            .unwrap()
+            .unwrap()
+            .state,
+        LocalCliMessageState::Sent
+    );
+}
+
+#[test]
+fn grok_mailbox_old_process_uncertain_result_does_not_block_new_process_result() {
+    let (mut connection, mut parent, _child, old_result) = grok_result_claim_fixture();
+    parent.state = LocalCliTaskState::Completed;
+    parent.revision = 1;
+    parent.terminal_evidence = Some("旧进程最后完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    claim_result(&mut connection, old_result.clone())
+        .unwrap()
+        .unwrap();
+    // 旧进程领取后丢失回执；显式新进程继续不推断旧消息是否执行过。
+    parent.generation = 2;
+    parent.revision = 0;
+    parent.state = LocalCliTaskState::Queued;
+    parent.result = None;
+    parent.terminal_evidence = None;
+    parent.config_json =
+        serde_json::json!({"runtime_generation":Uuid::new_v4(),"grok_pending_inputs":[]})
+            .to_string();
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+    let mut child = task("new-process-child", Some(&parent.task_id));
+    child.parent_generation = Some(2);
+    child.native_session_id = Some("new-child-session".into());
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    child.state = LocalCliTaskState::Completed;
+    child.revision = 1;
+    child.result = Some("新进程子任务结果".into());
+    child.terminal_evidence = Some("新子任务原生完成".into());
+    checkpoint(&mut connection, child.clone(), Some(1)).unwrap();
+    let new_result = insert_task_result(&mut connection, &child.task_id, 1)
+        .unwrap()
+        .unwrap();
+    parent.state = LocalCliTaskState::Completed;
+    parent.revision = 1;
+    parent.terminal_evidence = Some("新进程父回合完成".into());
+    checkpoint(&mut connection, parent.clone(), Some(2)).unwrap();
+    assert!(
+        claim_result_if_current(&mut connection, old_result.clone(), Some(&parent))
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        claim_result_if_current(&mut connection, new_result, Some(&parent))
+            .unwrap()
+            .unwrap()
+            .state,
+        LocalCliMessageState::Sent
+    );
+    let old = read_message(&mut connection, &old_result.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(old.state, LocalCliMessageState::Sent);
+    assert_eq!(old.receipt_kind, None);
+    assert_eq!(old.recipient_generation, 1);
+    assert_eq!(old.body, old_result.body);
+}

@@ -470,7 +470,7 @@ fn any_other_platform_hook_hash_requires_native_authorization() {
 #[cfg(all(windows, target_arch = "x86_64"))]
 #[test]
 #[serial_test::serial]
-fn windows_manager_reads_configured_trust_without_enabling_installation() {
+fn windows_manager_reads_trust_without_mutation_before_install_preflight() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(true);
     let home = controlled_home();
     fs::write(
@@ -492,6 +492,6 @@ fn windows_manager_reads_configured_trust_without_enabling_installation() {
         None => unsafe { std::env::remove_var("CODEX_HOME") },
     }
     assert_eq!(native_status, NativeAuthorizationStatus::Configured);
-    assert!(!can_install);
+    assert!(can_install);
     assert_eq!(contents(home.path()), before);
 }

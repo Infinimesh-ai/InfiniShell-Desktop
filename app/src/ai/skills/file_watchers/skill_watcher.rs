@@ -55,6 +55,9 @@ pub struct SkillWatcher {
     /// Allocates refresh generations that cannot be reused if a repository is removed
     /// and subsequently re-added while an old task is still in flight.
     next_project_skill_refresh_generation: u64,
+    /// 多个输入面板读取同一 cwd 时,只接收最后一次本地技能快照。
+    #[cfg(not(target_family = "wasm"))]
+    local_directory_refresh_generations: HashMap<PathBuf, u64>,
     /// Failed local repos still need the project file watcher path because
     /// repo metadata indexing can fail for oversized repos. This replaces the
     /// previous `watched_repos` set so we only subscribe when fallback is active
@@ -213,12 +216,48 @@ impl SkillWatcher {
             project_skill_files_by_repo: HashMap::new(),
             project_skill_refresh_generations: HashMap::new(),
             next_project_skill_refresh_generation: 0,
+            #[cfg(not(target_family = "wasm"))]
+            local_directory_refresh_generations: HashMap::new(),
             failed_local_project_watchers: HashMap::new(),
             watcher_event_tx,
             home_provider_watchers,
             symlink_canonical_to_originals: HashMap::new(),
             symlink_target_watchers: HashMap::new(),
         }
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub(super) fn begin_local_directory_refresh(&mut self, directory: &Path) -> u64 {
+        self.next_project_skill_refresh_generation += 1;
+        let generation = self.next_project_skill_refresh_generation;
+        self.local_directory_refresh_generations
+            .insert(directory.to_path_buf(), generation);
+        generation
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    pub(super) fn finish_local_directory_refresh(
+        &mut self,
+        directory: &Path,
+        generation: u64,
+        skills: Vec<ParsedSkill>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self.local_directory_refresh_generations.get(directory) != Some(&generation) {
+            return;
+        }
+        // 只替换 cwd 的固定 provider 目录,不删除其它子项目或远端技能。
+        let paths: Vec<_> = SKILL_PROVIDER_DEFINITIONS
+            .iter()
+            .map(|provider| directory.join(&provider.skills_path))
+            .collect();
+        self.cleanup_symlink_watches(&paths);
+        let _ = self
+            .watcher_event_tx
+            .try_send(SkillWatcherEvent::SkillsDeleted {
+                paths: paths.into_iter().map(LocalOrRemotePath::Local).collect(),
+            });
+        self.emit_project_skills(skills, ctx);
     }
 
     fn refresh_project_skills_for_repo(

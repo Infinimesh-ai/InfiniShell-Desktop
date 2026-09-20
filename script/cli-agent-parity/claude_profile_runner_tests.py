@@ -136,5 +136,44 @@ class ProfileRunnerTests(unittest.TestCase):
             self.assertEqual(metadata["authentication_source"], "explicit_api_environment")
 
 
+class FixedVersionEntryTests(unittest.TestCase):
+    def cli_arguments(self):
+        return ["runner", "--test-binary", "synthetic-libtest", "--claude", "synthetic-claude",
+                "--supervisor", "synthetic-supervisor", "--api-environment-file", "synthetic-api.json",
+                "--model", "offline-fixture", "--output", "synthetic-proof.ndjson"]
+
+    def test_formal_cli_defaults_to_old_version_and_accepts_explicit_supported_versions(self):
+        for version in (None, "2.1.273", "2.1.278"):
+            argv = self.cli_arguments() + (["--claude-version", version] if version else [])
+            with self.subTest(version=version), patch("sys.argv", argv), patch.object(runner, "run", return_value=0) as run:
+                self.assertEqual(runner.main(), 0)
+                run.assert_called_once()
+                args = run.call_args.args[0]
+                self.assertEqual(args.claude_version, version or "2.1.273")
+                self.assertEqual(args.api_environment_file, Path("synthetic-api.json"))
+
+    def test_formal_cli_rejects_unknown_version_without_entering_runner(self):
+        for version in ("latest", "2.1.279", "2.1.278-beta"):
+            with self.subTest(version=version), patch("sys.argv", self.cli_arguments() + ["--claude-version", version]), \
+                    patch("sys.stderr"), patch.object(runner, "run") as run:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+                self.assertEqual(error.exception.code, 2)
+                run.assert_not_called()
+
+    def test_direct_unknown_version_stops_before_configuration_api_or_native_work(self):
+        with patch.object(runner.tempfile, "mkdtemp") as prepare, \
+                patch.object(runner.adapter, "load_api_environment") as load_api, \
+                patch.object(runner.adapter, "run") as run, \
+                patch.object(runner.adapter.subprocess, "Popen") as spawn:
+            for version in ("latest", "2.1.279", "2.1.278-beta", None, []):
+                with self.subTest(version=version), self.assertRaises(ValueError):
+                    runner.run(SimpleNamespace(claude_version=version))
+            prepare.assert_not_called()
+            load_api.assert_not_called()
+            run.assert_not_called()
+            spawn.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

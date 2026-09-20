@@ -16,6 +16,8 @@ fn identifies_worker_subcommands() {
     assert!(is_worker_invocation("minidump-server"));
     #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     assert!(is_worker_invocation("cli-agent-supervisor"));
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    assert!(is_worker_invocation("cli-agent-notify"));
     #[cfg(unix)]
     assert!(is_worker_invocation(&terminal_server_subcommand()));
     #[cfg(feature = "plugin_host")]
@@ -40,7 +42,8 @@ fn cli_agent_supervisor_preserves_manifest_path_and_execution_mode() {
         let Some(Command::Worker(WorkerCommand::CliAgentSupervisor {
             manifest,
             execute: actual_execute,
-        })) = arguments.command() else {
+        })) = arguments.command()
+        else {
             panic!("隐藏监督 worker 必须进入专属入口");
         };
         assert_eq!(manifest, &path);
@@ -898,4 +901,26 @@ fn harness_parse_local_child_harness_accepts_codex() {
         Harness::parse_local_child_harness("codex"),
         Some(Harness::Codex)
     );
+}
+
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+#[test]
+fn cli_agent_notify_has_only_send_and_protocol_query_modes() {
+    for protocol_version in [false, true] {
+        let mut values = vec!["warp", "cli-agent-notify"];
+        if protocol_version {
+            values.push("--protocol-version");
+        }
+        let args = Args::try_parse_from(values).unwrap();
+        let Some(Command::Worker(WorkerCommand::CliAgentNotify {
+            protocol_version: actual,
+        })) = args.command()
+        else {
+            panic!("通知必须进入专属 worker");
+        };
+        assert_eq!(*actual, protocol_version);
+    }
+    for extra in ["payload.json", "--tty", "--execute", "--protocol-version=2"] {
+        assert!(Args::try_parse_from(["warp", "cli-agent-notify", extra]).is_err());
+    }
 }

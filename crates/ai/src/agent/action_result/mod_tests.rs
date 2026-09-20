@@ -1,6 +1,6 @@
 use super::{
-    AIAgentActionResultType, RunAgentsAgentOutcome, RunAgentsAgentOutcomeKind,
-    RunAgentsLaunchedExecutionMode, RunAgentsResult,
+    AIAgentActionResultType, RequestCommandOutputResult, RunAgentsAgentOutcome,
+    RunAgentsAgentOutcomeKind, RunAgentsLaunchedExecutionMode, RunAgentsResult,
 };
 
 fn launched_agent(name: &str) -> RunAgentsAgentOutcome {
@@ -53,4 +53,33 @@ fn run_agents_is_failed_when_no_agents_launch() {
 
     assert!(!result.is_successful());
     assert!(result.is_failed());
+}
+
+#[test]
+fn launch_failure_is_terminal_failure_and_never_cancellation_or_running_success() {
+    let result =
+        AIAgentActionResultType::RequestCommandOutput(RequestCommandOutputResult::LaunchFailed {
+            command: "grok".to_owned(),
+            reason: "CLI update is in progress".to_owned(),
+        });
+    assert!(result.is_failed());
+    assert!(!result.is_successful());
+    assert!(!result.is_cancelled());
+    assert!(!result.triggers_server_subagent());
+    assert!(result.should_trigger_request_upon_completion());
+    assert_eq!(result.command_str(), Some("grok"));
+}
+
+#[test]
+fn launch_failure_does_not_masquerade_as_a_supported_remote_proto_result() {
+    let result = RequestCommandOutputResult::LaunchFailed {
+        command: "claude".to_owned(),
+        reason: "CLI update is in progress".to_owned(),
+    };
+    let converted: Result<warp_multi_agent_api::request::input::tool_call_result::Result, _> =
+        result.try_into();
+    assert!(matches!(
+        converted,
+        Err(crate::agent::convert::ConvertToAPITypeError::Other(_))
+    ));
 }

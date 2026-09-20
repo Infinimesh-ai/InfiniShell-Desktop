@@ -36,7 +36,13 @@ if ([Regex]::IsMatch($expanded, '(?m)^[\t ]*#include ')) {
     throw 'PowerShell bootstrap still contains an unexpanded include'
 }
 
-$null = [ScriptBlock]::Create($expanded)
+$sessionIdPlaceholder = '@@WARP_SESSION_ID@@'
+if (-not $expanded.Contains($sessionIdPlaceholder)) {
+    throw 'PowerShell bootstrap does not contain the runtime session ID placeholder'
+}
+# 最终资源必须保留占位符，由每个终端会话注入真实 ID；语法检查使用固定非零值。
+$syntaxCandidate = $expanded.Replace($sessionIdPlaceholder, '1')
+$null = [ScriptBlock]::Create($syntaxCandidate)
 $destinationDirectory = Split-Path -Parent $DestinationPath
 if (-not [String]::IsNullOrEmpty($destinationDirectory)) {
     New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null

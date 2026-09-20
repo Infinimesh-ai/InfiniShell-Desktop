@@ -27,6 +27,113 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_RECORD_BYTES: u64 = 64 * 1024;
 
+/// 更新器仅可覆盖发行选择与安装路径，不能借监督入口更改审批或注入认证。
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ManagedEnvironment {
+    pub values: Vec<(OsString, OsString)>,
+    pub remove: Vec<OsString>,
+}
+
+impl ManagedEnvironment {
+    fn validate(&self) -> io::Result<()> {
+        let mut names = std::collections::HashSet::new();
+        for (name, value) in &self.values {
+            if !matches!(
+                name.to_str(),
+                Some(
+                    "PATH"
+                        | "CODEX_INSTALL_DIR"
+                        | "CODEX_HOME"
+                        | "CODEX_NON_INTERACTIVE"
+                        | "CODEX_RELEASE"
+                        | "HOMEBREW_NO_AUTO_UPDATE"
+                        | "HOMEBREW_NO_INSTALL_CLEANUP"
+                        | "CLAUDE_CONFIG_DIR"
+                )
+            ) || !names.insert(name)
+                || value.as_encoded_bytes().contains(&0)
+                || value.as_encoded_bytes().len() > 32 * 1024
+                || name == "CLAUDE_CONFIG_DIR" && !Path::new(value).is_absolute()
+            {
+                return Err(io::Error::other("更新环境覆盖不符合启动契约"));
+            }
+        }
+        for name in &self.remove {
+            if !matches!(
+                name.to_str(),
+                Some(
+                    "CODEX_MANAGED_BY_NPM"
+                        | "CODEX_MANAGED_BY_BUN"
+                        | "CODEX_MANAGED_BY_PNPM"
+                        | "CODEX_MANAGED_BY_VITE_PLUS"
+                )
+            ) || !names.insert(name)
+            {
+                return Err(io::Error::other("更新环境移除不符合启动契约"));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_for_generation(
+        &self,
+        state_dir: &Path,
+        generation: Uuid,
+        arguments: &[OsString],
+    ) -> io::Result<()> {
+        self.validate()?;
+        for (name, value) in &self.values {
+            if name != "CLAUDE_CONFIG_DIR" {
+                continue;
+            }
+            let expected = state_dir
+                .canonicalize()?
+                .join(format!("claude-update-{generation}"))
+                .join("config");
+            if Path::new(value) != expected
+                || arguments.len() != 3
+                || arguments[0] != "--settings"
+                || arguments[2] != "update"
+                || !matches!(
+                    arguments[1].to_str(),
+                    Some(
+                        "{\"autoUpdatesChannel\":\"latest\"}"
+                            | "{\"autoUpdatesChannel\":\"stable\"}"
+                    )
+                )
+            {
+                return Err(io::Error::other("Claude 更新配置未绑定本次代次与更新命令"));
+            }
+            // 清理后目录可缺失；尚存在的任何一层不能把监督者重定向到用户目录。
+            for ancestor in expected.ancestors() {
+                match fs::symlink_metadata(ancestor) {
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        return Err(io::Error::other("Claude 更新配置路径不能经过链接"));
+                    }
+                    Ok(metadata) => {
+                        #[cfg(windows)]
+                        {
+                            use std::os::windows::fs::MetadataExt as _;
+                            use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+                            if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT.0 != 0 {
+                                return Err(io::Error::other(
+                                    "Claude 更新配置路径不能经过重解析点",
+                                ));
+                            }
+                        }
+                        #[cfg(not(windows))]
+                        let _ = metadata;
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Manifest {
     version: u32,
@@ -37,6 +144,10 @@ struct Manifest {
     executable: PathBuf,
     arguments: Vec<OsString>,
     cwd: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    isolated_home: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    environment: Option<ManagedEnvironment>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -130,6 +241,59 @@ pub(crate) async fn spawn(
     arguments: &[OsString],
     cwd: &Path,
 ) -> io::Result<ManagedChild> {
+    spawn_with_isolated_home(state_dir, generation, executable, arguments, cwd, None).await
+}
+
+pub(crate) async fn spawn_with_isolated_home(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    arguments: &[OsString],
+    cwd: &Path,
+    isolated_home: Option<&Path>,
+) -> io::Result<ManagedChild> {
+    spawn_configured(
+        state_dir,
+        generation,
+        executable,
+        arguments,
+        cwd,
+        isolated_home,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn spawn_with_environment(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    arguments: &[OsString],
+    cwd: &Path,
+    environment: ManagedEnvironment,
+) -> io::Result<ManagedChild> {
+    environment.validate_for_generation(state_dir, generation, arguments)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        executable,
+        arguments,
+        cwd,
+        None,
+        Some(environment),
+    )
+    .await
+}
+
+async fn spawn_configured(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    arguments: &[OsString],
+    cwd: &Path,
+    isolated_home: Option<&Path>,
+    environment: Option<ManagedEnvironment>,
+) -> io::Result<ManagedChild> {
     let worker = supervisor_executable()?;
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
     let manifest = Manifest {
@@ -141,13 +305,11 @@ pub(crate) async fn spawn(
         executable: executable.to_owned(),
         arguments: arguments.to_owned(),
         cwd: cwd.to_owned(),
+        isolated_home: isolated_home.map(Path::to_owned),
+        environment,
     };
-    let directory = create_generation_directory(state_dir, generation)?;
+    let (directory, _) = create_launch_manifest(state_dir, &manifest)?;
     let manifest_path = directory.join("manifest.json");
-    write_new_record(
-        &manifest_path,
-        &serde_json::to_vec(&manifest).map_err(io::Error::other)?,
-    )?;
     let mut command = Command::new(worker);
     command
         .arg(WORKER_COMMAND)
@@ -155,7 +317,32 @@ pub(crate) async fn spawn(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    let mut process = command.spawn()?;
+    let mut process = match command.spawn() {
+        Ok(process) => process,
+        Err(error) => {
+            // OS拒绝创建监督者，真实CLI不可能已启动；用持久回执解除未启动事务。
+            let mut not_started = manifest.clone();
+            not_started.launch_allowed = false;
+            let bytes = serde_json::to_vec(&not_started).map_err(io::Error::other)?;
+            let mut record = NamedTempFile::new_in(&directory)?;
+            record.write_all(&bytes)?;
+            record.as_file().sync_all()?;
+            record
+                .persist(&manifest_path)
+                .map_err(|error| error.error)?;
+            let receipt = ExitReceipt {
+                version: 1,
+                generation,
+                cleanup_confirmed: true,
+                containment: "not_started".to_owned(),
+                exit_reason: ExitReason::StopRequested,
+                exit_code: None,
+                manifest_sha256: sha256(&bytes),
+            };
+            write_receipt(&directory, &receipt)?;
+            return Err(error);
+        }
+    };
     let expected = manifest.clone();
     let control = blocking::unblock(move || {
         let mut stream = accept_authorized(&listener, &expected)?;
@@ -185,7 +372,6 @@ pub(crate) fn record_not_started(
     arguments: &[OsString],
     cwd: &Path,
 ) -> io::Result<ExitReceipt> {
-    let directory = create_generation_directory(state_dir, generation)?;
     let manifest = Manifest {
         version: 1,
         launch_allowed: false,
@@ -195,9 +381,10 @@ pub(crate) fn record_not_started(
         executable: executable.to_owned(),
         arguments: arguments.to_owned(),
         cwd: cwd.to_owned(),
+        isolated_home: None,
+        environment: None,
     };
-    let bytes = serde_json::to_vec(&manifest).map_err(io::Error::other)?;
-    write_new_record(&directory.join("manifest.json"), &bytes)?;
+    let (directory, bytes) = create_launch_manifest(state_dir, &manifest)?;
     let receipt = ExitReceipt {
         version: 1,
         generation,
@@ -247,6 +434,30 @@ fn create_generation_directory(state_dir: &Path, generation: Uuid) -> io::Result
     Ok(directory)
 }
 
+// 在声明代次前检查记录，避免确定未启动的更新因准备失败永久锁住。
+fn create_launch_manifest(state_dir: &Path, manifest: &Manifest) -> io::Result<(PathBuf, Vec<u8>)> {
+    let bytes = serde_json::to_vec(manifest).map_err(io::Error::other)?;
+    if bytes.len() as u64 > MAX_RECORD_BYTES {
+        return Err(io::Error::other("托管进程记录过大"));
+    }
+    let directory = create_generation_directory(state_dir, manifest.generation)?;
+    let result = (|| {
+        let mut record = NamedTempFile::new_in(&directory)?;
+        record.write_all(&bytes)?;
+        record.as_file().sync_all()?;
+        record
+            .persist_noclobber(directory.join("manifest.json"))
+            .map_err(|error| error.error)?;
+        Ok::<_, io::Error>(())
+    })();
+    if let Err(error) = result {
+        // 这里只删除本次独占创建的空目录；从未派生进程，也不删除已有账本。
+        let _ = fs::remove_dir(&directory);
+        return Err(error);
+    }
+    Ok((directory, bytes))
+}
+
 fn write_new_record(path: &Path, contents: &[u8]) -> io::Result<()> {
     if contents.len() as u64 > MAX_RECORD_BYTES {
         return Err(io::Error::other("托管进程记录过大"));
@@ -291,6 +502,32 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         || !manifest.cwd.is_absolute()
     {
         return Err(io::Error::other("托管进程启动契约不匹配"));
+    }
+    if let Some(environment) = &manifest.environment {
+        if manifest.isolated_home.is_some() {
+            return Err(io::Error::other("隔离任务不接受额外环境覆盖"));
+        }
+        let state_dir = directory
+            .parent()
+            .and_then(Path::parent)
+            .ok_or_else(|| io::Error::other("更新环境缺少状态域"))?;
+        environment.validate_for_generation(state_dir, manifest.generation, &manifest.arguments)?;
+    }
+    if let Some(home) = &manifest.isolated_home {
+        let state = directory
+            .parent()
+            .and_then(Path::parent)
+            .ok_or_else(|| io::Error::other("隔离启动缺少状态域"))?
+            .canonicalize()?;
+        if home.parent() != Some(state.join("grok-managed").as_path())
+            || home
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_none_or(|name| Uuid::parse_str(name).is_err())
+            || home.canonicalize()? != *home
+        {
+            return Err(io::Error::other("隔离启动目录不属于托管状态域"));
+        }
     }
     Ok((manifest, bytes))
 }
@@ -509,6 +746,17 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
 mod macos;
 
 fn write_receipt(directory: &Path, receipt: &ExitReceipt) -> io::Result<()> {
+    // 只有原生进程树收尾后才删除本代认证副本；失败不能生成成功清理回执。
+    if receipt.cleanup_confirmed {
+        let (manifest, _) = read_manifest(&directory.join("manifest.json"))?;
+        if let Some(home) = manifest.isolated_home {
+            match fs::remove_file(home.join("grok/auth.json")) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
+        }
+    }
     let mut temporary = NamedTempFile::new_in(directory)?;
     let bytes = serde_json::to_vec(receipt).map_err(io::Error::other)?;
     temporary.write_all(&bytes)?;
@@ -519,6 +767,53 @@ fn write_receipt(directory: &Path, receipt: &ExitReceipt) -> io::Result<()> {
     #[cfg(unix)]
     fs::File::open(directory)?.sync_all()?;
     Ok(())
+}
+
+pub(super) fn isolated_environment(home: &Path) -> Vec<(OsString, OsString)> {
+    // 只继承系统运行与网络路由变量；不继承 CLI 配置、动态加载器或自动批准开关。
+    let mut values: Vec<_> = [
+        "PATH",
+        "SystemRoot",
+        "WINDIR",
+        "COMSPEC",
+        "PATHEXT",
+        "LANG",
+        "LC_ALL",
+        "TZ",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+    ]
+    .into_iter()
+    .filter_map(|name| std::env::var_os(name).map(|value| (OsString::from(name), value)))
+    .collect();
+    values.extend(
+        [
+            ("HOME", "home"),
+            ("USERPROFILE", "home"),
+            ("GROK_HOME", "grok"),
+            ("APPDATA", "home/AppData/Roaming"),
+            ("LOCALAPPDATA", "home/AppData/Local"),
+            ("XDG_CONFIG_HOME", "home/.config"),
+            ("XDG_DATA_HOME", "home/.local/share"),
+            ("XDG_CACHE_HOME", "home/.cache"),
+            ("CLAUDE_CONFIG_DIR", "home/.claude"),
+            ("CODEX_HOME", "home/.codex"),
+            ("TMPDIR", "tmp"),
+            ("TMP", "tmp"),
+            ("TEMP", "tmp"),
+        ]
+        .into_iter()
+        .map(|(name, path)| (OsString::from(name), home.join(path).into_os_string())),
+    );
+    values
 }
 
 fn run_exec_worker(manifest: &Manifest) -> io::Result<()> {
@@ -535,6 +830,17 @@ fn run_exec_worker(manifest: &Manifest) -> io::Result<()> {
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
+    if let Some(home) = &manifest.isolated_home {
+        let environment = isolated_environment(home);
+        command.env_clear().envs(environment);
+    }
+    if let Some(environment) = &manifest.environment {
+        environment.validate()?;
+        for name in &environment.remove {
+            command.env_remove(name);
+        }
+        command.envs(environment.values.iter().map(|(name, value)| (name, value)));
+    }
     #[cfg(unix)]
     {
         use command::unix::CommandExt as _;

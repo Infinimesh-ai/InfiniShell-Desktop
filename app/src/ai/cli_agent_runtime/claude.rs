@@ -1,4 +1,4 @@
-//! Claude Code 2.1.273 双向 stream-json；输入排队与同回合 steering 保持区别。
+//! Claude Code 精确版本的双向 stream-json；输入排队与同回合 steering 保持区别。
 
 use std::collections::HashMap;
 use std::ffi::OsString;
@@ -39,7 +39,18 @@ mod profile_preflight;
 use permission_snapshot::{Observation, Rejection};
 
 const PERMISSION_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(5);
-const VERIFIED_VERSION: &str = "2.1.273 (Claude Code)";
+// 2.1.278 已核对原生 --version/--help；完整任务链仍需独立真实验收。
+const SUPPORTED_VERSIONS: [(&str, &str); 2] = [
+    ("2.1.273 (Claude Code)", "2.1.273"),
+    ("2.1.278 (Claude Code)", "2.1.278"),
+];
+
+pub(crate) fn supported_version(version: &str) -> bool {
+    SUPPORTED_VERSIONS
+        .iter()
+        .any(|(_, supported)| *supported == version)
+}
+
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
@@ -96,9 +107,7 @@ async fn run_process(
         .await
         .map_err(|_| RuntimeError::RequestTimedOut)??;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if !output.status.success() || detected != VERIFIED_VERSION {
-        return Err(RuntimeError::UnsupportedVersion(detected));
-    }
+    protocol.bind_probed_version(output.status.success(), &detected)?;
 
     protocol.skill_plugin = prepare_claude_skill_plugin(&protocol.options.selected_skills)
         .map_err(RuntimeError::InvalidConfiguration)?;
@@ -534,10 +543,12 @@ async fn flush_effects(
 }
 
 fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
-    if !matches!(
-        options.permission_policy,
-        PermissionPolicy::Inherit | PermissionPolicy::ClaudeRestrictedFilesV1
-    ) {
+    if options.grok_profile.is_some()
+        || !matches!(
+            options.permission_policy,
+            PermissionPolicy::Inherit | PermissionPolicy::ClaudeRestrictedFilesV1
+        )
+    {
         return Err(RuntimeError::InvalidConfiguration(
             "Claude permission modes are not equivalent to the requested filesystem sandbox".into(),
         ));
@@ -691,6 +702,8 @@ struct PendingLocalTool {
 
 struct ClaudeProtocol {
     options: SessionOptions,
+    probed_version: Option<&'static str>,
+    paired_version: Option<&'static str>,
     initialized: bool,
     session_id: Option<String>,
     next_request_id: u64,
@@ -726,6 +739,12 @@ impl ClaudeProtocol {
     fn new(options: SessionOptions) -> Self {
         Self {
             options,
+            // 旧离线协议夹具不派生进程；真实运行始终由 run_process 的本次探测重新绑定。
+            #[cfg(test)]
+            probed_version: Some("2.1.273"),
+            #[cfg(not(test))]
+            probed_version: None,
+            paired_version: None,
             initialized: false,
             session_id: None,
             next_request_id: 0,
@@ -756,6 +775,20 @@ impl ClaudeProtocol {
             #[cfg(test)]
             native_ids_for_live: None,
         }
+    }
+
+    fn bind_probed_version(&mut self, succeeded: bool, detected: &str) -> Result<(), RuntimeError> {
+        self.probed_version = None;
+        self.paired_version = None;
+        if succeeded
+            && let Some((_, version)) = SUPPORTED_VERSIONS
+                .iter()
+                .find(|(output, _)| *output == detected)
+        {
+            self.probed_version = Some(*version);
+            return Ok(());
+        }
+        Err(RuntimeError::UnsupportedVersion(detected.to_owned()))
     }
 
     fn event(&self, kind: RuntimeEventKind) -> RuntimeEvent {
@@ -871,6 +904,7 @@ impl ClaudeProtocol {
             effective_permissions["permissionObservation"] = observation.value();
         }
         RuntimeEventKind::SessionReady {
+            verified_cli_version: self.paired_version.map(str::to_owned),
             effective_permissions,
         }
     }
@@ -1546,10 +1580,15 @@ impl ClaudeProtocol {
                 }
             }
             "system" if message["subtype"] == "init" => {
+                self.paired_version = None;
                 if let Some(profile) = &self.options.claude_profile {
                     profile.verify_system_init(&message)?;
                 }
-                if message.get("claude_code_version").and_then(Value::as_str) != Some("2.1.273") {
+                // 两个已知版本也不能混配，避免探测后入口被替换却沿用旧能力判断。
+                if self.probed_version.is_none()
+                    || message.get("claude_code_version").and_then(Value::as_str)
+                        != self.probed_version
+                {
                     return Err(RuntimeError::UnsupportedVersion(
                         message["claude_code_version"].to_string(),
                     ));
@@ -1559,6 +1598,7 @@ impl ClaudeProtocol {
                         "Claude init has no native session id".into(),
                     ));
                 }
+                self.paired_version = self.probed_version;
                 let effective_permissions = json!({
                     "permissionMode":message["permissionMode"], "capabilities":message["capabilities"],
                 });
@@ -1624,6 +1664,11 @@ impl ClaudeProtocol {
         let mut effects = Effects::default();
         match pending.kind {
             PendingKind::Initialize => {
+                if self.probed_version.is_none() {
+                    return Err(RuntimeError::Protocol(
+                        "Claude initialization has no successful CLI version probe".into(),
+                    ));
+                }
                 if !success {
                     return Err(RuntimeError::Protocol(error_text(response)));
                 }

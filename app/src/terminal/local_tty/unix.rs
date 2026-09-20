@@ -19,10 +19,14 @@ use mio::Interest;
 use mio::unix::SourceFd;
 use nix::pty::openpty;
 use nix::sys::termios::{self, InputFlags, SetArg};
+use nix::unistd::ttyname;
 use serde::{Deserialize, Serialize};
 use signal_hook_mio::v1_0::Signals;
 use warp_core::channel::ChannelState;
-use warp_core::cli_agent_protocol::{WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV};
+use warp_core::cli_agent_protocol::{
+    WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV, WARP_CLI_AGENT_PROTOCOL_VERSION_ENV,
+    WARP_CLI_AGENT_TTY_ENV, WARP_CLIENT_VERSION_ENV,
+};
 use warp_core::features::FeatureFlag;
 use warp_core::safe_error;
 use warp_errors::report_if_error;
@@ -451,6 +455,14 @@ fn build_host_shell_command(
         builder.env(key, value);
     }
 
+    // 通知发送者绑定本次宿主，不能使用继承或调用者提供的旧平台路径。
+    builder.env_remove(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV);
+    if FeatureFlag::HOANotifications.is_enabled()
+        && let Ok(executable) = std::env::current_exe()
+    {
+        builder.env(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV, executable);
+    }
+
     // Set the initial working directory to the user's home directory.  If
     // `start_dir` is Some, we'll attempt to cd to that directory at the
     // start of bootstrap.
@@ -479,6 +491,12 @@ fn spawn_command_in_pty(
     // Close the follower at the end of this function.
     // We need to keep it alive long enough for fork().
     let _file = unsafe { File::from_raw_fd(follower) };
+
+    // Grok hook 会脱离控制终端；传递本次 PTY 的路径，不能沿用父进程旧值。
+    command.env_remove(WARP_CLI_AGENT_TTY_ENV);
+    if let Ok(path) = ttyname(follower) {
+        command.env(WARP_CLI_AGENT_TTY_ENV, path);
+    }
 
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     if let Ok(mut termios) = termios::tcgetattr(leader) {
@@ -938,6 +956,8 @@ fn build_docker_sandbox_command(
         builder.env(key, value);
     }
 
+    // 容器尚未部署同平台 worker，不能把宿主可执行路径误当成容器能力。
+    builder.env_remove(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV);
     builder.current_dir(home_dir);
 
     builder

@@ -124,8 +124,9 @@ def validate_tree(root, version, metadata):
         raise ValueError("插件文件不完整")
 
 
-def atomic_write(path, contents, mode):
-    descriptor, temporary_name = tempfile.mkstemp(prefix=".infinishell-patch-", dir=path.parent)
+def atomic_write(path, contents, mode, *, staging_dir=None):
+    parent = path.parent if staging_dir is None else staging_dir
+    descriptor, temporary_name = tempfile.mkstemp(prefix=".infinishell-patch-", dir=parent)
     temporary = Path(temporary_name)
     try:
         with os.fdopen(descriptor, "wb") as output:
@@ -142,7 +143,7 @@ def atomic_write(path, contents, mode):
         temporary.unlink(missing_ok=True)
 
 
-def apply_files(root, metadata, replacements):
+def apply_files(root, metadata, replacements, *, staging_parent=None):
     originals = []
     for name, contents in replacements.items():
         path = checked_file(root, name)
@@ -151,28 +152,37 @@ def apply_files(root, metadata, replacements):
         if digest(original) not in (hashes["upstream_sha256"], hashes["replacement_sha256"]) or digest(contents) != hashes["replacement_sha256"]:
             raise ValueError("摘要不匹配，未执行替换")
         originals.append((name, path, original, stat.S_IMODE(path.stat().st_mode)))
-    replaced = []
-    try:
-        for name, path, original, mode in originals:
-            if checked_file(root, name).read_bytes() != original:
-                raise ValueError("预检后检测到并发编辑")
-            atomic_write(path, replacements[name], mode)
-            replaced.append((name, path, original, mode))
-        for name, path, _, _ in originals:
-            if digest(checked_file(root, name).read_bytes()) != metadata["files"][name]["replacement_sha256"]:
-                raise ValueError("写入后摘要校验失败")
-    except Exception as original_error:
-        failures = []
-        for name, path, original, mode in reversed(replaced):
-            try:
-                if checked_file(root, name).read_bytes() != replacements[name]:
-                    raise ValueError("文件被并发修改，拒绝覆盖")
-                atomic_write(path, original, mode)
-            except Exception:
-                failures.append(name)
-        if failures:
-            raise ValueError("部分文件恢复失败，需重新校验：" + ", ".join(failures)) from original_error
-        raise
+    parent = (root.parent if staging_parent is None else staging_parent).resolve(strict=True)
+    if parent.is_relative_to(root.resolve(strict=True)):
+        raise ValueError("替换暂存必须位于活动插件目录之外")
+    # 入口指定 cache 外的 plugins 目录；夹具的默认值仅使用其私有插件父目录。
+    with tempfile.TemporaryDirectory(prefix=".infinishell-notification-patch-", dir=parent) as temporary:
+        staging = Path(temporary)
+        device = staging.stat().st_dev
+        if any(path.stat().st_dev != device for _, path, _, _ in originals):
+            raise ValueError("替换暂存与插件必须位于同一文件系统")
+        replaced = []
+        try:
+            for name, path, original, mode in originals:
+                if checked_file(root, name).read_bytes() != original:
+                    raise ValueError("预检后检测到并发编辑")
+                atomic_write(path, replacements[name], mode, staging_dir=staging)
+                replaced.append((name, path, original, mode))
+            for name, path, _, _ in originals:
+                if digest(checked_file(root, name).read_bytes()) != metadata["files"][name]["replacement_sha256"]:
+                    raise ValueError("写入后摘要校验失败")
+        except Exception as original_error:
+            failures = []
+            for name, path, original, mode in reversed(replaced):
+                try:
+                    if checked_file(root, name).read_bytes() != replacements[name]:
+                        raise ValueError("文件被并发修改，拒绝覆盖")
+                    atomic_write(path, original, mode, staging_dir=staging)
+                except Exception:
+                    failures.append(name)
+            if failures:
+                raise ValueError("部分文件恢复失败，需重新校验：" + ", ".join(failures)) from original_error
+            raise
 
 
 def verify_runtime(agent, home, cli, files_only=False):
@@ -239,7 +249,7 @@ def main():
     root, plugin_version = installation(home, args.agent, args.bundle_dir)
     validate_tree(root, plugin_version, metadata)
     if not args.check and args.agent != "codex":
-        apply_files(root, metadata, replacements)
+        apply_files(root, metadata, replacements, staging_parent=home / "plugins")
     hashes = {name: digest(checked_file(root, name).read_bytes()) for name in replacements}
     verified = all(value == metadata["files"][name]["replacement_sha256"] for name, value in hashes.items())
     report = {"agent": args.agent, "cli_version": version, "plugin_version": plugin_version, "mode": "check" if args.check else "apply", "patch_verified": verified, "sha256": hashes, "persistent_source_verified": args.agent == "codex", "native_hook_lifecycle_verified": False, "host_os": sys.platform, "files_only": args.files_only, "bash_jq_probed": not args.files_only, "native_notifications_verified": False}

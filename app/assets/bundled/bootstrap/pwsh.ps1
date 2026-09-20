@@ -7,6 +7,17 @@ param()
 # the function name to the 'Export-ModuleMember' call at the end.
 $null = New-Module -Name Warp-Module -ScriptBlock {
 #include bundled/bootstrap/pwsh_ssh_wrapper.ps1
+    # 远端只宣告已安装的同平台 worker，不能继承上一跳的可执行路径。
+    if ($env:WARP_IS_SSH -eq '1' -and $env:WARP_IS_LOCAL_SHELL_SESSION -ne '1') {
+        Remove-Item Env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE -ErrorAction SilentlyContinue
+        $notifyRelative = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { '@@WARP_NOTIFY_WINDOWS_RELATIVE_PATH@@' } else { '@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@' }
+        if ($env:WARP_CLI_AGENT_PROTOCOL_VERSION -eq '1' -and -not [String]::IsNullOrEmpty($notifyRelative)) {
+            $notifyWorker = Get-Item -LiteralPath (Join-Path $HOME $notifyRelative) -ErrorAction SilentlyContinue
+            if ($null -ne $notifyWorker -and -not $notifyWorker.PSIsContainer -and -not ($notifyWorker.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                $env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE = $notifyWorker.FullName
+            }
+        }
+    }
     # Byte sequence used to signal the start of an OSC for Warp JSON messages.
     $oscStart = "$([char]0x1b)]9278;"
 

@@ -1,4 +1,4 @@
-//! 真实生产安装器的无模型迁移；仅由隔离运行器显式启动，Windows 产品门控保持原样。
+//! 真实生产安装器的无模型迁移；仅由隔离运行器显式启动，Windows 仍走生产依赖预检。
 
 use std::env;
 use std::fs::File;
@@ -18,7 +18,9 @@ struct Evidence {
 impl Evidence {
     fn record(&mut self, value: Value) {
         let encoded = serde_json::to_string(&value).unwrap();
-        let encoded = encoded.replace(&*self.root.to_string_lossy(), "<probe-root>");
+        // Windows 路径在 JSON 中含转义反斜杠，使用同样的编码后再隐藏私有目录。
+        let root = serde_json::to_string(&self.root.to_string_lossy()).unwrap();
+        let encoded = encoded.replace(&root[1..root.len() - 1], "<probe-root>");
         writeln!(self.file, "{encoded}").unwrap();
         self.file.flush().unwrap();
     }
@@ -80,13 +82,21 @@ async fn real_install(
     let outcome = install(home, "warp", runtime, &mut log).await;
     evidence.record(json!({"event":"install_observed", "phase":phase,
         "succeeded":outcome.is_ok(), "native_install_log":log,
+        "native_command_invoked":log.lines().any(|line| line.starts_with("$ codex ")),
         "error":outcome.as_ref().err().map(|error| &error.message)}));
     assert!(
         outcome.is_ok(),
         "生产 Rust 安装失败，原始输出已保存至私有验收证据"
     );
-    assert!(log.contains("$ codex plugin marketplace add "));
-    assert!(log.contains("$ codex plugin add warp@codex-warp"));
+    match phase {
+        "rev3_to_rev4" => {
+            assert!(log.contains("$ codex plugin marketplace add "));
+            assert!(log.contains("$ codex plugin add warp@codex-warp"));
+        }
+        // 已完成的可信事务只读复验，不伪造原生安装日志。
+        "repeat_rev4_install" => assert!(log.is_empty()),
+        unexpected => panic!("未知验收安装阶段：{unexpected}"),
+    }
 }
 
 async fn exercise(root: &Path, runtime: &VerifiedRuntime, evidence: &mut Evidence) {
@@ -230,7 +240,8 @@ async fn exercise(root: &Path, runtime: &VerifiedRuntime, evidence: &mut Evidenc
     evidence.record(
         json!({"event":"rust_source_migration_passed", "passed":true,
         "model_commands_sent":0, "hook_authorization_performed":false,
-        "native_hook_execution_verified":false, "windows_product_gate_opened":false,
+        "native_hook_execution_verified":false,
+        "windows_product_gate_opened":cfg!(all(windows, target_arch = "x86_64")),
         "gui_verified":false, "rejected_cases":4}),
     );
 }
@@ -273,6 +284,7 @@ async fn real_codex_source_migration_without_model() {
     };
     evidence.record(
         json!({"event":"rust_source_migration_started", "scope":"production_rust_installer",
+        "schema_version":2,
         "platform":env::consts::OS, "credentials_provided":false, "model_commands_sent":0}),
     );
     let mut log = String::new();

@@ -8,6 +8,57 @@ use super::*;
 
 struct TestAssetProvider;
 
+#[cfg(unix)]
+#[test]
+fn remote_notification_bootstrap_drops_local_path_and_requires_installed_worker() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    let root = tempfile::tempdir().unwrap();
+    let relative = remote_server::setup::remote_server_relative_binary_path(
+        &remote_server::setup::RemoteOs::Linux,
+    );
+    let worker = root.path().join(relative);
+    std::fs::create_dir_all(worker.parent().unwrap()).unwrap();
+    let target = root.path().join("other-worker");
+    std::fs::write(&target, "synthetic worker, never executed").unwrap();
+    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o700)).unwrap();
+
+    for asset in [
+        include_str!("../../assets/bundled/bootstrap/bash_body.sh"),
+        include_str!("../../assets/bundled/bootstrap/zsh_body.sh"),
+    ] {
+        let start = asset.find("# SSH 每跳只绑定").unwrap();
+        let end = asset.find("# 新 shell 和 SSH 必须刷新当前 PTY").unwrap();
+        let block = embed_cli_agent_notify_paths(asset[start..end].to_owned());
+        let run = |local: &str, protocol: &str| {
+            let output = Command::new("bash")
+                .arg("-c")
+                .arg(format!(
+                    "{block}\nprintf '%s' \"$WARP_CLI_AGENT_NOTIFY_EXECUTABLE\""
+                ))
+                .env("HOME", root.path())
+                .env("WARP_IS_SSH", "1")
+                .env("WARP_IS_LOCAL_SHELL_SESSION", local)
+                .env("WARP_CLI_AGENT_PROTOCOL_VERSION", protocol)
+                .env("WARP_CLI_AGENT_NOTIFY_EXECUTABLE", "/previous-host/worker")
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+            assert!(output.stderr.is_empty());
+            String::from_utf8(output.stdout).unwrap()
+        };
+        assert_eq!(run("0", "1"), "");
+        symlink(&target, &worker).unwrap();
+        assert_eq!(run("0", "1"), "");
+        std::fs::remove_file(&worker).unwrap();
+        std::fs::copy(&target, &worker).unwrap();
+        assert_eq!(run("0", "1"), worker.to_string_lossy());
+        assert_eq!(run("0", "0"), "");
+        assert_eq!(run("1", "1"), "/previous-host/worker");
+        std::fs::remove_file(&worker).unwrap();
+    }
+}
+
 impl AssetProvider for TestAssetProvider {
     fn get(&self, path: &str) -> anyhow::Result<Cow<'_, [u8]>> {
         let content = match path {

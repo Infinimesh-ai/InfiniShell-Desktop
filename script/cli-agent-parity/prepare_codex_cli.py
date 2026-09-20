@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""在 RUNNER_TEMP 中准备固定 Codex 0.147.0 完整运行包，只输出绝对入口路径。"""
+"""在 RUNNER_TEMP 中准备固定完整运行包；默认 Codex 0.147.0，可显式选择 0.155.1。"""
 
 import argparse
 import hashlib
+from functools import lru_cache
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -13,9 +14,10 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import urllib.request
 
 sys.dont_write_bytecode = True
-from codex_windows_hook_inputs import CODEX_VERSION, fetch_file, regular_file, require, sha256
+from codex_windows_hook_inputs import CODEX_VERSION, fetch_file as fetch_legacy_file, regular_file, require, sha256
 
 
 # 来自固定官方完整 package 的实际成员；路径、大小、模式和摘要都属于输入契约。
@@ -83,9 +85,63 @@ PACKAGES = {
         },
     },
 }
-MAX_MEMBERS = 32
+SUPPORTED_VERSIONS = (CODEX_VERSION, "0.155.1")
+LATEST_MANIFEST_SHA256 = "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc"
+MAX_MEMBERS = 54
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
+
+
+@lru_cache(maxsize=2)
+def packages_for_version(version):
+    if version == CODEX_VERSION:
+        return PACKAGES
+    require(version == "0.155.1", "没有此版本的固定官方完整包清单")
+    manifest = Path(__file__).with_name("codex_0155_package_manifest.json")
+    require(regular_file(manifest).stat().st_size <= 64 * 1024 and
+            sha256(manifest) == LATEST_MANIFEST_SHA256, "新版固定包清单大小或摘要不匹配")
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    require(data["version"] == version and data["release_tag"] == f"rust-v{version}" and
+            set(data["packages"]) == {"linux-x64", "windows-x64", "windows-arm64", "macos-arm64"},
+            "新版固定包清单版本或平台不匹配")
+    return data["packages"]
+
+
+def fetch_file(url, destination, digest, size=None):
+    if url.startswith(f"https://github.com/openai/codex/releases/download/rust-v{CODEX_VERSION}/"):
+        return fetch_legacy_file(url, destination, digest, size)
+    # 新版只接受随准备器固定的完整包三元组，不放宽旧 hook 下载器的发布范围。
+    packages = packages_for_version("0.155.1").values()
+    require(any(url == f"https://github.com/openai/codex/releases/download/rust-v0.155.1/{p['archive']}" and
+                digest == p["sha256"] and size == p["bytes"] for p in packages),
+            "只允许固定新版官方完整包的 URL、大小和摘要")
+    if destination.exists() or destination.is_symlink():
+        require(sha256(destination) == digest and destination.stat().st_size == size,
+                "已存在的下载文件摘要不匹配，拒绝覆盖")
+        return
+    check_parent_chain(destination.parent)
+    descriptor, name = tempfile.mkstemp(prefix=".download-", dir=destination.parent)
+    temporary = Path(name)
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "InfiniShell-fixed-package-verification"})
+        with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
+            require(response.url.startswith("https://"), "官方完整包下载重定向必须保留 HTTPS")
+            count = 0
+            while chunk := response.read(1024 * 1024):
+                count += len(chunk)
+                require(count <= size, "下载内容超过固定大小限制")
+                output.write(chunk)
+        require(count == size and sha256(temporary) == digest, "下载摘要或大小不匹配")
+        os.link(temporary, destination)
+    finally:
+        original_error = sys.exc_info()[1]
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as error:
+            if original_error is not None:
+                original_error.add_note(f"完整包下载清理失败: {error}")
+            else:
+                raise
 
 
 def directory_without_links(path, *, private=False):
@@ -119,13 +175,19 @@ def check_parent_chain(path):
         directory_without_links(parent)
 
 
-def expected_metadata(package):
-    return {"layoutVersion": 1, "version": CODEX_VERSION, "target": package["target"],
+def expected_metadata(package, version=CODEX_VERSION):
+    if version != CODEX_VERSION:
+        require(version == "0.155.1", "没有此版本的固定布局元数据")
+        metadata = package["metadata"]
+        require(metadata["version"] == version and metadata["target"] == package["target"] and
+                metadata["entrypoint"] == package["entrypoint"], "所选版本与固定布局元数据不匹配")
+        return metadata
+    return {"layoutVersion": 1, "version": version, "target": package["target"],
             "variant": "codex", "entrypoint": package["entrypoint"],
             "resourcesDir": "codex-resources", "pathDir": "codex-path"}
 
 
-def verify_runtime_tree(directory, package):
+def verify_runtime_tree(directory, package, version=CODEX_VERSION):
     directory_without_links(directory, private=True)
     observed_files, observed_directories = set(), set()
     for root, directories, files in os.walk(directory, followlinks=False):
@@ -147,24 +209,24 @@ def verify_runtime_tree(directory, package):
     require(observed_files == set(package["files"]) and
             observed_directories == set(package["directories"]), "运行时完整树存在缺失或额外条目")
     metadata = json.loads((directory / "codex-package.json").read_text(encoding="utf-8"))
-    require(metadata == expected_metadata(package), "官方运行时布局元数据不匹配")
+    require(metadata == expected_metadata(package, version), "官方运行时布局元数据不匹配")
     return directory / package["entrypoint"]
 
 
-def extract_runtime_package(archive, destination, target):
-    package = PACKAGES[target]
+def extract_runtime_package(archive, destination, target, version=CODEX_VERSION):
+    package = packages_for_version(version)[target]
     require(regular_file(archive).stat().st_size == package["bytes"] and
             sha256(archive) == package["sha256"], "完整官方归档大小或摘要不匹配")
     check_parent_chain(destination.parent)
     if destination.exists() or destination.is_symlink():
-        return verify_runtime_tree(destination, package)
+        return verify_runtime_tree(destination, package, version)
     # 同一个下载目录只允许一个准备进程发布，原目录不被清空或逐文件覆盖。
     lock = destination.with_name(destination.name + ".prepare-lock")
     lock.mkdir(mode=0o700)
     staging = None
     try:
         if destination.exists() or destination.is_symlink():
-            return verify_runtime_tree(destination, package)
+            return verify_runtime_tree(destination, package, version)
         staging = Path(tempfile.mkdtemp(prefix=".codex-package-", dir=destination.parent))
         seen, total = set(), 0
         with tarfile.open(archive, mode="r:gz") as source:
@@ -175,7 +237,9 @@ def extract_runtime_package(archive, destination, target):
                         not name.startswith("/") and all(part not in ("", ".", "..") for part in name.split("/")) and
                         PurePosixPath(name).as_posix() == name,
                         "归档包含非规范或越界成员路径")
-                require(name not in seen and len(seen) < MAX_MEMBERS, "归档成员重复或过多")
+                require(name not in seen and
+                        len(seen) < min(MAX_MEMBERS, len(package["files"]) + len(package["directories"])),
+                        "归档成员重复或过多")
                 seen.add(name)
                 require(not member.linkname and not member.sparse, "归档不能包含链接或稀疏文件")
                 path = staging.joinpath(*parts)
@@ -203,11 +267,11 @@ def extract_runtime_package(archive, destination, target):
                 # 保留所需读写/执行语义，只给当前用户权限，不复制官方包的组/其他写权限。
                 path.chmod(mode & 0o700)
         require(seen == set(package["files"]) | set(package["directories"]), "完整归档有缺失成员")
-        verify_runtime_tree(staging, package)
+        verify_runtime_tree(staging, package, version)
         require(not destination.exists() and not destination.is_symlink(), "发布目标在解包期间发生变化")
         staging.rename(destination)
         staging = None
-        return verify_runtime_tree(destination, package)
+        return verify_runtime_tree(destination, package, version)
     finally:
         original_error = sys.exc_info()[1]
         cleanup_errors = []
@@ -229,7 +293,8 @@ def extract_runtime_package(archive, destination, target):
                 raise cleanup_errors[0]
 
 
-def verified_version(executable, runner_temp):
+def verified_version(executable, runner_temp, version=CODEX_VERSION):
+    require(version in SUPPORTED_VERSIONS, "没有此版本的固定官方完整包清单")
     allowed = {"PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL"}
     environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
     with tempfile.TemporaryDirectory(prefix="codex-version-", dir=runner_temp) as temporary:
@@ -243,12 +308,13 @@ def verified_version(executable, runner_temp):
         (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8")
         result = subprocess.run([str(executable), "--version"], cwd=root, env=environment,
                                 capture_output=True, text=True, timeout=10, check=True)
-    require(result.stdout.strip() == f"codex-cli {CODEX_VERSION}", "固定文件报告的 CLI 版本不匹配")
+    require(result.stdout.strip() == f"codex-cli {version}", "固定文件报告的 CLI 版本不匹配")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--download-dir", type=Path, required=True)
+    parser.add_argument("--version", choices=SUPPORTED_VERSIONS, default=CODEX_VERSION)
     args = parser.parse_args()
     machine = platform.machine().lower()
     architecture = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}.get(machine)
@@ -258,8 +324,11 @@ def main():
     elif sys.platform == "win32":
         require(architecture in ("x86_64", "aarch64"), "当前 Windows 架构没有固定官方摘要")
         target = "windows-x64" if architecture == "x86_64" else "windows-arm64"
+    elif sys.platform == "darwin" and args.version == "0.155.1":
+        require(architecture == "aarch64", "当前仅核实新版 macOS ARM64 官方完整包")
+        target = "macos-arm64"
     else:
-        parser.error("此准备器只用于 Linux / Windows；macOS 使用已有受测 CLI 路径")
+        parser.error("此版本或平台没有固定完整包；macOS 仅支持显式选择 0.155.1 ARM64")
     require("RUNNER_TEMP" in os.environ, "必须显式提供 RUNNER_TEMP")
     runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     repository = Path(__file__).resolve().parents[2]
@@ -272,13 +341,15 @@ def main():
             "下载目录必须位于 RUNNER_TEMP 且不能写入仓库")
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     check_parent_chain(directory)
-    package = PACKAGES[target]
+    package = packages_for_version(args.version)[target]
     name = package["archive"]
-    archive = directory / name
-    fetch_file(f"https://github.com/openai/codex/releases/download/rust-v{CODEX_VERSION}/{name}",
+    # 不同版本的官方资产同名；新版缓存加版本前缀，保留旧调用方的文件位置。
+    archive = directory / (name if args.version == CODEX_VERSION else f"{args.version}-{name}")
+    fetch_file(f"https://github.com/openai/codex/releases/download/rust-v{args.version}/{name}",
                archive, package["sha256"], package["bytes"])
-    executable = extract_runtime_package(archive, directory / f"runtime-{CODEX_VERSION}-{target}", target)
-    verified_version(executable, runner_temp)
+    executable = extract_runtime_package(
+        archive, directory / f"runtime-{args.version}-{target}", target, args.version)
+    verified_version(executable, runner_temp, args.version)
     print(executable.resolve())
 
 

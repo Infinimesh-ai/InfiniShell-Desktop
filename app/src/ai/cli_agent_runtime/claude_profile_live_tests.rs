@@ -44,6 +44,7 @@ async fn ready(
     match event.kind {
         RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         } => observe_profile(
             &effective_permissions,
             expected,
@@ -122,6 +123,7 @@ async fn turn(
             }
             RuntimeEventKind::SessionReady {
                 effective_permissions,
+                ..
             } => {
                 observe_profile(
                     &effective_permissions,
@@ -305,6 +307,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: env::var("INFINISHELL_CLAUDE_LIVE_MODEL").ok(),
         local_tools: None,
         selected_skills: Vec::new(),

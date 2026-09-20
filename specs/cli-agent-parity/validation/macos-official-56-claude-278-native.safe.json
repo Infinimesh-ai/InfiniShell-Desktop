@@ -1,0 +1,301 @@
+{
+  "schema": 1,
+  "scope": "source56_claude_2_1_278_fixed_profile_and_cancel_native_acceptance",
+  "candidate": "source56",
+  "parent_candidate": "source55",
+  "observed_at_utc": "2026-09-19T23:04:13Z",
+  "finalized_at_utc": "2026-09-20T00:12:24Z",
+  "host_platform": "darwin-arm64",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_tree_dirty": true,
+  "official_cli": {
+    "version": "2.1.278 (Claude Code)",
+    "platform": "darwin-arm64",
+    "release_commit": "809c980662e3525645594dc8b74f78c38a348db1",
+    "bytes": 217695408,
+    "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+    "release_manifest_bytes": 2161,
+    "release_manifest_sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28",
+    "codesign_strict_verified": true,
+    "model": "claude-sonnet-4-6"
+  },
+  "build_binding": {
+    "source50_test_binary": {
+      "sha256": "c06e5bfe2c44e70d8ec9c004c4c52e6d2756b73f03195e0d3cd88b8b918c67ae",
+      "used_by": [
+        "fixed_profile_pass",
+        "coordinator_version_ceiling_failure"
+      ]
+    },
+    "source56_test_binary": {
+      "bytes": 867291224,
+      "sha256": "9357bc46c877ad1e4544156afceb8d84774398805481dc0d390571d959232b0f",
+      "used_by": [
+        "coordinator_pass",
+        "joined_batch_cancel_wrapper_failure",
+        "joined_batch_cancel_pass",
+        "pending_edit_cancel_pass"
+      ]
+    },
+    "signed_supervisor": {
+      "bytes": 869568112,
+      "sha256": "da269b5e1d28e33e3c036b3f461b0f6f2b4ebe486bb22e511631aa0a9f99be45",
+      "codesign_strict_verified": true,
+      "source50_to_source56_relevant_runtime_implementation_unchanged": true
+    },
+    "same_commit_verified": false
+  },
+  "production_changes": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "25821cb04708d1050bee93a6dea38e4e411089f64c34c1128437a53785de235a",
+      "summary": "Expose the existing fixed Claude supported-version table as the single runtime predicate."
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "sha256": "2dfd09c461806a5406d9ae43a30f9a572e1d68db3a1d43177dbb1ce663e30bc0",
+      "summary": "Validate a saved fixed-profile parent against the supported-version table instead of the stale 2.1.273 literal."
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "sha256": "be578b6212020793a85b6b852a796c721071763c996be6db4c60b691c066c772",
+      "summary": "Use the same supported-version predicate when projecting fixed-profile verification into the task manager."
+    }
+  ],
+  "test_and_runner_changes": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "sha256": "f6d17e17a832103278296f816cf6ec77b09f61b35e1ec15f8a74c779c27e9eec"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "sha256": "ccdd9981ec0ddc4ebf73cd4afc320933db9958cf2becd407249c8b942b44648f"
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_batch_cancel_live.py",
+      "sha256": "3b540da83ee5b1f847724db8f020e27254dc93100cb1d8c4326a6be911970dc5"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+      "sha256": "400a2c12603c9357c151417ba345ac3c4e87172917ab207fd2c2ddc306836173"
+    }
+  ],
+  "native_cases": [
+    {
+      "case_id": "fixed_profile_pass",
+      "passed": true,
+      "test_exit_code": 0,
+      "events": 41,
+      "profile_verified_events": 7,
+      "approvals": 2,
+      "same_profile_resume_verified": true,
+      "resume_escalation_rejections": 3,
+      "metadata_sha256": "c1628dd1015cf56178f90a236666bc089ee8c0e4c3b5509828f4f38f1e4cb527",
+      "public_events_sha256": "6ccc1a5171bc9b75afe9d5559a3a74b779824c772dc6733fdfba7096374eeb91",
+      "test_output_sha256": "4722aa224f936ec1df26379645aad751a059e969b97983346a6901e48e366171"
+    },
+    {
+      "case_id": "coordinator_version_ceiling_failure",
+      "passed": false,
+      "counted_as_success": false,
+      "test_exit_code": 101,
+      "events": 16,
+      "elapsed_limit_seconds": 450,
+      "observed_reason": "The saved parent was verified as Claude 2.1.278, but the parent permission ceiling still accepted only the stale 2.1.273 literal, so run_agents rejected dispatch before creating a child.",
+      "cleanup_confirmed": true,
+      "metadata_sha256": "89bd5b6416fecb845a19c129b3efe2b552c0289fdbd2aad4f2a58210218fc11e",
+      "public_events_sha256": "39b2fe6bcd61747191be62a5b5c96199278a9f51491a64a471bb5d00d9cb80dd",
+      "test_output_sha256": "5431bad9878c3072a83c161c760823e1dcf1bc0e6a8a16210b38c3edf83da6e7"
+    },
+    {
+      "case_id": "coordinator_pass",
+      "passed": true,
+      "test_exit_code": 0,
+      "events": 61,
+      "runtime_events": 49,
+      "approvals_allowed": 5,
+      "native_result_correlations": 3,
+      "production_spawn_verified": true,
+      "saved_parent_child_profile_equal": true,
+      "native_message_ack_both_directions": true,
+      "automatic_result_delivery_ack_verified": true,
+      "cleanup_confirmed_events": 2,
+      "metadata_sha256": "7ae54a53eb67ea36592a65634f2494ecb782739a793eec03f441274ad25c4060",
+      "public_events_sha256": "b0bbe9d6746dd75f32c32d732a3108c4400150c52db77beb313e4fdd57215bff",
+      "test_output_sha256": "7c70acf025e83efb254b5272bd5ec7fcaf262628b5ae371d798b450c3fe1ad37"
+    },
+    {
+      "case_id": "joined_batch_cancel_wrapper_failure",
+      "passed": false,
+      "counted_as_success": false,
+      "rust_test_exit_code": 0,
+      "rust_acceptance_passed_event_present": true,
+      "events": 139,
+      "native_protocol_records": 111,
+      "observed_reason": "The outer runner incorrectly required turn_started=true for the joined input. The product correctly reported false because that input joined an already-running native batch; running and continuation inputs reported true.",
+      "product_failure": false,
+      "metadata_sha256": "973169ef9e26d5a59d1a485d8b60193ad84b10c24dc841c397c799af3dc11622",
+      "public_events_sha256": "7e2dad4965567e017b7bf8c4b5775f56b0e00c0ccd2117c7287f596b01ca5415",
+      "test_output_sha256": "3859578966c9accd76ed209d8915aada5d0240ce3bff0cdfecb1cbcd91e12a2c"
+    },
+    {
+      "case_id": "joined_batch_cancel_pass",
+      "passed": true,
+      "test_exit_code": 0,
+      "events": 138,
+      "native_protocol_records": 110,
+      "native_inputs": 3,
+      "native_executions": 2,
+      "joined_inputs": 1,
+      "cancelled_inputs": 2,
+      "continued_inputs": 1,
+      "native_interrupt_ack_verified": true,
+      "native_execution_cancelled_verified": true,
+      "native_complete_batch_result_verified": true,
+      "same_native_session_verified": true,
+      "cleanup_confirmed": true,
+      "metadata_sha256": "4414e90689704fc29a876c63add491e524e17708f944f7c32bdc929802431e56",
+      "public_events_sha256": "908e08e5c352ee50455fde254baf4f5da722d752c3247280dd1e9a43dc916c47",
+      "test_output_sha256": "ce840d7a92102118d634af9913219312df479e637e44eafe9319c08ddd8b3668"
+    },
+    {
+      "case_id": "pending_edit_cancel_pass",
+      "passed": true,
+      "test_exit_code": 0,
+      "events": 96,
+      "native_protocol_records": 70,
+      "native_inputs": 2,
+      "approval_requested": true,
+      "edit_allowed": false,
+      "file_unchanged_checks": 4,
+      "terminal_reason": "aborted_tools",
+      "continued_in_same_native_session": true,
+      "cleanup_confirmed": true,
+      "metadata_sha256": "fff193cbf0d9a22be91bfb5d4889e225721aa8ca4ba8ffffe8e0a18c45458a1b",
+      "public_events_sha256": "45b501886f076d08b9a7788f9706385c6fd089369353fb8921f14c4b4452435a",
+      "test_output_sha256": "a89124850cef8f1c7e58c879fe0f181258683db698f0bfc5335695f1eb14bd44"
+    }
+  ],
+  "local_gates": {
+    "permissions_module": {
+      "passed": 8,
+      "failed": 0
+    },
+    "task_manager_view_module": {
+      "passed": 36,
+      "failed": 0
+    },
+    "fixed_profile_version_test": {
+      "passed": 1,
+      "failed": 0
+    },
+    "installed_or_newer_version_test": {
+      "passed": 1,
+      "failed": 0
+    },
+    "batch_cancel_runner_tests": {
+      "passed": 28,
+      "failed": 0,
+      "elapsed_seconds": 0.027
+    },
+    "i18n_tests_after_copy_change": {
+      "passed": 11,
+      "failed": 0,
+      "filtered_out": 7345,
+      "elapsed_seconds": 4.85
+    },
+    "cargo_check_warp_after_copy_change": {
+      "passed": true,
+      "elapsed_seconds": 155
+    },
+    "initial_source56_gui_build_failure": {
+      "command": "cargo build -p warp --bin infinishell",
+      "passed": false,
+      "counted_as_code_failure": false,
+      "exit_code": 101,
+      "failure_stage": "warp_rlib_archive",
+      "failure_signature": "No space left on device (os error 28)",
+      "preexisting_binary_unchanged": true,
+      "preexisting_binary_sha256": "19a094a00e65cb3c60a7e34edf5e3415442178ec029c176e96a32983275732b1"
+    },
+    "source56_gui_build_without_managed_feature": {
+      "command": "CARGO_INCREMENTAL=0 cargo build -p warp --bin infinishell",
+      "passed": true,
+      "counted_as_managed_gui_acceptance": false,
+      "reason": "The local_cli_managed_tasks Cargo feature was not enabled, so the task-manager entry was intentionally absent.",
+      "bytes": 743623088,
+      "sha256": "ea9c9bfe89d8ba8360c4a80fb3b0885b32c43f038e085f1723042720df2b2d12"
+    },
+    "source56_gui_build_with_managed_feature_after_copy_change": {
+      "command": "CARGO_INCREMENTAL=0 cargo build -p warp --bin infinishell --features local_cli_managed_tasks",
+      "passed": true,
+      "bytes": 743121984,
+      "sha256": "871e8ab4666530d12a0b824f8668e4b249bcee47c0cdb901ff73976546662f35"
+    },
+    "rustfmt_changed_files_passed": true,
+    "git_diff_check_passed": true
+  },
+  "privacy_and_integrity": {
+    "fresh_private_auth_home_per_case": true,
+    "authentication_source": "explicit_api_environment",
+    "api_environment_values_recorded": false,
+    "native_credential_files_read_or_copied": false,
+    "project_settings_unchanged": true,
+    "cli_binary_unchanged": true,
+    "private_raw_evidence_preserved_outside_repository": true,
+    "repository_contains_only_safe_projection_and_hashes": true
+  },
+  "localization": {
+    "user_visible_copy_changed": true,
+    "localization_change_required": true,
+    "message_id": "cli-task-manager-claude-verification",
+    "english_ftl_sha256": "13bf49118ca03aae06bee041fe72be7cd5af5b34066be7fa10f9d066b164c335",
+    "simplified_chinese_ftl_sha256": "1cb3d8efd412468cc26bd4cb8d1dd722276375b4c475dfdae36123d90419c092",
+    "versions_named": [
+      "2.1.273",
+      "2.1.278"
+    ],
+    "i18n_gate_passed": true,
+    "new_bilingual_layout_check_required": true,
+    "english_layout_checked": true,
+    "simplified_chinese_layout_checked": true,
+    "clipping_or_overlap_observed": false
+  },
+  "managed_gui_verification": {
+    "feature": "local_cli_managed_tasks",
+    "signed_bundle": "/private/tmp/infinishell-gui-source56-managed.2PZ80I/InfiniShellCliParity56Managed.app",
+    "bundle_inner_binary_bytes": 738801664,
+    "bundle_inner_binary_sha256": "decefd1b65edecbc92338ff378177125d919a27e9e0076f4a52de51449a68098",
+    "code_resources_sha256": "2d246cbf6953484403d2c81fccc87266daafccbc76e18b872663f012a88281f9",
+    "codesign_deep_strict_verified": true,
+    "official_claude_detected": true,
+    "detected_version": "2.1.278",
+    "detected_path": "/private/tmp/infinishell-claude-278-source55.XQNhrL/fixed/claude",
+    "fixed_policy_button_simplified_chinese": "Claude 文件审批任务",
+    "fixed_policy_button_english": "Claude reviewed file tasks",
+    "updated_copy_visible_in_both_locales": true,
+    "model_request_sent": false,
+    "task_started": false,
+    "authentication_used": false,
+    "app_restart_and_persistence_verified": false,
+    "verification_app_exited": true,
+    "language_preference_restored_to_simplified_chinese": true
+  },
+  "boundaries": {
+    "fixed_profile_parent_child_native_chain_passed": true,
+    "joined_batch_cancel_native_chain_passed": true,
+    "pending_edit_cancel_native_chain_passed": true,
+    "real_gui_verified_by_these_cases": true,
+    "exact_source56_gui_build_passed": true,
+    "managed_gui_detection_and_layout_verified": true,
+    "managed_gui_native_task_run_verified": false,
+    "app_restart_verified_by_these_cases": false,
+    "persistence_verified_by_these_cases": false,
+    "http_request_count_verified": false,
+    "linux_or_windows_exact_source56_workflow_dispatched": false,
+    "dispatch_blocker": "Source56 is an uncommitted dirty candidate and no commit or push authorization was provided.",
+    "full_workspace_rerun_for_source56": false,
+    "full_cli_parity_acceptance_passed": false,
+    "goal_complete": false
+  }
+}

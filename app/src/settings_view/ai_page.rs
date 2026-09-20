@@ -19,6 +19,8 @@ use warpui::fonts::{Properties, Weight};
 use warpui::keymap::{ContextPredicate, Keystroke};
 use warpui::platform::Cursor;
 use warpui::text_layout::TextAlignment;
+#[cfg(not(target_family = "wasm"))]
+use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::ui_components::slider::SliderStateHandle;
 use warpui::ui_components::switch::SwitchStateHandle;
@@ -89,8 +91,15 @@ use crate::settings::{
     ShowConversationHistory, ShowHintText, ThinkingDisplayMode, VoiceInputEnabled,
     WarpDriveContextEnabled,
 };
+#[cfg(not(target_family = "wasm"))]
+use crate::settings::{CLIAgentUpdateChannels, CLIUpdateChannel};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
+#[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent_updates::{
+    CliAgentUpdateChannel, CliAgentUpdateError, CliAgentUpdatePhase, CliAgentUpdateSource,
+    CliAgentUpdatesModel,
+};
 use crate::terminal::session_settings::{SessionSettings, SessionSettingsChangedEvent};
 use crate::view_components::action_button::{ActionButton, ButtonSize, SecondaryTheme};
 use crate::view_components::{
@@ -645,6 +654,8 @@ pub struct AISettingsPageView {
     cli_agent_footer_command_editor: ViewHandle<SubmittableTextInput>,
     cli_agent_footer_command_mouse_state_handles: Vec<MouseStateHandle>,
     cli_agent_footer_command_agent_dropdowns: Vec<ViewHandle<Dropdown<AISettingsPageAction>>>,
+    #[cfg(not(target_family = "wasm"))]
+    cli_agent_update_channel_dropdowns: Vec<(CLIAgent, ViewHandle<Dropdown<AISettingsPageAction>>)>,
     agent_toolbar_inline_editor: ViewHandle<AgentToolbarInlineEditor>,
     cli_agent_toolbar_inline_editor: ViewHandle<AgentToolbarInlineEditor>,
 
@@ -869,6 +880,40 @@ impl AISettingsPageView {
             me.handle_context_window_editor_event(event, ctx);
         });
         let last_synced_context_window_editor_value = Some(clamped_initial);
+
+        #[cfg(not(target_family = "wasm"))]
+        let cli_agent_update_channel_dropdowns =
+            [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok]
+                .into_iter()
+                .map(|agent| {
+                    let selected = AISettings::as_ref(ctx).cli_agent_update_channel(agent);
+                    let handle = ctx.add_typed_action_view(|ctx| {
+                        let mut dropdown = Dropdown::new(ctx);
+                        dropdown.set_top_bar_max_width(AI_SETTINGS_DROPDOWN_WIDTH);
+                        dropdown.set_menu_width(AI_SETTINGS_DROPDOWN_WIDTH, ctx);
+                        dropdown.set_items(
+                            CLIUpdateChannel::supported_by(agent)
+                                .iter()
+                                .map(|channel| {
+                                    DropdownItem::new(
+                                        channel.display_name(),
+                                        AISettingsPageAction::SetCLIAgentUpdateChannel(
+                                            agent, *channel,
+                                        ),
+                                    )
+                                })
+                                .collect(),
+                            ctx,
+                        );
+                        dropdown.set_selected_by_action(
+                            AISettingsPageAction::SetCLIAgentUpdateChannel(agent, selected),
+                            ctx,
+                        );
+                        dropdown
+                    });
+                    (agent, handle)
+                })
+                .collect();
 
         let thinking_display_mode_dropdown =
             OtherAIWidget::create_thinking_display_mode_dropdown(ctx);
@@ -1333,6 +1378,18 @@ impl AISettingsPageView {
                     me.cli_agent_footer_command_agent_dropdowns =
                         Self::create_cli_agent_dropdowns(ctx);
                 }
+                #[cfg(not(target_family = "wasm"))]
+                AISettingsChangedEvent::CLIAgentUpdateChannels { .. } => {
+                    for (agent, handle) in &me.cli_agent_update_channel_dropdowns {
+                        let selected = AISettings::as_ref(ctx).cli_agent_update_channel(*agent);
+                        handle.update(ctx, |dropdown, ctx| {
+                            dropdown.set_selected_by_action(
+                                AISettingsPageAction::SetCLIAgentUpdateChannel(*agent, selected),
+                                ctx,
+                            );
+                        });
+                    }
+                }
                 AISettingsChangedEvent::ThinkingDisplayMode { .. } => {
                     let current_mode = *AISettings::as_ref(ctx).thinking_display_mode.value();
                     me.thinking_display_mode_dropdown
@@ -1399,6 +1456,12 @@ impl AISettingsPageView {
                 ctx.notify();
             },
         );
+        #[cfg(not(target_family = "wasm"))]
+        if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+            ctx.subscribe_to_model(&CliAgentUpdatesModel::handle(ctx), |_, _, _, ctx| {
+                ctx.notify();
+            });
+        }
 
         let current_permission =
             BlocklistAIPermissions::as_ref(ctx).active_permissions_profile(ctx, None);
@@ -2009,6 +2072,8 @@ impl AISettingsPageView {
             mcp_allowlist_mouse_state_handles,
             mcp_denylist_dropdown,
             mcp_denylist_mouse_state_handles,
+            #[cfg(not(target_family = "wasm"))]
+            cli_agent_update_channel_dropdowns,
             thinking_display_mode_dropdown,
             orchestration_message_display_mode_dropdown,
             default_prompt_submission_mode_dropdown,
@@ -3715,6 +3780,14 @@ pub enum AISettingsPageAction {
     ToggleAIInputAutoDetection,
     ToggleNLDInTerminal,
     ToggleCLIAgentToolbar,
+    #[cfg(not(target_family = "wasm"))]
+    ToggleCLIAgentAutoUpdate(CLIAgent),
+    #[cfg(not(target_family = "wasm"))]
+    SetCLIAgentUpdateChannel(CLIAgent, CLIUpdateChannel),
+    #[cfg(not(target_family = "wasm"))]
+    CheckCLIAgentUpdate(CLIAgent),
+    #[cfg(not(target_family = "wasm"))]
+    ApplyCLIAgentUpdate(CLIAgent),
     /// 切换单个 CLI agent 的指定维度可见性。
     ToggleCLIAgentPerAgent(CLIAgent, PerAgentDimension),
     ToggleUseAgentToolbar,
@@ -4145,6 +4218,37 @@ impl TypedActionView for AISettingsPageView {
                     }
                 }
                 ctx.notify();
+            }
+            #[cfg(not(target_family = "wasm"))]
+            AISettingsPageAction::ToggleCLIAgentAutoUpdate(agent) => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    let enabled = !settings.is_cli_agent_auto_update_enabled(*agent);
+                    settings.set_cli_agent_auto_update(*agent, enabled, ctx);
+                });
+                ctx.notify();
+            }
+            #[cfg(not(target_family = "wasm"))]
+            AISettingsPageAction::SetCLIAgentUpdateChannel(agent, channel) => {
+                AISettings::handle(ctx).update(ctx, |settings, ctx| {
+                    settings.set_cli_agent_update_channel(*agent, *channel, ctx);
+                });
+                ctx.notify();
+            }
+            #[cfg(not(target_family = "wasm"))]
+            AISettingsPageAction::CheckCLIAgentUpdate(agent) => {
+                if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                    CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                        model.check_now(*agent, ctx);
+                    });
+                }
+            }
+            #[cfg(not(target_family = "wasm"))]
+            AISettingsPageAction::ApplyCLIAgentUpdate(agent) => {
+                if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                    CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                        model.update_now(*agent, ctx);
+                    });
+                }
             }
             AISettingsPageAction::ToggleCLIAgentToolbar => {
                 match AISettings::handle(ctx).update(ctx, |settings, ctx| {
@@ -8095,6 +8199,12 @@ pub(crate) fn cli_agent_settings_widget_id() -> &'static str {
 fn cli_agent_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>> {
     vec![
         Box::new(CLIAgentWidget::default()),
+        #[cfg(not(target_family = "wasm"))]
+        Box::new(CLIAgentUpdateWidget::new(CLIAgent::Codex)),
+        #[cfg(not(target_family = "wasm"))]
+        Box::new(CLIAgentUpdateWidget::new(CLIAgent::Claude)),
+        #[cfg(not(target_family = "wasm"))]
+        Box::new(CLIAgentUpdateWidget::new(CLIAgent::Grok)),
         Box::new(CLIAgentAutoToggleRichInputWidget::default()),
         Box::new(CLIAgentAutoOpenRichInputWidget::default()),
         Box::new(CLIAgentAutoDismissRichInputWidget::default()),
@@ -8102,6 +8212,268 @@ fn cli_agent_widgets() -> Vec<Box<dyn SettingsWidget<View = AISettingsPageView>>
         Box::new(CLIAgentCommandsWidget),
         Box::new(CLIAgentToolbarLayoutWidget),
     ]
+}
+
+#[cfg(not(target_family = "wasm"))]
+struct CLIAgentUpdateWidget {
+    agent: CLIAgent,
+    toggle: SwitchStateHandle,
+    check_button: MouseStateHandle,
+    update_button: MouseStateHandle,
+    install_button: MouseStateHandle,
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl CLIAgentUpdateWidget {
+    fn new(agent: CLIAgent) -> Self {
+        Self {
+            agent,
+            toggle: Default::default(),
+            check_button: Default::default(),
+            update_button: Default::default(),
+            install_button: Default::default(),
+        }
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+impl SettingsWidget for CLIAgentUpdateWidget {
+    type View = AISettingsPageView;
+
+    fn widget_id(&self) -> &'static str {
+        match self.agent {
+            CLIAgent::Codex => "cli-codex-auto-update",
+            CLIAgent::Claude => "cli-claude-auto-update",
+            CLIAgent::Grok => "cli-grok-auto-update",
+            // 仅上面的三方工厂创建升级控件；其他 CLI 仍可使用原有工具栏设置。
+            _ => "cli-auto-update-unsupported",
+        }
+    }
+
+    fn search_terms(&self) -> &str {
+        match self.agent {
+            CLIAgent::Codex => {
+                "third party cli agent codex automatic update version upgrade channel latest alpha 自动 升级 更新 版本 渠道"
+            }
+            CLIAgent::Claude => {
+                "third party cli agent claude automatic update version upgrade channel latest stable 自动 升级 更新 版本 渠道"
+            }
+            CLIAgent::Grok => {
+                "third party cli agent grok automatic update version upgrade channel stable alpha 自动 升级 更新 版本 渠道"
+            }
+            _ => "third party cli update",
+        }
+    }
+
+    fn render(
+        &self,
+        view: &Self::View,
+        appearance: &Appearance,
+        app: &AppContext,
+    ) -> Box<dyn Element> {
+        let mut column = Flex::column().with_child(render_ai_setting_toggle::<
+            crate::settings::CLIAgentAutoUpdates,
+        >(
+            crate::t!(
+                "settings-cli-updates-auto",
+                agent = self.agent.display_name()
+            ),
+            AISettingsPageAction::ToggleCLIAgentAutoUpdate(self.agent),
+            AISettings::as_ref(app).is_cli_agent_auto_update_enabled(self.agent),
+            true,
+            self.toggle.clone(),
+            &view.local_only_icon_tooltip_states,
+            app,
+        ));
+        column.add_child(render_ai_status_text(
+            crate::t!("settings-cli-updates-description"),
+            app,
+        ));
+        if let Some((_, handle)) = view
+            .cli_agent_update_channel_dropdowns
+            .iter()
+            .find(|(agent, _)| *agent == self.agent)
+        {
+            let description = match self.agent {
+                CLIAgent::Codex => crate::t!("settings-cli-updates-channel-codex"),
+                CLIAgent::Claude => crate::t!("settings-cli-updates-channel-claude"),
+                CLIAgent::Grok => crate::t!("settings-cli-updates-channel-grok"),
+                _ => unreachable!("升级控件只包含三款受支持的 CLI"),
+            };
+            column.add_child(render_dropdown_item(
+                appearance,
+                &crate::t!("settings-cli-updates-channel"),
+                Some(&description),
+                None,
+                LocalOnlyIconState::for_setting(
+                    CLIAgentUpdateChannels::storage_key(),
+                    CLIAgentUpdateChannels::sync_to_cloud(),
+                    &mut view.local_only_icon_tooltip_states.borrow_mut(),
+                    app,
+                ),
+                None,
+                handle,
+            ));
+        }
+        let status = app
+            .has_singleton_model::<CliAgentUpdatesModel>()
+            .then(|| CliAgentUpdatesModel::as_ref(app).status(self.agent))
+            .flatten();
+        let Some(status) = status else {
+            column.add_child(render_ai_status_text(
+                crate::t!("settings-cli-updates-not-checked"),
+                app,
+            ));
+            return column.finish();
+        };
+        let unknown = crate::t!("settings-cli-updates-version-unknown");
+        column.add_child(render_ai_status_text(
+            crate::t!(
+                "settings-cli-updates-versions",
+                installed = status.installed_version.as_deref().unwrap_or(&unknown),
+                latest = status.latest_version.as_deref().unwrap_or(&unknown),
+                source = cli_agent_update_source_label(&status.source),
+            ),
+            app,
+        ));
+        if let Some(channel) = status.effective_channel {
+            let label = match channel {
+                CliAgentUpdateChannel::FollowInstallation => CLIUpdateChannel::FollowInstallation,
+                CliAgentUpdateChannel::Latest => CLIUpdateChannel::Latest,
+                CliAgentUpdateChannel::Stable => CLIUpdateChannel::Stable,
+                CliAgentUpdateChannel::Alpha => CLIUpdateChannel::Alpha,
+            }
+            .display_name();
+            column.add_child(render_ai_status_text(
+                crate::t!("settings-cli-updates-effective-channel", channel = label),
+                app,
+            ));
+        }
+        column.add_child(render_ai_status_text(
+            cli_agent_update_phase_label(&status.phase),
+            app,
+        ));
+        if let Some(error) = &status.error {
+            column.add_child(render_ai_status_text(
+                cli_agent_update_error_label(error),
+                app,
+            ));
+        }
+        let in_progress = matches!(
+            status.phase,
+            CliAgentUpdatePhase::Checking
+                | CliAgentUpdatePhase::Updating
+                | CliAgentUpdatePhase::Verifying
+        );
+        let mut check = appearance
+            .ui_builder()
+            .button(ButtonVariant::Secondary, self.check_button.clone())
+            .with_text_label(crate::t!("settings-cli-updates-check"));
+        if in_progress {
+            check = check.disabled();
+        }
+        let agent = self.agent;
+        let mut actions = Flex::row().with_spacing(8.).with_child(
+            check
+                .build()
+                .on_click(move |ctx, _, _| {
+                    ctx.dispatch_typed_action(AISettingsPageAction::CheckCLIAgentUpdate(agent));
+                })
+                .finish(),
+        );
+        let can_update = matches!(
+            status.phase,
+            CliAgentUpdatePhase::Available | CliAgentUpdatePhase::WaitingForIdle
+        );
+        if can_update {
+            actions.add_child(
+                appearance
+                    .ui_builder()
+                    .button(ButtonVariant::Secondary, self.update_button.clone())
+                    .with_text_label(crate::t!("settings-cli-updates-update"))
+                    .build()
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(AISettingsPageAction::ApplyCLIAgentUpdate(agent));
+                    })
+                    .finish(),
+            );
+        }
+        if matches!(status.error, Some(CliAgentUpdateError::NotInstalled)) {
+            let url = match self.agent {
+                CLIAgent::Codex => "https://developers.openai.com/codex/cli/",
+                CLIAgent::Claude => "https://code.claude.com/docs/en/setup",
+                CLIAgent::Grok => "https://docs.x.ai/build/cli/reference",
+                _ => unreachable!("升级控件只包含三款受支持的 CLI"),
+            };
+            actions.add_child(
+                appearance
+                    .ui_builder()
+                    .button(ButtonVariant::Secondary, self.install_button.clone())
+                    .with_text_label(crate::t!("settings-cli-updates-install-guide"))
+                    .build()
+                    .on_click(move |ctx, _, _| {
+                        ctx.dispatch_typed_action(AISettingsPageAction::OpenUrl(url.to_owned()));
+                    })
+                    .finish(),
+            );
+        }
+        column.add_child(
+            Container::new(actions.finish())
+                .with_margin_bottom(16.)
+                .finish(),
+        );
+        column.finish()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn cli_agent_update_source_label(source: &CliAgentUpdateSource) -> String {
+    match source {
+        CliAgentUpdateSource::Native => crate::t!("settings-cli-updates-source-native"),
+        CliAgentUpdateSource::Npm => "npm".to_owned(),
+        CliAgentUpdateSource::Homebrew => "Homebrew".to_owned(),
+        CliAgentUpdateSource::WinGet => "WinGet".to_owned(),
+        CliAgentUpdateSource::Unknown => crate::t!("settings-cli-updates-source-unknown"),
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn cli_agent_update_phase_label(phase: &CliAgentUpdatePhase) -> String {
+    match phase {
+        CliAgentUpdatePhase::NotChecked => crate::t!("settings-cli-updates-not-checked"),
+        CliAgentUpdatePhase::Checking => crate::t!("settings-cli-updates-checking"),
+        CliAgentUpdatePhase::UpToDate => crate::t!("settings-cli-updates-current"),
+        CliAgentUpdatePhase::Available => crate::t!("settings-cli-updates-available"),
+        CliAgentUpdatePhase::WaitingForIdle => crate::t!("settings-cli-updates-waiting"),
+        CliAgentUpdatePhase::Updating => crate::t!("settings-cli-updates-updating"),
+        CliAgentUpdatePhase::Verifying => crate::t!("settings-cli-updates-verifying"),
+        CliAgentUpdatePhase::Failed => crate::t!("settings-cli-updates-failed"),
+        CliAgentUpdatePhase::Unsupported => crate::t!("settings-cli-updates-manual"),
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn cli_agent_update_error_label(error: &CliAgentUpdateError) -> String {
+    match error {
+        CliAgentUpdateError::NotInstalled => crate::t!("settings-cli-updates-not-installed"),
+        CliAgentUpdateError::UnsupportedSource => {
+            crate::t!("settings-cli-updates-unsupported-source")
+        }
+        CliAgentUpdateError::UnsupportedPlatform => {
+            crate::t!("settings-cli-updates-unsupported-platform")
+        }
+        CliAgentUpdateError::SourceChanged => crate::t!("settings-cli-updates-source-changed"),
+        CliAgentUpdateError::Network => crate::t!("settings-cli-updates-network"),
+        CliAgentUpdateError::InvalidRelease => crate::t!("settings-cli-updates-invalid-release"),
+        CliAgentUpdateError::ProbeFailed => crate::t!("settings-cli-updates-probe-failed"),
+        CliAgentUpdateError::PermissionDenied => crate::t!("settings-cli-updates-permission"),
+        CliAgentUpdateError::CommandFailed => crate::t!("settings-cli-updates-command-failed"),
+        CliAgentUpdateError::TimedOut => crate::t!("settings-cli-updates-timeout"),
+        CliAgentUpdateError::VersionMismatch => crate::t!("settings-cli-updates-version-mismatch"),
+        CliAgentUpdateError::ChannelMismatch => crate::t!("settings-cli-updates-channel-mismatch"),
+        CliAgentUpdateError::RecoveryRequired => crate::t!("settings-cli-updates-recovery"),
+        CliAgentUpdateError::PersistenceFailed => crate::t!("settings-cli-updates-persistence"),
+    }
 }
 
 // ── Per-agent chip 布局常量 ──
@@ -9612,3 +9984,7 @@ mod styles {
         }
     }
 }
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "ai_page_tests.rs"]
+mod tests;

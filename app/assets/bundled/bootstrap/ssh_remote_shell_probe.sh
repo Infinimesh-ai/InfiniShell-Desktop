@@ -78,6 +78,8 @@ function warp_windows_powershell_bootstrap_command() {
 
     local bootstrap_script="\$env:TERM_PROGRAM='WarpTerminal'
 \$env:WARP_IS_SSH='1'
+\$env:WARP_IS_LOCAL_SHELL_SESSION='0'
+\$env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE=\$null
 \$env:WARP_CLIENT_VERSION='$client_version'
 \$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
 \$env:WARP_SSH_HOP_DEPTH='$hop_depth'

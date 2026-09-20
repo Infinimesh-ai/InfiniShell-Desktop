@@ -83,8 +83,6 @@ jobs:
           node --version
           node -e "if (Number(process.versions.node.split('.')[0]) < 18) throw new Error('Node 18+ is required');"
           node --test script/cli-agent-parity/grok_plugin_tests.cjs
-          # Unix 控制终端实测；Windows 的 CONOUT$ 通道须由独立原生验收覆盖。
-          python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 
       - name: Test notification patch file transactions
         shell: bash
@@ -106,6 +104,7 @@ jobs:
           python3 -B script/cli-agent-parity/claude_image_probe_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_source_runner_tests.py -v
+          python3 -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_adapter_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_coordinator_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_official_pty_runner_tests.py -v
@@ -114,12 +113,23 @@ jobs:
           python3 -B script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_native_tool_lease_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_policy_preflight_runner_tests.py -v
+          # 仅运行合成证据与准备边界回归，不启动真实 CLI 或模型。
+          python3 -B script/cli-agent-parity/grok_native_skill_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_fixed_policy_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_child_coordinator_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_files_policy_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_selected_skill_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_catalog_preflight_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
           python3 -B script/cli-agent-parity/codex_windows_notify_tests.py -v
           python3 -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
+          python3 -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
+          # 原始 Grok P0 的 POSIX 离线夹具；不启动真实 CLI 或模型。
+          python3 -B script/cli-agent-parity/grok_native_p0_probe_tests.py -v
           python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
+          python3 -B script/cli-agent-parity/claude_windows_notifications_tests.py -v
           python3 -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
           python3 -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
           python3 -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
@@ -237,6 +247,15 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "2"
         run: cargo build -p warp_tui --bin infinishell-tui
+
+      - name: Test installed Grok hook through the native notification worker
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          export INFINISHELL_TEST_NOTIFY_WORKER="$target_dir/debug/infinishell-tui"
+          python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 
       - name: Test supervisor cleanup after host crash
         shell: bash
@@ -400,6 +419,7 @@ jobs:
           python -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Claude 托管 PNG 验收证据校验失败' }
           python -B script/cli-agent-parity/codex_source_runner_tests.py -v
+          python -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Codex source migration evidence validation failed' }
           python -B script/cli-agent-parity/grok_adapter_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Grok adapter evidence validation failed' }
@@ -409,6 +429,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Grok ordinary PTY preparation validation failed' }
           python -B script/cli-agent-parity/grok_policy_preflight_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Grok 只读权限接口预检证据校验失败' }
+          # 仅运行合成证据与准备边界回归，不启动真实 CLI 或模型。
+          python -B script/cli-agent-parity/grok_native_skill_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok 原生技能离线证据校验失败' }
+          python -B script/cli-agent-parity/grok_fixed_policy_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok 固定策略离线证据校验失败' }
+          python -B script/cli-agent-parity/grok_child_coordinator_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok 父子任务离线证据校验失败' }
+          python -B script/cli-agent-parity/grok_files_policy_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok 文件工具离线证据校验失败' }
+          python -B script/cli-agent-parity/grok_selected_skill_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok 所选技能离线证据校验失败' }
+          python -B script/cli-agent-parity/grok_catalog_preflight_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok SDK 目录离线证据校验失败' }
           # macOS 官方隔离运行器依赖 POSIX 文件权限；Windows 原生门禁由 Rust 与下方步骤验证。
           python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Windows hook command and fixed-input validation failed' }
@@ -419,9 +452,12 @@ jobs:
           python -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Native persistent source cleanup validation failed' }
           python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
+          python -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI extraction validation failed' }
           python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
+          python -B script/cli-agent-parity/claude_windows_notifications_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 通知离线判定失败' }
           python -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok preparation validation failed' }
           python -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
@@ -602,6 +638,28 @@ jobs:
 
       # 原生插件探针和离线 Rust 门禁互相独立；保留失败，同时继续具备前置条件的检查。
       # 通过显式步骤依赖阻止缺少工具链、测试二进制或监督 worker 时误跑后续验收。
+      # 只验证私有、已完成引导但未登录的会话；路径初始化不能代替正式 OSC 传输。
+      # 独立条件不因其他 CLI 门禁失败而跳过；没有自动重试，也不开放产品安装门控。
+      - name: Verify Claude Windows native SessionStart notification without credentials
+        id: claude_windows_notifications
+        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 8
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-windows-notifications.json')
+          if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 原生 SessionStart 通知未通过，保留门控关闭' }
+
+      - name: Preserve Claude Windows native notification evidence
+        if: ${{ !cancelled() && steps.claude_windows_notifications.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: claude-windows-notifications-${{ github.sha }}
+          path: ${{ runner.temp }}/claude-windows-notifications.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Check InfiniShell-Desktop
         id: check_app
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
@@ -628,6 +686,45 @@ jobs:
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
           -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)'
+
+      # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
+      - name: Verify Windows Codex production notification installer without credentials
+        id: codex_source_installer
+        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 8
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { (Test-Path -LiteralPath $_ -PathType Leaf) -and (Test-Path -LiteralPath (Join-Path (Split-Path $_) 'msys-2.0.dll') -PathType Leaf) } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash usr/bin is required for the production notification installer' }
+          $jqExecutable = (Get-Command jq.exe -CommandType Application -ErrorAction Stop).Source
+          $systemDirectory = Join-Path $env:SYSTEMROOT 'System32'
+          $powershellDirectory = Join-Path $systemDirectory 'WindowsPowerShell\v1.0'
+          $env:PATH = "$(Split-Path $gitBash);$(Split-Path $jqExecutable);$powershellDirectory;$systemDirectory;$env:PATH"
+          python -B script/cli-agent-parity/run_codex_source_live.py --test-binary $executables[0] --codex "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-rust-source-installer.ndjson" --timeout 300
+          if ($LASTEXITCODE -ne 0) { throw 'Production Codex installer migration or idempotent verification failed; no automatic retry' }
+
+      - name: Preserve Windows Codex production installer evidence
+        if: ${{ !cancelled() && steps.codex_source_installer.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-windows-production-installer-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-rust-source-installer.ndjson
+            ${{ runner.temp }}/codex-rust-source-installer.metadata.json
+            ${{ runner.temp }}/codex-rust-source-installer.test-output.txt
+          if-no-files-found: error
+          retention-days: 14
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills

@@ -34,14 +34,16 @@ BINARY_SHA256 = "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfec
 BINARY_BYTES = 141869568
 SOURCE_SNAPSHOT = "482711333c7195dc16a272777f86086d615e2afb"
 SOURCE_REVISION = "be7ce6e8cffe46d20bef9834b211616082ee866b"
+# ACP 扩展在线上传输时带一个下划线；SDK 去除后才交给 x.ai/… handler。
 DIAGNOSTIC_METHODS = (
-    "x.ai/session/info", "x.ai/session/state", "x.ai/mcp/list", "x.ai/debug/agent",
+    "_x.ai/session/info", "_x.ai/session/state", "_x.ai/mcp/list", "_x.ai/debug/agent",
 )
 ALLOWED_METHODS = ("initialize", "authenticate", "session/new", "session/load", *DIAGNOSTIC_METHODS)
 RESPONSE_STATES = {"ok", "method_not_found", "auth_required", "rpc_error", "timeout"}
 GLOBAL_CATALOG_METHOD = "_x.ai/mcp/servers_updated"
 SESSION_NOTIFICATION_METHOD = "_x.ai/session_notification"
-NOTIFICATION_METHODS = {SESSION_NOTIFICATION_METHOD, "session/update", "_x.ai/mcp_initialized", "_x.ai/mcp/init_progress", "_x.ai/mcp/server_status", GLOBAL_CATALOG_METHOD}
+GLOBAL_MODELS_METHOD = "_x.ai/models/update"
+NOTIFICATION_METHODS = {GLOBAL_MODELS_METHOD, SESSION_NOTIFICATION_METHOD, "session/update", "_x.ai/mcp_initialized", "_x.ai/mcp/init_progress", "_x.ai/mcp/server_status", GLOBAL_CATALOG_METHOD}
 JSON_TYPES = {"absent", "null", "boolean", "number", "string", "array", "object"}
 LIMITATIONS = (
     "candidate_source_differs_from_binary", "no_effective_builtin_catalog_interface_verified",
@@ -162,6 +164,16 @@ def stdout_summary(raw):
         "test_success_summary_count": len(re.findall(rb"test result: ok\. 1 passed; 0 failed; 0 ignored;", raw))}
 
 
+def info_confirmation_summary(value):
+    summaries = {"session_id", "cwd", "turns", "turn_index"}
+    flags = {"session_id_matches", "cwd_matches"}
+    counts = {"turns_u64", "turn_index_u64"}
+    return (isinstance(value, dict) and set(value) == summaries | flags | counts
+        and all(diagnostic_summary(value[key]) for key in summaries)
+        and all(type(value[key]) is bool for key in flags)
+        and all(value[key] is None or integer(value[key], 2 ** 64 - 1) for key in counts))
+
+
 def event_schemas():
     flag = lambda value: type(value) is bool
     count = integer
@@ -188,16 +200,19 @@ def event_schemas():
             "error_code": lambda value: value is None or type(value) is int and -(2 ** 31) <= value < 2 ** 31,
             "message": diagnostic_summary, "data": diagnostic_summary,
             "response_bytes": count, "response_sha256": digest},
+        "session_info_diagnostic": {"generation": valid_uuid, "sequence": count, "rpc_id": count,
+            "method": choice("_x.ai/session/info"), "response_bytes": count, "response_sha256": digest,
+            "confirmation": info_confirmation_summary},
         "diagnostic_observed": {"generation": valid_uuid, "method": choice(*DIAGNOSTIC_METHODS),
             "status": choice(*RESPONSE_STATES), "top_level_key_sha256s": lambda value:
                 isinstance(value, list) and len(value) <= 128 and all(digest(item) for item in value)},
         "mode_observation": {"generation": valid_uuid, "state": choice("unknown"),
             "value_sha256": nullable_digest},
         "catalog_observation": {"generation": valid_uuid, "state": choice("unknown"),
-            "coverage": choice("mcp_only", "unavailable"), "tool_count": count,
+            "coverage": choice("mcp_only", "unavailable"), "tool_count": lambda value: value is None or count(value),
             "catalog_sha256": nullable_digest, "fixed_tool_closure_verified": flag},
         "source_observation": {"generation": valid_uuid, "state": choice("unknown"),
-            "extra_source_count": count, "all_configuration_sources_verified": flag},
+            "extra_source_count": lambda value: value is None or count(value), "all_configuration_sources_verified": flag},
         "resume_checked": {"generation": valid_uuid, "native_session_id_sha256": digest,
             "original_profile_sha256": digest, "current_profile_sha256": digest,
             "same_profile": flag, "inputs_replayed": zero},
@@ -239,6 +254,11 @@ def project_events(events):
                 schema = schema | {"global_catalog_closed_empty": lambda value: type(value) is bool}
             if item["event"] == "native_notification_diagnostic" and item.get("method") == SESSION_NOTIFICATION_METHOD:
                 schema = schema | {"session_notification_metadata_only": lambda value: type(value) is bool}
+            if item["event"] == "native_notification_diagnostic" and item.get("method") == GLOBAL_MODELS_METHOD:
+                schema = schema | {"global_models_metadata_only": lambda value: type(value) is bool}
+            if (item["event"] == "native_notification_diagnostic" and isinstance(item.get("method"), dict)
+                    and "ignored_extension_notification" in item):
+                schema = schema | {"ignored_extension_notification": lambda value: type(value) is bool}
             require(set(item) == {"event", *schema}, "event_schema_invalid")
             require(all(check(item[name]) for name, check in schema.items()), "event_value_invalid")
             # 深拷贝只通过封闭模式的内容；未知字段的值不进入任何公开产物。
@@ -247,6 +267,19 @@ def project_events(events):
             failures.append({"event": "projection_rejected", "record_sha256": sha(canonical(item)),
                 "record_bytes": len(canonical(item))})
     return projected, failures
+
+
+def ignored_extension_observation(row):
+    # Rust 只在实际忽略后报告事实；摘要不声明正文是展示配置，也不形成权限证据。
+    summary = row["method_summary"]
+    recognized = NOTIFICATION_METHODS | {"_x.ai/queue/changed", "_x.ai/session/prompt_complete",
+        "_x.ai/session/updates", "_x.ai/session/update", "_x.ai/mcp/sdk_call"}
+    return (row.get("ignored_extension_notification") is True
+        and row["method"] == summary and summary.get("type") == "string"
+        and type(summary.get("bytes")) is int and 1 < summary["bytes"] <= 256
+        and summary["sha256"] not in {sha(method.encode()) for method in recognized}
+        and row["frame_type"] == "object" and row["params_type"] in {"object", "array", "absent"}
+        and not any(row[key] for key in ("id_present", "result_present", "error_present")))
 
 
 def rpc_error_ledger_correlated(public, diagnostic):
@@ -269,10 +302,34 @@ def rpc_error_ledger_correlated(public, diagnostic):
         and public.index(request) < public.index(response) < public.index(diagnostic))
 
 
+def info_ledger_correlated(public, diagnostic):
+    identity = lambda row: (row.get("generation"), row.get("sequence"), row.get("rpc_id"))
+    requests = [row for row in public if row["event"] == "rpc_sent" and identity(row) == identity(diagnostic)]
+    responses = [row for row in public if row["event"] == "rpc_response" and identity(row) == identity(diagnostic)]
+    duplicates = [row for row in public if row["event"] == "session_info_diagnostic" and identity(row) == identity(diagnostic)]
+    if len(requests) != 1 or len(responses) != 1 or len(duplicates) != 1:
+        return False
+    request, response = requests[0], responses[0]
+    before = public[:public.index(diagnostic)]
+    launches = [row for row in before if row["event"] == "launch_snapshot"]
+    sent = [row for row in before if row["event"] == "rpc_sent"]
+    closed = [row for row in before if row["event"] == "process_cleanup"
+        and row["generation"] == diagnostic["generation"]]
+    # 迟到、旧代或重复形状只能保留诊断，不作为当前会话核对的证明。
+    return (not closed and bool(launches) and launches[-1]["generation"] == diagnostic["generation"]
+        and bool(sent) and sent[-1] == request and request["method"] == diagnostic["method"]
+        and response["status"] == "ok"
+        and response["response_bytes"] == diagnostic["response_bytes"] > 0
+        and response["response_sha256"] == diagnostic["response_sha256"]
+        and public.index(request) < public.index(response) < public.index(diagnostic))
+
+
 def failure_diagnostics(public):
     return {"notifications": [row for row in public if row["event"] == "native_notification_diagnostic"],
         "phase_failures": [row for row in public if row["event"] == "phase_failure"],
         "drain_responses": [row for row in public if row["event"] == "drain_response_observed"],
+        "session_info": [{"diagnostic": row, "ledger_correlated": info_ledger_correlated(public, row)}
+            for row in public if row["event"] == "session_info_diagnostic"],
         "rpc_errors": [{"diagnostic": row, "ledger_correlated": rpc_error_ledger_correlated(public, row)}
             for row in public if row["event"] == "rpc_error_diagnostic"]}
 
@@ -289,7 +346,13 @@ def audit_events(exit_code, stdout, events):
             and not any(result["stdout"]["credential_shape_counts"].values()), "test_or_projection_failed")
         one = lambda name: [row for row in public if row["event"] == name]
         require(all(item["ledger_correlated"] for item in diagnostics["rpc_errors"]), "error_diagnostic_uncorrelated")
-        require(not one("rpc_error_diagnostic"), "interface_unavailable")
+        require(all(item["ledger_correlated"] for item in diagnostics["session_info"]), "info_diagnostic_uncorrelated")
+        require(all(row["confirmation"]["session_id_matches"] and row["confirmation"]["cwd_matches"]
+            and row["confirmation"]["turns_u64"] == 1 and row["confirmation"]["turn_index_u64"] == 0
+            for row in one("session_info_diagnostic")), "empty_native_history_unconfirmed")
+        errors = one("rpc_error_diagnostic")
+        require(all(row["method"] in DIAGNOSTIC_METHODS and row["error_code"] == -32601
+            for row in errors), "interface_unavailable")
         require(len(one("probe_started")) == 1 and len(one("probe_finished")) == 1
             and not one("probe_failed") and not one("phase_failure"), "probe_incomplete")
         start, finish = one("probe_started")[0], one("probe_finished")[0]
@@ -300,18 +363,23 @@ def audit_events(exit_code, stdout, events):
         require(len(launches) == MAX_PROCESSES and [row["phase"] for row in launches] == ["new", "resume"], "launch_count_invalid")
         generations = [row["generation"] for row in launches]
         require(len(set(generations)) == MAX_PROCESSES, "generation_reused")
-        # 摘要只保留安全诊断；未知通知或异常帧不能靠成功finish覆盖。
-        require(all(isinstance(row["method"], str) and row["method"] in NOTIFICATION_METHODS
+        # 已忽略的未知扩展只保留事实；已知通知仍要求原有证据与身份约束。
+        require(all(ignored_extension_observation(row) or (isinstance(row["method"], str) and row["method"] in NOTIFICATION_METHODS
             and row["frame_type"] == row["params_type"] == "object"
             and (row["global_catalog_closed_empty"] is True
                 and row["session_id"] == {"type": "absent"}
                 and row["method_summary"] == {"type": "string", "bytes": 25,
                     "sha256": sha(GLOBAL_CATALOG_METHOD.encode())}
-                if row["method"] == GLOBAL_CATALOG_METHOD else row["session_id"]["type"] == "string")
+                if row["method"] == GLOBAL_CATALOG_METHOD else (
+                    row["global_models_metadata_only"] is True
+                    and row["session_id"] == {"type": "absent"}
+                    and row["method_summary"] == {"type": "string", "bytes": 19,
+                        "sha256": sha(GLOBAL_MODELS_METHOD.encode())}
+                    if row["method"] == GLOBAL_MODELS_METHOD else row["session_id"]["type"] == "string"))
             and (row["method"] != SESSION_NOTIFICATION_METHOD or (
                 row["session_notification_metadata_only"] is True and row["method_summary"] == {
                     "type": "string", "bytes": 26, "sha256": sha(SESSION_NOTIFICATION_METHOD.encode())}))
-            and not any(row[key] for key in ("id_present", "result_present", "error_present"))
+            and not any(row[key] for key in ("id_present", "result_present", "error_present")))
             for row in one("native_notification_diagnostic")), "notification_unproved")
         require(public[0] is start and public[-1] is finish
             and all(row.get("generation") in generations for row in public if "generation" in row),
@@ -332,8 +400,14 @@ def audit_events(exit_code, stdout, events):
         for request, response in zip(sent, responses):
             require((response["generation"], response["rpc_id"], response["sequence"])
                 == (request["generation"], request["rpc_id"], request["sequence"]), "response_uncorrelated")
-            require(response["status"] == "ok" and response["response_bytes"] > 0
+            missing = response["status"] == "method_not_found" and request["method"] in DIAGNOSTIC_METHODS
+            require((response["status"] == "ok" or missing) and response["response_bytes"] > 0
                 and digest(response["response_sha256"]), "interface_unavailable")
+            if missing:
+                correlated = [row for row in errors if (row["generation"], row["rpc_id"], row["sequence"])
+                    == (request["generation"], request["rpc_id"], request["sequence"])]
+                require(len(correlated) == 1 and correlated[0]["method"] == request["method"]
+                    and correlated[0]["error_code"] == -32601, "missing_method_unproved")
             require(public.index(request) < public.index(response), "response_before_request")
         for generation, opening in zip(generations, ("session/new", "session/load")):
             phase_sent = [row for row in sent if row["generation"] == generation]
@@ -349,11 +423,26 @@ def audit_events(exit_code, stdout, events):
                 < public.index(phase_sent[2]), "auth_sequence_invalid")
             diagnostics = [row for row in one("diagnostic_observed") if row["generation"] == generation]
             require([row["method"] for row in diagnostics] == list(DIAGNOSTIC_METHODS)
-                and all(row["status"] == "ok" for row in diagnostics), "diagnostic_missing")
+                and all(row["status"] == response["status"] for row, response in zip(diagnostics, phase_responses[3:]))
+                and all(row["status"] != "method_not_found" or not row["top_level_key_sha256s"] for row in diagnostics),
+                "diagnostic_missing")
             for name in ("mode_observation", "catalog_observation", "source_observation"):
                 require(len([row for row in one(name) if row["generation"] == generation]) == 1, "unknown_boundary_missing")
+            mode = next(row for row in one("mode_observation") if row["generation"] == generation)
+            catalog = next(row for row in one("catalog_observation") if row["generation"] == generation)
+            source = next(row for row in one("source_observation") if row["generation"] == generation)
+            if diagnostics[1]["status"] == "method_not_found":
+                require(mode["value_sha256"] is None, "missing_mode_overclaimed")
+            if diagnostics[2]["status"] == "method_not_found":
+                require(catalog["coverage"] == "unavailable" and catalog["tool_count"] is None
+                    and catalog["catalog_sha256"] is None and source["extra_source_count"] is None,
+                    "missing_catalog_overclaimed")
+            else:
+                require(catalog["coverage"] == "mcp_only" and integer(catalog["tool_count"])
+                    and digest(catalog["catalog_sha256"]) and integer(source["extra_source_count"]),
+                    "catalog_observation_unproved")
         require(all(row["fixed_tool_closure_verified"] is False for row in one("catalog_observation")), "catalog_overclaimed")
-        require(all(row["extra_source_count"] == 0 and row["all_configuration_sources_verified"] is False
+        require(all(row["extra_source_count"] in (None, 0) and row["all_configuration_sources_verified"] is False
             for row in one("source_observation")), "extra_source_observed")
         resumes = one("resume_checked")
         require(len(resumes) == 1 and resumes[0]["generation"] == generations[1]

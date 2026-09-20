@@ -27,6 +27,7 @@ use crate::editor::{
     AttachedImage, EditorBufferRevision, Event as EditorEvent, ImageContextOptions,
 };
 use crate::terminal::cli_agent::CLIAgent;
+use crate::terminal::input::skills::{is_user_invocable, selectable_cli_skill};
 use crate::view_components::{Dropdown, DropdownItem};
 
 #[derive(Clone, Default)]
@@ -146,6 +147,7 @@ impl LocalCLITaskManagerView {
         let agent = match self.harness {
             Harness::Codex => Some(CLIAgent::Codex),
             Harness::Claude => Some(CLIAgent::Claude),
+            Harness::Grok if self.permission == PermissionPolicy::Inherit => Some(CLIAgent::Grok),
             Harness::Grok
             | Harness::Oz
             | Harness::OpenCode
@@ -165,14 +167,19 @@ impl LocalCLITaskManagerView {
         let items = manager
             .get_skills_for_working_directory(Some(&directory), ctx)
             .into_iter()
-            .filter(|skill| {
-                skill.scope != SkillScope::Bundled
-                    && agent.is_some_and(|agent| {
-                        manager.skill_exists_for_any_provider(
-                            skill,
+            .filter(|skill| skill.scope != SkillScope::Bundled)
+            .filter_map(|skill| {
+                let agent = agent?;
+                if agent == CLIAgent::Grok {
+                    selectable_cli_skill(skill, Some(agent), manager)
+                } else {
+                    manager
+                        .skill_exists_for_any_provider(
+                            &skill,
                             agent.supported_skill_providers_for_scope(skill.scope),
                         )
-                    })
+                        .then_some(skill)
+                }
             })
             .filter(|skill| {
                 manager
@@ -303,6 +310,14 @@ impl LocalCLITaskManagerView {
         {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
+        if self.harness == Harness::Grok && !self.managed_input.attachments.skills.is_empty() {
+            if self.permission != PermissionPolicy::Inherit {
+                return Err(crate::t!("cli-agent-grok-skill-policy-required"));
+            }
+            if self.managed_input.attachments.skills.len() > 1 {
+                return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+            }
+        }
         let manager = SkillManager::as_ref(ctx);
         self.managed_input
             .attachments
@@ -311,6 +326,10 @@ impl LocalCLITaskManagerView {
             .map(|reference| {
                 manager
                     .active_skill_by_reference(reference, ctx)
+                    .filter(|skill| {
+                        self.harness != Harness::Grok
+                            || is_user_invocable(&skill.user_invocable(), CLIAgent::Grok)
+                    })
                     .cloned()
                     .ok_or_else(|| {
                         crate::t!(
@@ -334,6 +353,16 @@ impl LocalCLITaskManagerView {
         if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
+        if self.harness == Harness::Grok {
+            if self.permission != PermissionPolicy::Inherit {
+                return Err(crate::t!("cli-agent-grok-skill-policy-required"));
+            }
+            if !self.managed_input.attachments.skills.is_empty()
+                && !self.managed_input.attachments.skills.contains(reference)
+            {
+                return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+            }
+        }
         if !self.claude_skill_was_registered(reference, ctx) {
             return Err(crate::t!("cli-task-manager-skills-session-fixed"));
         }
@@ -345,7 +374,11 @@ impl LocalCLITaskManagerView {
                     skill = reference.display_label()
                 )
             })?;
-        if !skill.path.is_local() || skill.is_bundled() {
+        if !skill.path.is_local()
+            || skill.is_bundled()
+            || (self.harness == Harness::Grok
+                && !is_user_invocable(&skill.user_invocable(), CLIAgent::Grok))
+        {
             return Err(crate::t!(
                 "cli-agent-task-skill-unavailable",
                 skill = skill.name.clone()

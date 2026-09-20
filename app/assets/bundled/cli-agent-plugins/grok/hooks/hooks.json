@@ -98,6 +98,17 @@
           }
         ]
       }
+    ],
+    "StopCancelled": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"require(process.env.GROK_PLUGIN_ROOT + '/hooks/notify.cjs').main()\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

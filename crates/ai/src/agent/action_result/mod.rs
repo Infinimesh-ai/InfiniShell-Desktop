@@ -112,6 +112,9 @@ impl AIAgentActionResultType {
             | AIAgentActionResultType::RequestCommandOutput(
                 RequestCommandOutputResult::LongRunningCommandSnapshot { command, .. },
             )
+            | AIAgentActionResultType::RequestCommandOutput(
+                RequestCommandOutputResult::LaunchFailed { command, .. },
+            )
             | AIAgentActionResultType::ReadShellCommandOutput(
                 ReadShellCommandOutputResult::CommandFinished { command, .. },
             )
@@ -181,6 +184,8 @@ pub enum RequestCommandOutputResult {
     CancelledBeforeExecution,
     /// The command was denied because it was present on the denylist.
     Denylisted { command: String },
+    /// 派发前失败：没有创建 shell 命令，也不是用户取消或权限拒绝。
+    LaunchFailed { command: String, reason: String },
 }
 
 impl RequestCommandOutputResult {
@@ -188,14 +193,16 @@ impl RequestCommandOutputResult {
         match self {
             Self::Completed { exit_code, .. } => exit_code.was_successful(),
             Self::LongRunningCommandSnapshot { .. } => true,
-            Self::CancelledBeforeExecution | Self::Denylisted { .. } => false,
+            Self::CancelledBeforeExecution
+            | Self::Denylisted { .. }
+            | Self::LaunchFailed { .. } => false,
         }
     }
 
     pub fn failed(&self) -> bool {
         match self {
             Self::Completed { exit_code, .. } => !exit_code.was_successful(),
-            Self::Denylisted { .. } => true,
+            Self::Denylisted { .. } | Self::LaunchFailed { .. } => true,
             Self::CancelledBeforeExecution | Self::LongRunningCommandSnapshot { .. } => false,
         }
     }
@@ -226,6 +233,9 @@ impl Display for RequestCommandOutputResult {
             }
             RequestCommandOutputResult::Denylisted { .. } => {
                 write!(f, "Command output was on denylist")
+            }
+            RequestCommandOutputResult::LaunchFailed { command, reason } => {
+                write!(f, "Command '{command}' did not start: {reason}")
             }
         }
     }

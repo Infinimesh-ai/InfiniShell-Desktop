@@ -8602,6 +8602,9 @@ fn submit_without_auto_dismiss_keeps_rich_input_open() {
         let terminal = add_window_with_terminal(&mut app, None);
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Claude.command_prefix(), "");
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.set_session(
                     view.view_id,
@@ -8632,10 +8635,16 @@ fn submit_without_auto_dismiss_keeps_rich_input_open() {
         });
 
         // Buffer should still be cleared even though rich input is open.
-        terminal.read(&app, |view, ctx| {
-            let input = view.input.as_ref(ctx);
-            assert!(input.editor().as_ref(ctx).buffer_text(ctx).is_empty());
-        });
+        assert_eventually!(
+            terminal.read(&app, |view, ctx| view
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .buffer_text(ctx)
+                .is_empty()),
+            "Rich input buffer should clear after the delayed submit is acknowledged"
+        );
     })
 }
 
@@ -8656,6 +8665,9 @@ fn submit_with_plugin_and_auto_toggle_keeps_rich_input_open() {
         let terminal = add_window_with_terminal(&mut app, None);
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Claude.command_prefix(), "");
             // Create a session with a plugin listener and should_auto_toggle_input.
             let listener = ctx.add_model(|ctx| {
                 CLIAgentSessionListener::new(
@@ -8712,6 +8724,9 @@ fn submit_with_plugin_but_auto_toggle_off_respects_auto_dismiss() {
         let terminal = add_window_with_terminal(&mut app, None);
 
         terminal.update(&mut app, |view, ctx| {
+            view.model
+                .lock()
+                .simulate_long_running_block(CLIAgent::Claude.command_prefix(), "");
             let listener = ctx.add_model(|ctx| {
                 CLIAgentSessionListener::new(
                     view.view_id,
@@ -8822,6 +8837,22 @@ fn exiting_lrc_user_takeover_does_not_insert_agent_view_entry_card() {
     })
 }
 
+fn claude_rich_event(event: CLIAgentEventType, payload: CLIAgentEventPayload) -> CLIAgentEvent {
+    CLIAgentEvent {
+        source: CLIAgentEventSource::RichPlugin,
+        v: 1,
+        agent: CLIAgent::Claude,
+        event,
+        session_id: Some("test-claude-session".to_owned()),
+        cwd: None,
+        project: None,
+        payload: CLIAgentEventPayload {
+            prompt_id: Some("test-claude-prompt".to_owned()),
+            ..payload
+        },
+    }
+}
+
 #[test]
 fn status_blocked_auto_closes_rich_input() {
     App::test((), |mut app| async move {
@@ -8859,6 +8890,14 @@ fn status_blocked_auto_closes_rich_input() {
                     },
                     ctx,
                 );
+                sessions.update_from_event(
+                    view.view_id,
+                    &claude_rich_event(
+                        CLIAgentEventType::PromptSubmit,
+                        CLIAgentEventPayload::default(),
+                    ),
+                    ctx,
+                );
             });
 
             view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
@@ -8868,19 +8907,13 @@ fn status_blocked_auto_closes_rich_input() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionRequest,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionRequest,
+                        CLIAgentEventPayload {
                             summary: Some("Approve?".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
@@ -8936,6 +8969,14 @@ fn status_in_progress_auto_opens_rich_input_after_blocked() {
                     },
                     ctx,
                 );
+                sessions.update_from_event(
+                    view.view_id,
+                    &claude_rich_event(
+                        CLIAgentEventType::PromptSubmit,
+                        CLIAgentEventPayload::default(),
+                    ),
+                    ctx,
+                );
             });
 
             // Open rich input, then simulate blocked → closed automatically.
@@ -8943,19 +8984,13 @@ fn status_in_progress_auto_opens_rich_input_after_blocked() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionRequest,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionRequest,
+                        CLIAgentEventPayload {
                             summary: Some("Approve?".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
@@ -8971,16 +9006,10 @@ fn status_in_progress_auto_opens_rich_input_after_blocked() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionReplied,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload::default(),
-                    },
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionReplied,
+                        CLIAgentEventPayload::default(),
+                    ),
                     ctx,
                 );
             });
@@ -9117,6 +9146,14 @@ fn cli_session_status_updates_active_child_conversation() {
                     },
                     ctx,
                 );
+                sessions.update_from_event(
+                    view.view_id,
+                    &claude_rich_event(
+                        CLIAgentEventType::PromptSubmit,
+                        CLIAgentEventPayload::default(),
+                    ),
+                    ctx,
+                );
             });
 
             child_conversation_id
@@ -9133,19 +9170,13 @@ fn cli_session_status_updates_active_child_conversation() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionRequest,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionRequest,
+                        CLIAgentEventPayload {
                             summary: Some("Approve?".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
@@ -9167,16 +9198,10 @@ fn cli_session_status_updates_active_child_conversation() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionReplied,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload::default(),
-                    },
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionReplied,
+                        CLIAgentEventPayload::default(),
+                    ),
                     ctx,
                 );
             });
@@ -9193,19 +9218,13 @@ fn cli_session_status_updates_active_child_conversation() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::Stop,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::Stop,
+                        CLIAgentEventPayload {
                             response: Some("Done".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
@@ -9215,7 +9234,12 @@ fn cli_session_status_updates_active_child_conversation() {
             let conversation = BlocklistAIHistoryModel::as_ref(ctx)
                 .conversation(&child_conversation_id)
                 .expect("child conversation should exist");
-            assert_eq!(conversation.status(), &ConversationStatus::Success);
+            assert_eq!(
+                conversation.status(),
+                &ConversationStatus::Blocked {
+                    blocked_action: crate::t!("cli-agent-status-unknown"),
+                }
+            );
         });
     })
 }
@@ -9262,6 +9286,14 @@ fn cli_session_status_updates_single_child_conversation_without_agent_view() {
                     },
                     ctx,
                 );
+                sessions.update_from_event(
+                    view.view_id,
+                    &claude_rich_event(
+                        CLIAgentEventType::PromptSubmit,
+                        CLIAgentEventPayload::default(),
+                    ),
+                    ctx,
+                );
             });
 
             child_conversation_id
@@ -9278,19 +9310,13 @@ fn cli_session_status_updates_single_child_conversation_without_agent_view() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::Stop,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::Stop,
+                        CLIAgentEventPayload {
                             response: Some("Done".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
@@ -9300,7 +9326,12 @@ fn cli_session_status_updates_single_child_conversation_without_agent_view() {
             let conversation = BlocklistAIHistoryModel::as_ref(ctx)
                 .conversation(&child_conversation_id)
                 .expect("child conversation should exist");
-            assert_eq!(conversation.status(), &ConversationStatus::Success);
+            assert_eq!(
+                conversation.status(),
+                &ConversationStatus::Blocked {
+                    blocked_action: crate::t!("cli-agent-status-unknown"),
+                }
+            );
         });
     })
 }
@@ -9341,6 +9372,14 @@ fn manual_dismiss_disables_auto_toggle_for_session() {
                     },
                     ctx,
                 );
+                sessions.update_from_event(
+                    view.view_id,
+                    &claude_rich_event(
+                        CLIAgentEventType::PromptSubmit,
+                        CLIAgentEventPayload::default(),
+                    ),
+                    ctx,
+                );
             });
 
             view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
@@ -9363,35 +9402,23 @@ fn manual_dismiss_disables_auto_toggle_for_session() {
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionRequest,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload {
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionRequest,
+                        CLIAgentEventPayload {
                             summary: Some("Approve?".to_owned()),
                             ..Default::default()
                         },
-                    },
+                    ),
                     ctx,
                 );
             });
             CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                 sessions.update_from_event(
                     view.view_id,
-                    &CLIAgentEvent {
-                        source: CLIAgentEventSource::RichPlugin,
-                        v: 1,
-                        agent: CLIAgent::Claude,
-                        event: CLIAgentEventType::PermissionReplied,
-                        session_id: None,
-                        cwd: None,
-                        project: None,
-                        payload: CLIAgentEventPayload::default(),
-                    },
+                    &claude_rich_event(
+                        CLIAgentEventType::PermissionReplied,
+                        CLIAgentEventPayload::default(),
+                    ),
                     ctx,
                 );
             });

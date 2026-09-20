@@ -154,6 +154,8 @@ async fn spawn_captured_output(
     // 产品默认丢弃诊断 stderr；这个下层真实 supervisor 验收单独保存它，以核对转发边界。
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
     let manifest = Manifest {
+        isolated_home: None,
+        environment: None,
         version: 1,
         launch_allowed: true,
         generation,
@@ -376,6 +378,8 @@ fn supervised_macos_live_domain_zero_timeout_never_writes_success() {
     let generation = Uuid::new_v4();
     let state = create_generation_directory(&directory, generation).unwrap();
     let manifest = Manifest {
+        isolated_home: None,
+        environment: None,
         version: 1,
         launch_allowed: true,
         generation,
@@ -413,6 +417,8 @@ fn supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper() {
     let generation = Uuid::new_v4();
     let state = create_generation_directory(&directory, generation).unwrap();
     let manifest = Manifest {
+        isolated_home: None,
+        environment: None,
         version: 1,
         launch_allowed: true,
         generation,

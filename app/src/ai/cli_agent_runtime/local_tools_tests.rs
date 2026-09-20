@@ -1,4 +1,5 @@
 use super::*;
+use crate::ai::agent_providers::tools::local_orchestration::LocalHarness;
 
 fn context() -> TrustedLocalToolContext {
     TrustedLocalToolContext {
@@ -8,6 +9,7 @@ fn context() -> TrustedLocalToolContext {
         active_turn_id: "turn-1".to_owned(),
         allow_spawn: false,
         allow_message: true,
+        grok_creation_policy_bound: false,
         related_task_ids: HashSet::from(["parent".to_owned()]),
     }
 }
@@ -315,4 +317,76 @@ fn grok_dispatcher_preserves_serialized_reply_targets_and_shared_task_boundaries
     let mut unrelated = restored;
     unrelated.arguments["addresses"] = json!(["stranger"]);
     assert!(bind_local_tool_call(unrelated, &context()).is_err());
+}
+
+#[test]
+fn local_dispatch_preserves_grok_child_identity_and_keeps_parent_permission_gate() {
+    let request = codex_tool_request(
+        &codex_message(
+            RUN_AGENTS.name,
+            json!({"summary":"审查","base_prompt":"中文\nReview","harness":"grok",
+                "skills":["/project/.agents/skills/review/SKILL.md"],
+                "agent_run_configs":[{"name":"review","prompt":"检查修改"}]}),
+        ),
+        "native-session",
+        "turn-1",
+    )
+    .unwrap();
+    let mut allowed = context();
+    allowed.allow_spawn = true;
+    let first = bind_local_tool_call(request.clone(), &allowed).unwrap();
+    let LocalToolOperation::Spawn(run) = &first.operation else {
+        panic!("本地派发请求类型错误");
+    };
+    assert_eq!(run.harness, LocalHarness::Grok);
+    assert_eq!(run.base_prompt, "中文\nReview");
+    assert_eq!(run.skills, vec!["/project/.agents/skills/review/SKILL.md"]);
+    assert_eq!(
+        first.message_id,
+        bind_local_tool_call(request.clone(), &allowed)
+            .unwrap()
+            .message_id
+    );
+    assert!(bind_local_tool_call(request.clone(), &context()).is_err());
+    let mut grok_parent = request;
+    grok_parent.reply_target = LocalToolReplyTarget::Grok {
+        request_id: json!("grok-rpc"),
+        mcp_id: json!(4),
+    };
+    assert!(bind_local_tool_call(grok_parent, &allowed).is_err());
+    let tools = tool_definitions(true, false);
+    let spawn = tools
+        .iter()
+        .find(|tool| tool["name"] == RUN_AGENTS.name)
+        .unwrap();
+    assert_eq!(
+        spawn["inputSchema"]["properties"]["harness"]["enum"],
+        json!(["claude", "codex", "grok"])
+    );
+}
+
+#[test]
+fn grok_spawn_requires_both_creation_binding_and_current_call_permission() {
+    let request = NativeLocalToolRequest {
+        reply_target: LocalToolReplyTarget::Grok {
+            request_id: json!(4),
+            mcp_id: json!(2),
+        },
+        call_id: "fixed-spawn".into(),
+        turn_id: "turn-1".into(),
+        tool: RUN_AGENTS.name.into(),
+        arguments: json!({"summary":"审查","base_prompt":"检查","harness":"grok","agent_run_configs":[{"name":"review","prompt":"检查改动"}]}),
+    };
+    let mut trusted = context();
+    trusted.allow_spawn = true;
+    assert!(bind_local_tool_call(request.clone(), &trusted).is_err());
+    trusted.grok_creation_policy_bound = true;
+    assert!(matches!(
+        bind_local_tool_call(request.clone(), &trusted)
+            .unwrap()
+            .operation,
+        LocalToolOperation::Spawn(_)
+    ));
+    trusted.allow_spawn = false;
+    assert!(bind_local_tool_call(request, &trusted).is_err());
 }

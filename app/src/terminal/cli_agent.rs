@@ -24,7 +24,7 @@ use pathfinder_color::ColorU;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use warp_cli::agent::Harness;
-use warp_completer::parsers::simple::{all_parsed_commands, top_level_command};
+use warp_completer::parsers::simple::{all_parsed_commands, decompose_command, top_level_command};
 use warp_editor::content::buffer::Buffer;
 use warp_editor::content::markdown::MarkdownStyle;
 use warp_util::path::EscapeChar;
@@ -34,9 +34,19 @@ use warpui::{AppContext, Entity, ModelContext, SingletonEntity};
 
 use crate::ai::agent::{AgentReviewCommentBatch, DiffSetHunk};
 use crate::ai::blocklist::CLAUDE_ORANGE;
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
 use crate::code::editor::line::EditorLineLocation;
 use crate::code_review::comments::AttachedReviewCommentTarget;
 use crate::server::telemetry::CLIAgentType;
+#[cfg(not(target_family = "wasm"))]
+use crate::settings::{AISettings, CLIUpdateChannel};
+#[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
+#[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent_updates::{
+    CliAgentUpdateChannel, CliAgentUpdateEvent, CliAgentUpdatesModel,
+};
 use crate::terminal::model::session::command_executor::shell_quote_arg;
 use crate::terminal::shell::ShellType;
 use crate::ui_components::icons::Icon;
@@ -719,6 +729,78 @@ impl CLIAgent {
         }
     }
 
+    /// 简单解析器不保留分隔符语义；用原始范围仅接受完整的字面参数。
+    /// 变量、命令替换、复杂引号拼接和注释保守拒绝，不尝试执行或补全 shell 语法。
+    fn is_single_literal_command(command: &str, escape_char: EscapeChar) -> bool {
+        if command.contains(['$', '`', '\n', '\r', '#', '!']) {
+            return false;
+        }
+        let (decomposed, contains_redirection) = decompose_command(command, escape_char);
+        if contains_redirection || decomposed.len() != 1 {
+            return false;
+        }
+        let mut commands = all_parsed_commands(command, escape_char);
+        let Some(parsed) = commands.next() else {
+            return false;
+        };
+        let Some((first, last)) = parsed.parts.first().zip(parsed.parts.last()) else {
+            return false;
+        };
+        if commands.next().is_some()
+            || !command
+                .get(..first.span.start())
+                .is_some_and(|prefix| prefix.trim().is_empty())
+            || !command
+                .get(last.span.end()..)
+                .is_some_and(|suffix| suffix.trim().is_empty())
+        {
+            return false;
+        }
+        parsed.parts.iter().all(|part| {
+            let Some(raw) = command.get(part.span.start()..part.span.end()) else {
+                return false;
+            };
+            let value = part.item.as_str();
+            let quoted = raw
+                .strip_prefix('\'')
+                .and_then(|value| value.strip_suffix('\''))
+                .or_else(|| {
+                    raw.strip_prefix('"')
+                        .and_then(|value| value.strip_suffix('"'))
+                });
+            quoted == Some(value) || (raw == value && !raw.contains(['*', '?', '[', ']']))
+        })
+    }
+
+    /// 仅识别一个普通 cd 后以 && 启动单个 CLI，不猜测任意复合命令当前执行到了哪一段。
+    fn command_after_directory_change(command: &str, escape_char: EscapeChar) -> Option<&str> {
+        if command.contains(['\n', '\r']) {
+            return None;
+        }
+        let mut commands = all_parsed_commands(command, escape_char);
+        let directory_change = commands.next()?;
+        let cli = commands.next()?;
+        if commands.next().is_some() {
+            return None;
+        }
+        let [cd, path] = directory_change.parts.as_slice() else {
+            return None;
+        };
+        let cli_start = cli.parts.first()?.span.start();
+        let path_end = path.span.end();
+        if cd.span.start() != 0
+            || command.get(..cd.span.end()) != Some("cd")
+            || path.item.is_empty()
+            || path.item.starts_with('-')
+            || command.get(path_end..cli_start)?.trim() != "&&"
+            || !Self::is_single_literal_command(command.get(..path_end)?, escape_char)
+            || !Self::is_single_literal_command(command.get(cli_start..)?, escape_char)
+        {
+            return None;
+        }
+        command.get(cli_start..)
+    }
+
     /// Detects the CLI agent from a command string.
     ///
     /// When `escape_char` is provided, full shell parsing is used to skip leading
@@ -738,6 +820,19 @@ impl CLIAgent {
     ) -> Option<CLIAgent> {
         let trimmed = command.trim_start();
         let first_word = Self::extract_first_command(trimmed, escape_char)?;
+        let shell_escape = escape_char.unwrap_or(EscapeChar::Backslash);
+        let has_directory_change =
+            first_word == "cd" && all_parsed_commands(trimmed, shell_escape).nth(1).is_some();
+        let trimmed = if has_directory_change {
+            // cd 被别名重定义时，不能假设它只切换目录。
+            if aliases.is_some_and(|aliases| aliases.contains_key("cd")) {
+                return None;
+            }
+            Self::command_after_directory_change(trimmed, shell_escape)?
+        } else {
+            trimmed
+        };
+        let first_word = Self::extract_first_command(trimmed, escape_char)?;
 
         // Resolve the full command through aliases. If the first word matches an
         // alias, replace it with the alias value to produce the resolved command.
@@ -752,10 +847,20 @@ impl CLIAgent {
             })
             .unwrap_or(Cow::Borrowed(trimmed));
 
+        // 末段别名也必须仍是单个命令；版本、管理及非交互参数继续交给原有过滤。
+        if has_directory_change && !Self::is_single_literal_command(&resolved_command, shell_escape)
+        {
+            return None;
+        }
+
         // Check if resolved command matches any known CLI agent.
         // Also matches `aifx agent run claude` as Claude for Uber employees.
         enum_iterator::all::<CLIAgent>()
-            .filter(|agent| !matches!(agent, CLIAgent::Unknown))
+            .filter(|agent| {
+                !matches!(agent, CLIAgent::Unknown)
+                    && (!has_directory_change
+                        || matches!(agent, CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok))
+            })
             .find(|agent| {
                 agent.matches_command(&resolved_command, escape_char)
                     || (matches!(agent, CLIAgent::Claude)
@@ -1134,6 +1239,86 @@ impl Entity for CLIAgentInstallModel {
 
 impl SingletonEntity for CLIAgentInstallModel {}
 
+/// 复用安装、会话及设置事件同步升级条件，不在终端模型锁内执行更新操作。
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn init_cli_agent_updates(ctx: &mut AppContext) {
+    ctx.add_singleton_model(CliAgentUpdatesModel::new);
+    sync_cli_agent_update_conditions(ctx);
+    ctx.subscribe_to_model(&AISettings::handle(ctx), |_, _, ctx| {
+        sync_cli_agent_update_conditions(ctx);
+    });
+    ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |_, _, ctx| {
+        sync_cli_agent_update_conditions(ctx);
+    });
+    #[cfg(feature = "local_fs")]
+    ctx.subscribe_to_model(&LocalCLITaskCoordinator::handle(ctx), |_, _, ctx| {
+        sync_cli_agent_update_conditions(ctx);
+    });
+    ctx.subscribe_to_model(&CLIAgentInstallModel::handle(ctx), |_, _, ctx| {
+        sync_cli_agent_update_conditions(ctx);
+        CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+            for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+                updates.check_now(agent, ctx);
+            }
+        });
+    });
+    ctx.subscribe_to_model(
+        &CliAgentUpdatesModel::handle(ctx),
+        |_, event, ctx| match event {
+            CliAgentUpdateEvent::Changed { .. } => {}
+            CliAgentUpdateEvent::InstallationChanged { .. } => {
+                CLIAgentInstallModel::handle(ctx).update(ctx, |model, ctx| model.refresh(ctx));
+            }
+        },
+    );
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn sync_cli_agent_update_conditions(ctx: &mut AppContext) {
+    let conditions = [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok].map(|agent| {
+        let automatic = AISettings::as_ref(ctx).is_cli_agent_auto_update_enabled(agent);
+        let mut busy = CLIAgentSessionsModel::as_ref(ctx).has_local_session(agent);
+        #[cfg(feature = "local_fs")]
+        {
+            busy |= LocalCLITaskCoordinator::as_ref(ctx)
+                .snapshots()
+                .any(|snapshot| {
+                    snapshot.task.harness == agent.command_prefix()
+                        && (snapshot.connected
+                            || snapshot.task.state.is_active()
+                            || snapshot.active_turn_id.is_some())
+                });
+        }
+        let channel = match AISettings::as_ref(ctx).cli_agent_update_channel(agent) {
+            CLIUpdateChannel::FollowInstallation => CliAgentUpdateChannel::FollowInstallation,
+            CLIUpdateChannel::Latest => CliAgentUpdateChannel::Latest,
+            CLIUpdateChannel::Stable => CliAgentUpdateChannel::Stable,
+            CLIUpdateChannel::Alpha => CliAgentUpdateChannel::Alpha,
+        };
+        (agent, automatic, busy, channel)
+    });
+    CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+        for (agent, automatic, busy, channel) in conditions {
+            updates.configure(agent, automatic, busy, channel, ctx);
+        }
+    });
+}
+
+/// 更新期间阻止应用启动同款 CLI；尚未初始化升级模型的测试和入口保持原行为。
+pub(crate) fn cli_agent_update_in_progress(agent: CLIAgent, ctx: &AppContext) -> bool {
+    #[cfg(not(target_family = "wasm"))]
+    {
+        ctx.has_singleton_model::<CliAgentUpdatesModel>()
+            && CliAgentUpdatesModel::as_ref(ctx).is_updating(agent)
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        // Web 入口不运行本地 CLI 更新器，保持调用方相同的启动检查接口。
+        let _ = (agent, ctx);
+        false
+    }
+}
+
 #[cfg(not(target_family = "wasm"))]
 async fn scan_cli_agent_installations() -> HashMap<CLIAgent, CLIAgentInstallation> {
     let search_dirs = cli_agent_search_dirs().collect::<Vec<_>>();
@@ -1214,7 +1399,10 @@ fn find_executable_in_dir(directory: &Path, command: &str) -> Option<PathBuf> {
 }
 
 #[cfg(not(target_family = "wasm"))]
-async fn probe_cli_agent_version(agent: CLIAgent, executable: &Path) -> CLIAgentVersionStatus {
+pub(crate) async fn probe_cli_agent_version(
+    agent: CLIAgent,
+    executable: &Path,
+) -> CLIAgentVersionStatus {
     let mut command = Command::new(executable);
     command
         .arg("--version")
@@ -1236,7 +1424,7 @@ async fn probe_cli_agent_version(agent: CLIAgent, executable: &Path) -> CLIAgent
 }
 
 #[cfg(not(target_family = "wasm"))]
-fn parse_cli_agent_version(agent: CLIAgent, output: &str) -> Option<String> {
+pub(crate) fn parse_cli_agent_version(agent: CLIAgent, output: &str) -> Option<String> {
     let output = output.trim();
     let version = match agent {
         CLIAgent::Codex => output

@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 
 use super::RuntimeError;
 pub use super::claude_profile::ClaudeRestrictedFilesV1;
+pub use super::grok_profile::GrokCreationPolicyV1;
 #[cfg(feature = "local_fs")]
 use crate::persistence::model::LocalCliTask;
 
@@ -25,6 +26,7 @@ pub struct ParentPermissionCeiling {
 enum NativePermissions {
     Codex(CodexPermissions),
     Claude(ClaudePermissionProof),
+    Grok(GrokCreationProof),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,11 +35,24 @@ struct ClaudePermissionProof {
     claude_restricted_files_v1: ClaudeRestrictedFilesV1,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct GrokCreationProof {
+    grok_creation_policy_v1: GrokCreationPolicyV1,
+}
+
 impl ParentPermissionCeiling {
+    pub(crate) fn grok_profile(&self) -> Option<&GrokCreationPolicyV1> {
+        match &self.permissions {
+            NativePermissions::Grok(proof) => Some(&proof.grok_creation_policy_v1),
+            NativePermissions::Codex(_) | NativePermissions::Claude(_) => None,
+        }
+    }
+
     pub(crate) fn claude_profile(&self) -> Option<&ClaudeRestrictedFilesV1> {
         match &self.permissions {
             NativePermissions::Claude(proof) => Some(&proof.claude_restricted_files_v1),
-            NativePermissions::Codex(_) => None,
+            NativePermissions::Codex(_) | NativePermissions::Grok(_) => None,
         }
     }
 }
@@ -96,7 +111,7 @@ pub(crate) fn ceiling_from_parent(
         .unwrap_or(Value::Null);
     let reject = || rejected(None, &observed, "parent_permissions_unverifiable", false);
     if parent.harness != child_harness
-        || !matches!(parent.harness.as_str(), "codex" | "claude")
+        || !matches!(parent.harness.as_str(), "codex" | "claude" | "grok")
         || parent.generation < 1
         || parent.task_id.is_empty()
         || !Path::new(&parent.working_directory).is_absolute()
@@ -113,7 +128,10 @@ pub(crate) fn ceiling_from_parent(
             NativePermissions::Codex(parse_permissions(&observed).ok_or_else(reject)?)
         }
         "claude"
-            if config.get("cli_version").and_then(Value::as_str) == Some("2.1.273")
+            if config
+                .get("cli_version")
+                .and_then(Value::as_str)
+                .is_some_and(super::claude::supported_version)
                 && config["permission_policy"] == "ClaudeRestrictedFilesV1"
                 && observed["fixedProfileVerified"] == true
                 && observed["permissionMode"] == "plan"
@@ -125,6 +143,32 @@ pub(crate) fn ceiling_from_parent(
             profile.validate(Path::new(&parent.working_directory))?;
             NativePermissions::Claude(ClaudePermissionProof {
                 claude_restricted_files_v1: profile,
+            })
+        }
+        "grok"
+            if config["cli_version"] == "1.0.30"
+                && matches!(
+                    config["permission_policy"].as_str(),
+                    Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
+                )
+                && observed["appCreationPolicyApplied"] == true
+                && observed["permissionEnforcementVerified"] == false
+                && config["grok_profile"] == observed["grokCreationPolicyV1"] =>
+        {
+            let profile: GrokCreationPolicyV1 =
+                serde_json::from_value(config["grok_profile"].clone()).map_err(|_| reject())?;
+            profile.validate()?;
+            if config["permission_policy"] != json!(profile.permission_policy())
+                || observed["requestedPolicy"] != json!(profile.permission_policy())
+                || profile.working_directory()
+                    != Path::new(&parent.working_directory)
+                        .canonicalize()
+                        .map_err(|_| reject())?
+            {
+                return Err(reject());
+            }
+            NativePermissions::Grok(GrokCreationProof {
+                grok_creation_policy_v1: profile,
             })
         }
         _ => return Err(reject()),
@@ -220,7 +264,25 @@ pub(crate) fn verify_effective_permissions(
                 ));
             }
         }
-        NativePermissions::Codex(_) | NativePermissions::Claude(_) => {
+        NativePermissions::Grok(expected) if harness == "grok" => {
+            let profile: GrokCreationPolicyV1 =
+                serde_json::from_value(actual["grokCreationPolicyV1"].clone()).map_err(|_| {
+                    rejected(Some(ceiling), actual, "grok_creation_child_unknown", false)
+                })?;
+            if actual["appCreationPolicyApplied"] != true
+                || actual["permissionEnforcementVerified"] != false
+                || actual["requestedPolicy"] != json!(profile.permission_policy())
+            {
+                return Err(rejected(
+                    Some(ceiling),
+                    actual,
+                    "grok_creation_child_unknown",
+                    false,
+                ));
+            }
+            expected.grok_creation_policy_v1.validate_child(&profile)?;
+        }
+        NativePermissions::Codex(_) | NativePermissions::Claude(_) | NativePermissions::Grok(_) => {
             return Err(rejected(
                 Some(ceiling),
                 actual,

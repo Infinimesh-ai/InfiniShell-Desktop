@@ -25,6 +25,7 @@ fn options() -> SessionOptions {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -171,6 +172,122 @@ fn replay_native_cancellation(fixture: &str) -> Vec<RuntimeEventKind> {
         .into_iter()
         .filter(|event| matches!(event, RuntimeEventKind::TurnFinished { .. }))
         .collect()
+}
+
+// 仅用于版本绑定回归的合成 init，不代表新版本已通过真实任务链验收。
+fn version_init(version: Value) -> Value {
+    json!({
+        "type":"system", "subtype":"init", "claude_code_version":version,
+        "permissionMode":"default", "tools":[], "mcp_servers":[],
+        "session_id":"3ddff71c-4062-4198-a130-502e4c15684e"
+    })
+}
+
+#[test]
+fn supported_versions_require_matching_probe_and_init() {
+    for (output, version) in [
+        ("2.1.273 (Claude Code)", "2.1.273"),
+        ("2.1.278 (Claude Code)", "2.1.278"),
+    ] {
+        let mut protocol = ready_protocol();
+        protocol.bind_probed_version(true, output).unwrap();
+        let effects = protocol.receive(version_init(json!(version))).unwrap();
+        assert!(matches!(
+            effects.events.as_slice(),
+            [RuntimeEventKind::SessionReady { verified_cli_version: Some(actual), .. }]
+                if actual == version
+        ));
+        assert_eq!(
+            protocol.event(effects.events[0].clone()).native_session_id,
+            Some("3ddff71c-4062-4198-a130-502e4c15684e".into())
+        );
+    }
+}
+
+#[test]
+fn supported_versions_cannot_mix_probe_and_init() {
+    for (output, version) in [
+        ("2.1.273 (Claude Code)", "2.1.278"),
+        ("2.1.278 (Claude Code)", "2.1.273"),
+    ] {
+        let mut protocol = ready_protocol();
+        protocol.bind_probed_version(true, output).unwrap();
+        assert!(matches!(
+            protocol.receive(version_init(json!(version))),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+}
+
+#[test]
+fn unknown_or_failed_probe_clears_previous_version_binding() {
+    for (succeeded, output) in [
+        (true, "2.1.279 (Claude Code)"),
+        (true, "2.1.274 (Claude Code)"),
+        (true, "2.1.278-beta (Claude Code)"),
+        (true, "2.1.278"),
+        (true, ""),
+        (false, "2.1.273 (Claude Code)"),
+        (false, "2.1.278 (Claude Code)"),
+    ] {
+        let mut protocol = ready_protocol();
+        protocol
+            .bind_probed_version(true, "2.1.273 (Claude Code)")
+            .unwrap();
+        assert!(matches!(
+            protocol.bind_probed_version(succeeded, output),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+        assert!(matches!(
+            protocol.receive(version_init(json!("2.1.273"))),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+}
+
+#[test]
+fn init_requires_successful_probe_even_for_known_version() {
+    for version in ["2.1.273", "2.1.278"] {
+        let mut protocol = ready_protocol();
+        // 清除旧夹具的默认绑定，复现生产进程尚未完成探测的状态。
+        protocol.probed_version = None;
+        assert!(matches!(
+            protocol.receive(version_init(json!(version))),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+}
+
+#[test]
+fn init_rejects_unknown_or_malformed_version_after_known_probe() {
+    for version in [
+        json!("2.1.279"),
+        json!("2.1.278-beta"),
+        json!(278),
+        Value::Null,
+    ] {
+        let mut protocol = ready_protocol();
+        protocol
+            .bind_probed_version(true, "2.1.278 (Claude Code)")
+            .unwrap();
+        assert!(matches!(
+            protocol.receive(version_init(version)),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+    let mut protocol = ready_protocol();
+    protocol
+        .bind_probed_version(true, "2.1.278 (Claude Code)")
+        .unwrap();
+    let mut message = version_init(Value::Null);
+    message
+        .as_object_mut()
+        .unwrap()
+        .remove("claude_code_version");
+    assert!(matches!(
+        protocol.receive(message),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
 }
 
 #[test]
@@ -1707,6 +1824,7 @@ fn ready_observation(effects: &Effects) -> &Value {
     let [
         RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         },
     ] = effects.events.as_slice()
     else {
@@ -2034,6 +2152,7 @@ fn runtime_mode_notification_invalidates_observation_without_finishing_any_turn(
     );
     let RuntimeEventKind::SessionReady {
         effective_permissions,
+        ..
     } = &updated.events[0]
     else {
         panic!("expected updated permission observation");
@@ -2345,4 +2464,53 @@ fn live_cancel_diagnostics_distinguish_missing_null_and_non_string_values() {
         live_native_protocol_ids(&json!({"terminal_reason":"aborted_tools"}))["terminal_reason"],
         "aborted_tools"
     );
+}
+
+#[test]
+fn initial_control_ready_has_no_paired_version() {
+    let protocol = ready_protocol();
+    assert!(matches!(
+        protocol.ready_event(),
+        RuntimeEventKind::SessionReady {
+            verified_cli_version: None,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn control_handshake_without_a_successful_probe_cannot_become_ready() {
+    let mut protocol = ClaudeProtocol::new(options());
+    protocol.probed_version = None;
+    let initialize = protocol.initialize();
+    let mut reply = capture(AUTH_FAILURE)
+        .into_iter()
+        .find(|message| message["type"] == "control_response")
+        .unwrap();
+    reply["response"]["request_id"] = initialize["request_id"].clone();
+    assert!(protocol.receive(reply).is_err());
+    assert!(!protocol.initialized);
+    assert!(protocol.paired_version.is_none());
+}
+
+#[test]
+fn paired_init_after_first_input_does_not_replay_that_input() {
+    let mut protocol = ready_protocol();
+    protocol
+        .bind_probed_version(true, "2.1.278 (Claude Code)")
+        .unwrap();
+    let first = protocol.command(submit(Uuid::from_u128(72), "只提交一次"));
+    assert_eq!(first.writes.len(), 1);
+    assert_eq!(first.writes[0]["type"], "user");
+    let ready = protocol.receive(version_init(json!("2.1.278"))).unwrap();
+    assert!(ready.writes.is_empty());
+    assert!(
+        matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
+        verified_cli_version: Some(version), ..
+    }] if version == "2.1.278")
+    );
+    let repeated = protocol.receive(version_init(json!("2.1.278"))).unwrap();
+    assert!(repeated.writes.is_empty());
+    assert_eq!(protocol.turns.len(), 1);
+    assert_eq!(protocol.messages.len(), 1);
 }

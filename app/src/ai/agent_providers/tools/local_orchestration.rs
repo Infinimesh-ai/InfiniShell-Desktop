@@ -9,28 +9,37 @@ use warp_multi_agent_api as api;
 
 use super::OpenAiTool;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct RunArgs {
-    summary: String,
-    base_prompt: String,
-    harness: String,
-    #[serde(default)]
-    model_id: String,
-    agent_run_configs: Vec<ChildArgs>,
-    #[serde(default)]
-    skills: Vec<String>,
-    #[serde(default)]
-    plan_id: String,
+/// 本地派发独立于共享 protobuf，不能把 Grok 请求映射成其他 CLI。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum LocalHarness {
+    Claude,
+    Codex,
+    Grok,
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ChildArgs {
-    name: String,
-    prompt: String,
+pub(crate) struct LocalRunAgents {
+    pub summary: String,
+    pub base_prompt: String,
+    pub harness: LocalHarness,
     #[serde(default)]
-    title: String,
+    pub model_id: String,
+    pub agent_run_configs: Vec<LocalChild>,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub plan_id: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct LocalChild {
+    pub name: String,
+    pub prompt: String,
+    #[serde(default)]
+    pub title: String,
 }
 
 #[derive(Deserialize)]
@@ -60,8 +69,17 @@ fn run_parameters() -> Value {
     })
 }
 
-fn run_from_args(args: &str) -> Result<api::message::tool_call::Tool> {
-    let args: RunArgs = serde_json::from_str(args)?;
+pub(crate) fn local_run_parameters() -> Value {
+    let mut parameters = run_parameters();
+    parameters["properties"]["harness"]["enum"] = json!(["claude", "codex", "grok"]);
+    parameters
+}
+
+pub(crate) const LOCAL_RUN_AGENTS_DESCRIPTION: &str = "Request local Claude Code, Codex, or Grok child tasks under the parent's verified creation policy. Unsupported permission policies are rejected before launch. Assign distinct scopes and names. A launched task is not a completed task. Reuse returned task IDs for follow-up messages; do not spawn duplicate children. No cloud or remote execution is available through this tool.";
+
+/// 只解析本地请求；创建权限仍由协调器读取已提交父任务后判定。
+pub(crate) fn parse_local_run(args: &str) -> Result<LocalRunAgents> {
+    let args: LocalRunAgents = serde_json::from_str(args)?;
     if args.agent_run_configs.is_empty() || args.agent_run_configs.len() > 8 {
         bail!("run_agents requires between 1 and 8 local children");
     }
@@ -71,10 +89,17 @@ fn run_from_args(args: &str) -> Result<api::message::tool_call::Tool> {
             bail!("child names must be nonempty and unique");
         }
     }
-    let variant = match args.harness.as_str() {
-        "claude" => api::harness::Variant::ClaudeCode(api::harness::ClaudeCode {}),
-        "codex" => api::harness::Variant::Codex(api::harness::Codex {}),
-        _ => bail!("only verified local Claude and Codex adapters are available"),
+    Ok(args)
+}
+
+fn run_from_args(args: &str) -> Result<api::message::tool_call::Tool> {
+    let args = parse_local_run(args)?;
+    let variant = match args.harness {
+        LocalHarness::Claude => api::harness::Variant::ClaudeCode(api::harness::ClaudeCode {}),
+        LocalHarness::Codex => api::harness::Variant::Codex(api::harness::Codex {}),
+        LocalHarness::Grok => {
+            bail!("only verified local Claude and Codex adapters are available")
+        }
     };
     Ok(api::message::tool_call::Tool::RunAgents(api::RunAgents {
         summary: args.summary,

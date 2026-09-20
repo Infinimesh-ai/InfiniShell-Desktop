@@ -49,7 +49,7 @@ use anyhow::Result;
 use serde_json::Value;
 use warp_multi_agent_api as api;
 
-use crate::ai::agent::AIAgentActionResult;
+use crate::ai::agent::{AIAgentActionResult, AIAgentActionResultType, RequestCommandOutputResult};
 
 /// 一条 tool 的双向适配描述。
 ///
@@ -169,6 +169,21 @@ pub fn serialize_result(result: &api::message::ToolCallResult) -> String {
 /// 新增 BYOP tool 时,**这里的 enum match 必须同步加 variant**,否则该 tool 的
 /// 当前轮 ActionResult 会 fallback 到 Display,丢失结构化字段。
 pub fn serialize_action_result(action: &AIAgentActionResult) -> Option<String> {
+    if let AIAgentActionResultType::RequestCommandOutput(
+        RequestCommandOutputResult::LaunchFailed { command, reason },
+    ) = &action.result
+    {
+        // 复用本地 BYOP 的持久 JSON 承载，不向旧远端协议发送虚构 oneof。
+        return Some(
+            serde_json::json!({
+                "status": "error",
+                "code": "command_launch_failed",
+                "command": command,
+                "error": reason,
+            })
+            .to_string(),
+        );
+    }
     let msg_side = action_result_to_msg_result(action)?;
     for t in REGISTRY {
         if let Some(json) = (t.result_to_json)(&msg_side) {
@@ -179,6 +194,24 @@ pub fn serialize_action_result(action: &AIAgentActionResult) -> Option<String> {
         return Some(serde_json::to_string(&json).unwrap_or_else(|_| "{}".to_owned()));
     }
     None
+}
+
+/// 仅恢复本客户端明确编码的失败记录；普通工具错误不能变成 shell 启动失败。
+pub(crate) fn deserialize_command_launch_failure(
+    content: &str,
+) -> Option<RequestCommandOutputResult> {
+    let value: Value = serde_json::from_str(content).ok()?;
+    let object = value.as_object()?;
+    if object.len() != 4
+        || object.get("status")?.as_str()? != "error"
+        || object.get("code")?.as_str()? != "command_launch_failed"
+    {
+        return None;
+    }
+    Some(RequestCommandOutputResult::LaunchFailed {
+        command: object.get("command")?.as_str()?.to_owned(),
+        reason: object.get("error")?.as_str()?.to_owned(),
+    })
 }
 
 /// 把当前轮 client 端执行完的 `AIAgentActionResult` 转为
@@ -223,3 +256,7 @@ pub fn action_result_to_msg_result(
     };
     Some(msg_side)
 }
+
+#[cfg(test)]
+#[path = "launch_failure_tests.rs"]
+mod launch_failure_tests;

@@ -1548,6 +1548,7 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -1591,6 +1592,7 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
             match event.kind {
                 RuntimeEventKind::SessionReady {
                     effective_permissions,
+                    ..
                 } => {
                     if submitted_inputs != 0 || session_id.is_none() {
                         return Err("探针初始化重复或没有会话身份".into());
@@ -1860,7 +1862,7 @@ async fn native_sdk_registration_and_origin_probe() {
 #[test]
 fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
     let probe = SdkOriginProbe::new(Uuid::nil());
-    let mut protocol = GrokProtocol::new(SessionOptions {
+    let mut protocol = GrokProtocol::from_fixture(SessionOptions {
         executable: env::current_exe().unwrap(),
         cwd: env::temp_dir(),
         state_dir: env::temp_dir(),
@@ -1869,12 +1871,13 @@ fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
     });
     protocol.sdk_origin_probe = Some(probe.clone());
-    protocol.initialize();
+    protocol.initialize().unwrap();
     let error = protocol
         .receive(json!({"jsonrpc":true,"id":1,
         "error":{"code":-32603,"message":"OFFLINE_MALFORMED_RESPONSE_BODY"}}))
@@ -2027,12 +2030,12 @@ fn maintenance_shape_diagnostic_does_not_copy_deep_result_values() {
 fn maintenance_shape_diagnostic_preserves_user_pending_and_rejects_unknown_ids() {
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-    let mut protocol = GrokProtocol::new(super::tests::options());
+    let mut protocol = GrokProtocol::from_fixture(super::tests::options());
     let probe = SdkOriginProbe::new(protocol.options.generation);
     probe.state.lock().unwrap().private_response_envelope =
         Some(open_private_response_envelope(root.path()).unwrap());
     protocol.sdk_origin_probe = Some(probe.clone());
-    protocol.initialize();
+    protocol.initialize().unwrap();
     let context = protocol.transaction_context();
     let sent_at = protocol.pending.as_ref().unwrap().sent_at;
     let response = json!({"jsonrpc":"2.0","id":"skills-reload","result":{"result":{"reloaded":0}}});
@@ -2102,12 +2105,12 @@ fn unknown_response_is_captured_before_id_guard_without_consuming_pending() {
     use std::os::unix::fs::PermissionsExt;
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
-    let mut protocol = GrokProtocol::new(super::tests::options());
+    let mut protocol = GrokProtocol::from_fixture(super::tests::options());
     let probe = SdkOriginProbe::new(protocol.options.generation);
     probe.state.lock().unwrap().private_response_envelope =
         Some(open_private_response_envelope(root.path()).unwrap());
     protocol.sdk_origin_probe = Some(probe.clone());
-    protocol.initialize();
+    protocol.initialize().unwrap();
     let response = json!({"jsonrpc":"2.0","id":"OFFLINE_UNKNOWN_RESPONSE",
         "result":{"text":"OFFLINE_MODEL_BODY"}});
     for _ in 0..2 {

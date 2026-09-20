@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""准备官方固定 Grok 1.0.30 原生文件；只写私有测试目录，默认仅运行 --version。"""
+"""准备官方固定 Grok 原生文件；默认 1.0.30，只写私有目录且仅运行 --version。"""
 
 import argparse
 import hashlib
@@ -28,6 +28,21 @@ RELEASES = {
     "win32-x64": ("grok-1.0.30-windows-x86_64.exe", "grok.exe", 150036808,
                   "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266"),
 }
+VERSION_OUTPUTS = {
+    VERSION: VERSION_OUTPUT,
+    "1.0.34": "grok 1.0.34 (3736acbc8658)",
+}
+VERSION_RELEASES = {
+    VERSION: RELEASES,
+    "1.0.34": {
+        "linux-x64": ("grok-1.0.34-linux-x86_64", "grok", 163035648,
+                      "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d"),
+        "win32-x64": ("grok-1.0.34-windows-x86_64.exe", "grok.exe", 151293256,
+                      "021d8f7f6bdf9db48b6c87e799cd99130a76c463e6e6a3161510839aed016d94"),
+        "darwin-arm64": ("grok-1.0.34-macos-aarch64", "grok", 143016096,
+                         "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"),
+    },
+}
 
 
 def require(condition, message):
@@ -35,10 +50,16 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def current_platform():
-    architecture = {"amd64": "x64", "x86_64": "x64"}.get(platform.machine().lower())
+def releases_for(version):
+    require(version in VERSION_RELEASES, "只接受已核验的固定 Grok 版本")
+    return VERSION_RELEASES[version]
+
+
+def current_platform(version=VERSION):
+    architecture = {"amd64": "x64", "x86_64": "x64", "arm64": "arm64",
+                    "aarch64": "arm64"}.get(platform.machine().lower())
     target = f"{sys.platform}-{architecture}"
-    require(target in RELEASES, "当前平台没有本准备器固定的原生 Grok 文件")
+    require(target in releases_for(version), "当前平台没有此固定版本的原生 Grok 文件")
     return target
 
 
@@ -65,6 +86,11 @@ def binary_format(path, target):
             require(header[:6] == b"\x7fELF\x02\x01" and
                     struct.unpack_from("<HH", header, 16) == (3, 62), "需要 x86-64 小端 ELF PIE")
             return "elf64-x86-64"
+        if target == "darwin-arm64":
+            require(struct.unpack_from("<II", header) == (0xFEEDFACF, 0x0100000C) and
+                    struct.unpack_from("<I", header, 12)[0] == 2,
+                    "需要 macOS ARM64 小端 Mach-O 可执行文件")
+            return "mach-o64-arm64"
         require(target == "win32-x64" and header[:2] == b"MZ", "需要 Windows PE 文件")
         offset = struct.unpack_from("<I", header, 60)[0]
         require(64 <= offset <= 1024 * 1024, "PE 文件头偏移越界")
@@ -76,8 +102,10 @@ def binary_format(path, target):
         return "pe32+-x86-64"
 
 
-def verify_binary(path, target):
-    artifact, name, size, checksum = RELEASES[target]
+def verify_binary(path, target, version=VERSION):
+    releases = releases_for(version)
+    require(target in releases, "所选版本没有此平台的固定原生文件")
+    artifact, name, size, checksum = releases[target]
     require(regular_file(path).st_size == size and digest(path) == checksum,
             "原生 Grok 文件不匹配固定官方下载摘要")
     return {"platform": target, "artifact": artifact, "binary": name, "bytes": size,
@@ -104,17 +132,20 @@ def isolated_environment(root):
     return env
 
 
-def verify_version(executable, directory):
+def verify_version(executable, directory, version=VERSION):
+    releases_for(version)
     with tempfile.TemporaryDirectory(prefix="version-", dir=directory) as temporary:
         root = Path(temporary).resolve()
         completed = subprocess.run([str(executable), "--version"], env=isolated_environment(root),
                                    cwd=root, capture_output=True, text=True, encoding="utf-8",
                                    errors="strict", timeout=10, check=True)
-    require(completed.stdout.strip() == VERSION_OUTPUT, "原生 Grok 报告的版本不匹配")
+    require(completed.stdout.strip() == VERSION_OUTPUTS[version], "原生 Grok 报告的版本不匹配")
     return completed.stdout.strip()
 
 
-def owned_directory(directory, explicit_private=False):
+def owned_directory(directory, explicit_private=False, version=VERSION):
+    releases_for(version)
+    marker_contents = f"isolated Grok {version} verification inputs\n".encode()
     require(not directory.is_symlink(), "测试目录不能是符号链接")
     if directory.exists():
         require(not getattr(directory.lstat(), "st_file_attributes", 0) & 0x400,
@@ -136,17 +167,17 @@ def owned_directory(directory, explicit_private=False):
     marker = directory / MARKER
     if marker.exists() or marker.is_symlink():
         regular_file(marker)
-        require(marker.read_bytes() == MARKER_CONTENTS, "目录不属于此固定版本准备器")
+        require(marker.read_bytes() == marker_contents, "目录不属于此固定版本准备器")
     else:
         require(not any(directory.iterdir()), "不接管已有内容的目录")
         with marker.open("xb") as output:
-            output.write(MARKER_CONTENTS)
+            output.write(marker_contents)
     return directory
 
 
-def fetch(url, destination, expected_size, expected_sha256):
-    require(url in {f"{BASE_URL}/{release[0]}" for release in RELEASES.values()},
-            "只允许内置的两个固定官方版本下载地址")
+def fetch(url, destination, expected_size, expected_sha256, version=VERSION):
+    require(url in {f"{BASE_URL}/{release[0]}" for release in releases_for(version).values()},
+            "只允许所选版本的固定官方下载地址")
     if destination.exists() or destination.is_symlink():
         require(regular_file(destination).st_size == expected_size and digest(destination) == expected_sha256,
                 "已有文件不匹配固定发布，拒绝覆盖")
@@ -184,22 +215,30 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--download-dir", type=Path, help="RUNNER_TEMP 内的专用下载目录")
     group.add_argument("--private-directory", type=Path, help="显式指定源树外的新私有目录")
+    parser.add_argument("--version", choices=VERSION_RELEASES, default=VERSION,
+                        help="显式选择固定版本，默认保留 1.0.30")
     parser.add_argument("--download-only", action="store_true", help="只验证完整下载字节，不执行原生文件")
-    parser.add_argument("--target", choices=RELEASES, help="仅 --download-only 允许指定其他平台")
+    parser.add_argument("--target", choices=sorted({target for releases in VERSION_RELEASES.values()
+                                                   for target in releases}),
+                        help="仅 --download-only 允许指定其他平台")
     args = parser.parse_args()
     require(args.target is None or args.download_only, "跨平台选择只允许下载，不能执行")
-    target = args.target or current_platform()
-    directory = owned_directory(args.private_directory or args.download_dir, args.private_directory is not None)
-    artifact, name, size, checksum = RELEASES[target]
+    releases = releases_for(args.version)
+    target = args.target or current_platform(args.version)
+    require(target in releases, "所选版本没有此平台的固定原生文件")
+    directory = owned_directory(args.private_directory or args.download_dir,
+                                args.private_directory is not None, args.version)
+    artifact, name, size, checksum = releases[target]
     executable = directory / name
-    fetch(f"{BASE_URL}/{artifact}", executable, size, checksum)
-    evidence = verify_binary(executable, target)
-    evidence.update(version=VERSION, version_output=None, native_version_verified=False,
+    fetch(f"{BASE_URL}/{artifact}", executable, size, checksum, args.version)
+    evidence = verify_binary(executable, target, args.version)
+    evidence.update(version=args.version, version_output=None, native_version_verified=False,
                     installed=False, credentials_provided=False, model_input_submitted=False,
                     checksum_origin="observed_complete_official_download", archive=False)
     if not args.download_only:
-        evidence.update(version_output=verify_version(executable, directory), native_version_verified=True)
-        verify_binary(executable, target)
+        evidence.update(version_output=verify_version(executable, directory, args.version),
+                        native_version_verified=True)
+        verify_binary(executable, target, args.version)
     report = directory / "grok-fixed-inputs.json"
     if report.exists() or report.is_symlink():
         regular_file(report)

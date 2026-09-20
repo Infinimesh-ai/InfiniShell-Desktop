@@ -1,0 +1,116 @@
+{
+  "version": "1.0.34",
+  "expected_version_output": "grok 1.0.34 (3736acbc8658)",
+  "recorded_at": "2026-09-19T12:03:03.502682+00:00",
+  "observed_on": "macOS arm64",
+  "source_commit": null,
+  "source_commit_is_binary_build_commit": false,
+  "official_checksum_manifest_verified": false,
+  "checksum_origin": "observed_complete_official_download",
+  "credentials_provided": false,
+  "model_input_submitted": false,
+  "platforms": {
+    "linux-x64": {
+      "artifact": "grok-1.0.34-linux-x86_64",
+      "url": "https://x.ai/cli/grok-1.0.34-linux-x86_64",
+      "bytes": 163035648,
+      "sha256": "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d",
+      "format": "elf64-x86-64",
+      "binary": "grok",
+      "complete_download_seconds": 13.632,
+      "archive": false,
+      "native_version_verified": false,
+      "target_executed": false,
+      "signature_verified_during_this_download": false
+    },
+    "win32-x64": {
+      "artifact": "grok-1.0.34-windows-x86_64.exe",
+      "url": "https://x.ai/cli/grok-1.0.34-windows-x86_64.exe",
+      "bytes": 151293256,
+      "sha256": "021d8f7f6bdf9db48b6c87e799cd99130a76c463e6e6a3161510839aed016d94",
+      "format": "pe32+-x86-64",
+      "binary": "grok.exe",
+      "complete_download_seconds": 13.139,
+      "archive": false,
+      "native_version_verified": false,
+      "target_executed": false,
+      "signature_verified_during_this_download": false
+    },
+    "darwin-arm64": {
+      "artifact": "grok-1.0.34-macos-aarch64",
+      "url": "https://x.ai/cli/grok-1.0.34-macos-aarch64",
+      "bytes": 143016096,
+      "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+      "format": "mach-o64-arm64",
+      "binary": "grok",
+      "complete_download_seconds": 8.522,
+      "archive": false,
+      "native_version_verified": false,
+      "target_executed": false,
+      "signature_verified_during_this_download": false,
+      "response_headers": {
+        "Content-Length": "143016096",
+        "last-modified": "Wed, 16 Sep 2026 04:12:40 GMT",
+        "etag": "\"6c669e5cab26ee2627b5fbf31139a8e3\"",
+        "x-goog-generation": "1789531960871946"
+      }
+    }
+  },
+  "prior_native_version_observation": {
+    "platform": "darwin-arm64",
+    "binary_sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+    "version_output": "grok 1.0.34 (3736acbc8658)",
+    "report": "specs/cli-agent-parity/validation/grok-autoupdate-20260919/native-upgrade-report.json",
+    "report_sha256": "20bc30d50259faac55b291863b4b12c6c637ce1c7fe3ecee12498bf9e01602da",
+    "reexecuted_during_this_preparation": false,
+    "boundary": "精确版本输出依据此前隔离 macOS ARM64 记录；本次仅下载及静态架构校验，Linux/Windows 原生版本输出仍待实际验证。"
+  },
+  "installer_executed": false,
+  "native_commands_executed": [],
+  "runtime_capabilities_changed": false,
+  "windows_optional_payload_downloaded": false,
+  "boundary": "三平台固定官方地址的完整下载字节与静态架构检查通过；没有上游发布的 SHA-256 清单。准备器仍默认 1.0.30，1.0.34 需要显式选择。本次未执行原生 CLI、认证、模型、审批、取消、恢复、父子任务或 hooks；这些能力不可由下载成功推断。",
+  "preparer_validation": {
+    "script_sha256": "fd182ae8645e40cc572578f9ec47a6944d8e7160ef53d1f3efdf2cf6daa73c0b",
+    "tests_sha256": "5f71babe4da3f2151eaab416db6a0168b985c85872a33ee1829c8bdc3d7c3fca",
+    "mode": "existing_bytes_read_only",
+    "byte_checks": [
+      {
+        "platform": "linux-x64",
+        "artifact": "grok-1.0.34-linux-x86_64",
+        "binary": "grok",
+        "bytes": 163035648,
+        "sha256": "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d",
+        "url": "https://x.ai/cli/grok-1.0.34-linux-x86_64",
+        "format": "elf64-x86-64"
+      },
+      {
+        "platform": "win32-x64",
+        "artifact": "grok-1.0.34-windows-x86_64.exe",
+        "binary": "grok.exe",
+        "bytes": 151293256,
+        "sha256": "021d8f7f6bdf9db48b6c87e799cd99130a76c463e6e6a3161510839aed016d94",
+        "url": "https://x.ai/cli/grok-1.0.34-windows-x86_64.exe",
+        "format": "pe32+-x86-64"
+      },
+      {
+        "platform": "darwin-arm64",
+        "artifact": "grok-1.0.34-macos-aarch64",
+        "binary": "grok",
+        "bytes": 143016096,
+        "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+        "url": "https://x.ai/cli/grok-1.0.34-macos-aarch64",
+        "format": "mach-o64-arm64"
+      }
+    ],
+    "native_commands_executed": [],
+    "unit_tests": {
+      "command": "python3 -B -m unittest discover -s script/cli-agent-parity -p prepare_grok_cli_tests.py -v",
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 0.046
+    },
+    "real_linux_windows_execution": false
+  }
+}

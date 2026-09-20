@@ -17,6 +17,7 @@ pub(crate) mod conversation_bridge;
 #[cfg(feature = "local_fs")]
 pub(crate) mod coordinator;
 pub(crate) mod grok;
+mod grok_profile;
 pub(crate) mod grok_tool_lease;
 pub(crate) mod local_skills;
 pub(crate) mod local_tools;
@@ -49,6 +50,10 @@ pub enum PermissionPolicy {
     WorkspaceWrite,
     /// 固定 Claude 文件工具及逐次审批，不等价于操作系统沙箱。
     ClaudeRestrictedFilesV1,
+    /// 固定 Grok 只读工具与应用 SDK 子集，逐次审批；不等价于操作系统沙箱。
+    GrokRestrictedReadV1,
+    /// 应用固定 Grok 文件工具及逐次审批，不声明原生文件系统沙箱。
+    GrokRestrictedFilesV1,
 }
 
 #[derive(Clone, Debug)]
@@ -62,6 +67,7 @@ pub struct SessionOptions {
     pub permission_policy: PermissionPolicy,
     pub permission_ceiling: Option<permissions::ParentPermissionCeiling>,
     pub claude_profile: Option<permissions::ClaudeRestrictedFilesV1>,
+    pub grok_profile: Option<permissions::GrokCreationPolicyV1>,
     pub model: Option<String>,
     pub local_tools: Option<local_tools::LocalToolPermissions>,
     pub selected_skills: Vec<local_skills::SelectedLocalSkill>,
@@ -137,6 +143,8 @@ pub struct RuntimeEvent {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum RuntimeEventKind {
     SessionReady {
+        /// 仅记录本次成功探测并与原生握手配对的版本；Claude 首次控制握手尚不提供版本。
+        verified_cli_version: Option<String>,
         effective_permissions: Value,
     },
     MessageAccepted {

@@ -33,7 +33,10 @@ if case=="context":
         executable=shutil.which(name)
         result=subprocess.run([executable,"--version"],capture_output=True,text=True,timeout=8)
         versions[name]={"path":executable,"exit_code":result.returncode,"version":result.stdout.strip()}
-    print(json.dumps({"home":os.environ["HOME"],"cwd":str(pathlib.Path.cwd()),"versions":versions,"codex_plugin_present":(home/".codex/plugins/cache/codex-warp/warp/0.4.0/.codex-plugin/plugin.json").exists(),"claude_registry_present":(home/".claude/plugins/installed_plugins.json").exists(),"grok_registry_present":(home/".grok/installed-plugins/registry.json").exists()}))
+    worker=shutil.which("infinishell-notify")
+    worker_result=subprocess.run([worker,"cli-agent-notify","--protocol-version"],capture_output=True,text=True,timeout=8)
+    worker_protocol=json.loads(worker_result.stdout)
+    print(json.dumps({"home":os.environ["HOME"],"cwd":str(pathlib.Path.cwd()),"versions":versions,"grok_worker":{"path":worker,"exit_code":worker_result.returncode,"stderr_bytes":len(worker_result.stderr.encode()),"protocol":worker_protocol},"codex_plugin_present":(home/".codex/plugins/cache/codex-warp/warp/0.4.0/.codex-plugin/plugin.json").exists(),"claude_registry_present":(home/".claude/plugins/installed_plugins.json").exists(),"grok_registry_present":(home/".grok/installed-plugins/registry.json").exists()}))
     raise SystemExit(0)
 parts=case.split(":")
 if len(parts)!=2 or parts[0] not in ("direct","tmux-on","tmux-off","emit") or parts[1] not in ("codex","claude","grok"):
@@ -51,7 +54,7 @@ session="ssh-probe-"+agent+"-"+mode+"-"+str(os.getpid())
 env.update(WARP_CLI_AGENT_PROTOCOL_VERSION="1",WARP_CLIENT_VERSION="v0.2026.09.16.00.00.stable_00",CLAUDE_PLUGIN_ROOT=str(root),PLUGIN_ROOT=str(root),GROK_PLUGIN_ROOT=str(root),GROK_PLUGIN_DATA=str(home/"grok-plugin-data"))
 payload={"hook_event_name":"SessionStart","session_id":session,"cwd":str(work)}
 if agent=="grok":
-    env.update(GROK_HOOK_EVENT="SessionStart",GROK_SESSION_ID=session)
+    env.update(GROK_HOOK_EVENT="SessionStart",GROK_SESSION_ID=session,WARP_CLI_AGENT_NOTIFY_EXECUTABLE=configuration["grok_worker"])
     payload={"hookEventName":"SessionStart","sessionId":session,"cwd":str(work),"timestamp":datetime.datetime.now(datetime.timezone.utc).isoformat()}
 hooks=json.loads((root/"hooks/hooks.json").read_text())["hooks"]["SessionStart"][0]["hooks"][0]
 if "args" in hooks:
@@ -99,7 +102,12 @@ def execute(args, root, socket_directory):
     home.mkdir(); work.mkdir()
     for name in (".codex", ".claude", ".grok", "bin"):
         (home / name).mkdir()
-    paths = {"codex": args.codex, "claude": args.claude, "grok": args.grok, "node": Path(shutil.which("node") or ""), "jq": Path(shutil.which("jq") or ""), "bash": Path(shutil.which("bash") or "")}
+    paths = {"codex": args.codex, "claude": args.claude, "grok": args.grok,
+             "tmux": args.tmux,
+             "infinishell-notify": args.grok_worker,
+             "node": Path(shutil.which("node") or ""),
+             "jq": Path(shutil.which("jq") or ""),
+             "bash": Path(shutil.which("bash") or "")}
     for name, executable in paths.items():
         if not executable.is_file():
             raise RuntimeError("缺少实际 CLI/运行时：" + name)
@@ -119,7 +127,10 @@ def execute(args, root, socket_directory):
     local_marker.parent.mkdir(parents=True)
     local_marker.write_text('{"version":"0.4.0","synthetic_local_control":true}')
     configuration = root / "probe.json"
-    configuration.write_text(json.dumps({"root": str(root), "socket_dir": str(socket_directory), "home": str(home), "work": str(work), "tmux": str(args.tmux), "plugins": plugins}))
+    configuration.write_text(json.dumps({"root": str(root), "socket_dir": str(socket_directory),
+                                         "home": str(home), "work": str(work),
+                                         "tmux": str(args.tmux), "plugins": plugins,
+                                         "grok_worker": str(home / "bin/infinishell-notify")}))
     remote = root / "remote.py"
     remote.write_text(REMOTE)
     for name in ("host-key", "client-key"):
@@ -160,7 +171,14 @@ def execute(args, root, socket_directory):
         if code:
             raise RuntimeError("SSH 上下文检查失败：" + error.decode(errors="replace"))
         context = json.loads(output)
-        context_ok = context["home"] == str(home) and context["cwd"] == str(work) and not any(context[key] for key in ("codex_plugin_present", "claude_registry_present", "grok_registry_present")) and all(value["exit_code"] == 0 and value["path"].startswith(str(home / "bin") + "/") for value in context["versions"].values())
+        context_ok = (context["home"] == str(home)
+                      and context["cwd"] == str(work)
+                      and not any(context[key] for key in ("codex_plugin_present", "claude_registry_present", "grok_registry_present"))
+                      and all(value["exit_code"] == 0 and value["path"].startswith(str(home / "bin") + "/") for value in context["versions"].values())
+                      and context["grok_worker"] == {"path": str(home / "bin/infinishell-notify"),
+                                                     "exit_code": 0,
+                                                     "stderr_bytes": 0,
+                                                     "protocol": {"protocol": 1, "maxFrameBytes": 4096}})
         cases = []
         for mode in ("direct", "tmux-off", "tmux-on"):
             for agent in ("codex", "claude", "grok"):
@@ -185,19 +203,41 @@ def execute(args, root, socket_directory):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("tmux", "codex", "claude", "grok", "codex-plugin", "claude-plugin"):
+    for name in ("tmux", "codex", "claude", "grok", "grok-worker", "codex-plugin", "claude-plugin"):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--sshd", type=Path, default=Path("/usr/sbin/sshd"))
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if os.name != "posix":
         parser.error("此回环 sshd/PTY 探测需要 Unix；Windows 远端 SSH 场景须单独验收")
-    for name in ("tmux", "codex", "claude", "grok", "codex_plugin", "claude_plugin", "sshd"):
+    for name in ("tmux", "codex", "claude", "grok", "grok_worker", "codex_plugin", "claude_plugin", "sshd"):
         setattr(args, name, getattr(args, name).resolve())
     repository = Path(__file__).resolve().parents[2]
     commit = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     dirty = bool(subprocess.run(["git", "-C", str(repository), "status", "--porcelain"], capture_output=True, text=True, check=True).stdout.strip())
-    result = {"source_commit": commit, "source_tree_dirty": dirty, "tmux_sha256": hashlib.sha256(args.tmux.read_bytes()).hexdigest(), "host_platform": sys.platform, "ssh": subprocess.run(["ssh", "-V"], capture_output=True, text=True).stderr.strip(), "tmux": subprocess.run([str(args.tmux), "-V"], capture_output=True, text=True, check=True).stdout.strip(), "credentials_provided": False, "model_requests": False, "native_cli_hook_triggered": False, "notification_origin": "bundled_hook_replay", "product_ssh_ui_verified": False, "different_os_host_verified": False}
+    worker_protocol_result = subprocess.run(
+        [str(args.grok_worker), "cli-agent-notify", "--protocol-version"],
+        capture_output=True, text=True, timeout=8)
+    try:
+        worker_protocol = json.loads(worker_protocol_result.stdout)
+    except json.JSONDecodeError:
+        worker_protocol = None
+    worker_protocol_valid = (worker_protocol_result.returncode == 0
+                             and worker_protocol_result.stderr == ""
+                             and worker_protocol == {"protocol": 1, "maxFrameBytes": 4096})
+    result = {"source_commit": commit, "source_tree_dirty": dirty,
+              "tmux_sha256": hashlib.sha256(args.tmux.read_bytes()).hexdigest(),
+              "grok_worker_sha256": hashlib.sha256(args.grok_worker.read_bytes()).hexdigest(),
+              "grok_worker_protocol": worker_protocol,
+              "grok_worker_protocol_valid": worker_protocol_valid,
+              "host_platform": sys.platform,
+              "ssh": subprocess.run(["ssh", "-V"], capture_output=True, text=True).stderr.strip(),
+              "tmux": subprocess.run([str(args.tmux), "-V"], capture_output=True, text=True, check=True).stdout.strip(),
+              "credentials_provided": False, "model_requests": False,
+              "native_cli_hook_triggered": False,
+              "notification_origin": "bundled_hook_replay",
+              "grok_notification_transport": "bundled_hook_replay_via_native_worker",
+              "product_ssh_ui_verified": False, "different_os_host_verified": False}
     result["notification_patch"] = {agent: {"revision": bundle_data(default_bundle(), agent)[0]["patch_revision"], "warp_notify_sha256": hashlib.sha256((default_bundle() / agent / "scripts/warp-notify.sh").read_bytes()).hexdigest()} for agent in ("claude", "codex")}
     with tempfile.TemporaryDirectory(prefix="infinishell-ssh-tmux-") as temporary, tempfile.TemporaryDirectory(prefix="istmux-", dir="/tmp") as short_sockets:
         root = Path(temporary).resolve()
@@ -208,7 +248,11 @@ def main():
         result = json.loads(json.dumps(result, ensure_ascii=False).replace(str(root), "<isolated-probe>"))
     if "error" in result:
         result["error"] = result["error"].replace(getpass.getuser() + "@127.0.0.1", "<local-user>@127.0.0.1")
-    result["passed"] = result.get("remote_context_verified") is True and result.get("direct_transport_passed") is True and result.get("tmux_passthrough_passed") is True and result.get("default_tmux_blocking_observed") is True
+    result["passed"] = (result.get("grok_worker_protocol_valid") is True
+                        and result.get("remote_context_verified") is True
+                        and result.get("direct_transport_passed") is True
+                        and result.get("tmux_passthrough_passed") is True
+                        and result.get("default_tmux_blocking_observed") is True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({"passed": result["passed"], "remote_context_verified": result.get("remote_context_verified"), "direct_transport_passed": result.get("direct_transport_passed"), "tmux_passthrough_passed": result.get("tmux_passthrough_passed"), "error": result.get("error")}))
     if not result["passed"]:

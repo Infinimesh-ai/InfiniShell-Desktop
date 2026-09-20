@@ -8,7 +8,10 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 use warp_multi_agent_api as api;
 
-use crate::ai::agent_providers::tools::local_orchestration::{RUN_AGENTS, SEND_MESSAGE};
+use crate::ai::agent_providers::tools::local_orchestration::{
+    LOCAL_RUN_AGENTS_DESCRIPTION, LocalRunAgents, RUN_AGENTS, SEND_MESSAGE, local_run_parameters,
+    parse_local_run,
+};
 
 // 生产桥接的业务入口要求已绑定原生工具租约；协议模块可见不代表连接能力已开放。
 #[path = "grok_local_tools.rs"]
@@ -50,12 +53,13 @@ pub(crate) struct TrustedLocalToolContext {
     pub active_turn_id: String,
     pub allow_spawn: bool,
     pub allow_message: bool,
+    pub grok_creation_policy_bound: bool,
     pub related_task_ids: HashSet<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum LocalToolOperation {
-    Spawn(api::RunAgents),
+    Spawn(LocalRunAgents),
     Send(api::SendMessageToAgent),
     Inspect {
         task_ids: Vec<String>,
@@ -104,14 +108,17 @@ pub(crate) fn tool_definitions(allow_spawn: bool, allow_message: bool) -> Vec<Va
                 "result_generation":{"type":"integer","minimum":1},
                 "result_offset":{"type":"integer","minimum":0}}},
     })];
-    for tool in [
-        allow_spawn.then_some(&RUN_AGENTS),
-        allow_message.then_some(&SEND_MESSAGE),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        tools.push(json!({"name":tool.name,"description":tool.description,"inputSchema":(tool.parameters)()}));
+    if allow_spawn {
+        tools.push(
+            json!({"name":RUN_AGENTS.name,"description":LOCAL_RUN_AGENTS_DESCRIPTION,
+            "inputSchema":local_run_parameters()}),
+        );
+    }
+    if allow_message {
+        tools.push(
+            json!({"name":SEND_MESSAGE.name,"description":SEND_MESSAGE.description,
+            "inputSchema":(SEND_MESSAGE.parameters)()}),
+        );
     }
     tools
 }
@@ -232,6 +239,7 @@ pub(crate) fn bind_local_tool_call(
     // Grok 注册、租约与调用时授权均不能替代尚未验证的父任务权限上限。
     if matches!(&request.reply_target, LocalToolReplyTarget::Grok { .. })
         && request.tool == RUN_AGENTS.name
+        && !context.grok_creation_policy_bound
     {
         return Err("Grok 父任务缺少创建时固定的权限上限，不能派发子任务".into());
     }
@@ -241,12 +249,7 @@ pub(crate) fn bind_local_tool_call(
     }
     let operation = match request.tool.as_str() {
         "run_agents" if context.allow_spawn => {
-            let api::message::tool_call::Tool::RunAgents(run) =
-                (RUN_AGENTS.from_args)(&encoded).map_err(|error| error.to_string())?
-            else {
-                return Err("本地派发工具解析类型错误".to_owned());
-            };
-            LocalToolOperation::Spawn(run)
+            LocalToolOperation::Spawn(parse_local_run(&encoded).map_err(|error| error.to_string())?)
         }
         "send_message_to_agent" if context.allow_message => {
             let api::message::tool_call::Tool::SendMessageToAgent(message) =

@@ -534,6 +534,50 @@ impl DefaultSessionMode {
     }
 }
 
+/// 渠道选项按各 CLI 的官方发行渠道提供，偏好不写入 CLI 全局配置。
+#[derive(
+    Default,
+    Debug,
+    Serialize,
+    Deserialize,
+    PartialEq,
+    Eq,
+    Copy,
+    Clone,
+    schemars::JsonSchema,
+    settings_value::SettingsValue,
+)]
+#[serde(rename_all = "snake_case")]
+#[schemars(rename_all = "snake_case")]
+pub enum CLIUpdateChannel {
+    #[default]
+    FollowInstallation,
+    Latest,
+    Stable,
+    Alpha,
+}
+
+impl CLIUpdateChannel {
+    pub(crate) fn supported_by(agent: CLIAgent) -> &'static [Self] {
+        match agent {
+            CLIAgent::Codex => &[Self::FollowInstallation, Self::Latest, Self::Alpha],
+            CLIAgent::Claude => &[Self::FollowInstallation, Self::Latest, Self::Stable],
+            CLIAgent::Grok => &[Self::FollowInstallation, Self::Stable, Self::Alpha],
+            // 其他 CLI 尚未接入自动升级。
+            _ => &[],
+        }
+    }
+
+    pub(crate) fn display_name(self) -> String {
+        match self {
+            Self::FollowInstallation => crate::t!("settings-cli-updates-channel-follow"),
+            Self::Latest => crate::t!("settings-cli-updates-channel-latest"),
+            Self::Stable => crate::t!("settings-cli-updates-channel-stable"),
+            Self::Alpha => crate::t!("settings-cli-updates-channel-alpha"),
+        }
+    }
+}
+
 /// Controls how agent thinking/reasoning traces are displayed after streaming.
 #[derive(
     Default,
@@ -2775,6 +2819,32 @@ define_settings_group!(AISettings, settings: [
         description: "Per-agent visibility settings for toolbar and tab menu.",
     }
 
+    // 独立保存升级偏好，避免安装扫描暂时缺失时删除用户的关闭选择。
+    cli_agent_auto_updates: CLIAgentAutoUpdates {
+        type: HashMap<String, bool>,
+        default: HashMap::new(),
+        supported_platforms: SupportedPlatforms::DESKTOP,
+        sync_to_cloud: SyncToCloud::Never,
+        surface: settings::SettingSurfaces::GUI,
+        private: false,
+        toml_path: "agents.third_party.auto_updates",
+        max_table_depth: 1,
+        description: "Automatically update installed Codex, Claude Code, and Grok CLIs when idle.",
+    }
+
+    cli_agent_update_channels: CLIAgentUpdateChannels {
+        type: HashMap<String, CLIUpdateChannel>,
+        default: HashMap::new(),
+        supported_platforms: SupportedPlatforms::DESKTOP,
+        sync_to_cloud: SyncToCloud::Never,
+        surface: settings::SettingSurfaces::GUI,
+        private: false,
+        toml_path: "agents.third_party.update_channels",
+        max_table_depth: 1,
+        description: "Follow each installed CLI channel or explicitly select a supported release channel.",
+    }
+
+
     // 是否已完成至少一次 CLI agent 安装扫描。
     // 首次打开第三方智能体设置页时,若该标记为 false 则自动触发一次同步。
     cli_agent_scan_completed: CLIAgentScanCompleted {
@@ -3365,6 +3435,52 @@ impl AISettings {
             self.plugin_update_chip_dismissed_for_version_map
                 .set_value(map, ctx)
         );
+    }
+
+    /// 三款受支持 CLI 默认自动升级；偏好独立于安装发现和工具栏显示。
+    pub(crate) fn is_cli_agent_auto_update_enabled(&self, agent: CLIAgent) -> bool {
+        matches!(agent, CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok)
+            && self
+                .cli_agent_auto_updates
+                .get(agent.to_serialized_name().as_str())
+                .copied()
+                .unwrap_or(true)
+    }
+
+    pub(crate) fn set_cli_agent_auto_update(
+        &mut self,
+        agent: CLIAgent,
+        enabled: bool,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if !matches!(agent, CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok) {
+            return;
+        }
+        let mut preferences = self.cli_agent_auto_updates.clone();
+        preferences.insert(agent.to_serialized_name(), enabled);
+        report_if_error!(self.cli_agent_auto_updates.set_value(preferences, ctx));
+    }
+
+    pub(crate) fn cli_agent_update_channel(&self, agent: CLIAgent) -> CLIUpdateChannel {
+        self.cli_agent_update_channels
+            .get(agent.to_serialized_name().as_str())
+            .copied()
+            .filter(|channel| CLIUpdateChannel::supported_by(agent).contains(channel))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn set_cli_agent_update_channel(
+        &mut self,
+        agent: CLIAgent,
+        channel: CLIUpdateChannel,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if !CLIUpdateChannel::supported_by(agent).contains(&channel) {
+            return;
+        }
+        let mut preferences = self.cli_agent_update_channels.clone();
+        preferences.insert(agent.to_serialized_name(), channel);
+        report_if_error!(self.cli_agent_update_channels.set_value(preferences, ctx));
     }
 
     // ── Per-agent settings ──

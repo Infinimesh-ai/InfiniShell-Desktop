@@ -201,6 +201,7 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
                 .join("\n");
 
             script = embed_windows_remote_init_shell(script, assets, shell_type);
+            script = embed_cli_agent_notify_paths(script);
 
             // Make sure there's a newline at the end of the bootstrap script,
             // otherwise we'll never submit the final line to the shell.
@@ -208,6 +209,29 @@ pub fn script_for_shell(shell_type: ShellType, assets: &dyn AssetProvider) -> Co
             script.into_bytes()
         })
         .into()
+}
+
+fn embed_cli_agent_notify_paths(mut script: String) -> String {
+    for (placeholder, os) in [
+        (
+            "@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@",
+            remote_server::setup::RemoteOs::Linux,
+        ),
+        (
+            "@@WARP_NOTIFY_WINDOWS_RELATIVE_PATH@@",
+            remote_server::setup::RemoteOs::Windows,
+        ),
+    ] {
+        let path = remote_server::setup::remote_server_relative_binary_path(&os);
+        // 占位符处于 shell 引号中；非预期发布标签只能停用通知绑定，不能形成命令。
+        let safe = !path.starts_with('/')
+            && !path.split('/').any(|part| part == "..")
+            && path
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"/._-+".contains(&byte));
+        script = script.replace(placeholder, if safe { &path } else { "" });
+    }
+    script
 }
 
 const WINDOWS_REMOTE_INIT_SHELL_GZIP_BASE64_PLACEHOLDER: &str =

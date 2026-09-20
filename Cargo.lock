@@ -16200,6 +16200,7 @@ dependencies = [
  "float-cmp",
  "fluent",
  "freedesktop-desktop-entry",
+ "fs4",
  "futures",
  "futures-lite 1.13.0",
  "futures-timer",

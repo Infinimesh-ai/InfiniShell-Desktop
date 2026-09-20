@@ -15,6 +15,7 @@ use warpui::{
     AppContext, Element, Entity, EntityId, ModelContext, ModelHandle, SingletonEntity as _,
 };
 
+use crate::ai::skills::{SkillManager, SkillManagerEvent};
 use crate::appearance::Appearance;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
@@ -83,6 +84,12 @@ impl SkillSelectorDataSource {
         ctx.subscribe_to_model(&active_session, |_, _, event, ctx| match event {
             // Emit event so the mixer can re-run its query with the new pwd
             ActiveSessionEvent::UpdatedPwd | ActiveSessionEvent::Bootstrapped => {
+                ctx.emit(UpdatedAvailableSkills);
+            }
+        });
+
+        ctx.subscribe_to_model(&SkillManager::handle(ctx), |_, _, event, ctx| {
+            if matches!(event, SkillManagerEvent::SkillsChanged { .. }) {
                 ctx.emit(UpdatedAvailableSkills);
             }
         });

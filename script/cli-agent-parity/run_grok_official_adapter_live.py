@@ -29,6 +29,25 @@ OFFICIAL_HOSTS = frozenset({"cli-chat-proxy.grok.com", "auth.x.ai"})
 ACP_INPUTS = 8
 MAX_TUNNELS = 32
 MAX_BYTES = 32 * 1024 * 1024
+P0_PROFILE = "p0-1.0.34"
+PROFILES = {
+    "full-1.0.30": {
+        "version": shared.VERSION,
+        "sha256": shared.BINARY_SHA256,
+        "test_name": shared.TEST_NAME,
+        "max_acp_inputs": ACP_INPUTS,
+        "project_files": ["approval-allow.txt"],
+        "public_product_gate_open": False,
+    },
+    P0_PROFILE: {
+        "version": "grok 1.0.34 (3736acbc8658)",
+        "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+        "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_p0_lifecycle",
+        "max_acp_inputs": 4,
+        "project_files": ["allow.txt", "deny.txt"],
+        "public_product_gate_open": True,
+    },
+}
 NATIVE_MARKETPLACE_INITIALIZATION = {
     "default_skills_installs_purged": True,
     "official_marketplace_auto_installed": True,
@@ -236,8 +255,9 @@ class OfficialTunnel:
         return drained and not self.thread.is_alive()
 
 
-def prepare_native(root, native, source_home, port):
-    wrapper, settings = shared.prepare_native(root, native, source_home, port)
+def prepare_native(root, native, source_home, port, binary_sha256=None):
+    wrapper, settings = shared.prepare_native(
+        root, native, source_home, port, binary_sha256=binary_sha256)
     # 保留原生模型定义与官方认证解析，仅固定模型选择；不能把缓存令牌送往自定义后端。
     settings.write_text(f'''[cli]
 use_leader = true
@@ -262,7 +282,7 @@ tool = "any"
 def public_events(events):
     # 官方令牌不被运行器解析，故公开证据采用字段值白名单，不能依赖已知密钥替换。
     fixed = {shared.SCOPE, MODEL_PATH, "Completed", "Cancelled", "Failed", "AllowOnce", "DenyOnce",
-        shared.RECEIPT_SOURCE,"PARITY_ONE", "PARITY_TWO", "APPROVED", "READY", "QUEUE_PARENT_DONE"}
+        shared.RECEIPT_SOURCE,"PARITY_ONE", "PARITY_TWO", "APPROVED", "READY", "QUEUE_PARENT_DONE", "p0"}
     identifiers = {"event", "phase", "exit_reason"}
     result = []
     for event in events:
@@ -284,15 +304,83 @@ def public_events(events):
     return result
 
 
+def verified_p0_acceptance(exit_code, output, events):
+    if exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
+        return False
+    endings = [event for event in events if event.get("event") == "acceptance_passed"]
+    if len(endings) != 1 or any(event.get("event") == "acceptance_failed" for event in events):
+        return False
+    ending = endings[0]
+    native = ending.get("native_session_id")
+    if (not isinstance(native, str) or not native or ending.get("scope") != shared.SCOPE
+            or ending.get("verified_scope") != "p0"
+            or ending.get("official_grok_model_tested") is not True
+            or ending.get("public_product_gate_open") is not True
+            or ending.get("full_cli_parity_acceptance_passed") is not False
+            or ending.get("read_approval_verified") is not True
+            or ending.get("queued_input_verified") is not False
+            or any(ending.get(key) is not False for key in ("same_turn_steering_supported",
+                "write_approval_verified", "close_session_verified", "app_restart_and_ui_verified",
+                "parent_permission_ceiling_verified"))):
+        return False
+    results = [event for event in events if event.get("event") == "turn_finished"]
+    if (len(results) != 4 or len({event.get("turn_id") for event in results}) != 4
+            or any(event.get("native_session_id") != native for event in results)
+            or any(not shared.verified_final_response(event, native) for event in results)):
+        return False
+    by_phase = {event.get("phase"): event for event in results}
+    if set(by_phase) != {"p0_read_allow", "p0_read_deny", "p0_cancel", "p0_resume"}:
+        return False
+    marker = by_phase["p0_read_allow"].get("final_response", "").strip()
+    if (not re.fullmatch(r"[0-9a-f]{64}", marker)
+            or by_phase["p0_read_allow"].get("outcome") != "Completed"
+            or not shared.verified_final_response(by_phase["p0_read_allow"], native, marker)
+            or by_phase["p0_read_deny"].get("outcome") != "Cancelled"
+            or by_phase["p0_cancel"].get("outcome") != "Cancelled"
+            or by_phase["p0_resume"].get("outcome") != "Completed"
+            or not shared.verified_final_response(by_phase["p0_resume"], native, marker)):
+        return False
+    for result in results:
+        accepted = [event for event in events if event.get("event") == "message_accepted"
+            and event.get("turn_id") == result.get("turn_id") and event.get("native_receipt") is True]
+        if len(accepted) != 1 or not accepted[0].get("message_id"):
+            return False
+        if sum(event.get("event") == "turn_started"
+                and event.get("turn_id") == result.get("turn_id") for event in events) != 1:
+            return False
+    for phase, decision in (("p0_read_allow", "AllowOnce"), ("p0_read_deny", "DenyOnce")):
+        approvals = [event for event in events if event.get("event") == "approval_requested"
+            and event.get("phase") == phase]
+        if (len(approvals) != 1 or approvals[0].get("decision") != decision
+                or approvals[0].get("exact_read_fixture") is not True
+                or approvals[0].get("exact_write_fixture") is not False):
+            return False
+    if not any(event.get("event") == "cancel_submitted"
+            and event.get("phase") == "p0_cancel"
+            and event.get("submitted_after_real_text") is True for event in events):
+        return False
+    if any(event.get("event") in {"queued_input_submitted", "queued_input_result_verified"}
+            for event in events):
+        return False
+    shutdowns = [event for event in events if event.get("event") == "connection_shutdown"]
+    return (len(shutdowns) == 2
+        and [event.get("queued_submissions_observed_inside_adapter") for event in shutdowns] == [0, 0]
+        and all(event.get("cleanup_confirmed") is True
+            and event.get("native_session_id") == native for event in shutdowns))
+
+
 def validate_paths(args):
     if sys.platform != "darwin":
         raise ValueError("官方隔离运行器目前只验证 macOS")
+    args.acceptance_profile = getattr(args, "acceptance_profile", "full-1.0.30")
+    profile = PROFILES[args.acceptance_profile]
+    args.profile = profile
     for name in ("test_binary", "grok", "supervisor"):
         path = getattr(args, name)
         if path.is_symlink() or not path.is_file():
             raise ValueError("可执行输入必须是现有非符号链接文件")
         setattr(args, name, path.resolve(strict=True))
-    if args.test_binary == args.supervisor or shared.digest(args.grok) != shared.BINARY_SHA256:
+    if args.test_binary == args.supervisor or shared.digest(args.grok) != profile["sha256"]:
         raise ValueError("需要同提交监督入口与固定 Grok 二进制")
     home = args.official_grok_home
     if home.is_symlink() or not home.is_dir():
@@ -300,8 +388,10 @@ def validate_paths(args):
     args.official_grok_home = home.resolve(strict=True)
     if home.stat().st_uid != os.getuid() or home.stat().st_mode & 0o077:
         raise ValueError("认证目录必须由当前用户独占")
-    if args.max_acp_inputs != ACP_INPUTS or not 30 <= args.timeout <= 900:
-        raise ValueError("固定生命周期需要 8 个 ACP 输入，期限必须在 30–900 秒")
+    if args.max_acp_inputs is None:
+        args.max_acp_inputs = profile["max_acp_inputs"]
+    if args.max_acp_inputs != profile["max_acp_inputs"] or not 30 <= args.timeout <= 900:
+        raise ValueError("固定生命周期的 ACP 输入预算不匹配，期限必须在 30–900 秒")
     if args.output.is_symlink():
         raise ValueError("证据路径不能是符号链接")
     args.output = args.output.resolve()
@@ -318,6 +408,7 @@ def artifacts(output):
 
 
 def run(args):
+    profile = args.profile
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for path in artifacts(args.output):
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -329,8 +420,11 @@ def run(args):
     raw_path = root / "private-evidence.ndjson"
     raw_path.touch(mode=0o600)
     metadata = {"scope": shared.SCOPE, "model_path": MODEL_PATH, "requested_model": MODEL,
+        "acceptance_profile": args.acceptance_profile, "test": profile["test_name"],
         "official_grok_model_tested": False, "acceptance_passed": False,
-        "public_product_gate_open": False, "app_restart_and_ui_verified": False,
+        "public_product_gate_open": profile["public_product_gate_open"],
+        "full_cli_parity_acceptance_passed": False,
+        "app_restart_and_ui_verified": False,
         "test_only_internal_command_switch": False, "production_runtime_commands": True,
         "native_received_real_credential": True, "public_credential_values_recorded": False,
         "auth_copy_method": "opaque_auth_json_only", "private_workspace": str(root),
@@ -349,22 +443,24 @@ def run(args):
     try:
         copy_private_auth(args.official_grok_home, root / "home/.grok")
         metadata["sandbox_canary"] = shared.network_canary(root, args.official_grok_home / "auth.json", port)
-        wrapper, settings = prepare_native(root, args.grok, args.official_grok_home, port)
+        wrapper, settings = prepare_native(
+            root, args.grok, args.official_grok_home, port, profile["sha256"])
         settings_before = settings.read_bytes()
         environment = official_environment(root, port)
         environment.update({"INFINISHELL_GROK_LIVE_ROOT": str(root),
             "INFINISHELL_GROK_LIVE_EXECUTABLE": str(wrapper), "INFINISHELL_GROK_LIVE_ARTIFACT": str(raw_path),
-            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor)})
+            "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
+            "INFINISHELL_GROK_LIVE_PROFILE": args.acceptance_profile})
         metadata["native_environment_names"] = sorted(environment)
         version = subprocess.run([str(wrapper), "--version"], cwd=root / "project", env=environment,
             capture_output=True, text=True, timeout=10, check=True)
-        if version.stdout.strip() != shared.VERSION:
+        if version.stdout.strip() != profile["version"]:
             raise ValueError("固定原生版本不匹配")
-        metadata["grok_version"] = shared.VERSION
+        metadata["grok_version"] = profile["version"]
         repository = Path(__file__).resolve().parents[2]
         metadata["repository_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repository, text=True).strip()
         metadata["worktree_dirty"] = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=repository, text=True).strip())
-        command = [str(args.test_binary), shared.TEST_NAME, "--exact", "--ignored", "--nocapture", "--test-threads=1"]
+        command = [str(args.test_binary), profile["test_name"], "--exact", "--ignored", "--nocapture", "--test-threads=1"]
         process = subprocess.Popen(command, cwd=repository, env=environment, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
         try:
@@ -386,10 +482,12 @@ def run(args):
         metadata["private_settings_unchanged"] = metadata["private_settings_audit"]["bytes_unchanged"]
         metadata["project_files"] = sorted(str(path.relative_to(root / "project")) for path in (root / "project").rglob("*") if path.is_file())
         model_tunnel = any(item == {"event": "official_tunnel_opened", "host": "cli-chat-proxy.grok.com"} for item in tunnel.events)
-        passed = shared.verified_acceptance(process.returncode, output, events, official=True)
+        passed = (verified_p0_acceptance(process.returncode, output, events)
+            if args.acceptance_profile == P0_PROFILE
+            else shared.verified_acceptance(process.returncode, output, events, official=True))
         metadata["acceptance_passed"] = (passed and model_tunnel and not metadata.get("timed_out", False)
             and metadata["private_settings_audit"]["settings_scope_verified"]
-            and metadata["project_files"] == ["approval-allow.txt"]
+            and metadata["project_files"] == profile["project_files"]
             and len(leaders) == 2 and len({item["private_socket"] for item in leaders}) == 2)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         # 异常可能包含原生响应，公开报告仅记录类型，原生输出保存在 0700 工作目录。
@@ -432,7 +530,8 @@ def main():
     parser.add_argument("--grok", type=Path, required=True)
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--official-grok-home", type=Path, required=True)
-    parser.add_argument("--max-acp-inputs", type=int, default=ACP_INPUTS)
+    parser.add_argument("--acceptance-profile", choices=sorted(PROFILES), default="full-1.0.30")
+    parser.add_argument("--max-acp-inputs", type=int)
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

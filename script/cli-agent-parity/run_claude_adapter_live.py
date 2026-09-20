@@ -11,9 +11,11 @@ import subprocess
 import sys
 import tempfile
 
+from prepare_claude_cli import (RELEASE_CATALOG, VERSION as DEFAULT_VERSION, current_platform,
+                                verify_binary, verify_version)
+
 
 TEST_NAME = "ai::cli_agent_runtime::claude::live_tests::real_claude_managed_lifecycle"
-VERSION = "2.1.273 (Claude Code)"
 MARKER = "isolated Claude Rust adapter verification\n"
 PROJECT_SETTINGS = {"permissions": {"defaultMode": "default", "ask": ["Write"]}}
 API_ENVIRONMENT_KEYS = {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"}
@@ -222,8 +224,15 @@ def validate_paths(args):
 
 def run(args):
     repository = Path(__file__).resolve().parents[2]
-    api_environment = load_api_environment(args.api_environment_file)
+    # 先核对固定文件及无认证版本输出，再读取显式 API 环境；旧派生运行器缺省仍使用 273。
+    selected_version = getattr(args, "claude_version", DEFAULT_VERSION)
+    target = current_platform()
+    verified_cli = verify_binary(args.claude, target, selected_version)
     root = Path(tempfile.mkdtemp(prefix="infinishell-claude-adapter-")).resolve()
+    detected = verify_version(args.claude, root, selected_version)
+    if verify_binary(args.claude, target, selected_version) != verified_cli:
+        raise ValueError("原生 Claude 在版本探测期间变化")
+    api_environment = load_api_environment(args.api_environment_file)
     settings = prepare_project(root)
     environment = authenticated_environment(root, args.config_dir, args.auth_home)
     environment.update(api_environment)
@@ -232,6 +241,7 @@ def run(args):
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
         "INFINISHELL_CLAUDE_LIVE_CONFIG_DIR": str(args.config_dir),
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
+        "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(args.output),
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
     })
@@ -250,6 +260,7 @@ def run(args):
         "private_workspace": str(root), "project_settings_sha256": digest(settings),
         "test_binary_sha256": digest(args.test_binary), "cli_binary_sha256": digest(args.claude),
         "supervisor_binary_sha256": digest(args.supervisor), "acceptance_passed": False,
+        "cli_version": detected, "requested_cli_version": selected_version, "cli": verified_cli,
     }
     for command, key in ((["git", "rev-parse", "HEAD"], "commit"), (["git", "status", "--porcelain"], "worktree_dirty")):
         result = subprocess.run(command, cwd=repository, text=True, capture_output=True, check=True)
@@ -259,11 +270,6 @@ def run(args):
     events = []
     owns_output = False
     try:
-        version = subprocess.run([str(args.claude), "--version"], cwd=root / "project", env=environment,
-                                 text=True, encoding="utf-8", capture_output=True, timeout=10, check=True)
-        if version.stdout.strip() != VERSION:
-            raise ValueError("Claude 版本不匹配已验证的 2.1.273 契约")
-        metadata["cli_version"] = version.stdout.strip()
         # 预先创建空证据，防止零测试成功被当成验收，也拒绝复用已有文件。
         with args.output.open("x", encoding="utf-8"):
             pass
@@ -292,8 +298,9 @@ def run(args):
         args.output.write_text("".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events),
                                encoding="utf-8", newline="\n")
         metadata["project_settings_unchanged"] = digest(settings) == metadata["project_settings_sha256"]
+        metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_version) == verified_cli
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
-            and metadata["project_settings_unchanged"]
+            and metadata["project_settings_unchanged"] and metadata["cli_binary_unchanged"]
             and verified_acceptance(process.returncode, output, events))
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         # 不输出 subprocess 的任意 stdout/stderr，也不读取失败时可能存在的认证资料。
@@ -315,7 +322,9 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test-binary", type=Path, required=True)
-    parser.add_argument("--claude", type=Path, required=True, help="固定 2.1.273 原生可执行文件")
+    parser.add_argument("--claude", type=Path, required=True, help="所选固定官方版本的原生可执行文件")
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
+                        help="精确官方版本；缺省保留 2.1.273")
     parser.add_argument("--supervisor", type=Path, required=True, help="同提交的主程序或 TUI 监督入口")
     parser.add_argument("--config-dir", type=Path, required=True, help="私有 CLAUDE_CONFIG_DIR；使用已有登录或显式 API 环境")
     parser.add_argument("--auth-home", type=Path, required=True, help="登录时使用的私有 HOME/USERPROFILE")

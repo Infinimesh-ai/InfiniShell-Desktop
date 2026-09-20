@@ -11,6 +11,7 @@ import tempfile
 import uuid
 
 import run_claude_adapter_live as adapter
+from prepare_claude_cli import RELEASE_CATALOG, VERSION, release_contract
 from run_claude_batch_cancel_live import NATIVE_KEYS, validate_cancel_diagnostics, validate_cancel_terminal
 from run_claude_managed_image_live import compact_stdout
 
@@ -399,6 +400,8 @@ def prepare_project(root):
 
 
 def run(args):
+    # 兼容旧 Namespace；未知版本在配置准备、API 读取和原生执行之前拒绝。
+    release_contract(getattr(args, "claude_version", VERSION))
     if args.api_environment_file is None or not isinstance(args.model, str) or not args.model \
             or any(character in args.model for character in "\x00\r\n"):
         raise ValueError("必须显式指定私有API环境文件和固定模型")
@@ -470,6 +473,8 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
+                        help="精确官方版本；缺省保留 2.1.273")
     for name in ("test-binary", "claude", "supervisor", "api-environment-file", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--model", required=True)

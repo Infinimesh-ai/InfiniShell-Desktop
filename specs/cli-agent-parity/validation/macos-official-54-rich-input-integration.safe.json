@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "scope": "source54_rich_input_ctrl_enter_integration_recovery",
+  "candidate": "source54",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_tree_dirty": true,
+  "observed_at_utc": "2026-09-19T21:42:29Z",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "rust_toolchain": "1.92.0-aarch64-apple-darwin"
+  },
+  "parent_candidate": {
+    "name": "source53",
+    "file_count": 278,
+    "manifest_sha256": "27f46cc2f95e16a9bf186b2ab0937893d069ea24bf98d5581cc8182a2c4115e6",
+    "evidence": "specs/cli-agent-parity/validation/macos-official-53-warp-unit-recovery.safe.json",
+    "evidence_sha256": "cc1f891b20804bfdf3a6fa59b058d56cc47d4bf19453c6383b2d7ad72924a800"
+  },
+  "changes": [
+    {
+      "path": "app/src/integration_testing/input/step.rs",
+      "bytes": 6804,
+      "sha256": "f0ba17933e7454c48ca0769e53d215e169946f73a79009627f6bf301d99b0d65",
+      "production_code_changed": false,
+      "summary": "Preserve the pending-model-events guard while removing the contradictory idle-terminal assertion from the helper that opens Rich Input for an active CLI agent."
+    },
+    {
+      "path": "crates/integration/src/test/rich_input_ctrl_enter.rs",
+      "bytes": 5931,
+      "sha256": "5aa0d1c8924d1b38f271ee352c409ba706c9800d025ddc764495cc71a0f7de71",
+      "production_code_changed": false,
+      "summary": "Run a hermetic fake Claude CLI as an active long-running PTY command, enable bracketed paste, and retain active-command-compatible model-event assertions."
+    }
+  ],
+  "cause": {
+    "summary": "The integration fixture created only a session model. Production submission also requires the same active long-running CLI command and multiline bracketed-paste capability, while the shared test steps incorrectly asserted that no command was active.",
+    "production_fix_required": false,
+    "verified_contracts": [
+      "Rich Input submission targets the active long-running CLI command rather than a session-model-only fixture.",
+      "The multiline Ctrl+Enter path requires bracketed paste before the delayed Enter acknowledgement clears the editor.",
+      "Integration steps may still reject pending model events while allowing the CLI command that the feature requires."
+    ]
+  },
+  "tests": {
+    "source53_deterministic_reproduction": {
+      "command": "cargo nextest run -p integration --no-fail-fast --test-threads=1 test_rich_input_toggle_on_enter_inserts_newline_and_ctrl_enter_submits",
+      "nextest_run_id": "d77fd018-12d9-4e46-90e2-0701fdaf065d",
+      "tests_run": 1,
+      "passed_count": 0,
+      "failed_count": 1,
+      "observed_editor_text": "line1\nline2",
+      "passed": false
+    },
+    "source54_direct_ctrl_enter": {
+      "command": "cargo run -p integration --bin integration -- test_rich_input_toggle_on_enter_inserts_newline_and_ctrl_enter_submits",
+      "tests_run": 1,
+      "passed_count": 1,
+      "failed_count": 0,
+      "passed": true
+    },
+    "source54_direct_slash_menu": {
+      "command": "cargo run -p integration --bin integration -- test_rich_input_enter_accepts_menu_item_when_toggle_is_true",
+      "tests_run": 1,
+      "passed_count": 1,
+      "failed_count": 0,
+      "passed": true
+    },
+    "source54_nextest_rich_input": {
+      "command": "cargo nextest run -p integration --no-fail-fast rich_input_",
+      "nextest_run_id": "709efd29-a4de-4199-ae1c-f58c68073894",
+      "duration_seconds": 10.261,
+      "tests_run": 2,
+      "passed_count": 2,
+      "failed_count": 0,
+      "skipped_count": 335,
+      "passed": true
+    },
+    "source54_integration_crate": {
+      "command": "cargo nextest run -p integration --no-fail-fast",
+      "nextest_run_id": "7a819f28-31ef-4171-862c-495eda049ea1",
+      "duration_seconds": 259.758,
+      "tests_run": 274,
+      "passed_count": 215,
+      "failed_count": 55,
+      "timed_out_count": 4,
+      "skipped_count": 63,
+      "passed": false,
+      "counted_as_success": false
+    }
+  },
+  "static_checks": {
+    "rustfmt_changed_files_passed": true,
+    "git_diff_check_changed_files_passed": true,
+    "root_and_source54_changed_files_identical": true,
+    "source53_worktree_untouched": true
+  },
+  "inherited_parent_gates": {
+    "warp_crate_nextest_run_id": "d6517601-8f0a-4d26-9f46-c0b86bf9571e",
+    "warp_crate_tests_run": 7297,
+    "warp_crate_passed_count": 7297,
+    "cargo_check_warp_passed": true,
+    "i18n_tests_passed": true,
+    "reason_not_rerun": "Source54 changes only integration-test infrastructure and an integration test; the source53 production files and localization resources are byte-identical."
+  },
+  "build_boundaries": [
+    {
+      "stage": "first source54 nextest link",
+      "result": "failed",
+      "counted_as_test_failure": false,
+      "signature": "ld: write() failed, errno=28 (No space left on device)",
+      "recovery": "Removed only generated Cargo artifacts from completed direct-run and older fingerprints, then relinked and ran nextest successfully."
+    }
+  ],
+  "localization": {
+    "user_visible_copy_changed": false,
+    "localization_change_required": false,
+    "parent_i18n_gate_passed": true
+  },
+  "remote_read_only_check": {
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "branch": "codex/cli-agent-parity",
+    "remote_branch_sha": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+    "cross_platform_preflight_workflow_available": true,
+    "linux_runner": {
+      "id": 21,
+      "name": "infinishell-linux-x64",
+      "status": "online",
+      "busy": false
+    },
+    "windows_runner": {
+      "id": 22,
+      "name": "infinishell-windows-x64",
+      "status": "online",
+      "busy": false
+    }
+  },
+  "boundaries": {
+    "source54_targeted_rich_input_integration_passed": true,
+    "source54_full_integration_crate_rerun": true,
+    "source53_full_integration_nonpassing_count": 61,
+    "source54_full_integration_nonpassing_count": 59,
+    "source53_target_failure_recovered": true,
+    "additional_source53_failure_absent_in_source54": "integration::integration ui_tests::test_file_tree_non_openable_files",
+    "additional_difference_attributed_to_source54": false,
+    "remaining_source53_integration_failures_reclassified": false,
+    "windows_fake_claude_runtime_verified": false,
+    "linux_fake_claude_runtime_verified": false,
+    "linux_or_windows_exact_source54_workflow_dispatched": false,
+    "dispatch_blocker": "Source54 is an uncommitted dirty candidate and no commit or push authorization was provided."
+  }
+}

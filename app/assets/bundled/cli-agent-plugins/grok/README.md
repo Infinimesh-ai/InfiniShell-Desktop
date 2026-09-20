@@ -1,10 +1,10 @@
 # InfiniShell Grok 状态插件
 
-原生 Grok 插件，版本 `0.1.1`，受测 Grok `1.0.30`。无需远端 marketplace。插件仅把已知生命周期事件转换为 InfiniShell OSC 777 v1 通知，不改变权限策略。
+原生插件 `0.1.3` 候选，仅转换已知 hook 为 InfiniShell v1 通知，不决定权限或执行工具。管理器的 CLI 精确支持集合仍为 `1.0.30`；本候选的十项 hook 在真实 Grok 1.0.30/1.0.34 中的 validate、加载、取消派发和跨平台传输尚待验收，不能沿用 0.1.2 的历史结果作为通过证据。
 
-## 安装、更新与禁用
+## 安装、升级与禁用
 
-需要 Node.js 18 或更新版本，并且 Grok hook 子进程能从 `PATH` 找到 `node`。InfiniShell 安装器应先验证运行时可用；缺失时保留普通终端体验。Windows 不要求 Python。插件文件由桌面安装器保存在持久目录，不能把临时解压目录当更新源。
+需要 Node.js 18 或更新版本，以及 InfiniShell 引导提供的绝对路径 `WARP_CLI_AGENT_NOTIFY_EXECUTABLE`。仅有 Node 和已安装插件不证明通知链路可用。缺少 worker、协议不兼容、终端不可写或写入超时均安静降级，普通原生终端继续工作。
 
 ```text
 grok plugin validate <插件绝对目录>
@@ -14,21 +14,23 @@ grok plugin enable infinishell-grok
 grok plugin uninstall infinishell-grok
 ```
 
-本地来源由 Grok 复制到 `GROK_HOME/installed-plugins/`。受测版本的 `plugin update` 对本地复制来源返回成功，但不会更新实际文件，重复安装同一来源也会失败。桌面升级先备份本插件的四个文件，再卸载单个已识别插件并安装明确的新版本；若安装失败，使用备份重新安装旧版本并验证。存在同名重复注册或插件已被禁用时不自动执行。没有创建不存在的远端发布地址。
+真实 1.0.30 的本地插件更新不会可靠替换缓存，管理器继续使用已识别插件的备份、卸载、安装及失败恢复流程。0.1.0/0.1.1 的历史脚本与九项 hooks、0.1.2 的全部四个文件按已保存配方核对；用户改动、混合版本和未知旧版本不取得应用所有权。重复同名注册及已禁用插件不自动升级。
 
-`grok plugin list --json` 的 `status=installed` 不代表启用。受测版本将原生启用/禁用列表写入 `GROK_HOME/config.toml` 的 `[plugins].enabled` / `disabled`。版本与安装位置保存在 `installed-plugins/registry.json`。管理器应区分未安装、禁用、不兼容和运行时缺失。
+升级后在 Grok `/plugins` 的 **Plugins** 页按 `r` 重新加载，再检查 Hooks 页的当前版本与十项 hooks。仅有 `plugin list --json` 的 installed 状态不足以证明启用或发送成功。
 
-## 状态与兼容边界
+## 身份与状态
 
-- 必须同时存在 `WARP_CLI_AGENT_PROTOCOL_VERSION`、`GROK_HOOK_EVENT`、`GROK_SESSION_ID`，且事件类型/会话与载荷一致。普通 Claude 不会通过 Grok 身份检查。
-- 兼容 Grok camelCase 和 Claude snake_case 字段；冲突载荷丢弃。事件 ID 基于规范化载荷计算，不伪造上游单调序号。
-- 同一会话的少量状态放在 Grok 提供的 `GROK_PLUGIN_DATA`，只保存去重标识、时间和状态，不保存提示词或工具输入。独立 hook 进程通过锁和原子替换防止状态竞争。
-- `PermissionDenied` 只是通知，不进入等待审批。单个工具失败不等于任务失败。
-- `StopFailure` 保持失败状态；`SessionEnd` 和 `Stop(reason=shutdown)` 不能变成成功。只有显式 `end_turn`、有最终文本、没有继续 hook 标志且当前回合未失败时才发送当前回合的 Stop 候选响应；应用仍不能仅凭该 hook 判断任务完成。其余普通 Stop 降级为通知。
-- 取消、活跃任务重连和审批回传由托管协议承担，本插件不会依据退出码或文本猜测这些状态。
-- JSON 文本转义终端控制字符；tmux 使用 DCS passthrough。Unix 写 `/dev/tty`，Windows 写 `CONOUT$`；无控制终端时安静降级，不污染 ACP/hook stdout。
-- Windows/真实 tmux/SSH 尚需在同一产品修改提交上实际验收。纯字节测试只验证转义逻辑，不代替真实平台交互。
+- `WARP_CLI_AGENT_PROTOCOL_VERSION=1`、`GROK_HOOK_EVENT`、`GROK_SESSION_ID` 必须与载荷一致。兼容 camelCase/snake_case，冲突拒绝；任何 `subagentType` 或 `subagent_type` 字段出现均过滤，包括空值。
+- 原生 session/prompt ID 必须为 1–256 字节的 ASCII 字母数字及 `-_.:`，不截断、不补造。实际存在的 `prompt_id` 保留到应用，由 EventCursor 处理重复、过时回调和新输入等待；时间戳不用于推进回合。
+- `StopCancelled` 仅在有有效原生 prompt 且 reason 为 `user_interrupt`、`permission_rejected` 或 `permission_cancelled` 时表示取消。其余类别、缺失归属、SessionEnd 和精确 idle_prompt 只发 `notification + terminal_unverified`。
+- Stop 仅提供候选响应，不能证明任务成功；StopFailure 是原生失败候选，仍由应用核对回合归属。PermissionDenied 不表示等待审批，单个工具失败不表示整个任务失败。未知 reasonDetails/cancelTrigger 不进入通知。
 
-## 验证
+## 原生通知 worker
 
-在仓库根运行 `node --test script/cli-agent-parity/grok_plugin_tests.cjs`。真实 Grok 协议与 hook 来源见 `specs/cli-agent-parity/PROTOCOL_EVIDENCE.md` 和 `fixtures/`。
+Node 不创建持久状态或锁，也不直接打开、写入 TTY。先调用 `<绝对路径> cli-agent-notify --protocol-version`，仅接受协议 1、最大帧 4096 字节；发送调用只有 `cli-agent-notify` 参数，stdin 为单个紧凑 JSON。使用 `execFileSync`，无 shell 拼接、旧写法回退或自动重投。
+
+Node 按包含 tmux 包装的完整 OSC 帧预估 4096 字节上限；C1 和分号转义计入预算，超限时省略可选文本字段而不截断身份。最终大小、终端选择、并发写入及取消收尾由 worker 再严格核验。worker 成功且 stdout 为空仅表示写完终端，不是应用接收确认；hook stdout 永远不输出审批决定或模型正文。
+
+## 尚未完成的候选验证
+
+当前未冻结候选的 Node 映射/worker 合同 14 项、本机 Rust 定向 86 项、`warp_cli` 129 项和 `cargo check -p warp --lib` 已通过。同源码 `infinishell-tui` 的安装后探针在 macOS 上 17 项中通过 15 项；本机缺少 fish 和 tmux，相关 2 项明确跳过。上述只证明受测候选的本机离线合同与 Node→worker→PTY 接线，不替代真实 Grok 1.0.30/1.0.34 validate、加载、StopCancelled、应用消费、Windows ConPTY、SSH/tmux 或同提交跨平台验收。

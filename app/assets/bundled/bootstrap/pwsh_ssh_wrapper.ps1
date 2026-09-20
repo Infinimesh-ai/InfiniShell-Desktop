@@ -269,6 +269,8 @@ function Warp-New-RemoteBootstrapCommand {
     $remoteCommand = @'
 export TERM_PROGRAM='WarpTerminal'
 export WARP_IS_SSH='1'
+export WARP_IS_LOCAL_SHELL_SESSION='0'
+unset WARP_CLI_AGENT_NOTIFY_EXECUTABLE
 export WARP_USE_SSH_WRAPPER='__WARP_USE_SSH_WRAPPER__'
 export WARP_SSH_REUSE_CONTROL_MASTER='__WARP_SSH_REUSE_CONTROL_MASTER__'
 test -n '__WARP_CLIENT_VERSION__' && export WARP_CLIENT_VERSION='__WARP_CLIENT_VERSION__'
@@ -344,6 +346,7 @@ function Warp-New-WindowsBootstrapCommand {
 `$env:TERM_PROGRAM = 'WarpTerminal'
 `$env:WARP_IS_SSH = '1'
 `$env:WARP_IS_LOCAL_SHELL_SESSION = '0'
+Remove-Item Env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE -ErrorAction SilentlyContinue
 `$env:WARP_CLIENT_VERSION = '$clientVersion'
 `$env:WARP_CLI_AGENT_PROTOCOL_VERSION = '$protocolVersion'
 `$env:WARP_SSH_HOP_DEPTH = '$nextHopDepth'

@@ -110,6 +110,22 @@ impl GrokToolLeaseLedger {
         })
     }
 
+    /// 目录只可复用本进程、代次、注册 nonce 和原生会话的活跃账本，不授予任何工具租约。
+    pub(crate) fn matches_catalog_connection(
+        &self,
+        process_epoch: Uuid,
+        runtime_generation: Uuid,
+        server_id: &str,
+        native_session_id: &str,
+    ) -> bool {
+        !self.retired
+            && self.process_epoch == process_epoch
+            && self.runtime_generation == runtime_generation
+            && self.server_id == server_id
+            && self.server_name == super::local_tools::MCP_SERVER_NAME
+            && self.native_session_id == native_session_id
+    }
+
     /// 回合身份来自已验证的 Started；普通完成可沿用进程，取消必须另建 epoch。
     pub(crate) fn begin_turn(
         &mut self,

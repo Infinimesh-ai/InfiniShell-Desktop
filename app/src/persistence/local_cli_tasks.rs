@@ -49,6 +49,7 @@ pub enum LocalCliPersistenceRequest {
     },
     ClaimTaskResult {
         message: LocalCliMessage,
+        expected_recipient: Option<LocalCliTask>,
         completion: oneshot::Sender<Result<Option<LocalCliMessage>, String>>,
     },
     ClaimParentHistoryMessage {
@@ -167,11 +168,20 @@ pub(crate) fn claim_task_result(
     sender: &SyncSender<ModelEvent>,
     message: LocalCliMessage,
 ) -> Result<oneshot::Receiver<Result<Option<LocalCliMessage>, String>>, String> {
+    claim_task_result_if_current(sender, message, None)
+}
+
+pub(crate) fn claim_task_result_if_current(
+    sender: &SyncSender<ModelEvent>,
+    message: LocalCliMessage,
+    expected_recipient: Option<LocalCliTask>,
+) -> Result<oneshot::Receiver<Result<Option<LocalCliMessage>, String>>, String> {
     let (completion, receiver) = oneshot::channel();
     enqueue_request(
         sender,
         LocalCliPersistenceRequest::ClaimTaskResult {
             message,
+            expected_recipient,
             completion,
         },
     )?;
@@ -269,7 +279,7 @@ pub(crate) fn load_messages(
     Ok(receiver)
 }
 
-/// 人类查看任务双向消息与所有历史代次；不参与运行中的邮箱投递。
+/// 读取任务双向消息与历史代次；自动结果仍须单独核对原代来源与当前连接。
 pub(crate) fn load_task_messages(
     sender: &SyncSender<ModelEvent>,
     task_id: String,
@@ -347,8 +357,12 @@ pub(super) fn handle_request(
         ),
         LocalCliPersistenceRequest::ClaimTaskResult {
             message,
+            expected_recipient,
             completion,
-        } => complete(claim_result(connection, message), completion),
+        } => complete(
+            claim_result_if_current(connection, message, expected_recipient.as_ref()),
+            completion,
+        ),
         LocalCliPersistenceRequest::ClaimParentHistoryMessage {
             message,
             completion,
@@ -576,6 +590,15 @@ fn checkpoint(
                 connection,
                 &task.task_id,
                 is_new_generation || task.state == LocalCliTaskState::Cancelled,
+                task.harness == "grok" && task.state.is_terminal() && !is_new_generation,
+                previous
+                    .as_ref()
+                    .filter(|old| {
+                        is_new_generation
+                            && old.state == LocalCliTaskState::Completed
+                            && grok_same_process(old, &task)
+                    })
+                    .map(|_| &task),
             )?;
         }
         Ok(())
@@ -876,9 +899,18 @@ fn task_result_message_body(task: &LocalCliTask) -> String {
     .to_string()
 }
 
+#[cfg(test)]
 fn claim_result(
     connection: &mut SqliteConnection,
     message: LocalCliMessage,
+) -> Result<Option<LocalCliMessage>> {
+    claim_result_if_current(connection, message, None)
+}
+
+fn claim_result_if_current(
+    connection: &mut SqliteConnection,
+    message: LocalCliMessage,
+    expected_recipient: Option<&LocalCliTask>,
 ) -> Result<Option<LocalCliMessage>> {
     connection.transaction(|connection| {
         if message.subject != TASK_RESULT_SUBJECT || message.state != LocalCliMessageState::Queued {
@@ -897,6 +929,72 @@ fn claim_result(
         }
         let recipient =
             read_task(connection, &message.recipient_task_id)?.context("结果接收任务不存在")?;
+        if expected_recipient.is_some_and(|expected| expected != &recipient) {
+            bail!("结果领取前当前接收运行已被更新");
+        }
+        if recipient.harness == "grok" {
+            let config: Value = serde_json::from_str(&recipient.config_json)?;
+            let pending = config
+                .get("grok_pending_inputs")
+                .filter(|value| !value.is_null());
+            if recipient.state != LocalCliTaskState::Completed
+                || pending.is_some_and(|value| !value.as_array().is_some_and(Vec::is_empty))
+            {
+                return Ok(None);
+            }
+            let generations = read_task_generations(connection, &recipient.task_id)?;
+            if !grok_result_history_matches(&message, &generations, &recipient) {
+                bail!("结果接收运行不属于连续完成的同一原生进程");
+            }
+            let original = generations
+                .iter()
+                .find(|task| task.generation == message.recipient_generation)
+                .context("结果原父运行不存在")?;
+            let source = read_task_generation(
+                connection,
+                &message.sender_task_id,
+                message.sender_generation,
+            )?
+            .context("结果来源运行不存在")?;
+            if !grok_mailbox_origin_matches(
+                &message,
+                &source,
+                original,
+                &grok_mailbox_digest(&message)?,
+            ) {
+                bail!("结果来源、亲缘或原运行不符");
+            }
+            // 领取与单槽检查共用事务；尚无原生回执的结果不能因并发回调再次占槽。
+            let sent = local_cli_messages::table
+                .filter(local_cli_messages::recipient_task_id.eq(&recipient.task_id))
+                .filter(local_cli_messages::state.eq("sent"))
+                .select(local_cli_messages::data)
+                .load::<String>(connection)?;
+            for row in sent {
+                let other: LocalCliMessage = serde_json::from_str(&row)?;
+                if other.subject == TASK_RESULT_SUBJECT {
+                    let original = read_task_generation(
+                        connection,
+                        &other.recipient_task_id,
+                        other.recipient_generation,
+                    )?
+                    .context("未确认结果的原接收运行不存在")?;
+                    if other.version != 1
+                        || other.state != LocalCliMessageState::Sent
+                        || other.recipient_task_id != recipient.task_id
+                        || !grok_same_process(&original, &original)
+                    {
+                        bail!("未确认结果的原接收身份无效");
+                    }
+                    if grok_same_process(&original, &recipient) {
+                        return Ok(None);
+                    }
+                }
+            }
+            stored.state = LocalCliMessageState::Sent;
+            write_message_state(connection, &stored)?;
+            return Ok(Some(stored));
+        }
         if recipient.generation != message.recipient_generation || !recipient.state.is_active() {
             bail!("结果接收运行已结束、断开或被继续操作取代");
         }
@@ -1019,11 +1117,119 @@ struct PersistedGrokInputLink {
     submission_generation: i64,
     runtime_generation: Uuid,
     native_turn_id: Option<String>,
+    #[serde(default)]
+    mailbox_sha256: Option<String>,
+}
+
+/// 固定邮箱原始身份与内容；交付状态变化不改变已绑定的来源摘要。
+pub(crate) fn grok_mailbox_digest(message: &LocalCliMessage) -> Result<String> {
+    let mut original = message.clone();
+    original.state = LocalCliMessageState::Queued;
+    original.receipt_kind = None;
+    Ok(format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&original)?)
+    ))
+}
+
+pub(crate) fn grok_mailbox_origin_matches(
+    message: &LocalCliMessage,
+    sender: &LocalCliTask,
+    recipient: &LocalCliTask,
+    digest: &str,
+) -> bool {
+    message.version == 1
+        && sender.version == 1
+        && recipient.version == 1
+        && recipient.harness == "grok"
+        && message.sender_task_id == sender.task_id
+        && message.recipient_task_id == recipient.task_id
+        && message.sender_generation == sender.generation
+        && message.recipient_generation == recipient.generation
+        && sender.parent_task_id.is_some() == sender.parent_generation.is_some()
+        && recipient.parent_task_id.is_some() == recipient.parent_generation.is_some()
+        && (sender.task_id == recipient.task_id
+            || sender.parent_task_id.as_deref() == Some(recipient.task_id.as_str())
+            || recipient.parent_task_id.as_deref() == Some(sender.task_id.as_str()))
+        && grok_mailbox_digest(message).is_ok_and(|actual| actual == digest)
+        && (message.subject != TASK_RESULT_SUBJECT
+            || (sender.parent_task_id.as_deref() == Some(recipient.task_id.as_str())
+                && sender.parent_generation == Some(recipient.generation)
+                && sender.state.is_terminal()
+                && task_result_message_body(sender) == message.body))
+}
+
+/// 自动结果只能沿同一原生进程的正常回合前进，不能借继续历史会话重新执行。
+pub(crate) fn grok_same_process(original: &LocalCliTask, current: &LocalCliTask) -> bool {
+    let runtime = |task: &LocalCliTask| {
+        serde_json::from_str::<Value>(&task.config_json)
+            .ok()
+            .and_then(|config| {
+                config["runtime_generation"]
+                    .as_str()
+                    .and_then(|id| Uuid::parse_str(id).ok())
+            })
+            .filter(|id| !id.is_nil())
+    };
+    original.version == 1
+        && current.version == 1
+        && original.harness == "grok"
+        && current.harness == "grok"
+        && original.task_id == current.task_id
+        && original.generation <= current.generation
+        && original
+            .native_session_id
+            .as_deref()
+            .is_some_and(|session| {
+                !session.trim().is_empty()
+                    && session.len() <= 4096
+                    && !session.chars().any(char::is_control)
+            })
+        && original.native_session_id == current.native_session_id
+        && runtime(original).is_some()
+        && runtime(original) == runtime(current)
+}
+
+pub(crate) fn grok_result_history_matches(
+    message: &LocalCliMessage,
+    generations: &[LocalCliTask],
+    current: &LocalCliTask,
+) -> bool {
+    if message.subject != TASK_RESULT_SUBJECT
+        || message.recipient_task_id != current.task_id
+        || message.recipient_generation < 1
+        || message.recipient_generation > current.generation
+    {
+        return false;
+    }
+    // 每一代都必须有真实完成记录。先失败或取消再手动继续，不会恢复旧结果执行资格。
+    let mut expected = message.recipient_generation;
+    let mut history: Vec<_> = generations
+        .iter()
+        .filter(|task| {
+            task.generation >= message.recipient_generation && task.generation <= current.generation
+        })
+        .collect();
+    history.sort_by_key(|task| task.generation);
+    for task in history {
+        if task.generation != expected
+            || !grok_same_process(task, current)
+            || (task.generation < current.generation && task.state != LocalCliTaskState::Completed)
+        {
+            return false;
+        }
+        if task.generation == current.generation {
+            return task == current;
+        }
+        expected += 1;
+    }
+    false
 }
 
 /// 只接收同一原生进程已提交队列的旧任务代回执，不改原消息的投递身份。
 fn matches_grok_queued_input_receipt(
     message: &LocalCliMessage,
+    sender: &LocalCliTask,
     original: &LocalCliTask,
     current: &LocalCliTask,
     state: LocalCliMessageState,
@@ -1036,22 +1242,15 @@ fn matches_grok_queued_input_receipt(
         || message.receipt_kind.is_some()
         || original.harness != "grok"
         || current.harness != "grok"
-        || message.subject != "user_input"
-        || message.sender_task_id != current.task_id
         || message.recipient_task_id != current.task_id
         || original.task_id != current.task_id
-        || original.generation != message.sender_generation
-        || message.sender_generation != message.recipient_generation
+        || original.generation != message.recipient_generation
         || current.generation <= original.generation
         || matches!(
             current.state,
             LocalCliTaskState::Disconnected
                 | LocalCliTaskState::Unknown
                 | LocalCliTaskState::Unconfirmed
-        )
-        || !matches!(
-            serde_json::from_str::<RuntimeAction>(&message.body),
-            Ok(RuntimeAction::Submit { .. })
         )
     {
         return false;
@@ -1136,6 +1335,21 @@ fn matches_grok_queued_input_receipt(
             {
                 return false;
             }
+            if let Some(digest) = &input.mailbox_sha256 {
+                if !grok_mailbox_origin_matches(message, sender, original, digest) {
+                    return false;
+                }
+            } else if message.subject != "user_input"
+                || message.sender_task_id != current.task_id
+                || original.generation != message.sender_generation
+                || message.sender_generation != message.recipient_generation
+                || !matches!(
+                    serde_json::from_str::<RuntimeAction>(&message.body),
+                    Ok(RuntimeAction::Submit { .. })
+                )
+            {
+                return false;
+            }
             matched = true;
         }
     }
@@ -1157,7 +1371,7 @@ fn update_message_state_with_receipt(
             && receipt == Some(LocalCliReceiptKind::NativeProtocol);
         let is_delivery_outcome = is_native_ack || state == LocalCliMessageState::Failed;
         // 已派发消息的发送方可能先进入下一轮，回执仍属于原来的发送记录。
-        // 仅 Grok 同一进程中有持久队列关联的自输入允许跨任务代，旧连接仍被拒绝。
+        // 仅 Grok 同一进程的持久队列允许跨接收代；邮箱另外核对原亲缘与内容摘要。
         let sender = if is_delivery_outcome {
             read_task_generation(
                 connection,
@@ -1168,8 +1382,23 @@ fn update_message_state_with_receipt(
             read_task(connection, &message.sender_task_id)?
         }
         .context("消息发送运行不存在")?;
-        let same_grok_queue =
-            matches_grok_queued_input_receipt(&message, &sender, &recipient, state, receipt);
+        let original_recipient = if is_delivery_outcome
+            && recipient.harness == "grok"
+            && recipient.generation != message.recipient_generation
+        {
+            read_task_generation(
+                connection,
+                &message.recipient_task_id,
+                message.recipient_generation,
+            )?
+        } else {
+            None
+        };
+        let same_grok_queue = original_recipient.as_ref().is_some_and(|original| {
+            matches_grok_queued_input_receipt(
+                &message, &sender, original, &recipient, state, receipt,
+            )
+        });
         if message.version != 1
             || recipient.version != 1
             || sender.version != 1
@@ -1251,6 +1480,8 @@ fn cancel_pending_messages(
     connection: &mut SqliteConnection,
     task_id: &str,
     cancel_outgoing: bool,
+    keep_incoming_results: bool,
+    continued_grok: Option<&LocalCliTask>,
 ) -> Result<()> {
     let query = local_cli_messages::table
         // 只有尚未派发的消息可由任务结束取消。Sent 可能已被原生 CLI 接收，
@@ -1273,10 +1504,36 @@ fn cancel_pending_messages(
         let mut message: LocalCliMessage = serde_json::from_str(&row)?;
         // 已完成一代的结果不因发送方开始下一代而丢失。
         if message.subject == TASK_RESULT_SUBJECT
-            && message.sender_task_id == task_id
-            && message.recipient_task_id != task_id
+            && ((message.sender_task_id == task_id && message.recipient_task_id != task_id)
+                || (keep_incoming_results && message.recipient_task_id == task_id))
         {
+            // Grok 终态保留自动结果供回收；只有仍活跃的 Completed 连接允许后续领取。
             continue;
+        }
+        if message.subject == TASK_RESULT_SUBJECT
+            && message.recipient_task_id == task_id
+            && let Some(current) = continued_grok
+        {
+            let generations = read_task_generations(connection, task_id)?;
+            let original = generations
+                .iter()
+                .find(|task| task.generation == message.recipient_generation);
+            let source = read_task_generation(
+                connection,
+                &message.sender_task_id,
+                message.sender_generation,
+            )?;
+            if grok_result_history_matches(&message, &generations, current)
+                && let (Some(original), Some(source)) = (original, source)
+                && grok_mailbox_origin_matches(
+                    &message,
+                    &source,
+                    original,
+                    &grok_mailbox_digest(&message)?,
+                )
+            {
+                continue;
+            }
         }
         message.state = LocalCliMessageState::Cancelled;
         write_message_state(connection, &message)?;

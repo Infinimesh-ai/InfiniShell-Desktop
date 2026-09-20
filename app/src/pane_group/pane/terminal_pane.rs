@@ -1786,6 +1786,7 @@ fn launch_local_harness_child(
                     permission_policy: PermissionPolicy::Inherit,
                     permission_ceiling: None,
                     claude_profile: None,
+                    grok_profile: None,
                     model: managed_model,
                     local_tools: (allow_local_child_messages && parent_harness == Harness::Oz)
                         .then_some(LocalToolPermissions {

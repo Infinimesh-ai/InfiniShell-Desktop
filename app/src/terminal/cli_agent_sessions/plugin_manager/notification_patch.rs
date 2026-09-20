@@ -2,16 +2,20 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::OsString;
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+use std::io::Read as _;
 use std::io::Write as _;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 use std::{env, fs, io};
 
+#[cfg(all(windows, target_arch = "x86_64"))]
+use base64::Engine as _;
 use serde::Deserialize;
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, TempDir};
 #[cfg(not(target_family = "wasm"))]
 use {command::r#async::Command, warpui::r#async::FutureExt as _};
 
@@ -194,8 +198,60 @@ fn operation_error(error: impl std::fmt::Display, log: &str) -> PluginInstallErr
 }
 
 pub(super) fn auto_install_supported() -> bool {
-    // 上游通知仍依赖 Bash、jq 和 Unix TTY；不能把 Windows 文件写入成功当成可运行。
+    // Claude 的 Windows 原生通知链尚未验证，继续保留原有 Unix 门槛。
     cfg!(unix)
+}
+
+pub(super) fn auto_install_supported_for(kind: PatchKind) -> bool {
+    match kind {
+        PatchKind::Claude => auto_install_supported(),
+        // 此处仅提供入口；写入前仍须验证固定 CLI 以及当前 PATH 的实际依赖。
+        PatchKind::Codex => cfg!(unix) || cfg!(all(windows, target_arch = "x86_64")),
+    }
+}
+
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+const WINDOWS_CODEX_BYTES: u64 = 298_668_336;
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+const WINDOWS_CODEX_SHA256: &str =
+    "935a1911ed2556e4ffcec995f4886ac2ac425863ba26fed264df62e30272ad9d";
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+const WINDOWS_DEPENDENCY_PROBE: &str = include_str!(
+    "../../../../assets/bundled/cli-agent-plugins/codex/windows-install-preflight.ps1"
+);
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+fn windows_dependency_receipt_matches(stdout: &[u8], stderr: &[u8]) -> bool {
+    stdout == b"infinishell-codex-windows-dependencies-v1\r\n" && stderr.is_empty()
+}
+
+#[cfg(any(test, all(windows, target_arch = "x86_64")))]
+fn verify_windows_codex_binary(path: &Path) -> io::Result<()> {
+    // 当前原生证据仅覆盖官方 x64 exe；不把同版本 shim 或其他构建当成已验证入口。
+    if !path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"))
+    {
+        return Err(invalid_state());
+    }
+    let file = fs::File::open(path)?;
+    if !file.metadata()?.is_file() || file.metadata()?.len() != WINDOWS_CODEX_BYTES {
+        return Err(invalid_state());
+    }
+    let mut file = file.take(WINDOWS_CODEX_BYTES + 1);
+    let mut digest = Sha256::new();
+    let mut buffer = [0; 65536];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    if format!("{:x}", digest.finalize()) != WINDOWS_CODEX_SHA256 {
+        return Err(invalid_state());
+    }
+    Ok(())
 }
 
 pub(super) struct VerifiedRuntime {
@@ -226,7 +282,7 @@ impl VerifiedRuntime {
     ) -> Result<Self, PluginInstallError> {
         #[cfg(not(target_family = "wasm"))]
         {
-            if !auto_install_supported() {
+            if !auto_install_supported_for(kind) {
                 return Err(unsupported());
             }
             let search_path = path_env
@@ -235,37 +291,93 @@ impl VerifiedRuntime {
             let executable = resolve_executable_in_path(kind.name(), &search_path)
                 .ok_or_else(unsupported)?
                 .into_owned();
-            let mut runtime = Self {
+            let runtime = Self {
                 executable,
                 kind,
                 home: home.to_owned(),
                 search_path,
                 isolated_home: false,
             };
+            #[cfg(all(windows, target_arch = "x86_64"))]
+            verify_windows_codex_binary(&runtime.executable).map_err(|_| unsupported())?;
             let version = runtime
                 .run_with_timeout(&["--version"], Duration::from_secs(5), log)
                 .await?;
             if !version_matches(kind, &version) {
                 return Err(unsupported());
             }
-            // 与后续插件命令使用完全相同的 PATH，不借 shell 启动文件重定向用户配置目录。
-            let cli = runtime.executable.clone();
-            for dependency in ["bash", "jq"] {
-                runtime.executable = resolve_executable_in_path(dependency, &runtime.search_path)
-                    .ok_or_else(unsupported)?
-                    .into_owned();
-                runtime
-                    .run_with_timeout(&["--version"], Duration::from_secs(5), log)
-                    .await?;
+            #[cfg(all(windows, target_arch = "x86_64"))]
+            {
+                runtime.probe_windows_dependencies(log).await?;
+                Ok(runtime)
             }
-            runtime.executable = cli;
-            Ok(runtime)
+            #[cfg(not(all(windows, target_arch = "x86_64")))]
+            {
+                // 与后续插件命令使用完全相同的 PATH，不借 shell 启动文件重定向用户配置目录。
+                let mut runtime = runtime;
+                let cli = runtime.executable.clone();
+                for dependency in ["bash", "jq"] {
+                    runtime.executable =
+                        resolve_executable_in_path(dependency, &runtime.search_path)
+                            .ok_or_else(unsupported)?
+                            .into_owned();
+                    runtime
+                        .run_with_timeout(&["--version"], Duration::from_secs(5), log)
+                        .await?;
+                }
+                runtime.executable = cli;
+                Ok(runtime)
+            }
         }
         #[cfg(target_family = "wasm")]
         {
             let _ = (kind, home, path_env, log);
             Err(unsupported())
         }
+    }
+
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    async fn probe_windows_dependencies(&self, log: &mut String) -> Result<(), PluginInstallError> {
+        let failed = || PluginInstallError {
+            message: crate::t!("cli-agent-plugin-codex-windows-dependencies"),
+            // 只记录固定诊断，不把 PowerShell 返回的环境值或路径写入日志。
+            log: format!("{log}\nWindows Codex 通知依赖预检未通过。"),
+        };
+        let system_root = env::var_os("SystemRoot").ok_or_else(|| failed())?;
+        let powershell =
+            PathBuf::from(system_root).join("System32/WindowsPowerShell/v1.0/powershell.exe");
+        if !powershell.is_absolute() || !powershell.is_file() {
+            return Err(failed());
+        }
+        let source = WINDOWS_DEPENDENCY_PROBE.replace("\r\n", "\n");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(
+            source
+                .encode_utf16()
+                .flat_map(u16::to_le_bytes)
+                .collect::<Vec<_>>(),
+        );
+        let output = Command::new(powershell)
+            .args([
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-EncodedCommand",
+                &encoded,
+            ])
+            .env("PATH", &self.search_path)
+            .kill_on_drop(true)
+            .output()
+            .with_timeout(Duration::from_secs(15))
+            .await
+            .map_err(|_| failed())?
+            .map_err(|_| failed())?;
+        if !output.status.success()
+            || !windows_dependency_receipt_matches(&output.stdout, &output.stderr)
+        {
+            return Err(failed());
+        }
+        log.push_str("Windows Codex 通知依赖预检通过。\n");
+        Ok(())
     }
 
     pub(super) async fn run(
@@ -549,6 +661,7 @@ pub(super) fn verify_staged_claude_cache(path: &Path) -> io::Result<()> {
 
 pub(super) fn apply(home: &Path, kind: PatchKind, log: &str) -> Result<(), PluginInstallError> {
     invalidate(home, kind);
+    // Windows Codex 只经运行时预检后的完整来源事务，不开放仅修缓存的旁路。
     if !auto_install_supported() {
         return Err(unsupported());
     }
@@ -561,6 +674,7 @@ pub(super) fn apply(home: &Path, kind: PatchKind, log: &str) -> Result<(), Plugi
     validate_tree(&installation, kind).map_err(|_| modified())?;
     apply_files(
         &installation.path,
+        &home.join("plugins"),
         kind.files(),
         &kind.metadata().files,
         |_, _| Ok(()),
@@ -572,17 +686,44 @@ pub(super) fn apply(home: &Path, kind: PatchKind, log: &str) -> Result<(), Plugi
     Ok(())
 }
 
-fn replace(path: &Path, contents: &[u8], permissions: fs::Permissions) -> io::Result<()> {
-    let mut temporary = NamedTempFile::new_in(path.parent().ok_or_else(invalid_state)?)?;
+fn patch_staging(root: &Path, parent: &Path) -> io::Result<TempDir> {
+    let parent = parent.canonicalize()?;
+    if parent.starts_with(root.canonicalize()?) {
+        return Err(invalid_state());
+    }
+    // 唯一私有目录位于活动树外；进程中断留下的暂存不能污染严格插件清单。
+    tempfile::Builder::new()
+        .prefix(".infinishell-notification-patch-")
+        .tempdir_in(parent)
+}
+
+fn stage_replacement(
+    staging: &Path,
+    contents: &[u8],
+    permissions: fs::Permissions,
+) -> io::Result<NamedTempFile> {
+    let mut temporary = NamedTempFile::new_in(staging)?;
     temporary.as_file().set_permissions(permissions)?;
     temporary.write_all(contents)?;
     temporary.as_file().sync_all()?;
-    temporary.persist(path).map_err(|error| error.error)?;
+    Ok(temporary)
+}
+
+fn replace(
+    staging: &Path,
+    path: &Path,
+    contents: &[u8],
+    permissions: fs::Permissions,
+) -> io::Result<()> {
+    stage_replacement(staging, contents, permissions)?
+        .persist(path)
+        .map_err(|error| error.error)?;
     Ok(())
 }
 
 fn apply_files(
     root: &Path,
+    staging_parent: &Path,
     files: &[(&str, &str)],
     hashes: &BTreeMap<String, FileHashes>,
     mut before_replace: impl FnMut(usize, &Path) -> io::Result<()>,
@@ -601,6 +742,18 @@ fn apply_files(
         }
         originals.push((path.clone(), original, fs::metadata(path)?.permissions()));
     }
+    let staging = patch_staging(root, staging_parent)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+        let device = fs::metadata(staging.path())?.dev();
+        // 在任何替换前拒绝跨挂载点，不能退化成非原子的复制。
+        for (path, _, _) in &originals {
+            if fs::metadata(path)?.dev() != device {
+                return Err(invalid_state());
+            }
+        }
+    }
     let mut replaced = 0;
     let outcome = (|| {
         for (index, ((_, replacement), (path, original, permissions))) in
@@ -611,7 +764,12 @@ fn apply_files(
             if fs::read(checked_file(root, files[index].0)?)? != *original {
                 return Err(invalid_state());
             }
-            replace(path, replacement.as_bytes(), permissions.clone())?;
+            replace(
+                staging.path(),
+                path,
+                replacement.as_bytes(),
+                permissions.clone(),
+            )?;
             replaced += 1;
         }
         for ((relative, replacement), _) in files.iter().zip(&originals) {
@@ -631,7 +789,7 @@ fn apply_files(
                 .ok()
                 .as_deref()
                 != Some(files[index].1.as_bytes())
-                || replace(path, original, permissions.clone()).is_err()
+                || replace(staging.path(), path, original, permissions.clone()).is_err()
             {
                 rollback_failed = true;
             }

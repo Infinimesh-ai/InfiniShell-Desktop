@@ -47,7 +47,7 @@ fn local_skill_missing_after_snapshot_is_rejected_instead_of_silently_dropped() 
 #[test]
 fn local_skill_unverified_harness_and_unmapped_bundled_files_are_rejected() {
     let (_directory, skill) = skill();
-    assert!(prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Grok, true).is_err());
+    assert!(prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Gemini, true).is_err());
     assert!(prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Codex, false).is_err());
     let mut bundled = skill;
     bundled.scope = SkillScope::Bundled;
@@ -158,4 +158,36 @@ fn local_skill_read_is_bounded_and_rejects_invalid_utf8() {
     assert!(prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Codex, true).is_err());
     fs::write(path, [0xff, 0xfe]).unwrap();
     assert!(prepare_local_cli_skill_inputs(vec![skill], Harness::Codex, true).is_err());
+}
+
+#[test]
+fn grok_selection_preserves_native_reference_and_rejects_hidden_or_renamed_files() {
+    let (_directory, skill) = skill();
+    let inputs = prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Grok, true).unwrap();
+    let LocalOrRemotePath::Local(path) = &skill.path else {
+        panic!("本地路径");
+    };
+    assert_eq!(
+        inputs,
+        vec![InputContent::Skill {
+            name: "review-local".into(),
+            path: path.clone()
+        }]
+    );
+    assert!(
+        prepare_local_cli_skill_inputs(vec![skill.clone(), skill.clone()], Harness::Grok, true)
+            .is_err()
+    );
+    fs::write(
+        path,
+        "---\nname: review-local\ndescription: Review\nuser-invocable: false\n---\n隐藏\n",
+    )
+    .unwrap();
+    assert!(prepare_local_cli_skill_inputs(vec![skill.clone()], Harness::Grok, true).is_err());
+    fs::write(
+        path,
+        "---\nname: renamed\ndescription: Review\n---\n重命名\n",
+    )
+    .unwrap();
+    assert!(prepare_local_cli_skill_inputs(vec![skill], Harness::Grok, true).is_err());
 }

@@ -1,5 +1,6 @@
 //! 固定 Grok SDK MCP 反向通道；只转换已注册连接的工具，不把观察快照当作子任务权限。
 
+use crate::ai::cli_agent_runtime::permissions::GrokCreationPolicyV1;
 use std::{collections::HashMap, time::Instant};
 
 use serde_json::{Value, json};
@@ -35,6 +36,12 @@ struct OuterRequest {
     inner_key: String,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+enum CatalogRegistration {
+    Discovery,
+    Tools,
+}
+
 struct InnerRequest {
     id: Value,
     fingerprint: [u8; 32],
@@ -44,11 +51,14 @@ struct InnerRequest {
     response: Option<Value>,
     cancelled: bool,
     modern: bool,
+    catalog_registration: Option<CatalogRegistration>,
+    registration_written: bool,
 }
 
 pub(crate) struct GrokMcpBridge {
     server_id: String,
     allow_message: bool,
+    allow_spawn: bool,
     outer_requests: HashMap<String, OuterRequest>,
     inner_requests: HashMap<String, InnerRequest>,
     retained_reply_bytes: usize,
@@ -57,15 +67,27 @@ pub(crate) struct GrokMcpBridge {
 
 impl GrokMcpBridge {
     pub(crate) fn new(process_epoch: Uuid, permissions: LocalToolPermissions) -> Self {
-        // allow_spawn 请求不能代替 Grok 创建时固定的权限证明；当前始终拒绝派发。
+        // 默认连接没有创建上限，allow_spawn 不能由调用方布尔值自行提升。
         Self {
             server_id: format!("infinishell-{process_epoch}"),
             allow_message: permissions.allow_message,
+            allow_spawn: false,
             outer_requests: HashMap::new(),
             inner_requests: HashMap::new(),
             retained_reply_bytes: 0,
             modern_discovered: false,
         }
+    }
+
+    pub(crate) fn with_creation_policy(
+        process_epoch: Uuid,
+        profile: &GrokCreationPolicyV1,
+    ) -> Result<Self, String> {
+        profile.validate().map_err(|error| error.to_string())?;
+        let permissions = profile.local_tools().ok_or("固定策略没有本地工具")?;
+        let mut bridge = Self::new(process_epoch, permissions);
+        bridge.allow_spawn = permissions.allow_spawn;
+        Ok(bridge)
     }
 
     pub(crate) fn server_id(&self) -> &str {
@@ -95,6 +117,55 @@ impl GrokMcpBridge {
             return Err("不是封闭的 Grok MCP 注册请求".into());
         }
         self.receive(message, None)
+    }
+
+    /// 仅确认本桥验证过的完整响应；生成、缓存或另一 nonce 的响应不构成已发送证据。
+    pub(crate) fn record_registration_written(&mut self, message: &Value) {
+        let discovery_written = self.inner_requests.values().any(|request| {
+            request.catalog_registration == Some(CatalogRegistration::Discovery)
+                && request.registration_written
+        });
+        let Some(outer) = self.outer_requests.get(&message["id"].to_string()) else {
+            return;
+        };
+        let Some(inner) = self.inner_requests.get_mut(&outer.inner_key) else {
+            return;
+        };
+        if inner.catalog_registration.is_some()
+            && (inner.catalog_registration != Some(CatalogRegistration::Tools) || discovery_written)
+            && inner
+                .response
+                .as_ref()
+                .is_some_and(|response| *message == envelope(outer.id.clone(), response.clone()))
+        {
+            inner.registration_written = true;
+        }
+    }
+
+    /// 名称只来自当前 nonce 实际发送的目录；发现失败或尚未写入时保持空集合。
+    pub(crate) fn served_catalog_names(&self) -> Vec<String> {
+        let discovered = self.inner_requests.values().any(|request| {
+            request.catalog_registration == Some(CatalogRegistration::Discovery)
+                && request.registration_written
+        });
+        if !discovered {
+            return Vec::new();
+        }
+        self.inner_requests
+            .values()
+            .find(|request| {
+                request.catalog_registration == Some(CatalogRegistration::Tools)
+                    && request.registration_written
+            })
+            .and_then(|request| request.response.as_ref())
+            .and_then(|response| response["result"]["tools"].as_array())
+            .and_then(|tools| {
+                tools
+                    .iter()
+                    .map(|tool| qualify_local_catalog_name(tool["name"].as_str()?))
+                    .collect::<Option<Vec<_>>>()
+            })
+            .unwrap_or_default()
     }
 
     /// 先模拟租约事务，再验证现有 MCP 协议；协议拒绝不能消费原生租约。
@@ -265,7 +336,7 @@ impl GrokMcpBridge {
                     GrokMcpRequest::Immediate(envelope(
                         outer_id.clone(),
                         json!({"jsonrpc":"2.0","id":inner_id,"result":{
-                            "tools":tool_definitions(false, self.allow_message)
+                            "tools":tool_definitions(self.allow_spawn, self.allow_message)
                         }}),
                     ))
                 }
@@ -290,9 +361,10 @@ impl GrokMcpBridge {
                         .map(str::to_owned);
                     let rejection = if turn_id.is_none() {
                         Some("没有已验证的原生回合来源，不能执行 Grok 本地任务工具")
-                    } else if tool == "run_agents" {
+                    } else if tool == "run_agents" && !self.allow_spawn {
                         Some("Grok 父任务缺少创建时固定的权限上限，不能派发子任务")
                     } else if tool != INSPECT_TOOL_NAME
+                        && !(tool == "run_agents" && self.allow_spawn)
                         && !(tool == SEND_MESSAGE.name && self.allow_message)
                     {
                         Some("本地工具不存在或当前连接权限不允许调用")
@@ -352,6 +424,18 @@ impl GrokMcpBridge {
                 inner_key: inner_key.clone(),
             },
         );
+        let catalog_registration = response.as_ref().and_then(|response| {
+            if response.get("error").is_some() || !response["result"].is_object() {
+                return None;
+            }
+            if matches!(method, "initialize" | "server/discover") {
+                Some(CatalogRegistration::Discovery)
+            } else if method == "tools/list" {
+                Some(CatalogRegistration::Tools)
+            } else {
+                None
+            }
+        });
         self.inner_requests.insert(
             inner_key,
             InnerRequest {
@@ -363,6 +447,8 @@ impl GrokMcpBridge {
                 response,
                 cancelled: false,
                 modern,
+                catalog_registration,
+                registration_written: false,
             },
         );
         Ok(outcome)
@@ -540,3 +626,31 @@ fn fingerprint(value: &Value) -> Result<[u8; 32], String> {
 #[cfg(test)]
 #[path = "grok_local_tools_tests.rs"]
 mod tests;
+
+/// 对齐固定官方 qualify_mcp_tool_name：保留连字符，只允许一个不重叠或重叠的分隔位置。
+fn qualify_local_catalog_name(tool: &str) -> Option<String> {
+    let segment = |name: &str| {
+        !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    };
+    if !MCP_SERVER_NAME
+        .bytes()
+        .next()
+        .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+        || !segment(MCP_SERVER_NAME)
+        || !segment(tool)
+    {
+        return None;
+    }
+    let qualified = format!("{MCP_SERVER_NAME}__{tool}");
+    (qualified.len() <= 256
+        && qualified
+            .as_bytes()
+            .windows(2)
+            .filter(|pair| *pair == b"__")
+            .count()
+            == 1)
+        .then_some(qualified)
+}

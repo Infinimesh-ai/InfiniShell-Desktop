@@ -11,6 +11,24 @@ begin
 set -l saved_fish_private_mode $fish_private_mode
 set -g fish_private_mode 1
 
+# SSH 路径仅来自本次客户端的远端安装布局，不能沿用本机路径。
+if test "$WARP_IS_SSH" = 1; and test "$WARP_IS_LOCAL_SHELL_SESSION" != 1
+    set -e WARP_CLI_AGENT_NOTIFY_EXECUTABLE
+    if test "$WARP_CLI_AGENT_PROTOCOL_VERSION" = 1; and test -n '@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@'
+        set -l worker "$HOME/@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@"
+        if test -f "$worker"; and not test -L "$worker"; and test -x "$worker"
+            set -gx WARP_CLI_AGENT_NOTIFY_EXECUTABLE "$worker"
+        end
+    end
+end
+
+# 新 shell 和 SSH 必须刷新当前 PTY，不能沿用外层终端路径。
+set -e WARP_CLI_AGENT_TTY
+set -l warp_cli_agent_tty (command tty 2>/dev/null)
+if test $status -eq 0
+    set -gx WARP_CLI_AGENT_TTY $warp_cli_agent_tty
+end
+
 # Disable fish autosuggestions - because input goes through Warp's editor instead,
 # they are never actionable, and the extra output can cause problems.
 set -g fish_autosuggestion_enabled 0
@@ -675,6 +693,8 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
 
         set -l bootstrap_script "\$env:TERM_PROGRAM='WarpTerminal'
 \$env:WARP_IS_SSH='1'
+\$env:WARP_IS_LOCAL_SHELL_SESSION='0'
+Remove-Item Env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE -ErrorAction SilentlyContinue
 \$env:WARP_CLIENT_VERSION='$client_version'
 \$env:WARP_CLI_AGENT_PROTOCOL_VERSION='$protocol_version'
 \$env:WARP_SSH_HOP_DEPTH='$hop_depth'
@@ -833,6 +853,8 @@ if test "$WARP_IS_LOCAL_SHELL_SESSION" = "1"; or test "$WARP_IS_SSH" = "1"
 "
 export TERM_PROGRAM='WarpTerminal'
 export WARP_IS_SSH='1'
+export WARP_IS_LOCAL_SHELL_SESSION='0'
+unset WARP_CLI_AGENT_NOTIFY_EXECUTABLE
 export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
 export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
 export WARP_SSH_HOP_DEPTH='$next_hop_depth'

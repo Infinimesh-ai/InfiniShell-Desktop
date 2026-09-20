@@ -4842,7 +4842,9 @@ impl TuiTerminalSessionView {
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            ShellCommandExecutorEvent::ExecuteCommand { action_id, command } => {
+            ShellCommandExecutorEvent::ExecuteCommand {
+                action_id, command, ..
+            } => {
                 let Some((session_id, conversation_id)) = (|| {
                     let model = model.lock();
                     let session_id = model.block_list().active_block().session_id()?;

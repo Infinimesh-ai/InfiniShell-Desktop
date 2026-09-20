@@ -11,6 +11,7 @@ use warp_multi_agent_api as api;
 use warpui::r#async::Timer;
 
 use super::*;
+use crate::ai::agent_providers::tools::local_orchestration::{LocalHarness, LocalRunAgents};
 use crate::ai::cli_agent_runtime::PermissionPolicy;
 use crate::ai::cli_agent_runtime::conversation_bridge::recorded_history_identity;
 use crate::ai::cli_agent_runtime::local_skills::{
@@ -98,6 +99,8 @@ async fn execute_inner(
             .ok_or("本地工具没有当前回合")?,
         allow_spawn: permissions.allow_spawn,
         allow_message: permissions.allow_message,
+        grok_creation_policy_bound: source.harness == "grok"
+            && ceiling_from_parent(source, "grok").is_ok(),
         related_task_ids,
     };
     let call = bind_local_tool_call(request, &context)?;
@@ -504,12 +507,12 @@ async fn spawn_children(
     source: &LocalCliTask,
     records: &[LocalCliTask],
     options: &SessionOptions,
-    run: &api::RunAgents,
+    run: &LocalRunAgents,
 ) -> Result<Value, String> {
-    let (harness, agent) = match run.harness.as_ref().and_then(|h| h.variant.as_ref()) {
-        Some(api::harness::Variant::Codex(_)) => ("codex", CLIAgent::Codex),
-        Some(api::harness::Variant::ClaudeCode(_)) => ("claude", CLIAgent::Claude),
-        _ => return Err("本地子任务仅支持已验证的 Codex 与 Claude 适配器".into()),
+    let (harness, agent) = match run.harness {
+        LocalHarness::Codex => ("codex", CLIAgent::Codex),
+        LocalHarness::Claude => ("claude", CLIAgent::Claude),
+        LocalHarness::Grok => ("grok", CLIAgent::Grok),
     };
     if harness != source.harness && options.permission_policy == PermissionPolicy::Inherit {
         return Err("不同 CLI 的继承权限不等价，不能自动扩大子任务权限".into());
@@ -525,7 +528,10 @@ async fn spawn_children(
         .skills
         .iter()
         .cloned()
-        .map(|skill| {
+        .map(|path| {
+            let skill = api::SkillRef {
+                skill_reference: Some(api::skill_ref::SkillReference::Path(path)),
+            };
             skill_reference_from_api_skill_ref(skill, &SkillPathOrigin::Local)
                 .ok_or_else(|| "子任务技能引用无效".to_owned())
         })
@@ -568,6 +574,13 @@ async fn spawn_children(
         config["skill_references"] = saved_references.clone();
         config["permission_ceiling"] =
             serde_json::to_value(&permission_ceiling).map_err(|error| error.to_string())?;
+        let grok_profile = permission_ceiling
+            .grok_profile()
+            .map(|profile| profile.derive_child(options.local_tools))
+            .transpose()
+            .map_err(|error| error.to_string())?;
+        config["grok_profile"] =
+            serde_json::to_value(&grok_profile).map_err(|error| error.to_string())?;
         config["claude_profile"] = serde_json::to_value(permission_ceiling.claude_profile())
             .map_err(|error| error.to_string())?;
         config["name"] = json!(child.name);
@@ -593,6 +606,7 @@ async fn spawn_children(
         let mut child_options = options.clone();
         child_options.permission_ceiling = Some(permission_ceiling.clone());
         child_options.claude_profile = permission_ceiling.claude_profile().cloned();
+        child_options.grok_profile = grok_profile;
         child_options.executable = executable;
         child_options.target = SessionTarget::New;
         child_options.generation = Uuid::new_v4();

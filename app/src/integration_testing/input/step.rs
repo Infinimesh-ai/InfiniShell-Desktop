@@ -6,7 +6,9 @@ use warpui::windowing::WindowManager;
 use crate::ai::blocklist::agent_view::AgentInputFooterEvent;
 use crate::ai::blocklist::{InputConfig, InputType};
 use crate::integration_testing::input::{inline_model_selector_is_open, input_is_empty};
-use crate::integration_testing::step::new_step_with_default_assertions;
+use crate::integration_testing::step::{
+    assert_no_pending_model_events_for_pane, new_step_with_default_assertions,
+};
 use crate::integration_testing::terminal::assert_context_menu_is_open;
 use crate::integration_testing::view_getters::{
     single_input_view_for_tab, single_terminal_view, single_terminal_view_for_tab,
@@ -21,8 +23,12 @@ use crate::terminal::view::TerminalAction;
 
 /// Opens the CLI-agent Rich Input for the terminal view at `tab_index`.
 pub fn open_cli_agent_rich_input(tab_index: usize) -> TestStep {
-    new_step_with_default_assertions("Open CLI Agent Rich Input").with_action(
-        move |app, window_id, _step_data| {
+    TestStep::new("Open CLI Agent Rich Input")
+        .add_named_assertion(
+            "no pending model events",
+            assert_no_pending_model_events_for_pane(tab_index, 0),
+        )
+        .with_action(move |app, window_id, _step_data| {
             let terminal_view = single_terminal_view_for_tab(app, window_id, tab_index);
             terminal_view.update(app, |view, ctx| {
                 let view_id = view.view_id();
@@ -61,8 +67,7 @@ pub fn open_cli_agent_rich_input(tab_index: usize) -> TestStep {
                     );
                 });
             });
-        },
-    )
+        })
 }
 
 /// Asserts that the Rich Input buffer text for `tab_index` is empty.

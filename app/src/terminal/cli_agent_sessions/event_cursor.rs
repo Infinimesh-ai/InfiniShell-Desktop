@@ -58,7 +58,7 @@ impl EventCursor {
         }
         let turn_id = match event.agent {
             CLIAgent::Codex => event.payload.turn_id.as_deref(),
-            CLIAgent::Claude => event.payload.prompt_id.as_deref(),
+            CLIAgent::Claude | CLIAgent::Grok => event.payload.prompt_id.as_deref(),
             _ => return EventDisposition::Accept,
         }
         .filter(|id| !id.is_empty());

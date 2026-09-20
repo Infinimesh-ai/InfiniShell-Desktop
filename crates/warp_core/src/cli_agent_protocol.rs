@@ -10,6 +10,12 @@ pub const CLI_AGENT_PROTOCOL_VERSION: u32 = 1;
 /// Environment variable that advertises the host's CLI-agent protocol version.
 pub const WARP_CLI_AGENT_PROTOCOL_VERSION_ENV: &str = "WARP_CLI_AGENT_PROTOCOL_VERSION";
 
+/// 当前 shell 的 Unix PTY 路径，供脱离控制终端的 CLI hook 发送状态。
+pub const WARP_CLI_AGENT_TTY_ENV: &str = "WARP_CLI_AGENT_TTY";
+
+/// 当前平台宿主的通知 worker；不能将本机路径直接透传到 SSH、容器或 WSL。
+pub const WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV: &str = "WARP_CLI_AGENT_NOTIFY_EXECUTABLE";
+
 /// Environment variable that identifies the hosting Warp client version.
 pub const WARP_CLIENT_VERSION_ENV: &str = "WARP_CLIENT_VERSION";
 

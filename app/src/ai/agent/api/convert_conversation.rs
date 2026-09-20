@@ -351,12 +351,17 @@ impl ConvertToExchanges for &api::Task {
                 }
                 api::message::Message::ToolCallResult(tool_call_result) => {
                     // Try to convert tool call result - returns None for ServerToolCalls
-                    if let Some(input) = convert_tool_call_result_to_input(
+                    if let Some(input) = restore_command_launch_failure(
+                        &task_id,
+                        tool_call_result,
+                        &api_message.server_message_data,
+                        &tool_call_map,
+                    ).or_else(|| convert_tool_call_result_to_input(
                         &task_id,
                         tool_call_result,
                         &tool_call_map,
                         &mut document_versions,
-                    ) {
+                    )) {
                         // Add tool call result as input
                         current_inputs.push(input);
                     }
@@ -466,6 +471,34 @@ impl ConvertToExchanges for &api::Task {
 
         exchanges
     }
+}
+
+/// 本地 BYOP 自由 JSON 字段补充旧 proto；必须仍对应真实 shell 工具调用。
+pub(crate) fn restore_command_launch_failure(
+    task_id: &TaskId,
+    tool_call_result: &api::message::ToolCallResult,
+    content: &str,
+    tool_call_map: &HashMap<String, &api::message::ToolCall>,
+) -> Option<AIAgentInput> {
+    if tool_call_result.result.is_some() {
+        return None;
+    }
+    let call = tool_call_map.get(&tool_call_result.tool_call_id)?;
+    if !matches!(
+        call.tool.as_ref(),
+        Some(api::message::tool_call::Tool::RunShellCommand(_))
+    ) {
+        return None;
+    }
+    let result = crate::ai::agent_providers::tools::deserialize_command_launch_failure(content)?;
+    Some(AIAgentInput::ActionResult {
+        result: AIAgentActionResult {
+            id: tool_call_result.tool_call_id.clone().into(),
+            task_id: task_id.clone(),
+            result: AIAgentActionResultType::RequestCommandOutput(result),
+        },
+        context: convert_input_context(tool_call_result.context.as_ref()),
+    })
 }
 
 /// Convert a ToolCallResult to an AIAgentInput::ActionResult

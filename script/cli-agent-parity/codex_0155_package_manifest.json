@@ -1,0 +1,603 @@
+{
+  "version": "0.155.1",
+  "release_tag": "rust-v0.155.1",
+  "release_api": "https://api.github.com/repos/openai/codex/releases/tags/rust-v0.155.1",
+  "packages": {
+    "linux-x64": {
+      "archive": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+      "bytes": 138838055,
+      "sha256": "a65b895c6ac1a73629bbe4b864640c86133e94a43b4d67b3103044e1a306d5a2",
+      "target": "x86_64-unknown-linux-musl",
+      "entrypoint": "bin/codex",
+      "directories": {
+        "bin": 493,
+        "codex-path": 493,
+        "codex-resources": 493,
+        "codex-resources/voice": 493,
+        "codex-resources/voice/bin": 493,
+        "codex-resources/voice/lib": 493,
+        "codex-resources/voice/lib/gstreamer-1.0": 493,
+        "codex-resources/voice/licenses": 493,
+        "codex-resources/zsh": 493,
+        "codex-resources/zsh/bin": 493
+      },
+      "files": {
+        "bin/codex": [
+          269273536,
+          "0753dfe1d8b87a52436deb13eb1c549661ef4c84fee2c5aa688385eebeccb761",
+          493
+        ],
+        "bin/codex-code-mode-host": [
+          69423168,
+          "210ab8ebaebf4bc1421d9e30339c858354ca35fa91e2f87f4c6204e5382f8a63",
+          493
+        ],
+        "codex-package.json": [
+          205,
+          "a62ef9bdf297e3d86a30d940f2b54e6daf5e4b36e25b5f25cef49eee38b92e80",
+          420
+        ],
+        "codex-path/rg": [
+          5408904,
+          "e62198eb19b136b88c330af83647b5a962cb99b6b1f066758568f12de1974849",
+          493
+        ],
+        "codex-resources/bwrap": [
+          529776,
+          "77360cb751ccedc5971391444ac86a8a33c15b04d6b4a6fe45f5d25496e62c4c",
+          493
+        ],
+        "codex-resources/voice/NOTICE.md": [
+          1079,
+          "edadf0a401a293778fdb7416707b1ac55df26a686388d3b2db72cd2043763c16",
+          420
+        ],
+        "codex-resources/voice/bin/codex-voice-host": [
+          12806552,
+          "c5cea0a307d683a4f11dd0bf4aaa26430aef3b3299c3abb4a744830c41f88401",
+          493
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstapp.so": [
+          6488,
+          "273dd0cef410ba933580142b4d3aecb9de9a02ea8ccb44d4cd0072f1be13624d",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstaudioconvert.so": [
+          40928,
+          "cec016217ca8461d6c1aff1e07f05cc350ef4f11301c18d05d917d7909f84e98",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstaudioresample.so": [
+          35120,
+          "3754b172d3902141aa65b307ebb2cb2e5953ecb8be1d3ec48b059d9825765e7f",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstcoreelements.so": [
+          473176,
+          "825037b9e1b82dc33fa40e507a5ea11c6604f053121a7731012450919a34f4ff",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstopus.so": [
+          71992,
+          "9ff0058e22b4b17a3ff739fcf4956ec4288626cb522e7f3be632c11c66e4eafd",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstrtp.so": [
+          739744,
+          "2c550ec3a4a8ffc949b4d8c7ee56305019ed8dfb6ddc11dc616f0d32da63decc",
+          365
+        ],
+        "codex-resources/voice/lib/gstreamer-1.0/libgstrtpmanager.so": [
+          558104,
+          "a8324c765a0431250e842a81626ed4be51af27bbce6db1132ff80f424404091d",
+          365
+        ],
+        "codex-resources/voice/lib/libffi.so.8": [
+          63112,
+          "6ef5db59b2e4b1eb63032fa6c8afb1669bc09b073789233c379efda85b1353db",
+          365
+        ],
+        "codex-resources/voice/lib/libgio-2.0.so.0": [
+          2307904,
+          "f2b01325b9880a6050a6d9b380495c05920ccb614b65070bfe50a883ad3c5b59",
+          365
+        ],
+        "codex-resources/voice/lib/libglib-2.0.so.0": [
+          1480224,
+          "0beb2da5be4e426aff91394172e09dccf5e9a413de450dd32504ca47db7ce67c",
+          365
+        ],
+        "codex-resources/voice/lib/libgmodule-2.0.so.0": [
+          15656,
+          "dd6bf973282b80ac308ad8c453b69ba94eafe358cddd17dc5f256602482bd60d",
+          365
+        ],
+        "codex-resources/voice/lib/libgobject-2.0.so.0": [
+          449600,
+          "43f50b570200c3bec7f04ae0e75b74f78b455b1f767467665beb2e4990147cce",
+          365
+        ],
+        "codex-resources/voice/lib/libgstallocators-1.0.so.0": [
+          30128,
+          "b9dd63b6676e3bab1ad25cedcf1ecd3ccd34adc8564b4be0931ba1096d006024",
+          365
+        ],
+        "codex-resources/voice/lib/libgstapp-1.0.so.0": [
+          105200,
+          "94a2c78ec2589014aa719d0f45320fb48cc30e90568f518f749b0220d06bac6a",
+          365
+        ],
+        "codex-resources/voice/lib/libgstaudio-1.0.so.0": [
+          597832,
+          "80cbe5f0ce5bdd8111cbc550cdcf53d5ef2aa6828441b76fba052590f4c0e84d",
+          365
+        ],
+        "codex-resources/voice/lib/libgstbase-1.0.so.0": [
+          564592,
+          "61ed2fac21b57f9691cb102fa40aad58e08ba148e74a7bbce4470e43776b1dfe",
+          365
+        ],
+        "codex-resources/voice/lib/libgstnet-1.0.so.0": [
+          73856,
+          "0dcc313fa275232f356a83f7a7b6e18c7a22c7accf24768a8d9f946e9a07a92e",
+          365
+        ],
+        "codex-resources/voice/lib/libgstpbutils-1.0.so.0": [
+          316576,
+          "3f245e363a7b500867cff43012bcb1e84bdd7b5d4044c3455e32c4816cbe89b8",
+          365
+        ],
+        "codex-resources/voice/lib/libgstreamer-1.0.so.0": [
+          1548568,
+          "19f9b840b0b1b825059fb1bbd7000c7fe1f871b5bf7238919bc5ef38cd4ff4f3",
+          365
+        ],
+        "codex-resources/voice/lib/libgstrtp-1.0.so.0": [
+          209200,
+          "10dfe4d90cf550b237b97ec73ece5cd127f3f48aa0015be0a25d5913b8efeb86",
+          365
+        ],
+        "codex-resources/voice/lib/libgsttag-1.0.so.0": [
+          268280,
+          "6e17b41a0d975e308cca86984c4a067e458ab81019da1b1c0669db250932549e",
+          365
+        ],
+        "codex-resources/voice/lib/libgstvideo-1.0.so.0": [
+          975136,
+          "c27531d2bdbc01700d4f87db771f217d6950da81347d95cf734e80820d13a1ca",
+          365
+        ],
+        "codex-resources/voice/lib/libintl.so.8": [
+          6288,
+          "f50f3ab34be7b3392f2db82bd67d50e133b35fa41d352dc3b3a97b70b0ffd960",
+          365
+        ],
+        "codex-resources/voice/lib/libopus.so.0": [
+          565744,
+          "9b768239b031926f3ae8a47a4974683dc7703281e1698c1735aee447b14a14e2",
+          365
+        ],
+        "codex-resources/voice/lib/libpcre2-8.so.0": [
+          442424,
+          "e39519b242f40686734ed8d0218f68cac24f0e956ec64c8c1b49b9da5cc9788b",
+          365
+        ],
+        "codex-resources/voice/lib/libz.so.1": [
+          109296,
+          "6c5d765f42d9368cc4bdbd11f725c1bcf6b14b78322033d3c94f787fc6261f5e",
+          365
+        ],
+        "codex-resources/voice/licenses/LGPL-2.1.txt": [
+          26431,
+          "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+          420
+        ],
+        "codex-resources/voice/licenses/Opus.txt": [
+          1945,
+          "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551",
+          420
+        ],
+        "codex-resources/voice/licenses/PCRE2.md": [
+          4011,
+          "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+          420
+        ],
+        "codex-resources/voice/licenses/libffi.txt": [
+          1132,
+          "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c",
+          420
+        ],
+        "codex-resources/voice/licenses/proxy-libintl.txt": [
+          25292,
+          "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5",
+          420
+        ],
+        "codex-resources/voice/licenses/sljit.txt": [
+          1444,
+          "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+          420
+        ],
+        "codex-resources/voice/licenses/zlib.txt": [
+          1002,
+          "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+          420
+        ],
+        "codex-resources/voice/manifest.json": [
+          4768,
+          "4356f350ea66c789b0ac294fa869cfffcafa7088bb9f7fc69ceba02471207687",
+          420
+        ],
+        "codex-resources/voice/runtime.json": [
+          13941,
+          "759a7df5c46a5af7efdf791cce1d5bf96b547ac15e3a918c3972e5509265beef",
+          493
+        ],
+        "codex-resources/voice/sources.json": [
+          4911,
+          "e2f6b124f6277e7c3c4f5c7cc8830c66190f671ad65e972bb2cc9507dbfcb937",
+          420
+        ],
+        "codex-resources/zsh/bin/zsh": [
+          898480,
+          "67faaaa89242c4a332e16e508a1977cffc24bf7fca31d4411cdfd101f3831ef3",
+          493
+        ]
+      },
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.155.1",
+        "target": "x86_64-unknown-linux-musl",
+        "variant": "codex",
+        "entrypoint": "bin/codex",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      }
+    },
+    "windows-x64": {
+      "archive": "codex-package-x86_64-pc-windows-msvc.tar.gz",
+      "bytes": 139547261,
+      "sha256": "f45c273b7835c192aaa9cef5b93aa9528966ac7301444632de80a565a9bf14e8",
+      "target": "x86_64-pc-windows-msvc",
+      "entrypoint": "bin/codex.exe",
+      "directories": {
+        "bin": 511,
+        "codex-path": 511,
+        "codex-resources": 511
+      },
+      "files": {
+        "bin/codex-code-mode-host.exe": [
+          72473904,
+          "480da4a9a98b5b54d6656d731fbcc00c73fd4d0fc4b9aaceafc9fbdf08a7d523",
+          511
+        ],
+        "bin/codex.exe": [
+          307108144,
+          "eba0f32c976667cb9298efafd98513e823eeda7b576a03ec658bb8be8d336316",
+          511
+        ],
+        "codex-package.json": [
+          215,
+          "64a1994514c461a7fbf5a73367a31c21d7f328ac07ec64a920994700eae5b3b9",
+          438
+        ],
+        "codex-path/rg.exe": [
+          4218880,
+          "14231169855ec5205cf5a1b6f1db358ff4aed4247c86b69ce8aae647c77f6680",
+          511
+        ],
+        "codex-resources/codex-command-runner.exe": [
+          8217904,
+          "0431ee03aaf7e3c2ecda92017ef2fb9750d66221917467132c2136f078924b6c",
+          511
+        ],
+        "codex-resources/codex-windows-sandbox-setup.exe": [
+          15498544,
+          "a430e15894ef450ee9003459597f95b3e3db5ac1e260f662bbc5d7db4e855047",
+          511
+        ]
+      },
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.155.1",
+        "target": "x86_64-pc-windows-msvc",
+        "variant": "codex",
+        "entrypoint": "bin/codex.exe",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      }
+    },
+    "windows-arm64": {
+      "archive": "codex-package-aarch64-pc-windows-msvc.tar.gz",
+      "bytes": 129273387,
+      "sha256": "f53deb24650d288fddfd1724ef952f6ad9cb6119c75ecc12a6223b98fd97719a",
+      "target": "aarch64-pc-windows-msvc",
+      "entrypoint": "bin/codex.exe",
+      "directories": {
+        "bin": 511,
+        "codex-path": 511,
+        "codex-resources": 511
+      },
+      "files": {
+        "bin/codex-code-mode-host.exe": [
+          67646256,
+          "e6ad0719748f70e4c68413c02fe2b6dd5d2338e800e1f5c67678df202edb97d2",
+          511
+        ],
+        "bin/codex.exe": [
+          258754352,
+          "30bbe48875b79f8c4715d079812e9ca82176870e948992324abb941c15e4d5f6",
+          511
+        ],
+        "codex-package.json": [
+          216,
+          "78a5c886480d76a87d0692601504f2b801b8c59e1643f1c0ef70c0d4054c0769",
+          438
+        ],
+        "codex-path/rg.exe": [
+          3859456,
+          "d33a29a9ef03c9f4c03be9e8d88498e6e2d2e566d64cdbdef97f9afc8f13120c",
+          511
+        ],
+        "codex-resources/codex-command-runner.exe": [
+          7345968,
+          "6f48172ea2c8f72470fb5ce6271426aac725c80297e9c15c489d6f67a66257f0",
+          511
+        ],
+        "codex-resources/codex-windows-sandbox-setup.exe": [
+          13723952,
+          "344868f36a6b1785fb6cac96173a4c74ada5ffbc0b5dd6693550032887508793",
+          511
+        ]
+      },
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.155.1",
+        "target": "aarch64-pc-windows-msvc",
+        "variant": "codex",
+        "entrypoint": "bin/codex.exe",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      }
+    },
+    "macos-arm64": {
+      "archive": "codex-package-aarch64-apple-darwin.tar.gz",
+      "bytes": 122962085,
+      "sha256": "e6e08717da9e35b72332eff753527fe79a9ae876081033c5c6820a8e5f58b943",
+      "target": "aarch64-apple-darwin",
+      "entrypoint": "bin/codex",
+      "directories": {
+        "bin": 493,
+        "codex-path": 493,
+        "codex-resources": 493,
+        "codex-resources/voice": 493,
+        "codex-resources/voice/bin": 493,
+        "codex-resources/voice/lib": 493,
+        "codex-resources/voice/licenses": 493,
+        "codex-resources/voice/plugins": 493,
+        "codex-resources/zsh": 493,
+        "codex-resources/zsh/bin": 493
+      },
+      "files": {
+        "bin/codex": [
+          228803200,
+          "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+          493
+        ],
+        "bin/codex-code-mode-host": [
+          62802592,
+          "59a702a68f1ef79fceaca644db46b8385ceefbb66035e78b8ade7cdcc21fda55",
+          493
+        ],
+        "codex-package.json": [
+          200,
+          "b4895dbb7a0b6532d819809d798eca98e0f6c3dcaa417ad9b39bc32640618424",
+          420
+        ],
+        "codex-path/rg": [
+          4030432,
+          "c6c50764c763f44464bd4681dc0392668b2cb42f88bd123f8d0b43fbf3b02576",
+          493
+        ],
+        "codex-resources/voice/NOTICE.md": [
+          1079,
+          "edadf0a401a293778fdb7416707b1ac55df26a686388d3b2db72cd2043763c16",
+          420
+        ],
+        "codex-resources/voice/bin/codex-voice-host": [
+          9283600,
+          "be67257c4308d9f8460493ab1789297350b2d398547087fe0bff7bcc624c443d",
+          493
+        ],
+        "codex-resources/voice/lib/libffi.8.dylib": [
+          136768,
+          "4fa18eb30e8407e5cc16afa30a643b402a22c0ea37a6dc9450ab99aecd88f62e",
+          493
+        ],
+        "codex-resources/voice/lib/libgio-2.0.0.dylib": [
+          1866272,
+          "0e31023e6498d08ae702019ac4cd8d388c96afba6085e28c9ea5ba5efb8075e1",
+          493
+        ],
+        "codex-resources/voice/lib/libglib-2.0.0.dylib": [
+          1310992,
+          "23c39e06b864f74d8b86b3ae9596568a5b009823e38d29fe462b44804cb2e606",
+          493
+        ],
+        "codex-resources/voice/lib/libgmodule-2.0.0.dylib": [
+          68912,
+          "46058202a8a679fae5b248bf74f5daaa37ada6c46991d35bb65b9a2d5f1cf686",
+          493
+        ],
+        "codex-resources/voice/lib/libgobject-2.0.0.dylib": [
+          403088,
+          "eca170837e173884a736343c58268d1ef7adae9034b6d3b8d3e0b8d36336301a",
+          493
+        ],
+        "codex-resources/voice/lib/libgstapp-1.0.0.dylib": [
+          152608,
+          "3f6a6542b8bcbf3cbfb0fd9246abc9a858722d1dd5b74e268f15c8e06c74d2c1",
+          493
+        ],
+        "codex-resources/voice/lib/libgstaudio-1.0.0.dylib": [
+          530400,
+          "0d8ee5b5dc742324c9ab74e4384378e7373900b8fbfa5a4101f153e429033561",
+          493
+        ],
+        "codex-resources/voice/lib/libgstbase-1.0.0.dylib": [
+          505968,
+          "0b4ecd24beb23e6f258bfd661a33ff3d1e4a7383e46aedba2085df567a9951ab",
+          493
+        ],
+        "codex-resources/voice/lib/libgstnet-1.0.0.dylib": [
+          117008,
+          "a5edfbbddd1875472d0ce14a2673a740705a2449780b95c70149fd425fa6244c",
+          493
+        ],
+        "codex-resources/voice/lib/libgstpbutils-1.0.0.dylib": [
+          309856,
+          "d2cef4b2287ed3bdb5d71f50f4071917531155312aed24d869e0228e03827571",
+          493
+        ],
+        "codex-resources/voice/lib/libgstreamer-1.0.0.dylib": [
+          1304704,
+          "39c1725b3aae9d9aa154e7937988032b23f67d98c4ab6e4a38fb2bad247d544b",
+          493
+        ],
+        "codex-resources/voice/lib/libgstrtp-1.0.0.dylib": [
+          205696,
+          "473813e09b9a1db3ea131662c90907eb9aaaec504078767f503440243866c4b3",
+          493
+        ],
+        "codex-resources/voice/lib/libgsttag-1.0.0.dylib": [
+          283696,
+          "645fdcf191167e7be94f3cdf6c526960d27ce99665ba5947eb407132286340c4",
+          493
+        ],
+        "codex-resources/voice/lib/libgstvideo-1.0.0.dylib": [
+          903664,
+          "39fb8be790e196e686690ebf75e5f7c4558d5a4e4e79c57c41743004a68f1e39",
+          493
+        ],
+        "codex-resources/voice/lib/libintl.8.dylib": [
+          50112,
+          "686944b9fccfc3179bb91a3d12ebd5cfcf8fb1d0100da63c4f3b0f3be86305db",
+          493
+        ],
+        "codex-resources/voice/lib/libopus.0.dylib": [
+          504080,
+          "3090c1988f7046c78c4856e115ac93d9917830e4d8bb27327b43c64447f82a92",
+          493
+        ],
+        "codex-resources/voice/lib/libpcre2-8.0.dylib": [
+          456816,
+          "fcae9e2caaf8c516244c95b386299b0c8a706df95b3a4f20245b1a61732a8b5c",
+          493
+        ],
+        "codex-resources/voice/lib/libz.1.dylib": [
+          123312,
+          "df31491c6d32ec00c2411359524b0bc0ed3e6e1e8c49bd5561ed8890911ec25c",
+          493
+        ],
+        "codex-resources/voice/licenses/LGPL-2.1.txt": [
+          26431,
+          "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+          420
+        ],
+        "codex-resources/voice/licenses/Opus.txt": [
+          1945,
+          "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551",
+          420
+        ],
+        "codex-resources/voice/licenses/PCRE2.md": [
+          4011,
+          "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+          420
+        ],
+        "codex-resources/voice/licenses/libffi.txt": [
+          1132,
+          "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c",
+          420
+        ],
+        "codex-resources/voice/licenses/proxy-libintl.txt": [
+          25292,
+          "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5",
+          420
+        ],
+        "codex-resources/voice/licenses/sljit.txt": [
+          1444,
+          "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+          420
+        ],
+        "codex-resources/voice/licenses/zlib.txt": [
+          1002,
+          "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+          420
+        ],
+        "codex-resources/voice/manifest.json": [
+          4637,
+          "0e5ab5f2c4d3b9b07aa7ef0166cb4cca9f30672b63c90ebb11f1acd5920b0928",
+          420
+        ],
+        "codex-resources/voice/plugins/libgstapp.dylib": [
+          49872,
+          "127b3740d40a727102239061bd179e850c78c4736291fe55a38da9c8630b91f4",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstaudioconvert.dylib": [
+          93824,
+          "ea1048cab051959cdc8730ec186274389f41b22848e7aed470ae936e1cf5a01e",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstaudioresample.dylib": [
+          91840,
+          "b1faf437f781386e98e79688fec332816fc741304d70c1fca41ca52447b5b5e4",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstcoreelements.dylib": [
+          446608,
+          "3fec07badb54b1364e1a906efa305ac73b7c86275c79cb2767eae9a39df0453f",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstopus.dylib": [
+          131680,
+          "fd2b9cb054f7dec866c508212d345a5459097f7f550e676f2a29ba14fb48f8a8",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstrtp.dylib": [
+          673888,
+          "c8910ce8ffdd66e5d1e8c3d69beb282506905d73e8baf3a73f18216a43cec76d",
+          493
+        ],
+        "codex-resources/voice/plugins/libgstrtpmanager.dylib": [
+          527568,
+          "338cd280a8d2693358d21039b8c429199ab178b9b5b7693c2d35443bdf04ac64",
+          493
+        ],
+        "codex-resources/voice/runtime.json": [
+          14915,
+          "27db27d294d7c76fadb0c7dfd6d6e9130f4c2fd2448ec633517067ad1542ca00",
+          493
+        ],
+        "codex-resources/voice/sources.json": [
+          4911,
+          "e2f6b124f6277e7c3c4f5c7cc8830c66190f671ad65e972bb2cc9507dbfcb937",
+          420
+        ],
+        "codex-resources/zsh/bin/zsh": [
+          754208,
+          "7f3cb812c2954e63cafd045acfcc8093319529eea532979a73a813e3745c9bd3",
+          493
+        ]
+      },
+      "metadata": {
+        "layoutVersion": 1,
+        "version": "0.155.1",
+        "target": "aarch64-apple-darwin",
+        "variant": "codex",
+        "entrypoint": "bin/codex",
+        "resourcesDir": "codex-resources",
+        "pathDir": "codex-path"
+      }
+    }
+  }
+}

@@ -646,6 +646,7 @@ mod tests {
             description: "Automates Chrome browser operations.".into(),
             scope: SkillScope::Project,
             provider: SkillProvider::Agents,
+            user_invocable: Default::default(),
             icon_override: None,
         };
         let ctx = vec![AIAgentContext::Skills {
@@ -681,6 +682,7 @@ mod tests {
             description: "Help discover and install new agent skills.".into(),
             scope: SkillScope::Bundled,
             provider: SkillProvider::InfiniShell,
+            user_invocable: Default::default(),
             icon_override: Some(Icon::InfiniShell),
         };
         let ctx = vec![AIAgentContext::Skills {

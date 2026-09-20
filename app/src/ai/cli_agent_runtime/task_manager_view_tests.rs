@@ -135,6 +135,14 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
         Harness::Claude,
         &CLIAgentVersionStatus::Detected("2.1.273".into())
     ));
+    assert!(verified_version(
+        Harness::Claude,
+        &CLIAgentVersionStatus::Detected("2.1.278".into())
+    ));
+    assert!(!verified_version(
+        Harness::Claude,
+        &CLIAgentVersionStatus::Detected("2.1.279".into())
+    ));
     assert!(!verified_version(
         Harness::Claude,
         &CLIAgentVersionStatus::Unknown
@@ -143,9 +151,17 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
         Harness::Grok,
         &CLIAgentVersionStatus::Detected("1.0.30".into())
     ));
+    assert!(verified_version(
+        Harness::Grok,
+        &CLIAgentVersionStatus::Detected("1.0.34".into())
+    ));
     assert!(!verified_version(
         Harness::Grok,
         &CLIAgentVersionStatus::Detected("1.0.31".into())
+    ));
+    assert!(!verified_version(
+        Harness::Grok,
+        &CLIAgentVersionStatus::Detected("1.0.35".into())
     ));
 }
 
@@ -243,11 +259,15 @@ fn saved_tool_permissions_default_off_and_round_trip_without_escalation() {
     let old: SavedLaunchOptions =
         serde_json::from_str(r#"{"permission_policy":"Inherit","model":null}"#).unwrap();
     assert!(old.local_tools.is_none());
+    assert!(
+        supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, old.local_tools).is_none()
+    );
     assert!(old.claude_profile.is_none());
     let saved = SavedLaunchOptions {
         permission_policy: PermissionPolicy::ReadOnly,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         selected_skills: Vec::new(),
         local_tools: Some(LocalToolPermissions {
@@ -1031,6 +1051,312 @@ fn project_skill_refresh_rejects_a_directory_changed_before_the_callback() {
             );
             assert!(view.managed_input.skill_index_token.is_none());
             assert!(view.managed_input.skill_index_directory.is_none());
+        });
+    });
+}
+
+#[test]
+fn switching_to_grok_preserves_messages_without_inheriting_child_spawn_permission() {
+    warpui::App::test((), |mut app| async move {
+        let manager = manager_view(&mut app);
+        manager.update(&mut app, |view, ctx| {
+            view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert_eq!(
+                view.local_tools,
+                LocalToolPermissions {
+                    allow_spawn: true,
+                    allow_message: true
+                }
+            );
+            view.handle_action(&TaskManagerAction::SelectHarness(Harness::Grok), ctx);
+
+            assert_eq!(
+                view.local_tools,
+                LocalToolPermissions {
+                    allow_spawn: false,
+                    allow_message: true
+                }
+            );
+            assert!(view.buttons["allow-spawn"].as_ref(ctx).is_disabled());
+            assert!(!view.buttons["allow-messages"].as_ref(ctx).is_disabled());
+            view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+            assert!(!view.local_tools.allow_spawn);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert!(!view.local_tools.allow_message);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert!(view.local_tools.allow_message);
+
+            view.handle_action(&TaskManagerAction::SelectHarness(Harness::Claude), ctx);
+            assert_eq!(
+                view.local_tools,
+                LocalToolPermissions {
+                    allow_spawn: false,
+                    allow_message: true
+                }
+            );
+            assert!(!view.buttons["allow-spawn"].as_ref(ctx).is_disabled());
+        });
+    });
+}
+
+#[test]
+fn restored_grok_permissions_keep_messages_but_cannot_reenable_saved_spawn_permission() {
+    warpui::App::test((), |mut app| async move {
+        let mut original = task("saved-grok");
+        original.harness = "grok".into();
+        original.parent_task_id = None;
+        original.parent_generation = None;
+        original.config_json = serde_json::to_string(&SavedLaunchOptions {
+            permission_policy: PermissionPolicy::Inherit,
+            permission_ceiling: None,
+            claude_profile: None,
+            grok_profile: None,
+            model: None,
+            local_tools: Some(LocalToolPermissions {
+                allow_spawn: true,
+                allow_message: true,
+            }),
+            selected_skills: Vec::new(),
+        })
+        .unwrap();
+        let manager = manager_view_with_records(&mut app, vec![original.clone()]);
+        manager.update(&mut app, |view, ctx| {
+            view.handle_action(
+                &TaskManagerAction::SelectTask(original.task_id.clone()),
+                ctx,
+            );
+            let constrained = LocalToolPermissions {
+                allow_spawn: false,
+                allow_message: true,
+            };
+            assert_eq!(view.local_tools, constrained);
+            assert!(view.buttons["allow-spawn"].as_ref(ctx).is_disabled());
+            assert!(view.buttons["allow-messages"].as_ref(ctx).is_disabled());
+            view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert_eq!(view.local_tools, constrained);
+
+            let (resumed, target) = resumed_task(&original).unwrap();
+            let mut saved: SavedLaunchOptions = serde_json::from_str(&resumed.config_json).unwrap();
+            saved.local_tools =
+                supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, saved.local_tools);
+            let restored: SavedLaunchOptions =
+                serde_json::from_str(&serde_json::to_string(&saved).unwrap()).unwrap();
+            assert_eq!(restored.local_tools, Some(constrained));
+            assert_eq!(
+                target,
+                SessionTarget::Resume {
+                    native_session_id: "native-session".into()
+                }
+            );
+            assert_eq!(view.selected_record(ctx), Some(original.clone()));
+            assert_eq!(resumed.config_json, original.config_json);
+        });
+    });
+}
+
+#[test]
+fn grok_spawn_selection_requires_the_explicit_fixed_policy() {
+    let tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    assert_eq!(
+        supported_local_tools(Harness::Grok, PermissionPolicy::GrokRestrictedReadV1, tools),
+        tools
+    );
+    assert_eq!(
+        supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, tools),
+        Some(LocalToolPermissions {
+            allow_spawn: false,
+            allow_message: true
+        })
+    );
+    assert!(permission_supported(
+        Harness::Grok,
+        PermissionPolicy::GrokRestrictedReadV1
+    ));
+    assert!(!permission_supported(
+        Harness::Claude,
+        PermissionPolicy::GrokRestrictedReadV1
+    ));
+    assert!(!permission_supported(
+        Harness::Codex,
+        PermissionPolicy::GrokRestrictedReadV1
+    ));
+}
+
+#[test]
+fn grok_file_policy_exposes_child_tools_without_changing_inherited_launches() {
+    let tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    assert_eq!(
+        supported_local_tools(
+            Harness::Grok,
+            PermissionPolicy::GrokRestrictedFilesV1,
+            tools
+        ),
+        tools
+    );
+    assert!(permission_supported(
+        Harness::Grok,
+        PermissionPolicy::GrokRestrictedFilesV1
+    ));
+    assert!(!permission_supported(
+        Harness::Codex,
+        PermissionPolicy::GrokRestrictedFilesV1
+    ));
+    assert!(!permission_supported(
+        Harness::Claude,
+        PermissionPolicy::GrokRestrictedFilesV1
+    ));
+    assert_eq!(
+        supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, tools),
+        Some(LocalToolPermissions {
+            allow_spawn: false,
+            allow_message: true
+        })
+    );
+}
+
+#[test]
+fn grok_latest_gui_gate_maps_only_to_the_verified_p0_adapter_mode() {
+    let latest = CLIAgentVersionStatus::Detected("1.0.34".into());
+    assert!(permission_supported_for_version(
+        Harness::Grok,
+        PermissionPolicy::Inherit,
+        Some(&latest)
+    ));
+    for permission in [
+        PermissionPolicy::GrokRestrictedReadV1,
+        PermissionPolicy::GrokRestrictedFilesV1,
+    ] {
+        assert!(!permission_supported_for_version(
+            Harness::Grok,
+            permission,
+            Some(&latest)
+        ));
+    }
+
+    let full = CLIAgentVersionStatus::Detected("1.0.30".into());
+    for permission in [
+        PermissionPolicy::Inherit,
+        PermissionPolicy::GrokRestrictedReadV1,
+        PermissionPolicy::GrokRestrictedFilesV1,
+    ] {
+        assert!(permission_supported_for_version(
+            Harness::Grok,
+            permission,
+            Some(&full)
+        ));
+    }
+    assert_eq!(
+        permission_name_for_version(Harness::Grok, PermissionPolicy::Inherit, Some(&latest)),
+        crate::t!("cli-task-manager-permission-grok-p0")
+    );
+    assert_eq!(
+        permission_help_for_version(Harness::Grok, PermissionPolicy::Inherit, Some(&latest)),
+        Some(crate::t!("cli-task-manager-permission-grok-p0-help"))
+    );
+}
+
+#[test]
+fn fixed_policy_help_does_not_claim_to_inherit_cli_configuration() {
+    let inherited = permission_help(PermissionPolicy::Inherit).unwrap();
+    assert_ne!(
+        permission_help(PermissionPolicy::GrokRestrictedReadV1).unwrap(),
+        inherited
+    );
+    assert_ne!(
+        permission_help(PermissionPolicy::GrokRestrictedFilesV1).unwrap(),
+        inherited
+    );
+    assert_ne!(
+        permission_help(PermissionPolicy::ClaudeRestrictedFilesV1).unwrap(),
+        inherited
+    );
+    assert_eq!(permission_help(PermissionPolicy::ReadOnly), None);
+    assert_eq!(permission_help(PermissionPolicy::WorkspaceWrite), None);
+}
+
+#[test]
+fn grok_composer_applies_native_visibility_single_skill_and_inherit_policy() {
+    use crate::ai::skills::SkillManager;
+    use warp_util::local_or_remote_path::LocalOrRemotePath;
+
+    warpui::App::test((), |mut app| async move {
+        let project = tempfile::tempdir().unwrap();
+        let visible = project.path().join(".grok/skills/visible/SKILL.md");
+        let other = project.path().join(".grok/skills/other/SKILL.md");
+        let hidden = project.path().join(".grok/skills/hidden/SKILL.md");
+        std::fs::create_dir_all(visible.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(other.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(hidden.parent().unwrap()).unwrap();
+        std::fs::write(
+            &visible,
+            "---\nname: visible\ndescription: Visible\n---\n显示\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &other,
+            "---\nname: other\ndescription: Other\n---\n第二技能\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &hidden,
+            "---\nname: hidden\ndescription: Hidden\nuser-invocable: false\n---\n隐藏\n",
+        )
+        .unwrap();
+        let manager = manager_view(&mut app);
+        SkillManager::handle(&app).update(&mut app, |skills, _| {
+            skills.handle_skills_added(vec![
+                ai::skills::parse_skill(&visible).unwrap(),
+                ai::skills::parse_skill(&other).unwrap(),
+                ai::skills::parse_skill(&hidden).unwrap(),
+            ]);
+        });
+        manager.update(&mut app, |view, ctx| {
+            view.harness = Harness::Grok;
+            view.permission = PermissionPolicy::Inherit;
+            view.directory.update(ctx, |editor, ctx| {
+                editor.set_buffer_text(&project.path().to_string_lossy(), ctx)
+            });
+            view.refresh_managed_input(ctx);
+            assert!(view.managed_input.available_skills);
+            let visible = SkillReference::Path(LocalOrRemotePath::Local(visible));
+            let other = SkillReference::Path(LocalOrRemotePath::Local(other));
+            let hidden = SkillReference::Path(LocalOrRemotePath::Local(hidden));
+            assert!(
+                view.select_composer_skill(&hidden, view.input_generation, ctx)
+                    .is_err()
+            );
+            assert!(
+                view.select_composer_skill(&visible, view.input_generation, ctx)
+                    .is_ok()
+            );
+            assert!(
+                view.select_composer_skill(&other, view.input_generation, ctx)
+                    .is_err()
+            );
+            assert_eq!(view.parsed_composer_skills(ctx).unwrap().len(), 1);
+            view.permission = PermissionPolicy::GrokRestrictedReadV1;
+            view.refresh_managed_input(ctx);
+            assert!(!view.managed_input.available_skills);
+            assert!(view.parsed_composer_skills(ctx).is_err());
+            assert!(
+                view.select_composer_skill(&visible, view.input_generation, ctx)
+                    .is_err()
+            );
+            view.permission = PermissionPolicy::GrokRestrictedFilesV1;
+            view.refresh_managed_input(ctx);
+            assert!(!view.managed_input.available_skills);
+            assert!(view.parsed_composer_skills(ctx).is_err());
+            view.permission = PermissionPolicy::Inherit;
+            view.managed_input.attachments.skills = vec![hidden];
+            assert!(view.parsed_composer_skills(ctx).is_err());
         });
     });
 }

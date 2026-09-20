@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "scope": "macos_gui_grok_1_0_34_verified_p0_native_read",
+  "candidate": "source50",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_tree_dirty": true,
+  "host_platform": "darwin",
+  "build": {
+    "command": "cargo build -p warp --bin infinishell --features local_cli_managed_tasks,rust-embed/debug-embed",
+    "unsigned_binary_sha256": "19a094a00e65cb3c60a7e34edf5e3415442178ec029c176e96a32983275732b1",
+    "signed_app_binary_sha256": "da269b5e1d28e33e3c036b3f461b0f6f2b4ebe486bb22e511631aa0a9f99be45",
+    "bundle_id": "dev.infinishell.InfiniShellCliParity50",
+    "codesign_deep_strict_verified": true,
+    "wrong_default_feature_build_used_as_evidence": false
+  },
+  "local_gates": {
+    "cargo_check_warp": "passed",
+    "feature_enabled_gui_build": "passed",
+    "i18n_tests": {
+      "passed": 11,
+      "failed": 0
+    },
+    "targeted_tests": [
+      {
+        "name": "ai::cli_agent_runtime::task_manager_view::tests::grok_latest_gui_gate_maps_only_to_the_verified_p0_adapter_mode",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "name": "ai::cli_agent_runtime::task_manager_view::tests::fixed_policy_help_does_not_claim_to_inherit_cli_configuration",
+        "passed": 1,
+        "failed": 0
+      }
+    ],
+    "task_manager_view_module": {
+      "passed": 36,
+      "failed": 0,
+      "filtered_out": 7320
+    },
+    "formatting": {
+      "focused_source50_rustfmt_check": "passed",
+      "workspace_cargo_fmt_check": "failed_on_pre_existing_out_of_scope_diffs",
+      "workspace_cargo_fmt_counted_as_success": false
+    },
+    "initial_nextest_filter_matched_tests": 0,
+    "initial_nextest_filter_counted_as_evidence": false
+  },
+  "gui_layout": {
+    "english_checked": true,
+    "simplified_chinese_checked": true,
+    "grok_p0_label_visible_in_both_languages": true,
+    "grok_p0_help_visible_without_clipping_in_both_languages": true,
+    "local_tools_disabled_for_grok_p0": true,
+    "child_task_controls_disabled_for_grok_p0": true
+  },
+  "successful_case": {
+    "task_id": "5470f8a3-61ae-4d81-8b08-fd226859cbb2",
+    "native_session_id": "01a0bafb-20b7-7760-9235-a6cb1fa807fa",
+    "cli_version": "1.0.34",
+    "permission_policy": "Inherit",
+    "local_tools": null,
+    "grok_profile": null,
+    "prompt_contained_fixture_marker": false,
+    "native_approval": {
+      "visible_in_gui": true,
+      "namespace": "grok_build",
+      "name": "read_file",
+      "kind": "read",
+      "path": "gui-native-secret.txt",
+      "decision": "AllowOnce"
+    },
+    "fixture_marker": "GUI_NATIVE_AB421D4ECECF424FA85A5995DBBE3450",
+    "final_gui_output_matched_fixture_marker": true,
+    "final_state": "completed",
+    "database_sha256": "c0e67ea23df5da260e5c8f9cb1fe49deddc3f27c20462d1edeec57df9124af49",
+    "p0_cli_config_sha256": "288fd07d3bc2c50b32cff3aa850a50d268e63441cc49589d1dec375885113ddf",
+    "fixture_sha256": "00d5670fba27f3725524f95410cf825c34c85ced07e28ee5cf247ebd818e162c",
+    "effective_permissions": {
+      "requestedPolicy": "inherit",
+      "appCreationPolicyApplied": false,
+      "permissionEnforcementVerified": false,
+      "verifiedCapabilities": {
+        "approval": true,
+        "cancel": true,
+        "childTasks": false,
+        "closeSession": false,
+        "emptyHistoryRecovery": false,
+        "localTools": false,
+        "newSession": true,
+        "queuedSubmit": false,
+        "resume": true,
+        "steer": false,
+        "submit": true
+      }
+    }
+  },
+  "excluded_or_failed_cases": [
+    {
+      "task_id": "02616de0-5969-4a45-abf2-65138bdf0db8",
+      "state": "failed",
+      "reason": "grok_creation_executable_unverified",
+      "cause": "The first GUI mapping incorrectly requested the fixed 1.0.30 creation policy for Grok 1.0.34.",
+      "resolution": "The 1.0.34 GUI gate now maps only to Inherit and the adapter's verified P0 native-read filtering.",
+      "counted_as_success": false
+    },
+    {
+      "task_id_prefix": "771e7cd2",
+      "reason": "fixture marker leaked in the prompt",
+      "counted_as_success": false
+    },
+    {
+      "task_id": "5ffd29b2-fd71-4d18-bf58-e052a40aa746",
+      "reason": "default inherited Grok configuration did not request native approval",
+      "real_native_read_observed": true,
+      "counted_as_approval_proof": false
+    }
+  ],
+  "supporting_production_evidence": {
+    "path": "specs/cli-agent-parity/validation/macos-official-48-grok-1034-p0-production1.safe.ndjson",
+    "sha256": "1ed3eee7c73e9010d14fac92672f0b31147e836906d6a550c9bc41f5ae6ec74f",
+    "read_allow_once_verified": true,
+    "read_deny_once_verified": true,
+    "cancel_after_real_text_verified": true,
+    "resume_verified": true
+  },
+  "boundaries": {
+    "gui_independently_reproved_deny_cancel_resume": false,
+    "p0_is_a_filesystem_sandbox": false,
+    "shell_commands_hooks_admin_policies_within_verified_p0": false,
+    "fixed_1_0_30_creation_policy_applied_to_1_0_34": false,
+    "different_os_exact_source_verified": false,
+    "different_os_blocker": "The exact dirty candidate cannot be dispatched to remote runners without an authorized commit and push."
+  }
+}

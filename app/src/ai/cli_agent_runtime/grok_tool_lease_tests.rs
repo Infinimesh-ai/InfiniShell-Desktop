@@ -333,3 +333,49 @@ fn fixed_runtime_generation_accepts_next_confirmed_native_turn_after_all_leases_
     );
     assert_eq!(ledger.state(&second).unwrap(), GrokToolLeaseState::Bound);
 }
+
+#[test]
+fn catalog_identity_never_reuses_retired_epoch_generation_nonce_or_session() {
+    let epoch = Uuid::new_v4();
+    let generation = Uuid::new_v4();
+    let mut ledger = GrokToolLeaseLedger::new(
+        epoch,
+        generation,
+        "registered-nonce".into(),
+        super::super::local_tools::MCP_SERVER_NAME.into(),
+        "native-session".into(),
+    )
+    .unwrap();
+    assert!(ledger.matches_catalog_connection(
+        epoch,
+        generation,
+        "registered-nonce",
+        "native-session"
+    ));
+    assert!(!ledger.matches_catalog_connection(
+        Uuid::new_v4(),
+        generation,
+        "registered-nonce",
+        "native-session"
+    ));
+    assert!(!ledger.matches_catalog_connection(
+        epoch,
+        Uuid::new_v4(),
+        "registered-nonce",
+        "native-session"
+    ));
+    assert!(!ledger.matches_catalog_connection(epoch, generation, "old-nonce", "native-session"));
+    assert!(!ledger.matches_catalog_connection(
+        epoch,
+        generation,
+        "registered-nonce",
+        "old-session"
+    ));
+    ledger.retire();
+    assert!(!ledger.matches_catalog_connection(
+        epoch,
+        generation,
+        "registered-nonce",
+        "native-session"
+    ));
+}

@@ -98,6 +98,7 @@ async fn cancel_and_continue(
         match event.kind {
             RuntimeEventKind::SessionReady {
                 effective_permissions,
+                ..
             } => {
                 observe_permissions(&effective_permissions, evidence)?;
             }
@@ -440,6 +441,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
             permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
             permission_ceiling: None,
             claude_profile: None,
+            grok_profile: None,
             model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "缺少固定模型")?),
             local_tools: None,
             selected_skills: Vec::new(),
@@ -450,6 +452,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         let first = session.next().await?;
         let RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         } = first.kind
         else {
             return Err("固定策略没有就绪".into());

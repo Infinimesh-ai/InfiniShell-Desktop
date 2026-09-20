@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Local};
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
-use futures::{FutureExt, select};
+use futures::{FutureExt, select, select_biased};
 use futures_lite::pin;
 use itertools::Itertools;
 use parking_lot::FairMutex;
@@ -71,6 +71,8 @@ pub(crate) fn agent_shell_command_block_output(block: &Block) -> String {
 pub struct ShellCommandExecutor {
     active_session: ModelHandle<ActiveSession>,
     block_finished_senders: HashMap<BlockSelector, oneshot::Sender<()>>,
+    /// 只属于尚未派发的请求；失败优先于清理通道造成的取消唤醒。
+    launch_failure_senders: HashMap<AIAgentActionId, oneshot::Sender<String>>,
     /// Senders used by the `Check now` affordance to force a long-running shell command's
     /// pending poll future to resolve immediately with a fresh snapshot, bypassing the
     /// agent-set timeout.
@@ -114,6 +116,7 @@ impl ShellCommandExecutor {
             active_session,
             terminal_model,
             block_finished_senders: HashMap::new(),
+            launch_failure_senders: HashMap::new(),
             force_refresh_senders: HashMap::new(),
             terminal_view_id,
             control_handback_sender: None,
@@ -263,7 +266,7 @@ impl ShellCommandExecutor {
         &mut self,
         input: ExecuteActionInput,
         ctx: &mut ModelContext<Self>,
-    ) -> impl Into<AnyActionExecution> + use<> {
+    ) -> AnyActionExecution {
         let model = self.terminal_model.lock();
 
         // Determine the action we want to take based on the input.
@@ -283,10 +286,13 @@ impl ShellCommandExecutor {
                     .is_active_and_long_running()
                 {
                     // If there is an active block, we can't execute another command.
-                    return ActionExecution::Sync(AIAgentActionResultType::RequestCommandOutput(
-                        RequestCommandOutputResult::CancelledBeforeExecution,
-                    ));
+                    return AnyActionExecution::Sync(
+                        AIAgentActionResultType::RequestCommandOutput(
+                            RequestCommandOutputResult::CancelledBeforeExecution,
+                        ),
+                    );
                 }
+                drop(model);
                 // Zap:同步等待型命令(wait_until_completion=true)无条件禁用 pager。
                 //
                 // 模型自报的 `uses_pager` 不可靠 —— deepseek-v4-flash 等小模型几乎不会主动标,
@@ -305,32 +311,41 @@ impl ShellCommandExecutor {
                 } else {
                     command.clone()
                 };
+                let block_selector = BlockSelector::RequestedCommandId(action_id.clone());
+                let (launch_failed_tx, launch_failed_rx) = oneshot::channel();
+                self.launch_failure_senders
+                    .insert(action_id.clone(), launch_failed_tx);
+                let completion = self.action_result_future(
+                    block_selector.clone(),
+                    action_result_delay_for_requested_command(*wait_until_completion),
+                );
+                // 必须先登记所有接收者，再发送可被同步拒绝的派发事件。
                 ctx.emit(ShellCommandExecutorEvent::ExecuteCommand {
                     action_id: action_id.clone(),
                     command: decorated_command,
+                    original_command: command.clone(),
                 });
-
-                let block_selector = BlockSelector::RequestedCommandId(action_id.clone());
                 let command = command.clone();
-                drop(model);
-
+                let requested_id = action_id.clone();
                 ActionExecution::new_async(
-                    self.action_result_future(
-                        block_selector.clone(),
-                        action_result_delay_for_requested_command(*wait_until_completion),
-                    ),
+                    wait_for_requested_command(completion, launch_failed_rx),
                     move |result, ctx| {
-                        // Remove the senders from the maps.
                         if let Some(handle) = handle.upgrade(ctx) {
                             handle.update(ctx, |me, _| {
                                 me.block_finished_senders.remove(&block_selector);
                                 me.force_refresh_senders.remove(&block_selector);
+                                me.launch_failure_senders.remove(&requested_id);
                             });
                         }
-
-                        action_result_for_requested_command(command, result)
+                        match result {
+                            Ok(result) => action_result_for_requested_command(command, result),
+                            Err(reason) => AIAgentActionResultType::RequestCommandOutput(
+                                RequestCommandOutputResult::LaunchFailed { command, reason },
+                            ),
+                        }
                     },
                 )
+                .into()
             }
             AIAgentActionType::WriteToLongRunningShellCommand {
                 block_id,
@@ -338,7 +353,7 @@ impl ShellCommandExecutor {
                 mode,
             } => {
                 let Some(block) = model.block_list().block_with_id(block_id) else {
-                    return ActionExecution::Sync(
+                    return AnyActionExecution::Sync(
                         AIAgentActionResultType::WriteToLongRunningShellCommand(
                             WriteToLongRunningShellCommandResult::Error(
                                 ShellCommandError::BlockNotFound,
@@ -349,7 +364,7 @@ impl ShellCommandExecutor {
                 if block.finished() {
                     let output: String = agent_shell_command_block_output(block);
                     let exit_code = block.exit_code();
-                    return ActionExecution::Sync(
+                    return AnyActionExecution::Sync(
                         AIAgentActionResultType::WriteToLongRunningShellCommand(
                             WriteToLongRunningShellCommandResult::CommandFinished {
                                 block_id: block.id().clone(),
@@ -393,27 +408,32 @@ impl ShellCommandExecutor {
                         action_result_for_write_to_long_running_shell_command(result)
                     },
                 )
+                .into()
             }
             AIAgentActionType::ReadShellCommandOutput { block_id, delay } => {
                 let Some(block) = model.block_list().block_with_id(block_id) else {
-                    return ActionExecution::Sync(AIAgentActionResultType::ReadShellCommandOutput(
-                        ReadShellCommandOutputResult::Error(ShellCommandError::BlockNotFound),
-                    ));
+                    return AnyActionExecution::Sync(
+                        AIAgentActionResultType::ReadShellCommandOutput(
+                            ReadShellCommandOutputResult::Error(ShellCommandError::BlockNotFound),
+                        ),
+                    );
                 };
                 if block.finished() && !model.is_active_ssh_command_block(block_id) {
                     let command = block.command_with_secrets_unobfuscated(false);
                     let output: String = block.output_with_secrets_unobfuscated();
                     let exit_code = block.exit_code();
-                    return ActionExecution::Sync(AIAgentActionResultType::ReadShellCommandOutput(
-                        ReadShellCommandOutputResult::CommandFinished {
-                            command,
-                            block_id: block_id.clone(),
-                            output,
-                            exit_code,
-                            start_ts: block.start_ts().copied(),
-                            completed_ts: block.completed_ts().copied(),
-                        },
-                    ));
+                    return AnyActionExecution::Sync(
+                        AIAgentActionResultType::ReadShellCommandOutput(
+                            ReadShellCommandOutputResult::CommandFinished {
+                                command,
+                                block_id: block_id.clone(),
+                                output,
+                                exit_code,
+                                start_ts: block.start_ts().copied(),
+                                completed_ts: block.completed_ts().copied(),
+                            },
+                        ),
+                    );
                 }
                 let command = block.command_with_secrets_unobfuscated(false);
                 // 仅在 `ReadShellCommandOutput` 路径上根据命令内容下调等待时长:此处
@@ -440,11 +460,12 @@ impl ShellCommandExecutor {
                         action_result_for_read_shell_command_output(command.clone(), result)
                     },
                 )
+                .into()
             }
             AIAgentActionType::TransferShellCommandControlToUser { reason } => {
                 let Some(transfer_target) = transfer_control_target(&model, input.conversation_id)
                 else {
-                    return ActionExecution::Sync(
+                    return AnyActionExecution::Sync(
                         AIAgentActionResultType::TransferShellCommandControlToUser(
                             TransferShellCommandControlToUserResult::Error(
                                 ShellCommandError::BlockNotFound,
@@ -521,9 +542,21 @@ impl ShellCommandExecutor {
 
                     action_result_for_transfer_shell_command_control_to_user(result)
                 })
+                .into()
             }
-            _ => ActionExecution::InvalidAction,
+            _ => AnyActionExecution::InvalidAction,
         }
+    }
+
+    /// 在 PTY 派发前拒绝请求；只唤醒对应 action，不误取消其他正在运行的命令。
+    pub fn reject_launch(&mut self, action_id: &AIAgentActionId, reason: String) {
+        let Some(sender) = self.launch_failure_senders.remove(action_id) else {
+            return;
+        };
+        let _ = sender.send(reason);
+        let selector = BlockSelector::RequestedCommandId(action_id.clone());
+        self.block_finished_senders.remove(&selector);
+        self.force_refresh_senders.remove(&selector);
     }
 
     /// Called when user hands control back to agent after TransferShellCommandControlToUser.
@@ -539,7 +572,7 @@ impl ShellCommandExecutor {
         &mut self,
         block_selector: BlockSelector,
         delay: ActionResultDelay,
-    ) -> impl Spawnable<Output = ActionResult> {
+    ) -> impl Spawnable<Output = ActionResult> + use<> {
         // Create a channel to notify us when we receive block metadata.
         let (block_metadata_received_tx, block_metadata_received_rx) = oneshot::channel();
         self.block_finished_senders
@@ -641,6 +674,7 @@ impl ShellCommandExecutor {
         let requested_selector = BlockSelector::RequestedCommandId(id.clone());
         self.block_finished_senders.remove(&requested_selector);
         self.force_refresh_senders.remove(&requested_selector);
+        self.launch_failure_senders.remove(id);
 
         // 不再用 `BlockSelector::Id(active_block.id())` 做兜底清理。WriteToLRC /
         // ReadShellCommandOutput / TransferShellCommandControlToUser 的 sender key 来
@@ -1113,6 +1147,23 @@ fn action_result_for_requested_command(
     }
 }
 
+async fn wait_for_requested_command(
+    completion: impl Spawnable<Output = ActionResult>,
+    launch_failed: oneshot::Receiver<String>,
+) -> Result<ActionResult, String> {
+    let completion = completion.fuse();
+    let launch_failed = launch_failed.fuse();
+    pin!(completion);
+    pin!(launch_failed);
+    select_biased! {
+        failure = launch_failed => match failure {
+            Ok(reason) => Err(reason),
+            Err(_) => Ok(completion.await),
+        },
+        result = completion => Ok(result),
+    }
+}
+
 /// Returns the result from writing to a long-running shell command.
 fn action_result_for_write_to_long_running_shell_command(
     result: ActionResult,
@@ -1253,6 +1304,8 @@ pub enum ShellCommandExecutorEvent {
     ExecuteCommand {
         action_id: AIAgentActionId,
         command: String,
+        /// 未加 pager 包装的原命令，用于派发前的 CLI 识别和启动保留。
+        original_command: String,
     },
     WriteToPty {
         input: Bytes,
@@ -1306,3 +1359,7 @@ enum ActionResult {
 #[cfg(test)]
 #[path = "shell_command_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "shell_command_launch_failure_tests.rs"]
+mod launch_failure_tests;

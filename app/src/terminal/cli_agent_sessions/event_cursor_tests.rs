@@ -7,7 +7,7 @@ fn event(agent: CLIAgent, kind: CLIAgentEventType, turn: Option<&str>) -> CLIAge
             .then_some(turn)
             .flatten()
             .map(str::to_owned),
-        prompt_id: (agent == CLIAgent::Claude)
+        prompt_id: matches!(agent, CLIAgent::Claude | CLIAgent::Grok)
             .then_some(turn)
             .flatten()
             .map(str::to_owned),
@@ -27,7 +27,7 @@ fn event(agent: CLIAgent, kind: CLIAgentEventType, turn: Option<&str>) -> CLIAge
 
 #[test]
 fn native_turns_reject_old_completion_and_replayed_prompt() {
-    for agent in [CLIAgent::Codex, CLIAgent::Claude] {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
         let mut cursor = EventCursor::default();
         for turn in ["first", "second"] {
             assert_eq!(
@@ -87,7 +87,7 @@ fn local_input_closes_previous_turn_before_native_prompt_arrives() {
 
 #[test]
 fn missing_prompt_or_native_correlation_never_confirms_terminal() {
-    for agent in [CLIAgent::Codex, CLIAgent::Claude] {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
         for kind in [
             CLIAgentEventType::Stop,
             CLIAgentEventType::StopFailure,
@@ -156,4 +156,72 @@ fn marked_unverified_terminal_is_distinct_from_an_ordinary_notification() {
     );
     notification.payload.prompt_id = Some("previous".into());
     assert_eq!(cursor.accept(&notification), EventDisposition::Drop);
+}
+
+#[test]
+fn grok_local_input_waits_for_native_prompt_before_accepting_cancel() {
+    let mut cursor = EventCursor::default();
+    cursor.accept(&event(
+        CLIAgent::Grok,
+        CLIAgentEventType::PromptSubmit,
+        Some("old"),
+    ));
+    let mut local = event(CLIAgent::Grok, CLIAgentEventType::PromptSubmit, None);
+    local.source = CLIAgentEventSource::LocalRichInput;
+    cursor.accept(&local);
+
+    let mut cancel = event(CLIAgent::Grok, CLIAgentEventType::Cancelled, Some("old"));
+    cancel.payload.event_id = Some("old-cancel".into());
+    assert_eq!(cursor.accept(&cancel), EventDisposition::Drop);
+    assert_eq!(
+        cursor.accept(&event(
+            CLIAgent::Grok,
+            CLIAgentEventType::PromptSubmit,
+            Some("old")
+        )),
+        EventDisposition::Drop
+    );
+    assert_eq!(
+        cursor.accept(&event(
+            CLIAgent::Grok,
+            CLIAgentEventType::PromptSubmit,
+            Some("new")
+        )),
+        EventDisposition::Accept
+    );
+    assert_eq!(cursor.accept(&cancel), EventDisposition::Drop);
+
+    cancel.payload.prompt_id = Some("new".into());
+    cancel.payload.event_id = Some("new-cancel".into());
+    assert_eq!(cursor.accept(&cancel), EventDisposition::Accept);
+    assert_eq!(cursor.accept(&cancel), EventDisposition::Drop);
+}
+
+#[test]
+fn grok_unknown_terminal_does_not_advance_active_prompt() {
+    let mut cursor = EventCursor::default();
+    cursor.accept(&event(
+        CLIAgent::Grok,
+        CLIAgentEventType::PromptSubmit,
+        Some("current"),
+    ));
+    let mut previous = event(
+        CLIAgent::Grok,
+        CLIAgentEventType::Cancelled,
+        Some("previous"),
+    );
+    previous.payload.sequence = Some(999);
+    previous.payload.event_id = Some("previous-cancel".into());
+    assert_eq!(cursor.accept(&previous), EventDisposition::Drop);
+
+    let mut current = event(
+        CLIAgent::Grok,
+        CLIAgentEventType::Cancelled,
+        Some("current"),
+    );
+    current.payload.sequence = Some(1);
+    assert_eq!(cursor.accept(&current), EventDisposition::Accept);
+    let mut idle = event(CLIAgent::Grok, CLIAgentEventType::Notification, None);
+    idle.payload.terminal_unverified = Some(true);
+    assert_eq!(cursor.accept(&idle), EventDisposition::UnverifiedTerminal);
 }

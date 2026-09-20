@@ -10,8 +10,8 @@ use uuid::Uuid;
 use super::{
     ALLOWED_METHODS, DIAGNOSTIC_METHODS, MAX_BYTES, MAX_FRAMES, MAX_REQUESTS, Observations, Plan,
     RequestKind, SCOPE, WireReader, confirm_cached_token_method, confirm_info, guard_outbound,
-    hash, mcp_counts, normal_receipt, notification_diagnostic, outbound, phase_outcome,
-    phase_requests, response_body, rpc_error_diagnostic,
+    hash, info_confirmation_diagnostic, mcp_counts, normal_receipt, notification_diagnostic,
+    outbound, phase_outcome, phase_requests, response_body, rpc_error_diagnostic, rpc_outcome,
 };
 use crate::ai::cli_agent_runtime::managed_process::ExitReceipt;
 
@@ -245,10 +245,10 @@ fn both_phase_wire_sequences_authenticate_before_opening_with_four_diagnostics()
                 "initialize",
                 "authenticate",
                 opening,
-                "x.ai/session/info",
-                "x.ai/session/state",
-                "x.ai/mcp/list",
-                "x.ai/debug/agent"
+                "_x.ai/session/info",
+                "_x.ai/session/state",
+                "_x.ai/mcp/list",
+                "_x.ai/debug/agent"
             ]
         );
         let mut wire = Vec::new();
@@ -271,6 +271,65 @@ fn both_phase_wire_sequences_authenticate_before_opening_with_four_diagnostics()
             assert!(reader.next().await.unwrap().is_none());
         });
     }
+}
+
+#[test]
+fn diagnostic_wire_fixture_rejects_handler_names_and_double_prefix_before_write() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-wire.json"
+    ))
+    .unwrap();
+    let cases = fixture["diagnostics"].as_array().unwrap();
+    assert_eq!(cases.len(), 4);
+    for (index, (kind, case)) in [
+        RequestKind::Info,
+        RequestKind::State,
+        RequestKind::McpList,
+        RequestKind::DebugAgent,
+    ]
+    .into_iter()
+    .zip(cases)
+    .enumerate()
+    {
+        let id = index + 4;
+        let request = outbound(kind, id, Path::new(CWD), Some(SESSION)).unwrap();
+        let wire: Value = serde_json::from_slice(&serde_json::to_vec(&request).unwrap()).unwrap();
+        assert_eq!(wire["method"], case["wire_method"]);
+        let mut params = case["params"].clone();
+        if params.get("cwd").is_some() {
+            params["cwd"] = json!(CWD);
+        }
+        assert_eq!(wire["params"], params);
+        guard_outbound(&wire, kind, id, Path::new(CWD), Some(SESSION)).unwrap();
+        for replacement in [
+            case["handler_method"].clone(),
+            json!(format!("_{}", case["wire_method"].as_str().unwrap())),
+        ] {
+            let mut changed = wire.clone();
+            changed["method"] = replacement;
+            assert_eq!(
+                guard_outbound(&changed, kind, id, Path::new(CWD), Some(SESSION)),
+                Err("outbound_parameters_rejected")
+            );
+        }
+    }
+}
+
+#[test]
+fn old_handler_name_plan_is_rejected_before_native_launch() {
+    let mut plan = plan_value();
+    // 完整改回旧清单仍不能绕过前置校验，避免把路由错误解释为接口能力缺失。
+    for key in ["allowed_methods", "diagnostic_methods"] {
+        for method in plan[key].as_array_mut().unwrap() {
+            if let Some(handler) = method.as_str().unwrap().strip_prefix('_') {
+                *method = json!(handler);
+            }
+        }
+    }
+    assert_eq!(
+        serde_json::from_value::<Plan>(plan).unwrap().validate(),
+        Err("plan_methods_invalid")
+    );
 }
 
 #[test]
@@ -455,12 +514,77 @@ fn unknown_plan_fields_and_relaxed_reverse_guard_are_rejected() {
 }
 
 #[test]
-fn missing_method_is_failure_and_does_not_become_empty_tool_catalog() {
+fn missing_diagnostic_method_is_unavailable_and_never_an_empty_catalog() {
     let response =
         json!({"jsonrpc":"2.0","id":5,"error":{"code":-32601,"message":"OFFLINE_METHOD_CANARY"}});
+    for kind in [
+        RequestKind::Info,
+        RequestKind::State,
+        RequestKind::McpList,
+        RequestKind::DebugAgent,
+    ] {
+        let body = response_body(&response, 5, kind);
+        assert_eq!(body, Err("method_not_found"));
+        assert_eq!(rpc_outcome(kind, body), Ok(None));
+    }
+}
+
+#[test]
+fn required_rpc_missing_method_and_unknown_errors_remain_failures() {
+    let missing =
+        json!({"jsonrpc":"2.0","id":3,"error":{"code":-32601,"message":"OFFLINE_METHOD_CANARY"}});
+    for kind in [
+        RequestKind::Initialize,
+        RequestKind::Authenticate,
+        RequestKind::New,
+        RequestKind::Load,
+    ] {
+        assert_eq!(
+            rpc_outcome(kind, response_body(&missing, 3, kind)),
+            Err("method_not_found")
+        );
+    }
+    for resume in [false, true] {
+        for kind in phase_requests(resume) {
+            for code in [-32603, -32602, -32000] {
+                let response = json!({"jsonrpc":"2.0","id":3,
+                    "error":{"code":code,"message":"OFFLINE_RPC_ERROR"}});
+                assert_eq!(
+                    rpc_outcome(kind, response_body(&response, 3, kind)),
+                    Err("rpc_error")
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn missing_method_does_not_relax_response_identity_or_result_shape() {
+    let stale = json!({"jsonrpc":"2.0","id":4,
+        "error":{"code":-32601,"message":"OFFLINE_METHOD_CANARY"}});
     assert_eq!(
-        response_body(&response, 5, RequestKind::McpList),
-        Err("method_not_found")
+        rpc_outcome(
+            RequestKind::Info,
+            response_body(&stale, 5, RequestKind::Info)
+        ),
+        Err("native_response_uncorrelated")
+    );
+    let partial = json!({"jsonrpc":"2.0","id":5,
+        "result":{"result":{},"error":"OFFLINE_PARTIAL_ERROR"}});
+    assert_eq!(
+        rpc_outcome(
+            RequestKind::Info,
+            response_body(&partial, 5, RequestKind::Info)
+        ),
+        Err("extension_result_failed")
+    );
+    let available = json!({"jsonrpc":"2.0","id":5,"result":{"result":{"servers":[]}}});
+    assert_eq!(
+        rpc_outcome(
+            RequestKind::McpList,
+            response_body(&available, 5, RequestKind::McpList)
+        ),
+        Ok(Some(json!({"servers":[]})))
     );
 }
 
@@ -558,7 +682,7 @@ fn unknown_notification_diagnostic_hashes_method_without_accepting_it() {
     let generation = Uuid::new_v4();
     let frame = json!({"jsonrpc":"2.0","method":"OFFLINE_PRIVATE_METHOD",
         "params":{"sessionId":SESSION,"body":"OFFLINE_MODEL_BODY"}});
-    let diagnostic = notification_diagnostic(&frame, generation);
+    let diagnostic = notification_diagnostic(&frame, generation, false);
     assert_eq!(diagnostic["method"]["type"], "string");
     assert_eq!(
         diagnostic["method"]["sha256"],
@@ -578,7 +702,7 @@ fn unknown_notification_diagnostic_hashes_method_without_accepting_it() {
 fn known_mcp_initialization_diagnostic_does_not_expand_policy_white_list() {
     let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/init_progress",
         "params":{"sessionId":SESSION,"total":0,"connected":0}});
-    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil(), false);
     assert_eq!(diagnostic["method"], "_x.ai/mcp/init_progress");
     assert_eq!(diagnostic["method_summary"]["type"], "string");
     assert_eq!(
@@ -601,7 +725,7 @@ fn empty_global_catalog_preserves_the_unbound_session_and_pending_rpc() {
     assert_eq!(observations.pending_response, Some((2, RequestKind::New)));
     assert!(observations.completed_responses.is_empty());
     assert_eq!(observations.received_notifications, 1);
-    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil(), false);
     assert_eq!(diagnostic["global_catalog_closed_empty"], true);
     assert_eq!(diagnostic["session_id"], json!({"type":"absent"}));
 }
@@ -777,21 +901,28 @@ fn global_catalog_server_and_notification_budgets_preserve_pending_identity() {
 }
 
 #[test]
-fn global_catalog_method_variants_do_not_expand_the_notification_contract() {
+fn unknown_catalog_extensions_are_opaque_without_proving_an_empty_catalog() {
     for method in [
-        "x.ai/mcp/servers_updated",
         "__x.ai/mcp/servers_updated",
         "_x.ai/mcp/servers_updated/extra",
         "_x.ai/mcp/tools_changed",
     ] {
         let mut observations = Observations::default();
-        let frame = json!({"jsonrpc":"2.0","method":method,"params":{"mcpServers":[]}});
-        assert_eq!(
-            observations.notification(&frame),
-            Err("native_unknown_notification_rejected")
-        );
-        assert_eq!(observations.received_notifications, 0);
+        let frame =
+            json!({"jsonrpc":"2.0","method":method,"params":{"mcpServers":[{"name":"PRIVATE"}]}});
+        assert_eq!(observations.notification(&frame), Ok(()));
+        assert_eq!(observations.received_notifications, 1);
+        assert!(observations.native_session.is_none());
+        let diagnostic = notification_diagnostic(&frame, Uuid::nil(), true);
+        assert_eq!(diagnostic["ignored_extension_notification"], true);
+        assert!(diagnostic.get("global_catalog_closed_empty").is_none());
+        assert!(!diagnostic.to_string().contains("PRIVATE"));
     }
+    let frame = json!({"jsonrpc":"2.0","method":"x.ai/mcp/servers_updated","params":{}});
+    assert_eq!(
+        Observations::default().notification(&frame),
+        Err("native_unknown_notification_rejected")
+    );
 }
 
 #[test]
@@ -799,7 +930,7 @@ fn global_catalog_diagnostic_projects_the_verified_method_without_catalog_body()
     let frame = json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated",
         "params":{"mcpServers":[{"name":"OFFLINE_PRIVATE_SERVER",
             "env":[{"name":"OFFLINE_PRIVATE_ENV","value":"OFFLINE_PRIVATE_VALUE"}]}]}});
-    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil(), false);
 
     assert_eq!(diagnostic["method"], "_x.ai/mcp/servers_updated");
     assert_eq!(diagnostic["global_catalog_closed_empty"], false);
@@ -967,7 +1098,7 @@ fn primary_failure_survives_missing_exit_code_cleanup_timeout_and_drain_error() 
 }
 
 #[test]
-fn nonempty_history_or_different_native_identity_cannot_confirm_empty_recovery() {
+fn advanced_turn_or_different_native_identity_cannot_confirm_unused_recovery() {
     let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":1,"turnIndex":1});
     assert_eq!(
         confirm_info(&body, SESSION, Path::new(CWD)),
@@ -991,7 +1122,7 @@ fn mcp_partial_catalog_reports_extra_origin_without_claiming_builtin_closure() {
 #[test]
 fn session_info_requires_the_native_flattened_data_fields() {
     // SessionInfoResponse 的 data 使用 serde(flatten)，不能按 Rust 字段名套 JSON 包装。
-    let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":0,"turnIndex":0});
+    let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":1,"turnIndex":0});
     assert_eq!(confirm_info(&body, SESSION, Path::new(CWD)), Ok(()));
     let wrapped = json!({"sessionId":SESSION,"cwd":CWD,"data":{"turns":0,"turnIndex":0}});
     assert_eq!(
@@ -1196,18 +1327,363 @@ fn compatibility_metadata_cannot_change_bound_session_or_admit_tool_activity() {
 #[test]
 fn compatibility_metadata_diagnostic_keeps_model_private_and_rejects_turn_completion() {
     let frame = compatibility_model_notification(SESSION);
-    let diagnostic = notification_diagnostic(&frame, Uuid::nil());
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil(), false);
     assert_eq!(diagnostic["method"], "_x.ai/session_notification");
     assert_eq!(diagnostic["session_notification_metadata_only"], true);
     assert!(!diagnostic.to_string().contains("offline-model"));
     let mut completion = frame;
     completion["params"]["update"] = json!({"sessionUpdate":"turn_completed","prompt_id":SESSION});
     assert_eq!(
-        notification_diagnostic(&completion, Uuid::nil())["session_notification_metadata_only"],
+        notification_diagnostic(&completion, Uuid::nil(), false)["session_notification_metadata_only"],
         false
     );
     assert_eq!(
         Observations::default().notification(&completion),
         Err("native_session_notification_activity_rejected")
     );
+}
+
+fn archived_empty_session_model_metadata() -> Vec<Value> {
+    // 已归档的官方 New/Load 输出只用于解析回归，不算作本次原生执行证据。
+    include_str!(
+        "../../../../specs/cli-agent-parity/fixtures/grok-1.0.30-empty-session-recovery.ndjson"
+    )
+    .lines()
+    .map(|line| serde_json::from_str::<Value>(line).unwrap())
+    .filter(|row| {
+        row["direction"] == "stdout"
+            && (row["message"]["method"] == "_x.ai/models/update"
+                || (row["message"]["method"] == "_x.ai/session_notification"
+                    && row["message"]["params"]["update"]["sessionUpdate"] == "model_changed"))
+    })
+    .map(|row| row["message"].clone())
+    .collect()
+}
+
+#[test]
+fn official_empty_session_model_metadata_preserves_new_and_load_transactions() {
+    let frames = archived_empty_session_model_metadata();
+    assert_eq!(frames.len(), 6);
+    let session = frames[0]["params"]["sessionId"].as_str().unwrap();
+    assert_eq!(frames[0]["params"]["update"]["reasoning_effort"], "high");
+    for (pending, native_session) in [
+        ((3, RequestKind::New), None),
+        ((10, RequestKind::Load), Some(session.to_owned())),
+    ] {
+        let mut observations = Observations {
+            native_session: native_session.clone(),
+            pending_response: Some(pending),
+            ..Default::default()
+        };
+        for frame in &frames {
+            observations.notification(frame).unwrap();
+            assert_eq!(observations.native_session, native_session);
+            assert_eq!(observations.pending_response, Some(pending));
+            assert!(observations.completed_responses.is_empty());
+            let diagnostic = notification_diagnostic(frame, Uuid::nil(), false);
+            let proof = if frame["method"] == "_x.ai/models/update" {
+                assert_eq!(diagnostic["session_id"], json!({"type":"absent"}));
+                "global_models_metadata_only"
+            } else {
+                "session_notification_metadata_only"
+            };
+            assert_eq!(diagnostic[proof], true);
+            for private_field in [
+                "grok-4.6",
+                "Grok 4.6",
+                "reasoningEfforts",
+                "availableModels",
+            ] {
+                assert!(!diagnostic.to_string().contains(private_field));
+            }
+        }
+        assert_eq!(observations.received_notifications, 6);
+        let response = json!({"jsonrpc":"2.0","id":pending.0,"result":{"sessionId":session}});
+        assert_eq!(
+            observations.response_transaction(&response),
+            Ok(Some(pending.1))
+        );
+        assert_eq!(observations.pending_response, None);
+        assert_eq!(observations.completed_responses.len(), 1);
+    }
+}
+
+#[test]
+fn official_reasoning_metadata_rejects_unbounded_or_non_string_extensions() {
+    let frame = archived_empty_session_model_metadata().remove(0);
+    let mut invalid = Vec::new();
+    for effort in [
+        json!(null),
+        json!(false),
+        json!(1),
+        json!({}),
+        json!(""),
+        json!("x".repeat(257)),
+    ] {
+        let mut changed = frame.clone();
+        changed["params"]["update"]["reasoning_effort"] = effort;
+        invalid.push(changed);
+    }
+    let mut changed = frame.clone();
+    changed["params"]["update"]["rawInput"] = json!({"command":"NOT_EXECUTED"});
+    invalid.push(changed);
+    let mut changed = frame;
+    changed["params"]["update"] = json!({"sessionUpdate":"background_tasks","tasks":[]});
+    invalid.push(changed);
+    for frame in invalid {
+        let mut observations = Observations {
+            pending_response: Some((3, RequestKind::New)),
+            ..Default::default()
+        };
+        assert_eq!(
+            observations.notification(&frame),
+            Err("native_session_notification_activity_rejected")
+        );
+        assert_eq!(
+            notification_diagnostic(&frame, Uuid::nil(), false)["session_notification_metadata_only"],
+            false
+        );
+        assert_eq!(observations.pending_response, Some((3, RequestKind::New)));
+        assert!(observations.completed_responses.is_empty());
+        assert_eq!(observations.received_notifications, 0);
+        assert_eq!(observations.native_session, None);
+    }
+}
+
+#[test]
+fn official_model_catalog_rejects_activity_identity_and_unbounded_metadata() {
+    let frame = archived_empty_session_model_metadata().remove(1);
+    assert_eq!(frame["method"], "_x.ai/models/update");
+    let mut invalid = Vec::new();
+    for (key, value) in [
+        ("sessionId", json!(SESSION)),
+        ("sessionId", json!(null)),
+        ("promptId", json!(SESSION)),
+        ("rawInput", json!({"command":"NOT_EXECUTED"})),
+        ("currentModelId", json!(null)),
+        ("currentModelId", json!("x".repeat(257))),
+        ("availableModels", json!({})),
+        ("availableModels", json!([{}])),
+        (
+            "availableModels",
+            json!(vec![frame["params"]["availableModels"][0].clone(); 65]),
+        ),
+    ] {
+        let mut changed = frame.clone();
+        changed["params"][key] = value;
+        invalid.push(changed);
+    }
+    for (key, value) in [
+        ("rawInput", json!({"command":"NOT_EXECUTED"})),
+        ("_meta", json!(null)),
+        ("name", json!("x".repeat(super::MAX_FILE_BYTES))),
+    ] {
+        let mut changed = frame.clone();
+        changed["params"]["availableModels"][0][key] = value;
+        invalid.push(changed);
+    }
+    for frame in invalid {
+        let mut observations = Observations {
+            native_session: Some(SESSION.into()),
+            pending_response: Some((10, RequestKind::Load)),
+            ..Default::default()
+        };
+        assert!(observations.notification(&frame).is_err());
+        assert_eq!(
+            notification_diagnostic(&frame, Uuid::nil(), false)["global_models_metadata_only"],
+            false
+        );
+        assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+        assert_eq!(observations.pending_response, Some((10, RequestKind::Load)));
+        assert!(observations.completed_responses.is_empty());
+        assert_eq!(observations.received_notifications, 0);
+    }
+    let mut observations = Observations {
+        received_notifications: MAX_FRAMES,
+        pending_response: Some((3, RequestKind::New)),
+        ..Default::default()
+    };
+    assert_eq!(
+        observations.notification(&frame),
+        Err("native_notification_budget_exceeded")
+    );
+    assert_eq!(observations.pending_response, Some((3, RequestKind::New)));
+}
+
+#[test]
+fn ignored_settings_extension_preserves_pending_session_and_identity_ledgers() {
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/settings/update", "params":{
+        "sessionId":FOREIGN,"permission_mode":"PRIVATE_MODE", "future_field":{"promptId":"PRIVATE_PROMPT"},
+        "_meta":{"eventId":"PRIVATE_EVENT"},"remote_account":"PRIVATE_ACCOUNT"}});
+    let mut observations = Observations {
+        native_session: Some(SESSION.into()),
+        pending_response: Some((4, RequestKind::Info)),
+        ..Observations::default()
+    };
+    for _ in 0..2 {
+        assert_eq!(observations.notification(&frame), Ok(()));
+    }
+    assert_eq!(observations.received_notifications, 2);
+    assert_eq!(observations.native_session.as_deref(), Some(SESSION));
+    assert_eq!(observations.pending_response, Some((4, RequestKind::Info)));
+    assert!(observations.completed_responses.is_empty());
+    assert!(observations.metadata_notification_ids.is_empty());
+    let diagnostic = notification_diagnostic(&frame, Uuid::nil(), true);
+    assert_eq!(diagnostic["ignored_extension_notification"], true);
+    assert_eq!(
+        diagnostic["method"]["sha256"],
+        hash(b"_x.ai/settings/update")
+    );
+    assert!(
+        diagnostic
+            .get("session_notification_metadata_only")
+            .is_none()
+    );
+    assert!(!diagnostic.to_string().contains("PRIVATE"));
+}
+
+#[test]
+fn ignored_extension_can_omit_params_or_use_positional_params() {
+    for frame in [
+        json!({"jsonrpc":"2.0","method":"_vendor/notice"}),
+        json!({"jsonrpc":"2.0","method":"_vendor/notice","params":[]}),
+    ] {
+        let mut observations = Observations::default();
+        assert_eq!(observations.notification(&frame), Ok(()));
+        assert_eq!(observations.received_notifications, 1);
+        assert!(observations.native_session.is_none());
+    }
+}
+
+#[test]
+fn malformed_extension_envelope_cannot_enter_ignored_path() {
+    let base = json!({"jsonrpc":"2.0","method":"_vendor/notice","params":{}});
+    for (key, value) in [
+        ("id", Value::Null),
+        ("id", json!(4)),
+        ("result", json!({})),
+        ("error", json!({})),
+        ("jsonrpc", json!("1.0")),
+        ("params", Value::Null),
+        ("params", json!("PRIVATE")),
+        ("method", json!("")),
+        ("method", json!("_")),
+        ("method", json!(4)),
+        ("method", json!(format!("_{}", "a".repeat(256)))),
+        ("extra", json!(true)),
+    ] {
+        let mut frame = base.clone();
+        frame[key] = value;
+        assert!(!super::ignored_extension_notification(&frame));
+        let mut observations = Observations::default();
+        assert!(observations.notification(&frame).is_err());
+        assert_eq!(observations.received_notifications, 0);
+    }
+}
+
+#[test]
+fn recognized_activity_and_reverse_sdk_calls_remain_strict() {
+    for method in [
+        "_x.ai/queue/changed",
+        "_x.ai/session/prompt_complete",
+        "_x.ai/session/updates",
+        "_x.ai/session/update",
+        "_x.ai/mcp/sdk_call",
+    ] {
+        let frame = json!({"jsonrpc":"2.0","method":method,"params":{}});
+        assert!(!super::ignored_extension_notification(&frame));
+        assert!(Observations::default().notification(&frame).is_err());
+    }
+    let frame = json!({"jsonrpc":"2.0","method":"_x.ai/session_notification","params":{
+        "sessionId":SESSION,"update":{"sessionUpdate":"turn_completed"}}});
+    assert_eq!(
+        Observations::default().notification(&frame),
+        Err("native_session_notification_activity_rejected")
+    );
+}
+
+#[test]
+fn ignored_extensions_obey_byte_and_frame_budgets() {
+    let frame = json!({"jsonrpc":"2.0","method":"_vendor/notice","params":{}});
+    let mut observations = Observations {
+        received_notifications: MAX_FRAMES,
+        ..Observations::default()
+    };
+    assert_eq!(
+        observations.notification(&frame),
+        Err("native_notification_budget_exceeded")
+    );
+    assert_eq!(observations.received_notifications, MAX_FRAMES);
+    let large = json!({"jsonrpc":"2.0","method":"_vendor/notice","params":{"blob":"a".repeat(super::MAX_FILE_BYTES)}});
+    assert!(!super::ignored_extension_notification(&large));
+    assert!(Observations::default().notification(&large).is_err());
+    assert!(
+        notification_diagnostic(&frame, Uuid::nil(), false)
+            .get("ignored_extension_notification")
+            .is_none()
+    );
+}
+
+#[test]
+fn info_failure_shape_is_specific_and_never_contains_private_values() {
+    let private = "OFFLINE_PRIVATE_INFO_CANARY";
+    let body = json!({"sessionId":private,"cwd":private,"turns":0,"turnIndex":1,
+        "unknown":{"prompt":private}});
+    let diagnostic = info_confirmation_diagnostic(&body, SESSION, Path::new(CWD));
+    assert_eq!(diagnostic["session_id_matches"], false);
+    assert_eq!(diagnostic["cwd_matches"], false);
+    assert_eq!(diagnostic["turns_u64"], 0);
+    assert_eq!(diagnostic["turn_index_u64"], 1);
+    assert_eq!(diagnostic["session_id"]["type"], "string");
+    assert!(!diagnostic.to_string().contains(private));
+    assert!(!diagnostic.to_string().contains(SESSION));
+    assert_eq!(diagnostic.as_object().unwrap().len(), 8);
+    assert_eq!(
+        confirm_info(&body, SESSION, Path::new(CWD)),
+        Err("empty_native_history_unconfirmed")
+    );
+}
+
+#[test]
+fn info_failure_shape_distinguishes_missing_null_and_invalid_counters() {
+    for invalid in [
+        json!(null),
+        json!(false),
+        json!(-1),
+        json!(0.5),
+        json!("OFFLINE_PRIVATE_COUNT"),
+        json!([]),
+        json!({}),
+    ] {
+        let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":invalid,"turnIndex":invalid});
+        let diagnostic = info_confirmation_diagnostic(&body, SESSION, Path::new(CWD));
+        assert_eq!(diagnostic["session_id_matches"], true);
+        assert_eq!(diagnostic["cwd_matches"], true);
+        assert!(diagnostic["turns_u64"].is_null());
+        assert!(diagnostic["turn_index_u64"].is_null());
+        assert!(!diagnostic.to_string().contains("OFFLINE_PRIVATE_COUNT"));
+        assert_eq!(
+            confirm_info(&body, SESSION, Path::new(CWD)),
+            Err("empty_native_history_unconfirmed")
+        );
+    }
+    let absent = info_confirmation_diagnostic(&json!({}), SESSION, Path::new(CWD));
+    assert_eq!(absent["turns"], json!({"type":"absent"}));
+    let present = info_confirmation_diagnostic(&json!({"turns":null}), SESSION, Path::new(CWD));
+    assert_eq!(present["turns"]["type"], "null");
+    let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":1,"turnIndex":0});
+    assert_eq!(confirm_info(&body, SESSION, Path::new(CWD)), Ok(()));
+}
+
+#[test]
+fn unused_native_info_requires_the_observed_initial_turn_count() {
+    for turns in [0, 2, 3] {
+        let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":turns,"turnIndex":0});
+        assert_eq!(
+            confirm_info(&body, SESSION, Path::new(CWD)),
+            Err("empty_native_history_unconfirmed")
+        );
+    }
+    let body = json!({"sessionId":SESSION,"cwd":CWD,"turns":1,"turnIndex":0});
+    assert_eq!(confirm_info(&body, SESSION, Path::new(CWD)), Ok(()));
 }

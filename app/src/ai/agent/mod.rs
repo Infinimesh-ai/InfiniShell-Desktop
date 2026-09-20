@@ -1282,6 +1282,13 @@ impl<'a> std::fmt::Display for MarkdownActionResult<'a> {
                         "\n```bash\n{command}\n```\n\n**Current Output:**\n```\n{grid_contents}\n```"
                     )
                 }
+                RequestCommandOutputResult::LaunchFailed { command, reason } => {
+                    write!(
+                        f,
+                        "\n```bash\n{command}\n```\n\n{}",
+                        crate::t!("ai-command-launch-failed", reason = reason)
+                    )
+                }
                 RequestCommandOutputResult::CancelledBeforeExecution => {
                     write!(f, "\n_Command cancelled_")
                 }

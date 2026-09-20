@@ -1,4 +1,4 @@
-//! Grok 1.0.30 的 ACP 适配；原生协议实证与产品能力门禁分别维护。
+//! Grok 固定版本的 ACP 适配；按版本分别维护 P0 与扩展生命周期的验收边界。
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::sync::mpsc;
 use uuid::Uuid;
+use warp_cli::agent::Harness;
 use warpui::r#async::{FutureExt as _, Timer};
 
 use super::{
@@ -26,7 +27,8 @@ use super::{
 use super::grok_tool_lease::{GrokToolLeaseLedger, GrokToolLeaseState, VerifiedGrokToolLease};
 use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeLocalToolRequest};
 
-const VERIFIED_VERSION: &str = "1.0.30";
+pub(super) const VERIFIED_VERSION: &str = "1.0.30";
+pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
@@ -74,26 +76,99 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
             "cli-agent-grok-managed-unverified"
         )));
     }
-    // Grok 根任务继承原生配置；尚未证明创建时固定的子任务权限上限。
-    if options.permission_policy != PermissionPolicy::Inherit
-        || options.permission_ceiling.is_some()
-        || options.claude_profile.is_some()
+    if !matches!(
+        options.permission_policy,
+        PermissionPolicy::Inherit
+            | PermissionPolicy::GrokRestrictedReadV1
+            | PermissionPolicy::GrokRestrictedFilesV1
+    ) || options.claude_profile.is_some()
         || options.model.is_some()
-        || !options.selected_skills.is_empty()
     {
         return Err(RuntimeError::InvalidConfiguration(crate::t!(
             "cli-agent-grok-managed-unverified"
         )));
     }
+    if !options.selected_skills.is_empty() && options.permission_policy != PermissionPolicy::Inherit
+    {
+        return Err(RuntimeError::InvalidConfiguration(crate::t!(
+            "cli-agent-grok-skill-policy-required"
+        )));
+    }
+    if options.selected_skills.len() > 1 && options.target == SessionTarget::New {
+        return Err(RuntimeError::InvalidConfiguration(crate::t!(
+            "cli-agent-task-skill-one-per-turn"
+        )));
+    }
+    match options.permission_policy {
+        PermissionPolicy::Inherit => {
+            if options.permission_ceiling.is_some()
+                || options.grok_profile.is_some()
+                || options.local_tools.is_some_and(|tools| tools.allow_spawn)
+            {
+                return Err(super::permissions::rejected(
+                    None,
+                    &Value::Null,
+                    "grok_inherit_parent_unknown",
+                    false,
+                ));
+            }
+        }
+        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1 => {
+            if options.target != SessionTarget::New && options.grok_profile.is_none() {
+                return Err(super::permissions::rejected(
+                    None,
+                    &Value::Null,
+                    "grok_resume_creation_policy_missing",
+                    false,
+                ));
+            }
+            if let Some(profile) = &options.grok_profile {
+                profile.validate()?;
+                if profile.permission_policy() != options.permission_policy {
+                    return Err(super::permissions::rejected(
+                        None,
+                        &Value::Null,
+                        "grok_saved_tool_set_changed",
+                        false,
+                    ));
+                }
+            }
+            if let Some(parent) = &options.permission_ceiling {
+                let parent = parent.grok_profile().ok_or_else(|| {
+                    super::permissions::rejected(
+                        None,
+                        &Value::Null,
+                        "grok_creation_parent_unknown",
+                        false,
+                    )
+                })?;
+                parent.validate_child(options.grok_profile.as_ref().ok_or_else(|| {
+                    super::permissions::rejected(
+                        None,
+                        &Value::Null,
+                        "grok_creation_child_missing",
+                        false,
+                    )
+                })?)?;
+            }
+        }
+        PermissionPolicy::ReadOnly
+        | PermissionPolicy::WorkspaceWrite
+        | PermissionPolicy::ClaudeRestrictedFilesV1 => unreachable!("已拒绝其他 CLI 策略"),
+    }
     Ok(())
 }
 
-fn verified_version(output: &str) -> bool {
-    output
+fn verified_version(output: &str) -> Option<&'static str> {
+    match output
         .trim()
         .strip_prefix("grok ")
         .and_then(|suffix| suffix.split_whitespace().next())
-        == Some(VERIFIED_VERSION)
+    {
+        Some(VERIFIED_VERSION) => Some(VERIFIED_VERSION),
+        Some(P0_VERIFIED_VERSION) => Some(P0_VERIFIED_VERSION),
+        Some(_) | None => None,
+    }
 }
 
 async fn run_process(
@@ -101,6 +176,20 @@ async fn run_process(
     commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
+    let launch = if matches!(
+        protocol.options.permission_policy,
+        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+    ) {
+        let launch = super::grok_profile::GrokCreationPolicyV1::prepare(&protocol.options)?;
+        protocol.options.grok_profile = Some(launch.policy.clone());
+        if let Some(sdk) = &mut protocol.sdk {
+            sdk.bridge = GrokMcpBridge::with_creation_policy(sdk.process_epoch, &launch.policy)
+                .map_err(RuntimeError::InvalidConfiguration)?;
+        }
+        Some(launch)
+    } else {
+        None
+    };
     let mut version = Command::new(&protocol.options.executable);
     version
         .arg("--version")
@@ -108,15 +197,22 @@ async fn run_process(
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .kill_on_drop(true);
+    if let Some(launch) = &launch {
+        version
+            .env_clear()
+            .envs(super::managed_process::isolated_environment(&launch.home))
+            .current_dir(launch.home.join("startup"));
+    }
     let output = version
         .output()
         .with_timeout(Duration::from_secs(3))
         .await
         .map_err(|_| RuntimeError::RequestTimedOut)??;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-    if !output.status.success() || !verified_version(&detected) {
+    if !output.status.success() {
         return Err(RuntimeError::UnsupportedVersion(detected));
     }
+    protocol.bind_cli_version(&detected)?;
 
     // 独立 leader socket 防止此次连接意外关联用户已有的 Grok 进程。
     let mut directory_builder = tempfile::Builder::new();
@@ -131,7 +227,15 @@ async fn run_process(
     let direct_sdk = protocol.options.local_tools.is_some();
     #[cfg(test)]
     let direct_sdk = direct_sdk || protocol.sdk_origin_probe.is_some();
-    let arguments = if direct_sdk {
+    let arguments = if let Some(launch) = &launch {
+        vec![
+            OsString::from("agent"),
+            OsString::from("--no-leader"),
+            OsString::from("--agent-profile"),
+            launch.profile_path.clone().into_os_string(),
+            OsString::from("stdio"),
+        ]
+    } else if direct_sdk {
         vec![
             OsString::from("agent"),
             OsString::from("--no-leader"),
@@ -145,12 +249,36 @@ async fn run_process(
             directory.path().join("leader.sock").into_os_string(),
         ]
     };
-    let mut child = super::managed_process::spawn(
+    #[cfg(all(test, unix))]
+    let arguments = if let Some(profile) = &protocol.skill_profile_for_live {
+        if protocol.options.permission_policy != PermissionPolicy::Inherit
+            || protocol.options.grok_profile.is_some()
+        {
+            return Err(RuntimeError::InvalidConfiguration(
+                "技能实验不能替换固定生产策略".into(),
+            ));
+        }
+        vec![
+            OsString::from("agent"),
+            OsString::from("--no-leader"),
+            OsString::from("--agent-profile"),
+            profile.clone().into_os_string(),
+            OsString::from("stdio"),
+        ]
+    } else {
+        arguments
+    };
+    let process_cwd = launch
+        .as_ref()
+        .map(|launch| launch.home.join("startup"))
+        .unwrap_or_else(|| protocol.options.cwd.clone());
+    let mut child = super::managed_process::spawn_with_isolated_home(
         &protocol.options.state_dir,
         protocol.options.generation,
         &protocol.options.executable,
         &arguments,
-        &protocol.options.cwd,
+        &process_cwd,
+        launch.as_ref().map(|launch| launch.home.as_path()),
     )
     .await?;
     if let Some(sdk) = protocol.sdk.as_mut() {
@@ -213,7 +341,11 @@ async fn run_transport(
     mut commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
-    let initialize = protocol.initialize();
+    let initialize = protocol.initialize()?;
+    #[cfg(test)]
+    if let Some(probe) = &protocol.catalog_probe_for_live {
+        probe.guard_write(&initialize)?;
+    }
     write_message(stdin, &initialize).await?;
     #[cfg(test)]
     if let Some(probe) = &protocol.sdk_origin_probe {
@@ -474,9 +606,21 @@ async fn flush_effects(
         publish(kind)?;
     }
     for message in effects.writes {
+        #[cfg(test)]
+        if let Some(probe) = &protocol.catalog_probe_for_live {
+            probe.guard_write(&message)?;
+        }
         write_message(stdin, &message).await?;
+        if message["method"] == "session/prompt" {
+            // 只证明本进程代次曾完整写入输入；原生 ACK 仍由独立接收事件确认。
+            protocol.task_input_written = true;
+        }
         // 缓存或生成回复不能证明真实写入；必须在 write_all 和 flush 都成功后登记。
         protocol.sdk_written_message(&message)?;
+        #[cfg(test)]
+        if let Some(probe) = &protocol.catalog_probe_for_live {
+            probe.observe_written(&message);
+        }
         #[cfg(test)]
         if let Some(probe) = &protocol.sdk_origin_probe {
             probe.observe_outbound_transaction(&message, protocol.transaction_context());
@@ -534,7 +678,8 @@ struct PendingCompletion {
 
 struct QueuedPrompt {
     message_id: Uuid,
-    content: Vec<Value>,
+    input: Vec<InputContent>,
+    skill: Option<skills::SelectedSkill>,
 }
 
 struct NativeTool {
@@ -696,6 +841,16 @@ impl GrokSdkConnection {
 }
 
 struct GrokProtocol {
+    probed_version: Option<&'static str>,
+    paired_version: Option<&'static str>,
+    creation_catalog_session: Option<String>,
+    skill_catalog: Option<skills::SkillCatalog>,
+    early_skill_catalogs: HashMap<String, skills::SkillCatalog>,
+    deferred_ready: Option<(Value, Instant)>,
+    #[cfg(all(test, unix))]
+    skill_profile_for_live: Option<std::path::PathBuf>,
+    #[cfg(all(test, unix))]
+    skill_catalog_for_live: Option<native_skill_live_tests::SkillCatalogProbe>,
     options: SessionOptions,
     session_id: Option<String>,
     next_id: u64,
@@ -708,6 +863,7 @@ struct GrokProtocol {
     permission_requests: HashMap<String, [u8; 32]>,
     responses: HashMap<u64, [u8; 32]>,
     submitted_messages: HashMap<Uuid, [u8; 32]>,
+    task_input_written: bool,
     notification_ids: HashMap<String, [u8; 32]>,
     observed_prompt_ids: HashSet<String>,
     reported_capabilities: Value,
@@ -717,6 +873,8 @@ struct GrokProtocol {
     #[cfg(test)]
     lease_audit_for_live: Option<Arc<Mutex<GrokLeaseAudit>>>,
     #[cfg(test)]
+    catalog_probe_for_live: Option<catalog_preflight_live_tests::CatalogProbe>,
+    #[cfg(test)]
     queued_submissions: usize,
     #[cfg(test)]
     sdk_origin_probe: Option<sdk_origin_live_tests::SdkOriginProbe>,
@@ -725,6 +883,17 @@ struct GrokProtocol {
 }
 
 impl GrokProtocol {
+    fn baseline_lifecycle_verified(&self) -> bool {
+        matches!(
+            self.probed_version,
+            Some(VERIFIED_VERSION | P0_VERIFIED_VERSION)
+        )
+    }
+
+    fn extended_lifecycle_verified(&self) -> bool {
+        self.probed_version == Some(VERIFIED_VERSION)
+    }
+
     #[cfg(test)]
     fn transaction_context(&self) -> Value {
         let kind = self.pending.as_ref().map(|pending| match &pending.kind {
@@ -761,6 +930,16 @@ impl GrokProtocol {
             }
         });
         Self {
+            probed_version: None,
+            paired_version: None,
+            creation_catalog_session: None,
+            skill_catalog: None,
+            early_skill_catalogs: HashMap::new(),
+            deferred_ready: None,
+            #[cfg(all(test, unix))]
+            skill_profile_for_live: None,
+            #[cfg(all(test, unix))]
+            skill_catalog_for_live: None,
             options,
             session_id: None,
             next_id: 0,
@@ -773,6 +952,7 @@ impl GrokProtocol {
             permission_requests: HashMap::new(),
             responses: HashMap::new(),
             submitted_messages: HashMap::new(),
+            task_input_written: false,
             notification_ids: HashMap::new(),
             observed_prompt_ids: HashSet::new(),
             reported_capabilities: Value::Null,
@@ -782,12 +962,66 @@ impl GrokProtocol {
             #[cfg(test)]
             lease_audit_for_live: None,
             #[cfg(test)]
+            catalog_probe_for_live: None,
+            #[cfg(test)]
             queued_submissions: 0,
             #[cfg(test)]
             sdk_origin_probe: None,
             #[cfg(test)]
             verified_final_histories_for_live: None,
         }
+    }
+
+    #[cfg(test)]
+    fn from_fixture(options: SessionOptions) -> Self {
+        let mut protocol = Self::new(options);
+        // 历史纯离线夹具显式绑定旧版本；真实进程只能走 run_process 的版本探测。
+        protocol.bind_cli_version("grok 1.0.30").unwrap();
+        protocol
+    }
+
+    fn bind_cli_version(&mut self, output: &str) -> Result<(), RuntimeError> {
+        if self.next_id != 0 {
+            return Err(RuntimeError::Protocol(
+                "Grok version probe arrived after protocol initialization".into(),
+            ));
+        }
+        self.probed_version = None;
+        self.paired_version = None;
+        let version = verified_version(output)
+            .ok_or_else(|| RuntimeError::UnsupportedVersion(output.trim().to_owned()))?;
+        // 新版仅继承 P0 生命周期；不继承旧版固定策略、技能与 SDK 租约的验收结论。
+        if version != VERIFIED_VERSION
+            && (self.options.permission_policy != PermissionPolicy::Inherit
+                || self.options.grok_profile.is_some()
+                || self.options.local_tools.is_some()
+                || !self.options.selected_skills.is_empty())
+        {
+            return Err(RuntimeError::InvalidConfiguration(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
+        self.probed_version = Some(version);
+        Ok(())
+    }
+
+    fn served_catalog_names(&self, session: &str) -> Vec<String> {
+        self.sdk
+            .as_ref()
+            .filter(|sdk| {
+                sdk.owned_process
+                    && !sdk.retired
+                    && sdk.ledger.as_ref().is_some_and(|ledger| {
+                        ledger.matches_catalog_connection(
+                            sdk.process_epoch,
+                            self.options.generation,
+                            sdk.bridge.server_id(),
+                            session,
+                        )
+                    })
+            })
+            .map(|sdk| sdk.bridge.served_catalog_names())
+            .unwrap_or_default()
     }
 
     fn sdk_timed_out(&self, now: Instant) -> bool {
@@ -1132,6 +1366,7 @@ impl GrokProtocol {
         let Some(sdk) = &mut self.sdk else {
             return Ok(());
         };
+        sdk.bridge.record_registration_written(message);
         let hash = message_fingerprint(message)?;
         if let Some((permission, allowed)) = sdk.permissions_to_write.remove(&hash) {
             let ledger = sdk.ledger.as_mut().ok_or_else(|| {
@@ -1225,6 +1460,16 @@ impl GrokProtocol {
         }
     }
 
+    fn ready_event(&self, effective_permissions: Value) -> Result<RuntimeEventKind, RuntimeError> {
+        let version = self.paired_version.ok_or_else(|| {
+            RuntimeError::Protocol("Grok session has no paired CLI version".into())
+        })?;
+        Ok(RuntimeEventKind::SessionReady {
+            verified_cli_version: Some(version.to_owned()),
+            effective_permissions,
+        })
+    }
+
     fn request(&mut self, kind: PendingKind, method: &str, params: Value) -> Value {
         self.next_id += 1;
         self.pending = Some(PendingRequest {
@@ -1235,7 +1480,12 @@ impl GrokProtocol {
         json!({"jsonrpc": "2.0", "id": self.next_id, "method": method, "params": params})
     }
 
-    fn initialize(&mut self) -> Value {
+    fn initialize(&mut self) -> Result<Value, RuntimeError> {
+        if self.probed_version.is_none() {
+            return Err(RuntimeError::Protocol(
+                "Grok CLI version was not probed".into(),
+            ));
+        }
         let mut message = self.request(
             PendingKind::Initialize,
             "initialize",
@@ -1253,12 +1503,19 @@ impl GrokProtocol {
         if let Some(probe) = &self.sdk_origin_probe {
             let mut message = message;
             probe.decorate_initialize(&mut message);
-            return message;
+            return Ok(message);
         }
-        message
+        Ok(message)
     }
 
     fn request_timed_out(&self) -> bool {
+        if self
+            .deferred_ready
+            .as_ref()
+            .is_some_and(|(_, began)| began.elapsed() >= REQUEST_TIMEOUT)
+        {
+            return true;
+        }
         self.pending.as_ref().is_some_and(|request| {
             if matches!(request.kind, PendingKind::Prompt) {
                 if let Some(prompt) = &self.prompt {
@@ -1330,7 +1587,8 @@ impl GrokProtocol {
                 {
                     return Effects::default();
                 }
-                if self.session_id.is_none()
+                if !self.extended_lifecycle_verified()
+                    || self.session_id.is_none()
                     || self.pending.is_some()
                     || !self.reported_capabilities["sessionCapabilities"]["close"].is_object()
                 {
@@ -1366,6 +1624,23 @@ impl GrokProtocol {
                 }
             }
             RuntimeAction::Submit { input } => {
+                if self.deferred_ready.is_some() {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-managed-unverified"),
+                    );
+                }
+                if let Some(profile) = &self.options.grok_profile {
+                    if let Err(error) = profile.verify_files(&self.options.state_dir) {
+                        return rejected_command(command.message_id, error.to_string());
+                    }
+                }
+                if matches!(self.options.permission_policy,
+                    PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+                )
+                    && input.iter().any(|part| matches!(part, InputContent::Text(text) if text.trim_start().starts_with('/'))) {
+                    return rejected_command(command.message_id, crate::t!("cli-agent-grok-fixed-command-unavailable"));
+                }
                 let fingerprint = match message_fingerprint(&json!(&input)) {
                     Ok(fingerprint) => fingerprint,
                     Err(error) => return rejected_command(command.message_id, error.to_string()),
@@ -1395,21 +1670,54 @@ impl GrokProtocol {
                         crate::t!("cli-agent-grok-managed-unverified"),
                     );
                 }
-                let mut content = Vec::new();
-                for item in input {
+                if !self.extended_lifecycle_verified()
+                    && (self.pending.is_some() || self.prompt.is_some())
+                {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-managed-unverified"),
+                    );
+                }
+                let mut skill = None;
+                for item in &input {
                     match item {
-                        InputContent::Text(text) => {
-                            content.push(json!({"type": "text", "text": text}))
-                        }
-                        InputContent::LocalImage(_) | InputContent::Skill { .. } => {
+                        InputContent::Text(_) => {}
+                        InputContent::LocalImage(_) => {
                             return rejected_command(
                                 command.message_id,
-                                crate::t!("cli-agent-grok-managed-unverified"),
+                                crate::t!(
+                                    "cli-agent-input-images-unverified",
+                                    cli = Harness::Grok.display_name()
+                                ),
                             );
+                        }
+                        InputContent::Skill { name, path } => {
+                            if self.probed_version != Some(VERIFIED_VERSION) {
+                                return rejected_command(
+                                    command.message_id,
+                                    crate::t!("cli-agent-grok-managed-unverified"),
+                                );
+                            }
+                            if self.options.permission_policy != PermissionPolicy::Inherit {
+                                return rejected_command(
+                                    command.message_id,
+                                    crate::t!("cli-agent-grok-skill-policy-required"),
+                                );
+                            }
+                            if skill.is_some() {
+                                return rejected_command(
+                                    command.message_id,
+                                    crate::t!("cli-agent-task-skill-one-per-turn"),
+                                );
+                            }
+                            match skills::SelectedSkill::new(name.clone(), path.clone()) {
+                                Ok(selected) => skill = Some(selected),
+                                Err(error) => return rejected_command(command.message_id, error),
+                            }
                         }
                     }
                 }
-                if content.is_empty() {
+                if input.is_empty() {
                     return rejected_command(
                         command.message_id,
                         crate::t!("cli-task-manager-empty-prompt"),
@@ -1419,7 +1727,8 @@ impl GrokProtocol {
                     .insert(command.message_id, fingerprint);
                 let prompt = QueuedPrompt {
                     message_id: command.message_id,
-                    content,
+                    input,
+                    skill,
                 };
                 if self.pending.is_some() || self.prompt.is_some() {
                     // 本地等待不代表原生接收，也不向正在运行的回合发送第二个 prompt。
@@ -1470,6 +1779,13 @@ impl GrokProtocol {
                 approval_id,
                 decision,
             } => {
+                if decision == ApprovalDecision::AllowOnce {
+                    if let Some(profile) = &self.options.grok_profile {
+                        if let Err(error) = profile.verify_files(&self.options.state_dir) {
+                            return rejected_command(command.message_id, error.to_string());
+                        }
+                    }
+                }
                 if let Some(effects) = self.control_duplicate(
                     command.message_id,
                     &json!({"approval": approval_id, "decision": decision}),
@@ -1554,6 +1870,26 @@ impl GrokProtocol {
     }
 
     fn start_prompt(&mut self, queued: QueuedPrompt) -> Effects {
+        let content = if let Some(skill) = &queued.skill {
+            let result = self
+                .skill_catalog
+                .as_ref()
+                .ok_or_else(skills::unavailable)
+                .and_then(|catalog| catalog.encode(queued.input, skill));
+            match result {
+                Ok(content) => content,
+                Err(error) => return rejected_command(queued.message_id, error),
+            }
+        } else {
+            queued
+                .input
+                .into_iter()
+                .filter_map(|part| match part {
+                    InputContent::Text(text) => Some(json!({"type":"text", "text":text})),
+                    InputContent::LocalImage(_) | InputContent::Skill { .. } => None,
+                })
+                .collect()
+        };
         self.prompt = Some(PendingPrompt {
             message_id: queued.message_id,
             native_id: None,
@@ -1573,7 +1909,7 @@ impl GrokProtocol {
             writes: vec![self.request(
                 PendingKind::Prompt,
                 "session/prompt",
-                json!({"sessionId": self.session_id, "prompt": queued.content}),
+                json!({"sessionId": self.session_id, "prompt": content}),
             )],
             events: Vec::new(),
         }
@@ -1591,10 +1927,14 @@ impl GrokProtocol {
             }));
         }
         self.prompt = None;
-        if !self.closed {
-            if let Some(queued) = self.queued.pop_front() {
-                effects.writes.extend(self.start_prompt(queued).writes);
-            }
+        while !self.closed && self.prompt.is_none() {
+            let Some(queued) = self.queued.pop_front() else {
+                break;
+            };
+            // 坏技能只失败其所属消息，保留拒绝事件并继续检查后续排队输入。
+            let next = self.start_prompt(queued);
+            effects.writes.extend(next.writes);
+            effects.events.extend(next.events);
         }
     }
 
@@ -1668,6 +2008,14 @@ impl GrokProtocol {
         if !correlated {
             return Ok(cancelled_permission(id));
         }
+        let permission_verified = match self.probed_version {
+            Some(VERIFIED_VERSION) => true,
+            Some(P0_VERIFIED_VERSION) => verified_latest_read_tool(&params["toolCall"]),
+            Some(_) | None => false,
+        };
+        if !permission_verified {
+            return Ok(cancelled_permission(id));
+        }
         let Some(options) = params["options"].as_array() else {
             return Ok(cancelled_permission(id));
         };
@@ -1687,6 +2035,14 @@ impl GrokProtocol {
             .iter()
             .any(|option| option["optionId"] == "reject-once" && option["kind"] == "reject_once");
         if !allow_once || !reject_once {
+            return Ok(cancelled_permission(id));
+        }
+        if self
+            .options
+            .grok_profile
+            .as_ref()
+            .is_some_and(|profile| !profile.permits_native_request(&params["toolCall"]))
+        {
             return Ok(cancelled_permission(id));
         }
         let lease_permission = if let Some(sdk) = &self.sdk {
@@ -1828,6 +2184,18 @@ impl GrokProtocol {
     }
 
     fn poll_final_output(&mut self) -> Effects {
+        #[cfg(test)]
+        if let Some(probe) = &self.catalog_probe_for_live {
+            if let Some(session) = self.session_id.as_deref() {
+                if let Some(request) = probe.poll_pull(session, &self.served_catalog_names(session))
+                {
+                    return Effects {
+                        writes: vec![request],
+                        events: Vec::new(),
+                    };
+                }
+            }
+        }
         let Some(completion) = self
             .prompt
             .as_ref()
@@ -2220,6 +2588,10 @@ impl GrokProtocol {
         if let Some(id) = &requested_id {
             params["sessionId"] = json!(id);
         }
+        if self.options.grok_profile.is_some() {
+            // 独占冷进程同一固定输入；此请求不作为 warm load 降权或 native policy ACK。
+            params["_meta"] = super::grok_profile::GrokCreationPolicyV1::creation_meta();
+        }
         if let Some(sdk) = &self.sdk {
             params["_meta"]["x.ai/mcp/servers"] = sdk.bridge.registration();
         }
@@ -2231,6 +2603,24 @@ impl GrokProtocol {
     }
 
     fn receive(&mut self, message: Value) -> Result<Effects, RuntimeError> {
+        #[cfg(test)]
+        if let Some(probe) = &self.catalog_probe_for_live {
+            probe.guard_receive(&message)?;
+            if let Some(tools) = probe.pull_response(&message, self.session_id.as_deref())? {
+                let session = self
+                    .session_id
+                    .as_deref()
+                    .ok_or_else(|| RuntimeError::Protocol("目录预检缺少会话".into()))?;
+                let names = self.served_catalog_names(session);
+                self.options
+                    .grok_profile
+                    .as_ref()
+                    .ok_or_else(|| RuntimeError::Protocol("目录预检缺少固定策略".into()))?
+                    .verify_catalog_with_mcp(Some(&tools), self.task_input_written, &names)?;
+                probe.observe_pull(tools, &names);
+                return Ok(Effects::default());
+            }
+        }
         #[cfg(test)]
         if let Some(probe) = &self.sdk_origin_probe {
             // 在版本与身份前置校验之前保存安全形状，畸形帧也不能丢失终止诊断。
@@ -2361,12 +2751,14 @@ impl GrokProtocol {
         match kind {
             PendingKind::Initialize => {
                 if result["protocolVersion"].as_u64() != Some(1)
-                    || result["_meta"]["agentVersion"].as_str() != Some(VERIFIED_VERSION)
+                    || self.probed_version.is_none()
+                    || result["_meta"]["agentVersion"].as_str() != self.probed_version
                 {
                     return Err(RuntimeError::Protocol(
                         "unverified Grok ACP protocol or agent version".into(),
                     ));
                 }
+                self.paired_version = self.probed_version;
                 let capabilities = result
                     .get("agentCapabilities")
                     .filter(|value| value.is_object())
@@ -2425,6 +2817,8 @@ impl GrokProtocol {
                         .to_owned(),
                 };
                 self.session_id = Some(id.clone());
+                self.skill_catalog = self.early_skill_catalogs.remove(&id);
+                self.early_skill_catalogs.clear();
                 if let Some(sdk) = &mut self.sdk {
                     if !sdk.owned_process || sdk.retired {
                         return Err(RuntimeError::Protocol(crate::t!(
@@ -2445,20 +2839,40 @@ impl GrokProtocol {
                     );
                 }
                 self.update_metadata(result)?;
-                effects.events.push(RuntimeEventKind::SessionReady {
-                    effective_permissions: json!({
-                        "requestedPolicy": "inherit", "effectiveNativePolicy": null,
-                        "permissionEnforcementVerified": false,
-                        "reportedCapabilities": self.reported_capabilities,
-                        "reportedMetadata": self.reported_metadata,
-                        "verifiedCapabilities": {
-                            "newSession": true, "emptyHistoryRecovery": true, "closeSession": true,
-                            "submit": true, "queuedSubmit": true, "steer": false, "approval": true,
-                            "cancel": true, "resume": self.reported_capabilities["loadSession"] == true,
-                            "localTools": self.sdk.is_some(), "childTasks": false
-                        }
-                    }),
+                let baseline_lifecycle_verified = self.baseline_lifecycle_verified();
+                let extended_lifecycle_verified = self.extended_lifecycle_verified();
+                let effective_permissions = json!({
+                    "requestedPolicy": self.options.grok_profile.as_ref().map(|profile| json!(profile.permission_policy())).unwrap_or_else(|| json!("inherit")), "effectiveNativePolicy": null,
+                    "appCreationPolicyApplied": self.options.grok_profile.is_some(),
+                    "grokCreationPolicyV1": self.options.grok_profile,
+                    "permissionEnforcementVerified": false,
+                    "reportedCapabilities": self.reported_capabilities,
+                    "reportedMetadata": self.reported_metadata,
+                    "verifiedCapabilities": {
+                        "newSession": baseline_lifecycle_verified, "emptyHistoryRecovery": extended_lifecycle_verified, "closeSession": extended_lifecycle_verified,
+                        "submit": baseline_lifecycle_verified, "queuedSubmit": extended_lifecycle_verified, "steer": false, "approval": baseline_lifecycle_verified,
+                        "cancel": baseline_lifecycle_verified, "resume": baseline_lifecycle_verified && self.reported_capabilities["loadSession"] == true,
+                        "localTools": extended_lifecycle_verified && self.sdk.is_some(), "childTasks": extended_lifecycle_verified && self.options.grok_profile.as_ref().and_then(|profile| profile.local_tools()).is_some_and(|tools| tools.allow_spawn)
+                    }
                 });
+                super::permissions::verify_effective_permissions(
+                    self.options.permission_ceiling.as_ref(),
+                    "grok",
+                    &self.options.cwd,
+                    &effective_permissions,
+                )?;
+                if (self.options.grok_profile.is_some()
+                    && self.creation_catalog_session != self.session_id)
+                    || (self.options.target == SessionTarget::New
+                        && !self.options.selected_skills.is_empty()
+                        && self.skill_catalog.is_none())
+                {
+                    self.deferred_ready = Some((effective_permissions, Instant::now()));
+                } else {
+                    effects
+                        .events
+                        .push(self.ready_event(effective_permissions)?);
+                }
             }
             PendingKind::Prompt => {
                 effects = self.prompt_result(result)?;
@@ -2489,9 +2903,95 @@ impl GrokProtocol {
         Ok(())
     }
 
+    fn record_notification_id(&mut self, message: &Value) -> Result<bool, RuntimeError> {
+        let params = &message["params"];
+        if let Some(event_id) = params["_meta"]["eventId"].as_str() {
+            if !valid_native_id(event_id) {
+                return Err(RuntimeError::Protocol(
+                    "invalid Grok notification id".into(),
+                ));
+            }
+            let fingerprint = message_fingerprint(message)?;
+            if let Some(previous) = self.notification_ids.get(event_id) {
+                return if previous == &fingerprint {
+                    Ok(false)
+                } else {
+                    Err(RuntimeError::Protocol(
+                        "conflicting Grok native notification id".into(),
+                    ))
+                };
+            }
+            self.notification_ids
+                .insert(event_id.to_owned(), fingerprint);
+        }
+        Ok(true)
+    }
+
     fn notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
+        // 原生可能先发目录再回复 session/new；探针和生产目录都按真实会话关联。
+        #[cfg(all(test, unix))]
+        if let Some(probe) = &self.skill_catalog_for_live {
+            probe.observe(message, self.submitted_messages.is_empty());
+        }
         let method = message["method"].as_str().unwrap_or_default();
         let params = &message["params"];
+        if method == "session/update"
+            && params["update"]["sessionUpdate"] == "available_commands_update"
+        {
+            if let Some(profile) = &self.options.grok_profile {
+                if self
+                    .deferred_ready
+                    .as_ref()
+                    .is_some_and(|(_, began)| began.elapsed() >= REQUEST_TIMEOUT)
+                {
+                    return Err(RuntimeError::RequestTimedOut);
+                }
+                let session = params["sessionId"]
+                    .as_str()
+                    .filter(|session| valid_native_id(session))
+                    .ok_or_else(|| {
+                        super::permissions::rejected(
+                            None,
+                            &Value::Null,
+                            "grok_creation_catalog_session_missing",
+                            false,
+                        )
+                    })?;
+                if self
+                    .session_id
+                    .as_deref()
+                    .is_some_and(|current| current != session)
+                {
+                    return Ok(Effects::default());
+                }
+                let served_names = if params["_meta"]
+                    .get("isReplay")
+                    .is_none_or(|value| value == false)
+                {
+                    self.served_catalog_names(session)
+                } else {
+                    Vec::new()
+                };
+                #[cfg(test)]
+                if let Some(probe) = &self.catalog_probe_for_live {
+                    probe.observe_catalog(params, &served_names);
+                }
+                profile.verify_catalog_with_mcp(
+                    params["update"]["_meta"].get("tools"),
+                    self.task_input_written,
+                    &served_names,
+                )?;
+                self.creation_catalog_session = Some(session.to_owned());
+                if self.session_id.is_some() {
+                    if let Some((effective_permissions, _)) = self.deferred_ready.take() {
+                        return Ok(Effects {
+                            writes: Vec::new(),
+                            events: vec![self.ready_event(effective_permissions)?],
+                        });
+                    }
+                }
+            }
+        }
         // 模型列表是当前连接的无 sessionId 通知，其余更新必须匹配当前原生会话。
         if method == "_x.ai/models/update" {
             if params.get("sessionId").is_some()
@@ -2503,6 +3003,43 @@ impl GrokProtocol {
             return Ok(Effects::default());
         }
         if self.session_id.is_none() {
+            if method == "session/update"
+                && params["update"]["sessionUpdate"] == "available_commands_update"
+                && params["_meta"]
+                    .get("isReplay")
+                    .is_none_or(|value| value == false)
+                && self.options.permission_policy == PermissionPolicy::Inherit
+            {
+                if let Some(PendingRequest {
+                    kind: PendingKind::OpenSession { requested_id },
+                    ..
+                }) = &self.pending
+                {
+                    if let Some(id) = params["sessionId"]
+                        .as_str()
+                        .filter(|id| valid_native_id(id))
+                    {
+                        if requested_id
+                            .as_deref()
+                            .is_none_or(|requested| requested == id)
+                        {
+                            if self.early_skill_catalogs.len() >= 8
+                                && !self.early_skill_catalogs.contains_key(id)
+                            {
+                                return Err(RuntimeError::Protocol(skills::unavailable()));
+                            }
+                            if !self.record_notification_id(message)? {
+                                return Ok(Effects::default());
+                            }
+                            let catalog = skills::SkillCatalog::from_native(
+                                &params["update"]["availableCommands"],
+                            )
+                            .map_err(RuntimeError::Protocol)?;
+                            self.early_skill_catalogs.insert(id.to_owned(), catalog);
+                        }
+                    }
+                }
+            }
             if let Some(PendingRequest {
                 kind:
                     PendingKind::OpenSession {
@@ -2551,24 +3088,8 @@ impl GrokProtocol {
             }
             return Ok(Effects::default());
         }
-        if let Some(event_id) = params["_meta"]["eventId"].as_str() {
-            if !valid_native_id(event_id) {
-                return Err(RuntimeError::Protocol(
-                    "invalid Grok notification id".into(),
-                ));
-            }
-            let fingerprint = message_fingerprint(message)?;
-            if let Some(previous) = self.notification_ids.get(event_id) {
-                return if previous == &fingerprint {
-                    Ok(Effects::default())
-                } else {
-                    Err(RuntimeError::Protocol(
-                        "conflicting Grok native notification id".into(),
-                    ))
-                };
-            }
-            self.notification_ids
-                .insert(event_id.to_owned(), fingerprint);
+        if !self.record_notification_id(message)? {
+            return Ok(Effects::default());
         }
         match method {
             "_x.ai/queue/changed" => {
@@ -2597,6 +3118,21 @@ impl GrokProtocol {
                 if update["sessionUpdate"] == "available_commands_update" {
                     self.reported_metadata.available_commands =
                         decode_metadata(&update["availableCommands"])?;
+                    if self.options.permission_policy == PermissionPolicy::Inherit {
+                        self.skill_catalog = Some(
+                            skills::SkillCatalog::from_native(&update["availableCommands"])
+                                .map_err(RuntimeError::Protocol)?,
+                        );
+                        if let Some((effective_permissions, began)) = self.deferred_ready.take() {
+                            if began.elapsed() >= REQUEST_TIMEOUT {
+                                return Err(RuntimeError::RequestTimedOut);
+                            }
+                            return Ok(Effects {
+                                writes: Vec::new(),
+                                events: vec![self.ready_event(effective_permissions)?],
+                            });
+                        }
+                    }
                 }
                 self.update_metadata(update)?;
                 let effects = self.session_update(params)?;
@@ -2794,6 +3330,36 @@ fn verified_final_snapshot(
     Ok(watermark.map(|watermark| (output, watermark)))
 }
 
+fn verified_latest_read_tool(tool: &Value) -> bool {
+    let meta = &tool["_meta"]["x.ai/tool"];
+    let Some(raw) = tool["rawInput"].as_object() else {
+        return false;
+    };
+    tool["kind"] == "read"
+        && meta["name"] == "read_file"
+        && meta["namespace"] == "grok_build"
+        && meta["version"].as_u64() == Some(1)
+        && meta["read_only"] == true
+        && raw.keys().all(|key| {
+            matches!(
+                key.as_str(),
+                "variant" | "target_file" | "offset" | "limit" | "pages" | "format"
+            )
+        })
+        && raw.get("variant").is_some_and(|value| value == "ReadFile")
+        && raw
+            .get("target_file")
+            .and_then(Value::as_str)
+            .is_some_and(|path| !path.is_empty())
+        && ["offset", "limit"].into_iter().all(|key| {
+            raw.get(key)
+                .is_none_or(|value| value.is_null() || value.as_i64() == Some(1))
+        })
+        && ["pages", "format"]
+            .into_iter()
+            .all(|key| raw.get(key).is_none_or(Value::is_null))
+}
+
 fn cancelled_permission(id: &Value) -> Effects {
     Effects {
         writes: vec![
@@ -2848,3 +3414,26 @@ mod policy_preflight_live_tests;
 #[cfg(all(test, unix))]
 #[path = "grok_native_tool_lease_live_tests.rs"]
 mod native_tool_lease_live_tests;
+
+#[cfg(all(test, unix))]
+#[path = "grok_native_skill_live_tests.rs"]
+mod native_skill_live_tests;
+
+#[cfg(all(test, unix))]
+#[path = "grok_fixed_policy_live_tests.rs"]
+mod fixed_policy_live_tests;
+
+#[path = "grok_skills.rs"]
+mod skills;
+
+#[cfg(all(test, unix))]
+#[path = "grok_files_policy_live_tests.rs"]
+mod files_policy_live_tests;
+
+#[cfg(all(test, unix))]
+#[path = "grok_selected_skill_live_tests.rs"]
+mod selected_skill_live_tests;
+
+#[cfg(test)]
+#[path = "grok_catalog_preflight_live_tests.rs"]
+mod catalog_preflight_live_tests;

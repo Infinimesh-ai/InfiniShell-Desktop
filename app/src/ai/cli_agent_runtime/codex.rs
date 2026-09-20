@@ -1,4 +1,4 @@
-//! Codex 0.147.0 app-server 的本机管道适配；终态只来自原生回合事件。
+//! Codex app-server 的本机管道适配；终态只来自原生回合事件。
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -22,7 +22,7 @@ use super::{
     TurnOutcome, channels, local_tools,
 };
 
-const VERIFIED_VERSION: &str = "codex-cli 0.147.0";
+const SUPPORTED_VERSIONS: [&str; 2] = ["0.147.0", "0.155.1"];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
@@ -30,7 +30,10 @@ const MAX_INPUT_BYTES: usize = 1024 * 1024;
 const MAX_MESSAGE_RECORDS: usize = 4096;
 
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
-    if !options.executable.is_absolute() || !options.cwd.is_absolute() {
+    if options.grok_profile.is_some()
+        || !options.executable.is_absolute()
+        || !options.cwd.is_absolute()
+    {
         return Err(RuntimeError::InvalidConfiguration(
             "executable and cwd must be absolute".into(),
         ));
@@ -79,9 +82,10 @@ async fn run_process(
         .await
         .map_err(|_| RuntimeError::RequestTimedOut)??;
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if !output.status.success() || detected != VERIFIED_VERSION {
+    if !output.status.success() {
         return Err(RuntimeError::UnsupportedVersion(detected));
     }
+    protocol.record_version_probe(&detected)?;
 
     let arguments = [OsString::from("app-server"), OsString::from("--stdio")];
     let mut child = super::managed_process::spawn(
@@ -295,6 +299,8 @@ struct PendingLocalTool {
 
 struct CodexProtocol {
     options: SessionOptions,
+    probed_version: Option<&'static str>,
+    paired_version: Option<&'static str>,
     session_id: Option<String>,
     next_request_id: u64,
     pending: HashMap<u64, PendingRequest>,
@@ -309,6 +315,8 @@ impl CodexProtocol {
     fn new(options: SessionOptions) -> Self {
         Self {
             options,
+            probed_version: None,
+            paired_version: None,
             session_id: None,
             next_request_id: 0,
             pending: HashMap::new(),
@@ -318,6 +326,19 @@ impl CodexProtocol {
             approvals: HashMap::new(),
             local_tools: HashMap::new(),
         }
+    }
+
+    fn record_version_probe(&mut self, detected: &str) -> Result<(), RuntimeError> {
+        self.paired_version = None;
+        self.probed_version = detected.strip_prefix("codex-cli ").and_then(|version| {
+            SUPPORTED_VERSIONS
+                .into_iter()
+                .find(|supported| *supported == version)
+        });
+        if self.probed_version.is_none() {
+            return Err(RuntimeError::UnsupportedVersion(detected.to_owned()));
+        }
+        Ok(())
     }
 
     fn event(&self, kind: RuntimeEventKind) -> RuntimeEvent {
@@ -619,15 +640,24 @@ impl CodexProtocol {
         let effects = match pending.kind {
             PendingKind::Initialize => {
                 let user_agent = required_string(result, "/userAgent")?;
-                if !user_agent.contains("/0.147.0 ") {
+                // 只读取开头产品标识中的版本，不能把后文夹带的版本视为本次握手。
+                let handshake_version = user_agent
+                    .split_once('/')
+                    .filter(|(product, _)| !product.trim().is_empty())
+                    .and_then(|(_, remainder)| remainder.split_once(' '))
+                    .map(|(version, _)| version);
+                if self.probed_version.is_none() || handshake_version != self.probed_version {
                     return Err(RuntimeError::UnsupportedVersion(user_agent));
                 }
+                self.paired_version = self.probed_version;
                 let mut params = json!({"cwd": self.options.cwd});
                 if let Some(model) = &self.options.model {
                     params["model"] = json!(model);
                 }
                 match self.options.permission_policy {
-                    PermissionPolicy::ClaudeRestrictedFilesV1 => {
+                    PermissionPolicy::ClaudeRestrictedFilesV1
+                    | PermissionPolicy::GrokRestrictedReadV1
+                    | PermissionPolicy::GrokRestrictedFilesV1 => {
                         return Err(RuntimeError::InvalidConfiguration(
                             "Claude fixed file policy cannot be applied to Codex".into(),
                         ));
@@ -667,6 +697,9 @@ impl CodexProtocol {
                 }
             }
             PendingKind::OpenThread => {
+                let version = self.paired_version.ok_or_else(|| {
+                    RuntimeError::Protocol("Codex session has no paired CLI version".into())
+                })?;
                 let session_id = required_string(result, "/thread/id")?;
                 if let SessionTarget::Resume { native_session_id } = &self.options.target
                     && *native_session_id != session_id
@@ -687,7 +720,9 @@ impl CodexProtocol {
                     return Err(RuntimeError::Protocol("resume target is active or cannot accept direct input; reattach its owning runtime".into()));
                 }
                 let expected_sandbox = match self.options.permission_policy {
-                    PermissionPolicy::ClaudeRestrictedFilesV1 => {
+                    PermissionPolicy::ClaudeRestrictedFilesV1
+                    | PermissionPolicy::GrokRestrictedReadV1
+                    | PermissionPolicy::GrokRestrictedFilesV1 => {
                         return Err(RuntimeError::InvalidConfiguration(
                             "Claude fixed file policy cannot be applied to Codex".into(),
                         ));
@@ -720,6 +755,7 @@ impl CodexProtocol {
                 Effects {
                     writes: Vec::new(),
                     events: vec![RuntimeEventKind::SessionReady {
+                        verified_cli_version: Some(version.to_owned()),
                         effective_permissions,
                     }],
                 }

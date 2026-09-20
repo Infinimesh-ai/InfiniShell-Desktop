@@ -30,10 +30,17 @@ fn options() -> SessionOptions {
         permission_policy: PermissionPolicy::WorkspaceWrite,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
     }
+}
+
+fn legacy_probed_protocol(options: SessionOptions) -> CodexProtocol {
+    let mut protocol = CodexProtocol::new(options);
+    protocol.record_version_probe("codex-cli 0.147.0").unwrap();
+    protocol
 }
 
 fn captured_output(capture: &str, predicate: impl Fn(&Value) -> bool) -> Value {
@@ -47,7 +54,7 @@ fn captured_output(capture: &str, predicate: impl Fn(&Value) -> bool) -> Value {
 }
 
 fn ready_protocol(capture: &str) -> CodexProtocol {
-    let mut protocol = CodexProtocol::new(options());
+    let mut protocol = legacy_probed_protocol(options());
     protocol.initialize();
     protocol
         .receive(captured_output(capture, |message| message["id"] == 1))
@@ -90,7 +97,7 @@ fn start_captured_turn(protocol: &mut CodexProtocol, capture: &str) -> String {
 
 #[test]
 fn real_two_turn_capture_only_finishes_at_native_completed_events() {
-    let mut protocol = CodexProtocol::new(options());
+    let mut protocol = legacy_probed_protocol(options());
     protocol.initialize();
     let mut outcomes = Vec::new();
     for line in TWO_TURNS.lines() {
@@ -306,7 +313,7 @@ fn missing_resume_never_creates_a_replacement_thread() {
     settings.target = SessionTarget::Resume {
         native_session_id: "missing".into(),
     };
-    let mut protocol = CodexProtocol::new(settings);
+    let mut protocol = legacy_probed_protocol(settings);
     protocol.initialize();
     let open = protocol
         .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
@@ -327,7 +334,7 @@ fn missing_resume_never_creates_a_replacement_thread() {
 fn inherited_permissions_are_not_replaced_with_bypass_or_sandbox_overrides() {
     let mut settings = options();
     settings.permission_policy = PermissionPolicy::Inherit;
-    let mut protocol = CodexProtocol::new(settings);
+    let mut protocol = legacy_probed_protocol(settings);
     protocol.initialize();
     let open = protocol
         .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
@@ -365,7 +372,7 @@ fn explicit_error_wins_over_a_completed_status() {
 
 #[test]
 fn eof_without_a_terminal_event_is_a_connection_failure() {
-    let mut protocol = CodexProtocol::new(options());
+    let mut protocol = legacy_probed_protocol(options());
     let (controller, receiver, sender, events) = channels(protocol.options.generation);
     let result = futures::executor::block_on(run_transport(
         &mut protocol,
@@ -381,7 +388,7 @@ fn eof_without_a_terminal_event_is_a_connection_failure() {
 
 #[test]
 fn a_full_event_queue_fails_without_blocking_approval_control() {
-    let protocol = CodexProtocol::new(options());
+    let protocol = legacy_probed_protocol(options());
     let (sender, events) = mpsc::channel(1);
     sender
         .try_send(protocol.event(RuntimeEventKind::TurnStarted {
@@ -618,7 +625,7 @@ fn captured_dynamic_tool_registration_is_opt_in_and_never_added_to_resume() {
         allow_spawn: false,
         allow_message: true,
     });
-    let mut protocol = CodexProtocol::new(settings.clone());
+    let mut protocol = legacy_probed_protocol(settings.clone());
     assert_eq!(
         protocol.initialize()["params"]["capabilities"]["experimentalApi"],
         true
@@ -642,7 +649,7 @@ fn captured_dynamic_tool_registration_is_opt_in_and_never_added_to_resume() {
         native_session_id: protocol.session_id.clone().unwrap(),
     };
     assert!(connect(settings.clone()).is_ok());
-    let mut probe = CodexProtocol::new(settings);
+    let mut probe = legacy_probed_protocol(settings);
     probe.initialize();
     let effects = probe
         .receive(captured_output(fixture, |message| message["id"] == 1))
@@ -650,7 +657,7 @@ fn captured_dynamic_tool_registration_is_opt_in_and_never_added_to_resume() {
     assert_eq!(effects.writes[1]["method"], "thread/resume");
     assert!(effects.writes[1]["params"].get("dynamicTools").is_none());
     assert!(
-        CodexProtocol::new(options()).initialize()["params"]
+        legacy_probed_protocol(options()).initialize()["params"]
             .get("capabilities")
             .is_none()
     );
@@ -778,7 +785,7 @@ fn captured_child_permission_drift_is_rejected_before_ready_or_initial_input() {
     };
     settings.permission_ceiling =
         Some(super::super::permissions::ceiling_from_parent(&parent, "codex").unwrap());
-    let mut protocol = CodexProtocol::new(settings.clone());
+    let mut protocol = legacy_probed_protocol(settings.clone());
     protocol.initialize();
     protocol
         .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
@@ -803,7 +810,7 @@ fn captured_child_permission_drift_is_rejected_before_ready_or_initial_input() {
             .is_empty()
     );
 
-    let mut matching = CodexProtocol::new(settings);
+    let mut matching = legacy_probed_protocol(settings);
     matching.initialize();
     matching
         .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
@@ -818,3 +825,173 @@ fn captured_child_permission_drift_is_rejected_before_ready_or_initial_input() {
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 #[path = "codex_idle_crash_tests.rs"]
 mod idle_crash;
+
+#[test]
+fn latest_version_probe_and_matching_handshake_preserve_requested_permissions() {
+    let mut protocol = CodexProtocol::new(options());
+    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
+    protocol.initialize();
+    // 新版握手是协议形状夹具，不是原生执行记录。
+    let effects = protocol
+        .receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.155.1 (Linux; x86_64)"
+        }}))
+        .unwrap();
+    assert_eq!(effects.writes[1]["method"], "thread/start");
+    assert_eq!(effects.writes[1]["params"]["approvalPolicy"], "untrusted");
+    assert_eq!(effects.writes[1]["params"]["approvalsReviewer"], "user");
+    assert_eq!(effects.writes[1]["params"]["sandbox"], "workspace-write");
+    assert!(effects.events.is_empty());
+    let ready = protocol
+        .receive(captured_output(TWO_TURNS, |message| message["id"] == 2))
+        .unwrap();
+    assert!(
+        matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
+        verified_cli_version: Some(version), ..
+    }] if version == "0.155.1")
+    );
+}
+
+#[test]
+fn unknown_version_probe_does_not_retain_a_previous_supported_version() {
+    let mut protocol = legacy_probed_protocol(options());
+    assert!(matches!(
+        protocol.record_version_probe("codex-cli 0.156.0"),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    assert!(protocol.probed_version.is_none());
+    assert!(matches!(
+        protocol.record_version_probe("codex-cli 0.155.10"),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    assert!(matches!(
+        protocol.record_version_probe("codex-cli 0.155.1-alpha.1"),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+}
+
+#[test]
+fn latest_probe_cannot_initialize_an_older_app_server() {
+    let mut protocol = CodexProtocol::new(options());
+    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
+    protocol.initialize();
+    assert!(matches!(
+        protocol.receive(captured_output(HANDSHAKE, |message| message["id"] == 1)),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    assert!(protocol.pending.is_empty());
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn older_probe_cannot_initialize_a_newer_app_server() {
+    let mut protocol = legacy_probed_protocol(options());
+    protocol.initialize();
+    assert!(matches!(
+        protocol.receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.155.1 (Linux; x86_64)"
+        }})),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    assert!(protocol.pending.is_empty());
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn known_version_in_user_agent_details_does_not_override_its_actual_version() {
+    for user_agent in [
+        "infinishell/0.999.0 (Linux; x86_64) other/0.155.1 extra",
+        "/0.155.1 extra",
+    ] {
+        let mut protocol = CodexProtocol::new(options());
+        protocol.record_version_probe("codex-cli 0.155.1").unwrap();
+        protocol.initialize();
+        assert!(matches!(
+            protocol.receive(json!({"id":1,"result":{"userAgent":user_agent}})),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+        assert!(protocol.pending.is_empty());
+    }
+}
+
+#[test]
+fn matching_handshake_cannot_replace_a_missing_version_probe() {
+    let mut protocol = CodexProtocol::new(options());
+    protocol.initialize();
+    assert!(matches!(
+        protocol.receive(captured_output(HANDSHAKE, |message| message["id"] == 1)),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    assert!(protocol.pending.is_empty());
+}
+
+#[test]
+fn legacy_version_still_resumes_the_requested_native_session() {
+    let mut settings = options();
+    settings.target = SessionTarget::Resume {
+        native_session_id: "legacy-native-session".into(),
+    };
+    let mut protocol = legacy_probed_protocol(settings);
+    protocol.initialize();
+    let effects = protocol
+        .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
+        .unwrap();
+    assert_eq!(effects.writes[1]["method"], "thread/resume");
+    assert_eq!(
+        effects.writes[1]["params"]["threadId"],
+        "legacy-native-session"
+    );
+    let mut reply = captured_output(TWO_TURNS, |message| message["id"] == 2);
+    reply["result"]["thread"]["id"] = json!("legacy-native-session");
+    let ready = protocol.receive(reply).unwrap();
+    assert!(
+        matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
+        verified_cli_version: Some(version), ..
+    }] if version == "0.147.0")
+    );
+}
+
+#[test]
+fn latest_version_does_not_enable_unimplemented_approval_or_elicitation_requests() {
+    let mut protocol = CodexProtocol::new(options());
+    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
+    protocol.initialize();
+    protocol
+        .receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.155.1 (Linux; x86_64)"
+        }}))
+        .unwrap();
+    let approval = protocol
+        .receive(json!({"id":20,"method":"item/permissions/requestApproval","params":{}}))
+        .unwrap();
+    let question = protocol
+        .receive(json!({"id":21,"method":"item/tool/requestUserInput","params":{}}))
+        .unwrap();
+    let elicitation = protocol
+        .receive(json!({"id":22,"method":"mcpServer/elicitation/request","params":{}}))
+        .unwrap();
+    assert_eq!(approval.writes[0]["error"]["code"], -32601);
+    assert_eq!(question.writes[0]["error"]["code"], -32601);
+    assert_eq!(elicitation.writes[0]["error"]["code"], -32601);
+    assert!(approval.events.is_empty());
+    assert!(question.events.is_empty());
+    assert!(elicitation.events.is_empty());
+    assert!(protocol.approvals.is_empty());
+}
+
+#[test]
+fn probe_replacement_after_handshake_cannot_claim_a_paired_ready_version() {
+    let mut protocol = legacy_probed_protocol(options());
+    protocol.initialize();
+    protocol
+        .receive(captured_output(HANDSHAKE, |message| message["id"] == 1))
+        .unwrap();
+    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
+    assert!(
+        protocol
+            .receive(captured_output(TWO_TURNS, |message| message["id"] == 2))
+            .is_err()
+    );
+    assert!(protocol.session_id.is_none());
+    assert!(protocol.paired_version.is_none());
+}

@@ -96,6 +96,8 @@ fn normal_finish_without_a_process_never_writes_stop_or_claims_exit() {
 fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
     let directory = create_generation_directory(state, generation).unwrap();
     let manifest = Manifest {
+        isolated_home: None,
+        environment: None,
         version: 1,
         launch_allowed: true,
         generation,
@@ -367,4 +369,232 @@ fn accepted_control_stream_waits_for_delayed_worker_readiness() {
     thread::sleep(Duration::from_millis(100));
     client.write_all(&[1]).unwrap();
     server.join().unwrap();
+}
+
+#[test]
+fn isolated_environment_keeps_managed_paths_and_excludes_cli_configuration_inputs() {
+    let directory = tempfile::tempdir().unwrap();
+    let environment: std::collections::HashMap<_, _> =
+        isolated_environment(directory.path()).into_iter().collect();
+    assert_eq!(
+        environment.get(&OsString::from("GROK_HOME")),
+        Some(&directory.path().join("grok").into_os_string())
+    );
+    assert_eq!(
+        environment.get(&OsString::from("HOME")),
+        Some(&directory.path().join("home").into_os_string())
+    );
+    assert!(!environment.contains_key(&OsString::from(EXEC_CONTROL_ENV)));
+    assert!(!environment.contains_key(&OsString::from("DYLD_INSERT_LIBRARIES")));
+    assert!(!environment.contains_key(&OsString::from("LD_PRELOAD")));
+    assert!(!environment.contains_key(&OsString::from("GROK_API_KEY")));
+}
+
+#[test]
+fn confirmed_receipt_removes_isolated_auth_but_preserves_session_storage() {
+    let state = tempfile::tempdir().unwrap();
+    let generation = Uuid::new_v4();
+    let (directory, mut receipt) = fixture(state.path(), generation);
+    let home = state
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("grok-managed")
+        .join(Uuid::new_v4().to_string());
+    fs::create_dir_all(home.join("grok")).unwrap();
+    fs::write(home.join("grok/auth.json"), b"offline opaque test cache").unwrap();
+    fs::write(home.join("grok/session-test"), b"history").unwrap();
+    let path = directory.join("manifest.json");
+    let (mut manifest, _) = read_manifest(&path).unwrap();
+    manifest.isolated_home = Some(home.clone());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(path, &bytes).unwrap();
+    receipt.manifest_sha256 = sha256(&bytes);
+    // 此处只测试文件生命周期，不表示真实进程或平台 containment 已通过。
+    write_receipt(&directory, &receipt).unwrap();
+    assert!(!home.join("grok/auth.json").exists());
+    assert_eq!(
+        fs::read(home.join("grok/session-test")).unwrap(),
+        b"history"
+    );
+}
+
+#[test]
+fn isolated_receipt_accepts_real_state_path_aliases_without_changing_ownership() {
+    let state = tempfile::tempdir().unwrap();
+    let generation = Uuid::new_v4();
+    let (directory, mut receipt) = fixture(state.path(), generation);
+    let home = state
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("grok-managed")
+        .join(Uuid::new_v4().to_string());
+    fs::create_dir_all(home.join("grok")).unwrap();
+    let manifest_path = directory.join("manifest.json");
+    let (mut manifest, _) = read_manifest(&manifest_path).unwrap();
+    manifest.isolated_home = Some(home);
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    fs::write(&manifest_path, &bytes).unwrap();
+    receipt.manifest_sha256 = sha256(&bytes);
+    write_receipt(&directory, &receipt).unwrap();
+
+    // 使用真实存在的目录别名；Windows 普通路径也会与 canonicalize 的扩展前缀不同。
+    let child = state.path().join("path-alias");
+    fs::create_dir(&child).unwrap();
+    let alias = child.join("..");
+    assert_eq!(
+        confirmed_exit(&alias, generation).unwrap(),
+        Some(receipt.clone())
+    );
+    assert_eq!(
+        confirmed_exit(state.path(), generation).unwrap(),
+        Some(receipt.clone())
+    );
+    #[cfg(unix)]
+    {
+        let parent = tempfile::tempdir().unwrap();
+        let link = parent.path().join("state-link");
+        std::os::unix::fs::symlink(state.path(), &link).unwrap();
+        assert_eq!(confirmed_exit(&link, generation).unwrap(), Some(receipt));
+    }
+}
+
+#[test]
+fn update_environment_rejects_credentials_permission_flags_and_conflicting_keys() {
+    for name in [
+        "ANTHROPIC_API_KEY",
+        "GROK_API_KEY",
+        "LD_PRELOAD",
+        "DISABLE_UPDATES",
+        "CLAUDE_CONFIG_DIR",
+    ] {
+        let environment = ManagedEnvironment {
+            values: vec![(name.into(), "synthetic".into())],
+            remove: vec![],
+        };
+        assert!(environment.validate().is_err(), "{name}");
+    }
+    let mut environment = ManagedEnvironment {
+        values: vec![("CODEX_RELEASE".into(), "0.155.1".into())],
+        remove: vec!["CODEX_MANAGED_BY_NPM".into()],
+    };
+    assert!(environment.validate().is_ok());
+    environment
+        .values
+        .push(("CODEX_RELEASE".into(), "0.156.0-alpha.7".into()));
+    assert!(environment.validate().is_err());
+    environment.values.pop();
+    environment.remove.push("PATH".into());
+    assert!(environment.validate().is_err());
+}
+
+#[test]
+fn claude_update_configuration_is_bound_to_generation_and_exact_update_command() {
+    let state = tempfile::tempdir().unwrap();
+    let generation = Uuid::new_v4();
+    let directory = state
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join(format!("claude-update-{generation}"));
+    let environment = ManagedEnvironment {
+        values: vec![(
+            "CLAUDE_CONFIG_DIR".into(),
+            directory.join("config").into_os_string(),
+        )],
+        remove: vec![],
+    };
+    let arguments = [
+        "--settings",
+        "{\"autoUpdatesChannel\":\"stable\"}",
+        "update",
+    ]
+    .map(OsString::from);
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &arguments)
+            .is_ok()
+    );
+    assert!(
+        environment
+            .validate_for_generation(state.path(), Uuid::new_v4(), &arguments)
+            .is_err()
+    );
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &["--print".into()])
+            .is_err()
+    );
+    let changed = [
+        "--settings",
+        "{\"skipDangerousModePermissionPrompt\":true}",
+        "update",
+    ]
+    .map(OsString::from);
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &changed)
+            .is_err()
+    );
+    let outside = ManagedEnvironment {
+        values: vec![(
+            "CLAUDE_CONFIG_DIR".into(),
+            state.path().join("user").into_os_string(),
+        )],
+        remove: vec![],
+    };
+    assert!(
+        outside
+            .validate_for_generation(state.path(), generation, &arguments)
+            .is_err()
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn claude_update_configuration_rejects_a_redirected_generation_directory() {
+    let state = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let generation = Uuid::new_v4();
+    let directory = state
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join(format!("claude-update-{generation}"));
+    std::os::unix::fs::symlink(other.path(), &directory).unwrap();
+    let environment = ManagedEnvironment {
+        values: vec![(
+            "CLAUDE_CONFIG_DIR".into(),
+            directory.join("config").into_os_string(),
+        )],
+        remove: vec![],
+    };
+    let arguments = [
+        "--settings",
+        "{\"autoUpdatesChannel\":\"latest\"}",
+        "update",
+    ]
+    .map(OsString::from);
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &arguments)
+            .is_err()
+    );
+}
+
+#[test]
+fn oversized_launch_record_never_claims_a_generation() {
+    let state = tempfile::tempdir().unwrap();
+    let existing_generation = Uuid::new_v4();
+    let (directory, _) = fixture(state.path(), existing_generation);
+    let (mut manifest, before) = read_manifest(&directory.join("manifest.json")).unwrap();
+    manifest.generation = Uuid::new_v4();
+    manifest.arguments = vec!["x".repeat(MAX_RECORD_BYTES as usize).into()];
+    assert!(create_launch_manifest(state.path(), &manifest).is_err());
+    assert!(!generation_directory(state.path(), manifest.generation).exists());
+    manifest.generation = existing_generation;
+    manifest.arguments.clear();
+    assert!(create_launch_manifest(state.path(), &manifest).is_err());
+    assert_eq!(fs::read(directory.join("manifest.json")).unwrap(), before);
 }

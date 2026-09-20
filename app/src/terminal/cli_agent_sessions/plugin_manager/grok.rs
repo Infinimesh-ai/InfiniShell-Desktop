@@ -20,7 +20,7 @@ use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, Pl
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.1";
+const PLUGIN_VERSION: &str = "0.1.3";
 const TESTED_GROK_VERSION: &str = "1.0.30";
 // 只认可此次发布前的完整 0.1.0 配方，不能把任意旧版说明当作应用来源。
 const LEGACY_README_SHA256: &str =
@@ -28,6 +28,24 @@ const LEGACY_README_SHA256: &str =
 // 历史通知脚本只按固定 0.1.0 原字节认可，当前脚本的版本修复不能写回旧来源。
 const LEGACY_NOTIFY_SHA256: &str =
     "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8";
+// 0.1.1 的通知原字节及两份已发布到验收构建的说明，升级时保留原来源和恢复副本。
+const LEGACY_011_NOTIFY_SHA256: &str =
+    "9d100f0aad5ce14e9237a15f39537278e8208082bc298acb2883662d8cd9580a";
+const LEGACY_011_README_SHA256: [&str; 2] = [
+    "13a5451348ef9278f243c18ea3f8c8af714cebfe49e2eb0979263de841531167",
+    "adf7a48c57b108a3b1d6c02fc33c077df6437324df40c4664a35f883bfa9cf41",
+];
+// 0.1.0–0.1.2 共用的九项 hook 必须按旧字节核验，不能套用新版本的第十项。
+const LEGACY_HOOKS_SHA256: &str =
+    "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326";
+const LEGACY_012_MANIFEST: &str =
+    include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-plugin.json");
+const LEGACY_012_SHA256: &[(&str, &str)] = &[
+    (".grok-plugin/plugin.json", "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571"),
+    ("hooks/hooks.json", LEGACY_HOOKS_SHA256),
+    ("hooks/notify.cjs", "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188"),
+    ("README.md", "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca"),
+];
 const BUNDLED_FILES: &[(&str, &str)] = &[
     (
         ".grok-plugin/plugin.json",
@@ -309,6 +327,14 @@ impl CliAgentPluginManager for GrokPluginManager {
         &INSTALL_INSTRUCTIONS
     }
 
+    fn install_success_message(&self) -> &'static str {
+        crate::t_static!("cli-agent-plugin-grok-installed")
+    }
+
+    fn update_success_message(&self) -> &'static str {
+        crate::t_static!("cli-agent-plugin-grok-updated")
+    }
+
     fn remote_install_instructions(&self) -> &'static PluginInstructions {
         &INSTALL_INSTRUCTIONS
     }
@@ -564,27 +590,40 @@ fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
 
 fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
     let tree = plugin_tree(root, false)?;
-    if !parse_version(version).is_some_and(|version| {
-        parse_version(PLUGIN_VERSION).is_some_and(|current| version <= current)
-    }) {
+    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2") && version != PLUGIN_VERSION {
         return Err(invalid_tree());
     }
     for (name, expected) in BUNDLED_FILES {
         let contents = &tree.get(*name).ok_or_else(invalid_tree)?.contents;
-        if version != PLUGIN_VERSION && *name == ".grok-plugin/plugin.json" {
-            // 尚无其他脚本配方的兼容证据；旧版仅允许同配方、不同版本号的完整来源。
-            let mut manifest: Value = serde_json::from_str(expected)?;
+        if version == PLUGIN_VERSION {
+            if contents.as_slice() != expected.as_bytes() {
+                return Err(invalid_tree());
+            }
+            continue;
+        }
+        if matches!(version, "0.1.0" | "0.1.1") && *name == ".grok-plugin/plugin.json" {
+            // 保留两旧版原有的 manifest 格式兼容，但字段必须来自已固定的历史配方。
+            let mut manifest: Value = serde_json::from_str(LEGACY_012_MANIFEST)?;
             manifest["version"] = Value::String(version.to_owned());
             if serde_json::from_slice::<Value>(contents)? != manifest {
                 return Err(invalid_tree());
             }
-        } else if contents.as_slice() != expected.as_bytes()
-            && !(version == "0.1.0"
-                && ((*name == "README.md"
-                    && format!("{:x}", Sha256::digest(contents)) == LEGACY_README_SHA256)
-                    || (*name == "hooks/notify.cjs"
-                        && format!("{:x}", Sha256::digest(contents)) == LEGACY_NOTIFY_SHA256)))
-        {
+            continue;
+        }
+        let digest = format!("{:x}", Sha256::digest(contents));
+        let known = match (version, *name) {
+            ("0.1.0", "README.md") => digest == LEGACY_README_SHA256,
+            ("0.1.0", "hooks/notify.cjs") => digest == LEGACY_NOTIFY_SHA256,
+            ("0.1.1", "README.md") => LEGACY_011_README_SHA256.contains(&digest.as_str()),
+            ("0.1.1", "hooks/notify.cjs") => digest == LEGACY_011_NOTIFY_SHA256,
+            ("0.1.0" | "0.1.1", "hooks/hooks.json") => digest == LEGACY_HOOKS_SHA256,
+            ("0.1.2", name) => LEGACY_012_SHA256
+                .iter()
+                .any(|(expected_name, expected_digest)| name == *expected_name && digest == *expected_digest),
+            // 未知配方或文件不得借较小版本号取得应用所有权。
+            _ => false,
+        };
+        if !known {
             return Err(invalid_tree());
         }
     }

@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "scope": "source52_windows_remote_bootstrap_size_fix",
+  "candidate": "source52",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_tree_dirty": true,
+  "observed_at_utc": "2026-09-19T20:10:33Z",
+  "host": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "rust_toolchain": "1.92.0-aarch64-apple-darwin",
+    "powershell": "7.7.0-preview.3"
+  },
+  "parent_candidate": {
+    "name": "source51",
+    "file_count": 275,
+    "manifest_sha256": "2d03e251742c4b84840fcc29006a95538b103d3281a3461c6a299a5d98048822",
+    "full_workspace_evidence": "specs/cli-agent-parity/validation/macos-official-51-full-workspace-failure.safe.json",
+    "full_workspace_evidence_sha256": "0326502fa7d809beb996891ed979b045499027d3dbf1a375498ab76d9183b149"
+  },
+  "failure_reproduced_on_source51": {
+    "test": "warp terminal::bootstrap::tests::windows_remote_bootstrap_command_fits_cmd_exe_limit",
+    "nextest_run_id": "486f92dd-33df-4e7b-b92a-1af16bfc3c44",
+    "actual_command_bytes": 4159,
+    "required_command_bytes_less_than": 4096,
+    "passed": false,
+    "counted_as_success": false
+  },
+  "fix": {
+    "description": "Use PowerShell environment assignment to null to remove the inherited local notification executable while shortening the encoded remote bootstrap command.",
+    "path": "app/assets/bundled/bootstrap/ssh_remote_shell_probe.sh",
+    "before": {
+      "bytes": 3356,
+      "sha256": "a64184a6672c164f1524f1830902da1f1f7cab9fdf2bd34e6bec858794b2333a",
+      "statement": "Remove-Item Env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE -ErrorAction SilentlyContinue"
+    },
+    "after": {
+      "bytes": 3323,
+      "sha256": "491a61925c3c015ef80f635fd4a2338b94123ce843a3b7473b501fbe7c47abd1",
+      "statement": "$env:WARP_CLI_AGENT_NOTIFY_EXECUTABLE=$null"
+    },
+    "powershell_null_assignment_removed_environment_entry": true
+  },
+  "static_checks": {
+    "powershell_environment_removal_probe_passed": true,
+    "bash_syntax_passed": true,
+    "git_diff_check_passed": true,
+    "shellcheck": {
+      "passed": false,
+      "matches_source51_baseline": true,
+      "new_diagnostics": false,
+      "preserved_diagnostics": [
+        "SC2148: the embedded shell fragment has no shebang or shell directive",
+        "SC2016: the literal $SHELL sentinel is intentionally single-quoted"
+      ],
+      "counted_as_success": false
+    }
+  },
+  "tests": {
+    "focused_size_gate": {
+      "nextest_run_id": "9e0eb0de-4161-4714-9d13-943ab9fd1b02",
+      "tests_run": 1,
+      "passed_count": 1,
+      "failed_count": 0,
+      "source52_command_bytes_less_than": 4096,
+      "exact_source52_command_bytes_emitted": false,
+      "passed": true
+    },
+    "terminal_bootstrap_module": {
+      "nextest_run_id": "89436f0a-61bf-4e70-b63f-93209e05912e",
+      "tests_run": 19,
+      "passed_count": 19,
+      "failed_count": 0,
+      "passed": true
+    }
+  },
+  "localization": {
+    "user_visible_copy_changed": false,
+    "localization_change_required": false
+  },
+  "boundaries": {
+    "source52_full_workspace_rerun": false,
+    "source51_full_workspace_gate_passed": false,
+    "windows_powershell_5_1_verified": false,
+    "windows_ssh_exe_argument_round_trip_verified": false,
+    "windows_conpty_verified": false,
+    "windows_rust_worker_verified": false,
+    "linux_or_windows_exact_source52_workflow_dispatched": false,
+    "dispatch_blocker": "Source52 is an uncommitted dirty candidate and no commit or push authorization was provided."
+  }
+}

@@ -410,6 +410,14 @@ impl Args {
 /// These subcommands run those worker processes, which are bundled into the Zap binary.
 #[derive(Debug, Clone, Subcommand)]
 pub enum WorkerCommand {
+    /// 一次性写入有界 Grok 通知帧，不保存任务状态。
+    #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+    #[clap(hide = true)]
+    CliAgentNotify {
+        #[arg(long, hide = true)]
+        protocol_version: bool,
+    },
+
     /// 管理本地 CLI 的独立生命周期；此入口不用于普通终端命令。
     #[cfg(any(target_os = "linux", target_os = "macos", windows))]
     #[clap(hide = true)]

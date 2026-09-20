@@ -7,9 +7,11 @@ import json
 import os
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
+import run_claude_adapter_live as runner
 from run_claude_adapter_live import (
     MARKER, PROJECT_SETTINGS, authenticated_environment, load_api_environment, prepare_project,
     sanitize, sanitize_event, validate_paths, verified_acceptance,
@@ -211,6 +213,72 @@ class EnvironmentTests(unittest.TestCase):
             args.output.write_text("old evidence", encoding="utf-8")
             with self.assertRaises(ValueError):
                 validate_paths(args)
+
+
+class FixedVersionRunnerTests(unittest.TestCase):
+    def test_unverified_input_is_rejected_before_api_read_or_process(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            executable = root / "claude"
+            executable.write_bytes(b"not an official binary")
+            with mock.patch.object(runner, "load_api_environment") as load_api, \
+                    mock.patch.object(runner, "verify_version") as probe, \
+                    mock.patch.object(runner.subprocess, "Popen") as spawn:
+                for version in ("2.1.273", "2.1.278", "latest", "2.1.279"):
+                    with self.subTest(version=version), self.assertRaises(ValueError):
+                        runner.run(argparse.Namespace(claude=executable, claude_version=version))
+                load_api.assert_not_called()
+                probe.assert_not_called()
+                spawn.assert_not_called()
+
+    def test_probe_failure_stops_before_api_read(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                mock.patch.object(runner.tempfile, "mkdtemp", return_value=temporary), \
+                mock.patch.object(runner, "verify_version", side_effect=ValueError("版本不匹配")), \
+                mock.patch.object(runner, "load_api_environment") as load_api, \
+                mock.patch.object(runner.subprocess, "Popen") as spawn:
+            with self.assertRaises(ValueError):
+                runner.run(argparse.Namespace(claude=Path(temporary) / "claude", claude_version="2.1.278"))
+            load_api.assert_not_called()
+            spawn.assert_not_called()
+
+    def test_default_and_explicit_version_reach_runtime_and_metadata(self):
+        for selected in (None, "2.1.278"):
+            expected = selected or "2.1.273"
+            with self.subTest(version=expected), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                for name in ("claude", "libtest", "supervisor"):
+                    (root / name).write_bytes(b"synthetic executable")
+                (root / "config").mkdir()
+                (root / "home").mkdir()
+                args = argparse.Namespace(claude=root / "claude", test_binary=root / "libtest",
+                    supervisor=root / "supervisor", config_dir=root / "config", auth_home=root / "home",
+                    output=root / "events.ndjson", api_environment_file=None, model=None)
+                if selected is not None:
+                    args.claude_version = selected
+
+                def spawn(command, **kwargs):
+                    self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION"], expected)
+                    self.assertEqual(command[0], str(args.test_binary))
+                    args.output.write_text("".join(json.dumps(row) + "\n" for row in complete_events()), encoding="utf-8")
+                    return SimpleNamespace(returncode=0, communicate=lambda timeout: (SUMMARY, None))
+
+                with mock.patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}) as verify, \
+                        mock.patch.object(runner, "verify_version", return_value=f"{expected} (Claude Code)") as probe, \
+                        mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                        mock.patch.object(runner.subprocess, "run", return_value=SimpleNamespace(stdout="")), \
+                        mock.patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                        mock.patch("builtins.print"):
+                    self.assertEqual(runner.run(args), 0)
+                probe.assert_called_once_with(args.claude, root, expected)
+                self.assertEqual(verify.call_count, 3)
+                self.assertTrue(all(call.args[-1] == expected for call in verify.call_args_list))
+                metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+                self.assertEqual(metadata["requested_cli_version"], expected)
+                self.assertEqual(metadata["cli_version"], f"{expected} (Claude Code)")
+                self.assertTrue(metadata["acceptance_passed"])
+                self.assertTrue(metadata["cli_binary_unchanged"])
 
 
 if __name__ == "__main__":

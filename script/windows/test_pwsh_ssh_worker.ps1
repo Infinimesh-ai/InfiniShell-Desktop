@@ -23,7 +23,11 @@ try {
     & (Join-Path $PSScriptRoot 'prepare_pwsh_bootstrap.ps1') `
         -DestinationPath $packagedBootstrap
     $packagedContent = [IO.File]::ReadAllText($packagedBootstrap)
-    $null = [ScriptBlock]::Create($packagedContent)
+    $sessionIdPlaceholder = '@@WARP_SESSION_ID@@'
+    if (-not $packagedContent.Contains($sessionIdPlaceholder)) {
+        throw 'Packaged PowerShell bootstrap does not contain the runtime session ID placeholder'
+    }
+    $null = [ScriptBlock]::Create($packagedContent.Replace($sessionIdPlaceholder, '1'))
     if ([Regex]::IsMatch($packagedContent, '(?m)^[\t ]*#include ')) {
         throw 'Packaged PowerShell bootstrap still contains an include directive'
     }

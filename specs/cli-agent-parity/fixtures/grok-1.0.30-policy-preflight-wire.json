@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "官方源码与固定版本随包文档核对；合成请求不证明原生接口可用",
+  "cli_version": "grok 1.0.30 (04b7ffed98c6)",
+  "cli_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "candidate_source_is_exact_binary": false,
+  "live_revalidation_required": true,
+  "historical_unprefixed_method_not_found_is_capability_evidence": false,
+  "public_source_snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+  "sources": [
+    {
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/Cargo.lock#L38-L59",
+      "sha256": "73088da69937bcc0bd8239dcc969cf4a703e836593cd5c7c35aa3a9cea393d0c",
+      "finding": "锁定 agent-client-protocol 0.10.4 与 schema 0.11.4；公开快照与真实二进制不是同一提交"
+    },
+    {
+      "url": "https://static.crates.io/crates/agent-client-protocol/agent-client-protocol-0.10.4.crate",
+      "archive_sha256": "10eeef5e80864f9c3c148a3f395c3e35a66d37ec7561c7845b2bffae8e841759",
+      "file": "src/lib.rs",
+      "file_sha256": "c0fed4a1d911b10b715cde480ceb1b37ea4621f02690e7e20cc65ca85c6dfd5b",
+      "client_send_lines": [
+        221,
+        229
+      ],
+      "agent_receive_lines": [
+        608,
+        617
+      ],
+      "finding": "客户端 ext_method 添加一个 _；接收端去掉一个 _ 后创建 ExtRequest，无前缀直接 Method not found"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs#L1952-L1985",
+      "finding": "session/info 与 session/state 的 handler 分派使用去前缀后的逻辑名"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mcp.rs#L24-L30",
+      "sha256": "cd764b68964071c6bee5f47d12980f46b2e93eb3394b7cbe7808f91e98692e94",
+      "finding": "MCP list 逻辑名为 x.ai/mcp/list"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/debug.rs#L17-L25",
+      "sha256": "bbbd81dacdb4838bc24fbafb62ce0ad0de83b739d4f7cee66e2957bc39664aa4",
+      "finding": "agent 诊断逻辑名为 x.ai/debug/agent"
+    },
+    {
+      "url": "https://agentclientprotocol.com/protocol/v1/extensibility",
+      "finding": "扩展方法保留 _ 前缀；_meta 内键名不属于方法路由"
+    },
+    {
+      "kind": "fixed_cli_bundled_document",
+      "path": "docs/user-guide/15-agent-mode.md",
+      "sha256": "17f6088ffd7ba636e8dff4ba37255d11920865492b9f23b7e1e91f838fafe185",
+      "lines": [
+        140,
+        160
+      ],
+      "finding": "文档列出 x.ai/… 逻辑名，不能把它当成 JSON-RPC 线上名"
+    },
+    {
+      "kind": "previous_fixed_binary_agent_help",
+      "stdout_sha256": "056e71951a4badab3948a351143cfc170beb12daf6708ed1bff2e0ed92189079",
+      "finding": "agent --help 确认 stdio 与 --no-leader，但没有说明扩展线上方法前缀"
+    }
+  ],
+  "diagnostics": [
+    {
+      "handler_method": "x.ai/session/info",
+      "wire_method": "_x.ai/session/info",
+      "params": {
+        "sessionId": "11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "handler_method": "x.ai/session/state",
+      "wire_method": "_x.ai/session/state",
+      "params": {
+        "sessionId": "11111111-1111-4111-8111-111111111111",
+        "cwd": "CWD"
+      }
+    },
+    {
+      "handler_method": "x.ai/mcp/list",
+      "wire_method": "_x.ai/mcp/list",
+      "params": {
+        "sessionId": "11111111-1111-4111-8111-111111111111",
+        "cache": true
+      }
+    },
+    {
+      "handler_method": "x.ai/debug/agent",
+      "wire_method": "_x.ai/debug/agent",
+      "params": {}
+    }
+  ],
+  "unchanged_standard_methods": [
+    "initialize",
+    "authenticate",
+    "session/new",
+    "session/load"
+  ],
+  "unchanged_metadata_key": "x.ai/sessionDetail"
+}

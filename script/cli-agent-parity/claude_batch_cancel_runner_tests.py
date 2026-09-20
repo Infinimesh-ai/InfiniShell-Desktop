@@ -130,15 +130,15 @@ def cancel_summary():
                        "sha256": hashlib.sha256(b"[]").hexdigest()}}
 
 
-def terminal_observation(events, failed=False):
-    completed = next(event for event in events if event["event"] == "turn_finished" and event["phase"] == "batch_cancel")
-    event = {"event": "cancel_terminal_observed", "phase": "batch_cancel", "turn_id": completed["turn_id"],
-             "expected_turn_id": completed["turn_id"], "native_session_id": completed["native_session_id"],
-             "outcome": "Failed" if failed else "Cancelled", "turn_id_matches": True,
-             "interrupt_acknowledged": True, "turn_started": True,
-             "error_bytes": 15 if failed else 0,
-             "error_sha256": hashlib.sha256(b"PRIVATE_FAILURE").hexdigest() if failed else None}
-    return event
+def terminal_observations(events):
+    finished = [event for event in events if event["event"] == "turn_finished"]
+    return [
+        {"event": "cancel_terminal_observed", "phase": event["phase"], "turn_id": event["turn_id"],
+         "expected_turn_id": event["turn_id"], "native_session_id": event["native_session_id"],
+         "outcome": event["outcome"], "turn_id_matches": True, "interrupt_acknowledged": True,
+         "turn_started": index != 0, "error_bytes": 0, "error_sha256": None}
+        for index, event in enumerate(finished)
+    ]
 
 class BatchCancelRunnerTests(unittest.TestCase):
     output = "test result: ok. 1 passed; 0 failed; 0 ignored; 7400 filtered out"
@@ -196,16 +196,26 @@ class BatchCancelRunnerTests(unittest.TestCase):
         native_of(events, type="result")["cancel_diagnostics"] = summary
         self.assertFalse(self.accepts(events))
 
-    def test_optional_terminal_observation_agrees_with_the_real_terminal(self):
+    def test_terminal_observations_distinguish_joined_input_from_started_executions(self):
         events = tools_events()
-        events.insert(-1, terminal_observation(events))
+        events[-1:-1] = terminal_observations(events)
         self.assertTrue(self.accepts(events))
-        events[-2]["turn_id_matches"] = False
+        observations = [event for event in events if event["event"] == "cancel_terminal_observed"]
+        observations[0]["turn_started"] = True
+        self.assertFalse(self.accepts(events))
+        events = tools_events()
+        events[-1:-1] = terminal_observations(events)
+        observations = [event for event in events if event["event"] == "cancel_terminal_observed"]
+        observations[1]["turn_started"] = False
         self.assertFalse(self.accepts(events))
 
     def test_failed_terminal_observation_never_counts_as_cancelled(self):
         events = tools_events()
-        events.insert(-1, terminal_observation(events, failed=True))
+        events[-1:-1] = terminal_observations(events)
+        observed = next(event for event in events if event["event"] == "cancel_terminal_observed")
+        observed["outcome"] = "Failed"
+        observed["error_bytes"] = 15
+        observed["error_sha256"] = hashlib.sha256(b"PRIVATE_FAILURE").hexdigest()
         self.assertFalse(self.accepts(events))
         self.assertNotIn("PRIVATE_FAILURE", json.dumps(events))
 
@@ -389,6 +399,45 @@ class BatchCancelRunnerTests(unittest.TestCase):
                     self.assertEqual(metadata["joined_batch_cancel_verified"], state == "success")
                     self.assertFalse(metadata["app_restart_and_ui_verified"])
                     self.assertFalse(metadata["http_request_count_verified"])
+
+
+class FixedVersionEntryTests(unittest.TestCase):
+    def cli_arguments(self):
+        return ["runner", "--test-binary", "synthetic-libtest", "--claude", "synthetic-claude",
+                "--supervisor", "synthetic-supervisor", "--api-environment-file", "synthetic-api.json",
+                "--model", "offline-fixture", "--output", "synthetic-proof.ndjson"]
+
+    def test_formal_cli_defaults_to_old_version_and_accepts_explicit_supported_versions(self):
+        for version in (None, "2.1.273", "2.1.278"):
+            argv = self.cli_arguments() + (["--claude-version", version] if version else [])
+            with self.subTest(version=version), patch("sys.argv", argv), patch.object(runner, "run", return_value=0) as run:
+                self.assertEqual(runner.main(), 0)
+                run.assert_called_once()
+                args = run.call_args.args[0]
+                self.assertEqual(args.claude_version, version or "2.1.273")
+                self.assertEqual(args.api_environment_file, Path("synthetic-api.json"))
+
+    def test_formal_cli_rejects_unknown_version_without_entering_runner(self):
+        for version in ("latest", "2.1.279", "2.1.278-beta"):
+            with self.subTest(version=version), patch("sys.argv", self.cli_arguments() + ["--claude-version", version]), \
+                    patch("sys.stderr"), patch.object(runner, "run") as run:
+                with self.assertRaises(SystemExit) as error:
+                    runner.main()
+                self.assertEqual(error.exception.code, 2)
+                run.assert_not_called()
+
+    def test_direct_unknown_version_stops_before_configuration_api_or_native_work(self):
+        with patch.object(runner.tempfile, "mkdtemp") as prepare, \
+                patch.object(runner.adapter, "load_api_environment") as load_api, \
+                patch.object(runner.adapter, "run") as run, \
+                patch.object(runner.adapter.subprocess, "Popen") as spawn:
+            for version in ("latest", "2.1.279", "2.1.278-beta", None, []):
+                with self.subTest(version=version), self.assertRaises(ValueError):
+                    runner.run(SimpleNamespace(claude_version=version))
+            prepare.assert_not_called()
+            load_api.assert_not_called()
+            run.assert_not_called()
+            spawn.assert_not_called()
 
 
 if __name__ == "__main__":

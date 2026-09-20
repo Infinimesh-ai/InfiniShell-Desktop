@@ -16,7 +16,7 @@ use warpui::{AppContext, Entity, EntityId, ModelContext, ModelHandle, SingletonE
 
 use crate::ai::blocklist::block::cli_controller::{CLISubagentController, CLISubagentEvent};
 use crate::ai::blocklist::{BlocklistAIHistoryEvent, BlocklistAIHistoryModel};
-use crate::ai::skills::{SkillDescriptor, SkillManager};
+use crate::ai::skills::{SkillDescriptor, SkillManager, SkillManagerEvent};
 use crate::search::slash_command_menu::fuzzy_match::SlashCommandFuzzyMatchResult;
 use crate::search::slash_command_menu::static_commands::{Availability, commands};
 use crate::search::slash_command_menu::{SlashCommandId, StaticCommand};
@@ -25,6 +25,7 @@ use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
+use crate::terminal::input::skills::selectable_cli_skill;
 use crate::terminal::input::slash_command_model::{
     DetectedCommand, DetectedSkillCommand, ParsedSlashCommandInput,
     slash_command_composition_filter,
@@ -77,9 +78,40 @@ pub(super) fn subscribe_to_shared_dependencies<T>(
 ) where
     T: Entity<Event = UpdatedActiveCommands>,
 {
-    ctx.subscribe_to_model(active_session, move |me, _, event, ctx| match event {
-        ActiveSessionEvent::UpdatedPwd | ActiveSessionEvent::Bootstrapped => {
-            recompute_active_commands(me, ctx);
+    #[cfg(not(target_family = "wasm"))]
+    let local_skills = {
+        let watcher = SkillManager::handle(ctx)
+            .update(ctx, |manager, ctx| manager.local_directory_watcher(ctx));
+        let directory = active_session
+            .as_ref(ctx)
+            .current_working_directory_location(ctx);
+        watcher.update(ctx, |watcher, ctx| {
+            watcher.set_directory(directory.as_ref(), ctx)
+        });
+        watcher
+    };
+    ctx.subscribe_to_model(
+        active_session,
+        move |me, active_session, event, ctx| match event {
+            ActiveSessionEvent::UpdatedPwd | ActiveSessionEvent::Bootstrapped => {
+                #[cfg(target_family = "wasm")]
+                let _ = active_session;
+                #[cfg(not(target_family = "wasm"))]
+                {
+                    let directory = active_session
+                        .as_ref(ctx)
+                        .current_working_directory_location(ctx);
+                    local_skills.update(ctx, |watcher, ctx| {
+                        watcher.set_directory(directory.as_ref(), ctx);
+                    });
+                }
+                recompute_active_commands(me, ctx);
+            }
+        },
+    );
+    ctx.subscribe_to_model(&SkillManager::handle(ctx), |_, _, event, ctx| {
+        if matches!(event, SkillManagerEvent::SkillsChanged { .. }) {
+            ctx.emit(UpdatedActiveCommands);
         }
     });
     ctx.subscribe_to_model(cli_subagent_controller, move |me, _, event, ctx| {
@@ -240,6 +272,9 @@ pub trait SlashCommandDataSource {
             .as_ref(ctx)
             .get_skills_for_working_directory(cwd_path.as_ref(), ctx)
             .into_iter()
+            .filter_map(|skill| {
+                selectable_cli_skill(skill, self.active_cli_agent(ctx), SkillManager::as_ref(ctx))
+            })
             .find(|skill| skill.name == skill_name)?;
 
         Some(DetectedSkillCommand {
@@ -465,20 +500,10 @@ pub trait SlashCommandDataSource {
 
         let skill_manager = SkillManager::as_ref(app);
         let mut results = Vec::new();
-        for mut skill in skills {
-            // In CLI agent input mode, only show skills that exist in a supported
-            // provider folder. We check all paths (not just the deduplicated
-            // provider) because deduplication may have picked a higher-priority
-            // provider even when the skill also exists in the CLI agent's folder.
-            if let Some(agent) = cli_agent {
-                let providers = agent.supported_skill_providers_for_scope(skill.scope);
-                if !skill_manager.skill_exists_for_any_provider(&skill, providers) {
-                    continue;
-                }
-                // Re-map the provider to the best supported one so the icon
-                // reflects the active CLI agent's native provider.
-                skill.provider = skill_manager.best_supported_provider(&skill, providers);
-            }
+        for skill in skills
+            .into_iter()
+            .filter_map(|skill| selectable_cli_skill(skill, cli_agent, skill_manager))
+        {
             let Some(fuzzy_result) = SlashCommandFuzzyMatchResult::try_match(
                 query_text,
                 &skill.name,

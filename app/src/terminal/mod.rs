@@ -88,6 +88,10 @@ pub use writeable_pty::{PtyIntent, PtyIntentEvent, TerminalSurface};
 pub mod wsl;
 
 pub mod cli_agent;
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+pub(crate) mod cli_agent_hook_writer;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod cli_agent_updates;
 pub use cli_agent::CLIAgent;
 pub(crate) mod cli_agent_sessions;
 

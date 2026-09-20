@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use chrono::{DateTime, Local};
 use warp_multi_agent_api::apply_file_diffs_result::success::UpdatedFileContent;
 use warp_multi_agent_api::ask_user_question_result::answer_item::{
@@ -76,6 +77,12 @@ impl TryFrom<RequestCommandOutputResult> for api::request::input::tool_call_resu
             ),
             RequestCommandOutputResult::CancelledBeforeExecution => {
                 Err(ConvertToAPITypeError::Ignore)
+            }
+            RequestCommandOutputResult::LaunchFailed { reason, .. } => {
+                // 固定远端协议没有启动失败类型；不能改装成已执行、取消或拒绝权限。
+                Err(ConvertToAPITypeError::Other(anyhow!(
+                    "Shell command did not start: {reason}"
+                )))
             }
             RequestCommandOutputResult::Denylisted { command } =>
             {

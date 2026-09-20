@@ -450,6 +450,13 @@ impl CLIAgentSessionsModel {
         self.sessions.get(&terminal_view_id)
     }
 
+    /// 空闲升级要求原生会话已退出；等待输入或已完成回合仍可能持有 CLI 进程。
+    pub(crate) fn has_local_session(&self, agent: CLIAgent) -> bool {
+        self.sessions
+            .values()
+            .any(|session| session.agent == agent && !session.is_remote())
+    }
+
     /// 异步粘贴和延迟 Enter 必须核对代次，禁止写入已取消或替换的会话。
     pub(crate) fn input_generation(&self, terminal_view_id: EntityId) -> Option<Uuid> {
         self.input_generations.get(&terminal_view_id).copied()
@@ -663,8 +670,13 @@ impl CLIAgentSessionsModel {
             EventDisposition::Accept => {}
         }
 
-        // 只有属于当前会话和回合的事件才能解除取消等待；空闲通知不确认取消。
-        if !matches!(event.event, CLIAgentEventType::IdlePrompt) {
+        // 普通广播、未知事件与空闲通知不确认任务仍运行，不能解除取消等待。
+        if !matches!(
+            event.event,
+            CLIAgentEventType::IdlePrompt
+                | CLIAgentEventType::Notification
+                | CLIAgentEventType::Unknown(_)
+        ) {
             self.abort_pending_cancel(terminal_view_id);
         }
         if matches!(event.event, CLIAgentEventType::PromptSubmit) {

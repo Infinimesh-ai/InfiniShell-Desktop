@@ -25,6 +25,10 @@ from probe_codex_windows_hooks import NativeRecorder
 
 PLUGIN_ID = 'warp@codex-warp'
 UPSTREAM_URL = 'https://github.com/warpdotdev/codex-warp.git'
+# 固定 be6e8eac029b183056b7e4402879f15d2c85f61b 的 core-plugins/src/marketplace_upgrade.rs
+# 将每次 Git 操作限为 30 秒；marketplace_upgrade/git.rs 的固定 SHA、无 sparse 路径
+# 依次执行 clone、checkout、rev-parse，再留 10 秒发布配置与缓存；不能提前将正常等待判为失败。
+BACKGROUND_REFRESH_TIMEOUT_SECONDS = 3 * 30 + 10
 
 
 def failure_record(error):
@@ -402,19 +406,29 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
         trace['hooks'] = hooks
         if expected_revert is not None:
             # 等待实际文件变化，不把初始化成功误当作后台刷新已经完成。
-            deadline = time.monotonic() + 20
-            while time.monotonic() < deadline:
-                try:
-                    if background_refresh_published(cache, expected_revert, Path(env['CODEX_HOME'])):
-                        trace['background_reverted_to_upstream'] = True
-                        trace['background_revision_published'] = PLUGIN_COMMIT
-                        break
-                except (FileNotFoundError, ValueError):
-                    # 原生原子替换目录的短窗口不属于最终结果。
-                    pass
-                time.sleep(0.02)
-            require(trace.get('background_reverted_to_upstream') is True,
-                    '没有在期限内复现真实后台还原；不能把源码推断当实证')
+            started = time.monotonic_ns()
+            deadline = started + BACKGROUND_REFRESH_TIMEOUT_SECONDS * 1_000_000_000
+            try:
+                while time.monotonic_ns() < deadline:
+                    try:
+                        if background_refresh_published(cache, expected_revert, Path(env['CODEX_HOME'])):
+                            trace['background_reverted_to_upstream'] = True
+                            trace['background_revision_published'] = PLUGIN_COMMIT
+                            break
+                    except (FileNotFoundError, ValueError):
+                        # 原生原子替换目录的短窗口不属于最终结果。
+                        pass
+                    time.sleep(0.02)
+                require(trace.get('background_reverted_to_upstream') is True,
+                        '没有在期限内复现真实后台还原；不能把源码推断当实证')
+            finally:
+                elapsed_ns = time.monotonic_ns() - started
+                # 收尾前的独立快照只作诊断，即使此刻才完成也不能改变等待阶段的失败结果。
+                trace['background_refresh_wait'] = {
+                    'timeout_seconds': BACKGROUND_REFRESH_TIMEOUT_SECONDS,
+                    'elapsed_ns': elapsed_ns,
+                    'final_observation': background_refresh_snapshot(cache, expected_revert, Path(env['CODEX_HOME'])),
+                }
         return hooks
     finally:
         primary = sys.exc_info()[1]
@@ -430,6 +444,35 @@ def background_refresh_published(cache, expected_tree, home):
     # 固定上游先发布 revision，再刷新缓存；两项都观察到才进入退出阶段。
     return (tree_hashes(cache) == expected_tree and
             configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision') == PLUGIN_COMMIT)
+
+
+def background_refresh_snapshot(cache, expected_tree, home):
+    snapshot = {'cache_tree_sha256': None, 'cache_file_count': None, 'cache_matches_expected': None,
+                'last_revision': None, 'last_revision_state': 'unavailable', 'revision_matches_expected': None}
+
+    def read_error(error):
+        # 异常正文可能带配置原文或绝对路径，只保留类型与数字错误码。
+        return {'type': type(error).__name__, **{key: getattr(error, key) for key in ('errno', 'winerror')
+                                               if type(getattr(error, key, None)) is int}}
+
+    try:
+        tree = tree_hashes(cache)
+        encoded = json.dumps(tree, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        # 全树只输出聚合摘要，既不包含文件内容，也不公开路径或文件名。
+        snapshot.update(cache_tree_sha256=hashlib.sha256(encoded).hexdigest(), cache_file_count=len(tree),
+                        cache_matches_expected=tree == expected_tree)
+    except Exception as error:
+        snapshot['cache_read_error'] = read_error(error)
+    try:
+        revision = configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision')
+        valid = (isinstance(revision, str) and len(revision) == 40
+                 and all(character in '0123456789abcdefABCDEF' for character in revision))
+        snapshot.update(last_revision=revision if valid else None,
+                        last_revision_state='valid' if valid else 'absent' if revision is None else 'invalid',
+                        revision_matches_expected=revision == PLUGIN_COMMIT)
+    except Exception as error:
+        snapshot['configuration_read_error'] = read_error(error)
+    return snapshot
 
 
 def verify_complete_git_source(root, env):

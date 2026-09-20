@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "candidate": "source50_frozen",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_manifest_sha256": "e1c87ad68ad83486b9d0b83bbad6840b8aa8c90fd89501ac731b5ce95171b0b0",
+  "exit_code": 0,
+  "strict_signature_exit_code": 0,
+  "worker": {
+    "path": "/private/tmp/infinishell-gui-source50.02L0zX/InfiniShellCliParity50.app/Contents/MacOS/infinishell",
+    "bytes": 869568112,
+    "sha256": "da269b5e1d28e33e3c036b3f461b0f6f2b4ebe486bb22e511631aa0a9f99be45"
+  },
+  "build_evidence": {
+    "path": "specs/cli-agent-parity/validation/macos-official-50-grok-1034-p0-gui.safe.json",
+    "sha256": "fbcad0fc6378d314ca31a1e5fce40b27d02dcc9728193d15a28eed110279e9ba",
+    "feature_enabled_gui_build": "passed",
+    "codesign_deep_strict_verified": true
+  }
+}

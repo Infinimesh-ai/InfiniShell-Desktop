@@ -15,10 +15,11 @@ import unittest
 from unittest.mock import patch
 
 import run_grok_adapter_live as shared
-from grok_adapter_runner_tests import acceptance_fixture
+from grok_adapter_runner_tests import acceptance_fixture, final_response_fields
 from run_grok_official_adapter_live import (
-    MODEL, OfficialTunnel, audit_private_settings, copy_private_auth, main, official_environment,
-    prepare_native, public_events, rejected_origin_event,
+    MODEL, PROFILES, P0_PROFILE, OfficialTunnel, audit_private_settings, copy_private_auth, main,
+    official_environment, prepare_native, public_events, rejected_origin_event,
+    verified_p0_acceptance,
 )
 
 
@@ -29,6 +30,38 @@ official_marketplace_auto_installed = true
 name = "xAI Official"
 git = "https://github.com/xai-org/plugin-marketplace.git"
 '''
+
+
+def p0_acceptance_fixture():
+    native = "native-p0"
+    marker = "a" * 64
+    events = [{"event": "acceptance_passed", "scope": shared.SCOPE,
+        "native_session_id": native, "verified_scope": "p0",
+        "official_grok_model_tested": True, "public_product_gate_open": True,
+        "full_cli_parity_acceptance_passed": False, "read_approval_verified": True,
+        "queued_input_verified": False, "same_turn_steering_supported": False,
+        "write_approval_verified": False, "close_session_verified": False,
+        "app_restart_and_ui_verified": False, "parent_permission_ceiling_verified": False}]
+    turns = [("p0_read_allow", "Completed", marker), ("p0_read_deny", "Cancelled", ""),
+        ("p0_cancel", "Cancelled", "READY"), ("p0_resume", "Completed", marker)]
+    for index, (phase, outcome, output) in enumerate(turns):
+        turn = f"p0-turn-{index}"
+        events.extend([final_response_fields({"event": "turn_finished", "phase": phase,
+            "turn_id": turn, "outcome": outcome, "output": output,
+            "native_session_id": native}, output, index + 1),
+            {"event": "turn_started", "turn_id": turn},
+            {"event": "message_accepted", "message_id": f"p0-local-{index}",
+                "turn_id": turn, "native_receipt": True}])
+    for phase, decision in (("p0_read_allow", "AllowOnce"), ("p0_read_deny", "DenyOnce")):
+        events.append({"event": "approval_requested", "phase": phase, "decision": decision,
+            "exact_read_fixture": True, "exact_write_fixture": False})
+    events.extend([{"event": "cancel_submitted", "phase": "p0_cancel",
+            "submitted_after_real_text": True},
+        {"event": "connection_shutdown", "cleanup_confirmed": True,
+            "native_session_id": native, "queued_submissions_observed_inside_adapter": 0},
+        {"event": "connection_shutdown", "cleanup_confirmed": True,
+            "native_session_id": native, "queued_submissions_observed_inside_adapter": 0}])
+    return events
 
 
 class OfficialRunnerTests(unittest.TestCase):
@@ -263,6 +296,38 @@ tool = "write"
         self.assertFalse(shared.verified_acceptance(0, output, events))
         events[-1]["cleanup_confirmed"] = False
         self.assertFalse(shared.verified_acceptance(0, output, events, official=True))
+
+    def test_p0_acceptance_requires_exact_read_cancel_resume_and_zero_queue(self):
+        output = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        self.assertTrue(verified_p0_acceptance(0, output, p0_acceptance_fixture()))
+        changes = [
+            (lambda events: events[0].update({"public_product_gate_open": False})),
+            (lambda events: next(event for event in events
+                if event.get("phase") == "p0_read_allow" and event.get("event") == "approval_requested")
+                .update({"exact_read_fixture": False})),
+            (lambda events: next(event for event in events
+                if event.get("phase") == "p0_resume" and event.get("event") == "turn_finished")
+                .update({"final_response": "b" * 64})),
+            (lambda events: events.append({"event": "queued_input_submitted"})),
+            (lambda events: next(event for event in events if event.get("event") == "connection_shutdown")
+                .update({"queued_submissions_observed_inside_adapter": 1})),
+        ]
+        for change in changes:
+            events = p0_acceptance_fixture()
+            change(events)
+            self.assertFalse(verified_p0_acceptance(0, output, events))
+
+    def test_p0_profile_pins_version_hash_test_and_four_input_budget(self):
+        profile = PROFILES[P0_PROFILE]
+        self.assertEqual(profile["version"], "grok 1.0.34 (3736acbc8658)")
+        self.assertEqual(profile["max_acp_inputs"], 4)
+        self.assertTrue(profile["test_name"].endswith("real_grok_p0_lifecycle"))
+        self.assertEqual(len(profile["sha256"]), 64)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); (root / "home/.grok").mkdir(parents=True)
+            wrapper, _ = prepare_native(root, Path("/tmp/fixed-grok"), Path("/tmp/auth-source"),
+                12345, profile["sha256"])
+            self.assertIn(profile["sha256"], wrapper.read_text())
 
     def test_public_evidence_never_exports_unrecognized_native_text(self):
         events = [{"event": "acceptance_failed", "reason": "dummy-secret", "output": "dummy-secret",

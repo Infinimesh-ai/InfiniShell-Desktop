@@ -4,7 +4,10 @@ use std::os::windows::ffi::{OsStrExt, OsStringExt};
 
 use itertools::Itertools;
 use warp_core::channel::ChannelState;
-use warp_core::cli_agent_protocol::{WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV};
+use warp_core::cli_agent_protocol::{
+    WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV, WARP_CLI_AGENT_PROTOCOL_VERSION_ENV,
+    WARP_CLIENT_VERSION_ENV,
+};
 use warp_core::features::FeatureFlag;
 use windows::Win32::System::Environment::ExpandEnvironmentStringsW;
 use windows::core::{HSTRING, PCWSTR};
@@ -230,6 +233,20 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
             EnvEntry {
                 preferred_key: key.clone(),
                 value: value.clone(),
+            },
+        );
+    }
+
+    // 只宣告本次安装的控制台 worker，拒绝父环境和配置中的旧路径。
+    env.remove(&map_key(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into()));
+    if FeatureFlag::HOANotifications.is_enabled()
+        && let Ok(executable) = crate::remote_server::rust_ssh::worker_executable()
+    {
+        env.insert(
+            map_key(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into()),
+            EnvEntry {
+                preferred_key: WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into(),
+                value: executable.into_os_string(),
             },
         );
     }

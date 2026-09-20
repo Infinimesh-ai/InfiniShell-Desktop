@@ -56,6 +56,9 @@ pub mod text {
                     RequestCommandOutputResult::LongRunningCommandSnapshot { command, .. } => {
                         writeln!(w, "`{command}` is still running...")
                     }
+                    RequestCommandOutputResult::LaunchFailed { reason, .. } => {
+                        writeln!(w, "{}", crate::t!("ai-command-launch-failed", reason = reason))
+                    }
                     RequestCommandOutputResult::CancelledBeforeExecution => {
                         writeln!(w, "{CANCELLED_MESSAGE}")
                     }
@@ -712,6 +715,11 @@ pub mod json {
                         Some(JsonMessage::ToolResult(JsonToolResult::RunCommand(
                             JsonRunCommandResult::Running,
                         )))
+                    }
+                    RequestCommandOutputResult::LaunchFailed { reason, .. } => {
+                        Some(JsonMessage::ToolError {
+                            error: Cow::Borrowed(reason),
+                        })
                     }
                     RequestCommandOutputResult::CancelledBeforeExecution => {
                         Some(JsonMessage::ToolCanceled)

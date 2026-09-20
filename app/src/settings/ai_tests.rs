@@ -1060,6 +1060,67 @@ fn ai_autodetection_setting_can_be_toggled_on_and_off() {
 }
 
 #[test]
+fn cli_agent_auto_update_preference_survives_missing_installation_scan() {
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+                assert!(settings.is_cli_agent_auto_update_enabled(agent));
+            }
+            assert!(!settings.is_cli_agent_auto_update_enabled(CLIAgent::Gemini));
+            settings.set_cli_agent_auto_update(CLIAgent::Grok, false, ctx);
+            settings.sync_per_agent_from_scan(&Default::default(), ctx);
+            settings.sync_per_agent_from_scan(&[(CLIAgent::Grok, true)].into_iter().collect(), ctx);
+            assert!(!settings.is_cli_agent_auto_update_enabled(CLIAgent::Grok));
+            assert!(settings.is_cli_agent_auto_update_enabled(CLIAgent::Codex));
+            let before = settings.cli_agent_auto_updates.clone();
+            settings.set_cli_agent_auto_update(CLIAgent::Gemini, true, ctx);
+            assert_eq!(settings.cli_agent_auto_updates.value(), &before);
+        });
+    });
+}
+
+#[test]
+fn cli_agent_update_channels_preserve_preferences_and_reject_unsupported_combinations() {
+    App::test((), |mut app| async move {
+        initialize_settings_for_tests(&mut app);
+        AISettings::handle(&app).update(&mut app, |settings, ctx| {
+            for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+                assert_eq!(
+                    settings.cli_agent_update_channel(agent),
+                    CLIUpdateChannel::FollowInstallation
+                );
+            }
+            settings.set_cli_agent_update_channel(CLIAgent::Codex, CLIUpdateChannel::Alpha, ctx);
+            settings.set_cli_agent_update_channel(CLIAgent::Claude, CLIUpdateChannel::Stable, ctx);
+            settings.set_cli_agent_update_channel(CLIAgent::Grok, CLIUpdateChannel::Alpha, ctx);
+            settings.sync_per_agent_from_scan(&Default::default(), ctx);
+            settings.set_cli_agent_update_channel(CLIAgent::Claude, CLIUpdateChannel::Alpha, ctx);
+            settings.set_cli_agent_update_channel(CLIAgent::Grok, CLIUpdateChannel::Latest, ctx);
+            settings.set_cli_agent_update_channel(CLIAgent::Codex, CLIUpdateChannel::Stable, ctx);
+            assert_eq!(
+                settings.cli_agent_update_channel(CLIAgent::Codex),
+                CLIUpdateChannel::Alpha
+            );
+            assert_eq!(
+                settings.cli_agent_update_channel(CLIAgent::Claude),
+                CLIUpdateChannel::Stable
+            );
+            assert_eq!(
+                settings.cli_agent_update_channel(CLIAgent::Grok),
+                CLIUpdateChannel::Alpha
+            );
+            let serialized =
+                serde_json::to_value(settings.cli_agent_update_channels.value()).unwrap();
+            assert_eq!(serialized[CLIAgent::Codex.to_serialized_name()], "alpha");
+            let decoded: HashMap<String, CLIUpdateChannel> =
+                serde_json::from_value(serialized).unwrap();
+            assert_eq!(&decoded, settings.cli_agent_update_channels.value());
+        });
+    });
+}
+
+#[test]
 fn responses_provider_options默认隐私优先且可完整往返() {
     let default_options = AgentProviderResponsesOptions::default();
     assert_eq!(

@@ -8,6 +8,7 @@ use crate::search::SyncDataSource;
 use crate::search::data_source::{Query, QueryResult};
 use crate::search::mixer::DataSourceRunErrorWrapper;
 use crate::settings::AISettings;
+use crate::terminal::input::skills::selectable_cli_skill;
 use crate::terminal::input::slash_commands::{
     AcceptSlashCommandOrSavedPrompt, GuiSlashCommandDataSource, InlineItem, SlashCommandDataSource,
     TuiSlashCommandDataSource,
@@ -56,17 +57,11 @@ impl SyncDataSource for GuiZeroStateDataSource {
             let skill_manager = skill_manager_handle.as_ref(app);
             let skills = skill_manager.get_skills_for_working_directory(cwd.as_ref(), app);
 
-            for mut skill in skills
+            for skill in skills
                 .into_iter()
+                .filter_map(|skill| selectable_cli_skill(skill, cli_agent, skill_manager))
                 .sorted_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()))
             {
-                if let Some(agent) = cli_agent {
-                    let providers = agent.supported_skill_providers_for_scope(skill.scope);
-                    if !skill_manager.skill_exists_for_any_provider(&skill, providers) {
-                        continue;
-                    }
-                    skill.provider = skill_manager.best_supported_provider(&skill, providers);
-                }
                 results.push(InlineItem::from_skill(&skill, app));
             }
         }

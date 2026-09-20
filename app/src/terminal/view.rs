@@ -2585,6 +2585,8 @@ pub struct TerminalView {
     /// command finishes successfully.
     pending_command_queue: VecDeque<String>,
     pending_specific_cli_agent_launch: Option<PendingSpecificCLIAgentLaunch>,
+    /// 只由同一命令块结束或真实 PTY 退出释放，旧回调不能释放后续启动。
+    cli_agent_launch_reservation_block_id: Option<BlockId>,
     /// When true, enter agent view after pending setup commands complete
     /// (i.e. after `PendingCommandCompleted` is emitted). Set by
     /// `pane_tree_from_template_recursive` when a tab config has both
@@ -3848,6 +3850,15 @@ impl TerminalView {
             }
             me.handle_cli_agent_sessions_event(event, ctx)
         });
+        #[cfg(not(target_family = "wasm"))]
+        if ctx.has_singleton_model::<crate::terminal::cli_agent_updates::CliAgentUpdatesModel>() {
+            use crate::terminal::cli_agent_updates::{CliAgentUpdateEvent, CliAgentUpdatesModel};
+            ctx.subscribe_to_model(&CliAgentUpdatesModel::handle(ctx), |me, _, event, ctx| {
+                if let CliAgentUpdateEvent::Changed { agent } = event {
+                    me.retry_cli_launch_after_update(*agent, ctx);
+                }
+            });
+        }
         ctx.subscribe_to_model(
             &ai_action_model.as_ref(ctx).shell_command_executor(ctx),
             Self::handle_shell_command_executor_event,
@@ -4287,6 +4298,7 @@ impl TerminalView {
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
             pending_specific_cli_agent_launch: None,
+            cli_agent_launch_reservation_block_id: None,
             enter_agent_view_after_pending_commands: false,
             enter_agent_view_after_ssh_bootstrap: None,
             pending_ssh_route_launch: None,
@@ -7736,12 +7748,16 @@ impl TerminalView {
 
     fn handle_shell_command_executor_event(
         &mut self,
-        _: ModelHandle<ShellCommandExecutor>,
+        executor: ModelHandle<ShellCommandExecutor>,
         event: &ShellCommandExecutorEvent,
         ctx: &mut ViewContext<Self>,
     ) {
         match event {
-            ShellCommandExecutorEvent::ExecuteCommand { command, action_id } => {
+            ShellCommandExecutorEvent::ExecuteCommand {
+                command,
+                original_command,
+                action_id,
+            } => {
                 let Some(session_id) = self.active_block_session_id() else {
                     return;
                 };
@@ -7819,6 +7835,10 @@ impl TerminalView {
                     }
                 });
 
+                let workflow_id = associated_workflow.map(|workflow| workflow.sync_id());
+                let workflow_command = associated_workflow
+                    .and_then(|workflow| workflow.model().data.command())
+                    .map(str::to_string);
                 let agent_metadata =
                     AgentInteractionMetadata::new_hidden(action_id.clone(), conversation.id());
 
@@ -7845,16 +7865,21 @@ impl TerminalView {
                 }
                 let block_id = model.active_block_id().clone();
                 drop(model);
+                if let Err(reason) = self.input.update(ctx, |input, ctx| {
+                    input.try_reserve_cli_launch(original_command, ctx)
+                }) {
+                    executor.update(ctx, |executor, _| executor.reject_launch(action_id, reason));
+                    return;
+                }
+                self.cli_agent_launch_reservation_block_id = Some(block_id.clone());
 
                 ctx.emit(Event::ExecuteCommand(ExecuteCommandEvent {
                     command,
                     session_id,
                     source,
                     should_add_command_to_history: true,
-                    workflow_id: associated_workflow.map(|workflow| workflow.sync_id()),
-                    workflow_command: associated_workflow
-                        .and_then(|workflow| workflow.model().data.command())
-                        .map(str::to_string),
+                    workflow_id,
+                    workflow_command,
                 }));
 
                 if let Some(active_ai_block) = self.active_ai_block(ctx) {
@@ -11838,6 +11863,10 @@ impl TerminalView {
                 ctx.request_user_attention();
             }
             ModelEvent::Exit { reason } => {
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                    sessions.remove_session(self.view_id, ctx);
+                });
+                self.release_cli_launch_reservation(None, ctx);
                 self.pending_ssh_route_launch = None;
                 if !self.manual_pty_shutdown_requested
                     && let Some((conversation_id, command)) =
@@ -11963,6 +11992,7 @@ impl TerminalView {
                     CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
                         sessions_model.remove_session(self.view_id, ctx);
                     });
+                    self.release_cli_launch_reservation(Some(&block_completed_event.block_id), ctx);
                 }
 
                 let next_block_index = block_completed_event.block_index + BlockIndex::from(1);
@@ -15576,7 +15606,9 @@ impl TerminalView {
 
     /// Executes a command that was submitted by the user and not yet sent to the shell.
     pub fn execute_pending_command(&mut self, _: (), ctx: &mut ViewContext<Self>) {
-        self.prepare_specific_cli_agent_pending_command(ctx);
+        if !self.prepare_specific_cli_agent_pending_command(ctx) {
+            return;
+        }
         let had_pending = self.input.read(ctx, |input, _| input.has_pending_command());
         self.input.update(ctx, |input, ctx| {
             input.execute_pending_command(ctx);
@@ -15607,6 +15639,22 @@ impl TerminalView {
         executable: Option<PathBuf>,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self
+            .input
+            .as_ref(ctx)
+            .local_cli_update_session(ctx)
+            .is_some()
+            && cli_agent::cli_agent_update_in_progress(agent, ctx)
+        {
+            self.show_error_toast(
+                crate::t!(
+                    "settings-cli-updates-launch-blocked",
+                    agent = agent.display_name()
+                ),
+                ctx,
+            );
+            return;
+        }
         self.pending_specific_cli_agent_launch = None;
         self.set_pending_command(agent.command_prefix(), ctx);
         self.pending_specific_cli_agent_launch = Some(PendingSpecificCLIAgentLaunch {
@@ -15622,9 +15670,36 @@ impl TerminalView {
         self.execute_pending_command((), ctx);
     }
 
-    fn prepare_specific_cli_agent_pending_command(&mut self, ctx: &mut ViewContext<Self>) {
-        let Some(intent) = self.pending_specific_cli_agent_launch.as_ref() else {
+    #[cfg(not(target_family = "wasm"))]
+    fn retry_cli_launch_after_update(&mut self, agent: CLIAgent, ctx: &mut ViewContext<Self>) {
+        use crate::terminal::cli_agent_updates::{CliAgentUpdatePhase, CliAgentUpdatesModel};
+        let updates = CliAgentUpdatesModel::as_ref(ctx);
+        if updates.is_updating(agent)
+            || !updates
+                .status(agent)
+                .is_some_and(|status| status.phase == CliAgentUpdatePhase::UpToDate)
+        {
             return;
+        }
+        let input = self.input.as_ref(ctx);
+        // 仅重试原始、未编辑的特定 CLI 启动，不重放用户后来改写的草稿。
+        if self
+            .pending_specific_cli_agent_launch
+            .as_ref()
+            .is_some_and(|intent| {
+                intent.agent == agent
+                    && input.has_pending_command()
+                    && input.buffer_text(ctx) == agent.command_prefix()
+                    && input.editor().as_ref(ctx).buffer_revision(ctx) == intent.revision
+            })
+        {
+            self.execute_pending_command((), ctx);
+        }
+    }
+
+    fn prepare_specific_cli_agent_pending_command(&mut self, ctx: &mut ViewContext<Self>) -> bool {
+        let Some(intent) = self.pending_specific_cli_agent_launch.as_ref() else {
+            return true;
         };
         let input = self.input.as_ref(ctx);
         if !input.has_pending_command()
@@ -15632,7 +15707,24 @@ impl TerminalView {
             || input.editor().as_ref(ctx).buffer_revision(ctx) != intent.revision
         {
             self.pending_specific_cli_agent_launch = None;
-            return;
+            return true;
+        }
+        // 排队后可能才开始升级；保留原草稿与启动意图，不向 PTY 发送命令。
+        if self
+            .input
+            .as_ref(ctx)
+            .local_cli_update_session(ctx)
+            .is_some()
+            && cli_agent::cli_agent_update_in_progress(intent.agent, ctx)
+        {
+            self.show_error_toast(
+                crate::t!(
+                    "settings-cli-updates-launch-blocked",
+                    agent = intent.agent.display_name()
+                ),
+                ctx,
+            );
+            return false;
         }
         let has_local_pty = self.inactive_pty_reads_rx(ctx).is_some();
         let replacement = {
@@ -15647,13 +15739,13 @@ impl TerminalView {
                         .session_id()
                         .is_none_or(|id| !History::as_ref(ctx).is_appendable(&id)))
             {
-                return;
+                return true;
             }
             let Some(session) = active_block
                 .session_id()
                 .and_then(|id| self.sessions.as_ref(ctx).get(id))
             else {
-                return;
+                return true;
             };
             let host_namespace_verified = cfg!(all(
                 feature = "local_tty",
@@ -15718,6 +15810,7 @@ impl TerminalView {
                 input.replace_buffer_content(&replacement, ctx);
             });
         }
+        true
     }
 
     /// 让当前终端在第一跳登录后继续执行保存路径的后续跳点。
@@ -15919,6 +16012,13 @@ impl TerminalView {
         let Some(session_id) = self.active_block_session_id() else {
             return false;
         };
+        if let Err(message) = self
+            .input
+            .update(ctx, |input, ctx| input.try_reserve_cli_launch(command, ctx))
+        {
+            self.show_error_toast(message, ctx);
+            return false;
+        }
         let shell_family = self.sessions.read(ctx, |sessions, _| {
             sessions
                 .get(session_id)
@@ -15934,6 +16034,8 @@ impl TerminalView {
                 command.to_owned()
             };
         let metadata = AgentInteractionMetadata::new_hidden(action_id, conversation_id);
+        self.cli_agent_launch_reservation_block_id =
+            Some(self.model.lock().block_list().active_block_id().clone());
         ctx.emit(Event::ExecuteCommand(ExecuteCommandEvent {
             command,
             session_id,
@@ -22393,6 +22495,8 @@ impl TerminalView {
     }
 
     fn emit_execute_command(&mut self, event: ExecuteCommandEvent, ctx: &mut ViewContext<Self>) {
+        self.cli_agent_launch_reservation_block_id =
+            Some(self.model.lock().block_list().active_block_id().clone());
         self.pending_specific_cli_agent_launch = None;
         self.update_scroll_position_locking(
             ScrollPositionUpdate::AfterCommandExecutionStarted,
@@ -22415,6 +22519,33 @@ impl TerminalView {
         if self.block_onboarding_active {
             self.interrupt_onboarding_blocks(ctx);
         }
+    }
+
+    fn release_cli_launch_reservation(
+        &mut self,
+        completed_block: Option<&BlockId>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if self.input.as_ref(ctx).cli_launch_may_outlive_block() {
+            return;
+        }
+        if completed_block.is_some()
+            && self.cli_agent_launch_reservation_block_id.as_ref() != completed_block
+        {
+            return;
+        }
+        self.cli_agent_launch_reservation_block_id = None;
+        #[cfg(not(target_family = "wasm"))]
+        {
+            use crate::terminal::cli_agent_updates::CliAgentUpdatesModel;
+            if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+                    updates.release_launch(self.view_id, ctx);
+                });
+            }
+        }
+        #[cfg(target_family = "wasm")]
+        let _ = ctx;
     }
 
     fn handle_find_event(&mut self, event: &FindEvent, ctx: &mut ViewContext<Self>) {
@@ -25919,6 +26050,14 @@ impl TerminalView {
             let event = event.clone();
             match event {
                 EnvVarCollectionBlockEvent::RanCommand(command) => {
+                    if let Err(message) = me.input.update(ctx, |input, ctx| {
+                        input.try_reserve_cli_launch(&command, ctx)
+                    }) {
+                        block.update(ctx, |block, ctx| block.on_failed(Some(message), ctx));
+                        return;
+                    }
+                    me.cli_agent_launch_reservation_block_id =
+                        Some(me.model.lock().block_list().active_block_id().clone());
                     ctx.emit(Event::ExecuteCommand(ExecuteCommandEvent {
                         command,
                         session_id,
@@ -29224,3 +29363,7 @@ fn take_deferred_ssh_agent_entry_origin(
 #[cfg(test)]
 #[path = "view_tests.rs"]
 mod tests;
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "view_cli_update_tests.rs"]
+mod cli_update_launch_tests;

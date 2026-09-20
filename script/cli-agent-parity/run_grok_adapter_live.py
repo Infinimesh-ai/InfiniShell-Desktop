@@ -278,7 +278,8 @@ class MessagesProxy:
         return not self.thread.is_alive() and drained
 
 
-def prepare_native(root, real_cli, credential_directory, port):
+def prepare_native(root, real_cli, credential_directory, port, binary_sha256=None):
+    binary_sha256 = BINARY_SHA256 if binary_sha256 is None else binary_sha256
     configuration = f'''[cli]
 use_leader = true
 auto_update = false
@@ -316,7 +317,7 @@ tool = "any"
 import hashlib,json,os,sys
 from pathlib import Path
 root=Path({str(root)!r}); native=Path({str(real_cli)!r}); args=sys.argv[1:]
-if hashlib.sha256(native.read_bytes()).hexdigest()!={BINARY_SHA256!r}:raise SystemExit(91)
+if hashlib.sha256(native.read_bytes()).hexdigest()!={binary_sha256!r}:raise SystemExit(91)
 profile={sandbox_profile(root, credential_directory, port)!r}
 if args==['--version']:kind='version';endpoint=None
 elif len(args)==4 and args[:3]==['agent','stdio','--leader-socket']:

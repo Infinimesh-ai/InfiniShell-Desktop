@@ -148,13 +148,7 @@ async fn query(
 }
 
 fn executable_digest(path: &Path) -> Result<String, RuntimeError> {
-    let expected = match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
-        ("macos", "x86_64") => "2030ecf911e301e778b3c5a49068d6751384c830e48ea14f11eb61dd23622cee",
-        ("linux", "x86_64") => "6c752e2cc7c110c9df15f26d8d134d438c5ae95dbd610efc1a308bf7f9c5f6c1",
-        ("windows", "x86_64") => "19654006672b6da7c945115eea99ca10051796016df563a65b3f0c7d72720ef0",
-        _ => return Err(reject("claude_profile_platform_unverified")),
-    };
+    let expected = expected_executable_digests(std::env::consts::OS, std::env::consts::ARCH)?;
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha256::new();
     let mut bytes = [0u8; 64 * 1024];
@@ -166,8 +160,35 @@ fn executable_digest(path: &Path) -> Result<String, RuntimeError> {
         digest.update(&bytes[..count]);
     }
     let actual = format!("{:x}", digest.finalize());
-    if actual != expected {
+    if !expected.contains(&actual.as_str()) {
         return Err(reject("claude_profile_executable_unverified"));
     }
     Ok(actual)
 }
+
+fn expected_executable_digests(os: &str, arch: &str) -> Result<[&'static str; 2], RuntimeError> {
+    // 每个平台仅绑定已核对官方清单的 273/278；不代表各平台任务链已验收。
+    Ok(match (os, arch) {
+        ("macos", "aarch64") => [
+            "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+            "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+        ],
+        ("macos", "x86_64") => [
+            "2030ecf911e301e778b3c5a49068d6751384c830e48ea14f11eb61dd23622cee",
+            "c522425e3d42275d2ac2238757ef8ba7f80d165a934044ec5a7a5fd7d7b9950b",
+        ],
+        ("linux", "x86_64") => [
+            "6c752e2cc7c110c9df15f26d8d134d438c5ae95dbd610efc1a308bf7f9c5f6c1",
+            "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab",
+        ],
+        ("windows", "x86_64") => [
+            "19654006672b6da7c945115eea99ca10051796016df563a65b3f0c7d72720ef0",
+            "006ea5c8638f67f10a5ae66bb232fd267c9f6af294e3f03f4cfcf1fd3f2cced8",
+        ],
+        _ => return Err(reject("claude_profile_platform_unverified")),
+    })
+}
+
+#[cfg(test)]
+#[path = "claude_profile_preflight_tests.rs"]
+mod tests;

@@ -293,6 +293,7 @@ winit = { workspace = true }
 wgpu.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
+fs4.workspace = true
 app-installation-detection.workspace = true
 async-io.workspace = true
 axum.workspace = true
@@ -396,6 +397,7 @@ windows = { workspace = true, features = [
     "Wdk_Storage_FileSystem",
     "Win32_Networking_WinSock",
     "Win32_Security",
+    "Win32_Security_Authorization",
     "Win32_Storage",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",

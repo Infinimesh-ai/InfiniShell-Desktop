@@ -81,6 +81,10 @@ impl CodexPluginManager {
         if !FeatureFlag::CodexPlugin.is_enabled() {
             return Ok(());
         }
+        // 编排插件不在本次 Windows 通知契约内，保留原平台门槛且不创建 HOME。
+        if !notification_patch::auto_install_supported() {
+            return Err(notification_patch::unsupported());
+        }
         let home = ensure_codex_home_dir()?;
         let mut log = String::new();
         let runtime = VerifiedRuntime::probe(
@@ -112,7 +116,7 @@ impl CliAgentPluginManager for CodexPluginManager {
     }
 
     fn can_auto_install(&self) -> bool {
-        notification_patch::auto_install_supported()
+        notification_patch::auto_install_supported_for(PatchKind::Codex)
             && FeatureFlag::CodexPlugin.is_enabled()
             && !self.is_disabled()
             && !self.has_local_marketplace_override()
@@ -303,7 +307,7 @@ static PLUGIN_INSTALL_INSTRUCTIONS: LazyLock<PluginInstructions> =
         }],
         post_install_notes: vec![
             crate::t_static!("cli-agent-plugin-codex-activate-note"),
-            crate::t_static!("cli-agent-plugin-patch-manual-note"),
+            crate::t_static!("cli-agent-plugin-codex-patch-manual-note"),
         ],
     });
 
@@ -349,7 +353,7 @@ static PLUGIN_UPDATE_INSTRUCTIONS: LazyLock<PluginInstructions> =
         post_install_notes: vec![
             crate::t_static!("cli-agent-plugin-codex-activate-update-note"),
             crate::t_static!("cli-agent-plugin-codex-marketplace-recovery-note"),
-            crate::t_static!("cli-agent-plugin-patch-manual-note"),
+            crate::t_static!("cli-agent-plugin-codex-patch-manual-note"),
         ],
     });
 

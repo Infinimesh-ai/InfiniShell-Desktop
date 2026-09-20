@@ -1,5 +1,7 @@
 #[path = "file_watchers/mod.rs"]
 mod file_watchers;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) use file_watchers::LocalDirectorySkillWatcher;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -112,6 +114,16 @@ impl SkillManager {
             is_cloud_environment: false,
             skill_watcher,
         }
+    }
+
+    /// 普通终端的技能发现独立于 Git 索引,监听生命周期由输入数据源持有。
+    #[cfg(not(target_family = "wasm"))]
+    pub(crate) fn local_directory_watcher(
+        &self,
+        ctx: &mut ModelContext<Self>,
+    ) -> ModelHandle<LocalDirectorySkillWatcher> {
+        let skill_watcher = self.skill_watcher.clone();
+        ctx.add_model(|_| LocalDirectorySkillWatcher::new(skill_watcher))
     }
 
     /// Returns skills available for the given working directory.

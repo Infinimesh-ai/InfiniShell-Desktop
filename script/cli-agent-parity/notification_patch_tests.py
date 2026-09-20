@@ -5,7 +5,10 @@ import importlib.util
 import json
 from pathlib import Path
 import os
+import subprocess
+import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -53,10 +56,10 @@ class NotificationPatchTests(unittest.TestCase):
                 root, metadata, originals, replacements = self.hook_fixture(temporary, agent)
                 real_write = PATCH.atomic_write
 
-                def fail_hook(path, contents, mode):
+                def fail_hook(path, contents, mode, *, staging_dir=None):
                     if path.name == "hooks.json":
                         raise OSError("注入 hooks 清单替换失败")
-                    return real_write(path, contents, mode)
+                    return real_write(path, contents, mode, staging_dir=staging_dir)
 
                 with mock.patch.object(PATCH, "atomic_write", fail_hook):
                     with self.assertRaises(OSError):
@@ -82,10 +85,10 @@ class NotificationPatchTests(unittest.TestCase):
                 root, metadata, originals, replacements = self.hook_fixture(temporary, agent)
                 real_write = PATCH.atomic_write
 
-                def fail_notify(path, contents, mode):
+                def fail_notify(path, contents, mode, *, staging_dir=None):
                     if path.name == "warp-notify.sh":
                         raise OSError("注入 tmux 通知替换失败")
-                    return real_write(path, contents, mode)
+                    return real_write(path, contents, mode, staging_dir=staging_dir)
 
                 with mock.patch.object(PATCH, "atomic_write", fail_notify):
                     with self.assertRaises(OSError):
@@ -115,6 +118,113 @@ class NotificationPatchTests(unittest.TestCase):
             self.assertEqual((root / "scripts/a").stat().st_mode & 0o777, original_mode)
             self.assertEqual(len(list((root / "scripts").iterdir())), 2)
 
+    def test_process_exit_before_forward_or_rollback_rename_keeps_tree_retryable(self):
+        child = r"""
+import importlib.util, json, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("notification_patch", sys.argv[1])
+patch = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(patch)
+root, parent = Path(sys.argv[2]), Path(sys.argv[3])
+metadata, phase = json.loads(sys.argv[4]), sys.argv[5]
+replacements = {"scripts/a": b"replacement-a", "scripts/b": b"replacement-b"}
+real_replace = patch.os.replace
+
+def interrupted_replace(source, destination):
+    target = Path(destination)
+    if phase == "forward_first" or (phase == "forward_second" and target.name == "b"):
+        os._exit(91)
+    if phase == "rollback":
+        if target.name == "b":
+            raise OSError("注入第二次替换失败以触发回滚")
+        if Path(source).read_bytes() == b"original-a":
+            os._exit(91)
+    return real_replace(source, destination)
+
+patch.os.replace = interrupted_replace
+patch.apply_files(root, metadata, replacements, staging_parent=parent)
+raise AssertionError("未到达注入的进程中断点")
+"""
+        for phase, leftover in (("forward_first", b"replacement-a"), ("forward_second", b"replacement-b"), ("rollback", b"original-a")):
+            with self.subTest(phase=phase), tempfile.TemporaryDirectory() as temporary:
+                parent = Path(temporary) / "plugins"
+                cache = parent / "cache/claude-code-warp/warp"
+                root, metadata, replacements = self.fixture(cache / "test")
+                original_modes = {name: (root / name).stat().st_mode & 0o777 for name in replacements}
+                result = subprocess.run([sys.executable, "-I", "-c", child, str(Path(PATCH.__file__).resolve()), str(root), str(parent), json.dumps(metadata), phase], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 91, result.stderr.decode(errors="replace"))
+                self.assertEqual(result.stdout, b"")
+                self.assertEqual(result.stderr, b"")
+                abandoned = list(parent.glob(".infinishell-notification-patch-*"))
+                self.assertEqual(len(abandoned), 1)
+                self.assertFalse(abandoned[0].is_relative_to(root))
+                self.assertEqual(abandoned[0].stat().st_dev, root.stat().st_dev)
+                if os.name == "posix":
+                    self.assertEqual(abandoned[0].stat().st_mode & 0o777, 0o700)
+                orphans = list(abandoned[0].iterdir())
+                self.assertEqual(len(orphans), 1)
+                self.assertEqual(orphans[0].read_bytes(), leftover)
+                self.assertEqual(list(cache.iterdir()), [root])
+                expected_a = b"original-a" if phase == "forward_first" else b"replacement-a"
+                self.assertEqual((root / "scripts/a").read_bytes(), expected_a)
+                self.assertEqual((root / "scripts/b").read_bytes(), b"original-b")
+                PATCH.validate_tree(root, "test", metadata)
+                PATCH.apply_files(root, metadata, replacements, staging_parent=parent)
+                PATCH.validate_tree(root, "test", metadata)
+                self.assertEqual({name: (root / name).read_bytes() for name in replacements}, replacements)
+                self.assertEqual({name: (root / name).stat().st_mode & 0o777 for name in replacements}, original_modes)
+                self.assertEqual(list(parent.glob(".infinishell-notification-patch-*")), abandoned)
+                self.assertEqual(orphans[0].read_bytes(), leftover)
+
+    def test_staging_inside_active_tree_is_rejected_without_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, replacements = self.fixture(temporary)
+            with self.assertRaisesRegex(ValueError, "活动插件目录之外"):
+                PATCH.apply_files(root, metadata, replacements, staging_parent=root)
+            self.assertEqual((root / "scripts/a").read_bytes(), b"original-a")
+            self.assertEqual(list(root.iterdir()), [root / "scripts"])
+
+    @unittest.skipUnless(os.name == "posix", "符号链接行为限 Unix")
+    def test_staging_alias_into_active_tree_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root, metadata, replacements = self.fixture(parent / "active")
+            alias = parent / "alias"
+            alias.symlink_to(root, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "活动插件目录之外"):
+                PATCH.apply_files(root, metadata, replacements, staging_parent=alias)
+            self.assertEqual((root / "scripts/a").read_bytes(), b"original-a")
+            PATCH.validate_tree(root, "test", metadata)
+
+    def test_other_filesystem_is_rejected_before_any_replace(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root, metadata, replacements = self.fixture(parent / "active")
+            real_stat = Path.stat
+
+            def other_device(path, *args, **kwargs):
+                information = real_stat(path, *args, **kwargs)
+                if path.name.startswith(".infinishell-notification-patch-"):
+                    return SimpleNamespace(st_dev=information.st_dev + 1)
+                return information
+
+            with mock.patch.object(Path, "stat", other_device), mock.patch.object(PATCH, "atomic_write", side_effect=AssertionError("跨文件系统时不应写入")):
+                with self.assertRaisesRegex(ValueError, "同一文件系统"):
+                    PATCH.apply_files(root, metadata, replacements, staging_parent=parent)
+            self.assertEqual((root / "scripts/a").read_bytes(), b"original-a")
+            self.assertEqual((root / "scripts/b").read_bytes(), b"original-b")
+            self.assertEqual(list(parent.iterdir()), [root])
+
+    def test_old_unknown_temporary_inside_active_tree_is_not_accepted_or_deleted(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root, metadata, _ = self.fixture(temporary)
+            unknown = root / "scripts/.infinishell-patch-user-file"
+            unknown.write_bytes(b"unknown content")
+            with self.assertRaisesRegex(ValueError, "自定义文件"):
+                PATCH.validate_tree(root, "test", metadata)
+            self.assertEqual(unknown.read_bytes(), b"unknown content")
+            self.assertEqual((root / "scripts/a").read_bytes(), b"original-a")
+
     def test_custom_script_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as temporary:
             root, metadata, replacements = self.fixture(temporary)
@@ -137,12 +247,12 @@ class NotificationPatchTests(unittest.TestCase):
             real_write = PATCH.atomic_write
             count = 0
 
-            def fail_second(path, contents, mode):
+            def fail_second(path, contents, mode, *, staging_dir=None):
                 nonlocal count
                 count += 1
                 if count == 2:
                     raise OSError("注入写入失败")
-                return real_write(path, contents, mode)
+                return real_write(path, contents, mode, staging_dir=staging_dir)
 
             with mock.patch.object(PATCH, "atomic_write", fail_second):
                 with self.assertRaises(OSError):
@@ -155,11 +265,11 @@ class NotificationPatchTests(unittest.TestCase):
             root, metadata, replacements = self.fixture(temporary)
             real_write = PATCH.atomic_write
 
-            def concurrent_edit(path, contents, mode):
+            def concurrent_edit(path, contents, mode, *, staging_dir=None):
                 if path.name == "b":
                     (root / "scripts/a").write_text("concurrent")
                     raise OSError("注入并发编辑")
-                return real_write(path, contents, mode)
+                return real_write(path, contents, mode, staging_dir=staging_dir)
 
             with mock.patch.object(PATCH, "atomic_write", concurrent_edit):
                 with self.assertRaisesRegex(ValueError, "恢复失败"):

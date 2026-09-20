@@ -19,7 +19,10 @@ fn can_auto_install_is_true() {
         Some(value) => unsafe { std::env::set_var("CODEX_HOME", value) },
         None => unsafe { std::env::remove_var("CODEX_HOME") },
     }
-    assert_eq!(result, cfg!(unix));
+    assert_eq!(
+        result,
+        cfg!(unix) || cfg!(all(windows, target_arch = "x86_64"))
+    );
 }
 
 #[test]
@@ -31,7 +34,7 @@ fn can_auto_install_is_false_without_codex_plugin() {
 #[cfg(windows)]
 #[test]
 #[serial_test::serial]
-fn windows_incomplete_plugin_tree_stays_unknown_and_auto_install_remains_disabled() {
+fn windows_incomplete_plugin_tree_stays_unknown_before_runtime_preflight() {
     let _guard = FeatureFlag::CodexPlugin.override_enabled(true);
     let home = tempfile::tempdir().unwrap();
     write_plugin_config(home.path(), super::PLUGIN_KEY, true);
@@ -46,7 +49,7 @@ fn windows_incomplete_plugin_tree_stays_unknown_and_auto_install_remains_disable
         None => unsafe { std::env::remove_var("CODEX_HOME") },
     }
     assert_eq!(status, NativeAuthorizationStatus::Unknown);
-    assert!(!can_install);
+    assert_eq!(can_install, cfg!(target_arch = "x86_64"));
 }
 
 #[test]
@@ -606,4 +609,27 @@ fn remote_install_instructions_preserve_both_installation_modes_without_local_en
             "[tui]\nnotification_condition = \"always\""
         );
     }
+}
+
+#[cfg(windows)]
+#[tokio::test]
+#[serial_test::serial]
+async fn windows_notification_support_does_not_enable_orchestration_installation() {
+    let _guard = FeatureFlag::CodexPlugin.override_enabled(true);
+    let directory = tempfile::tempdir().unwrap();
+    let home = directory.path().join("not-created");
+    let previous = std::env::var_os("CODEX_HOME");
+    unsafe { std::env::set_var("CODEX_HOME", &home) };
+    let result = CodexPluginManager::new(Some(String::new()))
+        .install_platform_plugin()
+        .await;
+    match previous {
+        Some(value) => unsafe { std::env::set_var("CODEX_HOME", value) },
+        None => unsafe { std::env::remove_var("CODEX_HOME") },
+    }
+    assert_eq!(
+        result.unwrap_err().message,
+        super::notification_patch::unsupported().message
+    );
+    assert!(!home.exists());
 }

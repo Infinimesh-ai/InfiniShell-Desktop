@@ -1036,3 +1036,195 @@ fn cached_dispatch_path_is_the_same_binary_as_the_completed_installation_scan() 
         assert_eq!(model.scan_generation, 7);
     }
 }
+
+#[test]
+fn parity_cd_launch_recognizes_only_three_interactive_agents() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            for agent in [CLIAgent::Claude, CLIAgent::Codex, CLIAgent::Grok] {
+                let executable = agent.command_prefix();
+                for directory in [
+                    "/tmp/project",
+                    "./project",
+                    "~/project",
+                    "'/tmp/中文 空格'",
+                    "\"/tmp/a && b\"",
+                ] {
+                    let command = format!("cd {directory} && {executable} --resume");
+                    assert_eq!(
+                        CLIAgent::detect(&command, None, None, ctx),
+                        Some(agent),
+                        "{command}"
+                    );
+                }
+                let command =
+                    format!("  cd '/tmp/project'&&'/opt/CLI 工具/{executable}' \"解释 a && b\"  ");
+                assert_eq!(
+                    CLIAgent::detect(&command, Some(EscapeChar::Backslash), None, ctx),
+                    Some(agent)
+                );
+                let command =
+                    format!(r#"cd "C:\工作区 空格" && "C:\CLI 工具\{executable}.exe" --resume"#);
+                assert_eq!(
+                    CLIAgent::detect(&command, Some(EscapeChar::Backtick), None, ctx),
+                    Some(agent)
+                );
+            }
+            assert_eq!(
+                CLIAgent::detect("cd /tmp/project && gemini", None, None, ctx),
+                None
+            );
+            assert_eq!(
+                CLIAgent::detect("cd /tmp/project && warp", None, None, ctx),
+                None
+            );
+        });
+    });
+}
+
+#[test]
+fn parity_cd_launch_preserves_exact_tail_and_noninteractive_filters() {
+    let source = "cd '/tmp/中文 空格' && grok --model plugin '检查文件'  ";
+    assert_eq!(
+        CLIAgent::command_after_directory_change(source, EscapeChar::Backslash),
+        Some("grok --model plugin '检查文件'  ")
+    );
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            for command in [
+                "grok --version",
+                "grok --help",
+                "grok plugin install hooks",
+                "grok agent stdio",
+                "grok --cwd '/tmp/my repo' inspect",
+                "grok -p '检查文件'",
+                "grok --prompt-file input.txt",
+                "codex --version",
+                "codex exec '检查文件'",
+                "codex app-server",
+                "codex resume --help",
+                "codex --profile default plugin list",
+                "claude --version",
+                "claude mcp list",
+                "claude --print '检查文件'",
+                "claude -p '检查文件'",
+            ] {
+                let compound = format!("cd /tmp/project && {command}");
+                assert_eq!(
+                    CLIAgent::detect(&compound, None, None, ctx),
+                    None,
+                    "{compound}"
+                );
+            }
+            for (command, agent) in [
+                ("grok --model plugin '检查文件'", CLIAgent::Grok),
+                ("grok --resume plugin", CLIAgent::Grok),
+                ("codex --profile plugin resume --last", CLIAgent::Codex),
+                ("claude --model plugin --continue", CLIAgent::Claude),
+            ] {
+                let compound = format!("cd /tmp/project && {command}");
+                assert_eq!(
+                    CLIAgent::detect(&compound, None, None, ctx),
+                    Some(agent),
+                    "{compound}"
+                );
+            }
+        });
+    });
+}
+
+#[test]
+fn parity_cd_launch_rejects_other_shell_execution_and_incomplete_syntax() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            for command in [
+                "sleep 30 && grok",
+                "echo cd /tmp/project && grok",
+                "cd && grok",
+                "cd '' && grok",
+                "cd - && grok",
+                "cd -- /tmp/project && grok",
+                "cd /tmp/project extra && grok",
+                "cd /tmp/project || grok",
+                "cd /tmp/project | grok",
+                "cd /tmp/project & grok",
+                "cd /tmp/project; grok",
+                "cd /tmp/project\ngrok",
+                "cd /tmp/project &&\ngrok",
+                "cd /tmp/project && grok && sleep 30",
+                "cd /tmp/project && grok | cat",
+                "cd /tmp/project && grok &",
+                "cd /tmp/project && grok;",
+                "cd /tmp/project && grok &&",
+                "cd /tmp/project && grok > output.txt",
+                "cd /tmp/project > output.txt && grok",
+                "cd /tmp/project && grok < input.txt",
+                "cd $(pwd) && grok",
+                "cd `pwd` && grok",
+                "cd \"$(pwd)\" && grok",
+                "cd /tmp/project && grok 'safe'$(sleep 30)",
+                "cd /tmp/project && grok $()",
+                "cd /tmp/project && grok `sleep 30`",
+                "cd /tmp/project && grok <(sleep 30)",
+                "cd /tmp/project && (grok)",
+                "(cd /tmp/project) && grok",
+                "{ cd /tmp/project; } && grok",
+                "cd $HOME/project && grok",
+                "cd /tmp/project && grok $MODE",
+                "cd /tmp/* && grok",
+                "cd /tmp/project && grok *.txt",
+                "cd /tmp/project && grok --model 'unfinished",
+                "cd /tmp/project && grok # comment",
+                "cd /tmp/project && grok --model a'b'",
+                "MODE=test cd /tmp/project && grok",
+                "cd /tmp/project && MODE=test grok",
+                "cd \"/tmp && grok\"",
+                "cd '/tmp/project && grok",
+            ] {
+                assert_eq!(
+                    CLIAgent::detect(command, None, None, ctx),
+                    None,
+                    "{command}"
+                );
+            }
+        });
+    });
+}
+
+#[test]
+fn parity_cd_launch_revalidates_aliases_without_changing_direct_alias_detection() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            for (value, expected) in [
+                ("grok --model plugin", Some(CLIAgent::Grok)),
+                ("codex --profile plugin resume", Some(CLIAgent::Codex)),
+                ("claude --continue", Some(CLIAgent::Claude)),
+                ("grok plugin", None),
+                ("claude --print", None),
+                ("codex --version", None),
+                ("sleep 30 && grok", None),
+                ("grok && sleep 30", None),
+                ("grok | cat", None),
+                ("grok &", None),
+                ("grok $(sleep 30)", None),
+                ("grok > output.txt", None),
+            ] {
+                let map = aliases(&[("a", value)]);
+                assert_eq!(
+                    CLIAgent::detect("cd /tmp/project && a", None, Some(&map), ctx),
+                    expected,
+                    "{value}"
+                );
+            }
+            let map = aliases(&[("cd", "grok")]);
+            assert_eq!(
+                CLIAgent::detect("cd /tmp/project && grok", None, Some(&map), ctx),
+                None
+            );
+            assert_eq!(
+                CLIAgent::detect("cd", None, Some(&map), ctx),
+                Some(CLIAgent::Grok)
+            );
+        });
+    });
+}

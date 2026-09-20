@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::{ReportedModels, decode_metadata};
 use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason, ExitReceipt};
 
 type ProbeResult<T> = Result<T, &'static str>;
@@ -29,21 +30,22 @@ const MAX_PROCESSES: usize = 2;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 const MAX_FRAMES: usize = 256;
 const MAX_FILE_BYTES: usize = 65536;
+// ACP 扩展在线上传输时带一个下划线；SDK 去除后才交给 x.ai/… handler。
 const DIAGNOSTIC_METHODS: [&str; 4] = [
-    "x.ai/session/info",
-    "x.ai/session/state",
-    "x.ai/mcp/list",
-    "x.ai/debug/agent",
+    "_x.ai/session/info",
+    "_x.ai/session/state",
+    "_x.ai/mcp/list",
+    "_x.ai/debug/agent",
 ];
 const ALLOWED_METHODS: [&str; 8] = [
     "initialize",
     "authenticate",
     "session/new",
     "session/load",
-    "x.ai/session/info",
-    "x.ai/session/state",
-    "x.ai/mcp/list",
-    "x.ai/debug/agent",
+    "_x.ai/session/info",
+    "_x.ai/session/state",
+    "_x.ai/mcp/list",
+    "_x.ai/debug/agent",
 ];
 
 fn check(condition: bool, reason: &'static str) -> ProbeResult<()> {
@@ -325,10 +327,10 @@ impl RequestKind {
             Self::Authenticate => "authenticate",
             Self::New => "session/new",
             Self::Load => "session/load",
-            Self::Info => "x.ai/session/info",
-            Self::State => "x.ai/session/state",
-            Self::McpList => "x.ai/mcp/list",
-            Self::DebugAgent => "x.ai/debug/agent",
+            Self::Info => "_x.ai/session/info",
+            Self::State => "_x.ai/session/state",
+            Self::McpList => "_x.ai/mcp/list",
+            Self::DebugAgent => "_x.ai/debug/agent",
         }
     }
 
@@ -515,7 +517,12 @@ fn session_notification_metadata(params: &Value) -> bool {
             .and_then(Value::as_str)
             .is_some_and(is_session_id)
         && params.get("_meta").is_none_or(Value::is_object)
-        && update.len() == 2
+        && update.keys().all(|key| {
+            matches!(
+                key.as_str(),
+                "sessionUpdate" | "model_id" | "reasoning_effort"
+            )
+        })
         && update
             .get("sessionUpdate")
             .is_some_and(|kind| kind == "model_changed")
@@ -523,6 +530,62 @@ fn session_notification_metadata(params: &Value) -> bool {
             .get("model_id")
             .and_then(Value::as_str)
             .is_some_and(|model| !model.is_empty() && model.len() <= 256)
+        && update.get("reasoning_effort").is_none_or(|effort| {
+            effort
+                .as_str()
+                .is_some_and(|effort| !effort.is_empty() && effort.len() <= 256)
+        })
+}
+
+fn global_models_metadata(params: &Value) -> ProbeResult<()> {
+    check(
+        params.as_object().is_some_and(|params| {
+            params.len() == 2
+                && params.contains_key("currentModelId")
+                && params.contains_key("availableModels")
+        }),
+        "native_models_metadata_invalid",
+    )?;
+    check(
+        encoded(params)?.len() <= MAX_FILE_BYTES,
+        "native_models_metadata_budget_exceeded",
+    )?;
+    let available = params["availableModels"]
+        .as_array()
+        .ok_or("native_models_metadata_invalid")?;
+    check(
+        available.len() <= 64,
+        "native_models_metadata_budget_exceeded",
+    )?;
+    check(
+        available.iter().all(|model| {
+            model.as_object().is_some_and(|model| {
+                model
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "modelId" | "name" | "description" | "_meta"))
+                    && model.get("_meta").is_none_or(Value::is_object)
+            })
+        }),
+        "native_models_metadata_invalid",
+    )?;
+    // 复用生产展示类型；扩展模型描述只受字节预算约束，不解释为权限或工具活动。
+    let models: ReportedModels =
+        decode_metadata(params).map_err(|_| "native_models_metadata_invalid")?;
+    check(
+        !models.current_model_id.is_empty()
+            && models.current_model_id.len() <= 256
+            && models.available_models.iter().all(|model| {
+                !model.model_id.is_empty()
+                    && model.model_id.len() <= 256
+                    && !model.name.is_empty()
+                    && model.name.len() <= 1024
+                    && model
+                        .description
+                        .as_ref()
+                        .is_none_or(|text| text.len() <= 8192)
+            }),
+        "native_models_metadata_invalid",
+    )
 }
 
 fn global_catalog_empty(params: &Value) -> ProbeResult<()> {
@@ -538,6 +601,45 @@ fn global_catalog_empty(params: &Value) -> ProbeResult<()> {
     check(servers.len() <= 64, "native_mcp_catalog_budget_exceeded")?;
     // 实际 profile 及 New/Load 均注册空列表；目录不能引入其他服务域。
     check(servers.is_empty(), "native_extra_mcp_sources_observed")
+}
+
+fn ignored_extension_notification(frame: &Value) -> bool {
+    // ACP 建议忽略未知扩展通知；这里只识别信封，不解释正文或证明权限。
+    // https://agentclientprotocol.com/protocol/v1/extensibility#custom-notifications
+    let Some(object) = frame.as_object() else {
+        return false;
+    };
+    let Some(method) = frame.get("method").and_then(Value::as_str) else {
+        return false;
+    };
+    if !method.starts_with('_') || method.len() <= 1 || method.len() > 256 {
+        return false;
+    }
+    if matches!(
+        method,
+        "_x.ai/mcp/servers_updated"
+            | "_x.ai/models/update"
+            | "_x.ai/session_notification"
+            | "_x.ai/mcp_initialized"
+            | "_x.ai/mcp/init_progress"
+            | "_x.ai/mcp/server_status"
+            | "_x.ai/queue/changed"
+            | "_x.ai/session/prompt_complete"
+            | "_x.ai/session/updates"
+            | "_x.ai/session/update"
+            | "_x.ai/mcp/sdk_call"
+    ) {
+        // 已识别的生命周期、SDK 和目录通知继续走原有严格合同。
+        return false;
+    }
+    frame["jsonrpc"] == "2.0"
+        && object
+            .keys()
+            .all(|key| matches!(key.as_str(), "jsonrpc" | "method" | "params"))
+        && frame
+            .get("params")
+            .is_none_or(|params| params.is_object() || params.is_array())
+        && encoded(frame).is_ok_and(|bytes| bytes.len() <= MAX_FILE_BYTES)
 }
 
 impl Observations {
@@ -585,6 +687,15 @@ impl Observations {
     }
 
     fn notification(&mut self, frame: &Value) -> ProbeResult<()> {
+        if ignored_extension_notification(frame) {
+            check(
+                self.received_notifications < MAX_FRAMES,
+                "native_notification_budget_exceeded",
+            )?;
+            // 不消费 pending，不绑定 session，不保存 eventId，也不向原生端发送回复。
+            self.received_notifications += 1;
+            return Ok(());
+        }
         check(
             frame.as_object().is_some_and(|object| object.len() == 3)
                 && frame["jsonrpc"] == "2.0"
@@ -607,6 +718,16 @@ impl Observations {
                     self.received_notifications < MAX_FRAMES,
                     "native_mcp_catalog_budget_exceeded",
                 )?;
+                self.received_notifications += 1;
+                return Ok(());
+            }
+            Some("_x.ai/models/update") => {
+                global_models_metadata(&frame["params"])?;
+                check(
+                    self.received_notifications < MAX_FRAMES,
+                    "native_notification_budget_exceeded",
+                )?;
+                // 官方 New/Load 都会推送全局模型目录；目录不能绑定会话或消费请求。
                 self.received_notifications += 1;
                 return Ok(());
             }
@@ -679,7 +800,7 @@ impl Observations {
     }
 }
 
-fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
+fn notification_diagnostic(frame: &Value, generation: Uuid, ignored_extension: bool) -> Value {
     let method = match frame["method"].as_str() {
         Some(
             "session/update"
@@ -687,7 +808,8 @@ fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
             | "_x.ai/mcp/init_progress"
             | "_x.ai/mcp/server_status"
             | "_x.ai/mcp/servers_updated"
-            | "_x.ai/session_notification",
+            | "_x.ai/session_notification"
+            | "_x.ai/models/update",
         ) => frame["method"].clone(),
         Some(_) | None => super::diagnostic_value(frame.get("method")),
     };
@@ -698,12 +820,23 @@ fn notification_diagnostic(frame: &Value, generation: Uuid) -> Value {
         "id_present":frame.get("id").is_some(),"result_present":frame.get("result").is_some(),
         "error_present":frame.get("error").is_some(),
         "session_id":super::diagnostic_value(frame.get("params").and_then(|params|params.get("sessionId")))});
+    if ignored_extension {
+        diagnostic["ignored_extension_notification"] = json!(true);
+    }
     if frame["method"] == "_x.ai/session_notification" {
         diagnostic["session_notification_metadata_only"] = json!(
             frame.as_object().is_some_and(|frame| frame.len() == 3)
                 && frame["jsonrpc"] == "2.0"
                 && frame["params"]["_meta"].get("promptId").is_none()
                 && session_notification_metadata(&frame["params"])
+        );
+    }
+    if frame["method"] == "_x.ai/models/update" {
+        // 公开实际封闭元数据校验的布尔值，不输出模型目录或扩展描述。
+        diagnostic["global_models_metadata_only"] = json!(
+            frame.as_object().is_some_and(|frame| frame.len() == 3)
+                && frame["jsonrpc"] == "2.0"
+                && global_models_metadata(&frame["params"]).is_ok()
         );
     }
     if frame["method"] == "_x.ai/mcp/servers_updated" {
@@ -809,11 +942,36 @@ fn response_body(frame: &Value, id: usize, kind: RequestKind) -> ProbeResult<&Va
     }
 }
 
+/// 缺少诊断接口属于调查结果，不能伪装成成功响应或空工具目录。
+fn rpc_outcome(kind: RequestKind, body: ProbeResult<&Value>) -> ProbeResult<Option<Value>> {
+    match body {
+        Ok(body) => Ok(Some(body.clone())),
+        Err("method_not_found") if kind.diagnostic() => Ok(None),
+        Err(reason) => Err(reason),
+    }
+}
+
+fn info_confirmation_diagnostic(body: &Value, session: &str, cwd: &Path) -> Value {
+    // 仅公开类型、散列、计数和精确比较；未知正文、路径与会话 ID 不进入证据。
+    json!({
+        "session_id":super::diagnostic_value(body.get("sessionId")),
+        "cwd":super::diagnostic_value(body.get("cwd")),
+        "turns":super::diagnostic_value(body.get("turns")),
+        "turn_index":super::diagnostic_value(body.get("turnIndex")),
+        "session_id_matches":body["sessionId"] == session,
+        "cwd_matches":body["cwd"] == json!(cwd),
+        "turns_u64":body["turns"].as_u64(),
+        "turn_index_u64":body["turnIndex"].as_u64()
+    })
+}
+
 fn confirm_info(body: &Value, session: &str, cwd: &Path) -> ProbeResult<()> {
+    // 固定 1.0.30 的无输入 New 实测为一个初始回合、索引零；回合数量不是已发送输入数。
+    // 零输入另由所有写入前的封闭 RPC 守卫保证，不能仅凭此 info 推断历史正文为空。
     check(
         body["sessionId"] == session
             && body["cwd"] == json!(cwd)
-            && body["turns"].as_u64() == Some(0)
+            && body["turns"].as_u64() == Some(1)
             && body["turnIndex"].as_u64() == Some(0),
         "empty_native_history_unconfirmed",
     )
@@ -883,7 +1041,7 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     plan: &Plan,
     budget: &mut Budget,
     evidence: &mut Evidence,
-) -> ProbeResult<Value> {
+) -> ProbeResult<Option<Value>> {
     paths.verify_snapshots(plan)?;
     check(
         budget.requests < plan.max_protocol_requests,
@@ -925,8 +1083,13 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
         loop {
             let (frame, raw) = reader.next().await?.ok_or("native_eof_before_response")?;
             if frame.get("method").is_some() {
-                evidence.record(notification_diagnostic(&frame, generation))?;
-                if let Err(reason) = observations.notification(&frame) {
+                let observed = observations.notification(&frame);
+                evidence.record(notification_diagnostic(
+                    &frame,
+                    generation,
+                    observed.is_ok() && ignored_extension_notification(&frame),
+                ))?;
+                if let Err(reason) = observed {
                     evidence.failure(&raw)?;
                     return Err(reason);
                 }
@@ -974,7 +1137,22 @@ async fn rpc<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
             "method":kind.method(),"status":status,"top_level_key_sha256s":keys}),
         )?;
     }
-    Ok(body?.clone())
+    if kind == RequestKind::Info
+        && let Ok(info) = &body
+    {
+        let session = observations
+            .native_session
+            .as_deref()
+            .ok_or("native_session_missing")?;
+        // 此时回复已由当前账本消费，失败形状先记录，再由原有空会话检查拒绝。
+        evidence.record(
+            json!({"event":"session_info_diagnostic","generation":generation,
+            "sequence":id,"rpc_id":id,"method":kind.method(),
+            "response_bytes":raw.len(),"response_sha256":hash(&raw),
+            "confirmation":info_confirmation_diagnostic(info,session,&paths.cwd)}),
+        )?;
+    }
+    rpc_outcome(kind, body)
 }
 
 fn cleanup_event(receipt: &ExitReceipt) -> ProbeResult<Value> {
@@ -1047,7 +1225,7 @@ async fn phase(
         let [initialize, authenticate, opening, info_request, state_request, mcp_request, debug_request] =
             phase_requests(previous_session.is_some());
         let initialized = rpc(&mut stdin,&mut reader,&mut observations,initialize,
-            generation,paths,plan,budget,evidence).await?;
+            generation,paths,plan,budget,evidence).await?.ok_or("native_initialize_missing")?;
         check(initialized["protocolVersion"].as_u64() == Some(1)
             && initialized["_meta"]["agentVersion"] == "1.0.30"
             && initialized["agentCapabilities"]["loadSession"] == true, "native_identity_unconfirmed")?;
@@ -1056,9 +1234,9 @@ async fn phase(
             "method_id":"cached_token","advertised":true,"headless":true}))?;
         // 认证只完成当前 RPC，不把响应中的会话字段绑定为 New/Load 的原生身份。
         rpc(&mut stdin,&mut reader,&mut observations,authenticate,
-            generation,paths,plan,budget,evidence).await?;
+            generation,paths,plan,budget,evidence).await?.ok_or("native_authentication_missing")?;
         let opened = rpc(&mut stdin,&mut reader,&mut observations,opening,
-            generation,paths,plan,budget,evidence).await?;
+            generation,paths,plan,budget,evidence).await?.ok_or("native_opening_missing")?;
         if let Some(previous) = previous_session {
             for candidate in [opened.get("sessionId"), opened["_meta"].get("sessionId"),
                 opened["_meta"]["x.ai/sessionDetail"].get("sessionId")].into_iter().flatten() {
@@ -1070,22 +1248,29 @@ async fn phase(
         let session = observations.native_session.clone().ok_or("native_session_missing")?;
         let info = rpc(&mut stdin,&mut reader,&mut observations,info_request,
             generation,paths,plan,budget,evidence).await?;
-        confirm_info(&info,&session,&paths.cwd)?;
+        if let Some(info) = &info {
+            confirm_info(info,&session,&paths.cwd)?;
+        }
         let state = rpc(&mut stdin,&mut reader,&mut observations,state_request,
             generation,paths,plan,budget,evidence).await?;
         let mcp = rpc(&mut stdin,&mut reader,&mut observations,mcp_request,
             generation,paths,plan,budget,evidence).await?;
-        rpc(&mut stdin,&mut reader,&mut observations,debug_request,
+        let _ = rpc(&mut stdin,&mut reader,&mut observations,debug_request,
             generation,paths,plan,budget,evidence).await?;
-        let (tools, extra_sources) = mcp_counts(&mcp)?;
+        // 没有接口时数量和摘要未知，不能把 null 填成零而声称目录为空。
+        let counts = mcp.as_ref().map(mcp_counts).transpose()?;
+        let mode_hash = state.as_ref().map(encoded).transpose()?.map(|bytes| hash(&bytes));
+        let catalog_hash = mcp.as_ref().map(encoded).transpose()?.map(|bytes| hash(&bytes));
         evidence.record(json!({"event":"mode_observation","generation":generation,
-            "state":"unknown","value_sha256":hash(&encoded(&state)?)}))?;
+            "state":"unknown","value_sha256":mode_hash}))?;
         evidence.record(json!({"event":"catalog_observation","generation":generation,
-            "state":"unknown","coverage":"mcp_only","tool_count":tools,
-            "catalog_sha256":hash(&encoded(&mcp)?),"fixed_tool_closure_verified":false}))?;
+            "state":"unknown","coverage":if mcp.is_some(){"mcp_only"}else{"unavailable"},
+            "tool_count":counts.map(|(tools,_)|tools),
+            "catalog_sha256":catalog_hash,"fixed_tool_closure_verified":false}))?;
         evidence.record(json!({"event":"source_observation","generation":generation,
-            "state":"unknown","extra_source_count":extra_sources,"all_configuration_sources_verified":false}))?;
-        check(extra_sources == 0, "native_extra_mcp_sources_observed")?;
+            "state":"unknown","extra_source_count":counts.map(|(_,sources)|sources),
+            "all_configuration_sources_verified":false}))?;
+        check(counts.is_none_or(|(_,sources)|sources == 0), "native_extra_mcp_sources_observed")?;
         if previous_session.is_some() {
             evidence.record(json!({"event":"resume_checked","generation":generation,
                 "native_session_id_sha256":hash(session.as_bytes()),"original_profile_sha256":plan.profile_sha256,
@@ -1102,8 +1287,13 @@ async fn phase(
     let drain = async {
         while let Some((frame, raw)) = reader.next().await? {
             if frame.get("method").is_some() {
-                evidence.record(notification_diagnostic(&frame, generation))?;
-                if let Err(reason) = observations.notification(&frame) {
+                let observed = observations.notification(&frame);
+                evidence.record(notification_diagnostic(
+                    &frame,
+                    generation,
+                    observed.is_ok() && ignored_extension_notification(&frame),
+                ))?;
+                if let Err(reason) = observed {
                     evidence.failure(&raw)?;
                     return Err(reason);
                 }

@@ -52,6 +52,8 @@ pub fn main() -> Result<()> {
 
     if let Some(command) = &args.command {
         match command {
+            #[cfg(any(target_os = "linux", target_os = "macos", windows))]
+            WorkerCommand::CliAgentNotify { .. } => return warp::run(),
             #[cfg(unix)]
             WorkerCommand::TerminalServer(args) => {
                 // If we were asked to run as a terminal server (as opposed to the main

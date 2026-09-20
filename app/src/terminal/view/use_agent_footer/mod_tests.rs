@@ -568,22 +568,26 @@ fn test_image(data: &str, filename: &str) -> ImageContext {
 }
 
 #[test]
-fn grok_rich_input_real_enter_preserves_multiline_utf8() {
+fn grok_rich_input_keeps_multiline_utf8_without_injecting_paste_or_enter() {
     App::test((), |mut app| async move {
         let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
         let writes = collect_cli_test_writes(&mut app, &terminal);
         submit_cli_test_input(&terminal, &mut app, "第一行：修复 bug\n第二行：添加测试 🦀");
-        assert_eq!(
-            *writes.borrow(),
-            vec![
-                "\x1b[200~第一行：修复 bug\n第二行：添加测试 🦀\x1b[201~"
-                    .as_bytes()
-                    .to_vec(),
-                b"\r".to_vec()
-            ]
-        );
+        assert!(writes.borrow().is_empty());
         terminal.read(&app, |view, ctx| {
-            assert!(view.input.as_ref(ctx).buffer_text(ctx).is_empty())
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                "第一行：修复 bug\n第二行：添加测试 🦀"
+            );
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .session_context
+                    .query
+                    .is_none()
+            );
+            assert!(view.has_active_cli_agent_input_session(ctx));
         });
     });
 }
@@ -1013,3 +1017,6 @@ fn native_notification_authorization_opens_manual_steps_without_writing_to_cli()
         assert!(writes.borrow().is_empty());
     });
 }
+
+#[path = "input_approval_guard_tests.rs"]
+mod input_approval_guard_tests;

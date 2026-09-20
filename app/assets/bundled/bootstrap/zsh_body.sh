@@ -5,6 +5,24 @@
 # given command using the system default $PATH, which ensures the shells can locate
 # the corresponding binaries even if the user has a clobbered value of $PATH.
 if [[ -z $WARP_BOOTSTRAPPED ]]; then
+  # SSH 每跳只绑定已部署的远端宿主，插件还须核验 worker 协议。
+  if [ "$WARP_IS_SSH" = 1 ] && [ "$WARP_IS_LOCAL_SHELL_SESSION" != 1 ]; then
+    unset WARP_CLI_AGENT_NOTIFY_EXECUTABLE
+    if [ "$WARP_CLI_AGENT_PROTOCOL_VERSION" = 1 ] && [ -n '@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@' ]; then
+      if [ -f "$HOME/@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@" ] && [ ! -L "$HOME/@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@" ] && [ -x "$HOME/@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@" ]; then
+        export WARP_CLI_AGENT_NOTIFY_EXECUTABLE="$HOME/@@WARP_NOTIFY_UNIX_RELATIVE_PATH@@"
+      fi
+    fi
+  fi
+
+  # 新 shell 和 SSH 必须刷新当前 PTY，不能把外层终端路径交给脱离会话的 hook。
+  unset WARP_CLI_AGENT_TTY
+  if WARP_CLI_AGENT_TTY="$(command -p tty 2>/dev/null)"; then
+    export WARP_CLI_AGENT_TTY
+  else
+    unset WARP_CLI_AGENT_TTY
+  fi
+
   # Return PS2 to its original value.  We set this to an empty string in zsh.sh,
   # and want to reset it now that we've received the bootstrap script and started
   # to eval it.
@@ -1118,6 +1136,8 @@ export TERM_PROGRAM='WarpTerminal'
 # body can distinguish it from local shells. Used to gate the ExitShell
 # hook which tears down the remote-server-proxy subprocess.
 export WARP_IS_SSH='1'
+export WARP_IS_LOCAL_SHELL_SESSION='0'
+unset WARP_CLI_AGENT_NOTIFY_EXECUTABLE
 export WARP_USE_SSH_WRAPPER='$WARP_USE_SSH_WRAPPER'
 export WARP_SSH_REUSE_CONTROL_MASTER='$WARP_SSH_REUSE_CONTROL_MASTER'
 export WARP_SSH_HOP_DEPTH='$next_hop_depth'

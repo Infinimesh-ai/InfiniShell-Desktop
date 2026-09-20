@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "candidate": "source50_frozen",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_manifest_sha256": "e1c87ad68ad83486b9d0b83bbad6840b8aa8c90fd89501ac731b5ce95171b0b0",
+  "all_passed": true,
+  "test_binary": {
+    "path": "/private/tmp/infinishell-cli-parity-source48-tui-target/debug/deps/warp-bb3d3444381c0fbe",
+    "bytes": 866712824,
+    "sha256": "c06e5bfe2c44e70d8ec9c004c4c52e6d2756b73f03195e0d3cd88b8b918c67ae"
+  },
+  "evidence": {
+    "path": "specs/cli-agent-parity/validation/macos-official-50-grok-1034-p0-gui.safe.json",
+    "sha256": "fbcad0fc6378d314ca31a1e5fce40b27d02dcc9728193d15a28eed110279e9ba",
+    "cargo_check_warp": "passed",
+    "i18n_passed": 11,
+    "task_manager_view_passed": 36
+  }
+}

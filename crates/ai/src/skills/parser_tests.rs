@@ -201,3 +201,42 @@ This is the skill content.
     // Front matter is lines 1-4, markdown content starts at line 5
     assert_eq!(result.line_range, Some(5..9));
 }
+
+#[test]
+fn user_invocable_preserves_yaml_types_and_invalid_values() {
+    for (value, expected) in [
+        ("true", SkillUserInvocable::Boolean(true)),
+        ("false", SkillUserInvocable::Boolean(false)),
+        ("\"true\"", SkillUserInvocable::String("true".to_owned())),
+        ("'false'", SkillUserInvocable::String("false".to_owned())),
+        ("yes", SkillUserInvocable::String("yes".to_owned())),
+        (
+            "\" true \"",
+            SkillUserInvocable::String(" true ".to_owned()),
+        ),
+        ("1", SkillUserInvocable::Invalid),
+        ("null", SkillUserInvocable::Invalid),
+        ("[true]", SkillUserInvocable::Invalid),
+        ("{value: true}", SkillUserInvocable::Invalid),
+    ] {
+        let content = format!("---\nname: example\nuser-invocable: {value}\n---\n技能正文\n");
+        let parsed = parse_markdown_content(&content).unwrap();
+        assert_eq!(parsed.user_invocable, expected, "{value}");
+        assert_eq!(parsed.front_matter.get("name").unwrap(), "example");
+        assert_eq!(parsed.content, content);
+    }
+}
+
+#[test]
+fn absent_user_invocable_does_not_read_body_or_nested_metadata() {
+    for content in [
+        "# user-invocable: false\n",
+        "---\nname: example\n---\nuser-invocable: false\n",
+        "---\nmetadata:\n  user-invocable: false\n---\n技能正文\n",
+    ] {
+        assert_eq!(
+            parse_markdown_content(content).unwrap().user_invocable,
+            SkillUserInvocable::Unspecified,
+        );
+    }
+}

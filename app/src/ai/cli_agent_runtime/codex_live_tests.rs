@@ -96,6 +96,7 @@ impl LiveSession {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         } = event.kind
         else {
             return Err(format!("原生会话初始化失败：{:?}", event.kind));
@@ -341,11 +342,106 @@ async fn run_turn(
     }
 }
 
+fn marker_matches(output: &str, expected: &str) -> bool {
+    // 只容纳标记外侧空白与一个紧贴末尾的句号，完整随机标记仍须逐字相同。
+    let output = output.trim();
+    !expected.is_empty()
+        && (output == expected
+            || output
+                .strip_suffix('.')
+                .or_else(|| output.strip_suffix('。'))
+                == Some(expected))
+}
+
 fn completed(turn: &ObservedTurn, expected: &str) -> Result<(), String> {
-    if turn.outcome != TurnOutcome::Completed || turn.output.trim() != expected {
+    if turn.outcome != TurnOutcome::Completed || !marker_matches(&turn.output, expected) {
         return Err(format!("原生回合 {} 未给出预期完成结果", turn.turn_id));
     }
     Ok(())
+}
+
+#[test]
+fn marker_accepts_only_outer_whitespace_and_one_terminal_period() {
+    for output in [
+        "PARITY_TWO",
+        " \nPARITY_TWO\t",
+        "PARITY_TWO.",
+        "PARITY_TWO。",
+        " \tPARITY_TWO。\n ",
+        "\nPARITY_TWO.\r\n",
+    ] {
+        assert!(marker_matches(output, "PARITY_TWO"), "{output:?}");
+    }
+}
+
+#[test]
+fn marker_rejects_extra_context_internal_space_and_multiple_punctuation() {
+    for output in [
+        "",
+        ".",
+        "。",
+        "PARITY_TWO..",
+        "PARITY_TWO。。",
+        "PARITY_TWO.。",
+        "PARITY_TWO。.",
+        "PARITY_TWO .",
+        "PARITY_TWO\n.",
+        "PARITY_TWO!",
+        "PARITY_TWO…",
+        "PARITY_TWO．",
+        "`PARITY_TWO`",
+        "\"PARITY_TWO\"",
+        "结果：PARITY_TWO",
+        "PARITY_TWO 已完成",
+        "PARITY_TWO.\n说明",
+        "PARITY_ TWO",
+        "PARITY_TWO\u{200b}",
+    ] {
+        assert!(!marker_matches(output, "PARITY_TWO"), "{output:?}");
+    }
+    assert!(!marker_matches("", ""));
+    assert!(!marker_matches(".", ""));
+}
+
+#[test]
+fn marker_rejects_old_or_similar_random_markers() {
+    let expected = "STEER_APPLIED_0123456789abcdef0123456789abcdef";
+    assert!(marker_matches(&format!("{expected}。"), expected));
+    for output in [
+        "STEER_APPLIED_0123456789abcdef0123456789abcdee",
+        "STEER_APPLIED_0123456789abcdef0123456789abcde",
+        "STEER_APPLIED_0123456789abcdef0123456789abcdef0",
+        "STEER_APPLIED_0123456789ABCDEF0123456789ABCDEF",
+        "STEER_APPLIED_OLD",
+        "PARITY_ONE",
+        "PARITY_TWO",
+    ] {
+        assert!(!marker_matches(output, expected), "{output:?}");
+        assert!(
+            !marker_matches(&format!("{output}."), expected),
+            "{output:?}"
+        );
+    }
+    assert!(!marker_matches("PARITY_ONE.", "PARITY_TWO"));
+}
+
+#[test]
+fn matching_marker_never_turns_failure_or_cancellation_into_completion() {
+    let mut observed = ObservedTurn {
+        turn_id: "synthetic-turn".to_owned(),
+        output: "PARITY_TWO.".to_owned(),
+        approval_count: 1,
+        outcome: TurnOutcome::Completed,
+    };
+    assert!(completed(&observed, "PARITY_TWO").is_ok());
+    observed.outcome = TurnOutcome::Cancelled;
+    assert!(completed(&observed, "PARITY_TWO").is_err());
+    observed.outcome = TurnOutcome::Failed {
+        message: "synthetic failure".to_owned(),
+    };
+    assert!(completed(&observed, "PARITY_TWO").is_err());
+    assert_eq!(observed.turn_id, "synthetic-turn");
+    assert_eq!(observed.approval_count, 1);
 }
 
 fn quoted_command(program: &str, script: &str) -> String {
@@ -437,6 +533,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         permission_policy: PermissionPolicy::WorkspaceWrite,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -711,6 +808,7 @@ async fn real_codex_local_tool_restore() {
             permission_policy: PermissionPolicy::WorkspaceWrite,
             permission_ceiling: None,
             claude_profile: None,
+            grok_profile: None,
             model: None,
             local_tools: Some(super::local_tools::LocalToolPermissions::default()),
             selected_skills: Vec::new(),
@@ -780,6 +878,7 @@ async fn real_codex_image_input() {
             permission_policy: PermissionPolicy::WorkspaceWrite,
             permission_ceiling: None,
             claude_profile: None,
+            grok_profile: None,
             model: None,
             local_tools: None,
             selected_skills: Vec::new(),

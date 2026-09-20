@@ -11,6 +11,7 @@ import tempfile
 import uuid
 
 import run_claude_adapter_live as adapter
+from prepare_claude_cli import RELEASE_CATALOG, VERSION, release_contract
 
 
 TEST_NAME = ("ai::cli_agent_runtime::claude::live_tests::batch_cancel_live_tests::"
@@ -127,7 +128,8 @@ def audit_events(events):
         _require(len(matching) == 1 and event["native_session_id"] == native_id
                  and event["phase"] == matching[0].get("phase") and event["outcome"] == matching[0].get("outcome")
                  and event["outcome"] != "Failed" and event["turn_id_matches"] is True
-                 and event["interrupt_acknowledged"] is True and event["turn_started"] is True)
+                 and event["interrupt_acknowledged"] is True
+                 and type(event.get("turn_started")) is bool)
     _require(ending.get("scope") == SCOPE)
     for key, expected in (("native_inputs", 3), ("native_executions", 2), ("joined_inputs", 1),
                           ("cancelled_inputs", 2), ("continued_inputs", 1), ("inspect_call_count", 1)):
@@ -157,6 +159,12 @@ def audit_events(events):
              and [event.get("phase") for event in submissions] == ["batch_cancel", "batch_cancel", "continue"]
              and [event.get("submitted_input_count") for event in submissions] == [1, 2, 3]
              and submissions[1].get("active_turn_id") == running)
+    if observed:
+        observed_by_id = {event["turn_id"]: event for event in observed}
+        _require(len(observed) == 3 and set(observed_by_id) == {running, joined, continuation}
+                 and observed_by_id[running]["turn_started"] is True
+                 and observed_by_id[joined]["turn_started"] is False
+                 and observed_by_id[continuation]["turn_started"] is True)
     _flags(submissions[1], ("submitted_while_running",))
     accepts = [event for event in events if event["event"] == "message_accepted"]
     _require(len(accepts) == 3 and {event.get("message_id") for event in accepts} == {running, joined, continuation})
@@ -335,6 +343,8 @@ def verified_acceptance(exit_code, output, events):
 
 
 def run(args):
+    # 兼容旧 Namespace；未知版本在配置准备、API 读取和原生执行之前拒绝。
+    release_contract(getattr(args, "claude_version", VERSION))
     if args.api_environment_file is None:
         raise ValueError("合并取消固定策略必须显式提供 API 环境文件")
     if not isinstance(args.model, str) or not args.model or any(character in args.model for character in "\x00\r\n"):
@@ -381,8 +391,10 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
+                        help="精确官方版本；缺省保留 2.1.273")
     parser.add_argument("--test-binary", type=Path, required=True)
-    parser.add_argument("--claude", type=Path, required=True, help="固定 2.1.273 原生可执行文件")
+    parser.add_argument("--claude", type=Path, required=True, help="所选固定官方版本的原生可执行文件")
     parser.add_argument("--supervisor", type=Path, required=True, help="同提交主程序或 TUI 监督入口")
     parser.add_argument("--api-environment-file", type=Path, required=True, help="显式私有 Anthropic API 环境 JSON")
     parser.add_argument("--model", required=True, help="必须固定真实原生模型")

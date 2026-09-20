@@ -10,9 +10,10 @@ use crate::ai::cli_agent_runtime::coordinator::{ManagedTaskEndpoint, PreparedMan
 use crate::ai::cli_agent_runtime::{InputContent, RuntimeAction, RuntimeCommand, RuntimeEventKind};
 use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::{
-    LocalCliEnqueueOutcome, acknowledge_message, claim_task_result, enqueue_message, load_messages,
+    LocalCliEnqueueOutcome, acknowledge_message, claim_task_result_if_current, enqueue_message,
+    load_messages,
 };
-use crate::persistence::model::{LocalCliMessage, LocalCliMessageState};
+use crate::persistence::model::{LocalCliMessage, LocalCliMessageState, LocalCliTask};
 
 /// 普通 PTY 没有可靠的接收确认，因此此入口只接受已就绪的托管连接。
 pub(crate) async fn send_local_message(
@@ -37,7 +38,7 @@ where
     F: FnOnce(PreparedManagedSend) -> Fut,
     Fut: Future<Output = Result<futures::channel::oneshot::Receiver<Result<(), String>>, String>>,
 {
-    let command = message_command(&endpoint, &message)?;
+    let command = message_command(&endpoint, &message, false)?;
     dispatch_once(sender, message, || async move {
         let prepared = endpoint.prepare_send(command).await?;
         let receiver = validate(prepared).await?;
@@ -52,16 +53,23 @@ pub(crate) async fn send_prepared_result(
     endpoint: ManagedTaskEndpoint,
     message: LocalCliMessage,
 ) -> Result<(), String> {
-    let command = message_command(&endpoint, &message)?;
+    let command = message_command(&endpoint, &message, true)?;
     endpoint.send_result(command, message).await
 }
 
 fn message_command(
     endpoint: &ManagedTaskEndpoint,
     message: &LocalCliMessage,
+    prepared_result: bool,
 ) -> Result<RuntimeCommand, String> {
+    // 原代结果仅由专用入口传递；当前 worker 与 SQLite 领取事务仍会验证进程和亲缘。
+    let original_result = prepared_result
+        && endpoint.harness == Harness::Grok
+        && message.subject == "local_task_result"
+        && message.recipient_generation >= 1
+        && message.recipient_generation <= endpoint.generation;
     if endpoint.task_id != message.recipient_task_id
-        || endpoint.generation != message.recipient_generation
+        || (endpoint.generation != message.recipient_generation && !original_result)
     {
         return Err("消息接收任务或运行代数不匹配".to_owned());
     }
@@ -72,7 +80,9 @@ fn message_command(
         message.subject, message.body
     ))];
     let action = match endpoint.active_turn_id.clone() {
-        Some(_) if endpoint.harness == Harness::Claude => RuntimeAction::Submit { input },
+        Some(_) if matches!(endpoint.harness, Harness::Claude | Harness::Grok) => {
+            RuntimeAction::Submit { input }
+        }
         Some(expected_turn_id) => RuntimeAction::Steer {
             expected_turn_id,
             input,
@@ -115,6 +125,7 @@ where
     Ok(LocalCliMessageState::Sent)
 }
 
+#[cfg(test)]
 pub(crate) async fn dispatch_prepared_result_once<F, Fut>(
     sender: &SyncSender<ModelEvent>,
     message: LocalCliMessage,
@@ -124,7 +135,20 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = Result<(), String>>,
 {
-    let Some(claimed) = claim_task_result(sender, message)?
+    dispatch_prepared_result_if_current(sender, message, None, dispatch).await
+}
+
+pub(crate) async fn dispatch_prepared_result_if_current<F, Fut>(
+    sender: &SyncSender<ModelEvent>,
+    message: LocalCliMessage,
+    expected_recipient: Option<LocalCliTask>,
+    dispatch: F,
+) -> Result<(), String>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<(), String>>,
+{
+    let Some(claimed) = claim_task_result_if_current(sender, message, expected_recipient)?
         .await
         .map_err(|_| "结果派发领取确认通道已关闭".to_owned())??
     else {

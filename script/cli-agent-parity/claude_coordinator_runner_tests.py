@@ -6,6 +6,7 @@ import copy
 import json
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -34,7 +35,7 @@ def result_body(task):
         "terminal_evidence": task["terminal_evidence"], "evidence_truncated": False})
 
 
-def fixture():
+def fixture(version=runner.VERSION):
     profile = {
         "version": 1, "workingDirectory": "/probe/project",
         "canonicalWorkingDirectory": "/probe/project", "executableSha256": "a" * 64,
@@ -46,7 +47,8 @@ def fixture():
                "collected": "PARENT_COLLECTED_1", "parent_progress": "PARENT_PROGRESS_1",
                "automatic_result": "PARENT_AUTOMATIC_1",
                "followup": "followup-1", "progress": "progress-1"}
-    parent_config = {"model": "claude-sonnet-4-6", "permission_policy": "ClaudeRestrictedFilesV1",
+    parent_config = {"model": "claude-sonnet-4-6", "cli_version": version,
+                     "permission_policy": "ClaudeRestrictedFilesV1",
                      "claude_profile": profile, "runtime_generation": "parent-process-1",
                      "effective_permissions": {"claudeRestrictedFilesV1": profile,
                                                "fixedProfileVerified": True, "permissionMode": "plan"}}
@@ -632,6 +634,99 @@ class InitialReadyAcceptanceTests(unittest.TestCase):
         self.events.remove(self.ready_rows[0])
         self.events.append(self.ready_rows[0])
         self.assertFalse(self.verify())
+
+
+class FixedVersionCoordinatorTests(unittest.TestCase):
+    def test_persisted_parent_and_child_versions_match_selected_input(self):
+        for version in ("2.1.273", "2.1.278"):
+            events = fixture(version)
+            self.assertTrue(runner.verified_acceptance(0, OUTPUT, events, version))
+            self.assertTrue(runner.verified_acceptance(0, OUTPUT,
+                runner.project_public_events(events, lambda value: value), version))
+            other = "2.1.278" if version == "2.1.273" else "2.1.273"
+            self.assertFalse(runner.verified_acceptance(0, OUTPUT, events, other))
+            self.assertFalse(runner.verified_acceptance(0, OUTPUT, events, "latest"))
+            for key in ("parent", "child", "parent_generations", "child_generations"):
+                changed = copy.deepcopy(events)
+                chain = next(row for row in changed if row["event"] == "saved_chain_verified")
+                saved = chain[key][0] if isinstance(chain[key], list) else chain[key]
+                config = json.loads(saved["config_json"])
+                config["cli_version"] = other
+                saved["config_json"] = json.dumps(config)
+                self.assertFalse(runner.verified_acceptance(0, OUTPUT, changed, version), key)
+
+    def test_unverified_input_stops_before_api_read_or_process(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            executable = Path(temporary) / "claude"
+            executable.write_bytes(b"not an official binary")
+            with patch.object(runner.base, "load_api_environment") as load_api, \
+                    patch.object(runner, "verify_version") as probe, \
+                    patch.object(runner.subprocess, "Popen") as spawn:
+                for version in ("2.1.273", "2.1.278", "latest", "2.1.279"):
+                    with self.subTest(version=version), self.assertRaises(ValueError):
+                        runner.run(argparse.Namespace(claude=executable, claude_version=version))
+                load_api.assert_not_called()
+                probe.assert_not_called()
+                spawn.assert_not_called()
+
+    def test_probe_failure_stops_before_api_read(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                patch.object(runner.tempfile, "mkdtemp", return_value=temporary), \
+                patch.object(runner, "verify_version", side_effect=ValueError("版本不匹配")), \
+                patch.object(runner.base, "load_api_environment") as load_api, \
+                patch.object(runner.subprocess, "Popen") as spawn:
+            with self.assertRaises(ValueError):
+                runner.run(argparse.Namespace(claude=Path(temporary) / "claude", claude_version="2.1.278"))
+            load_api.assert_not_called()
+            spawn.assert_not_called()
+
+    def test_default_and_explicit_version_keep_platform_through_final_binary_verification(self):
+        for selected in (None, "2.1.278"):
+            expected = selected or "2.1.273"
+            with self.subTest(version=expected), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                for name in ("claude-fixture", "libtest", "supervisor"):
+                    (root / name).write_bytes(b"synthetic executable")
+                api = root / "api.json"
+                api.write_text('{"ANTHROPIC_API_KEY":"synthetic-test-only"}', encoding="utf-8")
+                args = argparse.Namespace(claude=root / "claude-fixture", test_binary=root / "libtest",
+                    supervisor=root / "supervisor", api_environment_file=api, output=root / "events.ndjson",
+                    model="claude-sonnet-4-6")
+                if selected is not None:
+                    args.claude_version = selected
+
+                def verify_native(path, platform, version):
+                    self.assertEqual(path, args.claude)
+                    self.assertEqual(platform, "darwin-arm64")
+                    self.assertEqual(version, expected)
+                    return {"sha256": "synthetic"}
+
+                def spawn(command, **kwargs):
+                    env = kwargs["env"]
+                    self.assertEqual(env["INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION"], expected)
+                    self.assertEqual(command[0], str(args.test_binary))
+                    Path(env["INFINISHELL_CLAUDE_LIVE_ARTIFACT"]).write_text(
+                        "".join(json.dumps(row) + "\n" for row in fixture(expected)), encoding="utf-8")
+                    return SimpleNamespace(returncode=0, communicate=lambda timeout: (OUTPUT, None))
+
+                with patch.object(runner, "current_platform", return_value="darwin-arm64"), \
+                        patch.object(runner, "verify_binary", side_effect=verify_native) as verify, \
+                        patch.object(runner, "verify_version", return_value=f"{expected} (Claude Code)") as probe, \
+                        patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                        patch.object(runner.subprocess, "run", return_value=SimpleNamespace(stdout="")), \
+                        patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                        patch("builtins.print"):
+                    self.assertEqual(runner.run(args), 0)
+                probe.assert_called_once_with(args.claude, root, expected)
+                self.assertEqual(verify.call_count, 3)
+                self.assertTrue(all(call.args == (args.claude, "darwin-arm64", expected)
+                                    for call in verify.call_args_list))
+                metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+                self.assertEqual(metadata["requested_cli_version"], expected)
+                self.assertEqual(metadata["cli_version"], f"{expected} (Claude Code)")
+                self.assertTrue(metadata["acceptance_passed"])
+                self.assertTrue(metadata["cli_binary_unchanged"])
 
 
 if __name__ == "__main__":

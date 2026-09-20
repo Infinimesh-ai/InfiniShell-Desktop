@@ -15,6 +15,7 @@ fn protocol(cwd: &std::path::Path) -> ClaudeProtocol {
         permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
         permission_ceiling: None,
         claude_profile: Some(profile),
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -73,7 +74,7 @@ fn fixed_profile_must_be_verified_before_any_model_input_is_written() {
     let mut protocol = protocol(&cwd);
     let ready = ready(&mut protocol);
     assert!(
-        matches!(&ready.events[0], RuntimeEventKind::SessionReady { effective_permissions } if effective_permissions["fixedProfileVerified"] == true)
+        matches!(&ready.events[0], RuntimeEventKind::SessionReady { effective_permissions, .. } if effective_permissions["fixedProfileVerified"] == true)
     );
     let pending = protocol.command(action(
         2,

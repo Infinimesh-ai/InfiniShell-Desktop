@@ -15,7 +15,9 @@ use crate::ai::blocklist::agent_view::agent_input_footer::{
 use crate::terminal::cli_agent_sessions::event::{
     CLIAgentEvent, CLIAgentEventPayload, CLIAgentEventSource, CLIAgentEventType,
 };
-use crate::terminal::cli_agent_sessions::{CLIAgentInputEntrypoint, CLIAgentSessionsModel};
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputEntrypoint, CLIAgentSessionStatus, CLIAgentSessionsModel,
+};
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod warpify_footer;
 
@@ -67,6 +69,8 @@ use crate::ui_components::icons::Icon;
 use crate::view_components::action_button::{
     ActionButton, ActionButtonTheme, ButtonSize, KeystrokeSource, TooltipAlignment,
 };
+use crate::view_components::{DismissibleToast, ToastLink};
+use crate::workspace::{ToastStack, WorkspaceAction};
 
 /// Small delay inserted between separate PTY writes to CLI agents.
 /// (Used both for the mode-switch prefix split and for the `DelayedEnter`
@@ -704,6 +708,9 @@ impl TerminalView {
         else {
             return;
         };
+        if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
+            return;
+        }
         if !images.is_empty() && self.cli_agent_image_paste_bytes(ctx).is_none() {
             return;
         }
@@ -755,16 +762,18 @@ impl TerminalView {
             return;
         };
 
-        let text_bytes = text.into_bytes();
-        if text_bytes.is_empty() {
+        if text.is_empty() {
             return;
         }
-
-        let strategy = rich_input_submit_strategy(agent);
         let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
         else {
             return;
         };
+        if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
+            return;
+        }
+        let text_bytes = text.into_bytes();
+        let strategy = rich_input_submit_strategy(agent);
         if !self.begin_cli_agent_text_submit(generation, ctx) {
             return;
         }
@@ -778,7 +787,10 @@ impl TerminalView {
         generation: Uuid,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
-        if text.is_empty() || !self.begin_cli_agent_text_submit(generation, ctx) {
+        if text.is_empty()
+            || self.reject_unsafe_cli_agent_input(generation, Some(text.to_owned()), ctx)
+            || !self.begin_cli_agent_text_submit(generation, ctx)
+        {
             return false;
         }
         let agent = CLIAgentSessionsModel::as_ref(ctx)
@@ -879,7 +891,9 @@ impl TerminalView {
                     let paste_bytes = paste_bytes.clone();
                     let accepted = spawner
                         .spawn(move |me, ctx| {
-                            if !me.cli_agent_input_target_matches(generation, ctx) {
+                            if !me.cli_agent_input_target_matches(generation, ctx)
+                                || me.reject_unsafe_cli_agent_input(generation, None, ctx)
+                            {
                                 return false;
                             }
                             ctx.clipboard().write(ClipboardContent {
@@ -925,6 +939,13 @@ impl TerminalView {
                 .is_input_submission_current(self.view_id, generation)
         {
             self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        }
+        if self.reject_unsafe_cli_agent_input(
+            generation,
+            snapshot.as_ref().map(|snapshot| snapshot.query.clone()),
+            ctx,
+        ) {
             return;
         }
         if text_bytes.len() > 1 && CLI_AGENT_MODE_SWITCH_PREFIXES.contains(&text_bytes[0]) {
@@ -1037,7 +1058,9 @@ impl TerminalView {
                     let paste_bytes = paste_bytes.clone();
                     let accepted = spawner
                         .spawn(move |me, ctx| {
-                            if !me.cli_agent_input_target_matches(generation, ctx) {
+                            if !me.cli_agent_input_target_matches(generation, ctx)
+                                || me.reject_unsafe_cli_agent_input(generation, None, ctx)
+                            {
                                 return false;
                             }
                             ctx.clipboard().write(ClipboardContent {
@@ -1096,6 +1119,52 @@ impl TerminalView {
                 ))
     }
 
+    /// 普通 PTY 写入不是原生输入确认；审批界面里的 Enter 可能直接批准工具。
+    fn reject_unsafe_cli_agent_input(
+        &mut self,
+        generation: Uuid,
+        unsent_text: Option<String>,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !self.cli_agent_input_generation_matches(generation, ctx) {
+            return false;
+        }
+        let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            return false;
+        };
+        let message = if matches!(session.status, CLIAgentSessionStatus::Blocked { .. }) {
+            crate::t!("cli-agent-input-waiting-for-native-response")
+        } else if session.agent == CLIAgent::Grok {
+            // Grok 1.0.30 hooks 没有可靠的审批开始或输入就绪事件，不能猜测可排队。
+            crate::t!("cli-agent-grok-input-manual-copy-required")
+        } else {
+            return false;
+        };
+        self.release_cli_agent_input_submission(generation, ctx);
+        let window_id = ctx.window_id();
+        let view_id = self.view_id;
+        ToastStack::handle(ctx).update(ctx, |stack, ctx| {
+            let mut toast = DismissibleToast::error(message)
+                .with_object_id(format!("cli-agent-input-blocked-{view_id:?}"));
+            if let Some(text) = unsent_text.filter(|text| !text.is_empty()) {
+                // 用户明确点击才复制；不清草稿、附件或原生输入，也不报告发送成功。
+                toast = toast
+                    .with_link(
+                        ToastLink::new(crate::t!("cli-agent-input-copy-unsent-text"))
+                            .with_onclick_action(WorkspaceAction::CopyTextToClipboard(
+                                text.clone(),
+                            )),
+                    )
+                    .with_on_body_click(move |ctx| {
+                        ctx.clipboard()
+                            .write(ClipboardContent::plain_text(text.clone()));
+                    });
+            }
+            stack.add_ephemeral_toast(toast, window_id, ctx);
+        });
+        true
+    }
+
     fn begin_cli_agent_text_submit(
         &mut self,
         generation: Uuid,
@@ -1103,6 +1172,9 @@ impl TerminalView {
     ) -> bool {
         if !self.cli_agent_input_target_matches(generation, ctx) {
             self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
+            return false;
+        }
+        if self.reject_unsafe_cli_agent_input(generation, None, ctx) {
             return false;
         }
         let accepted = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
@@ -1204,6 +1276,13 @@ impl TerminalView {
             self.release_cli_agent_input_submission(generation, ctx);
             return;
         }
+        if self.reject_unsafe_cli_agent_input(
+            generation,
+            snapshot.as_ref().map(|snapshot| snapshot.query.clone()),
+            ctx,
+        ) {
+            return;
+        }
         if self.write_user_bytes_to_pty(b"\r".to_vec(), ctx) {
             self.complete_cli_agent_text_submit(generation, snapshot, ctx);
         } else {
@@ -1228,6 +1307,13 @@ impl TerminalView {
                 .is_input_submission_current(self.view_id, generation)
         {
             self.release_cli_agent_input_submission(generation, ctx);
+            return;
+        }
+        if self.reject_unsafe_cli_agent_input(
+            generation,
+            snapshot.as_ref().map(|snapshot| snapshot.query.clone()),
+            ctx,
+        ) {
             return;
         }
         let strategy = if text_bytes.contains(&b'\n') || text_bytes.contains(&b'\r') {

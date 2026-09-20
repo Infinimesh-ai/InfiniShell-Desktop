@@ -40,9 +40,6 @@ pub(crate) fn prepare_managed_input(
             cli = harness.display_name()
         ));
     }
-    if harness == Harness::Grok && !skills.is_empty() {
-        return Err(crate::t!("cli-agent-grok-input-skills-unverified"));
-    }
     if harness == Harness::Claude && !images.is_empty() {
         // 当前原生校准仅覆盖 PNG 与文本，不把其他格式或技能混用计作可用能力。
         if images.iter().any(|image| image.mime_type != "image/png") {

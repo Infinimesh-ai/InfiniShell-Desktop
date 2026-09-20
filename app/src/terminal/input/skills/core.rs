@@ -1,14 +1,49 @@
-use ai::skills::{SkillProvider, SkillReference, SkillScope};
+use ai::skills::{SkillProvider, SkillReference, SkillScope, SkillUserInvocable};
 use fuzzy_match::{FuzzyMatchResult, match_indices_case_insensitive};
 use ordered_float::OrderedFloat;
 use warp_core::ui::icons::Icon;
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warpui::{AppContext, EntityId, SingletonEntity as _};
 
-use crate::ai::skills::SkillManager;
+use crate::ai::skills::{SkillDescriptor, SkillManager};
+use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::{CLIAgentInputState, CLIAgentSessionsModel};
 pub fn local_skills_remote_execution_error_message() -> String {
     crate::t!("terminal-local-skills-remote-error")
+}
+
+/// 所有人工技能菜单共用来源筛选和 CLI 原生调用规则。
+pub(crate) fn selectable_cli_skill(
+    mut skill: SkillDescriptor,
+    cli_agent: Option<CLIAgent>,
+    skill_manager: &SkillManager,
+) -> Option<SkillDescriptor> {
+    if let Some(agent) = cli_agent {
+        let providers = agent.supported_skill_providers_for_scope(skill.scope);
+        if !skill_manager.skill_exists_for_any_provider(&skill, providers)
+            || !is_user_invocable(&skill.user_invocable, agent)
+        {
+            return None;
+        }
+        skill.provider = skill_manager.best_supported_provider(&skill, providers);
+    }
+    Some(skill)
+}
+
+pub(crate) fn is_user_invocable(value: &SkillUserInvocable, agent: CLIAgent) -> bool {
+    if agent == CLIAgent::Grok {
+        // Grok 只接受 YAML true 或精确字符串 "true"，缺字段默认显示。
+        matches!(
+            value,
+            SkillUserInvocable::Unspecified | SkillUserInvocable::Boolean(true)
+        ) || matches!(value, SkillUserInvocable::String(value) if value == "true")
+    } else if agent == CLIAgent::Claude {
+        // Claude 已证明的布尔 false 只隐藏人工菜单，不影响模型侧技能调用。
+        !matches!(value, SkillUserInvocable::Boolean(false))
+    } else {
+        // Codex 等 CLI 使用各自的调用元数据，不能套用 Claude/Grok 的限制。
+        true
+    }
 }
 
 /// Surface-neutral skill selection result shared by GUI and TUI menus.
@@ -45,23 +80,10 @@ pub fn query_selectable_skills(
         .get_skills_for_working_directory(working_directory, app)
         .into_iter()
         .filter(|skill| {
-            if let Some(agent) = cli_agent {
-                skill_manager.skill_exists_for_any_provider(
-                    skill,
-                    agent.supported_skill_providers_for_scope(skill.scope),
-                )
-            } else {
-                include_bundled || skill.scope != SkillScope::Bundled
-            }
+            cli_agent.is_some() || include_bundled || skill.scope != SkillScope::Bundled
         })
-        .filter_map(|mut skill| {
-            if let Some(agent) = cli_agent {
-                skill.provider = skill_manager.best_supported_provider(
-                    &skill,
-                    agent.supported_skill_providers_for_scope(skill.scope),
-                );
-            }
-
+        .filter_map(|skill| selectable_cli_skill(skill, cli_agent, skill_manager))
+        .filter_map(|skill| {
             let (name_match_result, score) = if query_text.is_empty() {
                 (None, OrderedFloat(f64::MIN))
             } else {
@@ -96,3 +118,7 @@ pub fn query_selectable_skills(
     });
     results
 }
+
+#[cfg(test)]
+#[path = "core_tests.rs"]
+mod tests;

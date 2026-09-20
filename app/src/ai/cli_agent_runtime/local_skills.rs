@@ -14,6 +14,8 @@ use warpui::{AppContext, SingletonEntity};
 
 use super::InputContent;
 use crate::ai::skills::SkillManager;
+use crate::terminal::CLIAgent;
+use crate::terminal::input::skills::is_user_invocable;
 
 pub(crate) const CLAUDE_SKILL_PLUGIN_NAME: &str = "infinishell-local-skills";
 
@@ -209,10 +211,12 @@ pub(crate) fn prepare_local_cli_skill_inputs(
     harness: Harness,
     managed: bool,
 ) -> Result<Vec<InputContent>, String> {
-    if !skills.is_empty() && (!managed || !matches!(harness, Harness::Codex | Harness::Claude)) {
+    if !skills.is_empty()
+        && (!managed || !matches!(harness, Harness::Codex | Harness::Claude | Harness::Grok))
+    {
         return Err(crate::t!("cli-agent-task-skills-require-managed"));
     }
-    if harness == Harness::Claude && skills.len() > 1 {
+    if matches!(harness, Harness::Claude | Harness::Grok) && skills.len() > 1 {
         return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
     }
     skills
@@ -230,6 +234,12 @@ pub(crate) fn prepare_local_cli_skill_inputs(
             if !path.is_absolute() || skill.is_bundled() {
                 return Err(failure());
             }
+            if harness == Harness::Grok {
+                let metadata = std::fs::symlink_metadata(path).map_err(|_| failure())?;
+                if !metadata.is_file() || metadata.file_type().is_symlink() {
+                    return Err(failure());
+                }
+            }
             let mut content = String::new();
             std::fs::File::open(path)
                 .map_err(|_| failure())?
@@ -246,6 +256,12 @@ pub(crate) fn prepare_local_cli_skill_inputs(
                 skill.scope,
             )
             .map_err(|_| failure())?;
+            if harness == Harness::Grok
+                && (parsed.name != skill.name
+                    || !is_user_invocable(&parsed.user_invocable(), CLIAgent::Grok))
+            {
+                return Err(failure());
+            }
             Ok(InputContent::Skill {
                 name: parsed.name,
                 path: path.clone(),

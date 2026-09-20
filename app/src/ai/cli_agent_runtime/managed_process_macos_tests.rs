@@ -16,6 +16,8 @@ impl Fixture {
         let generation = Uuid::new_v4();
         let directory = create_generation_directory(state, generation).unwrap();
         let manifest = Manifest {
+            isolated_home: None,
+            environment: None,
             version: 1,
             launch_allowed: true,
             generation,

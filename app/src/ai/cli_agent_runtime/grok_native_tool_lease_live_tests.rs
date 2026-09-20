@@ -64,6 +64,7 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: Some(LocalToolPermissions {
             allow_spawn: false,
@@ -119,6 +120,7 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
             match event.kind {
                 RuntimeEventKind::SessionReady {
                     effective_permissions,
+                    ..
                 } => {
                     if submitted != 0
                         || session.is_none()

@@ -1,4 +1,4 @@
-use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope};
+use ai::skills::{ParsedSkill, SkillProvider, SkillReference, SkillScope, SkillUserInvocable};
 use serde::{Deserialize, Serialize};
 use warp_core::ui::icons::Icon;
 
@@ -7,6 +7,9 @@ pub struct SkillDescriptor {
     pub reference: SkillReference,
     pub name: String,
     pub description: String,
+    /// 缺字段的历史描述符保留原有人工菜单行为。
+    #[serde(default)]
+    pub user_invocable: SkillUserInvocable,
     /// The scope of the skill.
     pub scope: SkillScope,
     /// The provider/origin of the skill (Claude, Codex, or Zap).
@@ -26,6 +29,7 @@ impl SkillDescriptor {
 
     pub fn new_bundled(id: String, skill: ParsedSkill, icon: Icon) -> Self {
         Self {
+            user_invocable: skill.user_invocable(),
             provider: SkillProvider::InfiniShell,
             scope: SkillScope::Bundled,
             reference: SkillReference::BundledSkillId(id),
@@ -39,6 +43,7 @@ impl SkillDescriptor {
 impl From<ParsedSkill> for SkillDescriptor {
     fn from(skill: ParsedSkill) -> Self {
         Self {
+            user_invocable: skill.user_invocable(),
             provider: skill.provider,
             scope: skill.scope,
             reference: SkillReference::Path(skill.path),
@@ -48,3 +53,7 @@ impl From<ParsedSkill> for SkillDescriptor {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "listed_skill_tests.rs"]
+mod tests;

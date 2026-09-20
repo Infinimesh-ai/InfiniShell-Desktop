@@ -23,6 +23,7 @@ pub(super) fn options() -> SessionOptions {
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
         claude_profile: None,
+        grok_profile: None,
         model: None,
         local_tools: None,
         selected_skills: Vec::new(),
@@ -48,8 +49,8 @@ fn fixture_response(id: u64) -> Value {
 }
 
 fn ready_protocol() -> GrokProtocol {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     for id in 1..=3 {
         protocol.receive(fixture_response(id)).unwrap();
     }
@@ -57,17 +58,308 @@ fn ready_protocol() -> GrokProtocol {
 }
 
 #[test]
-fn only_the_observed_cli_version_is_accepted() {
-    assert!(verified_version("grok 1.0.30 (04b7ffed98c6)\n"));
-    assert!(!verified_version("grok 1.0.29 (other)"));
-    assert!(!verified_version("grok 1.0.31"));
-    assert!(!verified_version("grok 1.0.30-beta"));
+fn only_exact_observed_cli_versions_are_accepted() {
+    assert_eq!(
+        verified_version("grok 1.0.30 (04b7ffed98c6)\n"),
+        Some("1.0.30")
+    );
+    assert_eq!(
+        verified_version("grok 1.0.34 (3736acbc8658)\n"),
+        Some("1.0.34")
+    );
+    assert_eq!(verified_version("grok 1.0.29 (other)"), None);
+    assert_eq!(verified_version("grok 1.0.31"), None);
+    assert_eq!(verified_version("grok 1.0.35"), None);
+    assert_eq!(verified_version("grok 1.0.30-beta"), None);
+    assert_eq!(verified_version("grok 1.0.34-alpha"), None);
+}
+
+#[test]
+fn initialize_without_a_successful_probe_does_not_send_a_request() {
+    let mut protocol = GrokProtocol::new(options());
+    assert!(protocol.initialize().is_err());
+    assert_eq!(protocol.next_id, 0);
+    assert!(protocol.pending.is_none());
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn supported_probe_and_initialize_versions_must_match_in_both_directions() {
+    for (probe, handshake) in [("grok 1.0.30", "1.0.34"), ("grok 1.0.34", "1.0.30")] {
+        let mut protocol = GrokProtocol::new(options());
+        protocol.bind_cli_version(probe).unwrap();
+        protocol.initialize().unwrap();
+        let mut response = fixture_response(1);
+        response["result"]["_meta"]["agentVersion"] = json!(handshake);
+        assert!(protocol.receive(response).is_err());
+        assert_eq!(protocol.next_id, 1);
+        assert!(protocol.session_id.is_none());
+    }
+}
+
+#[test]
+fn unknown_probe_cannot_fall_back_to_the_historical_fixture_version() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.30").unwrap();
+    assert!(protocol.bind_cli_version("grok 1.0.35").is_err());
+    assert!(protocol.initialize().is_err());
+    assert!(protocol.probed_version.is_none());
+    assert!(protocol.paired_version.is_none());
+    assert_eq!(protocol.next_id, 0);
+}
+
+#[test]
+fn a_probe_cannot_replace_the_version_after_initialization() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.30").unwrap();
+    protocol.initialize().unwrap();
+    assert!(protocol.bind_cli_version("grok 1.0.34").is_err());
+    assert_eq!(protocol.probed_version, Some("1.0.30"));
+}
+
+#[test]
+fn latest_version_does_not_enable_fixed_profiles_or_local_tool_leases() {
+    let mut fixed = options();
+    fixed.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    assert!(
+        GrokProtocol::new(fixed)
+            .bind_cli_version("grok 1.0.34")
+            .is_err()
+    );
+    let mut files = options();
+    files.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
+    assert!(
+        GrokProtocol::new(files)
+            .bind_cli_version("grok 1.0.34")
+            .is_err()
+    );
+    let mut tools = options();
+    tools.local_tools = Some(LocalToolPermissions {
+        allow_spawn: false,
+        allow_message: true,
+    });
+    assert!(
+        GrokProtocol::new(tools)
+            .bind_cli_version("grok 1.0.34")
+            .is_err()
+    );
+}
+
+#[test]
+fn latest_synthetic_handshake_claims_only_the_native_p0_verified_capabilities() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol
+        .bind_cli_version("grok 1.0.34 (3736acbc8658)")
+        .unwrap();
+    protocol.initialize().unwrap();
+    // 仅复用旧回执构造离线状态；不能将此测试计为新版认证或会话验收。
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.34");
+    let auth = protocol.receive(initialize).unwrap();
+    assert_eq!(auth.writes[0]["method"], "authenticate");
+    protocol.receive(fixture_response(2)).unwrap();
+    let ready = protocol.receive(fixture_response(3)).unwrap();
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+            verified_cli_version,
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("合成握手应返回就绪状态");
+    };
+    assert_eq!(verified_cli_version.as_deref(), Some("1.0.34"));
+    assert_eq!(
+        effective_permissions["reportedCapabilities"]["promptCapabilities"]["image"],
+        false
+    );
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"],
+        json!({
+            "newSession": true, "emptyHistoryRecovery": false, "closeSession": false,
+            "submit": true, "queuedSubmit": false, "steer": false, "approval": true,
+            "cancel": true, "resume": true, "localTools": false, "childTasks": false
+        })
+    );
+    assert_eq!(
+        effective_permissions["permissionEnforcementVerified"],
+        false
+    );
+    let rejected = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::LocalImage(PathBuf::from("image.png"))],
+        },
+    });
+    assert!(rejected.writes.is_empty());
+    assert!(matches!(
+        rejected.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    let skill = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Skill {
+                name: "offline-skill".into(),
+                path: protocol.options.cwd.join("SKILL.md"),
+            }],
+        },
+    });
+    assert!(skill.writes.is_empty());
+    assert!(matches!(
+        skill.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    assert!(protocol.submitted_messages.is_empty() && protocol.queued.is_empty());
+
+    let first_id = Uuid::new_v4();
+    let first = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: first_id,
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("已验证的单回合输入".into())],
+        },
+    });
+    assert_eq!(first.writes[0]["method"], "session/prompt");
+    let queued = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("未验证的排队输入".into())],
+        },
+    });
+    assert!(queued.writes.is_empty());
+    assert!(matches!(
+        queued.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    assert!(protocol.queued.is_empty());
+
+    let shutdown = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Shutdown,
+    });
+    assert!(shutdown.writes.is_empty());
+    assert!(protocol.closed);
+    assert!(shutdown.events.iter().any(|event| matches!(
+        event,
+        RuntimeEventKind::CommandDispatched { turn_id: None, .. }
+    )));
+}
+
+#[test]
+fn resumed_connection_does_not_accept_a_handshake_from_another_supported_version() {
+    let mut resumed = options();
+    resumed.target = SessionTarget::Resume {
+        native_session_id: "OFFLINE_SAVED_SESSION".into(),
+    };
+    let mut protocol = GrokProtocol::new(resumed);
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    assert!(protocol.receive(fixture_response(1)).is_err());
+    assert_eq!(protocol.next_id, 1);
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn latest_version_cancels_a_correlated_but_unverified_write_approval() {
+    let (mut protocol, request) = pending_native_approval();
+    protocol.probed_version = Some("1.0.34");
+    let result = protocol.receive(request.clone()).unwrap();
+    assert!(result.events.is_empty());
+    assert_eq!(
+        result.writes,
+        vec![json!({"jsonrpc":"2.0","id":0,
+        "result":{"outcome":{"outcome":"cancelled"}}})]
+    );
+    assert!(protocol.approvals.is_empty());
+    let repeated = protocol.receive(request).unwrap();
+    assert!(repeated.events.is_empty() && repeated.writes.is_empty());
+}
+
+#[test]
+fn latest_version_opens_only_a_correlated_exact_read_approval() {
+    let (mut protocol, mut request) = pending_native_approval();
+    protocol.probed_version = Some("1.0.34");
+    let call_id = request["params"]["toolCall"]["toolCallId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let tool = json!({
+        "toolCallId": call_id,
+        "kind": "read",
+        "rawInput": {"variant":"ReadFile", "target_file":"verified.txt"},
+        "_meta": {"x.ai/tool": {
+            "version":1, "name":"read_file", "namespace":"grok_build", "read_only":true
+        }}
+    });
+    assert!(super::verified_latest_read_tool(&tool));
+    request["params"]["toolCall"] = tool;
+
+    let effects = protocol.receive(request).unwrap();
+    assert!(effects.writes.is_empty());
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { approval_id, .. }] if approval_id == "grok:0"
+    ));
+    assert!(protocol.approvals.contains_key("grok:0"));
+}
+
+#[test]
+fn latest_read_approval_rejects_unverified_schema_or_tool_event_provenance() {
+    let verified = json!({
+        "kind": "read",
+        "rawInput": {"variant":"ReadFile", "target_file":"verified.txt"},
+        "_meta": {"x.ai/tool": {
+            "version":1, "name":"read_file", "namespace":"grok_build", "read_only":true
+        }}
+    });
+    for (pointer, value) in [
+        ("/kind", json!("edit")),
+        ("/_meta/x.ai~1tool/name", json!("write")),
+        ("/_meta/x.ai~1tool/namespace", json!("opencode")),
+        ("/_meta/x.ai~1tool/read_only", json!(false)),
+        ("/rawInput/variant", json!("Write")),
+        ("/rawInput/offset", json!(2)),
+    ] {
+        let mut rejected = verified.clone();
+        if pointer == "/rawInput/offset" {
+            rejected["rawInput"]["offset"] = value;
+        } else {
+            *rejected.pointer_mut(pointer).unwrap() = value;
+        }
+        assert!(!super::verified_latest_read_tool(&rejected));
+    }
+    let mut extra = verified;
+    extra["rawInput"]["content"] = json!("unverified");
+    assert!(!super::verified_latest_read_tool(&extra));
+
+    let (mut protocol, mut request) = pending_native_approval();
+    protocol.probed_version = Some("1.0.34");
+    request["params"]["toolCall"] = json!({
+        "toolCallId": "unrelated-tool",
+        "kind": "read",
+        "rawInput": {"variant":"ReadFile", "target_file":"verified.txt"},
+        "_meta": {"x.ai/tool": {
+            "version":1, "name":"read_file", "namespace":"grok_build", "read_only":true
+        }}
+    });
+    let effects = protocol.receive(request).unwrap();
+    assert!(effects.events.is_empty());
+    assert_eq!(
+        effects.writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+    assert!(protocol.approvals.is_empty());
 }
 
 #[test]
 fn real_handshake_reports_verified_text_lifecycle_and_preserves_permission_limits() {
-    let mut protocol = GrokProtocol::new(options());
-    let initialize = protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    let initialize = protocol.initialize().unwrap();
     assert_eq!(initialize["jsonrpc"], "2.0");
     assert_eq!(initialize["params"]["protocolVersion"], 1);
     assert_eq!(
@@ -87,6 +379,7 @@ fn real_handshake_reports_verified_text_lifecycle_and_preserves_permission_limit
     let [
         RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         },
     ] = ready.events.as_slice()
     else {
@@ -125,8 +418,8 @@ fn real_handshake_reports_verified_text_lifecycle_and_preserves_permission_limit
 
 #[test]
 fn model_dependent_image_advertisement_never_implies_verified_image_input() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut initialize = fixture_response(1);
     initialize["result"]["agentCapabilities"]["promptCapabilities"]["image"] = json!(true);
     protocol.receive(initialize).unwrap();
@@ -150,8 +443,8 @@ fn model_dependent_image_advertisement_never_implies_verified_image_input() {
 
 #[test]
 fn missing_headless_credentials_does_not_start_interactive_auth_or_a_session() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut initialize = fixture_response(1);
     initialize["result"]["authMethods"] = json!([{"id": "grok.com", "name": "Grok"}]);
     assert!(protocol.receive(initialize).is_err());
@@ -165,8 +458,8 @@ fn native_byok_authentication_uses_only_advertised_method_without_credentials() 
         "../../../../specs/cli-agent-parity/fixtures/grok-1.0.30-byok-authentication.json"
     ))
     .unwrap();
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let effects = protocol.receive(fixture["initialize"].clone()).unwrap();
     assert_eq!(effects.writes.len(), 1);
     assert_eq!(effects.writes[0]["method"], "authenticate");
@@ -185,8 +478,8 @@ fn native_byok_authentication_uses_only_advertised_method_without_credentials() 
 
 #[test]
 fn cached_login_precedence_is_stable_and_api_authentication_failure_does_not_fallback() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut initialize = fixture_response(1);
     initialize["result"]["authMethods"] = json!([
         {"id":"xai.api_key"}, {"id":"cached_token"}, {"id":"grok.com"}
@@ -194,8 +487,8 @@ fn cached_login_precedence_is_stable_and_api_authentication_failure_does_not_fal
     let effects = protocol.receive(initialize).unwrap();
     assert_eq!(effects.writes[0]["params"]["methodId"], "cached_token");
 
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut initialize = fixture_response(1);
     initialize["result"]["authMethods"] = json!([{"id":"xai.api_key"}, {"id":"grok.com"}]);
     protocol.receive(initialize).unwrap();
@@ -215,8 +508,8 @@ fn mismatched_agent_and_protocol_versions_do_not_authenticate() {
         ("protocolVersion", json!(2)),
         ("agentVersion", json!("1.0.31")),
     ] {
-        let mut protocol = GrokProtocol::new(options());
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options());
+        protocol.initialize().unwrap();
         let mut initialize = fixture_response(1);
         if key == "protocolVersion" {
             initialize["result"][key] = value;
@@ -230,8 +523,8 @@ fn mismatched_agent_and_protocol_versions_do_not_authenticate() {
 
 #[test]
 fn duplicate_responses_do_not_create_another_session_and_conflicts_fail_closed() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let initialize = fixture_response(1);
     protocol.receive(initialize.clone()).unwrap();
     assert!(
@@ -257,8 +550,8 @@ fn duplicate_responses_do_not_create_another_session_and_conflicts_fail_closed()
 
 #[test]
 fn out_of_order_response_cannot_replace_pending_authentication() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     assert!(protocol.receive(fixture_response(3)).is_err());
     assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
     assert!(protocol.session_id.is_none());
@@ -266,8 +559,8 @@ fn out_of_order_response_cannot_replace_pending_authentication() {
 
 #[test]
 fn unknown_string_response_cannot_replace_a_numeric_pending_request() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let response = json!({"jsonrpc":"2.0","id":"OFFLINE_UNKNOWN_RESPONSE_ID",
         "error":{"code":-32603,"message":"OFFLINE_PRIVATE_ERROR_BODY"}});
 
@@ -298,8 +591,8 @@ fn internal_skills_reload_fixture() -> Value {
 #[test]
 fn internal_skills_reload_accepts_u64_boundaries_without_advancing_user_rpc() {
     for count in [0, u64::MAX] {
-        let mut protocol = GrokProtocol::new(options());
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options());
+        protocol.initialize().unwrap();
         let context = protocol.transaction_context();
         let sent_at = protocol.pending.as_ref().unwrap().sent_at;
         let mut response = internal_skills_reload_fixture();
@@ -319,8 +612,8 @@ fn internal_skills_reload_accepts_u64_boundaries_without_advancing_user_rpc() {
 
 #[test]
 fn duplicate_internal_skills_reload_preserves_authentication_and_native_identity() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     protocol.receive(fixture_response(1)).unwrap();
     let context = protocol.transaction_context();
     let responses = protocol.responses.clone();
@@ -405,8 +698,8 @@ fn internal_skills_reload_rejects_non_u64_counts_and_malformed_wrappers() {
         json!({"jsonrpc":"2.0","id":"skills-reload"}),
     ]);
     for response in rejected {
-        let mut protocol = GrokProtocol::new(options());
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options());
+        protocol.initialize().unwrap();
         let error = protocol.receive(response).err().unwrap();
         assert_eq!(
             super::runtime_error_diagnostic(&error)["protocol_failure_kind"],
@@ -455,8 +748,8 @@ fn internal_skills_reload_rejects_foreign_ids_errors_and_injected_identity() {
         }
     }
     for response in rejected {
-        let mut protocol = GrokProtocol::new(options());
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options());
+        protocol.initialize().unwrap();
         let context = protocol.transaction_context();
         let error = protocol.receive(response).err().unwrap();
         assert_eq!(
@@ -470,8 +763,8 @@ fn internal_skills_reload_rejects_foreign_ids_errors_and_injected_identity() {
 
 #[test]
 fn mixed_internal_skills_reload_frame_cannot_become_a_client_tool_request() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut response = internal_skills_reload_fixture();
     response["method"] = json!("session/request_permission");
     response["params"] = json!({"sessionId":"OFFLINE_FABRICATED_SESSION"});
@@ -484,7 +777,7 @@ fn mixed_internal_skills_reload_frame_cannot_become_a_client_tool_request() {
 
 #[tokio::test]
 async fn outbound_diagnostic_records_written_identity_without_parameters() {
-    let mut protocol = GrokProtocol::new(options());
+    let mut protocol = GrokProtocol::from_fixture(options());
     let probe = super::sdk_origin_live_tests::SdkOriginProbe::new(protocol.options.generation);
     protocol.sdk_origin_probe = Some(probe.clone());
     let request = protocol.request(
@@ -492,6 +785,7 @@ async fn outbound_diagnostic_records_written_identity_without_parameters() {
         "session/prompt",
         json!({"prompt":"OFFLINE_PRIVATE_PROMPT","sessionId":"OFFLINE_PRIVATE_SESSION"}),
     );
+    assert!(!protocol.task_input_written);
     let (sender, _) = mpsc::channel(4);
     let mut stdin = Cursor::new(Vec::new());
     flush_effects(
@@ -506,6 +800,7 @@ async fn outbound_diagnostic_records_written_identity_without_parameters() {
     .await
     .unwrap();
 
+    assert!(protocol.task_input_written);
     let report = probe.report(None, None);
     let diagnostic = &report["frames"][0];
     assert_eq!(diagnostic["event"], "outbound_transaction_observed");
@@ -521,10 +816,10 @@ async fn outbound_diagnostic_records_written_identity_without_parameters() {
 
 #[tokio::test]
 async fn failed_write_does_not_claim_an_outbound_transaction() {
-    let mut protocol = GrokProtocol::new(options());
+    let mut protocol = GrokProtocol::from_fixture(options());
     let probe = super::sdk_origin_live_tests::SdkOriginProbe::new(protocol.options.generation);
     protocol.sdk_origin_probe = Some(probe.clone());
-    let request = protocol.initialize();
+    let request = protocol.initialize().unwrap();
     let (sender, _) = mpsc::channel(4);
     let mut storage = [];
     let mut stdin = Cursor::new(&mut storage[..]);
@@ -542,12 +837,86 @@ async fn failed_write_does_not_claim_an_outbound_transaction() {
         .is_err()
     );
     assert_eq!(probe.report(None, None)["frames"], json!([]));
+    assert!(!protocol.task_input_written);
     assert_eq!(protocol.pending.as_ref().unwrap().id, 1);
+}
+
+#[tokio::test]
+async fn task_input_evidence_requires_a_successful_prompt_write() {
+    let mut protocol = ready_protocol();
+    let first = internal_submit(&mut protocol, Uuid::new_v4(), "first offline input");
+    assert_eq!(first.writes.len(), 1);
+    assert_eq!(first.writes[0]["method"], "session/prompt");
+    assert!(!protocol.task_input_written);
+    let queued = internal_submit(&mut protocol, Uuid::new_v4(), "queued offline input");
+    assert!(queued.writes.is_empty());
+    assert_eq!(protocol.queued.len(), 1);
+    assert!(!protocol.task_input_written);
+    let (sender, _receiver) = mpsc::channel(4);
+    let mut storage = [];
+    let mut failed_stdin = Cursor::new(&mut storage[..]);
+    assert!(
+        flush_effects(&mut protocol, &mut failed_stdin, &sender, first)
+            .await
+            .is_err()
+    );
+    assert!(!protocol.task_input_written);
+
+    let mut protocol = GrokProtocol::from_fixture(options());
+    let initialize = protocol.initialize().unwrap();
+    let mut stdin = Cursor::new(Vec::new());
+    flush_effects(
+        &mut protocol,
+        &mut stdin,
+        &sender,
+        super::Effects {
+            writes: vec![initialize],
+            events: Vec::new(),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(!protocol.task_input_written);
+}
+
+#[tokio::test]
+async fn refreshed_catalog_rejection_carries_successful_write_evidence() {
+    let mut protocol = ready_protocol();
+    let effects = internal_submit(&mut protocol, Uuid::new_v4(), "offline input");
+    let (sender, _receiver) = mpsc::channel(8);
+    let mut stdin = Cursor::new(Vec::new());
+    flush_effects(&mut protocol, &mut stdin, &sender, effects)
+        .await
+        .unwrap();
+    assert!(protocol.task_input_written);
+    // 尚未收到原生输入确认，目录错误仍应准确反映本代次已经完成写入。
+    protocol.options.grok_profile = Some(
+        super::super::permissions::GrokCreationPolicyV1::compile(
+            &protocol.options.cwd.canonicalize().unwrap(),
+            "1.0.30",
+            "a".repeat(64),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedReadV1,
+        )
+        .unwrap(),
+    );
+    let error = protocol
+        .receive(json!({"jsonrpc":"2.0","method":"session/update","params":{
+            "sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update",
+            "_meta":{"tools":["read_file","OFFLINE_PRIVATE_UNKNOWN"]}}
+        }}))
+        .err()
+        .unwrap();
+    let evidence = error.permission_ceiling_evidence().unwrap();
+    assert_eq!(evidence["reason"], "grok_creation_catalog_changed");
+    assert_eq!(evidence["task_input_sent"], true);
+    assert!(!evidence.to_string().contains("OFFLINE_PRIVATE_UNKNOWN"));
 }
 
 #[test]
 fn transaction_context_does_not_expose_history_session_or_recovery_arguments() {
-    let mut protocol = GrokProtocol::new(options());
+    let mut protocol = GrokProtocol::from_fixture(options());
     protocol.session_id = Some("OFFLINE_PRIVATE_NATIVE_SESSION".into());
     protocol.request(
         super::PendingKind::OpenSession {
@@ -571,8 +940,8 @@ fn transaction_context_does_not_expose_history_session_or_recovery_arguments() {
 
 #[test]
 fn an_old_error_response_cannot_replace_current_authentication() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     protocol.receive(fixture_response(1)).unwrap();
     let error = protocol
         .receive(json!({"jsonrpc":"2.0","id":1,
@@ -726,8 +1095,8 @@ fn stale_generation_and_incomplete_native_identity_do_not_open_a_task() {
         effects.events.as_slice(),
         [RuntimeEventKind::RequestFailed { .. }]
     ));
-    protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     protocol.receive(fixture_response(1)).unwrap();
     protocol.receive(fixture_response(2)).unwrap();
     let mut response = fixture_response(3);
@@ -766,8 +1135,8 @@ fn root_history_resume_is_valid_but_unverified_policies_fail_before_spawning() {
 
 #[test]
 fn handshake_timeout_remains_uncertain_and_does_not_retry() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     protocol.pending.as_mut().unwrap().sent_at =
         Instant::now() - REQUEST_TIMEOUT - Duration::from_secs(1);
     assert!(protocol.request_timed_out());
@@ -1132,8 +1501,8 @@ fn real_empty_load_retains_the_requested_identity_and_closes_without_a_turn() {
         native_session_id: "01a0a8ef-22d4-70f2-91d3-0cd052d7e80f".into(),
     };
     assert!(validate_options(&options).is_ok());
-    let mut protocol = GrokProtocol::new(options);
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options);
+    protocol.initialize().unwrap();
     protocol.receive(records[0].clone()).unwrap();
     let opened = protocol.receive(records[1].clone()).unwrap();
     assert_eq!(opened.writes[0]["method"], "session/load");
@@ -1199,8 +1568,8 @@ fn recovery_error_or_changed_identity_cannot_fall_back_to_a_new_session() {
         options.target = SessionTarget::Resume {
             native_session_id: "original-session".into(),
         };
-        let mut protocol = GrokProtocol::new(options);
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options);
+        protocol.initialize().unwrap();
         protocol.receive(fixture_response(1)).unwrap();
         assert_eq!(
             protocol.receive(fixture_response(2)).unwrap().writes[0]["method"],
@@ -1354,8 +1723,8 @@ fn byok_response(id: u64) -> Value {
 }
 
 fn active_byok_prompt() -> GrokProtocol {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     for id in 1..=3 {
         protocol.receive(byok_response(id)).unwrap();
     }
@@ -1386,8 +1755,8 @@ fn byok_text_chunks() -> Vec<Value> {
 }
 
 fn pending_native_approval() -> (GrokProtocol, Value) {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     for record in approval_lifecycle_fixture() {
         let message = &record["message"];
         if record["direction"] == "stdin" && message["method"] == "session/prompt" {
@@ -1420,8 +1789,8 @@ fn internal_action(
 
 #[test]
 fn native_byok_fixture_recovers_two_round_results_and_distinct_approval_outcomes() {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     let mut events = Vec::new();
     for record in approval_lifecycle_fixture() {
         let message = &record["message"];
@@ -1930,8 +2299,8 @@ fn native_cancel_continue_and_process_restart_recover_the_original_session_marke
                 native_session_id: "01a0add1-d9d9-7411-9a11-590ebd81db56".into(),
             };
         }
-        let mut protocol = GrokProtocol::new(options);
-        protocol.initialize();
+        let mut protocol = GrokProtocol::from_fixture(options);
+        protocol.initialize().unwrap();
         for record in records.iter().filter(|record| record["process"] == process) {
             let mut message = record["message"].clone();
             if record["direction"] == "stdin" {
@@ -2061,8 +2430,8 @@ fn advertised_resume_without_load_does_not_replace_the_verified_recovery_method(
     options.target = SessionTarget::Resume {
         native_session_id: "original-session".into(),
     };
-    let mut protocol = GrokProtocol::new(options);
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options);
+    protocol.initialize().unwrap();
     let mut initialize = fixture_response(1);
     initialize["result"]["agentCapabilities"]["loadSession"] = json!(false);
     protocol.receive(initialize).unwrap();
@@ -2124,8 +2493,8 @@ fn multistream_fixture() -> Vec<Value> {
 }
 
 fn multistream_before_final_text() -> (GrokProtocol, Value) {
-    let mut protocol = GrokProtocol::new(options());
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
     for record in multistream_fixture() {
         let message = &record["message"];
         if record["direction"] == "stdin" && message["method"] == "session/prompt" {
@@ -2672,9 +3041,9 @@ fn leased_protocol() -> GrokProtocol {
         allow_spawn: true,
         allow_message: true,
     });
-    let mut protocol = GrokProtocol::new(launch);
+    let mut protocol = GrokProtocol::from_fixture(launch);
     protocol.sdk.as_mut().unwrap().owned_process = true;
-    protocol.initialize();
+    protocol.initialize().unwrap();
     protocol.receive(fixture_response(1)).unwrap();
     protocol.receive(fixture_response(2)).unwrap();
     protocol.receive(fixture_response(3)).unwrap();
@@ -2780,13 +3149,13 @@ fn production_sdk_registration_uses_process_nonce_and_never_advertises_spawn() {
         allow_spawn: true,
         allow_message: true,
     });
-    let mut first = GrokProtocol::new(launch.clone());
-    let second = GrokProtocol::new(launch);
+    let mut first = GrokProtocol::from_fixture(launch.clone());
+    let second = GrokProtocol::from_fixture(launch);
     assert_ne!(
         first.sdk.as_ref().unwrap().bridge.server_id(),
         second.sdk.as_ref().unwrap().bridge.server_id()
     );
-    let initialize = first.initialize();
+    let initialize = first.initialize().unwrap();
     assert_eq!(
         initialize["params"]["clientCapabilities"]["_meta"]["x.ai/mcp/sdk"],
         true
@@ -2803,6 +3172,7 @@ fn production_sdk_registration_uses_process_nonce_and_never_advertises_spawn() {
     let [
         RuntimeEventKind::SessionReady {
             effective_permissions,
+            ..
         },
     ] = ready.events.as_slice()
     else {
@@ -2837,8 +3207,8 @@ fn production_sdk_registration_uses_process_nonce_and_never_advertises_spawn() {
 fn production_sdk_without_owned_process_cannot_register_or_open_session() {
     let mut launch = options();
     launch.local_tools = Some(LocalToolPermissions::default());
-    let mut protocol = GrokProtocol::new(launch);
-    protocol.initialize();
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    protocol.initialize().unwrap();
     protocol.receive(fixture_response(1)).unwrap();
     protocol.receive(fixture_response(2)).unwrap();
     assert!(protocol.receive(fixture_response(3)).is_err());
@@ -3242,4 +3612,398 @@ async fn production_lease_immediate_error_reply_also_bounds_native_completion_wa
             .is_empty()
     );
     assert!(!protocol.prompt.as_ref().unwrap().finished);
+}
+
+#[test]
+fn fixed_grok_creation_does_not_convert_unknown_history_to_a_restricted_task() {
+    let mut launch = options();
+    launch.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    assert!(validate_options(&launch).is_ok());
+    launch.target = SessionTarget::Resume {
+        native_session_id: "existing-native-session".into(),
+    };
+    assert!(validate_options(&launch).is_err());
+    launch.target = SessionTarget::New;
+    launch.permission_policy = PermissionPolicy::Inherit;
+    launch.local_tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    assert!(validate_options(&launch).is_err());
+}
+
+#[test]
+fn fixed_grok_prompt_cannot_toggle_native_approval_mode() {
+    let mut launch = options();
+    launch.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    let effects = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text(" /always-approve on".into())],
+        },
+    });
+    assert!(effects.writes.is_empty());
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    assert!(protocol.submitted_messages.is_empty());
+}
+
+#[test]
+fn fixed_grok_waits_for_a_matching_native_tool_catalog_before_ready() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut launch = options();
+    launch.cwd = directory.path().canonicalize().unwrap();
+    launch.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    launch.grok_profile = Some(
+        super::super::permissions::GrokCreationPolicyV1::compile(
+            &launch.cwd,
+            "1.0.30",
+            "a".repeat(64),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedReadV1,
+        )
+        .unwrap(),
+    );
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    protocol.initialize().unwrap();
+    protocol.receive(fixture_response(1)).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    let response = protocol.receive(fixture_response(3)).unwrap();
+    assert!(response.events.is_empty());
+    assert!(protocol.deferred_ready.is_some());
+    assert!(!protocol.task_input_written);
+    let error = protocol.receive(json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update","_meta":{}}
+    }})).err().unwrap();
+    let evidence = error.permission_ceiling_evidence().unwrap();
+    assert_eq!(evidence["reason"], "grok_creation_catalog_missing");
+    assert_eq!(evidence["actual"]["catalog"]["value_type"], "missing");
+    assert_eq!(evidence["task_input_sent"], false);
+    assert!(protocol.deferred_ready.is_some());
+    let ready = protocol.receive(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update","_meta":{"tools":["read_file"]}}}})).unwrap();
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+    assert!(protocol.deferred_ready.is_none());
+    assert!(!protocol.request_timed_out());
+    assert!(protocol.receive(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update","_meta":{"tools":["read_file","run_terminal_command"]}}}})).is_err());
+    protocol.deferred_ready = Some((Value::Null, Instant::now() - REQUEST_TIMEOUT));
+    assert!(protocol.request_timed_out());
+    assert!(matches!(protocol.receive(json!({"jsonrpc":"2.0","method":"session/update","params":{"sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update","_meta":{"tools":["read_file"]}}}})), Err(RuntimeError::RequestTimedOut)));
+}
+
+#[test]
+fn fixed_file_policy_is_saved_before_ready_and_cannot_resume_as_read_only() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut launch = options();
+    launch.cwd = directory.path().canonicalize().unwrap();
+    launch.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
+    launch.grok_profile = Some(
+        super::super::permissions::GrokCreationPolicyV1::compile(
+            &launch.cwd,
+            "1.0.30",
+            "a".repeat(64),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedFilesV1,
+        )
+        .unwrap(),
+    );
+    assert!(validate_options(&launch).is_ok());
+    let mut resumed = launch.clone();
+    resumed.target = SessionTarget::Resume {
+        native_session_id: "saved-file-session".into(),
+    };
+    assert!(validate_options(&resumed).is_ok());
+    resumed.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    assert!(validate_options(&resumed).is_err());
+    let mut unknown = launch.clone();
+    unknown.target = resumed.target;
+    unknown.grok_profile = None;
+    assert!(validate_options(&unknown).is_err());
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    protocol.initialize().unwrap();
+    protocol.receive(fixture_response(1)).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    assert!(
+        protocol
+            .receive(fixture_response(3))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let ready = protocol
+        .receive(json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":protocol.session_id,"update":{"sessionUpdate":"available_commands_update",
+        "_meta":{"tools":["read_file","write","search_replace"]}}}}))
+        .unwrap();
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+            verified_cli_version,
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("精确文件工具目录确认后才允许就绪");
+    };
+    assert_eq!(verified_cli_version.as_deref(), Some("1.0.30"));
+    assert_eq!(
+        effective_permissions["requestedPolicy"],
+        "GrokRestrictedFilesV1"
+    );
+    assert_eq!(
+        effective_permissions["grokCreationPolicyV1"]["toolSet"],
+        "files"
+    );
+    assert_eq!(
+        effective_permissions["permissionEnforcementVerified"],
+        false
+    );
+}
+
+#[test]
+fn fixed_file_policy_cannot_change_native_approval_mode_through_a_slash_command() {
+    let mut launch = options();
+    launch.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    let effects = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("/always-approve on".into())],
+        },
+    });
+    assert!(effects.writes.is_empty());
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+    assert!(protocol.submitted_messages.is_empty());
+}
+
+#[test]
+fn fixed_file_write_approval_waits_for_the_user_and_denial_is_sent_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let (mut protocol, mut request) = pending_native_approval();
+    // 公开真实夹具将绝对路径脱敏；本测试替换为独立临时项目中的合成路径。
+    request["params"]["toolCall"]["rawInput"]["file_path"] =
+        json!(directory.path().join("approval.txt"));
+    protocol.options.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
+    protocol.options.grok_profile = Some(
+        super::super::permissions::GrokCreationPolicyV1::compile(
+            directory.path(),
+            "1.0.30",
+            "a".repeat(64),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedFilesV1,
+        )
+        .unwrap(),
+    );
+    let pending = protocol.receive(request.clone()).unwrap();
+    assert!(pending.writes.is_empty());
+    assert!(matches!(
+        pending.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { .. }]
+    ));
+    assert!(protocol.receive(request.clone()).unwrap().events.is_empty());
+    let denied = internal_action(
+        &mut protocol,
+        Uuid::new_v4(),
+        RuntimeAction::RespondApproval {
+            approval_id: "grok:0".into(),
+            decision: ApprovalDecision::DenyOnce,
+        },
+    );
+    assert_eq!(
+        denied.writes,
+        vec![json!({"jsonrpc":"2.0","id":0,
+        "result":{"outcome":{"outcome":"selected","optionId":"reject-once"}}})]
+    );
+    assert!(protocol.receive(request).unwrap().writes.is_empty());
+}
+
+#[test]
+fn fixed_file_unknown_write_variant_is_cancelled_without_opening_an_approval() {
+    let directory = tempfile::tempdir().unwrap();
+    let (mut protocol, mut request) = pending_native_approval();
+    protocol.options.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
+    protocol.options.grok_profile = Some(
+        super::super::permissions::GrokCreationPolicyV1::compile(
+            directory.path(),
+            "1.0.30",
+            "a".repeat(64),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedFilesV1,
+        )
+        .unwrap(),
+    );
+    request["params"]["toolCall"]["rawInput"]["variant"] = json!("EditFile");
+    let cancelled = protocol.receive(request).unwrap();
+    assert!(cancelled.events.is_empty());
+    assert_eq!(
+        cancelled.writes,
+        vec![json!({"jsonrpc":"2.0","id":0,
+        "result":{"outcome":{"outcome":"cancelled"}}})]
+    );
+    assert!(protocol.approvals.is_empty());
+}
+
+fn catalog_sdk_protocol() -> GrokProtocol {
+    let mut options = options();
+    options.local_tools = Some(LocalToolPermissions {
+        allow_spawn: true,
+        allow_message: true,
+    });
+    options.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    let profile = super::super::permissions::GrokCreationPolicyV1::compile(
+        &options.cwd.canonicalize().unwrap(),
+        "1.0.30",
+        "a".repeat(64),
+        "b".repeat(64),
+        options.local_tools,
+        PermissionPolicy::GrokRestrictedReadV1,
+    )
+    .unwrap();
+    options.grok_profile = Some(profile.clone());
+    let mut protocol = GrokProtocol::from_fixture(options);
+    protocol.session_id = Some("catalog-native-session".into());
+    let sdk = protocol.sdk.as_mut().unwrap();
+    sdk.owned_process = true;
+    sdk.bridge = super::GrokMcpBridge::with_creation_policy(sdk.process_epoch, &profile).unwrap();
+    sdk.ledger = Some(
+        super::GrokToolLeaseLedger::new(
+            sdk.process_epoch,
+            protocol.options.generation,
+            sdk.bridge.server_id().into(),
+            super::MCP_SERVER_NAME.into(),
+            protocol.session_id.clone().unwrap(),
+        )
+        .unwrap(),
+    );
+    protocol
+}
+
+fn catalog_registration(protocol: &GrokProtocol, id: u64, method: &str) -> Value {
+    json!({"jsonrpc":"2.0","id":id,"method":"_x.ai/mcp/sdk_call","params":{
+        "serverId":protocol.sdk.as_ref().unwrap().bridge.server_id(),
+        "message":{"jsonrpc":"2.0","id":id,"method":method,"params":{"_meta":{
+            "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities":{},
+            "io.modelcontextprotocol/clientInfo":{"name":"offline-catalog-fixture","version":"1"}
+        }}}
+    }})
+}
+
+fn catalog_union_message() -> Value {
+    json!({"jsonrpc":"2.0","method":"session/update","params":{
+        "sessionId":"catalog-native-session","update":{"sessionUpdate":"available_commands_update",
+        "availableCommands":[],
+        "_meta":{"tools":["read_file","search_tool","use_tool",
+            "infinishell-local-tasks__inspect_local_tasks","infinishell-local-tasks__run_agents",
+            "infinishell-local-tasks__send_message_to_agent"]}}
+    }})
+}
+
+async fn write_catalog_registration(protocol: &mut GrokProtocol) {
+    let (sender, _receiver) = mpsc::channel(8);
+    for (id, method) in [(301, "server/discover"), (302, "tools/list")] {
+        let message = catalog_registration(protocol, id, method);
+        let effects = protocol.receive(message).unwrap();
+        let mut stdin = Cursor::new(Vec::new());
+        flush_effects(protocol, &mut stdin, &sender, effects)
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+async fn catalog_union_needs_successful_transport_writes_and_same_live_ledger() {
+    let mut protocol = catalog_sdk_protocol();
+    assert!(protocol.receive(catalog_union_message()).is_err());
+    let (sender, _receiver) = mpsc::channel(8);
+    let message = catalog_registration(&protocol, 301, "server/discover");
+    let effects = protocol.receive(message.clone()).unwrap();
+    let mut empty = [];
+    assert!(
+        flush_effects(
+            &mut protocol,
+            &mut Cursor::new(&mut empty[..]),
+            &sender,
+            effects
+        )
+        .await
+        .is_err()
+    );
+    assert!(protocol.receive(catalog_union_message()).is_err());
+    write_catalog_registration(&mut protocol).await;
+    protocol.receive(catalog_union_message()).unwrap();
+    assert!(protocol.creation_catalog_session.is_some());
+    assert!(protocol.sdk.as_ref().unwrap().calls.is_empty());
+    assert!(!protocol.task_input_written);
+}
+
+#[tokio::test]
+async fn catalog_union_rejects_replay_retirement_wrong_nonce_and_generation() {
+    let mut replay = catalog_union_message();
+    replay["params"]["_meta"]["isReplay"] = json!(true);
+    let mut protocol = catalog_sdk_protocol();
+    write_catalog_registration(&mut protocol).await;
+    assert!(protocol.receive(replay).is_err());
+    protocol.options.generation = Uuid::new_v4();
+    assert!(protocol.receive(catalog_union_message()).is_err());
+
+    let mut protocol = catalog_sdk_protocol();
+    write_catalog_registration(&mut protocol).await;
+    protocol
+        .sdk
+        .as_mut()
+        .unwrap()
+        .ledger
+        .as_mut()
+        .unwrap()
+        .retire();
+    assert!(protocol.receive(catalog_union_message()).is_err());
+
+    let mut protocol = catalog_sdk_protocol();
+    let mut message = catalog_registration(&protocol, 301, "server/discover");
+    message["params"]["serverId"] = json!("old-process-nonce");
+    assert!(protocol.receive(message).is_err());
+    assert!(protocol.receive(catalog_union_message()).is_err());
+}
+
+#[tokio::test]
+async fn old_session_catalog_cannot_confirm_new_creation_or_bypass_unknown_names() {
+    let mut protocol = catalog_sdk_protocol();
+    write_catalog_registration(&mut protocol).await;
+    let mut old = catalog_union_message();
+    old["params"]["sessionId"] = json!("old-native-session");
+    assert!(protocol.receive(old).unwrap().events.is_empty());
+    assert!(protocol.creation_catalog_session.is_none());
+    let mut unknown = catalog_union_message();
+    unknown["params"]["update"]["_meta"]["tools"][3] = json!("PRIVATE_UNKNOWN_CATALOG");
+    let error = protocol.receive(unknown).err().unwrap();
+    assert!(!error.to_string().contains("PRIVATE_UNKNOWN_CATALOG"));
+    assert!(protocol.creation_catalog_session.is_none());
+}
+
+#[test]
+fn legacy_grok_ready_carries_the_paired_native_version() {
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
+    protocol.receive(fixture_response(1)).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    let ready = protocol.receive(fixture_response(3)).unwrap();
+    assert!(
+        matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
+        verified_cli_version: Some(version), ..
+    }] if version == "1.0.30")
+    );
 }

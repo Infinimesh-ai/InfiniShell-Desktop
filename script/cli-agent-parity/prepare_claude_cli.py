@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""准备官方固定 Claude 2.1.273 原生文件；只写测试临时目录，不安装或改写已有 CLI。"""
+"""准备显式选择的官方固定 Claude 文件；默认保留 2.1.273，不安装或改写已有 CLI。"""
 
 import argparse
 import hashlib
@@ -28,11 +28,31 @@ RELEASES = {
     "darwin-arm64": ("claude", 212228880, "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"),
     "darwin-x64": ("claude", 221023456, "2030ecf911e301e778b3c5a49068d6751384c830e48ea14f11eb61dd23622cee"),
 }
+RELEASE_CATALOG = {
+    VERSION: {"commit": RELEASE_COMMIT, "manifest_sha256": MANIFEST_SHA256,
+              "manifest_size": MANIFEST_SIZE, "platforms": RELEASES},
+    "2.1.278": {
+        "commit": "809c980662e3525645594dc8b74f78c38a348db1",
+        "manifest_sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28",
+        "manifest_size": 2161,
+        "platforms": {
+            "linux-x64": ("claude", 234119480, "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab"),
+            "win32-x64": ("claude.exe", 237232800, "006ea5c8638f67f10a5ae66bb232fd267c9f6af294e3f03f4cfcf1fd3f2cced8"),
+            "darwin-arm64": ("claude", 217695408, "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"),
+            "darwin-x64": ("claude", 226521952, "c522425e3d42275d2ac2238757ef8ba7f80d165a934044ec5a7a5fd7d7b9950b"),
+        },
+    },
+}
 
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def release_contract(version=VERSION):
+    require(isinstance(version, str) and version in RELEASE_CATALOG, "只允许已绑定官方摘要的 Claude 版本")
+    return RELEASE_CATALOG[version]
 
 
 def current_platform():
@@ -56,12 +76,14 @@ def digest(path):
         return hashlib.file_digest(source, "sha256").hexdigest()
 
 
-def verify_binary(path, target):
-    name, size, checksum = RELEASES[target]
+def verify_binary(path, target, version=VERSION):
+    contract = release_contract(version)
+    require(target in contract["platforms"], "当前平台没有该固定 Claude 版本的摘要")
+    name, size, checksum = contract["platforms"][target]
     require(regular_file(path).st_size == size and digest(path) == checksum,
             "原生 Claude 文件不匹配固定官方版本摘要")
     return {"platform": target, "binary": name, "bytes": size, "sha256": checksum,
-            "url": f"{BASE_URL}/{target}/{name}"}
+            "url": f"https://downloads.claude.ai/claude-code-releases/{version}/{target}/{name}"}
 
 
 def isolated_environment(root):
@@ -83,17 +105,20 @@ def isolated_environment(root):
     return env
 
 
-def verify_version(executable, directory):
+def verify_version(executable, directory, version=VERSION):
+    release_contract(version)
     with tempfile.TemporaryDirectory(prefix="version-", dir=directory) as temporary:
         root = Path(temporary).resolve()
         completed = subprocess.run([str(executable), "--version"], env=isolated_environment(root),
                                    cwd=root, capture_output=True, text=True, encoding="utf-8",
                                    errors="strict", timeout=10, check=True)
-    require(completed.stdout.strip() == f"{VERSION} (Claude Code)", "原生 Claude 报告的版本不匹配")
+    require(completed.stdout.strip() == f"{version} (Claude Code)", "原生 Claude 报告的版本不匹配")
     return completed.stdout.strip()
 
 
-def owned_directory(directory, explicit_private=False):
+def owned_directory(directory, explicit_private=False, version=VERSION):
+    release_contract(version)
+    marker_contents = f"isolated Claude Code {version} verification inputs\n".encode()
     require(not directory.is_symlink(), "测试目录不能是符号链接")
     if directory.exists():
         require(not getattr(directory.lstat(), "st_file_attributes", 0) & 0x400, "测试目录不能是 Windows 重解析点")
@@ -112,16 +137,18 @@ def owned_directory(directory, explicit_private=False):
     marker = directory / MARKER
     if marker.exists():
         regular_file(marker)
-        require(marker.read_bytes() == MARKER_CONTENTS, "目录不属于此固定版本准备器")
+        require(marker.read_bytes() == marker_contents, "目录不属于此固定版本准备器")
     else:
         require(not any(directory.iterdir()), "不接管已有内容的目录")
         with marker.open("xb") as output:
-            output.write(MARKER_CONTENTS)
+            output.write(marker_contents)
     return directory
 
 
-def fetch(url, destination, expected_size, expected_sha256, executable=False):
-    require(url.startswith(BASE_URL + "/"), "只允许固定官方版本的下载地址")
+def fetch(url, destination, expected_size, expected_sha256, executable=False, version=VERSION):
+    release_contract(version)
+    base_url = f"https://downloads.claude.ai/claude-code-releases/{version}"
+    require(url.startswith(base_url + "/"), "只允许固定官方版本的下载地址")
     if destination.exists() or destination.is_symlink():
         require(regular_file(destination).st_size == expected_size and digest(destination) == expected_sha256,
                 "已有文件不匹配固定发布，拒绝覆盖")
@@ -153,26 +180,32 @@ def fetch(url, destination, expected_size, expected_sha256, executable=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
+                        help="精确官方版本；缺省保留旧版验收输入")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--download-dir", type=Path, help="RUNNER_TEMP 内的专用下载目录")
     group.add_argument("--private-directory", type=Path, help="显式指定源树外的新私有目录；已有目录必须带本准备器标记")
     args = parser.parse_args()
+    version = args.claude_version
+    contract = release_contract(version)
+    base_url = f"https://downloads.claude.ai/claude-code-releases/{version}"
     target = current_platform()
     require(target in ("linux-x64", "win32-x64"), "准备器仅下载 Linux/Windows x64；macOS 探测使用已有受测原生文件")
-    directory = owned_directory(args.private_directory or args.download_dir, args.private_directory is not None)
+    directory = owned_directory(args.private_directory or args.download_dir, args.private_directory is not None,
+                                version=version)
     manifest = directory / "manifest.json"
-    fetch(f"{BASE_URL}/manifest.json", manifest, MANIFEST_SIZE, MANIFEST_SHA256)
+    fetch(f"{base_url}/manifest.json", manifest, contract["manifest_size"], contract["manifest_sha256"], version=version)
     metadata = json.loads(manifest.read_text(encoding="utf-8"))
-    name, size, checksum = RELEASES[target]
-    require(metadata["version"] == VERSION and metadata["commit"] == RELEASE_COMMIT and
+    name, size, checksum = contract["platforms"][target]
+    require(metadata["version"] == version and metadata["commit"] == contract["commit"] and
             metadata["platforms"][target] == {"binary": name, "size": size, "checksum": checksum},
             "固定签名清单与内置契约不一致")
     executable = directory / name
-    fetch(f"{BASE_URL}/{target}/{name}", executable, size, checksum, executable=True)
-    evidence = verify_binary(executable, target)
-    evidence.update(version=verify_version(executable, directory), release_commit=RELEASE_COMMIT,
+    fetch(f"{base_url}/{target}/{name}", executable, size, checksum, executable=True, version=version)
+    evidence = verify_binary(executable, target, version)
+    evidence.update(version=verify_version(executable, directory, version), release_commit=contract["commit"],
                     manifest_sha256=digest(manifest), installed=False, credentials_provided=False)
-    verify_binary(executable, target)
+    verify_binary(executable, target, version)
     report = directory / "claude-fixed-inputs.json"
     if report.exists() or report.is_symlink():
         regular_file(report)
