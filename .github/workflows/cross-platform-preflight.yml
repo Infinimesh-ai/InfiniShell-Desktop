@@ -331,6 +331,34 @@ jobs:
           persist-credentials: false
           clean: true
 
+      # 自托管 runner 的目标目录与 sccache 可以完整重建。每次验收先清除旧产物，
+      # 避免历史提交累积占满系统盘并让后续平台门禁在编译中途失败。
+      - name: Reclaim Windows build storage
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:RUSTC_WRAPPER --stop-server
+          if ($LASTEXITCODE -ne 0) {
+            Write-Output 'No running sccache server needed to be stopped'
+          }
+
+          $buildRoots = @(
+            'C:\infinishell-ci\cargo-target',
+            'C:\infinishell-ci\sccache'
+          )
+          foreach ($buildRoot in $buildRoots) {
+            $resolved = [System.IO.Path]::GetFullPath($buildRoot)
+            if ($resolved -ne $buildRoot) {
+              throw "Unexpected build cleanup path: $resolved"
+            }
+            if (Test-Path -LiteralPath $resolved) {
+              Remove-Item -LiteralPath $resolved -Recurse -Force
+            }
+            New-Item -ItemType Directory -Path $resolved | Out-Null
+          }
+          Get-PSDrive -Name C | Select-Object Name, Used, Free
+
       # 直接解压固定摘要的官方 CI 包，保持当前作业以外的 Python 安装配置。
       - name: Prepare job-local Python for CLI parity verification
         shell: pwsh
