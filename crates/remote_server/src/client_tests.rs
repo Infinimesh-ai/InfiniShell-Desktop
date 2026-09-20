@@ -389,6 +389,11 @@ async fn disconnect_event_closes_lifecycle_stream_while_writer_is_alive() {
 
     let event = event_rx.recv().await.unwrap();
     assert!(matches!(event, ClientEvent::Disconnected));
+
+    let next_event = tokio::time::timeout(std::time::Duration::from_secs(1), event_rx.recv())
+        .await
+        .expect("lifecycle stream should close after the disconnect event");
+    assert!(next_event.is_err());
     assert!(event_rx.is_closed());
 }
 
