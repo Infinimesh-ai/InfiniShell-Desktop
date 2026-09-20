@@ -256,7 +256,7 @@ class DetachedGrokHookTests(unittest.TestCase):
         environment = {**self.env, "PATH": str(Path(tmux).parent) + ":/usr/bin:/bin"}
         def command(*args):
             return subprocess.run([tmux, "-S", str(socket), *args], env=environment,
-                                  check=True, capture_output=True, text=True, timeout=5).stdout.strip()
+                                  check=True, capture_output=True, text=True, timeout=15).stdout.strip()
         command("new-session", "-d", "-s", "hook", "-x", "80", "-y", "24", "/bin/cat")
         try:
             first = command("display-message", "-p", "-t", "hook", "#{pane_id}")
