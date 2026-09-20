@@ -21,6 +21,11 @@ SESSION = "00000000-0000-4000-8000-000000000001"
 OTHER_SESSION = "00000000-0000-4000-8000-000000000002"
 
 
+def python_runtime_environment():
+    allowed = {"PATH", "SYSTEMROOT", "WINDIR", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"}
+    return {key: value for key, value in os.environ.items() if key.upper() in allowed}
+
+
 def permission(target, session=SESSION, call="call", request_id="permission"):
     return {"jsonrpc": "2.0", "id": request_id, "method": "session/request_permission", "params": {
         "sessionId": session, "toolCall": {"toolCallId": call, "kind": "read",
@@ -561,7 +566,7 @@ class ProtocolTests(unittest.TestCase):
 p.run=lambda *args:{'passed':False}
 raise SystemExit(p.main(['--fixture-root','/fixture','--grok','/grok','--official-grok-home','/auth','--run','--confirm',p.CONFIRM]))
 '''
-        env = {key: value for key, value in os.environ.items() if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR"}}
+        env = python_runtime_environment()
         env["PYTHONPATH"] = str(Path(probe.__file__).parent)
         result = subprocess.run([sys.executable, "-B", "-c", code], capture_output=True, env=env, timeout=10)
         self.assertEqual(result.returncode, 1)
@@ -860,7 +865,7 @@ class PrivateFixtureTests(unittest.TestCase):
         self.assertTrue(result["auth_copy_removed"])
 
     def test_owned_python_process_eof_and_hanging_process_cleanup_are_distinct(self):
-        env = {"PATH": "/usr/bin:/bin"}
+        env = python_runtime_environment()
         wire = probe.Wire([sys.executable, "-B", "-c", "import sys;sys.stdin.buffer.read()"], env, self.base)
         self.assertTrue(wire.close(True))
         wire = probe.Wire([sys.executable, "-B", "-c", "import time;time.sleep(30)"], env, self.base)

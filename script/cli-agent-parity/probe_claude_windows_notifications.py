@@ -151,13 +151,10 @@ def seed_completed_onboarding(root, project):
     return value
 
 
-def native_command(executable, plugin, *, session_id=None):
+def native_command(executable, plugin, *, init_only=False):
     arguments = [str(executable)]
-    if session_id is None:
+    if init_only:
         arguments.append("--init-only")
-    else:
-        require(str(uuid.UUID(session_id)) == session_id, "会话 ID 必须是本轮 UUID")
-        arguments.extend(("--session-id", session_id))
     arguments.extend(("--setting-sources", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
                       "--plugin-dir", str(plugin)))
     return arguments
@@ -201,16 +198,18 @@ def raw_bytes(path):
 
 
 def notification_projection(value, expected):
-    require(isinstance(expected, dict) and isinstance(expected.get("session_id"), str)
+    require(isinstance(value, dict) and isinstance(expected, dict)
             and isinstance(expected.get("cwd"), str), "关联条件不完整")
     try:
-        fresh_id = str(uuid.UUID(expected["session_id"]))
-    except ValueError:
+        fresh_id = str(uuid.UUID(value.get("session_id")))
+    except (AttributeError, TypeError, ValueError):
         raise ProbeFailure("关联 UUID 格式不符") from None
-    require(fresh_id == expected["session_id"], "关联 UUID 格式不符")
+    expected_id = expected.get("session_id")
+    require((expected_id is None or expected_id == fresh_id) and value.get("session_id") == fresh_id,
+            "关联 UUID 格式不符")
     require(isinstance(value, dict) and type(value.get("v")) is int and value["v"] == 1
             and value.get("agent") == "claude" and value.get("event") == "session_start"
-            and value.get("session_id") == expected["session_id"] and value.get("cwd") == expected["cwd"]
+            and value.get("cwd") == expected["cwd"]
             and value.get("plugin_version") == "2.2.0", "原生通知关联不符")
     return {key: value[key] for key in ("v", "agent", "event", "session_id", "cwd", "plugin_version")}
 
@@ -263,7 +262,7 @@ def run_path_case(repo, root, executable, dependencies, name):
         "'{hook_event_name, source, plugin_root:$root}' > \"$INFINISHELL_NOTIFICATION_PATH_PROBE/marker.json\"\n",
         encoding="utf-8", newline="\n")
     env["INFINISHELL_NOTIFICATION_PATH_PROBE"] = root.as_posix()
-    command = native_command(executable, plugin)
+    command = native_command(executable, plugin, init_only=True)
     job, process = WindowsProbeJob(), None
     try:
         with suspended_creation(_winapi, job, command, env, project, record):
@@ -370,12 +369,12 @@ def run_driver(configuration):
         verify_binary(executable, "win32-x64")
         env = case_environment(root, config["dependencies"], executable)
         seed_completed_onboarding(root, project)
-        command = native_command(executable, plugin, session_id=config["session_id"])
+        command = native_command(executable, plugin)
         api = WinApi()
         with suspended_creation(_winapi, job, command, env, project, report):
             # 不重定向任何标准句柄：真正 Claude UI 必须继承此 HPCON。
             process = subprocess.Popen(command, env=env, cwd=project)
-        expected = {"session_id": config["session_id"], "cwd": str(project)}
+        expected = {"cwd": str(project)}
         started = time.monotonic()
         deadline = started + CASE_TIMEOUT
         while time.monotonic() < deadline and process.poll() is None:
@@ -481,7 +480,7 @@ def run_worker(configuration):
             report["path_cases"].append(run_path_case(repo, root / f"path-{index}", executable, dependencies, name))
             write_json(Path(config["worker_report"]), report)
         for index, name in enumerate(CASE_NAMES):
-            case = {"name": name, "passed": False, "session_id": str(uuid.uuid4())}
+            case = {"name": name, "passed": False}
             report["transport_cases"].append(case)
             case_root = root / f"interactive-{index}"
             case_root.mkdir()
@@ -490,12 +489,12 @@ def run_worker(configuration):
             plugin = case_root / name
             hashes = prepare_plugin(repo, plugin, case_root)
             case["plugin_sha256"] = hashes
-            case["expected"] = {"session_id": case["session_id"], "cwd": str(project)}
+            case["expected"] = {"cwd": str(project)}
             write_json(Path(config["worker_report"]), report)
             raw_output = root / f"case-{index}.pty.bin"
             driver_report = root / f"case-{index}.driver.json"
             driver_config = {**config, "dependencies": dependencies, "case_root": str(case_root), "project": str(project),
-                             "plugin": str(plugin), "plugin_hashes": hashes, "session_id": case["session_id"],
+                             "plugin": str(plugin), "plugin_hashes": hashes,
                              "raw_output": str(raw_output), "driver_report": str(driver_report)}
             path = root / f"case-{index}.config.json"
             write_json(path, driver_config, exclusive=True)
@@ -512,6 +511,8 @@ def run_worker(configuration):
                 case["raw_pty"] = {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
             try:
                 case["notification"] = transport_match(raw, case["expected"])
+                case["session_id"] = case["notification"]["session_id"]
+                case["expected"]["session_id"] = case["session_id"]
                 require(case.get("native", {}).get("passed") is True and case.get("conpty", {}).get("exit_code") == 0
                         and case["conpty"].get("console_close_and_output_eof_confirmed") is True
                         and not case.get("conpty_failure"), "原生退出与ConPTY收尾未确认")

@@ -72,6 +72,8 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
     def test_only_literal_osc_with_exact_uuid_and_path_is_accepted(self):
         for ending in (b"\x07", b"\x1b\\"):
             self.assertEqual(probe.transport_match(b"UI text" + osc(notification(), ending), expected()), notification())
+            self.assertEqual(probe.transport_match(b"UI text" + osc(notification(), ending), {"cwd": expected()["cwd"]}),
+                             notification())
         invalid = [json.dumps(notification()).encode(), json.dumps({"terminalSequence": osc(notification()).decode()}).encode(),
                    osc(notification()) * 2, osc(notification()) + osc({"diagnostic_nonce": "test"}),
                    osc([]), osc(None), osc("marker"), b"", b'\x1b]777;notify;warp://cli-agent;bad json\x07']
@@ -88,6 +90,9 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
         for item in (None, [], {"session_id": [], "cwd": "x"}, {"session_id": "not-uuid", "cwd": "x"}):
             with self.subTest(expected=item), self.assertRaises(ValueError):
                 probe.transport_match(osc(notification()), item)
+        for item in (None, [], "not-uuid"):
+            with self.subTest(native_session_id=item), self.assertRaises(ValueError):
+                probe.transport_match(osc({**notification(), "session_id": item}), {"cwd": expected()["cwd"]})
 
     def test_complete_two_phase_evidence_is_required(self):
         probe.validate_acceptance(evidence())
@@ -174,12 +179,11 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
     def test_native_argv_preserves_plugin_and_never_supplies_prompt_or_bypass(self):
         for name in probe.CASE_NAMES:
             plugin = Path(name)
-            command = probe.native_command(Path("claude.exe"), plugin, session_id=expected()["session_id"])
-            self.assertEqual(command, ["claude.exe", "--session-id", expected()["session_id"], "--setting-sources", "",
+            command = probe.native_command(Path("claude.exe"), plugin)
+            self.assertEqual(command, ["claude.exe", "--setting-sources", "",
                 "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}', "--plugin-dir", str(plugin)])
-            self.assertIn("--init-only", probe.native_command(Path("claude.exe"), plugin))
-        with self.assertRaises(ValueError):
-            probe.native_command(Path("claude.exe"), Path("plugin"), session_id="old")
+            self.assertNotIn("--session-id", command)
+            self.assertIn("--init-only", probe.native_command(Path("claude.exe"), plugin, init_only=True))
 
     def test_formal_tree_is_real_resource_combination_without_instrumentation(self):
         with tempfile.TemporaryDirectory() as directory:
