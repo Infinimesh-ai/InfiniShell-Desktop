@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "python3",
+    "-B",
+    "script/cli-agent-parity/installed_grok_hook_tests.py",
+    "DetachedGrokHookTests.test_real_tmux_pane_wins_over_both_stale_outer_paths"
+  ],
+  "exit_code": 0,
+  "seconds": 0.269,
+  "scope": "local real tmux target pane routing; not SSH or CLI online",
+  "output": ".\n----------------------------------------------------------------------\nRan 1 test in 0.174s\n\nOK\n",
+  "tmux_sha256": "a47f7c82de1e2779eadbd089ab4daccf60cd136a2b8dd976bec3399b9755a9f9"
+}

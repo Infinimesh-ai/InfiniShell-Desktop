@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "source": "source39",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_platform_acceptance": false,
+  "input_manifest_sha256": "3eb14394fc030d484e2066f3e2bfe8d9ac70e0ffdb512f1cffd08ebcb740e188",
+  "native_version": "1.0.30",
+  "plugin_version": "0.1.2",
+  "ui_submit_attempts": 13,
+  "native_model_inputs": 12,
+  "native_turns": [
+    {
+      "turn": 0,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    },
+    {
+      "turn": 1,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    },
+    {
+      "turn": 2,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "read_file",
+          "decision": "allow"
+        }
+      ],
+      "tools": [
+        "read_file"
+      ],
+      "outcome": "completed"
+    },
+    {
+      "turn": 3,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    },
+    {
+      "turn": 4,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "write",
+          "decision": "allow"
+        }
+      ],
+      "tools": [
+        "write"
+      ],
+      "outcome": "completed"
+    },
+    {
+      "turn": 5,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "write",
+          "decision": "deny"
+        }
+      ],
+      "tools": [
+        "write"
+      ],
+      "outcome": "cancelled"
+    },
+    {
+      "turn": 6,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "read_file",
+          "decision": "allow"
+        },
+        {
+          "tool_name": "search_replace",
+          "decision": "deny"
+        }
+      ],
+      "tools": [
+        "read_file",
+        "search_replace"
+      ],
+      "outcome": "cancelled"
+    },
+    {
+      "turn": 7,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "write",
+          "decision": "allow"
+        }
+      ],
+      "tools": [
+        "write"
+      ],
+      "outcome": "completed"
+    },
+    {
+      "turn": 8,
+      "yolo_mode": false,
+      "permissions": [
+        {
+          "tool_name": "write",
+          "decision": "cancelled"
+        }
+      ],
+      "tools": [
+        "write"
+      ],
+      "outcome": "cancelled"
+    },
+    {
+      "turn": 9,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    },
+    {
+      "turn": 10,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    },
+    {
+      "turn": 11,
+      "yolo_mode": false,
+      "permissions": [],
+      "tools": [],
+      "outcome": "completed"
+    }
+  ],
+  "cases": [
+    {
+      "number": 1,
+      "case": "english_memory",
+      "result": "GROK_MEMORY_39_a63e"
+    },
+    {
+      "number": 2,
+      "case": "automation_typeText_newline_error",
+      "result": "unintended_English_input_completed",
+      "counts_as_chinese_acceptance": false
+    },
+    {
+      "number": 3,
+      "case": "rich_input_chinese_multiline_file",
+      "result": "GROK_CONTEXT_39_83d9"
+    },
+    {
+      "number": 4,
+      "case": "app_visible_skill_menu",
+      "result": "GROK_SKILL_39_b481"
+    },
+    {
+      "number": 5,
+      "case": "write_allow",
+      "result": "PASS_exact_bytes_allow_once"
+    },
+    {
+      "number": 6,
+      "case": "write_deny",
+      "result": "PASS_rejected_cancelled_file_absent"
+    },
+    {
+      "number": 7,
+      "case": "edit_deny",
+      "result": "PASS_rejected_cancelled_original_unchanged"
+    },
+    {
+      "number": 8,
+      "case": "queue_hold",
+      "result": "write_completed_after_rich_input_submit_instead_of_explicit_native_approval"
+    },
+    {
+      "number": 9,
+      "case": "queue_append",
+      "result": "FAILED_append_not_observed_return_accepted_current_native_approval",
+      "model_input_proven": false
+    },
+    {
+      "number": 10,
+      "case": "cancel_pending_write",
+      "result": "PASS_ctrl_c_cancelled_file_absent"
+    },
+    {
+      "number": 11,
+      "case": "continue_memory",
+      "result": "PASS_exact_first_token_after_cancel"
+    },
+    {
+      "number": 12,
+      "case": "app_restart_explicit_resume_memory",
+      "result": "PASS_restart_no_autoreplay_exact_native_resume_memory",
+      "native_session_id": "01a0b5f3-4411-7f31-b67a-ffc0861f4ae4"
+    },
+    {
+      "number": 13,
+      "case": "actual_review_entrypoint",
+      "result": "PASS_review_button_path_line_text_and_final_token"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "01-en-plugin-installed.png",
+      "bytes": 87246,
+      "sha256": "f71e7de2fb8402a35d034c6e242caee9ad31dc2f038f9aaec2801959bda220ea"
+    },
+    {
+      "path": "02-en-first-result.png",
+      "bytes": 85119,
+      "sha256": "f5fa8a23bfb6e11a86cf57702849f094e28792f31cadaa6089ac86e5911ac7fd"
+    },
+    {
+      "path": "03-picker-late-callback-rejected.png",
+      "bytes": 81176,
+      "sha256": "9b7235a11d03713d71d81d1507deeeac6f920bfaa29907861ed1484b03509647"
+    },
+    {
+      "path": "04-zh-multiline-file-before-submit.png",
+      "bytes": 96991,
+      "sha256": "ddbdef270af0b8acb8fe4efcc8ff07485fd0e20107725d640cafcc4e2a36d72d"
+    },
+    {
+      "path": "05-zh-file-result.png",
+      "bytes": 99002,
+      "sha256": "c36536f961e0788889bb375e734bd6605f8d1128efd3f24cc9a6401c0e94f210"
+    },
+    {
+      "path": "06-visible-skill-menu.png",
+      "bytes": 109066,
+      "sha256": "f98d67306bbd6d82531d88f37f55ae5098f30d1a16d6ae89d1475fdd33aaa425"
+    },
+    {
+      "path": "07-skill-result.png",
+      "bytes": 78252,
+      "sha256": "c9a6c883149d1efd8a2013d6e5377ed2c792ccee2764dccfdfb74c56a434dfa9"
+    },
+    {
+      "path": "08-before-allow.png",
+      "bytes": 142572,
+      "sha256": "1ad26661fc683f8851dc680501343187cd904d73354c40afcf982c017f0f393a"
+    },
+    {
+      "path": "09-write-allowed.png",
+      "bytes": 106676,
+      "sha256": "1293e8f0109cb57f28ada1a8e81df6856a07ee4af0d78a23d4931717700c681d"
+    },
+    {
+      "path": "10-before-write-deny.png",
+      "bytes": 135981,
+      "sha256": "dbf07753caa61bd489ae019a75d5d47d00a21a0af7c29dfd4bc772fa8f55be28"
+    },
+    {
+      "path": "11-write-denied.png",
+      "bytes": 94471,
+      "sha256": "97ebfa845a335e777394a05161507eb7c9763e6110be936f53d7e7f4a10ed495"
+    },
+    {
+      "path": "12-before-edit-deny.png",
+      "bytes": 142904,
+      "sha256": "12a040d65beb29b07f94ed709ba24e010bfb5c7aca853276285c9f9688ef55dc"
+    },
+    {
+      "path": "13-edit-denied.png",
+      "bytes": 98483,
+      "sha256": "8c56a8badc6c17efe998e8d64b4383e093f2df996afa535356bd04814da73e78"
+    },
+    {
+      "path": "14-queue-waiting.png",
+      "bytes": 137588,
+      "sha256": "ca8b2af0110a0658c17597461beadf26df184a5da49b0d493e2d90bcfb37c6b1"
+    },
+    {
+      "path": "15-append-presubmit.png",
+      "bytes": 145781,
+      "sha256": "aeb20888e10a266260d98f63a49fb44870b044fd61fbf63aef58b9d9c1ffeb6f"
+    },
+    {
+      "path": "16-append-failed-approved-original.png",
+      "bytes": 104939,
+      "sha256": "78ad24f6ec542478ccf68aa0bb08d9468cb6a84da9915848d6a3ca9c589fd521"
+    },
+    {
+      "path": "17-before-cancel.png",
+      "bytes": 135888,
+      "sha256": "a7c2596940659ea9be5f833bb796975da66486b3b8e6b6d65dbbcdf7929f7fd9"
+    },
+    {
+      "path": "18-cancelled.png",
+      "bytes": 91833,
+      "sha256": "496e92ee3efd98c49924d5ec0780edcfa3695c2ee3095b1a534f3a5b8627c74a"
+    },
+    {
+      "path": "19-continue-memory.png",
+      "bytes": 83106,
+      "sha256": "c1b62c40e41d10d7b66ea5e67eaa9e4031ff8bbe58d6b8b80c6debbd9ea20c5a"
+    },
+    {
+      "path": "20-restart-no-auto-resume.png",
+      "bytes": 73218,
+      "sha256": "896cc45b9d73198926402231ab149a1196f0f315b05c34143e2eed4d279529d6"
+    },
+    {
+      "path": "21-resumed-memory.png",
+      "bytes": 85109,
+      "sha256": "9a243afa8e3acb1434424c55408d432032b460dbd8a8d7bff310583bf7d690eb"
+    },
+    {
+      "path": "22-review-draft.png",
+      "bytes": 189327,
+      "sha256": "deb49458c02d424f9bfa7c2080a8aa6df8c76c4d77ab344be2a4cfa3d22d2f41"
+    },
+    {
+      "path": "23-review-result.png",
+      "bytes": 166108,
+      "sha256": "c16346b4d79708ceaec17e166396c23bfedca950c3a4a7a00167612bd6f35515"
+    }
+  ],
+  "restart": {
+    "all_native_and_app_processes_stopped_before": true,
+    "history_unchanged_before_explicit_resume": true,
+    "native_active_before_explicit_resume": 0,
+    "same_native_id_explicit_resume": true,
+    "new_memory_result_recovered": true
+  },
+  "global_config_file_count": 7,
+  "global_config_unchanged": true,
+  "private_auth_removed": true,
+  "official_auth_unchanged": true,
+  "final_app_processes": 0,
+  "final_native_sessions": 0,
+  "synthetic_file_results": {
+    "write-allow.txt": {
+      "exists": true,
+      "expected_absent": false,
+      "bytes": 22,
+      "sha256": "e2e4e665b45f4dcb490f0d8ca08aa9e2bf1285c012bd41eafde41d56a04a2072",
+      "expected_bytes_match": true
+    },
+    "write-deny.txt": {
+      "exists": false,
+      "expected_absent": true,
+      "expected_bytes_match": true
+    },
+    "edit-allow.txt": {
+      "exists": true,
+      "expected_absent": false,
+      "bytes": 22,
+      "sha256": "2d1947316475dbeca1b12ccbe10876d24ee2727aec41446763aa6d34f626a80e",
+      "expected_bytes_match": false
+    },
+    "edit-deny.txt": {
+      "exists": true,
+      "expected_absent": false,
+      "bytes": 22,
+      "sha256": "2d1947316475dbeca1b12ccbe10876d24ee2727aec41446763aa6d34f626a80e",
+      "expected_bytes_match": true
+    },
+    "cancel.txt": {
+      "exists": false,
+      "expected_absent": true,
+      "expected_bytes_match": true
+    }
+  },
+  "all_acceptance_passed": false,
+  "failure": "pending-approval rich input dropped append text and its trailing Enter accepted native selected AllowOnce",
+  "separate_edit_allow_executed": false,
+  "true_ime_executed": false,
+  "full_bilingual_layout_executed": false,
+  "managed_task_acceptance": false,
+  "native_history_bodies_archived": false,
+  "credentials_archived": false
+}

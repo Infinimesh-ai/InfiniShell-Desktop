@@ -1,0 +1,663 @@
+{
+  "scope": "只读SSH/tmux最终验收入口与独立场景计划；不执行远端、CLI、GUI或构建",
+  "recorded_at_utc": "2026-09-17T20:21:43+00:00",
+  "goal_complete": false,
+  "ssh_tmux_final_acceptance_passed": false,
+  "remote_connection_executed": false,
+  "native_cli_executed": false,
+  "cargo_executed": false,
+  "target_accessed": false,
+  "auth_or_key_contents_read": false,
+  "key_file_metadata_read": false,
+  "private_host_addresses_disclosed": false,
+  "identity_file_values_disclosed": false,
+  "ssh_alias_projection": [
+    {
+      "host_alias": "ubuntu-infinishell-build",
+      "declared": true,
+      "identity_file_directive_present_in_any_explicit_stanza": true,
+      "remote_connection_verified": false,
+      "remote_cli_install_and_auth_verified": false
+    },
+    {
+      "host_alias": "win-infinishell-build",
+      "declared": true,
+      "identity_file_directive_present_in_any_explicit_stanza": true,
+      "remote_connection_verified": false,
+      "remote_cli_install_and_auth_verified": false
+    }
+  ],
+  "ssh_config_effective_semantics_resolved": false,
+  "includes_not_followed": 0,
+  "match_sections_not_resolved": 0,
+  "host_alias_only_proves_configuration": true,
+  "local_path_presence": {
+    "python3": true,
+    "ssh": true,
+    "sshd": true,
+    "ssh-keygen": true,
+    "tmux": false,
+    "codex": true,
+    "claude": true,
+    "grok": true,
+    "node": true,
+    "jq": true,
+    "bash": true,
+    "rsync": true
+  },
+  "system_sshd_file_present": true,
+  "local_cli_versions_or_current_hashes_verified": false,
+  "historical_tmux": {
+    "version": "3.7c",
+    "sha256": "a47f7c82de1e2779eadbd089ab4daccf60cd136a2b8dd976bec3399b9755a9f9",
+    "current_binary_location_verified": false,
+    "installed_globally": false,
+    "unicode_layout_verified": false
+  },
+  "historical_scopes": [
+    {
+      "fixture": "specs/cli-agent-parity/fixtures/ssh-tmux-macos-after-fix.json",
+      "source_commit": "6921a9925955a1955503e259cd935eaea4ac2ac0",
+      "source_tree_dirty": true,
+      "passed_within_original_scope": true,
+      "notification_origin": "bundled_hook_replay",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "different_os_host_verified": false
+    },
+    {
+      "fixture": "specs/cli-agent-parity/fixtures/codex-0.147-native-ssh-tmux-macos-final-commit.json",
+      "source_commit": "dbee1ecae81da54a1749de88a7caffb3099d7eb7",
+      "source_tree_dirty": false,
+      "passed_within_original_scope": true,
+      "model_http_request_count": 0,
+      "model_lifecycle_verified": false,
+      "product_ssh_ui_verified": false,
+      "keystroke_input_verified": false,
+      "native_hook_summary_obtained": false
+    }
+  ],
+  "existing_entrypoints": [
+    {
+      "path": "script/cli-agent-parity/probe_ssh_tmux.py",
+      "arguments": [
+        "--tmux",
+        "--codex",
+        "--claude",
+        "--grok",
+        "--codex-plugin",
+        "--claude-plugin",
+        "--sshd",
+        "--output"
+      ],
+      "scope": "真实回环ssh/tmux，合成随附hooks载荷"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_ssh_tmux.py",
+      "arguments": [
+        "--codex",
+        "--expected-codex-sha256",
+        "--tmux",
+        "--expected-tmux-sha256",
+        "--sshd",
+        "--output"
+      ],
+      "fixed_cli_version": "0.147.0",
+      "scope": "原生TUI+SessionStart/UserPromptSubmit阻断，无模型"
+    },
+    {
+      "path": "script/cli-agent-parity/tmux_notification_tests.py",
+      "scope": "Unix控制PTY+构造TMUX，未启动真实tmux/SSH"
+    },
+    {
+      "path": "script/windows/test_pwsh_ssh_worker.ps1",
+      "arguments": [
+        "-WorkerPath"
+      ],
+      "scope": "控制台worker/PowerShell/bootstrap参数+ssh -V，未联网"
+    },
+    {
+      "path": "script/deploy_remote_server",
+      "arguments": [
+        "--host",
+        "--profile"
+      ],
+      "scope": "Linuxmusl开发daemon构建与rsync上传，需同提交来源守卫"
+    }
+  ],
+  "architecture_evidence": [
+    {
+      "path": "app/src/workspace/view.rs",
+      "line": 4330,
+      "finding": "标题栏SpecificAgent新tab；不是当前SSH pane重关联"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod.rs",
+      "line": 132,
+      "finding": "Claude/Codex/Grok旧standalone Unsupported，不可作无人审批runner"
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/terminal.rs",
+      "line": 391,
+      "finding": "current_directory仅local路径；新workspace不是remoteCLI入口"
+    },
+    {
+      "path": "app/src/remote_server/ssh_transport.rs",
+      "line": 433,
+      "finding": "dev musl编译上传可能fallback release；最终同提交必须拒绝旧产物"
+    },
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "line": 608,
+      "finding": "Windows同提交SSHworker构建及下一步参数测试"
+    }
+  ],
+  "required_execution_order": [
+    "最终实际提交本地门禁",
+    "同ref Linux/Windows Actions",
+    "工具/远端OS/授权/插件/worker来源前置",
+    "同提交三方loopback通知限定范围",
+    "真实GUI远端direct与tmux-on及off降级",
+    "三方交互审批追加取消继续断连应用重启结果链",
+    "安全产物扫描与失败保留"
+  ],
+  "remaining_actual_verification": [
+    "当前CLI与tmux版本/hash",
+    "两个远端实际OS/登录/CLI安装及模型授权",
+    "现代Claude原生前台terminalSequence SSH/tmux",
+    "Grok原生hooks SSH/tmux",
+    "三方GUI富输入/上下文/两轮/审批/追加/取消/继续/结果回收",
+    "活跃tmux重关联与已退出nativeS历史resume区分",
+    "应用重启零重复输入与旧generation拒绝",
+    "Windows默认shell/ConPTY真实SSH",
+    "多层tmux与不可见pane",
+    "最终同提交跨平台与完整门禁"
+  ],
+  "managed_remote_task_adapter_claimed": false,
+  "no_plain_terminal_task_principal_fabrication": true,
+  "new_runner_needed_for_general_three_cli_online_gui_automation": true,
+  "once_marker_required_for_existing_write_text_runners": true,
+  "sources": [
+    {
+      "path": "specs/cli-agent-parity/PLAN.md",
+      "bytes": 38469,
+      "sha256": "1a41a934a4426376fc133c6014388d245044ce24f061e77453694d750bffb4ef",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": ".agents/skills/cross-platform-cloud-verification/SKILL.md",
+      "bytes": 4936,
+      "sha256": "cce22b953b9bda2b8db9fc791604851723ab6c3e3a534bea69bd0abe4ee77280",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "script/cli-agent-parity/probe_ssh_tmux.py",
+      "bytes": 14906,
+      "sha256": "d6c62afb486bd80131cae406d045d07d1a60143f2c9b9891fdafd3771520c454",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_ssh_tmux.py",
+      "bytes": 26481,
+      "sha256": "ef476a61fb084060ae61bc56b16e107a1eb3ff864caadc792363da42443cee05",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "script/cli-agent-parity/tmux_notification_tests.py",
+      "bytes": 5338,
+      "sha256": "92db7e3ff22471d3bb25099412eb8a8932402face23e4ccae30ea1bb4f461e8d",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "specs/cli-agent-parity/SSH_TMUX_VERIFICATION.md",
+      "bytes": 6502,
+      "sha256": "20590b5e804ae6e1a7d13d94acf573bbe0a5b16e4ed91b17bede35e855164ee7",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "specs/cli-agent-parity/CODEX_NATIVE_SSH_TMUX_VERIFICATION.md",
+      "bytes": 10120,
+      "sha256": "664e9083bcf1909765cec09b84619bc1ff693af88f9753cfd0fc11a29db834b1",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/ssh-tmux-tooling.json",
+      "bytes": 1063,
+      "sha256": "34165dcf3b501570d54f34e223664d4889c29740a23128563a4612ba59f0b401",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/ssh-tmux-macos-after-fix.json",
+      "bytes": 7884,
+      "sha256": "e49b7bc80f8f20b1ca65f683d0f0c48bafbe1d40082b455883d871a1e1f16750",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/codex-0.147-native-ssh-tmux-macos-final-commit.json",
+      "bytes": 165693,
+      "sha256": "ed7a31d4922f4f6d367fac24b2cdd477bf5989f0cd9dd3e8a344761b2de29f0a",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "bytes": 42808,
+      "sha256": "14fc5259049d6b127159e851bce2a5aef9f8fc65c5a0cd0e1adfaa531cb0eb09",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "script/windows/test_pwsh_ssh_worker.ps1",
+      "bytes": 3370,
+      "sha256": "bfb4659157d39d5286f7f029fbb6c7766e8e98eb69d158a796f609f000b59076",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "script/deploy_remote_server",
+      "bytes": 7091,
+      "sha256": "04ce764f0e02011b47a1d7e45514ed669521b01c03a73d3b36ffbf61e3bdac8e",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/bin/infinishell_ssh.rs",
+      "bytes": 925,
+      "sha256": "11dc7423ab38c80f7154b38ae7bb22fa08dc8fd0ad5560ae9553c1c6a7d32892",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/remote_server/ssh_transport.rs",
+      "bytes": 45316,
+      "sha256": "d0ed21980736889c298b939e6ee6f48c04fecf329c1b96bd2a17384d2c20b7e2",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/terminal.rs",
+      "bytes": 20119,
+      "sha256": "ea032984315d377f7c986744ced031db90f3fb380913d1e7f957ca2065b9f18d",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/workspace/view.rs",
+      "bytes": 1194595,
+      "sha256": "9e6a015d47e3b0def4572f3f14439dcb6bc8f767570e787a1d901d7a20169451",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/terminal/view/use_agent_footer/mod.rs",
+      "bytes": 69484,
+      "sha256": "4318be68e050d61ed02d0d004de6fc9f1038a1ac81de5321e75423e8aa258d00",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod.rs",
+      "bytes": 15036,
+      "sha256": "7ecef5ca70d20c156a590866ad9efbd38cc0f32e38ccb63e75cf6e7cad4114fb",
+      "credential_shape_scan": {
+        "serialized": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        }
+      },
+      "copied": false
+    }
+  ],
+  "new_document": {
+    "path": "specs/cli-agent-parity/SSH_TMUX_FINAL_ACCEPTANCE_EXECUTION_PLAN.md",
+    "bytes": 8114,
+    "sha256": "6f8c6fc71406d056f466010d1905bb2d962d42ce0b14d1ac3b458f77e070845a",
+    "credential_shape_scan": {
+      "serialized": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_strings": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      }
+    }
+  },
+  "localization_change_required": false,
+  "finished_reads_done": true
+}

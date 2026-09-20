@@ -1,0 +1,12 @@
+{
+  "observed_utc": "2026-09-17T18:33:02.658497+00:00",
+  "events": [],
+  "tls_connections_attempted": 0,
+  "tls_bytes": 0,
+  "tunnels_stopped": true,
+  "opaque_auth_copy_removed": true,
+  "gui_pid": null,
+  "tls_decrypted": false,
+  "http_model_call_budget_enforced": false,
+  "scope": "受限官方TLS代理与认证副本清理；不证明模型结果或CLI正常退出。"
+}

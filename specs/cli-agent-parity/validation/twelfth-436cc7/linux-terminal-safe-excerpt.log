@@ -1,0 +1,20 @@
+CI12 安全定向摘录（derived，不是完整原日志）
+来源：gh run view 35255292452 --repo Infinimesh-ai/InfiniShell-Desktop --job 105317311967 --log-failed
+原私有日志SHA：b88e02c127d289cdde612d0e812682c70c416f401fe1762e3c05cff4196eeee2
+用户名/认证/URL查询剔除；只记录公开测试与实际统计。
+原日志行371 [failure_test] ERROR: test_failed_offline_process_still_removes_auth_and_keeps_safe_sources (__main__.GrokCoordinatorRunnerTests.test_failed_offline_process_still_removes_auth_and_keeps_safe_sources)
+原日志行374 [traceback_file] script/cli-agent-parity/grok_coordinator_runner_tests.py:454 in test_failed_offline_process_still_removes_auth_and_keeps_safe_sources
+原日志行376 [traceback_file] script/cli-agent-parity/run_grok_coordinator_live.py:476 in run
+原日志行382 [error_line] FileNotFoundError: [Errno 2] No such file or directory: '/private/tmp/infinishell-grok-coordinator-9t8mghn7'
+原日志行385 [test_statistics] Ran 27 tests in 0.191s
+原日志行387 [test_statistics] FAILED (errors=1)
+原日志行420 [upload_failure] 上传未找到指定证据文件。
+原日志行420 [upload_missing_pattern] codex-plugin-lifecycle.json
+原日志行421 [upload_missing_pattern] codex-plugin-cache-refresh.json
+原日志行422 [upload_missing_pattern] codex-missing-session.*
+原日志行423 [upload_missing_pattern] codex-idle-crash.*
+原日志行424 [upload_missing_pattern] claude-initialize-idle-eof.json
+原日志行425 [upload_missing_pattern] claude-permission-observation.json
+原日志行426 [upload_missing_pattern] claude-21273-inputs/claude-fixed-inputs.json
+原日志行427 [upload_missing_pattern] grok-cli-fixed/grok-fixed-inputs.json
+原日志行428 [upload_missing_pattern] grok-fixed-acp.json

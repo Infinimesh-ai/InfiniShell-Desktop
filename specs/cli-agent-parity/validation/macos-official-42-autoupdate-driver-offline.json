@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "cli_autoupdate_driver_offline",
+  "source_manifest_sha256": "9a179659be8c4469a4082d261593ccb179a7545e8686458a69259d3c55b1b344",
+  "command": [
+    "python3",
+    "-B",
+    "script/cli-agent-parity/verify_cli_autoupdate_tests.py"
+  ],
+  "tests": 14,
+  "passed": 14,
+  "failed": 0,
+  "skipped": 0,
+  "run_from": "source42 frozen worktree",
+  "unchanged_in_source42a": true,
+  "native_cli_executed": false,
+  "same_commit_verified": false
+}

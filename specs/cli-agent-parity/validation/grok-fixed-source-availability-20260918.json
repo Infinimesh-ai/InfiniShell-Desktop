@@ -1,0 +1,573 @@
+{
+  "schema_version": 1,
+  "audit_date": "2026-09-18",
+  "scope": "仅官方 xai-org/grok-build 公开提交、明确版本标签及发布元数据；不执行原生 CLI",
+  "native_version_from_parent_evidence": "1.0.30",
+  "native_build_id_from_parent_evidence": "04b7ffed98c6",
+  "workspace_commit_from_parent_evidence": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "queries": [
+    {
+      "endpoint": "commits/04b7ffed98c6",
+      "url": "https://api.github.com/repos/xai-org/grok-build/commits/04b7ffed98c6",
+      "checked_at_utc": "2026-09-17T17:50:34.335913+00:00",
+      "http_status": 422,
+      "response_body_bytes": 146,
+      "response_body_sha256": "09ddc16769dffda1713473e24b90aee9b02a34b898969ab92770538822860b8f",
+      "projection": null
+    },
+    {
+      "endpoint": "git/matching-refs/tags/v1.0.30",
+      "url": "https://api.github.com/repos/xai-org/grok-build/git/matching-refs/tags/v1.0.30",
+      "checked_at_utc": "2026-09-17T17:50:34.339110+00:00",
+      "http_status": 200,
+      "response_body_bytes": 2,
+      "response_body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "projection": {
+        "count": 0,
+        "refs": []
+      }
+    },
+    {
+      "endpoint": "git/matching-refs/tags/1.0.30",
+      "url": "https://api.github.com/repos/xai-org/grok-build/git/matching-refs/tags/1.0.30",
+      "checked_at_utc": "2026-09-17T17:50:34.339578+00:00",
+      "http_status": 200,
+      "response_body_bytes": 2,
+      "response_body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "projection": {
+        "count": 0,
+        "refs": []
+      }
+    },
+    {
+      "endpoint": "tags?per_page=100&page=1",
+      "url": "https://api.github.com/repos/xai-org/grok-build/tags?per_page=100&page=1",
+      "checked_at_utc": "2026-09-17T17:50:35.194799+00:00",
+      "http_status": 200,
+      "response_body_bytes": 2,
+      "response_body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "projection": {
+        "page": 1,
+        "per_page": 100,
+        "count": 0,
+        "tags": []
+      }
+    },
+    {
+      "endpoint": "releases?per_page=100&page=1",
+      "url": "https://api.github.com/repos/xai-org/grok-build/releases?per_page=100&page=1",
+      "checked_at_utc": "2026-09-17T17:50:35.214181+00:00",
+      "http_status": 200,
+      "response_body_bytes": 2,
+      "response_body_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "projection": {
+        "page": 1,
+        "per_page": 100,
+        "count": 0,
+        "releases": []
+      }
+    },
+    {
+      "endpoint": "(repository metadata)",
+      "url": "https://api.github.com/repos/xai-org/grok-build/",
+      "checked_at_utc": "2026-09-17T17:50:35.225054+00:00",
+      "http_status": 404,
+      "response_body_bytes": 106,
+      "response_body_sha256": "edbd0367cec893df36f67acb56c3aa23810be28850977c35e0fedaf64aad286b",
+      "projection": null
+    },
+    {
+      "endpoint": "(canonical repository metadata)",
+      "url": "https://api.github.com/repos/xai-org/grok-build",
+      "checked_at_utc": "2026-09-17T17:51:26.013115+00:00",
+      "http_status": 200,
+      "response_body_bytes": 6239,
+      "response_body_sha256": "99bbca9b42019f3a22ce523fdb566243a58401d4ed1ae54ec9c769566290b6f6",
+      "projection": {
+        "full_name": "xai-org/grok-build",
+        "html_url": "https://github.com/xai-org/grok-build",
+        "default_branch": "main",
+        "private": false,
+        "archived": false,
+        "pushed_at": "2026-09-15T13:17:47Z"
+      }
+    },
+    {
+      "endpoint": "commits?per_page=100&page=1",
+      "url": "https://api.github.com/repos/xai-org/grok-build/commits?per_page=100&page=1",
+      "checked_at_utc": "2026-09-17T17:51:26.013580+00:00",
+      "http_status": 200,
+      "response_body_bytes": 227154,
+      "response_body_sha256": "19fd0507ba8abeabbcf49138c94db257d2aacd72fb301c63a0dc1adc321efdef",
+      "projection": {
+        "page": 1,
+        "per_page": 100,
+        "count": 45,
+        "commits": [
+          {
+            "sha": "482711333c7195dc16a272777f86086d615e2afb",
+            "html_url": "https://github.com/xai-org/grok-build/commit/482711333c7195dc16a272777f86086d615e2afb",
+            "committer_date": "2026-09-15T13:17:35Z",
+            "message_sha256": "b427848411e08f010ea05f85c16c24f5647fa7ea3adec22e6ba7f019bc9a9e6e",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "37949780c144e37df692e3d669051a21fec24f20",
+            "html_url": "https://github.com/xai-org/grok-build/commit/37949780c144e37df692e3d669051a21fec24f20",
+            "committer_date": "2026-09-09T19:03:16Z",
+            "message_sha256": "6a9e12445d5a79f735afd603e62f51aa988902ff12899f275ae2ceafb156b394",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "75810042ca2762aa0b0fa17864f3f68823ccbea5",
+            "html_url": "https://github.com/xai-org/grok-build/commit/75810042ca2762aa0b0fa17864f3f68823ccbea5",
+            "committer_date": "2026-09-08T15:08:48Z",
+            "message_sha256": "9e9de0a4dbe8097c015eaf5cf56647cd6c73e612a3e59159107dea80e667c9f4",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "72a61251fcffb464bcc687aeb5a998e5a98ec0c9",
+            "html_url": "https://github.com/xai-org/grok-build/commit/72a61251fcffb464bcc687aeb5a998e5a98ec0c9",
+            "committer_date": "2026-09-01T22:20:33Z",
+            "message_sha256": "2d5660ee454088e501182087813a70521de5456e8da6322285bdda4e349c9fa1",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "bb7f39d5858cbf5e00de639367f59debbdcb0138",
+            "html_url": "https://github.com/xai-org/grok-build/commit/bb7f39d5858cbf5e00de639367f59debbdcb0138",
+            "committer_date": "2026-08-31T17:40:27Z",
+            "message_sha256": "4500c6631d5d30d3b76602a4df0cd054404c5ebb5d1275b6fe6b6786041a91a4",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "bc7f02eddd3d84085849dc19ed216f11c23b0571",
+            "html_url": "https://github.com/xai-org/grok-build/commit/bc7f02eddd3d84085849dc19ed216f11c23b0571",
+            "committer_date": "2026-08-28T16:56:21Z",
+            "message_sha256": "961fc8aea8ada78a29ac8d8435b4844203b4dc06f7c472b59ea2b152acdbb149",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "9684fa3cdbf2995e30ea8b9b637f1db008f144fc",
+            "html_url": "https://github.com/xai-org/grok-build/commit/9684fa3cdbf2995e30ea8b9b637f1db008f144fc",
+            "committer_date": "2026-08-27T13:30:20Z",
+            "message_sha256": "7381196e9884b636a05779580c5d5f6b3b159a1bd2605736fc0c3ce39b008548",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "77cd7eb675ba911c225c3aaeeece3a20cbccc426",
+            "html_url": "https://github.com/xai-org/grok-build/commit/77cd7eb675ba911c225c3aaeeece3a20cbccc426",
+            "committer_date": "2026-08-25T21:15:49Z",
+            "message_sha256": "46796e160288f5283068f0da8ea0da4fad4fc677c81c349e56bf2a5f8fdcc476",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "c2ad97f87aea4303b6000a2c22128bc91ee76c9b",
+            "html_url": "https://github.com/xai-org/grok-build/commit/c2ad97f87aea4303b6000a2c22128bc91ee76c9b",
+            "committer_date": "2026-08-24T18:43:42Z",
+            "message_sha256": "4ee556c78c8fb63cde260edc546c8fe79bdb46d3acda67b0906d6cac5ca6b17b",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "07b2f7144fd5c5c9d3dd1966937a87852d2dbdb8",
+            "html_url": "https://github.com/xai-org/grok-build/commit/07b2f7144fd5c5c9d3dd1966937a87852d2dbdb8",
+            "committer_date": "2026-08-23T10:48:57Z",
+            "message_sha256": "385fca06dad12b149a8d595167984d52520fa0e67d4c7c1d127a8757a1bbffa8",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "19d42e35c07a9c9244f03f6df0c4c353f970d4f9",
+            "html_url": "https://github.com/xai-org/grok-build/commit/19d42e35c07a9c9244f03f6df0c4c353f970d4f9",
+            "committer_date": "2026-08-19T19:55:30Z",
+            "message_sha256": "8d0505f566782b2d23476ffebce5b66db19b45375b91fb4f4fdb01ab4afa5754",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "d92c5b0b8582fda358de1f97446aa74af44a464f",
+            "html_url": "https://github.com/xai-org/grok-build/commit/d92c5b0b8582fda358de1f97446aa74af44a464f",
+            "committer_date": "2026-08-19T00:29:49Z",
+            "message_sha256": "d8e91f7b332e70b33c1d185a96eb200427211e5989b585dac6f9368ec76964e3",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "d71f6e0c1f5acc5469e503e192fe14824e6f8c90",
+            "html_url": "https://github.com/xai-org/grok-build/commit/d71f6e0c1f5acc5469e503e192fe14824e6f8c90",
+            "committer_date": "2026-08-17T18:48:25Z",
+            "message_sha256": "ded29e40b636cbd65790c2fc41f3c4b1e4efadb00986c4d6c1b7bb5289fe6dc5",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "9fabadea800fa6e2ed8ec91c4f45f02b7e2504f4",
+            "html_url": "https://github.com/xai-org/grok-build/commit/9fabadea800fa6e2ed8ec91c4f45f02b7e2504f4",
+            "committer_date": "2026-08-16T19:00:58Z",
+            "message_sha256": "4996d39da790c7aa29e631d967051972d70443849833391b903f5266de26e754",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "5163763e703c319e4554c2f455535c5adb6e51e8",
+            "html_url": "https://github.com/xai-org/grok-build/commit/5163763e703c319e4554c2f455535c5adb6e51e8",
+            "committer_date": "2026-08-15T20:21:30Z",
+            "message_sha256": "b55b344e3b7c6ffb1cf6b7b9d1e35d9fabf23eb92ccaac49b1bec8f1b92f7c6d",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "d6a22a1aed70b58d30a0f82a1a2a76ce1301631e",
+            "html_url": "https://github.com/xai-org/grok-build/commit/d6a22a1aed70b58d30a0f82a1a2a76ce1301631e",
+            "committer_date": "2026-08-15T15:14:48Z",
+            "message_sha256": "43f8a0f3b6849a3f76ab0722311495178fe2bbb95a288ef1276c1765021161ef",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "eb267feff13129e568df38fb6fdf0ceb65f735d6",
+            "html_url": "https://github.com/xai-org/grok-build/commit/eb267feff13129e568df38fb6fdf0ceb65f735d6",
+            "committer_date": "2026-08-13T18:26:29Z",
+            "message_sha256": "0bd4605ddcbdac40b9964e4f106bc5279f0bd87a498ddc4a80e0078a97ae20ea",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "e5fd4816d43260c15ba785f103990c1ed6cea230",
+            "html_url": "https://github.com/xai-org/grok-build/commit/e5fd4816d43260c15ba785f103990c1ed6cea230",
+            "committer_date": "2026-08-12T22:40:17Z",
+            "message_sha256": "ba56a89a9e49380fe965baf7e1c35b0850b4f554e1fc620d834fcd469acfcfcb",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "be713136d2a69080743a3f6b3c72077057e5948f",
+            "html_url": "https://github.com/xai-org/grok-build/commit/be713136d2a69080743a3f6b3c72077057e5948f",
+            "committer_date": "2026-08-11T20:25:21Z",
+            "message_sha256": "33c78884395371e8d8a61ac92474df471a911a1989fdd4cfb8245c80f4f41214",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "b13fa526f5112c0b20dad5f1f2300d3d3b127895",
+            "html_url": "https://github.com/xai-org/grok-build/commit/b13fa526f5112c0b20dad5f1f2300d3d3b127895",
+            "committer_date": "2026-08-10T17:22:17Z",
+            "message_sha256": "284295086d91ce73ca959a4306f6ed1f70f539516e88e95bd5bdf0d3f8f3a73d",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "75e73f3d6ac0350d211f12ae7d57c2c0aad72576",
+            "html_url": "https://github.com/xai-org/grok-build/commit/75e73f3d6ac0350d211f12ae7d57c2c0aad72576",
+            "committer_date": "2026-08-09T20:00:51Z",
+            "message_sha256": "a25c12eafb74990456e666537606a38369940597ec765cc8572d89e158b484d9",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "8a14c91d88875a831a38b3a066b1683116bcb31c",
+            "html_url": "https://github.com/xai-org/grok-build/commit/8a14c91d88875a831a38b3a066b1683116bcb31c",
+            "committer_date": "2026-08-08T21:25:47Z",
+            "message_sha256": "4d8cafaf1338961369cddf83a2786b02f77b6aa65ea031047b6238c040a65a07",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "afbc0fb710320c7add294c2106d447ecc3e3af2e",
+            "html_url": "https://github.com/xai-org/grok-build/commit/afbc0fb710320c7add294c2106d447ecc3e3af2e",
+            "committer_date": "2026-08-07T16:56:10Z",
+            "message_sha256": "fc4b479da2104f8b4814014cf1828020a24cc6a0cafe6a350e86cf0e3f69d614",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "393430ee4934bc791b0d538f304a21691c517433",
+            "html_url": "https://github.com/xai-org/grok-build/commit/393430ee4934bc791b0d538f304a21691c517433",
+            "committer_date": "2026-08-06T19:09:11Z",
+            "message_sha256": "d7fdf37c434f36045e3cd1fdab3595d13bbb1503f2e449f619e4a06e89ee86d2",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "a5589e958437d79e13db026eedcb1720bffd4063",
+            "html_url": "https://github.com/xai-org/grok-build/commit/a5589e958437d79e13db026eedcb1720bffd4063",
+            "committer_date": "2026-08-05T18:16:04Z",
+            "message_sha256": "7db8a33e60dcbf08dfbb365f3dd7f2292388428dec1d70a050dda3fb9248a504",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "ed6d543643628663873c5de28298e022ed634238",
+            "html_url": "https://github.com/xai-org/grok-build/commit/ed6d543643628663873c5de28298e022ed634238",
+            "committer_date": "2026-08-04T16:51:06Z",
+            "message_sha256": "93ab8485c9d2a5a429c1bfeff094148b013c06ad0eb1ff4f9fbe12cb587e97e7",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "e5478eff1e4050558e12e1328b85e6616632efb6",
+            "html_url": "https://github.com/xai-org/grok-build/commit/e5478eff1e4050558e12e1328b85e6616632efb6",
+            "committer_date": "2026-08-03T17:33:32Z",
+            "message_sha256": "7909bc187161fabd6b90c75d723103f0d53940e2cdef12377a07707d1238ac37",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "780d1388fff103ff0db0d8c14de65af6225b4860",
+            "html_url": "https://github.com/xai-org/grok-build/commit/780d1388fff103ff0db0d8c14de65af6225b4860",
+            "committer_date": "2026-08-03T08:17:57Z",
+            "message_sha256": "836c2304faa133facd026db2433438ddb51e9ed6b9c0340749416bb174edd56a",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "a4221165824e5b1f5c4c10b7459f65e78dd6448d",
+            "html_url": "https://github.com/xai-org/grok-build/commit/a4221165824e5b1f5c4c10b7459f65e78dd6448d",
+            "committer_date": "2026-07-31T18:08:03Z",
+            "message_sha256": "d41e2d85c7f14c3d10742408ef339dc6d47a9b2e5bbc21b3d6c1fb03b60ecf6d",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "dd04f397b1d02f2272b092555669dfba1f01bc85",
+            "html_url": "https://github.com/xai-org/grok-build/commit/dd04f397b1d02f2272b092555669dfba1f01bc85",
+            "committer_date": "2026-07-30T19:07:40Z",
+            "message_sha256": "ea1139ccd1d00a6c70a704816c837d473f7b0309e1bbe262c5a6fd27690c0a00",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "500129c714ad1b10e6095481f4a8387a2ec52649",
+            "html_url": "https://github.com/xai-org/grok-build/commit/500129c714ad1b10e6095481f4a8387a2ec52649",
+            "committer_date": "2026-07-29T17:17:54Z",
+            "message_sha256": "29c0e449d82f816c127121bf967fa4afdaf722132bd63f3b69098ee1bdb9cc15",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "5da6962e4adb9c857f3def762542b52b4ec3e522",
+            "html_url": "https://github.com/xai-org/grok-build/commit/5da6962e4adb9c857f3def762542b52b4ec3e522",
+            "committer_date": "2026-07-28T22:50:19Z",
+            "message_sha256": "a7ac11fc288047db2169116cd7e7e514c26008be50d35debb84c04a3e57a7b3f",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "02d9359435d0e9c20a20945679389cdce441e431",
+            "html_url": "https://github.com/xai-org/grok-build/commit/02d9359435d0e9c20a20945679389cdce441e431",
+            "committer_date": "2026-07-27T17:54:34Z",
+            "message_sha256": "3bcd7e1f7bacdaff3d36b893ae8c1979ba5b1e84a5235b648817d0ff238349d4",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "b41c75a578f98bddbd326ab02cd53618451d97ee",
+            "html_url": "https://github.com/xai-org/grok-build/commit/b41c75a578f98bddbd326ab02cd53618451d97ee",
+            "committer_date": "2026-07-26T19:03:03Z",
+            "message_sha256": "29677cdcd557d505cfef4c89d00e00f583df4577f4d09b9b60e4e4dc170f3c96",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "47348d13ec4508dcfe440e34c6d511bb02998fb2",
+            "html_url": "https://github.com/xai-org/grok-build/commit/47348d13ec4508dcfe440e34c6d511bb02998fb2",
+            "committer_date": "2026-07-25T18:44:42Z",
+            "message_sha256": "a02d193073bc9bff35b8364233e74539d94444b83762b95d51d7096e5fc5dfed",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "6e386420825bd44ae648c63e7c8cba12fcec9401",
+            "html_url": "https://github.com/xai-org/grok-build/commit/6e386420825bd44ae648c63e7c8cba12fcec9401",
+            "committer_date": "2026-07-24T16:59:42Z",
+            "message_sha256": "f0366d7d57024757f566963fe02323c0fa622089cf6a47fc8755f5fc5db47e8d",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "69f0ba880aa98f55e3ac1dcc570e2f332f825fe2",
+            "html_url": "https://github.com/xai-org/grok-build/commit/69f0ba880aa98f55e3ac1dcc570e2f332f825fe2",
+            "committer_date": "2026-07-23T17:12:33Z",
+            "message_sha256": "9e600072dd374bdaaf9f5837d784dca7d64341b56b58a948f418fd053e56e4dc",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "a5727c5960452e7527a154b25cb5bf00cda0545e",
+            "html_url": "https://github.com/xai-org/grok-build/commit/a5727c5960452e7527a154b25cb5bf00cda0545e",
+            "committer_date": "2026-07-22T18:22:27Z",
+            "message_sha256": "0283f999156ab39f15b1899eba1308152ab4c1b93ae533357003db9561685d9d",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "3af4d5d39897855bdcc74f23e690024a5dc05573",
+            "html_url": "https://github.com/xai-org/grok-build/commit/3af4d5d39897855bdcc74f23e690024a5dc05573",
+            "committer_date": "2026-07-21T18:10:23Z",
+            "message_sha256": "37a9c80830c248cf517b4b9439222cf891932fe37d83a8510bcbe5b85baeeb09",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "a881e6703f46b01d8c7d4a5437683546df30449d",
+            "html_url": "https://github.com/xai-org/grok-build/commit/a881e6703f46b01d8c7d4a5437683546df30449d",
+            "committer_date": "2026-07-20T17:22:25Z",
+            "message_sha256": "0f337c9ea46fc61c3434ca1413bb4ac06bfc9c5d375594d84fbfecf42da28253",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "ba76b0a683fa52e4e60685017b85905451be17bc",
+            "html_url": "https://github.com/xai-org/grok-build/commit/ba76b0a683fa52e4e60685017b85905451be17bc",
+            "committer_date": "2026-07-19T17:42:24Z",
+            "message_sha256": "10c1c750faf6ed5edf6077f31e02d35c192ab00acab5814e39c754bad0dfb4c2",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "7cfcb20d2b50b0d18801a6c0af2e401c0e060894",
+            "html_url": "https://github.com/xai-org/grok-build/commit/7cfcb20d2b50b0d18801a6c0af2e401c0e060894",
+            "committer_date": "2026-07-18T18:48:28Z",
+            "message_sha256": "2bf9d95262f0639f94051098b666d929967c51d9bcbf75872287b2464abdb65e",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "98c3b2438aa922fbbe6178a5c0a4c48f85edc8ce",
+            "html_url": "https://github.com/xai-org/grok-build/commit/98c3b2438aa922fbbe6178a5c0a4c48f85edc8ce",
+            "committer_date": "2026-07-17T13:19:50Z",
+            "message_sha256": "c43ab325b144dbb2204d686d76066db150fc933f7b1855d40fb163bf5ae75f1c",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "8adf9013a0929e5c7f1d4e849492d2387837a28d",
+            "html_url": "https://github.com/xai-org/grok-build/commit/8adf9013a0929e5c7f1d4e849492d2387837a28d",
+            "committer_date": "2026-07-16T19:27:30Z",
+            "message_sha256": "310eb2268a353233d78b6d5f88464dc5b354e3aea84b33ddd51cf8eb7d91a77a",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          },
+          {
+            "sha": "c68e39f60462f28d9be5e683d9cbe2c57b1a5027",
+            "html_url": "https://github.com/xai-org/grok-build/commit/c68e39f60462f28d9be5e683d9cbe2c57b1a5027",
+            "committer_date": "2026-07-16T05:46:02Z",
+            "message_sha256": "8bd58906b19afc2e28a723e37687241b31f2b51f5d806788a9ebca4b81eab9ee",
+            "mentions_version_1_0_30": false,
+            "mentions_build_id_04b7ffed98c6": false
+          }
+        ]
+      }
+    },
+    {
+      "endpoint": "contents/SOURCE_REV?ref=482711333c7195dc16a272777f86086d615e2afb",
+      "url": "https://api.github.com/repos/xai-org/grok-build/contents/SOURCE_REV?ref=482711333c7195dc16a272777f86086d615e2afb",
+      "checked_at_utc": "2026-09-17T17:51:26.013708+00:00",
+      "http_status": 200,
+      "response_body_bytes": 1011,
+      "response_body_sha256": "499f63efc0c08f0ae6489c9ff061665aa616c0a881f69246308b94c2b93173ef",
+      "projection": {
+        "path": "SOURCE_REV",
+        "git_blob_sha": "0c594fbe842905b9db14f523b7acaa5ebc9a853a",
+        "html_url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/SOURCE_REV",
+        "source_bytes": 41,
+        "source_sha256": "f42d40d90d620527204dd41d9a0bb4a585d69dc8525ad5e81633f33a83c7d6e4",
+        "monorepo_sha": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+        "recognized_full_sha": true,
+        "matches_native_build_prefix": false
+      }
+    },
+    {
+      "endpoint": "search/commits?q=04b7ffed98c6+repo%3Axai-org%2Fgrok-build",
+      "url": "https://api.github.com/search/commits?q=04b7ffed98c6+repo%3Axai-org%2Fgrok-build",
+      "checked_at_utc": "2026-09-17T17:51:26.846485+00:00",
+      "http_status": 200,
+      "response_body_bytes": 55,
+      "response_body_sha256": "4af480b8ee5b87b369a76c49bd22c9a783908272ebffbe97898f8ab0f0772a5f",
+      "projection": {
+        "total_count": 0,
+        "incomplete_results": false,
+        "items": []
+      }
+    },
+    {
+      "endpoint": "contents/SOURCE_REV?ref=482711333c7195dc16a272777f86086d615e2afb",
+      "url": "https://api.github.com/repos/xai-org/grok-build/contents/SOURCE_REV?ref=482711333c7195dc16a272777f86086d615e2afb",
+      "checked_at_utc": "2026-09-17T17:51:55.428449+00:00",
+      "http_status": 200,
+      "response_body_bytes": 1011,
+      "response_body_sha256": "499f63efc0c08f0ae6489c9ff061665aa616c0a881f69246308b94c2b93173ef",
+      "projection": {
+        "path": "SOURCE_REV",
+        "git_blob_sha": "0c594fbe842905b9db14f523b7acaa5ebc9a853a",
+        "html_url": "https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/SOURCE_REV",
+        "source_bytes": 41,
+        "source_sha256": "f42d40d90d620527204dd41d9a0bb4a585d69dc8525ad5e81633f33a83c7d6e4",
+        "monorepo_sha": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+        "recognized_full_sha": true,
+        "matches_native_build_prefix": false
+      }
+    }
+  ],
+  "exact_native_source_verified": false,
+  "limitations": [
+    "此前 gh api 批次的返回未被工具保留，因此不作为 HTTP 状态或未命中证据。",
+    "标签和 release 列表只查询第一页面；精确前缀标签查询不代表全部可能版本命名。",
+    "HTTP 非 200 或空列表只限定所列 URL，不证明所有公开源码不存在。",
+    "未验证原生权限策略、内置工具全集、源码闭包或实际运行接口；未执行原生进程。",
+    "native build ID 可能是 monorepo SHA 的前缀；直接查询公开 GitHub commit 不覆盖 SOURCE_REV 历史值。",
+    "仅定向读取已知候选快照的 SOURCE_REV；没有逐个读取全部历史快照的 SOURCE_REV。",
+    "第一批 repository metadata URL 带末尾斜杠的 HTTP404 是该 URL 的响应，不能表示官方仓库不存在；另列无末尾斜杠的 canonical URL。"
+  ],
+  "public_web_observations": [
+    {
+      "url": "https://github.com/xai-org/grok-build/releases",
+      "http_status": null,
+      "observation": "官方发布页面明确没有 release 记录。"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build",
+      "http_status": null,
+      "observation": "官方 README 说明源码由 monorepo 周期同步，SOURCE_REV 记录所公开树对应的完整 monorepo SHA。"
+    },
+    {
+      "url": "https://x.ai/cli",
+      "resolved_url": "https://x.ai/build",
+      "http_status": null,
+      "observation": "官方产品页面提供 Open Source 及 Changelog 入口；本页未提供固定 1.0.30 构建的精确源码映射。"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build/commit/04b7ffed98c6",
+      "http_status": null,
+      "observation": "网页检索工具返回 Internal Error，不能当作 HTTP404 或源码不存在证据。"
+    },
+    {
+      "url": "https://github.com/xai-org/grok-build/tags",
+      "http_status": null,
+      "observation": "网页检索工具返回 Internal Error，不能当作 HTTP404 或空标签证据。"
+    }
+  ],
+  "observed_public_head": {
+    "default_branch": "main",
+    "commit_sha": "482711333c7195dc16a272777f86086d615e2afb",
+    "committer_date": "2026-09-15T13:17:35Z",
+    "evidence_url": "https://api.github.com/repos/xai-org/grok-build/commits?per_page=100&page=1",
+    "source_rev_query_url": "https://api.github.com/repos/xai-org/grok-build/contents/SOURCE_REV?ref=482711333c7195dc16a272777f86086d615e2afb"
+  },
+  "conclusion": {
+    "exact_native_source_mapping": "未在已核对的明确提交、标签、发布元数据、候选及当前 HEAD 的 SOURCE_REV 中证实。",
+    "candidate_source_revision_matches_native_build_prefix": false,
+    "current_head_source_revision_matches_native_build_prefix": false,
+    "native_policy_interface_verified": false,
+    "native_builtin_tool_catalog_verified": false,
+    "native_source_closure_verified": false
+  }
+}

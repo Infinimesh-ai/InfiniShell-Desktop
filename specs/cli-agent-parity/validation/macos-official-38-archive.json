@@ -1,0 +1,107 @@
+{
+  "scope": "public_evidence_archive",
+  "artifacts": [
+    {
+      "file": "macos-official-38-fixed3-host-events.ndjson",
+      "bytes": 2208,
+      "sha256": "a8e4efeb5ab33ab3b54b95faf4b777da0c554d8fab8ab984f79d6e43144e615f"
+    },
+    {
+      "file": "macos-official-38-fixed3-host-events.metadata.json",
+      "bytes": 1966,
+      "sha256": "7d4ae94f06ee79acc24b1dc8cf1f84199a36fdf2c523af639f828f47f14f2e63"
+    },
+    {
+      "file": "macos-official-38-fixed3-host-events.network.json",
+      "bytes": 23279,
+      "sha256": "6646530187747f8a828e4277abe650add89ce3161828b32a7baf1b1f403957f4"
+    },
+    {
+      "file": "macos-official-38-fixed3-host-invocation.json",
+      "bytes": 2364,
+      "sha256": "e7500e8b957c73b3d01d15fc4f0efb16cae9883fc65c465bef2a159c55d95ebd"
+    },
+    {
+      "file": "macos-official-38-child3-host-events.ndjson",
+      "bytes": 676,
+      "sha256": "385b3e1589eff0f88753f46acaf89642f147aae16cb7a4f7b40e64c5991a7702"
+    },
+    {
+      "file": "macos-official-38-child3-host-events.metadata.json",
+      "bytes": 1987,
+      "sha256": "6ad920fa0ad14007cc92b6d333e946ec3ed42028fb43627e4a7e036edcc16f4d"
+    },
+    {
+      "file": "macos-official-38-child3-host-events.network.json",
+      "bytes": 9283,
+      "sha256": "33588b44f22dafdf3f1cd1646cd895c149f48480a123ea260116e0a97d69c75d"
+    },
+    {
+      "file": "macos-official-38-child3-host-invocation.json",
+      "bytes": 2574,
+      "sha256": "d1639d55e12037f8118d078c7158681a3cb01c397bbfd2321acd4f857e91b87e"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-catalog-events.ndjson",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-catalog-events.metadata.json",
+      "bytes": 2960,
+      "sha256": "6b6126abea64557b0ce92d4c3db1591c670d66a101eb000e46b66be0d600b0ff"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-catalog-events.network.json",
+      "bytes": 11937,
+      "sha256": "4c4554cf468e5720488a62826fed2de9a297bd2b3f456e37b56c13e4eaae2dff"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-catalog-invocation.json",
+      "bytes": 14620,
+      "sha256": "f11274ca89f9da95dd18660e0cdaae37d4bd5926fedf8b56e498b023d7471c61"
+    },
+    {
+      "file": "macos-official-38-policy10-events.ndjson",
+      "bytes": 7188,
+      "sha256": "b6ef09382cc9f7a51bc4277791b00d1ebb127339c89e4a66235f8a61a9e51795"
+    },
+    {
+      "file": "macos-official-38-policy10-events.metadata.json",
+      "bytes": 6260,
+      "sha256": "9f11b045dcf2bc09b5e93e90c7e9e15e9e948b3f2635e1bbbcee6f979d827782"
+    },
+    {
+      "file": "macos-official-38-policy10-events.network.json",
+      "bytes": 176,
+      "sha256": "e86e1894b8e60395b36ce86fea7eae6689c8ebb89f2223b5aab3fb6d2c8be614"
+    },
+    {
+      "file": "macos-official-38-policy10-invocation.json",
+      "bytes": 2027,
+      "sha256": "5c963258fca770344ff64d05f9c4ce5ba95304721a2364da2294fccdbb419036"
+    },
+    {
+      "file": "macos-official-38-bundle.json",
+      "bytes": 880,
+      "sha256": "94a45f8e9c46d92607419f3bbd1fb0bcbe3b502d732141af30c86526427365c2"
+    },
+    {
+      "file": "macos-official-38-child3-host-diagnostic.json",
+      "bytes": 2836,
+      "sha256": "51960b3c1819ce05f36971bdcaa03cbe22765e2487c9d7defdcd4089a0081b32"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-reanalysis.safe.json",
+      "bytes": 4729,
+      "sha256": "b5923177d5140927ec5a0354fa49dac965726e58a8a214a4243bccb3217d81d3"
+    },
+    {
+      "file": "macos-official-38-skill-visible3-reanalysis-events.safe.ndjson",
+      "bytes": 2553,
+      "sha256": "d786974ca4331ab9ab105e9a8ac92400438cdd17a0afba8458dc3923bd4899db"
+    }
+  ],
+  "original_failures_preserved": true,
+  "native_or_model_invocations": 0
+}

@@ -1,0 +1,56 @@
+{
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "task": {
+    "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+    "generation": 5,
+    "revision": 3,
+    "state": "waiting_for_user"
+  },
+  "target": "gui-cancel.txt",
+  "file_bytes": 28,
+  "file_sha256": "36088fed0caa56332b19cced8144f712da4ba6565166ca5b79b69fe05caded81",
+  "file_matches_untouched_fixture": true,
+  "messages": [
+    {
+      "message_id": "490d60d2-4e9c-46d8-bfb0-8db1676a7a71",
+      "state": "acknowledged",
+      "sender_generation": 1,
+      "recipient_generation": 1
+    },
+    {
+      "message_id": "4f20c46d-7b5c-4729-bb89-32a0f356570a",
+      "state": "acknowledged",
+      "sender_generation": 2,
+      "recipient_generation": 2
+    },
+    {
+      "message_id": "b249dabc-98d2-44bd-886c-ceb8e22e1cd1",
+      "state": "acknowledged",
+      "sender_generation": 3,
+      "recipient_generation": 3
+    },
+    {
+      "message_id": "0dde4048-2981-47dc-a157-38a591efd1ed",
+      "state": "acknowledged",
+      "sender_generation": 4,
+      "recipient_generation": 4
+    },
+    {
+      "message_id": "44e52cfd-bdb7-4024-a7bd-cdb1cefd27bd",
+      "state": "acknowledged",
+      "sender_generation": 5,
+      "recipient_generation": 5
+    },
+    {
+      "message_id": "69eac33b-1ab8-4abe-a675-0c07ea6aaeff",
+      "state": "acknowledged",
+      "sender_generation": 5,
+      "recipient_generation": 5
+    }
+  ],
+  "running_append_receipt_confirmed": true,
+  "append_execution_started_verified": false,
+  "db_read_only": true,
+  "scope": "第五轮仍等待Write审批时GUI排队追加输入，原生接收确认已记录；接收不代表已执行/完成，取消尚未发送。"
+}

@@ -1,0 +1,168 @@
+{
+  "source_base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "415908767190975f76b0a81ced2ab7a7ad2cca5bde610a748c7f474128e7faf8",
+  "source_binary_sha256": "83b5e2af482cdc7494a2437fbbf98c0982bd0f33bb68774dd5ac9438311c0df7",
+  "resigned_binary_sha256": "2f828b689c8c7f829ebe81f36233f90e0615dfac7320da5478890c27092c755d",
+  "fixed_grok_version": "1.0.30",
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "node_sha256": "a46ed02589ca3af795237111ff854262064f8ff5c5b58d75c1509f37311eb15e",
+  "scope": "ordinary_pty_real_011_to_012_upgrade_and_app_notification",
+  "passed": true,
+  "full_cli_parity_acceptance_passed": false,
+  "initial_plugin": {
+    "version": "0.1.1",
+    "source": {
+      ".grok-plugin/plugin.json": {
+        "bytes": 148,
+        "sha256": "dce0d26f77b0e5a25da21418388d5f2a1d6d451da489e155b44699594f8cbdf3"
+      },
+      "README.md": {
+        "bytes": 3225,
+        "sha256": "13a5451348ef9278f243c18ea3f8c8af714cebfe49e2eb0979263de841531167"
+      },
+      "hooks/hooks.json": {
+        "bytes": 2353,
+        "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326"
+      },
+      "hooks/notify.cjs": {
+        "bytes": 8298,
+        "sha256": "9d100f0aad5ce14e9237a15f39537278e8208082bc298acb2883662d8cd9580a"
+      }
+    },
+    "cache": {
+      ".grok-plugin/plugin.json": {
+        "bytes": 148,
+        "sha256": "dce0d26f77b0e5a25da21418388d5f2a1d6d451da489e155b44699594f8cbdf3"
+      },
+      "README.md": {
+        "bytes": 3225,
+        "sha256": "13a5451348ef9278f243c18ea3f8c8af714cebfe49e2eb0979263de841531167"
+      },
+      "hooks/hooks.json": {
+        "bytes": 2353,
+        "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326"
+      },
+      "hooks/notify.cjs": {
+        "bytes": 8298,
+        "sha256": "9d100f0aad5ce14e9237a15f39537278e8208082bc298acb2883662d8cd9580a"
+      }
+    }
+  },
+  "final_plugin": {
+    "version": "0.1.2",
+    "source": {
+      ".grok-plugin/plugin.json": {
+        "bytes": 148,
+        "sha256": "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571"
+      },
+      "README.md": {
+        "bytes": 3854,
+        "sha256": "3201642c13a38e92d19e2f57f82e5f8c4b0b344b14c09a6343e9595e2686d3d3"
+      },
+      "hooks/hooks.json": {
+        "bytes": 2353,
+        "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326"
+      },
+      "hooks/notify.cjs": {
+        "bytes": 10818,
+        "sha256": "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188"
+      }
+    },
+    "cache": {
+      ".grok-plugin/plugin.json": {
+        "bytes": 148,
+        "sha256": "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571"
+      },
+      "README.md": {
+        "bytes": 3854,
+        "sha256": "3201642c13a38e92d19e2f57f82e5f8c4b0b344b14c09a6343e9595e2686d3d3"
+      },
+      "hooks/hooks.json": {
+        "bytes": 2353,
+        "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326"
+      },
+      "hooks/notify.cjs": {
+        "bytes": 10818,
+        "sha256": "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188"
+      }
+    }
+  },
+  "source35_unchanged": true,
+  "copied_011_source_unchanged": true,
+  "copied_history_and_config": {
+    "files": 52,
+    "bytes": 848202,
+    "manifest_sha256": "0eb00a6b65da8fa5b6c2da947c072cdc8da3368378fbb5ebe043db0d1be3f498"
+  },
+  "native_session_id": "01a0b5a6-bef5-7381-a79f-68a3eba06aea",
+  "native_model_inputs": 2,
+  "first_reply_exact": true,
+  "second_reply_recalls_first": true,
+  "history_sha256": "fc1cef3048c4dd46ede66b1e334f8147ff08487aee95877b3d555f7f6e7d8bcc",
+  "history_bodies_archived": false,
+  "app_update_button_used": true,
+  "native_plugins_tab_reload_required": true,
+  "hooks_tab_reload_alone_did_not_refresh_registry": true,
+  "native_loaded_hook_count": 9,
+  "actual_app_notification_observed_after_both_turns": true,
+  "notification_title": "Grok Build needs attention",
+  "notification_body": "Status unknown. Check the terminal to confirm the task outcome.",
+  "ordinary_stop_did_not_assert_success": true,
+  "plugin_state": {
+    "state_files": 1,
+    "states": [
+      {
+        "file_sha256": "f2959237e0fa33496ed7bf08ea329f4096e126abe56df1478f62229b2e567e55",
+        "seen_event_count": 8,
+        "failed": false,
+        "closed": true
+      }
+    ],
+    "osc_consumption_proven_by_this_snapshot": false
+  },
+  "private_processes_remaining": 0,
+  "private_auth_removed": true,
+  "original_auth_stat_unchanged": true,
+  "credential_values_archived": false,
+  "ssh_verified": false,
+  "windows_verified": false,
+  "screenshots": [
+    {
+      "file": "01-old-plugin-update-entry.png",
+      "bytes": 71122,
+      "sha256": "3eb0ec5ea6f3caee652be8f403d969797a9e9aecb42c6c99d3602bbc371f2446"
+    },
+    {
+      "file": "02-native-plugin-012-reloaded.png",
+      "bytes": 86348,
+      "sha256": "55cfdf24304a78e6ec23228eb0a05d3ee844ddbe7d09de64ca75ee86b03a3af1"
+    },
+    {
+      "file": "03-nine-hooks-012.png",
+      "bytes": 95208,
+      "sha256": "daa8d4ba0944ccfbba606291384748220a8d6d8a1e7fd88984ba1d926189c606"
+    },
+    {
+      "file": "04-first-native-result.png",
+      "bytes": 80983,
+      "sha256": "88c294c2464728dad942bb89d94c5adf4431c9023de9eb5e47f2b3d4a830b052"
+    },
+    {
+      "file": "05-app-consumed-grok-unknown-notification.png",
+      "bytes": 87815,
+      "sha256": "3d1987192f8d59aaa544748b7be0214736f20c322bc5b74c7a3f1c3a74a7a0b3"
+    },
+    {
+      "file": "06-second-native-result.png",
+      "bytes": 81773,
+      "sha256": "9fd591c77cdf1e6bbee898666d20d64e552079ff95d9247d4a0e9e896e7c9fc9"
+    },
+    {
+      "file": "07-second-app-notification.png",
+      "bytes": 88705,
+      "sha256": "55be5ca8b97e74a8ea423e5380034477fdac333504b84a292bbbafdd636f09c9"
+    }
+  ]
+}

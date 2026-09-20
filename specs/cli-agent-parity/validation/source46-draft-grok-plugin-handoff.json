@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "status": "partial_frozen_handoff",
+  "no_more_writes": true,
+  "files": [
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json",
+      "sha256": "c357e633f907623ff322f88aff2442cded9eaa243d9c14b45cdd66234bd20aa5"
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/hooks.json",
+      "sha256": "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe"
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs",
+      "sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898"
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/README.md",
+      "sha256": "22ef7175658f6f5edcac586acad0aef7a88633ea6b9ae434748292588b98e7ba"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "sha256": "136133462e3f71bdc01db803a4bf275bad8f2f627915328422689f634a70571c"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "sha256": "3334060f1e14acc10ce928cc4e48a13b6b827b8cb6d6a817d9438314463e316d"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-hooks.json",
+      "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-readme.md",
+      "sha256": "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-plugin.json",
+      "sha256": "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571"
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-notify.cjs",
+      "sha256": "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188"
+    }
+  ],
+  "node_syntax_checks": "notify.cjs and existing tests PASS",
+  "diff_check": "PASS",
+  "node_legacy_suite": {
+    "tests": 14,
+    "pass": 5,
+    "fail": 9
+  },
+  "node_legacy_log_sha256": "d1994bcf204e66070e98ebaeb4494aec1e264470d5f28cf71ebb7739fada165f",
+  "rust_or_native_run": false,
+  "node_tests_file_updated": false,
+  "cli_support_version_unchanged": "1.0.30",
+  "patch_sha256": "fbb6df25068e8af738ea496f98f411ac4025118609b97fab99e4c8d29651a189",
+  "unfinished": [
+    "适配并扩充Node去状态映射及worker调用测试；当前14项5通过9失败",
+    "跨进程worker真实传输和4096B/分号边界集成验证",
+    "installed_grok_hook_tests.py旧0.1.2硬断言及runner环境接线",
+    "Rust新增旧配方和升级/恢复回归尚未编译执行",
+    "真实Grok30/34插件validate/load/StopCancelled与Windows/SSH/tmux验收未做",
+    "检查parent worker/env/i18n其余域合并完整性"
+  ]
+}

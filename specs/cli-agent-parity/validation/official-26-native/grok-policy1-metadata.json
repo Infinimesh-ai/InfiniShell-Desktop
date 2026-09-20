@@ -1,0 +1,68 @@
+{
+  "scope": "grok_fixed_policy_interface_preflight",
+  "test_name": "ai::cli_agent_runtime::grok::policy_preflight_live_tests::native_fixed_policy_interfaces",
+  "prepared_only": false,
+  "native_inputs": 0,
+  "policy": {
+    "profile_loading": "unknown",
+    "effective_mode": "unknown",
+    "configuration_sources": "unknown",
+    "builtin_catalog": "unknown",
+    "wrapper_closure": "unknown",
+    "parent_permission_ceiling_verified": false,
+    "filesystem_sandbox_verified": false,
+    "ready_for_policy_implementation": false
+  },
+  "limitations": [
+    "candidate_source_differs_from_binary",
+    "no_effective_builtin_catalog_interface_verified",
+    "profile_loading_unknown",
+    "effective_mode_unknown",
+    "configuration_sources_unknown",
+    "wrapper_target_closure_unknown",
+    "parent_ceiling_unverified",
+    "filesystem_sandbox_unverified",
+    "opaque_tls_model_http_count_unknown",
+    "cross_platform_unverified",
+    "ssh_tmux_unverified"
+  ],
+  "execution_boundary_passed": false,
+  "interface_investigation_completed": false,
+  "same_commit_verified_by_runner": false,
+  "cross_platform_verified": false,
+  "model_http_count_measured": false,
+  "tls_decrypted": false,
+  "auth_copy_method": "opaque_auth_json_only",
+  "credential_values_parsed_by_runner": false,
+  "candidate_source_snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+  "candidate_source_revision": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+  "candidate_source_is_exact_binary": false,
+  "input_hashes": {
+    "test_binary": "bb019bc5e8e4c30582767e9a89685d46c515211c73b0b8914d04a5ee5b0e1cf1",
+    "supervisor": "d8102b9d02cd9f104d0d2c2098ca805c99abf6ac60441bd51b84356d3fd12de5",
+    "grok": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+  },
+  "opaque_auth_copy_removed": true,
+  "tunnels_stopped": true,
+  "private_workspace_removed": true,
+  "runner_cleanup_confirmed": true,
+  "stdout": {
+    "raw_stdout_archived": false,
+    "stdout_bytes": 965,
+    "stdout_sha256": "024ab8d3c512b0190ea412eb9b349b2b37bece977312481d67b552540257f719",
+    "credential_shape_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "test_success_summary_count": 0
+  },
+  "failure_code": "test_or_projection_failed",
+  "snapshots_match_explicit_inputs": false,
+  "test_exit_code": 101,
+  "private_config_bytes_unchanged": true,
+  "private_profile_bytes_unchanged": true
+}

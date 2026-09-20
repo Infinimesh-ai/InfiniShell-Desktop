@@ -1,0 +1,333 @@
+{
+  "events": [
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "bf68bba4f5a0724001e6b8a3e6dee3271fc34d5b71aced2e68e38f61d8fd2782"
+    },
+    {
+      "event": "rejected_nonofficial_origin",
+      "origin_kind": "unknown",
+      "authority_sha256": "9b733062390bcae6f4e51fe39bc56e510a3bdd7aa504bf3d97191dc4f8164896"
+    }
+  ],
+  "tls_connections_attempted": 18,
+  "tls_bytes": 8492577,
+  "http_model_calls_observable": false,
+  "tls_budget_scope": "observed_configured_proxy_connections",
+  "native_network_budget_enforced": false
+}

@@ -1,0 +1,219 @@
+{
+  "schema_version": 1,
+  "phase": "followup",
+  "final": false,
+  "archive_state": "closed_pending_final",
+  "run_id": 35263203530,
+  "expected_head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+  "window_started_at_utc": "2026-09-17T19:25:25.427648+00:00",
+  "window_deadline_utc": "2026-09-17T19:40:25.427648+00:00",
+  "window_closed_at_utc": "2026-09-17T19:37:32.223480+00:00",
+  "query_times_utc": [
+    "2026-09-17T19:25:25.427648+00:00",
+    "2026-09-17T19:30:57.108284+00:00",
+    "2026-09-17T19:36:12.183109+00:00"
+  ],
+  "query_count": 3,
+  "query_interval_seconds": [
+    331.680636,
+    315.074825
+  ],
+  "next_legal_query_at_utc": "2026-09-17T19:41:12.183109+00:00",
+  "head_all_six_observations_exact": true,
+  "dispatch_attempt_count_total": 1,
+  "full_workspace_tests": false,
+  "input_provenance": "actual_initial_dispatch_argv_not_run_api",
+  "initial_five_files_byte_unchanged": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_INITIAL_VERIFICATION.md",
+      "sha256": "7160eb4ebeb648b9a1b5d1a5a83136ce72e0a3822d1934c2b2ae88bc1c3b1af1",
+      "byte_unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/runner-availability.json",
+      "sha256": "8d6715f4281149cb1fb8b23d77d632a7486ce4d11e93477f872af87c93746d54",
+      "byte_unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-run.json",
+      "sha256": "bb93b8bda67307ca23ccf456bc06524ce6f2d15496644466bed6c5a3593c634e",
+      "byte_unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-jobs.json",
+      "sha256": "a272d41619c03fb20b316f779ada47df48be60b5582d64f4fdb30a41a1e15e87",
+      "byte_unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-audit.json",
+      "sha256": "4eb0c673a8d248c035be231351251ee11777414a935a181d069e8b12b89f4a3d",
+      "byte_unchanged": true
+    }
+  ],
+  "platform_latest_summary": [
+    {
+      "id": 105343794125,
+      "name": "Linux x64",
+      "status": "in_progress",
+      "conclusion": null,
+      "success_step_numbers": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23
+      ],
+      "failure_step_numbers": [],
+      "skipped_step_numbers": [],
+      "in_progress_step_numbers": [
+        24
+      ]
+    },
+    {
+      "id": 105343794289,
+      "name": "Windows x64",
+      "status": "in_progress",
+      "conclusion": null,
+      "success_step_numbers": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27
+      ],
+      "failure_step_numbers": [],
+      "skipped_step_numbers": [],
+      "in_progress_step_numbers": [
+        28
+      ]
+    }
+  ],
+  "raw_job_log_requests": 0,
+  "fallback_log_requests": 0,
+  "failure_cause": "unknown_no_failure_observed",
+  "files": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_FINAL_VERIFICATION.md",
+      "bytes": 3370,
+      "sha256": "f36d7d5d91a9915e7934edeceeb26255513754e294cd48d900a6791fc3026c75",
+      "serialized_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_string_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_strings_scanned": 0
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-run.json",
+      "bytes": 3872,
+      "sha256": "24211709bf947c31b48e40ef90cd542c7d174733b543ff98e022ac1dab7cf6f4",
+      "serialized_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_string_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_strings_scanned": 130
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-jobs.json",
+      "bytes": 69126,
+      "sha256": "9087855bf97b6828c1ab6eac68878827d1c829b86922b89e069ba112b9b35069",
+      "serialized_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_string_shape_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_strings_scanned": 2362
+    }
+  ],
+  "credential_shape_total_matches": 0,
+  "scan_scope": "六类固定形状；序列化及JSON解码字符串分别扫描，非穷尽保证",
+  "execution_and_archive_same_agent": true,
+  "archive_auditor_independent_from_executor": false,
+  "goal_complete": false,
+  "direct_native_or_model_or_cargo_or_gui_execution": false,
+  "authentication_or_model_body_read": false,
+  "git_mutation": false,
+  "localization_change_required": false,
+  "unverified": [
+    "CI13终态",
+    "本平台真实日志计数及各case证据",
+    "完整工作区full=true",
+    "新实际提交在线CLI模型/GUI全链",
+    "真实SSH/tmux全链",
+    "Goal全部验收"
+  ]
+}

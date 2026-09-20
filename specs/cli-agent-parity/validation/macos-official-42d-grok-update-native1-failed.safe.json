@@ -1,0 +1,22 @@
+{
+  "case_id": "source42d-grok-1030-to-1034-native1",
+  "credentials_provided": false,
+  "detached_descendants_verified": false,
+  "elapsed_seconds": 0.299,
+  "manifest_sha256": "e4142866fcf5c0248baf8271c323e0a718c2e4d13d97e5377d5b4a912f428d36",
+  "max_product_execute_calls": 1,
+  "model_inputs_sent": 0,
+  "passed": false,
+  "runner_error_type": "FileNotFoundError",
+  "safe_event_valid": false,
+  "scope": "cli_autoupdate_native_product",
+  "source_manifest_sha256": "6d67d82dec66e0d301820a216e8d3ab6acb041bd2986a9b8728f9b0a307c30f9",
+  "supervisor_sha256": "103cf2ff47f4856621278190cb79a1fac6005069da3b576f6a05890bb85e53e1",
+  "test_exit_code": 101,
+  "test_name": "terminal::cli_agent_updates::sources::live_tests::real_native_update_without_model",
+  "timed_out": false,
+  "timeout_seconds": 480,
+  "worker_group_initially_empty": true,
+  "worker_group_stopped": true,
+  "worker_sha256": "78448665e814b9cf00365d930a51543d6d72ac3c036d45878a541e4fd4adbef7"
+}

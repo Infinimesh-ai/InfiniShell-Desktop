@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "phase": "followup",
+  "final": false,
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "run_id": 35263203530,
+  "expected_head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+  "window_started_at_utc": "2026-09-17T19:25:25.427648+00:00",
+  "window_deadline_utc": "2026-09-17T19:40:25.427648+00:00",
+  "observations": [
+    {
+      "queried_at_utc": "2026-09-17T19:25:25.427648+00:00",
+      "api_request_at_utc": "2026-09-17T19:25:25.427928+00:00",
+      "endpoint": "repos/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+      "api_response_bytes": 13537,
+      "api_response_sha256": "04e0b01eb07ffcdf944e2c23e42745f5cb7749e22b98d339137788ee0405977b",
+      "run": {
+        "id": 35263203530,
+        "name": "Cross-platform preflight",
+        "run_number": 89,
+        "run_attempt": 1,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+        "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+        "created_at": "2026-09-17T19:09:35Z",
+        "updated_at": "2026-09-17T19:09:50Z",
+        "run_started_at": "2026-09-17T19:09:35Z",
+        "path": ".github/workflows/cross-platform-preflight.yml"
+      }
+    },
+    {
+      "queried_at_utc": "2026-09-17T19:30:57.108284+00:00",
+      "api_request_at_utc": "2026-09-17T19:30:57.109064+00:00",
+      "endpoint": "repos/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+      "api_response_bytes": 13537,
+      "api_response_sha256": "04e0b01eb07ffcdf944e2c23e42745f5cb7749e22b98d339137788ee0405977b",
+      "run": {
+        "id": 35263203530,
+        "name": "Cross-platform preflight",
+        "run_number": 89,
+        "run_attempt": 1,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+        "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+        "created_at": "2026-09-17T19:09:35Z",
+        "updated_at": "2026-09-17T19:09:50Z",
+        "run_started_at": "2026-09-17T19:09:35Z",
+        "path": ".github/workflows/cross-platform-preflight.yml"
+      }
+    },
+    {
+      "queried_at_utc": "2026-09-17T19:36:12.183109+00:00",
+      "api_request_at_utc": "2026-09-17T19:36:12.183585+00:00",
+      "endpoint": "repos/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+      "api_response_bytes": 13537,
+      "api_response_sha256": "04e0b01eb07ffcdf944e2c23e42745f5cb7749e22b98d339137788ee0405977b",
+      "run": {
+        "id": 35263203530,
+        "name": "Cross-platform preflight",
+        "run_number": 89,
+        "run_attempt": 1,
+        "event": "workflow_dispatch",
+        "status": "in_progress",
+        "conclusion": null,
+        "head_branch": "codex/cli-agent-parity",
+        "head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+        "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35263203530",
+        "created_at": "2026-09-17T19:09:35Z",
+        "updated_at": "2026-09-17T19:09:50Z",
+        "run_started_at": "2026-09-17T19:09:35Z",
+        "path": ".github/workflows/cross-platform-preflight.yml"
+      }
+    }
+  ],
+  "initial_five_files_must_remain_byte_exact": true,
+  "archive_auditor_independent_from_executor": false,
+  "dispatch_attempt_count_total": 1,
+  "full_workspace_tests": false,
+  "next_query_at_utc": "2026-09-17T19:41:12.183109+00:00",
+  "terminal_observed": false,
+  "window_closed": true,
+  "closed_at_utc": "2026-09-17T19:37:32.223480+00:00",
+  "close_reason": "next_legal_query_exceeds_followup_window",
+  "final_verification_state": "pending"
+}

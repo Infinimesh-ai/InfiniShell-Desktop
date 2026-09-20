@@ -1,0 +1,507 @@
+{
+  "base_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "worktree_dirty": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "5e8a71f38b458b4b1dc213068e9dcea9d638dafd1c20e857614188866b4eba5e",
+  "authorization_sha256": "69b8ebc04b83b2229f5fe9ef3d1efae403dfc3d162e1245a72dea09f87bbf1f4",
+  "scope": "source33 本地门禁，未执行 main/signature/native/GUI/跨平台",
+  "raw_logs_archived": false,
+  "source_scope_note": "126项选择的源码及测试闭包，未声称全工作区门禁或全部Cargo依赖审计",
+  "gates": [
+    {
+      "module": "claude_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.228,
+      "tests": 11,
+      "unittest_seconds": 0.008,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 1954,
+      "stdout_sha256": "729954470f7bcf20a7c2f668ac5c9f35ef2d0beb563626c1ce4e5358893d2456",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_profile_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.196,
+      "tests": 7,
+      "unittest_seconds": 0.005,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 1249,
+      "stdout_sha256": "e0a2d32f7cf0bfc334c99ed980bfff538c8ab3b6185d9538ec08c536d6bd0fc4",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.264,
+      "tests": 56,
+      "unittest_seconds": 0.046,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 8257,
+      "stdout_sha256": "58f722526f62b30c2cdc1e65b5338d5af03c41ba53c56bb5d86522cdab1a74db",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_batch_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.218,
+      "tests": 25,
+      "unittest_seconds": 0.021,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 4470,
+      "stdout_sha256": "24a521f14c910a0c615bb01760cce8b832aecda29599c670371c98b36e2ca915",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_approval_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_approval_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.24,
+      "tests": 33,
+      "unittest_seconds": 0.032,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 5686,
+      "stdout_sha256": "6b01d122191645388914c9d544a7549170f57272fabd1fcb8bd066d1348fc623",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_image_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.211,
+      "tests": 25,
+      "unittest_seconds": 0.014,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 3973,
+      "stdout_sha256": "d245cb67a8dab95f386f8885935babf83f11a8a61ee8bcf58aa95b0006733ec8",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "claude_managed_image_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.234,
+      "tests": 20,
+      "unittest_seconds": 0.034,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 3547,
+      "stdout_sha256": "486096001c3bba661f5a227b14018da59db9db94da4555bf155a5f9c96eb114a",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "codex_source_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.447,
+      "tests": 11,
+      "unittest_seconds": 0.233,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 1805,
+      "stdout_sha256": "48a7c0af58583229ef585bca01917aa814f143ba60d08ba7dbda6e8a69d2ff9b",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.218,
+      "tests": 13,
+      "unittest_seconds": 0.01,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 2359,
+      "stdout_sha256": "8d360f911fd1dd02414608b09b8595d7a97f27f2fc50d647a8c80f1e79c864ab",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.287,
+      "tests": 27,
+      "unittest_seconds": 0.066,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 4678,
+      "stdout_sha256": "a9040035bafcb39441de401a101c6fd47cf3b4b52671ee261019ae516dbda1c3",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_official_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 2.303,
+      "tests": 19,
+      "unittest_seconds": 2.08,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 3403,
+      "stdout_sha256": "73fc7ee0841278a5dea72eb3ed2d6850e833d9642673d4d5c87850932aa54ee2",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_sdk_origin_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.866,
+      "tests": 108,
+      "unittest_seconds": 0.643,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 18472,
+      "stdout_sha256": "f84af053055bfeb17d1df57371915141b1ae506dd9581d76db8be190d6b1c219",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_official_pty_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.224,
+      "tests": 20,
+      "unittest_seconds": 0.013,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 3565,
+      "stdout_sha256": "ee9685b81942292ac7bc110114f082bc577bbc003779acf780f98f4981d0cc49",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "prepare_codex_cli_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/prepare_codex_cli_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.34,
+      "tests": 27,
+      "unittest_seconds": 0.135,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 4482,
+      "stdout_sha256": "cad9542d77457a92d157aa67d6171b510505c78f8259e489c4f5d05ba5e8bca6",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "grok_policy_preflight_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.264,
+      "tests": 55,
+      "unittest_seconds": 0.064,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 9862,
+      "stdout_sha256": "55865df207ed2543e2c24f9a39fe4019428e1eef6e5f879596222e9a234f0ae8",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "module": "installed_grok_hook_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/installed_grok_hook_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 0.655,
+      "tests": 6,
+      "unittest_seconds": 0.459,
+      "skipped": 0,
+      "success_summary_observed": true,
+      "stdout_bytes": 1078,
+      "stdout_sha256": "2e47772825136ee60b44bccf31bd892aa23d3018cab8a19507375910d49c02b1",
+      "credential_shape_counts": {
+        "api_key": 0,
+        "jwt": 0,
+        "bearer": 0,
+        "private_key": 0,
+        "credential_assignment": 0,
+        "email": 0
+      },
+      "source_verified_before": true,
+      "source_verified_after": true
+    }
+  ],
+  "all_passed": true,
+  "node_gate": {
+    "argv": [
+      "/opt/homebrew/Cellar/node/25.9.0_1/bin/node",
+      "--test",
+      "--test-reporter=tap",
+      "script/cli-agent-parity/grok_plugin_tests.cjs"
+    ],
+    "exit_code": 0,
+    "summary": {
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "wall_seconds": 0.181,
+    "log": "/tmp/infinishell-cli-parity-official-33-node.log",
+    "log_bytes": 2478,
+    "log_sha256": "e50e15064c8792cd4772891b6c89248f3fabcac175a4e193bf1a1f015e36c27e",
+    "pass_lines": 13,
+    "credential_shape_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "source_verified_before": true,
+    "source_verified_after": true,
+    "node_binary_before": {
+      "path": "/opt/homebrew/Cellar/node/25.9.0_1/bin/node",
+      "bytes": 68384,
+      "sha256": "a46ed02589ca3af795237111ff854262064f8ff5c5b58d75c1509f37311eb15e",
+      "path_source": "本轮 PATH 的实际 Node 可执行路径"
+    },
+    "node_binary_after": {
+      "path": "/opt/homebrew/Cellar/node/25.9.0_1/bin/node",
+      "bytes": 68384,
+      "sha256": "a46ed02589ca3af795237111ff854262064f8ff5c5b58d75c1509f37311eb15e",
+      "path_source": "本轮 PATH 的实际 Node 可执行路径"
+    },
+    "passed": true
+  },
+  "total_tests": 463,
+  "wall_seconds": 16.566,
+  "log": "/tmp/infinishell-cli-parity-official-33-python.log",
+  "log_bytes": 78840,
+  "log_sha256": "f867dc15722ab2a124a823a2a6c154e61057f4c5cd99d3ec46d82ca34623257d",
+  "source_unchanged_after_gates": true,
+  "credential_shape_counts": {
+    "api_key": 0,
+    "jwt": 0,
+    "bearer": 0,
+    "private_key": 0,
+    "credential_assignment": 0,
+    "email": 0
+  },
+  "finished_reads_done": true
+}

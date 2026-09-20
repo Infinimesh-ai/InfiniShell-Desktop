@@ -1,0 +1,106 @@
+{
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "goal_complete": false,
+  "auth_content_read_by_driver": false,
+  "product_permission_gate_open": false,
+  "profile_override": "/private/tmp/infinishell-grok-policy-nonempty-readonly-profile-1.md",
+  "profile_override_sha256": "b6bce1cacc4853e3d1d87f7017285affc954dcbece21cb8812a985e9ff258809",
+  "profile_override_is_frozen_source": false,
+  "identity": {
+    "source_count": 126,
+    "changed_count": 29,
+    "source_manifest_sha256": "5e8a71f38b458b4b1dc213068e9dcea9d638dafd1c20e857614188866b4eba5e",
+    "identity_authorization_sha256": "924a15eff68dea3689e08ba98dd7dab8c8fa40a7c8fcf3cbda71aec6932413c6",
+    "test_binary": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "bytes": 850326936,
+      "sha256": "aee3a9458821b12706b1fb7451a5d21b4d400c122caf6eecd9579c30b6d60f32",
+      "path_source": "本轮实际 i18n 日志，不沿用旧源身份"
+    },
+    "supervisor": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "bytes": 866192528,
+      "sha256": "7adefe0dd66f7ac3527a2134b80dbf6bc72ef7536f7811b49ab7fd263886499b"
+    }
+  },
+  "argv": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "-B",
+    "script/cli-agent-parity/run_grok_policy_preflight.py",
+    "--test-binary",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "--supervisor",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "--grok",
+    "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "--official-grok-home",
+    "/private/tmp/infinishell-grok-official-login-ap0byk0e/home/.grok",
+    "--profile",
+    "/private/tmp/infinishell-grok-policy-nonempty-readonly-profile-1.md",
+    "--config",
+    "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation-33/specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-config.toml",
+    "--max-native-inputs",
+    "0",
+    "--timeout",
+    "360",
+    "--max-tls-connections",
+    "16",
+    "--max-tls-bytes",
+    "8388608",
+    "--output",
+    "/tmp/infinishell-cli-parity-official-33-policy6-events.ndjson"
+  ],
+  "runner_exit_code": 1,
+  "runner_termination_signal": null,
+  "driver_exit_code": 1,
+  "primary_or_cleanup_error_type": null,
+  "post_guard_error_type": null,
+  "public_artifact_audit_error_type": null,
+  "private_log_audit_error_type": null,
+  "wall_seconds": 6.26,
+  "max_native_inputs": 0,
+  "max_protocol_requests": 14,
+  "max_processes": 2,
+  "timeout_seconds": 360,
+  "max_tls_connections": 16,
+  "max_tls_bytes": 8388608,
+  "allowed_https_hosts": [
+    "auth.x.ai",
+    "cli-chat-proxy.grok.com"
+  ],
+  "public_artifacts": [
+    {
+      "path": "/tmp/infinishell-cli-parity-official-33-policy6-events.ndjson",
+      "bytes": 5865,
+      "sha256": "5b41d3f7be1516b3fb5994a9c84404fe0141f0d93fa177a079e412fe1f1339fe"
+    },
+    {
+      "path": "/tmp/infinishell-cli-parity-official-33-policy6-events.metadata.json",
+      "bytes": 6631,
+      "sha256": "76ad5864e78d5b1f8123e5ad62aafe50e843ce0bea6ca312ebebc0204b9a4146"
+    },
+    {
+      "path": "/tmp/infinishell-cli-parity-official-33-policy6-events.network.json",
+      "bytes": 176,
+      "sha256": "8d4018c0c03555e2e74528ab6aa9f7940dd9ddd970dca736efe00c1e7dc6d92c"
+    }
+  ],
+  "runner_public_summary": {
+    "execution_boundary_passed": false,
+    "interface_investigation_completed": false,
+    "opaque_auth_copy_removed": true,
+    "tunnels_stopped": true,
+    "private_workspace_removed": true,
+    "runner_cleanup_confirmed": true,
+    "private_config_bytes_unchanged": true,
+    "private_profile_bytes_unchanged": true,
+    "test_exit_code": 101
+  },
+  "original_auth_stat_unchanged": true,
+  "source_and_artifacts_post_guard_passed": true,
+  "private_log_bytes": 0,
+  "private_log_content_read": false,
+  "private_log_hash_computed": false
+}

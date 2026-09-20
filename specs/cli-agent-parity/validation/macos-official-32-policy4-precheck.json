@@ -1,0 +1,38 @@
+{
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "goal_complete": false,
+  "auth_content_read_by_driver": false,
+  "product_permission_gate_open": false,
+  "identity": {
+    "source_count": 119,
+    "changed_count": 18,
+    "source_manifest_sha256": "bd9b16f9debe9dd1038e8203e64b3f4205f21203fea781850aff1a092de89998",
+    "identity_authorization_sha256": "4359f25269b468a30f271eba53ab65a3613ac4fa0f07823026dc8e6b7637afab",
+    "test_binary": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "bytes": 850624232,
+      "sha256": "edead012a79f8add9251eab300f87d552b282bfb8812eeb893f8bac7e2fd84a1",
+      "path_source": "本轮实际 i18n 日志，不沿用旧源身份"
+    },
+    "supervisor": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "bytes": 866287536,
+      "sha256": "461cacd2ba2c4ed57de5b62ff6ea597e6feb58a669313bd9afd17043beb5a913"
+    }
+  },
+  "auth_stat": {
+    "owner_current_uid": true,
+    "home_0700_auth_0600_nlink1": true,
+    "device": 16777235,
+    "inode": 89694677,
+    "bytes": 1745,
+    "mtime_ns": 1789628691306593400
+  },
+  "sole_exact_ignored_entrypoint_listed_once": true,
+  "native_test_executed": false,
+  "credentials_provided_to_list_or_version": false,
+  "version_exit_code": 0,
+  "list_exit_code": 0
+}

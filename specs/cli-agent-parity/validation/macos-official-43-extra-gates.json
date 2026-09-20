@@ -1,0 +1,37 @@
+{
+  "source_manifest_sha256": "f9a596871fde5059b5800f2edc6f1767b6b7cb23fe8537a4ab98f9d6ffe6db96",
+  "same_commit_verified": false,
+  "gates": [
+    {
+      "name": "ai-action-result",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "ai",
+        "--lib",
+        "agent::action_result::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 1.483,
+      "log_sha256": "d4fe693d6d6a4d879f12cb242803e976a5aadc8036a6c549c5a9dc8bf843bbd8",
+      "summary": [
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 290 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "name": "tui-check",
+      "argv": [
+        "cargo",
+        "check",
+        "-p",
+        "warp_tui"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 64.164,
+      "log_sha256": "ebd0d892b4684a8acd7cdb221106b75116cbf3cdc2c692d1334ee98b45c39bb7",
+      "summary": []
+    }
+  ],
+  "all_passed": true
+}

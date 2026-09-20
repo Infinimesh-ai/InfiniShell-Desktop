@@ -1,0 +1,103 @@
+{
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "goal_complete": false,
+  "auth_content_read_by_driver": false,
+  "product_permission_gate_open": false,
+  "identity": {
+    "source_count": 119,
+    "changed_count": 18,
+    "source_manifest_sha256": "bd9b16f9debe9dd1038e8203e64b3f4205f21203fea781850aff1a092de89998",
+    "identity_authorization_sha256": "4359f25269b468a30f271eba53ab65a3613ac4fa0f07823026dc8e6b7637afab",
+    "test_binary": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "bytes": 850624232,
+      "sha256": "edead012a79f8add9251eab300f87d552b282bfb8812eeb893f8bac7e2fd84a1",
+      "path_source": "本轮实际 i18n 日志，不沿用旧源身份"
+    },
+    "supervisor": {
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "bytes": 866287536,
+      "sha256": "461cacd2ba2c4ed57de5b62ff6ea597e6feb58a669313bd9afd17043beb5a913"
+    }
+  },
+  "argv": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "-B",
+    "script/cli-agent-parity/run_grok_policy_preflight.py",
+    "--test-binary",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "--supervisor",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "--grok",
+    "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "--official-grok-home",
+    "/private/tmp/infinishell-grok-official-login-ap0byk0e/home/.grok",
+    "--profile",
+    "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation-32/specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-profile.md",
+    "--config",
+    "/Users/zhishi/Tools/github/InfiniShell-Desktop/.worktrees/cli-agent-parity-validation-32/specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-config.toml",
+    "--max-native-inputs",
+    "0",
+    "--timeout",
+    "360",
+    "--max-tls-connections",
+    "16",
+    "--max-tls-bytes",
+    "8388608",
+    "--output",
+    "/tmp/infinishell-cli-parity-official-32-policy4-events.ndjson"
+  ],
+  "runner_exit_code": 1,
+  "runner_termination_signal": null,
+  "driver_exit_code": 1,
+  "primary_or_cleanup_error_type": null,
+  "post_guard_error_type": null,
+  "public_artifact_audit_error_type": null,
+  "private_log_audit_error_type": null,
+  "wall_seconds": 13.074,
+  "max_native_inputs": 0,
+  "max_protocol_requests": 14,
+  "max_processes": 2,
+  "timeout_seconds": 360,
+  "max_tls_connections": 16,
+  "max_tls_bytes": 8388608,
+  "allowed_https_hosts": [
+    "auth.x.ai",
+    "cli-chat-proxy.grok.com"
+  ],
+  "public_artifacts": [
+    {
+      "path": "/tmp/infinishell-cli-parity-official-32-policy4-events.ndjson",
+      "bytes": 3600,
+      "sha256": "add3d636b20e59bebf82692bc1ec7f93cbc265c9946ae4dc18ab7c89ab6c4a6c"
+    },
+    {
+      "path": "/tmp/infinishell-cli-parity-official-32-policy4-events.metadata.json",
+      "bytes": 3731,
+      "sha256": "efd8a5871ec68a00e59341a0db37b0f6d07d023575db0ab4820ee0cf9fc8e8e9"
+    },
+    {
+      "path": "/tmp/infinishell-cli-parity-official-32-policy4-events.network.json",
+      "bytes": 177,
+      "sha256": "c9520e70ace01d5aa79ae2d236f2b091fc181cbb769f71905360ead53fcdfda3"
+    }
+  ],
+  "runner_public_summary": {
+    "execution_boundary_passed": false,
+    "interface_investigation_completed": false,
+    "opaque_auth_copy_removed": true,
+    "tunnels_stopped": true,
+    "private_workspace_removed": true,
+    "runner_cleanup_confirmed": true,
+    "private_config_bytes_unchanged": true,
+    "private_profile_bytes_unchanged": true,
+    "test_exit_code": 101
+  },
+  "original_auth_stat_unchanged": true,
+  "source_and_artifacts_post_guard_passed": true,
+  "private_log_bytes": 0,
+  "private_log_content_read": false,
+  "private_log_hash_computed": false
+}

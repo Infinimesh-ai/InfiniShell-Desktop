@@ -1,0 +1,11 @@
+{
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "old_pid_not_running": true,
+  "normal_exit_code_observable": false,
+  "running_pid": 19595,
+  "app": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-26-lwnota0o/InfiniShellParityOfficial26.app",
+  "bundle_id": "dev.infinishell.InfiniShellParityOfficial26",
+  "auth_copied": false,
+  "scope": "无任务环境中切换英文设置并正常退出后重开；不计任务重启恢复。"
+}

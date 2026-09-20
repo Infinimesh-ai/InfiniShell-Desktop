@@ -1,0 +1,138 @@
+{
+  "source_manifest_sha256": "f9591fb3011b8bc1c10a63f342090a1ce7f07398478bc9d2770702eaa56e4398",
+  "gates": [
+    {
+      "name": "prepare_codex_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.472,
+      "log_sha256": "95ae41b2e57bb4733759c280de5975bb329b6e1dbbad5f5db47d981ecc6ebf20",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 44 tests in 0.362s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "verify_cli_autoupdate_tests",
+      "exit_code": 0,
+      "seconds": 0.256,
+      "log_sha256": "2a69398956e97dab0d40bba9ae501d8ed5a74e832708613477d8901e8c20f91c",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 14 tests in 0.164s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "prepare_grok_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.153,
+      "log_sha256": "5079bde8c97323b3b12abee39647d6fcaa900e92ea77b6c6abc8b2db5d3c62d5",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 19 tests in 0.048s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "prepare_claude_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.123,
+      "log_sha256": "ab4c909b0b3d4498831732f84a554d2c5ff21a7f51dd7870fe9ad12785b7a1c3",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 10 tests in 0.022s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_adapter_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.13,
+      "log_sha256": "6450ab1fe836f9d5f3ad9ad173c832d87e5038c006badc806ac89cbf40ab104b",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 14 tests in 0.026s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_coordinator_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.238,
+      "log_sha256": "9443c8f172b6b67d34ed178a308ae542966f19dddc18cf97e73803628e73ee90",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 60 tests in 0.118s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_approval_cancel_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.161,
+      "log_sha256": "a164dd85c31739a0e58e90af1cf73a8f53ea38bac2d1a698f21e5c8dfc47807d",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 33 tests in 0.036s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_batch_cancel_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.141,
+      "log_sha256": "bb679bd1b7f46f0b81a4c601b879d0b14f1a7509eb91a7e94422e2c77c45ae9e",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 25 tests in 0.025s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_image_probe_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.129,
+      "log_sha256": "7ba21dc93a64093bb63745b76eff5d951739a3c99a1de1a062d5e9b2e75730a0",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 25 tests in 0.018s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_managed_image_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.155,
+      "log_sha256": "32442e1b6f88cf1ce33af0ba52b183a6fd037356f92a959a9dd503e19255dd06",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 20 tests in 0.040s",
+        "",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_profile_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.111,
+      "log_sha256": "dd0d3d66f9699acccb0eb3d37a5ebe93b07d6687b6174e64f32711c2e135f708",
+      "summary": [
+        "----------------------------------------------------------------------",
+        "Ran 7 tests in 0.006s",
+        "",
+        "OK"
+      ]
+    }
+  ],
+  "all_passed": true
+}

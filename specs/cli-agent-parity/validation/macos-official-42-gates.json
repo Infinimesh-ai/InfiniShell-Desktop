@@ -1,0 +1,24 @@
+{
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "9a179659be8c4469a4082d261593ccb179a7545e8686458a69259d3c55b1b344",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 101,
+      "wall_seconds": 113.959,
+      "log_sha256": "60818c9117e54612be50f887c4759ff18bf7c0224f616e93ab02552bf94f773c",
+      "summary": []
+    }
+  ],
+  "all_passed": false
+}

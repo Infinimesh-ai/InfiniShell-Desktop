@@ -1,0 +1,2620 @@
+{
+  "schema_version": 1,
+  "audit_observed_utc": "2026-09-17T18:32:38.519836+00:00",
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "scope": "仅审计root实际sky操作及受控SQLite读取后归档的公共文件；未独立重跑GUI，未读取任何数据库、私有日志、认证或二进制。",
+  "audit_status": "public_archive_consistent_with_recorded_partial_scope",
+  "independent_gui_rerun": false,
+  "goal_acceptance_passed": false,
+  "original_archive_file_count": 65,
+  "file_type_counts": {
+    ".json": 16,
+    ".txt": 2,
+    ".png": 34,
+    ".jpeg": 13
+  },
+  "original_archive_manifest_sha256": "6c9e5f9fa15db19b3a0f7e884eff86d3767a208348aff0ded584b9549a59b144",
+  "manifest_algorithm": "SHA256 of UTF-8 JSON sorted keys/compact separators over original_file_inventory; excludes this audit itself",
+  "original_file_inventory": [
+    {
+      "path": "00-claude-api-environment-preparation.json",
+      "bytes": 992,
+      "sha256": "2a80f73ddfc29019b29d5c1cd8de1e14f284d5c522446fd11268e1faa80b70bb",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "00-empty-task-en-restart.json",
+      "bytes": 575,
+      "sha256": "c2f550a62fa7489a97931314dd101dfdc589680e0412537a97a79f24d04ad2f1",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "00-isolated-clone-preparation.json",
+      "bytes": 3119,
+      "sha256": "c27e61f530cc28991a05590d91190b3704bf18a563f45a169da36aa33412a1c6",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "00-persisted-task-app-restart.json",
+      "bytes": 1065,
+      "sha256": "c2fa735bbf8e8555063ca2b599236ad9236a4d9bb64bb956a57b66d998d79a7b",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "00-processes-before-normal-exit.json",
+      "bytes": 498,
+      "sha256": "02db024ea9057cc52d30fd27e7ce56a14c7c51da8acc656620669bc8a480b6be",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "01-zh-titlebar-ax.txt",
+      "bytes": 699,
+      "sha256": "f6a117217944a2f66d014a76efd4d0216e904f6f0cbf4d2bbe3238293a93d463"
+    },
+    {
+      "path": "01-zh-titlebar.png",
+      "bytes": 49846,
+      "sha256": "9210db4624bfae37361cfcaa00f843517c66c23fdffd0296b7b94723baecaa7e",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "02-zh-task-manager-ax.txt",
+      "bytes": 716,
+      "sha256": "59e754e69dedd422e81bfcbe30bc0c2deb81d6fee7e8ec3c60e7b9d6ae4873be"
+    },
+    {
+      "path": "02-zh-task-manager.png",
+      "bytes": 119271,
+      "sha256": "09ce8e7b882fd27d96f671d29cb8628b602c5403a7b7786b1677947cbda01230",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "03-zh-task-manager-scroll.png",
+      "bytes": 91718,
+      "sha256": "12897230f220256f98c24ae706641f6391ec9928826558cd8816416a72743ebf",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "04-zh-cli-settings.png",
+      "bytes": 114543,
+      "sha256": "713c3e4e9e01646a7ee910ff80188973fec2700d373640ffa7e2de35c694b7b1",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "05-en-appearance-language.png",
+      "bytes": 69510,
+      "sha256": "0b953d47652f080021a1cc5734f7f94bb26f2aa7086c034da3ee18a870f9e7e0",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "06-en-after-restart.png",
+      "bytes": 83396,
+      "sha256": "1514a283f31fb35da05f5be0a0d32c42b05f2255cc2b79f5554b24542f255d07",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "07-en-cli-settings.png",
+      "bytes": 122926,
+      "sha256": "16c53ace2ec28b1084f5cfcff5b1ae0ec55bbb942b2f222ad8b3768409b42212",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "08-en-task-manager.png",
+      "bytes": 126640,
+      "sha256": "2aba616134d756a6daf97b9f9834caa8b952a36a3711a7ccb01412f52cc27ca0",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "09-en-task-manager-scroll.png",
+      "bytes": 103448,
+      "sha256": "7ff4c3379468a78f07dfc12c89b95119e295ddd2362eaaefafcc6efdc6793981",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "10-claude-first-draft-multiline.png",
+      "bytes": 109367,
+      "sha256": "08e462fb13af5e0bf5cbf4adb63674c3152a24e78fd7c3af2e798885147f072f",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "11-claude-first-task-start.png",
+      "bytes": 108730,
+      "sha256": "734c99410e9e7be1787ccb7111a28356584dd884996626285482cc49e441ebee",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "12-claude-first-task-result-view.png",
+      "bytes": 108896,
+      "sha256": "71bf31f462fe961e441288241d0ca740e2cebd04376a5d9afa0150af83b9684e",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "13-claude-first-task-prelaunch-error.png",
+      "bytes": 126432,
+      "sha256": "b4eaded742954b0122a499b8d280566c2476e11e84352ca259a2d258512cda13",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "14-claude-first-task-bottom-check.png",
+      "bytes": 113308,
+      "sha256": "3698bab7a22ae83d73908a38f4c494d4cf913c442a873b4743b82645af7bc815",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "15-claude-first-valid-start.png",
+      "bytes": 116922,
+      "sha256": "d48275c7386c4520f2d7bc8f6205c671d90b46e1b02760de3924ed58a8dda4d7",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "16-claude-first-current-state.png",
+      "bytes": 122429,
+      "sha256": "0f86454d692e0a04fac37aa11f64da122fec8fd2ab910dafd0dce11e065fe880",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "17-claude-first-sqlite-proof.json",
+      "bytes": 1132,
+      "sha256": "95e94a6ff77fb5c72ee1bf9751544309fc78391e82c3a98fe70ba2ce7772ee36",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "18-claude-first-output.png",
+      "bytes": 89060,
+      "sha256": "7df7da511f3dc35174064907768ab6f25a02236bb1e471fad8ac1601c26174a5",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "19-claude-second-input-sent.png",
+      "bytes": 109242,
+      "sha256": "34d03bfdedd9b54031fd120475a252cf77f4ba2e82792c8b83bfb68b6fd7b86c",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "20-claude-second-sqlite-proof.json",
+      "bytes": 1371,
+      "sha256": "f71e55c6eeef53e12b3758ee34c3649851e609f0bf60e8866254b38257425373",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "21-claude-two-turn-results.png",
+      "bytes": 103193,
+      "sha256": "e5940cec66f3dd0dfa90091f147a9592aa46fb7707efa9df5a77c85f0ba33fe6",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "22-claude-write-input-sent.png",
+      "bytes": 126217,
+      "sha256": "c4c2831644571eaa2a073c4da6df9ee91a29a7fa5f4476bd51e8fdcf3fc53049",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "23-claude-approval-wait.png",
+      "bytes": 125273,
+      "sha256": "7cb8cd38d61a9ecbfefc58f3a21ebcf41f81cc5e1bb103d1bdfe643f396047c6",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "24-claude-approval-allow-dialog.png",
+      "bytes": 137192,
+      "sha256": "0bd2da6004f92942d43606fafb6d5bc5ec0079f0fde2610366304a8f3e0340e6",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "25-claude-allow-once-visible.png",
+      "bytes": 92075,
+      "sha256": "ac86ebdf77b2087c5f3d6d2541eca8a21f8ec35557dab9fc66df80e17b3ba306",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "26-claude-allow-once-clicked.png",
+      "bytes": 101538,
+      "sha256": "2bbbf6e45b3cfb734ba35f1fe07a1a0f91c978af784e1e3966b146801e0c1753",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "27-claude-allow-sqlite-file-proof.json",
+      "bytes": 1285,
+      "sha256": "2fab1f9e626beafb592d4e496fcf7406df0575ea091cc7dfff0197515fe9275a",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "28-claude-allow-completed.png",
+      "bytes": 96642,
+      "sha256": "d884306a4fd7b445a32a4f4a7a55c94532ac2830cd0524dd2b7864324c0fc626",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "29-claude-deny-input-sent.png",
+      "bytes": 117852,
+      "sha256": "ae25be9c66661ffbe6c475f560b1b0b8986d63bf5b22952b7ab0981f78610cdf",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "30-claude-deny-before-sqlite-file-proof.json",
+      "bytes": 589,
+      "sha256": "6999bff55de1f7b88cf5c6f2fa0b2fd286bf8dfb8dff17069f5a205472bd76d1",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "31-claude-deny-once-visible.png",
+      "bytes": 119335,
+      "sha256": "977c68831be96d8cc73c68e2dc51f4672fee36f26e1cae145ef1a47403c22269",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "32-claude-deny-once-clicked.png",
+      "bytes": 117920,
+      "sha256": "49685fab43da8dc301e52f3cc415a8994ec4a7173091dfd93dfee2c49efd5986",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "33-claude-deny-after-sqlite-file-proof.json",
+      "bytes": 1170,
+      "sha256": "3dbd0b927bc1be8b93104373bc4b2229fda7baa62d62faebfd18c4fbdee3256c",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "34-claude-deny-completed.png",
+      "bytes": 117939,
+      "sha256": "7f1db6e8bb7efafc3c5ddae6862fc80621498a77640a2979cb21dec6b935f0ab",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "35-claude-cancel-input-sent.png",
+      "bytes": 141147,
+      "sha256": "d642aecc049d669264660a69540911cf06b6af6f97b9f98a1aa7ac3835ac18b6",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "36-claude-cancel-waiting-composer.png",
+      "bytes": 93391,
+      "sha256": "89239c7ff9bdb9a380b0d16306e6fd94648e91ede2b3ded38ac4fdaad680d6f3",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "37-claude-running-append-draft.png",
+      "bytes": 101780,
+      "sha256": "ea0da63511dc5a0db515c1b9f8a25340c96729ffafac75826b857ddff16a6475",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "38-claude-running-append-queued.png",
+      "bytes": 104026,
+      "sha256": "82c93260bacd7cc247e92696c85ca2e2a40ea42a9fc5e69b09b339c5d544493d",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "39-claude-append-before-cancel-proof.json",
+      "bytes": 1738,
+      "sha256": "3561c452239ecaf3eb91ec21976c6a441c67a93f07de3b4f6ff1ae6bf4ec132a",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "40-claude-cancel-turn-clicked.png",
+      "bytes": 124327,
+      "sha256": "8b698eb2ec4d9525eb389b0482fbf19baa494ab646096309ecfa5d0639433dec",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": false,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "41-cancel-and-append-sql-proof.json",
+      "bytes": 6059,
+      "sha256": "72418aa79314b589ea0fee676dca6ec2b2eb27a521141e5cce1190d05ed4ad5f",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "42-claude-queued-append-completed.jpeg",
+      "bytes": 89647,
+      "sha256": "7bb31442f19914e707e30881e7414778e36e9ef4f28815b6e65c3cb81e19c7b1",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "43-claude-cli-disconnected.jpeg",
+      "bytes": 88614,
+      "sha256": "98017026f5fa8e2cec8490cb877ce46d0e7e7e28c1e9fa7ea826864da9b3b5f6",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "44-claude-resume-draft.jpeg",
+      "bytes": 100783,
+      "sha256": "aa7e6836dae7e25855adae104a9480677d7cff3709b34b79ca9e56a9c200126f",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "45-claude-history-restarted.jpeg",
+      "bytes": 111265,
+      "sha256": "8efb290e9fc5d267936dce5b6f210b5df523489c998babfdc20d222009aabff0",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "46-claude-history-connected-awaiting-explicit-send.jpeg",
+      "bytes": 112758,
+      "sha256": "4b2687d31f0cb25ebb2884239cd5489d3525bb85a72e65763f3f3ca2a7302ca1",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "47-claude-history-explicit-input-sent.jpeg",
+      "bytes": 114452,
+      "sha256": "0f833b73f503b7a28dd96ea7bf3175378c368a09dcd2d44c45a5f856c3f9fc89",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "48-claude-history-continue-sql-proof.json",
+      "bytes": 2016,
+      "sha256": "6ac8121d25c4a0e45892541b9ddcd563b8f9e272a5e20f4a703ae1090f85933c",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "49-claude-history-resume-result.jpeg",
+      "bytes": 91754,
+      "sha256": "188e259a5bb4bbbaea226603f704e7a684f1ca7306e0eff127fc55f5002fc38d",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "50-claude-task-restored-after-app-restart.jpeg",
+      "bytes": 126850,
+      "sha256": "4249966432f6bd377254ff0e04a3cd7ca471be6fda90f99a6c58e11fea5821ba",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "51-claude-restart-no-replay-sql-proof.json",
+      "bytes": 2182,
+      "sha256": "36bc8fd221cefd19b86345d7160325a7178dda3f8255812715b4a8726d6b18dc",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "52-claude-restored-history-controls.jpeg",
+      "bytes": 91236,
+      "sha256": "5379186ddb9dc199fc1cd5d9defe2be87de8f6ba3e68ccc56f4621b52067de62",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "53-claude-restored-session-started-without-input.jpeg",
+      "bytes": 124394,
+      "sha256": "f9aa4a73f2c17f006b2a377b62c96ad09a69e26db71a956b691fbe89722372b1",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "54-claude-after-restart-new-input-draft.jpeg",
+      "bytes": 115101,
+      "sha256": "501a6bcbca0712c810f185304d61040071b4dcb0e7ccacc773263ca1fce4880b",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "55-claude-restarted-history-no-input-replay.json",
+      "bytes": 295,
+      "sha256": "1a65441b983adc3d3a843a430e0a671303d41117d38a370d8788c00d8b81d600",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "56-claude-restart-explicit-input-sent.jpeg",
+      "bytes": 117223,
+      "sha256": "13476c43573f5ea5360b7c0b2cce814faca106e8d787173edcaaac96fa88c542",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    },
+    {
+      "path": "57-claude-after-restart-final-result-sql-proof.json",
+      "bytes": 2280,
+      "sha256": "86cd920878ad6a342f71c0d4ba0de07662767c1ac864d215f05454bb388a50ab",
+      "json_parse_valid": true,
+      "json_duplicate_keys_rejected": true,
+      "top_level_type": "dict"
+    },
+    {
+      "path": "58-claude-after-restart-final-result.jpeg",
+      "bytes": 92073,
+      "sha256": "8f6910d9669117f6fa5baf329a9589292782afbba8823f2b3d6b85be4345c38e",
+      "actual_image_format": "JPEG",
+      "width": 1229,
+      "height": 768,
+      "extension_matches_format": true,
+      "jpeg_soi_eoi_valid": true
+    }
+  ],
+  "root_document_inventory": {
+    "path": "specs/cli-agent-parity/OFFICIAL_26_GUI_PARTIAL_VERIFICATION.md",
+    "bytes": 8546,
+    "sha256": "624caccd5a6d86ac8e159cabaf1e659ec9ec947cb458bdb49f3a937ca975c277"
+  },
+  "preparation_audit": {
+    "file_count": 5,
+    "files": [
+      "00-claude-api-environment-preparation.json",
+      "00-empty-task-en-restart.json",
+      "00-isolated-clone-preparation.json",
+      "00-persisted-task-app-restart.json",
+      "00-processes-before-normal-exit.json"
+    ],
+    "initial_environment_names": [
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "CLAUDE_CONFIG_DIR",
+      "CODEX_HOME",
+      "DISABLE_AUTOUPDATER",
+      "GROK_HOME",
+      "HOME",
+      "LANG",
+      "LC_ALL",
+      "PATH",
+      "SHELL",
+      "WARP_DATA_PROFILE",
+      "WARP_SKIP_COMMON_SKILLS_INSTALL",
+      "ZDOTDIR"
+    ],
+    "initial_environment_has_anthropic_secret_keys": false,
+    "api_environment_names_only": [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_BASE_URL",
+      "ANTHROPIC_MODEL"
+    ],
+    "credential_values_recorded": false,
+    "user_global_config_modified_claimed": false,
+    "old_recorded_process_ids_match_before_exit": true,
+    "old_processes_not_running_reported": true,
+    "normal_exit_code_observed": false,
+    "initial_no_auth_or_model_scope_distinct_from_later_authorized_api_scope": true,
+    "source_and_clone_binary_hashes_match_root_document": true
+  },
+  "session_chain_audit": {
+    "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+    "unique_acknowledged_input_count": 8,
+    "run_count": 8,
+    "completed_runs": 7,
+    "cancelled_runs": 1,
+    "turns": [
+      {
+        "generation": 1,
+        "message_id": "490d60d2-4e9c-46d8-bfb0-8db1676a7a71",
+        "sender_generation": 1,
+        "recipient_generation": 1,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 16,
+        "result_sha256_verified": "eafa7a519a5347db2fea9a9d2f6b45f435c9143432f65dfd7577957f33102967",
+        "synthetic_output_markers": [
+          "GUI_ONE_436CC739"
+        ]
+      },
+      {
+        "generation": 2,
+        "message_id": "4f20c46d-7b5c-4729-bb89-32a0f356570a",
+        "sender_generation": 2,
+        "recipient_generation": 2,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 33,
+        "result_sha256_verified": "f99e2f996e581134647a1603ef3009bb25138600605a7f3769fdad84ed562d90",
+        "synthetic_output_markers": [
+          "GUI_ONE_436CC739",
+          "GUI_TWO_436CC739"
+        ]
+      },
+      {
+        "generation": 3,
+        "message_id": "b249dabc-98d2-44bd-886c-ceb8e22e1cd1",
+        "sender_generation": 3,
+        "recipient_generation": 3,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 23,
+        "result_sha256_verified": "73a64d40849ac718e397312ea10cfa7007948942cc82b48e85888fbe610bd98d",
+        "synthetic_output_markers": [
+          "GUI_ALLOW_DONE_436CC739"
+        ]
+      },
+      {
+        "generation": 4,
+        "message_id": "0dde4048-2981-47dc-a157-38a591efd1ed",
+        "sender_generation": 4,
+        "recipient_generation": 4,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 27,
+        "result_sha256_verified": "54632e8bfc5f189ee739160373fe6ee0e3ff6d3393ead7c005c722c44c7c05d0",
+        "synthetic_output_markers": [
+          "GUI_DENY_CONFIRMED_436CC739"
+        ]
+      },
+      {
+        "generation": 5,
+        "message_id": "44e52cfd-bdb7-4024-a7bd-cdb1cefd27bd",
+        "sender_generation": 5,
+        "recipient_generation": 5,
+        "message_state": "acknowledged",
+        "persisted_state": "cancelled",
+        "native_outcome": "Cancelled",
+        "result_bytes_verified": 0,
+        "result_sha256_verified": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "synthetic_output_markers": []
+      },
+      {
+        "generation": 6,
+        "message_id": "69eac33b-1ab8-4abe-a675-0c07ea6aaeff",
+        "sender_generation": 5,
+        "recipient_generation": 5,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 19,
+        "result_sha256_verified": "0a8182519b3c3427646160dfeb22db3e98a7f6674bb96db02d83b9fbe49b20a2",
+        "synthetic_output_markers": [
+          "GUI_APPEND_436CC739"
+        ]
+      },
+      {
+        "generation": 7,
+        "message_id": "e5f15663-7a4f-4931-b6bd-37d067014249",
+        "sender_generation": 7,
+        "recipient_generation": 7,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 56,
+        "result_sha256_verified": "c282327d140a0fbcfdbeefc23183a2b58cc37d25edbc6594181d818125204816",
+        "synthetic_output_markers": [
+          "GUI_ONE_436CC739",
+          "GUI_APPEND_436CC739",
+          "GUI_RESUME_436CC739"
+        ]
+      },
+      {
+        "generation": 8,
+        "message_id": "4a889736-45b3-4ce8-8712-720280b6b119",
+        "sender_generation": 8,
+        "recipient_generation": 8,
+        "message_state": "acknowledged",
+        "persisted_state": "completed",
+        "native_outcome": "Completed",
+        "result_bytes_verified": 57,
+        "result_sha256_verified": "96ff5cdcac01ae4cf4ca06d0e61af1780eb7a689998bc177d93293549ecaaad5",
+        "synthetic_output_markers": [
+          "GUI_ONE_436CC739",
+          "GUI_APPEND_436CC739",
+          "GUI_RESTART_436CC739"
+        ]
+      }
+    ],
+    "all_known_native_session_fields_match": true,
+    "all_present_source_commit_fields_match": true,
+    "all_result_output_bytes_and_sha256_recomputed": true
+  },
+  "approval_append_cancel_audit": {
+    "allow_fixture_changed_after_permission": true,
+    "deny_fixture_unchanged": true,
+    "append_received_before_cancel": true,
+    "append_execution_not_claimed_before_cancel": true,
+    "generation_5_cancelled_distinct_from_generation_6_append_completed": true,
+    "append_original_receipt_generation_preserved": 5,
+    "cancel_fixture_bytes": 28,
+    "cancel_fixture_sha256": "36088fed0caa56332b19cced8144f712da4ba6565166ca5b79b69fe05caded81",
+    "cancel_fixture_unchanged_reported": true
+  },
+  "continue_restart_audit": {
+    "generation_6_message_count": 6,
+    "generation_7_new_message_count": 7,
+    "generation_7_prior_six_messages_unchanged": true,
+    "generation_7_continue_before_explicit_send_evidence": [
+      "41-cancel-and-append-sql-proof.json",
+      "45-claude-history-restarted.jpeg",
+      "46-claude-history-connected-awaiting-explicit-send.jpeg",
+      "47-claude-history-explicit-input-sent.jpeg",
+      "48-claude-history-continue-sql-proof.json"
+    ],
+    "post_continue_pre_send_generation_7_message_count_separate_public_json_available": false,
+    "generation_7_screenshot_read_observation": "46显示current run 7、仍保留未发送的验收草稿、Send instruction启用；47显示新消息接收确认并清空草稿。六消息计数直接来自41，Continue后发送前无单独公共JSON计数快照。",
+    "restart_51_input_count": 7,
+    "restart_51_same_messages_and_result": true,
+    "restart_51_cancelled_generation_5_preserved": true,
+    "history_connection_55_generation": 8,
+    "history_connection_55_message_count": 7,
+    "history_connection_55_state": "queued",
+    "history_connection_55_no_replay_reported": true,
+    "final_57_input_count": 8,
+    "final_57_native_completion_and_ack_persisted": true,
+    "final_57_expected_three_markers_verified": true,
+    "final_57_project_settings_and_cancel_target_unchanged_reported": true
+  },
+  "image_audit": {
+    "count": 47,
+    "actual_format": "JPEG",
+    "dimensions_method": "读取每张原始JPEG的SOI/EOI和SOF尺寸；未操作UI。",
+    "actual_dimensions_px": {
+      "width": 1229,
+      "height": 768
+    },
+    "png_extension_but_actual_jpeg_count": 34,
+    "root_document_window_dimensions_px": {
+      "width": 1230,
+      "height": 768
+    },
+    "window_bounds_and_screenshot_bitmap_dimensions_distinguished": true,
+    "files_visually_read": [
+      "46-claude-history-connected-awaiting-explicit-send.jpeg",
+      "47-claude-history-explicit-input-sent.jpeg",
+      "53-claude-restored-session-started-without-input.jpeg",
+      "58-claude-after-restart-final-result.jpeg"
+    ],
+    "original_files_renamed_or_transcoded": false
+  },
+  "credential_shape_scan": {
+    "scope": "原65公共档案及root文档的原始serialized字节；16 JSON递归decoded键和值字符串（含可解析嵌套JSON）及TXT/MD UTF-8文本。图片原始字节亦扫描，不声称OCR或数学证明不存在所有秘密。",
+    "patterns": {
+      "anthropic_key": "\\bsk-ant-[A-Za-z0-9_-]{12,}",
+      "api_key": "\\bsk-[A-Za-z0-9_-]{20,}",
+      "bearer": "(?i)\\bBearer\\s+[A-Za-z0-9._~+/-]{12,}=*",
+      "jwt": "\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}",
+      "url_secret": "(?i)[?&](?:token|api[_-]?key|access[_-]?token|auth[_-]?token|code)=[^&\\s\\\"\\x27<>]{6,}",
+      "private_key": "-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----"
+    },
+    "totals": {
+      "anthropic_key": {
+        "serialized": 0,
+        "decoded": 0
+      },
+      "api_key": {
+        "serialized": 0,
+        "decoded": 0
+      },
+      "bearer": {
+        "serialized": 0,
+        "decoded": 0
+      },
+      "jwt": {
+        "serialized": 0,
+        "decoded": 0
+      },
+      "url_secret": {
+        "serialized": 0,
+        "decoded": 0
+      },
+      "private_key": {
+        "serialized": 0,
+        "decoded": 0
+      }
+    },
+    "all_six_serialized_and_decoded_zero": true,
+    "per_file": {
+      "00-claude-api-environment-preparation.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "00-empty-task-en-restart.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "00-isolated-clone-preparation.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "00-persisted-task-app-restart.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "00-processes-before-normal-exit.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "01-zh-titlebar-ax.txt": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "01-zh-titlebar.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "02-zh-task-manager-ax.txt": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "02-zh-task-manager.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "03-zh-task-manager-scroll.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "04-zh-cli-settings.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "05-en-appearance-language.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "06-en-after-restart.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "07-en-cli-settings.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "08-en-task-manager.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "09-en-task-manager-scroll.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "10-claude-first-draft-multiline.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "11-claude-first-task-start.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "12-claude-first-task-result-view.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "13-claude-first-task-prelaunch-error.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "14-claude-first-task-bottom-check.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "15-claude-first-valid-start.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "16-claude-first-current-state.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "17-claude-first-sqlite-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "18-claude-first-output.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "19-claude-second-input-sent.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "20-claude-second-sqlite-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "21-claude-two-turn-results.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "22-claude-write-input-sent.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "23-claude-approval-wait.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "24-claude-approval-allow-dialog.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "25-claude-allow-once-visible.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "26-claude-allow-once-clicked.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "27-claude-allow-sqlite-file-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "28-claude-allow-completed.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "29-claude-deny-input-sent.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "30-claude-deny-before-sqlite-file-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "31-claude-deny-once-visible.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "32-claude-deny-once-clicked.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "33-claude-deny-after-sqlite-file-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "34-claude-deny-completed.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "35-claude-cancel-input-sent.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "36-claude-cancel-waiting-composer.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "37-claude-running-append-draft.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "38-claude-running-append-queued.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "39-claude-append-before-cancel-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "40-claude-cancel-turn-clicked.png": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "41-cancel-and-append-sql-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "42-claude-queued-append-completed.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "43-claude-cli-disconnected.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "44-claude-resume-draft.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "45-claude-history-restarted.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "46-claude-history-connected-awaiting-explicit-send.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "47-claude-history-explicit-input-sent.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "48-claude-history-continue-sql-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "49-claude-history-resume-result.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "50-claude-task-restored-after-app-restart.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "51-claude-restart-no-replay-sql-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "52-claude-restored-history-controls.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "53-claude-restored-session-started-without-input.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "54-claude-after-restart-new-input-draft.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "55-claude-restarted-history-no-input-replay.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "56-claude-restart-explicit-input-sent.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "57-claude-after-restart-final-result-sql-proof.json": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "58-claude-after-restart-final-result.jpeg": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      },
+      "specs/cli-agent-parity/OFFICIAL_26_GUI_PARTIAL_VERIFICATION.md": {
+        "anthropic_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "api_key": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "bearer": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "jwt": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "url_secret": {
+          "serialized": 0,
+          "decoded": 0
+        },
+        "private_key": {
+          "serialized": 0,
+          "decoded": 0
+        }
+      }
+    }
+  },
+  "limits": [
+    "本审计不是独立原生/GUI执行，也不验证本机当前clone、私有全局配置或数据库原文件。",
+    "八输入通过公开消息UUID及原生TurnFinished结果对应核对，不复制或重新读取原始模型请求。",
+    "完整底层取消三证据不由截图或SQLite终态推断，仍以独立原生验收为准。",
+    "第7轮Continue后发送前缺少单独公共JSON计数快照，相关顺序依据root报告及已归档截图。",
+    "不扩大为Codex/Grok GUI、父子任务、所有平台、SSH/tmux、活跃任务重新关联或Goal完成。"
+  ]
+}

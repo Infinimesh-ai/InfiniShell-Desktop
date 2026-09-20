@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "original_passed": false,
+  "original_receipt_sha256": "c8dc37bdea6755b4852bec4542c0e1e270a02f8520b64976249056f142190275",
+  "do_not_rewrite_original_total": true,
+  "selected_version": "1.0.34",
+  "selected_channel": "stable",
+  "native_background_cache_verified_before_manual_check": true,
+  "manual_check_later_eligibility_verified": true,
+  "manual_check_not_used_to_make_background_cache": true,
+  "cleanup": {
+    "sigkill_required": false,
+    "signals": [
+      {
+        "pid": 5620,
+        "signal": "SIGINT",
+        "direct_child": true
+      }
+    ],
+    "pty_bytes_drained": 107,
+    "pty_log_truncated": false,
+    "master_closed": false,
+    "root_native_pid": 5620,
+    "root_native_process_exit": 0,
+    "remaining_owned_count": 0,
+    "all_observed_owned_processes_exited": true,
+    "unobserved_detached_descendants_proven_absent": false
+  },
+  "direct_pid_absent_now": true,
+  "config_field_changes": [
+    {
+      "field": "marketplace.default_skills_installs_purged",
+      "before_present": false,
+      "after_present": true,
+      "before_type": "NoneType",
+      "after_type": "bool",
+      "after_bool_value": true
+    }
+  ],
+  "native_auto_update": true,
+  "native_channel": "stable",
+  "permission_fields_unchanged": true,
+  "other_semantics_unchanged_except_known_native_migration": true,
+  "model_inputs": 0,
+  "auth_supplied": false,
+  "source45_target_no_longer_held_by_observer": true
+}

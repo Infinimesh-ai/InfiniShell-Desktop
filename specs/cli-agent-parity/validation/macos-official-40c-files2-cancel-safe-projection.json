@@ -1,0 +1,81 @@
+{
+  "read_only_python_reconstruction_not_rust_test": true,
+  "saved_replay_rows": 52,
+  "saved_replay_sha256": "69c8ea0e8b8f71f14a90ed0d3a65337dec8a21638f7fc28fd1ac20f170b819c5",
+  "full_output_bytes": 51,
+  "full_output_sha256": "f3fa94c6932c137687ce8ad29283da51aef413672cecd025f98bd8f015660ff1",
+  "matches_product_final_output_sha256": true,
+  "tool_call_seen": true,
+  "agent_message_chunks_after_tool": 0,
+  "phase_response_verified_reconstruction": true,
+  "current_turn_tool_count": 1,
+  "explicit_tool_terminal_count": 0,
+  "unexpected_status_count": 0,
+  "completion_count": 1,
+  "completion_reason_exact_mid_turn_abort": true,
+  "native_tools_verified_reconstruction": false,
+  "cancel_file_absent": true,
+  "original_run_result_preserved": "FAIL",
+  "cold_read_was_run": false,
+  "diagnosis": "fixture_requires_explicit_tool_terminal_status_absent_in_verified_native_mid_turn_abort",
+  "native_tool_status_was_synthesized": false,
+  "native_update_rows": {
+    "48": "current_turn_thought",
+    "49": "current_turn_message_51_bytes",
+    "50": "current_expected_tool_call_without_status_or_raw_output",
+    "51": "same_tool_call_update_without_status_or_raw_output",
+    "52": "unique_current_turn_completed_cancelled_MidTurnAbort"
+  },
+  "product_final_snapshot_log_lines": {
+    "666": "pending_count50",
+    "668": "verified_count52",
+    "669": "Cancelled_51_bytes_matching_hash"
+  },
+  "independent_native_events_log": {
+    "434": "turn_ended_cancelled_mid_turn_abort"
+  },
+  "root_only_fixture_change": {
+    "file": "app/src/ai/cli_agent_runtime/grok_files_policy_live_tests.rs",
+    "before_sha256": "a4054e1d07e2dffd048fc4e952995cbc7d61ae91fca25b5ba4dbc0e19bf518f6",
+    "after_sha256": "390011e710444c782a3ec5dc2efba80d9ebbe8cb350482b847cf75a2062eb398",
+    "patch_sha256": "be0f6189db3d02ba78ce0d2d5a1bee4fb780bee2b0b5c71b5f5a88295509ac2d",
+    "frozen_40c_unchanged": true
+  },
+  "correction_boundary": [
+    "only pending_cancel, Cancelled, expected MidTurnAbort, one tool with decision None",
+    "one exact same-turn native cancelled completion watermark",
+    "expected tool_call plus tool_call_update both without a status field",
+    "all call identities must match; no rawOutput or successful status; no current-turn text after tool",
+    "DenyOnce and PermissionRejected do not use the statusless branch",
+    "actual file bytes, approval cancellation receipt and native catalog checks remain required"
+  ],
+  "diagnostic_change": "final_history_verified and final_sha256 are set after final_response_receipt; fixed safe JSON separately reports response and native tool closure checks",
+  "new_tests": [
+    "pending_cancel_accepts_statusless_tool_only_at_exact_native_cancel_watermark",
+    "statusless_pending_cancel_rejects_changed_identity_output_and_terminal_shape"
+  ],
+  "negative_shapes": [
+    "wrong_category",
+    "old_turn_watermark",
+    "old_turn_tool",
+    "extra_tool",
+    "null_status",
+    "pending_status",
+    "in_progress_status",
+    "completed_status",
+    "rawOutput_even_null",
+    "missing_tool_update",
+    "tool_update_after_watermark",
+    "text_after_tool",
+    "text_after_watermark",
+    "call_set_size_mismatch",
+    "DenyOnce_PermissionRejected_statusless"
+  ],
+  "validation": {
+    "rustfmt_parse_exit": 0,
+    "cargo_run": false,
+    "native_cli_rerun": false,
+    "raw_history_published": false,
+    "user_visible_strings_changed": false
+  }
+}

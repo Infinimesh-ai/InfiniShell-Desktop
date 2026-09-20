@@ -1,0 +1,41 @@
+{
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "531b314c33087ef352d50c1b06af2d2508d433ed0d40359877ff5df8dad25786",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 98.056,
+      "log_sha256": "6d4f406ae06b713030f9cf4082447895f2bc0e9e05b9973cd205d3e6f7fd7d61",
+      "summary": []
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 101,
+      "wall_seconds": 154.064,
+      "log_sha256": "59441c74539aa17b3f6b41bf14093fe9ecc28e73faac55d966eebff0ab6841a2",
+      "summary": []
+    }
+  ],
+  "all_passed": false
+}

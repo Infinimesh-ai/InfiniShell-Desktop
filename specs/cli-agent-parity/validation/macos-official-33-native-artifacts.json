@@ -1,0 +1,89 @@
+{
+  "scope": "source33_native_partial_evidence",
+  "same_commit_verified": false,
+  "model_inputs": 0,
+  "files": [
+    {
+      "path": "validation/macos-official-33-bundle.json",
+      "bytes": 3302,
+      "sha256": "9deda95a0e07141279bdb7b8af1da575085867caf3fbe47863066f2ebe9b08af"
+    },
+    {
+      "path": "validation/macos-official-33-plugin011-precheck.json",
+      "bytes": 1442,
+      "sha256": "80b7a8f041ba4c59d9a55ddaf48a54d016ab95b6bc22f60d5167356dc0e95dd3"
+    },
+    {
+      "path": "validation/macos-official-33-plugin011-invocation.json",
+      "bytes": 6159,
+      "sha256": "d9d09b098a24c610067dd691c1b6ec2863fb275078bb59c9e9d80eca7b7f1493"
+    },
+    {
+      "path": "validation/macos-official-33-plugin011-postcheck.json",
+      "bytes": 1501,
+      "sha256": "fe38d90bf0a4f63204a43d5c16fe60f05a1d77ed831eb9234099dd1fa5da9fca"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-precheck.json",
+      "bytes": 1509,
+      "sha256": "4273328c9fdb254c24ebd61f80b04dc4a90e502f208351f1843f5eabefffd4f1"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-invocation.json",
+      "bytes": 4046,
+      "sha256": "9c0d384d3bdc03d4ece120f8d1506a9b1b3d0077383e59ad40d574404623ce08"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-postcheck.json",
+      "bytes": 1267,
+      "sha256": "68ea37627d8e79fdc20c78f055c1e5da00af01c6e39912bc747a0f84291dbfb8"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-events.ndjson",
+      "bytes": 2466,
+      "sha256": "780cb588cc70dfa0e2bdb4179bb14101a90cb12a8a1b11ba720a01bad7fe761f"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-metadata.json",
+      "bytes": 3493,
+      "sha256": "68eebf59b9c4455be7a7594f12945609d267e6267ee15e80696f682d446983b4"
+    },
+    {
+      "path": "validation/macos-official-33-policy5-network.json",
+      "bytes": 176,
+      "sha256": "79c876c12da284bbfea4f225deb3e59ef1f9acb0b301012a7f95fc7c5ccabe6c"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-precheck.json",
+      "bytes": 1745,
+      "sha256": "26143faf0ff3291359ccbcd35346c2c7fed972845e6cbf592eead52b9d19ea68"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-invocation.json",
+      "bytes": 4187,
+      "sha256": "78cfda8f15cd2a8e7bf987be11c2ca0e1ffee3c631ab61bcb13b64e3f004cabd"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-postcheck.json",
+      "bytes": 1503,
+      "sha256": "55f9c97653bd7825d7dc17dcce3b2d6c7fd2c2f7763afa279f0bf9f29973833a"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-events.ndjson",
+      "bytes": 5865,
+      "sha256": "5b41d3f7be1516b3fb5994a9c84404fe0141f0d93fa177a079e412fe1f1339fe"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-metadata.json",
+      "bytes": 6631,
+      "sha256": "76ad5864e78d5b1f8123e5ad62aafe50e843ce0bea6ca312ebebc0204b9a4146"
+    },
+    {
+      "path": "validation/macos-official-33-policy6-network.json",
+      "bytes": 176,
+      "sha256": "8d4018c0c03555e2e74528ab6aa9f7940dd9ddd970dca736efe00c1e7dc6d92c"
+    }
+  ],
+  "private_logs_archived": false,
+  "auth_files_archived": false
+}

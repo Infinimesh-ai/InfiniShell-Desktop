@@ -1,0 +1,54 @@
+{
+  "source": "44",
+  "case": "idle-crash",
+  "source_manifest_sha256": "f9591fb3011b8bc1c10a63f342090a1ce7f07398478bc9d2770702eaa56e4398",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "cli_version": "0.155.1",
+  "cli_sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+  "official_package_files": 42,
+  "credentials_provided": false,
+  "max_model_inputs": 0,
+  "automatic_retry": false,
+  "same_commit_verified": false,
+  "dirty_candidate": true,
+  "source_and_binaries_unchanged": true,
+  "runner_exit_code": 0,
+  "wall_seconds": 2.774,
+  "metadata": {
+    "cli_version": "codex-cli 0.155.1",
+    "test_case": "idle-crash",
+    "scope": "rust_adapter_idle_crash_after_native_ready",
+    "credentials_provided": false,
+    "model_requests_expected": false,
+    "app_restart_and_ui_verified": false,
+    "test_exit_code": 0,
+    "acceptance_passed": true
+  },
+  "artifacts": [
+    {
+      "name": "invocation.json",
+      "bytes": 1695,
+      "sha256": "118a84fd2dd78c9de3fdea40c84a8d31886e3f4e597de6413eafa98703d124c2"
+    },
+    {
+      "name": "runner.log",
+      "bytes": 127,
+      "sha256": "70f9c5d0e28d92bba26d2fa1fcc7659e0bd8c57850cb7df4892015f9d5c89944"
+    },
+    {
+      "name": "idle-crash.ndjson",
+      "bytes": 3888,
+      "sha256": "5cd760eee511d659d111c024f3893ad7aa7278c8d8f2b375951e934f391e9bd0"
+    },
+    {
+      "name": "idle-crash.metadata.json",
+      "bytes": 737,
+      "sha256": "159db79d8c293eb35dc7acdc9db14f12cb2694246e8f45cda488a6eab6fcc91a"
+    },
+    {
+      "name": "idle-crash.test-output.txt",
+      "bytes": 485,
+      "sha256": "28a1496b25d3b7ee86e8f9c989321117f569aa16bb82cb33c15578c56230c0a1"
+    }
+  ]
+}

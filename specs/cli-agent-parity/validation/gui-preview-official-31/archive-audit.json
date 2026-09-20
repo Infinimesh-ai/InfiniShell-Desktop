@@ -1,0 +1,1124 @@
+{
+  "schema_version": 1,
+  "scope": "source31关闭的历史布局GUI公共证据独立归档审核，不重演GUI，不读取数据库/认证/日志/二进制",
+  "auditor_independent_from_gui_producer": true,
+  "gui_replayed_by_auditor": false,
+  "ocr_performed": false,
+  "screenshots_visually_reviewed_by_auditor": true,
+  "closed_original_inventory_count": 14,
+  "input_counts": {
+    "json": 8,
+    "jpeg": 4,
+    "accessibility_text": 2
+  },
+  "input_manifest": [
+    {
+      "path": "00-preparation.json",
+      "bytes": 4904,
+      "sha256": "72af484b5e9a3e3fc3d97e6f7a6b0f9289e5d40453a6a3d5be2c2d198ab6d435",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "01-english-attachment-history.ax.txt",
+      "bytes": 671,
+      "sha256": "dbae8869ffd343febcccaccd29c34f3a8bbc6cab1d597d226391c72e039c0e7d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "utf8_decode_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "01-english-attachment-history.jpg",
+      "bytes": 145836,
+      "sha256": "e636ca025705bd77383ce79e70ab1999b7421092a18fdf706d3c30b1d912c97d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "02-after-english-view.json",
+      "bytes": 2209,
+      "sha256": "23982693698827b1419467554d01ebe409063da4b6fdf84f2447326505909476",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "03-language-selected-before-restart.jpg",
+      "bytes": 63716,
+      "sha256": "7621570eaa2a8950bb251095d1778b857191bcb34c5395a91cbbdc28658f9b30",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "04-after-normal-app-exit.json",
+      "bytes": 1608,
+      "sha256": "9634472302b41dd4a6c6090668dacc86e301c6d6d296455f92415f34860b269d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "05-chinese-app-restart-preparation.json",
+      "bytes": 789,
+      "sha256": "804fb620fce8f9ae582fcd40d574c8e1c6c71bea615bc4dffdeff1ca090e2f64",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "06-chinese-attachment-history.ax.txt",
+      "bytes": 876,
+      "sha256": "ebb72c74b32ea4d6ad01727bf9f999d06d42f915cc907c9044fbf5e0e90d006e",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "utf8_decode_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "06-chinese-attachment-history.jpg",
+      "bytes": 131005,
+      "sha256": "1a86787c334aa5f30a93108f842dde47f635742335bed0f802d59d02ae9e87c8",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "07-actual-copy-paste-draft.jpg",
+      "bytes": 98596,
+      "sha256": "326f8936ddbcf0239ce88d264b4dc2cf014ee587620b590aa3e92481ca85ea0a",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "08-after-chinese-view-and-copy.json",
+      "bytes": 2209,
+      "sha256": "8fb8f25f8ccc832804d0859b6a0d35ae06af87e2351d419e745dd60ba467c0ce",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "09-after-final-normal-app-exit.json",
+      "bytes": 1608,
+      "sha256": "7e9c4c8cc5f43f4f33401746a0bfd877c0ce9494773048f199bb295b0c3d4769",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "10-process-cleanup.json",
+      "bytes": 465,
+      "sha256": "09b3f9edda905a720141ddd0e87f707910c7a3fe1b949baf1a16d90e986a0260",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "11-visual-review.json",
+      "bytes": 1710,
+      "sha256": "dd889b8125fb9db029fb5346bc9f8b0fe637e4eddb2c44d03b7fcad0733bdb10",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    }
+  ],
+  "references": [
+    {
+      "path": "validation/macos-official-31-inputs.json",
+      "bytes": 22137,
+      "sha256": "dc0e5d39e4cde7b00a7a8f6ded8f27f2e86adcc0d74bd2b8e5517abfee2c4789",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/macos-official-31-gates.json",
+      "bytes": 4612,
+      "sha256": "9314ea82435463aec570cee347d7e4f3496746ab8b8751d45815b515bfeebcb0",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/macos-official-31-python.json",
+      "bytes": 5827,
+      "sha256": "b8e48fdd3a525adf4c84f79a427d67bc2746ae0b10ff847f49b697c0b5e26006",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/macos-official-31-bundle.json",
+      "bytes": 2341,
+      "sha256": "51e4cd15c0dbf5a539c66f4890f4db02a71421fe5b2e6f963822fd204dd1c2b4",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "OFFICIAL_26_CLAUDE_PNG_GUI_VERIFICATION.md",
+      "bytes": 5944,
+      "sha256": "b641ffe93764878b153420fc787d94585d7d72ae53b1523552fb22806860f382",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-claude-png-436cc739/archive-audit.json",
+      "bytes": 41318,
+      "sha256": "69c6b45da86565a6eafd48510860e90d20210e84db31518e0ece4ca6aeda0474",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    }
+  ],
+  "credential_patterns": [
+    {
+      "name": "api_key",
+      "regex": "(?i)\\bsk-(?:ant-api[0-9]+-)?[A-Za-z0-9_-]{20,}"
+    },
+    {
+      "name": "xai_key",
+      "regex": "\\bxai-[A-Za-z0-9_-]{20,}"
+    },
+    {
+      "name": "github_token",
+      "regex": "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"
+    },
+    {
+      "name": "bearer",
+      "regex": "(?i)\\bBearer\\s+[A-Za-z0-9._~+/-]{20,}={0,2}"
+    },
+    {
+      "name": "aws_access_id",
+      "regex": "\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b"
+    },
+    {
+      "name": "private_key_header",
+      "regex": "-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----"
+    }
+  ],
+  "all_six_shapes_raw_serialized_decoded_image_and_ax_zero": true,
+  "strict_json_duplicate_keys_nonfinite_rejected": true,
+  "json_top_level_fields_closed": true,
+  "environment_fields_closed_and_no_api_auth_values": true,
+  "jpeg_full_decode_and_dimensions_1229x768_all_passed": true,
+  "jpeg_raw_byte_scan_is_not_ocr": true,
+  "identity": {
+    "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+    "source31_candidate_input_count": 111,
+    "source31_changed_paths": [
+      "app/i18n/en/warp.ftl",
+      "app/i18n/zh-CN/warp.ftl",
+      "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+      "script/cli-agent-parity/run_grok_sdk_origin_probe.py"
+    ],
+    "same_commit_verified": false,
+    "dirty_candidate": true,
+    "manifest_sha256": "dc0e5d39e4cde7b00a7a8f6ded8f27f2e86adcc0d74bd2b8e5517abfee2c4789",
+    "bundle_report_sha256": "51e4cd15c0dbf5a539c66f4890f4db02a71421fe5b2e6f963822fd204dd1c2b4",
+    "source_main_sha256": "5d0320978e1f8df4f88e8ee20fd78c3f925c31ec42aa0ac67d36f9f61db3bfa2",
+    "resigned_clone_sha256": "501495704bfc4bfe45668cdec2092b36a2cccaa2022d14b1c9749e333359fb52",
+    "bundle_id": "dev.infinishell.InfiniShellParityOfficial31",
+    "source_binary_read_by_auditor": false,
+    "candidate_gates_reference": {
+      "check_exit_code": 0,
+      "i18n_passed": 11,
+      "focused_passed": 1430,
+      "python_groups": 15,
+      "python_tests": 443,
+      "source": "只核公共已归档报告，未读取旧日志或重跑门禁"
+    }
+  },
+  "history_source": {
+    "commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+    "task_id": "f11f573b-504a-4423-bd04-94942633f19d",
+    "native_session_id": "273ef03b-aada-4921-8d78-9a387b61aa0c",
+    "historical_generations": 3,
+    "historical_messages": 3,
+    "historical_input_variants": [
+      [
+        "Text",
+        "LocalImage"
+      ],
+      [
+        "Text"
+      ],
+      [
+        "Text"
+      ]
+    ],
+    "relation_basis": "旧PNG专报及其独立公共审计，当前元数据相同taskID/代次/输入类型，截图显示同原生S；未读旧数据库或旧原生帧",
+    "historical_completed_is_new_candidate_completion": false
+  },
+  "database_public_metadata_audit": {
+    "initial_original_file_inventory": [
+      {
+        "suffix": "",
+        "bytes": 618496,
+        "sha256": "28acfe67834d7dcb65b70b574cccabd81eb54a954739633802637cfdf5a02698"
+      },
+      {
+        "suffix": "-wal",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "suffix": "-shm",
+        "bytes": 32768,
+        "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+      }
+    ],
+    "history_full_row_counts_and_hashes": {
+      "local_cli_tasks": {
+        "rows": 3,
+        "full_rows_sha256": "9a655c5e9e678635b4312c9ab1a8626bbc5e0c11b94e18b816869bf9409104f5"
+      },
+      "local_cli_task_generations": {
+        "rows": 20,
+        "full_rows_sha256": "cdfbbc58dd36bd9686c912fc9a0b347f5f497cf60ec15652c0714c8e1b07798e"
+      },
+      "local_cli_messages": {
+        "rows": 20,
+        "full_rows_sha256": "83fa11bfd8040a5e1ddfbbf68bb90b0d6d68894da06d986150b0a0c0639a5705"
+      }
+    },
+    "all_four_snapshots_equal_initial": true,
+    "snapshot_checks": [
+      {
+        "source": "02-after-english-view.json",
+        "history_snapshot_equal_initial": true,
+        "new_native_inputs_observed": 0,
+        "process_snapshot_count": 3,
+        "exit_code_observed": false
+      },
+      {
+        "source": "04-after-normal-app-exit.json",
+        "history_snapshot_equal_initial": true,
+        "new_native_inputs_observed": 0,
+        "process_snapshot_count": 0,
+        "exit_code_observed": false
+      },
+      {
+        "source": "08-after-chinese-view-and-copy.json",
+        "history_snapshot_equal_initial": true,
+        "new_native_inputs_observed": 0,
+        "process_snapshot_count": 3,
+        "exit_code_observed": false
+      },
+      {
+        "source": "09-after-final-normal-app-exit.json",
+        "history_snapshot_equal_initial": true,
+        "new_native_inputs_observed": 0,
+        "process_snapshot_count": 0,
+        "exit_code_observed": false
+      }
+    ],
+    "source_database_or_sidecar_read_by_auditor": false,
+    "whole_database_byte_exact_copy_independently_verified": false,
+    "whole_database_copy_claim_source": "根准备记录的scope；独立审核仅确认公开文件清单、哈希关联及逐阶段完整行哈希一致",
+    "initial_nonempty_shm_refusal_recorded": true,
+    "initial_refusal_no_app_started_source": "00-preparation根记录，非本代理实际系统查询",
+    "wal_zero_shm_preserved_recorded": true,
+    "immutable_database_open_rule_source": "根代理任务交付说明，公共记录未给打开SQL或原驱动；未独立执行数据库打开"
+  },
+  "visual_review": {
+    "basis": "实际查看归档截图，不运行GUI或OCR",
+    "english_attachment_label": "Image attachment",
+    "chinese_attachment_label": "图片附件",
+    "attachment_label_visible_without_truncation": true,
+    "multiline_chinese_english_first_message_wraps": true,
+    "serialized_action_json_visible": false,
+    "internal_attachment_store_path_visible": false,
+    "copy_paste_draft_readable_chinese_label_visible": true,
+    "copy_button_operation_and_draft_clear_independently_reperformed": false,
+    "copy_and_clear_action_source": "11-visual-review根CU操作记录；07截图验证当时可读草稿，清除及未发送仍依根操作记录/行哈希/0新输入",
+    "accessibility_text_scope": "只含shell输入及菜单语言，未包含任务消息标签，标签以截图为依据",
+    "skill_history_layout_observed": false,
+    "viewport_limits": "仅截图可见区域和附件消息专项，不代表全部控件或完整双语GUI门槛"
+  },
+  "process_cleanup": {
+    "recorded_app_pids": [
+      46032,
+      46379
+    ],
+    "recorded_owned_pids": [
+      46032,
+      46037,
+      46046,
+      46379,
+      46382,
+      46389
+    ],
+    "final_public_process_snapshots_empty": true,
+    "all_recorded_owned_pids_absent_root_record": true,
+    "root_cleanup_source": "10-process-cleanup.json",
+    "os_process_query_performed_by_auditor": false,
+    "native_exit_code_observed": false,
+    "native_exit_zero_claimed": false,
+    "auth_copied": false,
+    "api_environment_loaded": false,
+    "new_native_inputs": 0
+  },
+  "findings": [],
+  "limitations": [
+    "未独立读取原数据库或重新验证完整复制字节；只审核根公共元数据和阶段行哈希",
+    "初次SHM拒绝与immutable只读打开属于根准备记录/交付说明，不是独立数据库复演",
+    "Copy/Paste与清除操作未独立重演，草稿可读性由实际归档截图复核",
+    "技能真实历史布局未覆盖",
+    "source31为未提交候选；不计最终提交、平台、完整CLI链、SSH/tmux或Goal完成"
+  ],
+  "unchanged_original_files_before_after": true,
+  "unchanged_reference_files_before_after": true,
+  "new_report": {
+    "path": "OFFICIAL_31_GUI_PREVIEW_ARCHIVE_AUDIT.md",
+    "bytes": 4719,
+    "sha256": "b4099b0e8c449f5dab8b484b7f8bb243521e739abc8fd5b6693202f6ddcd3d84"
+  },
+  "new_audit_scan": {
+    "raw_serialized_counts": {
+      "api_key": 0,
+      "xai_key": 0,
+      "github_token": 0,
+      "bearer": 0,
+      "aws_access_id": 0,
+      "private_key_header": 0
+    },
+    "decoded_string_counts": {
+      "api_key": 0,
+      "xai_key": 0,
+      "github_token": 0,
+      "bearer": 0,
+      "aws_access_id": 0,
+      "private_key_header": 0
+    },
+    "passed": true,
+    "final_written_records_rechecked": true
+  },
+  "primary_input_count": 16,
+  "primary_input_manifest": [
+    {
+      "path": "validation/gui-preview-official-31/00-preparation.json",
+      "bytes": 4904,
+      "sha256": "72af484b5e9a3e3fc3d97e6f7a6b0f9289e5d40453a6a3d5be2c2d198ab6d435",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/01-english-attachment-history.ax.txt",
+      "bytes": 671,
+      "sha256": "dbae8869ffd343febcccaccd29c34f3a8bbc6cab1d597d226391c72e039c0e7d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "utf8_decode_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/01-english-attachment-history.jpg",
+      "bytes": 145836,
+      "sha256": "e636ca025705bd77383ce79e70ab1999b7421092a18fdf706d3c30b1d912c97d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/02-after-english-view.json",
+      "bytes": 2209,
+      "sha256": "23982693698827b1419467554d01ebe409063da4b6fdf84f2447326505909476",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/03-language-selected-before-restart.jpg",
+      "bytes": 63716,
+      "sha256": "7621570eaa2a8950bb251095d1778b857191bcb34c5395a91cbbdc28658f9b30",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/04-after-normal-app-exit.json",
+      "bytes": 1608,
+      "sha256": "9634472302b41dd4a6c6090668dacc86e301c6d6d296455f92415f34860b269d",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/05-chinese-app-restart-preparation.json",
+      "bytes": 789,
+      "sha256": "804fb620fce8f9ae582fcd40d574c8e1c6c71bea615bc4dffdeff1ca090e2f64",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/06-chinese-attachment-history.ax.txt",
+      "bytes": 876,
+      "sha256": "ebb72c74b32ea4d6ad01727bf9f999d06d42f915cc907c9044fbf5e0e90d006e",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "utf8_decode_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/06-chinese-attachment-history.jpg",
+      "bytes": 131005,
+      "sha256": "1a86787c334aa5f30a93108f842dde47f635742335bed0f802d59d02ae9e87c8",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/07-actual-copy-paste-draft.jpg",
+      "bytes": 98596,
+      "sha256": "326f8936ddbcf0239ce88d264b4dc2cf014ee587620b590aa3e92481ca85ea0a",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "image": {
+        "actual_format": "JPEG",
+        "width": 1229,
+        "height": 768,
+        "mode": "RGB",
+        "full_decode_passed": true
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/08-after-chinese-view-and-copy.json",
+      "bytes": 2209,
+      "sha256": "8fb8f25f8ccc832804d0859b6a0d35ae06af87e2351d419e745dd60ba467c0ce",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/09-after-final-normal-app-exit.json",
+      "bytes": 1608,
+      "sha256": "7e9c4c8cc5f43f4f33401746a0bfd877c0ce9494773048f199bb295b0c3d4769",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/10-process-cleanup.json",
+      "bytes": 465,
+      "sha256": "09b3f9edda905a720141ddd0e87f707910c7a3fe1b949baf1a16d90e986a0260",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/gui-preview-official-31/11-visual-review.json",
+      "bytes": 1710,
+      "sha256": "dd889b8125fb9db029fb5346bc9f8b0fe637e4eddb2c44d03b7fcad0733bdb10",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "validation/macos-official-31-bundle.json",
+      "bytes": 2341,
+      "sha256": "51e4cd15c0dbf5a539c66f4890f4db02a71421fe5b2e6f963822fd204dd1c2b4",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "strict_json_duplicate_key_nonfinite_passed": true,
+      "decoded_string_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "path": "OFFICIAL_31_GUI_PREVIEW_VERIFICATION.md",
+      "bytes": 4107,
+      "sha256": "3d64417677c6e65ce5b00b910aa6ae80d1763efd5ab9b45ddf2831cbc97f0a60",
+      "raw_byte_shape_counts": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "utf8_decode_passed": true
+    }
+  ],
+  "root_gui_report": {
+    "path": "OFFICIAL_31_GUI_PREVIEW_VERIFICATION.md",
+    "bytes": 4107,
+    "sha256": "3d64417677c6e65ce5b00b910aa6ae80d1763efd5ab9b45ddf2831cbc97f0a60",
+    "links": [
+      {
+        "target": "OFFICIAL_31_LOCAL_GATES.md",
+        "exists": true,
+        "content_read": false,
+        "scope": "仅路径存在检查，未读取正文"
+      },
+      {
+        "target": "validation/macos-official-31-bundle.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "OFFICIAL_26_CLAUDE_PNG_GUI_VERIFICATION.md",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/01-english-attachment-history.jpg",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/06-chinese-attachment-history.jpg",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/07-actual-copy-paste-draft.jpg",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/02-after-english-view.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/04-after-normal-app-exit.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/08-after-chinese-view-and-copy.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/09-after-final-normal-app-exit.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/10-process-cleanup.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "validation/gui-preview-official-31/11-visual-review.json",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      },
+      {
+        "target": "OFFICIAL_31_GUI_PREVIEW_ARCHIVE_AUDIT.md",
+        "exists": true,
+        "content_read": true,
+        "scope": "授权公共输入已读"
+      }
+    ],
+    "sha256_references": [
+      {
+        "sha256": "5d0320978e1f8df4f88e8ee20fd78c3f925c31ec42aa0ac67d36f9f61db3bfa2",
+        "matched": true,
+        "matching_public_paths": [
+          "00-preparation.json/source_binary_sha256",
+          "11-visual-review.json/source_main_sha256",
+          "macos-official-31-bundle.json/worker/sha256"
+        ],
+        "binary_independently_read": false
+      },
+      {
+        "sha256": "501495704bfc4bfe45668cdec2092b36a2cccaa2022d14b1c9749e333359fb52",
+        "matched": true,
+        "matching_public_paths": [
+          "00-preparation.json/resigned_binary_sha256",
+          "11-visual-review.json/resigned_clone_sha256"
+        ],
+        "binary_independently_read": false
+      }
+    ],
+    "raw_byte_shape_counts": {
+      "api_key": 0,
+      "xai_key": 0,
+      "github_token": 0,
+      "bearer": 0,
+      "aws_access_id": 0,
+      "private_key_header": 0
+    },
+    "all_local_links_exist": true,
+    "all_digest_references_match_public_metadata": true,
+    "root_manual_actions_not_independently_reperformed": true
+  },
+  "primary_input_inventory_closed_14_artifacts_plus_bundle_and_root_report": true
+}

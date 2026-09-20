@@ -1,0 +1,100 @@
+{
+  "observed_utc": "2026-09-17T20:07:45.778771+00:00",
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "dc0e5d39e4cde7b00a7a8f6ded8f27f2e86adcc0d74bd2b8e5517abfee2c4789",
+  "source_bundle_report_sha256": "51e4cd15c0dbf5a539c66f4890f4db02a71421fe5b2e6f963822fd204dd1c2b4",
+  "root": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_",
+  "home": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home",
+  "project": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/project",
+  "app": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/InfiniShellParityOfficial31.app",
+  "bundle_id": "dev.infinishell.InfiniShellParityOfficial31",
+  "source_binary_sha256": "5d0320978e1f8df4f88e8ee20fd78c3f925c31ec42aa0ac67d36f9f61db3bfa2",
+  "resigned_binary_sha256": "501495704bfc4bfe45668cdec2092b36a2cccaa2022d14b1c9749e333359fb52",
+  "codesign": [
+    {
+      "argv": [
+        "codesign",
+        "--force",
+        "--deep",
+        "--sign",
+        "-",
+        "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/InfiniShellParityOfficial31.app"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "91917b4744b85a07472f6fcc93ddafe408d7b7b363f84fba07cfb4211c1961ab"
+    },
+    {
+      "argv": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/InfiniShellParityOfficial31.app"
+      ],
+      "exit_code": 0,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "environment": {
+    "HOME": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home",
+    "ZDOTDIR": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home",
+    "WARP_DATA_PROFILE": "cli-parity-official-31-ui",
+    "CODEX_HOME": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home/.codex",
+    "CLAUDE_CONFIG_DIR": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home/.claude",
+    "GROK_HOME": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home/.grok",
+    "PATH": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/home/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "SHELL": "/bin/zsh",
+    "LANG": "en_US.UTF-8",
+    "LC_ALL": "en_US.UTF-8",
+    "WARP_SKIP_COMMON_SKILLS_INSTALL": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DISABLE_AUTOUPDATER": "1"
+  },
+  "auth_copied": false,
+  "api_environment_loaded": false,
+  "running_pid": 46032,
+  "private_log": "/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-gui-official-31-preview-_dpqr0e_/gui-preview-startup-private.log",
+  "original_database_sha256": "28acfe67834d7dcb65b70b574cccabd81eb54a954739633802637cfdf5a02698",
+  "original_database_file_inventory": [
+    {
+      "suffix": "",
+      "bytes": 618496,
+      "sha256": "28acfe67834d7dcb65b70b574cccabd81eb54a954739633802637cfdf5a02698"
+    },
+    {
+      "suffix": "-wal",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "suffix": "-shm",
+      "bytes": 32768,
+      "sha256": "fd4c9fda9cd3f9ae7c962b0ddf37232294d55580e1aa165aa06129b8549389eb"
+    }
+  ],
+  "first_preparation_refused_nonempty_shm_without_starting_app": true,
+  "original_database_unchanged": true,
+  "imported_history_snapshot": {
+    "local_cli_tasks": {
+      "rows": 3,
+      "full_rows_sha256": "9a655c5e9e678635b4312c9ab1a8626bbc5e0c11b94e18b816869bf9409104f5"
+    },
+    "local_cli_task_generations": {
+      "rows": 20,
+      "full_rows_sha256": "cdfbbc58dd36bd9686c912fc9a0b347f5f497cf60ec15652c0714c8e1b07798e"
+    },
+    "local_cli_messages": {
+      "rows": 20,
+      "full_rows_sha256": "83fa11bfd8040a5e1ddfbbf68bb90b0d6d68894da06d986150b0a0c0639a5705"
+    }
+  },
+  "imported_real_png_task_id": "f11f573b-504a-4423-bd04-94942633f19d",
+  "initial_locale": "en",
+  "native_inputs_sent": 0,
+  "gui_observed": false,
+  "scope": "source31候选独立应用／HOME只读显示此前真实PNG任务历史；完整数据库逐字节复制，没有改写消息或注入夹具，不复制CLI历史或认证。仅验历史显示布局，不计新的原生输入、任务恢复或最终提交通过。"
+}

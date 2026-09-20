@@ -1,0 +1,46 @@
+{
+  "scope": "claude_version_only_private_configuration",
+  "model_inputs": 0,
+  "credentials_provided": false,
+  "network_sandbox_denied": true,
+  "cases": [
+    {
+      "version": "2.1.278",
+      "binary_sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "wall_seconds": 0.025,
+      "version_output_matches": true,
+      "stderr_bytes": 0,
+      "settings_unchanged": true,
+      "metadata_before": {
+        "installMethod": "native",
+        "autoUpdates": true
+      },
+      "metadata_after": {
+        "installMethod": "native",
+        "autoUpdates": true
+      },
+      "metadata_bytes_changed": false
+    },
+    {
+      "version": "2.1.267",
+      "binary_sha256": "a681f3008f0050029aeebcab3af51bb6a55ddeb625a3af3141a4416d43cd2558",
+      "exit_code": 0,
+      "forced_cleanup": false,
+      "wall_seconds": 2.526,
+      "version_output_matches": true,
+      "stderr_bytes": 0,
+      "settings_unchanged": true,
+      "metadata_before": {
+        "installMethod": "native",
+        "autoUpdates": true
+      },
+      "metadata_after": {
+        "installMethod": "native",
+        "autoUpdates": true
+      },
+      "metadata_bytes_changed": false
+    }
+  ]
+}

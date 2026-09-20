@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "mode": "fixed2-host",
+  "status": "completed",
+  "reservation_id": "7f5f240f-7352-44d9-8fcd-1d62142cf4a4",
+  "contract_sha256": "2b81320c4866c0385522e6ad31b0d350593be512dc20eb673ba388181ce48576",
+  "source_manifest_sha256": "415908767190975f76b0a81ced2ab7a7ad2cca5bde610a748c7f474128e7faf8",
+  "production_source": "source37",
+  "production_manifest_files": 177,
+  "fixture_overlay": "reviewed_source38_four_python_files",
+  "patch_sha256": "9e5b2472c9d7a2884990c3fa8b9011c16f712029a308f5f80e01d99bc76614d2",
+  "mixed_source_artifact": true,
+  "source38_product": false,
+  "same_commit_verified": false,
+  "model_input_budget": 2,
+  "deadline_seconds": 540,
+  "runtime_os_sandbox": false,
+  "native_network_budget_enforced": false,
+  "tls_budget_scope": "observed_configured_proxy_connections",
+  "fixed_root_dependency": null,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 853646680,
+    "sha256": "7f2d4d1cb063b545c6b733d6eb28ffc378d2c605fac51708d42a9069edee29df"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 867651408,
+    "sha256": "83b5e2af482cdc7494a2437fbbf98c0982bd0f33bb68774dd5ac9438311c0df7"
+  },
+  "grok": {
+    "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "bytes": 141869568,
+    "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+  },
+  "fixture_script_files": 93,
+  "private_fixture_root": "/private/tmp/infinishell-cli-parity-37-host-fixtures-kskh0_sx",
+  "entrypoint_listed_exactly_once": true,
+  "passed": false,
+  "runner_pid": 16406,
+  "exit_code": 1,
+  "wall_seconds": 22.397,
+  "source_and_binaries_unchanged": true,
+  "public_artifacts": {
+    "/tmp/infinishell-cli-parity-official-37-fixed2-host-events.ndjson": {
+      "bytes": 1973,
+      "sha256": "7611eca943e3f829ade3ec5e0e6846e9233fd9ef389686145a61eae88801cb68"
+    },
+    "/tmp/infinishell-cli-parity-official-37-fixed2-host-events.metadata.json": {
+      "bytes": 1972,
+      "sha256": "2c6719d31a6b2ecffae424ee12e2d3dd83033c53f06917502beedcca3c962a1b"
+    },
+    "/tmp/infinishell-cli-parity-official-37-fixed2-host-events.network.json": {
+      "bytes": 22727,
+      "sha256": "8be386ff74a3192186b5c2e6b1eff3b48b6473a9178613d5374588553eab7d56"
+    }
+  }
+}

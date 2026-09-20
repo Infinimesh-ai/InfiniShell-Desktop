@@ -1,0 +1,49 @@
+{
+  "parent_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "source_manifest_sha256": "730a9aa633d9565eed15bc85ec4bfdbff45377e411f97ab6a23544c6326aaa8e",
+  "source_verified_count": 111,
+  "exact_nine_modified_paths": true,
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "native_precheck_sha256": "baf724d2540204413d102334f6889d374474ba09fd47391bbe10661f392eaf3b",
+  "artifact_hashes": [
+    {
+      "label": "lib",
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "bytes": 849690424,
+      "sha256": "050ff3f3a6bdf742ab628a19ddf618331b830bbaa9cabe20349e9c677156fdbd"
+    },
+    {
+      "label": "main",
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "bytes": 866053040,
+      "sha256": "f01f2525952847cba097feca5931566c41043948286402435012ce0a92dcda5e"
+    },
+    {
+      "label": "grok",
+      "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+      "bytes": 141869568,
+      "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+    }
+  ],
+  "source_and_artifacts_unchanged_after_two_native_phases": true,
+  "phases": [
+    {
+      "phase": "grok-policy2",
+      "invocation_sha256": "8e352e5eb7892d986b06bdaaeac57e7e04213233db5cf591f2b993b3092b2b98",
+      "runner_exit_code": 1,
+      "wall_seconds": 12.911,
+      "runner_private_log_bytes": 0
+    },
+    {
+      "phase": "grok-sdk10",
+      "invocation_sha256": "e440da4efc7f768320e69363ffe305e1503a5be2c3bf49daa6dda41de9f3c46b",
+      "runner_exit_code": 1,
+      "wall_seconds": 10.148,
+      "runner_private_log_bytes": 181
+    }
+  ],
+  "auth_content_read": false,
+  "native_tests_reexecuted": false,
+  "scope": "两次实际有界原生调用后独立身份核对；未提交候选，不计失败或Goal通过。"
+}

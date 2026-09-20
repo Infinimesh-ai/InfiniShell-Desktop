@@ -1,0 +1,43 @@
+{
+  "source_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "source_input_count": 111,
+  "source29_input_manifest_sha256": "4e45ec701b9b98cc9abe7cc7048a919648f9589b594af5d83e7277bae5fd700e",
+  "worktree_clean_before_and_after": true,
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks,rust-embed/debug-embed"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 323.458,
+  "log_sha256": "eb8c21909821e8fd53effab95d230dde6c2bfb3fb1d8728e7115621731a64060",
+  "scope": "实际0059干净源码的main构建；不计CLI、GUI、平台或全部验收通过。",
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 866053040,
+    "sha256": "ab33468aa09057ee58f71031aa5026430a8bdf3db9e34a776b02d1bbac1488ea"
+  },
+  "embedded_locale_resources": [
+    {
+      "locale": "en",
+      "bytes": 374895,
+      "sha256": "abc35589e8e30edb1f2c842105fb058a07d42d6baeae796dfe997a6a7f59f241",
+      "exact_bytes_found_in_binary": true
+    },
+    {
+      "locale": "zh-CN",
+      "bytes": 361806,
+      "sha256": "36541327e2148064b683bed14c2cdb5164c33752d991c080ed5d8fa04386179a",
+      "exact_bytes_found_in_binary": true
+    }
+  ],
+  "locale_resources_immutable_in_binary": true,
+  "strict_signature_verification": {
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

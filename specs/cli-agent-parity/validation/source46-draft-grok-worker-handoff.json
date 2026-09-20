@@ -1,0 +1,81 @@
+{
+  "status": "draft_implemented_uncompiled",
+  "files": [
+    {
+      "path": "app/src/terminal/cli_agent_hook_writer.rs",
+      "sha256": "bec832b65edc78adda4058f4bc1940e246732da25a00574af50ca8613fcd7b8f",
+      "bytes": 26936
+    },
+    {
+      "path": "app/src/terminal/cli_agent_hook_writer_tests.rs",
+      "sha256": "f1da0e82e09f4c80afc097bc22ef18e78d38c062d5bc2ccceec6b5a1ffa6a094",
+      "bytes": 19419
+    },
+    {
+      "path": "app/src/terminal/mod.rs",
+      "sha256": "4a4cb1c3c410844845b816e72cf9697901d5b7fa5d38a0b6cf83da77697de469",
+      "bytes": 16618
+    },
+    {
+      "path": "app/Cargo.toml",
+      "sha256": "d6c68f27d7dc7e5042c33fb6b0a58acd0828840c01bd3f7a50acb215ca8c0d77",
+      "bytes": 30562
+    },
+    {
+      "path": "crates/warp_cli/src/lib.rs",
+      "sha256": "58c1154978794453619c358092f744951aab236f5cc9bcbd6d86c6c1c7be794f",
+      "bytes": 25302
+    },
+    {
+      "path": "crates/warp_cli/src/lib_tests.rs",
+      "sha256": "7ebb1771f014d8dba9efaf69f03ef54e99e51f70723de2c4c21796b96e032986",
+      "bytes": 28154
+    },
+    {
+      "path": "app/src/lib.rs",
+      "sha256": "452bb8c2d93d43c2bbd2d0a5024ea7eef33e58e841013ba13840eec9ac0d8901",
+      "bytes": 121683
+    },
+    {
+      "path": "app/src/bin/integration.rs",
+      "sha256": "5257e058b9142ed2584c215f41a07e138eab7258dc41a996923b9805eb05abb0",
+      "bytes": 2990
+    }
+  ],
+  "new_hook_test_functions": [
+    "accepts_only_the_declared_grok_events_and_identity",
+    "rejects_missing_duplicate_unknown_and_multiple_payloads",
+    "identity_budget_never_truncates_or_admits_terminal_syntax",
+    "real_vte_preserves_utf8_and_many_semicolons_without_control_injection",
+    "final_frame_budget_includes_utf8_escapes_and_tmux_wrapper",
+    "stdin_budget_rejects_the_first_excess_byte",
+    "short_writes_and_transient_errors_preserve_every_byte_once",
+    "zero_writes_hard_errors_and_expired_budget_are_failures",
+    "failed_write_releases_os_lock_without_replacing_lock_file",
+    "nonempty_lock_is_rejected_without_deleting_its_contents",
+    "unix_lock_rejects_shared_permissions_symlinks_and_hardlinks",
+    "unix_terminal_rejects_non_tty_and_outside_device_paths",
+    "lock_holder_subprocess",
+    "killed_lock_owner_releases_same_persistent_os_lock",
+    "concurrent_maximum_short_writes_arrive_as_complete_real_pty_frames",
+    "killed_partial_pty_frame_resynchronizes_at_the_next_complete_notification"
+  ],
+  "new_hook_test_count": 16,
+  "ignored_child_helper_count": 1,
+  "new_cli_parse_test_count": 1,
+  "modified_existing_cli_worker_detection_tests": 1,
+  "checks": {
+    "rustfmt_skip_children": true,
+    "git_diff_check": true,
+    "cargo_check_run": false,
+    "rust_tests_run": false,
+    "real_worker_run": false
+  },
+  "remaining": [
+    "Windows DACL creation/verification and ConPTY handle inheritance unverified",
+    "Current product worker has not been compiled or run on any platform",
+    "Actual helper versus native Grok TUI writes/tmux/SSH unverified",
+    "No application ACK or replay guarantee; exit0 means full terminal write only"
+  ],
+  "localization": "protocol-only fixed diagnostics; no GUI or TUI text changes"
+}

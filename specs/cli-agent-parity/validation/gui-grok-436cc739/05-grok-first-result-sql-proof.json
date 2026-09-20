@@ -1,0 +1,29 @@
+{
+  "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+  "generation": 1,
+  "revision": 6,
+  "state": "completed",
+  "result_bytes": 21,
+  "result_sha256": "969f4238cb5bd513f645a9cb572da629d654276f789f9317d08cea80ba4ff82d",
+  "expected_marker_match": true,
+  "messages": [
+    {
+      "sequence": 9,
+      "message_id": "9ba0b079-a008-4988-b403-274cf2fd0e23",
+      "sender_generation": 1,
+      "recipient_generation": 1,
+      "state": "acknowledged"
+    }
+  ],
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_GROK_ONE_436CC739",
+        "turn_id": "b5e23200-eb42-4339-87d6-021b81c61edf"
+      }
+    },
+    "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6"
+  },
+  "observed_utc": "2026-09-17T18:35:47.826125+00:00"
+}

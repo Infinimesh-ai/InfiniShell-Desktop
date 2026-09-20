@@ -1,0 +1,291 @@
+{
+  "scope": "source27 候选本地门禁公共归档，不代表新同提交或原生/GUI/平台验收",
+  "parent_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "goal_complete": false,
+  "source_manifest_sha256": "730a9aa633d9565eed15bc85ec4bfdbff45377e411f97ab6a23544c6326aaa8e",
+  "manifest_paths": 111,
+  "changed_paths": [
+    "app/src/ai/cli_agent_runtime/grok.rs",
+    "app/src/ai/cli_agent_runtime/grok_policy_preflight_live_tests.rs",
+    "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs",
+    "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+    "app/src/ai/cli_agent_runtime/grok_tests.rs",
+    "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+    "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+    "script/cli-agent-parity/run_grok_policy_preflight.py",
+    "script/cli-agent-parity/run_grok_sdk_origin_probe.py"
+  ],
+  "unchanged_prior_paths": 102,
+  "user_excluded_paths_absent_from_manifest": [
+    "app/src/ai/agent_providers/tools/web_runtime.rs",
+    "app/src/ai/agent_providers/tools/websearch_tests.rs"
+  ],
+  "execution_and_archive_same_agent": true,
+  "archive_auditor_independent_from_executor": false,
+  "archive_review_reads": [
+    "原始公共 inputs/gates/python JSON",
+    "本轮 check/i18n/focused/python 日志，仅 SHA、统计与凭据形状扫描"
+  ],
+  "archive_review_no_frozen_target_or_binary_reads": true,
+  "binary_identity_source": "本轮实际执行器原始 gates 报告；归档未重新读二进制",
+  "test_binary_as_reported": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "050ff3f3a6bdf742ab628a19ddf618331b830bbaa9cabe20349e9c677156fdbd",
+    "bytes": 849690424,
+    "path_source": "actual_i18n_log"
+  },
+  "byte_exact_copies": [
+    {
+      "source": "/tmp/infinishell-cli-parity-official-27-inputs.json",
+      "destination": "specs/cli-agent-parity/validation/macos-official-27-inputs.json",
+      "bytes": 19745,
+      "sha256": "730a9aa633d9565eed15bc85ec4bfdbff45377e411f97ab6a23544c6326aaa8e",
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 472
+      },
+      "byte_exact_verified": true
+    },
+    {
+      "source": "/tmp/infinishell-cli-parity-official-27-gates.json",
+      "destination": "specs/cli-agent-parity/validation/macos-official-27-gates.json",
+      "bytes": 2966,
+      "sha256": "a09e9e383678f549757bc8bedb8f4cc5b8702a16a124d4227d5bf9b857a8c737",
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 88
+      },
+      "byte_exact_verified": true
+    },
+    {
+      "source": "/tmp/infinishell-cli-parity-official-27-python.json",
+      "destination": "specs/cli-agent-parity/validation/macos-official-27-python.json",
+      "bytes": 5809,
+      "sha256": "3cedd4ba7f3a3fbc08bdca629b7e2923c92c18c862399509fdfe8681e3a43bc9",
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 197
+      },
+      "byte_exact_verified": true
+    }
+  ],
+  "logs": [
+    {
+      "name": "check",
+      "path": "/tmp/infinishell-cli-parity-official-27-check.log",
+      "bytes": 9458,
+      "sha256": "deaea41ed50fa90d4b69ac8fab231dc3538fea993a97a8b0f57dffd7524fe217",
+      "copied": false,
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 0
+      }
+    },
+    {
+      "name": "i18n",
+      "path": "/tmp/infinishell-cli-parity-official-27-i18n.log",
+      "bytes": 10667,
+      "sha256": "5b21417a3f1e3cb3e7c24c7609101de0c750daa107c777df5640ec9116ee5dda",
+      "copied": false,
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 0
+      }
+    },
+    {
+      "name": "focused",
+      "path": "/tmp/infinishell-cli-parity-official-27-focused.log",
+      "bytes": 210719,
+      "sha256": "5bb9ceba7e81c7617bbc7138e9dde242c0701b715dfe711b0e86ebf1280b03f7",
+      "copied": false,
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 0
+      }
+    },
+    {
+      "name": "python",
+      "path": "/tmp/infinishell-cli-parity-official-27-python.log",
+      "bytes": 72539,
+      "sha256": "c4dafd6b877cfcaa1e3e3fcc0d03df14184caed507b8441c3c3dd9008765afa0",
+      "copied": false,
+      "scan": {
+        "serialized_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_string_match_counts": {
+          "sk_api_key": 0,
+          "xai_api_key": 0,
+          "github_token": 0,
+          "bearer_token": 0,
+          "aws_access_key_id": 0,
+          "pem_private_key": 0
+        },
+        "decoded_strings_scanned": 0
+      },
+      "independently_counted_modules": 15,
+      "independently_counted_tests": 426,
+      "skipped": 0
+    }
+  ],
+  "verified_results": {
+    "check_exit": 0,
+    "check_wall_seconds": 131.16,
+    "i18n_exit": 0,
+    "i18n_passed": 11,
+    "i18n_filtered": 6882,
+    "i18n_wall_seconds": 306.312,
+    "i18n_internal_seconds": 4.72,
+    "focused_exit": 0,
+    "focused_passed": 1410,
+    "focused_pass_lines": 1410,
+    "focused_skipped": 5483,
+    "focused_wall_seconds": 22.438,
+    "focused_internal_seconds": 18.501,
+    "python_modules": 15,
+    "python_passed": 426,
+    "python_skipped": 0,
+    "python_wall_seconds": 8.018,
+    "per_gate_manifest_guard_as_reported": true
+  },
+  "credential_shape_patterns": {
+    "sk_api_key": "(?i)\\bsk-(?:ant-api[0-9]+-)?[A-Za-z0-9_-]{20,}",
+    "xai_api_key": "\\bxai-[A-Za-z0-9_-]{20,}",
+    "github_token": "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})",
+    "bearer_token": "(?i)\\bBearer\\s+[A-Za-z0-9._~+/-]{20,}={0,2}",
+    "aws_access_key_id": "\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b",
+    "pem_private_key": "-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----"
+  },
+  "credential_shape_scope": "六类固定形状；序列化字节与JSON解码字符串分别计数，不输出匹配内容；不作为穷尽凭据检测声明",
+  "credential_shape_total_matches": 0,
+  "document": {
+    "path": "specs/cli-agent-parity/OFFICIAL_27_LOCAL_GATES.md",
+    "bytes": 2853,
+    "sha256": "9a7076c8f2f798d59ca546292c5d790447db9eae2904179b4d4ec1dd7f743cbb",
+    "scan": {
+      "serialized_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_string_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_strings_scanned": 0
+    }
+  },
+  "unverified": [
+    "新实际提交身份",
+    "source27 main 构建/签名",
+    "source27 真实 CLI/模型",
+    "GUI/双语布局",
+    "跨平台/完整工作区",
+    "SSH/tmux 完整链",
+    "Goal 全部验收"
+  ]
+}

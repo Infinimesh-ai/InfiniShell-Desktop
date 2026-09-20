@@ -1,0 +1,54 @@
+{
+  "source": "44",
+  "case": "lifecycle",
+  "source_manifest_sha256": "f9591fb3011b8bc1c10a63f342090a1ce7f07398478bc9d2770702eaa56e4398",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "cli_version": "0.155.1",
+  "cli_sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+  "official_package_files": 42,
+  "credentials_provided": true,
+  "max_model_inputs": 8,
+  "automatic_retry": false,
+  "same_commit_verified": false,
+  "dirty_candidate": true,
+  "source_and_binaries_unchanged": true,
+  "runner_exit_code": 1,
+  "wall_seconds": 13.286,
+  "metadata": {
+    "cli_version": "codex-cli 0.155.1",
+    "test_case": "lifecycle",
+    "scope": "rust_adapter_process_restart",
+    "credentials_provided": true,
+    "model_requests_expected": true,
+    "app_restart_and_ui_verified": false,
+    "test_exit_code": 101,
+    "acceptance_passed": false
+  },
+  "artifacts": [
+    {
+      "name": "invocation.json",
+      "bytes": 1755,
+      "sha256": "c0574316c42e647336ef0e0f63d3eb5ec10a55e744a9ce5eab5471fcf3fdfcdf"
+    },
+    {
+      "name": "runner.log",
+      "bytes": 128,
+      "sha256": "9fbd4705e7d23910fc56f06bca4fd0511fea50fea3142d26a828ae91a5225e39"
+    },
+    {
+      "name": "lifecycle.ndjson",
+      "bytes": 1346,
+      "sha256": "82e6d205693f7bb3e1ed56e50906ef3d9ed11b4fb8f08b4b52bf6f981c0f0622"
+    },
+    {
+      "name": "lifecycle.metadata.json",
+      "bytes": 694,
+      "sha256": "09dd325080a1a8b84023d97bac0ccb4fe6dd9d7164a3e81c36b6d28601f99f39"
+    },
+    {
+      "name": "lifecycle.test-output.txt",
+      "bytes": 867,
+      "sha256": "3566a64c9e065e246618a37af2c8f04dc7a2ad5d8cc78810238d32268b75119b"
+    }
+  ]
+}

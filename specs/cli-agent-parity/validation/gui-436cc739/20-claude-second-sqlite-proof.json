@@ -1,0 +1,42 @@
+{
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "scope": "实际Claude GUI第二轮同会话记忆与SQLite独立只读证明；不计后续完整链。",
+  "task": {
+    "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+    "generation": 2,
+    "revision": 2,
+    "state": "completed"
+  },
+  "same_native_session_as_first_turn": true,
+  "result_matches_fixed_two_markers": true,
+  "result_bytes": 33,
+  "result_sha256": "f99e2f996e581134647a1603ef3009bb25138600605a7f3769fdad84ed562d90",
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_ONE_436CC739 GUI_TWO_436CC739",
+        "turn_id": "4f20c46d-7b5c-4729-bb89-32a0f356570a"
+      }
+    },
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3"
+  },
+  "messages": [
+    {
+      "message_id": "490d60d2-4e9c-46d8-bfb0-8db1676a7a71",
+      "state": "acknowledged",
+      "sender_generation": 1,
+      "recipient_generation": 1
+    },
+    {
+      "message_id": "4f20c46d-7b5c-4729-bb89-32a0f356570a",
+      "state": "acknowledged",
+      "sender_generation": 2,
+      "recipient_generation": 2
+    }
+  ],
+  "db_read_only": true,
+  "synthetic_fixture_only": true
+}

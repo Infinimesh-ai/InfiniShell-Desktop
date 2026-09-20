@@ -1,0 +1,74 @@
+{
+  "source_manifest_sha256": "f5ae6eecf351f999189006a4e78045b8df335a3e4c837a6129a581f37ca8dfa0",
+  "source_binary_sha256": "45e1cecdebdb3a186ba75e5b33645e434462260ee657a0b1b60a73310488610f",
+  "resigned_binary_sha256": "7d6ba2729718ce88d6591b1ed2cf18ffa3535f2cc2d2607e6af09521eeea3531",
+  "scope": "real_gui_en_zh_grok_permission_policy_layout",
+  "source_base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_dirty_candidate": true,
+  "same_commit_verified": false,
+  "passed": true,
+  "native_inputs_sent": 0,
+  "auth_copied": false,
+  "private_app_stopped": true,
+  "full_cli_parity_acceptance_passed": false,
+  "task_tables": [
+    {
+      "table": "local_cli_tasks",
+      "rows": 3,
+      "unchanged_from_copied_history": true
+    },
+    {
+      "table": "local_cli_task_generations",
+      "rows": 20,
+      "unchanged_from_copied_history": true
+    },
+    {
+      "table": "local_cli_messages",
+      "rows": 20,
+      "unchanged_from_copied_history": true
+    }
+  ],
+  "screenshots": [
+    {
+      "file": "01-en-inherit.png",
+      "bytes": 97911,
+      "sha256": "8b34add71ddfb29153e79d870eec4eaf766bd1952186d568b5a04b8aabbf11f3"
+    },
+    {
+      "file": "02-en-fixed-read.png",
+      "bytes": 100655,
+      "sha256": "920b6156453965c94752b97c372828b4207ece6a32457da3ca56f452797faf6b"
+    },
+    {
+      "file": "03-en-fixed-files.png",
+      "bytes": 101346,
+      "sha256": "48a746cce4e2e1714fee0ce98dd886249bc61a260ca293830e3deb7f8bbf6ac1"
+    },
+    {
+      "file": "04-zh-inherit.png",
+      "bytes": 90845,
+      "sha256": "4dd8ee14a04d32955614717f2b09abcf76784ee2782825c6f4f47f80acc30e49"
+    },
+    {
+      "file": "05-zh-fixed-read.png",
+      "bytes": 92096,
+      "sha256": "836db28a73bdd53a9bfcb632a9ec73968f2c6e7cb932c46bf9cc16d87d2fbad0"
+    },
+    {
+      "file": "06-zh-fixed-files.png",
+      "bytes": 92699,
+      "sha256": "86704f242dbb7a494e740e9991299a6995f879301bf1ac31c0e064368af493ca"
+    }
+  ],
+  "checks": [
+    "英文和简体中文分别显示继承、固定只读、固定文件三项策略；按钮无截断。",
+    "继承策略禁用子任务，固定策略启用子任务入口。",
+    "固定策略说明按宽度换行，明确逐次审批和非文件系统沙箱。"
+  ],
+  "limits": [
+    "仅验证权限控件布局；未提交任务或验证原生权限。",
+    "未验证输入法、快速回车、评审组合输入或全界面布局。",
+    "Grok 通用帮助的只读旧描述仍需随后同步。",
+    "应用数据库是已结束验收历史副本；未恢复或重新运行其中的任务。"
+  ]
+}

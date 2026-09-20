@@ -1,0 +1,258 @@
+{
+  "source_commit": "7cfba0f4ad7a479912c9be8f387a8376cb1c4765",
+  "source_tree_dirty": false,
+  "tmux_sha256": "f2b57dbad53ee140b27df5779e43a7f12fac1e3eb1117c1d2dca97e0f3bab048",
+  "grok_worker_sha256": "d4d1367f4c223f07485ca83a862724125b9a4cfab91494733326ebe4e66ebe13",
+  "grok_worker_protocol": {
+    "protocol": 1,
+    "maxFrameBytes": 4096
+  },
+  "grok_worker_protocol_valid": true,
+  "host_platform": "darwin",
+  "ssh": "OpenSSH_10.3p1, LibreSSL 3.3.6",
+  "tmux": "tmux 3.7c",
+  "credentials_provided": false,
+  "model_requests": false,
+  "native_cli_hook_triggered": false,
+  "notification_origin": "bundled_hook_replay",
+  "grok_notification_transport": "bundled_hook_replay_via_native_worker",
+  "product_ssh_ui_verified": false,
+  "different_os_host_verified": false,
+  "notification_patch": {
+    "claude": {
+      "revision": 4,
+      "warp_notify_sha256": "3bd4102f7b537535a35ea69c0437ee38d3bed8e9b8734acaec7ff4d04565fbb9"
+    },
+    "codex": {
+      "revision": 4,
+      "warp_notify_sha256": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c"
+    }
+  },
+  "context": {
+    "home": "<isolated-probe>/远端 配置",
+    "cwd": "<isolated-probe>/远端 工作区",
+    "versions": {
+      "codex": {
+        "path": "<isolated-probe>/远端 配置/bin/codex",
+        "exit_code": 0,
+        "version": "codex-cli 0.155.1"
+      },
+      "claude": {
+        "path": "<isolated-probe>/远端 配置/bin/claude",
+        "exit_code": 0,
+        "version": "2.1.278 (Claude Code)"
+      },
+      "grok": {
+        "path": "<isolated-probe>/远端 配置/bin/grok",
+        "exit_code": 0,
+        "version": "grok 1.0.34 (3736acbc8658)"
+      }
+    },
+    "grok_worker": {
+      "path": "<isolated-probe>/远端 配置/bin/infinishell-notify",
+      "exit_code": 0,
+      "stderr_bytes": 0,
+      "protocol": {
+        "protocol": 1,
+        "maxFrameBytes": 4096
+      }
+    },
+    "codex_plugin_present": false,
+    "claude_registry_present": false,
+    "grok_registry_present": false
+  },
+  "remote_context_verified": true,
+  "synthetic_local_install_marker_exists": true,
+  "cases": [
+    {
+      "mode": "direct",
+      "agent": "codex",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "ssh-probe-codex-direct-73568",
+          "cwd": "<isolated-probe>/远端 工作区",
+          "project": "远端 工作区",
+          "plugin_version": "0.4.0"
+        }
+      ],
+      "raw_stream_sha256": "404d5268b9599d2111d9cbaa5d1ddd678a1b0256934a438b56600c1bee57f446",
+      "raw_stream_bytes": 348,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    },
+    {
+      "mode": "direct",
+      "agent": "claude",
+      "claude_transport_path": "compatibility_tty_version_unknown",
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "claude",
+          "event": "session_start",
+          "session_id": "ssh-probe-claude-direct-73596",
+          "cwd": "<isolated-probe>/远端 工作区",
+          "project": "远端 工作区",
+          "plugin_version": "2.2.0"
+        }
+      ],
+      "raw_stream_sha256": "d57c16598c275024bc72a9cb2363dbf09b437fba86873e7a703c1d8d3b0f1c12",
+      "raw_stream_bytes": 350,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    },
+    {
+      "mode": "direct",
+      "agent": "grok",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "grok",
+          "event": "session_start",
+          "session_id": "ssh-probe-grok-direct-73624",
+          "event_id": "grok:222b8f3df69ac1e90f002f09976f82c69370b3ae7612a0c65fb3f5515a62d80d",
+          "plugin_version": "0.1.3",
+          "cwd": "<isolated-probe>/远端 工作区"
+        }
+      ],
+      "raw_stream_sha256": "f77839a62d13e9e5c39e79b28fa97fd754c3c64bf6c82308d033d2994ca7d05b",
+      "raw_stream_bytes": 370,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    },
+    {
+      "mode": "tmux-off",
+      "agent": "codex",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 0,
+      "notifications": [],
+      "raw_stream_sha256": "5578983b9c6ec88b97ad41261453efd96d622432ac85163f99453bc8cc5ca3a3",
+      "raw_stream_bytes": 726,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": false
+    },
+    {
+      "mode": "tmux-off",
+      "agent": "claude",
+      "claude_transport_path": "compatibility_tty_version_unknown",
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 0,
+      "notifications": [],
+      "raw_stream_sha256": "5578983b9c6ec88b97ad41261453efd96d622432ac85163f99453bc8cc5ca3a3",
+      "raw_stream_bytes": 726,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": false
+    },
+    {
+      "mode": "tmux-off",
+      "agent": "grok",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 0,
+      "notifications": [],
+      "raw_stream_sha256": "5578983b9c6ec88b97ad41261453efd96d622432ac85163f99453bc8cc5ca3a3",
+      "raw_stream_bytes": 726,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": false
+    },
+    {
+      "mode": "tmux-on",
+      "agent": "codex",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "ssh-probe-codex-emit-73712",
+          "cwd": "<isolated-probe>/远端 工作区",
+          "project": "远端 工作区",
+          "plugin_version": "0.4.0"
+        }
+      ],
+      "raw_stream_sha256": "de12f6421188d20039b312581f5f42ba974b01a9106f344049f8e0570f3f0ddf",
+      "raw_stream_bytes": 1111,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    },
+    {
+      "mode": "tmux-on",
+      "agent": "claude",
+      "claude_transport_path": "compatibility_tty_version_unknown",
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "claude",
+          "event": "session_start",
+          "session_id": "ssh-probe-claude-emit-73744",
+          "cwd": "<isolated-probe>/远端 工作区",
+          "project": "远端 工作区",
+          "plugin_version": "2.2.0"
+        }
+      ],
+      "raw_stream_sha256": "a22168af710a8bf9d3b56d14be5158a54110071245668372094b3c68ba30b9c7",
+      "raw_stream_bytes": 1113,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    },
+    {
+      "mode": "tmux-on",
+      "agent": "grok",
+      "claude_transport_path": null,
+      "ssh_exit": 0,
+      "failure_output": null,
+      "hook_runner_completed": true,
+      "received_notifications": 1,
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "grok",
+          "event": "session_start",
+          "session_id": "ssh-probe-grok-emit-73776",
+          "event_id": "grok:f1e5865fec51aaf852f37911d2e9e024136c85464bd5380b2e77a904267b3dd0",
+          "plugin_version": "0.1.3",
+          "cwd": "<isolated-probe>/远端 工作区"
+        }
+      ],
+      "raw_stream_sha256": "b775c644c017436bd63eacd1ff4ac06e91f289fcf5cb2b29d18329ffbf3266ac",
+      "raw_stream_bytes": 1133,
+      "stderr": "Connection to 127.0.0.1 closed.\r\n",
+      "transport_received": true
+    }
+  ],
+  "direct_transport_passed": true,
+  "tmux_passthrough_passed": true,
+  "default_tmux_blocking_observed": true,
+  "passed": true
+}

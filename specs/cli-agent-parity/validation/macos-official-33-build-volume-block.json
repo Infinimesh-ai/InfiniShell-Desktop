@@ -1,0 +1,39 @@
+{
+  "scope": "source33_local_gates_and_missing_build_volume",
+  "source_input_count": 126,
+  "changed_source_count": 29,
+  "new_rust_cases": 53,
+  "cargo_check_exit": 0,
+  "i18n_passed": 11,
+  "focused_rust_passed": 1473,
+  "python_passed": 463,
+  "node_passed": 13,
+  "same_commit_verified": false,
+  "main_build_attempted": false,
+  "main_preflight_exit": 2,
+  "main_preflight_failure": "FileNotFoundError",
+  "build_volume_present": false,
+  "expected_volume": "/Volumes/ORICO",
+  "external_physical_disk_detected": false,
+  "local_free_gib_observed": 54.18,
+  "native_executed": false,
+  "goal_complete": false,
+  "archives": [
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-33-inputs.json",
+      "bytes": 62212,
+      "sha256": "5e8a71f38b458b4b1dc213068e9dcea9d638dafd1c20e857614188866b4eba5e"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-33-gates.json",
+      "bytes": 8825,
+      "sha256": "b6fc2e681ac6131481204df8e6a498dd26eb1dbc2551917720d87ddb3607a570"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-33-python.json",
+      "bytes": 14438,
+      "sha256": "365053c259ef86b3737748a23f680a34d4a415cdeb9411a220886733d08c0e0d"
+    }
+  ],
+  "date_utc": "2026-09-18"
+}

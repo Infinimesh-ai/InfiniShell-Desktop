@@ -1,0 +1,63 @@
+{
+  "lease_passed": true,
+  "authenticated_native_tool_lease_verified": true,
+  "native_origin_verified": false,
+  "parent_permission_ceiling_verified": false,
+  "spawn_verified": false,
+  "full_cli_parity_acceptance_passed": false,
+  "scope": "authenticated_process_capability_and_native_tool_lease",
+  "test_name": "ai::cli_agent_runtime::grok::native_tool_lease_live_tests::authenticated_process_capability_and_native_tool_lease",
+  "private_workspace": "/private/tmp/infinishell-grok-native-lease-fa3ewb7m",
+  "max_native_inputs": 1,
+  "max_tls_connections": 32,
+  "max_tls_bytes": 33554432,
+  "deadline_seconds": 450,
+  "http_model_calls_observable": false,
+  "http_model_call_budget_enforced": false,
+  "cost_budget_enforced": false,
+  "tls_decrypted": false,
+  "budget_boundary": "最多一次原生输入、32 次 TLS CONNECT、32 MiB 与 450 秒；不能计数加密 HTTP 内模型请求",
+  "same_commit_verified_by_runner": false,
+  "public_credential_values_recorded": false,
+  "requested_model": "grok-4.6-build",
+  "allowed_https_hosts": [
+    "auth.x.ai",
+    "cli-chat-proxy.grok.com"
+  ],
+  "auth_copy_method": "opaque_auth_json_only",
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "test_binary_sha256": "3df27ca1532c1b993af501a3ca1c98d71b9e5db2bb56ffc8b5f0ad86a4239450",
+  "supervisor_sha256": "91cf8f9c71d8bf3c50e0871c6f01b7867a4a89bb41f46142d550715b9a90e882",
+  "sandbox_canary": {
+    "allowed_proxy": true,
+    "other_loopback": 1,
+    "external": 1,
+    "exact_unix": true,
+    "other_unix": 1,
+    "credential_read": 1
+  },
+  "project_write_canary": {
+    "project_write": 1
+  },
+  "test_exit_code": 0,
+  "full_native_origin_fields_observed": false,
+  "tunnels_stopped": true,
+  "private_auth_copy_removed": true,
+  "original_auth_stat_unchanged": true,
+  "private_settings_audit": {
+    "bytes_unchanged": false,
+    "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+    "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+    "toml_parse_succeeded": true,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "settings_scope_verified": true,
+    "changed_top_level_tables": [
+      "marketplace"
+    ]
+  },
+  "project_entry_count": 0,
+  "boundary_passed": true,
+  "public_evidence_sha256": "a2e43af24e4f937b58f3ac98e52a24310bbf51f4b340afe816586eefcb1a529e",
+  "public_network_sha256": "f783141d26a010fe8e9ec024897b57427a558d5600b19fd296f5805298c023a0"
+}

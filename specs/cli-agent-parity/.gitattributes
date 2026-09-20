@@ -1,0 +1,4 @@
+# 保留已由归档摘要绑定的原始 AX 转储字节，不对其做文本空白规范化。
+validation/gui-436cc739/01-zh-titlebar-ax.txt -diff
+validation/gui-436cc739/02-zh-task-manager-ax.txt -diff
+validation/gui-preview-official-31/06-chinese-attachment-history.ax.txt -diff

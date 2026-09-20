@@ -1,0 +1,193 @@
+{
+  "commands": [
+    {
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "2.1.273 (Claude Code)\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "warpdotdev/claude-code-warp"
+      ],
+      "exit_code": 0,
+      "stdout": "Adding marketplace…SSH not configured, cloning via HTTPS: https://github.com/warpdotdev/claude-code-warp.git\nRefreshing marketplace cache (timeout: 120s)…\nCloning repository (timeout: 120s): https://github.com/warpdotdev/claude-code-warp.git\nClone complete, validating marketplace…\nCleaning up old marketplace cache…\n✔ Successfully added marketplace: claude-code-warp (declared in user settings)\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "install",
+        "warp@claude-code-warp"
+      ],
+      "exit_code": 0,
+      "stdout": "Installing plugin \"warp@claude-code-warp\"...✔ Successfully installed plugin: warp@claude-code-warp (scope: user)\n",
+      "stderr": ""
+    }
+  ],
+  "scope": {
+    "model_requests": 0,
+    "credentials_copied": false,
+    "rust_installer_executed": true,
+    "fixed_versions": [
+      "2.1.0",
+      "2.2.0"
+    ]
+  },
+  "cli_version": "2.1.273 (Claude Code)",
+  "executable_sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+  "loopback_requests": [
+    "\"GET /fixture.git/info/refs?service=git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -",
+    "\"GET /fixture.git/info/refs?service=git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -",
+    "\"POST /fixture.git/git-upload-pack HTTP/1.1\" 200 -"
+  ],
+  "before_native_update": {
+    "tree_sha256": {
+      ".claude-plugin/plugin.json": "604a943246c2fda3fbb470a97c6f1de2141634013f2b676a5dc3902aa994f536",
+      "hooks/hooks.json": "52c7f8bf98bff09d983a7056cf1cf2f68d0e8a806c5b56db35a4f145ddb9a2f1",
+      "scripts/build-payload.sh": "0ebf0734250d70d7c34a6948d550aeb140b785bcdeaa36e96f0fbac27850e881",
+      "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+      "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+      "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+      "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+      "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+      "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+      "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+      "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+      "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+      "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+      "scripts/on-stop.sh": "249852062f8659a265e8b55b887fd5384bc0027ac31c296f3ac9fb13e4341d6c",
+      "scripts/should-use-structured.sh": "f34b95caf2959dcb321d00eb72dc736c85d8f96958b03472380725ea950588bb",
+      "scripts/warp-notify.sh": "13c0200fb79b666eacfec87fd33fdd36ec29f0f8b836b2e26009b2848d7696fe",
+      "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+    },
+    "configuration": {
+      "settings.json": {
+        "extraKnownMarketplaces": {
+          "claude-code-warp": {
+            "source": {
+              "source": "github",
+              "repo": "warpdotdev/claude-code-warp"
+            }
+          }
+        },
+        "enabledPlugins": {
+          "warp@claude-code-warp": true
+        }
+      },
+      "plugins/known_marketplaces.json": {
+        "claude-code-warp": {
+          "source": {
+            "source": "github",
+            "repo": "warpdotdev/claude-code-warp"
+          },
+          "installLocation": "<isolated-probe>/home/.claude/plugins/marketplaces/claude-code-warp",
+          "lastUpdated": "2026-09-19T09:12:00.406Z"
+        }
+      },
+      "plugins/installed_plugins.json": {
+        "version": 2,
+        "plugins": {
+          "warp@claude-code-warp": [
+            {
+              "scope": "user",
+              "installPath": "<isolated-probe>/home/.claude/plugins/cache/claude-code-warp/warp/2.1.0",
+              "version": "2.1.0",
+              "installedAt": "2026-09-19T09:12:01.113Z",
+              "lastUpdated": "2026-09-19T09:12:01.113Z",
+              "gitCommitSha": "bb6c1cf2f5cd7eb609678a2b175e7f4504ca61c2"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "rust_test": {
+    "name": "terminal::cli_agent_sessions::plugin_manager::claude::tests::real_claude_plugin_transaction",
+    "case": "upgrade",
+    "binary_sha256": "1965c2b965fb64abe0369dda87ae67255a7653720deb3e6e8496e383022bcbf8",
+    "run": {
+      "exit_code": 0,
+      "stdout": "\nrunning 1 test\ntest terminal::cli_agent_sessions::plugin_manager::claude::tests::real_claude_plugin_transaction ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 7125 filtered out; finished in 3.74s\n\n",
+      "stderr": "17:12:02.170 [INFO] [i18n_embed] Selecting translations for domain \"warp\"\n17:12:02.193 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some(\"en\")), script: None, region: None, variants: None }], fallback=en\n"
+    },
+    "assertions": {
+      "active_version": "2.2.0",
+      "case": "upgrade",
+      "model_requests": 0,
+      "old_cache_preserved": true,
+      "rust_entry": "real_claude_plugin_transaction",
+      "verified": true
+    }
+  },
+  "after_rust_test": {
+    "tree_sha256": {
+      ".claude-plugin/plugin.json": "50c3aa9299fa465386062f35c395c0c690d8541f312b047584ad6f217cd7f1ee",
+      "hooks/hooks.json": "cbea2d15f3793688a5aa1b9ee459097db88f9446cb5c7d7cb2fe11fa2f39907c",
+      "scripts/build-payload.sh": "5b90e57a52d0f2efbce6c9648ffe6d470ef9cb903fa2d3b1d45a12005f045c36",
+      "scripts/emit-terminal-sequence.sh": "c461961b191ceb56cbd33f010a89f4c10d8927628c5aca4da3d79f4a881b3b9f",
+      "scripts/legacy/on-notification.sh": "ce184c59f210189eda2105d49cbb85e5e346b8190320ae000f0e31bc01af3a4d",
+      "scripts/legacy/on-session-start.sh": "e33036ff07a277d2403053e4b60610ac15a53d3e2eb36cf88d68efbf7bf54f0a",
+      "scripts/legacy/on-stop.sh": "0456cc984d9323f74ed0aa16c1758ad375f233d5a7d2ade777f21ec47c678d18",
+      "scripts/legacy/warp-notify.sh": "2e05721b486a376923d4efb290723937660892c3decc25e3329267e2509a5fc4",
+      "scripts/on-notification.sh": "dfe593f0b4e535335b9923b9bab597a35220e22085cd31e4a3eb833ece7d67f9",
+      "scripts/on-permission-request.sh": "4ccb832b300b67375c640e5b2fc2d08024e3c14256c92fa0cc96042c158bcfd6",
+      "scripts/on-post-tool-use.sh": "94f60981fcdaf0004e0ae94f0c780f8be32ee404ddf395b92a1378912df743d4",
+      "scripts/on-prompt-submit.sh": "58986635076f5b85a06e4d8f4e0baea061756543bd30e667a76f5a31423aa834",
+      "scripts/on-session-start.sh": "712123ece1a0fbb67d6a1d0db303712230ce424ab4fa6ceda3e202796449d582",
+      "scripts/on-stop-failure.sh": "71519423d039bc7d59c5af45f29ff1cd13ac3522aae6b57f5dc244cede76fa0e",
+      "scripts/on-stop.sh": "3f44cf96f0028fc15333f9ff6f6af5c7bceb545e445a49328a0a0e133bc248f4",
+      "scripts/should-use-structured.sh": "6460753a80c1fb6a39bba772a569644cc50bcc7b529a0f5f43b8944852410954",
+      "scripts/warp-notify.sh": "3bd4102f7b537535a35ea69c0437ee38d3bed8e9b8734acaec7ff4d04565fbb9",
+      "tests/test-hooks.sh": "56a82d0750475e79cce2aeb01097207007e7d7e58b2f982c3c15548da24a65fb"
+    },
+    "configuration": {
+      "settings.json": {
+        "enabledPlugins": {
+          "warp@claude-code-warp": true
+        },
+        "extraKnownMarketplaces": {
+          "claude-code-warp": {
+            "source": {
+              "repo": "warpdotdev/claude-code-warp",
+              "source": "github"
+            }
+          }
+        }
+      },
+      "plugins/known_marketplaces.json": {
+        "claude-code-warp": {
+          "installLocation": "<isolated-probe>/home/.claude/plugins/marketplaces/claude-code-warp",
+          "lastUpdated": "2026-09-19T09:12:00.406Z",
+          "source": {
+            "repo": "warpdotdev/claude-code-warp",
+            "source": "github"
+          }
+        }
+      },
+      "plugins/installed_plugins.json": {
+        "plugins": {
+          "warp@claude-code-warp": [
+            {
+              "gitCommitSha": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+              "installPath": "<isolated-probe>/home/.claude/plugins/cache/claude-code-warp/warp/2.2.0",
+              "installedAt": "2026-09-19T09:12:05.347Z",
+              "lastUpdated": "2026-09-19T09:12:05.347Z",
+              "scope": "user",
+              "version": "2.2.0"
+            }
+          ]
+        },
+        "version": 2
+      }
+    }
+  }
+}

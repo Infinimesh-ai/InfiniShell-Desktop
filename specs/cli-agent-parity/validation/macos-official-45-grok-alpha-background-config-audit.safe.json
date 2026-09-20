@@ -1,0 +1,16 @@
+{
+  "config_semantics_unchanged": false,
+  "changes": [
+    {
+      "field": "marketplace.default_skills_installs_purged",
+      "before_present": false,
+      "after_present": true,
+      "before_type": "NoneType",
+      "after_type": "bool",
+      "before_json_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      "after_json_sha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+    }
+  ],
+  "native_auto_update": true,
+  "native_channel": "alpha"
+}

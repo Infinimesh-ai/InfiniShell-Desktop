@@ -1,0 +1,8 @@
+{
+  "max_tls_connections": 16,
+  "max_tls_bytes": 8388608,
+  "connections_attempted": 5,
+  "tls_bytes": 58058,
+  "model_http_count_measured": false,
+  "tls_decrypted": false
+}

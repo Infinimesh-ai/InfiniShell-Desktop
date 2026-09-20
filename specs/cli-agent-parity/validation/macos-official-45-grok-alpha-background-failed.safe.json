@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "case": "grok-alpha",
+  "passed": false,
+  "native_started_once": true,
+  "model_inputs": 0,
+  "auth_supplied": false,
+  "failure": "cleanup_final_wait_timeout",
+  "original_inner_final_receipt_present": false,
+  "original_outer_exit": 1,
+  "original_outer_elapsed_seconds": 28.023,
+  "fresh_cache_verified_posthoc": true,
+  "cache": {
+    "version": "1.0.38",
+    "stable_version": null,
+    "checked_at": "2026-09-19T13:33:10.316543Z"
+  },
+  "cache_sha256": "0e2e964134564834f72c24c857625be11075e9472401196feaf5aa1e40d0cf4d",
+  "manual_check_was_not_started": true,
+  "config_bytes_equal_to_passed_channel_input": false,
+  "root_executable_process_count_now": 0,
+  "root_native_argv_process_count_now": 0,
+  "direct_native_pid_not_recorded_by_original_fixture": true,
+  "auth_paths_count": 0,
+  "original_outer_receipt_sha256": "42186728a5b371641a42ad62b0c2f9deafef0007c4c3224e05289b47eb16fb4c",
+  "cleanup_diagnosis": {
+    "reader_stopped_before_signals": true,
+    "original_signal_stage_trace_available": false,
+    "offline_pty_backpressure_reproduced": true,
+    "with_drain_synthetic_process_exited_without_sigkill": true,
+    "exact_alpha_unreaped_cause_not_fully_reconstructable": true
+  }
+}

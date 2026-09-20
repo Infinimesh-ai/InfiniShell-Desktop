@@ -1,0 +1,29 @@
+{
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "task": {
+    "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+    "generation": 4,
+    "revision": 4,
+    "state": "completed"
+  },
+  "target": "gui-denied.txt",
+  "file_bytes": 26,
+  "file_sha256": "b984476fa64a08d4fb6113b1748f92e6caff2c567951ba5cbbaa1fe6ac02a7f2",
+  "file_matches_untouched_fixture": true,
+  "result_matches_fixed_denial_marker": true,
+  "result_sha256": "54632e8bfc5f189ee739160373fe6ee0e3ff6d3393ead7c005c722c44c7c05d0",
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_DENY_CONFIRMED_436CC739",
+        "turn_id": "0dde4048-2981-47dc-a157-38a591efd1ed"
+      }
+    },
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3"
+  },
+  "db_read_only": true,
+  "scope": "第四轮GUI等待真实Write审批后根一次拒绝，CLI回收真实完成结果，目标文件未修改；Completed指原生回合完成，不表示被拒写入成功。"
+}

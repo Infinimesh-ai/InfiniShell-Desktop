@@ -1,0 +1,29 @@
+{
+  "private_native_response_envelope_bytes": 259,
+  "private_native_response_envelope_count": 1,
+  "private_native_response_envelope_sha256": "ed82aa0c7f5a228ef65737cef12ddb6099a764d6b7bd486d94c488d80fab8523",
+  "private_native_response_envelope_scope_verified": true,
+  "response_field_shapes": [
+    {
+      "result_type": "object",
+      "result_field_count": 1,
+      "result_fields": [
+        {
+          "key": {
+            "bytes": 6,
+            "sha256": "f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68",
+            "type": "string"
+          },
+          "value_type": "object"
+        }
+      ],
+      "error_present": false
+    }
+  ],
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "dirty_source27_candidate": true,
+  "exact_id_or_result_values_exported": false,
+  "raw_native_response_or_error_body_read": false,
+  "root_reviewed_metadata_only_envelope": true,
+  "projection_source_sha256": "b126b4d97840914576744c18e7c4747b4df0f5a3a7afc38c318964f0cbac2d31"
+}

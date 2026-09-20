@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "node",
+    "--test",
+    "script/cli-agent-parity/grok_plugin_tests.cjs"
+  ],
+  "exit_code": 0,
+  "log_sha256": "e327e54ac442813a17ac954eb5da2b6026c8f13ca10fac36cc1605cb6f8443d0",
+  "stdout_summary": [
+    "\u2714 \u8de8\u8fdb\u7a0b\u72b6\u6001\u6587\u4ef6\u4fdd\u7559\u5931\u8d25\u5e76\u4e14\u4e0d\u4fdd\u5b58\u63d0\u793a\u8bcd (2.643375ms)",
+    "\u2139 tests 13",
+    "\u2139 suites 0",
+    "\u2139 pass 13",
+    "\u2139 fail 0",
+    "\u2139 cancelled 0",
+    "\u2139 skipped 0",
+    "\u2139 todo 0",
+    "\u2139 duration_ms 119.488958"
+  ]
+}

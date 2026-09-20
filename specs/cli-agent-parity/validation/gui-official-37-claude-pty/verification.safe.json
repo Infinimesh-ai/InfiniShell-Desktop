@@ -1,0 +1,197 @@
+{
+  "source": "source37",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "same_commit_verified": false,
+  "ordinary_pty_chain_passed": true,
+  "managed_task_or_child_acceptance": false,
+  "native_cli_version": "2.1.273",
+  "native_cli_sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+  "native_session_id": "f90b9719-06d2-4570-923a-40ee9de16805",
+  "formal_model_inputs": 13,
+  "native_user_rows": 23,
+  "native_history_sha256": "c12186dbc556ccd05324595949fbe0c314b02ec22b0291f73a6c5c9c320b5128",
+  "raw_history_archived": false,
+  "results": {
+    "two_turn_zh_en": true,
+    "chinese_multiline_rich_input": true,
+    "unicode_space_file_context": true,
+    "visible_skill_selected_from_app_and_executed": true,
+    "hidden_skill_absent_from_app_menu_en_zh": true,
+    "write_allow_once_verified_bytes": true,
+    "write_deny_verified_bytes": true,
+    "inflight_queue_observed_and_final_result_returned": true,
+    "cancel_pending_write_verified_bytes": true,
+    "explicit_native_resume_same_id_and_memory_result": true,
+    "application_restart_same_id_and_new_memory_result": true
+  },
+  "cancel_semantics": "Esc at native Write approval ends this request; native history records user interruption and file remains unchanged. This is not managed RuntimeEvent::Cancelled evidence.",
+  "first_followup_scope": "The 1..120 run and QUEUE marker prove execution only; the later 121..520 run has a screenshot of queued messages while output was still streaming.",
+  "plugin": {
+    "version": "2.2.0",
+    "upstream_commit": "8c28e936ae51cbb23a1a5657fca2bfd30cf06f12",
+    "installed_via_production_app_entry": true,
+    "installed_hook_manifest_sha256": "cbea2d15f3793688a5aa1b9ee459097db88f9446cb5c7d7cb2fe11fa2f39907c",
+    "osc_consumption_proven": false
+  },
+  "approval_files": [
+    {
+      "file": "allow.txt",
+      "bytes": 20,
+      "sha256": "a7a5b6e72b4a59be04a80f6c0e20a045dbf1ec208a7f232c3e02f70604025e3a",
+      "expected_bytes_match": true
+    },
+    {
+      "file": "deny.txt",
+      "bytes": 28,
+      "sha256": "ea3571065cc0a735dbdc30d5c5b135fee961a1d1bd49cb30ab746832f4e2deb3",
+      "expected_bytes_match": true
+    },
+    {
+      "file": "cancel.txt",
+      "bytes": 28,
+      "sha256": "ea3571065cc0a735dbdc30d5c5b135fee961a1d1bd49cb30ab746832f4e2deb3",
+      "expected_bytes_match": true
+    }
+  ],
+  "restart": {
+    "history_sha256_before_app_relaunch": "4e2acc8ca5a81e6198ea22a35d11a4d00790e6951388174026f8f1c3a9ca3ac8",
+    "bytes": 349546,
+    "old_app_pid": 12233,
+    "old_app_pid_absent": true,
+    "new_app_pid": 14607,
+    "history_unchanged_before_explicit_resume": true
+  },
+  "global_config": {
+    "explicit_file_count": 6,
+    "all_launch_and_audit_snapshots_unchanged": true,
+    "audit_count": 6,
+    "config_content_archived": false
+  },
+  "layout": {
+    "languages": [
+      "en",
+      "zh-CN"
+    ],
+    "clipping_observed": false,
+    "scope": "Application toolbar, rich input, skill menu; native Claude content keeps its own language."
+  },
+  "screenshots": [
+    {
+      "file": "01-zh-multiline-rich-draft.png",
+      "sha256": "a776d2dedf471a4fb9ba8774eb64b3a4101b6f876a5c7dcf727451fef42b75a8",
+      "bytes": 68408
+    },
+    {
+      "file": "02-first-turn-result.png",
+      "sha256": "8110d90462cc27e84a48206afb4dc0ebc9180976b6d426380b3057225d8990f4",
+      "bytes": 73822
+    },
+    {
+      "file": "03-english-second-turn.png",
+      "sha256": "38533485b76ab2db022758e3e703ecb4d8e175dff73e21278a1a96a8827aa511",
+      "bytes": 87405
+    },
+    {
+      "file": "04-unicode-file-context-draft.png",
+      "sha256": "5a32a82c2efac59cb4fa1cdba24b695859604a571c05e10e7ef011017658f66f",
+      "bytes": 108862
+    },
+    {
+      "file": "05-context-marker-result.png",
+      "sha256": "1d182127b9916d835c499816eede9f01a700f83d8ec9f117d1da7a003a90d57e",
+      "bytes": 117326
+    },
+    {
+      "file": "06-visible-only-app-skill-menu.png",
+      "sha256": "d11c4641e59513832ab31699b8701e10ad282a8cb2515be163836d945b1b1597",
+      "bytes": 105234
+    },
+    {
+      "file": "07-native-selected-skill-result.png",
+      "sha256": "274d840195bbdad3b0286ac2d896daae49716d1d3a7f731ef3f7579678447baa",
+      "bytes": 128693
+    },
+    {
+      "file": "08-write-approval-allow.png",
+      "sha256": "bec407096982a0f41bdd8a8a82830d5a4d6e0deda0d5575ed685436eeacabd52",
+      "bytes": 136119
+    },
+    {
+      "file": "09-single-allow-result.png",
+      "sha256": "15c443de7c095fd39658bc456affb515250ee29aef78e475f02c717c2eeef388",
+      "bytes": 132714
+    },
+    {
+      "file": "10-write-approval-deny.png",
+      "sha256": "bb767033457c1e09522255cbfbe827375cdc77588461e51f73612a0ce27e1e3b",
+      "bytes": 141577
+    },
+    {
+      "file": "11-single-deny-result.png",
+      "sha256": "9533d803d415d8b9345748b090a5fdcd91c41c923514ca8bc137c56de6cdbd0b",
+      "bytes": 135772
+    },
+    {
+      "file": "12-followup-result.png",
+      "sha256": "8a37b94f1d28da1f8b01a4f760572ed4be94385ec8295e9487d392705a4aa01c",
+      "bytes": 83059
+    },
+    {
+      "file": "13-inflight-queued.png",
+      "sha256": "e25ba01ec816cabb52dd94dbbe418f005aa6825c00ce3cddf9a284dd077974ba",
+      "bytes": 87902
+    },
+    {
+      "file": "14-inflight-final-result.png",
+      "sha256": "b63f397e749bcddbfc0bda916d78cb0558e7180c6481229f67e14f6bd3d214d4",
+      "bytes": 87668
+    },
+    {
+      "file": "15-cancel-pending-write.png",
+      "sha256": "69629cb2e4d4b9b38220fafa0a8bdef24e56772129ad7e6d7b459853b0184e76",
+      "bytes": 119489
+    },
+    {
+      "file": "16-cancel-returned-to-input.png",
+      "sha256": "89d0916a2e81e68cfbc7062be043289c9006688112bac49ff1a4ac693cf9bd3e",
+      "bytes": 108481
+    },
+    {
+      "file": "17-native-explicit-resume-history.png",
+      "sha256": "b20ee95a072c391f8abdb57a6853085e35c550715bc278d178fd1a7dcce8fe90",
+      "bytes": 107508
+    },
+    {
+      "file": "18-native-resume-memory-result.png",
+      "sha256": "a4ac01d94b09957a4fc712f701c4510272546d326867e5f5921415c8fd48cb14",
+      "bytes": 114848
+    },
+    {
+      "file": "19-app-restart-shell-no-replay.png",
+      "sha256": "ea62479d4cfb25fffd55900ee1edc1370f372aaee8485eea3ffcae3cbaef998a",
+      "bytes": 87490
+    },
+    {
+      "file": "20-app-restart-recovered-result.png",
+      "sha256": "0716f25c89596ec0718a9a1a2476add9b50c54c7e84f30c98440774b02789672",
+      "bytes": 124627
+    },
+    {
+      "file": "21-zh-toolbar-and-menu.png",
+      "sha256": "d3848dee918e268e3924236a8a83a2f259c492c3e391752a3e1de56322fe8de2",
+      "bytes": 113734
+    },
+    {
+      "file": "22-zh-visible-only-skill-menu.png",
+      "sha256": "0ab14febe4638ad7d8e4e97640eab7b1b054c985c8d3bf89dd9b1deb5962b980",
+      "bytes": 114870
+    }
+  ],
+  "not_covered": [
+    "Actual IME composition and fast Enter",
+    "Code-review context GUI flow",
+    "Claude plugin fault injection and repair",
+    "All platforms and SSH/tmux",
+    "Managed parent-child recovery and final same-commit acceptance"
+  ]
+}

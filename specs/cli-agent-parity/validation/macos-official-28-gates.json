@@ -1,0 +1,99 @@
+{
+  "base_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "parent_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "worktree_dirty": true,
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "7bfe731c3a40207d8d428702deac95a8fa4fd9d6b603312c8ef4cb0310f6acd7",
+  "target_directory": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+  "preexisting_target_test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 849690424,
+    "sha256": "050ff3f3a6bdf742ab628a19ddf618331b830bbaa9cabe20349e9c677156fdbd",
+    "scope": "编译前共享目标既有身份，不代表source28候选"
+  },
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 133.635,
+      "log": "/tmp/infinishell-cli-parity-official-28-check.log",
+      "log_sha256": "09553c2b86b6b3616d8860f929a24286bf2ae88e3eba52f927c2cafe74eae3ad",
+      "source_verified_before": true,
+      "source_verified_after": true
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 325.967,
+      "log": "/tmp/infinishell-cli-parity-official-28-i18n.log",
+      "log_sha256": "9743ef98dbf75bf98180453ba74b6e1df6c4544150e4aab11b92443f8343835b",
+      "source_verified_before": true,
+      "source_verified_after": true,
+      "summary": {
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0,
+        "filtered": 6882,
+        "test_seconds": 4.77
+      }
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(ai::agent_sdk::driver::harness::) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 25.939,
+      "log": "/tmp/infinishell-cli-parity-official-28-focused.log",
+      "log_sha256": "9b952528119d5f3d73fa6087f8f6796220df468328386af25582d15bf5e877cd",
+      "source_verified_before": true,
+      "source_verified_after": true,
+      "summary": {
+        "run": 1410,
+        "passed": 1410,
+        "skipped": 5483
+      },
+      "pass_lines": 1410
+    }
+  ],
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "fea848db4e6c5fb7d67bc16cd12a5d29189f3cb498ef9926ce3d101723bde35f",
+    "bytes": 849690424,
+    "path_source": "actual_i18n_log"
+  },
+  "source_unchanged_after_gates": true,
+  "test_binary_after_python": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 849690424,
+    "sha256": "fea848db4e6c5fb7d67bc16cd12a5d29189f3cb498ef9926ce3d101723bde35f"
+  },
+  "test_binary_unchanged_after_python": true
+}

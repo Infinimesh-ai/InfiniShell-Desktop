@@ -1,0 +1,71 @@
+{
+  "observed_utc": "2026-09-17T18:24:17.255833+00:00",
+  "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+  "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+  "generation": 7,
+  "state": "completed",
+  "result_bytes": 56,
+  "result_sha256": "c282327d140a0fbcfdbeefc23183a2b58cc37d25edbc6594181d818125204816",
+  "expected_synthetic_markers_present": true,
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_ONE_436CC739 GUI_APPEND_436CC739 GUI_RESUME_436CC739",
+        "turn_id": "e5f15663-7a4f-4931-b6bd-37d067014249"
+      }
+    },
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3"
+  },
+  "messages": [
+    {
+      "sequence": 1,
+      "message_id": "490d60d2-4e9c-46d8-bfb0-8db1676a7a71",
+      "sender_generation": 1,
+      "recipient_generation": 1,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 2,
+      "message_id": "4f20c46d-7b5c-4729-bb89-32a0f356570a",
+      "sender_generation": 2,
+      "recipient_generation": 2,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 3,
+      "message_id": "b249dabc-98d2-44bd-886c-ceb8e22e1cd1",
+      "sender_generation": 3,
+      "recipient_generation": 3,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 4,
+      "message_id": "0dde4048-2981-47dc-a157-38a591efd1ed",
+      "sender_generation": 4,
+      "recipient_generation": 4,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 5,
+      "message_id": "44e52cfd-bdb7-4024-a7bd-cdb1cefd27bd",
+      "sender_generation": 5,
+      "recipient_generation": 5,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 6,
+      "message_id": "69eac33b-1ab8-4abe-a675-0c07ea6aaeff",
+      "sender_generation": 5,
+      "recipient_generation": 5,
+      "state": "acknowledged"
+    },
+    {
+      "sequence": 7,
+      "message_id": "e5f15663-7a4f-4931-b6bd-37d067014249",
+      "sender_generation": 7,
+      "recipient_generation": 7,
+      "state": "acknowledged"
+    }
+  ]
+}

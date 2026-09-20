@@ -1,0 +1,86 @@
+[
+  {
+    "version": "1.0.30",
+    "args": [
+      "version",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.039,
+    "stdout_sha256": "b12cbc1ab4bdabef6c0f699d5d205177f739d2151da4c5cc1ba6e0a92fea9e25",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "parsed": {
+      "currentVersion": "1.0.30 (04b7ffed98c6)",
+      "channel": "unknown"
+    },
+    "config_unchanged": true,
+    "auth_created": false
+  },
+  {
+    "version": "1.0.30",
+    "args": [
+      "update",
+      "--check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 1.655,
+    "stdout_sha256": "0a33bb750e354de210ec2db29bcad74825165c0d3c4c82525c19567504f63337",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "parsed": {
+      "currentVersion": "1.0.30",
+      "latestVersion": "1.0.34",
+      "updateAvailable": true,
+      "installer": "internal",
+      "channel": "stable",
+      "autoUpdate": false,
+      "error": null
+    },
+    "config_unchanged": true,
+    "auth_created": false
+  },
+  {
+    "version": "1.0.34",
+    "args": [
+      "version",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 0.035,
+    "stdout_sha256": "d5c8392fba1321124d1ffef84242b214b5d6e575cd48520bf6e7564251699ad7",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "parsed": {
+      "currentVersion": "1.0.34 (3736acbc8658)",
+      "channel": "unknown"
+    },
+    "config_unchanged": true,
+    "auth_created": false
+  },
+  {
+    "version": "1.0.34",
+    "args": [
+      "update",
+      "--check",
+      "--json"
+    ],
+    "exit_code": 0,
+    "seconds": 1.443,
+    "stdout_sha256": "0ae38a54af0f8dda84ca61a55af8cbfcd5aad2bce11de7ee7860807252d867ab",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_bytes": 0,
+    "parsed": {
+      "currentVersion": "1.0.34",
+      "latestVersion": "1.0.34",
+      "updateAvailable": false,
+      "installer": "internal",
+      "channel": "stable",
+      "autoUpdate": false,
+      "error": null
+    },
+    "config_unchanged": true,
+    "auth_created": false
+  }
+]

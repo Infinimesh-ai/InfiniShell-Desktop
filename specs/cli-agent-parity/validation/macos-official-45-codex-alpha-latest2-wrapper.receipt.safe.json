@@ -1,0 +1,200 @@
+{
+  "case_id": "source45-codex-alpha-latest2-alias-audit",
+  "source_manifest_sha256": "8f19bb52ac6b019618dd3fa79be5c05108d8be9cec9b0b54483c6334b955e2f5",
+  "private_runner_sha256": "52a0f5645cf742ed2e6eda5aeff56f48cafc78b0b5758cf5f3317e405a32a888",
+  "binding_sha256": "274495fa861c9e9b556f6bed247844adc7f0c3347c114c7d4b1a7cc13e18cf3c",
+  "plan_sha256": "9c4ff66be6c2ef9e8dad2328942ed74572bf5cfe4e14efe7b13e1977f059f500",
+  "test_binary_sha256": "48c0c48fcf38fcdab111dc09362e422d60c581bb605acf12cbdcc226fd622913",
+  "supervisor_sha256": "834c6921edcc74b0b94b5cbbd732e3dc00a925b5dede5f2db33a52ab1e7e37f9",
+  "native_update_expected": true,
+  "model_inputs_max": 0,
+  "dependency_case_id": "source45-codex-latest-alpha1",
+  "started_unix": 1789824714.933196,
+  "max_product_execute_calls": 1,
+  "passed": true,
+  "executed": true,
+  "error_code": null,
+  "artifacts": {
+    "manifest.private.json": "e6709229459ebe27159ee3557c7619663156137fabdb81da668805f2e6ce3aad",
+    "invocation.safe.json": "b1a7c93b7d6585adf20adaf6b8289d06c7b5df64c4f5216fd46ea117c7b56544",
+    "events.safe.json": "5005530da6306f0eed11b5d5817be4019a1efbc67b450ce63245bbee4c2d2d5f",
+    "receipt.safe.json": "4b3b60e56dad6698b442b7f9f73fe5d7685a1cb4add021b7d9690cfb2e23c83e",
+    "test-output.private.txt": "5effa159793160560854f48c4bd7fbd56169163405174733d8e05a79ed3a7306"
+  },
+  "elapsed_seconds": 119.356,
+  "background_behavior_verified": false,
+  "detached_descendants_verified": false,
+  "driver_run_called": true,
+  "stage": "finished",
+  "intentional_channel_only_seed": null,
+  "config_before": {
+    "home/.codex/config.toml": {
+      "present": true,
+      "sha256": "26ca739cedc6a548b2b5ef0a583585f2653ab2f8c80b4785e40cef57e995856f",
+      "mode": 384,
+      "bytes": 92
+    },
+    "home/.codex/packages/standalone/auto-update-version": {
+      "present": false
+    },
+    "home/.grok/config.toml": {
+      "present": true,
+      "sha256": "04f738d4783c5087e3847a3fd743ce7e4f4d4f5ff9c703b8810096bbea766c1c",
+      "mode": 384,
+      "bytes": 156
+    },
+    "home/.claude/settings.json": {
+      "present": true,
+      "sha256": "0f2688b0372978bcf07a5edd49d1291ea8625bfad4a1509a88da1677815088f7",
+      "mode": 384,
+      "bytes": 210
+    },
+    "home/.claude/.claude.json": {
+      "present": true,
+      "sha256": "fb2c9fc3fbd1c1ed57552242ffd02b4602071c5f1c13720593e64e53583deadf",
+      "mode": 384,
+      "bytes": 55
+    },
+    "home/.claude.json": {
+      "present": true,
+      "sha256": "e5173eefeb222f88df001f5e67f04e67264bae63f97899fee865051114de1fc5",
+      "mode": 384,
+      "bytes": 26
+    },
+    "home/.profile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.bashrc": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.bash_profile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zshrc": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zprofile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zshenv": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.config/fish/config.fish": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.codex/app-server-daemon/settings.json": {
+      "present": true,
+      "sha256": "a33a1b95027bfc568f931b974302bb85dbb2def5ab977f34b4d0cd61c756fd45",
+      "mode": 384,
+      "bytes": 119
+    }
+  },
+  "config_after": {
+    "home/.codex/config.toml": {
+      "present": true,
+      "sha256": "26ca739cedc6a548b2b5ef0a583585f2653ab2f8c80b4785e40cef57e995856f",
+      "mode": 384,
+      "bytes": 92
+    },
+    "home/.codex/packages/standalone/auto-update-version": {
+      "present": false
+    },
+    "home/.grok/config.toml": {
+      "present": true,
+      "sha256": "04f738d4783c5087e3847a3fd743ce7e4f4d4f5ff9c703b8810096bbea766c1c",
+      "mode": 384,
+      "bytes": 156
+    },
+    "home/.claude/settings.json": {
+      "present": true,
+      "sha256": "0f2688b0372978bcf07a5edd49d1291ea8625bfad4a1509a88da1677815088f7",
+      "mode": 384,
+      "bytes": 210
+    },
+    "home/.claude/.claude.json": {
+      "present": true,
+      "sha256": "fb2c9fc3fbd1c1ed57552242ffd02b4602071c5f1c13720593e64e53583deadf",
+      "mode": 384,
+      "bytes": 55
+    },
+    "home/.claude.json": {
+      "present": true,
+      "sha256": "e5173eefeb222f88df001f5e67f04e67264bae63f97899fee865051114de1fc5",
+      "mode": 384,
+      "bytes": 26
+    },
+    "home/.profile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.bashrc": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.bash_profile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zshrc": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zprofile": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.zshenv": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.config/fish/config.fish": {
+      "present": true,
+      "sha256": "b16c665938508a30b4679fb3eede5aab859bf207190aba002708006d527983c4",
+      "mode": 384,
+      "bytes": 63
+    },
+    "home/.codex/app-server-daemon/settings.json": {
+      "present": true,
+      "sha256": "a33a1b95027bfc568f931b974302bb85dbb2def5ab977f34b4d0cd61c756fd45",
+      "mode": 384,
+      "bytes": 119
+    }
+  },
+  "active_binary": {
+    "path": "/private/tmp/infinishell-cli-autoupdate-45-codex-alpha-latest-audit2-bsxi5p2p/home/.codex/packages/standalone/releases/0.155.1-aarch64-apple-darwin/bin/codex",
+    "sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e"
+  }
+}

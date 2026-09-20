@@ -1,0 +1,163 @@
+{
+  "auth_private_logs_native_bodies_read": false,
+  "cargo_native_cli_model_gui_git_mutation_run": false,
+  "credential_shape_scan": {
+    "pattern_count": 6,
+    "results": [
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "document_matches": 0,
+        "serialized_matches": 0
+      }
+    ]
+  },
+  "diagnostic_contract": {
+    "fixed_id_exact_match_required": true,
+    "fixed_id_utf8_bytes": 13,
+    "fixed_id_utf8_sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+    "inner_fields": [
+      "reloaded"
+    ],
+    "inner_value_requires_serde_json_as_u64": true,
+    "jsonrpc_equals_2_0": true,
+    "only_boolean_added": true,
+    "outer_fields": [
+      "jsonrpc",
+      "id",
+      "result"
+    ],
+    "outer_result_fields": [
+      "result"
+    ],
+    "public_original_count": false,
+    "public_original_id": false,
+    "public_result_values": false,
+    "raw_deep_values_retained": false
+  },
+  "diagnostic_field": "skills_reload_closed_success_shape",
+  "diff": {
+    "python_tests_added": 89,
+    "python_tests_removed": 1,
+    "runner_added": 19,
+    "runner_removed": 3,
+    "rust_added": 175,
+    "rust_removed": 2
+  },
+  "finished_reads_done": true,
+  "private_boundaries_unchanged": {
+    "create_new": true,
+    "directory_current_uid_mode": "0700",
+    "file_current_uid_mode": "0600",
+    "file_nlink": 1,
+    "first_only": true,
+    "max_bytes": 65536,
+    "max_field_fingerprints": 128,
+    "no_follow": true,
+    "result_fingerprint_raw_utf8_bytes": 6,
+    "result_fingerprint_raw_utf8_sha256": "f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68"
+  },
+  "python_audit": {
+    "empty_capture_has_no_boolean_claim": true,
+    "public_non_boolean_projection": null,
+    "rejects_legacy_missing_boolean": true,
+    "requires_new_seven_field_closed_schema": true,
+    "strict_boolean_type": true,
+    "true_requires_consistent_fixed_id_jsonrpc_result_fingerprint_and_no_error": true
+  },
+  "recorded_at_utc": "2026-09-17T19:36:47Z",
+  "schema_version": 1,
+  "scope": "sdk_fixture_private_envelope_closed_maintenance_shape_diagnostic_only",
+  "source_files": [
+    {
+      "bytes": 159503,
+      "path": "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "sha256": "1c66fc9433a0d32f2ede6e2bc4f1b2b6a5c86bb3c92546251c7e659b6365eca5"
+    },
+    {
+      "bytes": 56522,
+      "path": "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "sha256": "70daa6bdd677c11dae147e1cbc36fa787cb1e1379b4657cb5e9ca23872c53c88"
+    },
+    {
+      "bytes": 82842,
+      "path": "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+      "sha256": "1dbd764c0c4b28201d0fa1ad60ec3c899e7b8a2ca93a3b694cc77ac995e9421e"
+    }
+  ],
+  "stop": true,
+  "unchanged_behavior": {
+    "business_effects_changed": false,
+    "localization_change_required": false,
+    "old_failed_archives_changed": false,
+    "owned_requests_invented": false,
+    "permissions_or_product_gate_opened": false,
+    "primary_cleanup_failure_rules_changed": false,
+    "production_numeric_pending_and_unknown_id_rejection": true,
+    "zero_input_native_failed_evidence_changed": false
+  },
+  "verification": {
+    "cross_platform_run": false,
+    "git_diff_check_exit_code": 0,
+    "interface_acceptance_passed": false,
+    "native_sdk11_run": false,
+    "new_rust_test_count": 7,
+    "new_rust_tests": [
+      "maintenance_shape_diagnostic_accepts_u64_boundaries_without_retaining_counts",
+      "maintenance_shape_diagnostic_rejects_wrong_identity_and_outer_injections",
+      "maintenance_shape_diagnostic_rejects_inner_extras_and_missing_wrappers",
+      "maintenance_shape_diagnostic_rejects_non_u64_counts",
+      "maintenance_shape_diagnostic_does_not_copy_deep_result_values",
+      "maintenance_shape_diagnostic_preserves_the_unknown_id_guard_and_user_pending",
+      "maintenance_shape_diagnostic_cannot_replace_the_first_private_response"
+    ],
+    "py_compile_exit_code": 0,
+    "py_compile_files": [
+      "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py"
+    ],
+    "python_elapsed_seconds": 0.645,
+    "python_exit_code": 0,
+    "python_new_tests": 7,
+    "python_tests_names": [
+      "test_maintenance_shape_audit_exports_only_the_strict_boolean_and_file_metadata",
+      "test_maintenance_shape_audit_rejects_non_boolean_flags_and_legacy_schema",
+      "test_true_maintenance_shape_audit_rejects_conflicting_outer_summaries",
+      "test_maintenance_shape_audit_rejects_control_fields_and_deep_values",
+      "test_empty_capture_has_no_maintenance_shape_claim",
+      "test_maintenance_shape_public_projection_never_promotes_non_boolean_values",
+      "test_maintenance_shape_boolean_cannot_verify_sdk_origin_or_complete_the_probe"
+    ],
+    "python_tests_run": 108,
+    "python_unittest_module": "grok_sdk_origin_probe_runner_tests",
+    "rust_compilation_run": false,
+    "rust_tests_run": false,
+    "rustfmt_edition": "2024",
+    "rustfmt_exit_code": 0,
+    "rustfmt_skip_children": true
+  }
+}

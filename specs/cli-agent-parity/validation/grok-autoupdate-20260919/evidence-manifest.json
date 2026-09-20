@@ -1,0 +1,261 @@
+{
+  "created_at_utc": "2026-09-19T10:16:57.002280+00:00",
+  "files": {
+    "crates__codegen__xai-grok-update__src__cleanup_downloads.rs": {
+      "bytes": 9314,
+      "sha256": "528c98c19c430360180ca5f8d922836bab3452e8964de68f49c6d414c94fe2e0"
+    },
+    "crates__codegen__xai-grok-shell__src__util__config__load.rs": {
+      "bytes": 7091,
+      "sha256": "883ebdee0c8f164d27ac91168c434ce3316065fd4f903caac9d07ec0529cd736"
+    },
+    "crates__codegen__xai-grok-shell__src__util__config__persist.rs": {
+      "bytes": 13531,
+      "sha256": "a5c1034085cd184bfcaa8454209cd73fc96dab42e4aaae140e6a5d6694622683"
+    },
+    "1.0.30-agent-help.txt": {
+      "bytes": 583,
+      "sha256": "3c3fe7911c3a8d5194c498914d99765bc9aff273af06cf647b38096fa5193bff"
+    },
+    "native-update-audit-private-root.json": {
+      "bytes": 562,
+      "sha256": "640cd1fb2977382b757ae869230760e2c855b868c34787a6197a73ece97b4a0a"
+    },
+    "crates__codegen__xai-grok-shell-base__src__util__grok_home.rs": {
+      "bytes": 334,
+      "sha256": "1c862a217eccb97cc749c00ba46e01f0efe161119c7c92f9f9eba3021409a18f"
+    },
+    "native-upgrade-report.json": {
+      "bytes": 9456,
+      "sha256": "20bc30d50259faac55b291863b4b12c6c637ce1c7fe3ecee12498bf9e01602da"
+    },
+    "1.0.30-update-help.txt": {
+      "bytes": 1116,
+      "sha256": "7bb1d51de2040e0db7adf34389e7f04d71ebbd278002e583fbcaca6e9084f38c"
+    },
+    "native-rollback-report.json": {
+      "bytes": 16204,
+      "sha256": "779a84bbbed3c66f39efeef792d3edf554c97b976633fe1526410e067dd35ebe"
+    },
+    "source-tree-current.json": {
+      "bytes": 1235998,
+      "sha256": "9567e6fa541945491e596b746a5454748aa5f98d6a400841a74caf92906df376"
+    },
+    "crates__codegen__xai-grok-shell__src__config__mod.rs": {
+      "bytes": 81755,
+      "sha256": "71495f3624c984089f931ea8f313b3207e3f46f2ab126c9f3e6f027e0c411bf0"
+    },
+    "channel-stable.txt": {
+      "bytes": 6,
+      "sha256": "f793c92fb1aa67f65ee5a281b7acc0c7976cc29ec06ae255060d8027a0cf6855"
+    },
+    "binary-download.json": {
+      "bytes": 394,
+      "sha256": "fb28839fa1235c97dd5283a4e981e9922595ab1479a7bc08d3a51504925d7617"
+    },
+    "1.0.34-agent-help.txt": {
+      "bytes": 583,
+      "sha256": "3c3fe7911c3a8d5194c498914d99765bc9aff273af06cf647b38096fa5193bff"
+    },
+    "channel-alpha.txt": {
+      "bytes": 6,
+      "sha256": "e591605acbab3fb074dcf9a31387ab360e463c165289c968d338c55558bb019b"
+    },
+    "1.0.30-version.txt": {
+      "bytes": 27,
+      "sha256": "ceb4a133084eecd646214f39f259e22f18de71ecc1cd0154a336db2de608fc72"
+    },
+    "install.sh": {
+      "bytes": 19501,
+      "sha256": "7fd6fdc75d9418b2e58356726fcbf1ae849416f773925da07d0ccc7a60d3e791"
+    },
+    "recent-source-commits.json": {
+      "bytes": 154905,
+      "sha256": "2558c4191917e6b3b03786dc18705b00463d220b099f7abce89136ab494afbc2"
+    },
+    "plain-native-update-once.py": {
+      "bytes": 2740,
+      "sha256": "115744221ea188a52407e239d19d390363b4c4441001d0c8525c3276e68194a8"
+    },
+    "crates__codegen__xai-grok-update__src__auto_update.rs": {
+      "bytes": 103768,
+      "sha256": "39dab79cff54b7f300b8b697e6658afcf24cee8fe95f27c3f2c44e26ded853a2"
+    },
+    "plain-native-update-audit-private-root.json": {
+      "bytes": 221,
+      "sha256": "e2d264f062f33749f071a9d1b93dfa9955651ec13fe44fc07c7c3aa9fa999fde"
+    },
+    "482711333c7195dc16a272777f86086d615e2afb-SOURCE_REV": {
+      "bytes": 41,
+      "sha256": "f42d40d90d620527204dd41d9a0bb4a585d69dc8525ad5e81633f33a83c7d6e4"
+    },
+    "grok-1.0.34-macos-aarch64": {
+      "bytes": 143016096,
+      "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"
+    },
+    "json-probe-runs.json": {
+      "bytes": 2230,
+      "sha256": "e8e33bc4894a477c99548ac28c4a76e2edce7e5ffb936914022edc0479a3a202"
+    },
+    "native-update-once.py": {
+      "bytes": 2775,
+      "sha256": "32d02f8aff70dd93600b149097d7ad714bba0bbf4254c09c30cda94839c69ba2"
+    },
+    "crates__codegen__xai-grok-update__src__version_policy.rs": {
+      "bytes": 6963,
+      "sha256": "9223a0291110e20bec944473083890be58650d2d2606f642a130ab5dc23205bf"
+    },
+    "cleanup.json": {
+      "bytes": 407,
+      "sha256": "341945425a526bc47d2eedeccf7279ea62c5489c26b5b2280dda0d4f128b00df"
+    },
+    "config-semantic-deltas.json": {
+      "bytes": 1778,
+      "sha256": "25cc46e04b9e1080e17de7cf0ab6387c3990be74a898eda82c8d791e28f3f28c"
+    },
+    "config-env-static-literals.json": {
+      "bytes": 1555,
+      "sha256": "4a441b50b1cfb04a955edbf304193149cd9ece259e7c297a46e30a97b9b386d9"
+    },
+    "crates__codegen__xai-grok-pager-bin__src__main.rs": {
+      "bytes": 154860,
+      "sha256": "ba785e7e8c7f1049e45f09ac183dc37ef6b9fc5b427632e40701b06a79a2791e"
+    },
+    "source-downloads.json": {
+      "bytes": 2530,
+      "sha256": "eef9b2d3b179d7e8bdddd0a17e487c788912b41543f32a85191c8953ecaff68b"
+    },
+    "install.ps1": {
+      "bytes": 20660,
+      "sha256": "bf436b7638042f93af10b074d6a66ce15712d4a1cdd35864fc373ef3e1f22764"
+    },
+    "native-plain-report.json": {
+      "bytes": 9640,
+      "sha256": "d7e51b1c9813560490f32cd27aab2e1160857788353ce9e7cb31230a32c35890"
+    },
+    "help-runs.json": {
+      "bytes": 2087,
+      "sha256": "ab65124614fc49139e289861aef7da8e0ffcaaf000081da9d8820d874dd1fd41"
+    },
+    "1.0.34-version-json.stdout": {
+      "bytes": 63,
+      "sha256": "d5c8392fba1321124d1ffef84242b214b5d6e575cd48520bf6e7564251699ad7"
+    },
+    "1.0.30-version-help.txt": {
+      "bytes": 644,
+      "sha256": "74430b91d43b182ae50d89e6b94bbb8d2691ab783f2cbf15b08832bd86520111"
+    },
+    "1.0.34-update-help.txt": {
+      "bytes": 1116,
+      "sha256": "7bb1d51de2040e0db7adf34389e7f04d71ebbd278002e583fbcaca6e9084f38c"
+    },
+    "crates__codegen__xai-grok-config__src__lib.rs": {
+      "bytes": 3964,
+      "sha256": "840b90bc40a74e7813bed4a3e09a8670db3c53f59c511cc16bf17ea3077f4605"
+    },
+    "1.0.34-version-help.txt": {
+      "bytes": 644,
+      "sha256": "74430b91d43b182ae50d89e6b94bbb8d2691ab783f2cbf15b08832bd86520111"
+    },
+    "crates__codegen__xai-grok-pager__src__app__cli.rs": {
+      "bytes": 60686,
+      "sha256": "bd614658c9a20922497951d98e2e49f2a4c94bc247389ee79b39b0d00728022e"
+    },
+    "1.0.30-update-check-json.stdout": {
+      "bytes": 150,
+      "sha256": "0a33bb750e354de210ec2db29bcad74825165c0d3c4c82525c19567504f63337"
+    },
+    "1.0.30-version-json.stdout": {
+      "bytes": 63,
+      "sha256": "b12cbc1ab4bdabef6c0f699d5d205177f739d2151da4c5cc1ba6e0a92fea9e25"
+    },
+    "1.0.34-update-check-json.stdout": {
+      "bytes": 151,
+      "sha256": "0ae38a54af0f8dda84ca61a55af8cbfcd5aad2bce11de7ee7860807252d867ab"
+    },
+    "crates__codegen__xai-grok-config__src__paths.rs": {
+      "bytes": 14679,
+      "sha256": "87870fd5436f0504d313abba97a515c6a5eb2736470a46288d30b6d4c689bf1e"
+    },
+    "crates__codegen__xai-grok-shell__src__util__config__mod.rs": {
+      "bytes": 1210,
+      "sha256": "0b12b9fcdfec023dc6e248c7e48a12a6a919ecb88a41e28c70915a830569cce2"
+    },
+    "cross-platform-artifact-head.json": {
+      "bytes": 1274,
+      "sha256": "ab56a28daf6f96f12a2ef44989ab80ab6a473d92959d7767526b03cd22c10d89"
+    },
+    "env_overlay.rs": {
+      "bytes": 9584,
+      "sha256": "7f931fb9f84665710bb92d320a04076d42929cde5fe6d78609073e1ea39678bc"
+    },
+    "crates__codegen__xai-grok-pager__src__lib.rs": {
+      "bytes": 1669,
+      "sha256": "5925dabc45bf802170e52fc39cb0a1d4e33308c8fc3638b2b99bb9a3928fbd57"
+    },
+    "37949780c144e37df692e3d669051a21fec24f20-SOURCE_REV": {
+      "bytes": 41,
+      "sha256": "b0b3cda00d11b0e08483b3a4fb64587ecfc4e231f98ebe4c0500cade2a338814"
+    },
+    "crates__codegen__xai-grok-shell__src__util__config__mcp.rs": {
+      "bytes": 116717,
+      "sha256": "cb932bb36287e1b6bb8b6c56768328fc05a8d88a79f59041896ec01afa2316d6"
+    },
+    "1.0.30-update-check-json.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "1.0.30-version-json.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "SOURCE_REV": {
+      "bytes": 41,
+      "sha256": "c548cf3a5fa05d0e5494744945ef2085cb2448aab8dd01ac27789c3fe1569f7f"
+    },
+    "version-current.rs": {
+      "bytes": 32315,
+      "sha256": "0710544a30112232a73d1e923a931d7770a90105813a6bcef26224c12c066bff"
+    },
+    "crates__codegen__xai-grok-update__src__lib.rs": {
+      "bytes": 292,
+      "sha256": "a9048d5900a6b990c22515da68964d428a241c628bf405bf5a61cb5ab2311959"
+    },
+    "1.0.34-update-check-json.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "1.0.34-version.txt": {
+      "bytes": 27,
+      "sha256": "34807d59091bbc899d421df24805715310ffeeda8b606e2bc885acf223f9d2e0"
+    },
+    "xai-dirs-lib.rs": {
+      "bytes": 5846,
+      "sha256": "b047017fd856744eeee09fecb6abc38399982c82ecac0c42572e372ee53df665"
+    },
+    "grok-1.0.34-macos-aarch64.gz": {
+      "bytes": 60670915,
+      "sha256": "0eb941ff9379d6921dd119b1751f49cc16d138a50766f7dd58a35304706e3511"
+    },
+    "final-cleanup.json": {
+      "bytes": 799,
+      "sha256": "a210041bdabb0ded89ab8814ecf9fe922950dc581876a8f081b37c30d9f9993f"
+    },
+    "1.0.34-version-json.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "crates__codegen__xai-grok-tools__src__util__grok_home.rs": {
+      "bytes": 155,
+      "sha256": "96ee465c34a07d3c8385cb2c8f38da379ad9948ba28230150ba0d75551863f63"
+    },
+    "codesign.json": {
+      "bytes": 1193,
+      "sha256": "31f3c400af43a9dd832c487b65fcda70196ec2e26b1710ebfe4df75302a26223"
+    },
+    "github-latest.json": {
+      "bytes": 6657,
+      "sha256": "d5636b2b2fcc52bfcc9d06d0c60816c7063e56e7c5cb38c4fbfcdacfa9f18181"
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "base_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "8854e80cd9e60a6e2efdae4bd42cb7791882226976ea7e6cb0ceab0f01afa74e",
+  "gates": [
+    {
+      "module": "claude_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 11,
+      "skipped": 0,
+      "wall_seconds": 0.15,
+      "log_sha256": "35d445869885a7533fedf3011984d5862a5c027dc9a4482e28e0d6a5925ded2b"
+    },
+    {
+      "module": "claude_profile_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_profile_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 7,
+      "skipped": 0,
+      "wall_seconds": 0.109,
+      "log_sha256": "a2ad38f54219e4e31c7ffc3a64d6955b0bdda6c2a3251c1a66814d362e4a8c07"
+    },
+    {
+      "module": "claude_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 56,
+      "skipped": 0,
+      "wall_seconds": 0.18,
+      "log_sha256": "3aa62f4bebf1da9e15788d6587cb4c0d7832c9c9d19472c16de039c263cc320c"
+    },
+    {
+      "module": "claude_batch_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 25,
+      "skipped": 0,
+      "wall_seconds": 0.138,
+      "log_sha256": "bb679bd1b7f46f0b81a4c601b879d0b14f1a7509eb91a7e94422e2c77c45ae9e"
+    },
+    {
+      "module": "claude_approval_cancel_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_approval_cancel_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 33,
+      "skipped": 0,
+      "wall_seconds": 0.162,
+      "log_sha256": "cb9e8fac7c6f021a6f3d74374d3c18f89f768bac62730700f7ffb819adb59d33"
+    },
+    {
+      "module": "claude_image_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 25,
+      "skipped": 0,
+      "wall_seconds": 0.118,
+      "log_sha256": "8f32e737311911bb2a8383fdb6c168740d860760a432c7a5b6454d3f1d53e10e"
+    },
+    {
+      "module": "claude_managed_image_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 20,
+      "skipped": 0,
+      "wall_seconds": 0.152,
+      "log_sha256": "2d650d2b492cd81662b88d9f6fa0640e7a9bbcdc8742e07ae9c691c958c74e66"
+    },
+    {
+      "module": "codex_source_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/codex_source_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 11,
+      "skipped": 0,
+      "wall_seconds": 0.324,
+      "log_sha256": "93112f0ddefa2df27ced85ca15eff27e2502085ecaa3beae1121871d46e408ee"
+    },
+    {
+      "module": "grok_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 13,
+      "skipped": 0,
+      "wall_seconds": 0.127,
+      "log_sha256": "a467d816e382aad11b6cf5cc8b46af5f80103032e3a25617b3a47fd092de4280"
+    },
+    {
+      "module": "grok_coordinator_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 27,
+      "skipped": 0,
+      "wall_seconds": 0.215,
+      "log_sha256": "8aace67cab0b2b7e2fcc8fb07fc92a6f613f429c33192886f689cbbd1e152154"
+    },
+    {
+      "module": "grok_official_adapter_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 19,
+      "skipped": 0,
+      "wall_seconds": 2.164,
+      "log_sha256": "6ffd983a79008c446913c9d8a5d0275e7999847940160e71266c54258be84f98"
+    },
+    {
+      "module": "grok_sdk_origin_probe_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 108,
+      "skipped": 0,
+      "wall_seconds": 0.779,
+      "log_sha256": "f66a3df45d18e7d54f5742a2857edd330873e57957f3a4221de001f4698397c8"
+    },
+    {
+      "module": "grok_official_pty_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 20,
+      "skipped": 0,
+      "wall_seconds": 0.137,
+      "log_sha256": "180642eab3f60aaa863bf817248a8eff52b973804d39427a513748b0d0f11950"
+    },
+    {
+      "module": "prepare_codex_cli_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/prepare_codex_cli_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 27,
+      "skipped": 0,
+      "wall_seconds": 0.274,
+      "log_sha256": "c5f86bfafb4089df10e5084c562c30401a7b2f78e509d7d014fb0e6441cba1f2"
+    },
+    {
+      "module": "grok_policy_preflight_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 57,
+      "skipped": 0,
+      "wall_seconds": 0.185,
+      "log_sha256": "dddd97c567e08506b0f514d8f5b97e206b09a0452a04e4958a11f82ac47ad4b8"
+    },
+    {
+      "module": "installed_grok_hook_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/installed_grok_hook_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 6,
+      "skipped": 0,
+      "wall_seconds": 0.688,
+      "log_sha256": "f692c0d6830dddbff05c54760a812e3a279156f34491c522311c058d1148d0d8"
+    },
+    {
+      "module": "grok_native_tool_lease_runner_tests.py",
+      "argv": [
+        "python3",
+        "-B",
+        "script/cli-agent-parity/grok_native_tool_lease_runner_tests.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 13,
+      "skipped": 0,
+      "wall_seconds": 0.115,
+      "log_sha256": "29fb8167544e0e5ba0c6c439a079a1bd83142b125142469b61dbf1488f6750ce"
+    }
+  ],
+  "all_passed": true,
+  "total_tests": 478
+}

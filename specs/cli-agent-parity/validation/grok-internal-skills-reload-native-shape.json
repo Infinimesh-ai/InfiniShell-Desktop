@@ -1,0 +1,183 @@
+{
+  "authenticate_count": 0,
+  "authentication_copied_or_read": false,
+  "business_acceptance_passed": false,
+  "cleanup_failure": null,
+  "credential_shape_scan": {
+    "pattern_count": 6,
+    "results": [
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      },
+      {
+        "decoded_matches": 0,
+        "serialized_matches": 0
+      }
+    ]
+  },
+  "driver_sha256": "aab1f5b5706f2cb04e4f012d40007cc9480ef619f5741ac8e1ae9cb438741a5b",
+  "elapsed_seconds": 52.632,
+  "environment_names": [
+    "GROK_DISABLE_AUTOUPDATER",
+    "GROK_HOME",
+    "HOME",
+    "LANG",
+    "PATH",
+    "TMPDIR",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME"
+  ],
+  "first_failure": "internal_maintenance_shape_not_observed",
+  "fixture_removed": true,
+  "fixture_root": "/private/tmp/igks-09a5za_y",
+  "fixture_root_mode": "0700",
+  "frame_limit": 128,
+  "frames": [
+    {
+      "bytes": 3556,
+      "id": {
+        "type": "integer"
+      },
+      "index": 1,
+      "jsonrpc_2_0": true,
+      "kind": "initialize_response",
+      "method": {
+        "type": "absent"
+      },
+      "protocol_version_1": true,
+      "reported_agent_version_matches": true,
+      "sha256": "0d0636df903cfa342750009b6f8f5234dcfb7052f189f7b6df1a3382d0829287",
+      "type": "object"
+    },
+    {
+      "bytes": 81,
+      "id": {
+        "type": "absent"
+      },
+      "index": 2,
+      "jsonrpc_2_0": true,
+      "kind": "known_closed_empty_global_mcp_catalog",
+      "method": {
+        "bytes": 25,
+        "sha256": "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580",
+        "type": "string"
+      },
+      "sha256": "7258a3cb4ca91d18c9d17a22cfc6791a820b4858d65574e5b6a3906c7249ee55",
+      "type": "object"
+    }
+  ],
+  "initialize_count": 1,
+  "initialize_verified": true,
+  "native_argv": [
+    "agent",
+    "--no-leader",
+    "stdio"
+  ],
+  "native_model_inputs": 0,
+  "native_process": {
+    "cleanup": true,
+    "exit_code": 143,
+    "owned_group_absent": true,
+    "returncode": 143,
+    "signals_sent": [
+      "SIGTERM"
+    ],
+    "stderr_bytes": 0,
+    "stderr_eof": true,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_bytes": 3639,
+    "stdout_eof": true,
+    "stdout_sha256": "1106407018a9e438f349f26001eed6305f8b45ceb05a2d56b3472ef8f9d6f4a9",
+    "termination_signal": null
+  },
+  "native_sha256_expected": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "native_sha256_post": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "native_sha256_pre": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "native_sha256_stable": true,
+  "native_version_expected": "1.0.30",
+  "outbound_methods": [
+    "initialize"
+  ],
+  "production_source_changed": false,
+  "raw_protocol_saved": false,
+  "raw_stderr_saved": false,
+  "sandbox_canary": {
+    "observed_fixed_errno": {
+      "public_user_home_open": 1,
+      "tcp": 1,
+      "udp": 1,
+      "unix": 1
+    },
+    "passed": true,
+    "process": {
+      "budget_exceeded": false,
+      "cleanup": true,
+      "exit_code": 0,
+      "owned_group_absent": true,
+      "returncode": 0,
+      "signals_sent": [],
+      "stderr_bytes": 144,
+      "stderr_eof": true,
+      "stderr_sha256": "32b0827c40b6eb0de200806950b6e5070fe0cc2efe1d36cc736015195f309aaa",
+      "stdout_bytes": 60,
+      "stdout_eof": true,
+      "stdout_sha256": "103fa91b5eb2564dd0ba398d4bf21c929dc35d24afbfad96e826c360e9a79058",
+      "termination_signal": null
+    }
+  },
+  "sandbox_no_network_exceptions": true,
+  "sandbox_original_login_directory_read_denied": true,
+  "sandbox_profile_sha256": "e8ea998c3fc1d7d8188ea02a101c5f0b415600f4cda6c0aea1f5ed45655f238b",
+  "sandbox_user_home_read_denied_except_fixed_binary": true,
+  "schema_version": 1,
+  "scope": "fixed_native_internal_skills_maintenance_shape_only",
+  "session_load_count": 0,
+  "session_new_count": 0,
+  "shape_observed": false,
+  "source_snapshot_native_mapping_verified": false,
+  "started_at_utc": "2026-09-17T19:30:21Z",
+  "status": "FAILED",
+  "stdout_limit_bytes": 65536,
+  "synthetic_skill_file_bytes": 117,
+  "synthetic_skill_file_sha256": "ed7926904ba643e42d430e29f8fd4f1b5368972ea5858aa7be4f9aa334eb0ea5",
+  "synthetic_skill_write_count": 1,
+  "unknown_frame_count": 0,
+  "version_check": {
+    "bytes": 27,
+    "matches_expected": true,
+    "process": {
+      "budget_exceeded": false,
+      "cleanup": true,
+      "exit_code": 0,
+      "owned_group_absent": true,
+      "returncode": 0,
+      "signals_sent": [],
+      "stderr_bytes": 0,
+      "stderr_eof": true,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_bytes": 27,
+      "stdout_eof": true,
+      "stdout_sha256": "ceb4a133084eecd646214f39f259e22f18de71ecc1cd0154a336db2de608fc72",
+      "termination_signal": null
+    },
+    "sha256": "ceb4a133084eecd646214f39f259e22f18de71ecc1cd0154a336db2de608fc72"
+  }
+}

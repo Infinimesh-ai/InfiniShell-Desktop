@@ -1,0 +1,235 @@
+{
+  "schema_version": 1,
+  "record_kind": "grok_policy_auth_handshake_fix",
+  "source_provenance": "根代理已核对生产认证顺序；本代理只修改并验证四份授权探针源码，不宣称旧rpc_error根因",
+  "candidate_status": "主树局部候选；尚未统一冻结、Rust门禁、原生复验或同一实际修改提交验证",
+  "previous_native_failures_preserved": true,
+  "source31_frozen_tree_read_or_modified": false,
+  "shared_target_read_or_modified": false,
+  "sources": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_live_tests.rs",
+      "bytes": 41027,
+      "sha256": "302ba464fab97dbc6d080d3141b63f7bb6ebda665e78a0c2d0583995533fd49c",
+      "before_sha256": "ec0092a963b0c08e54d9e23604cf4b84899cbb1f304a3f61f75d13ac726ac0fd",
+      "static_diff": {
+        "before_lines": 1046,
+        "after_lines": 1098,
+        "inserted_lines": 63,
+        "deleted_lines": 11,
+        "before_sha256": "ec0092a963b0c08e54d9e23604cf4b84899cbb1f304a3f61f75d13ac726ac0fd"
+      },
+      "trailing_whitespace_lines": [],
+      "conflict_marker_lines": []
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs",
+      "bytes": 39896,
+      "sha256": "9dbcf4395a8a2680faa26ea19440499e99c59dc31e86283104618602f03e8289",
+      "before_sha256": "9a1a678d77366e128b9ad1aa1c23a21c9b06c25c2811e5c554f04d993e0e33ef",
+      "static_diff": {
+        "before_lines": 781,
+        "after_lines": 1060,
+        "inserted_lines": 284,
+        "deleted_lines": 5,
+        "before_sha256": "9a1a678d77366e128b9ad1aa1c23a21c9b06c25c2811e5c554f04d993e0e33ef"
+      },
+      "trailing_whitespace_lines": [],
+      "conflict_marker_lines": []
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_policy_preflight.py",
+      "bytes": 37344,
+      "sha256": "076b66fe60d4fe731c4221841960613a89803199c75e0edbd0b4bae05bbd42d6",
+      "before_sha256": "952253d7c132034c247a5735f6ce8f0aa4505f44b7045a6b6ca45804fe7fe275",
+      "static_diff": {
+        "before_lines": 600,
+        "after_lines": 611,
+        "inserted_lines": 15,
+        "deleted_lines": 4,
+        "before_sha256": "952253d7c132034c247a5735f6ce8f0aa4505f44b7045a6b6ca45804fe7fe275"
+      },
+      "trailing_whitespace_lines": [],
+      "conflict_marker_lines": []
+    },
+    {
+      "path": "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+      "bytes": 41587,
+      "sha256": "02be78ae5e0c4c490bd0ff0699f1962a4847e273112a13cea34edc31aed0e2da",
+      "before_sha256": "1bb6bb34bc6065e26fefd44d735239900f733ad41faf3e321d58e5c1038eda36",
+      "static_diff": {
+        "before_lines": 588,
+        "after_lines": 711,
+        "inserted_lines": 127,
+        "deleted_lines": 4,
+        "before_sha256": "1bb6bb34bc6065e26fefd44d735239900f733ad41faf3e321d58e5c1038eda36"
+      },
+      "trailing_whitespace_lines": [],
+      "conflict_marker_lines": []
+    }
+  ],
+  "protocol": {
+    "methods": [
+      "initialize",
+      "authenticate",
+      "session/new",
+      "session/load",
+      "x.ai/session/info",
+      "x.ai/session/state",
+      "x.ai/mcp/list",
+      "x.ai/debug/agent"
+    ],
+    "new_phase": [
+      "initialize",
+      "authenticate",
+      "session/new",
+      "x.ai/session/info",
+      "x.ai/session/state",
+      "x.ai/mcp/list",
+      "x.ai/debug/agent"
+    ],
+    "resume_phase": [
+      "initialize",
+      "authenticate",
+      "session/load",
+      "x.ai/session/info",
+      "x.ai/session/state",
+      "x.ai/mcp/list",
+      "x.ai/debug/agent"
+    ],
+    "max_protocol_requests": 14,
+    "max_processes": 2,
+    "max_native_inputs": 0,
+    "authentication_selection": "仅当前initialize唯一公布的精确cached_token",
+    "authentication_params": {
+      "methodId": "cached_token",
+      "_meta": {
+        "headless": true
+      }
+    },
+    "auth_result_binds_session": false,
+    "auth_result_proves_permission_ceiling": false,
+    "auth_result_consumes_new_or_load_pending": false,
+    "public_event": {
+      "event": "auth_method_selected",
+      "fields": [
+        "generation",
+        "method_id",
+        "advertised",
+        "headless"
+      ],
+      "method_id": "cached_token",
+      "advertised": true,
+      "headless": true
+    },
+    "unchanged_network_limits": {
+      "max_tls_connections": 16,
+      "max_tls_bytes": 8388608,
+      "max_deadline_seconds": 360,
+      "official_hosts": [
+        "auth.x.ai",
+        "cli-chat-proxy.grok.com"
+      ]
+    },
+    "policy_status": "unknown",
+    "no_api_key_or_interactive_fallback": true
+  },
+  "verification": {
+    "python": {
+      "argv": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "grok_policy_preflight_runner_tests"
+      ],
+      "cwd": "script/cli-agent-parity",
+      "tests": 51,
+      "passed": 51,
+      "failed": 0,
+      "skipped": 0,
+      "unittest_internal_seconds": 0.066,
+      "exit_code": 0,
+      "source": "本代理真实执行工具结果",
+      "new_tests": 10,
+      "initial_run": {
+        "tests": 51,
+        "passed": 50,
+        "failed": 1,
+        "seconds": 0.066,
+        "reason": "新增乱序响应测试错误预期；实际安全拒绝为response_uncorrelated，仅修正测试预期后重验"
+      }
+    },
+    "rustfmt": {
+      "argv": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "app/src/ai/cli_agent_runtime/grok_policy_preflight_live_tests.rs",
+        "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs"
+      ],
+      "exit_code": 0,
+      "compiled": false
+    },
+    "rust_tests": {
+      "new_tests": 10,
+      "file_total": 50,
+      "executed": false,
+      "cargo_run": false
+    },
+    "static_diffcheck": {
+      "performed": true,
+      "used_git": false,
+      "scope": "四份授权源码，改前公开源码与当前字节",
+      "trailing_whitespace_count": 0,
+      "conflict_marker_count": 0,
+      "python_ast_parse_files": 2
+    },
+    "real_cli_run": false,
+    "native_retry": false,
+    "network_request": false,
+    "gui_verification": false,
+    "cross_platform_verification": false,
+    "same_modified_commit_verified": false
+  },
+  "localization": {
+    "product_copy_changed": false,
+    "conclusion": "无需本地化变更"
+  },
+  "credential_scan": {
+    "scope": "仅本次两份新公共记录，不读取或扫描用户配置与认证值",
+    "classes": [
+      "api_key",
+      "jwt",
+      "bearer",
+      "private_key",
+      "credential_assignment",
+      "email"
+    ],
+    "serialized_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "decoded_string_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "passed": true,
+    "final_records_rechecked": true
+  },
+  "document": {
+    "path": "specs/cli-agent-parity/GROK_POLICY_AUTH_HANDSHAKE_FIX.md",
+    "bytes": 3286,
+    "sha256": "df31b12118c0781b3746651e20ece3230af155a68a7e30680c24d188cc62d813"
+  }
+}

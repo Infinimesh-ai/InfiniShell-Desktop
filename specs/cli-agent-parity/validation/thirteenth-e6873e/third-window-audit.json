@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "phase": "third_window",
+  "sealed_at_utc": "2026-09-17T19:44:59.000300+00:00",
+  "final": true,
+  "terminal_observed": true,
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "run_id": 35263203530,
+  "workflow": "cross-platform-preflight.yml",
+  "expected_and_actual_head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+  "head_sha_exact": true,
+  "checkpoint_result": "PASS",
+  "full_workspace_tests": false,
+  "full_workspace_result": "not_run",
+  "goal_complete": false,
+  "dispatch_attempt_count_total": 1,
+  "status_query_rounds_this_window": 1,
+  "api_reads_this_window": 2,
+  "first_query_earliest_at_utc": "2026-09-17T19:41:12.183109+00:00",
+  "first_actual_query_at_utc": "2026-09-17T19:42:30.456829+00:00",
+  "window_started_after_first_round_completed_at_utc": "2026-09-17T19:42:32.866992+00:00",
+  "window_deadline_utc": "2026-09-17T19:57:32.866992+00:00",
+  "stopped_reason": "terminal_observed",
+  "fourth_window_started": false,
+  "archive_auditor_independent_from_executor": false,
+  "execution_and_archiver_same_agent": true,
+  "sealed_nine_files_before": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_INITIAL_VERIFICATION.md",
+      "bytes": 4095,
+      "sha256": "7160eb4ebeb648b9a1b5d1a5a83136ce72e0a3822d1934c2b2ae88bc1c3b1af1",
+      "expected_sha256": "7160eb4ebeb648b9a1b5d1a5a83136ce72e0a3822d1934c2b2ae88bc1c3b1af1",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/runner-availability.json",
+      "bytes": 27687,
+      "sha256": "8d6715f4281149cb1fb8b23d77d632a7486ce4d11e93477f872af87c93746d54",
+      "expected_sha256": "8d6715f4281149cb1fb8b23d77d632a7486ce4d11e93477f872af87c93746d54",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-run.json",
+      "bytes": 4481,
+      "sha256": "bb93b8bda67307ca23ccf456bc06524ce6f2d15496644466bed6c5a3593c634e",
+      "expected_sha256": "bb93b8bda67307ca23ccf456bc06524ce6f2d15496644466bed6c5a3593c634e",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-jobs.json",
+      "bytes": 65637,
+      "sha256": "a272d41619c03fb20b316f779ada47df48be60b5582d64f4fdb30a41a1e15e87",
+      "expected_sha256": "a272d41619c03fb20b316f779ada47df48be60b5582d64f4fdb30a41a1e15e87",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-audit.json",
+      "bytes": 7756,
+      "sha256": "4eb0c673a8d248c035be231351251ee11777414a935a181d069e8b12b89f4a3d",
+      "expected_sha256": "4eb0c673a8d248c035be231351251ee11777414a935a181d069e8b12b89f4a3d",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/CI_13_FINAL_VERIFICATION.md",
+      "bytes": 3370,
+      "sha256": "f36d7d5d91a9915e7934edeceeb26255513754e294cd48d900a6791fc3026c75",
+      "expected_sha256": "f36d7d5d91a9915e7934edeceeb26255513754e294cd48d900a6791fc3026c75",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-run.json",
+      "bytes": 3872,
+      "sha256": "24211709bf947c31b48e40ef90cd542c7d174733b543ff98e022ac1dab7cf6f4",
+      "expected_sha256": "24211709bf947c31b48e40ef90cd542c7d174733b543ff98e022ac1dab7cf6f4",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-jobs.json",
+      "bytes": 69126,
+      "sha256": "9087855bf97b6828c1ab6eac68878827d1c829b86922b89e069ba112b9b35069",
+      "expected_sha256": "9087855bf97b6828c1ab6eac68878827d1c829b86922b89e069ba112b9b35069",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-audit.json",
+      "bytes": 5923,
+      "sha256": "012247af7e8f0ee4d3858f885158406068827c21f88afb136a93c7afe1a0237b",
+      "expected_sha256": "012247af7e8f0ee4d3858f885158406068827c21f88afb136a93c7afe1a0237b",
+      "unchanged": true
+    }
+  ],
+  "sealed_nine_files_after": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_INITIAL_VERIFICATION.md",
+      "bytes": 4095,
+      "sha256": "7160eb4ebeb648b9a1b5d1a5a83136ce72e0a3822d1934c2b2ae88bc1c3b1af1",
+      "expected_sha256": "7160eb4ebeb648b9a1b5d1a5a83136ce72e0a3822d1934c2b2ae88bc1c3b1af1",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/runner-availability.json",
+      "bytes": 27687,
+      "sha256": "8d6715f4281149cb1fb8b23d77d632a7486ce4d11e93477f872af87c93746d54",
+      "expected_sha256": "8d6715f4281149cb1fb8b23d77d632a7486ce4d11e93477f872af87c93746d54",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-run.json",
+      "bytes": 4481,
+      "sha256": "bb93b8bda67307ca23ccf456bc06524ce6f2d15496644466bed6c5a3593c634e",
+      "expected_sha256": "bb93b8bda67307ca23ccf456bc06524ce6f2d15496644466bed6c5a3593c634e",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-jobs.json",
+      "bytes": 65637,
+      "sha256": "a272d41619c03fb20b316f779ada47df48be60b5582d64f4fdb30a41a1e15e87",
+      "expected_sha256": "a272d41619c03fb20b316f779ada47df48be60b5582d64f4fdb30a41a1e15e87",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/initial-audit.json",
+      "bytes": 7756,
+      "sha256": "4eb0c673a8d248c035be231351251ee11777414a935a181d069e8b12b89f4a3d",
+      "expected_sha256": "4eb0c673a8d248c035be231351251ee11777414a935a181d069e8b12b89f4a3d",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/CI_13_FINAL_VERIFICATION.md",
+      "bytes": 3370,
+      "sha256": "f36d7d5d91a9915e7934edeceeb26255513754e294cd48d900a6791fc3026c75",
+      "expected_sha256": "f36d7d5d91a9915e7934edeceeb26255513754e294cd48d900a6791fc3026c75",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-run.json",
+      "bytes": 3872,
+      "sha256": "24211709bf947c31b48e40ef90cd542c7d174733b543ff98e022ac1dab7cf6f4",
+      "expected_sha256": "24211709bf947c31b48e40ef90cd542c7d174733b543ff98e022ac1dab7cf6f4",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-jobs.json",
+      "bytes": 69126,
+      "sha256": "9087855bf97b6828c1ab6eac68878827d1c829b86922b89e069ba112b9b35069",
+      "expected_sha256": "9087855bf97b6828c1ab6eac68878827d1c829b86922b89e069ba112b9b35069",
+      "unchanged": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/followup-audit.json",
+      "bytes": 5923,
+      "sha256": "012247af7e8f0ee4d3858f885158406068827c21f88afb136a93c7afe1a0237b",
+      "expected_sha256": "012247af7e8f0ee4d3858f885158406068827c21f88afb136a93c7afe1a0237b",
+      "unchanged": true
+    }
+  ],
+  "sealed_nine_files_all_unchanged": true,
+  "new_public_artifacts": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_THIRD_WINDOW_VERIFICATION.md",
+      "bytes": 4427,
+      "sha256": "7e7fc0830f63d3c88a8b5110acdd9b754881fadd0cafc71e1d566ed39e1c4a14"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/third-window-run.json",
+      "bytes": 2100,
+      "sha256": "125b3288dc5bb5559b39dd911390c4ff701e4c95bf14e97d0fed697c87a1731c"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/third-window-jobs.json",
+      "bytes": 25028,
+      "sha256": "32f4793efea784017190daa9497ec573ce0fedffc7a409fabc3f7dc12a79e8b8"
+    }
+  ],
+  "platform_results": [
+    {
+      "job_id": 105343794125,
+      "platform": "Linux x64",
+      "status": "completed",
+      "conclusion": "success",
+      "actual_head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+      "started_at": "2026-09-17T19:09:41Z",
+      "completed_at": "2026-09-17T19:38:33Z",
+      "api_step_count": 34,
+      "api_step_conclusion_counts": {
+        "success": 32,
+        "skipped": 2
+      },
+      "failed_steps": [],
+      "skipped_steps": [
+        {
+          "number": 29,
+          "name": "Compile GUI integration tests"
+        },
+        {
+          "number": 30,
+          "name": "Run desktop workspace unit tests"
+        }
+      ],
+      "individual_case_count": null,
+      "individual_case_status_not_inferred_from_step_group": true
+    },
+    {
+      "job_id": 105343794289,
+      "platform": "Windows x64",
+      "status": "completed",
+      "conclusion": "success",
+      "actual_head_sha": "e6873e2cbb12a12ffce0b8283ee2ac96b940da39",
+      "started_at": "2026-09-17T19:09:41Z",
+      "completed_at": "2026-09-17T19:42:00Z",
+      "api_step_count": 40,
+      "api_step_conclusion_counts": {
+        "success": 38,
+        "skipped": 2
+      },
+      "failed_steps": [],
+      "skipped_steps": [
+        {
+          "number": 35,
+          "name": "Compile GUI integration tests"
+        },
+        {
+          "number": 36,
+          "name": "Run desktop workspace unit tests"
+        }
+      ],
+      "individual_case_count": null,
+      "individual_case_status_not_inferred_from_step_group": true
+    }
+  ],
+  "terminal_log_attempts": [
+    {
+      "platform": "linux",
+      "job_id": 105343794125,
+      "method": "gh api job logs",
+      "attempt_count": 1,
+      "request_started_at_utc": "2026-09-17T19:42:59.791788+00:00",
+      "request_finished_at_utc": "2026-09-17T19:43:03.082940+00:00",
+      "exit_code": 1,
+      "timed_out": false,
+      "timeout_seconds": 45,
+      "file_byte_limit": 33554432,
+      "private_log": {
+        "path": "/private/tmp/infinishell-cli-parity-ci13-linux-third-terminal-job.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "private_stderr": {
+        "path": "/private/tmp/infinishell-cli-parity-ci13-linux-third-terminal-job.log.stderr",
+        "bytes": 99,
+        "sha256": "8b6407b2fdbca54bf3d53fb93e79a3560dbe59567fa5044cfee4bed1b5b6e467"
+      },
+      "owner_is_current_uid": true,
+      "regular_file": true,
+      "nlink": 1,
+      "mode": "0600",
+      "exclusive_no_follow_created": true,
+      "safe_error_category": "unclassified_gh_error",
+      "http_status": null,
+      "body_available": false,
+      "raw_stdout_not_public": true,
+      "raw_stderr_not_public": true,
+      "fallback_attempt_count": 0,
+      "fallback_reason": "job success，失败 job 专用 log-failed 后备不适用。",
+      "per_case_counts": null,
+      "safe_excerpts": []
+    },
+    {
+      "platform": "windows",
+      "job_id": 105343794289,
+      "method": "gh api job logs",
+      "attempt_count": 1,
+      "request_started_at_utc": "2026-09-17T19:42:59.792981+00:00",
+      "request_finished_at_utc": "2026-09-17T19:43:02.930951+00:00",
+      "exit_code": 1,
+      "timed_out": false,
+      "timeout_seconds": 45,
+      "file_byte_limit": 33554432,
+      "private_log": {
+        "path": "/private/tmp/infinishell-cli-parity-ci13-windows-third-terminal-job.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "private_stderr": {
+        "path": "/private/tmp/infinishell-cli-parity-ci13-windows-third-terminal-job.log.stderr",
+        "bytes": 99,
+        "sha256": "8b6407b2fdbca54bf3d53fb93e79a3560dbe59567fa5044cfee4bed1b5b6e467"
+      },
+      "owner_is_current_uid": true,
+      "regular_file": true,
+      "nlink": 1,
+      "mode": "0600",
+      "exclusive_no_follow_created": true,
+      "safe_error_category": "unclassified_gh_error",
+      "http_status": null,
+      "body_available": false,
+      "raw_stdout_not_public": true,
+      "raw_stderr_not_public": true,
+      "fallback_attempt_count": 0,
+      "fallback_reason": "job success，失败 job 专用 log-failed 后备不适用。",
+      "per_case_counts": null,
+      "safe_excerpts": []
+    }
+  ],
+  "raw_logs_committed": false,
+  "native_model_body_read_or_publicized": false,
+  "source_index_workflow_target_auth_modified": false,
+  "case_counts_unknown": true,
+  "case_counts_not_backfilled_from_local_reports": true,
+  "step_group_success_not_individual_case_proof": true,
+  "online_model_full_chain_verified": false,
+  "real_ssh_tmux_verified": false,
+  "real_gui_bilingual_layout_verified": false,
+  "ci11_ci12_failure_history_preserved": true,
+  "localization_change_needed": false,
+  "localization_note": "仅新增验证归档，无需本地化变更。",
+  "six_shape_scans": [
+    {
+      "path": "specs/cli-agent-parity/CI_13_THIRD_WINDOW_VERIFICATION.md",
+      "serialized_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_json_parse": "not_applicable",
+      "result": "PASS",
+      "not_exhaustive_secret_proof": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/third-window-run.json",
+      "serialized_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_json_parse": "PASS",
+      "result": "PASS",
+      "not_exhaustive_secret_proof": true
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/thirteenth-e6873e/third-window-jobs.json",
+      "serialized_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_shape_match_counts": {
+        "sk_api_key": 0,
+        "xai_api_key": 0,
+        "github_token": 0,
+        "bearer_token": 0,
+        "aws_access_key_id": 0,
+        "pem_private_key": 0
+      },
+      "decoded_json_parse": "PASS",
+      "result": "PASS",
+      "not_exhaustive_secret_proof": true
+    }
+  ],
+  "safe_diagnostic_limitation": "真实日志获取失败，gh 错误分类和 HTTP 状态未知；仅保留长度、SHA、退出码。",
+  "evidence_scope": "真实 run/jobs/steps API 的 selected full=false 检查点终态 success；不能替代最终 full=true、在线全链或未覆盖验收。"
+}

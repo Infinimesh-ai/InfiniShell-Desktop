@@ -1,0 +1,257 @@
+{
+  "observed_utc": "2026-09-17T18:50:38.431480+00:00",
+  "task": {
+    "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+    "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+    "generation": 6,
+    "revision": 2,
+    "state": "completed",
+    "result_bytes": 24,
+    "result_sha256": "aa232f12e542fe5aba492c754824282be674685ac8962fa2f15b46bdb6944c17",
+    "synthetic_markers": [
+      "GUI_GROK_APPEND_436CC739"
+    ],
+    "current_input": {
+      "message_id": "4fa7702e-37fe-4baf-98c5-b726b33b9a32",
+      "native_turn_id": "64715aef-c39f-4d53-9e71-cf3eaa0907a6",
+      "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+      "submission_generation": 5
+    },
+    "terminal": {
+      "outcome": "Completed",
+      "turn_id": "64715aef-c39f-4d53-9e71-cf3eaa0907a6",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "output_bytes": 24,
+      "output_sha256": "aa232f12e542fe5aba492c754824282be674685ac8962fa2f15b46bdb6944c17"
+    },
+    "native_turn_matches_current_input": true
+  },
+  "generations": [
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 1,
+      "revision": 6,
+      "state": "completed",
+      "result_bytes": 21,
+      "result_sha256": "969f4238cb5bd513f645a9cb572da629d654276f789f9317d08cea80ba4ff82d",
+      "synthetic_markers": [
+        "GUI_GROK_ONE_436CC739"
+      ],
+      "current_input": {
+        "message_id": "9ba0b079-a008-4988-b403-274cf2fd0e23",
+        "native_turn_id": "b5e23200-eb42-4339-87d6-021b81c61edf",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 1
+      },
+      "terminal": {
+        "outcome": "Completed",
+        "turn_id": "b5e23200-eb42-4339-87d6-021b81c61edf",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 21,
+        "output_sha256": "969f4238cb5bd513f645a9cb572da629d654276f789f9317d08cea80ba4ff82d"
+      },
+      "native_turn_matches_current_input": true
+    },
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 2,
+      "revision": 3,
+      "state": "completed",
+      "result_bytes": 43,
+      "result_sha256": "49b4e16a9219ea240a3a3700755cbc142c5c2d1aa353e42b1e225877ebfde72d",
+      "synthetic_markers": [
+        "GUI_GROK_ONE_436CC739",
+        "GUI_GROK_TWO_436CC739"
+      ],
+      "current_input": {
+        "message_id": "21c99283-ae5a-4000-9862-57e7d351c1f9",
+        "native_turn_id": "7d8532d0-794a-4e18-ad19-a5fd19f911b3",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 2
+      },
+      "terminal": {
+        "outcome": "Completed",
+        "turn_id": "7d8532d0-794a-4e18-ad19-a5fd19f911b3",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 43,
+        "output_sha256": "49b4e16a9219ea240a3a3700755cbc142c5c2d1aa353e42b1e225877ebfde72d"
+      },
+      "native_turn_matches_current_input": true
+    },
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 3,
+      "revision": 5,
+      "state": "completed",
+      "result_bytes": 74,
+      "result_sha256": "46d53e6214423a7fc73de241be3a7f74b1066f257d0a2086b9fe9d405d7d8abd",
+      "synthetic_markers": [
+        "GUI_GROK_ALLOW_DONE_436CC739"
+      ],
+      "current_input": {
+        "message_id": "1d0331a9-00c7-4d19-a407-53d411f21705",
+        "native_turn_id": "839ff075-cdaf-4d61-ac5d-1de07a0699b9",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 3
+      },
+      "terminal": {
+        "outcome": "Completed",
+        "turn_id": "839ff075-cdaf-4d61-ac5d-1de07a0699b9",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 74,
+        "output_sha256": "46d53e6214423a7fc73de241be3a7f74b1066f257d0a2086b9fe9d405d7d8abd"
+      },
+      "native_turn_matches_current_input": true
+    },
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 4,
+      "revision": 5,
+      "state": "cancelled",
+      "result_bytes": 58,
+      "result_sha256": "3744a4444ae20739a3c7d9dda053167344f9a8101e88c52ff62a156e7de2f31c",
+      "synthetic_markers": [],
+      "current_input": {
+        "message_id": "1d56fec4-749f-4977-8b94-87d03d75bd59",
+        "native_turn_id": "30792f00-998d-4975-b794-3a0891241f4d",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 4
+      },
+      "terminal": {
+        "outcome": "Cancelled",
+        "turn_id": "30792f00-998d-4975-b794-3a0891241f4d",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 58,
+        "output_sha256": "3744a4444ae20739a3c7d9dda053167344f9a8101e88c52ff62a156e7de2f31c"
+      },
+      "native_turn_matches_current_input": true
+    },
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 5,
+      "revision": 7,
+      "state": "cancelled",
+      "result_bytes": 58,
+      "result_sha256": "3744a4444ae20739a3c7d9dda053167344f9a8101e88c52ff62a156e7de2f31c",
+      "synthetic_markers": [],
+      "current_input": {
+        "message_id": "d3b2c00d-e180-4f79-9ee1-bcff9e09fd70",
+        "native_turn_id": "f8ffb814-e0bc-48ea-923a-81d3d6c8c117",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 5
+      },
+      "terminal": {
+        "outcome": "Cancelled",
+        "turn_id": "f8ffb814-e0bc-48ea-923a-81d3d6c8c117",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 58,
+        "output_sha256": "3744a4444ae20739a3c7d9dda053167344f9a8101e88c52ff62a156e7de2f31c"
+      },
+      "native_turn_matches_current_input": true
+    },
+    {
+      "task_id": "e48d0020-7629-4929-a75c-5c960ce2140c",
+      "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+      "generation": 6,
+      "revision": 2,
+      "state": "completed",
+      "result_bytes": 24,
+      "result_sha256": "aa232f12e542fe5aba492c754824282be674685ac8962fa2f15b46bdb6944c17",
+      "synthetic_markers": [
+        "GUI_GROK_APPEND_436CC739"
+      ],
+      "current_input": {
+        "message_id": "4fa7702e-37fe-4baf-98c5-b726b33b9a32",
+        "native_turn_id": "64715aef-c39f-4d53-9e71-cf3eaa0907a6",
+        "runtime_generation": "ac509932-3f99-44d9-b57d-f7d30d1c0ff1",
+        "submission_generation": 5
+      },
+      "terminal": {
+        "outcome": "Completed",
+        "turn_id": "64715aef-c39f-4d53-9e71-cf3eaa0907a6",
+        "native_session_id": "01a0b0a6-e037-7cc1-9fc8-9573baffe8a6",
+        "output_bytes": 24,
+        "output_sha256": "aa232f12e542fe5aba492c754824282be674685ac8962fa2f15b46bdb6944c17"
+      },
+      "native_turn_matches_current_input": true
+    }
+  ],
+  "messages": [
+    {
+      "sequence": 9,
+      "message_id": "9ba0b079-a008-4988-b403-274cf2fd0e23",
+      "sender_generation": 1,
+      "recipient_generation": 1,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "sequence": 10,
+      "message_id": "21c99283-ae5a-4000-9862-57e7d351c1f9",
+      "sender_generation": 2,
+      "recipient_generation": 2,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "sequence": 11,
+      "message_id": "1d0331a9-00c7-4d19-a407-53d411f21705",
+      "sender_generation": 3,
+      "recipient_generation": 3,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "sequence": 12,
+      "message_id": "1d56fec4-749f-4977-8b94-87d03d75bd59",
+      "sender_generation": 4,
+      "recipient_generation": 4,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "sequence": 13,
+      "message_id": "d3b2c00d-e180-4f79-9ee1-bcff9e09fd70",
+      "sender_generation": 5,
+      "recipient_generation": 5,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    },
+    {
+      "sequence": 14,
+      "message_id": "4fa7702e-37fe-4baf-98c5-b726b33b9a32",
+      "sender_generation": 5,
+      "recipient_generation": 5,
+      "state": "acknowledged",
+      "receipt_kind": "native_protocol"
+    }
+  ],
+  "files": [
+    {
+      "name": "gui-grok-approved.txt",
+      "exists": true,
+      "bytes": 26,
+      "sha256": "de2ce846b5c3e93ea6ddce4a7c187b3a3c9399a8d699b861b83e4710f3cb3851"
+    },
+    {
+      "name": "gui-grok-denied.txt",
+      "exists": true,
+      "bytes": 31,
+      "sha256": "36d67c532bbb91adbcc014e32275ba5d21bc0c5243ba70cac5bb6527c43848c3"
+    },
+    {
+      "name": "gui-grok-cancel.txt",
+      "exists": true,
+      "bytes": 33,
+      "sha256": "da1066b3e92c90bd1812729c96725e77e45d839f16d6a1b1d2bc66205c1db227"
+    }
+  ],
+  "read_only_exact_isolated_task": true,
+  "native_frame_replay_or_model_call": false,
+  "same_native_session_verified": true
+}

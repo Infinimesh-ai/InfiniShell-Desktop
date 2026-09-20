@@ -1,0 +1,55 @@
+{
+  "base_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "parent_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_input_count": 111,
+  "source_manifest_sha256": "dc0e5d39e4cde7b00a7a8f6ded8f27f2e86adcc0d74bd2b8e5517abfee2c4789",
+  "worktree_exact_seven_modified_paths_pre_post": true,
+  "gates_report_sha256": "9314ea82435463aec570cee347d7e4f3496746ab8b8751d45815b515bfeebcb0",
+  "python_report_sha256": "b8e48fdd3a525adf4c84f79a427d67bc2746ae0b10ff847f49b697c0b5e26006",
+  "test_binary_unchanged_after_main_build": true,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "sha256": "c4c1c54f805ebc8dbdd745a0702bd883960ac28d1c9efdb609cb785af6037ca0",
+    "bytes": 850320360,
+    "path_source": "actual_i18n_log"
+  },
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks,rust-embed/debug-embed"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 321.646,
+  "log_sha256": "911ec9d85dfcc1cf800136025b7cdc7e4da3ecfaa243f1ca1a03394c35294036",
+  "scope": "source31未提交七路径候选的main构建与嵌入资源；不包含随后插件迁移／权限探针握手修改，不计最终提交、CLI或平台通过。",
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 866049280,
+    "sha256": "5d0320978e1f8df4f88e8ee20fd78c3f925c31ec42aa0ac67d36f9f61db3bfa2"
+  },
+  "embedded_locale_resources": [
+    {
+      "locale": "en",
+      "bytes": 375007,
+      "sha256": "9e8110badc404c27a1b903dcf1be12e66b88313985b09d0215b1d9c7d864f183",
+      "exact_bytes_found_in_binary": true
+    },
+    {
+      "locale": "zh-CN",
+      "bytes": 361916,
+      "sha256": "e1201e56197f2100ff972b05d761ec6854934f9a2fc3777b68f9ec7d19a42720",
+      "exact_bytes_found_in_binary": true
+    }
+  ],
+  "locale_resources_immutable_in_binary": true,
+  "strict_signature_verification": {
+    "exit_code": 0,
+    "stdout_bytes": 0,
+    "stderr_bytes": 0,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

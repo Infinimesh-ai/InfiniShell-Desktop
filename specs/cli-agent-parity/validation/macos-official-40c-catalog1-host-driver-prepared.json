@@ -1,0 +1,81 @@
+{
+  "private_root": "/private/tmp/infinishell-cli-parity-40c-native-host-xogxu1pu/bound-40c",
+  "contract": {
+    "path": "/private/tmp/infinishell-cli-parity-40c-native-host-xogxu1pu/bound-40c/driver-contract.json",
+    "bytes": 45543,
+    "sha256": "cd9c3781846fb110be33a2fda1e7dbb97520b305d69246287ee23867380d97f2"
+  },
+  "driver": {
+    "path": "/private/tmp/infinishell-cli-parity-40c-native-host-xogxu1pu/bound-40c/host_driver.py",
+    "bytes": 20435,
+    "sha256": "778f01589ece25c1da7ffac6f81dad1e176858029ce31652b148b9a646019aed"
+  },
+  "entrypoints": [
+    {
+      "path": "/private/tmp/infinishell-cli-parity-official-40c-catalog1-host.py",
+      "bytes": 1395,
+      "sha256": "b46be6c9dbbc70cd9ba558530fd0ad90d50dc9d910dfda763fe73050a368a20b"
+    },
+    {
+      "path": "/private/tmp/infinishell-cli-parity-official-40c-files2-host.py",
+      "bytes": 1393,
+      "sha256": "81d79076deddd641d3d2d29dab91bbea2e5cbaca429ef70ccde39bc07a873046"
+    },
+    {
+      "path": "/private/tmp/infinishell-cli-parity-official-40c-child5-host.py",
+      "bytes": 1393,
+      "sha256": "54939f74ebbc4a7a96e97845f7fbcf1bc58a192a705aa7c1a84ee44bbc9eab5e"
+    }
+  ],
+  "source_label": "40c",
+  "production_source": "source40c",
+  "fixture_source": "source40c",
+  "mixed_source_artifact": false,
+  "same_frozen_source_verified": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "715f807e0b9d65791f4ce70b2ba706b8d2411db0a60e00283fd6fd23d1447f2a",
+  "script_files": 101,
+  "source_manifest_file_count": 204,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 855943192,
+    "sha256": "1965c2b965fb64abe0369dda87ae67255a7653720deb3e6e8496e383022bcbf8"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 868194640,
+    "sha256": "3c4a3db982704f102c3e077e5127cacd74537c1f7739f2cd21f3431ada0ff17a"
+  },
+  "grok": {
+    "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "bytes": 141869568,
+    "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+  },
+  "python": {
+    "path": "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/bin/python3.14",
+    "bytes": 34640,
+    "sha256": "4f00ea2ad53d62437a6a3946b73c73614a97e8accdc5b96dc095ea1a0d9c6a56"
+  },
+  "runtime_os_sandbox": false,
+  "native_network_budget_enforced": false,
+  "tls_budget_scope": "observed_configured_proxy_connections",
+  "models_requested": false,
+  "formal_names_reserved": false,
+  "test_binary_executed": false,
+  "default_action": "prepared",
+  "execute_flag": "--execute",
+  "cases": {
+    "catalog1-host": {
+      "input_cap": 0,
+      "deadline_seconds": 180
+    },
+    "files2-host": {
+      "input_cap": 6,
+      "deadline_seconds": 900
+    },
+    "child5-host": {
+      "input_cap": 6,
+      "deadline_seconds": 600
+    }
+  }
+}

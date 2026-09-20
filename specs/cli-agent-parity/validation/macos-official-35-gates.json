@@ -1,0 +1,116 @@
+{
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "db0b82ed6bd351189a4e54cefaf50c07cec40d64124fd9f8807ab11f407f265c",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 100.83,
+      "log_sha256": "435472de0cdca5426603e5c3572e56215ed14dc6028d7cb1411e5c34fb950133",
+      "log_bytes": 741
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 256.569,
+      "log_sha256": "22110e2a58c706aafbb3d2c9063234843204cf93563ea910275e1aca735a8898",
+      "log_bytes": 2259,
+      "summary": {
+        "passed": 11,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(ai::agent_sdk::driver::harness::) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::) | test(terminal::cli_agent_sessions::plugin_manager::grok::tests::) | test(ai::skills::) | test(terminal::input::skills::) | test(local_orchestration) | test(prompt_renderer)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 23.258,
+      "log_sha256": "1ce5193136d02f9859d086a06c84561f981e26b9f7999bbd790f537739495952",
+      "log_bytes": 246375,
+      "summary": {
+        "run": 1639,
+        "passed": 1639,
+        "skipped": 5352
+      },
+      "new_rust_test_pass_counts": {
+        "shared_orchestration_rejects_remote_fields_and_unverified_harnesses": 1,
+        "official_empty_session_model_metadata_preserves_new_and_load_transactions": 1,
+        "official_model_catalog_rejects_activity_identity_and_unbounded_metadata": 1,
+        "switching_to_grok_preserves_messages_without_inheriting_child_spawn_permission": 1,
+        "user_invocable_menu_policy_preserves_cli_differences": 1,
+        "shared_cli_skill_filter_hides_native_false_and_preserves_other_consumers": 1,
+        "descriptor_preserves_user_invocable_from_content": 1,
+        "official_reasoning_metadata_rejects_unbounded_or_non_string_extensions": 1,
+        "local_dispatch_preserves_grok_child_identity_and_keeps_parent_permission_gate": 1,
+        "grok_local_request_preserves_identity_without_claiming_shared_api_support": 1,
+        "restored_grok_permissions_keep_messages_but_cannot_reenable_saved_spawn_permission": 1,
+        "local_and_shared_parsers_preserve_claude_codex_launch_details": 1,
+        "local_harnesses_keep_child_limits_and_reject_identity_or_remote_overrides": 1
+      }
+    },
+    {
+      "name": "ai_skills",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "ai",
+        "--lib",
+        "-E",
+        "test(skills::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 37.529,
+      "log_sha256": "f80dcdea7729620dc476af18dde6e9ef948686250815ff37d6ec63dc8d503a2d",
+      "log_bytes": 13645,
+      "summary": {
+        "run": 66,
+        "passed": 66,
+        "skipped": 227
+      },
+      "new_rust_test_pass_counts": {
+        "user_invocable_preserves_yaml_types_and_invalid_values": 1,
+        "absent_user_invocable_does_not_read_body_or_nested_metadata": 1
+      }
+    }
+  ],
+  "all_passed": true,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 851470680,
+    "sha256": "c777131627b95d29ba949d725237d3417af9a543c2bb15750ca995d6852caddd"
+  }
+}

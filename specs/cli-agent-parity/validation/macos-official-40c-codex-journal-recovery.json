@@ -1,0 +1,69 @@
+{
+  "status": "completed",
+  "passed": true,
+  "test_binary_sha256": "1965c2b965fb64abe0369dda87ae67255a7653720deb3e6e8496e383022bcbf8",
+  "source_manifest_sha256": "715f807e0b9d65791f4ce70b2ba706b8d2411db0a60e00283fd6fd23d1447f2a",
+  "platform": "posix",
+  "rows": [
+    {
+      "step": 0,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-mx3g0_6q",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 3,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-nqhm3tzw",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 4,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-act9jajw",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 1,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-93q5q5hk",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 5,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-6kavezw6",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 2,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-o4rzmdf8",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    },
+    {
+      "step": 6,
+      "workspace": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-codex-journal-crash-bhhianb7",
+      "passed": true,
+      "termination_method": "SIGKILL",
+      "killed_exit_code": -9,
+      "recovery_exit_code": 0
+    }
+  ],
+  "native_cli_executed": false,
+  "credentials_read": false,
+  "power_loss_verified": false,
+  "bound_materials_unchanged": true
+}

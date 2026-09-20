@@ -1,0 +1,61 @@
+{
+  "events": [
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "auth.x.ai"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_connect_attempt",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_opened",
+      "host": "cli-chat-proxy.grok.com"
+    },
+    {
+      "event": "official_tunnel_io_failed",
+      "host": "cli-chat-proxy.grok.com"
+    }
+  ],
+  "tls_connections_attempted": 6,
+  "tls_bytes": 313937,
+  "http_model_calls_observable": false,
+  "tls_budget_scope": "observed_configured_proxy_connections",
+  "native_network_budget_enforced": false
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "source": "40c",
+  "source_manifest_sha256": "715f807e0b9d65791f4ce70b2ba706b8d2411db0a60e00283fd6fd23d1447f2a",
+  "source_binary_sha256": "3c4a3db982704f102c3e077e5127cacd74537c1f7739f2cd21f3431ada0ff17a",
+  "resigned_binary_sha256": "437163b19a39ea15b35671ea0036e243cf2b51000c2012371b7a9eca51257df9",
+  "same_commit_verified": false,
+  "full_parity_verified": false,
+  "observations": {
+    "plain_grok_toolbar_visible": true,
+    "compound_cd_and_grok_toolbar_visible": false,
+    "native_plugin_installed": false,
+    "enter_keeps_rich_draft": true,
+    "automatic_pty_submit_observed": false,
+    "explicit_copy_roundtrip_exact": true,
+    "copy_draft_includes_chinese_multiline_and_appended_ascii": true,
+    "english_toast_expandable_and_complete": true,
+    "chinese_toast_clipped_without_expand_button": true,
+    "language_switch_hint_remained_cached_english": true,
+    "bilingual_layout_passed": false,
+    "native_prompts_submitted_in_ui": 0,
+    "model_network_zero_verified": false
+  },
+  "cleanup": {
+    "global_cli_configuration_count": 7,
+    "global_cli_configurations_unchanged": true,
+    "private_app_processes_remaining": [],
+    "private_native_sessions_remaining": 0,
+    "private_auth_removed": true,
+    "original_auth_stat_unchanged": true
+  },
+  "automation_boundary": {
+    "post_quit_accessibility_query_relaunched_app": true,
+    "relaunched_with_private_environment": false,
+    "native_cli_started_after_relaunch": false,
+    "user_config_changed_by_app_startup_verified": false,
+    "subsequent_action": "仅关闭重启的应用；以进程查询确认结束，不再查询已关闭应用的可访问性树"
+  },
+  "limitations": [
+    "普通 Grok 富输入仍为显式复制降级，未验证自动提交或完整生命周期。",
+    "历史文件摘要不证明模型请求数。",
+    "中文截断和切换后缓存提示不计为双语布局通过。",
+    "默认环境重启事件之后未执行 CLI；已核对7个全局CLI配置不变，未声称整个应用配置未写入。"
+  ],
+  "screenshots": {
+    "01-en-manual-hint.png": {
+      "bytes": 81510,
+      "sha256": "cb03a0963218cb3fffba8ca280f6cc8016cc6b5cdfdf0865bd2fdeac25a7fc79"
+    },
+    "02-en-draft-before-submit.png": {
+      "bytes": 82801,
+      "sha256": "2c9ed901a8de2fb7c54ca1574fbc4e76d9d1c6c6ce324bc3e118a812227383c6"
+    },
+    "03-en-copy-required.png": {
+      "bytes": 92938,
+      "sha256": "bb45b8cea4f13fbf6762e64853b1da923dec5ec79fa580dd8d9c28e5b0eababf"
+    },
+    "04-en-expanded-hint.png": {
+      "bytes": 82904,
+      "sha256": "c0fcd27f660f5fa915d396a9786b5e08606d8177ca635c2de6a2b9e653252972"
+    },
+    "05-en-copy-click-draft-kept.png": {
+      "bytes": 94622,
+      "sha256": "221dab682fe6fa64e741aea72b19fb8ae4d27d6f499e9d8f99ff1466abe6b366"
+    },
+    "06-en-copy-roundtrip.png": {
+      "bytes": 83807,
+      "sha256": "130c5dea8c7b2241a7e85f7990b1608d98056884d97ec4acbd2cc4d07d87eb92"
+    },
+    "07-zh-copy-required.png": {
+      "bytes": 91624,
+      "sha256": "382caad2095076bb8e4ab5e4b44d235190daefa65a88c92c4c456fb340f3a2a5"
+    },
+    "08-zh-manual-hint.png": {
+      "bytes": 81584,
+      "sha256": "52074ca33bd6302e0b3cd71bcc2472c831c58a06531e882c910e208c24c28b5c"
+    }
+  }
+}

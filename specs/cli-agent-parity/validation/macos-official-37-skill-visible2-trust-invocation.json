@@ -1,0 +1,66 @@
+{
+  "case": "source37-skill-visible2-trust",
+  "status": "completed",
+  "plan_sha256": "668ff1500657465967442630a896778c03b62dce6934f2b12c34d846be4292f1",
+  "driver_sha256": "fe3b3ac14060bf107a30fa178bf4ba5af11a52016855b205ddada612a70beef6",
+  "production_source": "source37",
+  "fixture_source": "source38 trust-only Python overlay",
+  "same_commit_verified": false,
+  "source38_product_verified": false,
+  "source_manifest_sha256": "415908767190975f76b0a81ced2ab7a7ad2cca5bde610a748c7f474128e7faf8",
+  "source_manifest_files": 177,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 853646680,
+    "sha256": "7f2d4d1cb063b545c6b733d6eb28ffc378d2c605fac51708d42a9069edee29df"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 867651408,
+    "sha256": "83b5e2af482cdc7494a2437fbbf98c0982bd0f33bb68774dd5ac9438311c0df7"
+  },
+  "trust_patch_sha256": "653ab7052542e7eaa9ebd1eac19ea118d1d4d9d970a14ec28ed6d0ddac06b355",
+  "overlays": {
+    "script/cli-agent-parity/run_grok_native_skill.py": "5ba196f32cfcdb3ac71cfe56616fa14cb7cf15ade1b928f040454803381b224d",
+    "script/cli-agent-parity/grok_native_skill_runner_tests.py": "2a2090d86c8c3fd5f1fb952ce4f6e2ceb6bbed6d1ba17b11bd81346c8e2e71eb"
+  },
+  "model_input_budget": 1,
+  "synthetic_project_trust_requested": true,
+  "project_trust_scope": "synthetic_project_only",
+  "trust_store_scope": "private_home_only",
+  "source37_inputs_and_binaries_prechecked": true,
+  "native_invocation_count": 1,
+  "actual_argv_adds_trust": true,
+  "approval_allowlist_changed": false,
+  "sentinel_in_input": false,
+  "runner_pid": 15933,
+  "native_result": {
+    "case_passed": true,
+    "native_skill_expansion_verified": true,
+    "boundary_passed": true,
+    "private_auth_copy_removed": true,
+    "test_exit_code": 0,
+    "project_snapshot_unchanged": true
+  },
+  "source37_inputs_binaries_fixture_and_old_evidence_unchanged": true,
+  "exit_code": 0,
+  "wall_seconds": 11.957,
+  "public_artifacts": {
+    "infinishell-cli-parity-official-37-skill-visible2-trust-events.ndjson": {
+      "bytes": 1133,
+      "sha256": "d0a8413fd0c4733d6f63745897a9c6e4f945b936802bee59acec2c16c0f5764c"
+    },
+    "infinishell-cli-parity-official-37-skill-visible2-trust-events.metadata.json": {
+      "bytes": 2776,
+      "sha256": "d23febe030a41705eff4432f3c869789fd350105071706869cdbb7d030037205"
+    },
+    "infinishell-cli-parity-official-37-skill-visible2-trust-events.network.json": {
+      "bytes": 11937,
+      "sha256": "716c772cbd7d71444e5fb5da11e7631048a4be45a493a4f78c4834b955481b29"
+    },
+    "infinishell-cli-parity-official-37-skill-visible2-trust-catalog.safe.json": {
+      "bytes": 853,
+      "sha256": "19d5ff4f48c2b0416c4e4bc4487ef897d855d5ca2a3039c484f22e4cf8923a33"
+    }
+  }
+}

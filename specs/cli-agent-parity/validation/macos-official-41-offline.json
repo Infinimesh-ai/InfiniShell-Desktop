@@ -1,0 +1,29 @@
+{
+  "source": "41",
+  "source_manifest_sha256": "a73bf864ea6488c3bb150a3457299de65e4df1109321c67d3cf35cd4a8ea3a9d",
+  "groups": [
+    {
+      "name": "windows-claude",
+      "exit_code": 0,
+      "wall_seconds": 0.207,
+      "log_sha256": "c7e00b80163cf41e560ca0cb0fef9a3c27b41da0ca7afc396e65dc583d306645",
+      "summary": [
+        "Ran 24 tests in 0.058s",
+        "OK"
+      ]
+    },
+    {
+      "name": "host-driver",
+      "exit_code": 0,
+      "wall_seconds": 0.115,
+      "log_sha256": "426baa54de946914d9396ddd5b5fa52313551ddec84a970d2e8d8a2265867409",
+      "summary": [
+        "Ran 11 tests in 0.019s",
+        "OK"
+      ]
+    }
+  ],
+  "all_passed": true,
+  "native_cli_run": false,
+  "host_driver_first_run_failure": "旧source40源码文本断言未随新标签更新；已改为source_prefix(41)输出断言，未修改生产保护"
+}

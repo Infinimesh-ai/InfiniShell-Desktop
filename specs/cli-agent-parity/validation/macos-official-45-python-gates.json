@@ -1,0 +1,126 @@
+{
+  "source_manifest_sha256": "8f19bb52ac6b019618dd3fa79be5c05108d8be9cec9b0b54483c6334b955e2f5",
+  "gates": [
+    {
+      "name": "prepare_codex_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.489,
+      "log_sha256": "57ce556ef5215a4fbde106e584234214e7f4ac25775c00f4fa8da3751180e503",
+      "summary": [
+        "Ran 44 tests in 0.379s",
+        "OK"
+      ]
+    },
+    {
+      "name": "verify_cli_autoupdate_tests",
+      "exit_code": 0,
+      "seconds": 0.281,
+      "log_sha256": "5c471ec38f7f3e45925a8430055a4dd70db2a453edf5697cebd9ce14f4a6f597",
+      "summary": [
+        "Ran 22 tests in 0.185s",
+        "OK"
+      ]
+    },
+    {
+      "name": "prepare_grok_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.147,
+      "log_sha256": "afe33b7203828aec153280b76aca72fa1d8bb68cac5c418ff36a47b94d254641",
+      "summary": [
+        "Ran 19 tests in 0.047s",
+        "OK"
+      ]
+    },
+    {
+      "name": "prepare_claude_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.127,
+      "log_sha256": "fe2a4d391c48bdc7e95df1f7d0137c7a495cf650b3bbe4052b6f0cbe2cbe84fb",
+      "summary": [
+        "Ran 10 tests in 0.022s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_adapter_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.13,
+      "log_sha256": "3b82a5edb3bd49215f35f4dc7214845621b4788fb7d7ded298f1465ff900db15",
+      "summary": [
+        "Ran 14 tests in 0.027s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_coordinator_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.236,
+      "log_sha256": "562933420fad41460c3c4fe50fc25f6ad3ce237c5388fad8108f64639c2417c9",
+      "summary": [
+        "Ran 60 tests in 0.120s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_approval_cancel_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.161,
+      "log_sha256": "2623e640d65bd9d5e64693a9ad4448bc7369774158d3cbda933373ab97fc6f8f",
+      "summary": [
+        "Ran 36 tests in 0.041s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_batch_cancel_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.137,
+      "log_sha256": "fbba6b3c9193aa2a1886510a5e2b118b0815e217c435afccb4aef6b7fc451d28",
+      "summary": [
+        "Ran 28 tests in 0.028s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_image_probe_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.127,
+      "log_sha256": "4e40e3da3cff3f8f81ab8f7deaa7f69ed3500aac9698c2eb2fd2b42a85f9aeab",
+      "summary": [
+        "Ran 25 tests in 0.016s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_managed_image_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.155,
+      "log_sha256": "5f0db96303476ed8d595595dc9013fbd190be0351b55a7bca455788cf3efb9a7",
+      "summary": [
+        "Ran 20 tests in 0.040s",
+        "OK"
+      ]
+    },
+    {
+      "name": "claude_profile_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.116,
+      "log_sha256": "ceea5e339bfb84b2653af263ee2fe0a0e2de2bfaed2f3efd00a6d42b42fde502",
+      "summary": [
+        "Ran 10 tests in 0.011s",
+        "OK"
+      ]
+    },
+    {
+      "name": "grok_native_p0_probe_tests",
+      "exit_code": 0,
+      "seconds": 0.542,
+      "log_sha256": "31f0ed8539a71a4dc9b59c7df02dd2258e976fc963f0b5316b50f37276c67b49",
+      "summary": [
+        "Ran 33 tests in 0.412s",
+        "OK"
+      ]
+    }
+  ],
+  "all_passed": true
+}

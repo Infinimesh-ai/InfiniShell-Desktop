@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "source": "45",
+  "case": "profile",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "8f19bb52ac6b019618dd3fa79be5c05108d8be9cec9b0b54483c6334b955e2f5",
+  "gates_sha256": "d744a12e4b4d08218120847f28b0a249a6834b794c602310a775f8096be24037",
+  "bundle_sha256": "6d630d73b00985b6d88f093c72005958ca400e0433e74dcc7d7036c76e969575",
+  "cli_sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+  "max_native_inputs": 5,
+  "automatic_retry": false,
+  "runner_exit_code": 1,
+  "wall_seconds": 8.324,
+  "source_and_binaries_unchanged": true,
+  "metadata": {
+    "acceptance_passed": false,
+    "test_exit_code": 101,
+    "cli_version": "2.1.278 (Claude Code)",
+    "requested_cli_version": "2.1.278",
+    "project_settings_unchanged": true,
+    "cli_binary_unchanged": true,
+    "app_restart_and_ui_verified": false,
+    "parent_permission_ceiling_verified": false,
+    "filesystem_sandbox_verified": false,
+    "same_turn_steering_supported": false,
+    "native_credential_files_read_or_copied": false
+  },
+  "artifacts": [
+    {
+      "name": "invocation.json",
+      "bytes": 2206,
+      "sha256": "0b3666c0961cfa37fd4c46467cc3b59dcb6d712b9ae6052a4e2106784bea9835"
+    },
+    {
+      "name": "runner.log",
+      "bytes": 261,
+      "sha256": "1c69c956a220755df1df82fd31b8ec5688e019b4d8cb9c835b94b6c5ded5c53a"
+    },
+    {
+      "name": "claude-278-profile1.ndjson",
+      "bytes": 727,
+      "sha256": "8d88b194ca25710565c55485ae6bfe145d5b7b8fe7715c6f677f0020d6fd751b"
+    },
+    {
+      "name": "claude-278-profile1.metadata.json",
+      "bytes": 2164,
+      "sha256": "1e2f280e2d3db2d82f333204a94bbe2a0c9f4f7cc38c57b4eb8db9ec8c2bb8e1"
+    },
+    {
+      "name": "claude-278-profile1.test-output.txt",
+      "bytes": 966,
+      "sha256": "66a526519b782dda5141ad61558f20db2ca166d5a48e7eedcef26aeab67ae016"
+    }
+  ],
+  "detached_descendants_verified": false
+}

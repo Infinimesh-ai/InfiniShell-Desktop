@@ -1,0 +1,32 @@
+{
+  "observed_utc": "2026-09-17T19:00:39.237883+00:00",
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "old_processes_gone": {
+    "23649": false,
+    "23652": true,
+    "27776": true,
+    "23659": true
+  },
+  "old_process_states": {
+    "23649": "Z",
+    "23652": "absent",
+    "27776": "absent",
+    "23659": "absent"
+  },
+  "old_recorded_processes_inactive": {
+    "23649": true,
+    "23652": true,
+    "27776": true,
+    "23659": true
+  },
+  "old_process_exit_codes_observed": false,
+  "normal_exit_requested_via_gui": true,
+  "new_app_pid": 31783,
+  "same_app_home_and_data_profile": true,
+  "same_native_home_and_project": true,
+  "official_tunnel_reused": true,
+  "api_environment_inherited": false,
+  "auth_values_parsed_or_recorded": false,
+  "native_inputs_sent_by_restart_script": 0
+}

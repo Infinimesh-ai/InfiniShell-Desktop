@@ -1,0 +1,17 @@
+[
+  {
+    "name": "gui-grok-approved.txt",
+    "bytes": 26,
+    "sha256": "7857aa507dea8e88e0382e7eed1a7c215bc35f2acc27a0e0535c82a8b1e12a93"
+  },
+  {
+    "name": "gui-grok-denied.txt",
+    "bytes": 31,
+    "sha256": "36d67c532bbb91adbcc014e32275ba5d21bc0c5243ba70cac5bb6527c43848c3"
+  },
+  {
+    "name": "gui-grok-cancel.txt",
+    "bytes": 33,
+    "sha256": "da1066b3e92c90bd1812729c96725e77e45d839f16d6a1b1d2bc66205c1db227"
+  }
+]

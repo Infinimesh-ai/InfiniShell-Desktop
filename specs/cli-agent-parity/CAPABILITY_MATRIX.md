@@ -1,5 +1,7 @@
 # CLI 能力矩阵
 
+> **最终状态（2026-09-21）**：Goal 已完成。最终代码 SHA `38a611773b8ee53860f9ab731b2476b9a40d1819` 的 macOS、Linux、Windows 门禁和独立 SSH／tmux 收据均已收口；共同能力已对齐，上游差异及明确降级继续保留。详见 [最终验收](FINAL_20260921_CLI_PARITY.md)。下文阶段性缺口只描述各历史快照。
+
 阶段性收尾与新会话入口：[2026-09-19 续接交接](HANDOFF_20260919_CLI_PARITY.md)。source56 已统一 Claude 固定策略的受支持版本判定，并以官方 2.1.278 完成固定策略恢复、真实父子派发／双向 ACK／结果回收、运行批量取消和待编辑审批取消；原父子失败与验收脚本误判均保留。Grok 1.0.34 P0 生产链、GUI 原生读取审批及本机 SSH／tmux worker已按各自快照通过；最终 Goal 仍未完成。
 [自动升级与最新版当前验证](OFFICIAL_42_AUTOUPDATE_VERIFICATION.md)：source50 同源测试程序与签名监督程序已通过 Claude 2.1.278 Latest → Stable 2.1.267、反向 Stable → Latest 及同版本渠道同步；source56 又补齐最新版固定权限、父子和两类取消原生链，并通过启用托管任务 feature 的签名 GUI 核对官方 2.1.278 检出、固定审批入口及双语布局。整个 source56 尚无 GUI 任务运行／重启或 Linux／Windows 复验，不能回填为最终同提交通过。Codex／Grok 已有渠道结果、最新版协议任务链、完整工作区及最终跨平台仍按各自证据边界继续验收。
 

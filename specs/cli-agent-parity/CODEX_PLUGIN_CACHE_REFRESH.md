@@ -52,7 +52,7 @@ SSH 手动包必须携带相同完整来源和迁移规则，不能继续把仅�
 
 ## 实现与并发边界
 
-`codex_source.rs` 与导出包 `codex_persistent_source.py` 已按上述暂存方案接入。Unix 下完整来源还核对受测模式位；Windows 不把 Unix 模式位当作已验证原生权限语义。事务记录在实际步骤后更新 prepared/cache_written/configuration_written/verified 或 rolled_back/needs_review，记录只作诊断，不能授权重放。目标比较明确区分缺失项与空表，并比较带类型的 TOML 值；原生序列化新增空格不应被误报成配置漂移。合法普通表和内联表均保留支持，父表或目标启用字段类型非法时预检返回错误，不进入索引写入。GUI 配置写入仅修改 `marketplaces.codex-warp` 和目标插件的 `enabled` 字段，重新读取最新文档并保留无关修改和注释。标准库手动包由原生 CLI 在私有副本上生成完整 TOML，核对只有相同限定字段发生语义变化；真实提交要求整份输入仍相同，其他并发更新会拒绝提交。恢复时同样必须匹配本操作写入后的确切字节，不能整份盲覆旧配置。
+`codex_source.rs` 与导出包 `codex_persistent_source.py` 已按上述暂存方案接入。Unix 下完整来源还核对受测模式位；Windows 不把 Unix 模式位当作已验证原生权限语义。事务记录在实际步骤后更新 prepared/cache_written/configuration_written/verified 或 rolled_back/needs_review，旧无版本记录只作诊断，不能授权重放。后续 Rust 候选新增版本化 journal 和每 HOME 文件锁，恢复必须逐项核对固定来源、缓存与备份摘要、带类型的限定 TOML 作用域及实际文件位置；不以 phase 字符串单独授权。旧已完成记录只保留，旧未完成或用户变更明确拒绝；已精确安装则返回，不再调用原生 add。标准库手动 Python 安装器仍保持原边界。目标比较明确区分缺失项与空表，并比较带类型的 TOML 值；原生序列化新增空格不应被误报成配置漂移。合法普通表和内联表均保留支持，父表或目标启用字段类型非法时预检返回错误，不进入索引写入。GUI 配置写入仅修改 `marketplaces.codex-warp` 和目标插件的 `enabled` 字段，重新读取最新文档并保留无关修改和注释。标准库手动包由原生 CLI 在私有副本上生成完整 TOML，核对只有相同限定字段发生语义变化；真实提交要求整份输入仍相同，其他并发更新会拒绝提交。恢复时同样必须匹配本操作写入后的确切字节，不能整份盲覆旧配置。
 
 两条路径都使用“读后比较 + 原子 rename”，并非操作系统提供的原子 compare-and-swap。其他不协作进程在最后比较与 rename 之间写配置，仍存在极窄竞态；不宣称完全消除跨进程写入窗口。固定官方 [config manager](https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/app-server/src/config_manager_service.rs#L276) 的 `config/batchWrite expectedVersion` 也只在加载 user layer 时检查，随后 [ConfigEditsBuilder](https://github.com/openai/codex/blob/be6e8eac029b183056b7e4402879f15d2c85f61b/codex-rs/core/src/config/edit.rs#L727) 重新读取并原子写文件，没有可复用的跨进程锁或真正 CAS，因此没有引入额外 app-server 平台去声称解决该问题。
 
@@ -75,3 +75,7 @@ SSH 手动包必须携带相同完整来源和迁移规则，不能继续把仅�
 - cache-only 对照必须同时观察完整上游缓存树和固定 `last_revision`；固定源码先发布 revision，再刷新缓存，这不是用 sleep 代替发布证据。原生协议异常优先保留，收尾异常单独记录；任何失败保留私有目录，不再盲删活跃文件。所有验证完成后删除目录若失败，探针仍失败并保存清理诊断。
 
 本机运行 `python3 -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v`：12 项中 11 项通过，1 项 Windows 原生 Job 测试跳过。后者在目标平台实际启动私有 Python 父子进程，让子进程继承 stdout/stderr 并保持一个无法删除的文件；确认根 EOF 自然退出、子进程被本探针回收、Job 清空、读取到 EOF 后文件可删除。它不替代真实 Codex 来源重启探针；本次修正的 Windows 实际结果仍待后续同提交 CI。无需本地化变更。
+
+## 安装中断恢复候选
+
+source39 后新增 Rust 11项文件状态回归及两个 ignored进程夹具；`run_codex_journal_recovery.py` 绑定真实编译测试库和源码清单摘要，只在显式执行时于7个窗口强杀测试进程，再由新进程恢复。驱动4项离线边界测试通过，实际Rust强杀尚未执行。不是原生CLI或模型验收；Windows只有文件同步，没有目录断电持久性保证。未知缓存／备份／用户禁用或配置变更不被覆盖。

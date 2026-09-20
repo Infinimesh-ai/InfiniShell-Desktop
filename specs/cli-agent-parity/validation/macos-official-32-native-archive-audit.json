@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "scope": "source32_main_and_two_native_probe_public_archive",
+  "base_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "source_manifest_sha256": "bd9b16f9debe9dd1038e8203e64b3f4205f21203fea781850aff1a092de89998",
+  "same_commit_verified": false,
+  "dirty_candidate": true,
+  "source_input_count": 119,
+  "changed_source_count": 18,
+  "files": [
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-bundle.json",
+      "bytes": 3142,
+      "sha256": "7bdc1647407a6b139fd55cad053e7d69bdf667b1d5c472bbc7f0b33b763a59df",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-precheck.json",
+      "bytes": 3568,
+      "sha256": "c6044adc26d4de8800c668c95ae65b84c20cdaf8692fc0d7ffbd63a3f7ca1375",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-invocation.json",
+      "bytes": 5372,
+      "sha256": "e29688ac9d56ff9bc690ac4fc7a3aca490ee8742e1874838122d435c1deef548",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-postcheck.json",
+      "bytes": 2901,
+      "sha256": "18e4307709183cc1700790f86e531865da77b9b396ce96897a0acae04dd10326",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-events.ndjson",
+      "bytes": 24699,
+      "sha256": "4267caa4ee6b149ef899fa8f4b5a7a62719e95262013639a5554cf7eb3d23842",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 31
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-metadata.json",
+      "bytes": 6391,
+      "sha256": "1cff1439caf9c2b3df000687286eda0e3704de450646b6d14f2e7b514b832ce2",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-sdk12-network.json",
+      "bytes": 8425,
+      "sha256": "25e182801dffb158fa300fd19ca75fb7345fbb17201520496869f681645cec18",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-precheck.json",
+      "bytes": 1509,
+      "sha256": "2d98a314b21f867cc5679c04a1ffd0905037331ac345b41456a5f35d16d27fce",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-invocation.json",
+      "bytes": 4046,
+      "sha256": "dc66aa0472b4dc09fd00b6ca92748375e5217a5a3cb7be1fbb553a317038b456",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-postcheck.json",
+      "bytes": 1267,
+      "sha256": "10ba2a400ed4982959c7610119245286ba9f62cea91cb4a001000b77600d2f2c",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-events.ndjson",
+      "bytes": 3600,
+      "sha256": "add3d636b20e59bebf82692bc1ec7f93cbc265c9946ae4dc18ab7c89ab6c4a6c",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 14
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-metadata.json",
+      "bytes": 3731,
+      "sha256": "efd8a5871ec68a00e59341a0db37b0f6d07d023575db0ab4820ee0cf9fc8e8e9",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-32-policy4-network.json",
+      "bytes": 177,
+      "sha256": "c9520e70ace01d5aa79ae2d236f2b091fc181cbb769f71905360ead53fcdfda3",
+      "strict_json_passed": true,
+      "serialized_and_decoded_credential_shapes_zero": true,
+      "record_count": 1
+    }
+  ],
+  "source_and_public_artifact_postchecks_passed": true,
+  "private_logs_read_or_copied": false,
+  "private_native_envelopes_read_or_copied": false,
+  "credential_bodies_read_or_copied_by_archiver": false,
+  "cli_or_model_reexecuted": false,
+  "sdk12_probe_passed": false,
+  "policy4_probe_passed": false,
+  "goal_complete": false
+}

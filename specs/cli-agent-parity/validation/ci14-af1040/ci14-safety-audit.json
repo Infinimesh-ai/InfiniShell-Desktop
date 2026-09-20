@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "method": "显式字段投影后，复核字段类型、提交/版本、禁止正文键和敏感值模式；报告内容人工复核。",
+  "checks": {
+    "no_raw_output_or_event_keys": true,
+    "no_local_absolute_paths": true,
+    "no_detected_credential_value_patterns": true,
+    "no_original_artifact_bodies_copied": true,
+    "all_source_artifact_files_hash_recorded": true,
+    "failure_and_unverified_boundaries_preserved": true,
+    "no_root_workspace_writes": true
+  },
+  "checked_files": [
+    {
+      "file": "CI_14_FINAL_VERIFICATION.md",
+      "bytes": 2319,
+      "sha256": "299164e45c409442aa47f96119c36dafe0b5ebaec858bb9511bb3889134481c4"
+    },
+    {
+      "file": "ci14-final-verification.safe.json",
+      "bytes": 38294,
+      "sha256": "c4c6169a6c8116750df0f96c8d60fa20d93cd2cfe83bed452b353a4287acbae6"
+    },
+    {
+      "file": "ci14-source-artifacts.sha256.json",
+      "bytes": 10944,
+      "sha256": "867e5f75a6b5eb294cf307069ab149d3258a25be67ae51549f25410bb687718c"
+    }
+  ],
+  "limitations": [
+    "模式扫描不是普遍无秘密证明；安全性主要来自本次只输出允许字段、只对原件记录摘要。",
+    "原始下载产物留在交付目录以外，交付时只取 deliverable 子目录。",
+    "没有将 CI14 后续私有补丁当作已在该提交或 Windows 验证。"
+  ]
+}

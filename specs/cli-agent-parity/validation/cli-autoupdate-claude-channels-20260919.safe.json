@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "completed_at": "2026-09-19T10:25:47.131811+00:00",
+  "scope": {
+    "platform": "macOS arm64",
+    "synthetic_home_only": true,
+    "credentials_provided": false,
+    "model_inputs": 0,
+    "protocol_sessions_started": 0,
+    "actual_mutating_cli_commands": 5,
+    "each_case_invocations": 1,
+    "user_global_install_modified": false,
+    "cargo_executed": false
+  },
+  "cases": [
+    {
+      "case": "00-install-273",
+      "argv": [
+        "<isolated-native-claude>",
+        "install",
+        "2.1.273"
+      ],
+      "started_at": "2026-09-19T10:17:48.968989+00:00",
+      "finished_at": "2026-09-19T10:17:59.605100+00:00",
+      "exit_code": 0,
+      "timed_out": false,
+      "actual_version_output": "2.1.273 (Claude Code)",
+      "version_exit_code": 0,
+      "model_inputs": 0,
+      "settings_channel_before": null,
+      "settings_channel_after": null,
+      "settings_bytes_unchanged": true,
+      "permissions_unchanged": true,
+      "other_settings_semantically_unchanged": true,
+      "effective_global_existed_before": false,
+      "effective_global_bytes_unchanged": false,
+      "legacy_global_bytes_unchanged": true,
+      "changed_paths": [
+        ".claude/.claude.json",
+        ".claude/backups/.claude.json.backup.1789813069132",
+        ".local/bin/claude",
+        ".local/share/claude/versions/2.1.273"
+      ],
+      "existing_versions_preserved": [],
+      "stdout_sha256": "4c1b8145991704f3f30fa0cea7476b873a50a51303697f53e0e56dbf4fe02905",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot_before_sha256": "c3a84e7730af130099fb3191cc56ed5ba6768ab5663c11e1d1c3d513c9975c89",
+      "snapshot_after_sha256": "95be55a36475cac9ce97664ca0c43fa23e567b475c5d782caac30c805da8a20f"
+    },
+    {
+      "case": "01-settings-latest-update",
+      "argv": [
+        "<isolated-native-claude>",
+        "--settings",
+        "{\"autoUpdatesChannel\":\"latest\"}",
+        "update"
+      ],
+      "started_at": "2026-09-19T10:18:44.015621+00:00",
+      "finished_at": "2026-09-19T10:18:55.605997+00:00",
+      "exit_code": 0,
+      "timed_out": false,
+      "actual_version_output": "2.1.278 (Claude Code)",
+      "version_exit_code": 0,
+      "model_inputs": 0,
+      "settings_channel_before": "stable",
+      "settings_channel_after": "stable",
+      "settings_bytes_unchanged": true,
+      "permissions_unchanged": true,
+      "other_settings_semantically_unchanged": true,
+      "effective_global_existed_before": true,
+      "effective_global_bytes_unchanged": true,
+      "legacy_global_bytes_unchanged": true,
+      "changed_paths": [
+        ".local/bin/claude",
+        ".local/share/claude/versions/2.1.278"
+      ],
+      "existing_versions_preserved": [
+        {
+          "version": "2.1.273",
+          "unchanged": true,
+          "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"
+        }
+      ],
+      "stdout_sha256": "38b813bbde99193df875c1a8181a09a57dbb228c4c41c2e40de051e9de562c8c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot_before_sha256": "11f9d4d9844aa899df2024f02f562900a5bff44e76afd010f21dcc128856270b",
+      "snapshot_after_sha256": "94e77a8b3dcb377f109a742e5f8ee4e272ee49ecd2f45464e5fe2dfcd0c7687a"
+    },
+    {
+      "case": "02-settings-stable-update",
+      "argv": [
+        "<isolated-native-claude>",
+        "--settings",
+        "{\"autoUpdatesChannel\":\"stable\"}",
+        "update"
+      ],
+      "started_at": "2026-09-19T10:19:39.398730+00:00",
+      "finished_at": "2026-09-19T10:19:50.894270+00:00",
+      "exit_code": 0,
+      "timed_out": false,
+      "actual_version_output": "2.1.267 (Claude Code)",
+      "version_exit_code": 0,
+      "model_inputs": 0,
+      "settings_channel_before": "latest",
+      "settings_channel_after": "latest",
+      "settings_bytes_unchanged": true,
+      "permissions_unchanged": true,
+      "other_settings_semantically_unchanged": true,
+      "effective_global_existed_before": true,
+      "effective_global_bytes_unchanged": true,
+      "legacy_global_bytes_unchanged": true,
+      "changed_paths": [
+        ".local/bin/claude",
+        ".local/share/claude/versions/2.1.267"
+      ],
+      "existing_versions_preserved": [
+        {
+          "version": "2.1.273",
+          "unchanged": true,
+          "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"
+        },
+        {
+          "version": "2.1.278",
+          "unchanged": true,
+          "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"
+        }
+      ],
+      "stdout_sha256": "a7b2a3da1e0359f02514198f5cf24e70c00ed4cf61c8927b31e5ebe0cda7001a",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot_before_sha256": "ae2931602acd071a86c8d226f667d5a9ed55dcdaf39f25234a1a7524c71f8213",
+      "snapshot_after_sha256": "5fed6e5d7c825853cfcbd165d267587f0652c8459cd8f21237fba2e4a90fec2d"
+    },
+    {
+      "case": "03-install-stable",
+      "argv": [
+        "<isolated-native-claude>",
+        "install",
+        "stable"
+      ],
+      "started_at": "2026-09-19T10:20:44.794714+00:00",
+      "finished_at": "2026-09-19T10:20:58.682486+00:00",
+      "exit_code": 0,
+      "timed_out": false,
+      "actual_version_output": "2.1.267 (Claude Code)",
+      "version_exit_code": 0,
+      "model_inputs": 0,
+      "settings_channel_before": "latest",
+      "settings_channel_after": "stable",
+      "settings_bytes_unchanged": false,
+      "permissions_unchanged": true,
+      "other_settings_semantically_unchanged": true,
+      "effective_global_existed_before": true,
+      "effective_global_bytes_unchanged": true,
+      "legacy_global_bytes_unchanged": true,
+      "changed_paths": [
+        ".claude/settings.json",
+        ".local/bin/claude",
+        ".local/share/claude/versions/2.1.267"
+      ],
+      "existing_versions_preserved": [
+        {
+          "version": "2.1.273",
+          "unchanged": true,
+          "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"
+        },
+        {
+          "version": "2.1.278",
+          "unchanged": true,
+          "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"
+        }
+      ],
+      "stdout_sha256": "8e8342610a3466b75ea74359c7a1857301a6163ed072744bda87a09b6e9de8e9",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot_before_sha256": "5d59be01c7d0cebc92df5325c21b468aa4ffd465e41a8d3380aee9ff1d5fb999",
+      "snapshot_after_sha256": "6574a6d6bda33ab1d1d9c939584dbb9eac3e650814c94be05f917509f2672cf0"
+    },
+    {
+      "case": "04-install-latest",
+      "argv": [
+        "<isolated-native-claude>",
+        "install",
+        "latest"
+      ],
+      "started_at": "2026-09-19T10:21:25.436474+00:00",
+      "finished_at": "2026-09-19T10:21:33.607265+00:00",
+      "exit_code": 0,
+      "timed_out": false,
+      "actual_version_output": "2.1.278 (Claude Code)",
+      "version_exit_code": 0,
+      "model_inputs": 0,
+      "settings_channel_before": "stable",
+      "settings_channel_after": "latest",
+      "settings_bytes_unchanged": false,
+      "permissions_unchanged": true,
+      "other_settings_semantically_unchanged": true,
+      "effective_global_existed_before": true,
+      "effective_global_bytes_unchanged": true,
+      "legacy_global_bytes_unchanged": true,
+      "changed_paths": [
+        ".claude/settings.json",
+        ".local/bin/claude"
+      ],
+      "existing_versions_preserved": [
+        {
+          "version": "2.1.267",
+          "unchanged": true,
+          "sha256": "a681f3008f0050029aeebcab3af51bb6a55ddeb625a3af3141a4416d43cd2558"
+        },
+        {
+          "version": "2.1.273",
+          "unchanged": true,
+          "sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb"
+        },
+        {
+          "version": "2.1.278",
+          "unchanged": true,
+          "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"
+        }
+      ],
+      "stdout_sha256": "b9b7dd0f78ce34bd78e51aa6ea1e95f5612fb02be6320993108b1059265b7f28",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "snapshot_before_sha256": "61576dc537e5f15636b9bf1058bf450de9ee7ad451b1b3da7a1aa9741dd81d64",
+      "snapshot_after_sha256": "2f8d616f0b4178b3718e58ee4d3cd0707ac713fb1b76e4e520efab97b4864b11"
+    }
+  ],
+  "installed_binary_checks": [
+    {
+      "version": "2.1.273",
+      "binary_sha256": "953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
+      "binary_bytes": 212228880,
+      "official_manifest_url": "https://downloads.claude.ai/claude-code-releases/2.1.273/manifest.json",
+      "manifest_sha256": "02aa2311fd5d9a4cc9a5aea017b89f5067eec78013bd340f62450719a5393fca",
+      "codesign_exit_code": 0
+    },
+    {
+      "version": "2.1.267",
+      "binary_sha256": "a681f3008f0050029aeebcab3af51bb6a55ddeb625a3af3141a4416d43cd2558",
+      "binary_bytes": 200489184,
+      "official_manifest_url": "https://downloads.claude.ai/claude-code-releases/2.1.267/manifest.json",
+      "manifest_sha256": "0d616022e26a1b023eb0c3ebdb1810e4caa58de0929c86b421c1c8a7780e2529",
+      "codesign_exit_code": 0
+    }
+  ],
+  "installed_manifest_signature_checks": [
+    {
+      "version": "2.1.273",
+      "manifest_signature_valid": true
+    },
+    {
+      "version": "2.1.267",
+      "manifest_signature_valid": true
+    }
+  ],
+  "signer_fingerprint": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+  "verifier": "PGPy 0.6.0; 未验证撤销/key-flags/self-signature，参见前次记录",
+  "environment_policy": {
+    "HOME": "<CASE>/home",
+    "CLAUDE_CONFIG_DIR": "<CASE>/home/.claude",
+    "PATH": "<CASE>/home/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "DISABLE_AUTOUPDATER": "1",
+    "DISABLE_UPDATES": "not_set",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "inherited_auth_environment": false,
+    "stdin": "DEVNULL"
+  },
+  "configuration_paths": {
+    "settings": "<HOME>/.claude/settings.json",
+    "effective_global_with_explicit_CLAUDE_CONFIG_DIR": "<HOME>/.claude/.claude.json",
+    "legacy_global_sentinel": "<HOME>/.claude.json"
+  },
+  "recommended_native_recipes": {
+    "follow_installation": [
+      "claude",
+      "update"
+    ],
+    "latest": [
+      "claude",
+      "--settings",
+      "{\"autoUpdatesChannel\":\"latest\"}",
+      "update"
+    ],
+    "stable": [
+      "claude",
+      "--settings",
+      "{\"autoUpdatesChannel\":\"stable\"}",
+      "update"
+    ],
+    "follow_installation_plain_update_executed": false,
+    "explicit_install_latest": [
+      "claude",
+      "install",
+      "latest"
+    ],
+    "explicit_install_stable": [
+      "claude",
+      "install",
+      "stable"
+    ]
+  },
+  "codex_alpha_source_review": {
+    "binary_update_channel_flag": false,
+    "native_update_default": "latest",
+    "installer_accepts_bare_alpha": false,
+    "installer_accepts_exact_prerelease_version": true,
+    "installer_explicit_version_removes_auto_update_marker": true,
+    "persistent_alpha_channel_supported_by_native_update": false,
+    "native_update_with_exact_CODEX_RELEASE": "源码链条支持但未执行：Standalone UpdateAction继承环境，installer读取CODEX_RELEASE",
+    "npm_dist_tags_checked_by_this_agent": false,
+    "update_or_alpha_install_executed": false,
+    "source_digests": {
+      "codex-install.sh": "dd4282a1a3c8188f792513f2f16afb852e63ce3b98dbbc67684f716ebcc1e862",
+      "source-codex-rs__tui__src__update_action.rs": "76bc2a1531cf1449f244f4ba866ee9ac406c76a4bd6b713e6bbbddeb356b60f3",
+      "source-codex-rs__tui__src__updates.rs": "b8f3f4a1c3e5b34281473a5ac552774a9270f1622ab2cc8aea7a953e0b8d025e",
+      "source-codex-rs__tui__src__update_versions.rs": "99d2655c841a3b31e6eb7f8a9c5a51390633978260d8558a40e497b0a24c2ffd",
+      "source-codex-rs__tui__src__npm_registry.rs": "2399be188f4764a537cef751d4d17eb4319748b389b4aebef2219b70e26b10f3"
+    }
+  },
+  "limits": [
+    "未测试minimumVersion或组织requiredMinimumVersion/requiredMaximumVersion，不能据此绕过官方限制",
+    "未测试Windows/Linux真实升级、文件锁或跨平台回滚",
+    "保留旧版本摘要和双向切换成功不代表任意会话数据库、插件状态可向后兼容",
+    "未在真实用户配置上执行，不宣称任意未知字段、损坏文件或并发用户修改已验证",
+    "DISABLE_UPDATES未设置；应用不能清除此用户或组织禁用策略",
+    "未做系统调用或网络抓包，不把零模型输入等同零网络请求"
+  ],
+  "private_root": "/private/tmp/infinishell-claude-channel-vpysqios",
+  "probe_script_sha256": "cf59ae8bcd84f734db4ca094780315e91a43308bd827df09726727dcb8e91344"
+}

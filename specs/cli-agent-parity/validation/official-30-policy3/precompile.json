@@ -1,0 +1,25 @@
+{
+  "source_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "inputs_sha256": "1bee2a7f4e7862b178d98347b9a5f50c781241170efb7fb017939b0de7eecd37",
+  "argv": [
+    "cargo",
+    "test",
+    "--target-dir",
+    "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+    "-p",
+    "warp",
+    "--lib",
+    "--no-run"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 298.702,
+  "log_sha256": "8c07000fab1204d5ffba6ade7df91c8ff29253c4c089302c311cd94b815c6096",
+  "log_bytes": 7938,
+  "source_verified_before_and_after": true,
+  "test_binary": {
+    "label": "lib",
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 849545480,
+    "sha256": "9a0e6b663d6be887598b7a1eb444f9bf9926b8fb37c06d2f0c9860c3535d90fb"
+  }
+}

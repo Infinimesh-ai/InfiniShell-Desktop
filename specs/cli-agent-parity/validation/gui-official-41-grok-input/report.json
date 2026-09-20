@@ -1,0 +1,73 @@
+{
+  "source": "source41",
+  "source_manifest_sha256": "a73bf864ea6488c3bb150a3457299de65e4df1109321c67d3cf35cd4a8ea3a9d",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_binary_sha256": "c65b8ce6e08f4140da05cffe1456d91a304389988679d8893b1ea472b9d0bad6",
+  "resigned_binary_sha256": "054cf0b1d8b79cb30ae51f2a91fefefc10df18ae4e48afb4a5dfe1cc35af5a6b",
+  "grok_version": "1.0.30",
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "screen_size": [
+    1229,
+    768
+  ],
+  "compound_literal_cd_and_grok_toolbar": true,
+  "english_toast_complete": true,
+  "simplified_chinese_toast_complete": true,
+  "chinese_placeholder_checked_after_real_app_restart": true,
+  "english_explicit_copy_clear_native_paste_roundtrip": true,
+  "chinese_explicit_copy_clear_native_paste_roundtrip": true,
+  "multiline_chinese_english_and_unique_ascii_suffix_preserved": true,
+  "first_english_copy_attempt": "toast expired before click; old clipboard returned; excluded from passing roundtrip",
+  "corrected_english_copy_attempt": "new unique suffix COPY_BUTTON_41B; immediate button click; exact roundtrip observed",
+  "rich_enter_draft_retained": true,
+  "automatic_grok_pty_submission_verified": false,
+  "model_prompts_manually_submitted": 0,
+  "model_request_zero_proven_by_network": false,
+  "app_launch_count": 2,
+  "launches_used_private_environment": true,
+  "plugin_installed": false,
+  "plugin_installation_verified": false,
+  "global_cli_configuration_count": 7,
+  "global_cli_configurations_unchanged": true,
+  "original_auth_stat_unchanged": true,
+  "private_auth_removed": true,
+  "private_processes_after_cleanup": [],
+  "native_active_sessions_after_cleanup": 0,
+  "native_history_bodies_archived": false,
+  "history_files_after": 15,
+  "full_cli_parity_acceptance_passed": false,
+  "screenshots": [
+    {
+      "path": "01-en-compound-toolbar.png",
+      "bytes": 61716,
+      "sha256": "148d08dae3cd5cc525b099da7ade693e04708ba5277d6a4ace7590e8d04a88af"
+    },
+    {
+      "path": "02-en-unsent-draft.png",
+      "bytes": 79985,
+      "sha256": "7a4e08f63bcbe6d9ffab238b66d7f15f73d307b17ad3a771da2485fc592a2e66"
+    },
+    {
+      "path": "03-en-copy-roundtrip.png",
+      "bytes": 79440,
+      "sha256": "87aaaa8342ca3c298906ece21dd9293df2eb3305ec9cc627919f7b1b00291156"
+    },
+    {
+      "path": "04-zh-placeholder-after-restart.png",
+      "bytes": 83270,
+      "sha256": "cd2a701853dbb8fe3755f6ab224863c0341a55282783d53fc128cb23a92ac134"
+    },
+    {
+      "path": "05-zh-unsent-draft.png",
+      "bytes": 91355,
+      "sha256": "96865fc442677c3c1460ba2dad1e44bfaa3d0324040ee3eb13dcb91a8feb2b22"
+    },
+    {
+      "path": "06-zh-copy-roundtrip.png",
+      "bytes": 90747,
+      "sha256": "e1dd5cc93265dda2346a44a2cfe8825e1fd38c99d28620b369006754c3a59e4a"
+    }
+  ]
+}

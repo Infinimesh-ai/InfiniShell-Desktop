@@ -43,14 +43,14 @@ mod policy_preflight_live_tests;
 
 Rust 夹具直接复用当前实际 `managed_process::spawn`、`ManagedChild`、`finish_after_stdin_close` 和 `confirmed_exit` 的生产派生、控制连接、stdio、监督与清理路径，使用独立有限 ACP 驱动。当前架构不存在名为 `ManagedProcessSpawner` 的类型，未为测试另造 spawner 或 Command。未运行会自动认证/提交 prompt 的普通任务入口，也未修改生产 Grok 权限判据。正常清理还必须是 `macos_resource_coalition`、真实 stdin EOF、退出 0、生产资源域清理核验和严格匹配回执；StopRequested、旧 process group 或无 exit code 均不能冒充。
 
-准确候选签名已补齐：`session/info` 明确传 `{sessionId}`，拒绝 handler 中缺 ID 时选择首个 resident 的 fallback；`session/state` 传 `{sessionId,cwd}`；`mcp/list` 明确传 `{sessionId,cache:true}`；`debug/agent` 使用 `{}`，它只读独立进程 registry，不接收 session 参数。info/MCP/debug 使用候选 `ExtMethodResult`，所以 ACP `result` 内再包 `result`；state 为直接返回对象。部分错误、猜测的 `data`/`status` 包装、缺失 native S/cwd 或非零 turns/turnIndex 均失败，不能以请求中保存的 S 单独证明恢复。
+准确候选签名已补齐：`session/info` 明确传 `{sessionId}`，拒绝 handler 中缺 ID 时选择首个 resident 的 fallback；`session/state` 传 `{sessionId,cwd}`；`mcp/list` 明确传 `{sessionId,cache:true}`；`debug/agent` 使用 `{}`，它只读独立进程 registry，不接收 session 参数。info/MCP/debug 使用候选 `ExtMethodResult`，所以 ACP `result` 内再包 `result`；state 为直接返回对象。部分错误、猜测的 `data`/`status` 包装、缺失 native S/cwd 或不匹配本版本初始 turns=1／turnIndex=0 均失败，不能以请求中保存的 S 单独证明恢复。
 
 此次仅读取同固定 commit 且已由 GH tree 核实的官方 raw 文件。子任务公开副本及 URL/完整 SHA 记录位于 `/private/tmp/infinishell-grok-policy-preflight-public-23/`，没有认证、帐号或私有日志：
 
 | 官方主源 | 完整 SHA-256 | 用途 |
 | --- | --- | --- |
 | [agent/mvp_agent/acp_agent.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs#L1970) | `f9d0400c2d72a8bd2288a56842b1c18bdda571d315b0c6c34f5fb42977e3edda` | info 实际路由 |
-| [agent/handlers/session.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs#L55) | `bfdfbf0f68958043acb4ce8389f8ad25894f6d7a8d8f2ac50803c9ad21bc3a8c` | info Request 与真实 S/cwd/空历史回读 |
+| [agent/handlers/session.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs#L55) | `bfdfbf0f68958043acb4ce8389f8ad25894f6d7a8d8f2ac50803c9ad21bc3a8c` | info Request 与真实 S/cwd/初始回合计数回读 |
 | [session/result.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/result.rs#L29) | `ea717cb2245a7cc8fe6ee687186f4b77e80281dde27f3fb6ff851afecd64bad9` | ExtMethodResult 准确包装与部分错误 |
 | [extensions/session_admin.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/session_admin.rs) | `cdc05b3cb5b740b1f07c7906ab2bc2ca04ff073de6a4acf8353ccba24bd69e31` | 确认 admin 修改接口不在白名单 |
 | [extensions/mod.rs](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mod.rs) | `f2af3d918552016883c4dfff0ac9c3bab477a75ccf3da50f35c281f1ee85f51f` | 准确扩展解析与 direct response |
@@ -129,3 +129,7 @@ source24 的 [本地 Rust 门禁记录](/tmp/infinishell-cli-parity-official-24-
 ## 后续调查的独立输入
 
 随附 [profile](fixtures/grok-1.0.30-policy-preflight-profile.md) 与 [config](fixtures/grok-1.0.30-policy-preflight-config.toml) 用于后续空会话只读调查；当前未原生运行。profile 使用候选 [AgentDefinition](https://github.com/xai-org/grok-build/blob/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-agent/src/config.rs#L690) 的 Markdown frontmatter，关闭技能、agentsMd、默认工具注入，显式空 toolConfig/MCP/hooks；这只记录请求，不认定固定二进制实际加载或全部执行来源已封闭。配置复用已经观察的私有初始化形态，保留所有工具需审批的 ask 规则；marketplace 标记用于抑制本次首次初始化改写，不能证明插件安装或来源封闭。CLI 自身的有效模式、全部内建工具、子代理／Search／Use 等闭包仍为unknown；不开放子任务、不授予父权限上限。运行前后仍核对全字节散列，任何配置漂移保留失败。英文与简体中文界面没有文案变化，无需本地化变更；这些是测试输入和技术记录。
+
+## Source39 初始计数修正
+
+policy11 的真实同会话响应中 turns=1、turnIndex=0；旧夹具要求0／0而失败。候选只接受该精确初始组合，仍拒绝 turns=0、2、3 或非零 index、会话／cwd 漂移。0模型输入由实际出站白名单证明，不能从计数推断历史正文为空。Python75项通过；Rust及修正后原生执行仍待新快照，不追改policy11失败。

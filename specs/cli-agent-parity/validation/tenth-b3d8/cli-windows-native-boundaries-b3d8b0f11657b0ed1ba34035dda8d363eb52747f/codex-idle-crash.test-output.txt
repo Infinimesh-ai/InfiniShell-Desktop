@@ -1,0 +1,8 @@
+15:16:35.275 [INFO] [i18n_embed] Selecting translations for domain "warp"
+15:16:35.308 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some("en")), script: None, region: None, variants: None }], fallback=en
+
+running 1 test
+test ai::cli_agent_runtime::codex::tests::idle_crash::live_codex_idle_crash_after_ready_disconnects_once ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6455 filtered out; finished in 0.72s
+

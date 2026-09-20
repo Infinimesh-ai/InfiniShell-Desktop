@@ -1,0 +1,37 @@
+{
+  "original_passed": false,
+  "new_native_inputs_sent": 0,
+  "task_count": 1,
+  "child_task_count": 0,
+  "acknowledged_message_count": 1,
+  "terminal_evidence": [
+    {
+      "actual": {
+        "catalog": {
+          "duplicate_string_count": 0,
+          "expected_names": [
+            "read_file",
+            "search_tool",
+            "use_tool"
+          ],
+          "item_count": 6,
+          "known_name_counts": {
+            "read_file": 1,
+            "search_replace": 0,
+            "search_tool": 1,
+            "use_tool": 1,
+            "write": 0
+          },
+          "non_string_count": 0,
+          "unknown_string_count": 3,
+          "value_type": "array"
+        },
+        "creationPolicy": "GrokCreationPolicyV1"
+      },
+      "expected": null,
+      "reason": "grok_creation_catalog_changed",
+      "source": "parent_permission_ceiling",
+      "task_input_sent": true
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "task": {
+    "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+    "generation": 3,
+    "revision": 4,
+    "state": "completed"
+  },
+  "scope": "GUI中原生Write等待审批、根点击一次允许、实际目标文件写入与完成回收；不等价于文件系统沙箱。",
+  "target": "gui-approved.txt",
+  "root_observed_waiting_for_user_before_allow": true,
+  "before_bytes": 21,
+  "before_sha256": "713de44679fdff7c486ab507b7851b7f1e5b80ccaf762caf8e97e7c8fc544713",
+  "after_bytes": 21,
+  "after_sha256": "6fa16da0d3dca82f406d6fa1454647525aed6b73faa0d77a9abc8c0021aa8aa4",
+  "approved_write_matches_fixture": true,
+  "result_matches_fixed_marker": true,
+  "result_sha256": "73a64d40849ac718e397312ea10cfa7007948942cc82b48e85888fbe610bd98d",
+  "terminal_evidence": {
+    "event": {
+      "TurnFinished": {
+        "outcome": "Completed",
+        "output": "GUI_ALLOW_DONE_436CC739",
+        "turn_id": "b249dabc-98d2-44bd-886c-ceb8e22e1cd1"
+      }
+    },
+    "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3"
+  },
+  "db_read_only": true
+}

@@ -1,0 +1,36 @@
+{
+  "mode": "policy8",
+  "exit_code": 1,
+  "wall_seconds": 13.024,
+  "source_manifest_sha256": "db0b82ed6bd351189a4e54cefaf50c07cec40d64124fd9f8807ab11f407f265c",
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 851470680,
+    "sha256": "c777131627b95d29ba949d725237d3417af9a543c2bb15750ca995d6852caddd"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 867015920,
+    "sha256": "c39f1d9928e8d5ab1dff2a9e162d9570bf537cb6d9cd6040bce84513ea8d0bc3"
+  },
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_matches_commit": null,
+  "built_from_clean_commit": false,
+  "source_and_binaries_unchanged": true,
+  "entrypoint_listed_exactly_once": true,
+  "model_input_budget": 0,
+  "public_artifacts": {
+    "infinishell-cli-parity-official-35-policy8-events.ndjson": {
+      "bytes": 6858,
+      "sha256": "79e6558a55521dea13aa1db91565548e16a88ec0b0c93b165066e1a0ec88ff89"
+    },
+    "infinishell-cli-parity-official-35-policy8-events.metadata.json": {
+      "bytes": 6989,
+      "sha256": "48deec283afd303b2003ea1a38514bb4b60cd11c261c5e4396a6fc6d9259f69c"
+    },
+    "infinishell-cli-parity-official-35-policy8-events.network.json": {
+      "bytes": 176,
+      "sha256": "fdf7f5c6426d0d143e1f65d828d217d24f39839046031e532f723da7b6af62b4"
+    }
+  }
+}

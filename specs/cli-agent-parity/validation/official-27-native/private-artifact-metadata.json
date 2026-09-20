@@ -1,0 +1,56 @@
+{
+  "private_workspace_uid_0700": true,
+  "private_artifact_metadata": [
+    {
+      "name": "private-evidence.ndjson",
+      "exists": true,
+      "mode": "0600",
+      "uid_is_current": true,
+      "nlink": 1,
+      "bytes": 10394,
+      "content_read": false
+    },
+    {
+      "name": "private-test-output.txt",
+      "exists": true,
+      "mode": "0600",
+      "uid_is_current": true,
+      "nlink": 1,
+      "bytes": 42094,
+      "content_read": false
+    },
+    {
+      "name": "wrapper-audit.ndjson",
+      "exists": true,
+      "mode": "0600",
+      "uid_is_current": true,
+      "nlink": 1,
+      "bytes": 302,
+      "content_read": false
+    },
+    {
+      "name": "private-native-error-response.ndjson",
+      "exists": true,
+      "mode": "0600",
+      "uid_is_current": true,
+      "nlink": 1,
+      "bytes": 0,
+      "content_read": false
+    },
+    {
+      "name": "private-native-response-envelope.ndjson",
+      "exists": true,
+      "mode": "0600",
+      "uid_is_current": true,
+      "nlink": 1,
+      "bytes": 259,
+      "content_read": false
+    }
+  ],
+  "private_content_read": false,
+  "safe_fixed_literal_reason_hashes": {
+    "native_unknown_notification_rejected": "553467e5c8ad28e8e0d6d88da80163ba14785868c0d169461e0d092631e96237",
+    "native_exit_code_missing": "315ae2f1192d0c3184a943fc25736613ca76cd8f3b2fc7fc2ecfe5d0d127e1d7",
+    "rpc_error": "21964f4ced55d1efcd8b529b6e33d8b2f76b542f2b65e72ab52b7355299a1d2c"
+  }
+}

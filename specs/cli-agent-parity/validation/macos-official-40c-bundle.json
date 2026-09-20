@@ -1,0 +1,26 @@
+{
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "715f807e0b9d65791f4ce70b2ba706b8d2411db0a60e00283fd6fd23d1447f2a",
+  "argv": [
+    "./script/run",
+    "--dont-open",
+    "--features",
+    "local_cli_managed_tasks,rust-embed/debug-embed"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 216.236,
+  "log_sha256": "da118c69626f3d92eb89829285661bd31ef9189ebab5ed77aae117a0fe5a9ce8",
+  "test_binary_unchanged": true,
+  "worker": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 868194640,
+    "sha256": "3c4a3db982704f102c3e077e5127cacd74537c1f7739f2cd21f3431ada0ff17a"
+  },
+  "strict_signature_exit_code": 0,
+  "embedded_locales": {
+    "en": true,
+    "zh-CN": true
+  }
+}

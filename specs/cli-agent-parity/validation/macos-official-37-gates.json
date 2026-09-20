@@ -1,0 +1,68 @@
+{
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "dirty_candidate": true,
+  "same_commit_verified": false,
+  "source_manifest_sha256": "415908767190975f76b0a81ced2ab7a7ad2cca5bde610a748c7f474128e7faf8",
+  "gates": [
+    {
+      "name": "check",
+      "argv": [
+        "cargo",
+        "check",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 93.04,
+      "log_sha256": "6887d8280da807541c674974890bdc146dbb492b3efb04181a385eb6e5205d49",
+      "summary": []
+    },
+    {
+      "name": "i18n",
+      "argv": [
+        "cargo",
+        "test",
+        "--target-dir",
+        "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 235.321,
+      "log_sha256": "e28057c2bf263f3a65fa88ee737220db4f5acb0af665d2622f30fa372c96c33c",
+      "summary": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7021 filtered out; finished in 4.54s"
+      ]
+    },
+    {
+      "name": "focused",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "-E",
+        "test(ai::agent_sdk::driver::harness::) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(local_cli_mailbox) | test(local_cli_tasks) | test(local_harness) | test(ai::orchestration::) | test(ai::agent_providers::chat_stream::) | test(ai::blocklist::action_model::execute::) | test(terminal::cli_agent_sessions::plugin_manager::grok::tests::) | test(ai::skills::) | test(terminal::input::skills::) | test(local_orchestration) | test(prompt_renderer) | test(terminal::local_tty::) | test(terminal::bootstrap_tests::)"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 23.783,
+      "log_sha256": "eaab28c62bba5908acc342abe8073379904b46edfcd398c8f18345b73bd4574f",
+      "summary": [
+        "     Summary [  19.978s] 1698 tests run: 1698 passed, 5334 skipped"
+      ]
+    }
+  ],
+  "all_passed": true,
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 853646680,
+    "sha256": "7f2d4d1cb063b545c6b733d6eb28ffc378d2c605fac51708d42a9069edee29df"
+  }
+}

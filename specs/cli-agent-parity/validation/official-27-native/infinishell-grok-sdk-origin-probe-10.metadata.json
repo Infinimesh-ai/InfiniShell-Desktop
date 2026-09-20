@@ -1,0 +1,183 @@
+{
+  "scope": "grok_native_sdk_origin_probe",
+  "probe_passed": false,
+  "origin_verification": "unknown",
+  "native_origin_verified": false,
+  "public_product_gate_open": false,
+  "full_cli_parity_acceptance_passed": false,
+  "private_workspace": "/private/tmp/infinishell-grok-sdk-origin-jz_rzo7s",
+  "auth_copy_method": "opaque_auth_json_only",
+  "public_credential_values_recorded": false,
+  "credential_files_read_by_probe": false,
+  "native_received_real_credential": true,
+  "max_native_inputs": 1,
+  "max_tls_connections": 32,
+  "requested_model_request_budget": 2,
+  "http_model_call_budget_enforced": false,
+  "http_model_calls_observable": false,
+  "cost_budget_enforced": false,
+  "budget_boundary": "单次原生 prompt 与最多 32 次 opaque TLS CONNECT；无法计数其中 HTTP 模型请求",
+  "deadline_seconds": 450,
+  "max_tls_bytes": 33554432,
+  "allowed_https_hosts": [
+    "auth.x.ai",
+    "cli-chat-proxy.grok.com"
+  ],
+  "tls_decrypted": false,
+  "requested_model": "grok-4.6-build",
+  "grok_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+  "test_binary_sha256": "050ff3f3a6bdf742ab628a19ddf618331b830bbaa9cabe20349e9c677156fdbd",
+  "supervisor_sha256": "f01f2525952847cba097feca5931566c41043948286402435012ce0a92dcda5e",
+  "test_name": "ai::cli_agent_runtime::grok::sdk_origin_live_tests::native_sdk_registration_and_origin_probe",
+  "same_commit_verified_by_runner": false,
+  "sandbox_canary": {
+    "allowed_proxy": true,
+    "other_loopback": 1,
+    "external": 1,
+    "exact_unix": true,
+    "other_unix": 1,
+    "credential_read": 1
+  },
+  "project_write_canary": {
+    "project_write": 1
+  },
+  "native_environment_names": [
+    "GROK_CLAUDE_HOOKS_ENABLED",
+    "GROK_CLAUDE_MCPS_ENABLED",
+    "GROK_CODEX_HOOKS_ENABLED",
+    "GROK_CODEX_MCPS_ENABLED",
+    "GROK_DISABLE_API_KEY_AUTH",
+    "GROK_DISABLE_AUTOUPDATER",
+    "GROK_HOME",
+    "HOME",
+    "HTTPS_PROXY",
+    "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE",
+    "INFINISHELL_GROK_LIVE_ARTIFACT",
+    "INFINISHELL_GROK_LIVE_AUTH_MODE",
+    "INFINISHELL_GROK_LIVE_EXECUTABLE",
+    "INFINISHELL_GROK_LIVE_ROOT",
+    "LANG",
+    "LC_ALL",
+    "NO_PROXY",
+    "PATH",
+    "PYTHONUTF8",
+    "TMPDIR",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME"
+  ],
+  "grok_version": "grok 1.0.30 (04b7ffed98c6)",
+  "test_exit_code": 101,
+  "failure_diagnostics": {
+    "transport_join_error": null,
+    "failure_source": "production_runtime",
+    "private_response_envelope_sha256": "ed82aa0c7f5a228ef65737cef12ddb6099a764d6b7bd486d94c488d80fab8523",
+    "last_native_response_diagnostic": {
+      "error_code": null,
+      "error_code_type": "absent",
+      "error_data_message": {
+        "type": "absent"
+      },
+      "error_message": {
+        "type": "absent"
+      },
+      "error_present": false,
+      "error_type": "absent",
+      "jsonrpc": {
+        "bytes": 3,
+        "sha256": "d84bdb34d4eeef4034d77e5403f850e35bc4a51b1143e3a83510e1aaad839748",
+        "type": "string"
+      },
+      "jsonrpc_is_2_0": true,
+      "method_present": false,
+      "native_error_category": "unknown",
+      "native_error_http_status": null,
+      "response_id": {
+        "bytes": 13,
+        "sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+        "type": "string"
+      },
+      "response_id_number": null,
+      "result_error_conflict": false,
+      "result_present": true,
+      "result_stop_reason": {
+        "type": "absent"
+      },
+      "result_type": "object",
+      "transaction_context": {
+        "generation": "c616b3d3-a9a1-484b-9d0e-344cd26f199a",
+        "next_request_id": 4,
+        "pending_id": 4,
+        "pending_kind": "prompt"
+      }
+    },
+    "transport_task_status": "runtime_error",
+    "private_error_capture_status": "not_observed",
+    "private_response_envelope_bytes": 259,
+    "transport_error": {
+      "protocol_failure_kind": "invalid_response_id",
+      "runtime_error_kind": "protocol",
+      "runtime_error_message": {
+        "bytes": 44,
+        "sha256": "81a0d2b54c16378552a9d13efe06b72dacf3384020874ec4c04e22f9491868b9",
+        "type": "string"
+      }
+    },
+    "private_error_response_bytes": 0,
+    "private_response_envelope_status": "captured"
+  },
+  "native_counters": {
+    "native_inputs": 1,
+    "sdk_request_count": 2,
+    "inspect_call_count": 0,
+    "permission_request_count": 0,
+    "unexpected_tool_count": 0,
+    "submitted_input_count": 1,
+    "initialization_count": 0,
+    "tools_list_count": 1,
+    "approval_allow_count": 0,
+    "approval_deny_count": 0,
+    "approval_duplicate_count": 0,
+    "search_allow_count": 0,
+    "inspect_allow_count": 0,
+    "discovery_count": 1
+  },
+  "tunnels_stopped": true,
+  "private_auth_copy_removed": true,
+  "private_native_error_response_bytes": 0,
+  "private_native_error_response_count": 0,
+  "private_native_error_response_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "private_native_error_response_scope_verified": true,
+  "private_native_error_response_present": true,
+  "private_native_error_response_ledger_matches": true,
+  "private_native_response_envelope_bytes": 259,
+  "private_native_response_envelope_count": 1,
+  "private_native_response_envelope_sha256": "ed82aa0c7f5a228ef65737cef12ddb6099a764d6b7bd486d94c488d80fab8523",
+  "private_native_response_envelope_scope_verified": true,
+  "private_native_response_envelope_ledger_matches": true,
+  "private_settings_audit": {
+    "bytes_unchanged": false,
+    "before_sha256": "8b51690ac09910a6975d9a06dd138d6722e669bf10618a700c636812a4097bd6",
+    "after_sha256": "eededaf9df6afedbd8e81a759a44a85a349d18cadccdc18d926a14ee48674794",
+    "toml_parse_succeeded": true,
+    "permission_section_unchanged": true,
+    "native_marketplace_initialization_only": true,
+    "settings_scope_verified": true,
+    "changed_top_level_tables": [
+      "marketplace"
+    ]
+  },
+  "private_settings_unchanged": false,
+  "project_entry_count": 0,
+  "native_launch_counters": {
+    "version": 2,
+    "direct_agent": 1
+  },
+  "native_launch_arguments_unchanged": true,
+  "network_budget_exhausted": false,
+  "private_evidence_sha256": "69afed4e092936db54842791058c7cf717975a7e26c032bec63fea1346e8861d",
+  "private_test_output_sha256": "a765450234e979c62ca3c0adbfca042148744eabd6ca4cb81a26f18023e4bb4f",
+  "wrapper_audit_sha256": "a6e87389a3143d9462b6021cc3fe328c608c24d0ce68e4c5a812b475cf7e2dde",
+  "public_evidence_sha256": "95ee74ba0292d64cc3c4a390d78289e82084e9996292a9397765ee1de376b811",
+  "public_network_sha256": "d4d909d9f6fa4c9160bfad85152bbeab355e3fe4d562abe9b568af3468939b76"
+}

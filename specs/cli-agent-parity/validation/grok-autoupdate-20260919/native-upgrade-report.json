@@ -1,0 +1,248 @@
+{
+  "case": "upgrade",
+  "argv": [
+    "/private/tmp/igr-update-orp5szv0/home/.grok/bin/grok",
+    "update",
+    "--version",
+    "1.0.34",
+    "--leader-socket",
+    "/private/tmp/igr-update-orp5szv0/leader.sock"
+  ],
+  "exit_code": 0,
+  "timed_out": false,
+  "seconds": 8.917,
+  "native_prompt_count": 0,
+  "authentication_copied": false,
+  "before": {
+    "files": {
+      ".grok/config.toml": {
+        "type": "file",
+        "bytes": 111,
+        "sha256": "97d05c6341abc71dca1493492e8d7e258ea15ebf756db3bf0f6f41262a3075e2"
+      },
+      ".grok/bin/agent": {
+        "type": "symlink",
+        "target": "../downloads/grok-1.0.30-macos-aarch64",
+        "resolved_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+      },
+      ".grok/bin/grok": {
+        "type": "symlink",
+        "target": "../downloads/grok-1.0.30-macos-aarch64",
+        "resolved_sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+      },
+      ".grok/downloads/grok-1.0.30-macos-aarch64": {
+        "type": "file",
+        "bytes": 141869568,
+        "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+      }
+    },
+    "configuration": "# InfiniShell synthetic update verification\n[cli]\ninstaller = \"internal\"\nchannel = \"stable\"\nauto_update = true\n",
+    "auth_file_count": 0
+  },
+  "after": {
+    "files": {
+      ".grok/active_sessions.lock": {
+        "type": "file",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      ".grok/.config-init.lock": {
+        "type": "file",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      ".grok/config.toml": {
+        "type": "file",
+        "bytes": 167,
+        "sha256": "4c2af61eaefc16ecd53b8aee7874b683c4251e821c6d2b3225fa3b5bc572c180"
+      },
+      ".grok/active_sessions.json": {
+        "type": "file",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      ".grok/bin/agent": {
+        "type": "symlink",
+        "target": "../downloads/grok-1.0.34-macos-aarch64",
+        "resolved_sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"
+      },
+      ".grok/bin/grok": {
+        "type": "symlink",
+        "target": "../downloads/grok-1.0.34-macos-aarch64",
+        "resolved_sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"
+      },
+      ".grok/logs/unified.jsonl": {
+        "type": "file",
+        "bytes": 1318,
+        "sha256": "d6c4e98712bb1a723f5e2e160c004aab3dee095810b0fa00821f780b1de3a62f"
+      },
+      ".grok/downloads/grok-1.0.30-macos-aarch64": {
+        "type": "file",
+        "bytes": 141869568,
+        "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+      },
+      ".grok/downloads/grok-1.0.34-macos-aarch64": {
+        "type": "file",
+        "bytes": 143016096,
+        "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"
+      },
+      ".grok/docs/user-guide/05-configuration.md": {
+        "type": "file",
+        "bytes": 49475,
+        "sha256": "2ed70353e4f9c9d4c399a2cbd5a5ca16323ca133bf60c10d6eb3c56657123a36"
+      },
+      ".grok/docs/user-guide/07-mcp-servers.md": {
+        "type": "file",
+        "bytes": 20303,
+        "sha256": "cc9c0dc6ad74095ef4b0da8a312b3bce88ac1ff08578335d4888a5b8dc697395"
+      },
+      ".grok/docs/user-guide/06-theming.md": {
+        "type": "file",
+        "bytes": 17157,
+        "sha256": "957ccc193782ce9df51bedf2a17125f532d4d4553ffcc2a87aa7537d3097ee1a"
+      },
+      ".grok/docs/user-guide/23-dashboard.md": {
+        "type": "file",
+        "bytes": 15295,
+        "sha256": "a4b4f2a5d48b8f5bf15d1327b9274af51e980405bf5259fc40613a51545e86ed"
+      },
+      ".grok/docs/user-guide/01-getting-started.md": {
+        "type": "file",
+        "bytes": 9597,
+        "sha256": "30920ff22fe3cfa6faf2eb9c6d85f1a045470971376ce5fa513154efacc8e5fb"
+      },
+      ".grok/docs/user-guide/17-sessions.md": {
+        "type": "file",
+        "bytes": 20577,
+        "sha256": "2e728c7f53201df625582093aa5e626c081d7b51389093f4359b184407e99d61"
+      },
+      ".grok/docs/user-guide/16-subagents.md": {
+        "type": "file",
+        "bytes": 20255,
+        "sha256": "e7213c7181b9fb2188e346c8977e25832e183118020552c541ca1bafc5be2496"
+      },
+      ".grok/docs/user-guide/14-headless-mode.md": {
+        "type": "file",
+        "bytes": 41301,
+        "sha256": "2dd1302d88dc39276866e09a7c34501ecbe0e53b34a17f49e6908356ba1c98a9"
+      },
+      ".grok/docs/user-guide/03-keyboard-shortcuts.md": {
+        "type": "file",
+        "bytes": 31857,
+        "sha256": "4b00f8cfae4e9d1c9e5041ff4b997f29fc8a97d527e05d8707e42f24e39c94cb"
+      },
+      ".grok/docs/user-guide/09-plugins.md": {
+        "type": "file",
+        "bytes": 26963,
+        "sha256": "9fa694f43feebcdbd393f20e0d0d691d3352b2c3e565c13917378eac82a61cd4"
+      },
+      ".grok/docs/user-guide/08-skills.md": {
+        "type": "file",
+        "bytes": 13263,
+        "sha256": "6ed785b7e4c1c064a170abe69187202ce36a28ef08523483d7b240ab257c5da1"
+      },
+      ".grok/docs/user-guide/20-background-tasks.md": {
+        "type": "file",
+        "bytes": 10536,
+        "sha256": "309e90beaf775e9263be8f4bca7a564f9c4de15834d548ed8c9eb5a455f9fa2f"
+      },
+      ".grok/docs/user-guide/02-authentication.md": {
+        "type": "file",
+        "bytes": 15778,
+        "sha256": "1dc2f15c7b4ffdd0111db6eec2ce6448b1e55ad81d3900f30500d8ebdfccaaeb"
+      },
+      ".grok/docs/user-guide/27-grok-clone.md": {
+        "type": "file",
+        "bytes": 6526,
+        "sha256": "2f52454cf6c8c4ad864d2c195703082a33adb01eb00ec96afc9a28e1c4105046"
+      },
+      ".grok/docs/user-guide/10-hooks.md": {
+        "type": "file",
+        "bytes": 57584,
+        "sha256": "6af6cda5df56a02b194a96a59939f7b18e562983cd6f8c04f8f0c2d22a64a0d9"
+      },
+      ".grok/docs/user-guide/24-monitoring-usage.md": {
+        "type": "file",
+        "bytes": 21172,
+        "sha256": "1518dc540b48fdad9f72d94ac66f589374c14b3b5b148db34f107504e878d1d9"
+      },
+      ".grok/docs/user-guide/18-sandbox.md": {
+        "type": "file",
+        "bytes": 17987,
+        "sha256": "327816d24c153880828b72bc03385f36bccaa369d839d8ad7870cbb409375d84"
+      },
+      ".grok/docs/user-guide/21-terminal-support.md": {
+        "type": "file",
+        "bytes": 13458,
+        "sha256": "f694595298cf19db43e88ae7cb459c6b53e749fc6b0a6d015e6212ce70a9774e"
+      },
+      ".grok/docs/user-guide/26-config-reference.md": {
+        "type": "file",
+        "bytes": 64751,
+        "sha256": "ddf1a48ef060b6cf8e3073ded0410b3b3dda2fa38a016181a4dbd5b006e40967"
+      },
+      ".grok/docs/user-guide/15-agent-mode.md": {
+        "type": "file",
+        "bytes": 13067,
+        "sha256": "17f6088ffd7ba636e8dff4ba37255d11920865492b9f23b7e1e91f838fafe185"
+      },
+      ".grok/docs/user-guide/22-permissions-and-safety.md": {
+        "type": "file",
+        "bytes": 33137,
+        "sha256": "918ad092e92261e5c09c46f04c87acccf10b41a2945c97857ce0d5c57c12267d"
+      },
+      ".grok/docs/user-guide/13-memory.md": {
+        "type": "file",
+        "bytes": 17951,
+        "sha256": "fe164e09859a8fe9d6890c9b82eee3cbf3f5e4bc4da7710e772d134ff0bcf55b"
+      },
+      ".grok/docs/user-guide/11-custom-models.md": {
+        "type": "file",
+        "bytes": 15835,
+        "sha256": "d41d9ff5942eb84d8c8f73f7c0bad82b34d5b9a282b30e687770aa050f36e00a"
+      },
+      ".grok/docs/user-guide/19-plan-mode.md": {
+        "type": "file",
+        "bytes": 9309,
+        "sha256": "768ac26bb78f22ac696674a2188856ce3ee90c2ae71fa04af10462dc0adb7105"
+      },
+      ".grok/docs/user-guide/12-project-rules.md": {
+        "type": "file",
+        "bytes": 10453,
+        "sha256": "160380abbee8bb7c0a94809b3f563f9fccde8d9592d1261aff0186b13a2e290b"
+      },
+      ".grok/docs/user-guide/25-status-line.md": {
+        "type": "file",
+        "bytes": 17348,
+        "sha256": "3200adfa3740a7bca6e4079a47d1a2a80801813edd7e1818ae4773bb488ab48c"
+      },
+      ".grok/docs/user-guide/04-slash-commands.md": {
+        "type": "file",
+        "bytes": 24908,
+        "sha256": "db0cb7f140cc414256c357d5ff6f3883845f889a66338ea07f24feca76de5bbb"
+      },
+      ".grok/completions/bash/grok.bash": {
+        "type": "file",
+        "bytes": 256407,
+        "sha256": "d4f0d4317e75bd94beed10749619c4bfc58d02220a09a783bc424c4a8af29a5d"
+      },
+      ".grok/completions/zsh/_grok": {
+        "type": "file",
+        "bytes": 169346,
+        "sha256": "79b21e4d42c222cd9bd1de07163a42c484e370e43942dbb72948ca9730ddbb21"
+      },
+      ".config/fish/completions/grok.fish": {
+        "type": "file",
+        "bytes": 144855,
+        "sha256": "1e3372b78a547e9ccac9e558649d09652b7bb423a4940f3d57f2389281e48641"
+      }
+    },
+    "configuration": "[cli]\ninstaller = \"internal\"\nchannel = \"stable\"\nauto_update = false\n\n[ui]\nmax_thoughts_width = 120\nfork_secondary_model = \"grok-4.6\"\nyolo = false\ncompact_mode = false\n",
+    "auth_file_count": 0
+  },
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr_sha256": "60b5533f848cf881198baccf22b04286229bbadea907c262bba2fb9bd35808da",
+  "active_version_exit": 0,
+  "active_version": "grok 1.0.34 (3736acbc8658)",
+  "active_binary_sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"
+}

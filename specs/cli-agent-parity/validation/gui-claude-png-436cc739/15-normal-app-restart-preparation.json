@@ -1,0 +1,19 @@
+{
+  "observed_utc": "2026-09-17T19:28:31.268911+00:00",
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "bundle_id": "dev.infinishell.InfiniShellParityOfficial26",
+  "running_pid": 38245,
+  "old_recorded_processes_absent": true,
+  "old_exit_codes_observed": false,
+  "task_id": "f11f573b-504a-4423-bd04-94942633f19d",
+  "persisted_native_session_id": "273ef03b-aada-4921-8d78-9a387b61aa0c",
+  "persisted_generation": 2,
+  "persisted_state": "completed",
+  "persisted_message_count": 2,
+  "attachment_bytes": 248,
+  "attachment_sha256": "6e6f0c4608c8d97790950c80e966369767f0d6c7f043b65a16e8ec206000695d",
+  "native_inputs_sent": 0,
+  "credential_values_recorded": false,
+  "scope": "同隔离应用及数据域正常重启准备；应用实际恢复与新指令结果仍待验。"
+}

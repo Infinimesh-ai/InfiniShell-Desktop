@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "mode": "files1-host",
+  "status": "completed",
+  "reservation_id": "84532dde-0c03-46da-9732-4b20a86bb03a",
+  "contract_sha256": "a4450701dd38298fa81db9ebee70aa9cc2ca634a2e72c08919b3a1e929847f78",
+  "source_manifest_sha256": "3eb14394fc030d484e2066f3e2bfe8d9ac70e0ffdb512f1cffd08ebcb740e188",
+  "production_source": "source39",
+  "production_manifest_files": 188,
+  "fixture_source": "source39",
+  "mixed_source_artifact": false,
+  "same_frozen_source_verified": true,
+  "same_commit_verified": false,
+  "model_input_budget": 6,
+  "deadline_seconds": 900,
+  "runtime_os_sandbox": false,
+  "native_network_budget_enforced": false,
+  "tls_budget_scope": "observed_configured_proxy_connections",
+  "prior_fixed_read_dependency": null,
+  "catalog_diagnostics": {
+    "source": "source39",
+    "task_input_sent_semantics": "successful_session_prompt_write_in_current_process_generation",
+    "native_ack_inferred": false,
+    "unknown_catalog_content_logged": false,
+    "strict_catalog_rejection_preserved": true
+  },
+  "test_binary": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+    "bytes": 855740360,
+    "sha256": "26a3bcb5949c6374e95e5b8d1e4894d797e1010c4d3e2fec52a3a27ead9e6b26"
+  },
+  "supervisor": {
+    "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+    "bytes": 867959424,
+    "sha256": "080a173d6ff866b3c9bc3bf506105e978032e1f42ed3a1bcc019af64c31fcdce"
+  },
+  "grok": {
+    "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "bytes": 141869568,
+    "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+  },
+  "fixture_project_trust": false,
+  "test_agent_profile_override": false,
+  "fixture_script_files": 97,
+  "private_fixture_root": "/private/tmp/infinishell-cli-parity-39-host-fixtures-59jgj24n",
+  "entrypoint_listed_exactly_once": true,
+  "passed": false,
+  "runner_pid": 26998,
+  "exit_code": 1,
+  "wall_seconds": 30.441,
+  "source_and_binaries_unchanged": true,
+  "public_artifacts": {
+    "/tmp/infinishell-cli-parity-official-39-files1-host-events.ndjson": {
+      "bytes": 2456,
+      "sha256": "8d0504a9b89e18116bc34a882beb01f11b809be52fff611d5c2c8ff382d0e4fe"
+    },
+    "/tmp/infinishell-cli-parity-official-39-files1-host-events.metadata.json": {
+      "bytes": 2068,
+      "sha256": "d8c6fa4372909686559a9176fa4311f0ec9d782e63c2161ff3354d7e59ae373b"
+    },
+    "/tmp/infinishell-cli-parity-official-39-files1-host-events.network.json": {
+      "bytes": 22911,
+      "sha256": "b4a1398dbbd87d9611ac8de53049b67991b32bf9beea45aefe8679d3498593e4"
+    }
+  }
+}

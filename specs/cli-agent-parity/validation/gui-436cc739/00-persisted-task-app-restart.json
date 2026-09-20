@@ -1,0 +1,24 @@
+{
+  "observed_utc": "2026-09-17T18:25:22.564362+00:00",
+  "source_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "clone_binary_sha256": "2c0d7c02c7dd6cf21ee6088b0aa04dd8b4ea66287d6fb4be4dc3f4132a0a05ad",
+  "bundle_id": "dev.infinishell.InfiniShellParityOfficial26",
+  "old_processes_not_running": true,
+  "old_process_ids": [
+    19836,
+    19843,
+    19854,
+    21215
+  ],
+  "normal_exit_code_observable": false,
+  "running_pid": 21442,
+  "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
+  "persisted_native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
+  "persisted_generation": 7,
+  "persisted_state": "completed",
+  "persisted_result_sha256": "c282327d140a0fbcfdbeefc23183a2b58cc37d25edbc6594181d818125204816",
+  "message_count_before_restart": 7,
+  "project_settings_sha256": "cd71a3552bff518dcae45edb70c5fc980c6ca92434179f74eadc71de82172a84",
+  "credential_values_recorded": false,
+  "scope": "正常退出后旧进程均已消失；同一已重签隔离应用加载原持久化数据。重启后的恢复与不重发仍待实际检查。"
+}

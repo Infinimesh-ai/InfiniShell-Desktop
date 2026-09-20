@@ -1,0 +1,81 @@
+{
+  "source_manifest_sha256": "f1235c189bb798ab46d38a09cb972b11de5f73d8f14c81b375ece0e548930f25",
+  "native_online_cli_executed": false,
+  "model_inputs": 0,
+  "tests": [
+    {
+      "name": "notification_patch_tests.py",
+      "exit_code": 0,
+      "tests": 18,
+      "seconds": 0.377,
+      "log_sha256": "ce07d2622a712caff2dcecf4d780f69ec510dff893246eee8229764f1d320a8b",
+      "summary": "OK"
+    },
+    {
+      "name": "codex_persistent_source_tests.py",
+      "exit_code": 0,
+      "tests": 13,
+      "seconds": 0.655,
+      "log_sha256": "d3bb4b93d5d58c55520364fc52da9ac84e90bc334746266f65cc4e34654c1e81",
+      "summary": "OK"
+    },
+    {
+      "name": "codex_source_runner_tests.py",
+      "exit_code": 0,
+      "tests": 16,
+      "seconds": 0.341,
+      "log_sha256": "29ffcdd7d6897314f8fc53fbfd4bd4cbb30ad49ea1dec8b1441e1949687c57f9",
+      "summary": "OK"
+    },
+    {
+      "name": "codex_journal_recovery_runner_tests.py",
+      "exit_code": 0,
+      "tests": 4,
+      "seconds": 0.1,
+      "log_sha256": "80144f3bf12d071a1497821467ab02765712cb11da3f547a5e2b5cf79f938e9a",
+      "summary": "OK"
+    },
+    {
+      "name": "grok_files_policy_runner_tests.py",
+      "exit_code": 0,
+      "tests": 15,
+      "seconds": 0.491,
+      "log_sha256": "1a42d617b37a77d26bc23e38221c9cfe51dc65340526e6510a792d6e64f5c0d4",
+      "summary": "脱敏证据：/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/tmp42e8tnp2/safe.ndjson"
+    },
+    {
+      "name": "grok_policy_preflight_runner_tests.py",
+      "exit_code": 0,
+      "tests": 75,
+      "seconds": 0.248,
+      "log_sha256": "9d83d54808a3ee491ea361f6570771ff1a81be35d34d221127ba1df0feafb6e8",
+      "summary": "OK"
+    },
+    {
+      "name": "grok_catalog_preflight_runner_tests.py",
+      "exit_code": 0,
+      "tests": 8,
+      "seconds": 0.471,
+      "log_sha256": "fddb12349dfcd3d17e699746aa35822f165e7143e5f8cbd4c39eb2067932f34c",
+      "summary": "脱敏证据：/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/tmpztfk0f9s/safe.ndjson"
+    },
+    {
+      "name": "grok_child_coordinator_runner_tests.py",
+      "exit_code": 0,
+      "tests": 19,
+      "seconds": 0.135,
+      "log_sha256": "3a23405a755a7d6d9ad22267d1635b62fbc421d698b4ebf041393d18ba32585f",
+      "summary": "OK"
+    },
+    {
+      "name": "grok_selected_skill_runner_tests.py",
+      "exit_code": 0,
+      "tests": 10,
+      "seconds": 0.149,
+      "log_sha256": "1026e7dbbb76cf6ff756876816287096ecf84c033602e0fb96ce4e22bf9bba3b",
+      "summary": "脱敏证据：/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/tmpqmfsptas/result.ndjson"
+    }
+  ],
+  "total_tests": 178,
+  "all_passed": true
+}

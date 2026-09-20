@@ -1,0 +1,1439 @@
+{
+  "schema_version": 1,
+  "status": "completed_static_review",
+  "snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+  "exact_native_provenance_verified": false,
+  "tree_request": {
+    "url": "https://api.github.com/repos/xai-org/grok-build/git/trees/482711333c7195dc16a272777f86086d615e2afb?recursive=1",
+    "observed_utc": "2026-09-17T18:55:57.233384+00:00",
+    "http_status": 200,
+    "bytes": 1225421,
+    "sha256": "c6584e31d89976ac52c14ab39732be44f8b4909c7054e58ac94ef972231588fe",
+    "truncated": false,
+    "blob_count": 3998,
+    "requests": 1
+  },
+  "raw_source_files": [
+    {
+      "path": "crates/codegen/xai-grok-shell/src/extensions/skills.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/skills.rs",
+      "observed_utc": "2026-09-17T18:56:59.844257+00:00",
+      "http_status": 200,
+      "bytes": 24018,
+      "sha256": "9120497075cbcb6fd5456a24930b1657ebae9fb66900af953de6e53608e20ea5",
+      "line_count": 681,
+      "literal_matches": [],
+      "relevant_hit_count": 16,
+      "contract_excerpts": [
+        {
+          "line": 403,
+          "text": "        \"x.ai/skills/list\" => {"
+        },
+        {
+          "line": 404,
+          "text": "            let req: SkillsListRequest = serde_json::from_str(args.params.get())?;"
+        },
+        {
+          "line": 405,
+          "text": "            let skills = reload_skills(&req.cwd, plugin_registry, compat).await;"
+        },
+        {
+          "line": 406,
+          "text": "            // Sessions otherwise learn about disk changes only from inotify,"
+        },
+        {
+          "line": 407,
+          "text": "            // which misses writes made through another NFS client."
+        },
+        {
+          "line": 408,
+          "text": "            agent.refresh_skill_baseline_for_all_sessions();"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/session_setup.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/session_setup.rs",
+      "observed_utc": "2026-09-17T18:56:59.924227+00:00",
+      "http_status": 200,
+      "bytes": 31629,
+      "sha256": "191240fb00bac9d62cd11cd84871f5d01e461e6cf83ee0687855b379feeb3cc4",
+      "line_count": 698,
+      "literal_matches": [],
+      "relevant_hit_count": 8,
+      "contract_excerpts": [
+        {
+          "line": 199,
+          "text": "    /// Returns the number of skills discovered."
+        },
+        {
+          "line": 200,
+          "text": "    #[tracing::instrument(skip_all)]"
+        },
+        {
+          "line": 201,
+          "text": "    pub(super) async fn reload_skills_from_disk(&self) -> usize {"
+        },
+        {
+          "line": 202,
+          "text": "        let cwd = &self.session_info.cwd;"
+        },
+        {
+          "line": 203,
+          "text": "        let skills_config = crate::util::config::load_config().await.skills;"
+        },
+        {
+          "line": 204,
+          "text": "        let plugin_snapshot = self.plugin_registry.borrow().clone();"
+        },
+        {
+          "line": 222,
+          "text": "            Some(effects) => self.apply_skill_update_effects(effects).await,"
+        },
+        {
+          "line": 223,
+          "text": "            None => {"
+        },
+        {
+          "line": 224,
+          "text": "                self.send_available_commands_update(AdvertiseTrigger::SkillsReload)"
+        },
+        {
+          "line": 225,
+          "text": "                    .await"
+        },
+        {
+          "line": 226,
+          "text": "            }"
+        },
+        {
+          "line": 227,
+          "text": "        }"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/updates.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/updates.rs",
+      "observed_utc": "2026-09-17T18:57:00.052946+00:00",
+      "http_status": 200,
+      "bytes": 65960,
+      "sha256": "3f5d530ebdb2477750f1bcef483cc756c3f3d45f1a73447646a1b0f6d4e4e8d2",
+      "line_count": 1482,
+      "literal_matches": [],
+      "relevant_hit_count": 162,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_session.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session.rs",
+      "observed_utc": "2026-09-17T18:57:00.253088+00:00",
+      "http_status": 200,
+      "bytes": 113843,
+      "sha256": "ddf701cb4b3673337c9a63955db6b1cc6cade0a30260e13395d08a8e84900040",
+      "line_count": 2247,
+      "literal_matches": [],
+      "relevant_hit_count": 34,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-acp-lib/src/message.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-acp-lib/src/message.rs",
+      "observed_utc": "2026-09-17T18:57:00.894273+00:00",
+      "http_status": 200,
+      "bytes": 24606,
+      "sha256": "0854b79f14d2d4633f3cbae75e68a51cacc99bdd487049c8ffc0e466814a4e0e",
+      "line_count": 634,
+      "literal_matches": [],
+      "relevant_hit_count": 24,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-acp-lib/src/common.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-acp-lib/src/common.rs",
+      "observed_utc": "2026-09-17T18:57:00.884254+00:00",
+      "http_status": 200,
+      "bytes": 4212,
+      "sha256": "9cd52d2ac0ede62935831b96e69ce1b5d3af67678355ad3c077ddc9bf1849f68",
+      "line_count": 109,
+      "literal_matches": [],
+      "relevant_hit_count": 0,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/leader/protocol.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/leader/protocol.rs",
+      "http_status": 200,
+      "bytes": 41602,
+      "sha256": "b9207e87de886d53744abd55739819c09b224ab39148882bd6af399d2fffcf41",
+      "line_count": 1120,
+      "observed_utc": "2026-09-17T19:00:52.607966+00:00",
+      "literal_matches": [],
+      "relevant_hit_count": 41,
+      "contract_excerpts": [
+        {
+          "line": 508,
+          "text": "/// Extension methods injected into the agent, named as the agent matches them."
+        },
+        {
+          "line": 509,
+          "text": "#[derive(Clone, Copy, Debug, PartialEq, Eq, strum::EnumIter)]"
+        },
+        {
+          "line": 510,
+          "text": "pub(crate) enum InternalMethod {"
+        },
+        {
+          "line": 511,
+          "text": "    AuthCleared,"
+        },
+        {
+          "line": 512,
+          "text": "    EvictSessions,"
+        },
+        {
+          "line": 513,
+          "text": "    ReloadAllMcpServers,"
+        },
+        {
+          "line": 514,
+          "text": "    ReloadModels,"
+        },
+        {
+          "line": 515,
+          "text": "    ReloadModelsCache,"
+        },
+        {
+          "line": 516,
+          "text": "    ReloadProjectMcpServers,"
+        },
+        {
+          "line": 517,
+          "text": "    ReloadSkills,"
+        },
+        {
+          "line": 518,
+          "text": "    ReloadWorkflows,"
+        },
+        {
+          "line": 524,
+          "text": "            Self::AuthCleared => \"x.ai/internal/auth_cleared\","
+        },
+        {
+          "line": 525,
+          "text": "            Self::EvictSessions => \"x.ai/internal/evict_sessions\","
+        },
+        {
+          "line": 526,
+          "text": "            Self::ReloadAllMcpServers => \"x.ai/internal/reload_all_mcp_servers\","
+        },
+        {
+          "line": 527,
+          "text": "            Self::ReloadModels => \"x.ai/internal/reload_models\","
+        },
+        {
+          "line": 528,
+          "text": "            Self::ReloadModelsCache => \"x.ai/internal/reload_models_cache\","
+        },
+        {
+          "line": 529,
+          "text": "            Self::ReloadProjectMcpServers => \"x.ai/internal/reload_project_mcp_servers\","
+        },
+        {
+          "line": 530,
+          "text": "            Self::ReloadSkills => \"x.ai/internal/reload_skills\","
+        },
+        {
+          "line": 531,
+          "text": "            Self::ReloadWorkflows => \"x.ai/internal/reload_workflows\","
+        },
+        {
+          "line": 532,
+          "text": "        }"
+        },
+        {
+          "line": 541,
+          "text": "    /// The decoder routes a custom method to `ext_method` or `ext_notification` only when it carries the `_` prefix, and rejects the bare name."
+        },
+        {
+          "line": 542,
+          "text": "    fn wire_name(self) -> String {"
+        },
+        {
+          "line": 543,
+          "text": "        format!(\"_{}\", self.name())"
+        },
+        {
+          "line": 544,
+          "text": "    }"
+        },
+        {
+          "line": 558,
+          "text": "pub(crate) fn internal_request_line("
+        },
+        {
+          "line": 559,
+          "text": "    id: &str,"
+        },
+        {
+          "line": 560,
+          "text": "    method: InternalMethod,"
+        },
+        {
+          "line": 562,
+          "text": ") -> String {"
+        },
+        {
+          "line": 563,
+          "text": "    let msg = serde_json::json!({"
+        },
+        {
+          "line": 564,
+          "text": "        \"jsonrpc\": \"2.0\","
+        },
+        {
+          "line": 565,
+          "text": "        \"id\": id,"
+        },
+        {
+          "line": 566,
+          "text": "        \"method\": method.wire_name(),"
+        },
+        {
+          "line": 567,
+          "text": "        \"params\": params,"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-acp-lib/src/stdin_reader.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-acp-lib/src/stdin_reader.rs",
+      "http_status": 200,
+      "bytes": 8480,
+      "sha256": "2bb52d3d13e847b0345987b2edaa07c46813fe2b0d1b4b1744d968ca4876eac7",
+      "line_count": 187,
+      "observed_utc": "2026-09-17T19:00:52.603241+00:00",
+      "literal_matches": [],
+      "relevant_hit_count": 3,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/acp_session_impl/extensions.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/extensions.rs",
+      "http_status": 200,
+      "bytes": 1956,
+      "sha256": "4b092fbfa212a528ed319078197d59aef411f6b1e0ab116abcc79bc122bca1f4",
+      "line_count": 57,
+      "observed_utc": "2026-09-17T19:00:52.376280+00:00",
+      "literal_matches": [],
+      "relevant_hit_count": 14,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-grok-pager/src/acp/spawn.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager/src/acp/spawn.rs",
+      "http_status": 200,
+      "bytes": 29277,
+      "sha256": "3b0f855cc7fedd194c27f6d6578ea025dada726d122cb582b345443d79f52740",
+      "line_count": 718,
+      "observed_utc": "2026-09-17T19:01:23.089176+00:00",
+      "literal_matches": [],
+      "relevant_hit_count": 23,
+      "contract_excerpts": [
+        {
+          "line": 449,
+          "text": "fn spawn_skills_file_watcher("
+        },
+        {
+          "line": 450,
+          "text": "    agent: Rc<MvpAgent>,"
+        },
+        {
+          "line": 451,
+          "text": "    skills_paths: Vec<String>,"
+        },
+        {
+          "line": 452,
+          "text": "    cancel: CancellationToken,"
+        },
+        {
+          "line": 453,
+          "text": ") -> tokio::task::JoinHandle<()> {"
+        },
+        {
+          "line": 454,
+          "text": "    // Resolve the workspace at call time; the blocking pool may run this after cwd changes."
+        },
+        {
+          "line": 461,
+          "text": "            let _span = tracing::info_span!(\"skills_watcher\").entered();"
+        },
+        {
+          "line": 462,
+          "text": "            SkillsFileWatcher::start("
+        },
+        {
+          "line": 463,
+          "text": "                Some(cwd.as_path()),"
+        },
+        {
+          "line": 464,
+          "text": "                workspace_user_dir.as_deref(),"
+        },
+        {
+          "line": 465,
+          "text": "                &skills_paths,"
+        },
+        {
+          "line": 466,
+          "text": "            )"
+        },
+        {
+          "line": 467,
+          "text": "        })"
+        },
+        {
+          "line": 480,
+          "text": "            tokio::select! {"
+        },
+        {
+          "line": 481,
+          "text": "                _ = cancel.cancelled() => break,"
+        },
+        {
+          "line": 482,
+          "text": "                maybe = skills_rx.recv() => match maybe {"
+        },
+        {
+          "line": 483,
+          "text": "                    Some(change) => {"
+        },
+        {
+          "line": 484,
+          "text": "                        let created_discovery_dir = watcher.refresh_new_discovery_dirs();"
+        },
+        {
+          "line": 485,
+          "text": "                        apply_discovery_change(&agent, change, created_discovery_dir);"
+        },
+        {
+          "line": 486,
+          "text": "                    }"
+        },
+        {
+          "line": 487,
+          "text": "                    None => break,"
+        },
+        {
+          "line": 494,
+          "text": "fn apply_discovery_change(agent: &MvpAgent, change: DiscoveryChange, created_discovery_dir: bool) {"
+        },
+        {
+          "line": 495,
+          "text": "    match change {"
+        },
+        {
+          "line": 496,
+          "text": "        DiscoveryChange::Skills => {"
+        },
+        {
+          "line": 497,
+          "text": "            tracing::info!(\"skill directory changed on disk; reloading skills for all sessions\");"
+        },
+        {
+          "line": 498,
+          "text": "            agent.reload_skills_all_sessions();"
+        },
+        {
+          "line": 499,
+          "text": "            if created_discovery_dir {"
+        },
+        {
+          "line": 500,
+          "text": "                agent.advertise_commands_all_sessions();"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/leader/mod.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/leader/mod.rs",
+      "http_status": 200,
+      "bytes": 111272,
+      "sha256": "ff5bff6c6ac22a2bab3cd1de639b13e1d6187ee2dea366ff2c1f5808c407787e",
+      "line_count": 2604,
+      "observed_utc": "2026-09-17T19:02:01.449470+00:00",
+      "literal_matches": [],
+      "relevant_hit_count": 77,
+      "contract_excerpts": []
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/leader/server.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/leader/server.rs",
+      "observed_utc": "2026-09-17T19:02:35.025369+00:00",
+      "literal_matches": [
+        {
+          "line": 474,
+          "literal": "x.ai/mcp/servers_updated",
+          "constructed_utf8": "_x.ai/mcp/servers_updated",
+          "utf8_bytes": 25,
+          "sha256": "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580"
+        }
+      ],
+      "bytes": 122143,
+      "http_status": 200,
+      "sha256": "a9b149edd1eb711498290a8d34591ac1a5fb3eb5bcd1711943afd935c0383443",
+      "line_count": 2657,
+      "relevant_hit_count": 12,
+      "contract_excerpts": [
+        {
+          "line": 465,
+          "text": "/// Whether a payload is a machine-wide notification (no `sessionId`) that must be **broadcast to every client**."
+        },
+        {
+          "line": 466,
+          "text": "/// These never fall through to the last-active-client fallback: `x.ai/sessions/changed`: the session roster changed; every open dashboard must stay in sync."
+        },
+        {
+          "line": 467,
+          "text": "/// Every connected client's model picker must refresh, not just the most recently active one. `x.ai/mcp/servers_updated`: the MCP catalog resolved or changed (managed connectors fetched in the background after `initialize`). The push fires seconds after `initialize` returns. Broadcast is safe: the pager handler only debounce-refetches `mcp/list` for agents with an open extensions modal."
+        },
+        {
+          "line": 468,
+          "text": "fn is_machine_wide_broadcast_notification(json: &serde_json::Value) -> bool {"
+        },
+        {
+          "line": 469,
+          "text": "    matches!("
+        },
+        {
+          "line": 470,
+          "text": "        method_of(json),"
+        },
+        {
+          "line": 471,
+          "text": "        Some("
+        },
+        {
+          "line": 472,
+          "text": "            \"x.ai/sessions/changed\""
+        },
+        {
+          "line": 473,
+          "text": "                | \"x.ai/models/update\""
+        },
+        {
+          "line": 474,
+          "text": "                | \"x.ai/mcp/servers_updated\""
+        },
+        {
+          "line": 475,
+          "text": "                | \"x.ai/announcements/update\""
+        },
+        {
+          "line": 476,
+          "text": "        )"
+        },
+        {
+          "line": 477,
+          "text": "    )"
+        },
+        {
+          "line": 478,
+          "text": "}"
+        },
+        {
+          "line": 479,
+          "text": "/// The namespaced method a leader payload carries, normalizing the two ext wire forms the gateway produces: direct: `{\"method\":\"x.ai/foo\", ...}` -> `x.ai/foo` wrapped: `{\"method\":\"_x.ai/foo\",\"params\":{\"method\":\"x.ai/foo\",...}}` -> `x.ai/foo`"
+        }
+      ]
+    }
+  ],
+  "raw_source_request_count": 12,
+  "raw_source_bytes": 578998,
+  "auth_or_private_native_content_read": false,
+  "native_executed": false,
+  "raw_source_request_budget_exhausted": true,
+  "reused_cached_primary_sources": [
+    {
+      "path": "crates/codegen/xai-grok-shell/src/extensions/mcp.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mcp.rs",
+      "bytes": 142515,
+      "sha256": "cd764b68964071c6bee5f47d12980f46b2e93eb3394b7cbe7808f91e98692e94",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 26,
+          "text": "pub mod mcp_methods {"
+        },
+        {
+          "line": 27,
+          "text": "    /// Shared prefix that routes every MCP ext method to this module's dispatcher."
+        },
+        {
+          "line": 28,
+          "text": "    pub const PREFIX: &str = \"x.ai/mcp/\";"
+        },
+        {
+          "line": 29,
+          "text": ""
+        },
+        {
+          "line": 30,
+          "text": "    pub const LIST: &str = \"x.ai/mcp/list\";"
+        },
+        {
+          "line": 31,
+          "text": "    pub const READ_RESOURCE: &str = \"x.ai/mcp/read_resource\";"
+        },
+        {
+          "line": 32,
+          "text": "    pub const AUTH_STATUS: &str = \"x.ai/mcp/auth_status\";"
+        },
+        {
+          "line": 33,
+          "text": "    pub const AUTH_TRIGGER: &str = \"x.ai/mcp/auth_trigger\";"
+        },
+        {
+          "line": 34,
+          "text": "    pub const SETUP: &str = \"x.ai/mcp/setup\";"
+        },
+        {
+          "line": 35,
+          "text": "    pub const TOGGLE: &str = \"x.ai/mcp/toggle\";"
+        },
+        {
+          "line": 36,
+          "text": "    pub const TOGGLE_TOOL: &str = \"x.ai/mcp/toggle_tool\";"
+        },
+        {
+          "line": 37,
+          "text": "    pub const UPSERT: &str = \"x.ai/mcp/upsert\";"
+        },
+        {
+          "line": 38,
+          "text": "    pub const DELETE: &str = \"x.ai/mcp/delete\";"
+        },
+        {
+          "line": 39,
+          "text": ""
+        },
+        {
+          "line": 40,
+          "text": "    pub const SERVERS_UPDATED: &str = \"x.ai/mcp/servers_updated\";"
+        },
+        {
+          "line": 41,
+          "text": "    pub const TOOLS_CHANGED: &str = \"x.ai/mcp/tools_changed\";"
+        },
+        {
+          "line": 42,
+          "text": "    pub const INIT_PROGRESS: &str = \"x.ai/mcp/init_progress\";"
+        },
+        {
+          "line": 43,
+          "text": "}"
+        },
+        {
+          "line": 70,
+          "text": "#[derive(Debug, Clone, Serialize)]"
+        },
+        {
+          "line": 71,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 72,
+          "text": "pub struct McpServerEntry {"
+        },
+        {
+          "line": 73,
+          "text": "    pub name: String,"
+        },
+        {
+          "line": 74,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 75,
+          "text": "    pub display_name: Option<String>,"
+        },
+        {
+          "line": 76,
+          "text": "    #[serde(default, skip_serializing_if = \"Vec::is_empty\")]"
+        },
+        {
+          "line": 77,
+          "text": "    pub icons: Vec<xai_grok_mcp::servers::McpIcon>,"
+        },
+        {
+          "line": 78,
+          "text": "    pub source: McpServerSource,"
+        },
+        {
+          "line": 79,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 80,
+          "text": "    pub source_label: Option<String>,"
+        },
+        {
+          "line": 81,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 82,
+          "text": "    pub setup: Option<crate::util::config::McpSetupConfig>,"
+        },
+        {
+          "line": 83,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 84,
+          "text": "    pub setup_values: Option<HashMap<String, String>>,"
+        },
+        {
+          "line": 85,
+          "text": "    #[serde(flatten)]"
+        },
+        {
+          "line": 86,
+          "text": "    pub config: McpServerConfig,"
+        },
+        {
+          "line": 87,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 88,
+          "text": "    pub session: Option<McpServerSessionState>,"
+        },
+        {
+          "line": 89,
+          "text": "}"
+        },
+        {
+          "line": 90,
+          "text": ""
+        },
+        {
+          "line": 91,
+          "text": "/// MCP server config for the `mcp/list` catalog response."
+        },
+        {
+          "line": 92,
+          "text": "/// Distinct from `acp::McpServer` (session/new input) because: HTTP: exposes `scope`, `scope_id`, and `scope_name` for connector selection, NOT headers (auth tokens stay private)"
+        },
+        {
+          "line": 93,
+          "text": "/// Stdio: same structure but optimized for JSON wire format"
+        },
+        {
+          "line": 94,
+          "text": "#[derive(Debug, Clone, Serialize)]"
+        },
+        {
+          "line": 95,
+          "text": "#[serde(tag = \"type\", rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 96,
+          "text": "pub enum McpServerConfig {"
+        },
+        {
+          "line": 97,
+          "text": "    #[serde(rename = \"http\")]"
+        },
+        {
+          "line": 98,
+          "text": "    Http {"
+        },
+        {
+          "line": 99,
+          "text": "        url: String,"
+        },
+        {
+          "line": 100,
+          "text": "        #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 101,
+          "text": "        scope: Option<String>,"
+        },
+        {
+          "line": 102,
+          "text": "        #[serde(rename = \"scopeId\", skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 103,
+          "text": "        scope_id: Option<String>,"
+        },
+        {
+          "line": 104,
+          "text": "        #[serde(rename = \"scopeName\", skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 105,
+          "text": "        scope_name: Option<String>,"
+        },
+        {
+          "line": 106,
+          "text": "    },"
+        },
+        {
+          "line": 107,
+          "text": "    #[serde(rename = \"stdio\")]"
+        },
+        {
+          "line": 108,
+          "text": "    Stdio {"
+        },
+        {
+          "line": 109,
+          "text": "        command: std::path::PathBuf,"
+        },
+        {
+          "line": 110,
+          "text": "        #[serde(default, skip_serializing_if = \"Vec::is_empty\")]"
+        },
+        {
+          "line": 111,
+          "text": "        args: Vec<String>,"
+        },
+        {
+          "line": 112,
+          "text": "        #[serde(default, skip_serializing_if = \"Vec::is_empty\")]"
+        },
+        {
+          "line": 113,
+          "text": "        env: Vec<McpEnvVar>,"
+        },
+        {
+          "line": 114,
+          "text": "    },"
+        },
+        {
+          "line": 115,
+          "text": "    #[serde(rename = \"managedGateway\")]"
+        },
+        {
+          "line": 116,
+          "text": "    ManagedGateway,"
+        },
+        {
+          "line": 117,
+          "text": "}"
+        },
+        {
+          "line": 118,
+          "text": ""
+        },
+        {
+          "line": 119,
+          "text": "#[derive(Debug, Clone, Serialize)]"
+        },
+        {
+          "line": 120,
+          "text": "pub struct McpEnvVar {"
+        },
+        {
+          "line": 121,
+          "text": "    pub name: String,"
+        },
+        {
+          "line": 122,
+          "text": "    pub value: String,"
+        },
+        {
+          "line": 123,
+          "text": "}"
+        },
+        {
+          "line": 124,
+          "text": ""
+        },
+        {
+          "line": 135,
+          "text": "    pub enabled: bool,"
+        },
+        {
+          "line": 136,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 137,
+          "text": "    pub status: Option<McpSessionStatus>,"
+        },
+        {
+          "line": 138,
+          "text": "    #[serde(default, skip_serializing_if = \"Vec::is_empty\")]"
+        },
+        {
+          "line": 139,
+          "text": "    pub tools: Vec<McpToolEntry>,"
+        },
+        {
+          "line": 140,
+          "text": "    #[serde(default, skip_serializing_if = \"std::ops::Not::not\")]"
+        },
+        {
+          "line": 141,
+          "text": "    pub auth_required: bool,"
+        },
+        {
+          "line": 142,
+          "text": "    #[serde(default, skip_serializing_if = \"std::ops::Not::not\")]"
+        },
+        {
+          "line": 143,
+          "text": "    pub setup_required: bool,"
+        },
+        {
+          "line": 144,
+          "text": "    /// Managed-policy verdict for a server the merge dropped, so `/mcps` can say \"blocked by policy\""
+        },
+        {
+          "line": 145,
+          "text": "    /// instead of a generic \"unavailable\"; old pagers ignore the extra field."
+        },
+        {
+          "line": 146,
+          "text": "    #[serde(default, skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 147,
+          "text": "    pub blocked_reason: Option<String>,"
+        },
+        {
+          "line": 148,
+          "text": "}"
+        },
+        {
+          "line": 149,
+          "text": ""
+        },
+        {
+          "line": 150,
+          "text": "#[derive(Debug, Clone, Serialize, PartialEq, Eq)]"
+        },
+        {
+          "line": 151,
+          "text": "#[serde(rename_all = \"lowercase\")]"
+        },
+        {
+          "line": 152,
+          "text": "pub enum McpSessionStatus {"
+        },
+        {
+          "line": 153,
+          "text": "    Ready,"
+        },
+        {
+          "line": 154,
+          "text": "    Initializing,"
+        },
+        {
+          "line": 155,
+          "text": "    SetupRequired,"
+        },
+        {
+          "line": 156,
+          "text": "    Unavailable,"
+        },
+        {
+          "line": 157,
+          "text": "}"
+        },
+        {
+          "line": 158,
+          "text": ""
+        },
+        {
+          "line": 159,
+          "text": "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]"
+        },
+        {
+          "line": 160,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 161,
+          "text": "pub struct McpToolEntry {"
+        },
+        {
+          "line": 162,
+          "text": "    pub name: String,"
+        },
+        {
+          "line": 163,
+          "text": "    #[serde(default, skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 164,
+          "text": "    pub display_name: Option<String>,"
+        },
+        {
+          "line": 165,
+          "text": "    #[serde(default, skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 166,
+          "text": "    pub description: Option<String>,"
+        },
+        {
+          "line": 167,
+          "text": "    #[serde(rename = \"_meta\", default, skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 168,
+          "text": "    pub meta: Option<serde_json::Value>,"
+        },
+        {
+          "line": 225,
+          "text": "// ── Notification: mcp/servers_updated ────────────────────────────────"
+        },
+        {
+          "line": 226,
+          "text": ""
+        },
+        {
+          "line": 227,
+          "text": "#[derive(Debug, Serialize)]"
+        },
+        {
+          "line": 228,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 229,
+          "text": "pub struct McpServersUpdated {"
+        },
+        {
+          "line": 230,
+          "text": "    pub mcp_servers: Vec<McpServerEntry>,"
+        },
+        {
+          "line": 231,
+          "text": "}"
+        },
+        {
+          "line": 232,
+          "text": ""
+        },
+        {
+          "line": 233,
+          "text": "/// Per-server tool-list change push. Emitted by [`crate::session::acp_session::AcpSession`] on the post-handshake, auth-recovery, and toggle-tool paths."
+        },
+        {
+          "line": 234,
+          "text": "/// The `session_id` field lets the pager route the push to the owning agent via `find_session_match`. Falling back to `app.active_view` was a latent multi-agent bug."
+        },
+        {
+          "line": 235,
+          "text": "#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]"
+        },
+        {
+          "line": 236,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 237,
+          "text": "pub struct McpToolsChanged {"
+        },
+        {
+          "line": 238,
+          "text": "    /// Session that owns this push."
+        },
+        {
+          "line": 239,
+          "text": "    /// The pager routes via `find_session_match` so a background-agent push does not land on the foregrounded agent's modal."
+        },
+        {
+          "line": 240,
+          "text": "    pub session_id: String,"
+        },
+        {
+          "line": 241,
+          "text": "    /// MCP server whose tool list changed. Currently unread by the pager. The pager treats every `tools_changed` push as a trigger to schedule a debounced `mcp/list` refetch and re-reads the full catalog."
+        },
+        {
+          "line": 242,
+          "text": "    /// The toggle-tool path therefore leaves this empty for forward-compat. A future field-aware pager optimization would need to special-case empty as \"not scoped to one server\"; no consumer reads that today."
+        },
+        {
+          "line": 243,
+          "text": "    #[serde(default, skip_serializing_if = \"String::is_empty\")]"
+        },
+        {
+          "line": 287,
+          "text": ""
+        },
+        {
+          "line": 288,
+          "text": "/// Push the full MCP catalog to the client."
+        },
+        {
+          "line": 289,
+          "text": "/// Called in the background after launch-dir MCP discovery so `initialize()` isn't blocked by config walks."
+        },
+        {
+          "line": 290,
+          "text": "pub async fn notify_servers_updated("
+        },
+        {
+          "line": 291,
+          "text": "    gateway: &xai_acp_lib::AcpAgentGatewaySender,"
+        },
+        {
+          "line": 292,
+          "text": "    local_servers: &[acp::McpServer],"
+        },
+        {
+          "line": 293,
+          "text": ") {"
+        },
+        {
+          "line": 294,
+          "text": "    let catalog = build_mcp_catalog(local_servers);"
+        },
+        {
+          "line": 295,
+          "text": "    let payload = McpServersUpdated {"
+        },
+        {
+          "line": 296,
+          "text": "        mcp_servers: catalog,"
+        },
+        {
+          "line": 297,
+          "text": "    };"
+        },
+        {
+          "line": 298,
+          "text": "    if let Ok(params) = serde_json::value::to_raw_value(&payload) {"
+        },
+        {
+          "line": 299,
+          "text": "        let notification = acp::ExtNotification::new(mcp_methods::SERVERS_UPDATED, params.into());"
+        },
+        {
+          "line": 300,
+          "text": "        let _ = gateway.ext_notification(notification).await;"
+        },
+        {
+          "line": 301,
+          "text": "        tracing::info!(\"Sent x.ai/mcp/servers_updated notification to client\");"
+        },
+        {
+          "line": 302,
+          "text": "    }"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/extensions/session_admin.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/session_admin.rs",
+      "bytes": 43249,
+      "sha256": "cdc05b3cb5b740b1f07c7906ab2bc2ca04ff073de6a4acf8353ccba24bd69e31",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 12,
+          "text": "//! - `x.ai/internal/reload_all_mcp_servers` config hot-reload, all sessions"
+        },
+        {
+          "line": 13,
+          "text": "//! - `x.ai/internal/reload_project_mcp_servers` config hot-reload, cwd-scoped"
+        },
+        {
+          "line": 14,
+          "text": "//! - `x.ai/internal/reload_skills`          skills file watcher fan-out"
+        },
+        {
+          "line": 15,
+          "text": "//! - `x.ai/internal/reload_models`          model list hot-reload from config.toml"
+        },
+        {
+          "line": 16,
+          "text": "//! - `x.ai/internal/reload_models_cache`    model catalog hot-reload from disk cache"
+        },
+        {
+          "line": 29,
+          "text": "use crate::agent::MvpAgent;"
+        },
+        {
+          "line": 30,
+          "text": "use crate::leader::protocol::InternalMethod;"
+        },
+        {
+          "line": 31,
+          "text": "use crate::session::persistence::{"
+        },
+        {
+          "line": 66,
+          "text": "        InternalMethod::ReloadProjectMcpServers => {"
+        },
+        {
+          "line": 67,
+          "text": "            handle_reload_project_mcp_servers(agent, args).await"
+        },
+        {
+          "line": 68,
+          "text": "        }"
+        },
+        {
+          "line": 69,
+          "text": "        InternalMethod::ReloadSkills => handle_reload_skills(agent),"
+        },
+        {
+          "line": 607,
+          "text": ""
+        },
+        {
+          "line": 608,
+          "text": "// internal/reload_skills"
+        },
+        {
+          "line": 609,
+          "text": ""
+        },
+        {
+          "line": 610,
+          "text": "/// Reload skills for ALL active sessions. Called by the skills file watcher"
+        },
+        {
+          "line": 611,
+          "text": "fn handle_reload_skills(agent: &MvpAgent) -> ExtResult {"
+        },
+        {
+          "line": 612,
+          "text": "    let reloaded = agent.reload_skills_all_sessions();"
+        },
+        {
+          "line": 613,
+          "text": "    ExtMethodResult::success(serde_json::json!({ \"reloaded\": reloaded }))"
+        },
+        {
+          "line": 614,
+          "text": "        .to_ext_response()"
+        },
+        {
+          "line": 615,
+          "text": "        .map_err(|e| acp::Error::internal_error().data(e.to_string()))"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/result.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/result.rs",
+      "bytes": 4398,
+      "sha256": "ea717cb2245a7cc8fe6ee687186f4b77e80281dde27f3fb6ff851afecd64bad9",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 30,
+          "text": "#[derive(Debug, Clone, Serialize, Deserialize)]"
+        },
+        {
+          "line": 31,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 32,
+          "text": "pub struct ExtMethodResult<T: Serialize> {"
+        },
+        {
+          "line": 33,
+          "text": "    pub result: Option<T>,"
+        },
+        {
+          "line": 34,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 35,
+          "text": "    pub error: Option<serde_json::Value>,"
+        },
+        {
+          "line": 36,
+          "text": "}"
+        },
+        {
+          "line": 37,
+          "text": ""
+        },
+        {
+          "line": 57,
+          "text": "        Self {"
+        },
+        {
+          "line": 58,
+          "text": "            result: Some(result),"
+        },
+        {
+          "line": 59,
+          "text": "            error: None,"
+        },
+        {
+          "line": 60,
+          "text": "        }"
+        },
+        {
+          "line": 61,
+          "text": "    }"
+        },
+        {
+          "line": 62,
+          "text": ""
+        },
+        {
+          "line": 85,
+          "text": "        serde_json::to_value(self)"
+        },
+        {
+          "line": 86,
+          "text": "            .and_then(|v| to_raw_value(&v))"
+        },
+        {
+          "line": 87,
+          "text": "            .map(|raw| acp::ExtResponse::new(Arc::from(raw)))"
+        },
+        {
+          "line": 88,
+          "text": "            .map_err(|e| anyhow::anyhow!(e))"
+        },
+        {
+          "line": 89,
+          "text": "    }"
+        },
+        {
+          "line": 90,
+          "text": "}"
+        },
+        {
+          "line": 91,
+          "text": ""
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/extensions/mod.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mod.rs",
+      "bytes": 3084,
+      "sha256": "f2af3d918552016883c4dfff0ac9c3bab477a75ccf3da50f35c281f1ee85f51f",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 70,
+          "text": "pub fn to_ext_response<T: Serialize>(result: anyhow::Result<T>) -> ExtResult {"
+        },
+        {
+          "line": 71,
+          "text": "    ExtMethodResult::from_result(result)"
+        },
+        {
+          "line": 72,
+          "text": "        .to_ext_response()"
+        },
+        {
+          "line": 73,
+          "text": "        .map_err(|e| acp::Error::internal_error().data(e.to_string()))"
+        },
+        {
+          "line": 74,
+          "text": "}"
+        },
+        {
+          "line": 75,
+          "text": "/// Wrap a serializable value as an `ExtResponse` without the `ExtMethodResult` envelope."
+        },
+        {
+          "line": 76,
+          "text": "pub(crate) fn to_raw_response<T: Serialize>(v: &T) -> ExtResult {"
+        },
+        {
+          "line": 77,
+          "text": "    serde_json::value::to_raw_value(v)"
+        },
+        {
+          "line": 78,
+          "text": "        .map(|raw| acp::ExtResponse::new(Arc::from(raw)))"
+        }
+      ]
+    }
+  ],
+  "completed_utc": "2026-09-17T19:04:36.150679+00:00",
+  "hash_encoding": "string raw UTF-8 bytes, without JSON quotes",
+  "notification_method_match": {
+    "observed_utf8_bytes": 25,
+    "observed_sha256": "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580",
+    "bare_source_literal": "x.ai/mcp/servers_updated",
+    "acp_wire_method": "_x.ai/mcp/servers_updated",
+    "construction": "ACP extension underscore prefix",
+    "matching_source_declarations": 2,
+    "matching_sources": [
+      "extensions/mcp.rs:40",
+      "leader/server.rs:474"
+    ],
+    "params_shape": "object with mcpServers array, no sessionId",
+    "candidate_scope": "machine-wide MCP catalog notification, not turn/permission/tool-call origin"
+  },
+  "response_carrier_key_match": {
+    "observed_utf8_bytes": 6,
+    "observed_sha256": "f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68",
+    "key": "result",
+    "value_type": "object",
+    "matching_fixed_key_count": 1,
+    "source": "session/result.rs:30-37,85-91",
+    "private_envelope_read": false,
+    "inner_result_values_known": false
+  },
+  "skills_reload_id": {
+    "observed_utf8_bytes": 13,
+    "observed_sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+    "prior_fixed_binary_literal": "skills-reload",
+    "prior_fixed_binary_offset": 116151162,
+    "prior_fixed_binary_match_count": 1,
+    "current_native_binary_read": false,
+    "candidate_literal_match_count": 0,
+    "candidate_internal_request_method": "_x.ai/internal/reload_skills",
+    "candidate_request_builder_accepts_string_id": true,
+    "exact_skills_reload_id_callsite_verified": false,
+    "native_response_owned_by_app": false,
+    "application_pending_numeric_id": 4,
+    "application_pending_kind": "prompt"
+  },
+  "minimal_adaptation": [
+    "Policy preflight may recognize the exact catalog notification before session binding, validate bounded mcpServers catalog and enforce the pre-registered server closure; it must not create session/prompt/tool identities or permission verification.",
+    "Do not consume or ignore the unowned skills-reload response as prompt completion. App-initiated maintenance requests require their own actual outbound ID/generation ledger and validated ExtMethodResult envelope.",
+    "The bounded source review does not prove that issuing a new owned reload request prevents or safely correlates the already observed unsolicited internal string-ID response. Its injection/callsite must be verified separately before accepting it.",
+    "Keep MCP SDK outer/inner IDs separate from ACP maintenance IDs; neither a catalog update nor result wrapper proves an inspect call, native ACK, origin, root permission ceiling, or managed-task acceptance."
+  ],
+  "remaining_unknowns": [
+    "Exact published native binary to public snapshot source mapping",
+    "Fixed-native skills-reload injection callsite and who owns its transaction",
+    "Actual native mcpServers catalog value/field set and inner result schema; no private values read",
+    "Capability/model-configuration causal relationship to the observed response; no evidence in inspected files"
+  ],
+  "validation_scope": {
+    "new_recursive_tree_http_requests": 1,
+    "new_raw_source_http_requests": 12,
+    "new_raw_source_bytes": 578998,
+    "per_raw_source_limit_bytes": 262144,
+    "aggregate_limit_bytes": 2097152,
+    "all_http_statuses_200": true,
+    "cargo_run": false,
+    "native_run": false,
+    "model_requests": 0,
+    "production_source_modified": false,
+    "private_native_or_auth_body_read": false,
+    "interface_pass_claimed": false,
+    "finished_reads_done": true
+  },
+  "public_field_shape_evidence": {
+    "path": "specs/cli-agent-parity/validation/grok-27-native-response-field-shapes.json",
+    "bytes": 1013,
+    "sha256": "a0bc934fc9f285f2c49b704aef04b661282339e269cc9eb638bd2359a2db55c3"
+  }
+}

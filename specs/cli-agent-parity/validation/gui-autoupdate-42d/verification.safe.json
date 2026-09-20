@@ -1,0 +1,95 @@
+{
+  "scope": "macos_cli_autoupdate_settings_gui",
+  "base_commit": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "source_manifest_sha256": "6d67d82dec66e0d301820a216e8d3ab6acb041bd2986a9b8728f9b0a307c30f9",
+  "source_binary_sha256": "103cf2ff47f4856621278190cb79a1fac6005069da3b576f6a05890bb85e53e1",
+  "gui_signed_clone_sha256": "47a0e16bdef7ae8742038c5ba84f62499db8d2ee0b4050433341e6b854009ccd",
+  "same_commit_verified": false,
+  "locales": [
+    "en",
+    "zh-CN"
+  ],
+  "window_pixels": [
+    1230,
+    768
+  ],
+  "launches": 2,
+  "app_exited": true,
+  "observations": {
+    "three_channel_dropdowns_in_both_locales": true,
+    "no_clipping_or_overlap_in_checked_update_widgets": true,
+    "independent_toggles_saved_and_restored_after_restart": true,
+    "codex_selected_alpha_restored": true,
+    "claude_selected_stable_restored": true,
+    "grok_selected_alpha_restored": true,
+    "all_three_toggles_off_after_restart": true,
+    "english_search_scoped_per_cli": true,
+    "chinese_codex_update_search_scoped": true,
+    "grok_missing_install_guide_visible": true
+  },
+  "limits": [
+    "开发构建未启用 settings_file，预置 settings.toml 未加载；之后真实界面操作和系统偏好保存通过。",
+    "检测器仍从系统安装路径发现 Claude/Codex；更新器均为来源未识别状态，无更新执行。Grok 为未安装。",
+    "中文 typeText 未输入完整关键词，paste 工具报告等待剪贴板超时，但随后的真实截图已确认完整 codex 更新及单条结果。",
+    "不代表真实 IME 验收、不代表成功安装布局、不代表原生升级或模型任务链通过。"
+  ],
+  "update_actions_clicked": 0,
+  "credentials_copied": false,
+  "screenshots": [
+    {
+      "path": "en-claude-channels.png",
+      "bytes": 119387,
+      "sha256": "313f67861017847f53853cd093a6091fa2604f3d1a637101096d2b183a397537"
+    },
+    {
+      "path": "en-claude-search.png",
+      "bytes": 64464,
+      "sha256": "21c6b0af99a7cf345791fb161e84438237c27789525ad8ff6bf6e929cfee0286"
+    },
+    {
+      "path": "en-codex-channels.png",
+      "bytes": 120884,
+      "sha256": "41bebcb3a751f8bcb0b5ca15ed054c28e69574c0b8e2180d4c11a6d74673b8b6"
+    },
+    {
+      "path": "en-codex-search.png",
+      "bytes": 64688,
+      "sha256": "9f2d0434331ebda398c8ce614bd1369453037192168438971c40e40e5c1d2c15"
+    },
+    {
+      "path": "en-grok-channels.png",
+      "bytes": 119252,
+      "sha256": "a82bc3333efacfe51c11ce4b8847d1a823f10473958ab234b1f23bbbfb0a8d8f"
+    },
+    {
+      "path": "en-grok-search.png",
+      "bytes": 65141,
+      "sha256": "77bcfed9b4f4b51eb304cf24b36ae3bb421ffcbbcf56b71b3f5698f5ac268541"
+    },
+    {
+      "path": "zh-claude-channels.png",
+      "bytes": 65173,
+      "sha256": "34042ebefd7e86f5fbdff6b3d1591a2e5489a5fa045745fd26007c1924cf5052"
+    },
+    {
+      "path": "zh-codex-channels.png",
+      "bytes": 64146,
+      "sha256": "87d54a6340fa7759f0178c622554d7bba2f4ff6188d65d2d181757b568c7f277"
+    },
+    {
+      "path": "zh-codex-search.png",
+      "bytes": 57561,
+      "sha256": "2be1c236990008a70098f8c5589ffec329433291f091ea44a2e1afd9e0fa6813"
+    },
+    {
+      "path": "zh-grok-channels.png",
+      "bytes": 63953,
+      "sha256": "4df115ff98d540298d3e475efc3cce015fb4863d566fe7173068fdc14b80bc74"
+    },
+    {
+      "path": "zh-restart-preferences.png",
+      "bytes": 101804,
+      "sha256": "2005bca42ef64780b88f799b7811352394eb2cd4912af3d76d5197707549491e"
+    }
+  ]
+}

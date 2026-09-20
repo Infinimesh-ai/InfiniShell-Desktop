@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "original_receipt_sha256": "7880c401066077328bda2f997ea973ccac1eacf4c9098a003892975b193fff09",
+  "original42_members_unchanged": true,
+  "checked_members": 42,
+  "extra_release_entries": [
+    {
+      "relative": "codex",
+      "symlink": true,
+      "target": "bin/codex",
+      "inside_release": true
+    }
+  ],
+  "daemon_updater_installer_pids_absent_now": true,
+  "pid_check_exit": 1,
+  "scheduled_check_success_receipt_available": false,
+  "notes": [
+    "原生定时启动真实安装器已观察；上游安装器静默执行，未伪造退出0收据",
+    "原生日志stderr均空；只确认资格/定时启动/已观察安装器退出及本次daemon/updater清理"
+  ]
+}

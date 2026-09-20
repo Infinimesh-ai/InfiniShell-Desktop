@@ -1,0 +1,508 @@
+{
+  "schema_version": 1,
+  "observed_utc": "2026-09-17T19:51:00.798681+00:00",
+  "scope": "actual0059干净source30单次零任务输入Grok policy3真实执行及公共归档",
+  "source_commit": "0059ef1bf8438c5af7545c3101b880ec2d0b10e9",
+  "dirty_candidate": false,
+  "same_commit_verified_by_execution_driver": true,
+  "same_commit_verified_by_runner_original": false,
+  "execution_and_archive_same_agent": true,
+  "archive_auditor_independent_from_executor": false,
+  "native_attempt_count": 1,
+  "runner_exit_code": 1,
+  "rust_test_exit_code": 101,
+  "wall_seconds": 12.27,
+  "result": "FAILED",
+  "original_policy1_and_policy2_not_modified": true,
+  "source_input_count": 111,
+  "source_and_artifact_checks_source": "执行driver运行前后实际读取；归档未重读冻结树/target/二进制",
+  "finished_reads_done": true,
+  "target_released_after_postcheck": true,
+  "closed_event_schema_passed": true,
+  "closed_metadata_schema_passed": true,
+  "closed_network_schema_passed": true,
+  "metadata_diagnostics_equal_event_records": true,
+  "byte_exact_inputs": [
+    {
+      "archive_path": "inputs.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-inputs.json",
+      "bytes": 20395,
+      "sha256": "1bee2a7f4e7862b178d98347b9a5f50c781241170efb7fb017939b0de7eecd37",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "precompile.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-precompile.json",
+      "bytes": 811,
+      "sha256": "f6aad7069076d165a41025e4abb9c9b205ca9b0465ecfe3d917fa67bd864875b",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "entrypoint.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-entrypoint.json",
+      "bytes": 1333,
+      "sha256": "75b8f63493022f8ceeab6deecfc453dba796643d1241cf7e4c4ff54beb2e2150",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "precheck.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-precheck.json",
+      "bytes": 1428,
+      "sha256": "d85e331ed1a7b8237b8cf07cc222b203296c4454faf16f636fa901cd50fe1bb0",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "execution-once.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-execution-once.json",
+      "bytes": 180,
+      "sha256": "210d0a03b43ba86e226fe521ef3b1b1d434c032abc5c102ff204aa8f6fb81403",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "invocation.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-invocation.json",
+      "bytes": 2060,
+      "sha256": "ad8e6a1684508bdd2df993c787ad6864655f81a8fd69f63c75718b69b18efd37",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "postcheck.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-postcheck.json",
+      "bytes": 1343,
+      "sha256": "055366cd9fc3032ae29ed3d71f44dda9fb8719c77ce451644011139329d59f16",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "events.ndjson",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-events.ndjson",
+      "bytes": 2937,
+      "sha256": "f7bfb52b485d1992946ab864012f7005bc519d377a57770986deb85994a9836a",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "metadata.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-events.metadata.json",
+      "bytes": 3731,
+      "sha256": "a1df294ae4ea8b3f8263a7b21d5a700d9070387cbe51753f267fc0e0054bbb54",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "network.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-policy3-events.network.json",
+      "bytes": 177,
+      "sha256": "b1e782063db19660b058ca5b471d44deab147d4bfc6181bd65355b324cd2bfa9",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    },
+    {
+      "archive_path": "bundle.json",
+      "source": "/tmp/infinishell-cli-parity-official-30-bundle.json",
+      "bytes": 1613,
+      "sha256": "b0f471856d5536ae82529679271a5a11375b34c69dadf2a97fd7236c3bc04978",
+      "byte_exact_copy": true,
+      "strict_json_or_ndjson_parse_passed": true,
+      "serialized_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      },
+      "decoded_strings_scan": {
+        "api_key": 0,
+        "xai_key": 0,
+        "github_token": 0,
+        "bearer": 0,
+        "aws_access_id": 0,
+        "private_key_header": 0
+      }
+    }
+  ],
+  "credential_patterns": [
+    {
+      "name": "api_key",
+      "regex": "(?i)\\bsk-(?:ant-api[0-9]+-)?[A-Za-z0-9_-]{20,}"
+    },
+    {
+      "name": "xai_key",
+      "regex": "\\bxai-[A-Za-z0-9_-]{20,}"
+    },
+    {
+      "name": "github_token",
+      "regex": "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})"
+    },
+    {
+      "name": "bearer",
+      "regex": "(?i)\\bBearer\\s+[A-Za-z0-9._~+/-]{20,}={0,2}"
+    },
+    {
+      "name": "aws_access_id",
+      "regex": "\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b"
+    },
+    {
+      "name": "private_key_header",
+      "regex": "-----BEGIN(?: [A-Z0-9]+)? PRIVATE KEY-----"
+    }
+  ],
+  "all_serialized_and_decoded_shape_counts_zero": true,
+  "precompile_log_summary_only": {
+    "source": "/tmp/infinishell-cli-parity-official-30-policy3-precompile.log",
+    "bytes": 7938,
+    "sha256": "8c07000fab1204d5ffba6ade7df91c8ff29253c4c089302c311cd94b815c6096",
+    "actual_lib_path_matched": true,
+    "shape_counts": {
+      "api_key": 0,
+      "xai_key": 0,
+      "github_token": 0,
+      "bearer": 0,
+      "aws_access_id": 0,
+      "private_key_header": 0
+    },
+    "full_log_archived": false
+  },
+  "artifact_hashes_before_after": [
+    {
+      "label": "lib",
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/deps/warp-3ad688c9d0ab1400",
+      "bytes": 849545480,
+      "sha256": "9a0e6b663d6be887598b7a1eb444f9bf9926b8fb37c06d2f0c9860c3535d90fb"
+    },
+    {
+      "label": "main",
+      "path": "/Volumes/ORICO/CargoTarget/InfiniShell-Desktop-cli-agent-parity-dbee1ecae/debug/bundle/osx/InfiniShell.app/Contents/MacOS/infinishell",
+      "bytes": 866053040,
+      "sha256": "ab33468aa09057ee58f71031aa5026430a8bdf3db9e34a776b02d1bbac1488ea"
+    },
+    {
+      "label": "grok",
+      "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+      "bytes": 141869568,
+      "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
+    }
+  ],
+  "sole_ignored_entry_listed_once": true,
+  "entrypoint_list_not_native_execution": true,
+  "event_counts": {
+    "probe_started": 1,
+    "launch_snapshot": 1,
+    "rpc_sent": 2,
+    "rpc_response": 2,
+    "native_notification_diagnostic": 1,
+    "probe_failed": 2,
+    "phase_failure": 2
+  },
+  "request_response_pairs": [
+    {
+      "generation": "420c076d-27d6-49da-b1c9-49e228f3ddaf",
+      "rpc_id": 1,
+      "sequence": 1,
+      "method": "initialize",
+      "status": "ok",
+      "response_bytes": 3692,
+      "response_sha256": "85b7f30e8769a199bf52346f04bd090ad0842d3a08b8aaed5bbb795cec6be4f8"
+    },
+    {
+      "generation": "420c076d-27d6-49da-b1c9-49e228f3ddaf",
+      "rpc_id": 2,
+      "sequence": 2,
+      "method": "session/new",
+      "status": "rpc_error",
+      "response_bytes": 422,
+      "response_sha256": "979116740b5f7564d78917dcd90122af492fb796bf1fc8ca0badb472466481e9"
+    }
+  ],
+  "unmatched_public_pending_request_count": 0,
+  "global_empty_catalog_notification": {
+    "error_present": false,
+    "event": "native_notification_diagnostic",
+    "frame_type": "object",
+    "generation": "420c076d-27d6-49da-b1c9-49e228f3ddaf",
+    "global_catalog_closed_empty": true,
+    "id_present": false,
+    "method": "_x.ai/mcp/servers_updated",
+    "method_summary": {
+      "bytes": 25,
+      "sha256": "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580",
+      "type": "string"
+    },
+    "params_type": "object",
+    "result_present": false,
+    "session_id": {
+      "type": "absent"
+    }
+  },
+  "global_empty_catalog_notification_verified_before_rpc_error": true,
+  "phase_failures": [
+    {
+      "event": "phase_failure",
+      "generation": "420c076d-27d6-49da-b1c9-49e228f3ddaf",
+      "reason_bytes": 9,
+      "reason_sha256": "21964f4ced55d1efcd8b529b6e33d8b2f76b542f2b65e72ab52b7355299a1d2c",
+      "stage": "primary"
+    },
+    {
+      "event": "phase_failure",
+      "generation": "420c076d-27d6-49da-b1c9-49e228f3ddaf",
+      "reason_bytes": 24,
+      "reason_sha256": "315ae2f1192d0c3184a943fc25736613ca76cd8f3b2fc7fc2ecfe5d0d127e1d7",
+      "stage": "cleanup"
+    }
+  ],
+  "primary_reason_matches_public_rpc_error_status_digest": true,
+  "cleanup_reason_plaintext_not_verified": true,
+  "native_process_cleanup_receipt_observed": false,
+  "normal_stdio_exit_verified": false,
+  "probe_finished_observed": false,
+  "resume_checked_observed": false,
+  "drain_response_observed_count": 0,
+  "runner_cleanup_confirmed": true,
+  "runner_cleanup_is_not_native_exit_receipt": true,
+  "original_unknown_policy_preserved": {
+    "profile_loading": "unknown",
+    "effective_mode": "unknown",
+    "configuration_sources": "unknown",
+    "builtin_catalog": "unknown",
+    "wrapper_closure": "unknown",
+    "parent_permission_ceiling_verified": false,
+    "filesystem_sandbox_verified": false,
+    "ready_for_policy_implementation": false
+  },
+  "original_metadata_false_flags_preserved": [
+    "prepared_only",
+    "execution_boundary_passed",
+    "interface_investigation_completed",
+    "same_commit_verified_by_runner",
+    "cross_platform_verified",
+    "model_http_count_measured",
+    "tls_decrypted",
+    "credential_values_parsed_by_runner",
+    "candidate_source_is_exact_binary",
+    "snapshots_match_explicit_inputs"
+  ],
+  "network": {
+    "max_tls_connections": 16,
+    "max_tls_bytes": 8388608,
+    "connections_attempted": 6,
+    "tls_bytes": 132205,
+    "model_http_count_measured": false,
+    "tls_decrypted": false
+  },
+  "private_auth_original_stat_only_unchanged": true,
+  "auth_values_parsed_or_archived": false,
+  "private_native_diagnostics_or_raw_output_read_by_archiver": false,
+  "runner_stdout_summary_reference_only": {
+    "raw_stdout_archived": false,
+    "stdout_bytes": 965,
+    "stdout_sha256": "71abaa5fe736ca6c8752cc10b3ec327db5affd8d3ef794eaeaeb2009836a603e",
+    "credential_shape_counts": {
+      "api_key": 0,
+      "jwt": 0,
+      "bearer": 0,
+      "private_key": 0,
+      "credential_assignment": 0,
+      "email": 0
+    },
+    "test_success_summary_count": 0
+  },
+  "stdout_summary_counts_not_recomputed_from_forbidden_raw_output": true,
+  "all_original_public_source_bytes_unchanged": true,
+  "new_report": {
+    "path": "OFFICIAL_30_GROK_POLICY_VERIFICATION.md",
+    "bytes": 5460,
+    "sha256": "34399a3c585e05f0ea34729aea2d25c57bfd586a855114c79a4cd3f259bc91ff",
+    "shape_counts": {
+      "api_key": 0,
+      "xai_key": 0,
+      "github_token": 0,
+      "bearer": 0,
+      "aws_access_id": 0,
+      "private_key_header": 0
+    }
+  },
+  "audit_self_scan": "序列化及解码字符串六形状0命中，无自引用SHA",
+  "not_claimed": [
+    "正常原生退出0",
+    "原生cleanup收据通过",
+    "历史继续通过",
+    "权限上限证明",
+    "固定工具闭合证明",
+    "SDK父子支持通过",
+    "模型HTTP调用数或费用计量",
+    "GUI",
+    "其他平台同提交",
+    "全工作区",
+    "SSH/tmux整链",
+    "发布公证",
+    "Goal完成"
+  ]
+}

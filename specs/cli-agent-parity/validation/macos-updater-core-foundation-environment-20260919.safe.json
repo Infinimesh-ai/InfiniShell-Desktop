@@ -1,0 +1,32 @@
+{
+  "worker_sha256": "78448665e814b9cf00365d930a51543d6d72ac3c036d45878a541e4fd4adbef7",
+  "environment_values_disclosed": false,
+  "tests_executed": 0,
+  "upgrade_executed": false,
+  "model_inputs": 0,
+  "cases": [
+    {
+      "name": "libc_control",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 1.261,
+      "projected_key_count": 23,
+      "unexpected_keys": [],
+      "cf_projection": []
+    },
+    {
+      "name": "same_worker_list",
+      "exit_code": 0,
+      "timed_out": false,
+      "seconds": 0.078,
+      "projected_key_count": 24,
+      "unexpected_keys": [
+        "__CF_USER_TEXT_ENCODING"
+      ],
+      "cf_projection": [
+        "CF_ENCODING_MATCHES_PROCESS_UID_DEFAULT:1",
+        "CF_ENCODING_VALUE_LENGTH:13"
+      ]
+    }
+  ]
+}

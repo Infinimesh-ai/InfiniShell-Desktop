@@ -1,0 +1,54 @@
+[
+  {
+    "name": "grok_native_skill_runner_tests.py",
+    "exit_code": 0,
+    "wall_seconds": 0.119,
+    "log_sha256": "b64521671a6b5ac92233c006f0f018ec88c3da769318c6d52476ab6e22ba8cc2",
+    "summary": [
+      "Ran 13 tests in 0.006s",
+      "OK"
+    ]
+  },
+  {
+    "name": "grok_fixed_policy_runner_tests.py",
+    "exit_code": 0,
+    "wall_seconds": 0.143,
+    "log_sha256": "70430ee95cbfd51a30657c3f0e64f0b0c63e99313b94e202d79486cb46890e0a",
+    "summary": [
+      "Ran 14 tests in 0.012s",
+      "OK"
+    ]
+  },
+  {
+    "name": "grok_child_coordinator_runner_tests.py",
+    "exit_code": 0,
+    "wall_seconds": 0.13,
+    "log_sha256": "ae0b7a6a7cdf735ec31315f5a148b617cd4d7e11dc5852a8ff4a2d426d53b3ea",
+    "summary": [
+      "Ran 16 tests in 0.004s",
+      "OK"
+    ]
+  },
+  {
+    "name": "installed_grok_hook_tests.py",
+    "exit_code": 0,
+    "wall_seconds": 1.603,
+    "log_sha256": "4f35c103307f94998413657cdf37f5bae5da7737b578fdc6d1e7b2be16604232",
+    "summary": [
+      "Ran 17 tests in 1.507s",
+      "OK (skipped=1)"
+    ]
+  },
+  {
+    "name": "grok_plugin_tests.cjs",
+    "exit_code": 0,
+    "wall_seconds": 0.204,
+    "log_sha256": "7d8db5b6e5fed435dcb8db4abfb60dc773a5c34bd015f14a39cbe3d84c843379",
+    "summary": [
+      "tests 14",
+      "pass 14",
+      "fail 0",
+      "skipped 0"
+    ]
+  }
+]

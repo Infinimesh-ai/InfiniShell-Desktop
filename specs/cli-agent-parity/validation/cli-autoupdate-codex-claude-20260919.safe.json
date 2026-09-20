@@ -1,0 +1,908 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-09-19T10:04:26.763483+00:00",
+  "completed_at": "2026-09-19T10:13:52.703738+00:00",
+  "scope": {
+    "platform": "macOS arm64",
+    "purpose": "官方latest隔离输入与静态接口核对",
+    "model_inputs": 0,
+    "credentials_loaded": false,
+    "global_install_modified": false,
+    "cargo_executed": false,
+    "update_executed": false,
+    "protocol_session_started": false,
+    "linux_windows_executed": false,
+    "network_capture_performed": false
+  },
+  "official_metadata": {
+    "codex-release": {
+      "url": "https://api.github.com/repos/openai/codex/releases/latest",
+      "final_url": "https://api.github.com/repos/openai/codex/releases/latest",
+      "bytes": 284587,
+      "sha256": "4c9bb9d2a00dc51de38ded14ac773b680e6aa03500931e637af939a0b98be8d8"
+    },
+    "codex-npm": {
+      "url": "https://registry.npmjs.org/@openai%2fcodex/latest",
+      "final_url": "https://registry.npmjs.org/@openai%2fcodex/latest",
+      "bytes": 3521,
+      "sha256": "2c346b7643a7c641596f9bfe7d443bfdfa726452fd4feb7b44cc307e4aa7edb2"
+    },
+    "claude-npm": {
+      "url": "https://registry.npmjs.org/@anthropic-ai%2fclaude-code/latest",
+      "final_url": "https://registry.npmjs.org/@anthropic-ai%2fclaude-code/latest",
+      "bytes": 3300,
+      "sha256": "69db28aac6b981048d21a7dc7dfc8544cd80e954280693eb85f63b04884cfbfb"
+    },
+    "claude-manifest": {
+      "url": "https://downloads.claude.ai/claude-code-releases/2.1.278/manifest.json",
+      "final_url": "https://downloads.claude.ai/claude-code-releases/2.1.278/manifest.json",
+      "bytes": 2161,
+      "sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28"
+    },
+    "claude-latest": {
+      "url": "https://downloads.claude.ai/claude-code-releases/latest",
+      "final_url": "https://downloads.claude.ai/claude-code-releases/latest",
+      "bytes": 7,
+      "sha256": "f4e61b9ee6ad636c46e2b8a0494b26209ded05c401fbde64202c19336b8354fd"
+    },
+    "claude-stable": {
+      "url": "https://downloads.claude.ai/claude-code-releases/stable",
+      "final_url": "https://downloads.claude.ai/claude-code-releases/stable",
+      "bytes": 7,
+      "sha256": "02f727b31c47fc2ff6858d98a751f9c373c9c46a697e4ba8f78a98192d98c62a"
+    }
+  },
+  "codex": {
+    "version": "0.155.1",
+    "release_tag": "rust-v0.155.1",
+    "prerelease": false,
+    "published_at": "2026-09-18T20:03:04Z",
+    "npm_version": "0.155.1",
+    "package_assets": [
+      {
+        "name": "codex-package-aarch64-apple-darwin.tar.gz",
+        "bytes": 122962085,
+        "sha256": "e6e08717da9e35b72332eff753527fe79a9ae876081033c5c6820a8e5f58b943",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-aarch64-apple-darwin.tar.gz",
+        "downloaded": true
+      },
+      {
+        "name": "codex-package-aarch64-pc-windows-msvc.tar.gz",
+        "bytes": 129273387,
+        "sha256": "f53deb24650d288fddfd1724ef952f6ad9cb6119c75ecc12a6223b98fd97719a",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-aarch64-pc-windows-msvc.tar.gz",
+        "downloaded": false
+      },
+      {
+        "name": "codex-package-aarch64-unknown-linux-musl.tar.gz",
+        "bytes": 130233502,
+        "sha256": "71857dbc9bea3613410e8a69cfb46b07c0402d6d20fec18843dbaffd757634bd",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-aarch64-unknown-linux-musl.tar.gz",
+        "downloaded": false
+      },
+      {
+        "name": "codex-package-x86_64-apple-darwin.tar.gz",
+        "bytes": 133128625,
+        "sha256": "be752aebb2ac022c5bfed3fa14f46943d11ddb36a950b553b058794aba22496a",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-x86_64-apple-darwin.tar.gz",
+        "downloaded": false
+      },
+      {
+        "name": "codex-package-x86_64-pc-windows-msvc.tar.gz",
+        "bytes": 139547261,
+        "sha256": "f45c273b7835c192aaa9cef5b93aa9528966ac7301444632de80a565a9bf14e8",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-x86_64-pc-windows-msvc.tar.gz",
+        "downloaded": false
+      },
+      {
+        "name": "codex-package-x86_64-unknown-linux-musl.tar.gz",
+        "bytes": 138838055,
+        "sha256": "a65b895c6ac1a73629bbe4b864640c86133e94a43b4d67b3103044e1a306d5a2",
+        "url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-x86_64-unknown-linux-musl.tar.gz",
+        "downloaded": false
+      }
+    ],
+    "prepared_entrypoint": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-cli-latest-codex-claude-ed7d8264/codex-runtime-0.155.1/bin/codex",
+    "runtime_metadata": {
+      "layoutVersion": 1,
+      "version": "0.155.1",
+      "target": "aarch64-apple-darwin",
+      "variant": "codex",
+      "entrypoint": "bin/codex",
+      "resourcesDir": "codex-resources",
+      "pathDir": "codex-path"
+    },
+    "runtime_members": [
+      {
+        "path": "bin",
+        "directory": true
+      },
+      {
+        "path": "bin/codex",
+        "size": 228803200,
+        "sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "bin/codex-code-mode-host",
+        "size": 62802592,
+        "sha256": "59a702a68f1ef79fceaca644db46b8385ceefbb66035e78b8ade7cdcc21fda55",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-package.json",
+        "size": 200,
+        "sha256": "b4895dbb7a0b6532d819809d798eca98e0f6c3dcaa417ad9b39bc32640618424",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-path",
+        "directory": true
+      },
+      {
+        "path": "codex-path/rg",
+        "size": 4030432,
+        "sha256": "c6c50764c763f44464bd4681dc0392668b2cb42f88bd123f8d0b43fbf3b02576",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice/NOTICE.md",
+        "size": 1079,
+        "sha256": "edadf0a401a293778fdb7416707b1ac55df26a686388d3b2db72cd2043763c16",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/bin",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice/bin/codex-voice-host",
+        "size": 9283600,
+        "sha256": "be67257c4308d9f8460493ab1789297350b2d398547087fe0bff7bcc624c443d",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice/lib/libffi.8.dylib",
+        "size": 136768,
+        "sha256": "4fa18eb30e8407e5cc16afa30a643b402a22c0ea37a6dc9450ab99aecd88f62e",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgio-2.0.0.dylib",
+        "size": 1866272,
+        "sha256": "0e31023e6498d08ae702019ac4cd8d388c96afba6085e28c9ea5ba5efb8075e1",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libglib-2.0.0.dylib",
+        "size": 1310992,
+        "sha256": "23c39e06b864f74d8b86b3ae9596568a5b009823e38d29fe462b44804cb2e606",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgmodule-2.0.0.dylib",
+        "size": 68912,
+        "sha256": "46058202a8a679fae5b248bf74f5daaa37ada6c46991d35bb65b9a2d5f1cf686",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgobject-2.0.0.dylib",
+        "size": 403088,
+        "sha256": "eca170837e173884a736343c58268d1ef7adae9034b6d3b8d3e0b8d36336301a",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstapp-1.0.0.dylib",
+        "size": 152608,
+        "sha256": "3f6a6542b8bcbf3cbfb0fd9246abc9a858722d1dd5b74e268f15c8e06c74d2c1",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstaudio-1.0.0.dylib",
+        "size": 530400,
+        "sha256": "0d8ee5b5dc742324c9ab74e4384378e7373900b8fbfa5a4101f153e429033561",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstbase-1.0.0.dylib",
+        "size": 505968,
+        "sha256": "0b4ecd24beb23e6f258bfd661a33ff3d1e4a7383e46aedba2085df567a9951ab",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstnet-1.0.0.dylib",
+        "size": 117008,
+        "sha256": "a5edfbbddd1875472d0ce14a2673a740705a2449780b95c70149fd425fa6244c",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstpbutils-1.0.0.dylib",
+        "size": 309856,
+        "sha256": "d2cef4b2287ed3bdb5d71f50f4071917531155312aed24d869e0228e03827571",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstreamer-1.0.0.dylib",
+        "size": 1304704,
+        "sha256": "39c1725b3aae9d9aa154e7937988032b23f67d98c4ab6e4a38fb2bad247d544b",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstrtp-1.0.0.dylib",
+        "size": 205696,
+        "sha256": "473813e09b9a1db3ea131662c90907eb9aaaec504078767f503440243866c4b3",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgsttag-1.0.0.dylib",
+        "size": 283696,
+        "sha256": "645fdcf191167e7be94f3cdf6c526960d27ce99665ba5947eb407132286340c4",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstvideo-1.0.0.dylib",
+        "size": 903664,
+        "sha256": "39fb8be790e196e686690ebf75e5f7c4558d5a4e4e79c57c41743004a68f1e39",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libintl.8.dylib",
+        "size": 50112,
+        "sha256": "686944b9fccfc3179bb91a3d12ebd5cfcf8fb1d0100da63c4f3b0f3be86305db",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libopus.0.dylib",
+        "size": 504080,
+        "sha256": "3090c1988f7046c78c4856e115ac93d9917830e4d8bb27327b43c64447f82a92",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libpcre2-8.0.dylib",
+        "size": 456816,
+        "sha256": "fcae9e2caaf8c516244c95b386299b0c8a706df95b3a4f20245b1a61732a8b5c",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/lib/libz.1.dylib",
+        "size": 123312,
+        "sha256": "df31491c6d32ec00c2411359524b0bc0ed3e6e1e8c49bd5561ed8890911ec25c",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/licenses",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice/licenses/LGPL-2.1.txt",
+        "size": 26431,
+        "sha256": "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/Opus.txt",
+        "size": 1945,
+        "sha256": "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/PCRE2.md",
+        "size": 4011,
+        "sha256": "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/libffi.txt",
+        "size": 1132,
+        "sha256": "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/proxy-libintl.txt",
+        "size": 25292,
+        "sha256": "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/sljit.txt",
+        "size": 1444,
+        "sha256": "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/licenses/zlib.txt",
+        "size": 1002,
+        "sha256": "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/manifest.json",
+        "size": 4637,
+        "sha256": "0e5ab5f2c4d3b9b07aa7ef0166cb4cca9f30672b63c90ebb11f1acd5920b0928",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/voice/plugins",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstapp.dylib",
+        "size": 49872,
+        "sha256": "127b3740d40a727102239061bd179e850c78c4736291fe55a38da9c8630b91f4",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstaudioconvert.dylib",
+        "size": 93824,
+        "sha256": "ea1048cab051959cdc8730ec186274389f41b22848e7aed470ae936e1cf5a01e",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstaudioresample.dylib",
+        "size": 91840,
+        "sha256": "b1faf437f781386e98e79688fec332816fc741304d70c1fca41ca52447b5b5e4",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstcoreelements.dylib",
+        "size": 446608,
+        "sha256": "3fec07badb54b1364e1a906efa305ac73b7c86275c79cb2767eae9a39df0453f",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstopus.dylib",
+        "size": 131680,
+        "sha256": "fd2b9cb054f7dec866c508212d345a5459097f7f550e676f2a29ba14fb48f8a8",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstrtp.dylib",
+        "size": 673888,
+        "sha256": "c8910ce8ffdd66e5d1e8c3d69beb282506905d73e8baf3a73f18216a43cec76d",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstrtpmanager.dylib",
+        "size": 527568,
+        "sha256": "338cd280a8d2693358d21039b8c429199ab178b9b5b7693c2d35443bdf04ac64",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/runtime.json",
+        "size": 14915,
+        "sha256": "27db27d294d7c76fadb0c7dfd6d6e9130f4c2fd2448ec633517067ad1542ca00",
+        "archive_mode": "0o755"
+      },
+      {
+        "path": "codex-resources/voice/sources.json",
+        "size": 4911,
+        "sha256": "e2f6b124f6277e7c3c4f5c7cc8830c66190f671ad65e972bb2cc9507dbfcb937",
+        "archive_mode": "0o644"
+      },
+      {
+        "path": "codex-resources/zsh",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/zsh/bin",
+        "directory": true
+      },
+      {
+        "path": "codex-resources/zsh/bin/zsh",
+        "size": 754208,
+        "sha256": "7f3cb812c2954e63cafd045acfcc8093319529eea532979a73a813e3745c9bd3",
+        "archive_mode": "0o755"
+      }
+    ],
+    "member_count": 52,
+    "total_bytes": 317010263,
+    "native_codesign": {
+      "verification_exit_code": 0,
+      "details_exit_code": 0,
+      "identity_lines": [
+        "Identifier=codex",
+        "Authority=Developer ID Application: OpenAI OpCo, LLC (2DC432GLL2)",
+        "Authority=Developer ID Certification Authority",
+        "Authority=Apple Root CA",
+        "Timestamp=Sep 19, 2026 at 03:40:59",
+        "TeamIdentifier=2DC432GLL2"
+      ]
+    },
+    "all_mach_o_codesign": [
+      {
+        "path": "codex-path/rg",
+        "exit_code": 0
+      },
+      {
+        "path": "bin/codex",
+        "exit_code": 0
+      },
+      {
+        "path": "bin/codex-code-mode-host",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/zsh/bin/zsh",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/bin/codex-voice-host",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstrtp.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstaudioresample.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstapp.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstopus.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstcoreelements.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstrtpmanager.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/plugins/libgstaudioconvert.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstaudio-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstnet-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libffi.8.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstreamer-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libpcre2-8.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libglib-2.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgobject-2.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgsttag-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstvideo-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstrtp-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstapp-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgmodule-2.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libintl.8.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstbase-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libz.1.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgstpbutils-1.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libgio-2.0.0.dylib",
+        "exit_code": 0
+      },
+      {
+        "path": "codex-resources/voice/lib/libopus.0.dylib",
+        "exit_code": 0
+      }
+    ],
+    "sha256sums_verified": true,
+    "platform_archive_sigstore_available": false,
+    "npm_package_signatures_verified": false,
+    "config_notify_present": true,
+    "config_hooks_present": true,
+    "app_server_stdio_help_accepted": true,
+    "update_help_advertised": true,
+    "old_0_147_update_source_exists": true,
+    "old_0_147_update_reexecuted": false
+  },
+  "claude": {
+    "version": "2.1.278",
+    "latest": "2.1.278",
+    "stable": "2.1.267",
+    "npm_version": "2.1.278",
+    "release_commit": "809c980662e3525645594dc8b74f78c38a348db1",
+    "build_date": "2026-09-19T01:22:08Z",
+    "platforms": {
+      "darwin-arm64": {
+        "binary": "claude",
+        "checksum": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+        "size": 217695408
+      },
+      "darwin-x64": {
+        "binary": "claude",
+        "checksum": "c522425e3d42275d2ac2238757ef8ba7f80d165a934044ec5a7a5fd7d7b9950b",
+        "size": 226521952
+      },
+      "linux-arm64": {
+        "binary": "claude",
+        "checksum": "7de6cab134e48321148e30182c98614118e8f4666819412bead45865190b34ed",
+        "size": 234021104
+      },
+      "linux-x64": {
+        "binary": "claude",
+        "checksum": "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab",
+        "size": 234119480
+      },
+      "linux-arm64-musl": {
+        "binary": "claude",
+        "checksum": "cc8266db086b92faa10180d8c34fb4f196022ad13d0d8800b656966f94a9f0f4",
+        "size": 226637472
+      },
+      "linux-x64-musl": {
+        "binary": "claude",
+        "checksum": "e21d4818a7282c1b18f7949af863a58e640f017a8ffa4053f5ae927ac95d954a",
+        "size": 228036568
+      },
+      "win32-x64": {
+        "binary": "claude.exe",
+        "checksum": "006ea5c8638f67f10a5ae66bb232fd267c9f6af294e3f03f4cfcf1fd3f2cced8",
+        "size": 237232800
+      },
+      "win32-arm64": {
+        "binary": "claude.exe",
+        "checksum": "099128d103db9f10ca4e23c91b586ed7939f6c27deade560734fd8a8ba8e2b5f",
+        "size": 228457632
+      }
+    },
+    "prepared_entrypoint": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-cli-latest-codex-claude-ed7d8264/claude",
+    "manifest_signature": {
+      "verifier": "PGPy 0.6.0",
+      "key_fingerprint": "31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE",
+      "signature_valid": true,
+      "modified_manifest_rejected": true,
+      "signer": "BAA929FF1A7ECACE",
+      "manifest_sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28"
+    },
+    "signature_verifier_limits": [
+      "本机无gpg；使用私有PGPy0.6.0及standard-imghdr3.13.0验证",
+      "公钥指纹与官方文档精确匹配；签名算术校验和改写清单负例通过",
+      "未执行PGPy不支持的撤销、key-flags和self-signatures检查；未导入用户keyring"
+    ],
+    "native_codesign": {
+      "verification_exit_code": 0,
+      "details_exit_code": 0,
+      "identity_lines": [
+        "Identifier=com.anthropic.claude-code",
+        "Authority=Developer ID Application: Anthropic PBC (Q6L2SF6YDW)",
+        "Authority=Developer ID Certification Authority",
+        "Authority=Apple Root CA",
+        "Timestamp=Sep 19, 2026 at 09:16:00",
+        "TeamIdentifier=Q6L2SF6YDW"
+      ]
+    },
+    "structured_launch_help_accepted": true,
+    "plugin_help_advertised": true,
+    "npm_package_signatures_verified": false,
+    "latest_override_without_channel_persistence_verified": false
+  },
+  "downloads": [
+    {
+      "name": "codex-package.tar.gz",
+      "source": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-aarch64-apple-darwin.tar.gz",
+      "bytes": 122962085,
+      "sha256": "e6e08717da9e35b72332eff753527fe79a9ae876081033c5c6820a8e5f58b943",
+      "official_size_verified": true,
+      "official_sha256_verified": true
+    },
+    {
+      "name": "codex-package_SHA256SUMS",
+      "source": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package_SHA256SUMS",
+      "bytes": 1631,
+      "sha256": "e7c267fa8cda3fb783be8380ef9c2b660ceea740426bbae17ac1df8cd1012937",
+      "official_size_verified": true,
+      "official_sha256_verified": true
+    },
+    {
+      "name": "claude",
+      "source": "https://downloads.claude.ai/claude-code-releases/2.1.278/darwin-arm64/claude",
+      "bytes": 217695408,
+      "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+      "official_size_verified": true,
+      "official_sha256_verified": true
+    },
+    {
+      "name": "claude-manifest.json.sig",
+      "source": "https://downloads.claude.ai/claude-code-releases/2.1.278/manifest.json.sig",
+      "bytes": 833,
+      "sha256": "09ef2ff6521e6909d194283c87d19ec954b72f32657cbdb1eb05b0d28f179da3",
+      "official_size_verified": false,
+      "official_sha256_verified": false
+    },
+    {
+      "name": "claude-code.asc",
+      "source": "https://downloads.claude.ai/keys/claude-code.asc",
+      "bytes": 1688,
+      "sha256": "bd70a5e4a268002704024ceba7f8446024114e94f3f0bdd11c23a9e592be81c6",
+      "official_size_verified": false,
+      "official_sha256_verified": false
+    },
+    {
+      "name": "codex-install.sh",
+      "source": "https://chatgpt.com/codex/install.sh",
+      "bytes": 32660,
+      "sha256": "dd4282a1a3c8188f792513f2f16afb852e63ce3b98dbbc67684f716ebcc1e862",
+      "official_size_verified": false,
+      "official_sha256_verified": false
+    },
+    {
+      "name": "codex-cli-doc.md",
+      "source": "https://learn.chatgpt.com/docs/codex/cli.md",
+      "bytes": 6668,
+      "sha256": "4592869a38de248eef8c623816032bc34787c7797fcf7a64e41d860da83d1a5e",
+      "official_size_verified": false,
+      "official_sha256_verified": false
+    },
+    {
+      "name": "claude-setup-doc.md",
+      "source": "https://code.claude.com/docs/en/setup.md",
+      "bytes": 31277,
+      "sha256": "b4e5709f5a9554258e50343dc193815ad5888ce06d131fa4fe0e890f692e4a24",
+      "official_size_verified": false,
+      "official_sha256_verified": false
+    }
+  ],
+  "help_probes": [
+    {
+      "probe": "codex-version",
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 18,
+      "stderr_bytes": 0,
+      "stdout_sha256": "556478dd38e6185a3ceef8e5237286acd48d89da460cdbbc054ce7230b0caced",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "codex-help",
+      "arguments": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 5748,
+      "stderr_bytes": 0,
+      "stdout_sha256": "4abfbbaee583f6d8c3fa45fd751a138b2b8fdac68f651ac444aa36599629acb7",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "codex-app-server-help",
+      "arguments": [
+        "app-server",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 3206,
+      "stderr_bytes": 0,
+      "stdout_sha256": "95d290035d274e91e6f85b9af63e9a3fd2cf70a2295d9eedbfc23a2ee82d4383",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "codex-app-server-stdio-help",
+      "arguments": [
+        "app-server",
+        "--stdio",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 3206,
+      "stderr_bytes": 0,
+      "stdout_sha256": "95d290035d274e91e6f85b9af63e9a3fd2cf70a2295d9eedbfc23a2ee82d4383",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "codex-update-help",
+      "arguments": [
+        "update",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 827,
+      "stderr_bytes": 0,
+      "stdout_sha256": "f95f87b22c25ccc49f20ec5c15d68181b1ab5a90ae6659aa51e6c16e40e9baf0",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-version",
+      "arguments": [
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 22,
+      "stderr_bytes": 0,
+      "stdout_sha256": "f0d384f3abe85e8cb2f0366465826cc8232426881854235d3ad1150e4a76f689",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-help",
+      "arguments": [
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 21401,
+      "stderr_bytes": 0,
+      "stdout_sha256": "ae85d661e9c086f05637ebcd868f5702b477ff6e55e2e65b8ada7807cd51a4b6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-update-help",
+      "arguments": [
+        "update",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 132,
+      "stderr_bytes": 0,
+      "stdout_sha256": "51feb83b686c647c851607150f44773f0b07bda378a32fcac40cbc8b77ff39c6",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-install-help",
+      "arguments": [
+        "install",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 254,
+      "stderr_bytes": 0,
+      "stdout_sha256": "4dc358a42314bf21801781a0fe1d856ba5196a7aa59d48de63fd8e6632dd9505",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-plugin-help",
+      "arguments": [
+        "plugin",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 3438,
+      "stderr_bytes": 0,
+      "stdout_sha256": "b0214cc3567a6eff8fc62215006a94043c8debaacc89c366d4e0ce8b70a0c5ab",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "probe": "claude-structured-help",
+      "arguments": [
+        "--print",
+        "--input-format",
+        "stream-json",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--replay-user-messages",
+        "--permission-prompt-tool",
+        "stdio",
+        "--permission-prompts",
+        "host",
+        "--plugin-dir",
+        "<private-empty-plugin>",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout_bytes": 18326,
+      "stderr_bytes": 0,
+      "stdout_sha256": "5c3a96d7d2d8f4d69d95347e34344cf498370964c550ac699836e8e8080215ed",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "source_records": {
+    "codex-config-schema.json": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/core/config.schema.json",
+      "sha256": "786fee5181619dc73963f7544fa6afe8364236392d999df92d3dd6b3a8c8ac70",
+      "bytes": 208521
+    },
+    "codex-app-server-readme.md": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/app-server/README.md",
+      "sha256": "a0474274712e422a67e591c19ef87d602f47a019b1628d2734a2d066337feb11",
+      "bytes": 6514
+    },
+    "codex-readme.md": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/README.md",
+      "sha256": "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7",
+      "bytes": 3334
+    },
+    "source-codex-rs__cli__src__main.rs": {
+      "path": "codex-rs/cli/src/main.rs",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/cli/src/main.rs",
+      "sha256": "aaa8e6b68c603f53572da2088bc7ec0469256a94e2c8f3f9858939c87ccc0902",
+      "bytes": 185355
+    },
+    "source-codex-rs__tui__src__update_action.rs": {
+      "path": "codex-rs/tui/src/update_action.rs",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/tui/src/update_action.rs",
+      "sha256": "76bc2a1531cf1449f244f4ba866ee9ac406c76a4bd6b713e6bbbddeb356b60f3",
+      "bytes": 6862
+    },
+    "source-codex-rs__tui__src__updates.rs": {
+      "path": "codex-rs/tui/src/updates.rs",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/tui/src/updates.rs",
+      "sha256": "b8f3f4a1c3e5b34281473a5ac552774a9270f1622ab2cc8aea7a953e0b8d025e",
+      "bytes": 5837
+    },
+    "source-codex-rs__cli__tests__update.rs": {
+      "path": "codex-rs/cli/tests/update.rs",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/cli/tests/update.rs",
+      "sha256": "bce97406190ac756d93a83f273c6947ec2a7a7c2dd853f8304e4287d3d134f87",
+      "bytes": 644
+    },
+    "codex-install-context.rs": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/codex-rs/install-context/src/lib.rs",
+      "bytes": 32974,
+      "sha256": "18eef650f329b27fbfe986f88c565230d347cb6f5575e953260ace7d794b51b8"
+    },
+    "codex-0.147.0-main.rs": {
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.147.0/codex-rs/cli/src/main.rs",
+      "bytes": 159239,
+      "sha256": "1ca67a651488dd9af26b1328531dfaf68cc4cd3290afeec9dd9ca6f04bcd8091"
+    }
+  },
+  "verification_tool_versions": {
+    "pgpy": "0.6.0",
+    "standard-imghdr": "3.13.0"
+  },
+  "boundaries": [
+    "帮助解析不能证明真实initialize、两轮模型交互、审批、取消、恢复、父子任务或OSC通知成功",
+    "没有实际安装更新或回滚；完整包与版本路径已保留，旧版本输入未变",
+    "平台清单覆盖不等于该平台已下载或运行；本次仅macOS arm64原生执行",
+    "未验证Gatekeeper公证在线状态或npm registry签名/来源attestation",
+    "Claude update依赖既有通道；install latest可能保存后续通道，不能宣称无全局配置副作用",
+    "Codex当前硬编码0.147.0以及Claude2.1.273的生产策略/夹具需要独立对齐，不能只替换版本字符串"
+  ],
+  "private_root": "/private/var/folders/qp/t9_qxjfn4xl22sbd83t4qh7m0000gp/T/infinishell-cli-latest-codex-claude-ed7d8264"
+}

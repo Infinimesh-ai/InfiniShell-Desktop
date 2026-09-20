@@ -1,0 +1,2015 @@
+{
+  "schema_version": 1,
+  "status": "completed_static_ownership_review",
+  "snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+  "exact_native_source_mapping_verified": false,
+  "tree_request": {
+    "url": "https://api.github.com/repos/xai-org/grok-build/git/trees/482711333c7195dc16a272777f86086d615e2afb?recursive=1",
+    "http_status": 200,
+    "bytes": 1225421,
+    "sha256": "c6584e31d89976ac52c14ab39732be44f8b4909c7054e58ac94ef972231588fe",
+    "observed_utc": "2026-09-17T19:16:35.276723+00:00",
+    "truncated": false
+  },
+  "candidate_paths": [
+    "crates/codegen/xai-grok-shell/src/config/watcher.rs",
+    "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs"
+  ],
+  "raw_source_files": [
+    {
+      "path": "crates/codegen/xai-grok-pager-bin/src/main.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager-bin/src/main.rs",
+      "observed_utc": "2026-09-17T19:17:15.515009+00:00",
+      "bytes": 154860,
+      "contract_excerpts": [
+        {
+          "line": 52,
+          "text": "mod agent_command;"
+        },
+        {
+          "line": 1559,
+          "text": "    match agent_args.mode {"
+        },
+        {
+          "line": 1560,
+          "text": "        Some(AgentCmd::Stdio) => {"
+        },
+        {
+          "line": 1561,
+          "text": "            agent_command::run_stdio(&runtime, &agent_config, signal_flush).await"
+        },
+        {
+          "line": 1562,
+          "text": "        }"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "ba785e7e8c7f1049e45f09ac183dc37ef6b9fc5b427632e40701b06a79a2791e",
+      "line_count": 3731
+    },
+    {
+      "path": "crates/codegen/xai-grok-pager-bin/src/agent_command.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-pager-bin/src/agent_command.rs",
+      "observed_utc": "2026-09-17T19:17:32.716409+00:00",
+      "bytes": 2746,
+      "contract_excerpts": [
+        {
+          "line": 69,
+          "text": "pub(crate) async fn run_stdio("
+        },
+        {
+          "line": 70,
+          "text": "    runtime: &AgentRuntime,"
+        },
+        {
+          "line": 71,
+          "text": "    agent_config: &Config,"
+        },
+        {
+          "line": 72,
+          "text": "    mut signals: AgentSignals,"
+        },
+        {
+          "line": 73,
+          "text": ") -> anyhow::Result<()> {"
+        },
+        {
+          "line": 74,
+          "text": "    signals.defer_exit.store(true, Ordering::Release);"
+        },
+        {
+          "line": 75,
+          "text": ""
+        },
+        {
+          "line": 76,
+          "text": "    let outcome = tokio::select! {"
+        },
+        {
+          "line": 77,
+          "text": "        biased;"
+        },
+        {
+          "line": 78,
+          "text": "        code = &mut signals.received => code.map(Some).map_err(anyhow::Error::from),"
+        },
+        {
+          "line": 79,
+          "text": "        result = runtime.run_stdio(agent_config) => result.map(|()| None),"
+        },
+        {
+          "line": 80,
+          "text": "    };"
+        },
+        {
+          "line": 81,
+          "text": "    if let Some(exit_code) = outcome? {"
+        },
+        {
+          "line": 82,
+          "text": "        shutdown_and_flush_telemetry(exit_code);"
+        },
+        {
+          "line": 83,
+          "text": "    }"
+        },
+        {
+          "line": 84,
+          "text": "    Ok(())"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "a7a4259d05248293673902e6110215779257ab8d55382d28def9746eb2d7e6e3",
+      "line_count": 85
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/app.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/app.rs",
+      "observed_utc": "2026-09-17T19:18:06.134193+00:00",
+      "bytes": 96636,
+      "contract_excerpts": [
+        {
+          "line": 119,
+          "text": "    agent_config: AgentConfig,"
+        },
+        {
+          "line": 120,
+          "text": "    auth_manager: Arc<AuthManager>,"
+        },
+        {
+          "line": 121,
+          "text": "    prefetched_models: Option<IndexMap<String, ModelEntry>>,"
+        },
+        {
+          "line": 122,
+          "text": "    boot: Option<crate::agent::init::BootstrapPrefetch>,"
+        },
+        {
+          "line": 123,
+          "text": "    memory_config: Option<crate::config::MemoryConfig>,"
+        },
+        {
+          "line": 124,
+          "text": "    outgoing: impl futures::AsyncWrite + Unpin + 'static,"
+        },
+        {
+          "line": 125,
+          "text": "    incoming: impl futures::AsyncRead + Unpin + 'static,"
+        },
+        {
+          "line": 126,
+          "text": ") -> impl std::future::Future<Output = Result<(), acp::Error>> {"
+        },
+        {
+          "line": 127,
+          "text": "    let (gw_tx, gw_rx) = tokio::sync::mpsc::unbounded_channel();"
+        },
+        {
+          "line": 128,
+          "text": "    let gateway = GatewaySender::new(gw_tx);"
+        },
+        {
+          "line": 129,
+          "text": "    let mut agent = MvpAgent::new("
+        },
+        {
+          "line": 130,
+          "text": "        gateway,"
+        },
+        {
+          "line": 131,
+          "text": "        &agent_config,"
+        },
+        {
+          "line": 132,
+          "text": "        auth_manager,"
+        },
+        {
+          "line": 133,
+          "text": "        prefetched_models,"
+        },
+        {
+          "line": 134,
+          "text": "        boot,"
+        },
+        {
+          "line": 135,
+          "text": "    )"
+        },
+        {
+          "line": 136,
+          "text": "    .unwrap_or_else(exit_on_config_error);"
+        },
+        {
+          "line": 137,
+          "text": "    agent.models_manager.spawn_background_refresh();"
+        },
+        {
+          "line": 138,
+          "text": "    if let Some(mc) = memory_config {"
+        },
+        {
+          "line": 139,
+          "text": "        agent.set_memory_config(mc);"
+        },
+        {
+          "line": 140,
+          "text": "    }"
+        },
+        {
+          "line": 141,
+          "text": "    let incoming = LineBufferedRead::spawn_local(incoming);"
+        },
+        {
+          "line": 142,
+          "text": "    let (conn, handle_io) = acp::AgentSideConnection::new(agent, outgoing, incoming, |fut| {"
+        },
+        {
+          "line": 143,
+          "text": "        tokio::task::spawn_local(fut);"
+        },
+        {
+          "line": 144,
+          "text": "    });"
+        },
+        {
+          "line": 145,
+          "text": "    tokio::task::spawn_local("
+        },
+        {
+          "line": 146,
+          "text": "        GatewayReceiver::new(gw_rx, conn)"
+        },
+        {
+          "line": 147,
+          "text": "            .with_on_meta(xai_grok_otel::span_from_meta_traceparent)"
+        },
+        {
+          "line": 148,
+          "text": "            .run(),"
+        },
+        {
+          "line": 149,
+          "text": "    );"
+        },
+        {
+          "line": 150,
+          "text": "    handle_io"
+        },
+        {
+          "line": 151,
+          "text": "}"
+        },
+        {
+          "line": 152,
+          "text": "fn internal_reload_request_line("
+        },
+        {
+          "line": 153,
+          "text": "    id: &str,"
+        },
+        {
+          "line": 154,
+          "text": "    method: InternalMethod,"
+        },
+        {
+          "line": 155,
+          "text": "    params: serde_json::Value,"
+        },
+        {
+          "line": 156,
+          "text": ") -> String {"
+        },
+        {
+          "line": 157,
+          "text": "    crate::leader::protocol::internal_request_line(id, method, params)"
+        },
+        {
+          "line": 158,
+          "text": "}"
+        },
+        {
+          "line": 159,
+          "text": "/// Start a skills file watcher and wire it to inject `x.ai/internal/reload_skills` messages into the shared ACP incoming stream."
+        },
+        {
+          "line": 160,
+          "text": "/// The messages fire when SKILL.md files change on disk."
+        },
+        {
+          "line": 161,
+          "text": "/// Returns the watcher task, or `None` if no directories could be watched."
+        },
+        {
+          "line": 162,
+          "text": "fn spawn_skills_file_watcher<W>("
+        },
+        {
+          "line": 163,
+          "text": "    acp_incoming_tx: &Arc<TokioMutex<W>>,"
+        },
+        {
+          "line": 164,
+          "text": "    skills_paths: &[String],"
+        },
+        {
+          "line": 165,
+          "text": ") -> Option<tokio::task::JoinHandle<()>>"
+        },
+        {
+          "line": 166,
+          "text": "where"
+        },
+        {
+          "line": 167,
+          "text": "    W: tokio::io::AsyncWrite + Unpin + Send + 'static,"
+        },
+        {
+          "line": 168,
+          "text": "{"
+        },
+        {
+          "line": 169,
+          "text": "    let cwd = std::env::current_dir().unwrap_or_default();"
+        },
+        {
+          "line": 170,
+          "text": "    let workspace_user_dir = xai_grok_agent::prompt::workspace_user::optional_workspace_user_dir();"
+        },
+        {
+          "line": 171,
+          "text": "    let (mut watcher, mut skills_rx) = crate::config::watcher::SkillsFileWatcher::start("
+        },
+        {
+          "line": 172,
+          "text": "        Some(cwd.as_path()),"
+        },
+        {
+          "line": 173,
+          "text": "        workspace_user_dir.as_deref(),"
+        },
+        {
+          "line": 174,
+          "text": "        skills_paths,"
+        },
+        {
+          "line": 175,
+          "text": "    )?;"
+        },
+        {
+          "line": 176,
+          "text": "    let skills_tx = acp_incoming_tx.clone();"
+        },
+        {
+          "line": 177,
+          "text": "    let task = tokio::spawn(async move {"
+        },
+        {
+          "line": 178,
+          "text": "        while let Some(change) = skills_rx.recv().await {"
+        },
+        {
+          "line": 179,
+          "text": "            let created_discovery_dir = watcher.refresh_new_discovery_dirs();"
+        },
+        {
+          "line": 180,
+          "text": "            let (id, method) = match change {"
+        },
+        {
+          "line": 181,
+          "text": "                crate::config::watcher::DiscoveryChange::Skills if !created_discovery_dir => {"
+        },
+        {
+          "line": 182,
+          "text": "                    info!(\"Skill directory changed on disk, reloading skills for all sessions\");"
+        },
+        {
+          "line": 183,
+          "text": "                    (\"skills-reload\", InternalMethod::ReloadSkills)"
+        },
+        {
+          "line": 184,
+          "text": "                }"
+        },
+        {
+          "line": 185,
+          "text": "                crate::config::watcher::DiscoveryChange::Skills => {"
+        },
+        {
+          "line": 186,
+          "text": "                    info!(\"Discovery directory created on disk, reloading skills and workflows\");"
+        },
+        {
+          "line": 187,
+          "text": "                    (\"skills-reload\", InternalMethod::ReloadSkills)"
+        },
+        {
+          "line": 188,
+          "text": "                }"
+        },
+        {
+          "line": 189,
+          "text": "                crate::config::watcher::DiscoveryChange::Workflows => {"
+        },
+        {
+          "line": 190,
+          "text": "                    info!("
+        },
+        {
+          "line": 191,
+          "text": "                        \"Workflow directory changed on disk, re-advertising commands for all sessions\""
+        },
+        {
+          "line": 192,
+          "text": "                    );"
+        },
+        {
+          "line": 193,
+          "text": "                    (\"workflows-reload\", InternalMethod::ReloadWorkflows)"
+        },
+        {
+          "line": 194,
+          "text": "                }"
+        },
+        {
+          "line": 195,
+          "text": "            };"
+        },
+        {
+          "line": 196,
+          "text": "            let line = internal_reload_request_line(id, method, serde_json::json!({}));"
+        },
+        {
+          "line": 197,
+          "text": "            let mut tx = skills_tx.lock().await;"
+        },
+        {
+          "line": 198,
+          "text": "            if let Err(e) = tx.write_all(line.as_bytes()).await {"
+        },
+        {
+          "line": 199,
+          "text": "                warn!("
+        },
+        {
+          "line": 200,
+          "text": "                    error = %e,"
+        },
+        {
+          "line": 201,
+          "text": "                    \"failed to inject skills reload into ACP stream\""
+        },
+        {
+          "line": 202,
+          "text": "                );"
+        },
+        {
+          "line": 203,
+          "text": "            }"
+        },
+        {
+          "line": 240,
+          "text": "    let _total_timer = crate::instrumentation_timer!(\"startup.stdio_agent_total\");"
+        },
+        {
+          "line": 241,
+          "text": "    let outgoing = tokio::io::stdout().compat_write();"
+        },
+        {
+          "line": 242,
+          "text": "    let mut agent_config = agent_config.clone();"
+        },
+        {
+          "line": 243,
+          "text": "    let (acp_incoming_rx, acp_incoming_tx) = simplex(MAX_BUFFER_SIZE);"
+        },
+        {
+          "line": 244,
+          "text": "    let incoming = acp_incoming_rx.compat();"
+        },
+        {
+          "line": 245,
+          "text": "    let acp_incoming_tx = Arc::new(TokioMutex::new(acp_incoming_tx));"
+        },
+        {
+          "line": 246,
+          "text": "    let stdin_tx = acp_incoming_tx.clone();"
+        },
+        {
+          "line": 247,
+          "text": "    let (stdin_closed_tx, stdin_closed_rx) = tokio::sync::oneshot::channel();"
+        },
+        {
+          "line": 248,
+          "text": "    let mut stdin_lines = xai_acp_lib::spawn_stdin_line_reader();"
+        },
+        {
+          "line": 249,
+          "text": "    tokio::spawn(async move {"
+        },
+        {
+          "line": 250,
+          "text": "        while let Some(line) = stdin_lines.recv().await {"
+        },
+        {
+          "line": 251,
+          "text": "            let mut tx = stdin_tx.lock().await;"
+        },
+        {
+          "line": 252,
+          "text": "            if tx.write_all(&line).await.is_err() {"
+        },
+        {
+          "line": 253,
+          "text": "                break;"
+        },
+        {
+          "line": 254,
+          "text": "            }"
+        },
+        {
+          "line": 255,
+          "text": "        }"
+        },
+        {
+          "line": 256,
+          "text": "        let _ = stdin_closed_tx.send(());"
+        },
+        {
+          "line": 257,
+          "text": "    });"
+        },
+        {
+          "line": 258,
+          "text": "    let _skills_watcher = spawn_skills_file_watcher(&acp_incoming_tx, &agent_config.skills.paths);"
+        },
+        {
+          "line": 259,
+          "text": "    let local_set = tokio::task::LocalSet::new();"
+        },
+        {
+          "line": 260,
+          "text": "    let agent_cancel = tokio_util::sync::CancellationToken::new();"
+        },
+        {
+          "line": 261,
+          "text": "    let _cancel_on_exit = agent_cancel.clone().drop_guard();"
+        },
+        {
+          "line": 262,
+          "text": "    let cancel_for_agent = agent_cancel.clone();"
+        },
+        {
+          "line": 263,
+          "text": "    let result = local_set"
+        },
+        {
+          "line": 264,
+          "text": "        .run_until(async move {"
+        },
+        {
+          "line": 265,
+          "text": "            let simplex_tx = acp_incoming_tx;"
+        },
+        {
+          "line": 266,
+          "text": "            tokio::task::spawn_local(async move {"
+        },
+        {
+          "line": 267,
+          "text": "                let _ = stdin_closed_rx.await;"
+        },
+        {
+          "line": 268,
+          "text": "                tokio::time::sleep(Duration::from_millis(100)).await;"
+        },
+        {
+          "line": 269,
+          "text": "                let mut tx = simplex_tx.lock().await;"
+        },
+        {
+          "line": 270,
+          "text": "                let _ = tx.shutdown().await;"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "233fffd0c3fa786966ad82adb8f7f3e26a38f13e0fb9afdae52be86ffb700901",
+      "line_count": 2073
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/config/watcher.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/config/watcher.rs",
+      "observed_utc": "2026-09-17T19:19:22.057902+00:00",
+      "bytes": 61244,
+      "contract_excerpts": [
+        {
+          "line": 25,
+          "text": "            move |res: notify::Result<notify::Event>| match &res {"
+        },
+        {
+          "line": 26,
+          "text": "                Ok(event) if matches!(event.kind, notify::EventKind::Access(_)) => {}"
+        },
+        {
+          "line": 27,
+          "text": "                _ => event_handler.handle_event(res),"
+        },
+        {
+          "line": 287,
+          "text": "const SKILLS_DEBOUNCE: Duration = Duration::from_secs(2);"
+        },
+        {
+          "line": 288,
+          "text": ""
+        },
+        {
+          "line": 289,
+          "text": "#[derive(Debug, Clone, Copy, PartialEq, Eq)]"
+        },
+        {
+          "line": 290,
+          "text": "pub enum DiscoveryChange {"
+        },
+        {
+          "line": 291,
+          "text": "    Skills,"
+        },
+        {
+          "line": 292,
+          "text": "    Workflows,"
+        },
+        {
+          "line": 293,
+          "text": "}"
+        },
+        {
+          "line": 294,
+          "text": ""
+        },
+        {
+          "line": 295,
+          "text": "fn discovery_change_for_path(path: &Path) -> Option<DiscoveryChange> {"
+        },
+        {
+          "line": 296,
+          "text": "    let file_name = path.file_name().and_then(|name| name.to_str());"
+        },
+        {
+          "line": 297,
+          "text": "    if file_name.is_some_and(|name| VENDOR_CONFIG_ROOT_NAMES.contains(&name)) {"
+        },
+        {
+          "line": 298,
+          "text": "        return Some(DiscoveryChange::Skills);"
+        },
+        {
+          "line": 299,
+          "text": "    }"
+        },
+        {
+          "line": 300,
+          "text": "    if file_name.is_some_and(|name| name == \"workflows\")"
+        },
+        {
+          "line": 301,
+          "text": "        || path"
+        },
+        {
+          "line": 302,
+          "text": "            .ancestors()"
+        },
+        {
+          "line": 303,
+          "text": "            .any(|ancestor| ancestor.file_name().is_some_and(|name| name == \"workflows\"))"
+        },
+        {
+          "line": 304,
+          "text": "    {"
+        },
+        {
+          "line": 305,
+          "text": "        return Some(DiscoveryChange::Workflows);"
+        },
+        {
+          "line": 306,
+          "text": "    }"
+        },
+        {
+          "line": 307,
+          "text": "    if file_name.is_some_and(|name| SKILL_DISCOVERY_BASENAMES.contains(&name))"
+        },
+        {
+          "line": 308,
+          "text": "        || path"
+        },
+        {
+          "line": 309,
+          "text": "            .ancestors()"
+        },
+        {
+          "line": 310,
+          "text": "            .any(|ancestor| ancestor.file_name().is_some_and(|name| name == \"skills\"))"
+        },
+        {
+          "line": 311,
+          "text": "        || (path.extension().is_some_and(|extension| extension == \"md\")"
+        },
+        {
+          "line": 312,
+          "text": "            && path"
+        },
+        {
+          "line": 313,
+          "text": "                .parent()"
+        },
+        {
+          "line": 314,
+          "text": "                .is_some_and(|parent| parent.file_name().is_some_and(|name| name == \"commands\")))"
+        },
+        {
+          "line": 315,
+          "text": "    {"
+        },
+        {
+          "line": 316,
+          "text": "        return Some(DiscoveryChange::Skills);"
+        },
+        {
+          "line": 317,
+          "text": "    }"
+        },
+        {
+          "line": 318,
+          "text": "    None"
+        },
+        {
+          "line": 319,
+          "text": "}"
+        },
+        {
+          "line": 320,
+          "text": ""
+        },
+        {
+          "line": 321,
+          "text": "/// Known vendor config root basenames; kept in sync with `collect_skill_config_dirs`."
+        },
+        {
+          "line": 322,
+          "text": "const VENDOR_CONFIG_ROOT_NAMES: &[&str] = &[\".grok\", \".agents\", \".claude\", \".cursor\"];"
+        },
+        {
+          "line": 323,
+          "text": ""
+        },
+        {
+          "line": 324,
+          "text": "/// `bundled` is the synced bundle root in grok home, so its appearance means skills changed."
+        },
+        {
+          "line": 325,
+          "text": "const SKILL_DISCOVERY_BASENAMES: &[&str] = &[\"skills\", \"commands\", \"SKILL.md\", \"bundled\"];"
+        },
+        {
+          "line": 353,
+          "text": "fn vendor_skill_refresh_dirs(config_dir: &Path) -> [(PathBuf, RecursiveMode); 3] {"
+        },
+        {
+          "line": 354,
+          "text": "    ["
+        },
+        {
+          "line": 355,
+          "text": "        (config_dir.join(\"skills\"), RecursiveMode::Recursive),"
+        },
+        {
+          "line": 356,
+          "text": "        (config_dir.join(\"commands\"), RecursiveMode::NonRecursive),"
+        },
+        {
+          "line": 357,
+          "text": "        (config_dir.join(\"workflows\"), RecursiveMode::NonRecursive),"
+        },
+        {
+          "line": 567,
+          "text": "impl SkillsFileWatcher {"
+        },
+        {
+          "line": 568,
+          "text": "    /// Start watching discovery dirs from [`collect_skill_config_dirs`](xai_grok_agent::prompt::skills::collect_skill_config_dirs)."
+        },
+        {
+          "line": 569,
+          "text": "    ///"
+        },
+        {
+          "line": 570,
+          "text": "    /// After a [`DiscoveryChange`], call [`Self::refresh_new_discovery_dirs`] so newly created seed dirs get watches attached."
+        },
+        {
+          "line": 571,
+          "text": "    pub fn start("
+        },
+        {
+          "line": 572,
+          "text": "        cwd: Option<&Path>,"
+        },
+        {
+          "line": 573,
+          "text": "        monorepo_user_dir: Option<&Path>,"
+        },
+        {
+          "line": 574,
+          "text": "        config_paths: &[String],"
+        },
+        {
+          "line": 575,
+          "text": "    ) -> Option<(Self, mpsc::UnboundedReceiver<DiscoveryChange>)> {"
+        },
+        {
+          "line": 576,
+          "text": "        let grok_home = xai_grok_tools::util::grok_home::grok_home();"
+        },
+        {
+          "line": 577,
+          "text": "        // Watch the full superset of vendor dirs (all-on compat) This watcher is shared by the whole leader; per-session compat isn't resolved here, and the discovery gating happens downstream"
+        },
+        {
+          "line": 578,
+          "text": "        // Watching a currently-disabled vendor dir is harmless: a change just re-runs the gated discovery It also avoids ever missing a watch if a toggle flips"
+        },
+        {
+          "line": 579,
+          "text": "        let dirs_to_watch = xai_grok_agent::prompt::skills::collect_skill_config_dirs("
+        },
+        {
+          "line": 580,
+          "text": "            cwd,"
+        },
+        {
+          "line": 581,
+          "text": "            monorepo_user_dir,"
+        },
+        {
+          "line": 582,
+          "text": "            &grok_home,"
+        },
+        {
+          "line": 583,
+          "text": "            config_paths,"
+        },
+        {
+          "line": 584,
+          "text": "            xai_grok_tools::types::compat::CompatConfig::default(),"
+        },
+        {
+          "line": 585,
+          "text": "        );"
+        },
+        {
+          "line": 586,
+          "text": "        let project_root = cwd.map(crate::session::workflow::registry::project_root);"
+        },
+        {
+          "line": 587,
+          "text": "        let (mut watcher, rx) ="
+        },
+        {
+          "line": 588,
+          "text": "            Self::start_with_dirs(&dirs_to_watch, &grok_home, project_root.as_deref())?;"
+        },
+        {
+          "line": 589,
+          "text": "        // In-process bundle sync re-advertises itself; this catches a sync by another grok process"
+        },
+        {
+          "line": 590,
+          "text": "        // The `bundled` basename rule sees the root appear; the root watch sees its subdirs appear"
+        },
+        {
+          "line": 591,
+          "text": "        let bundled_root = crate::bundle::bundled_root();"
+        },
+        {
+          "line": 592,
+          "text": "        watcher"
+        },
+        {
+          "line": 593,
+          "text": "            .refresh_dirs"
+        },
+        {
+          "line": 594,
+          "text": "            .extend(vendor_skill_refresh_dirs(&bundled_root));"
+        },
+        {
+          "line": 595,
+          "text": "        watcher"
+        },
+        {
+          "line": 596,
+          "text": "            .refresh_dirs"
+        },
+        {
+          "line": 597,
+          "text": "            .push((bundled_root, RecursiveMode::NonRecursive));"
+        },
+        {
+          "line": 598,
+          "text": "        watcher.refresh_new_discovery_dirs();"
+        },
+        {
+          "line": 599,
+          "text": "        Some((watcher, rx))"
+        },
+        {
+          "line": 605,
+          "text": "    pub fn start_with_dirs("
+        },
+        {
+          "line": 606,
+          "text": "        dirs_to_watch: &[PathBuf],"
+        },
+        {
+          "line": 607,
+          "text": "        grok_home: &Path,"
+        },
+        {
+          "line": 608,
+          "text": "        project_root: Option<&Path>,"
+        },
+        {
+          "line": 609,
+          "text": "    ) -> Option<(Self, mpsc::UnboundedReceiver<DiscoveryChange>)> {"
+        },
+        {
+          "line": 610,
+          "text": "        let (tx, rx) = mpsc::unbounded_channel();"
+        },
+        {
+          "line": 611,
+          "text": ""
+        },
+        {
+          "line": 612,
+          "text": "        let mut debouncer ="
+        },
+        {
+          "line": 613,
+          "text": "            new_filtered_debouncer(SKILLS_DEBOUNCE, move |res: DebounceEventResult| {"
+        },
+        {
+          "line": 614,
+          "text": "                let Ok(events) = res else { return };"
+        },
+        {
+          "line": 615,
+          "text": "                let mut change = None;"
+        },
+        {
+          "line": 616,
+          "text": "                for next in events"
+        },
+        {
+          "line": 617,
+          "text": "                    .iter()"
+        },
+        {
+          "line": 618,
+          "text": "                    .filter_map(|event| discovery_change_for_path(&event.path))"
+        },
+        {
+          "line": 619,
+          "text": "                {"
+        },
+        {
+          "line": 620,
+          "text": "                    if next == DiscoveryChange::Skills {"
+        },
+        {
+          "line": 621,
+          "text": "                        change = Some(next);"
+        },
+        {
+          "line": 622,
+          "text": "                        break;"
+        },
+        {
+          "line": 623,
+          "text": "                    }"
+        },
+        {
+          "line": 624,
+          "text": "                    change = Some(next);"
+        },
+        {
+          "line": 625,
+          "text": "                }"
+        },
+        {
+          "line": 626,
+          "text": "                if let Some(change) = change {"
+        },
+        {
+          "line": 627,
+          "text": "                    let _ = tx.send(change);"
+        },
+        {
+          "line": 628,
+          "text": "                }"
+        },
+        {
+          "line": 629,
+          "text": "            })"
+        },
+        {
+          "line": 630,
+          "text": "            .map_err(|e| tracing::warn!(error = %e, \"failed to create skills file watcher\"))"
+        },
+        {
+          "line": 631,
+          "text": "            .ok()?;"
+        },
+        {
+          "line": 632,
+          "text": ""
+        },
+        {
+          "line": 633,
+          "text": "        let plan = plan_skills_watch_targets(dirs_to_watch, grok_home, project_root);"
+        },
+        {
+          "line": 634,
+          "text": ""
+        },
+        {
+          "line": 635,
+          "text": "        let mut watched = 0;"
+        },
+        {
+          "line": 636,
+          "text": "        let mut refreshed_dirs = HashSet::new();"
+        },
+        {
+          "line": 637,
+          "text": "        for dir in &plan.vendor_roots {"
+        },
+        {
+          "line": 638,
+          "text": "            let attached = watch_skill_subdirs(&mut debouncer, dir);"
+        },
+        {
+          "line": 639,
+          "text": "            watched += attached.len();"
+        },
+        {
+          "line": 640,
+          "text": "            refreshed_dirs.extend(attached);"
+        },
+        {
+          "line": 641,
+          "text": "        }"
+        },
+        {
+          "line": 642,
+          "text": "        for dir in &plan.recursive_roots {"
+        },
+        {
+          "line": 643,
+          "text": "            match debouncer.watcher().watch(dir, RecursiveMode::Recursive) {"
+        },
+        {
+          "line": 644,
+          "text": "                Ok(()) => {"
+        },
+        {
+          "line": 645,
+          "text": "                    watched += 1;"
+        },
+        {
+          "line": 646,
+          "text": "                    refreshed_dirs.insert(dir.clone());"
+        },
+        {
+          "line": 647,
+          "text": "                }"
+        },
+        {
+          "line": 648,
+          "text": "                Err(e) => log_watch_error(&e, \"failed to watch directory for skill changes\"),"
+        },
+        {
+          "line": 649,
+          "text": "            }"
+        },
+        {
+          "line": 650,
+          "text": "        }"
+        },
+        {
+          "line": 651,
+          "text": "        if let Some(parent_watch) = &plan.project_parent_watch {"
+        },
+        {
+          "line": 652,
+          "text": "            match debouncer"
+        },
+        {
+          "line": 653,
+          "text": "                .watcher()"
+        },
+        {
+          "line": 654,
+          "text": "                .watch(parent_watch, RecursiveMode::NonRecursive)"
+        },
+        {
+          "line": 655,
+          "text": "            {"
+        },
+        {
+          "line": 656,
+          "text": "                Ok(()) => {"
+        },
+        {
+          "line": 657,
+          "text": "                    watched += 1;"
+        },
+        {
+          "line": 658,
+          "text": "                    refreshed_dirs.insert(parent_watch.clone());"
+        },
+        {
+          "line": 659,
+          "text": "                }"
+        },
+        {
+          "line": 660,
+          "text": "                Err(error) => log_watch_error("
+        },
+        {
+          "line": 661,
+          "text": "                    &error,"
+        },
+        {
+          "line": 662,
+          "text": "                    \"failed to watch workflow discovery parent directory\","
+        },
+        {
+          "line": 663,
+          "text": "                ),"
+        },
+        {
+          "line": 664,
+          "text": "            }"
+        },
+        {
+          "line": 665,
+          "text": "        }"
+        },
+        {
+          "line": 666,
+          "text": ""
+        },
+        {
+          "line": 667,
+          "text": "        if watched == 0 {"
+        },
+        {
+          "line": 668,
+          "text": "            tracing::debug!(\"no config directories found to watch for skills\");"
+        },
+        {
+          "line": 669,
+          "text": "            return None;"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "b06edb6503f4d25970e2f5f059205aa9dab2dbd82bc1b6ce7c148c16cb634695",
+      "line_count": 1519
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/mod.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/mod.rs",
+      "observed_utc": "2026-09-17T19:19:22.058372+00:00",
+      "bytes": 118749,
+      "contract_excerpts": [],
+      "http_status": 200,
+      "sha256": "520557cea0f014331e0bd9c0279bbbb627fd6534c03c1d9bf7f16767192320ed",
+      "line_count": 2475
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/mod.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/mod.rs",
+      "http_status": 200,
+      "bytes": 118749,
+      "sha256": "520557cea0f014331e0bd9c0279bbbb627fd6534c03c1d9bf7f16767192320ed",
+      "observed_utc": "2026-09-17T19:19:52.909431+00:00",
+      "repeated_fetch_reason": "exact helper type source module declaration",
+      "contract_excerpts": [
+        {
+          "line": 1237,
+          "text": "mod agent_directory;"
+        },
+        {
+          "line": 1238,
+          "text": "mod agent_runtime;"
+        },
+        {
+          "line": 1239,
+          "text": "mod code_nav;"
+        },
+        {
+          "line": 1240,
+          "text": "mod folder_trust_prompt;"
+        },
+        {
+          "line": 1241,
+          "text": "mod heap_profile;"
+        },
+        {
+          "line": 1242,
+          "text": "mod resource_telemetry;"
+        },
+        {
+          "line": 1243,
+          "text": "mod session_registry;"
+        },
+        {
+          "line": 1244,
+          "text": "mod session_lifecycle;"
+        },
+        {
+          "line": 1245,
+          "text": "mod agent_ops;"
+        },
+        {
+          "line": 1246,
+          "text": "mod acp_agent;"
+        },
+        {
+          "line": 1247,
+          "text": "pub(crate) mod reasoning_effort;"
+        },
+        {
+          "line": 1248,
+          "text": "mod sampler_prewarm;"
+        },
+        {
+          "line": 1249,
+          "text": "mod session_setup;"
+        },
+        {
+          "line": 1250,
+          "text": "mod subagent_spawn;"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs",
+      "observed_utc": "2026-09-17T19:20:05.392192+00:00",
+      "bytes": 230223,
+      "contract_excerpts": [
+        {
+          "line": 72,
+          "text": "    pub fn reload_skills_all_sessions(&self) -> usize {"
+        },
+        {
+          "line": 73,
+          "text": "        let session_ids = self.resident_ids();"
+        },
+        {
+          "line": 74,
+          "text": "        for sid in &session_ids {"
+        },
+        {
+          "line": 75,
+          "text": "            if let Some(handle) = self.resident_handle(sid) {"
+        },
+        {
+          "line": 76,
+          "text": "                let _ = handle.cmd_tx.send(SessionCommand::ReloadSkills);"
+        },
+        {
+          "line": 77,
+          "text": "            }"
+        },
+        {
+          "line": 78,
+          "text": "        }"
+        },
+        {
+          "line": 79,
+          "text": "        session_ids.len()"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "5c1d3182780e92724445fc08f6c78f6d008d115d4a59ab35cbf155c159fc26cd",
+      "line_count": 5283
+    },
+    {
+      "path": "crates/codegen/xai-grok-agent/src/prompt/skills.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-agent/src/prompt/skills.rs",
+      "observed_utc": "2026-09-17T19:20:35.728290+00:00",
+      "bytes": 103163,
+      "contract_excerpts": [
+        {
+          "line": 137,
+          "text": "pub fn collect_skill_config_dirs("
+        },
+        {
+          "line": 138,
+          "text": "    cwd: Option<&Path>,"
+        },
+        {
+          "line": 139,
+          "text": "    workspace_user_dir: Option<&Path>,"
+        },
+        {
+          "line": 140,
+          "text": "    global_dir: &Path,"
+        },
+        {
+          "line": 141,
+          "text": "    config_paths: &[String],"
+        },
+        {
+          "line": 142,
+          "text": "    compat: CompatConfig,"
+        },
+        {
+          "line": 143,
+          "text": ") -> Vec<PathBuf> {"
+        },
+        {
+          "line": 144,
+          "text": "    let project_sources = cwd.map(|cwd| {"
+        },
+        {
+          "line": 145,
+          "text": "        crate::repo::StartupProjectSources::with_workspace_user("
+        },
+        {
+          "line": 146,
+          "text": "            cwd,"
+        },
+        {
+          "line": 147,
+          "text": "            workspace_user_dir.map(Path::to_path_buf),"
+        },
+        {
+          "line": 148,
+          "text": "        )"
+        },
+        {
+          "line": 149,
+          "text": "    });"
+        },
+        {
+          "line": 150,
+          "text": "    collect_skill_config_dirs_from_sources("
+        },
+        {
+          "line": 151,
+          "text": "        project_sources.as_ref(),"
+        },
+        {
+          "line": 152,
+          "text": "        global_dir,"
+        },
+        {
+          "line": 153,
+          "text": "        config_paths,"
+        },
+        {
+          "line": 154,
+          "text": "        compat,"
+        },
+        {
+          "line": 155,
+          "text": "    )"
+        },
+        {
+          "line": 156,
+          "text": "}"
+        },
+        {
+          "line": 157,
+          "text": ""
+        },
+        {
+          "line": 158,
+          "text": "fn collect_skill_config_dirs_from_sources("
+        },
+        {
+          "line": 159,
+          "text": "    project_sources: Option<&crate::repo::StartupProjectSources>,"
+        },
+        {
+          "line": 160,
+          "text": "    global_dir: &Path,"
+        },
+        {
+          "line": 161,
+          "text": "    config_paths: &[String],"
+        },
+        {
+          "line": 162,
+          "text": "    compat: CompatConfig,"
+        },
+        {
+          "line": 163,
+          "text": ") -> Vec<PathBuf> {"
+        },
+        {
+          "line": 164,
+          "text": "    let grok_home = global_dir.to_path_buf();"
+        },
+        {
+          "line": 165,
+          "text": "    let mut dirs = Vec::new();"
+        },
+        {
+          "line": 166,
+          "text": "    let mut seen = HashSet::new();"
+        },
+        {
+          "line": 167,
+          "text": ""
+        },
+        {
+          "line": 168,
+          "text": "    // Helper: add if the directory exists and hasn't been seen yet."
+        },
+        {
+          "line": 169,
+          "text": "    let mut try_add = |dir: PathBuf| {"
+        },
+        {
+          "line": 170,
+          "text": "        if !dir.is_dir() {"
+        },
+        {
+          "line": 171,
+          "text": "            return;"
+        },
+        {
+          "line": 172,
+          "text": "        }"
+        },
+        {
+          "line": 173,
+          "text": "        let canonical = dunce::canonicalize(&dir).unwrap_or_else(|_| dir.clone());"
+        },
+        {
+          "line": 174,
+          "text": "        if seen.insert(canonical) {"
+        },
+        {
+          "line": 175,
+          "text": "            dirs.push(dir);"
+        },
+        {
+          "line": 176,
+          "text": "        }"
+        },
+        {
+          "line": 177,
+          "text": "    };"
+        },
+        {
+          "line": 178,
+          "text": ""
+        },
+        {
+          "line": 179,
+          "text": "    // Vendor dirs (`.claude`/`.cursor`) are gated by the resolved compat config; `.grok` and `.agents` are always present"
+        },
+        {
+          "line": 180,
+          "text": "    // When all cells are on, this list equals the historical `[\".grok\", \".agents\", \".claude\", \".cursor\"]`"
+        },
+        {
+          "line": 181,
+          "text": "    let config_dir_names = compat.skill_config_dirs();"
+        },
+        {
+          "line": 182,
+          "text": ""
+        },
+        {
+          "line": 183,
+          "text": "    if let Some(project_sources) = project_sources {"
+        },
+        {
+          "line": 184,
+          "text": "        for dir in project_sources.skill_dirs() {"
+        },
+        {
+          "line": 185,
+          "text": "            for name in &config_dir_names {"
+        },
+        {
+          "line": 186,
+          "text": "                try_add(dir.join(name));"
+        },
+        {
+          "line": 187,
+          "text": "            }"
+        },
+        {
+          "line": 188,
+          "text": "        }"
+        },
+        {
+          "line": 189,
+          "text": "    }"
+        },
+        {
+          "line": 190,
+          "text": ""
+        },
+        {
+          "line": 191,
+          "text": "    // Priority 3: Global user dirs. `.grok` comes from `grok_home` (which may be overridden), so it's handled separately."
+        },
+        {
+          "line": 192,
+          "text": "    // `.agents` is always added, while `.claude`/`.cursor` are gated by the skills compat cells"
+        },
+        {
+          "line": 193,
+          "text": "    try_add(grok_home);"
+        },
+        {
+          "line": 194,
+          "text": "    if let Some(home) = xai_dirs::home_dir() {"
+        },
+        {
+          "line": 195,
+          "text": "        try_add(home.join(\".agents\"));"
+        },
+        {
+          "line": 196,
+          "text": "        if compat.claude.skills {"
+        },
+        {
+          "line": 197,
+          "text": "            try_add(home.join(\".claude\"));"
+        },
+        {
+          "line": 198,
+          "text": "        }"
+        },
+        {
+          "line": 199,
+          "text": "        if compat.cursor.skills {"
+        },
+        {
+          "line": 200,
+          "text": "            try_add(home.join(\".cursor\"));"
+        },
+        {
+          "line": 201,
+          "text": "        }"
+        },
+        {
+          "line": 202,
+          "text": "    }"
+        },
+        {
+          "line": 203,
+          "text": ""
+        },
+        {
+          "line": 204,
+          "text": "    // Priority 4: Config paths (skills.paths entries)."
+        },
+        {
+          "line": 205,
+          "text": "    for raw in config_paths {"
+        },
+        {
+          "line": 206,
+          "text": "        let expanded = expand_tilde(raw);"
+        },
+        {
+          "line": 207,
+          "text": "        if expanded.is_dir() {"
+        },
+        {
+          "line": 208,
+          "text": "            try_add(expanded);"
+        },
+        {
+          "line": 209,
+          "text": "        } else if expanded.is_file()"
+        },
+        {
+          "line": 210,
+          "text": "            && let Some(parent) = expanded.parent()"
+        },
+        {
+          "line": 211,
+          "text": "        {"
+        },
+        {
+          "line": 212,
+          "text": "            try_add(parent.to_path_buf());"
+        },
+        {
+          "line": 213,
+          "text": "        }"
+        },
+        {
+          "line": 214,
+          "text": "    }"
+        },
+        {
+          "line": 215,
+          "text": ""
+        },
+        {
+          "line": 216,
+          "text": "    dirs"
+        }
+      ],
+      "http_status": 200,
+      "sha256": "497332a017e305bbbd6f97094b07080d7f7898d5235b372dc1193440511d809b",
+      "line_count": 2723
+    }
+  ],
+  "raw_source_request_count": 8,
+  "raw_source_bytes": 886370,
+  "new_network_reads_finished": true,
+  "inspected_local_sources": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "bytes": 86805,
+      "sha256": "d70ab22b582a229d50bf0cc7deac145b9a7b3a1127e5a22e5fa2e893c3b2972b"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+      "bytes": 19354,
+      "sha256": "6ad5252a39a78508b5645c9a4ee42d5173cc7ba774d3826440bf9b8cb28a09eb"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools.rs",
+      "bytes": 13741,
+      "sha256": "460c250327a3d524573d8ba59eb462e07bbfdfa4cdc1b8fa69cd583cdeb89a67"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "bytes": 152282,
+      "sha256": "f3481d34412504978216d7cafdeba16b598e72a3716db41c89989109277b9cb2"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "bytes": 55492,
+      "sha256": "b126b4d97840914576744c18e7c4747b4df0f5a3a7afc38c318964f0cbac2d31"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_policy_preflight.py",
+      "bytes": 36406,
+      "sha256": "952253d7c132034c247a5735f6ce8f0aa4505f44b7045a6b6ca45804fe7fe275"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+      "bytes": 22504,
+      "sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "bytes": 32056,
+      "sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli.py",
+      "bytes": 10151,
+      "sha256": "23d31c7834b68b336109690a5419d2ac18074bb40dee45909fcf13e2ab086404"
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs",
+      "bytes": 8298,
+      "sha256": "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8"
+    }
+  ],
+  "reused_cached_primary_sources": [
+    {
+      "path": "crates/codegen/xai-grok-shell/src/extensions/session_admin.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/session_admin.rs",
+      "bytes": 43249,
+      "sha256": "cdc05b3cb5b740b1f07c7906ab2bc2ca04ff073de6a4acf8353ccba24bd69e31",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 66,
+          "text": "        InternalMethod::ReloadProjectMcpServers => {"
+        },
+        {
+          "line": 67,
+          "text": "            handle_reload_project_mcp_servers(agent, args).await"
+        },
+        {
+          "line": 68,
+          "text": "        }"
+        },
+        {
+          "line": 69,
+          "text": "        InternalMethod::ReloadSkills => handle_reload_skills(agent),"
+        },
+        {
+          "line": 607,
+          "text": ""
+        },
+        {
+          "line": 608,
+          "text": "// internal/reload_skills"
+        },
+        {
+          "line": 609,
+          "text": ""
+        },
+        {
+          "line": 610,
+          "text": "/// Reload skills for ALL active sessions. Called by the skills file watcher"
+        },
+        {
+          "line": 611,
+          "text": "fn handle_reload_skills(agent: &MvpAgent) -> ExtResult {"
+        },
+        {
+          "line": 612,
+          "text": "    let reloaded = agent.reload_skills_all_sessions();"
+        },
+        {
+          "line": 613,
+          "text": "    ExtMethodResult::success(serde_json::json!({ \"reloaded\": reloaded }))"
+        },
+        {
+          "line": 614,
+          "text": "        .to_ext_response()"
+        },
+        {
+          "line": 615,
+          "text": "        .map_err(|e| acp::Error::internal_error().data(e.to_string()))"
+        }
+      ]
+    },
+    {
+      "path": "crates/codegen/xai-grok-shell/src/session/result.rs",
+      "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/result.rs",
+      "bytes": 4398,
+      "sha256": "ea717cb2245a7cc8fe6ee687186f4b77e80281dde27f3fb6ff851afecd64bad9",
+      "new_http_requests": 0,
+      "contract_excerpts": [
+        {
+          "line": 30,
+          "text": "#[derive(Debug, Clone, Serialize, Deserialize)]"
+        },
+        {
+          "line": 31,
+          "text": "#[serde(rename_all = \"camelCase\")]"
+        },
+        {
+          "line": 32,
+          "text": "pub struct ExtMethodResult<T: Serialize> {"
+        },
+        {
+          "line": 33,
+          "text": "    pub result: Option<T>,"
+        },
+        {
+          "line": 34,
+          "text": "    #[serde(skip_serializing_if = \"Option::is_none\")]"
+        },
+        {
+          "line": 35,
+          "text": "    pub error: Option<serde_json::Value>,"
+        },
+        {
+          "line": 36,
+          "text": "}"
+        },
+        {
+          "line": 37,
+          "text": ""
+        },
+        {
+          "line": 57,
+          "text": "        Self {"
+        },
+        {
+          "line": 58,
+          "text": "            result: Some(result),"
+        },
+        {
+          "line": 59,
+          "text": "            error: None,"
+        },
+        {
+          "line": 60,
+          "text": "        }"
+        },
+        {
+          "line": 61,
+          "text": "    }"
+        },
+        {
+          "line": 62,
+          "text": ""
+        },
+        {
+          "line": 63,
+          "text": "    pub fn failure(error: impl std::fmt::Display) -> Self {"
+        },
+        {
+          "line": 64,
+          "text": "        Self {"
+        },
+        {
+          "line": 65,
+          "text": "            result: None,"
+        },
+        {
+          "line": 66,
+          "text": "            error: Some(serde_json::Value::String(error.to_string())),"
+        },
+        {
+          "line": 67,
+          "text": "        }"
+        },
+        {
+          "line": 68,
+          "text": "    }"
+        },
+        {
+          "line": 69,
+          "text": ""
+        },
+        {
+          "line": 70,
+          "text": "    pub fn partial(result: T, error: impl std::fmt::Display) -> Self {"
+        },
+        {
+          "line": 71,
+          "text": "        Self {"
+        },
+        {
+          "line": 72,
+          "text": "            result: Some(result),"
+        },
+        {
+          "line": 73,
+          "text": "            error: Some(serde_json::Value::String(error.to_string())),"
+        },
+        {
+          "line": 85,
+          "text": "        serde_json::to_value(self)"
+        },
+        {
+          "line": 86,
+          "text": "            .and_then(|v| to_raw_value(&v))"
+        },
+        {
+          "line": 87,
+          "text": "            .map(|raw| acp::ExtResponse::new(Arc::from(raw)))"
+        },
+        {
+          "line": 88,
+          "text": "            .map_err(|e| anyhow::anyhow!(e))"
+        },
+        {
+          "line": 89,
+          "text": "    }"
+        },
+        {
+          "line": 90,
+          "text": "}"
+        },
+        {
+          "line": 91,
+          "text": ""
+        }
+      ]
+    }
+  ],
+  "public_native_shape_evidence": {
+    "path": "specs/cli-agent-parity/validation/grok-27-native-response-field-shapes.json",
+    "bytes": 1013,
+    "sha256": "a0bc934fc9f285f2c49b704aef04b661282339e269cc9eb638bd2359a2db55c3",
+    "only_proven_shape": "outer result object has exactly one key result with object value; native inner fields/values unknown",
+    "private_artifact_read": false
+  },
+  "completed_utc": "2026-09-17T19:23:34.218891+00:00",
+  "local_literal_search": {
+    "production_cli_source_or_preparer_or_plugin_emits_fixed_literal": false,
+    "matched_tests_only": [
+      "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs:425",
+      "script/cli-agent-parity/grok_policy_preflight_runner_tests.py:461"
+    ],
+    "MCP_bridge_can_echo_registered_reverse_request_string_id": true,
+    "bridge_does_not_originate_skills_reload": true,
+    "application_owned_request_ledger_available_for_observed_id": false
+  },
+  "candidate_caller": {
+    "source": "crates/codegen/xai-grok-shell/src/agent/app.rs",
+    "function": "spawn_skills_file_watcher",
+    "fixed_id": "skills-reload",
+    "fixed_id_lines": [
+      183,
+      187
+    ],
+    "fixed_id_utf8_bytes": 13,
+    "fixed_id_sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+    "wire_method": "_x.ai/internal/reload_skills",
+    "params": {},
+    "write_line": 198,
+    "direction": "CLI internal watcher -> shared ACP AgentSideConnection input; RPC response -> same stdout connected to App",
+    "stdin_and_watcher_share_simplex": true,
+    "watcher_awaits_response": false,
+    "stdio_outgoing_line": 241,
+    "connection_writer_binding_line": 142,
+    "input_clone_lines": [
+      245,
+      246,
+      258
+    ]
+  },
+  "candidate_watch_contract": {
+    "debounce_seconds": 2,
+    "Access_read_events_filtered": true,
+    "classification_source": "config/watcher.rs:295-325",
+    "Skills_paths": "vendor root basenames .grok/.agents/.claude/.cursor; skills/ commands/ SKILL.md/ bundled and descendants of skills; .md directly under commands",
+    "Workflows_is_distinct_maintenance_id": true,
+    "watch_roots": "existing project_sources.skill_dirs() vendor directories; workspace_user_dir through StartupProjectSources; GROK_HOME; user .agents/.claude/.cursor according to compat; explicit skills.paths directory or file parent; bundled root",
+    "watch_superset_uses_default_compat_not_session_profile": true,
+    "actual_native_changed_path_observed": false
+  },
+  "candidate_success_contract": {
+    "outer_jsonrpc": "2.0",
+    "outer_id": "skills-reload",
+    "outer_keys": [
+      "jsonrpc",
+      "id",
+      "result"
+    ],
+    "outer_result_keys": [
+      "result"
+    ],
+    "inner_result_keys": [
+      "reloaded"
+    ],
+    "reloaded_rust_type": "usize",
+    "reloaded_JSON_type": "nonnegative integer",
+    "reloaded_semantics": "resident_ids().len(), after enqueueing SessionCommand::ReloadSkills while ignoring send errors",
+    "actual_reload_completion_proven": false,
+    "task_completion_proven": false,
+    "errors": "ExtMethodResult error omitted on success; generic failure has result null and optional error value; serialization failure is outer ACP internal_error; errors are not harmless success shapes",
+    "native_inner_success_contract_observed": false
+  },
+  "receiver_scope": {
+    "watcher_has_reply_channel_or_consumer": false,
+    "inspected_stdio_pipeline_filters_internal_ids_from_stdout": false,
+    "AgentSideConnection_receives_internal_request_and_owns_bound_outgoing_writer": true,
+    "GatewayReceiver_role_in_inspected_setup": "gateway channel to same connection, distinct from watcher response ownership",
+    "third_party_ACP_writer_and_complete_receiver_implementation_read": false,
+    "claim_scope": "public candidate call/stream binding only, not fixed-native stack execution proof"
+  },
+  "minimal_compatible_plan": [
+    "Do not add an App outbound ledger entry for a request the App never wrote. Preserve numeric user request ownership and separate any CLI-internal maintenance observations by transport generation.",
+    "First obtain new bounded testcfg native inner-field shape evidence for this fixed CLI binary; only public fixed key/type/count/match booleans, no values or raw bodies.",
+    "After exact native contract is verified, recognize only current-owned-transport jsonrpc2.0 exact string skills-reload and closed result.result.reloaded unsigned bounded integer success shape, with no method/error/extra fields. Return no business effects, consume no pending user RPC, prove no SDK origin/ACK/permission/task completion.",
+    "Repeated exact internal IDs may recur for legitimate watcher changes. Do not reuse the immutable user-response fingerprint cache or retroactively own the request. Keep conservative frame/byte budgets and reject malformed/error/other unknown IDs.",
+    "If candidate source can be patched upstream, internal injection should use notification semantics or an internal reply sink before stdout; a newly App-issued reload request alone cannot prevent or own the internally injected skills-reload response."
+  ],
+  "remaining_unknowns": [
+    "Fixed binary to public SOURCE_REV full source mapping",
+    "Which exact filesystem change triggered source27 native response",
+    "Actual native inner success/error shape and reloaded type/value",
+    "Uninspected third-party ACP writer internals and runtime frontend delegation implementation"
+  ],
+  "validation": {
+    "new_tree_requests": 1,
+    "new_raw_requests": 8,
+    "new_unique_raw_files": 7,
+    "raw_source_bytes": 886370,
+    "all_new_http_statuses_200": true,
+    "new_raw_limit": 8,
+    "individual_raw_limit_bytes": 262144,
+    "aggregate_raw_limit_bytes": 2097152,
+    "network_model_calls": 0,
+    "native_or_CLI_executed": false,
+    "cargo_executed": false,
+    "UI_operations": 0,
+    "git_mutations": 0,
+    "production_sources_modified": false,
+    "auth_private_config_DB_or_native_body_read": false,
+    "private_envelope_read": false,
+    "binary_strings_read": false,
+    "protocol_acceptance_or_product_gate_changed": false,
+    "native_PASS_claimed": false,
+    "finished_reads_done": true
+  }
+}

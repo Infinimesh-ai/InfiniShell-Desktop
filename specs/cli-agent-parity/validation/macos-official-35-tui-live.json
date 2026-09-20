@@ -1,0 +1,17 @@
+{
+  "session": "parity35",
+  "binary_sha256": "adef6f84267cdca9669babee63155382bc0261c323484991ed3b189a6f8f397c",
+  "launch_exit_code": 0,
+  "source_snapshot": "source35",
+  "scope": "TUI本地共享菜单渲染，不是三CLI原生验收",
+  "cleanup_exit_code": 0,
+  "session_absent": true,
+  "frame_sha256": {
+    "02-slash-frame.txt": "9b656de70d681db83eaa9e1e4ad23246f4fa78855aa1e4937202add143574e54",
+    "03-skills-frame.txt": "4eac91cdc671fa35722f460ea721720f427bb1b499dd4866eab6a15de5ca0929",
+    "01-frame.txt": "ebe39d084288fc24c9f95b887ee8e4ffe653f19ba382a3d6441d4ebd75057384"
+  },
+  "model_inputs_sent": 0,
+  "bilingual_layout_verified": false,
+  "native_cli_filter_verified": false
+}

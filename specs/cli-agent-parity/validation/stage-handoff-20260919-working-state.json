@@ -1,0 +1,1370 @@
+{
+  "schema": 1,
+  "scope": "user_requested_stage_close_working_state_only",
+  "candidate": "source46_unfrozen_uncompiled",
+  "branch": "codex/cli-agent-parity",
+  "head": "af1040dc8e7522ccafb09d8f0d4c6b219bd9d607",
+  "new_commit_or_push_performed": false,
+  "all_agents_stopped_writing": true,
+  "all_native_cases_returned": true,
+  "source45_manifest_sha256": "8f19bb52ac6b019618dd3fa79be5c05108d8be9cec9b0b54483c6334b955e2f5",
+  "preserved_staged_path_count": 259,
+  "excluded_user_changes": [
+    "app/src/ai/agent_providers/tools/web_runtime.rs",
+    "app/src/ai/agent_providers/tools/websearch_tests.rs"
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "sha256": "cf6b29f3151e7bf472a157567f06e3247bdedc69bc41aec54f0760ad28e364df",
+      "bytes": 49744
+    },
+    {
+      "path": "app/Cargo.toml",
+      "sha256": "d6c68f27d7dc7e5042c33fb6b0a58acd0828840c01bd3f7a50acb215ca8c0d77",
+      "bytes": 30562
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/bash_body.sh",
+      "sha256": "f97b6579beffbd59152d9c6667711aeb70c8eb1fb2f8e9df832c3d73122eb4a9",
+      "bytes": 77378
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/fish.sh",
+      "sha256": "6fb40d416b4adc740fde4e369cbc62c69263d7f432537e6e90b1981d9f06297e",
+      "bytes": 46560
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/pwsh.ps1",
+      "sha256": "db59c9a69b29e6bba0c820334fcc679e7c859961110d92987884a9e81286f68c",
+      "bytes": 50975
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/pwsh_ssh_wrapper.ps1",
+      "sha256": "9abf94e0b663401c3bebc8b55800eb1e592a5e01850fced8f8412227ab32a4d7",
+      "bytes": 23008
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/ssh_remote_shell_probe.sh",
+      "sha256": "a64184a6672c164f1524f1830902da1f1f7cab9fdf2bd34e6bec858794b2333a",
+      "bytes": 3356
+    },
+    {
+      "path": "app/assets/bundled/bootstrap/zsh_body.sh",
+      "sha256": "ddd3ef6345282d3ae7969e942e096e459195e8211db5d672c6fe150dea8c5256",
+      "bytes": 82769
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/codex/NATIVE_HOOK_TRUST_WINDOWS.json",
+      "sha256": "e1531b5cbb8d331d06a3627b68ee5d20a4af00501657609670ebb99cf2bf42a0",
+      "bytes": 3083
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/codex/windows-install-preflight.ps1",
+      "sha256": "722031ada89007ee8bf3844a46f0e4f4b61ddc4131cc0c2f5b6a264df13f21d4",
+      "bytes": 4788
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json",
+      "sha256": "c357e633f907623ff322f88aff2442cded9eaa243d9c14b45cdd66234bd20aa5",
+      "bytes": 148
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/README.md",
+      "sha256": "22ef7175658f6f5edcac586acad0aef7a88633ea6b9ae434748292588b98e7ba",
+      "bytes": 3691
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/hooks.json",
+      "sha256": "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+      "bytes": 2613
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs",
+      "sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898",
+      "bytes": 8860
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "sha256": "b00ac849bf5651ecd0ea37897ebf9a4537e47b7085118770af4e458f33fa5994",
+      "bytes": 382055
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "sha256": "9a9a79665e8d4555af1361e00a6a16fad3f5de0455697179a60cf7baa4d84423",
+      "bytes": 368506
+    },
+    {
+      "path": "app/src/ai/agent/api/convert_conversation.rs",
+      "sha256": "80523195caa8b6d6bb30fc57ad699db54f70227faccd7a89631f53bddff881e2",
+      "bytes": 84598
+    },
+    {
+      "path": "app/src/ai/agent/mod.rs",
+      "sha256": "6f3ca8b15c3e2821f527754b28f0ce7cc0413fad3480d6a72a339344ed9dae55",
+      "bytes": 120607
+    },
+    {
+      "path": "app/src/ai/agent_events/mod.rs",
+      "sha256": "5bef1a85486ac28d073c677e7357367d9493ddeafd6b25d6562fd22815ba97e2",
+      "bytes": 2051
+    },
+    {
+      "path": "app/src/ai/agent_providers/chat_stream_responses_tests.rs",
+      "sha256": "0e55730076c762e3d4633c1463ad6c3dfbe6c78fc7fcf5ceeffecc86d2f9a0b9",
+      "bytes": 35071
+    },
+    {
+      "path": "app/src/ai/agent_providers/chat_stream_skill_tests.rs",
+      "sha256": "2a8b599a652046c3125f637c7855fcdc2b8175a91e3129fe7058df13984ccf01",
+      "bytes": 11036
+    },
+    {
+      "path": "app/src/ai/agent_providers/prompt_renderer.rs",
+      "sha256": "82c048c17fa52913e5c571d068d8096ba43fb8fcacc8beaa7b9a9fc6d7b98dcf",
+      "bytes": 37533
+    },
+    {
+      "path": "app/src/ai/agent_providers/tools/launch_failure_tests.rs",
+      "sha256": "8050642e91ff5425a5b88aff464540b337fe0aa47605bcd44f7a66796b62f3db",
+      "bytes": 3259
+    },
+    {
+      "path": "app/src/ai/agent_providers/tools/local_orchestration.rs",
+      "sha256": "1843309d15f456bc859be84fe4222966456eb5cee0deb96fb0b333436567388e",
+      "bytes": 9096
+    },
+    {
+      "path": "app/src/ai/agent_providers/tools/local_orchestration_tests.rs",
+      "sha256": "a1195e715de1145e394483e79811a4f2f9cfbef772657238e5f19609153e5335",
+      "bytes": 7590
+    },
+    {
+      "path": "app/src/ai/agent_providers/tools/mod.rs",
+      "sha256": "ded7285b5a2741c20e611e8f17e3fe893eb46a5c7206261ecbf6199698ff1cb9",
+      "bytes": 11325
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver.rs",
+      "sha256": "274b3c1501a8483f8b04010762cbf1ffa98506fd5f0ef845b8e881d71b12010f",
+      "bytes": 71347
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/claude_code.rs",
+      "sha256": "74d9edc5725e329ab13aea61a2227e0bf8401af0a2b11681b3c16bd69e552a40",
+      "bytes": 3481
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/claude_code_tests.rs",
+      "sha256": "362af52d978774283b3ab0742af18319400231ca0fb8fcdf89357761b44ee67f",
+      "bytes": 12341
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod.rs",
+      "sha256": "7ecef5ca70d20c156a590866ad9efbd38cc0f32e38ccb63e75cf6e7cad4114fb",
+      "bytes": 15036
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/harness/mod_tests.rs",
+      "sha256": "e8e2fcb93ce5b6b2887623dee1fadd4ee0211e7bca626a37b8abd72b2dbfd7ae",
+      "bytes": 3616
+    },
+    {
+      "path": "app/src/ai/agent_sdk/driver/output.rs",
+      "sha256": "b9b4b923ad6f9575d9ad960d91f3ea5e32ccb5b4952f621bb4f3044a9944baca",
+      "bytes": 55815
+    },
+    {
+      "path": "app/src/ai/agent_sdk/mod.rs",
+      "sha256": "a4e63343414fec4503fea0d41d9c725b2790dfd520ba1f5c9cf69a01a96ec4c5",
+      "bytes": 25534
+    },
+    {
+      "path": "app/src/ai/blocklist/action_model/execute/shell_command.rs",
+      "sha256": "ea2b812e17d7cddc1624842f79153bab396a3f667e04ca76b6a91c794ff9607e",
+      "bytes": 61087
+    },
+    {
+      "path": "app/src/ai/blocklist/action_model/execute/shell_command_launch_failure_tests.rs",
+      "sha256": "70769b52ebbae3ba5c5c3316e06f3e74919fd3ebffb70983d85b6abdfc17257a",
+      "bytes": 4035
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "c4a1e95217cc1434180868b13433ea9dae15eb4e84c44e24248e598bba815725",
+      "bytes": 104343
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_approval_cancel_live_tests.rs",
+      "sha256": "45bf380c206b96a17d2ce917130fd905ed4997e557db6e796405960ccbf7d6a9",
+      "bytes": 26438
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_batch_cancel_live_tests.rs",
+      "sha256": "39bdd3bc74874a69795c388b273564e6c20c68c3606a7f7a04084e935ece3c4c",
+      "bytes": 33067
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_coordinator_live_tests.rs",
+      "sha256": "58755de311a316628f8812875f9b73fb332805f6eeac763a1568b5887f556918",
+      "bytes": 34690
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_image_probe_live_tests.rs",
+      "sha256": "3e1f676ca11c3714f92bead43ee6c447a106fae213b6c61691742ec020a04e13",
+      "bytes": 30857
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_image_tests.rs",
+      "sha256": "c8e52d946a4808d24a3757d87d8825bd20dfc386329d0352018557885753d07d",
+      "bytes": 21721
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
+      "sha256": "5f54e83508cd1b7a92effca46f67ac25e0e0639790bf2dda708d47fab3e8d5cc",
+      "bytes": 25933
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_managed_image_live_tests.rs",
+      "sha256": "f63c73502b6b45c8657c1f3fb8e8f1a9cb76a52c374e08629a33b08deef84e1f",
+      "bytes": 19793
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+      "sha256": "d96d8ef12cd91e4bb9ea81023b8328d3f375d7399105f29f771c1763700b24b0",
+      "bytes": 22844
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_live_tests.rs",
+      "sha256": "8b35be98a2c911fe6a9c274ffa3d75bfe8c152c3978bf91896a34c5ea5372f4d",
+      "bytes": 20643
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+      "sha256": "2b3455df259fe81a02acf20dd65a1af54c58933fb8a1e88b97356ffdb514d98a",
+      "bytes": 7188
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight_tests.rs",
+      "sha256": "7f3f141dc76c24cebd347e863e099172d8fdf0d91776aaa393d4986a91a94b8f",
+      "bytes": 3544
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_protocol_tests.rs",
+      "sha256": "541f298d966bba3b720e8d25080a0520355884ec73e3b46a00a7e5c7c7db3897",
+      "bytes": 16723
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_profile_tests.rs",
+      "sha256": "1de1a4cb8c23449ff7be0f58412fe33fdff89ae971f31919fe54b701b032ee6d",
+      "bytes": 15682
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude_tests.rs",
+      "sha256": "0514053c5d0e1973f45e365ab0ffafd4dd9999598001332270f2b59a7cec58f1",
+      "bytes": 91572
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "sha256": "6e4e687b3ea98eb607a9386b3d1c599e9ba2644bcb0f24b352e15bb201add61b",
+      "bytes": 48693
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_live_tests.rs",
+      "sha256": "02cef2946b807a7c1c31fb1f326cfb395687997f8413288671950654a3ca0a7a",
+      "bytes": 35990
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_tests.rs",
+      "sha256": "542472521c31cfe4089536f98cb1a811c2cc12999b95e3babcd672f84678fe2d",
+      "bytes": 36307
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "sha256": "14d6ff4adad4d25e19d410f832a21113c78775ef85f115d8976eaee9fbbd4a70",
+      "bytes": 108390
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_cli_update_tests.rs",
+      "sha256": "9017a44999ca53107a79ae4c7752ded008b9a4fb77009fb9ed16c328bb6216e8",
+      "bytes": 6002
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+      "sha256": "dc7de867bf3613f8d770d2d8f6b3255baa830202d10ef58d835692621dbe5033",
+      "bytes": 183594
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+      "sha256": "ad7aa2b4da2ea5c6fb86556a29fda89003481027a8c62ca7c59f8fd47f91de2c",
+      "bytes": 29131
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "sha256": "a7fcc0a0e2bf9d2b6bede8d3828b02554b8f8ab6a1f5fcf7c33fcee93592efe6",
+      "bytes": 137769
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_catalog_preflight_live_tests.rs",
+      "sha256": "b1ab715525583a5acaddb44733bf822b64be7f68a2d4d5fa026cea508cff7813",
+      "bytes": 19381
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_child_coordinator_live_tests.rs",
+      "sha256": "34e6e11c7b66acae7e23810294cb8a82c25bd2772deff62b464f3212dda33e4b",
+      "bytes": 37589
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_coordinator_live_tests.rs",
+      "sha256": "7c956afd20ea906b877d14eaa3bb611b6576a3db89a6500ea7139a378ad8cd38",
+      "bytes": 39358
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_files_policy_live_tests.rs",
+      "sha256": "8be34c25bf5e85acc0ee62df31432a914abfd45a018914682a7a9846fe64bec4",
+      "bytes": 64003
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_fixed_policy_live_tests.rs",
+      "sha256": "6a135116609693e8b420faf65d7e1e41d9fe844ff5106077be382a7d33a04c0a",
+      "bytes": 27731
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_live_tests.rs",
+      "sha256": "e183c6f9fa312ddf90b8e64180ffb955faf98be210ceb6b53321dc5ad73be677",
+      "bytes": 40893
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+      "sha256": "2c621759210494c83b8a345f9a8c76938be1ebfaf5639aa2c7570d2ea0fc5a8c",
+      "bytes": 26306
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_local_tools_tests.rs",
+      "sha256": "e52a8c76aea46e4f61144f4ea23681772c42cb741c687cc198fecdc041b2abbc",
+      "bytes": 39828
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_native_skill_live_tests.rs",
+      "sha256": "d8cf1cbaeaf2fc8c9d0ce3cb3f18265ff87f805081de6145b39face2a9c7b8ac",
+      "bytes": 26335
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_native_skill_protocol_tests.rs",
+      "sha256": "874f2c5a208c3315303f995997ba5247f136dfc089c72b1fd76a8472cae1d65f",
+      "bytes": 10111
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_native_tool_lease_live_tests.rs",
+      "sha256": "00fa90834e1e1358e0e1e4bca501912731d04c1492ff93e5fd9923081d3df240",
+      "bytes": 18684
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_live_tests.rs",
+      "sha256": "ab473d26cfcda98b125e0939f372ec4a84fe816f213d59c3d798a9455102db5a",
+      "bytes": 53957
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_policy_preflight_protocol_tests.rs",
+      "sha256": "76744313ba0a10deb45ec47c312f4bdcf246534696458d41544c013a7c838e43",
+      "bytes": 65083
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_profile.rs",
+      "sha256": "f58e7cf8af812137f01a912fe7fc5c942776198e29258d9e2f08011be7eac10c",
+      "bytes": 26868
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_profile_tests.rs",
+      "sha256": "a220b1f897dcbbddc4ac1c3d512f2cdead051aa955c44b3ffaf48a04cb875cbc",
+      "bytes": 24237
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_sdk_origin_live_tests.rs",
+      "sha256": "9b0ce0a894775ab856c7c7a4816177f28afaeebed40b0976fbadaca73954fa56",
+      "bytes": 160413
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_selected_skill_live_tests.rs",
+      "sha256": "1b3d3d20ebe7c883505e868afa1c3fae34dd88eb2f82444971bf39e11b59376e",
+      "bytes": 21355
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_skills.rs",
+      "sha256": "d322ce4f555f788551c4b5d9be40c70e2c35a5b4b9df48326d5a6442bd867a22",
+      "bytes": 6206
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_skills_tests.rs",
+      "sha256": "795b1808c8da2f21501f1689a3f98f917d59e782ef226701d7c4dad152c1eeba",
+      "bytes": 12180
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+      "sha256": "73c6bb3bebf6c92284eda3581d0f19aa58a4eaaa0cf80ca60bd212e96d2e896c",
+      "bytes": 147509
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tool_lease.rs",
+      "sha256": "b0649728628fd153d3aa02153fc6d19f7bf1151e8d875f563451c431387c0f64",
+      "bytes": 23017
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_tool_lease_tests.rs",
+      "sha256": "311f597e73e07ea6621cd280b36095138b4e5f005440b13f888446bdafe4196f",
+      "bytes": 14274
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_skills.rs",
+      "sha256": "75453d355b9e5f7c17012cdbe203a59f7c08206701cf4f11f5dd072f0e85cc15",
+      "bytes": 9902
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_skills_tests.rs",
+      "sha256": "2747e1bd0c738b059d8a16eebdfdefd7a7e6a478408d26ffc71868d68224d7d2",
+      "bytes": 6708
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools.rs",
+      "sha256": "d277a42105d22dd0f0e14ac14ebf56592384ee4aeb7e65f9acd6d6be022d8b7d",
+      "bytes": 14137
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/local_tools_tests.rs",
+      "sha256": "7d7044b8fcb12b747074820be896dae6869bd8f55c4077286eb3b582ee992fae",
+      "bytes": 14639
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input.rs",
+      "sha256": "dcbf0875ee6b6a9026777f03b97481c0f06058c54de2453c5b5e94f1ed979067",
+      "bytes": 10401
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_input_tests.rs",
+      "sha256": "db59abb3a5f55f32406c15ba78a6aa671048fb73fc959aad633030ee9bb138d6",
+      "bytes": 19196
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "sha256": "be5ec3674d2554ea61424034ae8fefe54fc4c58c718d8365decd4cc842ab7963",
+      "bytes": 31610
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos_live_tests.rs",
+      "sha256": "2c4d6a3ef815640b77f742bf6e4fde285516e242184c3faad7c16dab2c616fa4",
+      "bytes": 18245
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+      "sha256": "37bb70a6fe1e2e636ea0a4f1874bce7dc83e414941021bad58ab944c28e9d5fe",
+      "bytes": 11002
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_tests.rs",
+      "sha256": "fdf5fa6688ad6218951949f896c3cb7d94d7978781a408b9c2bdea4dcefd14ab",
+      "bytes": 21732
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/mod.rs",
+      "sha256": "758f789606cad8e71b58cd749633fdfb359022adf5660d86bdac32e3157a2d43",
+      "bytes": 8525
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "sha256": "e1ae0bc665cd4d811584beb255d958b632c05e7ad4fd0ee2e58b5ed0c465609c",
+      "bytes": 11323
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "sha256": "a605d7a6b07aa6558fa80cddcbb194cf5f34924957cb88d8a3a9d385b6132ac4",
+      "bytes": 12225
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+      "sha256": "2636d05ec05279bfd64b4e655fca0426e00925c324157b7920be3bc98b859307",
+      "bytes": 29704
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "sha256": "ee7fe1e1f2d26446e513957a3df9f073beec7f8cecd88b202b193d4af2cfdc44",
+      "bytes": 92248
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view_tests.rs",
+      "sha256": "e374d82172ba21fd169e986a80ec162a7a48f4654bada811147d51cb5256bb71",
+      "bytes": 52112
+    },
+    {
+      "path": "app/src/ai/local_cli_mailbox.rs",
+      "sha256": "4d99d399c6f20b105f4fa7badb688b05d95e94276ec68f0ef25ec51da7029ab7",
+      "bytes": 7952
+    },
+    {
+      "path": "app/src/ai/skills/file_watchers/local_directory.rs",
+      "sha256": "e94cd39ef4569f8db9f40cc1e0a0ccf6da4883c84646207acea6587a779d19b6",
+      "bytes": 5562
+    },
+    {
+      "path": "app/src/ai/skills/file_watchers/local_directory_tests.rs",
+      "sha256": "e599894d73b6f43073fa82f78f7ba65f1ab8012c4d73479d8e493501e5f2e61e",
+      "bytes": 7806
+    },
+    {
+      "path": "app/src/ai/skills/file_watchers/mod.rs",
+      "sha256": "895e9894ff8d33a071de565fd1199ae04cbf4a4c50bd5880e1d3743ae664cf3e",
+      "bytes": 340
+    },
+    {
+      "path": "app/src/ai/skills/file_watchers/skill_watcher.rs",
+      "sha256": "4b2e554b62dbe523cf0cf68c7a8c1f388d66538c214f54fc422e1c00838c3d42",
+      "bytes": 46015
+    },
+    {
+      "path": "app/src/ai/skills/listed_skill.rs",
+      "sha256": "b78a68f819c9d5616fad92fb76bae6b080c4bd223a21b6c96f359d0a599bca69",
+      "bytes": 1998
+    },
+    {
+      "path": "app/src/ai/skills/listed_skill_tests.rs",
+      "sha256": "581594dd7259ce81c9c3f0dba8914d4e2413110aafa95c0f57ac50da7de95e75",
+      "bytes": 1262
+    },
+    {
+      "path": "app/src/ai/skills/skill_manager.rs",
+      "sha256": "69060a003b45a873561bb131b1d6e364b031aa4294d4543e6827639a605c2262",
+      "bytes": 32662
+    },
+    {
+      "path": "app/src/bin/integration.rs",
+      "sha256": "5257e058b9142ed2584c215f41a07e138eab7258dc41a996923b9805eb05abb0",
+      "bytes": 2990
+    },
+    {
+      "path": "app/src/lib.rs",
+      "sha256": "452bb8c2d93d43c2bbd2d0a5024ea7eef33e58e841013ba13840eec9ac0d8901",
+      "bytes": 121683
+    },
+    {
+      "path": "app/src/pane_group/pane/terminal_pane.rs",
+      "sha256": "b32f1e798bd4eaa0d0ea3a388324db0e961891c9f260f1c685add5c8d1531131",
+      "bytes": 99098
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks.rs",
+      "sha256": "43fba8d1486fd585cf3bd03febdf7e394fe48d8e49178ced5daeb096ec318f0e",
+      "bytes": 57760
+    },
+    {
+      "path": "app/src/persistence/local_cli_tasks_tests.rs",
+      "sha256": "eb3d516a9928870890dee72367d79a0a9d05a68f86a865b5d8bcfc4cc910d745",
+      "bytes": 79378
+    },
+    {
+      "path": "app/src/settings/ai.rs",
+      "sha256": "9092166242e0070809a8fd85c3c67b9f7df2717b3bb114a0233f4dc5b99aab73",
+      "bytes": 144530
+    },
+    {
+      "path": "app/src/settings/ai_tests.rs",
+      "sha256": "9ec2df2c012149ff0ce8131e22ef502d3da0cd765d8d78eaca6a55fb46556139",
+      "bytes": 40294
+    },
+    {
+      "path": "app/src/settings_view/ai_page.rs",
+      "sha256": "2b88510f2244c46ea3bb235683d947116f8f5a4aeed3170d53397c03c1704219",
+      "bytes": 412212
+    },
+    {
+      "path": "app/src/settings_view/ai_page_tests.rs",
+      "sha256": "e1474c694645566b3adefbebfc7637d3dbf01d4db6c27b206bd5a4ba0ba239cc",
+      "bytes": 2022
+    },
+    {
+      "path": "app/src/terminal/bootstrap.rs",
+      "sha256": "a9c2a866d84dd9022b8e5185062dc3e1628deddfe834a70333ce9067d4dc6780",
+      "bytes": 19712
+    },
+    {
+      "path": "app/src/terminal/bootstrap_tests.rs",
+      "sha256": "4275a6f395e8f836cb1ee06990af39eebf52ea0e21cb9dfe2efce17d14f31df0",
+      "bytes": 31962
+    },
+    {
+      "path": "app/src/terminal/cli_agent.rs",
+      "sha256": "2dddda42a0c9f07dd20da62cf734ebb6edcd4378dd2cc6a8bb6f6f39340d4290",
+      "bytes": 55607
+    },
+    {
+      "path": "app/src/terminal/cli_agent_hook_writer.rs",
+      "sha256": "bec832b65edc78adda4058f4bc1940e246732da25a00574af50ca8613fcd7b8f",
+      "bytes": 26936
+    },
+    {
+      "path": "app/src/terminal/cli_agent_hook_writer_tests.rs",
+      "sha256": "f1da0e82e09f4c80afc097bc22ef18e78d38c062d5bc2ccceec6b5a1ffa6a094",
+      "bytes": 19419
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/event_cursor.rs",
+      "sha256": "3d1f8a79c198ff9a01c6ceb5f3b9e23e9c3ee7bddff55098f68b779e59ecf528",
+      "bytes": 4647
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/event_cursor_tests.rs",
+      "sha256": "88f7c225b8893e1492dcbf3d42ba157f5c8fa61cf477af9a8c75d142f0411f88",
+      "bytes": 8021
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/mod.rs",
+      "sha256": "6d3cc4b3fae518ccd4607e9fc44a17095f3e079c0b49b27229c32c8946e1f83b",
+      "bytes": 40357
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/mod_tests.rs",
+      "sha256": "f34e2daa531f64096420bee8eae4b00b5d52899c863bdce64616106977ac347c",
+      "bytes": 65964
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+      "sha256": "2df03a050c17e4a208084652bfcbcaad9715e6f564f24baa5293a22dcaefe2c4",
+      "bytes": 16888
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+      "sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7",
+      "bytes": 5763
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust_tests.rs",
+      "sha256": "4b0e7332746a875df01f88023ad3f18e21a7feadf29b1ec235fb768b78c1ebaa",
+      "bytes": 18989
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source.rs",
+      "sha256": "4c7df2b9b7555f56303bc6e89384d1114b78b1c9d93f2773b7c034bf9509b969",
+      "bytes": 46770
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_live_tests.rs",
+      "sha256": "2a3360b72a0193d6d89afdd4b6894fbcd3c0ea20484f40762f89c6ae03ff3797",
+      "bytes": 12337
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_recovery_tests.rs",
+      "sha256": "25c4b165de3e855a5488e9fc414a0b53d3eb71fbb905dbf270679991ba282398",
+      "bytes": 15485
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source_tests.rs",
+      "sha256": "fa445f44aa452759369d771c8c40fbe407c0a40c31f7bed6517982c603975e72",
+      "bytes": 19246
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_tests.rs",
+      "sha256": "da57639ae624b3e8d0ae1a8989b4fe2ffad4e8056b03a642b2a4199d5602b4f6",
+      "bytes": 21395
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "sha256": "136133462e3f71bdc01db803a4bf275bad8f2f627915328422689f634a70571c",
+      "bytes": 45957
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "sha256": "3334060f1e14acc10ce928cc4e48a13b6b827b8cb6d6a817d9438314463e316d",
+      "bytes": 66099
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch.rs",
+      "sha256": "8af6b4f1188c6cf79dd4e10b7613fc50468f3916f376c44eb63424cb5897f1bb",
+      "bytes": 31622
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch_tests.rs",
+      "sha256": "62ff643cf89684f0c28582c134c357a1444cce5d8e393816cee7738699864712",
+      "bytes": 19161
+    },
+    {
+      "path": "app/src/terminal/cli_agent_tests.rs",
+      "sha256": "cb7bf5215ad4cf662ebc85380e4abd0e5afc20a1848109d2c401fe0f85323330",
+      "bytes": 44145
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates.rs",
+      "sha256": "6132fe55f47602bd12096249bd26d5834eaac3ec5938912b97c50fee3a336e4a",
+      "bytes": 19986
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "sha256": "efbaa9fb62509c49b86f815fe10dac9e51d5db9f62478e60a7c9391243d477a3",
+      "bytes": 96253
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_environment_tests.rs",
+      "sha256": "1e33f13aa91e79517ebff6ecca3f770d7ec3bf74bd5efe6934d2c21be245a9ae",
+      "bytes": 3151
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "sha256": "b112cca8d43dff3ebf4332df573d4de2df563417651f4f9ad02ba29eacd57614",
+      "bytes": 47216
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_tests.rs",
+      "sha256": "5efc089a0d86053b09a707e2cc9d954c43590db48786557329708ff26b4eda65",
+      "bytes": 61941
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates_tests.rs",
+      "sha256": "755bdfc9301d24d42646c36db2993e3bddf49722ae785d12a0a224fd11ad9748",
+      "bytes": 11051
+    },
+    {
+      "path": "app/src/terminal/input.rs",
+      "sha256": "bc458bbc302fa2382808df6cada2adbc9e6f4313160d5cd1091052f022fcb4ee",
+      "bytes": 694201
+    },
+    {
+      "path": "app/src/terminal/input/skills/core.rs",
+      "sha256": "413cdf13a6b9d0c08771274783b09d59e3fb2291110a1e8305fc3f759f3839a1",
+      "bytes": 4876
+    },
+    {
+      "path": "app/src/terminal/input/skills/core_tests.rs",
+      "sha256": "f8360466e76199c5336c350f03bb6f77f1c43fa86a500c749d51416af3815a36",
+      "bytes": 3555
+    },
+    {
+      "path": "app/src/terminal/input/skills/data_source.rs",
+      "sha256": "040ec9be6331e458777e83a8d27e2a33556d9057f9bfe169cfebac52fa5998eb",
+      "bytes": 13415
+    },
+    {
+      "path": "app/src/terminal/input/skills/mod.rs",
+      "sha256": "55883ef1f04d2794804aa7b0e99fbdf3fb47aa50c43d7fb203d0f0480569b994",
+      "bytes": 366
+    },
+    {
+      "path": "app/src/terminal/input/slash_commands/data_source/core.rs",
+      "sha256": "20cdbc36da9c36fdc57dfc13dcc30a9fcdfbb97c7785642f8a313ea11beac98a",
+      "bytes": 30008
+    },
+    {
+      "path": "app/src/terminal/input/slash_commands/data_source/zero_state.rs",
+      "sha256": "5717031df183819dc280b9336140217b89799b7be0dde25761d1459750e9aa1f",
+      "bytes": 4421
+    },
+    {
+      "path": "app/src/terminal/input_cli_update_tests.rs",
+      "sha256": "9763b3619a74b713633e7684a13cefc8e1688e6f7811029582cca3886186b555",
+      "bytes": 9881
+    },
+    {
+      "path": "app/src/terminal/local_tty/unix.rs",
+      "sha256": "b8b78da7112fc2d17b88aee5001cbdd16cc97b7ec98f193a819315f14cb3ad0b",
+      "bytes": 42526
+    },
+    {
+      "path": "app/src/terminal/local_tty/unix_tests.rs",
+      "sha256": "b1d494cb6765d3a0ccdd08ababa9fb2428b31abc1b635ca25101c68bd53a0bde",
+      "bytes": 5536
+    },
+    {
+      "path": "app/src/terminal/local_tty/windows/environment.rs",
+      "sha256": "5f4d0f87851ff2278435e339118fab254f55169aa77f190bcf7f86c601bf4ccf",
+      "bytes": 16079
+    },
+    {
+      "path": "app/src/terminal/local_tty/windows/environment_tests.rs",
+      "sha256": "9d6f433d83d04076ef6d47bb4cae66c803f2cf01e11975d495eeac2876a42e02",
+      "bytes": 3931
+    },
+    {
+      "path": "app/src/terminal/mod.rs",
+      "sha256": "4a4cb1c3c410844845b816e72cf9697901d5b7fa5d38a0b6cf83da77697de469",
+      "bytes": 16618
+    },
+    {
+      "path": "app/src/terminal/model/ansi/dcs_hooks.rs",
+      "sha256": "de2c7beac8506d19461ddb55a4ba1ffdb88de4eab5c5e4b8629c08d5a045e702",
+      "bytes": 36796
+    },
+    {
+      "path": "app/src/terminal/model/ansi/dcs_hooks_tests.rs",
+      "sha256": "20f13d2a1e4f5f72ae511d8da4f2ce08c18cddfc8fb1865546e11e53c9bc5712",
+      "bytes": 5121
+    },
+    {
+      "path": "app/src/terminal/model/session.rs",
+      "sha256": "4f043cd324b75ea81cf3dc7bc758069dcc25e596443286c3f8ea91fd61702849",
+      "bytes": 84451
+    },
+    {
+      "path": "app/src/terminal/model/session_tests.rs",
+      "sha256": "ac3926eb7938baad71af83c33aa5853ad50c6ce5a677603f275d90ee5d2a4633",
+      "bytes": 13681
+    },
+    {
+      "path": "app/src/terminal/view.rs",
+      "sha256": "f88edbdb153c463888d6c60cfa4b8f975a8d4195520f8aa6f2b22b55fa7b9730",
+      "bytes": 1246780
+    },
+    {
+      "path": "app/src/terminal/view/use_agent_footer/input_approval_guard_tests.rs",
+      "sha256": "96839c282612ee788511e2a81aa0f566da3f17bdfb4d7c52c1659e7524598570",
+      "bytes": 12897
+    },
+    {
+      "path": "app/src/terminal/view/use_agent_footer/mod.rs",
+      "sha256": "c9d817b371747f9c66f148d600b9aef981b636a5dd871c3063b8e4d96f67eacd",
+      "bytes": 73038
+    },
+    {
+      "path": "app/src/terminal/view/use_agent_footer/mod_tests.rs",
+      "sha256": "2ba3d7be224ff2152eadea26d5c17a7fa87a6db33a1610b62cfdb31c7a54f6b4",
+      "bytes": 39738
+    },
+    {
+      "path": "app/src/terminal/view_cli_update_tests.rs",
+      "sha256": "e9bc7ede2832f888df85872c047d01f8ea00cf1717f8570b96eaece8a17325cd",
+      "bytes": 12528
+    },
+    {
+      "path": "app/src/terminal/view_tests.rs",
+      "sha256": "7edc28cddd12b430e44cd37f34fe25ff0b56f11667becc2103622ff3da4308bd",
+      "bytes": 428934
+    },
+    {
+      "path": "app/src/tui_test_support.rs",
+      "sha256": "33bfd0fc89ef28c4ddbebf60e1ffd702f548db2622a3bb50e63e2f5f346a0f77",
+      "bytes": 15206
+    },
+    {
+      "path": "app/src/workspace/view.rs",
+      "sha256": "9e6a015d47e3b0def4572f3f14439dcb6bc8f767570e787a1d901d7a20169451",
+      "bytes": 1194595
+    },
+    {
+      "path": "app/src/workspace/view_tests.rs",
+      "sha256": "afb82d4ed435225300eb05cfebd99005a2ffbe36ae090388cf8208050b206439",
+      "bytes": 146399
+    },
+    {
+      "path": "crates/ai/src/agent/action_result/convert.rs",
+      "sha256": "b21ccb0c04bafd6e631d76a49f94167718d30433737ec66ba0a2d3c8515f126b",
+      "bytes": 49052
+    },
+    {
+      "path": "crates/ai/src/agent/action_result/mod.rs",
+      "sha256": "11ff4ac101c88e6ecaf3a8721b03838a77cdce82951cfb16a07a123435af3b25",
+      "bytes": 46392
+    },
+    {
+      "path": "crates/ai/src/agent/action_result/mod_tests.rs",
+      "sha256": "c3760dc68e4e60cfdd081670f1c7fbadb54ad73937b0b5ccd9269bd345d144eb",
+      "bytes": 2808
+    },
+    {
+      "path": "crates/ai/src/skills/mod.rs",
+      "sha256": "1381af973964078b8d7210263e13841149d30b0583fd276c2a27c010f19e2ae3",
+      "bytes": 796
+    },
+    {
+      "path": "crates/ai/src/skills/parse_skill.rs",
+      "sha256": "d9080dd9f1d2c32c35d1343b3e0c0c315ae46f09730b1bd4fe4e556a48811e97",
+      "bytes": 7388
+    },
+    {
+      "path": "crates/ai/src/skills/parser.rs",
+      "sha256": "009b88e5fa13b250078478460b115cd7385da78b5cbc14f20c085085e56cd1bb",
+      "bytes": 4800
+    },
+    {
+      "path": "crates/ai/src/skills/parser_tests.rs",
+      "sha256": "8ac8914aaa4f1f3e58fb15323b13c3e3b35a56af6e6a65100b14f1b133507097",
+      "bytes": 7305
+    },
+    {
+      "path": "crates/warp_cli/src/lib.rs",
+      "sha256": "58c1154978794453619c358092f744951aab236f5cc9bcbd6d86c6c1c7be794f",
+      "bytes": 25302
+    },
+    {
+      "path": "crates/warp_cli/src/lib_tests.rs",
+      "sha256": "7ebb1771f014d8dba9efaf69f03ef54e99e51f70723de2c4c21796b96e032986",
+      "bytes": 28154
+    },
+    {
+      "path": "crates/warp_core/src/cli_agent_protocol.rs",
+      "sha256": "84c48591873f48c25239db698667f6230754b2adf9355f827cc7edb76e029a6d",
+      "bytes": 2891
+    },
+    {
+      "path": "crates/warp_tui/src/terminal_session_view.rs",
+      "sha256": "accf6cfd77a3d9e5e5dce1ebdc1731c9290bf2d2b2de2f8b5019f1406dacbb5a",
+      "bytes": 229807
+    },
+    {
+      "path": "script/cli-agent-parity/apply_notification_patch.py",
+      "sha256": "992c1bf8baecc296b7203d781f6c9ed8781beae1917a6f67c32835b0d96fe455",
+      "bytes": 13976
+    },
+    {
+      "path": "script/cli-agent-parity/claude_adapter_runner_tests.py",
+      "sha256": "0063789814d6d50f818a76a582a92c735bfcc4dd3229b70e8d9ed22923c54a79",
+      "bytes": 17562
+    },
+    {
+      "path": "script/cli-agent-parity/claude_approval_cancel_runner_tests.py",
+      "sha256": "c74964cc02b733d2fac9c4ccbb07a255858aa2e632fd7577be98bc4a854e8546",
+      "bytes": 31768
+    },
+    {
+      "path": "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+      "sha256": "110f7c8112a2d388d205c4ce9a01df76ed6ea9f31fad674dcbe76650bb2cbecb",
+      "bytes": 28610
+    },
+    {
+      "path": "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+      "sha256": "ced2ebf189df62431a42d24fb544bea2e07b901be9d0e57066a6de3d78455cc2",
+      "bytes": 43880
+    },
+    {
+      "path": "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+      "sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8",
+      "bytes": 22446
+    },
+    {
+      "path": "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+      "sha256": "424869d5331c301f1d15da37feaaee240c6d1d005e7ae5e25381bba34c71fe61",
+      "bytes": 23957
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "sha256": "264a135d2c5817e1d454267936d62da5f711f0ea5458f2d7b88f9d5c3a6ffc7d",
+      "bytes": 11200
+    },
+    {
+      "path": "script/cli-agent-parity/claude_windows_notifications_tests.py",
+      "sha256": "37951517a3693a6064cd6479ee7bdb5a1098c1a294c51e07b203486e2a7df9c4",
+      "bytes": 28758
+    },
+    {
+      "path": "script/cli-agent-parity/codex_0155_package_manifest.json",
+      "sha256": "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc",
+      "bytes": 20563
+    },
+    {
+      "path": "script/cli-agent-parity/codex_journal_recovery_runner_tests.py",
+      "sha256": "008a36cacee2ad97d2a5ee579b022d4ac0461401715ddabc68d8e627603cd0f8",
+      "bytes": 3900
+    },
+    {
+      "path": "script/cli-agent-parity/codex_plugin_cache_refresh_tests.py",
+      "sha256": "75ce8db9c495fb0ab040f4fc984cc708268e1b9924073cdcfeb367a191af54ea",
+      "bytes": 26921
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "sha256": "6c70ae8de93a7bbbb71608d7f08fdf854f17cc957d1dbe557e5d31a1105106c1",
+      "bytes": 16896
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191",
+      "bytes": 12485
+    },
+    {
+      "path": "script/cli-agent-parity/grok_catalog_preflight_runner_tests.py",
+      "sha256": "d6bc984388e69e2aaba074b94652d78570507ca7cf5b34a75e4fa9eb9d9e8059",
+      "bytes": 8829
+    },
+    {
+      "path": "script/cli-agent-parity/grok_child_coordinator_runner_tests.py",
+      "sha256": "d5d2695dd0511dcb05a7dee23728f29543756dc695cb87f053e90a1dc01abc0f",
+      "bytes": 11242
+    },
+    {
+      "path": "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+      "sha256": "6cf1a8cbd073628505611b23540dfb57818d3e81f513c059d374d2fbb8242e23",
+      "bytes": 32018
+    },
+    {
+      "path": "script/cli-agent-parity/grok_files_policy_runner_tests.py",
+      "sha256": "377f821ebcaae694c6628550ea629df23a5e73ba93348a1781867052a4456d03",
+      "bytes": 14281
+    },
+    {
+      "path": "script/cli-agent-parity/grok_fixed_policy_runner_tests.py",
+      "sha256": "f56717690540e04514dcca9d8a9cb78f7c4ebebf475c339374d63f4ff0212054",
+      "bytes": 15644
+    },
+    {
+      "path": "script/cli-agent-parity/grok_native_p0_probe.py",
+      "sha256": "ce31b81379794ba89e7f1b75ae8834725af4c0f753fedd876fdde0e1d77d8c23",
+      "bytes": 54566
+    },
+    {
+      "path": "script/cli-agent-parity/grok_native_p0_probe_tests.py",
+      "sha256": "d5c46ee30eaf58f0f348c65030fefad0aa4be8a59cc6d08763c99d8eee19be2f",
+      "bytes": 51861
+    },
+    {
+      "path": "script/cli-agent-parity/grok_native_skill_runner_tests.py",
+      "sha256": "53b1051000d41f06ecf174658f94115d36ef8e507d31b3fb6c400566d5268f69",
+      "bytes": 24019
+    },
+    {
+      "path": "script/cli-agent-parity/grok_native_tool_lease_runner_tests.py",
+      "sha256": "a5c7889544018bec3552c30ec1a944ac29fd74bfc8cbede6522bd3b103df2c43",
+      "bytes": 7689
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_adapter_runner_tests.py",
+      "sha256": "de4b23fb81ce7f68e7f65fec920aceb2ccb17553cfabe505a8853ee7e1e43f7b",
+      "bytes": 15188
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+      "sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720",
+      "bytes": 15239
+    },
+    {
+      "path": "script/cli-agent-parity/grok_plugin_tests.cjs",
+      "sha256": "df79c7a17af0f37dda559137675ea8272d4f0bd1f4c1aa56591f0c1692df1337",
+      "bytes": 9021
+    },
+    {
+      "path": "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+      "sha256": "aec8612a3b2150b6de3978438cd68ba5d4547485b8a24bbd70e144128209b361",
+      "bytes": 65661
+    },
+    {
+      "path": "script/cli-agent-parity/grok_sdk_origin_probe_runner_tests.py",
+      "sha256": "1dbd764c0c4b28201d0fa1ad60ec3c899e7b8a2ca93a3b694cc77ac995e9421e",
+      "bytes": 82842
+    },
+    {
+      "path": "script/cli-agent-parity/grok_selected_skill_runner_tests.py",
+      "sha256": "b592d74fbf4d9f5faae29cf67f8f9e0498f2a89157e02f08fedc0446ec4ba9fc",
+      "bytes": 14047
+    },
+    {
+      "path": "script/cli-agent-parity/installed_grok_hook_tests.py",
+      "sha256": "a2b92c6462d5bbbc9db94a68d906769a640e1516cc1d3a1cdc47de26c4a096ed",
+      "bytes": 14760
+    },
+    {
+      "path": "script/cli-agent-parity/notification_patch_tests.py",
+      "sha256": "84fbddcc37a064a6ec8ae4536793b088315d94e5ae95f446118baaa0e465bc55",
+      "bytes": 18208
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_claude_cli.py",
+      "sha256": "c91d01167400967d5c0688418a55383a7aacbe5be1abaa36f3546ac09d5aeddd",
+      "bytes": 11260
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_claude_cli_tests.py",
+      "sha256": "1d4826f71d6d86c657d0dea9ba064ae69543985a78b15343317c29a486e0deed",
+      "bytes": 10958
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_codex_cli.py",
+      "sha256": "b2e9b356a793dbc746c570b57b3bf51696b30ed6ce1f63987fd206c33e2bf436",
+      "bytes": 19587
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_codex_cli_tests.py",
+      "sha256": "0c23b24754236e8f392192919e948e438f86369a90effd9473aafb2e78726e19",
+      "bytes": 35441
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli.py",
+      "sha256": "fd182ae8645e40cc572578f9ec47a6944d8e7160ef53d1f3efdf2cf6daa73c0b",
+      "bytes": 12253
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+      "sha256": "5f71babe4da3f2151eaab416db6a0168b985c85872a33ee1829c8bdc3d7c3fca",
+      "bytes": 22171
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_windows_notifications.py",
+      "sha256": "7fec04dd2c4bb186ed6668017cd49c57bf79dd773d931e5458681121c457dfe9",
+      "bytes": 36229
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_plugin_cache_refresh.py",
+      "sha256": "1e9b7c05f8b47786a0c10156cb0875dabb48230e97b68fb940c28bcb5c783e27",
+      "bytes": 38318
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_adapter_live.py",
+      "sha256": "58810f6860f462c2e022a5f482b18b5747314528a872ebdeea175e1d6fd6f6ca",
+      "bytes": 20248
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_approval_cancel_live.py",
+      "sha256": "0fcfc52c304bd9ca42b92fdae6aec068f90664f2e678ee1a9cf8de1fde891029",
+      "bytes": 31626
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_batch_cancel_live.py",
+      "sha256": "72c07c0d14eac645870dce00326d1ceeb0db59ea7d1cdeefdb66b1978f678eda",
+      "bytes": 25402
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_coordinator_live.py",
+      "sha256": "a32b4d6a81ea89d7444b972b131324091b985f72d9cced9054dfcf9fbeb0afe0",
+      "bytes": 37724
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_image_probe.py",
+      "sha256": "bbf2c41b7467289e18b262090a2125941f4477008bc9ad9b25773673baaff2cd",
+      "bytes": 20193
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_managed_image_live.py",
+      "sha256": "45ec89f38b4e5caecec00f581e636285c832e13f36a3ec4fe773dcdc1f9eaec3",
+      "bytes": 25398
+    },
+    {
+      "path": "script/cli-agent-parity/run_claude_profile_live.py",
+      "sha256": "55c09d7f9ffd4411b8a274d3ed5981e127cc3af7ef83b5156df0beda678d957d",
+      "bytes": 9868
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_journal_recovery.py",
+      "sha256": "5e040cc24274e52d516461df4c53aae6e3330b68f21709af25ddcef98a2db748",
+      "bytes": 6118
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_source_live.py",
+      "sha256": "6a167eb314e4b296c61e02c20f5995fec24a000ab0dc37bc5f85c2b341a0f0e9",
+      "bytes": 13776
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_adapter_live.py",
+      "sha256": "b9b302bbbfdb1924b340e3cb8fee91633d5b5998904ec37ece98bf4894bd7f32",
+      "bytes": 32056
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_catalog_preflight.py",
+      "sha256": "87a824cd2fa1f6b92e3bf6cae4562fd866440c8d80d7f98d6107c98744e4681f",
+      "bytes": 10898
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_child_coordinator.py",
+      "sha256": "5608d83b84001eead1371ca4bab5bfc0f9ab9e52e9310774e039a5c0ecdd2735",
+      "bytes": 11610
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_coordinator_live.py",
+      "sha256": "8edfce820bd4be808c391e6e9cb3057820143721ccdb79f948bea563c5d16371",
+      "bytes": 39565
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_files_policy.py",
+      "sha256": "606099f0df3da3143df37bec58abba51d11a3d5bd731d6044ae7678ce44fd9bd",
+      "bytes": 15869
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_fixed_policy.py",
+      "sha256": "58f5ea54744cf73f9217d1ecdf2b732bf2339f14eefb8539bbe509e2ef4aeabc",
+      "bytes": 18094
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_native_skill.py",
+      "sha256": "019f76cc4a68452af090dd12b8619c54a2fa6567e3331ee6733db0235417d2b1",
+      "bytes": 20396
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_native_tool_lease.py",
+      "sha256": "ac26310023d352932659fccb24da9794378a51d1e328398e14dc664c4e6b5fbb",
+      "bytes": 14915
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_adapter_live.py",
+      "sha256": "3dd0ef8e495f02a7bdda681bc904759464924f24e97f55ceec0c7c6a7d55a06d",
+      "bytes": 22504
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_official_pty_live.py",
+      "sha256": "266589d48d0271bdee605349039f046066c2e8732ea919e21244c2bb71d1525c",
+      "bytes": 18576
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_policy_preflight.py",
+      "sha256": "27aca13d2d2865c29b2604041d9d368bace88b1475e948319909f0b2ad13177b",
+      "bytes": 46970
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_sdk_origin_probe.py",
+      "sha256": "70daa6bdd677c11dae147e1cbc36fa787cb1e1379b4657cb5e9ca23872c53c88",
+      "bytes": 56522
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_selected_skill.py",
+      "sha256": "5cff5b9af07e5b48fbfbd1f62c67c874e1cc77de2cb572aacef3b6b1cda7507d",
+      "bytes": 16591
+    },
+    {
+      "path": "script/cli-agent-parity/run_installed_grok_hook.py",
+      "sha256": "8426ec2636e82cad9b8cda6a45a3fc98db8e52e46524c36a5217698059d9c862",
+      "bytes": 6445
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate.py",
+      "sha256": "82d999965dc366b7879fa40231015780627ce809be57e6aeef3c994bf20b22a6",
+      "bytes": 24873
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate_tests.py",
+      "sha256": "96cc33498defb87d00088065dbfe1dc9e1ebbdb05796e62be6b4856bb11a0cc2",
+      "bytes": 20698
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-fixed-profile-control.json",
+      "sha256": "fb7c0fe39c3fea7d4b721ace8e62e034b8059f4e4492d80ad51981c056e88dbb",
+      "bytes": 2807
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.273-tool-cancel-binary-contract.json",
+      "sha256": "c1969d1aacee0ff89ded7fed3f0c0e88f48e869fcb5f06108d84f10f3651a660",
+      "bytes": 2463
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/claude-2.1.278-release-manifest.json",
+      "sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28",
+      "bytes": 2161
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/codex-0.147.0-native-hook-trust-rev4-windows.json",
+      "sha256": "b8253c5faa631257aa6f50052b919fb29c04f9effb086fa766626f188f7f0a13",
+      "bytes": 11233
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-final-history-offline.json",
+      "sha256": "a71da4851785ce794205fa5b13247961685c364d490510fd1834b67a15512731",
+      "bytes": 3470
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-hooks.ndjson",
+      "sha256": "87f2e3f3092f2079fae0f425a92e043045660a218ad6aed7530991192cddb763",
+      "bytes": 9095
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-installed-integrity-macos.json",
+      "sha256": "9c496aad1ea3a0827a15b4a32a097f815f654a074d7003b1b54a6263042333c1",
+      "bytes": 5333
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-local-tools-source-contract.json",
+      "sha256": "819a7e8ecdb0a76ee39c4606f9149529e6f52cda9fc6460b982e71f2c01df0a9",
+      "bytes": 25964
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-modern-discovery-source-contract.json",
+      "sha256": "ee23a14d79061c65999a8e5eb0b64c3157ddb1557344203cb75c43e8ef6175df",
+      "bytes": 5032
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-config.toml",
+      "sha256": "4ea339fd82e2d8a0280526079f1809226bc1049847f877dfc209eda369384a0a",
+      "bytes": 729
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-profile.md",
+      "sha256": "b6bce1cacc4853e3d1d87f7017285affc954dcbece21cb8812a985e9ff258809",
+      "bytes": 549
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.30-policy-preflight-wire.json",
+      "sha256": "c9994b68a937e2fb0efe704bb89359874b2648ff503d28691788893be10839c8",
+      "bytes": 4035
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-1.0.34-fixed-platform-inputs.json",
+      "sha256": "0d2cb679d6efc18351a283ca6d66be45f87b021a8875887e91e8f71dfa7a7843",
+      "bytes": 4872
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-native-skill-profile.md",
+      "sha256": "c60da0b8cb2aa58b3ea256783b18bb7d9a0671f797560e3d65c42ea3bee7a6a8",
+      "bytes": 580
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.0-notify.cjs",
+      "sha256": "134fd490e7396157c80c2a33bd9d8a88397881e6f926743319fafe6c0df5ccd8",
+      "bytes": 8298
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.0-readme.md",
+      "sha256": "2db65e9c54c35725ba1164edb39daf9645bfdf7f1d3cd2689b8e338853c2e8b7",
+      "bytes": 3153
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-notify.cjs",
+      "sha256": "9d100f0aad5ce14e9237a15f39537278e8208082bc298acb2883662d8cd9580a",
+      "bytes": 8298
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-original-readme.md",
+      "sha256": "13a5451348ef9278f243c18ea3f8c8af714cebfe49e2eb0979263de841531167",
+      "bytes": 3225
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.1-readme.md",
+      "sha256": "adf7a48c57b108a3b1d6c02fc33c077df6437324df40c4664a35f883bfa9cf41",
+      "bytes": 3574
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-hooks.json",
+      "sha256": "2ec75e0fc4daf1da6e649d7b11cfb2e3d836973455ad4b14852366f1392d6326",
+      "bytes": 2353
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-notify.cjs",
+      "sha256": "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188",
+      "bytes": 10818
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-plugin.json",
+      "sha256": "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571",
+      "bytes": 148
+    },
+    {
+      "path": "specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-readme.md",
+      "sha256": "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca",
+      "bytes": 3936
+    }
+  ],
+  "file_count": 265,
+  "agent_handoffs": [
+    {
+      "path": "specs/cli-agent-parity/validation/source46-draft-claude-update-handoff.json",
+      "sha256": "ef69b31eb70d7bf1c4cf0edacc56c22ec227f072c9c0d16a6592e3ed52bad6a0"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/source46-draft-grok-worker-handoff.json",
+      "sha256": "674396853da17851cc9682edb7173a0eb8071ad4e364372a5cad74e7f04a83b6"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/source46-draft-grok-plugin-handoff.json",
+      "sha256": "da38d44a50040d64c3d3f739a2e2bf557527520b6b31a7eb4ecf475034d08d0f"
+    }
+  ],
+  "current_candidate_cargo_ran": false,
+  "current_plugin_node_suite": {
+    "passed": 5,
+    "failed": 9
+  },
+  "current_raw_grok_probe_offline_tests": 47,
+  "new_grok_raw_p0_native_passed": true,
+  "production_grok_34_capabilities_opened": false,
+  "cargo_lock_dependency_refresh_pending": true,
+  "diff_check_exit_code": 0,
+  "same_commit_cross_platform_verified": false,
+  "goal_complete": false
+}

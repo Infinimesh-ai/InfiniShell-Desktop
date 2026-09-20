@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "observed_utc": "2026-09-17T18:54:25.699437+00:00",
+  "scope": "仅重新读取已公开native摘要、缓存官方候选源码及固定二进制定长ASCII窗口；没有读取私有信封、日志、认证或原生/模型错误正文，没有执行native/网络/Cargo/UI/Git mutation。",
+  "finished_reads_done": true,
+  "parent_commit": "436cc739234061c092cedd106432bbbfa3c2d645",
+  "source27_dirty_candidate": true,
+  "same_commit_verified": false,
+  "diagnostic_hash_semantics": {
+    "repository_path": "app/src/ai/cli_agent_runtime/grok.rs",
+    "line": 299,
+    "string_conversion_line": 304,
+    "type": "UTF-8 raw string bytes",
+    "non_string_conversion": "serde_json::to_vec",
+    "initial_quoted_json_scan_valid_for_target_conclusions": false
+  },
+  "binary": {
+    "path": "/Users/zhishi/.grok/downloads/grok-1.0.30-macos-aarch64",
+    "bytes": 141869568,
+    "sha256": "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+    "executed": false
+  },
+  "targets": {
+    "response_id": {
+      "observed_public_summary": {
+        "bytes": 13,
+        "sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+        "type": "string"
+      },
+      "fixed_protocol_literal": "skills-reload",
+      "fixed_literal_utf8_bytes": 13,
+      "fixed_literal_sha256": "731058153ec89c5e512596d24d5ac95c7262a9cb4e5c58fbdcebd36677f9b38e",
+      "binary_match_count": 1,
+      "binary_offsets": [
+        116151162
+      ],
+      "public_cached_source_literal_match_count": 0,
+      "literal_identity_verified": true,
+      "trigger_path_verified": false,
+      "handling_semantics_verified": false
+    },
+    "notification_method": {
+      "observed_public_summary": {
+        "bytes": 25,
+        "sha256": "5ad0b9eadd8fadb2225bf5c00b21c1cf42ab869332b86333e722aa248a106580",
+        "type": "string"
+      },
+      "binary_match_count": 0,
+      "public_cached_source_literal_match_count": 0,
+      "fixed_protocol_literal": null,
+      "state": "unknown"
+    }
+  },
+  "actual_width_binary_scan": {
+    "ascii_protocol_name_windows": 4439592,
+    "quoted_ascii_candidates": 472,
+    "raw_widths": [
+      13,
+      25
+    ],
+    "long_spans_not_skipped": true,
+    "non_ascii_or_escaped_or_dynamically_constructed_names_excluded_from_plain_ascii_proof": true,
+    "match_count": 1
+  },
+  "cached_public_source": {
+    "github_snapshot": "482711333c7195dc16a272777f86086d615e2afb",
+    "source_rev": "be7ce6e8cffe46d20bef9834b211616082ee866b",
+    "exact_native_provenance_verified": false,
+    "complete_snapshot_read": false,
+    "file_count": 9,
+    "files": [
+      {
+        "path": "/private/tmp/infinishell-grok-public-policy-source-22/acp_types.rs",
+        "bytes": 38460,
+        "sha256": "3576669c4c17e300872efb3fb1d2bed05973d04ff14103bd306825f0d0f83e96",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_types.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-public-policy-source-22/debug.rs",
+        "bytes": 4841,
+        "sha256": "bbbd81dacdb4838bc24fbafb62ce0ad0de83b739d4f7cee66e2957bc39664aa4",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/debug.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-public-policy-source-22/mcp.rs",
+        "bytes": 142515,
+        "sha256": "cd764b68964071c6bee5f47d12980f46b2e93eb3394b7cbe7808f91e98692e94",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mcp.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/acp_agent.rs",
+        "bytes": 120280,
+        "sha256": "f9d0400c2d72a8bd2288a56842b1c18bdda571d315b0c6c34f5fb42977e3edda",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/mod.rs",
+        "bytes": 3084,
+        "sha256": "f2af3d918552016883c4dfff0ac9c3bab477a75ccf3da50f35c281f1ee85f51f",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/mod.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/session_admin.rs",
+        "bytes": 43249,
+        "sha256": "cdc05b3cb5b740b1f07c7906ab2bc2ca04ff073de6a4acf8353ccba24bd69e31",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/extensions/session_admin.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/session_handler.rs",
+        "bytes": 12259,
+        "sha256": "bfdfbf0f68958043acb4ce8389f8ad25894f6d7a8d8f2ac50803c9ad21bc3a8c",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/session_mod.rs",
+        "bytes": 22511,
+        "sha256": "4b3279ad5d5100756dd8b0bff654e9ce151c375a6b0ca8840e0f25d2e4933815",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/mod.rs"
+      },
+      {
+        "path": "/private/tmp/infinishell-grok-policy-preflight-public-23/session_result.rs",
+        "bytes": 4398,
+        "sha256": "ea717cb2245a7cc8fe6ee687186f4b77e80281dde27f3fb6ff851afecd64bad9",
+        "primary_source_url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/result.rs"
+      }
+    ]
+  },
+  "observed_protocol_difference": {
+    "unknown_id_is_fixed_skills_reload_literal": true,
+    "active_prompt_transaction_context": {
+      "generation": "c616b3d3-a9a1-484b-9d0e-344cd26f199a",
+      "next_request_id": 4,
+      "pending_id": 4,
+      "pending_kind": "prompt"
+    },
+    "outbound_prompt_request_id": 4,
+    "known_sdk_reverse_reply_ids": [
+      {
+        "outer": 0,
+        "inner": 0
+      },
+      {
+        "outer": 1,
+        "inner": 1
+      }
+    ],
+    "outbound_owned_skills_reload_transaction_observed": false,
+    "response_has_method": false,
+    "response_has_error": false,
+    "response_result_type": "object",
+    "response_stop_reason": {
+      "type": "absent"
+    },
+    "production_numeric_pending_guard_relaxed": false,
+    "native_origin_or_permission_acceptance_verified": false,
+    "api_or_login_failure_verified": false
+  },
+  "envelope_public_summary": {
+    "status": "captured",
+    "bytes": 259,
+    "sha256": "ed82aa0c7f5a228ef65737cef12ddb6099a764d6b7bd486d94c488d80fab8523",
+    "scope_verified": true,
+    "ledger_matches": true,
+    "count": 1,
+    "result_field_key_or_value_type_projection_publicly_available": false,
+    "private_content_read": false
+  },
+  "limits": [
+    "字面值的固定二进制hash匹配不证明skills-reload的触发路径、结果字段、与当前prompt的关联或安全接纳规则。",
+    "25字节method在本次原样ASCII窗口和9缓存RS中未匹配，不证明该协议名称在上游不存在。",
+    "公开信封仅有status/count/bytes/文件SHA与已公开response形状，没有result_fields摘要；不以私有内容补齐。",
+    "候选公开SOURCE_REV与native短构建ID04b7ffed98c6未映射，不能当作固定native全部来源。",
+    "不计修复、native PASS、同实际新提交、跨平台或Goal完成。"
+  ]
+}
