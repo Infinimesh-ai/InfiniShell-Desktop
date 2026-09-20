@@ -154,11 +154,14 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
                 "BASH_ENV": "unexpected-script", "ENV": "unexpected-script", "PYTHONPATH": "unexpected-code",
                 "NODE_OPTIONS": "unexpected-code", "TMUX": "unexpected-server", "ANTHROPIC_BASE_URL": "unexpected-provider"}):
             root = Path(directory).resolve()
-            env = probe.case_environment(root, {"PATH": "native-tools", "COMSPEC": "fixed-cmd"}, root / "bin/claude.exe")
+            git_bash = str(root / "git/usr/bin/bash.exe")
+            env = probe.case_environment(root, {"PATH": "native-tools", "COMSPEC": "fixed-cmd",
+                "CLAUDE_CODE_GIT_BASH_PATH": git_bash}, root / "bin/claude.exe")
             for key in ("ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CODE_VERSION", "CLAUDE_CODE_ENTRYPOINT",
                         "BASH_ENV", "ENV", "PYTHONPATH", "NODE_OPTIONS", "TMUX", "ANTHROPIC_BASE_URL"):
                 self.assertNotIn(key, env)
             self.assertEqual(env["PATH"], str(root / "bin") + os.pathsep + "native-tools")
+            self.assertEqual(env["CLAUDE_CODE_GIT_BASH_PATH"], git_bash)
             self.assertEqual(env["WARP_CLI_AGENT_PROTOCOL_VERSION"], "1")
             for key in ("HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "CLAUDE_CONFIG_DIR"):
                 self.assertTrue(Path(env[key]).is_relative_to(root))

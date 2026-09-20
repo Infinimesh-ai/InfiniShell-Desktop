@@ -130,7 +130,7 @@ def case_environment(root, dependencies, executable):
     env = isolated_environment(root)
     # 此处要验证真正交互模式，不能继承隔离 SDK 探针的入口标记或任何宿主认证变量。
     env.pop("CLAUDE_CODE_ENTRYPOINT", None)
-    for key in ("PATH", "COMSPEC", "SYSTEMROOT", "WINDIR"):
+    for key in ("PATH", "COMSPEC", "SYSTEMROOT", "WINDIR", "CLAUDE_CODE_GIT_BASH_PATH"):
         if key in dependencies:
             env[key] = dependencies[key]
     env["PATH"] = str(executable.parent) + os.pathsep + dependencies["PATH"]
@@ -465,6 +465,9 @@ def run_worker(configuration):
         report["binary"] = verify_binary(executable, "win32-x64")
         report["version"] = verify_version(executable, root)
         dependencies = windows_environment(Path(config["bash"]), Path(config["jq"]))
+        # Claude Windows 不从受控 PATH 中的 bash.exe 直接推导 Git Bash；只传递已与
+        # msys-2.0.dll 一起验证的绝对路径，不恢复 runner 的其他环境。
+        dependencies["CLAUDE_CODE_GIT_BASH_PATH"] = str(Path(config["bash"]))
         dependency_files = {"bash.exe": Path(config["bash"]), "jq.exe": Path(config["jq"]),
                             "msys-2.0.dll": Path(config["bash"]).parent / "msys-2.0.dll"}
         report["dependency_sha256"] = {name: digest(path) for name, path in dependency_files.items()}
