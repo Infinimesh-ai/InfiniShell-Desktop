@@ -25,6 +25,7 @@ const WORKER_COMMAND: &str = "cli-agent-supervisor";
 const EXEC_CONTROL_ENV: &str = "INFINISHELL_CLI_EXEC_CONTROL";
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(10);
+const GRACEFUL_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
 const MAX_RECORD_BYTES: u64 = 64 * 1024;
 
 /// 更新器仅可覆盖发行选择与安装路径，不能借监督入口更改审批或注入认证。
@@ -707,8 +708,8 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
             Err(mpsc::RecvTimeoutError::Disconnected) => break ExitReason::HostDisconnected,
         }
     };
-    // 给 stdin EOF 一个短暂的原生收尾窗口；不以该窗口或空闲状态代替最终组/Job 验证。
-    let graceful_deadline = Instant::now() + Duration::from_millis(500);
+    // 给 stdin EOF 一个有界的原生收尾窗口；不以该窗口或空闲状态代替最终组/Job 验证。
+    let graceful_deadline = Instant::now() + GRACEFUL_EXIT_TIMEOUT;
     while !tree.root_exited()? && Instant::now() < graceful_deadline {
         thread::sleep(Duration::from_millis(10));
     }

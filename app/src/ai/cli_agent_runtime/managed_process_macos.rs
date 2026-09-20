@@ -29,9 +29,9 @@ use tempfile::{NamedTempFile, TempDir};
 use uuid::Uuid;
 
 use super::{
-    CLEANUP_TIMEOUT, EXEC_CONTROL_ENV, ExitReason, ExitReceipt, HANDSHAKE_TIMEOUT,
-    MAX_RECORD_BYTES, Manifest, WORKER_COMMAND, accept_authorized, connect_authorized, read_record,
-    sha256, write_receipt,
+    CLEANUP_TIMEOUT, EXEC_CONTROL_ENV, ExitReason, ExitReceipt, GRACEFUL_EXIT_TIMEOUT,
+    HANDSHAKE_TIMEOUT, MAX_RECORD_BYTES, Manifest, WORKER_COMMAND, accept_authorized,
+    connect_authorized, read_record, sha256, write_receipt,
 };
 
 pub(super) const CONTAINMENT: &str = "macos_resource_coalition";
@@ -730,7 +730,7 @@ fn execute(
             )?),
         ),
     };
-    let graceful_deadline = Instant::now() + Duration::from_millis(500);
+    let graceful_deadline = Instant::now() + GRACEFUL_EXIT_TIMEOUT;
     while status.is_none() && Instant::now() < graceful_deadline {
         match receiver.recv_timeout(Duration::from_millis(10)) {
             Ok(Event::Native(result)) => {
