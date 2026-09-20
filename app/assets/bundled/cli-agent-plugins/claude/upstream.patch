@@ -78,6 +78,20 @@
 +              else . end
 +          else . end'
  }
+--- a/plugins/warp/scripts/on-session-start.sh
++++ b/plugins/warp/scripts/on-session-start.sh
+@@ -37,8 +37,10 @@
+ fi
+ 
+-# Read plugin version from plugin.json
+-PLUGIN_VERSION=$(jq -r '.version // "unknown"' "$SCRIPT_DIR/../.claude-plugin/plugin.json" 2>/dev/null)
++# Claude 提供的插件根目录已经过 argv 路径验证；Windows Git Bash 对含 shell
++# 元字符的 BASH_SOURCE 反推路径可能失真，因此只在未提供根目录时回退。
++PLUGIN_MANIFEST="${CLAUDE_PLUGIN_ROOT:-$SCRIPT_DIR/..}/.claude-plugin/plugin.json"
++PLUGIN_VERSION=$(jq -r '.version // "unknown"' "$PLUGIN_MANIFEST" 2>/dev/null)
+ 
+ # Emit structured notification with plugin version so Warp can track it
+ BODY=$(build_payload "$INPUT" "session_start" \
 --- a/plugins/warp/scripts/on-stop.sh
 +++ b/plugins/warp/scripts/on-stop.sh
 @@ -1,73 +1,23 @@

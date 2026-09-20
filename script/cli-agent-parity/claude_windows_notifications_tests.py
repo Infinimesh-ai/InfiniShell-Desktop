@@ -195,11 +195,13 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             hashes = probe.prepare_plugin(REPO, plugin, root)
             probe.verify_plugin(plugin, hashes)
             self.assertEqual(len(hashes), 18)
-            originals = json.loads((REPO / "specs/cli-agent-parity/fixtures/claude-warp-compatible-original-trees.json").read_text(encoding="utf-8"))["2.2.0"]
-            self.assertEqual((plugin / "scripts/on-session-start.sh").read_text(encoding="utf-8"), originals["scripts/on-session-start.sh"])
             bundled = REPO / "app/assets/bundled/cli-agent-plugins/claude"
-            for path in ("hooks/hooks.json", "scripts/warp-notify.sh"):
+            for path in ("hooks/hooks.json", "scripts/on-session-start.sh", "scripts/warp-notify.sh"):
                 self.assertEqual((plugin / path).read_bytes(), (bundled / path).read_bytes())
+            self.assertIn(
+                '${CLAUDE_PLUGIN_ROOT:-$SCRIPT_DIR/..}',
+                (plugin / "scripts/on-session-start.sh").read_text(encoding="utf-8"),
+            )
             hooks = json.loads((plugin / "hooks/hooks.json").read_text(encoding="utf-8"))["hooks"]
             self.assertEqual(len(hooks), 7)
             (plugin / "unrecognized.tmp").write_bytes(b"interruption")

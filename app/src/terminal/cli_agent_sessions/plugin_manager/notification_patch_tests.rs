@@ -530,6 +530,15 @@ fn windows_dependency_preflight_reuses_reviewed_launcher_argument_encoding() {
     );
 }
 
+#[test]
+fn windows_dependency_preflight_accepts_reviewed_git_bash_runtime_names() {
+    assert!(
+        WINDOWS_DEPENDENCY_PROBE
+            .contains(r#"case "$OSTYPE" in msys*|cygwin) ;; *) exit 1 ;; esac"#)
+    );
+    assert!(WINDOWS_DEPENDENCY_PROBE.contains("$ProgressPreference = 'SilentlyContinue'"));
+}
+
 #[cfg(all(windows, target_arch = "x86_64"))]
 #[tokio::test]
 async fn windows_runtime_rejects_unreviewed_binary_before_any_cli_command_or_home_write() {

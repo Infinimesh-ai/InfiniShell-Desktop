@@ -19,7 +19,7 @@ CONTRACTS = {
     "codex": ("codex-cli 0.147.0", "0.4.0", "codex-warp", ".codex-plugin/plugin.json", "CODEX_HOME"),
 }
 FILES = {
-    "claude": ("scripts/build-payload.sh", "scripts/on-stop.sh", "scripts/should-use-structured.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
+    "claude": ("scripts/build-payload.sh", "scripts/on-session-start.sh", "scripts/on-stop.sh", "scripts/should-use-structured.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
     "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh", "scripts/on-prompt-submit.sh"),
 }
 

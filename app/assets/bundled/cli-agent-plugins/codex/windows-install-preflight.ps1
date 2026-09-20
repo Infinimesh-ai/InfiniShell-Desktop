@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 Set-StrictMode -Version 2
 
 function ConvertTo-NativeArgument([string] $Value) {
@@ -59,7 +60,7 @@ try {
     $null = Get-Command jq.exe -CommandType Application -ErrorAction Stop
     # 通过正式启动器选中的同一个 Bash 检查 jq；逐字比较，不归一化中文及 LF/CRLF。
     $probe = @'
-case "$OSTYPE" in msys*) ;; *) exit 1 ;; esac
+case "$OSTYPE" in msys*|cygwin) ;; *) exit 1 ;; esac
 [ -n "$BASH_VERSION" ] || exit 1
 jq --binary --null-input --join-output --arg text $'中文\nEnglish\r\n' '$text'
 '@

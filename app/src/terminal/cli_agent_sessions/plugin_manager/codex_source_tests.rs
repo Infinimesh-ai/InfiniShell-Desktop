@@ -1,6 +1,6 @@
 use super::*;
 
-#[cfg(unix)]
+#[cfg(any(unix, all(windows, target_arch = "x86_64")))]
 #[path = "codex_source_live_tests.rs"]
 mod live_tests;
 

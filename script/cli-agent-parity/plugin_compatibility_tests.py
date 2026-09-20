@@ -70,6 +70,31 @@ class CompatibilityTests(unittest.TestCase):
                     self.assertEqual(response[field], "round")
                     self.assertEqual(response["response"], "中文 response")
 
+    def test_session_start_reads_version_from_explicit_adversarial_plugin_root(self):
+        with tempfile.TemporaryDirectory(prefix="infinishell-plugin-session-start-test-") as temporary:
+            root = Path(temporary) / "插件 ' $(touch INJECTED) `touch INJECTED` & %PATH% !name! ^ ()"
+            shutil.copytree(ASSETS / "claude" / "scripts", root / "scripts")
+            manifest = root / ".claude-plugin/plugin.json"
+            manifest.parent.mkdir()
+            manifest.write_text('{"version":"2.2.0"}\n', encoding="utf-8", newline="\n")
+            notify = root / "scripts/warp-notify.sh"
+            notify.write_text('#!/bin/bash\nprintf "%s" "$2"\n', encoding="utf-8", newline="\n")
+            notify.chmod(0o755)
+            environment = self.environment()
+            environment["CLAUDE_PLUGIN_ROOT"] = root.as_posix()
+            result = subprocess.run(
+                ["bash", (root / "scripts/on-session-start.sh").as_posix()],
+                input=json.dumps({"session_id": "session", "cwd": temporary}),
+                cwd=temporary,
+                env=environment,
+                text=True,
+                encoding="utf-8",
+                capture_output=True,
+                check=True,
+            )
+            self.assertEqual(json.loads(result.stdout)["plugin_version"], "2.2.0")
+            self.assertFalse((Path(temporary) / "INJECTED").exists())
+
     def test_every_hook_uses_the_reviewed_argument_boundary(self):
         for agent in ("claude", "codex"):
             hooks = json.loads((ASSETS / agent / "hooks/hooks.json").read_text())["hooks"]
