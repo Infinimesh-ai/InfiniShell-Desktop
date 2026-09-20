@@ -23,6 +23,7 @@ TEST_CASES = {
 
 
 UNAUTHENTICATED_CASES = {"missing-session", "idle-crash"}
+VERSION_PROBE_TIMEOUT_SECONDS = 30
 
 
 def verified_idle_macos_boundary(event):
@@ -101,6 +102,14 @@ def digest(path):
         for block in iter(lambda: source.read(4 * 1024 * 1024), b""):
             checksum.update(block)
     return checksum.hexdigest()
+
+
+def probe_version(executable, environment):
+    # Windows 首次启动新复制的官方二进制可能包含防病毒扫描；仍设置有限上限，
+    # 但不能让独立的 10 秒预检先于后续 120 秒原生验收误判失败。
+    return subprocess.run([str(executable), "--version"], env=environment,
+                          text=True, capture_output=True,
+                          timeout=VERSION_PROBE_TIMEOUT_SECONDS, check=True)
 
 
 def terminate(process, own_process_only=False):
@@ -187,8 +196,7 @@ def run(args):
             "INFINISHELL_CODEX_LIVE_ARTIFACT": str(args.output),
             "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
         })
-        version = subprocess.run([str(args.codex), "--version"], env=environment,
-                                 text=True, capture_output=True, timeout=10, check=True)
+        version = probe_version(args.codex, environment)
         metadata["cli_version"] = version.stdout.strip()
         # 清空本次输出，避免筛选器未匹配时错误采用上一次的成功记录。
         args.output.write_text("")

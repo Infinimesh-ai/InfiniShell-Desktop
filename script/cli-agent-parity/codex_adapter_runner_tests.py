@@ -7,10 +7,32 @@ import tempfile
 import unittest
 from unittest import mock
 
-from run_codex_adapter_live import idle_crash_environment, missing_session_environment, verified_acceptance
+from run_codex_adapter_live import (
+    VERSION_PROBE_TIMEOUT_SECONDS,
+    idle_crash_environment,
+    missing_session_environment,
+    probe_version,
+    verified_acceptance,
+)
 
 
 class AcceptanceEvidenceTests(unittest.TestCase):
+    def test_version_probe_preserves_special_path_and_allows_cold_scan_budget(self):
+        executable = Path("C:/runner temp/codex shim 中文 & path/codex.cmd")
+        environment = {"PATH": "isolated"}
+        completed = mock.Mock(stdout="codex-cli 0.147.0\n")
+        with mock.patch("run_codex_adapter_live.subprocess.run", return_value=completed) as run:
+            self.assertIs(probe_version(executable, environment), completed)
+        self.assertEqual(VERSION_PROBE_TIMEOUT_SECONDS, 30)
+        run.assert_called_once_with(
+            [str(executable), "--version"],
+            env=environment,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=True,
+        )
+
     def test_each_case_requires_current_success_and_matching_test(self):
         summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"
         zero = "test result: ok. 0 passed; 0 failed; 0 ignored;"
