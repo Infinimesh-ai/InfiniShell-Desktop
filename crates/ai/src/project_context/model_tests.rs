@@ -883,7 +883,10 @@ fn fast_path_invalidated_when_rule_file_mtime_changes() {
     let rule = cwd.join("AGENTS.md");
     std::fs::write(&rule, "v1").unwrap();
 
-    let entry = ProjectContextModel::scan_fast_path(&cwd);
+    let mut entry = ProjectContextModel::scan_fast_path(&cwd);
+    // 本用例只验证规则文件 mtime 失效，不把慢速 Windows runner 上逐级 stat 是否
+    // 恰好在 20ms 产品预算内完成也混进断言。
+    entry.walked_dir_stamps.truncate(1);
     assert!(ProjectContextModel::fast_path_entry_still_valid(&entry));
 
     // 把 mtime 推后 10s → 缓存应被检测为失效
