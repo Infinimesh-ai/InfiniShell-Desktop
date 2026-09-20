@@ -9,7 +9,9 @@ use std::time::{Duration, Instant};
 
 use fs4::fs_std::FileExt as _;
 use serde::{Deserialize, Serialize};
-use warp_core::cli_agent_protocol::{CLI_AGENT_NOTIFICATION_SENTINEL, WARP_CLI_AGENT_TTY_ENV};
+use warp_core::cli_agent_protocol::CLI_AGENT_NOTIFICATION_SENTINEL;
+#[cfg(unix)]
+use warp_core::cli_agent_protocol::WARP_CLI_AGENT_TTY_ENV;
 
 const MAX_FRAME_BYTES: usize = 4096;
 const MAX_ID_BYTES: usize = 256;
@@ -252,6 +254,11 @@ fn verify_path_components(path: &Path) -> Result<()> {
             return Err(HookWriteError::LockUnavailable);
         }
         prefix.push(component);
+        // Windows canonicalize 会产生 `\\?\C:\...`；单独的 `\\?\C:` 前缀尚不是
+        // 可查询的路径。等 RootDir 拼入后再逐层拒绝重解析点，不跳过任何真实组件。
+        if matches!(component, Component::Prefix(_)) {
+            continue;
+        }
         match fs::symlink_metadata(&prefix) {
             Ok(metadata) => {
                 if metadata.file_type().is_symlink() {
@@ -469,10 +476,11 @@ mod windows_platform {
     struct PrivateSecurity {
         memory: LocalMemory,
         user: Vec<usize>,
+        ace_flags: u8,
     }
 
     impl PrivateSecurity {
-        fn new() -> Result<Self> {
+        fn new(inherit: bool) -> Result<Self> {
             let mut token = HANDLE::default();
             unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) }
                 .map_err(|_| HookWriteError::LockUnavailable)?;
@@ -508,8 +516,12 @@ mod windows_platform {
             let user_sid =
                 unsafe { text.to_string() }.map_err(|_| HookWriteError::LockUnavailable)?;
             drop(text_memory);
-            // 仅当前用户和 SYSTEM 完全访问；保护 DACL，不继承缓存父目录的额外授权。
-            let sddl = format!("O:{user_sid}D:P(A;OICI;FA;;;{user_sid})(A;OICI;FA;;;SY)");
+            // 目录权限向其子项继承；Windows 会从普通文件的显式 ACE 去掉 OI/CI 标记。
+            // 两类对象仍都只允许当前用户和 SYSTEM 完全访问，并保护 DACL 不继承父目录授权。
+            let (inheritance, ace_flags) = if inherit { ("OICI", 3) } else { ("", 0) };
+            let sddl = format!(
+                "O:{user_sid}D:P(A;{inheritance};FA;;;{user_sid})(A;{inheritance};FA;;;SY)"
+            );
             let wide: Vec<u16> = sddl.encode_utf16().chain(Some(0)).collect();
             let mut descriptor = PSECURITY_DESCRIPTOR::default();
             unsafe {
@@ -524,6 +536,7 @@ mod windows_platform {
             Ok(Self {
                 memory: LocalMemory(descriptor.0),
                 user,
+                ace_flags,
             })
         }
 
@@ -573,9 +586,9 @@ mod windows_platform {
                 if raw.is_null() {
                     return Err(HookWriteError::LockUnavailable);
                 }
-                // ACCESS_ALLOWED_ACE 的类型为 0；仅接纳本模块写出的 OI/CI 两个标记。
+                // ACCESS_ALLOWED_ACE 的类型为 0；标记必须与目录或普通文件契约一致。
                 let header = unsafe { &*(raw.cast::<ACE_HEADER>()) };
-                if header.AceType != 0 || header.AceFlags != 3 || header.AceSize < 16 {
+                if header.AceType != 0 || header.AceFlags != self.ace_flags || header.AceSize < 16 {
                     return Err(HookWriteError::LockUnavailable);
                 }
                 let ace = unsafe { &*(raw.cast::<ACCESS_ALLOWED_ACE>()) };
@@ -610,10 +623,11 @@ mod windows_platform {
         let parent = directory.parent().ok_or(HookWriteError::LockUnavailable)?;
         fs::create_dir_all(parent).map_err(|_| HookWriteError::LockUnavailable)?;
         verify_path_components(directory)?;
-        let security = PrivateSecurity::new()?;
-        let attributes = security.attributes();
+        let directory_security = PrivateSecurity::new(true)?;
+        let directory_attributes = directory_security.attributes();
         let wide = wide_path(directory);
-        let created = unsafe { CreateDirectoryW(PCWSTR(wide.as_ptr()), Some(&attributes)) };
+        let created =
+            unsafe { CreateDirectoryW(PCWSTR(wide.as_ptr()), Some(&directory_attributes)) };
         if created.is_err() && !directory.is_dir() {
             return Err(HookWriteError::LockUnavailable);
         }
@@ -631,16 +645,18 @@ mod windows_platform {
         }
         .map_err(|_| HookWriteError::LockUnavailable)?;
         let directory_handle = unsafe { File::from_raw_handle(handle.0) };
-        security.verify(&directory_handle)?;
+        directory_security.verify(&directory_handle)?;
         let path = directory.join("transport.lock");
         verify_path_components(&path)?;
+        let file_security = PrivateSecurity::new(false)?;
+        let file_attributes = file_security.attributes();
         let wide = wide_path(&path);
         let handle = unsafe {
             CreateFileW(
                 PCWSTR(wide.as_ptr()),
                 FILE_GENERIC_READ.0 | FILE_GENERIC_WRITE.0,
                 FILE_SHARE_READ | FILE_SHARE_WRITE,
-                Some(&attributes),
+                Some(&file_attributes),
                 OPEN_ALWAYS,
                 FILE_FLAG_OPEN_REPARSE_POINT,
                 None,
@@ -648,7 +664,7 @@ mod windows_platform {
         }
         .map_err(|_| HookWriteError::LockUnavailable)?;
         let lock = unsafe { File::from_raw_handle(handle.0) };
-        security.verify(&lock)?;
+        file_security.verify(&lock)?;
         let mut info = BY_HANDLE_FILE_INFORMATION::default();
         unsafe { GetFileInformationByHandle(handle, &mut info) }
             .map_err(|_| HookWriteError::LockUnavailable)?;

@@ -387,7 +387,7 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
             report = {'app_server_traces': []}
 
             def finish_refresh(delay):
-                self.assertEqual(delay, 0.02)
+                self.assertEqual(delay, probe.BACKGROUND_REFRESH_POLL_SECONDS)
                 (cache / 'private-name').write_bytes(b'upstream')
 
             self.listing(home, cache, expected, report, [0, 0, 25_000_000_000, 25_000_000_019], finish_refresh)
@@ -409,7 +409,10 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
                     self.listing(home, cache, expected, report, [0, 0, 100_000_000_000, 100_000_000_023])
                 trace = report['app_server_traces'][0]
                 self.assertNotIn('background_reverted_to_upstream', trace)
-                self.assertNotIn('background_revision_published', trace)
+                if revision_matches:
+                    self.assertEqual(trace['background_revision_published'], probe.PLUGIN_COMMIT)
+                else:
+                    self.assertNotIn('background_revision_published', trace)
                 wait = trace['background_refresh_wait']
                 self.assertEqual(wait['elapsed_ns'], 100_000_000_023)
                 observed = wait['final_observation']
@@ -437,22 +440,21 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
     def test_final_read_errors_are_safe_and_do_not_replace_original_failure(self):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
-            cache, expected = self.files(home, True, False)
+            cache, expected = self.files(home, True, True)
             secret = 'private-path-and-secret'
-            (home / 'config.toml').write_text(f'last_revision = "{secret}', encoding='utf-8')
             primary = PermissionError(13, secret, str(cache))
             primary.winerror = 5
             report = {'app_server_traces': []}
             with patch.object(probe, 'tree_hashes', side_effect=primary):
                 with self.assertRaises(PermissionError) as raised:
-                    self.listing(home, cache, expected, report, [0, 0, 17])
+                    self.listing(home, cache, expected, report, [0, 0, 17, 18])
             self.assertIs(raised.exception, primary)
             wait = report['app_server_traces'][0]['background_refresh_wait']
-            self.assertEqual(wait['elapsed_ns'], 17)
+            self.assertEqual(wait['elapsed_ns'], 18)
             observed = wait['final_observation']
             self.assertIsNone(observed['cache_tree_sha256'])
             self.assertEqual(observed['cache_read_error'], {'type': 'PermissionError', 'errno': 13, 'winerror': 5})
-            self.assertEqual(observed['configuration_read_error'], {'type': 'TOMLDecodeError'})
+            self.assertTrue(observed['revision_matches_expected'])
             self.assertNotIn(secret, json.dumps(wait))
             self.assertNotIn(str(home), json.dumps(wait))
 

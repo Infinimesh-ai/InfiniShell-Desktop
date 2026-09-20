@@ -29,6 +29,7 @@ UPSTREAM_URL = 'https://github.com/warpdotdev/codex-warp.git'
 # 将每次 Git 操作限为 30 秒；marketplace_upgrade/git.rs 的固定 SHA、无 sparse 路径
 # 依次执行 clone、checkout、rev-parse，再留 10 秒发布配置与缓存；不能提前将正常等待判为失败。
 BACKGROUND_REFRESH_TIMEOUT_SECONDS = 3 * 30 + 10
+BACKGROUND_REFRESH_POLL_SECONDS = 0.25
 
 
 def failure_record(error):
@@ -405,20 +406,28 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
         hooks = recorder.rpc('hooks/list', {'cwds': [str(directory)]}, 3)
         trace['hooks'] = hooks
         if expected_revert is not None:
-            # 等待实际文件变化，不把初始化成功误当作后台刷新已经完成。
+            # 先观察 revision，再读缓存树。Windows 不能让高频文件扫描与原子替换争抢句柄。
             started = time.monotonic_ns()
             deadline = started + BACKGROUND_REFRESH_TIMEOUT_SECONDS * 1_000_000_000
+            revision_observed = False
             try:
                 while time.monotonic_ns() < deadline:
                     try:
-                        if background_refresh_published(cache, expected_revert, Path(env['CODEX_HOME'])):
+                        if not revision_observed:
+                            revision = configuration(Path(env['CODEX_HOME'])).get(
+                                'marketplaces', {}).get('codex-warp', {}).get('last_revision')
+                            if revision == PLUGIN_COMMIT:
+                                revision_observed = True
+                                trace['background_revision_published'] = PLUGIN_COMMIT
+                            time.sleep(BACKGROUND_REFRESH_POLL_SECONDS)
+                            continue
+                        if tree_hashes(cache) == expected_revert:
                             trace['background_reverted_to_upstream'] = True
-                            trace['background_revision_published'] = PLUGIN_COMMIT
                             break
                     except (FileNotFoundError, ValueError):
                         # 原生原子替换目录的短窗口不属于最终结果。
                         pass
-                    time.sleep(0.02)
+                    time.sleep(BACKGROUND_REFRESH_POLL_SECONDS)
                 require(trace.get('background_reverted_to_upstream') is True,
                         '没有在期限内复现真实后台还原；不能把源码推断当实证')
             finally:
@@ -442,8 +451,8 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
 
 def background_refresh_published(cache, expected_tree, home):
     # 固定上游先发布 revision，再刷新缓存；两项都观察到才进入退出阶段。
-    return (tree_hashes(cache) == expected_tree and
-            configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision') == PLUGIN_COMMIT)
+    return (configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision') == PLUGIN_COMMIT
+            and tree_hashes(cache) == expected_tree)
 
 
 def background_refresh_snapshot(cache, expected_tree, home):

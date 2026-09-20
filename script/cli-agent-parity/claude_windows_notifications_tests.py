@@ -363,10 +363,14 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
                  mock.patch.object(probe, "WindowsProbeJob", return_value=job), \
                  mock.patch.object(probe, "verify_binary"), mock.patch.object(probe, "WinApi", return_value=api), \
                  mock.patch.object(probe, "suspended_creation", side_effect=attached), \
+                 mock.patch("builtins.open", side_effect=[io.BytesIO(), io.BytesIO()]) as console_open, \
                  mock.patch.object(probe.subprocess, "Popen", return_value=process) as launch, \
                  mock.patch.object(probe, "send_exit_key") as exit_key, mock.patch.object(probe.time, "sleep"):
                 self.assertEqual(probe.run_driver(config_path), 0)
-            self.assertEqual(set(launch.call_args.kwargs), {"env", "cwd"})
+            self.assertEqual(console_open.call_args_list[0].args, ("CONIN$", "rb"))
+            self.assertEqual(console_open.call_args_list[1].args, ("CONOUT$", "wb"))
+            self.assertEqual(set(launch.call_args.kwargs), {"env", "cwd", "stdin", "stdout", "stderr"})
+            self.assertIs(launch.call_args.kwargs["stdout"], launch.call_args.kwargs["stderr"])
             exit_key.assert_called_once_with(api)
             result = probe.bounded_json(root / "driver.json")
             self.assertTrue(result["passed"])

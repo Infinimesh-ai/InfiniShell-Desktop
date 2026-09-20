@@ -288,6 +288,27 @@ class RuntimeExtractionTests(unittest.TestCase):
         self.assertFalse(self.destination.with_name("runtime.prepare-lock").exists())
         self.assertEqual(len(list(self.root.glob(".codex-package-*"))), 1)
 
+    def test_transient_staging_cleanup_failure_is_retried(self):
+        self.write_archive([entry for entry in self.entries if entry[0] != "bin/codex-code-mode-host"])
+        original = shutil.rmtree
+        calls = []
+
+        def transient(path):
+            calls.append(path)
+            if len(calls) == 1:
+                raise PermissionError("fixture-transient-sharing")
+            original(path)
+
+        with patch.object(prepare.shutil, "rmtree", side_effect=transient), \
+                patch.object(prepare.time, "sleep") as sleep:
+            with self.assertRaisesRegex(ValueError, "完整归档有缺失成员"):
+                self.extract()
+        self.assertEqual(len(calls), 2)
+        sleep.assert_called_once_with(0.05)
+        self.assertFalse(self.destination.exists())
+        self.assertFalse(self.destination.with_name("runtime.prepare-lock").exists())
+        self.assertEqual({p.name for p in self.root.iterdir()}, {"fixture.tar.gz"})
+
     def test_metadata_must_describe_actual_fixed_layout(self):
         body = b'{"layoutVersion":2}'
         self.package["files"]["codex-package.json"] = (len(body), hashlib.sha256(body).hexdigest(), 0o644)

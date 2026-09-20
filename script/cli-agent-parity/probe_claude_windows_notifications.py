@@ -226,7 +226,11 @@ def cleanup_process(process, job, record):
     try:
         if process is not None:
             record["exit_code_before_cleanup"] = process.poll()
-        if job.active() != 0:
+        active = job.active()
+        if active and process is not None and process.poll() is not None:
+            # Claude 主进程正常退出后，允许 hook 或内部收尾进程自然离开 Job。
+            active = job.wait_empty(5)
+        if active:
             record["forced_cleanup"] = True
             job.terminate()
         record["job_empty"] = job.wait_empty(5) == 0
@@ -371,9 +375,25 @@ def run_driver(configuration):
         seed_completed_onboarding(root, project)
         command = native_command(executable, plugin)
         api = WinApi()
-        with suspended_creation(_winapi, job, command, env, project, report):
-            # 不重定向任何标准句柄：真正 Claude UI 必须继承此 HPCON。
-            process = subprocess.Popen(command, env=env, cwd=project)
+        # CPython 作为 ConPTY driver 时其 CRT 标准句柄会被子进程识别为 pipe，
+        # Claude 因此误入 --print 路径并在 UI 绘制前退出。显式传入当前 HPCON 的字符设备。
+        console_input = open("CONIN$", "rb", buffering=0)
+        try:
+            console_output = open("CONOUT$", "wb", buffering=0)
+            try:
+                with suspended_creation(_winapi, job, command, env, project, report):
+                    process = subprocess.Popen(
+                        command,
+                        env=env,
+                        cwd=project,
+                        stdin=console_input,
+                        stdout=console_output,
+                        stderr=console_output,
+                    )
+            finally:
+                console_output.close()
+        finally:
+            console_input.close()
         expected = {"cwd": str(project)}
         started = time.monotonic()
         deadline = started + CASE_TIMEOUT

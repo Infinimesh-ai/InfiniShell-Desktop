@@ -254,7 +254,10 @@ jobs:
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
-          export INFINISHELL_TEST_NOTIFY_WORKER="$target_dir/debug/infinishell-tui"
+          # Cargo 可以把顶层二进制硬链接到 deps 产物；正式安装身份门禁要求单链接文件。
+          # 复制同提交构建产物到 runner 私有目录，不放宽生产 worker 的身份校验。
+          install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
+          export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
           python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
 
       - name: Test supervisor cleanup after host crash

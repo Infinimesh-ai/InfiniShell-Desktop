@@ -444,7 +444,8 @@ fn killed_lock_owner_releases_same_persistent_os_lock() {
     child.0.kill().unwrap();
     child.0.wait().unwrap();
     acquire_lock(&contender, IO_TIMEOUT).unwrap();
-    assert_eq!(fs::read(directory.join("transport.lock")).unwrap(), b"");
+    // Windows 的独占字节锁会拒绝第二个句柄读取；用持锁句柄确认原文件仍为空。
+    assert_eq!(contender.metadata().unwrap().len(), 0);
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt as _;

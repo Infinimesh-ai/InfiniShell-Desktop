@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.request
 
 sys.dont_write_bytecode = True
@@ -276,10 +277,18 @@ def extract_runtime_package(archive, destination, target, version=CODEX_VERSION)
         original_error = sys.exc_info()[1]
         cleanup_errors = []
         if staging is not None:
-            try:
-                shutil.rmtree(staging)
-            except OSError as error:
-                cleanup_errors.append(error)
+            for attempt in range(5):
+                try:
+                    shutil.rmtree(staging)
+                    break
+                except FileNotFoundError:
+                    break
+                except OSError as error:
+                    if attempt == 4:
+                        cleanup_errors.append(error)
+                    else:
+                        # Windows 防病毒或归档读句柄可能短暂延迟解除；只重试本进程的私有 staging。
+                        time.sleep(0.05 * (attempt + 1))
         try:
             lock.rmdir()
         except OSError as error:
