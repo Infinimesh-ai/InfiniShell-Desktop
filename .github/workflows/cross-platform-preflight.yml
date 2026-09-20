@@ -358,6 +358,7 @@ jobs:
             New-Item -ItemType Directory -Path $resolved | Out-Null
           }
           Get-PSDrive -Name C | Select-Object Name, Used, Free
+          exit 0
 
       # 直接解压固定摘要的官方 CI 包，保持当前作业以外的 Python 安装配置。
       - name: Prepare job-local Python for CLI parity verification
