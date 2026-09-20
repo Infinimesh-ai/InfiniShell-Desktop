@@ -523,10 +523,14 @@ fn windows_dependency_preflight_reuses_reviewed_launcher_argument_encoding() {
         .split("# BEGIN_NOTIFICATION_LAUNCH")
         .next()
         .unwrap();
+    let dependency = WINDOWS_DEPENDENCY_PROBE.replace("\r\n", "\n").replacen(
+        "$ProgressPreference = 'SilentlyContinue'\n",
+        "",
+        1,
+    );
     assert!(
-        WINDOWS_DEPENDENCY_PROBE
-            .replace("\r\n", "\n")
-            .starts_with(preamble)
+        dependency.starts_with(preamble),
+        "依赖预检除进度流抑制外必须复用已审阅的原生 argv 编码"
     );
 }
 
