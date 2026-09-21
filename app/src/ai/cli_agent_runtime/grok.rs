@@ -4136,7 +4136,7 @@ fn validate_current_available_commands_update(
             "invalid Grok command catalog update params".into(),
         ));
     }
-    if params_meta["updateType"] != "available_commands_update" {
+    if params_meta["updateType"] != "AvailableCommandsUpdate" {
         return Err(RuntimeError::Protocol(
             "invalid Grok command catalog update type".into(),
         ));

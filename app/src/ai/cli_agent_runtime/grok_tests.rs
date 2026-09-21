@@ -163,7 +163,7 @@ fn current_command_catalog(session_id: &str) -> Value {
                 "eventId":format!("{session_id}-2"),
                 "totalTokens":0,
                 "updateParams":{},
-                "updateType":"available_commands_update"
+                "updateType":"AvailableCommandsUpdate"
             },
             "update":{
                 "sessionUpdate":"available_commands_update",
@@ -867,7 +867,15 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     independent_order.receive(commands.clone()).unwrap();
     independent_order.receive(display[3].clone()).unwrap();
 
-    for mutation in ["session", "event", "count", "tools", "extra", "duplicate"] {
+    for mutation in [
+        "session",
+        "event",
+        "update_type",
+        "count",
+        "tools",
+        "extra",
+        "duplicate",
+    ] {
         let mut protocol = current_waiting_for_display_notifications();
         protocol.receive(models.clone()).unwrap();
         protocol.receive(display[1].clone()).unwrap();
@@ -877,6 +885,9 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
         match mutation {
             "session" => changed["params"]["sessionId"] = json!(Uuid::new_v4().to_string()),
             "event" => changed["params"]["_meta"]["eventId"] = json!("old-session-2"),
+            "update_type" => {
+                changed["params"]["_meta"]["updateType"] = json!("available_commands_update");
+            }
             "count" => {
                 changed["params"]["update"]["availableCommands"]
                     .as_array_mut()
