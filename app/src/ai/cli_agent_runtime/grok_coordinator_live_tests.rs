@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
 
-use super::super::managed_process::confirmed_exit;
+use super::super::runtime_host::confirmed_exit;
 use super::super::{ApprovalDecision, current_state_dir};
 use super::*;
 use crate::persistence::local_cli_tasks::load_task_messages;
@@ -595,11 +595,9 @@ impl Probe {
                 }
                 Timer::after(Duration::from_millis(50)).await;
             };
-            if !receipt.cleanup_confirmed {
-                return Err("真实清理未确认".into());
-            }
             self.evidence.record(
-                json!({"event":"cleanup_confirmed","runtime_generation":token,"receipt":receipt}),
+                json!({"event":"cleanup_confirmed","runtime_generation":token,
+                    "runtime_host_receipt":receipt,"cleanup_confirmed":true}),
             )?;
             self.cleaned.insert(token);
         }

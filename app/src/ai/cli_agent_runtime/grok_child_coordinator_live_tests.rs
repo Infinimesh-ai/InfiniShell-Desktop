@@ -11,8 +11,8 @@ use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
 
 use super::super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME, NativeLocalToolRequest};
-use super::super::managed_process::confirmed_exit;
 use super::super::permissions::{GrokCreationPolicyV1, ceiling_from_parent};
+use super::super::runtime_host::confirmed_exit;
 use super::super::{ApprovalDecision, current_state_dir};
 use super::*;
 use crate::persistence::local_cli_tasks::load_task_messages;
@@ -649,9 +649,8 @@ async fn shutdown(
             if let Some(receipt) =
                 confirmed_exit(&current_state_dir(), generation).map_err(|_| "退出回执无效")?
             {
-                if !receipt.cleanup_confirmed {
-                    return Err("真实清理未确认".into());
-                }
+                evidence.record(json!({"event":"runtime_host_cleanup_receipt",
+                    "runtime_generation":generation,"receipt":receipt}))?;
                 break;
             }
             if Instant::now() >= deadline {

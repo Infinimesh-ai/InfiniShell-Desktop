@@ -10,8 +10,8 @@ use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
 
 use super::super::local_tools::{LocalToolPermissions, NativeLocalToolRequest};
-use super::super::managed_process::confirmed_exit;
 use super::super::permissions::ceiling_from_parent;
+use super::super::runtime_host::confirmed_exit;
 use super::super::{ApprovalDecision, current_state_dir};
 use super::*;
 use crate::persistence::local_cli_tasks::load_task_messages;
