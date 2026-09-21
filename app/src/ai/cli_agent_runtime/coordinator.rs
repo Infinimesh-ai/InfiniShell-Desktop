@@ -1070,10 +1070,7 @@ impl LocalCLITaskCoordinator {
                     }
                     if message.subject != "local_task_result" {
                         if message.recipient_generation == generation
-                            && !matches!(
-                                message.subject.as_str(),
-                                "native_tool_call" | "native_tool_result"
-                            )
+                            && !internal_runtime_message_subject(&message.subject)
                         {
                             ordinary.push(message);
                         }
@@ -1888,6 +1885,13 @@ async fn classify_runtime_after_disconnect(
 }
 
 const LOCAL_TOOL_LEASE_SUBJECT: &str = "native_tool_lease";
+
+fn internal_runtime_message_subject(subject: &str) -> bool {
+    matches!(
+        subject,
+        "local_task_result" | LOCAL_TOOL_LEASE_SUBJECT | "native_tool_call" | "native_tool_result"
+    )
+}
 
 fn local_tool_lease_id(
     task: &LocalCliTask,

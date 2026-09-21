@@ -369,10 +369,7 @@ async fn send(
     if request.addresses.contains(&call.sender_task_id) {
         return Err("父子消息不能发给当前任务自身".into());
     }
-    if matches!(
-        request.subject.as_str(),
-        "local_task_result" | "native_tool_call" | "native_tool_result"
-    ) {
+    if super::internal_runtime_message_subject(&request.subject) {
         return Err("普通消息不能使用内部结果或工具记录主题".into());
     }
     let mut dispatched = Vec::new();

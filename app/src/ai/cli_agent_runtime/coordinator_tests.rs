@@ -299,6 +299,19 @@ fn snapshot() -> ManagedTaskSnapshot {
     }
 }
 
+#[test]
+fn internal_runtime_messages_are_never_treated_as_ordinary_parent_child_inputs() {
+    for subject in [
+        "local_task_result",
+        LOCAL_TOOL_LEASE_SUBJECT,
+        "native_tool_call",
+        "native_tool_result",
+    ] {
+        assert!(internal_runtime_message_subject(subject));
+    }
+    assert!(!internal_runtime_message_subject("progress"));
+}
+
 async fn persist_running_task(
     sender: &std::sync::mpsc::SyncSender<ModelEvent>,
     task: &mut LocalCliTask,
