@@ -2609,7 +2609,7 @@ fn claude_fixed_profile_is_committed_before_ready_and_cannot_change_on_repeated_
             "denyRules":[], "sourceRules":[], "localTools":null,
         });
         let permissions = json!({
-            "permissionMode":"plan",
+            "permissionMode":"default",
             "fixedProfileVerified":true,
             "claudeRestrictedFilesV1":profile,
         });
@@ -2652,6 +2652,11 @@ fn claude_fixed_profile_is_committed_before_ready_and_cannot_change_on_repeated_
         for replacement in [
             json!({"fixedProfileVerified":false,"claudeRestrictedFilesV1":profile}),
             json!({"fixedProfileVerified":true}),
+            {
+                let mut changed = permissions.clone();
+                changed["permissionMode"] = json!("plan");
+                changed
+            },
             {
                 let mut changed = permissions.clone();
                 changed["permissionMode"] = json!("bypassPermissions");

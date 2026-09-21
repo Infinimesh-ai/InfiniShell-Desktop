@@ -3651,7 +3651,10 @@ fn verified_claude_profile(
     let reject = || crate::t!("cli-agent-task-invalid-launch");
     if task.harness != "claude"
         || effective_permissions.get("fixedProfileVerified") != Some(&json!(true))
-        || effective_permissions.get("permissionMode") != Some(&json!("plan"))
+        || effective_permissions.get("permissionMode")
+            != Some(&json!(
+                super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
+            ))
     {
         return Err(reject());
     }
