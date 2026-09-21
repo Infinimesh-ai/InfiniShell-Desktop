@@ -654,7 +654,8 @@ async fn shutdown(
             let _ = reply.with_timeout(Duration::from_secs(5)).await;
         }
     }
-    let deadline = Instant::now() + Duration::from_secs(35);
+    // Claude 在关闭 stdin 后仍会耗尽有界的末帧读取预算；给监督回执留出边界余量。
+    let deadline = Instant::now() + Duration::from_secs(60);
     while coordinator.read(app, |model, _| {
         model.snapshots().any(|snapshot| snapshot.connected)
     }) {
