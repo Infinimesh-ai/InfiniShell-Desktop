@@ -20,7 +20,8 @@ fn observe_profile(
     let profile: ClaudeRestrictedFilesV1 =
         serde_json::from_value(permissions["claudeRestrictedFilesV1"].clone())
             .map_err(|error| format!("原生预检未返回固定配置：{error}"))?;
-    if permissions["permissionMode"] != "plan"
+    if permissions["permissionMode"]
+        != super::super::super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
         || permissions["fixedProfileVerified"] != true
         || permissions["fixedProfileSha256"] != profile.digest()
         || expected.is_some_and(|expected| expected != &profile)
@@ -29,7 +30,9 @@ fn observe_profile(
     }
     evidence.record(
         json!({"event":"profile_verified", "native_session_id":native_id,
-        "profile_sha256":profile.digest(), "permission_mode":"plan", "fixed_profile_verified":true,
+        "profile_sha256":profile.digest(),
+        "permission_mode":super::super::super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE,
+        "fixed_profile_verified":true,
         "filesystem_sandbox_verified":false}),
     )?;
     Ok(profile)

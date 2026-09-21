@@ -46,13 +46,15 @@ fn start(
 }
 
 fn observe_permissions(permissions: &Value, evidence: &mut Evidence) -> Result<(), String> {
-    if permissions["permissionMode"] != "plan"
+    if permissions["permissionMode"]
+        != super::super::super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
         || permissions["fixedProfileVerified"] != true
         || permissions["fixedProfileSha256"].as_str().is_none()
     {
         return Err("原生固定权限策略没有通过验证".into());
     }
-    evidence.record(json!({"event":"profile_verified","permission_mode":"plan",
+    evidence.record(json!({"event":"profile_verified",
+        "permission_mode":super::super::super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE,
         "fixed_profile_verified":true,"profile_sha256":permissions["fixedProfileSha256"],
         "filesystem_sandbox_verified":false,"parent_permission_ceiling_verified":false}))
 }

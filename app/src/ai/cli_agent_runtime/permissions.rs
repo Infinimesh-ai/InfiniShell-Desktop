@@ -134,7 +134,8 @@ pub(crate) fn ceiling_from_parent(
                 .is_some_and(super::claude::supported_version)
                 && config["permission_policy"] == "ClaudeRestrictedFilesV1"
                 && observed["fixedProfileVerified"] == true
-                && observed["permissionMode"] == "plan"
+                && observed["permissionMode"]
+                    == super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
                 && config["claude_profile"] == observed["claudeRestrictedFilesV1"] =>
         {
             let profile: ClaudeRestrictedFilesV1 =
@@ -256,7 +257,7 @@ pub(crate) fn verify_effective_permissions(
                 )
             })?;
             if actual["fixedProfileVerified"] != true
-                || actual["permissionMode"] != "plan"
+                || actual["permissionMode"] != super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
                 || !expected.claude_restricted_files_v1.same_scope(&profile)
             {
                 return Err(rejected(

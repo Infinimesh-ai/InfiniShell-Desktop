@@ -154,7 +154,7 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
         "canonicalWorkingDirectory":std::fs::canonicalize(&task.working_directory).unwrap(),
         "executableSha256":"953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
         "denyRules":[],"sourceRules":[],"localTools":{"allow_spawn":true,"allow_message":true}});
-    let effective = json!({"permissionMode":"plan","fixedProfileVerified":true,"claudeRestrictedFilesV1":profile});
+    let effective = json!({"permissionMode":"default","fixedProfileVerified":true,"claudeRestrictedFilesV1":profile});
     let saved_config = |version| {
         json!({"cli_version":version,"permission_policy":"ClaudeRestrictedFilesV1",
         "claude_profile":profile,"effective_permissions":effective})
@@ -176,6 +176,17 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
         &effective,
     )
     .unwrap();
+    let mut changed_mode = effective.clone();
+    changed_mode["permissionMode"] = json!("plan");
+    assert!(
+        verify_effective_permissions(
+            Some(&ceiling),
+            "claude",
+            Path::new(&task.working_directory),
+            &changed_mode
+        )
+        .is_err()
+    );
     let mut widened = effective.clone();
     widened["claudeRestrictedFilesV1"]["workingDirectory"] =
         json!(std::env::temp_dir().join("other"));
@@ -201,10 +212,10 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
 #[cfg(feature = "local_fs")]
 #[test]
 fn fixed_claude_profile_requires_the_saved_policy_and_cannot_be_inferred_from_mode() {
-    let mut task = parent(json!({"permissionMode":"plan","fixedProfileVerified":true}));
+    let mut task = parent(json!({"permissionMode":"default","fixedProfileVerified":true}));
     task.harness = "claude".into();
     task.config_json = json!({"cli_version":"2.1.273","permission_policy":"Inherit",
-        "effective_permissions":{"permissionMode":"plan","fixedProfileVerified":true}})
+        "effective_permissions":{"permissionMode":"default","fixedProfileVerified":true}})
     .to_string();
     assert!(ceiling_from_parent(&task, "claude").is_err());
 }
