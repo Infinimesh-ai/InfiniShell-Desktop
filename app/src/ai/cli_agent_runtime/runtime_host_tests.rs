@@ -157,6 +157,48 @@ fn runtime_host_manifest_version_is_v2() {
 }
 
 #[test]
+fn exit_receipt_seals_the_journal_before_late_owner_mutations() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let generation = Uuid::new_v4();
+    let host_manifest = manifest(&state_dir, generation);
+    let record = RuntimeHostRecord {
+        manifest: host_manifest.clone(),
+        manifest_sha256: "manifest-digest".to_owned(),
+        directory: state_dir.clone(),
+    };
+    let state = Arc::new(Mutex::new(
+        RuntimeHostState::new(
+            &state_dir,
+            host_manifest.clone(),
+            record.manifest_sha256.clone(),
+        )
+        .unwrap(),
+    ));
+    let (commands, _receiver) = tokio::sync::mpsc::channel(1);
+    let service = RuntimeHostServiceImpl {
+        state: state.clone(),
+        controller: RuntimeController {
+            generation,
+            commands,
+            host_event_acks: None,
+        },
+    };
+
+    let receipt = write_exit_receipt(&record, &state, true, true, true).unwrap();
+    assert!(matches!(
+        claim(&service, host_manifest.token, generation, 0, Uuid::new_v4()),
+        RuntimeHostResponse::Rejected {
+            code: RuntimeHostRejection::OwnerJournalFailed
+        }
+    ));
+    let summary = verify_journal(&record).unwrap();
+    assert_eq!(summary.final_sha256, receipt.journal_sha256);
+    assert_eq!(summary.last_event_sequence, receipt.last_event_sequence);
+    assert_eq!(summary.acknowledged_sequence, receipt.acknowledged_sequence);
+}
+
+#[test]
 fn manifest_failure_receipt_proves_host_and_adapter_were_not_started() {
     let directory = tempfile::tempdir().unwrap();
     let state_dir = directory.path().canonicalize().unwrap();

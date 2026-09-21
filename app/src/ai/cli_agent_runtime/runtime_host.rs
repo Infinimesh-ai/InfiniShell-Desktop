@@ -466,6 +466,7 @@ struct RuntimeHostState {
     journal_bytes: u64,
     journal_sha256: String,
     journal: File,
+    journal_sealed: bool,
     events: Vec<HostedEvent>,
     commands: HashMap<Uuid, HostCommandStatus>,
     snapshot: RuntimeHostSnapshot,
@@ -496,6 +497,7 @@ impl RuntimeHostState {
             journal_bytes: 0,
             journal_sha256: manifest_sha256,
             journal,
+            journal_sealed: false,
             events: Vec::new(),
             commands: HashMap::new(),
             snapshot: RuntimeHostSnapshot::default(),
@@ -515,6 +517,9 @@ impl RuntimeHostState {
     }
 
     fn append(&mut self, payload: JournalPayload) -> io::Result<()> {
+        if self.journal_sealed {
+            return Err(io::Error::other("运行时宿主账本已封存"));
+        }
         #[cfg(test)]
         if let Some(remaining) = self.append_failure_countdown.as_mut() {
             if *remaining == 0 {
@@ -2601,9 +2606,11 @@ fn write_exit_receipt(
             (NativeProcessCompletion::Unconfirmed, None)
         }
     };
-    let state = state
+    let mut state = state
         .lock()
         .map_err(|_| io::Error::other("运行时宿主状态不可用"))?;
+    // 退出回执绑定当前账本终点；封存后，在途 IPC 请求不能再追加 ACK 或命令记录。
+    state.journal_sealed = true;
     let receipt = RuntimeHostExitReceipt {
         version: HOST_MANIFEST_VERSION,
         runtime_generation: record.manifest.runtime_generation,
