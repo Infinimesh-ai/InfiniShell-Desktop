@@ -630,6 +630,12 @@ async fn drive(
             )?;
             return Ok(());
         }
+        if snapshots
+            .iter()
+            .any(|snapshot| snapshot.task.task_id == parent_id && snapshot.task.state.is_terminal())
+        {
+            return Err("父任务在父子验收完成前提前结束".into());
+        }
     }
 }
 
