@@ -16,8 +16,9 @@ import time
 import uuid
 
 sys.dont_write_bytecode = True
-from prepare_grok_cli import (VERSION, digest, isolated_environment, regular_file,
-                              require, verify_binary, verify_version)
+from prepare_grok_cli import (LEGACY_VERSION, P0_VERSION, VERSION, VERSION_RELEASES, digest,
+                              isolated_environment, regular_file, require,
+                              verify_binary, verify_version)
 from probe_claude_no_credentials import Recorder, repository_identity
 
 
@@ -26,6 +27,9 @@ LEADER_TIMEOUT = 10
 EXIT_TIMEOUT = 5
 MISSING_SESSION = "00000000-0000-4000-8000-000000000000"
 METHODS = ("initialize", "session/new", "session/cancel", "session/load", "session/resume")
+SETUP_METHOD = "_x.ai/session/setup"
+SETUP_PHASES = ("auth", "resolve_workspace", "folder_trust", "plugin_registry", "mcp_merge",
+                "persistence_init", "spawn_session_actor")
 MACOS_BINARY_BYTES = 141869568
 MACOS_BINARY_SHA256 = "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb"
 
@@ -34,16 +38,20 @@ class EmptyLeaderPid(ValueError):
     """原生先创建并加锁，再写 PID；仅启动等待阶段允许此短暂空文件。"""
 
 
-def fixed_binary(executable):
+def fixed_binary(executable, version=VERSION):
+    require(version in VERSION_RELEASES, "ACP 探针版本不在固定输入清单")
     machine = platform.machine().lower()
     if sys.platform == "darwin" and machine in ("arm64", "aarch64"):
-        require(regular_file(executable).st_size == MACOS_BINARY_BYTES and digest(executable) == MACOS_BINARY_SHA256,
-                "本机 Grok 不匹配已有 macOS 1.0.30 完整摘要")
-        return {"platform": "darwin-arm64", "bytes": MACOS_BINARY_BYTES, "sha256": MACOS_BINARY_SHA256}
+        if version == LEGACY_VERSION:
+            require(regular_file(executable).st_size == MACOS_BINARY_BYTES and digest(executable) == MACOS_BINARY_SHA256,
+                    "本机 Grok 不匹配已有 macOS 1.0.30 完整摘要")
+            return {"platform": "darwin-arm64", "bytes": MACOS_BINARY_BYTES,
+                    "sha256": MACOS_BINARY_SHA256}
+        return verify_binary(executable, "darwin-arm64", version)
     require(machine in ("amd64", "x86_64"), "ACP 探针没有当前架构的固定输入")
     target = f"{sys.platform}-x64"
     require(target in ("linux-x64", "win32-x64"), "ACP 探针没有当前平台的固定输入")
-    return verify_binary(executable, target)
+    return verify_binary(executable, target, version)
 
 
 def requests(project, nonce):
@@ -58,12 +66,32 @@ def requests(project, nonce):
     ]
 
 
-def validate_notification(message):
+def valid_session_id(value):
+    try:
+        return isinstance(value, str) and str(uuid.UUID(value)) == value
+    except ValueError:
+        return False
+
+
+def validate_notification(message, version=VERSION):
+    if message.get("method") == SETUP_METHOD:
+        require(version == VERSION and set(message) == {"jsonrpc", "method", "params"}
+                and message["jsonrpc"] == "2.0", "setup 通知只允许当前固定版本的精确外层")
+        params = message["params"]
+        require(isinstance(params, dict) and set(params) == {"method", "phase", "sessionId"}
+                and params["method"] == "session/new" and params["phase"] in SETUP_PHASES,
+                "setup 通知方法、阶段或字段改变")
+        if params["phase"] in SETUP_PHASES[:5]:
+            require(params["sessionId"] is None, "setup 前置阶段不得提前声明会话身份")
+        else:
+            require(valid_session_id(params["sessionId"]), "setup 创建阶段缺少有效会话身份")
+        return
     require(message == {"jsonrpc": "2.0", "method": "_x.ai/mcp/servers_updated", "params": {"mcpServers": []}},
             "无模型探针收到未经验证的通知、工具请求或模型事件")
 
 
-def validate_response(request, response):
+def validate_response(request, response, version=VERSION):
+    require(version in VERSION_RELEASES, "ACP 响应版本不在固定输入清单")
     require(isinstance(response, dict) and response.get("jsonrpc") == "2.0"
             and type(response.get("id")) is str and response["id"] == request["id"]
             and "method" not in response, "ACP 响应没有关联本次 method/id")
@@ -73,7 +101,7 @@ def validate_response(request, response):
         value = response["result"]
         metadata = value.get("_meta")
         require(type(value.get("protocolVersion")) is int and value["protocolVersion"] == 1
-                and isinstance(metadata, dict) and metadata.get("agentVersion") == VERSION,
+                and isinstance(metadata, dict) and metadata.get("agentVersion") == version,
                 "ACP 版本或原生 Grok 身份不匹配")
         methods = value.get("authMethods")
         require(isinstance(methods, list) and all(isinstance(item, dict) for item in methods)
@@ -81,7 +109,7 @@ def validate_response(request, response):
                 and metadata.get("defaultAuthMethodId") is None,
                 "无凭据握手意外出现已登录认证方式")
         require(metadata.get("mcpServers") == [], "隔离握手意外加载 MCP 服务")
-        return {"status": "passed", "protocol_version": 1, "agent_version": VERSION,
+        return {"status": "passed", "protocol_version": 1, "agent_version": version,
                 "auth_method_ids": ["grok.com"], "reported_capabilities": value.get("agentCapabilities")}
     error = response.get("error")
     require("result" not in response and isinstance(error, dict), "无凭据或缺失会话操作意外成功")
@@ -95,13 +123,14 @@ def validate_response(request, response):
     return {"status": "missing_session_rejected", "error": error, "history_restored": False}
 
 
-def validate_transcript(records, expected):
+def validate_transcript(records, expected, version=VERSION):
     sent = [row["message"] for row in records if row["direction"] == "stdin"]
     require(sent == expected and tuple(item["method"] for item in sent) == METHODS,
             "探针请求发生变化，或出现认证、模型输入及额外操作")
     by_id = {request["id"]: request for request in expected if "id" in request}
     observed = set()
     dispatched = set()
+    setup = []
     for row in records:
         if row["direction"] == "stdin" and "id" in row["message"]:
             dispatched.add(row["message"]["id"])
@@ -110,14 +139,24 @@ def validate_transcript(records, expected):
         message = row["message"]
         require(isinstance(message, dict), "ACP stdout 出现非 JSON 对象")
         if "id" not in message:
-            validate_notification(message)
+            validate_notification(message, version)
+            if message.get("method") == SETUP_METHOD:
+                setup.append(message["params"])
             continue
         identifier = message["id"]
         require(type(identifier) is str and identifier in dispatched and identifier not in observed,
                 "ACP 收到重复、过期或未知请求的响应")
-        validate_response(by_id[identifier], message)
+        validate_response(by_id[identifier], message, version)
         observed.add(identifier)
     require(observed == set(by_id), "ACP 并非每个请求都有唯一响应")
+    if version == VERSION:
+        require(tuple(item["phase"] for item in setup) == SETUP_PHASES,
+                "当前版本 setup 阶段缺失、重复或乱序")
+        require(all(item["sessionId"] is None for item in setup[:5])
+                and setup[5]["sessionId"] == setup[6]["sessionId"],
+                "当前版本 setup 会话身份未在创建阶段稳定关联")
+    else:
+        require(not setup, "历史固定版本意外出现当前版本 setup 通知")
 
 
 def clean(value, root):
@@ -181,7 +220,7 @@ def wait_leader(leader, endpoint):
     raise ValueError("私有 leader 没有在期限内建立本进程的锁与端点")
 
 
-def exchange(client, leader, endpoint, request):
+def exchange(client, leader, endpoint, request, version=VERSION):
     require(request.get("method") in METHODS, "拒绝认证、模型输入或额外 ACP 操作")
     if request["method"] == "session/cancel":
         require(request == {"jsonrpc": "2.0", "method": "session/cancel", "params": {"sessionId": MISSING_SESSION}},
@@ -205,9 +244,9 @@ def exchange(client, leader, endpoint, request):
             continue
         require(isinstance(message, dict), "ACP stdout 必须为 JSON 对象")
         if "id" not in message:
-            validate_notification(message)
+            validate_notification(message, version)
             continue
-        return validate_response(request, message)
+        return validate_response(request, message, version)
     raise ValueError(f"ACP {request['method']} / {request['id']} 响应超时")
 
 
@@ -222,11 +261,11 @@ def wait_idle_exit(recorder):
             "elapsed_ms": round((time.monotonic() - started) * 1000)}
 
 
-def run(executable, root, report):
+def run(executable, root, report, version=VERSION):
     env = isolated_environment(root)
     report.update(repository_identity(env))
-    report["binary"] = fixed_binary(executable)
-    report["cli_version"] = verify_version(executable, root)
+    report["binary"] = fixed_binary(executable, version)
+    report["cli_version"] = verify_version(executable, root, version)
     project = root / "project"
     project.mkdir()
     endpoint = root / "leader.sock"
@@ -250,7 +289,7 @@ def run(executable, root, report):
         report["stdio_pid"] = client.process.pid
         for request in expected:
             report["phase"] = request["method"]
-            result = exchange(client, leader, endpoint, request)
+            result = exchange(client, leader, endpoint, request, version)
             report["cases"].append({"method": request["method"], "request_id": request.get("id"), **result})
         owned_leader(leader, endpoint)
         report["private_leader_pid_confirmed"] = True
@@ -279,7 +318,7 @@ def run(executable, root, report):
         report["endpoint_file_remaining"] = endpoint.exists()
         report["leader_lock_file_remaining"] = lock.exists()
     require(client is not None, "stdio 没有启动")
-    validate_transcript(client.records, expected)
+    validate_transcript(client.records, expected, version)
     require(all(item.get("owned_process_exited") and "error" not in item for item in cleanup.values()),
             "自持原生进程或输出读取线程未完整清理")
     require(report["stdio_eof"]["stdin_eof_exited_within_5s"] and
@@ -289,7 +328,7 @@ def run(executable, root, report):
             report["leader_after_stdio_eof"]["exit_code_before_cleanup"] == 0,
             "leader 在收尾前异常退出")
     require(not (root / "grok/auth.json").exists(), "无凭据探针意外产生 auth.json")
-    require(fixed_binary(executable) == report["binary"], "原生文件在探测期间发生变化")
+    require(fixed_binary(executable, version) == report["binary"], "原生文件在探测期间发生变化")
     report["binary_unchanged"] = True
     report["phase"] = "complete"
 
@@ -298,6 +337,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--version", choices=VERSION_RELEASES, default=VERSION,
+                        help=f"固定原生版本，默认当前正式版 {VERSION}")
     args = parser.parse_args()
     require(args.executable.is_absolute() and args.output.is_absolute(), "可执行文件和证据必须使用绝对路径")
     regular_file(args.executable)
@@ -309,14 +350,14 @@ def main():
     report = {"passed": False, "scope": "unauthenticated_fixed_acp_boundaries", "cases": [],
               "credentials_provided": False, "authenticate_sent": False, "model_input_submitted": False,
               "running_approval_verified": False, "running_cancel_verified": False, "history_recovery_verified": False,
-              "model_http_traffic_measured": False}
+              "model_http_traffic_measured": False, "requested_cli_version": args.version}
     # Unix 用短路径避免 sockaddr_un 上限；Windows 由原生实现把唯一私有路径映射为命名管道。
     temporary_parent = None if os.name == "nt" else "/tmp"
     root = None
     try:
         with tempfile.TemporaryDirectory(prefix="grok-acp-", dir=temporary_parent) as temporary:
             root = Path(temporary).resolve()
-            run(executable, root, report)
+            run(executable, root, report, args.version)
         require(not root.exists(), "探针私有配置及端点目录未完成清理")
         report["passed"] = True
     except Exception as error:

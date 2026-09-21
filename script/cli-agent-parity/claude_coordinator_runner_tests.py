@@ -51,7 +51,7 @@ def fixture(version=runner.VERSION):
                      "permission_policy": "ClaudeRestrictedFilesV1",
                      "claude_profile": profile, "runtime_generation": "parent-process-1",
                      "effective_permissions": {"claudeRestrictedFilesV1": profile,
-                                               "fixedProfileVerified": True, "permissionMode": "plan"}}
+                                               "fixedProfileVerified": True, "permissionMode": "default"}}
     ceiling = {"parent_task_id": PARENT, "parent_generation": 1, "parent_native_session_id": "parent-native-1",
                "working_directory": "/probe/project", "permissions": {"claudeRestrictedFilesV1": profile}}
     child_config = copy.deepcopy(parent_config)
@@ -485,7 +485,7 @@ class IsolationTests(unittest.TestCase):
                        "rules": ["deny"], "rejections": []}
         event = {"event": "runtime", "runtime": {"kind": {"SessionReady": {
             "effective_permissions": {"permissionObservation": observation, "fixedProfileVerified": True,
-                                      "permissionMode": "plan", "unapprovedSettings": "private-extra"}}}}}
+                                      "permissionMode": "default", "unapprovedSettings": "private-extra"}}}}}
         projected = runner.project_public_events([event], lambda value: value)[0]
         permissions = projected["runtime"]["kind"]["SessionReady"]["effective_permissions"]
         self.assertNotIn("permissionObservation", permissions)
@@ -571,6 +571,37 @@ class IsolationTests(unittest.TestCase):
             args = argparse.Namespace(test_binary=paths[0], claude=paths[1], supervisor=paths[2], api_environment_file=paths[3], output=root / "evidence.ndjson")
             with self.assertRaises(ValueError):
                 runner.validate_inputs(args)
+
+    def test_default_account_requires_opt_in_and_excludes_api_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = [root / name for name in ("test", "claude", "supervisor", "api.json")]
+            for path in paths:
+                path.write_text("placeholder")
+                path.chmod(0o600)
+            common = dict(test_binary=paths[0], claude=paths[1], supervisor=paths[2],
+                          output=root / "evidence.ndjson", model="claude-sonnet-4-6")
+            online = argparse.Namespace(**common, api_environment_file=None,
+                use_authorized_default_account=True, claude_version="2.1.278")
+            runner.validate_inputs(online)
+            self.assertTrue(runner.validate_auth_selection(online))
+            for changes in (
+                {"api_environment_file": paths[3]}, {"claude_version": "2.1.273"},
+                {"use_authorized_default_account": False},
+            ):
+                args = argparse.Namespace(**(vars(online) | changes))
+                with self.subTest(changes=changes), self.assertRaises(ValueError):
+                    runner.validate_inputs(args)
+
+    def test_sensitive_value_scan_requires_already_redacted_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            receipt = root / "receipt.txt"
+            redact = lambda value: runner.base.sanitize(value, root, None, None, {})
+            receipt.write_text("email=person@example.invalid token=secret-token", encoding="utf-8")
+            self.assertFalse(runner._file_has_no_sensitive_values(receipt, redact))
+            receipt.write_text(redact(receipt.read_text(encoding="utf-8")), encoding="utf-8")
+            self.assertTrue(runner._file_has_no_sensitive_values(receipt, redact))
 
 
 class InitialReadyAcceptanceTests(unittest.TestCase):
@@ -681,6 +712,23 @@ class FixedVersionCoordinatorTests(unittest.TestCase):
             load_api.assert_not_called()
             spawn.assert_not_called()
 
+    def test_direct_default_account_run_rejects_api_before_reading_it(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                patch.object(runner.tempfile, "mkdtemp", return_value=temporary), \
+                patch.object(runner, "verify_version", return_value="2.1.278 (Claude Code)"), \
+                patch.object(runner.base, "load_api_environment") as load_api, \
+                patch.object(runner.base, "probe_authorized_default_account") as probe:
+            root = Path(temporary)
+            args = argparse.Namespace(
+                claude=root / "claude", claude_version="2.1.278",
+                use_authorized_default_account=True, api_environment_file=root / "api.json",
+            )
+            with self.assertRaisesRegex(ValueError, "不能同时提供"):
+                runner.run(args)
+            load_api.assert_not_called()
+            probe.assert_not_called()
+
     def test_default_and_explicit_version_keep_platform_through_final_binary_verification(self):
         for selected in (None, "2.1.278"):
             expected = selected or "2.1.273"
@@ -727,6 +775,54 @@ class FixedVersionCoordinatorTests(unittest.TestCase):
                 self.assertEqual(metadata["cli_version"], f"{expected} (Claude Code)")
                 self.assertTrue(metadata["acceptance_passed"])
                 self.assertTrue(metadata["cli_binary_unchanged"])
+
+    def test_authorized_default_account_runs_coordinator_without_config_override(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for name in ("claude-fixture", "libtest", "supervisor"):
+                (root / name).write_bytes(b"synthetic executable")
+            args = argparse.Namespace(
+                claude=root / "claude-fixture", claude_version="2.1.278",
+                test_binary=root / "libtest", supervisor=root / "supervisor",
+                api_environment_file=None, use_authorized_default_account=True,
+                output=root / "events.ndjson", model="claude-sonnet-4-6",
+                config_dir=None, auth_home=None,
+            )
+            status = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                      "subscriptionType": "pro"}
+
+            def spawn(command, **kwargs):
+                environment = kwargs["env"]
+                self.assertNotIn("CLAUDE_CONFIG_DIR", environment)
+                self.assertNotIn("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR", environment)
+                self.assertEqual(environment["INFINISHELL_CLAUDE_LIVE_AUTH_MODE"],
+                                 "authorized_default_account")
+                self.assertRegex(environment["WARP_DATA_PROFILE"],
+                                 r"^claude-coordinator-[0-9a-f]{32}$")
+                Path(environment["INFINISHELL_CLAUDE_LIVE_ARTIFACT"]).write_text(
+                    "".join(json.dumps(row) + "\n" for row in fixture("2.1.278")),
+                    encoding="utf-8")
+                return SimpleNamespace(returncode=0, communicate=lambda timeout: (OUTPUT, None))
+
+            account_environment = {"HOME": str(Path.home()), "PATH": "/safe/bin"}
+            with patch.object(runner, "current_platform", return_value="darwin-arm64"), \
+                    patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                    patch.object(runner, "verify_version", return_value="2.1.278 (Claude Code)"), \
+                    patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                    patch.object(runner.base, "authorized_default_account_environment",
+                                 return_value=account_environment.copy()), \
+                    patch.object(runner.base, "probe_authorized_default_account",
+                                 return_value=status) as probe, \
+                    patch.object(runner.subprocess, "run", return_value=SimpleNamespace(stdout="")), \
+                    patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                    patch("builtins.print"):
+                self.assertEqual(runner.run(args), 0)
+            probe.assert_called_once_with(args.claude, account_environment, root / "project")
+            metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+            self.assertEqual(metadata["authentication_source"], "authorized_default_account")
+            self.assertEqual(metadata["authorized_default_account"], status)
+            self.assertTrue(metadata["sensitive_value_scan_passed"])
+            self.assertTrue(metadata["acceptance_passed"])
 
 
 if __name__ == "__main__":

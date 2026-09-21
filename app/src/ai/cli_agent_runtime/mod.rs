@@ -25,6 +25,8 @@ pub(crate) mod managed_input;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) mod managed_process;
 pub(crate) mod permissions;
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+pub(crate) mod runtime_host;
 #[cfg(feature = "local_fs")]
 pub(crate) mod task_manager_view;
 
@@ -56,7 +58,7 @@ pub enum PermissionPolicy {
     GrokRestrictedFilesV1,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SessionOptions {
     pub executable: PathBuf,
     pub cwd: PathBuf,
@@ -250,9 +252,24 @@ impl RuntimeError {
 pub struct RuntimeController {
     generation: Uuid,
     commands: mpsc::Sender<RuntimeCommand>,
+    host_event_acks: Option<mpsc::Sender<()>>,
 }
 
 impl RuntimeController {
+    pub(crate) async fn reserve_command(
+        &self,
+        generation: Uuid,
+    ) -> Result<mpsc::OwnedPermit<RuntimeCommand>, RuntimeError> {
+        if generation != self.generation {
+            return Err(RuntimeError::StaleGeneration);
+        }
+        self.commands
+            .clone()
+            .reserve_owned()
+            .await
+            .map_err(|_| RuntimeError::ControllerClosed)
+    }
+
     pub async fn send(&self, command: RuntimeCommand) -> Result<(), RuntimeError> {
         if command.generation != self.generation {
             return Err(RuntimeError::StaleGeneration);
@@ -262,12 +279,22 @@ impl RuntimeController {
             .await
             .map_err(|_| RuntimeError::ControllerClosed)
     }
+
+    /// 宿主事件只有在协调器完成对应 SQLite 提交后才能推进持久 ACK 水位。
+    pub(crate) async fn acknowledge_host_event(&self) -> Result<(), RuntimeError> {
+        let Some(acks) = &self.host_event_acks else {
+            return Ok(());
+        };
+        acks.send(())
+            .await
+            .map_err(|_| RuntimeError::ControllerClosed)
+    }
 }
 
 pub struct RuntimeConnection {
     pub controller: RuntimeController,
     pub events: mpsc::Receiver<RuntimeEvent>,
-    /// 调用者负责调度并观察结果；队列满导致的失败仍通过该结果可靠回收。
+    /// 调用者负责调度并观察结果；命令队列使用有界背压，adapter 退出仍通过该结果可靠回收。
     pub task: BoxFuture<'static, Result<(), RuntimeError>>,
 }
 
@@ -285,6 +312,7 @@ fn channels(
         RuntimeController {
             generation,
             commands,
+            host_event_acks: None,
         },
         receiver,
         sender,

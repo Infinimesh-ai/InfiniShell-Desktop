@@ -30,10 +30,12 @@ ACP_INPUTS = 8
 MAX_TUNNELS = 32
 MAX_BYTES = 32 * 1024 * 1024
 P0_PROFILE = "p0-1.0.34"
+CURRENT_ROOT_PROFILE = "root-1.0.40"
 PROFILES = {
     "full-1.0.30": {
         "version": shared.VERSION,
         "sha256": shared.BINARY_SHA256,
+        "model": MODEL,
         "test_name": shared.TEST_NAME,
         "max_acp_inputs": ACP_INPUTS,
         "project_files": ["approval-allow.txt"],
@@ -42,10 +44,20 @@ PROFILES = {
     P0_PROFILE: {
         "version": "grok 1.0.34 (3736acbc8658)",
         "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+        "model": MODEL,
         "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_p0_lifecycle",
         "max_acp_inputs": 4,
         "project_files": ["allow.txt", "deny.txt"],
         "public_product_gate_open": True,
+    },
+    CURRENT_ROOT_PROFILE: {
+        "version": "grok 1.0.40 (eb1a2256660d)",
+        "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+        "model": "grok-4.6",
+        "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_current_root_lifecycle",
+        "max_acp_inputs": ACP_INPUTS,
+        "project_files": ["approval-allow.txt"],
+        "public_product_gate_open": False,
     },
 }
 NATIVE_MARKETPLACE_INITIALIZATION = {
@@ -255,18 +267,32 @@ class OfficialTunnel:
         return drained and not self.thread.is_alive()
 
 
-def prepare_native(root, native, source_home, port, binary_sha256=None):
+def prepare_native(
+    root,
+    native,
+    source_home,
+    port,
+    binary_sha256=None,
+    model=MODEL,
+    leader_socket_root=None,
+):
     wrapper, settings = shared.prepare_native(
-        root, native, source_home, port, binary_sha256=binary_sha256)
+        root,
+        native,
+        source_home,
+        port,
+        binary_sha256=binary_sha256,
+        leader_socket_root=leader_socket_root,
+    )
     # 保留原生模型定义与官方认证解析，仅固定模型选择；不能把缓存令牌送往自定义后端。
     settings.write_text(f'''[cli]
 use_leader = true
 auto_update = false
 [models]
-default = "{MODEL}"
-session_summary = "{MODEL}"
-web_search = "{MODEL}"
-image_description = "{MODEL}"
+default = "{model}"
+session_summary = "{model}"
+web_search = "{model}"
+image_description = "{model}"
 [features]
 turn_summary = false
 title_refresh = false
@@ -373,13 +399,28 @@ def validate_paths(args):
     if sys.platform != "darwin":
         raise ValueError("官方隔离运行器目前只验证 macOS")
     args.acceptance_profile = getattr(args, "acceptance_profile", "full-1.0.30")
+    private_root_parent = Path(getattr(args, "private_root_parent", "/private/tmp"))
+    if private_root_parent.is_symlink() or not private_root_parent.is_dir():
+        raise ValueError("私有运行根父目录必须是已存在的真实目录")
+    args.private_root_parent = private_root_parent.resolve(strict=True)
+    supervisor_state_parent = getattr(args, "supervisor_state_parent", None)
+    if supervisor_state_parent is not None:
+        supervisor_state_parent = Path(supervisor_state_parent)
+        if supervisor_state_parent.is_symlink() or not supervisor_state_parent.is_dir():
+            raise ValueError("监督状态父目录必须是已存在的真实目录")
+        supervisor_state_parent = supervisor_state_parent.resolve(strict=True)
+    args.supervisor_state_parent = supervisor_state_parent
     profile = PROFILES[args.acceptance_profile]
     args.profile = profile
-    for name in ("test_binary", "grok", "supervisor"):
+    for name in ("test_binary", "supervisor"):
         path = getattr(args, name)
         if path.is_symlink() or not path.is_file():
             raise ValueError("可执行输入必须是现有非符号链接文件")
         setattr(args, name, path.resolve(strict=True))
+    # 正式安装入口允许是精确固定摘要的版本链接；解析后仍必须是普通现有文件。
+    if not args.grok.is_file():
+        raise ValueError("Grok 正式入口必须解析到现有文件")
+    args.grok = args.grok.resolve(strict=True)
     if args.test_binary == args.supervisor or shared.digest(args.grok) != profile["sha256"]:
         raise ValueError("需要同提交监督入口与固定 Grok 二进制")
     home = args.official_grok_home
@@ -413,13 +454,18 @@ def run(args):
     for path in artifacts(args.output):
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         os.close(descriptor)
-    root = Path(tempfile.mkdtemp(prefix="infinishell-grok-official-adapter-", dir="/private/tmp")).resolve()
+    root = Path(tempfile.mkdtemp(
+        prefix="infinishell-grok-official-adapter-", dir=args.private_root_parent)).resolve()
+    state_root = (Path(tempfile.mkdtemp(
+        prefix="infinishell-grok-supervisor-state-", dir=args.supervisor_state_parent)).resolve()
+        if args.supervisor_state_parent is not None else root / "state")
+    (state_root / "tmp").mkdir(mode=0o700)
     for relative in ("home", "home/.grok", "project", "tmp", "state"):
         (root / relative).mkdir(parents=True, exist_ok=True, mode=0o700)
     (root / ".infinishell-grok-live-probe").write_text(shared.MARKER, encoding="utf-8")
     raw_path = root / "private-evidence.ndjson"
     raw_path.touch(mode=0o600)
-    metadata = {"scope": shared.SCOPE, "model_path": MODEL_PATH, "requested_model": MODEL,
+    metadata = {"scope": shared.SCOPE, "model_path": MODEL_PATH, "requested_model": profile["model"],
         "acceptance_profile": args.acceptance_profile, "test": profile["test_name"],
         "official_grok_model_tested": False, "acceptance_passed": False,
         "public_product_gate_open": profile["public_product_gate_open"],
@@ -435,6 +481,7 @@ def run(args):
         "tls_decrypted": False, "product_network_isolation_verified": False,
         "grok_sha256": shared.digest(args.grok), "test_binary_sha256": shared.digest(args.test_binary),
         "supervisor_sha256": shared.digest(args.supervisor)}
+    metadata["separate_internal_supervisor_state"] = args.supervisor_state_parent is not None
     tunnel = OfficialTunnel(args.timeout)
     port = tunnel.start()
     events = []
@@ -444,12 +491,15 @@ def run(args):
         copy_private_auth(args.official_grok_home, root / "home/.grok")
         metadata["sandbox_canary"] = shared.network_canary(root, args.official_grok_home / "auth.json", port)
         wrapper, settings = prepare_native(
-            root, args.grok, args.official_grok_home, port, profile["sha256"])
+            root, args.grok, args.official_grok_home, port, profile["sha256"], profile["model"],
+            state_root / "tmp")
         settings_before = settings.read_bytes()
         environment = official_environment(root, port)
+        environment["TMPDIR"] = str(state_root / "tmp")
         environment.update({"INFINISHELL_GROK_LIVE_ROOT": str(root),
             "INFINISHELL_GROK_LIVE_EXECUTABLE": str(wrapper), "INFINISHELL_GROK_LIVE_ARTIFACT": str(raw_path),
             "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
+            "INFINISHELL_GROK_LIVE_STATE_DIR": str(state_root),
             "INFINISHELL_GROK_LIVE_PROFILE": args.acceptance_profile})
         metadata["native_environment_names"] = sorted(environment)
         version = subprocess.run([str(wrapper), "--version"], cwd=root / "project", env=environment,
@@ -505,6 +555,15 @@ def run(args):
             metadata["auth_cleanup_error_type"] = type(error).__name__
             metadata["acceptance_passed"] = False
             metadata["official_grok_model_tested"] = False
+        if args.supervisor_state_parent is not None:
+            try:
+                shutil.rmtree(state_root)
+                metadata["separate_internal_supervisor_state_removed"] = not state_root.exists()
+            except OSError as error:
+                metadata["separate_internal_supervisor_state_removed"] = False
+                metadata["supervisor_state_cleanup_error_type"] = type(error).__name__
+                metadata["acceptance_passed"] = False
+                metadata["official_grok_model_tested"] = False
         diagnostic = root / "private-test-output.txt"
         descriptor = os.open(diagnostic, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as file:
@@ -530,6 +589,8 @@ def main():
     parser.add_argument("--grok", type=Path, required=True)
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--official-grok-home", type=Path, required=True)
+    parser.add_argument("--private-root-parent", type=Path, default=Path("/private/tmp"))
+    parser.add_argument("--supervisor-state-parent", type=Path)
     parser.add_argument("--acceptance-profile", choices=sorted(PROFILES), default="full-1.0.30")
     parser.add_argument("--max-acp-inputs", type=int)
     parser.add_argument("--timeout", type=int, default=900)

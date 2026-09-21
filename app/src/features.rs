@@ -473,3 +473,7 @@ const UNSTABLE_FEATURES: &[(&str, FeatureFlag)] = &[
         FeatureFlag::WindowsHighPerformanceGpuDefault,
     ),
 ];
+
+#[cfg(test)]
+#[path = "features_tests.rs"]
+mod tests;

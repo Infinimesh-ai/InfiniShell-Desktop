@@ -13,22 +13,33 @@ import grok_fixed_acp_probe as probe
 from probe_claude_no_credentials_tests import python_fixture_environment
 
 
-def native_responses():
+def native_responses(version=probe.VERSION):
+    if version not in probe.VERSION_RELEASES:
+        raise ValueError("测试版本不在固定输入清单")
     fixture = Path(__file__).resolve().parents[2] / "specs/cli-agent-parity/fixtures/grok-1.0.30-handshake.ndjson"
     rows = [json.loads(line) for line in fixture.read_text(encoding="utf-8").splitlines()]
-    return {row["message"]["id"]: row["message"] for row in rows
-            if row["direction"] == "stdout" and "id" in row["message"]}
+    responses = {row["message"]["id"]: copy.deepcopy(row["message"]) for row in rows
+                 if row["direction"] == "stdout" and "id" in row["message"]}
+    # 只替换本测试所核对的原生身份；其余历史响应保持原始字节语义，不作为 1.0.34 实录。
+    responses[1]["result"]["_meta"]["agentVersion"] = version
+    return responses
 
 
-def transcript():
+def transcript(version=probe.VERSION):
     expected = probe.requests(Path("isolated-project"), "current-probe")
-    responses = native_responses()
+    responses = native_responses(version)
     records = []
     native_id = 0
     for request in expected:
         records.append({"direction": "stdin", "message": request})
         if "id" in request:
             native_id += 1
+            if version == probe.VERSION and request["method"] == "session/new":
+                session_id = "019d0000-0000-7000-8000-000000000040"
+                for phase in probe.SETUP_PHASES:
+                    records.append({"direction": "stdout", "message": {"jsonrpc": "2.0",
+                        "method": probe.SETUP_METHOD, "params": {"method": "session/new", "phase": phase,
+                            "sessionId": None if phase in probe.SETUP_PHASES[:5] else session_id}}})
             response = copy.deepcopy(responses[native_id])
             response["id"] = request["id"]
             records.append({"direction": "stdout", "message": response})
@@ -67,11 +78,23 @@ class GrokFixedAcpTests(unittest.TestCase):
             with self.subTest(keys=keys), self.assertRaises(ValueError):
                 probe.validate_response(request, changed)
 
+    def test_historical_initialize_requires_explicit_legacy_version(self):
+        request = probe.requests(Path("project"), "legacy")[0]
+        response = native_responses(probe.LEGACY_VERSION)[1]
+        response["id"] = request["id"]
+        self.assertEqual(
+            probe.validate_response(request, response, probe.LEGACY_VERSION)["agent_version"],
+            probe.LEGACY_VERSION,
+        )
+        with self.assertRaises(ValueError):
+            probe.validate_response(request, response)
+
     def test_new_session_auth_block_and_missing_history_are_not_successful_sessions(self):
         records, expected = transcript()
         for index, status in [(1, 'blocked_by_auth'), (3, 'missing_session_rejected'), (4, 'missing_session_rejected')]:
             request = expected[index]
-            response = next(row['message'] for row in records if row['direction'] == 'stdout' and row['message']['id'] == request['id'])
+            response = next(row['message'] for row in records if row['direction'] == 'stdout'
+                            and row['message'].get('id') == request['id'])
             self.assertEqual(probe.validate_response(request, response)['status'], status)
             with self.assertRaises(ValueError):
                 probe.validate_response(request, {'jsonrpc': '2.0', 'id': request['id'], 'result': {'sessionId': 'unexpected'}})
@@ -85,6 +108,37 @@ class GrokFixedAcpTests(unittest.TestCase):
             with self.subTest(length=len(replacement)), self.assertRaises(ValueError):
                 probe.validate_transcript(replacement, expected)
 
+    def test_current_setup_notifications_require_exact_order_and_stable_session(self):
+        records, expected = transcript()
+        probe.validate_transcript(records, expected)
+        setup_indexes = [index for index, row in enumerate(records)
+                         if row["message"].get("method") == probe.SETUP_METHOD]
+
+        reordered = copy.deepcopy(records)
+        left, right = setup_indexes[1:3]
+        reordered[left], reordered[right] = reordered[right], reordered[left]
+        with self.assertRaisesRegex(ValueError, "乱序"):
+            probe.validate_transcript(reordered, expected)
+
+        duplicate = copy.deepcopy(records)
+        duplicate.insert(setup_indexes[-1], copy.deepcopy(duplicate[setup_indexes[-1]]))
+        with self.assertRaisesRegex(ValueError, "重复"):
+            probe.validate_transcript(duplicate, expected)
+
+        changed = copy.deepcopy(records)
+        changed[setup_indexes[-1]]["message"]["params"]["phase"] = "old_phase"
+        with self.assertRaisesRegex(ValueError, "阶段"):
+            probe.validate_transcript(changed, expected)
+
+    def test_historical_transcript_rejects_current_setup_notification(self):
+        records, expected = transcript(probe.P0_VERSION)
+        probe.validate_transcript(records, expected, probe.P0_VERSION)
+        records.insert(2, {"direction": "stdout", "message": {"jsonrpc": "2.0",
+            "method": probe.SETUP_METHOD, "params": {"method": "session/new", "phase": "auth",
+                "sessionId": None}}})
+        with self.assertRaisesRegex(ValueError, "当前固定版本"):
+            probe.validate_transcript(records, expected, probe.P0_VERSION)
+
     def test_unexpected_model_or_approval_events_are_rejected(self):
         for message in [{'jsonrpc': '2.0', 'method': 'session/update', 'params': {'update': {'sessionUpdate': 'agent_message_chunk'}}},
                         {'jsonrpc': '2.0', 'method': 'session/request_permission', 'id': 'approval'},
@@ -92,6 +146,27 @@ class GrokFixedAcpTests(unittest.TestCase):
             with self.subTest(message=message), self.assertRaises(ValueError):
                 probe.validate_notification(message)
         probe.validate_notification({'jsonrpc': '2.0', 'method': '_x.ai/mcp/servers_updated', 'params': {'mcpServers': []}})
+
+    def test_setup_notification_rejects_unknown_fields_method_and_identity(self):
+        session_id = "019d0000-0000-7000-8000-000000000040"
+        base = {"jsonrpc": "2.0", "method": probe.SETUP_METHOD,
+                "params": {"method": "session/new", "phase": "persistence_init", "sessionId": session_id}}
+        probe.validate_notification(base)
+        changes = [
+            ("phase", "old_phase"),
+            ("method", "session/load"),
+            ("sessionId", None),
+            ("sessionId", "not-a-session"),
+        ]
+        for key, value in changes:
+            changed = copy.deepcopy(base)
+            changed["params"][key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                probe.validate_notification(changed)
+        extra = copy.deepcopy(base)
+        extra["params"]["legacy"] = True
+        with self.assertRaises(ValueError):
+            probe.validate_notification(extra)
 
     def test_private_lock_cannot_reassociate_a_replaced_or_exited_leader(self):
         with tempfile.TemporaryDirectory() as temporary:

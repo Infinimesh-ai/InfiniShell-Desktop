@@ -13,7 +13,9 @@ use uuid::Uuid;
 use warpui::r#async::FutureExt as _;
 
 use super::{MAX_LINE_BYTES, write_message};
-use crate::ai::cli_agent_runtime::claude_profile::{ClaudeRestrictedFilesV1, reject};
+use crate::ai::cli_agent_runtime::claude_profile::{
+    ClaudeRestrictedFilesV1, FIXED_PERMISSION_MODE_ARGUMENT, ISOLATED_SETTINGS_ARGUMENTS, reject,
+};
 use crate::ai::cli_agent_runtime::{RuntimeError, SessionOptions, SessionTarget};
 
 pub(super) async fn prepare(
@@ -26,22 +28,24 @@ pub(super) async fn prepare(
         return Err(reject("claude_profile_resume_missing"));
     }
     let digest = executable_digest(&options.executable)?;
+    let arguments = [
+        "--print",
+        "--input-format=stream-json",
+        "--output-format=stream-json",
+        "--verbose",
+        "--permission-prompt-tool=stdio",
+        "--permission-prompts=host",
+        "--tools=",
+        "--disallowedTools=*",
+        "--strict-mcp-config",
+        "--mcp-config={\"mcpServers\":{}}",
+        "--no-session-persistence",
+    ]
+    .into_iter()
+    .chain(ISOLATED_SETTINGS_ARGUMENTS)
+    .chain([FIXED_PERMISSION_MODE_ARGUMENT]);
     let mut child = Command::new(&options.executable)
-        .args([
-            "--print",
-            "--bare",
-            "--input-format=stream-json",
-            "--output-format=stream-json",
-            "--verbose",
-            "--permission-prompt-tool=stdio",
-            "--permission-prompts=host",
-            "--tools=",
-            "--disallowedTools=*",
-            "--strict-mcp-config",
-            "--mcp-config={\"mcpServers\":{}}",
-            "--setting-sources=user,project,local",
-            "--no-session-persistence",
-        ])
+        .args(arguments)
         .current_dir(&options.cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

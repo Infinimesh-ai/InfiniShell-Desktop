@@ -1,8 +1,123 @@
 use std::ffi::OsStr;
+use std::io;
+use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::os::windows::process::CommandExt as _;
+use std::process::Child;
 
 use anyhow::{Context, Result};
 use warp_errors::report_error;
+
+/// 主线程仍处于 `CREATE_SUSPENDED` 状态的子进程。
+///
+/// 此类型不提供直接取出 [`Child`] 的通道；只有原生恢复成功后才会移交进程所有权。
+#[derive(Debug)]
+pub struct SuspendedChild {
+    child: Option<Child>,
+    primary_thread: Option<OwnedHandle>,
+}
+
+impl SuspendedChild {
+    pub(crate) fn from_child(mut child: Child) -> io::Result<Self> {
+        match find_only_thread(child.id()) {
+            Ok(primary_thread) => Ok(Self {
+                child: Some(child),
+                primary_thread: Some(primary_thread),
+            }),
+            Err(error) => {
+                terminate_and_wait(&mut child);
+                Err(error)
+            }
+        }
+    }
+
+    /// 返回冻结进程的进程 ID。
+    #[must_use]
+    pub fn id(&self) -> u32 {
+        self.child.as_ref().expect("冻结进程必须存在").id()
+    }
+
+    /// 恢复原生主线程，成功后返回普通子进程句柄。
+    pub fn resume(mut self) -> io::Result<Child> {
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::System::Threading::ResumeThread;
+
+        let primary_thread = self
+            .primary_thread
+            .as_ref()
+            .expect("冻结进程必须保留主线程句柄");
+        let previous_count = unsafe { ResumeThread(HANDLE(primary_thread.as_raw_handle())) };
+        if previous_count == u32::MAX {
+            return Err(io::Error::last_os_error());
+        }
+        if previous_count != 1 {
+            return Err(io::Error::other(format!(
+                "恢复冻结进程时的悬挂计数应为 1，实际为 {previous_count}"
+            )));
+        }
+
+        self.primary_thread.take();
+        Ok(self.child.take().expect("冻结进程必须存在"))
+    }
+}
+
+impl Drop for SuspendedChild {
+    fn drop(&mut self) {
+        if let Some(child) = self.child.as_mut() {
+            terminate_and_wait(child);
+        }
+    }
+}
+
+fn terminate_and_wait(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn find_only_thread(process_id: u32) -> io::Result<OwnedHandle> {
+    use windows::Win32::Foundation::ERROR_NO_MORE_FILES;
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
+    };
+    use windows::Win32::System::Threading::{OpenThread, THREAD_SUSPEND_RESUME};
+    use windows::core::HRESULT;
+
+    let snapshot =
+        unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }.map_err(io::Error::from)?;
+    let snapshot = unsafe { OwnedHandle::from_raw_handle(snapshot.0) };
+    let snapshot_handle = windows::Win32::Foundation::HANDLE(snapshot.as_raw_handle());
+    let mut entry = THREADENTRY32 {
+        dwSize: size_of::<THREADENTRY32>() as u32,
+        ..Default::default()
+    };
+    unsafe { Thread32First(snapshot_handle, &mut entry) }.map_err(io::Error::from)?;
+
+    let mut thread_id = None;
+    loop {
+        if entry.th32OwnerProcessID == process_id {
+            if thread_id.replace(entry.th32ThreadID).is_some() {
+                return Err(io::Error::other(format!(
+                    "冻结进程 {process_id} 存在多个线程，拒绝恢复"
+                )));
+            }
+        }
+
+        match unsafe { Thread32Next(snapshot_handle, &mut entry) } {
+            Ok(()) => {}
+            Err(error) if error.code() == HRESULT::from_win32(ERROR_NO_MORE_FILES.0) => break,
+            Err(error) => return Err(io::Error::from(error)),
+        }
+    }
+
+    let thread_id = thread_id.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("未找到冻结进程 {process_id} 的主线程"),
+        )
+    })?;
+    let thread =
+        unsafe { OpenThread(THREAD_SUSPEND_RESUME, false, thread_id) }.map_err(io::Error::from)?;
+    Ok(unsafe { OwnedHandle::from_raw_handle(thread.0) })
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum JobObjectError {
@@ -145,3 +260,7 @@ impl CommandExt for crate::r#async::Command {
         self
     }
 }
+
+#[cfg(test)]
+#[path = "windows_tests.rs"]
+mod tests;

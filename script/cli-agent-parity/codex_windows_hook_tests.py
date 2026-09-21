@@ -36,7 +36,7 @@ class FormalResourceTests(unittest.TestCase):
         repo = Path(__file__).resolve().parents[2]
         current, replacements, source_hash = probe_bundle(repo, 'formal')
         old, old_replacements, old_source_hash = probe_bundle(repo, 'candidate')
-        self.assertEqual((current['patch_revision'], old['patch_revision']), (4, 3))
+        self.assertEqual((current['patch_revision'], old['patch_revision']), (5, 3))
         self.assertEqual(len(source_hash), 64)
         self.assertIsNone(old_source_hash)
         self.assertNotIn('scripts/on-prompt-submit.sh', old_replacements)

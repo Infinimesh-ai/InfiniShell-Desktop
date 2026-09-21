@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""准备官方固定 Grok 原生文件；默认 1.0.30，只写私有目录且仅运行 --version。"""
+"""准备官方固定 Grok 原生文件；默认最新正式版，只写私有目录且仅运行 --version。"""
 
 import argparse
 import hashlib
@@ -15,26 +15,28 @@ import tempfile
 import urllib.request
 
 
-VERSION = "1.0.30"
-VERSION_OUTPUT = "grok 1.0.30 (04b7ffed98c6)"
-SOURCE_COMMIT = "482711333c7195dc16a272777f86086d615e2afb"
+LEGACY_VERSION = "1.0.30"
+P0_VERSION = "1.0.34"
+VERSION = "1.0.40"
+VERSION_OUTPUT = "grok 1.0.40 (eb1a2256660d)"
+LEGACY_SOURCE_COMMIT = "482711333c7195dc16a272777f86086d615e2afb"
 BASE_URL = "https://x.ai/cli"
 MARKER = ".infinishell-grok-fixed-inputs"
 MARKER_CONTENTS = f"isolated Grok {VERSION} verification inputs\n".encode()
 # 摘要来自固定官方地址的完整下载；并非官方签名或官方发布的 SHA-256 清单。
-RELEASES = {
-    "linux-x64": ("grok-1.0.30-linux-x86_64", "grok", 161725088,
-                  "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54"),
-    "win32-x64": ("grok-1.0.30-windows-x86_64.exe", "grok.exe", 150036808,
-                  "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266"),
-}
 VERSION_OUTPUTS = {
+    LEGACY_VERSION: "grok 1.0.30 (04b7ffed98c6)",
+    P0_VERSION: "grok 1.0.34 (3736acbc8658)",
     VERSION: VERSION_OUTPUT,
-    "1.0.34": "grok 1.0.34 (3736acbc8658)",
 }
 VERSION_RELEASES = {
-    VERSION: RELEASES,
-    "1.0.34": {
+    LEGACY_VERSION: {
+        "linux-x64": ("grok-1.0.30-linux-x86_64", "grok", 161725088,
+                      "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54"),
+        "win32-x64": ("grok-1.0.30-windows-x86_64.exe", "grok.exe", 150036808,
+                      "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266"),
+    },
+    P0_VERSION: {
         "linux-x64": ("grok-1.0.34-linux-x86_64", "grok", 163035648,
                       "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d"),
         "win32-x64": ("grok-1.0.34-windows-x86_64.exe", "grok.exe", 151293256,
@@ -42,7 +44,16 @@ VERSION_RELEASES = {
         "darwin-arm64": ("grok-1.0.34-macos-aarch64", "grok", 143016096,
                          "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e"),
     },
+    VERSION: {
+        "linux-x64": ("grok-1.0.40-linux-x86_64", "grok", 165587968,
+                      "92c997dfd109c0672d40d5ae6fbd15835d53ffaf12cf9ea124d22aaef3ff23fc"),
+        "win32-x64": ("grok-1.0.40-windows-x86_64.exe", "grok.exe", 153730376,
+                      "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e"),
+        "darwin-arm64": ("grok-1.0.40-macos-aarch64", "grok", 145308720,
+                         "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2"),
+    },
 }
+RELEASES = VERSION_RELEASES[VERSION]
 
 
 def require(condition, message):
@@ -216,7 +227,7 @@ def main():
     group.add_argument("--download-dir", type=Path, help="RUNNER_TEMP 内的专用下载目录")
     group.add_argument("--private-directory", type=Path, help="显式指定源树外的新私有目录")
     parser.add_argument("--version", choices=VERSION_RELEASES, default=VERSION,
-                        help="显式选择固定版本，默认保留 1.0.30")
+                        help=f"显式选择固定版本，默认最新正式版 {VERSION}")
     parser.add_argument("--download-only", action="store_true", help="只验证完整下载字节，不执行原生文件")
     parser.add_argument("--target", choices=sorted({target for releases in VERSION_RELEASES.values()
                                                    for target in releases}),

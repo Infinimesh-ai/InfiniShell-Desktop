@@ -1,0 +1,234 @@
+{
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true,
+  "host_alias": "bwh-2t",
+  "remote_root_scope": "private_cache",
+  "prompt": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL",
+  "credentials_read_or_copied": false,
+  "product_ssh_ui_verified": false,
+  "product_osc_parser_verified": false,
+  "model_lifecycle_verified": false,
+  "cases": [
+    {
+      "mode": "direct",
+      "passed": false
+    }
+  ],
+  "remote_inputs": {
+    "root": "<remote-private-root>",
+    "home": "/root",
+    "kernel": "Linux",
+    "architecture": "x86_64",
+    "codex_path": "<remote-private-root>/codex/package/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "codex_sha256": "0753dfe1d8b87a52436deb13eb1c549661ef4c84fee2c5aa688385eebeccb761",
+    "codex_package_sha256": "f110cccdd50b0be8130b84f45b3144ea775c233f1c8bd8226da6ee719d63d206",
+    "codex_version": "codex-cli 0.155.1",
+    "tmux_path": "<remote-private-root>/pkg/usr/bin/tmux",
+    "tmux_sha256": "3bdeba4db61fa25e569e5d1ca6466acfd193018c7bbc2bc924ec415ffa0c2e58",
+    "tmux_version": "tmux 3.6",
+    "jq_path": "<remote-private-root>/pkg/usr/bin/jq",
+    "jq_version": "jq-1.8.1",
+    "package_sha256": {
+      "jq_1.8.1-4ubuntu2_amd64.deb": "bb7f69de12414f6e52eea1da952ed7226b8e3fd9db74f93bb8ea3f2f39f4836f",
+      "libevent-core-2.1-7t64_2.1.12-stable-10build2_amd64.deb": "1423e63d2cccebd31900ecdaceb366279231efb4aa6e4a29188657100166141f",
+      "libjemalloc2_5.3.0-4_amd64.deb": "df00a1d37c735bfb1830418efb721c2c0b79cd0a735c3d35e4015eb6a4d2683d",
+      "libjq1_1.8.1-4ubuntu2_amd64.deb": "3ced45ef4154cce59ce9fc74cc606b7361fa1b2f088b31a903d54fbcee75cb43",
+      "libonig5_6.9.10-1build1_amd64.deb": "050ad79c8c02956d896407ff66fddcb24e114b307cde196a0226697cf643ef88",
+      "tmux_3.6a-2ubuntu0.1_amd64.deb": "c1df283beedf7c554a441d5b34e5801f3494fea1809c8c03917a5ff87a856e71"
+    }
+  },
+  "reference_tree_sha256": {
+    ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+    "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+    "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+    "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+    "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+    "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+    "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+    "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+    "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+    "scripts/warp-notify.sh": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c"
+  },
+  "native_install": [
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "<remote-private-root>/marketplace",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"installedRoot\": \"<remote-private-root>/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "ssh-transport-probe@infinishell-ssh-transport-probe",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"ssh-transport-probe@infinishell-ssh-transport-probe\",\n  \"name\": \"ssh-transport-probe\",\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "authorization_rpc": [
+    {
+      "channel": "stderr",
+      "value": "\u001b[2m2026-09-20T18:29:43.830400Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+      "observed_elapsed_ms": 2205
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 1,
+        "result": {
+          "userAgent": "infinishell_remote_ssh_probe/0.155.1 (Ubuntu 26.4.0; x86_64) WarpTerminal (infinishell_remote_ssh_probe; 0.1.0)",
+          "codexHome": "<remote-private-root>/home/.codex",
+          "platformFamily": "unix",
+          "platformOs": "linux"
+        }
+      },
+      "observed_elapsed_ms": 2295
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "method": "configWarning",
+        "params": {
+          "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "details": null
+        },
+        "emittedAtMs": 1789928983918
+      },
+      "observed_elapsed_ms": 2295
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "method": "remoteControl/status/changed",
+        "params": {
+          "status": "disabled",
+          "serverName": "cheerful-laser-5.localdomain",
+          "installationId": "17205267-dffa-4457-ae4b-571d04db1f4f",
+          "environmentId": null
+        },
+        "emittedAtMs": 1789928983918
+      },
+      "observed_elapsed_ms": 2295
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 2,
+        "result": {
+          "data": [
+            {
+              "cwd": "<remote-private-root>/work",
+              "hooks": [
+                {
+                  "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:session_start:0:0",
+                  "eventName": "sessionStart",
+                  "handlerType": "command",
+                  "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" session",
+                  "async": false,
+                  "matcher": null,
+                  "timeoutSec": 10,
+                  "statusMessage": null,
+                  "additionalContextLimit": null,
+                  "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                  "source": "plugin",
+                  "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                  "displayOrder": 0,
+                  "enabled": true,
+                  "isManaged": false,
+                  "currentHash": "sha256:535385b7ba4d8088c9ee0cb7aa74bbc82012114f53e93b9d564cf1806d58a617",
+                  "trustStatus": "untrusted"
+                },
+                {
+                  "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                  "eventName": "userPromptSubmit",
+                  "handlerType": "command",
+                  "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" prompt",
+                  "async": false,
+                  "matcher": null,
+                  "timeoutSec": 10,
+                  "statusMessage": null,
+                  "additionalContextLimit": null,
+                  "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                  "source": "plugin",
+                  "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                  "displayOrder": 1,
+                  "enabled": true,
+                  "isManaged": false,
+                  "currentHash": "sha256:548489bc0a3111c064a1ece15c29c81922055fb4cda375f4a2b3c330c3dc6cae",
+                  "trustStatus": "untrusted"
+                }
+              ],
+              "warnings": [],
+              "errors": []
+            }
+          ]
+        }
+      },
+      "observed_elapsed_ms": 2445
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 10,
+        "result": {
+          "status": "ok",
+          "version": "sha256:1fa263314f7e7e5a2214225c3f165751a5ab8f09af2512fd0ec6e546aad162b3",
+          "filePath": "<remote-private-root>/home/.codex/config.toml",
+          "overriddenMetadata": null
+        }
+      },
+      "observed_elapsed_ms": 2629
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 11,
+        "result": {
+          "status": "ok",
+          "version": "sha256:edc1a9ee0ab640ac4300dc8dee24aef7fb2d4e9c73a40d0ba39367e2a9996287",
+          "filePath": "<remote-private-root>/home/.codex/config.toml",
+          "overriddenMetadata": null
+        }
+      },
+      "observed_elapsed_ms": 2776
+    }
+  ],
+  "authorized_hooks": [
+    {
+      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+      "eventName": "sessionStart",
+      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" session",
+      "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+      "trustStatus": "untrusted",
+      "currentHash": "sha256:535385b7ba4d8088c9ee0cb7aa74bbc82012114f53e93b9d564cf1806d58a617"
+    },
+    {
+      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+      "eventName": "userPromptSubmit",
+      "command": "\"$INFINISHELL_SSH_PROBE_PYTHON\" \"$PLUGIN_ROOT/native_hook.py\" prompt",
+      "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+      "trustStatus": "untrusted",
+      "currentHash": "sha256:548489bc0a3111c064a1ece15c29c81922055fb4cda375f4a2b3c330c3dc6cae"
+    }
+  ],
+  "error": {
+    "type": "RuntimeError",
+    "message": "远端原生 Codex TUI 超时"
+  },
+  "passed": false,
+  "private_receipt": {
+    "path_recorded": false,
+    "sha256": "48e13fe9a81588409d62d67a6d04a1823d46eefe92fb7df2a1b653b604363ee9",
+    "contains_raw_ssh_bytes": true
+  },
+  "safe_receipt_contains_raw_ssh_bytes": false
+}

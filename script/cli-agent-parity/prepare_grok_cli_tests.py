@@ -45,11 +45,28 @@ def macho_header(machine=0x0100000C, file_type=2):
 
 
 class FixedGrokInputsTests(unittest.TestCase):
-    def test_pins_match_full_official_download_evidence(self):
+    def test_legacy_pins_remain_available_for_explicit_regression(self):
         fixture = Path(__file__).resolve().parents[2] / "specs/cli-agent-parity/fixtures/grok-1.0.30-fixed-platform-inputs.json"
         evidence = json.loads(fixture.read_text(encoding="utf-8"))
-        self.assertEqual(evidence["source_commit"], grok.SOURCE_COMMIT)
+        releases = grok.releases_for(grok.LEGACY_VERSION)
+        self.assertEqual(evidence["source_commit"], grok.LEGACY_SOURCE_COMMIT)
+        self.assertEqual(evidence["version"], grok.LEGACY_VERSION)
+        self.assertFalse(evidence["official_checksum_manifest_verified"])
+        self.assertEqual(set(evidence["platforms"]), set(releases))
+        for target, (artifact, name, size, checksum) in releases.items():
+            actual = evidence["platforms"][target]
+            self.assertEqual((actual["artifact"], actual["binary"], actual["bytes"], actual["sha256"]),
+                             (artifact, name, size, checksum))
+            self.assertEqual(actual["url"], f"{grok.BASE_URL}/{artifact}")
+            self.assertFalse(actual["native_version_verified"])
+
+    def test_default_latest_pins_match_complete_downloads(self):
+        fixture = Path(__file__).resolve().parents[2] / "specs/cli-agent-parity/fixtures/grok-1.0.40-fixed-platform-inputs.json"
+        evidence = json.loads(fixture.read_text(encoding="utf-8"))
+        self.assertEqual(grok.VERSION, "1.0.40")
+        self.assertIs(grok.releases_for(grok.VERSION), grok.RELEASES)
         self.assertEqual(evidence["version"], grok.VERSION)
+        self.assertEqual(evidence["expected_version_output"], grok.VERSION_OUTPUT)
         self.assertFalse(evidence["official_checksum_manifest_verified"])
         self.assertEqual(set(evidence["platforms"]), set(grok.RELEASES))
         for target, (artifact, name, size, checksum) in grok.RELEASES.items():
@@ -57,24 +74,8 @@ class FixedGrokInputsTests(unittest.TestCase):
             self.assertEqual((actual["artifact"], actual["binary"], actual["bytes"], actual["sha256"]),
                              (artifact, name, size, checksum))
             self.assertEqual(actual["url"], f"{grok.BASE_URL}/{artifact}")
-            self.assertFalse(actual["native_version_verified"])
-
-    def test_explicit_34_pins_match_complete_downloads_without_replacing_default(self):
-        fixture = Path(__file__).resolve().parents[2] / "specs/cli-agent-parity/fixtures/grok-1.0.34-fixed-platform-inputs.json"
-        evidence = json.loads(fixture.read_text(encoding="utf-8"))
-        self.assertEqual(grok.VERSION, "1.0.30")
-        self.assertIs(grok.releases_for(grok.VERSION), grok.RELEASES)
-        self.assertEqual(evidence["version"], "1.0.34")
-        self.assertEqual(evidence["expected_version_output"], grok.VERSION_OUTPUTS["1.0.34"])
-        self.assertFalse(evidence["official_checksum_manifest_verified"])
-        self.assertEqual(set(evidence["platforms"]), set(grok.releases_for("1.0.34")))
-        for target, (artifact, name, size, checksum) in grok.releases_for("1.0.34").items():
-            actual = evidence["platforms"][target]
-            self.assertEqual((actual["artifact"], actual["binary"], actual["bytes"], actual["sha256"]),
-                             (artifact, name, size, checksum))
-            self.assertEqual(actual["url"], f"{grok.BASE_URL}/{artifact}")
-            self.assertFalse(actual["native_version_verified"])
-            self.assertFalse(actual["target_executed"])
+            self.assertEqual(actual["native_version_verified"], target == "darwin-arm64")
+            self.assertEqual(actual["target_executed"], target == "darwin-arm64")
 
     def test_binary_architecture_uses_actual_headers(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -100,8 +101,8 @@ class FixedGrokInputsTests(unittest.TestCase):
         for system, machine, version, expected in [
                 ("linux", "x86_64", "1.0.30", "linux-x64"),
                 ("win32", "AMD64", "1.0.34", "win32-x64"),
-                ("darwin", "arm64", "1.0.34", "darwin-arm64"),
-                ("darwin", "aarch64", "1.0.34", "darwin-arm64")]:
+                ("darwin", "arm64", "1.0.40", "darwin-arm64"),
+                ("darwin", "aarch64", "1.0.40", "darwin-arm64")]:
             with self.subTest(system=system, machine=machine, version=version), \
                     mock.patch.object(grok.sys, "platform", system), \
                     mock.patch.object(grok.platform, "machine", return_value=machine):
@@ -120,7 +121,8 @@ class FixedGrokInputsTests(unittest.TestCase):
     def test_binary_digest_remains_bound_to_selected_version_and_platform(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "grok"
-            payloads = {"1.0.30": elf_header() + b"30", "1.0.34": elf_header() + b"34"}
+            payloads = {"1.0.30": elf_header() + b"30", "1.0.34": elf_header() + b"34",
+                        "1.0.40": elf_header() + b"40"}
             recipes = {version: {"linux-x64": (f"grok-{version}-linux-x86_64", "grok", len(payload),
                                                hashlib.sha256(payload).hexdigest())}
                        for version, payload in payloads.items()}
@@ -129,9 +131,9 @@ class FixedGrokInputsTests(unittest.TestCase):
                     path.write_bytes(payload)
                     self.assertEqual(grok.verify_binary(path, "linux-x64", actual_version)["sha256"],
                                      hashlib.sha256(payload).hexdigest())
-                    other_version = "1.0.34" if actual_version == "1.0.30" else "1.0.30"
-                    with self.assertRaises(ValueError):
-                        grok.verify_binary(path, "linux-x64", other_version)
+                    for other_version in set(payloads) - {actual_version}:
+                        with self.assertRaises(ValueError):
+                            grok.verify_binary(path, "linux-x64", other_version)
                     with self.assertRaises(ValueError):
                         grok.verify_binary(path, "win32-x64", actual_version)
                     path.write_bytes(payload + b"extra")
@@ -194,9 +196,9 @@ class FixedGrokInputsTests(unittest.TestCase):
                 before = marker.read_bytes()
                 self.assertEqual(before, f"isolated Grok {version} verification inputs\n".encode())
                 self.assertEqual(grok.owned_directory(directory, True, version), directory)
-                other_version = "1.0.34" if version == "1.0.30" else "1.0.30"
-                with self.assertRaises(ValueError):
-                    grok.owned_directory(directory, True, other_version)
+                for other_version in set(grok.VERSION_RELEASES) - {version}:
+                    with self.assertRaises(ValueError):
+                        grok.owned_directory(directory, True, other_version)
                 self.assertEqual(marker.read_bytes(), before)
             unknown = root / "unknown"
             with self.assertRaises(ValueError):
@@ -239,10 +241,11 @@ class FixedGrokInputsTests(unittest.TestCase):
     def test_download_url_must_belong_to_selected_version_before_network_or_cache(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "grok"
-            for version, url in [("1.0.30", f"{grok.BASE_URL}/grok-1.0.34-linux-x86_64"),
+            for version, url in [("1.0.30", f"{grok.BASE_URL}/grok-1.0.40-linux-x86_64"),
                                  ("1.0.34", f"{grok.BASE_URL}/grok-1.0.30-linux-x86_64"),
-                                 ("1.0.34", f"{grok.BASE_URL}/grok-1.0.34-linux-aarch64"),
-                                 ("latest", f"{grok.BASE_URL}/grok-1.0.34-linux-x86_64")]:
+                                 ("1.0.40", f"{grok.BASE_URL}/grok-1.0.34-linux-x86_64"),
+                                 ("1.0.40", f"{grok.BASE_URL}/grok-1.0.40-linux-aarch64"),
+                                 ("latest", f"{grok.BASE_URL}/grok-1.0.40-linux-x86_64")]:
                 with self.subTest(version=version, url=url), \
                         mock.patch.object(grok.urllib.request, "urlopen") as opened:
                     with self.assertRaises(ValueError):
@@ -281,9 +284,9 @@ class FixedGrokInputsTests(unittest.TestCase):
             root = Path(temporary).resolve()
             executable = root / "grok"
             for version in grok.VERSION_OUTPUTS:
-                other_version = "1.0.34" if version == "1.0.30" else "1.0.30"
-                for output in [grok.VERSION_OUTPUTS[other_version],
-                               f"grok {version} (unexpected-build)", f"grok {version}"]:
+                other_output = next(output for other, output in grok.VERSION_OUTPUTS.items()
+                                    if other != version)
+                for output in [other_output, f"grok {version} (unexpected-build)", f"grok {version}"]:
                     with self.subTest(version=version, output=output), mock.patch.object(
                             grok.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, output, "")):
                         with self.assertRaises(ValueError):
@@ -302,7 +305,7 @@ class FixedGrokInputsTests(unittest.TestCase):
                 grok.main()
             version.assert_not_called()
             report = json.loads((root / "grok-fixed-inputs.json").read_text())
-            self.assertEqual(report["version"], "1.0.30")
+            self.assertEqual(report["version"], grok.VERSION)
             self.assertFalse(report["native_version_verified"])
             self.assertFalse(report["model_input_submitted"])
             with mock.patch.object(grok.sys, "argv", argv[:-1]), self.assertRaises(ValueError):
@@ -351,7 +354,7 @@ class FixedGrokInputsTests(unittest.TestCase):
             base = ["prepare_grok_cli.py", "--private-directory", str(root)]
             for args, error in [(["--version", "latest", "--download-only"], SystemExit),
                                 (["--version", "1.0.35", "--download-only"], SystemExit),
-                                (["--target", "darwin-arm64", "--download-only"], ValueError),
+                                (["--version", "1.0.30", "--target", "darwin-arm64", "--download-only"], ValueError),
                                 (["--version", "1.0.34", "--target", "linux-x64"], ValueError)]:
                 with self.subTest(args=args), mock.patch.object(grok.sys, "argv", base + args), \
                         mock.patch.object(grok.sys, "stderr", io.StringIO()), \

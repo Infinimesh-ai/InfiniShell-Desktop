@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""用私有 Claude 配置或显式 API 环境运行真实 Rust 验收；不读取原生登录资料。"""
+"""用私有认证或用户显式授权的默认 Claude 账户运行真实 Rust 验收。"""
 
 import argparse
 import hashlib
@@ -19,6 +19,11 @@ TEST_NAME = "ai::cli_agent_runtime::claude::live_tests::real_claude_managed_life
 MARKER = "isolated Claude Rust adapter verification\n"
 PROJECT_SETTINGS = {"permissions": {"defaultMode": "default", "ask": ["Write"]}}
 API_ENVIRONMENT_KEYS = {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"}
+DEFAULT_ACCOUNT_VERSION = "2.1.278"
+SENSITIVE_IDENTITY_KEYS = {
+    "email", "emailaddress", "organization", "organizationid", "orgid", "token",
+    "accesstoken", "refreshtoken",
+}
 
 
 def digest(path):
@@ -42,6 +47,27 @@ def authenticated_environment(root, config_dir, auth_home):
         "CLAUDE_CODE_ENTRYPOINT": "sdk-py", "DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1",
         "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "PYTHONUTF8": "1",
     })
+    return environment
+
+
+def authorized_default_account_environment(root):
+    # 默认账户模式只保留系统身份和常规进程环境；认证仍由原生 CLI 在默认位置自行处理。
+    allowed = {
+        "PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL", "LC_CTYPE",
+        "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "XDG_CONFIG_HOME", "XDG_DATA_HOME",
+        "XDG_CACHE_HOME", "USER", "USERNAME", "LOGNAME", "SHELL",
+    }
+    environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
+    if not environment.get("HOME") and not environment.get("USERPROFILE"):
+        raise ValueError("默认账户模式缺少用户 HOME/USERPROFILE")
+    environment.update({
+        "TMPDIR": str(root / "tmp"), "TMP": str(root / "tmp"), "TEMP": str(root / "tmp"),
+        "CLAUDE_CODE_ENTRYPOINT": "sdk-py", "DISABLE_AUTOUPDATER": "1", "DISABLE_UPDATES": "1",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "PYTHONUTF8": "1",
+    })
+    environment.pop("CLAUDE_CONFIG_DIR", None)
+    for key in API_ENVIRONMENT_KEYS:
+        environment.pop(key, None)
     return environment
 
 
@@ -82,23 +108,74 @@ def sanitize(text, root, config_dir, auth_home, api_environment=None):
         if secret:
             text = text.replace(json.dumps(secret, ensure_ascii=False)[1:-1], "<redacted>")
             text = text.replace(secret, "<redacted>")
-    for path, replacement in ((config_dir, "<private-claude-config>"),
-                              (auth_home, "<private-auth-home>"),
-                              (root, "<probe-root>"), (Path.home(), "<user-home>")):
+    paths = ((config_dir, "<private-claude-config>"), (auth_home, "<private-auth-home>"),
+             (root, "<probe-root>"), (Path.home(), "<user-home>"))
+    for path, replacement in paths:
+        if path is None:
+            continue
         for value in {str(path), json.dumps(str(path), ensure_ascii=False)[1:-1]}:
             text = text.replace(value, replacement)
-    return re.sub(r"(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{16,}|Bearer [A-Za-z0-9_.-]+)",
+    text = re.sub(r"(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{16,}|Bearer [A-Za-z0-9_.-]+)",
                   "<redacted>", text)
+    text = re.sub(r"(?i)(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+                  "<redacted-email>", text)
+    text = re.sub(r"(?i)(?<![A-Za-z0-9_-])(?:org|organization)[_-][A-Za-z0-9_-]{8,}",
+                  "<redacted-org>", text)
+    text = re.sub(
+        r'''(?i)(["']?(?:email|email_address|organization_id|organizationId|org_id|orgId|'''
+        r'''token|access_token|accessToken|refresh_token|refreshToken)["']?\s*[:=]\s*)'''
+        r'''(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|[^\s,}\]]+)''',
+        r'''\1"<redacted>"''', text,
+    )
+    return text
 
 
 def sanitize_event(value, redact):
     if isinstance(value, str):
         return redact(value)
     if isinstance(value, dict):
-        return {redact(key): sanitize_event(item, redact) for key, item in value.items()}
+        result = {}
+        for key, item in value.items():
+            cleaned_key = redact(key)
+            normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+            result[cleaned_key] = "<redacted>" if normalized in SENSITIVE_IDENTITY_KEYS else sanitize_event(item, redact)
+        return result
     if isinstance(value, list):
         return [sanitize_event(item, redact) for item in value]
     return value
+
+
+def authorized_account_summary(value):
+    if not isinstance(value, dict):
+        raise ValueError("Claude 默认账户状态不是 JSON 对象")
+    summary = {key: value.get(key) for key in
+               ("loggedIn", "authMethod", "apiProvider", "subscriptionType")}
+    if summary["loggedIn"] is not True:
+        raise ValueError("Claude 默认账户尚未登录")
+    if summary["authMethod"] != "claude.ai" or summary["apiProvider"] != "firstParty":
+        raise ValueError("Claude 默认账户不是已授权的官方在线账户")
+    subscription = summary["subscriptionType"]
+    if (not isinstance(subscription, str) or not subscription.strip()
+            or subscription.strip().lower() in {"none", "free", "unknown"}):
+        raise ValueError("Claude 默认账户没有可验证的有效订阅")
+    summary["subscriptionType"] = subscription.strip()
+    return summary
+
+
+def probe_authorized_default_account(executable, environment, cwd):
+    completed = subprocess.run(
+        [str(executable), "auth", "status", "--json"], cwd=cwd, env=environment,
+        capture_output=True, text=True, encoding="utf-8", errors="strict", timeout=30,
+    )
+    if completed.returncode != 0:
+        raise ValueError("Claude 默认账户状态检查失败")
+    if len(completed.stdout.encode("utf-8")) > 64 * 1024:
+        raise ValueError("Claude 默认账户状态输出超过大小上限")
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError("Claude 默认账户状态不是有效 JSON") from error
+    return authorized_account_summary(value)
 
 
 def verified_acceptance(exit_code, output, events):
@@ -190,9 +267,28 @@ def verified_acceptance(exit_code, output, events):
     return len(shutdowns) == 2 and all(event.get("native_session_id") == native_id for event in shutdowns)
 
 
+def validate_auth_selection(args):
+    default_account = getattr(args, "use_authorized_default_account", False)
+    config_dir = getattr(args, "config_dir", None)
+    auth_home = getattr(args, "auth_home", None)
+    api_file = getattr(args, "api_environment_file", None)
+    if default_account:
+        if any(path is not None for path in (config_dir, auth_home, api_file)):
+            raise ValueError("默认在线账户模式不能同时提供私有配置、私有 HOME 或 API 环境")
+        if getattr(args, "claude_version", DEFAULT_VERSION) != DEFAULT_ACCOUNT_VERSION:
+            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278")
+    elif config_dir is None or auth_home is None:
+        raise ValueError("私有认证模式必须同时提供 config-dir 与 auth-home")
+    return default_account
+
+
 def validate_paths(args):
+    default_account = validate_auth_selection(args)
+    config_dir = getattr(args, "config_dir", None)
+    auth_home = getattr(args, "auth_home", None)
+    api_file = getattr(args, "api_environment_file", None)
     for name in ("test_binary", "claude", "supervisor", "config_dir", "auth_home", "api_environment_file"):
-        path = getattr(args, name)
+        path = getattr(args, name, None)
         if path is None:
             continue
         if path.is_symlink() or getattr(path.lstat(), "st_file_attributes", 0) & 0x400:
@@ -211,12 +307,15 @@ def validate_paths(args):
     args.output = args.output.resolve()
     if args.output.suffix != ".ndjson":
         raise ValueError("证据输出必须使用 .ndjson 扩展名")
-    inputs = {args.test_binary, args.claude, args.supervisor, args.api_environment_file}
+    inputs = {args.test_binary, args.claude, args.supervisor, api_file}
     outputs = (args.output, args.output.with_suffix(".metadata.json"), args.output.with_suffix(".test-output.txt"))
     if len(set(outputs)) != 3:
         raise ValueError("输出须使用 .ndjson 等独立扩展名，不能与元数据或测试日志重名")
     for output in outputs:
-        if output in inputs or output.is_relative_to(args.config_dir) or output.is_relative_to(args.auth_home):
+        private_roots = [path for path in (config_dir, auth_home) if path is not None]
+        if default_account:
+            private_roots.append((Path.home() / ".claude").resolve())
+        if output in inputs or any(output.is_relative_to(path) for path in private_roots):
             raise ValueError("证据不得覆盖输入、认证 HOME 或私有配置目录")
         if output.exists() or output.is_symlink():
             raise ValueError("证据文件已存在，请使用新名称，避免误用旧成功记录")
@@ -232,28 +331,46 @@ def run(args):
     detected = verify_version(args.claude, root, selected_version)
     if verify_binary(args.claude, target, selected_version) != verified_cli:
         raise ValueError("原生 Claude 在版本探测期间变化")
-    api_environment = load_api_environment(args.api_environment_file)
+    default_account = validate_auth_selection(args)
+    api_environment = ({} if default_account else
+                       load_api_environment(getattr(args, "api_environment_file", None)))
     settings = prepare_project(root)
-    environment = authenticated_environment(root, args.config_dir, args.auth_home)
-    environment.update(api_environment)
-    redact = lambda text: sanitize(text, root, args.config_dir, args.auth_home, api_environment)
+    account_status = None
+    if default_account:
+        environment = authorized_default_account_environment(root)
+        account_status = probe_authorized_default_account(args.claude, environment.copy(), root / "project")
+        config_dir = None
+        auth_home = None
+        auth_mode = "authorized_default_account"
+    else:
+        config_dir = args.config_dir
+        auth_home = args.auth_home
+        environment = authenticated_environment(root, config_dir, auth_home)
+        environment.update(api_environment)
+        auth_mode = "private_config"
+    redact = lambda text: sanitize(text, root, config_dir, auth_home, api_environment)
     environment.update({
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
-        "INFINISHELL_CLAUDE_LIVE_CONFIG_DIR": str(args.config_dir),
+        "INFINISHELL_CLAUDE_LIVE_AUTH_MODE": auth_mode,
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
         "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(args.output),
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
     })
-    if args.model:
+    if config_dir is not None:
+        environment["INFINISHELL_CLAUDE_LIVE_CONFIG_DIR"] = str(config_dir)
+    if getattr(args, "model", None):
         environment["INFINISHELL_CLAUDE_LIVE_MODEL"] = args.model
     metadata = {
         "test": TEST_NAME, "scope": "rust_adapter_process_restart", "platform": sys.platform,
-        "native_credential_files_read_or_copied": False, "private_config_supplied": True,
-        "authentication_source": "explicit_api_environment" if api_environment else "existing_private_login",
+        "native_credential_files_read_or_copied_by_runner": False,
+        "private_config_supplied": config_dir is not None,
+        "authentication_source": ("authorized_default_account" if default_account else
+                                  "explicit_api_environment" if api_environment else "existing_private_login"),
         "api_environment_values_recorded": False,
         "runner_modifies_auth_configuration": False, "native_cli_may_refresh_credentials": True,
-        "private_auth_home_preserved": True, "model_requests_expected": True,
+        "private_auth_home_preserved": auth_home is not None,
+        "default_user_home_preserved": default_account, "model_requests_expected": True,
         "app_restart_and_ui_verified": False, "same_turn_steering_supported": False,
         "parent_permission_ceiling_verified": False, "filesystem_sandbox_verified": False,
         "supervised_process_lifecycle": True, "private_workspace_preserved": True,
@@ -262,6 +379,12 @@ def run(args):
         "supervisor_binary_sha256": digest(args.supervisor), "acceptance_passed": False,
         "cli_version": detected, "requested_cli_version": selected_version, "cli": verified_cli,
     }
+    if account_status is not None:
+        metadata["authorized_default_account"] = account_status
+        metadata["native_cli_credential_access_expected"] = True
+        metadata["credential_access_boundary"] = "native_cli_only"
+    else:
+        metadata["native_credential_files_read_or_copied"] = False
     for command, key in ((["git", "rev-parse", "HEAD"], "commit"), (["git", "status", "--porcelain"], "worktree_dirty")):
         result = subprocess.run(command, cwd=repository, text=True, capture_output=True, check=True)
         metadata[key] = bool(result.stdout.strip()) if key == "worktree_dirty" else result.stdout.strip()
@@ -324,11 +447,13 @@ def main():
     parser.add_argument("--test-binary", type=Path, required=True)
     parser.add_argument("--claude", type=Path, required=True, help="所选固定官方版本的原生可执行文件")
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
-                        help="精确官方版本；缺省保留 2.1.273")
+                        help=f"精确官方版本；缺省为 {DEFAULT_VERSION}")
     parser.add_argument("--supervisor", type=Path, required=True, help="同提交的主程序或 TUI 监督入口")
-    parser.add_argument("--config-dir", type=Path, required=True, help="私有 CLAUDE_CONFIG_DIR；使用已有登录或显式 API 环境")
-    parser.add_argument("--auth-home", type=Path, required=True, help="登录时使用的私有 HOME/USERPROFILE")
+    parser.add_argument("--config-dir", type=Path, help="私有 CLAUDE_CONFIG_DIR；使用已有登录或显式 API 环境")
+    parser.add_argument("--auth-home", type=Path, help="登录时使用的私有 HOME/USERPROFILE")
     parser.add_argument("--api-environment-file", type=Path, help="显式私有 JSON；只读取允许的 Anthropic API 环境键")
+    parser.add_argument("--use-authorized-default-account", action="store_true",
+                        help="显式使用用户已授权的默认 Claude 在线订阅；与私有配置/API 模式互斥")
     parser.add_argument("--model", help="可选原生模型 ID；未指定时保留 CLI 默认模型")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

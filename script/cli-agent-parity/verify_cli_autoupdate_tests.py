@@ -27,12 +27,21 @@ class DriverTests(unittest.TestCase):
             path = self.root / name
             path.write_bytes(("synthetic-" + name).encode())
             self.value[name] = {"path": str(path), "sha256": runner.digest(path)}
-        self.write_binding("source_manifest", {"files": [{"path": "script/cli-agent-parity/verify_cli_autoupdate.py",
-            "sha256": runner.digest(Path(runner.__file__).resolve())}]})
+        repository = Path(runner.__file__).resolve().parents[2]
+        self.write_binding("source_manifest", {"files": [{"path": relative,
+            "bytes": (repository / relative).stat().st_size,
+            "sha256": runner.digest(repository / relative)} for relative in runner.REQUIRED_SOURCE_FILES]})
         self.write_binding("gates_report", {"source_manifest_sha256": self.value["source_manifest"]["sha256"],
             "all_passed": True, "test_binary": self.value["worker"]})
         self.write_binding("bundle_report", {"source_manifest_sha256": self.value["source_manifest"]["sha256"],
             "exit_code": 0, "strict_signature_exit_code": 0, "worker": self.value["supervisor"]})
+        self.strict_signature_verified = runner.strict_signature_verified
+        signature = patch.object(runner, "strict_signature_verified", return_value=True)
+        signature.start()
+        self.addCleanup(signature.stop)
+        source_binding = patch.object(runner, "supervisor_source_binding_verified", return_value=True)
+        source_binding.start()
+        self.addCleanup(source_binding.stop)
 
     def write_binding(self, name, data):
         path = Path(self.value[name]["path"])
@@ -117,7 +126,8 @@ class DriverTests(unittest.TestCase):
         for key, bad in (("worker_sha256", "b" * 64), ("source_manifest_sha256", "b" * 64),
                          ("product_execute_calls", 2), ("product_execute_calls", True), ("model_inputs_sent", 1),
                          ("config_permissions_unchanged", False), ("journal_absent", False),
-                         ("failure_code", "execute_failed"), ("case_id", "other-case")):
+                         ("failure_intent_persisted", False), ("failure_code", "execute_failed"),
+                         ("case_id", "other-case")):
             with self.subTest(key=key):
                 self.assertFalse(runner.acceptance(0, text, dict(event, **{key: bad}), self.value, "a" * 64))
         self.assertFalse(runner.acceptance(0, "test result: ok. 0 passed;", event, self.value, "a" * 64))
@@ -172,6 +182,26 @@ class DriverTests(unittest.TestCase):
         self.assertFalse(runner.acceptance(0, "test result: ok. 1 passed; 0 failed; 0 ignored;",
                                            dict(event, error=None), value, "a" * 64))
 
+    def test_failure_and_interruption_require_old_entry_real_generation_and_exact_error(self):
+        text = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        for expected, error in (("command_failed_rolled_back", "CommandFailed"),
+                                ("interrupted_recovered", None)):
+            with self.subTest(expected=expected):
+                value = dict(self.value, expected=expected)
+                runner.validate_manifest(value)
+                event = dict(self.event(), expected=expected, error=error,
+                    entry_unchanged=True, supervisor_generations_unchanged=False)
+                self.assertTrue(runner.acceptance(0, text, event, value, "a" * 64))
+                self.assertFalse(runner.acceptance(0, text,
+                    dict(event, entry_unchanged=False), value, "a" * 64))
+                self.assertFalse(runner.acceptance(0, text,
+                    dict(event, supervisor_generations_unchanged=True), value, "a" * 64))
+                self.assertFalse(runner.acceptance(0, text,
+                    dict(event, error=None if error else "CommandFailed"), value, "a" * 64))
+                with self.assertRaises(ValueError):
+                    runner.validate_manifest(dict(value, config_transition={
+                        "kind": "channel", "before": "stable", "after": "latest"}))
+
     def test_reservation_is_exclusive_and_cannot_silently_retry(self):
         path = self.root / "invocation.safe.json"
         runner.exclusive_bytes(path, b"original")
@@ -182,8 +212,8 @@ class DriverTests(unittest.TestCase):
     def test_supervisor_and_test_worker_must_bind_to_the_same_successful_source(self):
         runner.verify_build_binding(self.value)
         bundle = json.loads(Path(self.value["bundle_report"]["path"]).read_bytes())
-        for changed in (dict(bundle, source_manifest_sha256="c" * 64), dict(bundle, exit_code=1),
-                        dict(bundle, exit_code=False), dict(bundle, worker=self.value["worker"])):
+        for changed in (dict(bundle, source_manifest_sha256="c" * 64),
+                        dict(bundle, worker=self.value["worker"])):
             with self.subTest(changed=changed):
                 self.write_binding("bundle_report", changed)
                 with self.assertRaises(ValueError):
@@ -192,6 +222,74 @@ class DriverTests(unittest.TestCase):
         self.write_binding("source_manifest", {"files": []})
         with self.assertRaises(ValueError):
             runner.verify_build_binding(self.value)
+
+    def test_source_manifest_and_signature_are_verified_instead_of_trusting_reports(self):
+        source = json.loads(Path(self.value["source_manifest"]["path"]).read_bytes())
+        altered = json.loads(json.dumps(source))
+        altered["files"][0]["sha256"] = "c" * 64
+        self.write_binding("source_manifest", altered)
+        gates = json.loads(Path(self.value["gates_report"]["path"]).read_bytes())
+        gates["source_manifest_sha256"] = self.value["source_manifest"]["sha256"]
+        self.write_binding("gates_report", gates)
+        bundle = json.loads(Path(self.value["bundle_report"]["path"]).read_bytes())
+        bundle["source_manifest_sha256"] = self.value["source_manifest"]["sha256"]
+        self.write_binding("bundle_report", bundle)
+        with self.assertRaisesRegex(ValueError, "source_file_manifest_mismatch"):
+            runner.verify_build_binding(self.value)
+
+        self.write_binding("source_manifest", source)
+        gates["source_manifest_sha256"] = self.value["source_manifest"]["sha256"]
+        self.write_binding("gates_report", gates)
+        bundle["source_manifest_sha256"] = self.value["source_manifest"]["sha256"]
+        self.write_binding("bundle_report", bundle)
+        with patch.object(runner, "supervisor_source_binding_verified", return_value=False), \
+             self.assertRaisesRegex(ValueError, "source_build_mismatch"):
+            runner.verify_build_binding(self.value)
+        with patch.object(runner, "strict_signature_verified", return_value=False), \
+             self.assertRaisesRegex(ValueError, "supervisor_signature_not_verified"):
+            runner.verify_build_binding(self.value)
+
+    def test_macos_signature_check_executes_codesign_instead_of_reading_report_status(self):
+        succeeded = type("Result", (), {"returncode": 0})()
+        failed = type("Result", (), {"returncode": 1})()
+        with patch.object(runner.sys, "platform", "darwin"), \
+             patch.object(runner.subprocess, "run", side_effect=[succeeded, failed]) as called:
+            self.assertTrue(self.strict_signature_verified(Path(self.value["supervisor"]["path"])))
+            self.assertFalse(self.strict_signature_verified(Path(self.value["supervisor"]["path"])))
+        self.assertEqual(called.call_args_list[0].args[0][:3],
+            ["/usr/bin/codesign", "--verify", "--strict"])
+
+    def test_binary_source_binding_matches_across_read_boundaries(self):
+        path = self.root / "source-bound-supervisor"
+        path.write_bytes(b"x" * (1024 * 1024 - 2) + b"source-one-middle-source-two")
+        self.assertTrue(runner.binary_contains_all(path, [b"source-one", b"source-two"]))
+        self.assertFalse(runner.binary_contains_all(path, [b"source-one", b"missing"]))
+
+    def test_source_binding_covers_adapter_versions_and_plugin_compatibility(self):
+        required = {
+            "app/src/ai/cli_agent_runtime/codex.rs",
+            "app/src/ai/cli_agent_runtime/claude.rs",
+            "app/src/ai/cli_agent_runtime/grok.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/mod.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+            "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch.rs",
+        }
+        self.assertTrue(required.issubset(runner.REQUIRED_SOURCE_FILES))
+        self.assertTrue(required.issubset(runner.SUPERVISOR_SOURCE_FILES))
+
+        source = (Path(__file__).resolve().parents[2]
+                  / "app/src/terminal/cli_agent_updates/sources.rs").read_text(encoding="utf-8")
+        for path in required:
+            relative = path.removeprefix("app/src/terminal/")
+            if relative == path:
+                relative = "../../" + path.removeprefix("app/src/")
+            else:
+                relative = "../" + relative
+            self.assertIn(f'include_bytes!("{relative}")', source)
 
     def test_missing_or_modified_gate_artifact_cannot_reuse_success_metadata(self):
         path = Path(self.value["gates_report"]["path"])
@@ -263,7 +361,13 @@ class DriverTests(unittest.TestCase):
         self.assertTrue(result["passed"])
         self.assertEqual(captured["argv"][1:], [runner.TEST_NAME, "--exact", "--ignored", "--nocapture", "--test-threads=1"])
         self.assertTrue(captured["kwargs"]["start_new_session"])
-        self.assertFalse(result["detached_descendants_verified"])
+        self.assertNotIn("detached_descendants_verified", result)
+
+    def test_windows_reparse_attribute_is_never_plain(self):
+        self.assertTrue(runner.windows_file_attributes_are_plain(0))
+        self.assertTrue(runner.windows_file_attributes_are_plain(0x20))
+        self.assertFalse(runner.windows_file_attributes_are_plain(0x400))
+        self.assertFalse(runner.windows_file_attributes_are_plain(0x420))
 
     def test_channel_only_run_reserves_single_execute_without_claiming_native_update(self):
         self.value.update(expected="channel_only", target_version=self.value["old_version"],

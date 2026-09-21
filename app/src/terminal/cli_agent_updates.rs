@@ -523,39 +523,82 @@ impl CliAgentUpdatesModel {
         entry.manual_update = false;
         let operation = entry.operation;
         self.changed(agent, ctx);
+        let (verification_started_tx, verification_started_rx) = async_channel::bounded(1);
+        let (verification_continue_tx, verification_continue_rx) = async_channel::bounded(1);
         ctx.spawn(
-            async move { sources::execute(plan).await },
+            async move { verification_started_rx.recv().await },
             move |model, result, ctx| {
-                let Some(entry) = model.entries.get_mut(&agent) else {
-                    return;
-                };
-                if !entry.active || entry.operation != operation {
-                    return;
+                if result.is_ok() {
+                    model.mark_verifying(agent, operation, ctx);
                 }
-                entry.active = false;
-                match result {
-                    Ok(version) => {
-                        entry.status.installed_version = Some(version);
-                        entry.status.phase = CliAgentUpdatePhase::UpToDate;
-                        entry.failed_target = None;
-                        entry.status.error = None;
-                        ctx.emit(CliAgentUpdateEvent::InstallationChanged { agent });
-                    }
-                    Err(error) => {
-                        if error == CliAgentUpdateError::RecoveryRequired {
-                            entry.recovery_required = true;
-                        }
-                        entry.failed_target = entry.status.latest_version.clone();
-                        entry.check_failed(error, Instant::now());
-                    }
-                }
-                let recheck = entry.recheck;
-                model.changed(agent, ctx);
-                if recheck {
-                    model.check_now(agent, ctx);
-                }
+                // 即使该操作已经过期，也要放行其事务清理；旧操作不能更新当前状态。
+                let _ = verification_continue_tx.try_send(());
             },
         );
+        ctx.spawn(
+            async move {
+                sources::execute(
+                    plan,
+                    Some(sources::VerificationProgress::new(
+                        verification_started_tx,
+                        verification_continue_rx,
+                    )),
+                )
+                .await
+            },
+            move |model, result, ctx| model.updated(agent, operation, result, ctx),
+        );
+    }
+
+    fn updated(
+        &mut self,
+        agent: CLIAgent,
+        operation: u64,
+        result: Result<String, CliAgentUpdateError>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        let Some(entry) = self.entries.get_mut(&agent) else {
+            return;
+        };
+        if !entry.active || entry.operation != operation {
+            return;
+        }
+        entry.active = false;
+        match result {
+            Ok(version) => {
+                entry.status.installed_version = Some(version);
+                entry.status.phase = CliAgentUpdatePhase::UpToDate;
+                entry.failed_target = None;
+                entry.status.error = None;
+                ctx.emit(CliAgentUpdateEvent::InstallationChanged { agent });
+            }
+            Err(error) => {
+                if error == CliAgentUpdateError::RecoveryRequired {
+                    entry.recovery_required = true;
+                }
+                entry.failed_target = entry.status.latest_version.clone();
+                entry.check_failed(error, Instant::now());
+            }
+        }
+        let recheck = entry.recheck;
+        self.changed(agent, ctx);
+        if recheck {
+            self.check_now(agent, ctx);
+        }
+    }
+
+    fn mark_verifying(&mut self, agent: CLIAgent, operation: u64, ctx: &mut ModelContext<Self>) {
+        let Some(entry) = self.entries.get_mut(&agent) else {
+            return;
+        };
+        if !entry.active
+            || entry.operation != operation
+            || entry.status.phase != CliAgentUpdatePhase::Updating
+        {
+            return;
+        }
+        entry.status.phase = CliAgentUpdatePhase::Verifying;
+        self.changed(agent, ctx);
     }
 
     fn schedule_tick(&mut self, ctx: &mut ModelContext<Self>) {

@@ -3,8 +3,8 @@ use std::time::Duration;
 use ::settings::Setting;
 use futures::FutureExt;
 use uuid::Uuid;
-use warpui::r#async::Timer;
 use warpui::App;
+use warpui::r#async::Timer;
 
 use super::*;
 use crate::ai::agent::{AIAgentExchange, AIAgentExchangeId, AIAgentOutputStatus};

@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
+use std::future::Future;
 use std::time::{Duration, Instant};
 
 use command::Stdio;
@@ -28,6 +29,12 @@ const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
 const MAX_INPUT_BYTES: usize = 1024 * 1024;
 const MAX_MESSAGE_RECORDS: usize = 4096;
+const PENDING_NATIVE_EXECUTION_ERROR: &str =
+    "app-server ended the turn before every native execution reached a terminal state";
+
+pub(crate) fn supported_version(version: &str) -> bool {
+    SUPPORTED_VERSIONS.contains(&version)
+}
 
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
     if options.grok_profile.is_some()
@@ -104,7 +111,7 @@ async fn run_process(
         .stdout
         .take()
         .ok_or_else(|| RuntimeError::Protocol("missing stdout".into()))?;
-    let result = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
+    let transport = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
     drop(stdin);
     // 保留读端至有界 EOF；丢弃退出尾部字节，不生成新的原生事件或保存正文。
     let drain = async move {
@@ -121,7 +128,7 @@ async fn run_process(
             })?;
         }
     };
-    let graceful = result.is_ok();
+    let graceful = matches!(&transport, Ok(TransportCompletion::Graceful));
     let finish = async move {
         if graceful {
             child.finish_after_stdin_close().await
@@ -130,11 +137,36 @@ async fn run_process(
         }
     };
     let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
-    // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
-    result?;
-    finished?;
-    drained.map_err(|_| RuntimeError::RequestTimedOut)??;
-    Ok(())
+    match transport {
+        // 清理和读取均结束后保留原传输失败；失败路径绝不补发终态。
+        Err(error) => Err(error),
+        Ok(TransportCompletion::Graceful) => {
+            finished?;
+            drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+            Ok(())
+        }
+        Ok(TransportCompletion::CleanupThenPublish(terminal)) => {
+            let cleanup = async move {
+                let receipt = finished?;
+                if !receipt.cleanup_confirmed {
+                    return Err(RuntimeError::Protocol(
+                        "managed process cleanup was not confirmed".into(),
+                    ));
+                }
+                drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+                Ok(())
+            };
+            publish_terminal_after_cleanup(protocol, events, terminal, cleanup).await?;
+            Err(RuntimeError::Protocol(
+                "native execution outlived its turn; the managed process tree was cleaned".into(),
+            ))
+        }
+    }
+}
+
+enum TransportCompletion {
+    Graceful,
+    CleanupThenPublish(RuntimeEventKind),
 }
 
 async fn run_transport(
@@ -143,7 +175,7 @@ async fn run_transport(
     stdout: &mut (impl AsyncRead + Unpin),
     mut commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
-) -> Result<(), RuntimeError> {
+) -> Result<TransportCompletion, RuntimeError> {
     let initialize = protocol.initialize();
     write_message(stdin, &initialize).await?;
     let mut buffer = Vec::new();
@@ -190,7 +222,11 @@ async fn run_transport(
                     let message: Value = serde_json::from_slice(&line)
                         .map_err(|error| RuntimeError::Protocol(error.to_string()))?;
                     let effects = protocol.receive(message)?;
-                    flush_effects(protocol, stdin, events, effects).await?;
+                    if let FlushOutcome::CleanupThenPublish(terminal) =
+                        flush_effects(protocol, stdin, events, effects).await?
+                    {
+                        return Ok(TransportCompletion::CleanupThenPublish(terminal));
+                    }
                 }
                 if buffer.len() > MAX_LINE_BYTES {
                     return Err(RuntimeError::Protocol(
@@ -202,12 +238,18 @@ async fn run_transport(
                 let shutdown = command.action == RuntimeAction::Shutdown
                     && command.generation == protocol.options.generation;
                 let effects = protocol.command(command);
-                flush_effects(protocol, stdin, events, effects).await?;
+                if let FlushOutcome::CleanupThenPublish(terminal) =
+                    flush_effects(protocol, stdin, events, effects).await?
+                {
+                    return Ok(TransportCompletion::CleanupThenPublish(terminal));
+                }
                 if shutdown {
-                    return Ok(());
+                    return Ok(TransportCompletion::Graceful);
                 }
             }
-            Incoming::Command(None) | Incoming::ConsumerClosed => return Ok(()),
+            Incoming::Command(None) | Incoming::ConsumerClosed => {
+                return Ok(TransportCompletion::Graceful);
+            }
             Incoming::Tick => {}
         }
     }
@@ -238,11 +280,16 @@ async fn flush_effects(
     stdin: &mut (impl AsyncWrite + Unpin),
     events: &mpsc::Sender<RuntimeEvent>,
     effects: Effects,
-) -> Result<(), RuntimeError> {
-    for message in effects.writes {
+) -> Result<FlushOutcome, RuntimeError> {
+    let Effects {
+        writes,
+        events: runtime_events,
+        terminal_after_cleanup,
+    } = effects;
+    for message in writes {
         write_message(stdin, &message).await?;
     }
-    for kind in effects.events {
+    for kind in runtime_events {
         events
             .try_send(protocol.event(kind))
             .map_err(|error| match error {
@@ -250,13 +297,37 @@ async fn flush_effects(
                 mpsc::error::TrySendError::Closed(_) => RuntimeError::ControllerClosed,
             })?;
     }
-    Ok(())
+    Ok(match terminal_after_cleanup {
+        Some(terminal) => FlushOutcome::CleanupThenPublish(terminal),
+        None => FlushOutcome::Continue,
+    })
+}
+
+async fn publish_terminal_after_cleanup(
+    protocol: &CodexProtocol,
+    events: &mpsc::Sender<RuntimeEvent>,
+    terminal: RuntimeEventKind,
+    cleanup: impl Future<Output = Result<(), RuntimeError>>,
+) -> Result<(), RuntimeError> {
+    cleanup.await?;
+    events
+        .try_send(protocol.event(terminal))
+        .map_err(|error| match error {
+            mpsc::error::TrySendError::Full(_) => RuntimeError::EventBackpressure,
+            mpsc::error::TrySendError::Closed(_) => RuntimeError::ControllerClosed,
+        })
+}
+
+enum FlushOutcome {
+    Continue,
+    CleanupThenPublish(RuntimeEventKind),
 }
 
 #[derive(Default)]
 struct Effects {
     writes: Vec<Value>,
     events: Vec<RuntimeEventKind>,
+    terminal_after_cleanup: Option<RuntimeEventKind>,
 }
 
 #[derive(Clone)]
@@ -282,6 +353,7 @@ struct ActiveTurn {
     id: String,
     started: bool,
     final_messages: Vec<(String, String)>,
+    native_executions: HashMap<String, String>,
 }
 
 struct PendingApproval {
@@ -331,9 +403,13 @@ impl CodexProtocol {
     fn record_version_probe(&mut self, detected: &str) -> Result<(), RuntimeError> {
         self.paired_version = None;
         self.probed_version = detected.strip_prefix("codex-cli ").and_then(|version| {
-            SUPPORTED_VERSIONS
-                .into_iter()
-                .find(|supported| *supported == version)
+            supported_version(version)
+                .then(|| {
+                    SUPPORTED_VERSIONS
+                        .into_iter()
+                        .find(|supported| *supported == version)
+                })
+                .flatten()
         });
         if self.probed_version.is_none() {
             return Err(RuntimeError::UnsupportedVersion(detected.to_owned()));
@@ -396,6 +472,7 @@ impl CodexProtocol {
             return Effects {
                 writes: Vec::new(),
                 events: record.response.clone().into_iter().collect(),
+                terminal_after_cleanup: None,
             };
         }
         if self.messages.len() >= MAX_MESSAGE_RECORDS {
@@ -448,6 +525,7 @@ impl CodexProtocol {
                 Effects {
                     writes: vec![request],
                     events: Vec::new(),
+                    terminal_after_cleanup: None,
                 }
             }
             RuntimeAction::Steer {
@@ -478,6 +556,7 @@ impl CodexProtocol {
                 Effects {
                     writes: vec![request],
                     events: Vec::new(),
+                    terminal_after_cleanup: None,
                 }
             }
             RuntimeAction::Interrupt { turn_id } => {
@@ -498,6 +577,7 @@ impl CodexProtocol {
                 Effects {
                     writes: vec![request],
                     events: Vec::new(),
+                    terminal_after_cleanup: None,
                 }
             }
             RuntimeAction::RespondApproval {
@@ -535,6 +615,7 @@ impl CodexProtocol {
                             turn_id: self.active_turn.as_ref().map(|turn| turn.id.clone()),
                         },
                     ],
+                    terminal_after_cleanup: None,
                 }
             }
             RuntimeAction::RespondLocalTool {
@@ -562,6 +643,7 @@ impl CodexProtocol {
                 Effects {
                     writes: vec![response],
                     events: dispatched(message_id, Some(turn_id)).events,
+                    terminal_after_cleanup: None,
                 }
             }
             RuntimeAction::Shutdown => dispatched(message_id, None),
@@ -694,6 +776,7 @@ impl CodexProtocol {
                 Effects {
                     writes: vec![json!({"method": "initialized"}), request],
                     events: Vec::new(),
+                    terminal_after_cleanup: None,
                 }
             }
             PendingKind::OpenThread => {
@@ -758,6 +841,7 @@ impl CodexProtocol {
                         verified_cli_version: Some(version.to_owned()),
                         effective_permissions,
                     }],
+                    terminal_after_cleanup: None,
                 }
             }
             PendingKind::Submit(message_id) => {
@@ -774,6 +858,7 @@ impl CodexProtocol {
                             id: turn_id.clone(),
                             started: false,
                             final_messages: Vec::new(),
+                            native_executions: HashMap::new(),
                         });
                     }
                 }
@@ -806,6 +891,7 @@ impl CodexProtocol {
         let reject = |reason: &str| Effects {
             writes: vec![json!({"id":message["id"], "error":{"code":-32601,"message":reason}})],
             events: Vec::new(),
+            terminal_after_cleanup: None,
         };
         let Some(permissions) = self.options.local_tools else {
             return Ok(reject(
@@ -835,6 +921,7 @@ impl CodexProtocol {
             return Ok(Effects {
                 writes: previous.response.clone().into_iter().collect(),
                 events: Vec::new(),
+                terminal_after_cleanup: None,
             });
         }
         if self
@@ -868,6 +955,7 @@ impl CodexProtocol {
         Ok(Effects {
             writes: Vec::new(),
             events: vec![RuntimeEventKind::LocalToolRequested { request }],
+            terminal_after_cleanup: None,
         })
     }
 
@@ -883,6 +971,7 @@ impl CodexProtocol {
         let reject = |message: &str| Effects {
             writes: vec![json!({"id": id, "error": {"code": -32601, "message": message}})],
             events: Vec::new(),
+            terminal_after_cleanup: None,
         };
         if !matches!(
             method,
@@ -918,6 +1007,7 @@ impl CodexProtocol {
             return Ok(Effects {
                 writes: approval.response.clone().into_iter().collect(),
                 events: Vec::new(),
+                terminal_after_cleanup: None,
             });
         }
         if self.approvals.len() >= MAX_MESSAGE_RECORDS {
@@ -940,6 +1030,7 @@ impl CodexProtocol {
                 method: method.to_string(),
                 details: params,
             }],
+            terminal_after_cleanup: None,
         })
     }
 
@@ -969,6 +1060,7 @@ impl CodexProtocol {
                         id: turn_id.clone(),
                         started: true,
                         final_messages: Vec::new(),
+                        native_executions: HashMap::new(),
                     });
                 } else {
                     return Ok(Effects::default());
@@ -976,6 +1068,7 @@ impl CodexProtocol {
                 Ok(Effects {
                     writes: Vec::new(),
                     events: vec![RuntimeEventKind::TurnStarted { turn_id }],
+                    terminal_after_cleanup: None,
                 })
             }
             "item/agentMessage/delta" => {
@@ -990,6 +1083,7 @@ impl CodexProtocol {
                         item_id: required_string(&params, "/itemId")?,
                         text: required_string(&params, "/delta")?,
                     }],
+                    terminal_after_cleanup: None,
                 })
             }
             "error" => {
@@ -1002,18 +1096,18 @@ impl CodexProtocol {
                     Some(true) => Ok(Effects {
                         writes: Vec::new(),
                         events: vec![RuntimeEventKind::Progress { turn_id, message }],
+                        terminal_after_cleanup: None,
                     }),
                     Some(false) => {
-                        self.active_turn = None;
+                        let active = self.active_turn.take().expect("active turn exists");
+                        let pending_native_execution = !active.native_executions.is_empty();
                         self.finished_turns.insert(turn_id.clone());
-                        Ok(Effects {
-                            writes: Vec::new(),
-                            events: vec![RuntimeEventKind::TurnFinished {
-                                turn_id,
-                                outcome: TurnOutcome::Failed { message },
-                                output: String::new(),
-                            }],
-                        })
+                        Ok(terminal_effects(
+                            turn_id,
+                            TurnOutcome::Failed { message },
+                            String::new(),
+                            pending_native_execution,
+                        ))
                     }
                     None => Err(RuntimeError::Protocol(
                         "error notification is missing willRetry".into(),
@@ -1029,7 +1123,22 @@ impl CodexProtocol {
                     .pointer("/item/type")
                     .and_then(Value::as_str)
                     .unwrap_or("");
-                if matches!(item_type, "commandExecution" | "fileChange" | "mcpToolCall") {
+                if is_native_execution_type(item_type) {
+                    let item_id = required_string(&params, "/item/id")?;
+                    let native_executions = &mut self
+                        .active_turn
+                        .as_mut()
+                        .expect("active turn exists")
+                        .native_executions;
+                    if native_executions
+                        .get(&item_id)
+                        .is_some_and(|started_type| started_type != item_type)
+                    {
+                        return Err(RuntimeError::Protocol(
+                            "native execution item id was reused with a different type".into(),
+                        ));
+                    }
+                    native_executions.insert(item_id, item_type.to_string());
                     let message = params
                         .pointer("/item/command")
                         .and_then(Value::as_str)
@@ -1038,16 +1147,38 @@ impl CodexProtocol {
                     return Ok(Effects {
                         writes: Vec::new(),
                         events: vec![RuntimeEventKind::Progress { turn_id, message }],
+                        terminal_after_cleanup: None,
                     });
                 }
                 Ok(Effects::default())
             }
             "item/completed" => {
                 let turn_id = required_string(&params, "/turnId")?;
+                let item_type = params
+                    .pointer("/item/type")
+                    .and_then(Value::as_str)
+                    .unwrap_or("");
+                if self.turn_is_started(&turn_id) && is_native_execution_type(item_type) {
+                    let item_id = required_string(&params, "/item/id")?;
+                    let native_executions = &mut self
+                        .active_turn
+                        .as_mut()
+                        .expect("active turn exists")
+                        .native_executions;
+                    if native_executions
+                        .get(&item_id)
+                        .is_some_and(|started_type| started_type != item_type)
+                    {
+                        return Err(RuntimeError::Protocol(
+                            "native execution completed with a different item type".into(),
+                        ));
+                    }
+                    native_executions.remove(&item_id);
+                }
                 if self.turn_is_started(&turn_id)
                     && matches!(
-                        params.pointer("/item/type").and_then(Value::as_str),
-                        Some("commandExecution" | "fileChange" | "mcpToolCall" | "dynamicToolCall")
+                        item_type,
+                        "commandExecution" | "fileChange" | "mcpToolCall" | "dynamicToolCall"
                     )
                 {
                     // 保留原生执行状态与错误细节，最终成功仍只由 turn/completed 决定。
@@ -1059,6 +1190,7 @@ impl CodexProtocol {
                             turn_id,
                             message: message.chars().take(16_384).collect(),
                         }],
+                        terminal_after_cleanup: None,
                     });
                 }
                 if self.turn_is_started(&turn_id)
@@ -1094,6 +1226,7 @@ impl CodexProtocol {
                 let active = self.active_turn.take().expect("active turn exists");
                 let turn = params.get("turn").expect("turn id was parsed");
                 let outcome = turn_outcome(turn)?;
+                let pending_native_execution = !active.native_executions.is_empty();
                 let output = final_output(turn).unwrap_or_else(|| {
                     active
                         .final_messages
@@ -1103,17 +1236,50 @@ impl CodexProtocol {
                         .join("\n")
                 });
                 self.finished_turns.insert(turn_id.clone());
-                Ok(Effects {
-                    writes: Vec::new(),
-                    events: vec![RuntimeEventKind::TurnFinished {
-                        turn_id,
-                        outcome,
-                        output,
-                    }],
-                })
+                Ok(terminal_effects(
+                    turn_id,
+                    outcome,
+                    output,
+                    pending_native_execution,
+                ))
             }
             // app-server 同时发送旧版 codex/event 通道，只消费上面的 v2 生命周期，避免双报。
             _ => Ok(Effects::default()),
+        }
+    }
+}
+
+fn terminal_effects(
+    turn_id: String,
+    outcome: TurnOutcome,
+    output: String,
+    pending_native_execution: bool,
+) -> Effects {
+    let outcome = if pending_native_execution && outcome != TurnOutcome::Cancelled {
+        TurnOutcome::Failed {
+            message: PENDING_NATIVE_EXECUTION_ERROR.into(),
+        }
+    } else {
+        outcome
+    };
+    let terminal = RuntimeEventKind::TurnFinished {
+        turn_id,
+        outcome,
+        output,
+    };
+    if pending_native_execution {
+        // 原生回合终态不能证明仍在运行的工具已退出；由调用层先收回托管进程树，
+        // 并核验同代退出回执，再发布这里保留的终态。
+        Effects {
+            writes: Vec::new(),
+            events: Vec::new(),
+            terminal_after_cleanup: Some(terminal),
+        }
+    } else {
+        Effects {
+            writes: Vec::new(),
+            events: vec![terminal],
+            terminal_after_cleanup: None,
         }
     }
 }
@@ -1125,6 +1291,10 @@ fn required_string(value: &Value, pointer: &str) -> Result<String, RuntimeError>
         .filter(|value| !value.is_empty())
         .map(str::to_string)
         .ok_or_else(|| RuntimeError::Protocol(format!("missing string field {pointer}")))
+}
+
+fn is_native_execution_type(item_type: &str) -> bool {
+    matches!(item_type, "commandExecution" | "fileChange" | "mcpToolCall")
 }
 
 fn encode_input(input: Vec<InputContent>) -> Result<Vec<Value>, String> {
@@ -1201,6 +1371,7 @@ fn failed(message_id: Uuid, message: &str) -> Effects {
             message_id,
             message: message.to_string(),
         }],
+        terminal_after_cleanup: None,
     }
 }
 
@@ -1211,6 +1382,7 @@ fn accepted(message_id: Uuid, turn_id: Option<String>) -> Effects {
             message_id,
             turn_id,
         }],
+        terminal_after_cleanup: None,
     }
 }
 
@@ -1221,6 +1393,7 @@ fn dispatched(message_id: Uuid, turn_id: Option<String>) -> Effects {
             message_id,
             turn_id,
         }],
+        terminal_after_cleanup: None,
     }
 }
 

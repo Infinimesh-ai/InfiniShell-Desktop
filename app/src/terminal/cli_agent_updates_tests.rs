@@ -109,6 +109,81 @@ fn stale_check_cannot_release_current_operation() {
 }
 
 #[test]
+fn active_update_enters_verifying_before_completion() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Claude).unwrap();
+                entry.operation = 7;
+                entry.active = true;
+                entry.status.phase = CliAgentUpdatePhase::Updating;
+
+                model.mark_verifying(CLIAgent::Claude, 7, ctx);
+
+                assert_eq!(
+                    model.status(CLIAgent::Claude).unwrap().phase,
+                    CliAgentUpdatePhase::Verifying
+                );
+            });
+        });
+    });
+}
+
+#[test]
+fn stale_verification_progress_cannot_replace_current_operation() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Claude).unwrap();
+                entry.operation = 7;
+                entry.active = true;
+                entry.status.phase = CliAgentUpdatePhase::Updating;
+
+                model.mark_verifying(CLIAgent::Claude, 6, ctx);
+
+                assert_eq!(
+                    model.status(CLIAgent::Claude).unwrap().phase,
+                    CliAgentUpdatePhase::Updating
+                );
+            });
+        });
+    });
+}
+
+#[test]
+fn failed_compatibility_verification_never_becomes_up_to_date() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Claude).unwrap();
+                entry.operation = 7;
+                entry.active = true;
+                entry.status.phase = CliAgentUpdatePhase::Verifying;
+                entry.status.installed_version = Some("2.1.267".to_owned());
+                entry.status.latest_version = Some("2.1.278".to_owned());
+
+                model.updated(
+                    CLIAgent::Claude,
+                    7,
+                    Err(CliAgentUpdateError::ProbeFailed),
+                    ctx,
+                );
+
+                let entry = &model.entries[&CLIAgent::Claude];
+                assert!(!entry.active);
+                assert_eq!(entry.status.phase, CliAgentUpdatePhase::Failed);
+                assert_eq!(entry.status.installed_version.as_deref(), Some("2.1.267"));
+                assert_eq!(entry.status.error, Some(CliAgentUpdateError::ProbeFailed));
+                assert_eq!(entry.failed_target.as_deref(), Some("2.1.278"));
+            });
+        });
+    });
+}
+
+#[test]
 fn unresolved_recovery_keeps_launch_guard_after_failed_read_only_recheck() {
     App::test((), |mut app| async move {
         app.add_singleton_model(CliAgentUpdatesModel::new);

@@ -1,0 +1,51 @@
+{
+  "case_id": "codex-follow-v2",
+  "classification": "external_build_artifact_io_unavailable",
+  "credentials_copied": false,
+  "credentials_provided": false,
+  "existing_orico_evidence_modified": false,
+  "gates": {
+    "diff_check_passed": true,
+    "python_driver_tests_failed": 0,
+    "python_driver_tests_passed": 23,
+    "real_native_update_passed": false,
+    "rustfmt_check_passed": true
+  },
+  "model_inputs_sent": 0,
+  "native_updates_executed": 0,
+  "official_reference": {
+    "agent": "codex",
+    "old_sha256": "4f85982624b3898c8991cb80c0981b2aa71070e3537046c9a95950318a95afcc",
+    "old_strict_signature_verified": true,
+    "old_version": "0.154.0",
+    "old_version_probe_passed": true,
+    "target_sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+    "target_strict_signature_verified": true,
+    "target_version": "0.155.1",
+    "target_version_probe_passed": true
+  },
+  "private_auth_files_absent": true,
+  "private_root_mode": "0o700",
+  "product_execute_calls": 0,
+  "product_inspect_calls": 0,
+  "recorded_at_utc": "2026-09-20T21:15:34+00:00",
+  "schema": 1,
+  "scope": "cli_autoupdate_native_product",
+  "stage": "before_manifest_and_product_inspect",
+  "status": "blocked",
+  "supervisor": {
+    "local_apfs_copy": true,
+    "same_bytes_as_current_build": true,
+    "sha256": "76a1df7abb48df78c13df2e7ebf6f4dea75e28c32bc07a81a389049ca1926b2c",
+    "strict_signature_verified": true
+  },
+  "user_cli_configuration_modified": false,
+  "user_cli_installation_modified": false,
+  "worker_blocker": {
+    "fresh_system_disk_rebuild_attempted": false,
+    "local_copy_created": false,
+    "one_byte_read_completed": false,
+    "reason": "current_test_worker_unreadable_before_first_byte",
+    "source_mount": "external_apfs"
+  }
+}

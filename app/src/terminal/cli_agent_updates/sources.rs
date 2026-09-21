@@ -1,5 +1,6 @@
 //! 来源必须同时绑定当前入口和管理器记录；PATH 中存在管理器并不能证明 CLI 归它管理。
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::{OsStr, OsString};
 use std::fs::{self, File, OpenOptions};
 use std::io::{Read as _, Write as _};
@@ -8,7 +9,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg(feature = "local_fs")]
-use crate::ai::cli_agent_runtime::managed_process::{self, ManagedEnvironment};
+use crate::ai::cli_agent_runtime::managed_process::ManagedEnvironment;
+use crate::ai::cli_agent_runtime::{claude, codex, grok, managed_process};
 use command::Stdio;
 use command::r#async::Command;
 use futures::{AsyncReadExt as _, StreamExt as _};
@@ -22,10 +24,59 @@ use warpui::r#async::FutureExt as _;
 use super::{
     CliAgentUpdateChannel as Channel, CliAgentUpdateError as Error, CliAgentUpdateSource as Source,
 };
-use crate::terminal::cli_agent::{CLIAgent, CLIAgentVersionStatus, probe_cli_agent_version};
+use crate::terminal::cli_agent::{CLIAgent, parse_cli_agent_version};
+use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
+const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
+// 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
+#[used]
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 16] = [
+    include_bytes!("../cli_agent_updates.rs"),
+    include_bytes!("sources.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/codex.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/claude.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/grok.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/mod.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/codex.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/claude.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/grok.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/codex_source.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/codex_hook_trust.rs"),
+    include_bytes!("../cli_agent_sessions/plugin_manager/notification_patch.rs"),
+];
+
+pub(super) struct VerificationProgress {
+    entered: async_channel::Sender<()>,
+    resume: async_channel::Receiver<()>,
+}
+
+impl VerificationProgress {
+    pub(super) fn new(
+        entered: async_channel::Sender<()>,
+        resume: async_channel::Receiver<()>,
+    ) -> Self {
+        Self { entered, resume }
+    }
+
+    async fn enter(self) {
+        self.enter_with_timeout(VERIFICATION_ACK_TIMEOUT).await;
+    }
+
+    async fn enter_with_timeout(self, timeout: Duration) {
+        // UI 已关闭时不能让非关键进度通知阻塞事务收敛。
+        if self.entered.send(()).await.is_ok() {
+            // 主线程回调延迟或丢失只降级进度展示，不改变安装核验结果。
+            let _ = self.resume.recv().with_timeout(timeout).await;
+        }
+    }
+}
+
 const MAX_OUTPUT: u64 = 1024 * 1024;
 const MAX_CONFIG: u64 = 1024 * 1024;
 
@@ -57,6 +108,283 @@ impl Invocation {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+enum ArtifactRole {
+    Program,
+    Entry,
+    Manager,
+    Helper,
+    Registration,
+    InstallRoot,
+    ConfigRoot,
+    DependencyRoot,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum ArgumentRef {
+    Literal(OsString),
+    ArtifactPath {
+        role: ArtifactRole,
+        relative: PathBuf,
+    },
+    TargetVersion,
+    PackageVersion {
+        package: String,
+    },
+    PathList(Vec<ArgumentRef>),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum LaunchBindingSpec {
+    NativeFile {
+        program: ArtifactRole,
+    },
+    SnapshotTree {
+        root: ArtifactRole,
+        program: ArgumentRef,
+    },
+    WindowsLease {
+        program: ArtifactRole,
+        ancestors: Vec<ArtifactRole>,
+    },
+    ManualOnly {
+        reason: String,
+    },
+}
+
+#[derive(Clone, Debug)]
+struct BoundInvocation {
+    artifacts: BTreeMap<ArtifactRole, PathBuf>,
+    program: ArtifactRole,
+    arguments: Vec<ArgumentRef>,
+    environment: Vec<(OsString, ArgumentRef)>,
+    env_remove: Vec<OsString>,
+    binding: LaunchBindingSpec,
+}
+
+#[derive(Clone, Debug)]
+struct PreparedInvocation {
+    invocation: Invocation,
+    binding: managed_process::PreparedLaunchBinding,
+}
+
+impl BoundInvocation {
+    fn manual_only(
+        artifacts: impl IntoIterator<Item = (ArtifactRole, PathBuf)>,
+        program: ArtifactRole,
+        arguments: Vec<ArgumentRef>,
+        reason: &str,
+    ) -> Self {
+        Self {
+            artifacts: artifacts.into_iter().collect(),
+            program,
+            arguments,
+            environment: Vec::new(),
+            env_remove: Vec::new(),
+            binding: LaunchBindingSpec::ManualOnly {
+                reason: reason.to_owned(),
+            },
+        }
+    }
+
+    fn prepare(&self, target_version: &str) -> Result<PreparedInvocation, Error> {
+        if matches!(self.binding, LaunchBindingSpec::ManualOnly { .. }) {
+            return Err(Error::UnsupportedSource);
+        }
+        let program = self
+            .artifacts
+            .get(&self.program)
+            .filter(|path| path.is_absolute())
+            .ok_or(Error::UnsupportedSource)?
+            .clone();
+        let args = self
+            .arguments
+            .iter()
+            .map(|argument| self.resolve(argument, target_version))
+            .collect::<Result<Vec<_>, _>>()?;
+        let env = self
+            .environment
+            .iter()
+            .map(|(name, value)| Ok((name.clone(), self.resolve(value, target_version)?)))
+            .collect::<Result<Vec<_>, Error>>()?;
+        let digest = self.digest(target_version)?;
+        let binding = match &self.binding {
+            LaunchBindingSpec::NativeFile { .. } => {
+                managed_process::PreparedLaunchBinding::native_file(digest)
+            }
+            LaunchBindingSpec::SnapshotTree { .. } | LaunchBindingSpec::WindowsLease { .. } => {
+                managed_process::PreparedLaunchBinding::new(digest)
+            }
+            LaunchBindingSpec::ManualOnly { .. } => unreachable!("ManualOnly 已在物化前拒绝"),
+        }
+        .map_err(|_| Error::UnsupportedSource)?;
+        Ok(PreparedInvocation {
+            invocation: Invocation {
+                program,
+                args,
+                env,
+                env_remove: self.env_remove.clone(),
+            },
+            binding,
+        })
+    }
+
+    fn resolve(&self, argument: &ArgumentRef, target_version: &str) -> Result<OsString, Error> {
+        match argument {
+            ArgumentRef::Literal(value) => Ok(value.clone()),
+            ArgumentRef::ArtifactPath { role, relative } => {
+                if relative.is_absolute()
+                    || relative.components().any(|component| {
+                        matches!(
+                            component,
+                            std::path::Component::ParentDir
+                                | std::path::Component::RootDir
+                                | std::path::Component::Prefix(_)
+                        )
+                    })
+                {
+                    return Err(Error::UnsupportedSource);
+                }
+                let base = self.artifacts.get(role).ok_or(Error::UnsupportedSource)?;
+                Ok(if relative.as_os_str().is_empty() {
+                    base.as_os_str().to_owned()
+                } else {
+                    base.join(relative).into_os_string()
+                })
+            }
+            ArgumentRef::TargetVersion => Ok(target_version.into()),
+            ArgumentRef::PackageVersion { package } => {
+                Ok(format!("{package}@{target_version}").into())
+            }
+            ArgumentRef::PathList(items) => {
+                let paths = items
+                    .iter()
+                    .map(|item| self.resolve(item, target_version).map(PathBuf::from))
+                    .collect::<Result<Vec<_>, _>>()?;
+                std::env::join_paths(paths).map_err(|_| Error::UnsupportedSource)
+            }
+        }
+    }
+
+    fn digest(&self, target_version: &str) -> Result<String, Error> {
+        let mut digest = Sha256::new();
+        digest_field(&mut digest, b"infinishell.launch-binding.v1");
+        digest_field(&mut digest, target_version.as_bytes());
+        digest_role(&mut digest, self.program);
+        for (role, path) in &self.artifacts {
+            digest_role(&mut digest, *role);
+            digest_field(&mut digest, path.as_os_str().as_encoded_bytes());
+        }
+        for argument in &self.arguments {
+            digest_argument(&mut digest, argument);
+        }
+        for (name, value) in &self.environment {
+            digest_field(&mut digest, name.as_encoded_bytes());
+            digest_argument(&mut digest, value);
+        }
+        for name in &self.env_remove {
+            digest_field(&mut digest, name.as_encoded_bytes());
+        }
+        digest_binding(&mut digest, &self.binding);
+        Ok(format!("{:x}", digest.finalize()))
+    }
+}
+
+fn digest_field(digest: &mut Sha256, bytes: &[u8]) {
+    digest.update((bytes.len() as u64).to_be_bytes());
+    digest.update(bytes);
+}
+
+fn digest_role(digest: &mut Sha256, role: ArtifactRole) {
+    digest.update([role as u8]);
+}
+
+fn digest_argument(digest: &mut Sha256, argument: &ArgumentRef) {
+    match argument {
+        ArgumentRef::Literal(value) => {
+            digest.update([0]);
+            digest_field(digest, value.as_encoded_bytes());
+        }
+        ArgumentRef::ArtifactPath { role, relative } => {
+            digest.update([1]);
+            digest_role(digest, *role);
+            digest_field(digest, relative.as_os_str().as_encoded_bytes());
+        }
+        ArgumentRef::TargetVersion => digest.update([2]),
+        ArgumentRef::PackageVersion { package } => {
+            digest.update([3]);
+            digest_field(digest, package.as_bytes());
+        }
+        ArgumentRef::PathList(items) => {
+            digest.update([4]);
+            digest.update((items.len() as u64).to_be_bytes());
+            for item in items {
+                digest_argument(digest, item);
+            }
+        }
+    }
+}
+
+fn digest_binding(digest: &mut Sha256, binding: &LaunchBindingSpec) {
+    match binding {
+        LaunchBindingSpec::NativeFile { program } => {
+            digest.update([0]);
+            digest_role(digest, *program);
+        }
+        LaunchBindingSpec::SnapshotTree { root, program } => {
+            digest.update([1]);
+            digest_role(digest, *root);
+            digest_argument(digest, program);
+        }
+        LaunchBindingSpec::WindowsLease { program, ancestors } => {
+            digest.update([2]);
+            digest_role(digest, *program);
+            digest.update((ancestors.len() as u64).to_be_bytes());
+            for ancestor in ancestors {
+                digest_role(digest, *ancestor);
+            }
+        }
+        LaunchBindingSpec::ManualOnly { reason } => {
+            digest.update([3]);
+            digest_field(digest, reason.as_bytes());
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct JournalLaunch {
+    program: PathBuf,
+    args: Vec<OsString>,
+    cwd: PathBuf,
+}
+
+impl JournalLaunch {
+    fn new(invocation: &Invocation, cwd: &Path) -> Self {
+        Self {
+            program: invocation.program.clone(),
+            args: invocation.args.clone(),
+            cwd: cwd.to_owned(),
+        }
+    }
+
+    fn validate(&self, root: &Path) -> Result<(), Error> {
+        if !self.program.is_absolute()
+            || !self.cwd.is_absolute()
+            || self.cwd != root
+            || self.args.len() > 256
+            || self.program.as_os_str().as_encoded_bytes().contains(&0)
+            || self.args.iter().any(|argument| {
+                argument.as_encoded_bytes().contains(&0)
+                    || argument.as_encoded_bytes().len() > 32 * 1024
+            })
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug)]
 struct Installation {
     source: Source,
@@ -65,7 +393,7 @@ struct Installation {
     manager: Option<Stamp>,
     helper: Option<Stamp>,
     registration: Option<(PathBuf, Stamp)>,
-    invocation: Option<Invocation>,
+    invocation: Option<BoundInvocation>,
     channel: Channel,
     config: Option<(PathBuf, ConfigKind)>,
     error: Option<Error>,
@@ -99,6 +427,66 @@ pub(super) struct CheckReport {
     pub plan: Option<UpdatePlan>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct PluginCompatibility {
+    installed: bool,
+    disabled: bool,
+    needs_update: bool,
+    platform_installed: bool,
+    platform_needs_update: bool,
+}
+
+impl PluginCompatibility {
+    fn verified(self) -> bool {
+        self.installed
+            && !self.disabled
+            && !self.needs_update
+            && self.platform_installed
+            && !self.platform_needs_update
+    }
+}
+
+fn adapter_supports_version(agent: CLIAgent, version: &str) -> bool {
+    match agent {
+        CLIAgent::Codex => codex::supported_version(version),
+        CLIAgent::Claude => claude::supported_version(version),
+        CLIAgent::Grok => grok::supported_version(version),
+        CLIAgent::Gemini
+        | CLIAgent::Amp
+        | CLIAgent::Droid
+        | CLIAgent::OpenCode
+        | CLIAgent::Copilot
+        | CLIAgent::Pi
+        | CLIAgent::OhMyPi
+        | CLIAgent::Auggie
+        | CLIAgent::CursorCli
+        | CLIAgent::Goose
+        | CLIAgent::DeepSeek
+        | CLIAgent::Hermes
+        | CLIAgent::Vibe
+        | CLIAgent::Antigravity
+        | CLIAgent::Omp
+        | CLIAgent::WarpTui
+        | CLIAgent::Unknown => false,
+    }
+}
+
+fn plugin_compatibility(agent: CLIAgent) -> Option<PluginCompatibility> {
+    let manager = plugin_manager_for(agent)?;
+    Some(PluginCompatibility {
+        installed: manager.is_installed(),
+        disabled: manager.is_disabled(),
+        needs_update: manager.needs_update(),
+        platform_installed: manager.is_platform_plugin_installed(),
+        platform_needs_update: manager.platform_plugin_needs_update(),
+    })
+}
+
+fn managed_compatibility_verified(agent: CLIAgent, version: &str) -> bool {
+    adapter_supports_version(agent, version)
+        && plugin_compatibility(agent).is_some_and(PluginCompatibility::verified)
+}
+
 pub(super) async fn inspect(
     agent: CLIAgent,
     executable: Option<PathBuf>,
@@ -123,6 +511,10 @@ pub(super) async fn inspect(
     let target_version = latest(agent, installation.channel, client).await?;
     let version_matches = installed_version == target_version;
     let mut error = installation.error;
+    if error.is_none() && !managed_compatibility_verified(agent, &target_version) {
+        // 缺少适配器版本合同或完整插件证据时保持手动处理，不能让版本号相同冒充兼容。
+        error = Some(Error::UnsupportedSource);
+    }
     if installation
         .source_target
         .as_ref()
@@ -135,23 +527,6 @@ pub(super) async fn inspect(
         && channel == Channel::FollowInstallation
     {
         error = Some(Error::ChannelMismatch);
-    }
-    if let Some(invocation) = installation.invocation.as_mut() {
-        for (_, value) in &mut invocation.env {
-            if value == OsStr::new("@TARGET@") {
-                *value = target_version.clone().into();
-            }
-        }
-        for argument in &mut invocation.args {
-            if argument == OsStr::new("@TARGET@") {
-                *argument = target_version.clone().into();
-            } else if let Some(package) = argument
-                .to_str()
-                .and_then(|arg| arg.strip_suffix("@@TARGET@"))
-            {
-                *argument = format!("{package}@{target_version}").into();
-            }
-        }
     }
     let config = snapshot_config(&installation, &installed_version, &target_version, channel)?;
     if agent == CLIAgent::Claude && source_is_native_claude(&installation) && !version_matches {
@@ -206,15 +581,19 @@ pub(super) async fn inspect(
 }
 
 async fn version(agent: CLIAgent, entry: &Path) -> Result<String, Error> {
-    match probe_cli_agent_version(agent, entry).await {
-        CLIAgentVersionStatus::Detected(version) => {
-            parse_version(&version)?;
-            Ok(version)
-        }
-        CLIAgentVersionStatus::NotInstalled
-        | CLIAgentVersionStatus::NotProbed
-        | CLIAgentVersionStatus::Unknown => Err(Error::ProbeFailed),
-    }
+    version_with_timeout(agent, entry, PROBE_TIMEOUT).await
+}
+
+async fn version_with_timeout(
+    agent: CLIAgent,
+    entry: &Path,
+    timeout: Duration,
+) -> Result<String, Error> {
+    let bytes = run(&Invocation::new(entry, ["--version"]), timeout).await?;
+    let output = String::from_utf8(bytes).map_err(|_| Error::ProbeFailed)?;
+    let version = parse_cli_agent_version(agent, &output).ok_or(Error::ProbeFailed)?;
+    parse_version(&version)?;
+    Ok(version)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -403,7 +782,23 @@ async fn discover(
                     paths.extend(std::env::split_paths(
                         &std::env::var_os("PATH").unwrap_or_default(),
                     ));
-                    let mut invocation = Invocation::new(&installation.entry, ["update"]);
+                    let mut invocation = BoundInvocation {
+                        artifacts: [
+                            (ArtifactRole::Program, installation.stamp.canonical.clone()),
+                            (ArtifactRole::Entry, installation.entry.clone()),
+                            (ArtifactRole::InstallRoot, parent.to_path_buf()),
+                            (ArtifactRole::ConfigRoot, codex_home.clone()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                        program: ArtifactRole::Program,
+                        arguments: vec![ArgumentRef::Literal("update".into())],
+                        environment: Vec::new(),
+                        env_remove: Vec::new(),
+                        binding: LaunchBindingSpec::NativeFile {
+                            program: ArtifactRole::Program,
+                        },
+                    };
                     invocation.env_remove.extend(
                         [
                             "CODEX_MANAGED_BY_NPM",
@@ -413,27 +808,48 @@ async fn discover(
                         ]
                         .map(OsString::from),
                     );
-                    invocation.env.extend([
+                    invocation.environment.extend([
                         (
                             "PATH".into(),
-                            std::env::join_paths(paths).map_err(|_| Error::UnsupportedSource)?,
+                            ArgumentRef::PathList(
+                                paths
+                                    .into_iter()
+                                    .map(|path| ArgumentRef::Literal(path.into_os_string()))
+                                    .collect(),
+                            ),
                         ),
-                        ("CODEX_INSTALL_DIR".into(), parent.as_os_str().to_owned()),
-                        ("CODEX_HOME".into(), codex_home.as_os_str().to_owned()),
-                        ("CODEX_NON_INTERACTIVE".into(), "1".into()),
-                        ("CODEX_RELEASE".into(), "@TARGET@".into()),
+                        (
+                            "CODEX_INSTALL_DIR".into(),
+                            ArgumentRef::ArtifactPath {
+                                role: ArtifactRole::InstallRoot,
+                                relative: PathBuf::new(),
+                            },
+                        ),
+                        (
+                            "CODEX_HOME".into(),
+                            ArgumentRef::ArtifactPath {
+                                role: ArtifactRole::ConfigRoot,
+                                relative: PathBuf::new(),
+                            },
+                        ),
+                        (
+                            "CODEX_NON_INTERACTIVE".into(),
+                            ArgumentRef::Literal("1".into()),
+                        ),
+                        ("CODEX_RELEASE".into(), ArgumentRef::TargetVersion),
                     ]);
-                    // Windows 安装器还会改写持久 PATH，未取得同安装无副作用证据前不开放。
-                    if cfg!(unix) {
-                        installation.config = Some((
-                            codex_home.join("packages/standalone/auto-update-version"),
-                            ConfigKind::CodexUpdateMarker,
-                        ));
-                        installation.invocation = Some(invocation);
-                        installation.error = None;
-                    } else {
-                        installation.error = Some(Error::UnsupportedPlatform);
+                    if cfg!(windows) {
+                        invocation.binding = LaunchBindingSpec::ManualOnly {
+                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
+                                .to_owned(),
+                        };
                     }
+                    installation.config = Some((
+                        codex_home.join("packages/standalone/auto-update-version"),
+                        ConfigKind::CodexUpdateMarker,
+                    ));
+                    installation.invocation = Some(invocation);
+                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
                     return Ok(installation);
                 }
             }
@@ -455,12 +871,35 @@ async fn discover(
                         Channel::FollowInstallation | Channel::Latest | Channel::Alpha => "latest",
                     };
                     let settings = format!("{{\"autoUpdatesChannel\":\"{selected}\"}}");
-                    installation.invocation = Some(Invocation::new(
-                        &installation.entry,
-                        ["--settings", settings.as_str(), "update"],
-                    ));
+                    let mut invocation = BoundInvocation {
+                        artifacts: [
+                            (ArtifactRole::Program, installation.stamp.canonical.clone()),
+                            (ArtifactRole::Entry, installation.entry.clone()),
+                            (ArtifactRole::ConfigRoot, config_dir),
+                        ]
+                        .into_iter()
+                        .collect(),
+                        program: ArtifactRole::Program,
+                        arguments: vec![
+                            ArgumentRef::Literal("--settings".into()),
+                            ArgumentRef::Literal(settings.into()),
+                            ArgumentRef::Literal("update".into()),
+                        ],
+                        environment: Vec::new(),
+                        env_remove: Vec::new(),
+                        binding: LaunchBindingSpec::NativeFile {
+                            program: ArtifactRole::Program,
+                        },
+                    };
+                    if cfg!(windows) {
+                        invocation.binding = LaunchBindingSpec::ManualOnly {
+                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
+                                .to_owned(),
+                        };
+                    }
+                    installation.invocation = Some(invocation);
                     installation.config = Some((config_path, ConfigKind::Claude));
-                    installation.error = None;
+                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
                     return Ok(installation);
                 }
             }
@@ -485,16 +924,35 @@ async fn discover(
                     } else {
                         requested
                     };
-                    let args = if installation.channel == current_channel {
-                        vec!["update"]
-                    } else if installation.channel == Channel::Alpha {
-                        vec!["update", "--alpha"]
-                    } else {
-                        vec!["update", "--stable"]
+                    let mut invocation = BoundInvocation {
+                        artifacts: [
+                            (ArtifactRole::Program, installation.stamp.canonical.clone()),
+                            (ArtifactRole::Entry, installation.entry.clone()),
+                            (ArtifactRole::ConfigRoot, grok_home.clone()),
+                        ]
+                        .into_iter()
+                        .collect(),
+                        program: ArtifactRole::Program,
+                        arguments: vec![
+                            ArgumentRef::Literal("update".into()),
+                            ArgumentRef::Literal("--version".into()),
+                            ArgumentRef::TargetVersion,
+                        ],
+                        environment: Vec::new(),
+                        env_remove: Vec::new(),
+                        binding: LaunchBindingSpec::NativeFile {
+                            program: ArtifactRole::Program,
+                        },
                     };
-                    installation.invocation = Some(Invocation::new(&installation.entry, args));
+                    if cfg!(windows) {
+                        invocation.binding = LaunchBindingSpec::ManualOnly {
+                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
+                                .to_owned(),
+                        };
+                    }
+                    installation.invocation = Some(invocation);
                     installation.config = Some((grok_home.join("config.toml"), ConfigKind::Grok));
-                    installation.error = None;
+                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
                     return Ok(installation);
                 }
             }
@@ -696,22 +1154,39 @@ async fn discover_npm(
     found.manager = Some(node_identity);
     found.helper = Some(npm_identity);
     found.registration = Some((manifest.clone(), stamp(&manifest)?));
-    let spec = format!("{package}@@TARGET@");
-    found.invocation = Some(Invocation::new(
-        node,
+    found.invocation = Some(BoundInvocation::manual_only(
         [
-            npm_cli.as_os_str(),
-            OsStr::new("install"),
-            OsStr::new("--global"),
-            OsStr::new("--prefix"),
-            prefix.as_os_str(),
-            OsStr::new(&spec),
-            OsStr::new("--registry=https://registry.npmjs.org/"),
-            OsStr::new("--no-audit"),
-            OsStr::new("--no-fund"),
+            (ArtifactRole::Program, node.clone()),
+            (ArtifactRole::Entry, installation.entry.clone()),
+            (ArtifactRole::Manager, node),
+            (ArtifactRole::Helper, npm_cli),
+            (ArtifactRole::Registration, manifest.clone()),
+            (ArtifactRole::InstallRoot, prefix),
+            (ArtifactRole::DependencyRoot, package_root),
         ],
+        ArtifactRole::Program,
+        vec![
+            ArgumentRef::ArtifactPath {
+                role: ArtifactRole::Helper,
+                relative: PathBuf::new(),
+            },
+            ArgumentRef::Literal("install".into()),
+            ArgumentRef::Literal("--global".into()),
+            ArgumentRef::Literal("--prefix".into()),
+            ArgumentRef::ArtifactPath {
+                role: ArtifactRole::InstallRoot,
+                relative: PathBuf::new(),
+            },
+            ArgumentRef::PackageVersion {
+                package: package.to_owned(),
+            },
+            ArgumentRef::Literal("--registry=https://registry.npmjs.org/".into()),
+            ArgumentRef::Literal("--no-audit".into()),
+            ArgumentRef::Literal("--no-fund".into()),
+        ],
+        "npm 的 Node、依赖树、lifecycle script 与外部工具闭包尚未冻结",
     ));
-    found.error = None;
+    found.error = Some(Error::UnsupportedSource);
     if agent == CLIAgent::Claude {
         if requested == Channel::FollowInstallation {
             let home = user_home().ok_or(Error::UnsupportedSource)?;
@@ -720,9 +1195,7 @@ async fn discover_npm(
                 .join("settings.json");
             found.channel = claude_channel(&config)?;
         }
-        // npm install 不经过 Claude 的托管版本约束；原生 npm 更新尚未实证前保持明确降级。
-        found.invocation = None;
-        found.error = Some(Error::UnsupportedSource);
+        // npm install 不经过 Claude 的托管版本约束；保留来源检查但不派生更新器。
     }
     Ok(Some(found))
 }
@@ -790,13 +1263,32 @@ async fn discover_brew(
                 found.error = Some(Error::ChannelMismatch);
                 return Ok(Some(found));
             }
-            let mut invocation = Invocation::new(&brew, ["upgrade", "--cask", "--greedy", cask]);
-            invocation.env.extend([
-                ("HOMEBREW_NO_AUTO_UPDATE".into(), "1".into()),
-                ("HOMEBREW_NO_INSTALL_CLEANUP".into(), "1".into()),
+            let mut invocation = BoundInvocation::manual_only(
+                [
+                    (ArtifactRole::Program, brew.clone()),
+                    (ArtifactRole::Entry, installation.entry.clone()),
+                    (ArtifactRole::Manager, brew),
+                    (ArtifactRole::InstallRoot, PathBuf::from(base)),
+                ],
+                ArtifactRole::Program,
+                ["upgrade", "--cask", "--greedy", cask]
+                    .into_iter()
+                    .map(|argument| ArgumentRef::Literal(argument.into()))
+                    .collect(),
+                "Homebrew 根据自身 pathname 解析 repository/prefix，只允许手动更新",
+            );
+            invocation.environment.extend([
+                (
+                    "HOMEBREW_NO_AUTO_UPDATE".into(),
+                    ArgumentRef::Literal("1".into()),
+                ),
+                (
+                    "HOMEBREW_NO_INSTALL_CLEANUP".into(),
+                    ArgumentRef::Literal("1".into()),
+                ),
             ]);
             found.invocation = Some(invocation);
-            found.error = None;
+            found.error = Some(Error::UnsupportedSource);
             return Ok(Some(found));
         }
     }
@@ -843,6 +1335,98 @@ fn stamp(path: &Path) -> Result<Stamp, Error> {
         canonical,
         digest: digest.finalize().into(),
     })
+}
+
+fn verify_installation_identity(installation: &Installation) -> Result<(), Error> {
+    if stamp(&installation.entry)? != installation.stamp {
+        return Err(Error::SourceChanged);
+    }
+    if let Some(manager) = &installation.manager
+        && stamp(&manager.canonical)? != *manager
+    {
+        return Err(Error::SourceChanged);
+    }
+    if let Some(helper) = &installation.helper
+        && stamp(&helper.canonical)? != *helper
+    {
+        return Err(Error::SourceChanged);
+    }
+    if let Some((path, expected)) = &installation.registration
+        && stamp(path)? != *expected
+    {
+        return Err(Error::SourceChanged);
+    }
+    Ok(())
+}
+
+fn expected_invocation_stamp<'a>(
+    installation: &'a Installation,
+    invocation: &Invocation,
+) -> Result<&'a Stamp, Error> {
+    let canonical = invocation
+        .program
+        .canonicalize()
+        .map_err(|_| Error::SourceChanged)?;
+    if canonical == installation.stamp.canonical {
+        return Ok(&installation.stamp);
+    }
+    if let Some(manager) = &installation.manager
+        && canonical == manager.canonical
+    {
+        return Ok(manager);
+    }
+    Err(Error::SourceChanged)
+}
+
+fn supervised_dependency_paths(
+    installation: &Installation,
+    invocation: &Invocation,
+) -> Result<Vec<PathBuf>, Error> {
+    let mut canonical_paths = BTreeSet::new();
+    let mut paths = Vec::new();
+    let mut add = |path: &Path| -> Result<(), Error> {
+        let canonical = path.canonicalize().map_err(|_| Error::SourceChanged)?;
+        if canonical_paths.insert(canonical) {
+            paths.push(path.to_owned());
+        }
+        Ok(())
+    };
+
+    // 实际 executable 必须优先保留原路径，不能被指向同一文件的入口或管理器别名替代。
+    add(&invocation.program)?;
+    add(&installation.entry)?;
+    if let Some(manager) = &installation.manager {
+        add(&manager.canonical)?;
+    }
+    if let Some(helper) = &installation.helper {
+        add(&helper.canonical)?;
+    }
+    if let Some((path, _)) = &installation.registration {
+        add(path)?;
+    }
+    Ok(paths)
+}
+
+fn capture_supervised_dependencies(
+    installation: &Installation,
+    invocation: &Invocation,
+    binding: &managed_process::PreparedLaunchBinding,
+) -> Result<(Stamp, Vec<managed_process::ExpectedFileIdentity>), Error> {
+    // 先捕获，再对原始发现结果复核；两者之间发生的任何替换都会由本地复核或最终 worker 拒绝。
+    let dependency_paths = if binding.is_native_file() {
+        vec![invocation.program.clone()]
+    } else {
+        supervised_dependency_paths(installation, invocation)?
+    };
+    let expected_files = dependency_paths
+        .into_iter()
+        .map(|path| {
+            managed_process::ExpectedFileIdentity::capture(&path).map_err(|_| Error::SourceChanged)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    verify_installation_identity(installation)?;
+    let expected_program = expected_invocation_stamp(installation, invocation)?.clone();
+    Ok((expected_program, expected_files))
 }
 
 #[derive(Debug)]
@@ -983,6 +1567,12 @@ struct Journal {
     old_stamp: Option<Stamp>,
     #[serde(default)]
     claude_update: Option<ClaudeUpdateScope>,
+    #[serde(default)]
+    launch: Option<JournalLaunch>,
+    #[serde(default)]
+    binding_digest: Option<String>,
+    #[serde(default)]
+    binding_kind: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -1454,9 +2044,13 @@ fn finish_claude_scope(root: &Path, journal: &Journal) -> Result<(), Error> {
     };
     validate_claude_journal(journal)?;
     #[cfg(feature = "local_fs")]
-    managed_process::confirmed_exit(root, scope.generation)
-        .map_err(|_| Error::RecoveryRequired)?
-        .ok_or(Error::RecoveryRequired)?;
+    managed_process::confirmed_exit_with_binding(
+        root,
+        scope.generation,
+        &journal_binding(journal)?,
+    )
+    .map_err(|_| Error::RecoveryRequired)?
+    .ok_or(Error::RecoveryRequired)?;
     #[cfg(not(feature = "local_fs"))]
     return Err(Error::RecoveryRequired);
     let unchanged = verify_claude_originals(scope);
@@ -1702,12 +2296,30 @@ fn plain_ancestors(path: &Path) -> Result<(), Error> {
             Ok(metadata) if metadata.file_type().is_symlink() => {
                 return Err(Error::PersistenceFailed);
             }
-            Ok(_) => {}
+            Ok(metadata) => {
+                #[cfg(windows)]
+                {
+                    use std::os::windows::fs::MetadataExt as _;
+
+                    if !windows_file_attributes_are_plain(metadata.file_attributes()) {
+                        return Err(Error::PersistenceFailed);
+                    }
+                }
+                #[cfg(not(windows))]
+                let _ = metadata;
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(Error::PersistenceFailed),
         }
     }
     Ok(())
+}
+
+#[cfg(any(windows, test))]
+fn windows_file_attributes_are_plain(attributes: u32) -> bool {
+    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
+
+    attributes & FILE_ATTRIBUTE_REPARSE_POINT == 0
 }
 
 fn lock_journal(root: &Path, agent: CLIAgent) -> Result<File, Error> {
@@ -1754,6 +2366,40 @@ fn save_journal(path: &Path, journal: &Journal) -> Result<(), Error> {
     Ok(())
 }
 
+#[cfg(feature = "local_fs")]
+fn record_not_started_if_missing(
+    root: &Path,
+    generation: Uuid,
+    program: &Path,
+    args: &[OsString],
+    binding: &managed_process::PreparedLaunchBinding,
+) -> Result<bool, Error> {
+    let generation_missing = !root
+        .join("cli-agent-processes")
+        .join(generation.to_string())
+        .try_exists()
+        .map_err(|_| Error::RecoveryRequired)?;
+    if generation_missing {
+        managed_process::record_not_started_with_binding(
+            root, generation, program, args, root, binding,
+        )
+        .map_err(|_| Error::RecoveryRequired)?;
+    }
+    Ok(generation_missing)
+}
+
+fn journal_binding(journal: &Journal) -> Result<managed_process::PreparedLaunchBinding, Error> {
+    let digest = journal
+        .binding_digest
+        .as_ref()
+        .ok_or(Error::RecoveryRequired)?;
+    managed_process::PreparedLaunchBinding::from_persisted(
+        digest.clone(),
+        journal.binding_kind.as_deref(),
+    )
+    .map_err(|_| Error::RecoveryRequired)
+}
+
 fn preflight_recovery(agent: CLIAgent, entry: &Path, root: &Path) -> Result<bool, Error> {
     let path = root.join(format!("{}.json", agent.command_prefix()));
     if !path.try_exists().map_err(|_| Error::PersistenceFailed)? {
@@ -1761,25 +2407,39 @@ fn preflight_recovery(agent: CLIAgent, entry: &Path, root: &Path) -> Result<bool
     }
     let journal: Journal = serde_json::from_slice(&read_limited(&path, 12 * MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
-    if journal.schema != 1 || journal.agent != agent.command_prefix() || journal.entry != entry {
+    if journal.schema != 2 || journal.agent != agent.command_prefix() || journal.entry != entry {
         return Err(Error::RecoveryRequired);
     }
     if let Some(generation) = journal.generation {
         #[cfg(feature = "local_fs")]
         {
-            if journal.claude_update.is_some()
-                && !root
-                    .join("cli-agent-processes")
-                    .join(generation.to_string())
-                    .try_exists()
-                    .map_err(|_| Error::RecoveryRequired)?
-            {
-                validate_claude_journal(&journal)?;
-                // 尚无代次账本时先永久认领“未启动”，排除任何延迟启动后再回收私有配置。
-                managed_process::record_not_started(root, generation, &journal.entry, &[], root)
-                    .map_err(|_| Error::RecoveryRequired)?;
+            if matches!(
+                journal.phase.as_str(),
+                "prepared" | "claude_config_preparing"
+            ) {
+                if journal.phase == "claude_config_preparing"
+                    && (agent != CLIAgent::Claude || journal.claude_update.is_none())
+                {
+                    return Err(Error::RecoveryRequired);
+                }
+                if journal.claude_update.is_some() {
+                    validate_claude_journal(&journal)?;
+                }
+                let launch = journal.launch.as_ref().ok_or(Error::RecoveryRequired)?;
+                launch.validate(root)?;
+                let binding = journal_binding(&journal)?;
+                // journal 锁证明旧派生方已退出；尚无代次账本时永久认领“未启动”，
+                // 让三款 CLI 都能恢复派生前崩溃，而不是永远停在 RecoveryRequired。
+                record_not_started_if_missing(
+                    root,
+                    generation,
+                    &launch.program,
+                    &launch.args,
+                    &binding,
+                )?;
             }
-            managed_process::confirmed_exit(root, generation)
+            let binding = journal_binding(&journal)?;
+            managed_process::confirmed_exit_with_binding(root, generation, &binding)
                 .map_err(|_| Error::RecoveryRequired)?
                 .ok_or(Error::RecoveryRequired)?;
             finish_claude_scope(root, &journal)?;
@@ -1818,7 +2478,7 @@ fn reconcile_journal_locked(
     let path = root.join(format!("{}.json", agent.command_prefix()));
     let mut journal: Journal = serde_json::from_slice(&read_limited(&path, 12 * MAX_CONFIG)?)
         .map_err(|_| Error::RecoveryRequired)?;
-    if journal.schema != 1 || journal.agent != agent.command_prefix() || journal.entry != entry {
+    if journal.schema != 2 || journal.agent != agent.command_prefix() || journal.entry != entry {
         return Err(Error::RecoveryRequired);
     }
     if journal.generation.is_some() {
@@ -1892,7 +2552,12 @@ fn reconcile_journal_locked(
     fs::remove_file(path).map_err(|_| Error::PersistenceFailed)
 }
 
-pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
+pub(super) async fn execute(
+    plan: UpdatePlan,
+    mut verification_progress: Option<VerificationProgress>,
+) -> Result<String, Error> {
+    // 阻止链接器丢弃供独立构建来源核验使用的只读字节。
+    std::hint::black_box(&SUPERVISOR_UPDATER_SOURCE_BINDING);
     let root = journal_root()?;
     let _lock = lock_journal(&root, plan.agent)?;
     let journal_path = root.join(format!("{}.json", plan.agent.command_prefix()));
@@ -1903,32 +2568,22 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
         return Err(Error::RecoveryRequired);
     }
     let installation = &plan.installation;
-    if stamp(&installation.entry)? != installation.stamp {
-        return Err(Error::SourceChanged);
-    }
-    if let Some(manager) = &installation.manager {
-        if stamp(&manager.canonical)? != *manager {
-            return Err(Error::SourceChanged);
-        }
-    }
-    if let Some(helper) = &installation.helper {
-        if stamp(&helper.canonical)? != *helper {
-            return Err(Error::SourceChanged);
-        }
-    }
-    if let Some((path, expected)) = &installation.registration {
-        if stamp(path)? != *expected {
-            return Err(Error::SourceChanged);
-        }
-    }
+    verify_installation_identity(installation)?;
     if version(plan.agent, &installation.entry).await? != plan.installed_version {
         return Err(Error::SourceChanged);
     }
-    let mut invocation = installation
+    let prepared = installation
         .invocation
         .as_ref()
         .ok_or(Error::UnsupportedSource)?
-        .clone();
+        .prepare(&plan.target_version)?;
+    // 数据合同可先落地，但平台原子执行原语未实现时必须在任何事务副作用前拒绝。
+    prepared
+        .binding
+        .validate_update_execution()
+        .map_err(|_| Error::UnsupportedPlatform)?;
+    let mut invocation = prepared.invocation;
+    let binding = prepared.binding;
     let config = plan.config.clone();
     if let Some(config) = &config {
         if read_optional_config(&config.path)? != config.before {
@@ -1963,7 +2618,7 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
     };
     let mut journal = Journal {
         claude_update,
-        schema: 1,
+        schema: 2,
         agent: plan.agent.command_prefix().to_owned(),
         entry: installation.entry.clone(),
         old_version: plan.installed_version.clone(),
@@ -1976,6 +2631,9 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
         command_failed: false,
         intent: Some(plan.intent.clone()),
         channel: channel_name(installation.channel)?.to_owned(),
+        launch: generation.map(|_| JournalLaunch::new(&invocation, &root)),
+        binding_digest: generation.map(|_| binding.digest().to_owned()),
+        binding_kind: generation.and_then(|_| binding.kind_name().map(ToOwned::to_owned)),
     };
     if !requires_native_update {
         // 同版本只同步渠道，不调用原生安装器，也不伪造进程退出回执。
@@ -1984,12 +2642,19 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
             config.after = config.before.clone();
         }
         save_journal(&journal_path, &journal)?;
+        if let Some(progress) = verification_progress.take() {
+            progress.enter().await;
+        }
         reconcile_journal_locked(
             plan.agent,
             &installation.entry,
             &plan.installed_version,
             &root,
         )?;
+        if !managed_compatibility_verified(plan.agent, &plan.target_version) {
+            // 同版本渠道同步也会进入 UpToDate，返回前必须抵御插件在检查后的并发变化。
+            return Err(Error::ProbeFailed);
+        }
         return Ok(plan.target_version);
     }
     if journal.claude_update.is_some() {
@@ -2006,12 +2671,13 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
             Ok(shadow) => shadow,
             Err(error) => {
                 #[cfg(feature = "local_fs")]
-                managed_process::record_not_started(
+                managed_process::record_not_started_with_binding(
                     &root,
                     scope.generation,
                     &invocation.program,
                     &invocation.args,
                     &root,
+                    &binding,
                 )
                 .map_err(|_| Error::RecoveryRequired)?;
                 journal.command_failed = true;
@@ -2033,19 +2699,68 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
         save_journal(&journal_path, &journal)?;
     }
     // 更新命令必须有完整监督回执；只读版本与发行检查仍使用轻量进程探测。
-    let failure = match run_supervised_update(&invocation, &root, journal.generation.unwrap()).await
+    // 配置准备可能耗时，因此在最终派生前再次复核全部来源，并把实际程序摘要带到监督调用边界。
+    let (expected_program, expected_files) =
+        match capture_supervised_dependencies(installation, &invocation, &binding) {
+            Ok(expected) => expected,
+            Err(error) => {
+                #[cfg(feature = "local_fs")]
+                if !record_not_started_if_missing(
+                    &root,
+                    journal.generation.unwrap(),
+                    &invocation.program,
+                    &invocation.args,
+                    &binding,
+                )? {
+                    return Err(Error::RecoveryRequired);
+                }
+                if journal.claude_update.is_some() {
+                    finish_claude_scope(&root, &journal)?;
+                }
+                fs::remove_file(&journal_path).map_err(|_| Error::RecoveryRequired)?;
+                return Err(error);
+            }
+        };
+    let failure = match run_supervised_update(
+        &invocation,
+        &expected_program,
+        expected_files,
+        &root,
+        journal.generation.unwrap(),
+        &binding,
+    )
+    .await
     {
         Ok(failure) => failure,
         Err(error) => {
             // 只有真实退出可确认时才能回收副本；未知存活状态继续由 journal 阻止重投。
+            if error == Error::SourceChanged {
+                #[cfg(feature = "local_fs")]
+                if !record_not_started_if_missing(
+                    &root,
+                    journal.generation.unwrap(),
+                    &invocation.program,
+                    &invocation.args,
+                    &binding,
+                )? {
+                    return Err(Error::RecoveryRequired);
+                }
+            }
             if journal.claude_update.is_some() {
                 finish_claude_scope(&root, &journal)?;
+            }
+            // 最终身份复核发生在派生调用之前；此错误明确证明没有监督代次可恢复。
+            if error == Error::SourceChanged {
+                fs::remove_file(&journal_path).map_err(|_| Error::RecoveryRequired)?;
             }
             return Err(error);
         }
     };
     journal.command_failed = failure.is_some();
     save_journal(&journal_path, &journal)?;
+    if let Some(progress) = verification_progress.take() {
+        progress.enter().await;
+    }
     finish_supervised_update(&journal_path, &mut journal, plan.agent, &root).await?;
     if let Some(error) = failure {
         return Err(error);
@@ -2053,26 +2768,39 @@ pub(super) async fn execute(plan: UpdatePlan) -> Result<String, Error> {
     if version(plan.agent, &installation.entry).await? != plan.target_version {
         return Err(Error::VersionMismatch);
     }
+    if !managed_compatibility_verified(plan.agent, &plan.target_version) {
+        // 更新期间插件或配置可能被并发改变，完成前必须重新核验，失败时不得进入 UpToDate。
+        return Err(Error::ProbeFailed);
+    }
     Ok(plan.target_version)
 }
 
 #[cfg(feature = "local_fs")]
 async fn run_supervised_update(
     invocation: &Invocation,
+    expected_program: &Stamp,
+    expected_files: Vec<managed_process::ExpectedFileIdentity>,
     root: &Path,
     generation: Uuid,
+    binding: &managed_process::PreparedLaunchBinding,
 ) -> Result<Option<Error>, Error> {
     let environment = ManagedEnvironment {
         values: invocation.env.clone(),
         remove: invocation.env_remove.clone(),
     };
-    let child = managed_process::spawn_with_environment(
+    // 这是现有监督 API 前的最后一个同步步骤；不允许较早的检查结果跨过派生边界复用。
+    if stamp(&invocation.program)? != *expected_program {
+        return Err(Error::SourceChanged);
+    }
+    let child = managed_process::spawn_bound_update(
         root,
         generation,
         &invocation.program,
         &invocation.args,
         root,
         environment,
+        expected_files,
+        binding,
     )
     .await;
     let mut child = match child {
@@ -2083,16 +2811,17 @@ async fn run_supervised_update(
                 .join(generation.to_string());
             if generation_directory.try_exists().ok() == Some(false) {
                 // 启动函数只会在先写代次账本后派生监督者；账本未创建明确表示尚未派生。
-                managed_process::record_not_started(
+                managed_process::record_not_started_with_binding(
                     root,
                     generation,
                     &invocation.program,
                     &invocation.args,
                     root,
+                    binding,
                 )
                 .map_err(|_| Error::RecoveryRequired)?;
             }
-            if managed_process::confirmed_exit(root, generation)
+            if managed_process::confirmed_exit_with_binding(root, generation, binding)
                 .ok()
                 .flatten()
                 .is_some()
@@ -2139,10 +2868,20 @@ async fn run_supervised_update(
 #[cfg(not(feature = "local_fs"))]
 async fn run_supervised_update(
     invocation: &Invocation,
+    expected_program: &Stamp,
+    expected_files: Vec<managed_process::ExpectedFileIdentity>,
     root: &Path,
     generation: Uuid,
+    binding: &managed_process::PreparedLaunchBinding,
 ) -> Result<Option<Error>, Error> {
-    let _ = (invocation, root, generation);
+    let _ = (
+        invocation,
+        expected_program,
+        expected_files,
+        root,
+        generation,
+        binding,
+    );
     Err(Error::UnsupportedPlatform)
 }
 
@@ -2170,7 +2909,8 @@ fn reconcile_confirmed_update(
     #[cfg(feature = "local_fs")]
     let command_succeeded = {
         let generation = journal.generation.ok_or(Error::RecoveryRequired)?;
-        managed_process::confirmed_exit(root, generation)
+        let binding = journal_binding(journal)?;
+        managed_process::confirmed_exit_with_binding(root, generation, &binding)
             .map_err(|_| Error::RecoveryRequired)?
             .ok_or(Error::RecoveryRequired)?
             .exit_code

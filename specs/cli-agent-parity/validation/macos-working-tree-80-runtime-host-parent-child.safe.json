@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "generated_at_utc": "2026-09-20T20:54:53Z",
+  "receipt_kind": "targeted_working_tree_validation",
+  "scope": "父子 CLI 运行时宿主、托管进程、重关联、离线事件回收与持久恢复的定向验证",
+  "source": {
+    "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "branch": "codex/cli-agent-parity",
+    "tree_dirty": true,
+    "unstaged_path_count_before_receipt": 45,
+    "staged_path_count": 7,
+    "untracked_path_count_before_receipt": 25,
+    "tested_source_is_a_commit": false,
+    "same_commit_cross_platform_verified": false
+  },
+  "environment": {
+    "os": "macOS 27.0",
+    "kernel": "Darwin 27.0.0",
+    "architecture": "arm64",
+    "platform_role": "local targeted validation only"
+  },
+  "write_domain": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/mod.rs",
+      "sha256": "900bc680f8ef430e02a02ab2cf227e9f6b245f2d7b596521a01db2dc9bfcc83c",
+      "bytes": 9691
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "sha256": "acf07adca08b9cfa02a252d65725496c82668d61eb45607b1c000c4075e492d1",
+      "bytes": 33848
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+      "sha256": "028156ba42ded2e7e8f19ac20d8c84ee24d3ed22146f9444101917598433a7c2",
+      "bytes": 38087
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos_tests.rs",
+      "sha256": "c7a4d55781e987a31647243aab71c9fa05107f33a821e7c272887adcf78ab360",
+      "bytes": 11799
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_tests.rs",
+      "sha256": "b056b174cc64bb6c5a98253eb4910993e179a5407f77d1fe277adf8810e60932",
+      "bytes": 23985
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/runtime_host.rs",
+      "sha256": "2e5cafdbef63cbaf18ca32603f23313b188f2e874e2723fcd7bb53bc9bc4740b",
+      "bytes": 72786,
+      "untracked": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/runtime_host_tests.rs",
+      "sha256": "43feeeeefe337f356af03596c5d1f8b760f48354b121b1aa43f4653020615085",
+      "bytes": 54858,
+      "untracked": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "sha256": "73d0f4978bc2f4505eff8b880a5be16a5056f9485a13ed69a33dd2906762fa4e",
+      "bytes": 139167
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+      "sha256": "428858f5cf2ee17be9508c4f9f8fa15095a31f6aeb4051d5a422e974bc94957f",
+      "bytes": 191591
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "sha256": "980f642d299ac83d4ec7ad3d752aa178f91b9d6bcf2a54621732557a53d3847a",
+      "bytes": 383048
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "sha256": "894cf694b8ad38d11d468d56537f27ef535902a3e0c85a021bd5d12751fe896d",
+      "bytes": 369445
+    }
+  ],
+  "verification_runs": [
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::runtime_host::tests::fake_ack_parser_accepts_one_prefixed_marker_and_rejects_ambiguous_or_polluted_values -- --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::runtime_host::tests::real_process_host_survives_gui_exit_and_reconnects_without_replay -- --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "duration_seconds": 54.63
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::managed_process::tests::stdout_bridge_flushes_ack_before_the_long_lived_source_reaches_eof -- --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::runtime_host::tests:: -- --nocapture --test-threads=1",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 1,
+      "ignored_reason": "仅由真实多进程测试派生的 helper 入口",
+      "duration_seconds": 164.17
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::managed_process::tests:: -- --nocapture --test-threads=1",
+      "passed": 23,
+      "failed": 0,
+      "ignored": 0,
+      "duration_seconds": 0.44
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::managed_process::macos::tests:: -- --nocapture --test-threads=1",
+      "passed": 14,
+      "failed": 0,
+      "ignored": 0,
+      "duration_seconds": 0.27
+    },
+    {
+      "command": "target/debug/deps/warp-bc7cbbbc88dff6d5 ai::cli_agent_runtime::coordinator::tests::committed_duplicate_is_acked_without_reapplying_result_and_next_event_continues --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "target/debug/deps/warp-bc7cbbbc88dff6d5 ai::cli_agent_runtime::coordinator::tests::cross_generation_host_event_is_rejected_instead_of_waiting_for_an_ack --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "target/debug/deps/warp-bc7cbbbc88dff6d5 ai::cli_agent_runtime::coordinator::tests::offline_recovery_replays_a_committed_event_before_advancing_its_durable_watermark --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "duration_seconds": 0.12
+    },
+    {
+      "command": "target/debug/deps/warp-bc7cbbbc88dff6d5 ai::cli_agent_runtime::coordinator::tests::repeated_refresh_skips_every_runtime_already_owned_by_this_coordinator --exact --nocapture --test-threads=1",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "git diff --check -- <runtime-host-write-domain>",
+      "passed": 1,
+      "failed": 0,
+      "ignored": 0
+    }
+  ],
+  "preserved_failure_lineage": [
+    {
+      "result": "failed",
+      "boundary": "真实多进程夹具的首条命令已到 fake CLI，但 old_gui 等待原生 ACK 超时",
+      "cause": "libtest 在 helper 名称后保留未换行前缀，ACK marker 被拼接在同一行；旧夹具错误使用 strip_prefix",
+      "resolution": "测试夹具仅允许行内唯一 ACK marker，仍严格解析完整 UUID，并拒绝多 marker、尾随非空污染和身份不匹配"
+    },
+    {
+      "result": "failed",
+      "boundary": "stdout bridge 回归的 EOF 前 ACK 内容与 flush 已通过，但最终字节计数断言失败",
+      "cause": "测试把 26 字节的固定输入误写为 27",
+      "resolution": "断言改为使用实际字节串长度；生产实现未因该断言失败而放宽"
+    },
+    {
+      "result": "failed_then_fixed",
+      "boundary": "IPC bincode 无法直接反序列化包含 serde_json::Value 的命令、事件和 snapshot",
+      "cause": "bincode 不支持 deserialize_any",
+      "resolution": "仅对既有 IPC 字段使用有界 JSON bytes 包装，外层认证 IPC 类型未扩张"
+    }
+  ],
+  "verified_boundaries": {
+    "real_os_processes_used": true,
+    "real_gui_process_used": false,
+    "real_third_party_cli_used": false,
+    "adapter_fixture_used": true,
+    "old_gui_helper_exited_while_host_and_native_process_remained_alive": true,
+    "new_gui_helper_reattached_to_same_host_generation": true,
+    "previous_owner_epoch_was_fenced": true,
+    "only_events_after_durable_ack_were_recovered": true,
+    "same_message_retry_was_not_redispatched": true,
+    "two_inputs_and_shutdown_were_each_delivered_once": true,
+    "host_crash_was_classified_unconfirmed_and_did_not_resume_history": true,
+    "offline_turn_started_text_delta_turn_finished_and_final_result_were_recovered": true,
+    "offline_recovery_did_not_reexecute_old_commands": true,
+    "sqlite_commit_before_host_ack_was_recovered_idempotently": true,
+    "cross_generation_event_failed_closed_without_ack": true,
+    "repeated_refresh_did_not_reclaim_the_active_owner": true,
+    "stdout_ack_was_visible_before_source_eof": true,
+    "ipc_command_event_inspection_and_owner_claimed_nested_json_roundtrip": true,
+    "ipc_json_logical_limit_bytes": 67108864
+  },
+  "not_covered": [
+    "不是包含这些改动的冻结提交，不能作为同一提交验证收据",
+    "未在 Linux 或 Windows 上运行真实宿主、进程树、IPC、stdout flush 或重关联测试",
+    "未使用真实 Codex CLI、Claude Code 或 Grok Build；不证明三方原生协议、权限、审批、技能或版本兼容",
+    "未运行 cargo check -p warp、i18n::tests 或仓库适用完整门禁",
+    "未运行真实 GUI 新建、两轮交互、审批允许/拒绝、追加、取消、继续、应用重启、恢复和结果回收完整生命周期",
+    "未验证 SSH/tmux、IME、双语布局或实际用户界面呈现",
+    "未验证自动升级、渠道持久化或升级失败事务恢复",
+    "generic IPC framing allocates the declared outer frame before the runtime-host JSON logical-size check; the private 0600 endpoint and token reduce exposure but do not prove a same-user hostile-client allocation bound"
+  ],
+  "remaining_risks": [
+    "跨平台通用 stdout flush 仅有平台无关单元测试；Linux/Windows 的真实监督进程仍需在同一冻结提交上验证",
+    "当前证据使用 fake adapter；真实三款 CLI 可能存在不同 ACK、进度、审批或退出时序",
+    "恢复 checkpoint 存在现有 local task config 中；需要完整迁移兼容与旧数据库升级路径门禁继续确认",
+    "完整 GUI 接入仍需证明 snapshot 与 SQLite/UI 状态一致，而不只是宿主和协调器定向测试",
+    "当前工作树包含其他代理和用户的并行改动，本收据不能把它们的状态归因于父子宿主实现"
+  ],
+  "safety": {
+    "credentials_read_or_copied": false,
+    "authentication_material_in_receipt": false,
+    "raw_cli_transcript_in_receipt": false,
+    "raw_ipc_token_in_receipt": false,
+    "local_temporary_diagnostic_paths_embedded": false,
+    "existing_staged_handoff_documents_modified": false
+  },
+  "passed": true,
+  "result": "targeted_parent_child_runtime_host_validation_passed_on_dirty_macos_working_tree",
+  "overall_goal_complete": false,
+  "final_release_or_cross_platform_receipt": false
+}

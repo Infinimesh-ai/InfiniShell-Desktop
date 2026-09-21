@@ -4,7 +4,7 @@
 
 Codex `rust-v0.147.0` 官方 hook schema 在 UserPromptSubmit、Stop、PermissionRequest 和 PostToolUse 中明确声明原生 `turn_id`，此修补只透传该字段，不制造 Claude `prompt_id`、事件 ID 或序号。缺少关联字段的终态降级为普通通知；`stop_hook_active=true` 不报告完成，缺少最终文本也不声称成功。
 
-本地安装器把完整来源发布到 CLI HOME 下的 `plugins/infinishell-sources/codex-warp-0.4.0-rev4/source`，在私有暂存 HOME 用真实 Codex 完成来源注册及安装，再验证缓存并迁入单一 marketplace 与目标插件启用字段。没有只修缓存的默认路径：Codex 的后台 Git marketplace 刷新会覆盖这种修补。原用户信任字段、无关配置、其他 marketplace、orchestration 的禁用及缓存均须保留。未知来源、完整源码或缓存的自定义修改、未经验证的版本、显式禁用会拒绝操作。
+本地安装器把完整来源发布到 CLI HOME 下的 `plugins/infinishell-sources/codex-warp-0.4.0-rev5/source`，在私有暂存 HOME 用真实 Codex 完成来源注册及安装，再验证缓存并迁入单一 marketplace 与目标插件启用字段。没有只修缓存的默认路径：Codex 的后台 Git marketplace 刷新会覆盖这种修补。原用户信任字段、无关配置、其他 marketplace、orchestration 的禁用及缓存均须保留。未知来源、完整源码或缓存的自定义修改、未经验证的版本、显式禁用会拒绝操作。
 
 配置提交使用限定字段重读比较和原子文件替换，并非跨进程原子 CAS。发现并发目标变化时停止；失败恢复仅覆盖仍匹配本操作写入值的状态。无法安全恢复的旧缓存及阶段记录保留在 `plugins/infinishell-transactions/`，错误日志给出路径。原始 Git snapshot 不会被删除；新版本应随应用交付新的完整受控来源，不能直接执行原生 Git upgrade 覆盖当前来源。详细实证、恢复边界及原生 `expectedVersion` 的限制见 `specs/cli-agent-parity/CODEX_PLUGIN_CACHE_REFRESH.md`。
 
@@ -21,7 +21,9 @@ SSH 或容器需用 `script/cli-agent-parity/apply_notification_patch.py --expor
 
 修补第 4 版为五个既有事件保留 POSIX `command`，并加入从仓库 `script/cli-agent-parity/codex_windows_hook_command.ps1` 确定生成的 `commandWindows`。`warp-notify.sh` 在 Git Bash 中使用从 `codex_windows_notify.ps1` 编码的 `CONOUT$` / `WriteConsoleW` 通道。新增 `on-prompt-submit.sh` 替换件，仅 Windows 分支为 jq 开启 `--binary`，逐字保留 LF/CRLF；Unix 继续使用既有 `jq -r`，不要求实现 Windows 专用选项。未改动其他 CLI 的资源或平台门控。
 
-rev3 迁移按 `revisions/rev3/SOURCE_METADATA.json` 的全部 36 个文件、固定路径、元数据原文和模式位识别旧不可变来源，并按完整 10 文件树识别通知缓存。单独改版本号、伪造清单、混合不同修补版本或用户自定义脚本均不构成受控迁移来源。升级发布新 rev4 目录，旧 rev3 来源不变；升级后的旧缓存及 `state.json` 也保留在事务目录。回滚只恢复仍匹配此次事务的缓存和受影响配置，保留用户信任、显式禁用和无关配置。
+rev3/rev4 迁移分别按 `revisions/rev3` 与 `revisions/rev4` 中的全部 36 个文件清单、固定路径、元数据原文和模式位识别旧不可变来源，并按完整 10 文件树识别通知缓存。单独改版本号、伪造清单、混合不同修补版本或用户自定义脚本均不构成受控迁移来源。升级发布新 rev5 目录，旧 rev3/rev4 来源不变；升级后的旧缓存及 `state.json` 也保留在事务目录。回滚只恢复仍匹配此次事务的缓存和受影响配置，保留用户信任、显式禁用和无关配置。
+
+修补第 5 版适配 Codex 0.155.1 将 hook 放入无控制终端新会话的行为。tmux 路径只接受当前 `TMUX_PANE` 查询到的 `pane_tty`，SSH 路径只接受经校验的 `SSH_TTY`；两者都拒绝链接、普通文件和非 TTY 字符设备。本地路径优先 `/dev/tty`，其不可用时只遍历有限父进程并接受名称为 Codex 的祖先 TTY。任何选择或写入失败都返回非零并输出错误，不再静默伪装通知成功。异机 Linux SSH 中的真实 Codex 0.155.1 已验证普通终端与 tmux `allow-passthrough=on/off` 正负路径；该记录不代表 GUI 完整生命周期或 Windows 新脚本字节已验收。
 
 rev4 的 macOS 无凭据原生 `hooks/list` 已采集为 `NATIVE_HOOK_TRUST.json`：仅五个正式 hook，无测试阻断 hook、无插桩 wrapper、无输入回合及模型调用。第十轮 b3d8 的 Windows x64 正式采集也已通过，独立摘要保存为 `NATIVE_HOOK_TRUST_WINDOWS.json`；应用据此只读判断 Required/Configured/Unknown，不把配置吻合显示为当前会话已生效。其他 Windows 架构及生产自动安装仍未开放。正式 ConPTY 证据只覆盖 SessionStart/UserPromptSubmit，剩余事件和完整生命周期仍待验；第九轮候选证据不替代正式记录。
 

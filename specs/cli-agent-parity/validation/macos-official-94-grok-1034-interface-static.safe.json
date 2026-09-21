@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_34_installed_binary_help_bundled_guides_static_interface_and_current_adapter_gate_audit",
+  "observed_at": "2026-09-21T07:39:39+08:00",
+  "receipt_created_at": "2026-09-21T07:43:10+08:00",
+  "host_platform": "darwin-arm64",
+  "repository": {
+    "branch": "codex/cli-agent-parity",
+    "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "source_tree_dirty": true,
+    "audit_wrote_product_source": false,
+    "receipt_only_write": true
+  },
+  "binary": {
+    "entrypoint": "/Users/zhishi/.grok/bin/grok",
+    "symlink_target": "../downloads/grok-1.0.34-macos-aarch64",
+    "resolved_path": "/Users/zhishi/.grok/downloads/grok-1.0.34-macos-aarch64",
+    "version": "1.0.34",
+    "version_output": "grok 1.0.34 (3736acbc8658)",
+    "build_commit": "3736acbc8658",
+    "bytes": 143016096,
+    "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+    "format": "Mach-O 64-bit executable arm64",
+    "thin_architecture": "arm64",
+    "codesign_deep_strict_verified": true,
+    "codesign_identifier": "xai-grok-pager",
+    "codesign_authority": "Developer ID Application: X.AI Corporation (5Y6N3AJ54S)",
+    "team_identifier": "5Y6N3AJ54S",
+    "cdhash": "79eb5737d2e941171b5fbbef945c1efa77876a25",
+    "signature_timestamp_codesign_display": "Sep 16, 2026 at 09:50:10"
+  },
+  "command_audit": {
+    "environment": {
+      "inherited_environment": false,
+      "isolated_home": true,
+      "isolated_grok_home": true,
+      "isolated_xdg_directories": true,
+      "user_configuration_loaded": false,
+      "authentication_attempted": false,
+      "model_input_sent": 0
+    },
+    "command_categories": [
+      "readlink/stat/shasum/file/codesign binary identity checks",
+      "isolated grok --version and grok version --json",
+      "isolated grok --help and selected subcommand --help",
+      "isolated grok inspect --json in an empty private project",
+      "local strings and exact byte-substring counting",
+      "jq projection of existing safe receipts"
+    ],
+    "version_json": {
+      "currentVersion": "1.0.34 (3736acbc8658)",
+      "channel": "unknown",
+      "boundary": "The isolated environment intentionally did not load the user's persisted channel."
+    },
+    "help_observed": {
+      "agent_transports": [
+        "stdio",
+        "serve",
+        "headless",
+        "leader"
+      ],
+      "permission_flags": [
+        "--allow",
+        "--deny",
+        "--permission-mode",
+        "--always-approve"
+      ],
+      "session_flags": [
+        "--resume",
+        "--continue",
+        "--fork-session"
+      ],
+      "subagent_flags": [
+        "--agent",
+        "--agents",
+        "--no-subagents"
+      ],
+      "subcommands": [
+        "agent",
+        "inspect",
+        "sessions",
+        "plugin",
+        "mcp",
+        "update",
+        "version"
+      ],
+      "boundary": "Help availability is not a protocol, task, permission, tool, child-task, recovery, or product acceptance result."
+    },
+    "isolated_inspect": {
+      "grokVersion": "1.0.34",
+      "channel": "unknown",
+      "builtin_agent_names": [
+        "general-purpose",
+        "explore",
+        "plan"
+      ],
+      "skills_count": 0,
+      "mcp_servers_count": 0,
+      "top_level_keys": [
+        "agents",
+        "channel",
+        "configSources",
+        "cwd",
+        "externalCompat",
+        "grokVersion",
+        "hooks",
+        "loginPolicy",
+        "lspServers",
+        "marketplaces",
+        "mcpServers",
+        "permissions",
+        "plugins",
+        "projectInstructions",
+        "projectRoot",
+        "projectTrusted",
+        "skills"
+      ],
+      "boundary": "Inspect proved only clean isolated discovery shape and the builtin agent catalog; it did not execute a skill, MCP tool, model turn, or subagent."
+    }
+  },
+  "materialized_bundled_guides": {
+    "source": "Exact user-guide bytes materialized by the installed 1.0.34 binary inside an isolated temporary home.",
+    "temporary_materialization_removed": true,
+    "files": {
+      "08-skills.md": "6ed785b7e4c1c064a170abe69187202ce36a28ef08523483d7b240ab257c5da1",
+      "14-headless-mode.md": "2dd1302d88dc39276866e09a7c34501ecbe0e53b34a17f49e6908356ba1c98a9",
+      "15-agent-mode.md": "17f6088ffd7ba636e8dff4ba37255d11920865492b9f23b7e1e91f838fafe185",
+      "16-subagents.md": "e7213c7181b9fb2188e346c8977e25832e183118020552c541ca1bafc5be2496",
+      "17-sessions.md": "2e728c7f53201df625582093aa5e626c081d7b51389093f4359b184407e99d61",
+      "22-permissions-and-safety.md": "918ad092e92261e5c09c46f04c87acccf10b41a2945c97857ce0d5c57c12267d"
+    },
+    "boundary": "Bundled documentation describes candidate behavior but is not evidence that InfiniShell invoked or completed that behavior."
+  },
+  "static_candidate_counts": {
+    "measurement": "Exact non-overlapping byte-substring occurrences in the installed executable; shorter substrings may also occur inside longer strings.",
+    "counts": {
+      "initialize": 224,
+      "session/new": 22,
+      "session/load": 26,
+      "session/prompt": 18,
+      "session/cancel": 5,
+      "session/update": 21,
+      "session/request_permission": 4,
+      "session/set_config_option": 2,
+      "available_commands_update": 8,
+      "tool_call_update": 5,
+      "spawn_subagent": 17,
+      "send_subagent_message": 15,
+      "get_command_or_subagent_output": 11,
+      "GROK_ACTIVE_AGENT_MESSAGES": 4,
+      "resume_from": 27,
+      "subagent_spawn.metadata_persist": 1,
+      "reconcile_orphaned_subagents_with_backend": 2,
+      "x.ai/mcp/sdk": 3,
+      "x.ai/mcp/sdk_call": 2,
+      "server/discover": 14,
+      "tools/list": 19,
+      "tools/call": 5
+    },
+    "unique_queue_method_strings": [
+      "x.ai/queue/changed",
+      "x.ai/queue/clear",
+      "x.ai/queue/edit",
+      "x.ai/queue/hold_edit",
+      "x.ai/queue/interject",
+      "x.ai/queue/remove",
+      "x.ai/queue/reorder"
+    ],
+    "boundary": "Counts and embedded method names are implementation-presence signals only. They do not establish request shape, authorization, native acknowledgement, execution, persistence, or compatibility."
+  },
+  "native_parent_child_limit": {
+    "source_guide": "16-subagents.md",
+    "documented_behavior": "A root session may send to an owned subagent when active-agent messaging is enabled.",
+    "documented_limit": "A child whose direct parent is the root session cannot send a native message back to that root session.",
+    "effect": "The builtin native root-child topology cannot by itself satisfy arbitrary bidirectional parent-child message acknowledgement required by the product.",
+    "product_bridge_required_for_full_requirement": true,
+    "runtime_verified_in_this_audit": false
+  },
+  "existing_adapter_gate": {
+    "source_files": [
+      "app/src/ai/cli_agent_runtime/grok.rs",
+      "app/src/ai/cli_agent_runtime/grok_profile.rs",
+      "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+      "app/src/ai/cli_agent_runtime/grok_skills.rs",
+      "app/src/ai/cli_agent_runtime/grok_tool_lease.rs"
+    ],
+    "fully_verified_version_constant": "1.0.30",
+    "p0_verified_version_constant": "1.0.34",
+    "grok_1_0_34": {
+      "newSession": true,
+      "submit": true,
+      "exact_correlated_read_allow_once": true,
+      "exact_correlated_read_deny_once": true,
+      "cancel": true,
+      "root_session_resume": true,
+      "queuedSubmit": false,
+      "steer": false,
+      "selectedSkills": false,
+      "localTools": false,
+      "childTasks": false,
+      "closeSession": false,
+      "emptyHistoryRecovery": false,
+      "fixed_files_or_write_approval": false
+    },
+    "fail_closed_behavior": [
+      "A second submit while a 1.0.34 turn is active is rejected rather than represented as a native queue acknowledgement.",
+      "Steer is rejected.",
+      "Selected skills and local tools remain version-gated off.",
+      "Unverified 1.0.34 write approval requests are cancelled rather than broadened from read-only evidence.",
+      "Child tasks remain disabled because catalog registration or a tool lease is not a completed parent-child chain."
+    ],
+    "boundary": "This is a static audit of the live dirty-tree adapter gate, not a compile, unit-test, GUI, native task, or same-commit cross-platform result."
+  },
+  "existing_safe_receipt_boundaries": [
+    {
+      "path": "specs/cli-agent-parity/validation/grok-latest-protocol-interface-20260919.safe.json",
+      "proved": "Unauthenticated initialize shape for the same 1.0.34 binary digest.",
+      "did_not_prove": "Session creation, prompt, approval, cancel, tool, child task, recovery, or result collection."
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/grok-1034-native-p0-native12.safe.json",
+      "proved": "Raw ACP read allow, read deny, cancel after real text, and cold root-session load/recall candidate flow.",
+      "did_not_prove": "Production runtime, full parity, skills, local tools, queued submit, steer, fixed write policy, or parent-child chain."
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-official-50-grok-1034-p0-gui.safe.json",
+      "proved": "One GUI-visible exact native read approval and final marker on the recorded dirty candidate.",
+      "did_not_prove": "Independent GUI deny/cancel/resume, extended lifecycle, local tools, or child tasks."
+    }
+  ],
+  "capability_assessment": {
+    "running_append": "candidate_interface_only",
+    "fixed_read_allow_deny": "limited_real_p0_evidence",
+    "fixed_files_write_allow_deny": "not_verified",
+    "skills": "candidate_interface_only",
+    "local_tools": "candidate_interface_only",
+    "native_parent_child_dispatch": "candidate_interface_only",
+    "bidirectional_native_ack": "not_satisfied_for_direct_root_child_topology",
+    "child_progress": "candidate_interface_only",
+    "automatic_child_result_collection": "candidate_interface_only",
+    "root_session_recovery": "limited_real_p0_evidence",
+    "child_persistent_recovery": "not_verified",
+    "reliable_product_degradation": "Keep 1.0.34 extended capabilities disabled and fail closed until exact authenticated native and product receipts exist."
+  },
+  "safety": {
+    "authentication_accessed": false,
+    "authentication_copied": false,
+    "authentication_attempted": false,
+    "network_accessed": false,
+    "network_model_call": false,
+    "model_inputs_sent": 0,
+    "config_modified": false,
+    "user_config_read": false,
+    "raw_config_archived": false,
+    "credential_material_archived": false,
+    "raw_protocol_output_archived": false,
+    "temp_cleaned": true
+  },
+  "acceptance": {
+    "static_interface_audit_completed": true,
+    "help_counted_as_runtime_pass": false,
+    "bundled_guides_counted_as_runtime_pass": false,
+    "static_strings_counted_as_runtime_pass": false,
+    "inspect_counted_as_skill_or_tool_pass": false,
+    "overall_product_acceptance": false,
+    "full_goal_passed": false
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "receipt": "official CLI channel discovery",
+  "fetched_at_utc": "2026-09-20T22:03:12Z",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_state": "dirty_working_tree",
+  "results": [
+    {
+      "cli": "codex",
+      "channel": "latest",
+      "url": "https://registry.npmjs.org/@openai/codex/latest",
+      "version": "0.155.1",
+      "response_bytes": 3521,
+      "response_sha256": "2c346b7643a7c641596f9bfe7d443bfdfa726452fd4feb7b44cc307e4aa7edb2"
+    },
+    {
+      "cli": "codex",
+      "channel": "alpha",
+      "url": "https://registry.npmjs.org/@openai/codex/alpha",
+      "version": "0.156.0-alpha.10",
+      "response_bytes": 3667,
+      "response_sha256": "07c22770e012f8e9f33e570e7c8572cf730474485d8d8e42fefb937b3c517e3e"
+    },
+    {
+      "cli": "claude",
+      "channel": "stable",
+      "url": "https://registry.npmjs.org/@anthropic-ai/claude-code/stable",
+      "version": "2.1.267",
+      "response_bytes": 3271,
+      "response_sha256": "fd315b5f079134b932a3c3a25cef9e46b0a0d8d157cd067972457bcbe3768f1b"
+    },
+    {
+      "cli": "claude",
+      "channel": "latest",
+      "url": "https://registry.npmjs.org/@anthropic-ai/claude-code/latest",
+      "version": "2.1.278",
+      "response_bytes": 3300,
+      "response_sha256": "69db28aac6b981048d21a7dc7dfc8544cd80e954280693eb85f63b04884cfbfb"
+    },
+    {
+      "cli": "grok",
+      "channel": "stable",
+      "url": "https://x.ai/cli/stable",
+      "version": "1.0.34",
+      "response_bytes": 6,
+      "response_sha256": "f793c92fb1aa67f65ee5a281b7acc0c7976cc29ec06ae255060d8027a0cf6855"
+    },
+    {
+      "cli": "grok",
+      "channel": "alpha",
+      "url": "https://x.ai/cli/alpha",
+      "version": "1.0.38",
+      "response_bytes": 6,
+      "response_sha256": "e591605acbab3fb074dcf9a31387ab360e463c165289c968d338c55558bb019b"
+    }
+  ],
+  "scope": {
+    "channel_discovery": true,
+    "download_verified": false,
+    "update_executed": false,
+    "cli_lifecycle_verified": false,
+    "product_acceptance_verified": false
+  },
+  "overall_acceptance": false,
+  "note": "This receipt records current official channel responses only. Historical alpha lifecycle receipts remain bound to their original versions and are not promoted to the versions above."
+}

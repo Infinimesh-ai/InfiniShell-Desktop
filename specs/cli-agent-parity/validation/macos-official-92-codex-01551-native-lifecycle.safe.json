@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-20T23:14:23.037560+00:00",
+  "scope": "Codex 0.155.1 native app-server authenticated lifecycle",
+  "source": {
+    "commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "tree_dirty": true,
+    "probe_sha256": "4ec32327ead6f353c7fa389530551eeb0a609f2c5c20e627b64cb5f8c1b0b705",
+    "codex_version": "codex-cli 0.155.1",
+    "codex_sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+    "server_cli_version": null
+  },
+  "authentication": {
+    "existing_login_reused": true,
+    "credential_content_recorded": false,
+    "credential_bytes_copied_to_temporary_home": 3977
+  },
+  "phases": [
+    {
+      "phase": "first",
+      "turn_id_sha256": "0d4edcda365c6c8e14a647eccb6c529cbc08073f3a098c36b43652f6a5291b21",
+      "status": "completed",
+      "marker_observed": true,
+      "approval_count": 0,
+      "command_event_count": 0,
+      "passed": true
+    },
+    {
+      "phase": "second",
+      "turn_id_sha256": "757ccaa6547ca4bd300f2c89124ba8d1a556bb024344230548b3c3e721183cb6",
+      "status": "completed",
+      "marker_observed": true,
+      "approval_count": 0,
+      "command_event_count": 0,
+      "passed": true
+    },
+    {
+      "phase": "approval_allow",
+      "turn_id_sha256": "f72e171217da760e905643c6629189e6facb2c78391c77cb6cf1b48e82b7a058",
+      "status": "completed",
+      "approval": {
+        "request_id_sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+        "item_id_sha256": "5831f2290060137f604c1d3adb0bec8379a790822033804acb0a4165a6963b8c",
+        "decision": "accept",
+        "exact_fixture": true
+      },
+      "command_events": [
+        {
+          "event": "item/started",
+          "status": "inProgress",
+          "exit_code": null
+        },
+        {
+          "event": "item/completed",
+          "status": "completed",
+          "exit_code": 0
+        }
+      ],
+      "file_effect_verified": true,
+      "marker_observed": true
+    },
+    {
+      "phase": "approval_deny",
+      "turn_id_sha256": "2ad49d6d006f508a73620a5cd8c1d3dbe18dd8665b3f4fa433258365fefd44cb",
+      "status": "completed",
+      "approval": {
+        "request_id_sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+        "item_id_sha256": "c6a9d8dc9cd71748fc3ae458965b2d2fefc3062e6eb70f257ec5f2171d8722c6",
+        "decision": "decline",
+        "exact_fixture": true
+      },
+      "command_events": [
+        {
+          "event": "item/started",
+          "status": "inProgress",
+          "exit_code": null
+        },
+        {
+          "event": "item/completed",
+          "status": "declined",
+          "exit_code": null
+        }
+      ],
+      "file_absence_verified": true
+    },
+    {
+      "phase": "running_steer",
+      "turn_id_sha256": "4f29262a3cb530f1554a5229e3798fbbea3e6f93cbbef4dc2ad31ce7e25572e0",
+      "status": "completed",
+      "approval": {
+        "request_id_sha256": "d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35",
+        "item_id_sha256": "2f432ed7f0e38cc032b2a887ee89d17b0ec0380cc05f0075d81c512d91bc461b",
+        "decision": "accept",
+        "exact_fixture": true
+      },
+      "steer_native_ack": true,
+      "command_events": [
+        {
+          "event": "item/started",
+          "status": "inProgress",
+          "exit_code": null
+        },
+        {
+          "event": "item/completed",
+          "status": "completed",
+          "exit_code": 0
+        }
+      ],
+      "marker_observed": true
+    },
+    {
+      "phase": "running_cancel",
+      "turn_id_sha256": "60c7eab076c22aa224b7313afb5f9dea3508e134f0c1a871ed88250a976a4fed",
+      "status": "interrupted",
+      "approval": {
+        "request_id_sha256": "4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce",
+        "item_id_sha256": "b687f8b48e2444aae8de3646803e03b742f08b42f572c0cc6d0f5efe443b3ed5",
+        "decision": "accept",
+        "exact_fixture": true
+      },
+      "interrupt_native_ack": true,
+      "command_events": [
+        {
+          "event": "item/started",
+          "status": "inProgress",
+          "exit_code": null
+        }
+      ],
+      "fixture_process_exited": false
+    },
+    {
+      "phase": "resume",
+      "turn_id_sha256": "8052048e5bbebfe099cdb98085b9868306d5e561ff8d0d93221729dbf8b2c3c4",
+      "status": "completed",
+      "marker_observed": true,
+      "approval_count": 0,
+      "command_event_count": 0,
+      "passed": true,
+      "same_thread_after_server_restart": true
+    }
+  ],
+  "result": {
+    "native_lifecycle_passed": false,
+    "product_adapter_passed": false,
+    "application_restart_passed": false,
+    "full_goal_passed": false
+  },
+  "limitations": [
+    "This native probe does not execute the InfiniShell adapter, GUI, managed task persistence, or application restart.",
+    "The source working tree is dirty and not a frozen cross-platform candidate."
+  ],
+  "thread_id_sha256": "afa27e922fbd3e278f92a4be04eaf8a9c5df54a6217a2b590dec7ab389e10dd8",
+  "transcript": {
+    "bytes": 114999,
+    "lines": 292,
+    "sha256": "581d52ff5223615cf95638dab7b0110e112127786bdb19c3a68c2a5fc93b0a2a",
+    "persisted": false
+  },
+  "process_exit_codes": [
+    0,
+    0
+  ]
+}

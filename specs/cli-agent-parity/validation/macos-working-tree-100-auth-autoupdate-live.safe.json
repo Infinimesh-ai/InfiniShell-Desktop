@@ -1,0 +1,243 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-21T04:57:49Z",
+  "receipt": "Current-source macOS atomic updater fix, successful Claude and Grok native product updates, and authenticated live CLI capability checks",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "upstream_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "historical_tested_commit": "38a611773b8ee53860f9ab731b2476b9a40d1819",
+    "tree_dirty": true,
+    "porcelain_path_count_before_this_receipt": 137,
+    "code_committed": false,
+    "code_pushed": false,
+    "same_commit_cross_platform_dispatched": false
+  },
+  "current_source_binding": {
+    "manifest_sha256": "a0bae2275a86ebcf0f6ce757f93e0ec4f5ff1318da622ef258f0b3fc877e97b1",
+    "bundle_sha256": "9b676d74c936a9026221aac96803516fc5389354c6693eeebea629c4427ac676",
+    "gates_sha256": "91a8b48430a8fb75b101a90c9c51bd3594e49fc5c33b46fefcfc7c8a03324f61",
+    "worker_sha256": "cbdd4c242bf06400460e7709bbb8b89a00eb26b410c305d5759cb11d4fd161ce",
+    "supervisor_sha256": "6c98c97ae009efa33f91428819aff94f63c5a12a84980c49eaf4da87795dac3a",
+    "files": {
+      "app/src/ai/cli_agent_runtime/managed_process.rs": "cc190c3bb2c6ba60db87921a0d0885501fd8d0c836a99d469f8463d9fa8886bb",
+      "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs": "851680295f3efb00653f2745cdbea7f07b763cc35e150647d7b79c7694159956",
+      "app/src/ai/cli_agent_runtime/managed_process_atomic_macos_tests.rs": "55da9d9389da9f54fe1dcf7445cb3dc914343f50358cf3735437047992c241b3",
+      "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs": "4c69ad1b61388dca2886684bb22a6c9a9dc2d04d657855c1c2a389fedb3b176a",
+      "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "7be0f4de92f41add6114ca5264b1aa600af43d45c43b5d8c47ec8044fcc42aeb",
+      "app/src/terminal/cli_agent_updates/sources.rs": "9ba857d6e6f30913de56e77f9b8d3b50223785408516208ade98a5f2a2010b96",
+      "app/src/terminal/cli_agent_updates/sources_live_tests.rs": "d83c21afc6c841091257a8eeb9ebb4aa7c6ab54c588b68b3d290661d1f0927a6",
+      "script/cli-agent-parity/verify_cli_autoupdate.py": "9800674bda0e08de4ff532691363f61adbeefc1a6aebbda4fd5f36351054ab44"
+    },
+    "same_source_build_verified": true,
+    "same_commit_verified": false
+  },
+  "macos_atomic_snapshot_fix": {
+    "issue": "fcopyfile preserved an extended attribute semantically but macOS rewrote the com.apple.quarantine timestamp, violating the exact signed snapshot digest check",
+    "implementation": "after COPYFILE_DATA and COPYFILE_XATTR, the snapshot removes attributes absent from the source and rewrites every source attribute byte-for-byte through file-descriptor APIs",
+    "strict_codesign_after_exact_xattr_mirror": true,
+    "quarantine_attribute_byte_for_byte_regression_test_added": true,
+    "macos_atomic_unit_tests": {
+      "passed": 15,
+      "failed": 0
+    },
+    "internal_volume_real_c_fixture": {
+      "passed": 1,
+      "failed": 0,
+      "actual_launchd_supervisor_execution": true
+    },
+    "preserved_external_volume_environment_failures": [
+      {
+        "fixture_suffix": "YDB9HV",
+        "classification": "environment_failure",
+        "observed": "the launchd control channel timed out while the external-volume worker was cold-starting"
+      },
+      {
+        "fixture_suffix": "IPgCay",
+        "classification": "environment_failure",
+        "observed": "the launchd control channel timed out while the external-volume worker was cold-starting"
+      }
+    ]
+  },
+  "native_product_updates": {
+    "claude": {
+      "case_id": "claude-21267-to-21278-atomic-4",
+      "channel": "follow_installation",
+      "old_version": "2.1.267",
+      "target_version": "2.1.278",
+      "passed": true,
+      "stage": "finished",
+      "product_inspect_calls": 2,
+      "product_execute_calls": 1,
+      "model_inputs_sent": 0,
+      "config_files_checked": 13,
+      "config_bytes_unchanged": true,
+      "credential_files_absent_before_and_after": true,
+      "old_binary_unchanged": true,
+      "target_reference_unchanged": true,
+      "entry_matches_expected": true,
+      "post_version_matches": true,
+      "journal_absent": true,
+      "production_chain_verified": true,
+      "receipt_sha256": "ed4f410f337848ca0ed7a1fda55043eb70e4d0fe114368f616ce34f97ea65934",
+      "event_sha256": "d5627f3f277f1de11db0dae6d3d294cbcd5e38256f8916be7f2d6d0ec9e2e81b",
+      "manifest_sha256": "03ae3fa2fd108b0ac59694fb49a78c5a64df3db153403e57d3d29f8733c0b95d"
+    },
+    "grok": {
+      "case_id": "grok-1034-to-1040-atomic-2",
+      "channel": "follow_installation",
+      "old_version": "1.0.34",
+      "target_version": "1.0.40",
+      "passed": true,
+      "stage": "finished",
+      "product_inspect_calls": 2,
+      "product_execute_calls": 1,
+      "model_inputs_sent": 0,
+      "config_files_checked": 13,
+      "config_bytes_unchanged": true,
+      "credential_files_absent_before_and_after": true,
+      "old_binary_unchanged": true,
+      "target_reference_unchanged": true,
+      "entry_matches_expected": true,
+      "post_version_matches": true,
+      "journal_absent": true,
+      "production_chain_verified": true,
+      "receipt_sha256": "6c40170f6abde4e3565f83ff044834284113f15e20a302bcadfc87e4c15170ff",
+      "event_sha256": "c7d111b324ac8ab3b17ea6016e8933f15e8d40538f944694efd411d79776b863",
+      "manifest_sha256": "4c3e6aaa0247b70c2541c33764323b6531e23ee0ca3c1333e9cfd600769510e7"
+    },
+    "preserved_failures": [
+      {
+        "case_id": "claude-21267-to-21278-atomic-2",
+        "receipt_sha256": "8459c21b5c858824dfe7e0c6357bfa8150d69a34eb49f00def7cc38a8e0ff6a7",
+        "classification": "actual_rejection",
+        "reason": "the fixture lived below the world-writable /private/tmp ancestor and the supervisor rejected the unsafe execution root"
+      },
+      {
+        "case_id": "claude-21267-to-21278-atomic-3",
+        "receipt_sha256": "e3a35cbc09950e130e926d012084584f91a19335e50e1b30b993919f59f67d39",
+        "classification": "actual_failure",
+        "reason": "the exact xattr snapshot check detected the quarantine-byte rewrite before the macOS mirror fix"
+      },
+      {
+        "case_id": "grok-1034-to-1040-atomic-1",
+        "receipt_sha256": "89379ffa4c772b44ad97f86dbf00be001b0a393c86a1d2aacc41d9e44c23883d",
+        "classification": "external_failure",
+        "reason": "network failure during inspect-before; execute was never called"
+      }
+    ]
+  },
+  "development_installations": {
+    "claude": {
+      "installed_version": "2.1.267",
+      "manager": "homebrew_cask",
+      "channel": "stable",
+      "official_update_result": "up_to_date",
+      "latest_channel_version_observed": "2.1.278",
+      "latest_channel_installed": false,
+      "classification": "passed_current_channel_following"
+    },
+    "grok": {
+      "installed_version": "1.0.40",
+      "revision": "eb1a2256660d",
+      "channel": "stable",
+      "update_available": false,
+      "binary_sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+      "strict_codesign_verified": true,
+      "oauth_models_command_exit_code": 0,
+      "classification": "passed"
+    }
+  },
+  "authenticated_live_cli": {
+    "claude": {
+      "authentication": "compatible_anthropic_api",
+      "credential_storage": "macos_keychain_only",
+      "credential_in_repository_or_receipt": false,
+      "models_endpoint_http_status": 200,
+      "models_returned": 11,
+      "models_probe_sha256": "dfb8d23077b231a9da4a70d4ed93a5adaeb10cbf48352402a74cd73228e047c5",
+      "session_id": "5c58768e-819e-4bef-8a59-ad774afd10a3",
+      "new_process_round_one_exact": "INFINISHELL_CLAUDE_API_OK",
+      "new_process_resume_round_two_exact": "INFINISHELL_CLAUDE_RESUME_OK",
+      "round_one_sha256": "c351cba0d8c9188d315a3fe60805bc013626d31236c80ba4c9494bb2ff037731",
+      "round_two_sha256": "8b07f532bfd15d5c88622704c7301c7f08c37fe63891d2871503919c3e2e2fac",
+      "deny_permission_denials": 1,
+      "deny_marker_absent": true,
+      "deny_sha256": "509b0a07f0421badf9b0c203b9de85d74f82e58945ae65f8eedcce69e4072974",
+      "narrow_bash_pattern_allow_passed": false,
+      "narrow_bash_pattern_allow_classification": "actual_failure",
+      "tool_level_bash_allow_passed": true,
+      "tool_level_bash_allow_permission_denials": 0,
+      "tool_level_bash_allow_sha256": "77301cb2ace567b87ad86d3c77b12acb63cc320c3cd87583877740cf9e1d355d",
+      "allowed_marker_sha256": "ac9d48e2f643cfa5372fd2e19c45790344d8424e4742cfb278a340a9d561423c",
+      "product_managed_full_lifecycle_verified": false
+    },
+    "grok": {
+      "authentication": "oauth",
+      "credential_storage_mode": "0600",
+      "credential_in_repository_or_receipt": false,
+      "headless_session_id": "7668553a-46cd-4c7c-9226-fd270f107c9c",
+      "new_process_round_one_exact": "INFINISHELL_GROK_ROUND1_OK",
+      "new_process_resume_round_two_exact": "INFINISHELL_GROK_RESUME_OK",
+      "round_one_sha256": "754042c640fe920876172678ea237ac2c75c9281086a176fcc0ba593989c2554",
+      "round_two_sha256": "eebd0588b5e5ad136f0ee4fb973fc5fae95e1349a1ad2b72c8a65c20575772c4",
+      "resume_warning": "resident session actor exited unexpectedly and was reaped as DeadFailed before successful recovery",
+      "headless_deny_passed": true,
+      "headless_deny_marker_absent": true,
+      "headless_deny_sha256": "6203682d1a936560bfe071b28794c42da3e33987ba8594c9a6d4864e3927ff5b",
+      "headless_allow_passed": false,
+      "headless_allow_stop_reason": "cancelled",
+      "headless_allow_classification": "actual_failure",
+      "interactive_allow": {
+        "session_id": "13f7d77a-0f4c-4e3f-9c52-aaf3f093b1c7",
+        "permission_requested": true,
+        "permission_decision": "allow",
+        "tool_exit_code": 0,
+        "marker_sha256": "2e956d60a3bd79cd129628b5d93fbdb23abe6d9d8d6c9d3bd36951511626cfe2",
+        "events_sha256": "aba4ba59392341f7ed3ee6ce9b49408f8cc55a3de6d4888c241639e0168cf953",
+        "updates_sha256": "e1292d8b374b5a6e922f190dc06b6fe885bdd088295af8c3de6e41a25ffb7d14",
+        "passed": true
+      },
+      "product_managed_full_lifecycle_verified": false
+    }
+  },
+  "local_validation": {
+    "cargo_fmt_all_check_passed": true,
+    "working_tree_diff_check_passed": true,
+    "index_diff_check_passed": true,
+    "verify_cli_autoupdate_python_tests": {
+      "passed": 27,
+      "failed": 0
+    },
+    "i18n_tests": {
+      "passed": 11,
+      "failed": 0
+    },
+    "cargo_check_warp_with_local_cli_managed_tasks": true,
+    "cargo_build_main_with_local_cli_managed_tasks": true,
+    "new_user_visible_copy_changed_in_the_xattr_fix": false,
+    "localization_change_required_for_the_xattr_fix": false
+  },
+  "platform_validation": {
+    "macos_actual_atomic_execution": true,
+    "windows_x86_64_msvc_typecheck": true,
+    "windows_aarch64_msvc_typecheck": true,
+    "linux_x86_64_musl_typecheck": true,
+    "linux_aarch64_musl_typecheck": true,
+    "cross_typechecks_are_execution_proof": false,
+    "linux_actual_execution": false,
+    "windows_actual_execution": false,
+    "same_commit_linux_windows_validation_dispatched": false,
+    "reason_not_dispatched": "the working tree is not frozen, committed, or pushed; dispatch would not test these bytes"
+  },
+  "unresolved": [
+    "The current-source product-managed complete lifecycle has not passed for Codex, Claude, or Grok in both ordinary-terminal and managed-task modes.",
+    "Grok full P1-P5 support, real parent-child dispatch, bidirectional native ACK, progress, result collection, and persistent recovery remain unaccepted.",
+    "Claude and Grok authenticated standalone CLI checks do not prove the InfiniShell managed-task integration.",
+    "SSH/tmux product acceptance and real IME plus bilingual layout checks remain incomplete.",
+    "Linux and Windows actual execution and same-commit cross-platform verification have not run.",
+    "The current working tree has not been frozen, committed, or pushed."
+  ],
+  "overall_product_acceptance": false,
+  "full_goal_passed": false
+}

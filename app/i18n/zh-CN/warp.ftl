@@ -5554,6 +5554,7 @@ cli-agent-message-local-only = 此会话无法使用本地任务消息。
 cli-agent-standalone-harness-unavailable = 此智能体命令无法启动 { $cli }。请在终端中运行，或使用本地 CLI 任务管理器。
 cli-agent-message-recipient-unavailable = 接收任务没有活动的托管连接，请先继续或重连该任务。
 cli-agent-message-delivery-failed = 任务消息未被接收，请先检查已保存的消息状态再重试。
+cli-agent-local-tool-concurrency-limit = 同时运行的本地工具请求过多。
 cli-agent-grok-managed-unverified = Grok 不支持这项操作或策略。子任务需要与父任务匹配的固定只读或文件工具策略。托管模式不支持图片；技能需要使用“继承”策略，并匹配当前会话中的技能。
 cli-agent-grok-managed-login-required = 请先登录 Grok 或在 Grok 中配置 API 密钥，再检查托管连接。
 cli-agent-grok-output-unverified = Grok 已结束本轮，但无法核验输出是否完整。已保留收到的输出。

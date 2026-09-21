@@ -12,7 +12,10 @@ use anyhow::Context as _;
 #[cfg(windows)]
 use warp_errors::report_error;
 #[cfg(windows)]
-use {super::windows::JobObject, std::os::windows::io::AsRawHandle};
+use {
+    super::windows::{JobObject, SuspendedChild},
+    std::os::windows::io::AsRawHandle,
+};
 
 /// Wrapper around a [`std::process::Command`] that ensures any new Command is set with the windows
 /// `CREATE_NO_WINDOW` flag to avoid a console window temporarily popping up.
@@ -21,6 +24,8 @@ pub struct Command {
     pub(super) inner: std::process::Command,
     #[cfg(windows)]
     kill_on_parent_process_close: bool,
+    #[cfg(windows)]
+    creation_flags: u32,
     stdin_is_default: bool,
     stdout_is_default: bool,
     stderr_is_default: bool,
@@ -75,19 +80,22 @@ impl Command {
         let mut inner = std::process::Command::new(program);
 
         #[cfg(windows)]
+        let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0
+            | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
+        #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
             // We need to set the `CREATE_BREAKAWAY_FROM_JOB` flag to avoid assigning
             // the process to the same Job Object as the Zap process, otherwise the
             // process will be killed when the Zap process is killed.
-            let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0
-                | windows::Win32::System::Threading::CREATE_BREAKAWAY_FROM_JOB.0;
             inner.creation_flags(flags);
         }
         Self {
             inner,
             #[cfg(windows)]
             kill_on_parent_process_close: false,
+            #[cfg(windows)]
+            creation_flags: flags,
             stdin_is_default: true,
             stdout_is_default: true,
             stderr_is_default: true,
@@ -104,12 +112,10 @@ impl Command {
         }
         #[cfg(windows)]
         {
-            use std::os::windows::process::CommandExt as _;
             // 监督者已经拥有独立生命周期；worker 保留其宿主 Job，再在授权前加入严格嵌套 Job。
             // 再次请求 breakaway 会被禁止脱离的宿主拒绝，且不属于 worker 所需的权限。
             command
-                .inner
-                .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+                .set_windows_creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
         }
         command
     }
@@ -117,9 +123,7 @@ impl Command {
     /// 已被专属 Job 管理的 worker 派生真实 CLI 时禁止脱离该 Job。
     #[cfg(windows)]
     pub fn inherit_managed_job(&mut self) -> &mut Self {
-        use std::os::windows::process::CommandExt as _;
-        self.inner
-            .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
+        self.set_windows_creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
         self
     }
 
@@ -131,9 +135,8 @@ impl Command {
     ///
     /// [1]: https://msdn.microsoft.com/en-us/library/windows/desktop/ms684863(v=vs.85).aspx
     pub fn creation_flags(&mut self, flags: u32) -> &mut Self {
-        use std::os::windows::process::CommandExt;
         let flags = windows::Win32::System::Threading::CREATE_NO_WINDOW.0 | flags;
-        self.inner.creation_flags(flags);
+        self.set_windows_creation_flags(flags);
         self
     }
 
@@ -143,9 +146,15 @@ impl Command {
     /// `CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB`，避免启动子进程时闪现窗口。
     #[cfg(windows)]
     pub fn inherit_console(&mut self) -> &mut Self {
-        use std::os::windows::process::CommandExt;
-        self.inner.creation_flags(0);
+        self.set_windows_creation_flags(0);
         self
+    }
+
+    #[cfg(windows)]
+    fn set_windows_creation_flags(&mut self, flags: u32) {
+        use std::os::windows::process::CommandExt as _;
+        self.inner.creation_flags(flags);
+        self.creation_flags = flags;
     }
 
     /// Adds an argument to pass to the program.
@@ -564,6 +573,45 @@ impl Command {
         }
 
         child
+    }
+
+    /// 以冻结主线程的方式派生 Windows 子进程。
+    ///
+    /// 调用者可在返回后释放可执行文件租约，然后调用 [`SuspendedChild::resume`]。
+    /// 如果未恢复就丢弃返回值，子进程会被终止并等待回收。
+    #[cfg(windows)]
+    pub fn spawn_suspended(&mut self) -> io::Result<SuspendedChild> {
+        use std::os::windows::process::CommandExt as _;
+
+        if self.stdin_is_default {
+            self.inner.stdin(Stdio::null());
+        }
+        if self.stdout_is_default {
+            self.inner.stdout(Stdio::null());
+        }
+        if self.stderr_is_default {
+            self.inner.stderr(Stdio::null());
+        }
+
+        self.inner.creation_flags(
+            self.creation_flags | windows::Win32::System::Threading::CREATE_SUSPENDED.0,
+        );
+        let child = self.inner.spawn();
+        self.inner.creation_flags(self.creation_flags);
+        let child = child?;
+
+        if self.kill_on_parent_process_close {
+            let proc_handle = child.as_raw_handle() as isize;
+            if let Err(e) = JobObject::new()
+                .assign_process(proc_handle)
+                .create()
+                .context("Failed to create job object for suspended command")
+            {
+                report_error!(e, extra: { "program" => ?self.inner.get_program() });
+            }
+        }
+
+        SuspendedChild::from_child(child)
     }
 
     /// Executes the command as a child process, waiting for it to finish and

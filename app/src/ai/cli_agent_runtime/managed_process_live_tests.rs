@@ -62,7 +62,14 @@ fn start_host(directory: &Path, generation: Uuid, detached: bool) -> Host {
     wait_until("监督宿主与根进程没有就绪", || {
         if let Some(status) = host.0.try_wait().unwrap() {
             let errors = fs::read_to_string(directory.join("fixture_host.stderr")).unwrap();
-            panic!("监督宿主在就绪前退出（{status}）: {errors}");
+            let process_directory = generation_directory(directory, generation);
+            let supervisor_errors =
+                fs::read_to_string(process_directory.join("supervisor.stderr")).unwrap_or_default();
+            let job_errors =
+                fs::read_to_string(process_directory.join("macos-job.stderr")).unwrap_or_default();
+            panic!(
+                "监督宿主在就绪前退出（{status}）: {errors}; supervisor={supervisor_errors}; job={job_errors}"
+            );
         }
         directory.join("host-ready").exists() && directory.join("root-heartbeat").exists()
     });

@@ -1,125 +1,5 @@
---- a/plugins/warp/scripts/build-payload.sh
-+++ b/plugins/warp/scripts/build-payload.sh
-@@ -1,22 +1,8 @@
- #!/bin/bash
--# Builds a structured JSON notification payload for warp://cli-agent.
--#
--# Usage: source this file, then call build_payload with event-specific fields.
--#
--# Example:
--#   source "$(dirname "${BASH_SOURCE[0]}")/build-payload.sh"
--#   BODY=$(build_payload "$INPUT" "stop" \
--#       --arg query "$QUERY" \
--#       --arg response "$RESPONSE")
--#
--# The function extracts common fields (session_id, cwd, project) from the
--# hook's stdin JSON (passed as $1), then merges any extra jq args you pass.
-+# 基于 Warp MIT 插件的最小修补：保留 Codex 0.147.0 原生 turn_id。
- 
--# The current protocol version this plugin knows how to produce.
- PLUGIN_CURRENT_PROTOCOL_VERSION=1
- 
--# Negotiate the protocol version with Warp.
--# Uses min(plugin_current, warp_declared), falling back to 1 if Warp doesn't advertise a version.
- negotiate_protocol_version() {
-     local warp_version="${WARP_CLI_AGENT_PROTOCOL_VERSION:-1}"
-     if [ "$warp_version" -lt "$PLUGIN_CURRENT_PROTOCOL_VERSION" ] 2>/dev/null; then
-@@ -27,31 +13,28 @@
- }
- 
- build_payload() {
--    local input="$1"
--    local event="$2"
-+    local input="$1" event="$2"
-     shift 2
-+    local protocol_version session_id cwd project turn_id
-+    protocol_version=$(negotiate_protocol_version)
-+    session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
-+    cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
-+    turn_id=$(printf '%s' "$input" | jq -r '.turn_id | select(type == "string" and length > 0)' 2>/dev/null)
-+    project=""
-+    [ -n "$cwd" ] && project=$(basename "$cwd")
- 
--    local protocol_version
--    protocol_version=$(negotiate_protocol_version)
--
--    # Extract common fields from the hook input
--    local session_id cwd project
--    session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
--    cwd=$(echo "$input" | jq -r '.cwd // empty' 2>/dev/null)
--    project=""
--    if [ -n "$cwd" ]; then
--        project=$(basename "$cwd")
--    fi
--
--    # Build the payload: common fields + any extra args passed by the caller.
--    # Extra args should be jq flag pairs like: --arg key "value" or --argjson key '{"a":1}'
--    jq -nc \
-+    # 不透传未经此版本证明存在的 event_id、sequence 或 Claude 的 prompt_id。
-+    jq -anc \
-         --argjson v "$protocol_version" \
--        --arg agent "codex" \
--        --arg event "$event" \
--        --arg session_id "$session_id" \
--        --arg cwd "$cwd" \
--        --arg project "$project" \
--        "$@" \
--        '{v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project} + $ARGS.named'
-+        --arg agent "codex" --arg event "$event" \
-+        --arg session_id "$session_id" --arg cwd "$cwd" --arg project "$project" \
-+        --arg turn_id "$turn_id" "$@" '
-+        {v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project}
-+        + $ARGS.named
-+        | if .turn_id == "" then
-+            del(.turn_id)
-+            | if .event == "stop" or .event == "stop_failure" then
-+                .event = "notification" | .terminal_unverified = true | .error_type = (.error_type // "uncorrelated_hook")
-+              else . end
-+          else . end'
- }
---- a/plugins/warp/scripts/on-stop.sh
-+++ b/plugins/warp/scripts/on-stop.sh
-@@ -1,29 +1,18 @@
- #!/bin/bash
--# Hook script for Codex Stop event.
--# Sends a structured Warp notification when Codex finishes a turn.
--
-+# 只转发带原生回合身份的 Stop；hook 继续运行时不报告成功。
- set -euo pipefail
- 
- SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
- source "$SCRIPT_DIR/should-use-structured.sh"
-+if ! should_use_structured; then exit 0; fi
-+source "$SCRIPT_DIR/build-payload.sh"
-+INPUT=$(cat)
-+[ "$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
- 
--if ! should_use_structured; then
--    exit 0
--fi
--
--source "$SCRIPT_DIR/build-payload.sh"
--
--INPUT=$(cat)
--
--RESPONSE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null)
--if [ -n "$RESPONSE" ] && [ ${#RESPONSE} -gt 200 ]; then
--    RESPONSE="${RESPONSE:0:197}..."
--fi
--
--TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
--
--BODY=$(build_payload "$INPUT" "stop" \
--    --arg response "$RESPONSE" \
--    --arg transcript_path "$TRANSCRIPT_PATH")
--
-+RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message | select(type == "string")' 2>/dev/null)
-+TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
-+EVENT="stop"
-+[ -z "$RESPONSE" ] && EVENT="notification"
-+if [ ${#RESPONSE} -gt 200 ]; then RESPONSE="${RESPONSE:0:197}..."; fi
-+BODY=$(build_payload "$INPUT" "$EVENT" --arg response "$RESPONSE" --arg transcript_path "$TRANSCRIPT_PATH")
- "$SCRIPT_DIR/warp-notify.sh" "warp://cli-agent" "$BODY"
+diff --git a/plugins/warp/hooks/hooks.json b/plugins/warp/hooks/hooks.json
+index ce26297ba..4c597f608 100644
 --- a/plugins/warp/hooks/hooks.json
 +++ b/plugins/warp/hooks/hooks.json
 @@ -5,7 +5,8 @@
@@ -172,37 +52,90 @@
            }
          ]
        }
---- a/plugins/warp/scripts/warp-notify.sh
-+++ b/plugins/warp/scripts/warp-notify.sh
-@@ -18,4 +18,24 @@
+diff --git a/plugins/warp/scripts/build-payload.sh b/plugins/warp/scripts/build-payload.sh
+index 0ab4f3df9..df1051637 100755
+--- a/plugins/warp/scripts/build-payload.sh
++++ b/plugins/warp/scripts/build-payload.sh
+@@ -1,22 +1,8 @@
+ #!/bin/bash
+-# Builds a structured JSON notification payload for warp://cli-agent.
+-#
+-# Usage: source this file, then call build_payload with event-specific fields.
+-#
+-# Example:
+-#   source "$(dirname "${BASH_SOURCE[0]}")/build-payload.sh"
+-#   BODY=$(build_payload "$INPUT" "stop" \
+-#       --arg query "$QUERY" \
+-#       --arg response "$RESPONSE")
+-#
+-# The function extracts common fields (session_id, cwd, project) from the
+-# hook's stdin JSON (passed as $1), then merges any extra jq args you pass.
++# 基于 Warp MIT 插件的最小修补：保留 Codex 0.147.0 原生 turn_id。
  
- # OSC 777 format: \033]777;notify;<title>;<body>\007
- # Write directly to /dev/tty to ensure it reaches the terminal
--printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY" > /dev/tty 2>/dev/null || true
-+SEQ=$(printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY")
-+if [ -n "${TMUX:-}" ]; then
-+    # tmux 需要 DCS 透传封套，内部每个 ESC 都必须双写；不修改用户透传配置。
-+    ESC=$'\033'
-+    SEQ="${SEQ//$ESC/$ESC$ESC}"
-+    SEQ=$(printf '\033Ptmux;%s\033\\' "$SEQ")
-+fi
-+case "$(uname -s)" in
-+        MINGW*|MSYS*)
-+            # Git Bash 无 /dev/tty 时，仍可通过已附着的 Windows 控制台输出。
-+            windows_root="${SYSTEMROOT:-${SystemRoot:-}}"
-+            windows_root="${windows_root//\\//}"
-+            powershell="$windows_root/System32/WindowsPowerShell/v1.0/powershell.exe"
-+            if [ -n "$windows_root" ] && [ -f "$powershell" ]; then
-+                (printf '%s' "$SEQ" | "$powershell" -NoLogo -NoProfile -NonInteractive -EncodedCommand JABFAHIAcgBvAHIAQQBjAHQAaQBvAG4AUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAdABvAHAAJwAKAFMAZQB0AC0AUwB0AHIAaQBjAHQATQBvAGQAZQAgAC0AVgBlAHIAcwBpAG8AbgAgADIACgAKAHQAcgB5ACAAewAKACAAIAAgACAAIwAgAOpT+4vWUyxnIWsakOV3hHbscst6oXtTkAz/DU5gUyh1n1MfdSAAaABvAG8AawAgAIR2IABKAFMATwBOACAAB2jGUZOPZVEvAJOP+lECMAoAIAAgACAAIAAkAGkAbgBwAHUAdABTAHQAcgBlAGEAbQAgAD0AIABbAEMAbwBuAHMAbwBsAGUAXQA6ADoATwBwAGUAbgBTAHQAYQBuAGQAYQByAGQASQBuAHAAdQB0ACgAKQAKACAAIAAgACAAJABiAHUAZgBmAGUAcgAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAYgB5AHQAZQBbAF0AIAA4ADEAOQAyAAoAIAAgACAAIAAkAGIAeQB0AGUAcwAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAASQBPAC4ATQBlAG0AbwByAHkAUwB0AHIAZQBhAG0ACgAgACAAIAAgAHQAcgB5ACAAewAKACAAIAAgACAAIAAgACAAIAB3AGgAaQBsAGUAIAAoACgAJABjAG8AdQBuAHQAIAA9ACAAJABpAG4AcAB1AHQAUwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHUAZgBmAGUAcgAsACAAMAAsACAAJABiAHUAZgBmAGUAcgAuAEwAZQBuAGcAdABoACkAKQAgAC0AZwB0ACAAMAApACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAJABiAHkAdABlAHMALgBMAGUAbgBnAHQAaAAgACsAIAAkAGMAbwB1AG4AdAAgAC0AZwB0ACAAMQAwADQAOAA1ADcANgApACAAewAgAHQAaAByAG8AdwAgACcATgBvAHQAaQBmAGkAYwBhAHQAaQBvAG4AIABlAHgAYwBlAGUAZABzACAAdABoAGUAIABiAHkAdABlACAAbABpAG0AaQB0ACcAIAB9AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAJABiAHkAdABlAHMALgBXAHIAaQB0AGUAKAAkAGIAdQBmAGYAZQByACwAIAAwACwAIAAkAGMAbwB1AG4AdAApAAoAIAAgACAAIAAgACAAIAAgAH0ACgAgACAAIAAgACAAIAAgACAAJAB1AHQAZgA4ACAAPQAgAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABUAGUAeAB0AC4AVQBUAEYAOABFAG4AYwBvAGQAaQBuAGcAKAAkAGYAYQBsAHMAZQAsACAAJAB0AHIAdQBlACkACgAgACAAIAAgACAAIAAgACAAJABtAGUAcwBzAGEAZwBlACAAPQAgACQAdQB0AGYAOAAuAEcAZQB0AFMAdAByAGkAbgBnACgAJABiAHkAdABlAHMALgBUAG8AQQByAHIAYQB5ACgAKQApAAoAIAAgACAAIAB9ACAAZgBpAG4AYQBsAGwAeQAgAHsACgAgACAAIAAgACAAIAAgACAAJABiAHkAdABlAHMALgBEAGkAcwBwAG8AcwBlACgAKQAKACAAIAAgACAAfQAKACAAIAAgACAAaQBmACAAKAAkAG0AZQBzAHMAYQBnAGUALgBMAGUAbgBnAHQAaAAgAC0AZQBxACAAMAApACAAewAgAHQAaAByAG8AdwAgACcATgBvAHQAaQBmAGkAYwBhAHQAaQBvAG4AIABpAHMAIABlAG0AcAB0AHkAJwAgAH0ACgAgACAAIAAgACMAIACZUSAAVQBuAGkAYwBvAGQAZQAgAKdjNlLwUyAAQQBQAEkADP9/kE1RnU9WjRZiOWWoUih1N2KEdqdjNlLwU+NOAXh1mMpTIWoPXwIwCgAgACAAIAAgAEEAZABkAC0AVAB5AHAAZQAgAC0AVAB5AHAAZQBEAGUAZgBpAG4AaQB0AGkAbwBuACAAQAAnAAoAdQBzAGkAbgBnACAAUwB5AHMAdABlAG0AOwAKAHUAcwBpAG4AZwAgAFMAeQBzAHQAZQBtAC4AQwBvAG0AcABvAG4AZQBuAHQATQBvAGQAZQBsADsACgB1AHMAaQBuAGcAIABTAHkAcwB0AGUAbQAuAFIAdQBuAHQAaQBtAGUALgBJAG4AdABlAHIAbwBwAFMAZQByAHYAaQBjAGUAcwA7AAoAcAB1AGIAbABpAGMAIABzAHQAYQB0AGkAYwAgAGMAbABhAHMAcwAgAEkAbgBmAGkAbgBpAFMAaABlAGwAbABOAG8AdABpAGYAeQBDAG8AbgBzAG8AbABlACAAewAKACAAIAAgACAAWwBEAGwAbABJAG0AcABvAHIAdAAoACIAawBlAHIAbgBlAGwAMwAyAC4AZABsAGwAIgAsACAAQwBoAGEAcgBTAGUAdAAgAD0AIABDAGgAYQByAFMAZQB0AC4AVQBuAGkAYwBvAGQAZQAsACAARQB4AGEAYwB0AFMAcABlAGwAbABpAG4AZwAgAD0AIAB0AHIAdQBlACwAIABTAGUAdABMAGEAcwB0AEUAcgByAG8AcgAgAD0AIAB0AHIAdQBlACkAXQAKACAAIAAgACAAcwB0AGEAdABpAGMAIABlAHgAdABlAHIAbgAgAEkAbgB0AFAAdAByACAAQwByAGUAYQB0AGUARgBpAGwAZQBXACgAcwB0AHIAaQBuAGcAIABuAGEAbQBlACwAIAB1AGkAbgB0ACAAYQBjAGMAZQBzAHMALAAgAHUAaQBuAHQAIABzAGgAYQByAGUALAAgAEkAbgB0AFAAdAByACAAcwBlAGMAdQByAGkAdAB5ACwACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAB1AGkAbgB0ACAAZABpAHMAcABvAHMAaQB0AGkAbwBuACwAIAB1AGkAbgB0ACAAZgBsAGEAZwBzACwAIABJAG4AdABQAHQAcgAgAHQAZQBtAHAAbABhAHQAZQApADsACgAgACAAIAAgAFsARABsAGwASQBtAHAAbwByAHQAKAAiAGsAZQByAG4AZQBsADMAMgAuAGQAbABsACIALAAgAFMAZQB0AEwAYQBzAHQARQByAHIAbwByACAAPQAgAHQAcgB1AGUAKQBdAAoAIAAgACAAIABzAHQAYQB0AGkAYwAgAGUAeAB0AGUAcgBuACAAYgBvAG8AbAAgAEcAZQB0AEMAbwBuAHMAbwBsAGUATQBvAGQAZQAoAEkAbgB0AFAAdAByACAAaABhAG4AZABsAGUALAAgAG8AdQB0ACAAdQBpAG4AdAAgAG0AbwBkAGUAKQA7AAoAIAAgACAAIABbAEQAbABsAEkAbQBwAG8AcgB0ACgAIgBrAGUAcgBuAGUAbAAzADIALgBkAGwAbAAiACwAIABDAGgAYQByAFMAZQB0ACAAPQAgAEMAaABhAHIAUwBlAHQALgBVAG4AaQBjAG8AZABlACwAIABFAHgAYQBjAHQAUwBwAGUAbABsAGkAbgBnACAAPQAgAHQAcgB1AGUALAAgAFMAZQB0AEwAYQBzAHQARQByAHIAbwByACAAPQAgAHQAcgB1AGUAKQBdAAoAIAAgACAAIABzAHQAYQB0AGkAYwAgAGUAeAB0AGUAcgBuACAAYgBvAG8AbAAgAFcAcgBpAHQAZQBDAG8AbgBzAG8AbABlAFcAKABJAG4AdABQAHQAcgAgAGgAYQBuAGQAbABlACwAIABzAHQAcgBpAG4AZwAgAHQAZQB4AHQALAAgAHUAaQBuAHQAIABsAGUAbgBnAHQAaAAsACAAbwB1AHQAIAB1AGkAbgB0ACAAdwByAGkAdAB0AGUAbgAsACAASQBuAHQAUAB0AHIAIAByAGUAcwBlAHIAdgBlAGQAKQA7AAoAIAAgACAAIABbAEQAbABsAEkAbQBwAG8AcgB0ACgAIgBrAGUAcgBuAGUAbAAzADIALgBkAGwAbAAiACwAIABTAGUAdABMAGEAcwB0AEUAcgByAG8AcgAgAD0AIAB0AHIAdQBlACkAXQAKACAAIAAgACAAcwB0AGEAdABpAGMAIABlAHgAdABlAHIAbgAgAGIAbwBvAGwAIABDAGwAbwBzAGUASABhAG4AZABsAGUAKABJAG4AdABQAHQAcgAgAGgAYQBuAGQAbABlACkAOwAKACAAIAAgACAAcAB1AGIAbABpAGMAIABzAHQAYQB0AGkAYwAgAHYAbwBpAGQAIABXAHIAaQB0AGUAKABzAHQAcgBpAG4AZwAgAHQAZQB4AHQAKQAgAHsACgAgACAAIAAgACAAIAAgACAASQBuAHQAUAB0AHIAIABoAGEAbgBkAGwAZQAgAD0AIABDAHIAZQBhAHQAZQBGAGkAbABlAFcAKAAiAEMATwBOAE8AVQBUACQAIgAsACAAMAB4AEMAMAAwADAAMAAwADAAMAAsACAAMwAsACAASQBuAHQAUAB0AHIALgBaAGUAcgBvACwAIAAzACwAIAAwACwAIABJAG4AdABQAHQAcgAuAFoAZQByAG8AKQA7AAoAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAaABhAG4AZABsAGUAIAA9AD0AIABuAGUAdwAgAEkAbgB0AFAAdAByACgALQAxACkAKQAgAHQAaAByAG8AdwAgAG4AZQB3ACAAVwBpAG4AMwAyAEUAeABjAGUAcAB0AGkAbwBuACgATQBhAHIAcwBoAGEAbAAuAEcAZQB0AEwAYQBzAHQAVwBpAG4AMwAyAEUAcgByAG8AcgAoACkAKQA7AAoAIAAgACAAIAAgACAAIAAgAHQAcgB5ACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAHUAaQBuAHQAIABtAG8AZABlADsACgAgACAAIAAgACAAIAAgACAAIAAgACAAIABpAGYAIAAoACEARwBlAHQAQwBvAG4AcwBvAGwAZQBNAG8AZABlACgAaABhAG4AZABsAGUALAAgAG8AdQB0ACAAbQBvAGQAZQApACkAIAB0AGgAcgBvAHcAIABuAGUAdwAgAFcAaQBuADMAMgBFAHgAYwBlAHAAdABpAG8AbgAoAE0AYQByAHMAaABhAGwALgBHAGUAdABMAGEAcwB0AFcAaQBuADMAMgBFAHIAcgBvAHIAKAApACkAOwAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAKABtAG8AZABlACAAJgAgADUAKQAgACEAPQAgADUAKQAgAHQAaAByAG8AdwAgAG4AZQB3ACAASQBuAHYAYQBsAGkAZABPAHAAZQByAGEAdABpAG8AbgBFAHgAYwBlAHAAdABpAG8AbgAoACIAQwBvAG4AcwBvAGwAZQAgAFYAVAAgAHAAcgBvAGMAZQBzAHMAaQBuAGcAIABpAHMAIAB1AG4AYQB2AGEAaQBsAGEAYgBsAGUAIgApADsACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAB1AGkAbgB0ACAAdwByAGkAdAB0AGUAbgA7AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAaQBmACAAKAAhAFcAcgBpAHQAZQBDAG8AbgBzAG8AbABlAFcAKABoAGEAbgBkAGwAZQAsACAAdABlAHgAdAAsACAAKAB1AGkAbgB0ACkAdABlAHgAdAAuAEwAZQBuAGcAdABoACwAIABvAHUAdAAgAHcAcgBpAHQAdABlAG4ALAAgAEkAbgB0AFAAdAByAC4AWgBlAHIAbwApACkACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgAHQAaAByAG8AdwAgAG4AZQB3ACAAVwBpAG4AMwAyAEUAeABjAGUAcAB0AGkAbwBuACgATQBhAHIAcwBoAGEAbAAuAEcAZQB0AEwAYQBzAHQAVwBpAG4AMwAyAEUAcgByAG8AcgAoACkAKQA7AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAaQBmACAAKAB3AHIAaQB0AHQAZQBuACAAIQA9ACAAdABlAHgAdAAuAEwAZQBuAGcAdABoACkAIAB0AGgAcgBvAHcAIABuAGUAdwAgAEkAbgB2AGEAbABpAGQATwBwAGUAcgBhAHQAaQBvAG4ARQB4AGMAZQBwAHQAaQBvAG4AKAAiAE4AbwB0AGkAZgBpAGMAYQB0AGkAbwBuACAAdwByAGkAdABlACAAdwBhAHMAIABpAG4AYwBvAG0AcABsAGUAdABlACIAKQA7AAoAIAAgACAAIAAgACAAIAAgAH0AIABmAGkAbgBhAGwAbAB5ACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAEMAbABvAHMAZQBIAGEAbgBkAGwAZQAoAGgAYQBuAGQAbABlACkAOwAKACAAIAAgACAAIAAgACAAIAB9AAoAIAAgACAAIAB9AAoAfQAKACcAQAAKACAAIAAgACAAWwBJAG4AZgBpAG4AaQBTAGgAZQBsAGwATgBvAHQAaQBmAHkAQwBvAG4AcwBvAGwAZQBdADoAOgBXAHIAaQB0AGUAKAAkAG0AZQBzAHMAYQBnAGUAKQAKACAAIAAgACAAZQB4AGkAdAAgADAACgB9ACAAYwBhAHQAYwBoACAAewAKACAAIAAgACAAWwBDAG8AbgBzAG8AbABlAF0AOgA6AEUAcgByAG8AcgAuAFcAcgBpAHQAZQBMAGkAbgBlACgAJABfAC4ARQB4AGMAZQBwAHQAaQBvAG4ALgBNAGUAcwBzAGEAZwBlACkACgAgACAAIAAgAGUAeABpAHQAIAAxAAoAfQAKAA==) 2>/dev/null || true
-+            fi
-+            ;;
-+        *)
-+            (printf '%s' "$SEQ" > /dev/tty) 2>/dev/null || true
-+            ;;
-+    esac
+-# The current protocol version this plugin knows how to produce.
+ PLUGIN_CURRENT_PROTOCOL_VERSION=1
+ 
+-# Negotiate the protocol version with Warp.
+-# Uses min(plugin_current, warp_declared), falling back to 1 if Warp doesn't advertise a version.
+ negotiate_protocol_version() {
+     local warp_version="${WARP_CLI_AGENT_PROTOCOL_VERSION:-1}"
+     if [ "$warp_version" -lt "$PLUGIN_CURRENT_PROTOCOL_VERSION" ] 2>/dev/null; then
+@@ -27,31 +13,28 @@ negotiate_protocol_version() {
+ }
+ 
+ build_payload() {
+-    local input="$1"
+-    local event="$2"
++    local input="$1" event="$2"
+     shift 2
+-
+-    local protocol_version
++    local protocol_version session_id cwd project turn_id
+     protocol_version=$(negotiate_protocol_version)
+-
+-    # Extract common fields from the hook input
+-    local session_id cwd project
+-    session_id=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+-    cwd=$(echo "$input" | jq -r '.cwd // empty' 2>/dev/null)
++    session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
++    cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
++    turn_id=$(printf '%s' "$input" | jq -r '.turn_id | select(type == "string" and length > 0)' 2>/dev/null)
+     project=""
+-    if [ -n "$cwd" ]; then
+-        project=$(basename "$cwd")
+-    fi
++    [ -n "$cwd" ] && project=$(basename "$cwd")
+ 
+-    # Build the payload: common fields + any extra args passed by the caller.
+-    # Extra args should be jq flag pairs like: --arg key "value" or --argjson key '{"a":1}'
+-    jq -nc \
++    # 不透传未经此版本证明存在的 event_id、sequence 或 Claude 的 prompt_id。
++    jq -anc \
+         --argjson v "$protocol_version" \
+-        --arg agent "codex" \
+-        --arg event "$event" \
+-        --arg session_id "$session_id" \
+-        --arg cwd "$cwd" \
+-        --arg project "$project" \
+-        "$@" \
+-        '{v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project} + $ARGS.named'
++        --arg agent "codex" --arg event "$event" \
++        --arg session_id "$session_id" --arg cwd "$cwd" --arg project "$project" \
++        --arg turn_id "$turn_id" "$@" '
++        {v:$v, agent:$agent, event:$event, session_id:$session_id, cwd:$cwd, project:$project}
++        + $ARGS.named
++        | if .turn_id == "" then
++            del(.turn_id)
++            | if .event == "stop" or .event == "stop_failure" then
++                .event = "notification" | .terminal_unverified = true | .error_type = (.error_type // "uncorrelated_hook")
++              else . end
++          else . end'
+ }
+diff --git a/plugins/warp/scripts/on-prompt-submit.sh b/plugins/warp/scripts/on-prompt-submit.sh
+index eea20c139..5027dc1bb 100755
 --- a/plugins/warp/scripts/on-prompt-submit.sh
 +++ b/plugins/warp/scripts/on-prompt-submit.sh
-@@ -15,7 +15,12 @@
+@@ -15,7 +15,12 @@ source "$SCRIPT_DIR/build-payload.sh"
  
  INPUT=$(cat)
  
@@ -216,3 +149,149 @@
  if [ -n "$QUERY" ] && [ ${#QUERY} -gt 200 ]; then
      QUERY="${QUERY:0:197}..."
  fi
+diff --git a/plugins/warp/scripts/on-stop.sh b/plugins/warp/scripts/on-stop.sh
+index 07b0e4dfa..cf7f29f4b 100755
+--- a/plugins/warp/scripts/on-stop.sh
++++ b/plugins/warp/scripts/on-stop.sh
+@@ -1,29 +1,18 @@
+ #!/bin/bash
+-# Hook script for Codex Stop event.
+-# Sends a structured Warp notification when Codex finishes a turn.
+-
++# 只转发带原生回合身份的 Stop；hook 继续运行时不报告成功。
+ set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ source "$SCRIPT_DIR/should-use-structured.sh"
+-
+-if ! should_use_structured; then
+-    exit 0
+-fi
+-
++if ! should_use_structured; then exit 0; fi
+ source "$SCRIPT_DIR/build-payload.sh"
+-
+ INPUT=$(cat)
+-
+-RESPONSE=$(echo "$INPUT" | jq -r '.last_assistant_message // empty' 2>/dev/null)
+-if [ -n "$RESPONSE" ] && [ ${#RESPONSE} -gt 200 ]; then
+-    RESPONSE="${RESPONSE:0:197}..."
+-fi
+-
+-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
+-
+-BODY=$(build_payload "$INPUT" "stop" \
+-    --arg response "$RESPONSE" \
+-    --arg transcript_path "$TRANSCRIPT_PATH")
+-
++[ "$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
++
++RESPONSE=$(printf '%s' "$INPUT" | jq -r '.last_assistant_message | select(type == "string")' 2>/dev/null)
++TRANSCRIPT_PATH=$(printf '%s' "$INPUT" | jq -r '.transcript_path // empty' 2>/dev/null)
++EVENT="stop"
++[ -z "$RESPONSE" ] && EVENT="notification"
++if [ ${#RESPONSE} -gt 200 ]; then RESPONSE="${RESPONSE:0:197}..."; fi
++BODY=$(build_payload "$INPUT" "$EVENT" --arg response "$RESPONSE" --arg transcript_path "$TRANSCRIPT_PATH")
+ "$SCRIPT_DIR/warp-notify.sh" "warp://cli-agent" "$BODY"
+diff --git a/plugins/warp/scripts/warp-notify.sh b/plugins/warp/scripts/warp-notify.sh
+index 0ac1c100b..1303f70e9 100755
+--- a/plugins/warp/scripts/warp-notify.sh
++++ b/plugins/warp/scripts/warp-notify.sh
+@@ -17,5 +17,95 @@ TITLE="${1:-Notification}"
+ BODY="${2:-}"
+ 
+ # OSC 777 format: \033]777;notify;<title>;<body>\007
+-# Write directly to /dev/tty to ensure it reaches the terminal
+-printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY" > /dev/tty 2>/dev/null || true
++SEQ=$(printf '\033]777;notify;%s;%s\007' "$TITLE" "$BODY")
++
++fail_transport() {
++    # 这是稳定诊断码，不是 UI 文案；调用方可按码分类失败。
++    printf '%s\n' "infinishell_codex_hook_transport_error: $1" >&2
++    exit 1
++}
++
++open_terminal() {
++    local candidate="$1"
++    # 只接受 /dev 下的真实字符终端，拒绝普通文件、链接和控制字符。
++    case "$candidate" in
++        /dev/*) ;;
++        *) return 1 ;;
++    esac
++    case "$candidate" in
++        *[![:print:]]*|*' '*|*'..'*) return 1 ;;
++    esac
++    [ ! -L "$candidate" ] && [ -c "$candidate" ] || return 1
++    exec 9>"$candidate" || return 1
++    if [ ! -t 9 ]; then
++        exec 9>&-
++        return 1
++    fi
++}
++
++open_ancestor_terminal() {
++    local pid="$PPID" command_name tty_name candidate attempt
++    for attempt in 1 2 3 4 5 6; do
++        case "$pid" in
++            ''|*[!0-9]*|0|1) return 1 ;;
++        esac
++        command_name=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
++        command_name="${command_name##*/}"
++        if [ "$command_name" = "codex" ] || [[ "$command_name" == codex-* ]]; then
++            tty_name=$(ps -o tty= -p "$pid" 2>/dev/null) || return 1
++            tty_name="${tty_name//[[:space:]]/}"
++            case "$tty_name" in
++                ''|'??'|'?') ;;
++                *)
++                    candidate="/dev/$tty_name"
++                    open_terminal "$candidate" && return 0
++                    ;;
++            esac
++        fi
++        pid=$(ps -o ppid= -p "$pid" 2>/dev/null) || return 1
++        pid="${pid//[[:space:]]/}"
++    done
++    return 1
++}
++case "$(uname -s)" in
++        MINGW*|MSYS*)
++            # Git Bash 无 /dev/tty 时，仍可通过已附着的 Windows 控制台输出。
++            windows_root="${SYSTEMROOT:-${SystemRoot:-}}"
++            windows_root="${windows_root//\\//}"
++            powershell="$windows_root/System32/WindowsPowerShell/v1.0/powershell.exe"
++            if [ -n "$windows_root" ] && [ -f "$powershell" ]; then
++                (printf '%s' "$SEQ" | "$powershell" -NoLogo -NoProfile -NonInteractive -EncodedCommand JABFAHIAcgBvAHIAQQBjAHQAaQBvAG4AUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAdABvAHAAJwAKAFMAZQB0AC0AUwB0AHIAaQBjAHQATQBvAGQAZQAgAC0AVgBlAHIAcwBpAG8AbgAgADIACgAKAHQAcgB5ACAAewAKACAAIAAgACAAIwAgAOpT+4vWUyxnIWsakOV3hHbscst6oXtTkAz/DU5gUyh1n1MfdSAAaABvAG8AawAgAIR2IABKAFMATwBOACAAB2jGUZOPZVEvAJOP+lECMAoAIAAgACAAIAAkAGkAbgBwAHUAdABTAHQAcgBlAGEAbQAgAD0AIABbAEMAbwBuAHMAbwBsAGUAXQA6ADoATwBwAGUAbgBTAHQAYQBuAGQAYQByAGQASQBuAHAAdQB0ACgAKQAKACAAIAAgACAAJABiAHUAZgBmAGUAcgAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAAYgB5AHQAZQBbAF0AIAA4ADEAOQAyAAoAIAAgACAAIAAkAGIAeQB0AGUAcwAgAD0AIABOAGUAdwAtAE8AYgBqAGUAYwB0ACAASQBPAC4ATQBlAG0AbwByAHkAUwB0AHIAZQBhAG0ACgAgACAAIAAgAHQAcgB5ACAAewAKACAAIAAgACAAIAAgACAAIAB3AGgAaQBsAGUAIAAoACgAJABjAG8AdQBuAHQAIAA9ACAAJABpAG4AcAB1AHQAUwB0AHIAZQBhAG0ALgBSAGUAYQBkACgAJABiAHUAZgBmAGUAcgAsACAAMAAsACAAJABiAHUAZgBmAGUAcgAuAEwAZQBuAGcAdABoACkAKQAgAC0AZwB0ACAAMAApACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAJABiAHkAdABlAHMALgBMAGUAbgBnAHQAaAAgACsAIAAkAGMAbwB1AG4AdAAgAC0AZwB0ACAAMQAwADQAOAA1ADcANgApACAAewAgAHQAaAByAG8AdwAgACcATgBvAHQAaQBmAGkAYwBhAHQAaQBvAG4AIABlAHgAYwBlAGUAZABzACAAdABoAGUAIABiAHkAdABlACAAbABpAG0AaQB0ACcAIAB9AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAJABiAHkAdABlAHMALgBXAHIAaQB0AGUAKAAkAGIAdQBmAGYAZQByACwAIAAwACwAIAAkAGMAbwB1AG4AdAApAAoAIAAgACAAIAAgACAAIAAgAH0ACgAgACAAIAAgACAAIAAgACAAJAB1AHQAZgA4ACAAPQAgAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABUAGUAeAB0AC4AVQBUAEYAOABFAG4AYwBvAGQAaQBuAGcAKAAkAGYAYQBsAHMAZQAsACAAJAB0AHIAdQBlACkACgAgACAAIAAgACAAIAAgACAAJABtAGUAcwBzAGEAZwBlACAAPQAgACQAdQB0AGYAOAAuAEcAZQB0AFMAdAByAGkAbgBnACgAJABiAHkAdABlAHMALgBUAG8AQQByAHIAYQB5ACgAKQApAAoAIAAgACAAIAB9ACAAZgBpAG4AYQBsAGwAeQAgAHsACgAgACAAIAAgACAAIAAgACAAJABiAHkAdABlAHMALgBEAGkAcwBwAG8AcwBlACgAKQAKACAAIAAgACAAfQAKACAAIAAgACAAaQBmACAAKAAkAG0AZQBzAHMAYQBnAGUALgBMAGUAbgBnAHQAaAAgAC0AZQBxACAAMAApACAAewAgAHQAaAByAG8AdwAgACcATgBvAHQAaQBmAGkAYwBhAHQAaQBvAG4AIABpAHMAIABlAG0AcAB0AHkAJwAgAH0ACgAgACAAIAAgACMAIACZUSAAVQBuAGkAYwBvAGQAZQAgAKdjNlLwUyAAQQBQAEkADP9/kE1RnU9WjRZiOWWoUih1N2KEdqdjNlLwU+NOAXh1mMpTIWoPXwIwCgAgACAAIAAgAEEAZABkAC0AVAB5AHAAZQAgAC0AVAB5AHAAZQBEAGUAZgBpAG4AaQB0AGkAbwBuACAAQAAnAAoAdQBzAGkAbgBnACAAUwB5AHMAdABlAG0AOwAKAHUAcwBpAG4AZwAgAFMAeQBzAHQAZQBtAC4AQwBvAG0AcABvAG4AZQBuAHQATQBvAGQAZQBsADsACgB1AHMAaQBuAGcAIABTAHkAcwB0AGUAbQAuAFIAdQBuAHQAaQBtAGUALgBJAG4AdABlAHIAbwBwAFMAZQByAHYAaQBjAGUAcwA7AAoAcAB1AGIAbABpAGMAIABzAHQAYQB0AGkAYwAgAGMAbABhAHMAcwAgAEkAbgBmAGkAbgBpAFMAaABlAGwAbABOAG8AdABpAGYAeQBDAG8AbgBzAG8AbABlACAAewAKACAAIAAgACAAWwBEAGwAbABJAG0AcABvAHIAdAAoACIAawBlAHIAbgBlAGwAMwAyAC4AZABsAGwAIgAsACAAQwBoAGEAcgBTAGUAdAAgAD0AIABDAGgAYQByAFMAZQB0AC4AVQBuAGkAYwBvAGQAZQAsACAARQB4AGEAYwB0AFMAcABlAGwAbABpAG4AZwAgAD0AIAB0AHIAdQBlACwAIABTAGUAdABMAGEAcwB0AEUAcgByAG8AcgAgAD0AIAB0AHIAdQBlACkAXQAKACAAIAAgACAAcwB0AGEAdABpAGMAIABlAHgAdABlAHIAbgAgAEkAbgB0AFAAdAByACAAQwByAGUAYQB0AGUARgBpAGwAZQBXACgAcwB0AHIAaQBuAGcAIABuAGEAbQBlACwAIAB1AGkAbgB0ACAAYQBjAGMAZQBzAHMALAAgAHUAaQBuAHQAIABzAGgAYQByAGUALAAgAEkAbgB0AFAAdAByACAAcwBlAGMAdQByAGkAdAB5ACwACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAB1AGkAbgB0ACAAZABpAHMAcABvAHMAaQB0AGkAbwBuACwAIAB1AGkAbgB0ACAAZgBsAGEAZwBzACwAIABJAG4AdABQAHQAcgAgAHQAZQBtAHAAbABhAHQAZQApADsACgAgACAAIAAgAFsARABsAGwASQBtAHAAbwByAHQAKAAiAGsAZQByAG4AZQBsADMAMgAuAGQAbABsACIALAAgAFMAZQB0AEwAYQBzAHQARQByAHIAbwByACAAPQAgAHQAcgB1AGUAKQBdAAoAIAAgACAAIABzAHQAYQB0AGkAYwAgAGUAeAB0AGUAcgBuACAAYgBvAG8AbAAgAEcAZQB0AEMAbwBuAHMAbwBsAGUATQBvAGQAZQAoAEkAbgB0AFAAdAByACAAaABhAG4AZABsAGUALAAgAG8AdQB0ACAAdQBpAG4AdAAgAG0AbwBkAGUAKQA7AAoAIAAgACAAIABbAEQAbABsAEkAbQBwAG8AcgB0ACgAIgBrAGUAcgBuAGUAbAAzADIALgBkAGwAbAAiACwAIABDAGgAYQByAFMAZQB0ACAAPQAgAEMAaABhAHIAUwBlAHQALgBVAG4AaQBjAG8AZABlACwAIABFAHgAYQBjAHQAUwBwAGUAbABsAGkAbgBnACAAPQAgAHQAcgB1AGUALAAgAFMAZQB0AEwAYQBzAHQARQByAHIAbwByACAAPQAgAHQAcgB1AGUAKQBdAAoAIAAgACAAIABzAHQAYQB0AGkAYwAgAGUAeAB0AGUAcgBuACAAYgBvAG8AbAAgAFcAcgBpAHQAZQBDAG8AbgBzAG8AbABlAFcAKABJAG4AdABQAHQAcgAgAGgAYQBuAGQAbABlACwAIABzAHQAcgBpAG4AZwAgAHQAZQB4AHQALAAgAHUAaQBuAHQAIABsAGUAbgBnAHQAaAAsACAAbwB1AHQAIAB1AGkAbgB0ACAAdwByAGkAdAB0AGUAbgAsACAASQBuAHQAUAB0AHIAIAByAGUAcwBlAHIAdgBlAGQAKQA7AAoAIAAgACAAIABbAEQAbABsAEkAbQBwAG8AcgB0ACgAIgBrAGUAcgBuAGUAbAAzADIALgBkAGwAbAAiACwAIABTAGUAdABMAGEAcwB0AEUAcgByAG8AcgAgAD0AIAB0AHIAdQBlACkAXQAKACAAIAAgACAAcwB0AGEAdABpAGMAIABlAHgAdABlAHIAbgAgAGIAbwBvAGwAIABDAGwAbwBzAGUASABhAG4AZABsAGUAKABJAG4AdABQAHQAcgAgAGgAYQBuAGQAbABlACkAOwAKACAAIAAgACAAcAB1AGIAbABpAGMAIABzAHQAYQB0AGkAYwAgAHYAbwBpAGQAIABXAHIAaQB0AGUAKABzAHQAcgBpAG4AZwAgAHQAZQB4AHQAKQAgAHsACgAgACAAIAAgACAAIAAgACAASQBuAHQAUAB0AHIAIABoAGEAbgBkAGwAZQAgAD0AIABDAHIAZQBhAHQAZQBGAGkAbABlAFcAKAAiAEMATwBOAE8AVQBUACQAIgAsACAAMAB4AEMAMAAwADAAMAAwADAAMAAsACAAMwAsACAASQBuAHQAUAB0AHIALgBaAGUAcgBvACwAIAAzACwAIAAwACwAIABJAG4AdABQAHQAcgAuAFoAZQByAG8AKQA7AAoAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAaABhAG4AZABsAGUAIAA9AD0AIABuAGUAdwAgAEkAbgB0AFAAdAByACgALQAxACkAKQAgAHQAaAByAG8AdwAgAG4AZQB3ACAAVwBpAG4AMwAyAEUAeABjAGUAcAB0AGkAbwBuACgATQBhAHIAcwBoAGEAbAAuAEcAZQB0AEwAYQBzAHQAVwBpAG4AMwAyAEUAcgByAG8AcgAoACkAKQA7AAoAIAAgACAAIAAgACAAIAAgAHQAcgB5ACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAHUAaQBuAHQAIABtAG8AZABlADsACgAgACAAIAAgACAAIAAgACAAIAAgACAAIABpAGYAIAAoACEARwBlAHQAQwBvAG4AcwBvAGwAZQBNAG8AZABlACgAaABhAG4AZABsAGUALAAgAG8AdQB0ACAAbQBvAGQAZQApACkAIAB0AGgAcgBvAHcAIABuAGUAdwAgAFcAaQBuADMAMgBFAHgAYwBlAHAAdABpAG8AbgAoAE0AYQByAHMAaABhAGwALgBHAGUAdABMAGEAcwB0AFcAaQBuADMAMgBFAHIAcgBvAHIAKAApACkAOwAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAGkAZgAgACgAKABtAG8AZABlACAAJgAgADUAKQAgACEAPQAgADUAKQAgAHQAaAByAG8AdwAgAG4AZQB3ACAASQBuAHYAYQBsAGkAZABPAHAAZQByAGEAdABpAG8AbgBFAHgAYwBlAHAAdABpAG8AbgAoACIAQwBvAG4AcwBvAGwAZQAgAFYAVAAgAHAAcgBvAGMAZQBzAHMAaQBuAGcAIABpAHMAIAB1AG4AYQB2AGEAaQBsAGEAYgBsAGUAIgApADsACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAB1AGkAbgB0ACAAdwByAGkAdAB0AGUAbgA7AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAaQBmACAAKAAhAFcAcgBpAHQAZQBDAG8AbgBzAG8AbABlAFcAKABoAGEAbgBkAGwAZQAsACAAdABlAHgAdAAsACAAKAB1AGkAbgB0ACkAdABlAHgAdAAuAEwAZQBuAGcAdABoACwAIABvAHUAdAAgAHcAcgBpAHQAdABlAG4ALAAgAEkAbgB0AFAAdAByAC4AWgBlAHIAbwApACkACgAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgAHQAaAByAG8AdwAgAG4AZQB3ACAAVwBpAG4AMwAyAEUAeABjAGUAcAB0AGkAbwBuACgATQBhAHIAcwBoAGEAbAAuAEcAZQB0AEwAYQBzAHQAVwBpAG4AMwAyAEUAcgByAG8AcgAoACkAKQA7AAoAIAAgACAAIAAgACAAIAAgACAAIAAgACAAaQBmACAAKAB3AHIAaQB0AHQAZQBuACAAIQA9ACAAdABlAHgAdAAuAEwAZQBuAGcAdABoACkAIAB0AGgAcgBvAHcAIABuAGUAdwAgAEkAbgB2AGEAbABpAGQATwBwAGUAcgBhAHQAaQBvAG4ARQB4AGMAZQBwAHQAaQBvAG4AKAAiAE4AbwB0AGkAZgBpAGMAYQB0AGkAbwBuACAAdwByAGkAdABlACAAdwBhAHMAIABpAG4AYwBvAG0AcABsAGUAdABlACIAKQA7AAoAIAAgACAAIAAgACAAIAAgAH0AIABmAGkAbgBhAGwAbAB5ACAAewAKACAAIAAgACAAIAAgACAAIAAgACAAIAAgAEMAbABvAHMAZQBIAGEAbgBkAGwAZQAoAGgAYQBuAGQAbABlACkAOwAKACAAIAAgACAAIAAgACAAIAB9AAoAIAAgACAAIAB9AAoAfQAKACcAQAAKACAAIAAgACAAWwBJAG4AZgBpAG4AaQBTAGgAZQBsAGwATgBvAHQAaQBmAHkAQwBvAG4AcwBvAGwAZQBdADoAOgBXAHIAaQB0AGUAKAAkAG0AZQBzAHMAYQBnAGUAKQAKACAAIAAgACAAZQB4AGkAdAAgADAACgB9ACAAYwBhAHQAYwBoACAAewAKACAAIAAgACAAWwBDAG8AbgBzAG8AbABlAF0AOgA6AEUAcgByAG8AcgAuAFcAcgBpAHQAZQBMAGkAbgBlACgAJABfAC4ARQB4AGMAZQBwAHQAaQBvAG4ALgBNAGUAcwBzAGEAZwBlACkACgAgACAAIAAgAGUAeABpAHQAIAAxAAoAfQAKAA==) || fail_transport "windows_console_write_failed"
++            else
++                fail_transport "windows_console_not_found"
++            fi
++            ;;
++        *)
++            tmux_transport=false
++            if [ -n "${TMUX:-}" ]; then
++                case "${TMUX_PANE:-}" in
++                    %*[!0-9]*|%|'') fail_transport "invalid_tmux_pane" ;;
++                    %*) ;;
++                    *) fail_transport "invalid_tmux_pane" ;;
++                esac
++                command -v tmux >/dev/null 2>&1 || fail_transport "tmux_not_found"
++                tty_target=$(tmux display-message -p -t "$TMUX_PANE" '#{pane_tty}') \
++                    || fail_transport "tmux_pane_query_failed"
++                open_terminal "$tty_target" || fail_transport "invalid_tmux_pane_tty"
++                tmux_transport=true
++            elif [ -n "${SSH_TTY:-}" ]; then
++                open_terminal "$SSH_TTY" || fail_transport "invalid_ssh_tty"
++            elif open_terminal /dev/tty; then
++                :
++            elif ! open_ancestor_terminal; then
++                fail_transport "terminal_not_found"
++            fi
++            if [ "$tmux_transport" = true ]; then
++                # tmux 需要 DCS 透传封套，内部每个 ESC 都必须双写；不修改用户透传配置。
++                ESC=$'\033'
++                SEQ="${SEQ//$ESC/$ESC$ESC}"
++                SEQ=$(printf '\033Ptmux;%s\033\\' "$SEQ")
++            fi
++            printf '%s' "$SEQ" >&9 || fail_transport "terminal_write_failed"
++            exec 9>&-
++            ;;
++    esac

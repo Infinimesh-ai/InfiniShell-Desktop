@@ -56,6 +56,12 @@ pub enum LocalCliPersistenceRequest {
         message: LocalCliMessage,
         completion: oneshot::Sender<Result<Option<LocalCliMessage>, String>>,
     },
+    ClaimManagedMessage {
+        message: LocalCliMessage,
+        expected_sender: LocalCliTask,
+        expected_recipient: LocalCliTask,
+        completion: oneshot::Sender<Result<Option<LocalCliMessage>, String>>,
+    },
     EnqueueMessage {
         message: LocalCliMessage,
         completion: oneshot::Sender<Result<LocalCliEnqueueOutcome, String>>,
@@ -198,6 +204,26 @@ pub(crate) fn claim_parent_history_message(
         sender,
         LocalCliPersistenceRequest::ClaimParentHistoryMessage {
             message,
+            completion,
+        },
+    )?;
+    Ok(receiver)
+}
+
+/// 在线托管接收端保留协议队列容量后领取普通父子消息；Sent 不会重新入队。
+pub(crate) fn claim_managed_message_if_current(
+    sender: &SyncSender<ModelEvent>,
+    message: LocalCliMessage,
+    expected_sender: LocalCliTask,
+    expected_recipient: LocalCliTask,
+) -> Result<oneshot::Receiver<Result<Option<LocalCliMessage>, String>>, String> {
+    let (completion, receiver) = oneshot::channel();
+    enqueue_request(
+        sender,
+        LocalCliPersistenceRequest::ClaimManagedMessage {
+            message,
+            expected_sender,
+            expected_recipient,
             completion,
         },
     )?;
@@ -367,6 +393,15 @@ pub(super) fn handle_request(
             message,
             completion,
         } => complete(claim_parent_message(connection, message), completion),
+        LocalCliPersistenceRequest::ClaimManagedMessage {
+            message,
+            expected_sender,
+            expected_recipient,
+            completion,
+        } => complete(
+            claim_managed_message(connection, message, &expected_sender, &expected_recipient),
+            completion,
+        ),
         LocalCliPersistenceRequest::AcknowledgeMessage {
             message_id,
             task_id,
@@ -423,6 +458,7 @@ pub(super) fn reject_request(request: LocalCliPersistenceRequest) {
         }
         LocalCliPersistenceRequest::EnqueueTaskResult { completion, .. }
         | LocalCliPersistenceRequest::ClaimParentHistoryMessage { completion, .. }
+        | LocalCliPersistenceRequest::ClaimManagedMessage { completion, .. }
         | LocalCliPersistenceRequest::ClaimTaskResult { completion, .. } => {
             let _ = completion.send(Err(error));
         }
@@ -1073,6 +1109,65 @@ fn claim_parent_message(
             LocalCliMessageState::Sent,
         )?;
         stored.state = LocalCliMessageState::Sent;
+        Ok(Some(stored))
+    })
+}
+
+fn claim_managed_message(
+    connection: &mut SqliteConnection,
+    message: LocalCliMessage,
+    expected_sender: &LocalCliTask,
+    expected_recipient: &LocalCliTask,
+) -> Result<Option<LocalCliMessage>> {
+    connection.transaction(|connection| {
+        if message.state != LocalCliMessageState::Queued
+            || message.receipt_kind.is_some()
+            || message.sender_task_id == message.recipient_task_id
+            || matches!(
+                message.subject.as_str(),
+                TASK_RESULT_SUBJECT | "native_tool_call" | "native_tool_result"
+            )
+        {
+            bail!("只能领取待派发的普通父子消息");
+        }
+        let mut stored =
+            read_message(connection, &message.message_id)?.context("普通父子消息尚未入队")?;
+        let state = stored.state;
+        stored.state = LocalCliMessageState::Queued;
+        stored.receipt_kind = None;
+        if stored != message {
+            bail!("普通父子消息内容与持久化记录不一致");
+        }
+        if state != LocalCliMessageState::Queued {
+            return Ok(None);
+        }
+        let sender =
+            read_task(connection, &message.sender_task_id)?.context("消息发送任务不存在")?;
+        let recipient =
+            read_task(connection, &message.recipient_task_id)?.context("消息接收任务不存在")?;
+        let permissions: Value = serde_json::from_str(&sender.config_json)?;
+        let direct_child_to_parent = sender.parent_task_id.as_deref()
+            == Some(recipient.task_id.as_str())
+            && sender.parent_generation == Some(recipient.generation);
+        let direct_parent_to_child = recipient.parent_task_id.as_deref()
+            == Some(sender.task_id.as_str())
+            && recipient.parent_generation == Some(sender.generation);
+        if sender != *expected_sender
+            || recipient != *expected_recipient
+            || sender.version != 1
+            || recipient.version != 1
+            || sender.generation != message.sender_generation
+            || recipient.generation != message.recipient_generation
+            || !sender.state.is_active()
+            || !recipient.state.is_active()
+            || recipient.harness == "oz"
+            || permissions["local_tools"]["allow_message"] != true
+            || (!direct_child_to_parent && !direct_parent_to_child)
+        {
+            bail!("普通父子消息未获授权或接收运行已经变化");
+        }
+        stored.state = LocalCliMessageState::Sent;
+        write_message_state(connection, &stored)?;
         Ok(Some(stored))
     })
 }

@@ -1,6 +1,37 @@
 use super::super::{confirmed_exit, create_generation_directory, write_new_record};
 use super::*;
 
+#[test]
+fn launchd_test_script_keeps_worker_argument_positions() {
+    assert_eq!(
+        job_program_arguments(
+            Path::new("/tmp/managed-supervisor.sh"),
+            Path::new("/tmp/manifest.json")
+        )
+        .unwrap(),
+        [
+            "/bin/sh",
+            "/tmp/managed-supervisor.sh",
+            WORKER_COMMAND,
+            "/tmp/manifest.json",
+            "--execute",
+        ]
+    );
+    assert_eq!(
+        job_program_arguments(
+            Path::new("/Applications/InfiniShell.app/Contents/MacOS/warp"),
+            Path::new("/tmp/manifest.json")
+        )
+        .unwrap(),
+        [
+            "/Applications/InfiniShell.app/Contents/MacOS/warp",
+            WORKER_COMMAND,
+            "/tmp/manifest.json",
+            "--execute",
+        ]
+    );
+}
+
 struct Fixture {
     directory: PathBuf,
     manifest: Manifest,
@@ -26,6 +57,9 @@ impl Fixture {
             executable: std::env::current_exe().unwrap(),
             arguments: Vec::new(),
             cwd: state.to_owned(),
+            expected_files: Vec::new(),
+            atomic_launch_kind: None,
+            atomic_cwd: None,
         };
         let manifest_bytes = encode(&manifest).unwrap();
         // 仅构造持久化校验输入；这些编号不是本机清理目标，也不替代真实回执验收。

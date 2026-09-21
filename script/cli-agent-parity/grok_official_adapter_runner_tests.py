@@ -11,15 +11,16 @@ import socket
 import stat
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import run_grok_adapter_live as shared
 from grok_adapter_runner_tests import acceptance_fixture, final_response_fields
 from run_grok_official_adapter_live import (
-    MODEL, PROFILES, P0_PROFILE, OfficialTunnel, audit_private_settings, copy_private_auth, main,
-    official_environment, prepare_native, public_events, rejected_origin_event,
-    verified_p0_acceptance,
+    CURRENT_ROOT_PROFILE, MODEL, PROFILES, P0_PROFILE, OfficialTunnel, audit_private_settings,
+    copy_private_auth, main, official_environment, prepare_native, public_events,
+    rejected_origin_event, validate_paths, verified_p0_acceptance,
 )
 
 
@@ -328,6 +329,58 @@ tool = "write"
             wrapper, _ = prepare_native(root, Path("/tmp/fixed-grok"), Path("/tmp/auth-source"),
                 12345, profile["sha256"])
             self.assertIn(profile["sha256"], wrapper.read_text())
+
+    def test_current_root_profile_pins_exact_binary_model_and_full_root_lifecycle(self):
+        profile = PROFILES[CURRENT_ROOT_PROFILE]
+        self.assertEqual(profile["version"], "grok 1.0.40 (eb1a2256660d)")
+        self.assertEqual(
+            profile["sha256"],
+            "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+        )
+        self.assertEqual(profile["model"], "grok-4.6")
+        self.assertEqual(profile["max_acp_inputs"], 8)
+        self.assertFalse(profile["public_product_gate_open"])
+        self.assertTrue(profile["test_name"].endswith("real_grok_current_root_lifecycle"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "home/.grok").mkdir(parents=True)
+            wrapper, settings = prepare_native(
+                root,
+                Path("/tmp/fixed-grok"),
+                Path("/tmp/auth-source"),
+                12345,
+                profile["sha256"],
+                profile["model"],
+            )
+            self.assertIn(profile["sha256"], wrapper.read_text())
+            self.assertIn('default = "grok-4.6"', settings.read_text())
+
+    def test_current_formal_symlink_resolves_before_exact_digest_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            test_binary = root / "test-binary"
+            supervisor = root / "supervisor"
+            target = root / "grok-1.0.40"
+            for path in (test_binary, supervisor, target):
+                path.write_bytes(b"fixture")
+            formal = root / "grok"
+            formal.symlink_to(target)
+            home = root / "official-home"
+            home.mkdir(mode=0o700)
+            args = SimpleNamespace(
+                test_binary=test_binary,
+                grok=formal,
+                supervisor=supervisor,
+                official_grok_home=home,
+                acceptance_profile=CURRENT_ROOT_PROFILE,
+                max_acp_inputs=None,
+                timeout=300,
+                output=root / "receipt.ndjson",
+            )
+            with patch.object(shared, "digest", return_value=PROFILES[CURRENT_ROOT_PROFILE]["sha256"]):
+                validate_paths(args)
+            self.assertEqual(args.grok, target.resolve())
+            self.assertEqual(args.max_acp_inputs, 8)
 
     def test_public_evidence_never_exports_unrecognized_native_text(self):
         events = [{"event": "acceptance_failed", "reason": "dummy-secret", "output": "dummy-secret",

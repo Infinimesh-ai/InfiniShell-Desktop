@@ -1,0 +1,57 @@
+{
+  "patch_revision": 4,
+  "upstream_repository": "https://github.com/warpdotdev/codex-warp",
+  "upstream_plugin": "warp",
+  "compatible_bases": [
+    {
+      "version": "0.4.0",
+      "commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+      "tree_sha256": {
+        ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+        "hooks/hooks.json": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+        "scripts/build-payload.sh": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+        "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+        "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+        "scripts/on-prompt-submit.sh": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+        "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+        "scripts/on-stop.sh": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+        "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+        "scripts/warp-notify.sh": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366"
+      }
+    }
+  ],
+  "cli_contract_version": "0.147.0",
+  "correlation_field": "turn_id",
+  "native_sequence_available": false,
+  "native_event_id_available": false,
+  "native_hook_lifecycle_verified": false,
+  "files": {
+    "scripts/build-payload.sh": {
+      "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+      "replacement_sha256": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "mode": "0755"
+    },
+    "scripts/on-stop.sh": {
+      "upstream_sha256": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+      "replacement_sha256": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "mode": "0755"
+    },
+    "hooks/hooks.json": {
+      "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+      "replacement_sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+      "mode": "0644"
+    },
+    "scripts/warp-notify.sh": {
+      "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
+      "replacement_sha256": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "mode": "0755"
+    },
+    "scripts/on-prompt-submit.sh": {
+      "upstream_sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "replacement_sha256": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+      "mode": "0755"
+    }
+  },
+  "windows_product_enabled": false,
+  "windows_uninstrumented_hooks_verified": false
+}

@@ -434,8 +434,14 @@ fn native_tools_verified(replay: &Value, turn: &str, calls: &[String], case: &Ca
                     fields.keys().all(|key| {
                         matches!(
                             key.as_str(),
-                            "sessionUpdate" | "toolCallId" | "title" | "rawInput" | "_meta"
-                                | "kind" | "content" | "locations"
+                            "sessionUpdate"
+                                | "toolCallId"
+                                | "title"
+                                | "rawInput"
+                                | "_meta"
+                                | "kind"
+                                | "content"
+                                | "locations"
                         )
                     })
                 });
@@ -466,8 +472,7 @@ fn native_tools_verified(replay: &Value, turn: &str, calls: &[String], case: &Ca
     // 此分支验证待审批调用由原生回合取消闭合，不补造 failed/cancelled 工具状态。
     completions == 1
         && seen.len() == calls.len()
-        && (terminal.len() == calls.len()
-            || (statusless_cancel && updated.len() == calls.len()))
+        && (terminal.len() == calls.len() || (statusless_cancel && updated.len() == calls.len()))
 }
 
 fn catalogue_verified(catalog: &Value) -> bool {
@@ -1322,7 +1327,10 @@ fn statusless_pending_cancel_rejects_changed_identity_output_and_terminal_shape(
     let mut extra_tool = baseline.clone();
     let mut extra = extra_tool["updates"][3].clone();
     extra["params"]["update"]["toolCallId"] = json!("unexpected-call");
-    extra_tool["updates"].as_array_mut().unwrap().insert(4, extra);
+    extra_tool["updates"]
+        .as_array_mut()
+        .unwrap()
+        .insert(4, extra);
     rejected.push(extra_tool);
     for status in [
         json!(null),
@@ -1389,14 +1397,24 @@ fn statusless_pending_cancel_accepts_only_exact_write_preview_without_output() {
         } else {
             update.as_object_mut().unwrap().remove("content");
         }
-        assert!(native_tools_verified(&snapshot.replay, "turn", &calls, &case));
+        assert!(native_tools_verified(
+            &snapshot.replay,
+            "turn",
+            &calls,
+            &case
+        ));
     }
     // 已有明确工具终态的分支保持原义，不套用待审批预览的严格形状。
     let update = &mut snapshot.replay["updates"][4]["params"]["update"];
     update["status"] = json!("failed");
     update["content"] = json!([{"type":"content","content":{"type":"text","text":"工具错误"}}]);
     update["locations"] = json!([]);
-    assert!(native_tools_verified(&snapshot.replay, "turn", &calls, &case));
+    assert!(native_tools_verified(
+        &snapshot.replay,
+        "turn",
+        &calls,
+        &case
+    ));
 }
 
 #[test]
@@ -1457,7 +1475,12 @@ fn statusless_pending_cancel_rejects_unknown_content_and_changed_write_preview()
     }
     let mut initial_tool_output = baseline;
     initial_tool_output["updates"][3]["params"]["update"]["content"] = json!([{"type":"text"}]);
-    assert!(!native_tools_verified(&initial_tool_output, "turn", &calls, &case));
+    assert!(!native_tools_verified(
+        &initial_tool_output,
+        "turn",
+        &calls,
+        &case
+    ));
 }
 
 #[test]

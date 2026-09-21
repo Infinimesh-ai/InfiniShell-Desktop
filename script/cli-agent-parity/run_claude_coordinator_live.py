@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""显式运行真实 Claude 父子生产协调器验收；复用私有认证边界与脱敏，不执行 GUI 验收。"""
+"""显式运行真实 Claude 父子生产协调器验收；认证与证据均有独立边界，不执行 GUI 验收。"""
 
 import argparse
 import hashlib
@@ -98,9 +98,25 @@ def project_public_events(events, redact):
     return result
 
 
+def validate_auth_selection(args):
+    default_account = getattr(args, "use_authorized_default_account", False)
+    api_file = getattr(args, "api_environment_file", None)
+    if default_account:
+        if api_file is not None:
+            raise ValueError("默认在线账户模式不能同时提供 API 环境")
+        if getattr(args, "claude_version", VERSION) != base.DEFAULT_ACCOUNT_VERSION:
+            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278")
+    elif api_file is None:
+        raise ValueError("私有 API 模式必须提供 api-environment-file")
+    return default_account
+
+
 def validate_inputs(args):
+    default_account = validate_auth_selection(args)
     for name in ("test_binary", "claude", "supervisor", "api_environment_file"):
-        path = getattr(args, name)
+        path = getattr(args, name, None)
+        if path is None:
+            continue
         if path.is_symlink() or getattr(path.lstat(), "st_file_attributes", 0) & 0x400:
             raise ValueError("输入不能使用符号链接或重解析点")
         path = path.resolve(strict=True)
@@ -114,10 +130,20 @@ def validate_inputs(args):
     args.output = args.output.resolve()
     if args.output.suffix != ".ndjson":
         raise ValueError("证据输出必须使用 .ndjson 扩展名")
-    inputs = {args.test_binary, args.claude, args.supervisor, args.api_environment_file}
+    inputs = {args.test_binary, args.claude, args.supervisor,
+              getattr(args, "api_environment_file", None)}
     for output in (args.output, args.output.with_suffix(".metadata.json"), args.output.with_suffix(".test-output.txt")):
-        if output in inputs or output.exists() or output.is_symlink():
+        default_config = (Path.home() / ".claude").resolve()
+        if (output in inputs or output.exists() or output.is_symlink()
+                or default_account and output.is_relative_to(default_config)):
             raise ValueError("输出不得覆盖输入或既有证据")
+
+
+def _file_has_no_sensitive_values(path, redact):
+    if not path.exists() or not path.is_file():
+        return False
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return redact(text) == text
 
 
 def _one(events, kind):
@@ -252,7 +278,7 @@ def _audit_inputs(output, runtime, histories, expected, metrics):
         ready = kind.get("SessionReady", {}).get("effective_permissions", {})
         if (native_id is not None or row["task"].get("native_session_id") is not None
                 or key[1] != 1 or key[0] in session_bound or set(kind) != {"SessionReady"}
-                or ready.get("fixedProfileVerified") is not True or ready.get("permissionMode") != "plan"
+                or ready.get("fixedProfileVerified") is not True or ready.get("permissionMode") != "default"
                 or ready.get("sessionAssociationConfirmed") is not False
                 or ready.get("claudeRestrictedFilesV1") != config["claude_profile"]
                 or ready.get("fixedProfileSha256") != config["effective_permissions"].get("fixedProfileSha256")):
@@ -343,7 +369,7 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
         if (profile != child_config["claude_profile"]
                 or child_config["effective_permissions"]["claudeRestrictedFilesV1"] != profile
                 or child_config["effective_permissions"]["fixedProfileVerified"] is not True
-                or child_config["effective_permissions"]["permissionMode"] != "plan"
+                or child_config["effective_permissions"]["permissionMode"] != "default"
                 or profile.get("localTools") != {"allow_spawn": True, "allow_message": True}
                 or child_config["permission_ceiling"] != ceiling):
             return False
@@ -354,7 +380,7 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
                     or config.get("permission_policy") != "ClaudeRestrictedFilesV1"
                     or config.get("effective_permissions", {}).get("claudeRestrictedFilesV1") != profile
                     or config.get("effective_permissions", {}).get("fixedProfileVerified") is not True
-                    or config.get("effective_permissions", {}).get("permissionMode") != "plan"):
+                    or config.get("effective_permissions", {}).get("permissionMode") != "default"):
                 return False
         messages = chain["messages"]
         ids = [row["message_id"] for row in messages]
@@ -497,12 +523,17 @@ def run(args):
     detected = verify_version(args.claude, root, selected_version)
     if verify_binary(args.claude, target, selected_version) != verified_cli:
         raise ValueError("原生 Claude 在版本探测期间变化")
-    api_environment = base.load_api_environment(args.api_environment_file)
-    # 每次都创建全新的 HOME／配置，不接受既有原生登录域，也不复制凭据。
-    args.auth_home, args.config_dir = root / "home", root / "claude"
-    args.auth_home.mkdir(mode=0o700)
-    args.config_dir.mkdir(mode=0o700)
-    base.validate_paths(args)
+    default_account = validate_auth_selection(args)
+    api_environment = ({} if default_account else
+                       base.load_api_environment(args.api_environment_file))
+    if default_account:
+        args.auth_home, args.config_dir = None, None
+    else:
+        # 私有 API 模式每次创建全新 HOME／配置，不接受既有原生登录域，也不复制凭据。
+        args.auth_home, args.config_dir = root / "home", root / "claude"
+        args.auth_home.mkdir(mode=0o700)
+        args.config_dir.mkdir(mode=0o700)
+        base.validate_paths(args)
     settings = base.prepare_project(root)
     (root / ".infinishell-claude-coordinator-probe").write_text(SCOPE, encoding="utf-8")
     blocked = root / "project/blocked.txt"
@@ -513,21 +544,36 @@ def run(args):
     settings.write_text(json.dumps({"permissions": {
         "ask": ["Edit"], "deny": [f"Read(/{blocked.as_posix()})"]
     }}) + "\n", encoding="utf-8")
-    environment = base.authenticated_environment(root, args.config_dir, args.auth_home)
+    account_status = None
+    data_profile = None
+    if default_account:
+        environment = base.authorized_default_account_environment(root)
+        account_status = base.probe_authorized_default_account(
+            args.claude, environment.copy(), root / "project")
+        data_profile = f"claude-coordinator-{uuid.uuid4().hex}"
+        environment["WARP_DATA_PROFILE"] = data_profile
+        auth_mode = "authorized_default_account"
+    else:
+        environment = base.authenticated_environment(root, args.config_dir, args.auth_home)
+        environment.update(api_environment)
+        auth_mode = "private_api"
     raw_artifact = root / "coordinator.raw.ndjson"
     with raw_artifact.open("x", encoding="utf-8"):
         pass
     raw_artifact.chmod(0o600)
-    environment.update(api_environment)
     environment.update({
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
-        "INFINISHELL_CLAUDE_LIVE_CONFIG_DIR": str(args.config_dir),
+        "INFINISHELL_CLAUDE_LIVE_AUTH_MODE": auth_mode,
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
         "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(raw_artifact),
         "INFINISHELL_CLAUDE_LIVE_MODEL": args.model,
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
     })
+    if args.config_dir is not None:
+        environment["INFINISHELL_CLAUDE_LIVE_CONFIG_DIR"] = str(args.config_dir)
+    if data_profile is not None:
+        environment["INFINISHELL_CLAUDE_LIVE_STATE_PROFILE"] = data_profile
     redact = lambda value: base.sanitize(value, root, args.config_dir, args.auth_home, api_environment)
     repository = Path(__file__).resolve().parents[2]
     metadata = {
@@ -537,8 +583,11 @@ def run(args):
         "test_binary_sha256": base.digest(args.test_binary), "supervisor_binary_sha256": base.digest(args.supervisor),
         "private_workspace": str(root), "project_settings_sha256": base.digest(settings),
         "private_workspace_preserved": True, "runner_modifies_auth_configuration": False,
-        "fresh_private_auth_home": True, "authentication_source": "explicit_api_environment",
-        "native_credential_files_read_or_copied": False, "api_environment_values_recorded": False,
+        "fresh_private_auth_home": not default_account,
+        "authentication_source": ("authorized_default_account" if default_account else
+                                  "explicit_api_environment"),
+        "native_credential_files_read_or_copied_by_runner": False,
+        "api_environment_values_recorded": False,
         "native_cli_may_refresh_credentials": True, "real_gui_verified": False,
         "automatic_result_delivery_ack_verified": False, "model_requests_expected": True,
         "max_native_tools": 4, "max_native_inputs": 6, "max_native_executions": 6, "max_test_seconds": 450,
@@ -546,6 +595,13 @@ def run(args):
         "public_evidence_projection_version": 1, "private_raw_evidence_preserved": True,
         "private_raw_evidence_filename": raw_artifact.name,
     }
+    if account_status is not None:
+        metadata["authorized_default_account"] = account_status
+        metadata["native_cli_credential_access_expected"] = True
+        metadata["credential_access_boundary"] = "native_cli_only"
+        metadata["isolated_data_profile"] = data_profile
+    else:
+        metadata["native_credential_files_read_or_copied"] = False
     for command, key in ((["git", "rev-parse", "HEAD"], "commit"), (["git", "status", "--porcelain"], "worktree_dirty")):
         result = subprocess.run(command, cwd=repository, text=True, capture_output=True, check=True)
         metadata[key] = bool(result.stdout.strip()) if key == "worktree_dirty" else result.stdout.strip()
@@ -553,6 +609,7 @@ def run(args):
     output = ""
     events = []
     owns_output = False
+    private_output = root / "coordinator.raw.test-output.txt"
     try:
         with args.output.open("x", encoding="utf-8"):
             pass
@@ -573,14 +630,10 @@ def run(args):
             process.wait(timeout=15)
             raise
         metadata["test_exit_code"] = process.returncode
-        private_output = root / "coordinator.raw.test-output.txt"
-        with private_output.open("x", encoding="utf-8") as output_stream:
-            output_stream.write(output)
-        private_output.chmod(0o600)
-        metadata["private_test_output_filename"] = private_output.name
-        metadata["private_test_output_sha256"] = base.digest(private_output)
         metadata["native_result_correlations"] = base.sanitize_event(_native_results(output), redact)
-        raw_events = [json.loads(line) for line in raw_artifact.read_text(encoding="utf-8").splitlines() if line.strip()]
+        raw_text = redact(raw_artifact.read_text(encoding="utf-8"))
+        raw_artifact.write_text(raw_text, encoding="utf-8")
+        raw_events = [json.loads(line) for line in raw_text.splitlines() if line.strip()]
         # 验收先审核私有全树，再审核公开摘要；删除字段不能把失败记录变成通过。
         private_verified = verified_acceptance(process.returncode, output,
             [base.sanitize_event(row, redact) for row in raw_events], selected_version)
@@ -599,12 +652,44 @@ def run(args):
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         metadata["runner_error"] = redact(f"{type(error).__name__}: {error}")
     finally:
+        raw_text = redact(raw_artifact.read_text(encoding="utf-8", errors="replace"))
+        raw_artifact.write_text(raw_text, encoding="utf-8")
+        if not private_output.exists():
+            private_output.write_text(redact(output), encoding="utf-8")
+            private_output.chmod(0o600)
+        else:
+            private_output.write_text(redact(private_output.read_text(
+                encoding="utf-8", errors="replace")), encoding="utf-8")
+        metadata["private_test_output_filename"] = private_output.name
+        metadata["private_test_output_sha256"] = base.digest(private_output)
         if owns_output and args.output.exists():
             args.output.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in events), encoding="utf-8")
             metadata["public_evidence_sha256"] = base.digest(args.output)
         metadata["private_raw_evidence_sha256"] = base.digest(raw_artifact)
-        args.output.with_suffix(".test-output.txt").write_text(redact(output), encoding="utf-8")
-        args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        public_output = args.output.with_suffix(".test-output.txt")
+        public_output.write_text(redact(output), encoding="utf-8")
+        scan = {
+            args.output.name: _file_has_no_sensitive_values(args.output, redact),
+            raw_artifact.name: _file_has_no_sensitive_values(raw_artifact, redact),
+            private_output.name: _file_has_no_sensitive_values(private_output, redact),
+            public_output.name: _file_has_no_sensitive_values(public_output, redact),
+        }
+        metadata["sensitive_value_scan"] = scan
+        metadata["sensitive_value_scan_passed"] = all(scan.values())
+        metadata["acceptance_passed"] = (metadata["acceptance_passed"]
+                                         and metadata["sensitive_value_scan_passed"])
+        metadata = base.sanitize_event(metadata, redact)
+        metadata_output = args.output.with_suffix(".metadata.json")
+        metadata_text = json.dumps(metadata, ensure_ascii=False, indent=2) + "\n"
+        if redact(metadata_text) != metadata_text:
+            metadata["sensitive_value_scan_passed"] = False
+            metadata["acceptance_passed"] = False
+            metadata_text = json.dumps(base.sanitize_event(metadata, redact),
+                                       ensure_ascii=False, indent=2) + "\n"
+        metadata_output.write_text(metadata_text, encoding="utf-8")
+        for receipt in (args.output, public_output, metadata_output, raw_artifact, private_output):
+            if receipt.exists():
+                receipt.chmod(0o600)
     print("真实 Claude 生产协调器父子验收" + ("通过" if metadata["acceptance_passed"] else "未通过"))
     print(f"证据：{args.output}")
     print(f"私有工作目录已保留：{root}")
@@ -616,9 +701,11 @@ def main():
     parser.add_argument("--test-binary", type=Path, required=True)
     parser.add_argument("--claude", type=Path, required=True)
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
-                        help="精确官方版本；缺省保留 2.1.273")
+                        help="精确官方版本；私有 API 模式缺省保留 2.1.273")
     parser.add_argument("--supervisor", type=Path, required=True)
-    parser.add_argument("--api-environment-file", type=Path, required=True)
+    parser.add_argument("--api-environment-file", type=Path)
+    parser.add_argument("--use-authorized-default-account", action="store_true",
+                        help="显式使用用户已授权的默认 Claude 在线订阅；与 API 环境互斥")
     parser.add_argument("--model", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

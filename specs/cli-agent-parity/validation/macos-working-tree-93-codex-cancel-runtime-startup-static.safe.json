@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-20T23:29:03Z",
+  "receipt": "Codex cancellation cleanup, Runtime Host startup convergence, and updater pre-spawn recovery static evidence",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "upstream_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "tree_dirty": true
+  },
+  "files": {
+    "app/src/ai/cli_agent_runtime/codex.rs": "897c2e3a42e2d935db0fe981a7522d93339c4af6a622f0338aba5ca1d21ff971",
+    "app/src/ai/cli_agent_runtime/codex_tests.rs": "7cae9b613378865bf35e84e3aa50b8e992b47dfa8c652445387518edaa3cf606",
+    "app/src/ai/cli_agent_runtime/runtime_host.rs": "11d078c841300efc2ed6317e33986f8594d2e7055262b874682ecdbd628e2baf",
+    "app/src/ai/cli_agent_runtime/runtime_host_tests.rs": "f9db277ada4763dab641a92de9bf72c9ae1861f88a3d0883e5fd3397bfe3d558",
+    "app/src/terminal/cli_agent_updates/sources.rs": "1e97db4b2f2b25be72a6d4c00f1e4ee2817aea134ddf02baf432ac601b8d1e4a",
+    "app/src/terminal/cli_agent_updates/sources_tests.rs": "2f3a7f56759693072c89ecb68806aaf2a55d3606c0f20499e00cd43ac8fd21f2",
+    "script/cli-agent-parity/probe_codex_current_lifecycle.py": "26c9ff06c6a2a59565ff40184bf94820b64bfb84bff470585937dfe66a4dd92f",
+    "script/cli-agent-parity/probe_codex_current_lifecycle_tests.py": "02d95b6bbd833e4073c89ee741ca9aef471ff9a80fde6a9218bf3279b926261c"
+  },
+  "native_evidence": {
+    "receipt": "macos-official-92-codex-01551-native-lifecycle.safe.json",
+    "receipt_sha256": "277958acbc1ee055c9bc990db1ee33dd080c22b0ead0e6c21a3c5608ac46b647",
+    "codex_version": "0.155.1",
+    "two_turns_allow_deny_steer_and_server_restart_resume_passed": true,
+    "interrupt_ack_and_interrupted_turn_observed": true,
+    "cancelled_fixture_process_exited_within_10_seconds": false,
+    "native_lifecycle_passed": false
+  },
+  "implementation_candidates": {
+    "codex_pending_native_execution_forces_managed_disconnect_after_cancel_event": true,
+    "runtime_host_startup_receipt_is_manifest_and_generation_bound": true,
+    "ready_failure_requires_observed_host_exit_and_native_cleanup_evidence": true,
+    "cancelled_startup_future_kills_direct_host": true,
+    "updater_pre_spawn_missing_generation_records_not_started": true,
+    "late_missing_generation_remains_recovery_required": true,
+    "compiled": false,
+    "real_product_lifecycle_passed": false
+  },
+  "static_validation": {
+    "rustfmt_changed_and_untracked_rust_files": 41,
+    "rustfmt_passed": true,
+    "probe_python_ast_passed": true,
+    "probe_offline_tests_passed": 4,
+    "probe_offline_tests_failed": 0,
+    "working_tree_diff_check_passed": true,
+    "index_diff_check_passed": true,
+    "untracked_safe_receipt_json_files_parsed": 32,
+    "user_visible_copy_changed_by_these_candidates": false
+  },
+  "limitations": [
+    "The Rust candidates were not compiled because the existing external Cargo target is unreadable and a safe fresh Warp build does not fit on the current internal volume.",
+    "No InfiniShell GUI, managed task, application restart, Claude, Grok, Linux, or Windows lifecycle was executed for these bytes.",
+    "Static tests cannot replace the recorded Codex native cancellation failure or prove process-tree cleanup.",
+    "The updater still has a pathname check-to-exec gap and does not yet have a source-provided LaunchBinding for a complete dependency snapshot."
+  ],
+  "overall_product_acceptance": false,
+  "full_goal_passed": false
+}

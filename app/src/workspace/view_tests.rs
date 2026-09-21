@@ -23,6 +23,8 @@ use crate::ai::agent_tips::AITipModel;
 use crate::ai::ambient_agents::github_auth_notifier::GitHubAuthNotifier;
 use crate::ai::blocklist::agent_view::orchestration_pill_bar_model::OrchestrationPillBarModel;
 use crate::ai::blocklist::{BlocklistAIHistoryModel, BlocklistAIPermissions};
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
 use crate::ai::document::ai_document_model::AIDocumentModel;
 use crate::ai::execution_profiles::profiles::AIExecutionProfilesModel;
 use crate::ai::facts::manager::AIFactManager;
@@ -235,6 +237,114 @@ pub(crate) fn mock_workspace(app: &mut App) -> ViewHandle<Workspace> {
         )
     });
     workspace
+}
+
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+#[test]
+fn local_cli_task_manager_action_is_a_noop_when_the_feature_is_disabled() {
+    let _flag = FeatureFlag::LocalCLIManagedTasks.override_enabled(false);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+
+        workspace.update(&mut app, |workspace, ctx| {
+            assert!(workspace.local_cli_task_manager.is_none());
+            workspace.handle_action(&WorkspaceAction::OpenLocalCLITaskManager, ctx);
+            assert!(workspace.local_cli_task_manager.is_none());
+        });
+    });
+}
+
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+#[test]
+fn local_cli_task_manager_action_creates_and_opens_the_modal_when_enabled() {
+    let _flag = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        app.add_singleton_model(|_| LocalCLITaskCoordinator::new(None));
+        let workspace = mock_workspace(&mut app);
+
+        workspace.update(&mut app, |workspace, ctx| {
+            assert!(workspace.local_cli_task_manager.is_none());
+            workspace.handle_action(&WorkspaceAction::OpenLocalCLITaskManager, ctx);
+            assert!(
+                workspace
+                    .local_cli_task_manager
+                    .as_ref()
+                    .is_some_and(|modal| modal.is_open())
+            );
+        });
+    });
+}
+
+#[test]
+fn local_cli_task_manager_keeps_the_bounded_bilingual_layout_contract() {
+    fn section<'a>(source: &'a str, start: &str, end: &str) -> &'a str {
+        let start = source
+            .find(start)
+            .unwrap_or_else(|| panic!("缺少源码边界：{start}"));
+        let end = source[start..]
+            .find(end)
+            .map(|offset| start + offset)
+            .unwrap_or_else(|| panic!("缺少源码边界：{end}"));
+        &source[start..end]
+    }
+
+    let workspace_source = include_str!("view.rs");
+    let manager_builder = section(
+        workspace_source,
+        "fn build_local_cli_task_manager",
+        "fn close_local_cli_task_manager",
+    );
+
+    for required in [
+        "crate::t!(\"cli-agent-task-manager-title\")",
+        ".with_max_height_percentage(0.9)",
+        "width: Some(760.)",
+        "height: Some(580.)",
+    ] {
+        assert!(
+            manager_builder.contains(required),
+            "任务管理器模态框缺少布局合同：{required}"
+        );
+    }
+
+    let manager_view_source = include_str!("../ai/cli_agent_runtime/task_manager_view.rs");
+    let constructor = section(
+        manager_view_source,
+        "pub(crate) fn new",
+        "pub(crate) fn on_open",
+    );
+    assert_eq!(
+        constructor.matches("soft_wrap: true").count(),
+        2,
+        "目录与多行提示输入都应允许双语软换行"
+    );
+
+    let text_helper = section(manager_view_source, "fn text", "fn row");
+    assert!(
+        text_helper.contains(".with_soft_wrap()"),
+        "任务管理器普通文案应允许双语软换行"
+    );
+
+    let render = section(manager_view_source, "fn render", "impl TypedActionView");
+    for required in [
+        ".with_min_height(80.)",
+        ".with_max_height(180.)",
+        ".with_max_height(650.)",
+    ] {
+        assert!(
+            render.contains(required),
+            "任务管理器内容缺少窄窗口与双语长文案保护：{required}"
+        );
+    }
+    assert_eq!(
+        render.matches(".with_vertical_scrollbar(").count(),
+        2,
+        "提示输入区与任务面板都应具有独立滚动边界"
+    );
 }
 
 #[test]

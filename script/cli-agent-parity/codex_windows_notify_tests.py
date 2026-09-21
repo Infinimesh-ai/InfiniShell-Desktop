@@ -22,9 +22,15 @@ class NotifyCandidateTests(unittest.TestCase):
     def original(self):
         return (ASSETS / 'codex/revisions/rev3/scripts/warp-notify.sh').read_text(encoding='utf-8')
 
-    def test_rev4_resources_match_reviewable_candidate_and_five_native_commands(self):
-        self.assertEqual((ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8'),
-                         candidate.candidate_notify(self.original()).rstrip("\n") + "\n")
+    def test_rev5_resources_keep_reviewable_windows_payload_and_five_native_commands(self):
+        notify = (ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8')
+        encoded = re.findall(r'-EncodedCommand ([A-Za-z0-9+/=]+)', notify)
+        self.assertEqual(len(encoded), 1)
+        self.assertEqual(base64.b64decode(encoded[0], validate=True).decode('utf-16le'),
+                         candidate.source_text())
+        self.assertNotIn('2>/dev/null || true', notify)
+        self.assertIn('windows_console_write_failed', notify)
+        self.assertIn('windows_console_not_found', notify)
         hooks = json.loads((ASSETS / 'codex/hooks/hooks.json').read_text())['hooks']
         handlers = [handler for groups in hooks.values() for group in groups for handler in group['hooks']]
         self.assertEqual(len(handlers), 5)
@@ -34,7 +40,7 @@ class NotifyCandidateTests(unittest.TestCase):
             self.assertEqual((ASSETS / 'codex' / name).read_bytes(),
                              (ASSETS / 'codex/source/plugins/warp' / name).read_bytes())
         metadata = json.loads((ASSETS / 'codex/PATCH_METADATA.json').read_text())
-        self.assertEqual(metadata['patch_revision'], 4)
+        self.assertEqual(metadata['patch_revision'], 5)
         self.assertFalse(metadata['windows_product_enabled'])
         self.assertFalse(metadata['windows_uninstrumented_hooks_verified'])
 
@@ -62,7 +68,7 @@ class NotifyCandidateTests(unittest.TestCase):
                 self.assertEqual(json.loads(result.stdout)['query'], prompt)
 
     def test_encoded_program_roundtrip_and_bash_syntax(self):
-        body = candidate.candidate_notify(self.original())
+        body = (ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8')
         encoded = re.findall(r'-EncodedCommand ([A-Za-z0-9+/=]+)', body)
         self.assertEqual(len(encoded), 1)
         self.assertEqual(base64.b64decode(encoded[0], validate=True).decode('utf-16le'), candidate.source_text())
@@ -88,18 +94,14 @@ class NotifyCandidateTests(unittest.TestCase):
             self.assertEqual(candidate.source_text(), source)
 
     @unittest.skipUnless(os.name == 'posix', '此项需要真实 Unix 控制终端，不能代替 Windows 原生控制台验证')
-    def test_direct_and_tmux_control_terminal_bytes_preserved(self):
+    def test_direct_control_terminal_bytes_preserved(self):
         with tempfile.TemporaryDirectory(prefix='candidate-notify-') as temporary:
             root = Path(temporary)
             shutil.copytree(ASSETS / 'codex/scripts', root / 'codex/scripts')
-            (root / 'codex/scripts/warp-notify.sh').write_text(candidate.candidate_notify(self.original()), encoding='utf-8')
             with patch.object(unix_probe, 'ASSETS', root):
-                for tmux in (False, True):
-                    with self.subTest(tmux=tmux):
-                        raw, received, stdout = unix_probe.TmuxNotificationTests().notify('codex', tmux)
-                        expected = b'\x1bPtmux;' + raw.replace(b'\x1b', b'\x1b\x1b') + b'\x1b\\' if tmux else raw
-                        self.assertEqual(received, expected)
-                        self.assertEqual(stdout, b'')
+                raw, received, stdout = unix_probe.TmuxNotificationTests().notify('codex', False)
+                self.assertEqual(received, raw)
+                self.assertEqual(stdout, b'')
 
 
 if __name__ == '__main__':

@@ -22,7 +22,11 @@ use crate::service::ServiceImpl;
 /// implementation.
 #[async_trait]
 pub(super) trait AnyServiceImpl: Send + Sync {
-    async fn handle_request(&self, request: &[u8]) -> Vec<u8>;
+    async fn handle_request(
+        &self,
+        request: &[u8],
+        max_frame_bytes: Option<usize>,
+    ) -> std::result::Result<Vec<u8>, ProtocolError>;
 
     fn clone_service(&self) -> Box<dyn AnyServiceImpl>;
 }
@@ -33,11 +37,24 @@ where
     S: Service,
     I: ServiceImpl<Service = S> + Clone + Sized,
 {
-    async fn handle_request(&self, request_bytes: &[u8]) -> Vec<u8> {
-        let request: S::Request =
-            bincode::deserialize(request_bytes).expect("Failed to deserialize request bytes.");
-        bincode::serialize::<S::Response>(&I::handle_request(self, request).await)
-            .expect("Should be able to serialize response.")
+    async fn handle_request(
+        &self,
+        request_bytes: &[u8],
+        max_frame_bytes: Option<usize>,
+    ) -> std::result::Result<Vec<u8>, ProtocolError> {
+        let request: S::Request = bincode::deserialize(request_bytes)?;
+        let response = I::handle_request(self, request).await;
+        if let Some(max_frame_bytes) = max_frame_bytes {
+            let serialized_size = bincode::serialized_size(&response)?;
+            let frame_bytes = usize::try_from(serialized_size).unwrap_or(usize::MAX);
+            if frame_bytes > max_frame_bytes {
+                return Err(ProtocolError::FrameTooLarge {
+                    frame_bytes,
+                    max_frame_bytes,
+                });
+            }
+        }
+        Ok(bincode::serialize::<S::Response>(&response)?)
     }
 
     fn clone_service(&self) -> Box<dyn AnyServiceImpl> {
@@ -113,6 +130,7 @@ impl Connection {
 pub struct ServerBuilder {
     services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
     fixed_connection_address: Option<ConnectionAddress>,
+    max_frame_bytes: Option<usize>,
 }
 
 impl ServerBuilder {
@@ -125,6 +143,12 @@ impl ServerBuilder {
     /// Use a fixed address name instead of a randomly generated one.
     pub fn with_fixed_address(mut self, fixed_address: String) -> Self {
         self.fixed_connection_address = Some(ConnectionAddress::from(fixed_address));
+        self
+    }
+
+    /// 仅为这个服务端实例设置双向 IPC frame 上限；未调用时保持原有无限制行为。
+    pub fn with_max_frame_bytes(mut self, max_frame_bytes: usize) -> Self {
+        self.max_frame_bytes = Some(max_frame_bytes);
         self
     }
 
@@ -144,6 +168,7 @@ impl ServerBuilder {
         Server::run(
             connection_address.clone(),
             self.services,
+            self.max_frame_bytes,
             background_executor,
         )
         .map(|server| (server, connection_address))
@@ -168,6 +193,7 @@ impl Server {
     fn run(
         connection_address: ConnectionAddress,
         services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
+        max_frame_bytes: Option<usize>,
         background_executor: Arc<Background>,
     ) -> Result<Self> {
         let listener = ConnectionListener::new(connection_address)?;
@@ -185,6 +211,7 @@ impl Server {
             )),
             background_executor.spawn(Self::accept_new_connections(
                 services,
+                max_frame_bytes,
                 new_connection_rx,
                 background_executor.clone(),
             )),
@@ -217,6 +244,7 @@ impl Server {
     /// for processing incoming request messages and outgoing response messages.
     async fn accept_new_connections(
         services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
+        max_frame_bytes: Option<usize>,
         new_connection_rx: Receiver<Connection>,
         background_executor: Arc<Background>,
     ) {
@@ -236,11 +264,14 @@ impl Server {
             tasks.push(background_executor.spawn(Self::handle_incoming_requests(
                 reader,
                 services.clone(),
+                max_frame_bytes,
                 response_tx,
             )));
-            tasks.push(
-                background_executor.spawn(Self::handle_outgoing_responses(writer, response_rx)),
-            );
+            tasks.push(background_executor.spawn(Self::handle_outgoing_responses(
+                writer,
+                max_frame_bytes,
+                response_rx,
+            )));
         }
     }
 
@@ -255,21 +286,28 @@ impl Server {
     async fn handle_incoming_requests(
         reader: impl AsyncRead + Unpin,
         services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
+        max_frame_bytes: Option<usize>,
         response_tx: Sender<Response>,
     ) {
         let mut reader = BufReader::new(reader);
         loop {
-            match receive_message(&mut reader).await {
+            match receive_message(&mut reader, max_frame_bytes).await {
                 Ok(Request {
                     id,
                     service_id,
                     bytes,
                 }) => {
                     let response_message = match services.get(&service_id) {
-                        Some(service) => {
-                            let response_bytes = service.handle_request(&bytes[..]).await;
-                            Response::success(id, service_id, response_bytes)
-                        }
+                        Some(service) => match service
+                            .handle_request(&bytes[..], max_frame_bytes)
+                            .await
+                        {
+                            Ok(response_bytes) => Response::success(id, service_id, response_bytes),
+                            Err(error) => Response::failure(
+                                id,
+                                format!("Service request encoding failed: {error}"),
+                            ),
+                        },
                         None => {
                             Response::failure(id, format!("No such service (ID: {service_id})"))
                         }
@@ -287,13 +325,16 @@ impl Server {
                         ProtocolError::Serialization(e) => {
                             log::warn!("Failed to deserialize request: {e:?}");
                         }
-                        ProtocolError::Disconnected(_) => {
+                        error @ (ProtocolError::Disconnected(_)
+                        | ProtocolError::FrameTooLarge { .. }
+                        | ProtocolError::FrameAllocationFailed { .. }) => {
                             // The socket is disconnected, so exit.
-                            log::warn!("IPC server disconnected unexpectedly.");
+                            log::warn!("IPC server connection failed: {error:?}");
                             break;
                         }
-                        e => {
-                            log::warn!("Unknown error occurred when receiving request: {e:?}");
+                        ProtocolError::Other(error) => {
+                            log::warn!("Unknown error occurred when receiving request: {error}");
+                            break;
                         }
                     }
                 }
@@ -304,23 +345,32 @@ impl Server {
     /// Process outgoing response messages, received from the given `response_rx` receiver.
     async fn handle_outgoing_responses(
         mut writer: impl AsyncWrite + Unpin,
+        max_frame_bytes: Option<usize>,
         response_rx: Receiver<Response>,
     ) {
         while let Ok(message) = response_rx.recv().await {
-            if let Err(e) = send_message(&mut writer, message).await {
+            if let Err(e) = send_message(&mut writer, message, max_frame_bytes).await {
                 match e {
                     ProtocolError::Serialization(e) => {
                         log::warn!("Failed to serialize response: {e:?}");
                     }
-                    ProtocolError::Disconnected(_) => {
+                    error @ (ProtocolError::Disconnected(_)
+                    | ProtocolError::FrameTooLarge { .. }
+                    | ProtocolError::FrameAllocationFailed { .. }) => {
                         // The socket is disconnected, so exit.
+                        log::warn!("IPC server response failed: {error:?}");
                         break;
                     }
-                    e => {
-                        log::warn!("Unknown error occurred when sending response: {e:?}");
+                    ProtocolError::Other(error) => {
+                        log::warn!("Unknown error occurred when sending response: {error}");
+                        break;
                     }
                 }
             }
         }
     }
 }
+
+#[cfg(test)]
+#[path = "server_tests.rs"]
+mod tests;

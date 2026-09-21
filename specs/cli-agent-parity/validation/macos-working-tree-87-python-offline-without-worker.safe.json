@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "receipt": "CLI parity Python discovery after Grok and tmux fixture repair",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_state": "dirty_working_tree",
+  "selection": {
+    "pattern": "*_tests.py",
+    "excluded_module": "installed_grok_hook_tests",
+    "reason": "The module requires INFINISHELL_TEST_NOTIFY_WORKER built from the current source, which is unavailable while the current Warp build is blocked."
+  },
+  "result": {
+    "tests_run": 974,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "exit_code": 0,
+    "passed": true
+  },
+  "repaired_failure_classes": [
+    "Grok fixed ACP fixtures now bind current 1.0.34 by default and expose 1.0.30 only through an explicit historical version.",
+    "tmux notification fixtures clear inherited session variables and use a private strict tmux replacement."
+  ],
+  "relevant_source_sha256": {
+    "grok_fixed_acp_probe.py": "c09e09e9790a52e17f7100dc2d7b50eec17666e6fdb3172a6b8d64cc9be74168",
+    "grok_fixed_acp_probe_tests.py": "2448021f1694597880e3dc84a66e0c06ea49bc479839d1cc626f9b2635187f0b",
+    "tmux_notification_tests.py": "9754878a2437c9c9fc0dfd2d1f02af8902c8484f521b728afe84ad9b07cd848e",
+    "installed_grok_hook_tests.py": "1a49636f33e0fa74223cf3e30b0b1b696b4605d3f6fd8a992daf50642b076b28"
+  },
+  "scope": {
+    "offline_python_discovery": true,
+    "same_source_native_worker_tests": false,
+    "cargo_or_gui_run": false,
+    "real_cli_lifecycle_run": false
+  },
+  "overall_product_acceptance": false,
+  "note": "The preceding receipt86 failure is retained. This receipt proves only the selected offline Python suite; the 17 worker-dependent test methods remain unexecuted, not skipped or passed."
+}

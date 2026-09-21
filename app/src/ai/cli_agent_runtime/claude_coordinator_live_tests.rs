@@ -693,7 +693,7 @@ async fn shutdown(
 }
 
 #[test]
-#[ignore = "仅由显式私有API运行器执行，调用真实模型并产生费用"]
+#[ignore = "仅由显式私有 API 或授权默认账户运行器执行，调用真实模型并产生费用"]
 fn real_claude_fixed_profile_parent_child() {
     // 运行器预期值只用于安装快照；可信版本仍由真实探测与 system/init 配对后落库。
     let expected_version = match env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION") {
@@ -709,14 +709,31 @@ fn real_claude_fixed_profile_parent_child() {
         fs::read_to_string(root.join(".infinishell-claude-coordinator-probe")).unwrap(),
         SCOPE
     );
-    let auth_home = PathBuf::from(env::var_os("HOME").expect("缺少私有HOME"))
+    let auth_home = PathBuf::from(env::var_os("HOME").expect("缺少认证 HOME"))
         .canonicalize()
         .unwrap();
     let state = current_state_dir();
-    assert!(
-        state.starts_with(&auth_home),
-        "监督记录必须位于运行器提供的私有HOME"
-    );
+    let auth_mode = env::var("INFINISHELL_CLAUDE_LIVE_AUTH_MODE").expect("缺少认证模式边界");
+    match auth_mode.as_str() {
+        "private_api" => {
+            assert!(
+                state.starts_with(&auth_home),
+                "监督记录必须位于运行器提供的私有 HOME"
+            );
+            assert!(env::var_os("CLAUDE_CONFIG_DIR").is_some());
+        }
+        "authorized_default_account" => {
+            assert!(env::var_os("CLAUDE_CONFIG_DIR").is_none());
+            assert!(env::var_os("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR").is_none());
+            assert!(!auth_home.starts_with(&root));
+            let profile = env::var("INFINISHELL_CLAUDE_LIVE_STATE_PROFILE")
+                .expect("默认账户模式缺少隔离数据 profile");
+            assert_eq!(env::var("WARP_DATA_PROFILE").unwrap(), profile);
+            assert!(state.starts_with(&auth_home));
+            assert!(state.to_string_lossy().contains(&profile));
+        }
+        _ => panic!("不支持的 Claude 协调器认证模式"),
+    }
     let artifact =
         PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").expect("缺少私有证据路径"))
             .canonicalize()
@@ -732,6 +749,7 @@ fn real_claude_fixed_profile_parent_child() {
     evidence
         .record(
             json!({"event":"acceptance_started","scope":SCOPE,"real_gui_verified":false,
+        "authentication_source":auth_mode,
         "max_native_tools":MAX_NATIVE_TOOLS,"max_native_inputs":MAX_NATIVE_INPUTS,
         "max_native_executions":MAX_NATIVE_INPUTS,"max_seconds":450,
         "http_request_count_verified":false,"automatic_result_delivery_ack_verified":false}),

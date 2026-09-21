@@ -20,7 +20,8 @@ MARKER = b"InfiniShell private updater fixture; no credentials or model inputs\n
 CHANNELS = {"codex": {"follow_installation", "latest", "alpha"},
             "claude": {"follow_installation", "latest", "stable"},
             "grok": {"follow_installation", "stable", "alpha"}}
-EXPECTED = {"updated", "source_changed_rejected", "channel_only"}
+EXPECTED = {"updated", "source_changed_rejected", "channel_only", "command_failed_rolled_back",
+            "interrupted_recovered"}
 PATHS = {"HOME": "home", "USERPROFILE": "home", "CODEX_HOME": "home/.codex",
          "CLAUDE_CONFIG_DIR": "home/.claude", "GROK_HOME": "home/.grok",
          "XDG_CONFIG_HOME": "home/.config", "XDG_DATA_HOME": "home/.local/share",
@@ -32,12 +33,32 @@ MANIFEST_KEYS = {"schema", "scope", "case_id", "root", "agent", "channel", "expe
                  "old_version", "target_version", "old_binary", "target_binary", "worker",
                  "supervisor", "source_manifest", "gates_report", "bundle_report", "timeout_seconds"}
 BINDINGS = ("old_binary", "target_binary", "worker", "supervisor", "source_manifest", "gates_report", "bundle_report")
+REQUIRED_SOURCE_FILES = ("app/src/terminal/cli_agent_updates.rs",
+    "app/src/terminal/cli_agent_updates/sources.rs",
+    "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+    "app/src/ai/cli_agent_runtime/managed_process.rs",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+    "app/src/ai/cli_agent_runtime/codex.rs",
+    "app/src/ai/cli_agent_runtime/claude.rs",
+    "app/src/ai/cli_agent_runtime/grok.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/mod.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch.rs",
+    "script/cli-agent-parity/verify_cli_autoupdate.py")
+SUPERVISOR_SOURCE_FILES = REQUIRED_SOURCE_FILES[:2] + REQUIRED_SOURCE_FILES[3:-1]
 BOOLS = {"passed", "credentials_provided", "private_environment_verified", "credential_files_absent_before",
          "credential_files_absent_after", "config_bytes_unchanged", "config_semantics_unchanged",
          "config_permissions_unchanged", "old_binary_unchanged", "target_reference_unchanged",
          "entry_matches_expected", "post_version_matches", "journal_absent", "production_chain_verified",
          "same_source_build_verified", "same_commit_verified_by_runner", "config_transition_verified",
-         "unrelated_config_bytes_unchanged", "config_permissions_preserved", "supervisor_generations_unchanged", "entry_unchanged"}
+         "unrelated_config_bytes_unchanged", "config_permissions_preserved", "supervisor_generations_unchanged", "entry_unchanged",
+         "failure_intent_persisted"}
 HASHES = {"manifest_sha256", "worker_sha256", "supervisor_sha256", "source_manifest_sha256", "old_sha256", "target_sha256"}
 COUNTERS = {"product_inspect_calls", "product_execute_calls", "model_inputs_sent", "config_files_checked"}
 EVENT_KEYS = BOOLS | HASHES | COUNTERS | {"schema", "scope", "case_id", "agent", "channel", "expected",
@@ -47,7 +68,11 @@ FAILURE_CODES = {"binary_unreadable", "path_outside_fixture", "fixture_symlink",
     "inspect_before_failed", "native_plan_mismatch", "native_plan_missing", "inspect_changed_configuration",
     "entry_not_symlink", "source_change_failed", "source_change_restore_conflict", "source_change_restore_failed",
     "execute_failed", "source_change_not_rejected", "invalid_expectation", "inspect_after_failed",
-    "state_unavailable", "supervisor_snapshot_failed", "channel_only_started_update", "config_transition_mismatch"}
+    "state_unavailable", "supervisor_snapshot_failed", "entry_changed_unexpectedly", "config_transition_mismatch",
+    "failure_boundary_missing", "failure_boundary_invalid", "failure_boundary_read_only_failed",
+    "failure_boundary_restore_failed", "native_start_timeout", "native_update_completed_before_interrupt",
+    "interrupted_exit_unconfirmed", "interrupted_exit_timeout", "command_failure_not_rolled_back",
+    "native_update_not_started", "failure_intent_not_persisted"}
 
 
 def require(condition, code):
@@ -97,12 +122,20 @@ def under(root, path):
     return path.is_absolute() and path != root and root in path.parents and ".." not in path.parts
 
 
+def windows_file_attributes_are_plain(attributes):
+    return attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400) == 0
+
+
 def plain_path(root, path):
     require(under(root, path), "path_outside_fixture")
     for item in (path, *path.parents):
         if item == root:
             break
-        require(not item.is_symlink(), "fixture_symlink")
+        if os.path.lexists(item):
+            info = item.lstat()
+            require(not item.is_symlink()
+                    and (os.name != "nt" or windows_file_attributes_are_plain(info.st_file_attributes)),
+                    "fixture_symlink")
 
 
 def auth_absent(root):
@@ -112,7 +145,7 @@ def auth_absent(root):
 def valid_transition(transition, agent, channel, expected):
     if transition is None:
         return expected != "channel_only"
-    if type(transition) is not dict or expected == "source_changed_rejected":
+    if type(transition) is not dict or expected not in {"updated", "channel_only"}:
         return False
     if transition.get("kind") == "channel":
         allowed = {"grok": ("stable", "alpha"), "claude": ("latest", "stable")}.get(agent)
@@ -155,6 +188,59 @@ def validate_manifest(value):
     return value
 
 
+def verify_source_manifest(source):
+    files = source.get("files")
+    require(type(files) is list, "source_file_manifest_missing")
+    root = Path(__file__).resolve().parents[2]
+    seen = set()
+    for row in files:
+        require(type(row) is dict and set(row).issubset({"path", "sha256", "bytes"})
+                and set(row) >= {"path", "sha256"}, "source_file_manifest_invalid")
+        relative = row["path"]
+        require(type(relative) is str and relative not in seen and not Path(relative).is_absolute()
+                and all(part not in ("", ".", "..") for part in Path(relative).parts)
+                and is_hash(row["sha256"]), "source_file_manifest_invalid")
+        seen.add(relative)
+        path = root / relative
+        info = path.lstat()
+        require(stat.S_ISREG(info.st_mode) and not path.is_symlink()
+                and path.resolve(strict=True).is_relative_to(root)
+                and digest(path) == row["sha256"]
+                and ("bytes" not in row or type(row["bytes"]) is int and row["bytes"] == info.st_size),
+                "source_file_manifest_mismatch")
+    require(set(REQUIRED_SOURCE_FILES).issubset(seen), "source_file_manifest_missing")
+
+
+def strict_signature_verified(path):
+    if sys.platform != "darwin":
+        return True
+    result = subprocess.run(["/usr/bin/codesign", "--verify", "--strict", str(path)],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        timeout=30, check=False)
+    return result.returncode == 0
+
+
+def binary_contains_all(path, needles):
+    maximum = max((len(needle) for needle in needles), default=0)
+    require(maximum > 0 and all(needles), "source_build_binding_invalid")
+    found = [False] * len(needles)
+    tail = b""
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            body = tail + chunk
+            found = [present or needle in body for present, needle in zip(found, needles)]
+            if all(found):
+                return True
+            tail = body[-(maximum - 1):] if maximum > 1 else b""
+    return all(found)
+
+
+def supervisor_source_binding_verified(value):
+    root = Path(__file__).resolve().parents[2]
+    sources = [(root / relative).read_bytes() for relative in SUPERVISOR_SOURCE_FILES]
+    return binary_contains_all(Path(value["supervisor"]["path"]), sources)
+
+
 def verify_build_binding(value):
     records = {}
     for name in ("source_manifest", "gates_report", "bundle_report"):
@@ -164,16 +250,11 @@ def verify_build_binding(value):
         records[name] = json.loads(path.read_bytes())
         require(type(records[name]) is dict, "build_binding_shape")
     source, gates, bundle = (records[name] for name in ("source_manifest", "gates_report", "bundle_report"))
-    require(type(source.get("files")) is list, "source_file_manifest_missing")
-    driver_rows = [row for row in source["files"] if type(row) is dict and row.get("path") == "script/cli-agent-parity/verify_cli_autoupdate.py"]
-    require(len(driver_rows) == 1 and driver_rows[0].get("sha256") == digest(Path(__file__).resolve()), "driver_not_in_same_source")
+    verify_source_manifest(source)
     for report in (gates, bundle):
         require(report.get("source_manifest_sha256") == value["source_manifest"]["sha256"], "source_build_mismatch")
-    require(gates.get("all_passed") is True and type(bundle.get("exit_code")) is int and bundle["exit_code"] == 0,
-            "source_build_failed")
-    if sys.platform == "darwin":
-        require(type(bundle.get("strict_signature_exit_code")) is int and bundle["strict_signature_exit_code"] == 0,
-                "supervisor_signature_not_verified")
+    require(supervisor_source_binding_verified(value), "source_build_mismatch")
+    require(strict_signature_verified(Path(value["supervisor"]["path"])), "supervisor_signature_not_verified")
     for report, key, name in ((gates, "test_binary", "worker"), (bundle, "worker", "supervisor")):
         actual = report.get(key)
         require(type(actual) is dict and all(actual.get(field) == value[name][field] for field in ("path", "sha256")),
@@ -274,8 +355,14 @@ def acceptance(exit_code, text, event, value, manifest_hash):
         return False
     if transition is None and not all(event[key] for key in measured_flags if key.startswith("config_")):
         return False
-    if value["expected"] == "channel_only" and not (event["entry_unchanged"] and event["supervisor_generations_unchanged"]):
+    if value["expected"] in {"channel_only", "source_changed_rejected"} and not (
+            event["entry_unchanged"] and event["supervisor_generations_unchanged"]):
         return False
+    if value["expected"] in {"command_failed_rolled_back", "interrupted_recovered"} and not (
+            event["entry_unchanged"] and not event["supervisor_generations_unchanged"]):
+        return False
+    expected_error = {"source_changed_rejected": "SourceChanged",
+                      "command_failed_rolled_back": "CommandFailed"}.get(value["expected"])
     return (all(event[key] is True for key in BOOLS - false_flags - measured_flags) and all(event[key] is False for key in false_flags)
         and event["stage"] == "finished" and event["failure_code"] is None
         and event["product_inspect_calls"] == 2 and event["product_execute_calls"] == 1
@@ -285,7 +372,7 @@ def acceptance(exit_code, text, event, value, manifest_hash):
         and event["supervisor_sha256"] == value["supervisor"]["sha256"]
         and event["source_manifest_sha256"] == value["source_manifest"]["sha256"]
         and event["old_sha256"] == value["old_binary"]["sha256"] and event["target_sha256"] == value["target_binary"]["sha256"]
-        and event["error"] == ("SourceChanged" if value["expected"] == "source_changed_rejected" else None))
+        and event["error"] == expected_error)
 
 
 def group_exists(pid):
@@ -335,11 +422,12 @@ def run(args):
         "manifest_sha256": manifest_hash, "worker_sha256": value["worker"]["sha256"],
         "supervisor_sha256": value["supervisor"]["sha256"],
         "source_manifest_sha256": value["source_manifest"]["sha256"], "timeout_seconds": value["timeout_seconds"],
-        "max_product_execute_calls": 1, "native_update_expected": value["expected"] == "updated",
+        "max_product_execute_calls": 1,
+        "native_update_expected": value["expected"] in {"updated", "command_failed_rolled_back", "interrupted_recovered"},
         "config_transition": value.get("config_transition"), "model_inputs_sent": 0, "credentials_provided": False}
     exclusive_bytes(root / "invocation.safe.json", encoded(invocation))
     metadata = dict(invocation, passed=False, timed_out=False, test_exit_code=None,
-        worker_group_initially_empty=False, worker_group_stopped=False, detached_descendants_verified=False,
+        worker_group_initially_empty=False, worker_group_stopped=False,
         safe_event_valid=False, runner_error_type=None)
     started = time.monotonic()
     process = None
@@ -412,7 +500,7 @@ def main(argv=None):
             "fixture_marker", "binary_not_canonical", "old_entry_binding", "input_digest_mismatch", "credential_file_present",
             "environment_path", "native_fixture_requires_posix", "explicit_update_authorization_required", "case_binding",
             "test_log_budget", "build_binding_digest", "build_binding_shape", "source_file_manifest_missing",
-            "driver_not_in_same_source", "source_build_mismatch", "source_build_failed", "supervisor_signature_not_verified",
+            "source_file_manifest_invalid", "source_file_manifest_mismatch", "source_build_binding_invalid", "source_build_mismatch", "supervisor_signature_not_verified",
             "source_worker_mismatch", "config_transition", "channel_only_binary_binding"}
         code = str(error) if type(error) is ValueError and str(error) in known else None
         print(json.dumps({"passed": False, "runner_error_type": type(error).__name__, "failure_code": code}), file=sys.stderr)

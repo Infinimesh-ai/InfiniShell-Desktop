@@ -131,34 +131,59 @@ pub enum ProtocolError {
     #[error(transparent)]
     Disconnected(#[from] std::io::Error),
 
+    /// 对端声明的 frame 超过当前 IPC 使用方选择的上限。
+    #[error("IPC frame is {frame_bytes} bytes, exceeding the {max_frame_bytes}-byte limit")]
+    FrameTooLarge {
+        frame_bytes: usize,
+        max_frame_bytes: usize,
+    },
+
+    /// frame 长度未超过配置上限，但无法预留接收缓冲区。
+    #[error("Failed to reserve {frame_bytes} bytes for an IPC frame: {source}")]
+    FrameAllocationFailed {
+        frame_bytes: usize,
+        #[source]
+        source: std::collections::TryReserveError,
+    },
+
     #[error("Unknown error occurred: {0}")]
     Other(String),
 }
 
 /// Writes the given message to the given `writer`.
-pub(super) async fn send_message<M, W>(writer: &mut W, message: M) -> Result<(), ProtocolError>
+pub(super) async fn send_message<M, W>(
+    writer: &mut W,
+    message: M,
+    max_frame_bytes: Option<usize>,
+) -> Result<(), ProtocolError>
 where
     M: Message,
     W: AsyncWrite + Unpin,
 {
+    if let Some(max_frame_bytes) = max_frame_bytes {
+        let serialized_size = bincode::serialized_size(&message)?;
+        let frame_bytes = usize::try_from(serialized_size).unwrap_or(usize::MAX);
+        validate_frame_size(frame_bytes, Some(max_frame_bytes))?;
+    }
     let serialized_msg = bincode::serialize(&message)?;
 
-    // Create a buffer to hold the data to be written.
-    let mut buf = Vec::with_capacity(serialized_msg.len() + USIZE_SIZE);
+    validate_frame_size(serialized_msg.len(), max_frame_bytes)?;
 
     // First, add a message "header" - a usize representing the length of the
     // serialized payload, in bytes.
-    buf.extend_from_slice(&serialized_msg.len().to_be_bytes());
+    writer
+        .write_all(&serialized_msg.len().to_be_bytes())
+        .await?;
 
     // Next, add the serialized payload itself.
-    buf.extend(serialized_msg);
-
-    // Finally, write the buffer to the underlying transport.
-    Ok(writer.write_all(&buf[..]).await?)
+    Ok(writer.write_all(&serialized_msg).await?)
 }
 
 /// Reads the next message from the given `reader`.
-pub(super) async fn receive_message<M, R>(reader: &mut BufReader<R>) -> Result<M, ProtocolError>
+pub(super) async fn receive_message<M, R>(
+    reader: &mut BufReader<R>,
+    max_frame_bytes: Option<usize>,
+) -> Result<M, ProtocolError>
 where
     M: Message,
     R: AsyncRead + Unpin,
@@ -177,12 +202,41 @@ where
     // wire.
     let payload_len = usize::from_be_bytes(header_buf);
 
+    // header 由不可信对端控制；必须在预留缓冲区和反序列化前拒绝超限 frame。
+    validate_frame_size(payload_len, max_frame_bytes)?;
+
     // Grow the initial buffer to a sufficient size and read the rest of the
     // message from the socket.
-    let mut payload_buf = vec![0; payload_len];
+    let mut payload_buf = Vec::new();
+    payload_buf
+        .try_reserve_exact(payload_len)
+        .map_err(|source| ProtocolError::FrameAllocationFailed {
+            frame_bytes: payload_len,
+            source,
+        })?;
+    payload_buf.resize(payload_len, 0);
     reader.read_exact(&mut payload_buf).await?;
 
     // Deserialize the message.
     let message: M = bincode::deserialize(&payload_buf[..])?;
     Ok(message)
 }
+
+fn validate_frame_size(
+    frame_bytes: usize,
+    max_frame_bytes: Option<usize>,
+) -> Result<(), ProtocolError> {
+    if let Some(max_frame_bytes) = max_frame_bytes
+        && frame_bytes > max_frame_bytes
+    {
+        return Err(ProtocolError::FrameTooLarge {
+            frame_bytes,
+            max_frame_bytes,
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "protocol_tests.rs"]
+mod tests;

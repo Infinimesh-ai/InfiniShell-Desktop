@@ -8,6 +8,16 @@ fn private_root() -> (TempDir, PathBuf) {
     (directory, root)
 }
 
+#[cfg(unix)]
+fn executable_script(root: &Path, name: &str, body: &str) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let path = root.join(name);
+    fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    path
+}
+
 fn grok_before() -> Vec<u8> {
     b"# preserve comment\n[cli]\ninstaller = \"internal\"\nchannel = \"stable\"\nauto_update = true\n[ui]\nyolo = false\ncompact_mode = true\n".to_vec()
 }
@@ -58,6 +68,122 @@ fn channels_are_agent_specific() {
     assert!(channel_supported(CLIAgent::Grok, Channel::Alpha));
     assert!(!channel_supported(CLIAgent::Grok, Channel::Latest));
     assert!(!channel_supported(CLIAgent::Unknown, Channel::Latest));
+}
+
+#[test]
+fn updater_uses_each_adapter_exact_version_contract() {
+    assert!(adapter_supports_version(CLIAgent::Codex, "0.155.1"));
+    assert!(!adapter_supports_version(CLIAgent::Codex, "0.155.2"));
+    assert!(adapter_supports_version(CLIAgent::Claude, "2.1.278"));
+    assert!(!adapter_supports_version(CLIAgent::Claude, "2.1.279"));
+    assert!(adapter_supports_version(CLIAgent::Grok, "1.0.40"));
+    assert!(!adapter_supports_version(CLIAgent::Grok, "1.0.41"));
+    assert!(!adapter_supports_version(CLIAgent::Gemini, "1.0.40"));
+}
+
+fn compatible_plugins() -> PluginCompatibility {
+    PluginCompatibility {
+        installed: true,
+        disabled: false,
+        needs_update: false,
+        platform_installed: true,
+        platform_needs_update: false,
+    }
+}
+
+#[test]
+fn missing_plugin_fails_compatibility_verification() {
+    assert!(
+        !PluginCompatibility {
+            installed: false,
+            ..compatible_plugins()
+        }
+        .verified()
+    );
+}
+
+#[test]
+fn disabled_plugin_fails_compatibility_verification() {
+    assert!(
+        !PluginCompatibility {
+            disabled: true,
+            ..compatible_plugins()
+        }
+        .verified()
+    );
+}
+
+#[test]
+fn outdated_plugin_fails_compatibility_verification() {
+    assert!(
+        !PluginCompatibility {
+            needs_update: true,
+            ..compatible_plugins()
+        }
+        .verified()
+    );
+}
+
+#[test]
+fn missing_or_outdated_platform_plugin_fails_compatibility_verification() {
+    assert!(
+        !PluginCompatibility {
+            platform_installed: false,
+            ..compatible_plugins()
+        }
+        .verified()
+    );
+    assert!(
+        !PluginCompatibility {
+            platform_needs_update: true,
+            ..compatible_plugins()
+        }
+        .verified()
+    );
+}
+
+#[test]
+fn complete_plugin_installation_passes_compatibility_verification() {
+    assert!(compatible_plugins().verified());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn updater_version_probe_parses_the_supervised_command_output() {
+    let (_directory, root) = private_root();
+    let executable = executable_script(&root, "claude", "printf '2.1.278 (Claude Code)\\n'");
+
+    let detected = version(CLIAgent::Claude, &executable).await;
+
+    assert_eq!(detected, Ok("2.1.278".to_owned()));
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn updater_version_probe_reports_its_bounded_timeout() {
+    let (_directory, root) = private_root();
+    let executable = executable_script(&root, "claude", "exec sleep 3600");
+
+    let detected =
+        version_with_timeout(CLIAgent::Claude, &executable, Duration::from_millis(20)).await;
+
+    assert_eq!(detected, Err(Error::TimedOut));
+}
+
+#[tokio::test]
+async fn verification_progress_without_ack_still_converges() {
+    let (entered_tx, entered_rx) = async_channel::bounded(1);
+    let (_resume_tx, resume_rx) = async_channel::bounded(1);
+    let progress = VerificationProgress::new(entered_tx, resume_rx);
+
+    tokio::time::timeout(
+        Duration::from_secs(1),
+        progress.enter_with_timeout(Duration::from_millis(20)),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(entered_rx.try_recv(), Ok(()));
 }
 
 #[test]
@@ -198,12 +324,19 @@ fn restore_of_originally_absent_config_only_removes_recorded_native_file() {
 fn journal(root: &Path, phase: &str) -> Journal {
     Journal {
         claude_update: None,
+        binding_digest: None,
+        binding_kind: None,
+        launch: Some(JournalLaunch {
+            program: root.join("grok"),
+            args: vec![OsString::from("update")],
+            cwd: root.to_owned(),
+        }),
         publish_desired: false,
         command_failed: false,
         intent: None,
         generation: None,
         old_stamp: None,
-        schema: 1,
+        schema: 2,
         agent: "grok".to_owned(),
         entry: root.join("grok"),
         old_version: "1.0.30".to_owned(),
@@ -220,6 +353,28 @@ fn journal(root: &Path, phase: &str) -> Journal {
         }),
         channel: "stable".to_owned(),
     }
+}
+
+#[cfg(feature = "local_fs")]
+fn bind_journal(record: &mut Journal) -> managed_process::PreparedLaunchBinding {
+    let binding = managed_process::PreparedLaunchBinding::new("a".repeat(64)).unwrap();
+    record.binding_digest = Some(binding.digest().to_owned());
+    record.binding_kind = binding.kind_name().map(ToOwned::to_owned);
+    binding
+}
+
+#[cfg(feature = "local_fs")]
+fn record_bound_not_started(root: &Path, record: &Journal) {
+    let binding = journal_binding(record).unwrap();
+    managed_process::record_not_started_with_binding(
+        root,
+        record.generation.unwrap(),
+        &record.entry,
+        &[],
+        root,
+        &binding,
+    )
+    .unwrap();
 }
 
 #[test]
@@ -302,6 +457,281 @@ fn file_identity_detects_replacement_without_size_change() {
     let before = stamp(&path).unwrap();
     fs::write(&path, b"source-two").unwrap();
     assert_ne!(stamp(&path).unwrap(), before);
+}
+
+#[test]
+fn structured_roles_arguments_and_target_version_define_binding_digest() {
+    let (_directory, root) = private_root();
+    let node = root.join("node");
+    let npm = root.join("npm-cli.js");
+    let prefix = root.join("prefix");
+    let mut invocation = BoundInvocation {
+        artifacts: [
+            (ArtifactRole::Program, node.clone()),
+            (ArtifactRole::Helper, npm.clone()),
+            (ArtifactRole::InstallRoot, prefix.clone()),
+        ]
+        .into_iter()
+        .collect(),
+        program: ArtifactRole::Program,
+        arguments: vec![
+            ArgumentRef::ArtifactPath {
+                role: ArtifactRole::Helper,
+                relative: PathBuf::new(),
+            },
+            ArgumentRef::Literal("install".into()),
+            ArgumentRef::ArtifactPath {
+                role: ArtifactRole::InstallRoot,
+                relative: PathBuf::new(),
+            },
+            ArgumentRef::PackageVersion {
+                package: "@openai/codex".to_owned(),
+            },
+        ],
+        environment: vec![("CODEX_RELEASE".into(), ArgumentRef::TargetVersion)],
+        env_remove: Vec::new(),
+        binding: LaunchBindingSpec::NativeFile {
+            program: ArtifactRole::Program,
+        },
+    };
+
+    let first = invocation.prepare("0.155.1").unwrap();
+    let second = invocation.prepare("0.156.0-alpha.7").unwrap();
+    assert_eq!(first.invocation.program, node);
+    assert_eq!(
+        first.invocation.args,
+        [
+            npm.into_os_string(),
+            OsString::from("install"),
+            prefix.into_os_string(),
+            OsString::from("@openai/codex@0.155.1"),
+        ]
+    );
+    assert_eq!(
+        first.invocation.env,
+        [(OsString::from("CODEX_RELEASE"), OsString::from("0.155.1"))]
+    );
+    assert_eq!(first.binding.kind_name(), Some("native_file"));
+    assert_ne!(first.binding.digest(), second.binding.digest());
+
+    invocation
+        .artifacts
+        .insert(ArtifactRole::InstallRoot, root.join("another-prefix"));
+    assert_ne!(
+        invocation.prepare("0.155.1").unwrap().binding.digest(),
+        first.binding.digest()
+    );
+}
+
+#[test]
+fn journal_round_trip_preserves_atomic_execution_kind() {
+    let (_directory, root) = private_root();
+    let mut record = journal(&root, "prepared");
+    let binding = managed_process::PreparedLaunchBinding::native_file("a".repeat(64)).unwrap();
+    record.binding_digest = Some(binding.digest().to_owned());
+    record.binding_kind = binding.kind_name().map(ToOwned::to_owned);
+    let decoded: Journal = serde_json::from_slice(&serde_json::to_vec(&record).unwrap()).unwrap();
+
+    assert_eq!(journal_binding(&decoded).unwrap(), binding);
+}
+
+#[test]
+fn manual_only_binding_never_materializes_a_pathname_invocation() {
+    let (_directory, root) = private_root();
+    let invocation = BoundInvocation::manual_only(
+        [(ArtifactRole::Program, root.join("brew"))],
+        ArtifactRole::Program,
+        vec![ArgumentRef::Literal("upgrade".into())],
+        "Homebrew 依赖闭包未绑定",
+    );
+
+    assert!(matches!(
+        invocation.prepare("1.0.0"),
+        Err(Error::UnsupportedSource)
+    ));
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn journal_digest_mismatch_rejects_an_otherwise_confirmed_receipt() {
+    let (_directory, root) = private_root();
+    let mut record = journal(&root, "command_returned");
+    fs::write(&record.entry, b"unchanged installation").unwrap();
+    record.old_stamp = Some(stamp(&record.entry).unwrap());
+    record.generation = Some(Uuid::new_v4());
+    bind_journal(&mut record);
+    record.config = None;
+    record.binding_digest = Some("a".repeat(64));
+    save_journal(&root.join("grok.json"), &record).unwrap();
+    let other = managed_process::PreparedLaunchBinding::new("b".repeat(64)).unwrap();
+    managed_process::record_not_started_with_binding(
+        &root,
+        record.generation.unwrap(),
+        &record.entry,
+        &[],
+        &root,
+        &other,
+    )
+    .unwrap();
+
+    assert_eq!(
+        preflight_recovery(CLIAgent::Grok, &record.entry, &root),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[test]
+fn supervised_dependencies_include_every_controlled_file_and_reject_replacement() {
+    let (_directory, root) = private_root();
+    let entry = root.join("agent");
+    let manager_path = root.join("manager");
+    let helper_path = root.join("helper");
+    let registration_path = root.join("package.json");
+    let unrelated = root.join("unrelated");
+    fs::write(&entry, b"agent-one").unwrap();
+    fs::write(&manager_path, b"manager-one").unwrap();
+    fs::write(&helper_path, b"helper-one").unwrap();
+    fs::write(&registration_path, b"registration-one").unwrap();
+    fs::write(&unrelated, b"unrelated").unwrap();
+    let manager = stamp(&manager_path).unwrap();
+    let helper = stamp(&helper_path).unwrap();
+    let registration = stamp(&registration_path).unwrap();
+    let installation = Installation {
+        source: Source::Npm,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: Some(manager.clone()),
+        helper: Some(helper),
+        registration: Some((registration_path.clone(), registration)),
+        invocation: None,
+        channel: Channel::Latest,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    let invocation = Invocation::new(&manager_path, ["update"]);
+    let binding = managed_process::PreparedLaunchBinding::new("a".repeat(64)).unwrap();
+
+    assert_eq!(verify_installation_identity(&installation), Ok(()));
+    assert_eq!(
+        expected_invocation_stamp(&installation, &invocation),
+        Ok(&manager)
+    );
+    assert_eq!(
+        supervised_dependency_paths(&installation, &invocation),
+        Ok(vec![
+            manager_path.clone(),
+            entry.clone(),
+            helper_path.clone(),
+            registration_path.clone(),
+        ])
+    );
+    assert_eq!(
+        capture_supervised_dependencies(&installation, &invocation, &binding)
+            .unwrap()
+            .1
+            .len(),
+        4
+    );
+    assert_eq!(
+        expected_invocation_stamp(&installation, &Invocation::new(&unrelated, ["update"])),
+        Err(Error::SourceChanged)
+    );
+
+    fs::write(&helper_path, b"helper-two").unwrap();
+    assert_eq!(
+        verify_installation_identity(&installation),
+        Err(Error::SourceChanged)
+    );
+    fs::write(&helper_path, b"helper-one").unwrap();
+    fs::write(&registration_path, b"registration-two").unwrap();
+    assert_eq!(
+        capture_supervised_dependencies(&installation, &invocation, &binding).map(|_| ()),
+        Err(Error::SourceChanged)
+    );
+    fs::write(&registration_path, b"registration-one").unwrap();
+    fs::remove_file(&helper_path).unwrap();
+    assert_eq!(
+        capture_supervised_dependencies(&installation, &invocation, &binding).map(|_| ()),
+        Err(Error::SourceChanged)
+    );
+}
+
+#[test]
+fn supervised_dependencies_deduplicate_canonical_paths_but_keep_executable() {
+    let (_directory, root) = private_root();
+    let entry = root.join("agent");
+    let manager_path = root.join("manager");
+    fs::write(&entry, b"agent-one").unwrap();
+    fs::write(&manager_path, b"manager-one").unwrap();
+    let manager = stamp(&manager_path).unwrap();
+    let installation = Installation {
+        source: Source::Npm,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: Some(manager.clone()),
+        helper: Some(manager.clone()),
+        registration: Some((manager_path.clone(), manager)),
+        invocation: None,
+        channel: Channel::Latest,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    let invocation = Invocation::new(&manager_path, ["update"]);
+    let binding = managed_process::PreparedLaunchBinding::new("b".repeat(64)).unwrap();
+
+    assert_eq!(
+        supervised_dependency_paths(&installation, &invocation),
+        Ok(vec![manager_path.clone(), entry])
+    );
+    assert_eq!(
+        capture_supervised_dependencies(&installation, &invocation, &binding)
+            .unwrap()
+            .1
+            .len(),
+        2
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn native_file_capture_freezes_only_the_canonical_program_object() {
+    let (_directory, root) = private_root();
+    let program = root.join("native-program");
+    let entry = root.join("entry");
+    fs::write(&program, b"native-program").unwrap();
+    std::os::unix::fs::symlink(&program, &entry).unwrap();
+    let installation = Installation {
+        source: Source::Native,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: None,
+        helper: None,
+        registration: None,
+        invocation: None,
+        channel: Channel::Latest,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    let invocation = Invocation::new(program.canonicalize().unwrap(), ["update"]);
+    let binding = managed_process::PreparedLaunchBinding::native_file("c".repeat(64)).unwrap();
+
+    let (_, expected) =
+        capture_supervised_dependencies(&installation, &invocation, &binding).unwrap();
+
+    assert_eq!(expected.len(), 1);
+    assert_eq!(expected[0].path(), program.canonicalize().unwrap());
+    assert!(binding.is_native_file());
+}
+
+#[test]
+fn windows_reparse_attribute_is_never_plain() {
+    assert!(windows_file_attributes_are_plain(0));
+    assert!(windows_file_attributes_are_plain(0x20));
+    assert!(!windows_file_attributes_are_plain(0x400));
+    assert!(!windows_file_attributes_are_plain(0x420));
 }
 
 #[test]
@@ -406,6 +836,7 @@ fn confirmed_unstarted_update_recovers_old_installation_and_persists_retry_suppr
     fs::write(&record.entry, b"unchanged installation").unwrap();
     record.old_stamp = Some(stamp(&record.entry).unwrap());
     record.generation = Some(Uuid::new_v4());
+    bind_journal(&mut record);
     record.config = Some(ConfigBackup {
         desired: None,
         before_mode: None,
@@ -420,31 +851,263 @@ fn confirmed_unstarted_update_recovers_old_installation_and_persists_retry_suppr
     let old = record.old_version.clone();
     assert_eq!(
         preflight_recovery(CLIAgent::Grok, &record.entry, &root),
-        Err(Error::RecoveryRequired)
-    );
-    assert_eq!(
-        reconcile_confirmed_update(&path, &mut record, CLIAgent::Grok, &root, &old),
-        Err(Error::RecoveryRequired)
-    );
-    assert!(path.exists());
-    managed_process::record_not_started(
-        &root,
-        record.generation.unwrap(),
-        &record.entry,
-        &[],
-        &root,
-    )
-    .unwrap();
-    assert_eq!(
-        preflight_recovery(CLIAgent::Grok, &record.entry, &root),
         Ok(true)
     );
+    let receipt = managed_process::confirmed_exit_with_binding(
+        &root,
+        record.generation.unwrap(),
+        &journal_binding(&record).unwrap(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(receipt.containment, "not_started");
     reconcile_confirmed_update(&path, &mut record, CLIAgent::Grok, &root, &old).unwrap();
     assert!(!path.exists());
     assert!(!recovery_pending_in(&root, CLIAgent::Grok));
     assert_eq!(
         previous_failure(&root, CLIAgent::Grok, &record.entry).unwrap(),
         Some(record.target_version)
+    );
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn preflight_closes_every_supported_updater_generation_that_never_started() {
+    for (agent, config) in [
+        (CLIAgent::Codex, None),
+        (
+            CLIAgent::Claude,
+            Some((
+                ConfigKind::Claude,
+                br#"{"autoUpdatesChannel":"latest"}"#.to_vec(),
+            )),
+        ),
+        (CLIAgent::Grok, Some((ConfigKind::Grok, grok_before()))),
+    ] {
+        let (_directory, root) = private_root();
+        let mut record = journal(&root, "prepared");
+        record.agent = agent.command_prefix().to_owned();
+        record.entry = root.join(agent.command_prefix());
+        record.launch = Some(JournalLaunch {
+            program: record.entry.clone(),
+            args: vec![OsString::from("update")],
+            cwd: root.clone(),
+        });
+        match agent {
+            CLIAgent::Codex => {
+                record.old_version = "0.154.0".to_owned();
+                record.target_version = "0.155.1".to_owned();
+                record.channel = "latest".to_owned();
+            }
+            CLIAgent::Claude => {
+                record.old_version = "2.1.267".to_owned();
+                record.target_version = "2.1.278".to_owned();
+                record.channel = "latest".to_owned();
+            }
+            CLIAgent::Grok => {}
+            _ => unreachable!(),
+        }
+        fs::write(&record.entry, b"unchanged installation").unwrap();
+        record.old_stamp = Some(stamp(&record.entry).unwrap());
+        record.generation = Some(Uuid::new_v4());
+        bind_journal(&mut record);
+        record.config = config.map(|(kind, before)| {
+            let path = root.join(if matches!(kind, ConfigKind::Claude) {
+                "settings.json"
+            } else {
+                "config.toml"
+            });
+            fs::write(&path, &before).unwrap();
+            ConfigBackup {
+                kind,
+                path,
+                before: Some(before.clone()),
+                after: None,
+                desired: Some(ConfigDesired {
+                    bytes: Some(before),
+                }),
+                before_mode: None,
+                restore_stage: None,
+            }
+        });
+        if agent == CLIAgent::Claude {
+            record.claude_update = Some(
+                snapshot_claude_scope(
+                    record.config.as_ref().unwrap(),
+                    record.generation.unwrap(),
+                    root.join(".claude.json"),
+                    &record.target_version,
+                )
+                .unwrap(),
+            );
+        }
+        let journal_path = root.join(format!("{}.json", agent.command_prefix()));
+        save_journal(&journal_path, &record).unwrap();
+
+        assert_eq!(preflight_recovery(agent, &record.entry, &root), Ok(true));
+        let receipt = managed_process::confirmed_exit_with_binding(
+            &root,
+            record.generation.unwrap(),
+            &journal_binding(&record).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(receipt.containment, "not_started");
+        assert_eq!(receipt.exit_code, None);
+        let old_version = record.old_version.clone();
+        reconcile_confirmed_update(&journal_path, &mut record, agent, &root, &old_version).unwrap();
+        assert!(!journal_path.exists());
+        assert_eq!(
+            previous_failure(&root, agent, &record.entry).unwrap(),
+            Some(record.target_version.clone())
+        );
+    }
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn missing_generation_after_command_returned_is_not_rewritten_as_not_started() {
+    let (_directory, root) = private_root();
+    let mut record = journal(&root, "command_returned");
+    fs::write(&record.entry, b"unchanged installation").unwrap();
+    record.old_stamp = Some(stamp(&record.entry).unwrap());
+    record.generation = Some(Uuid::new_v4());
+    record.config = None;
+    save_journal(&root.join("grok.json"), &record).unwrap();
+
+    assert_eq!(
+        preflight_recovery(CLIAgent::Grok, &record.entry, &root),
+        Err(Error::RecoveryRequired)
+    );
+    assert!(
+        managed_process::confirmed_exit(&root, record.generation.unwrap())
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn pre_spawn_source_failure_receipt_is_idempotent() {
+    let (_directory, root) = private_root();
+    let generation = Uuid::new_v4();
+    let program = root.join("agent");
+    let args = [OsString::from("update")];
+    let binding = managed_process::PreparedLaunchBinding::new("a".repeat(64)).unwrap();
+
+    assert_eq!(
+        record_not_started_if_missing(&root, generation, &program, &args, &binding),
+        Ok(true)
+    );
+    assert_eq!(
+        record_not_started_if_missing(&root, generation, &program, &args, &binding),
+        Ok(false)
+    );
+    let receipt = managed_process::confirmed_exit_with_binding(&root, generation, &binding)
+        .unwrap()
+        .unwrap();
+    assert_eq!(receipt.containment, "not_started");
+    assert_eq!(receipt.exit_code, None);
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn preflight_not_started_receipt_uses_the_persisted_updater_command() {
+    let (_directory, root) = private_root();
+    let mut record = journal(&root, "prepared");
+    let generation = Uuid::new_v4();
+    let manager = root.join("manager");
+    record.generation = Some(generation);
+    record.launch = Some(JournalLaunch {
+        program: manager.clone(),
+        args: vec![OsString::from("install"), OsString::from("grok@1.0.34")],
+        cwd: root.clone(),
+    });
+    bind_journal(&mut record);
+    fs::write(&record.entry, b"unchanged installation").unwrap();
+    record.old_stamp = Some(stamp(&record.entry).unwrap());
+    save_journal(&root.join("grok.json"), &record).unwrap();
+
+    assert_eq!(
+        preflight_recovery(CLIAgent::Grok, &record.entry, &root),
+        Ok(true)
+    );
+    let manifest: Value = serde_json::from_slice(
+        &fs::read(
+            root.join("cli-agent-processes")
+                .join(generation.to_string())
+                .join("manifest.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(manifest["executable"], json!(manager));
+    let arguments: Vec<OsString> = serde_json::from_value(manifest["arguments"].clone()).unwrap();
+    assert_eq!(
+        arguments,
+        [OsString::from("install"), OsString::from("grok@1.0.34")]
+    );
+    assert_eq!(manifest["cwd"], json!(root));
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn preflight_rejects_old_or_malformed_pre_spawn_journals_without_a_receipt() {
+    for malformed_claude_phase in [false, true] {
+        let (_directory, root) = private_root();
+        let mut record = journal(
+            &root,
+            if malformed_claude_phase {
+                "claude_config_preparing"
+            } else {
+                "prepared"
+            },
+        );
+        let generation = Uuid::new_v4();
+        record.generation = Some(generation);
+        if malformed_claude_phase {
+            record.agent = "grok".to_owned();
+        } else {
+            record.launch = None;
+        }
+        fs::write(&record.entry, b"unchanged installation").unwrap();
+        record.old_stamp = Some(stamp(&record.entry).unwrap());
+        save_journal(&root.join("grok.json"), &record).unwrap();
+
+        assert_eq!(
+            preflight_recovery(CLIAgent::Grok, &record.entry, &root),
+            Err(Error::RecoveryRequired)
+        );
+        assert!(
+            managed_process::confirmed_exit(&root, generation)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    let (_directory, root) = private_root();
+    let mut record = journal(&root, "claude_config_preparing");
+    let generation = Uuid::new_v4();
+    record.agent = "claude".to_owned();
+    record.entry = root.join("claude");
+    record.launch = Some(JournalLaunch {
+        program: record.entry.clone(),
+        args: vec![OsString::from("update")],
+        cwd: root.clone(),
+    });
+    record.generation = Some(generation);
+    fs::write(&record.entry, b"unchanged installation").unwrap();
+    record.old_stamp = Some(stamp(&record.entry).unwrap());
+    save_journal(&root.join("claude.json"), &record).unwrap();
+
+    assert_eq!(
+        preflight_recovery(CLIAgent::Claude, &record.entry, &root),
+        Err(Error::RecoveryRequired)
+    );
+    assert!(
+        managed_process::confirmed_exit(&root, generation)
+            .unwrap()
+            .is_none()
     );
 }
 
@@ -457,17 +1120,11 @@ fn confirmed_update_recovery_rejects_changed_old_installation() {
     fs::write(&record.entry, b"original").unwrap();
     record.old_stamp = Some(stamp(&record.entry).unwrap());
     record.generation = Some(Uuid::new_v4());
+    bind_journal(&mut record);
     record.config = None;
     let path = root.join("grok.json");
     save_journal(&path, &record).unwrap();
-    managed_process::record_not_started(
-        &root,
-        record.generation.unwrap(),
-        &record.entry,
-        &[],
-        &root,
-    )
-    .unwrap();
+    record_bound_not_started(&root, &record);
     fs::write(&record.entry, b"changed concurrently").unwrap();
     let old = record.old_version.clone();
     assert_eq!(
@@ -485,6 +1142,7 @@ fn verified_update_recovery_accepts_already_restored_channel_configuration() {
     for original in [None, Some(b"[cli]\nchannel = \"alpha\"\n".to_vec())] {
         let mut record = journal(&root, "verified");
         record.generation = Some(Uuid::new_v4());
+        bind_journal(&mut record);
         let config_path = root.join("config.toml");
         if let Some(bytes) = &original {
             fs::write(&config_path, bytes).unwrap();
@@ -500,14 +1158,7 @@ fn verified_update_recovery_accepts_already_restored_channel_configuration() {
         });
         let path = root.join("grok.json");
         save_journal(&path, &record).unwrap();
-        managed_process::record_not_started(
-            &root,
-            record.generation.unwrap(),
-            &record.entry,
-            &[],
-            &root,
-        )
-        .unwrap();
+        record_bound_not_started(&root, &record);
         let target = record.target_version.clone();
         reconcile_confirmed_update(&path, &mut record, CLIAgent::Grok, &root, &target).unwrap();
         assert!(!path.exists());
@@ -1132,6 +1783,7 @@ fn confirmed_failed_update_never_publishes_explicit_channel() {
     fs::write(&record.entry, b"old unchanged binary").unwrap();
     record.old_stamp = Some(stamp(&record.entry).unwrap());
     record.generation = Some(Uuid::new_v4());
+    bind_journal(&mut record);
     record.config = Some(selected_backup(
         &root,
         ConfigKind::Grok,
@@ -1152,14 +1804,7 @@ fn confirmed_failed_update_never_publishes_explicit_channel() {
     );
     let journal_path = root.join("grok.json");
     save_journal(&journal_path, &record).unwrap();
-    managed_process::record_not_started(
-        &root,
-        record.generation.unwrap(),
-        &record.entry,
-        &[],
-        &root,
-    )
-    .unwrap();
+    record_bound_not_started(&root, &record);
     let old_version = record.old_version.clone();
     reconcile_confirmed_update(
         &journal_path,
@@ -1299,12 +1944,18 @@ fn claude_scope_fixture(root: &Path) -> Journal {
     let mut record = journal(root, "prepared");
     record.agent = "claude".to_owned();
     record.entry = root.join("claude");
+    record.launch = Some(JournalLaunch {
+        program: record.entry.clone(),
+        args: vec![OsString::from("update")],
+        cwd: root.to_owned(),
+    });
     fs::write(&record.entry, b"synthetic unchanged native executable").unwrap();
     record.old_stamp = Some(stamp(&record.entry).unwrap());
     record.old_version = "2.1.278".to_owned();
     record.target_version = "2.1.267".to_owned();
     record.config = Some(config);
     record.generation = Some(generation);
+    bind_journal(&mut record);
     record.claude_update = Some(scope);
     record
 }
@@ -1589,14 +2240,7 @@ fn claude_cas_conflict_cleans_the_finished_process_shadow_and_preserves_user_cha
     .unwrap();
     let path = root.join("claude.json");
     save_journal(&path, &record).unwrap();
-    managed_process::record_not_started(
-        &root,
-        record.generation.unwrap(),
-        &record.entry,
-        &[],
-        &root,
-    )
-    .unwrap();
+    record_bound_not_started(&root, &record);
     let config_path = record.config.as_ref().unwrap().path.clone();
     fs::write(&config_path, b"new user configuration").unwrap();
     let old = record.old_version.clone();
@@ -1620,14 +2264,7 @@ fn claude_metadata_conflict_cleans_only_the_shadow_after_confirmed_exit() {
         record.config.as_ref().unwrap(),
     )
     .unwrap();
-    managed_process::record_not_started(
-        &root,
-        record.generation.unwrap(),
-        &record.entry,
-        &[],
-        &root,
-    )
-    .unwrap();
+    record_bound_not_started(&root, &record);
     fs::write(root.join("user/.claude.json"), b"new user metadata").unwrap();
     assert_eq!(
         finish_claude_scope(&root, &record),

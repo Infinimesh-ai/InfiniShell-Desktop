@@ -1,0 +1,36 @@
+{
+  "cases": [
+    {
+      "mode": "direct",
+      "parsed_cli_agent_events": 2,
+      "passed": true,
+      "pluggable_notifications": 2,
+      "ssh_stdout_sha256": "a2fd5c42898983a45afc3842e00cb296a9235486a6e335541a87e2790ab24d91"
+    },
+    {
+      "mode": "tmux-on",
+      "parsed_cli_agent_events": 2,
+      "passed": true,
+      "pluggable_notifications": 2,
+      "ssh_stdout_sha256": "c0ec833c015d0fc47dec83b10240a10ec1a2acd1de7094489a0475dfb7018e79"
+    },
+    {
+      "mode": "tmux-off",
+      "parsed_cli_agent_events": 0,
+      "passed": true,
+      "pluggable_notifications": 0,
+      "ssh_stdout_sha256": "f6e2bc676c42aa06222085c79effbc1ba31981785dda53f7f8f788c853d5aef2"
+    }
+  ],
+  "codex_version": "codex-cli 0.155.1",
+  "host_alias": "bwh-2t",
+  "input_private_receipt_sha256": "07d83c1437c2ac0b5ca9e591db8341815b4861c87424a42e67f4e7430b03ae2f",
+  "official_codex_hook_control_tty_compatible": true,
+  "passed": true,
+  "product_terminal_model_osc_parser_verified": true,
+  "product_terminal_view_ui_verified": false,
+  "remote_transport_passed": true,
+  "scope": "official Codex SSH/tmux bytes -> TerminalModel OSC 777 -> parse_event",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true
+}

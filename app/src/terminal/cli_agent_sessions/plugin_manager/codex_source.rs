@@ -23,6 +23,9 @@ const METADATA: &str =
 const PREVIOUS_METADATA: &str = include_str!(
     "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/SOURCE_METADATA.json"
 );
+const REV4_METADATA: &str = include_str!(
+    "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev4/SOURCE_METADATA.json"
+);
 
 #[derive(Deserialize)]
 struct SourceMetadata {
@@ -42,6 +45,9 @@ static BUNDLE: LazyLock<SourceMetadata> =
     LazyLock::new(|| serde_json::from_str(METADATA).expect("随附 Codex 完整来源元数据必须有效"));
 static PREVIOUS_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
     serde_json::from_str(PREVIOUS_METADATA).expect("随附 Codex rev3 完整来源元数据必须有效")
+});
+static REV4_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
+    serde_json::from_str(REV4_METADATA).expect("随附 Codex rev4 完整来源元数据必须有效")
 });
 static CURRENT: LazyLock<Mutex<BTreeMap<PathBuf, (Instant, bool)>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
@@ -231,11 +237,17 @@ fn verify_revision_modes(root: &Path, prefix: &str, revision: &SourceMetadata) -
     Ok(())
 }
 
-/// 只接收 rev3 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
+/// 只接收 rev3/rev4 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
 pub(super) fn is_previous_notification_cache(root: &Path) -> bool {
-    tree(root, false)
-        .is_ok_and(|actual| actual == revision_tree(&PREVIOUS_BUNDLE, "plugins/warp/", false))
-        && verify_revision_modes(root, "plugins/warp/", &PREVIOUS_BUNDLE).is_ok()
+    let Ok(actual) = tree(root, false) else {
+        return false;
+    };
+    [&*REV4_BUNDLE, &*PREVIOUS_BUNDLE]
+        .into_iter()
+        .any(|revision| {
+            actual == revision_tree(revision, "plugins/warp/", false)
+                && verify_revision_modes(root, "plugins/warp/", revision).is_ok()
+        })
 }
 
 fn validate_config_shape(document: &DocumentMut) -> io::Result<()> {
@@ -333,6 +345,9 @@ pub(super) fn has_custom_source(home: &Path) -> bool {
             Some(_) if owned_revision_entry(&document, home, &PREVIOUS_BUNDLE) => {
                 verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA).is_err()
             }
+            Some(_) if owned_revision_entry(&document, home, &REV4_BUNDLE) => {
+                verify_revision(home, &REV4_BUNDLE, REV4_METADATA).is_err()
+            }
             Some(_) => !owned_entry(&document, home) || !is_current(home),
         },
         Err(_) => true,
@@ -381,6 +396,9 @@ fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {
         Some(_) if owned_entry(document, home) => verify_owned(home)?,
         Some(_) if owned_revision_entry(document, home, &PREVIOUS_BUNDLE) => {
             verify_revision(home, &PREVIOUS_BUNDLE, PREVIOUS_METADATA)?;
+        }
+        Some(_) if owned_revision_entry(document, home, &REV4_BUNDLE) => {
+            verify_revision(home, &REV4_BUNDLE, REV4_METADATA)?;
         }
         Some(_) => return Err(invalid()),
     }
@@ -561,7 +579,11 @@ pub(super) async fn install(
     // 普通拒绝路径不能为了取锁而新增文件；中断事务则必须先恢复再检查半成品缓存。
     if !home.join("plugins/infinishell-transactions").try_exists()? {
         let (_, document) = read_config(&home).map_err(|error| failure(error, log))?;
-        if Scope::read(&document, &format!("{name}@codex-warp")).enabled.as_bool() == Some(false) {
+        if Scope::read(&document, &format!("{name}@codex-warp"))
+            .enabled
+            .as_bool()
+            == Some(false)
+        {
             return Err(PluginInstallError {
                 message: crate::t!("cli-agent-plugin-disabled"),
                 log: log.clone(),
@@ -645,8 +667,8 @@ pub(super) async fn install(
         )
     })?;
     if preserve_previous_cache {
-        // rev3 升级成功仍保留旧缓存和事务记录，旧不可变来源也不会被删除。
-        log.push_str(&format!("rev3 恢复资料保留于 {}\n", transaction.display()));
+        // 受控旧版升级成功仍保留旧缓存和事务记录，旧不可变来源也不会被删除。
+        log.push_str(&format!("旧版恢复资料保留于 {}\n", transaction.display()));
     } else {
         fs::remove_dir_all(transaction)?;
     }

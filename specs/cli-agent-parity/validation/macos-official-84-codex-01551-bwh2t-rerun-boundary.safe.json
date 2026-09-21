@@ -1,0 +1,108 @@
+{
+  "scope": "Codex 0.155.1 远端 SSH/tmux 基线与断连重连重跑身份及边界",
+  "generated_at_utc": "2026-09-20T21:42:03Z",
+  "source": {
+    "commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "tree_dirty": true
+  },
+  "receipts": {
+    "baseline": {
+      "path": "specs/cli-agent-parity/validation/macos-official-82-codex-01551-bwh2t-ssh-tmux-rerun.safe.json",
+      "sha256": "e6cd274cb90212659d03cddb33d29fb8d027c1364829990579816b8394f3f706",
+      "private_receipt_sha256": "2d789c8914b2b73e9d66e2e56376638982fe04b3cae19062c427fc925f213f11"
+    },
+    "reconnect": {
+      "path": "specs/cli-agent-parity/validation/macos-official-83-codex-01551-bwh2t-ssh-tmux-reconnect-rerun.safe.json",
+      "sha256": "344b5d8b4c66d5443ee7d9469f97240cb24dc7f3c529f3103899b66f391a18c5",
+      "private_receipt_sha256": "5cf5a0fdff4823daf9470117e384c4be5f80cfaf0b0ddf1889b91cf200ad59cf",
+      "pre_disconnect_product_input_sha256": "cb887780843f4120198bb4889a652fdea787a5fbfc089d5e785576b298efc5d2",
+      "reattach_product_input_sha256": "961562447b82524de2550f6b978debfe5e69d622e8a1b29dde4675a3273dc48c"
+    }
+  },
+  "probe_identity": {
+    "baseline_script": {
+      "path": "script/cli-agent-parity/probe_codex_remote_ssh_tmux.py",
+      "sha256": "fbafc4304e8a919e248f4f48ce8042650a077e3ab0a3ba5d357700d9478390e6"
+    },
+    "reconnect_script": {
+      "path": "script/cli-agent-parity/probe_codex_ssh_tmux_reconnect.py",
+      "sha256": "f7bd323184ae21a292bb7b7268768e156f675032f284a92e1476b63f974e93f1"
+    },
+    "remote_root_policy": "仅允许 /root/.cache/infinishell-parity-ssh-tmux.<安全 basename>，上传前要求现有真实目录且 resolve 后路径不变"
+  },
+  "plugin_identity": {
+    "source_metadata_path": "app/assets/bundled/cli-agent-plugins/codex/SOURCE_METADATA.json",
+    "source_metadata_sha256": "b7127fbe0419f28ecbda77da621dbf78b7b555695fdc00151673366d24479e51",
+    "patch_metadata_path": "app/assets/bundled/cli-agent-plugins/codex/PATCH_METADATA.json",
+    "patch_metadata_sha256": "f6ca174d59cc7e913ac03a683c9f2e1ccbed15f23c5580ab8d60285f84b569c4",
+    "upstream_repository": "https://github.com/warpdotdev/codex-warp.git",
+    "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+    "plugin_version": "0.4.0",
+    "patch_revision": 5,
+    "warp_notify_sha256": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29"
+  },
+  "cli_identity": {
+    "codex_version": "codex-cli 0.155.1",
+    "codex_binary_sha256": "0753dfe1d8b87a52436deb13eb1c549661ef4c84fee2c5aa688385eebeccb761",
+    "codex_platform_package_sha256": "f110cccdd50b0be8130b84f45b3144ea775c233f1c8bd8226da6ee719d63d206",
+    "tmux_version": "tmux 3.6",
+    "tmux_binary_sha256": "3bdeba4db61fa25e569e5d1ca6466acfd193018c7bbc2bc924ec415ffa0c2e58",
+    "jq_version": "jq-1.8.1"
+  },
+  "product_parser_identity": {
+    "path": "app/src/terminal/model/terminal_model_tests.rs",
+    "sha256": "b7e0b0e1cbb30b3c5d903b305c0008c6944051493ea27e5f3823d870ac09b7e5",
+    "test": "live_remote_codex_ssh_tmux_bytes_reach_product_osc_parser",
+    "executed_in_this_rerun": false,
+    "reason": "本轮明确禁止运行 Cargo；仅生成了可供该离线解析测试消费的两份断连前后私有输入",
+    "product_terminal_model_osc_parser_verified": false,
+    "product_terminal_view_ui_verified": false
+  },
+  "security_boundary": {
+    "ssh_used_existing_batch_mode_authentication": true,
+    "credentials_read_or_copied": false,
+    "isolated_codex_home": true,
+    "fixed_local_probe_prompt_only": true,
+    "user_prompt_hook_returned_continue_false": true,
+    "model_provider_input_sent": false,
+    "model_lifecycle_verified": false,
+    "account_login_prompt_observed": false,
+    "interactive_permission_prompt_observed": false,
+    "hook_allow_entries_scoped_to_isolated_codex_home": true,
+    "raw_ssh_bytes_in_safe_receipts": false
+  },
+  "results": {
+    "direct_native_hook_transport": true,
+    "tmux_passthrough_native_hook_transport": true,
+    "tmux_blocking_observed": true,
+    "explicit_detach_lifecycle": true,
+    "abrupt_disconnect_lifecycle": true,
+    "tmux_survived_without_clients": true,
+    "reattach_same_session_new_prompt_transport": true,
+    "old_session_start_replayed_on_reattach": false,
+    "lifecycle_passed": true,
+    "same_identity_duplicate_actual_cli_triggered": false,
+    "out_of_order_actual_cli_triggered": false,
+    "duplicate_and_out_of_order_result": "evidence_insufficient",
+    "overall_passed": false
+  },
+  "cleanup": {
+    "remote_root": "<fixed-safe-private-root>",
+    "remote_root_removed": true,
+    "first_cleanup_verification_passed": false,
+    "first_cleanup_failure": "远端私有根目录已删除，但发现两个由本轮固定 root 摘要派生的残留 tmux socket",
+    "active_tmux_process_for_residual_sockets": false,
+    "residual_socket_type_and_owner_verified": true,
+    "residual_sockets_removed": true,
+    "final_remote_cleanup_verified": true,
+    "local_private_temporary_files_removed": true
+  },
+  "warnings": [
+    "apt-get download 因私有目录不允许 _apt 访问而报告以 root 非沙箱下载；未安装系统包，下载包摘要与预期一致。",
+    "远端未在 PATH 中发现 bubblewrap；Codex 报告使用 bundled bubblewrap，未影响本轮 hook 传输。",
+    "产品解析器本轮未执行；receipt 82/83 不能证明 TerminalModel、TerminalView 或 GUI 实际接收。",
+    "官方 hook 不提供原生 sequence 或 event id；未制造重复/乱序事件，因此该项仍为证据不足。"
+  ],
+  "passed": false,
+  "result": "remote_lifecycle_passed_product_and_ordering_evidence_incomplete"
+}

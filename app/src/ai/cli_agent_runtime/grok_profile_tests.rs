@@ -20,6 +20,157 @@ fn permissions(spawn: bool, message: bool) -> Option<LocalToolPermissions> {
 }
 
 #[test]
+fn fixed_policy_binds_each_supported_version_to_its_exact_executable_digest() {
+    for (version, other_version, digest) in [
+        (
+            "1.0.30",
+            "1.0.34",
+            "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+        ),
+        (
+            "1.0.30",
+            "1.0.34",
+            "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
+        ),
+        (
+            "1.0.30",
+            "1.0.34",
+            "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
+        ),
+        (
+            "1.0.34",
+            "1.0.30",
+            "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+        ),
+        (
+            "1.0.34",
+            "1.0.30",
+            "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d",
+        ),
+        (
+            "1.0.34",
+            "1.0.30",
+            "021d8f7f6bdf9db48b6c87e799cd99130a76c463e6e6a3161510839aed016d94",
+        ),
+        (
+            "1.0.40",
+            "1.0.34",
+            "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+        ),
+        (
+            "1.0.40",
+            "1.0.34",
+            "92c997dfd109c0672d40d5ae6fbd15835d53ffaf12cf9ea124d22aaef3ff23fc",
+        ),
+        (
+            "1.0.40",
+            "1.0.34",
+            "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e",
+        ),
+    ] {
+        let mut profile = policy(None);
+        profile.executable_sha256 = digest.into();
+        assert!(profile.matches_cli_version(version));
+        assert!(!profile.matches_cli_version(other_version));
+        assert!(!profile.matches_cli_version("1.0.35"));
+    }
+}
+
+#[test]
+fn p0_policy_can_resume_only_with_the_same_verified_cli_identity() {
+    let directory = tempfile::tempdir().unwrap();
+    let executable_sha256 = "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e";
+    let profile = GrokCreationPolicyV1::compile(
+        directory.path(),
+        "1.0.34",
+        executable_sha256.into(),
+        "b".repeat(64),
+        None,
+        PermissionPolicy::GrokRestrictedReadV1,
+    )
+    .unwrap();
+    profile
+        .validate_launch(
+            directory.path(),
+            "1.0.34",
+            executable_sha256.into(),
+            "b".repeat(64),
+            PermissionPolicy::GrokRestrictedReadV1,
+        )
+        .unwrap();
+    assert!(
+        profile
+            .validate_launch(
+                directory.path(),
+                "1.0.30",
+                executable_sha256.into(),
+                "b".repeat(64),
+                PermissionPolicy::GrokRestrictedReadV1,
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn p0_runtime_scope_is_only_fixed_read_without_local_tools() {
+    let directory = tempfile::tempdir().unwrap();
+    let executable_sha256 = "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e";
+    let read = GrokCreationPolicyV1::compile(
+        directory.path(),
+        "1.0.34",
+        executable_sha256.into(),
+        "b".repeat(64),
+        None,
+        PermissionPolicy::GrokRestrictedReadV1,
+    )
+    .unwrap();
+    assert!(read.runtime_scope_verified("1.0.34", None, PermissionPolicy::GrokRestrictedReadV1));
+    assert!(!read.runtime_scope_verified("1.0.34", None, PermissionPolicy::GrokRestrictedFilesV1));
+    assert!(!read.runtime_scope_verified(
+        "1.0.34",
+        permissions(false, true),
+        PermissionPolicy::GrokRestrictedReadV1
+    ));
+}
+
+#[test]
+fn p0_runtime_scope_rejects_unverified_file_profile_even_with_a_fixed_digest() {
+    let directory = tempfile::tempdir().unwrap();
+    let files = GrokCreationPolicyV1::compile(
+        directory.path(),
+        "1.0.34",
+        "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e".into(),
+        "b".repeat(64),
+        None,
+        PermissionPolicy::GrokRestrictedFilesV1,
+    )
+    .unwrap();
+
+    assert!(!files.runtime_scope_verified("1.0.34", None, PermissionPolicy::GrokRestrictedFilesV1));
+}
+
+#[test]
+fn current_fixed_bytes_do_not_enable_unverified_fixed_policy_scope() {
+    let directory = tempfile::tempdir().unwrap();
+    let read = GrokCreationPolicyV1::compile(
+        directory.path(),
+        "1.0.40",
+        "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2".into(),
+        "b".repeat(64),
+        None,
+        PermissionPolicy::GrokRestrictedReadV1,
+    )
+    .unwrap();
+
+    assert!(!read.runtime_scope_verified("1.0.40", None, PermissionPolicy::GrokRestrictedReadV1));
+    assert!(!read.runtime_scope_verified(
+        "1.0.40",
+        permissions(false, true),
+        PermissionPolicy::GrokRestrictedReadV1
+    ));
+}
+
+#[test]
 fn child_may_reduce_but_never_increase_sdk_permissions() {
     for parent_spawn in [false, true] {
         for parent_message in [false, true] {
@@ -367,10 +518,11 @@ fn file_child_preserves_its_parent_tool_set_and_cannot_regain_removed_sdk_access
 #[test]
 fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
     let directory = tempfile::tempdir().unwrap();
+    let executable_sha256 = "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb";
     let read = GrokCreationPolicyV1::compile(
         directory.path(),
         "1.0.30",
-        "a".repeat(64),
+        executable_sha256.into(),
         "b".repeat(64),
         None,
         PermissionPolicy::GrokRestrictedReadV1,
@@ -379,7 +531,7 @@ fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
     let files = GrokCreationPolicyV1::compile(
         directory.path(),
         "1.0.30",
-        "a".repeat(64),
+        executable_sha256.into(),
         "b".repeat(64),
         None,
         PermissionPolicy::GrokRestrictedFilesV1,
@@ -388,7 +540,7 @@ fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
     read.validate_launch(
         directory.path(),
         "1.0.30",
-        "a".repeat(64),
+        executable_sha256.into(),
         "b".repeat(64),
         PermissionPolicy::GrokRestrictedReadV1,
     )
@@ -397,7 +549,7 @@ fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
         .validate_launch(
             directory.path(),
             "1.0.30",
-            "a".repeat(64),
+            executable_sha256.into(),
             "b".repeat(64),
             PermissionPolicy::GrokRestrictedFilesV1,
         )
@@ -406,7 +558,7 @@ fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
         read.validate_launch(
             directory.path(),
             "1.0.30",
-            "a".repeat(64),
+            executable_sha256.into(),
             "b".repeat(64),
             PermissionPolicy::GrokRestrictedFilesV1
         )
@@ -417,11 +569,21 @@ fn resumed_tool_set_must_match_the_saved_policy_in_both_directions() {
             .validate_launch(
                 directory.path(),
                 "1.0.30",
-                "a".repeat(64),
+                executable_sha256.into(),
                 "b".repeat(64),
                 PermissionPolicy::GrokRestrictedReadV1
             )
             .is_err()
+    );
+    assert!(
+        read.validate_launch(
+            directory.path(),
+            "1.0.34",
+            executable_sha256.into(),
+            "b".repeat(64),
+            PermissionPolicy::GrokRestrictedReadV1
+        )
+        .is_err()
     );
 }
 

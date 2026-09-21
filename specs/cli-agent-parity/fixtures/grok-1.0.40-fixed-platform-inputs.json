@@ -1,0 +1,53 @@
+{
+  "version": "1.0.40",
+  "expected_version_output": "grok 1.0.40 (eb1a2256660d)",
+  "recorded_at": "2026-09-21T04:57:49Z",
+  "observed_on": "macOS arm64",
+  "source_commit": null,
+  "source_commit_is_binary_build_commit": false,
+  "official_checksum_manifest_verified": false,
+  "checksum_origin": "observed_complete_official_download",
+  "credentials_provided": false,
+  "model_input_submitted": false,
+  "platforms": {
+    "linux-x64": {
+      "artifact": "grok-1.0.40-linux-x86_64",
+      "url": "https://x.ai/cli/grok-1.0.40-linux-x86_64",
+      "bytes": 165587968,
+      "sha256": "92c997dfd109c0672d40d5ae6fbd15835d53ffaf12cf9ea124d22aaef3ff23fc",
+      "format": "elf64-x86-64",
+      "binary": "grok",
+      "archive": false,
+      "native_version_verified": false,
+      "target_executed": false,
+      "signature_verified_during_this_download": false
+    },
+    "win32-x64": {
+      "artifact": "grok-1.0.40-windows-x86_64.exe",
+      "url": "https://x.ai/cli/grok-1.0.40-windows-x86_64.exe",
+      "bytes": 153730376,
+      "sha256": "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e",
+      "format": "pe32+-x86-64",
+      "binary": "grok.exe",
+      "archive": false,
+      "native_version_verified": false,
+      "target_executed": false,
+      "signature_verified_during_this_download": false
+    },
+    "darwin-arm64": {
+      "artifact": "grok-1.0.40-macos-aarch64",
+      "url": "https://x.ai/cli/grok-1.0.40-macos-aarch64",
+      "bytes": 145308720,
+      "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+      "format": "mach-o64-arm64",
+      "binary": "grok",
+      "archive": false,
+      "native_version_verified": true,
+      "target_executed": true,
+      "signature_verified_during_this_download": true
+    }
+  },
+  "installer_executed": false,
+  "runtime_capabilities_changed": false,
+  "boundary": "三平台固定官方地址的完整下载字节已绑定；本机仅验证 macOS arm64 的版本输出与严格代码签名。无凭据 ACP 探针只证明 initialize、未认证拒绝、缺失历史拒绝及私有进程清理，不证明认证后的模型、审批、取消、恢复、技能、本地工具或父子任务。"
+}

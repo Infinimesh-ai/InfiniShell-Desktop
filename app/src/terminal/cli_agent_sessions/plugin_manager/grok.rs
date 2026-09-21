@@ -41,10 +41,19 @@ const LEGACY_HOOKS_SHA256: &str =
 const LEGACY_012_MANIFEST: &str =
     include_str!("../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.2-plugin.json");
 const LEGACY_012_SHA256: &[(&str, &str)] = &[
-    (".grok-plugin/plugin.json", "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571"),
+    (
+        ".grok-plugin/plugin.json",
+        "8cdbd6179378a60e8de4195c80aa64982936b11d3d66d2cb3d9fc5843b62b571",
+    ),
     ("hooks/hooks.json", LEGACY_HOOKS_SHA256),
-    ("hooks/notify.cjs", "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188"),
-    ("README.md", "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca"),
+    (
+        "hooks/notify.cjs",
+        "741c25075a63e3a03b0b9921e98c5685531dd296d66b0156b909497b37dd0188",
+    ),
+    (
+        "README.md",
+        "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca",
+    ),
 ];
 const BUNDLED_FILES: &[(&str, &str)] = &[
     (
@@ -619,7 +628,9 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
             ("0.1.0" | "0.1.1", "hooks/hooks.json") => digest == LEGACY_HOOKS_SHA256,
             ("0.1.2", name) => LEGACY_012_SHA256
                 .iter()
-                .any(|(expected_name, expected_digest)| name == *expected_name && digest == *expected_digest),
+                .any(|(expected_name, expected_digest)| {
+                    name == *expected_name && digest == *expected_digest
+                }),
             // 未知配方或文件不得借较小版本号取得应用所有权。
             _ => false,
         };

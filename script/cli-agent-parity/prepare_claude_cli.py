@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""准备显式选择的官方固定 Claude 文件；默认保留 2.1.273，不安装或改写已有 CLI。"""
+"""准备显式选择的官方固定 Claude 文件；默认最新正式版，不安装或改写已有 CLI。"""
 
 import argparse
 import hashlib
@@ -15,6 +15,7 @@ import urllib.request
 
 
 VERSION = "2.1.273"
+DEFAULT_VERSION = "2.1.278"
 RELEASE_COMMIT = "d48ecfd7a41c16c42e0564f7a94947d6e4c50db1"
 BASE_URL = f"https://downloads.claude.ai/claude-code-releases/{VERSION}"
 MANIFEST_SHA256 = "02aa2311fd5d9a4cc9a5aea017b89f5067eec78013bd340f62450719a5393fca"
@@ -180,8 +181,8 @@ def fetch(url, destination, expected_size, expected_sha256, executable=False, ve
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
-                        help="精确官方版本；缺省保留旧版验收输入")
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
+                        help=f"精确官方版本；缺省使用最新正式版 {DEFAULT_VERSION}")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--download-dir", type=Path, help="RUNNER_TEMP 内的专用下载目录")
     group.add_argument("--private-directory", type=Path, help="显式指定源树外的新私有目录；已有目录必须带本准备器标记")

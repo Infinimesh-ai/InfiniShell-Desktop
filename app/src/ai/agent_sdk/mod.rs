@@ -408,12 +408,7 @@ impl AgentDriverRunner {
             // Run the driver
             foreground
                 .spawn(move |_, ctx| {
-                    Self::create_and_run_driver(
-                        ctx,
-                        driver_options,
-                        output_format,
-                        task,
-                    );
+                    Self::create_and_run_driver(ctx, driver_options, output_format, task);
                 })
                 .await?;
 

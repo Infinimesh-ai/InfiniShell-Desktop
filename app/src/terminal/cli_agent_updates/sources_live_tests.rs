@@ -6,21 +6,71 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _, symlink};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 
+#[cfg(target_os = "macos")]
+use command::Stdio;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
+use warpui::r#async::Timer;
 
-use super::{Channel, Error, Source, execute, inspect, journal_root, parse_version};
+use super::{
+    Channel, Error, Journal, Source, execute, inspect, journal_root, parse_version,
+    previous_failure_for_intent,
+};
+use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason};
 use crate::terminal::cli_agent::CLIAgent;
 
 const SCOPE: &str = "cli_autoupdate_native_product";
 const MARKER: &str = "InfiniShell private updater fixture; no credentials or model inputs\n";
 const MAX_MANIFEST: usize = 64 * 1024;
+const COMPILED_SOURCE_FILES: [(&str, &[u8]); 8] = [
+    (
+        "app/src/terminal/cli_agent_updates.rs",
+        include_bytes!("../cli_agent_updates.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources.rs",
+        include_bytes!("sources.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+        include_bytes!("sources_live_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
+    ),
+    (
+        "script/cli-agent-parity/verify_cli_autoupdate.py",
+        include_bytes!("../../../../script/cli-agent-parity/verify_cli_autoupdate.py"),
+    ),
+];
+const SUPERVISOR_COMPILED_SOURCES: [&[u8]; 6] = [
+    include_bytes!("../cli_agent_updates.rs"),
+    include_bytes!("sources.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
+];
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -119,6 +169,7 @@ struct Evidence {
     production_chain_verified: bool,
     same_source_build_verified: bool,
     same_commit_verified_by_runner: bool,
+    failure_intent_persisted: bool,
 }
 
 fn sha(bytes: &[u8]) -> String {
@@ -335,29 +386,95 @@ fn verify_build_binding(manifest: &Manifest) -> Result<(), &'static str> {
             == Some(&binary.path)
             && value.get("sha256").and_then(Value::as_str) == Some(binary.sha256.as_str())
     };
-    if !source.get("files").is_some_and(Value::is_array)
+    if !compiled_source_files_match(&source)
         || gates.get("source_manifest_sha256").and_then(Value::as_str)
             != Some(manifest.source_manifest.sha256.as_str())
         || bundle.get("source_manifest_sha256").and_then(Value::as_str)
             != Some(manifest.source_manifest.sha256.as_str())
-        || gates.get("all_passed").and_then(Value::as_bool) != Some(true)
-        || bundle.get("exit_code").and_then(Value::as_i64) != Some(0)
         || !gates
             .get("test_binary")
             .is_some_and(|value| matches_binary(value, &manifest.worker))
         || !bundle
             .get("worker")
             .is_some_and(|value| matches_binary(value, &manifest.supervisor))
-        || (cfg!(target_os = "macos")
-            && bundle
-                .get("strict_signature_exit_code")
-                .and_then(Value::as_i64)
-                != Some(0))
         || binary_sha(&manifest.supervisor.path)? != manifest.supervisor.sha256
+        || !binary_contains_all(&manifest.supervisor.path, &SUPERVISOR_COMPILED_SOURCES)?
+        || !strict_signature_verified(&manifest.supervisor.path)
     {
         return Err("build_binding_mismatch");
     }
     Ok(())
+}
+
+fn binary_contains_all(path: &Path, needles: &[&[u8]]) -> Result<bool, &'static str> {
+    let maximum = needles.iter().map(|needle| needle.len()).max().unwrap_or(0);
+    if maximum == 0 || needles.iter().any(|needle| needle.is_empty()) {
+        return Err("build_binding_shape");
+    }
+    let mut found = vec![false; needles.len()];
+    let mut file = fs::File::open(path).map_err(|_| "build_binding_missing")?;
+    let mut tail = Vec::new();
+    let mut chunk = vec![0; 1024 * 1024];
+    loop {
+        let count = file.read(&mut chunk).map_err(|_| "build_binding_missing")?;
+        if count == 0 {
+            return Ok(found.into_iter().all(|present| present));
+        }
+        tail.extend_from_slice(&chunk[..count]);
+        for (index, needle) in needles.iter().enumerate() {
+            if !found[index]
+                && tail
+                    .windows(needle.len())
+                    .any(|candidate| candidate == *needle)
+            {
+                found[index] = true;
+            }
+        }
+        if found.iter().all(|present| *present) {
+            return Ok(true);
+        }
+        let retained = tail.len().min(maximum.saturating_sub(1));
+        let discarded = tail.len() - retained;
+        tail.drain(..discarded);
+    }
+}
+
+fn compiled_source_files_match(source: &Value) -> bool {
+    let Some(files) = source.get("files").and_then(Value::as_array) else {
+        return false;
+    };
+    COMPILED_SOURCE_FILES.iter().all(|(expected_path, bytes)| {
+        let mut rows = files
+            .iter()
+            .filter(|row| row.get("path").and_then(Value::as_str) == Some(*expected_path));
+        let Some(row) = rows.next() else {
+            return false;
+        };
+        rows.next().is_none()
+            && row.get("sha256").and_then(Value::as_str) == Some(sha(bytes).as_str())
+            && row
+                .get("bytes")
+                .is_none_or(|value| value.as_u64() == Some(bytes.len() as u64))
+    })
+}
+
+fn strict_signature_verified(path: &Path) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        return command::blocking::Command::new("/usr/bin/codesign")
+            .args(["--verify", "--strict"])
+            .arg(path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|status| status.success());
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        true
+    }
 }
 
 fn config_snapshot(root: &Path) -> Result<BTreeMap<&'static str, ConfigSnapshot>, &'static str> {
@@ -419,7 +536,7 @@ fn transition_valid(manifest: &Manifest) -> bool {
     let Some(transition) = &manifest.config_transition else {
         return manifest.expected != "channel_only";
     };
-    if manifest.expected == "source_changed_rejected" {
+    if !matches!(manifest.expected.as_str(), "updated" | "channel_only") {
         return false;
     }
     match transition {
@@ -638,6 +755,110 @@ fn supervisor_generations(root: &Path) -> Result<BTreeSet<PathBuf>, &'static str
     Ok(result)
 }
 
+struct WriteBlock {
+    path: PathBuf,
+    mode: u32,
+    active: bool,
+}
+
+impl WriteBlock {
+    fn new(root: &Path, agent: CLIAgent) -> Result<Self, &'static str> {
+        let path = if agent == CLIAgent::Codex {
+            root.join("home/.codex/packages/standalone/releases")
+        } else if agent == CLIAgent::Claude {
+            root.join("home/.local/share/claude/versions")
+        } else if agent == CLIAgent::Grok {
+            root.join("home/.grok/downloads")
+        } else {
+            return Err("failure_boundary_invalid");
+        };
+        plain_path(root, &path)?;
+        let metadata = fs::symlink_metadata(&path).map_err(|_| "failure_boundary_missing")?;
+        if !metadata.is_dir() || metadata.uid() != unsafe { libc::geteuid() } {
+            return Err("failure_boundary_invalid");
+        }
+        let mode = metadata.permissions().mode() & 0o777;
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode & !0o222))
+            .map_err(|_| "failure_boundary_read_only_failed")?;
+        Ok(Self {
+            path,
+            mode,
+            active: true,
+        })
+    }
+
+    fn restore(mut self) -> Result<(), &'static str> {
+        fs::set_permissions(&self.path, fs::Permissions::from_mode(self.mode))
+            .map_err(|_| "failure_boundary_restore_failed")?;
+        self.active = false;
+        Ok(())
+    }
+}
+
+impl Drop for WriteBlock {
+    fn drop(&mut self) {
+        if self.active {
+            let _ = fs::set_permissions(&self.path, fs::Permissions::from_mode(self.mode));
+        }
+    }
+}
+
+async fn wait_for_native_start(root: &Path, agent: CLIAgent) -> Result<uuid::Uuid, &'static str> {
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            let path = journal_root()
+                .map_err(|_| "state_unavailable")?
+                .join(format!("{}.json", agent.command_prefix()));
+            if let Ok(bytes) = fs::read(path)
+                && let Ok(journal) = serde_json::from_slice::<Journal>(&bytes)
+                && let Some(generation) = journal.generation
+            {
+                let directory = journal_root()
+                    .map_err(|_| "state_unavailable")?
+                    .join("cli-agent-processes")
+                    .join(generation.to_string());
+                plain_path(root, &directory)?;
+                #[cfg(target_os = "macos")]
+                let started = directory.join("macos-native.json").is_file();
+                #[cfg(not(target_os = "macos"))]
+                let started = directory.join("manifest.json").is_file();
+                if started {
+                    return Ok(generation);
+                }
+            }
+            Timer::after(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .map_err(|_| "native_start_timeout")?
+}
+
+async fn wait_for_confirmed_exit(root: &Path, generation: uuid::Uuid) -> Result<(), &'static str> {
+    let state = journal_root().map_err(|_| "state_unavailable")?;
+    plain_path(root, &state)?;
+    tokio::time::timeout(Duration::from_secs(30), async {
+        loop {
+            match managed_process::confirmed_exit(&state, generation) {
+                Ok(Some(receipt))
+                    if receipt.containment != "not_started"
+                        && matches!(
+                            receipt.exit_reason,
+                            ExitReason::HostDisconnected | ExitReason::StdioClosed
+                        ) =>
+                {
+                    return Ok(());
+                }
+                Ok(Some(_)) | Err(_) => return Err("interrupted_exit_unconfirmed"),
+                Ok(None) => {
+                    Timer::after(Duration::from_millis(10)).await;
+                }
+            }
+        }
+    })
+    .await
+    .map_err(|_| "interrupted_exit_timeout")?
+}
+
 async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'static str> {
     let (agent, channel) = agent_channel(manifest)?;
     let root = &manifest.root;
@@ -663,6 +884,7 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
         return Err("native_plan_mismatch");
     }
     let plan = report.plan.ok_or("native_plan_missing")?;
+    let intent = plan.intent.clone();
     evidence.plan_requires_native_update = Some(plan.requires_native_update());
     if plan.requires_native_update() != (manifest.expected != "channel_only") {
         return Err("native_plan_mismatch");
@@ -673,14 +895,32 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
     }
     evidence.stage = "execute";
     let mut original_link = None;
+    let mut write_block = None;
     if manifest.expected == "source_changed_rejected" {
         original_link = Some(fs::read_link(&manifest.entry).map_err(|_| "entry_not_symlink")?);
         fs::remove_file(&manifest.entry).map_err(|_| "source_change_failed")?;
         symlink(&manifest.target_binary.path, &manifest.entry)
             .map_err(|_| "source_change_failed")?;
+    } else if manifest.expected == "command_failed_rolled_back" {
+        write_block = Some(WriteBlock::new(root, agent)?);
     }
     evidence.product_execute_calls += 1;
-    let executed = execute(plan).await;
+    let executed = if manifest.expected == "interrupted_recovered" {
+        let task = tokio::spawn(async move { execute(plan, None).await });
+        let generation = wait_for_native_start(root, agent).await?;
+        if task.is_finished() {
+            return Err("native_update_completed_before_interrupt");
+        }
+        task.abort();
+        let _ = task.await;
+        wait_for_confirmed_exit(root, generation).await?;
+        Ok(manifest.old_version.clone())
+    } else {
+        execute(plan, None).await
+    };
+    if let Some(write_block) = write_block {
+        write_block.restore()?;
+    }
     if let Some(original) = original_link {
         // 仅恢复仍指向本夹具目标的入口，不能覆盖意外的并发修改。
         if fs::read_link(&manifest.entry).ok().as_ref() != Some(&manifest.target_binary.path) {
@@ -704,6 +944,15 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
             evidence.error = Some("SourceChanged".to_owned());
             &manifest.old_version
         }
+        "command_failed_rolled_back" => {
+            if executed != Err(Error::CommandFailed) {
+                evidence.error = executed.err().map(|error| format!("{error:?}"));
+                return Err("command_failure_not_rolled_back");
+            }
+            evidence.error = Some("CommandFailed".to_owned());
+            &manifest.old_version
+        }
+        "interrupted_recovered" => &manifest.old_version,
         _ => return Err("invalid_expectation"),
     };
     evidence.stage = "inspect_after";
@@ -714,13 +963,31 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
             evidence.error = Some(format!("{error:?}"));
             "inspect_after_failed"
         })?;
+    let failure_expected = matches!(
+        manifest.expected.as_str(),
+        "command_failed_rolled_back" | "interrupted_recovered"
+    );
+    let persisted = previous_failure_for_intent(
+        &journal_root().map_err(|_| "state_unavailable")?,
+        agent,
+        &manifest.entry,
+        &intent,
+        false,
+    )
+    .map_err(|_| "failure_intent_not_persisted")?;
+    evidence.failure_intent_persisted = report.failed_target.as_deref()
+        == failure_expected.then_some(manifest.target_version.as_str())
+        && persisted.as_deref() == failure_expected.then_some(manifest.target_version.as_str());
+    if !evidence.failure_intent_persisted {
+        return Err("failure_intent_not_persisted");
+    }
     evidence.post_version_matches = &report.installed_version == expected_version
         && report.latest_version == manifest.target_version
         && report.source == Source::Native
         && report.error.is_none()
-        && report.up_to_date == (manifest.expected != "source_changed_rejected");
+        && report.up_to_date == matches!(manifest.expected.as_str(), "updated" | "channel_only");
     evidence.entry_matches_expected = binary_sha(&manifest.entry)?
-        == if manifest.expected != "source_changed_rejected" {
+        == if matches!(manifest.expected.as_str(), "updated" | "channel_only") {
             manifest.target_binary.sha256.clone()
         } else {
             manifest.old_binary.sha256.clone()
@@ -730,10 +997,21 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
         && manifest.entry.canonicalize().ok().as_ref() == Some(&manifest.old_binary.path)
         && binary_sha(&manifest.entry)?.as_str() == manifest.old_binary.sha256;
     evidence.supervisor_generations_unchanged = supervisor_generations(root)? == generations_before;
-    if manifest.expected == "channel_only"
-        && (!evidence.entry_unchanged || !evidence.supervisor_generations_unchanged)
+    if matches!(
+        manifest.expected.as_str(),
+        "command_failed_rolled_back" | "interrupted_recovered"
+    ) && evidence.supervisor_generations_unchanged
     {
-        return Err("channel_only_started_update");
+        return Err("native_update_not_started");
+    }
+    if matches!(
+        manifest.expected.as_str(),
+        "channel_only" | "command_failed_rolled_back" | "interrupted_recovered"
+    ) && (!evidence.entry_unchanged || !evidence.supervisor_generations_unchanged)
+    {
+        if manifest.expected == "channel_only" || !evidence.entry_unchanged {
+            return Err("entry_changed_unexpectedly");
+        }
     }
     evidence.production_chain_verified = true;
     Ok(())
@@ -760,7 +1038,11 @@ async fn real_native_update_without_model() {
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
             && matches!(
                 manifest.expected.as_str(),
-                "updated" | "source_changed_rejected" | "channel_only"
+                "updated"
+                    | "source_changed_rejected"
+                    | "channel_only"
+                    | "command_failed_rolled_back"
+                    | "interrupted_recovered"
             )
             && parse_version(&manifest.old_version).is_ok()
             && parse_version(&manifest.target_version).is_ok()
@@ -863,6 +1145,7 @@ async fn real_native_update_without_model() {
         production_chain_verified: false,
         same_source_build_verified: true,
         same_commit_verified_by_runner: false,
+        failure_intent_persisted: false,
     };
     let result = exercise(&manifest, &mut evidence).await;
     evidence.failure_code = result.as_ref().err().copied();
@@ -910,7 +1193,8 @@ async fn real_native_update_without_model() {
         && evidence.journal_absent
         && evidence.entry_matches_expected
         && evidence.post_version_matches
-        && evidence.production_chain_verified;
+        && evidence.production_chain_verified
+        && evidence.failure_intent_persisted;
     if result.is_ok() {
         evidence.stage = "finished";
     }
@@ -963,6 +1247,43 @@ fn snapshot(bytes: Option<&str>) -> ConfigSnapshot {
         bytes: bytes.map(|bytes| bytes.as_bytes().to_vec()),
         mode: bytes.map(|_| 0o600),
     }
+}
+
+#[test]
+fn compiled_source_binding_rejects_a_forged_manifest_digest() {
+    let files = COMPILED_SOURCE_FILES
+        .iter()
+        .map(|(path, bytes)| {
+            serde_json::json!({
+                "path": path,
+                "bytes": bytes.len(),
+                "sha256": sha(bytes),
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut source = serde_json::json!({"files": files});
+    assert!(compiled_source_files_match(&source));
+
+    source["files"][0]["sha256"] = Value::String("0".repeat(64));
+    assert!(!compiled_source_files_match(&source));
+}
+
+#[test]
+fn binary_source_binding_matches_across_read_boundaries() {
+    let directory = tempfile::TempDir::new().unwrap();
+    let path = directory.path().join("supervisor");
+    let mut bytes = vec![b'x'; 1024 * 1024 - 2];
+    bytes.extend_from_slice(b"source-one-middle-source-two");
+    fs::write(&path, bytes).unwrap();
+
+    assert_eq!(
+        binary_contains_all(&path, &[b"source-one".as_slice(), b"source-two".as_slice()]),
+        Ok(true)
+    );
+    assert_eq!(
+        binary_contains_all(&path, &[b"source-one".as_slice(), b"missing".as_slice()]),
+        Ok(false)
+    );
 }
 
 #[test]
@@ -1189,7 +1510,7 @@ fn channel_baseline_rejects_unknown_values_and_wrong_table_shapes() {
 }
 
 #[test]
-fn follow_and_rejected_updates_cannot_declare_channel_mutations() {
+fn follow_rejected_failed_and_interrupted_updates_cannot_declare_channel_mutations() {
     let mut manifest = transition_fixture(
         "claude",
         "follow_installation",
@@ -1202,6 +1523,11 @@ fn follow_and_rejected_updates_cannot_declare_channel_mutations() {
     manifest.channel = "latest".to_owned();
     manifest.expected = "source_changed_rejected".to_owned();
     assert!(!transition_valid(&manifest));
+    manifest.expected = "command_failed_rolled_back".to_owned();
+    assert!(!transition_valid(&manifest));
+    manifest.expected = "interrupted_recovered".to_owned();
+    assert!(!transition_valid(&manifest));
+    manifest.expected = "source_changed_rejected".to_owned();
     manifest.config_transition = None;
     let before = BTreeMap::from([("home/.claude/settings.json", snapshot(Some("{}")))]);
     let after = BTreeMap::from([("home/.claude/settings.json", snapshot(Some("{ }")))]);

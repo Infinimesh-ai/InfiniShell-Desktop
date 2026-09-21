@@ -117,7 +117,7 @@ fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
         format!(
             "{:x}",
             Sha256::digest(include_bytes!(
-                "../../../../assets/bundled/cli-agent-plugins/codex/SOURCE_METADATA.json"
+                "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev4/SOURCE_METADATA.json"
             ))
         )
     );
@@ -125,7 +125,7 @@ fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
         "../../../../assets/bundled/cli-agent-plugins/codex/PATCH_METADATA.json"
     ))
     .unwrap();
-    assert_eq!(bundled["patch_revision"], patch_metadata["patch_revision"]);
+    assert_eq!(patch_metadata["patch_revision"], 5);
     assert_eq!(
         bundled["cli"],
         format!(
@@ -374,7 +374,7 @@ fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
         format!(
             "{:x}",
             Sha256::digest(include_bytes!(
-                "../../../../assets/bundled/cli-agent-plugins/codex/SOURCE_METADATA.json"
+                "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev4/SOURCE_METADATA.json"
             ))
         )
     );

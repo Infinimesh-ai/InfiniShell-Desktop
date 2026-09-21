@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-20T22:38:32Z",
+  "scope": "development_codex_homebrew_upgrade",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "working_tree_dirty": true
+  },
+  "channel": {
+    "requested": "latest",
+    "official_discovery_receipt": "official-85-cli-channel-discovery.safe.json",
+    "target_version": "0.155.1"
+  },
+  "before": {
+    "version_output": "codex-cli 0.154.0",
+    "install_source": "homebrew_cask",
+    "active_matching_processes": 0,
+    "outdated_target": "0.155.1"
+  },
+  "operation": {
+    "command_shape": [
+      "brew",
+      "upgrade",
+      "--cask",
+      "codex"
+    ],
+    "exit_code": 0,
+    "reported_transition": "0.154.0 -> 0.155.1"
+  },
+  "after": {
+    "version_output": "codex-cli 0.155.1",
+    "command_path": "/opt/homebrew/bin/codex",
+    "resolved_path": "/opt/homebrew/Caskroom/codex/0.155.1/bin/codex",
+    "bytes": 228803200,
+    "sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+    "format": "Mach-O 64-bit executable arm64",
+    "homebrew_archive_sha256": "e6e08717da9e35b72332eff753527fe79a9ae876081033c5c6820a8e5f58b943",
+    "homebrew_url": "https://github.com/openai/codex/releases/download/rust-v0.155.1/codex-package-aarch64-apple-darwin.tar.gz",
+    "codesign_strict": true,
+    "codesign_identifier": "codex",
+    "codesign_team_identifier": "2DC432GLL2",
+    "codesign_cdhash": "0fc5f92c54ae7e1d576cd1d7d8ce979daec5bee2",
+    "homebrew_outdated_entries": 0
+  },
+  "result": {
+    "development_environment_aligned": true,
+    "product_autoupdate_executed": false,
+    "managed_lifecycle_executed": false,
+    "full_goal_passed": false
+  },
+  "limitations": [
+    "This receipt proves only the existing Homebrew installation was upgraded to the then-current official latest channel.",
+    "It does not execute the InfiniShell consumer autoupdate transaction or prove rollback, restart recovery, managed tasks, GUI, SSH/tmux, or cross-platform behavior.",
+    "The source working tree is not frozen or committed."
+  ]
+}

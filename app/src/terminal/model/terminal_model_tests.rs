@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{DateTime, Local};
+use sha2::{Digest, Sha256};
 use vec1::vec1;
 use warp_core::command::ExitCode;
 use warp_core::features::FeatureFlag;
@@ -2308,4 +2309,187 @@ fn test_synchronized_output_sharing_session_split_batch() {
         panic!("Expected PtyBytesRead, got {:?}", events[3]);
     };
     assert_eq!(bytes.as_slice(), b"after");
+}
+
+fn active_marked_text(terminal: &TerminalModel) -> Option<&str> {
+    terminal
+        .block_list()
+        .active_block()
+        .output_grid()
+        .grid_handler()
+        .marked_text()
+}
+
+#[test]
+fn terminal_marked_text_respects_the_feature_gate() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("cat", "");
+    let _ime_marked_text = FeatureFlag::ImeMarkedText.override_enabled(false);
+
+    terminal.set_marked_text("nihao", &(5..5));
+
+    assert_eq!(active_marked_text(&terminal), None);
+}
+
+#[test]
+fn terminal_marked_text_preserves_mixed_cjk_preedit_until_clear() {
+    let mut terminal = TerminalModel::mock(None, None);
+    terminal.simulate_long_running_block("cat", "");
+    let _ime_marked_text = FeatureFlag::ImeMarkedText.override_enabled(true);
+    let preedit = "nihao / 你好 / かな";
+
+    terminal.set_marked_text(preedit, &(5..5));
+    assert_eq!(active_marked_text(&terminal), Some(preedit));
+
+    terminal.clear_marked_text();
+    assert_eq!(active_marked_text(&terminal), None);
+}
+
+#[test]
+fn terminal_marked_text_is_wired_through_the_terminal_view_action_entry() {
+    let source = include_str!("../view.rs");
+    let handler_start = source
+        .find("fn set_marked_text_on_terminal")
+        .expect("TerminalView 应实现终端 marked-text 入口");
+    let handler_end = source[handler_start..]
+        .find("fn clear_marked_text_on_terminal")
+        .map(|offset| handler_start + offset)
+        .expect("TerminalView marked-text 入口应有明确边界");
+    let handler = source[handler_start..handler_end]
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        handler.contains("if !FeatureFlag::ImeMarkedText.is_enabled() { return; }"),
+        "TerminalView 的真实输入入口应遵守 IME feature gate"
+    );
+    assert!(
+        handler.contains(".lock() .set_marked_text(marked_text, selected_range);"),
+        "TerminalView 的真实输入入口应把 preedit 传给 TerminalModel"
+    );
+
+    let action_start = source
+        .find("fn handle_action(&mut self, action: &TerminalAction")
+        .expect("TerminalView 应处理 TerminalAction");
+    let action_handler = source[action_start..]
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        action_handler.contains(
+            "SetMarkedText { marked_text, selected_range, } => self.set_marked_text_on_terminal(marked_text, selected_range, ctx),"
+        ),
+        "TerminalAction::SetMarkedText 应路由到受门禁保护的终端入口"
+    );
+    assert!(
+        action_handler.contains("ClearMarkedText => self.clear_marked_text_on_terminal(ctx),"),
+        "TerminalAction::ClearMarkedText 应路由到终端清理入口"
+    );
+}
+
+#[test]
+#[ignore = "需要由 SSH/tmux 实机探针生成的私有原始字节收据"]
+fn live_remote_codex_ssh_tmux_bytes_reach_product_osc_parser() {
+    use crate::terminal::cli_agent_sessions::event::{
+        CLIAgentEventSource, CLIAgentEventType, parse_event,
+    };
+
+    let input_path = std::env::var("INFINISHELL_REMOTE_CODEX_RECEIPT")
+        .expect("必须提供 SSH/tmux 私有原始字节收据路径");
+    let input_bytes = fs::read(&input_path).expect("无法读取 SSH/tmux 私有收据");
+    let input: serde_json::Value =
+        serde_json::from_slice(&input_bytes).expect("SSH/tmux 私有收据不是 JSON");
+    assert_eq!(input["remote_transport_passed"], true);
+    assert_eq!(input["official_codex_hook_control_tty_compatible"], true);
+
+    let _pluggable_notifications = FeatureFlag::PluggableNotifications.override_enabled(true);
+    let mut summaries = Vec::new();
+    for case in input["cases"].as_array().expect("收据缺少 cases") {
+        let mode = case["mode"].as_str().expect("case 缺少 mode");
+        let raw = base64::Engine::decode(
+            &BASE64,
+            case["ssh_stdout_base64"]
+                .as_str()
+                .expect("case 缺少 SSH 原始字节"),
+        )
+        .expect("SSH 原始字节不是 base64");
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&raw)),
+            case["ssh_stdout_sha256"].as_str().expect("case 缺少摘要")
+        );
+
+        let (event_tx, event_rx) = async_channel::unbounded();
+        let listener = ChannelEventListener::builder_for_test()
+            .with_terminal_events_tx(event_tx)
+            .build();
+        let mut terminal = TerminalModel::mock(None, Some(listener));
+        while event_rx.try_recv().is_ok() {}
+        terminal.process_bytes(raw.as_slice());
+
+        let notifications: Vec<_> = std::iter::from_fn(|| event_rx.try_recv().ok())
+            .filter_map(|event| match event {
+                Event::PluggableNotification { title, body } => Some((title, body)),
+                _ => None,
+            })
+            .collect();
+        let parsed: Vec<_> = notifications
+            .iter()
+            .filter_map(|(title, body)| parse_event(title.as_deref(), body))
+            .collect();
+        let expected = if mode == "tmux-off" { 0 } else { 2 };
+        assert_eq!(parsed.len(), expected, "{mode} 的产品解析事件数不符");
+
+        if expected != 0 {
+            assert!(parsed.iter().all(|event| {
+                event.agent == crate::terminal::CLIAgent::Codex
+                    && event.source == CLIAgentEventSource::RichPlugin
+                    && event.session_id.as_deref() == case["native_session_id"].as_str()
+            }));
+            assert!(
+                parsed
+                    .iter()
+                    .any(|event| { event.event == CLIAgentEventType::SessionStart })
+            );
+            let prompt = parsed
+                .iter()
+                .find(|event| event.event == CLIAgentEventType::PromptSubmit)
+                .expect("缺少 prompt_submit");
+            assert_eq!(
+                prompt.payload.turn_id.as_deref(),
+                case["native_turn_id"].as_str()
+            );
+        }
+        summaries.push(serde_json::json!({
+            "mode": mode,
+            "ssh_stdout_sha256": case["ssh_stdout_sha256"],
+            "pluggable_notifications": notifications.len(),
+            "parsed_cli_agent_events": parsed.len(),
+            "passed": parsed.len() == expected,
+        }));
+    }
+
+    if let Ok(output_path) = std::env::var("INFINISHELL_REMOTE_CODEX_PRODUCT_RECEIPT") {
+        let receipt = serde_json::json!({
+            "scope": "official Codex SSH/tmux bytes -> TerminalModel OSC 777 -> parse_event",
+            "source_commit": input["source_commit"],
+            "source_tree_dirty": input["source_tree_dirty"],
+            "host_alias": input["host_alias"],
+            "codex_version": input["remote_inputs"]["codex_version"],
+            "input_private_receipt_sha256": format!("{:x}", Sha256::digest(&input_bytes)),
+            "official_codex_hook_control_tty_compatible": true,
+            "remote_transport_passed": true,
+            "product_terminal_model_osc_parser_verified": true,
+            "product_terminal_view_ui_verified": false,
+            "cases": summaries,
+            "passed": true,
+        });
+        let mut output = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(output_path)
+            .expect("产品解析收据必须是新文件");
+        let encoded = serde_json::to_vec_pretty(&receipt).expect("无法编码产品解析收据");
+        std::io::Write::write_all(&mut output, &encoded).expect("无法写入产品解析收据");
+        std::io::Write::write_all(&mut output, b"\n").expect("无法结束产品解析收据");
+    }
 }

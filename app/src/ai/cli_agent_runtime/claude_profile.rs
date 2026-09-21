@@ -24,6 +24,11 @@ const BLOCKED_TOOLS: [&str; 10] = [
     "Computer",
 ];
 
+// 受限模式保留默认账户认证；空设置来源隔离用户、项目与本地设置，管理员策略仍由 CLI 强制应用。
+pub(super) const ISOLATED_SETTINGS_ARGUMENTS: [&str; 2] = ["--restricted", "--setting-sources="];
+pub(super) const FIXED_PERMISSION_MODE_ARGUMENT: &str = "--permission-mode=manual";
+pub(super) const FIXED_PROTOCOL_PERMISSION_MODE: &str = "default";
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct ClaudeRestrictedFilesV1 {
@@ -204,6 +209,9 @@ impl ClaudeRestrictedFilesV1 {
         {
             return Err(reject("claude_profile_identity_invalid"));
         }
+        if !self.deny_rules.is_empty() || !self.source_rules.is_empty() {
+            return Err(reject("claude_profile_legacy_settings_source"));
+        }
         for rule in &self.deny_rules {
             validate_deny(rule)?;
         }
@@ -263,15 +271,17 @@ impl ClaudeRestrictedFilesV1 {
     }
 
     pub(super) fn arguments(&self) -> Vec<String> {
-        let mut arguments = vec![
-            "--bare".into(),
-            "--restricted".into(),
-            "--permission-mode=plan".into(),
-            "--tools=Read,Edit".into(),
-            "--strict-mcp-config".into(),
-            "--disable-slash-commands".into(),
-            format!("--settings={}", self.fixed_settings()),
-        ];
+        let mut arguments = ISOLATED_SETTINGS_ARGUMENTS
+            .into_iter()
+            .map(str::to_owned)
+            .chain([
+                FIXED_PERMISSION_MODE_ARGUMENT.into(),
+                "--tools=Read,Edit".into(),
+                "--strict-mcp-config".into(),
+                "--disable-slash-commands".into(),
+                format!("--settings={}", self.fixed_settings()),
+            ])
+            .collect::<Vec<_>>();
         // 该变长参数只出现一次，避免后一个选项覆盖前一个拒绝列表。
         arguments.push("--disallowedTools".into());
         arguments.extend(BLOCKED_TOOLS.into_iter().map(str::to_owned));
@@ -316,9 +326,6 @@ impl ClaudeRestrictedFilesV1 {
             }) {
                 return Err(reject("claude_profile_cli_deny_missing"));
             }
-        }
-        if hooks.get("bareMode").and_then(Value::as_object).is_none() {
-            return Err(reject("claude_profile_bare_mode_unconfirmed"));
         }
         let servers = mcp["mcpServers"]
             .as_array()
@@ -433,7 +440,7 @@ impl ClaudeRestrictedFilesV1 {
     }
 
     pub(super) fn verify_system_init(&self, message: &Value) -> Result<(), RuntimeError> {
-        if message["permissionMode"] != "plan" {
+        if message["permissionMode"] != FIXED_PROTOCOL_PERMISSION_MODE {
             return Err(reject("claude_profile_mode_changed"));
         }
         let mut allowed = BTreeSet::from([
@@ -523,7 +530,9 @@ fn validate_settings(value: &Value, fixed: bool) -> Result<(), RuntimeError> {
         if name == "policySettings" && !settings.is_empty() {
             return Err(reject("claude_profile_admin_policy_unverified"));
         }
-        if fixed && !matches!(name, "flagSettings" | "policySettings") {
+        if (fixed && !matches!(name, "flagSettings" | "policySettings"))
+            || (!fixed && name != "policySettings")
+        {
             return Err(reject("claude_profile_unexpected_settings_source"));
         }
         if !matches!(

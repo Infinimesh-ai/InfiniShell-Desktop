@@ -27,7 +27,7 @@ fn reply(protocol: &mut ClaudeProtocol, request: &Value, response: Value) -> Eff
 }
 
 fn initialize() -> Value {
-    json!({"pid":42,"session_state":"idle","current_permission_mode":"plan"})
+    json!({"pid":42,"session_state":"idle","current_permission_mode":"default"})
 }
 
 fn finish_check(protocol: &mut ClaudeProtocol, request: &Value) -> Effects {
@@ -65,6 +65,46 @@ fn action(id: u128, action: RuntimeAction) -> RuntimeCommand {
         message_id: Uuid::from_u128(id),
         action,
     }
+}
+
+fn has_host_permission_prompts(arguments: &[String]) -> bool {
+    arguments
+        .windows(2)
+        .any(|values| values[0] == "--permission-prompt-tool" && values[1] == "stdio")
+        && arguments
+            .windows(2)
+            .any(|values| values[0] == "--permission-prompts" && values[1] == "host")
+}
+
+#[test]
+fn fixed_profile_launch_uses_manual_host_approval_without_allowed_tools() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = std::fs::canonicalize(directory.path()).unwrap();
+    let arguments = launch_arguments(&protocol(&cwd).options);
+    assert!(has_host_permission_prompts(&arguments));
+    assert_eq!(
+        arguments
+            .iter()
+            .filter(|argument| argument.as_str() == "--permission-mode=manual")
+            .count(),
+        1
+    );
+    assert!(!arguments.iter().any(|argument| {
+        argument.starts_with("--allowedTools") || argument.starts_with("--allowed-tools")
+    }));
+
+    let without_host = arguments
+        .iter()
+        .filter(|argument| argument.as_str() != "host")
+        .cloned()
+        .collect::<Vec<_>>();
+    let without_stdio = arguments
+        .iter()
+        .filter(|argument| argument.as_str() != "stdio")
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(!has_host_permission_prompts(&without_host));
+    assert!(!has_host_permission_prompts(&without_stdio));
 }
 
 #[test]
@@ -110,15 +150,17 @@ fn failed_fixed_profile_check_never_releases_the_pending_input() {
 
 #[test]
 fn fixed_profile_mode_change_does_not_become_a_new_ready_event() {
-    let directory = tempfile::tempdir().unwrap();
-    let cwd = std::fs::canonicalize(directory.path()).unwrap();
-    let mut protocol = protocol(&cwd);
-    ready(&mut protocol);
-    assert!(
-        protocol
-            .receive(json!({"type":"system","subtype":"status","permissionMode":"acceptEdits"}))
-            .is_err()
-    );
+    for mode in ["plan", "dontAsk", "acceptEdits", "auto"] {
+        let directory = tempfile::tempdir().unwrap();
+        let cwd = std::fs::canonicalize(directory.path()).unwrap();
+        let mut protocol = protocol(&cwd);
+        ready(&mut protocol);
+        assert!(
+            protocol
+                .receive(json!({"type":"system","subtype":"status","permissionMode":mode}))
+                .is_err()
+        );
+    }
 }
 
 #[test]

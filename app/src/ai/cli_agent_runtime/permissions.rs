@@ -146,7 +146,7 @@ pub(crate) fn ceiling_from_parent(
             })
         }
         "grok"
-            if config["cli_version"] == "1.0.30"
+            if matches!(config["cli_version"].as_str(), Some("1.0.30" | "1.0.34"))
                 && matches!(
                     config["permission_policy"].as_str(),
                     Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
@@ -158,7 +158,10 @@ pub(crate) fn ceiling_from_parent(
             let profile: GrokCreationPolicyV1 =
                 serde_json::from_value(config["grok_profile"].clone()).map_err(|_| reject())?;
             profile.validate()?;
-            if config["permission_policy"] != json!(profile.permission_policy())
+            if !config["cli_version"]
+                .as_str()
+                .is_some_and(|version| profile.matches_cli_version(version))
+                || config["permission_policy"] != json!(profile.permission_policy())
                 || observed["requestedPolicy"] != json!(profile.permission_policy())
                 || profile.working_directory()
                     != Path::new(&parent.working_directory)

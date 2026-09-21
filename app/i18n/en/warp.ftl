@@ -5742,6 +5742,7 @@ cli-agent-message-local-only = Local task messaging is unavailable for this conv
 cli-agent-standalone-harness-unavailable = This agent command cannot launch { $cli }. Run it in a terminal or use the local CLI task manager.
 cli-agent-message-recipient-unavailable = The recipient has no active managed connection. Resume or reconnect the task first.
 cli-agent-message-delivery-failed = The task message was not accepted. Check the saved message status before retrying.
+cli-agent-local-tool-concurrency-limit = Too many local tool requests are running at once.
 cli-agent-grok-managed-unverified = This Grok operation or policy is unavailable. Child tasks require a matching fixed read or file policy. Managed images are unavailable; skills require Inherit and a matching skill in the current session.
 cli-agent-grok-managed-login-required = Sign in to Grok or configure an API key in Grok before checking the managed connection.
 cli-agent-grok-output-unverified = Grok ended the turn, but its complete output could not be verified. The received output is preserved.

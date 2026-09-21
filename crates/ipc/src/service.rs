@@ -4,6 +4,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::protocol::Message;
+use crate::protocol::ProtocolError;
 use crate::{Client, ClientError};
 
 pub(crate) type ServiceId = String;
@@ -87,13 +88,30 @@ where
 {
     /// Sends the given request and returns a `Result` containing its response.
     async fn call(&self, request: S::Request) -> Result<S::Response, ClientError> {
-        let request_bytes = bincode::serialize(&request).expect("Failed to serialize request.");
+        if let Some(max_frame_bytes) = self.client.max_frame_bytes() {
+            let serialized_size = bincode::serialized_size(&request)
+                .map_err(ProtocolError::Serialization)
+                .map_err(ClientError::InternalProtocol)?;
+            let frame_bytes = usize::try_from(serialized_size).unwrap_or(usize::MAX);
+            if frame_bytes > max_frame_bytes {
+                return Err(ClientError::InternalProtocol(
+                    ProtocolError::FrameTooLarge {
+                        frame_bytes,
+                        max_frame_bytes,
+                    },
+                ));
+            }
+        }
+        let request_bytes = bincode::serialize(&request)
+            .map_err(ProtocolError::Serialization)
+            .map_err(ClientError::InternalProtocol)?;
         self.client
             .send_request::<S>(request_bytes)
             .await
-            .map(|response_bytes| {
+            .and_then(|response_bytes| {
                 bincode::deserialize::<S::Response>(&response_bytes[..])
-                    .expect("Failed to deserialize response.")
+                    .map_err(ProtocolError::Serialization)
+                    .map_err(ClientError::InternalProtocol)
             })
     }
 }

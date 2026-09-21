@@ -1,8 +1,12 @@
 use super::*;
 
-fn settings(deny: Vec<String>, ask: Vec<String>) -> Value {
+fn external_settings(source: &str, deny: Vec<String>, ask: Vec<String>) -> Value {
     let permissions = json!({"deny":deny,"ask":ask});
-    json!({"effective":{"permissions":permissions},"sources":[{"source":"userSettings","settings":{"permissions":permissions}}]})
+    json!({"effective":{"permissions":permissions},"sources":[{"source":source,"settings":{"permissions":permissions}}]})
+}
+
+fn isolated_settings() -> Value {
+    json!({"effective":{},"sources":[]})
 }
 
 fn rules(cwd: &Path, rows: Value) -> Value {
@@ -10,7 +14,7 @@ fn rules(cwd: &Path, rows: Value) -> Value {
 }
 
 fn hooks() -> Value {
-    json!({"hooks":[],"policy":{"policyHookCount":0},"bareMode":{"exitHint":"restart without --bare"}})
+    json!({"hooks":[],"policy":{"policyHookCount":0}})
 }
 
 fn profile(cwd: &Path) -> ClaudeRestrictedFilesV1 {
@@ -18,7 +22,7 @@ fn profile(cwd: &Path) -> ClaudeRestrictedFilesV1 {
         cwd,
         "a".repeat(64),
         None,
-        &settings(vec![], vec![]),
+        &isolated_settings(),
         &rules(cwd, json!([])),
         &hooks(),
     )
@@ -26,44 +30,44 @@ fn profile(cwd: &Path) -> ClaudeRestrictedFilesV1 {
 }
 
 #[test]
-fn fixed_file_policy_preserves_exact_source_denies_and_rejects_missing_live_rules() {
+fn isolated_source_contract_rejects_user_project_and_local_settings() {
     let directory = std::env::temp_dir();
     let cwd = directory.as_path();
-    let settings = settings(vec!["Read(//private/secret)".into()], vec!["Edit".into()]);
-    let rows = json!([
-        {"source":"userSettings","behavior":"deny","rule":"Read(//private/secret)"},
-        {"source":"userSettings","behavior":"ask","rule":"Edit"}
-    ]);
-    let profile = ClaudeRestrictedFilesV1::compile(
-        cwd,
-        "a".repeat(64),
-        None,
-        &settings,
-        &rules(cwd, rows),
-        &hooks(),
-    )
-    .unwrap();
-    assert_eq!(profile.deny_rules, vec!["Read(//private/secret)"]);
-    assert!(
-        ClaudeRestrictedFilesV1::compile(
-            cwd,
-            "a".repeat(64),
-            None,
-            &settings,
-            &rules(cwd, json!([])),
-            &hooks()
-        )
-        .is_err()
-    );
+    for source in ["userSettings", "projectSettings", "localSettings"] {
+        assert!(
+            ClaudeRestrictedFilesV1::compile(
+                cwd,
+                "a".repeat(64),
+                None,
+                &external_settings(source, vec!["Read(//private/secret)".into()], vec![]),
+                &rules(
+                    cwd,
+                    json!([{"source":source,"behavior":"deny","rule":"Read(//private/secret)"}])
+                ),
+                &hooks()
+            )
+            .is_err()
+        );
+    }
+    let profile = profile(cwd);
     let arguments = profile.arguments();
-    assert_eq!(
+    assert!(
+        ISOLATED_SETTINGS_ARGUMENTS
+            .iter()
+            .all(|argument| arguments.iter().any(|value| value == argument))
+    );
+    assert!(!arguments.iter().any(|argument| argument == "--bare"));
+    assert!(
         arguments
             .iter()
-            .filter(|value| value.as_str() == "--disallowedTools")
-            .count(),
-        1
+            .any(|argument| argument == "--permission-mode=manual")
     );
-    assert!(arguments.contains(&"Read(//private/secret)".to_owned()));
+    assert!(!arguments.iter().any(|argument| {
+        argument == "--permission-mode=plan"
+            || argument == "--permission-mode=default"
+            || argument.starts_with("--allowedTools")
+            || argument.starts_with("--allowed-tools")
+    }));
 }
 
 #[test]
@@ -74,7 +78,7 @@ fn read_ask_is_not_silently_promoted_to_automatic_read() {
         cwd,
         "a".repeat(64),
         None,
-        &settings(vec![], vec!["Read".into()]),
+        &external_settings("userSettings", vec![], vec!["Read".into()]),
         &rules(
             cwd,
             json!([{"source":"userSettings","behavior":"ask","rule":"Read"}]),
@@ -101,6 +105,32 @@ fn incomplete_admin_and_hook_boundaries_reject_only_the_affected_configuration()
         )
         .is_err()
     );
+    let unreadable_settings =
+        json!({"effective":{},"sources":[],"errors":[{"source":"policySettings"}]});
+    assert!(
+        ClaudeRestrictedFilesV1::compile(
+            cwd,
+            "a".repeat(64),
+            None,
+            &unreadable_settings,
+            &rules(cwd, json!([])),
+            &hooks()
+        )
+        .is_err()
+    );
+    let unreadable_policy =
+        json!({"hooks":[],"policy":{"policyHookCount":0,"policyUnreadable":true}});
+    assert!(
+        ClaudeRestrictedFilesV1::compile(
+            cwd,
+            "a".repeat(64),
+            None,
+            &isolated_settings(),
+            &rules(cwd, json!([])),
+            &unreadable_policy
+        )
+        .is_err()
+    );
     let hook =
         json!({"hooks":[{"source":"userSettings","disabled":true}],"policy":{"policyHookCount":0}});
     assert!(
@@ -108,7 +138,7 @@ fn incomplete_admin_and_hook_boundaries_reject_only_the_affected_configuration()
             cwd,
             "a".repeat(64),
             None,
-            &settings(vec![], vec![]),
+            &isolated_settings(),
             &rules(cwd, json!([])),
             &hook
         )
@@ -311,7 +341,7 @@ fn canonical_workspace_is_persisted_and_symlink_retargeting_never_moves_its_scop
         &alias,
         "a".repeat(64),
         None,
-        &settings(vec![], vec![]),
+        &isolated_settings(),
         &rules(&canonical, json!([])),
         &hooks(),
     )
@@ -360,47 +390,49 @@ fn windows_extended_canonical_prefix_does_not_reject_a_normal_workspace_path() {
 }
 
 #[test]
-fn native_mode_or_unexpected_execution_tool_invalidates_the_fixed_profile() {
+fn only_manuals_native_default_mode_and_the_narrow_tool_set_are_accepted() {
     let directory = std::env::temp_dir();
     let profile = profile(&directory);
     profile
-        .verify_system_init(&json!({"permissionMode":"plan","tools":["Read","Edit"]}))
+        .verify_system_init(&json!({"permissionMode":"default","tools":["Read","Edit"]}))
         .unwrap();
+    for mode in ["plan", "dontAsk", "acceptEdits", "auto"] {
+        assert!(
+            profile
+                .verify_system_init(&json!({"permissionMode":mode,"tools":["Read","Edit"]}))
+                .is_err()
+        );
+    }
     assert!(
         profile
-            .verify_system_init(&json!({"permissionMode":"acceptEdits","tools":["Read","Edit"]}))
-            .is_err()
-    );
-    assert!(
-        profile
-            .verify_system_init(&json!({"permissionMode":"plan","tools":["Read","Edit","Bash"]}))
+            .verify_system_init(&json!({"permissionMode":"default","tools":["Read","Edit","Bash"]}))
             .is_err()
     );
 }
 
 #[test]
-fn wildcard_deny_is_preserved_and_unknown_tool_globs_are_rejected() {
+fn legacy_user_denies_and_unknown_tool_globs_cannot_reenter_the_profile() {
     let cwd = std::env::temp_dir();
-    let all_denied = ClaudeRestrictedFilesV1::compile(
-        &cwd,
-        "a".repeat(64),
-        None,
-        &settings(vec!["*".into()], vec![]),
-        &rules(
-            &cwd,
-            json!([{"source":"userSettings","behavior":"deny","rule":"*"}]),
-        ),
-        &hooks(),
-    )
-    .unwrap();
-    assert_eq!(all_denied.deny_rules, vec!["*"]);
-    assert!(!all_denied.approval_allowed("Edit", &json!({"file_path":cwd.join("new.txt")})));
     assert!(
         ClaudeRestrictedFilesV1::compile(
             &cwd,
             "a".repeat(64),
             None,
-            &settings(vec!["Read*".into()], vec![]),
+            &external_settings("userSettings", vec!["*".into()], vec![]),
+            &rules(
+                &cwd,
+                json!([{"source":"userSettings","behavior":"deny","rule":"*"}]),
+            ),
+            &hooks(),
+        )
+        .is_err()
+    );
+    assert!(
+        ClaudeRestrictedFilesV1::compile(
+            &cwd,
+            "a".repeat(64),
+            None,
+            &external_settings("userSettings", vec!["Read*".into()], vec![]),
             &rules(
                 &cwd,
                 json!([{"source":"userSettings","behavior":"deny","rule":"Read*"}])

@@ -6,7 +6,12 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use uuid::Uuid;
 
-use super::{GrokProtocol, REQUEST_TIMEOUT, flush_effects, validate_options, verified_version};
+use super::{
+    Effects, GrokProtocol, REQUEST_TIMEOUT, flush_effects, supported_version, validate_options,
+    verified_version,
+};
+use crate::ai::cli_agent_runtime::grok_profile::GrokCreationPolicyV1;
+use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
 use crate::ai::cli_agent_runtime::local_tools::LocalToolPermissions;
 use crate::ai::cli_agent_runtime::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError,
@@ -48,6 +53,142 @@ fn fixture_response(id: u64) -> Value {
         .unwrap()
 }
 
+fn current_initialize() -> Value {
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.40");
+    initialize
+}
+
+fn current_setup_messages(session_id: &str) -> Vec<Value> {
+    super::CURRENT_SETUP_PHASES
+        .iter()
+        .enumerate()
+        .map(|(index, phase)| {
+            json!({
+                "jsonrpc": "2.0",
+                "method": super::CURRENT_SETUP_METHOD,
+                "params": {
+                    "method": "session/new",
+                    "phase": phase,
+                    "sessionId": if index < 5 { Value::Null } else { json!(session_id) }
+                }
+            })
+        })
+        .collect()
+}
+
+fn current_waiting_for_setup() -> GrokProtocol {
+    let mut protocol = GrokProtocol::new(options());
+    protocol
+        .bind_cli_version("grok 1.0.40 (eb1a2256660d)")
+        .unwrap();
+    protocol.initialize().unwrap();
+    protocol.receive(current_initialize()).unwrap();
+    protocol
+        .receive(json!({
+            "jsonrpc": "2.0",
+            "method": "_x.ai/mcp/servers_updated",
+            "params": {"mcpServers": []}
+        }))
+        .unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    protocol
+}
+
+fn current_display_notifications() -> Vec<Value> {
+    let fixture = authenticated_fixture();
+    let mut messages = vec![
+        fixture
+            .iter()
+            .find(|message| message["method"] == "_x.ai/models/update")
+            .unwrap()
+            .clone(),
+        fixture
+            .iter()
+            .find(|message| message["method"] == "_x.ai/settings/update")
+            .unwrap()
+            .clone(),
+    ];
+    messages.extend(
+        fixture
+            .into_iter()
+            .filter(|message| message["method"] == "_x.ai/announcements/update")
+            .take(2),
+    );
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    messages.push(current_command_catalog(&session_id));
+    assert_eq!(messages.len(), 5);
+    messages
+}
+
+fn current_command_catalog(session_id: &str) -> Value {
+    const COMMAND_HAS_META: [bool; 29] = [
+        false, false, false, false, false, true, false, false, false, true, true, true, true, true,
+        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    ];
+    const COMMAND_HAS_INPUT: [bool; 29] = [
+        true, true, false, false, true, true, true, true, true, true, false, false, false, true,
+        true, false, false, true, true, false, true, true, true, true, true, false, false, false,
+        true,
+    ];
+    let commands = COMMAND_HAS_META
+        .iter()
+        .zip(COMMAND_HAS_INPUT)
+        .enumerate()
+        .map(|(index, (has_meta, has_input))| {
+            let mut command = json!({
+                "name": format!("command-{index}"),
+                "description": "固定握手目录描述",
+                "input": if has_input { json!({}) } else { Value::Null },
+            });
+            if *has_meta {
+                command["_meta"] = json!({});
+            }
+            command
+        })
+        .collect::<Vec<_>>();
+    let tools = (0..27)
+        .map(|index| format!("tool-{index}"))
+        .collect::<Vec<_>>();
+    json!({
+        "jsonrpc":"2.0",
+        "method":"session/update",
+        "params":{
+            "sessionId":session_id,
+            "_meta":{
+                "agentTimestampMs":1,
+                "eventId":format!("{session_id}-2"),
+                "totalTokens":0,
+                "updateParams":{},
+                "updateType":"available_commands_update"
+            },
+            "update":{
+                "sessionUpdate":"available_commands_update",
+                "availableCommands":commands,
+                "_meta":{"tools":tools}
+            }
+        }
+    })
+}
+
+fn current_waiting_for_display_notifications() -> GrokProtocol {
+    let mut protocol = current_waiting_for_setup();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for message in &setup[..5] {
+        protocol.receive(message.clone()).unwrap();
+    }
+    protocol.receive(fixture_response(3)).unwrap();
+    protocol.receive(setup[5].clone()).unwrap();
+    protocol
+}
+
 fn ready_protocol() -> GrokProtocol {
     let mut protocol = GrokProtocol::from_fixture(options());
     protocol.initialize().unwrap();
@@ -67,11 +208,20 @@ fn only_exact_observed_cli_versions_are_accepted() {
         verified_version("grok 1.0.34 (3736acbc8658)\n"),
         Some("1.0.34")
     );
+    assert_eq!(
+        verified_version("grok 1.0.40 (eb1a2256660d)\n"),
+        Some("1.0.40")
+    );
     assert_eq!(verified_version("grok 1.0.29 (other)"), None);
     assert_eq!(verified_version("grok 1.0.31"), None);
     assert_eq!(verified_version("grok 1.0.35"), None);
     assert_eq!(verified_version("grok 1.0.30-beta"), None);
     assert_eq!(verified_version("grok 1.0.34-alpha"), None);
+    assert_eq!(verified_version("grok 1.0.40-alpha"), None);
+    assert!(supported_version("1.0.30"));
+    assert!(supported_version("1.0.34"));
+    assert!(supported_version("1.0.40"));
+    assert!(!supported_version("1.0.41"));
 }
 
 #[test]
@@ -118,14 +268,36 @@ fn a_probe_cannot_replace_the_version_after_initialization() {
 }
 
 #[test]
-fn latest_version_does_not_enable_fixed_profiles_or_local_tool_leases() {
+fn p0_version_enables_only_the_receipted_fixed_read_scope() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
     let mut fixed = options();
+    fixed.cwd.clone_from(&cwd);
     fixed.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    fixed.grok_profile = Some(
+        GrokCreationPolicyV1::compile(
+            &cwd,
+            "1.0.34",
+            "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e".into(),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedReadV1,
+        )
+        .unwrap(),
+    );
+    let mut fixed = GrokProtocol::new(fixed);
+    fixed.bind_cli_version("grok 1.0.34").unwrap();
+    assert!(fixed.fixed_read_policy_verified());
+    assert!(!fixed.extended_lifecycle_verified());
+
+    let mut missing_profile = options();
+    missing_profile.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
     assert!(
-        GrokProtocol::new(fixed)
+        GrokProtocol::new(missing_profile)
             .bind_cli_version("grok 1.0.34")
             .is_err()
     );
+
     let mut files = options();
     files.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
     assert!(
@@ -143,10 +315,21 @@ fn latest_version_does_not_enable_fixed_profiles_or_local_tool_leases() {
             .bind_cli_version("grok 1.0.34")
             .is_err()
     );
+
+    let mut skills = options();
+    skills.selected_skills.push(SelectedLocalSkill {
+        name: "not-opened".into(),
+        path: skills.cwd.join("SKILL.md"),
+    });
+    assert!(
+        GrokProtocol::new(skills)
+            .bind_cli_version("grok 1.0.34")
+            .is_err()
+    );
 }
 
 #[test]
-fn latest_synthetic_handshake_claims_only_the_native_p0_verified_capabilities() {
+fn p0_synthetic_handshake_claims_only_the_native_p0_verified_capabilities() {
     let mut protocol = GrokProtocol::new(options());
     protocol
         .bind_cli_version("grok 1.0.34 (3736acbc8658)")
@@ -172,6 +355,16 @@ fn latest_synthetic_handshake_claims_only_the_native_p0_verified_capabilities() 
     assert_eq!(
         effective_permissions["reportedCapabilities"]["promptCapabilities"]["image"],
         false
+    );
+    assert_eq!(
+        effective_permissions["reportedInitializeExtensions"],
+        json!({
+            "queueChangeNotifications": false,
+            "queueInterjectRequests": false,
+            "skillsMethods": false,
+            "availableCommands": true,
+            "localMcpSdkAdvertised": true
+        })
     );
     assert_eq!(
         effective_permissions["verifiedCapabilities"],
@@ -251,6 +444,633 @@ fn latest_synthetic_handshake_claims_only_the_native_p0_verified_capabilities() 
 }
 
 #[test]
+fn current_authenticated_shape_opens_only_after_the_exact_setup_sequence() {
+    let mut protocol = current_waiting_for_setup();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for setup in &setup[..5] {
+        let effects = protocol.receive(setup.clone()).unwrap();
+        assert!(effects.writes.is_empty() && effects.events.is_empty());
+    }
+    let response = protocol.receive(fixture_response(3)).unwrap();
+    assert!(response.writes.is_empty() && response.events.is_empty());
+    protocol.receive(setup[5].clone()).unwrap();
+    for notification in current_display_notifications() {
+        protocol.receive(notification).unwrap();
+    }
+    let mut ready = Effects::default();
+    for setup in &setup[6..] {
+        let effects = protocol.receive(setup.clone()).unwrap();
+        ready = effects;
+    }
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+            verified_cli_version,
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("当前版本精确 setup 完成后应返回就绪状态");
+    };
+    assert_eq!(verified_cli_version.as_deref(), Some("1.0.40"));
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"],
+        json!({
+            "newSession": true, "emptyHistoryRecovery": false, "closeSession": false,
+            "submit": false, "queuedSubmit": false, "steer": false, "approval": false,
+            "cancel": false, "resume": false, "localTools": false, "childTasks": false
+        })
+    );
+    assert!(protocol.current_setup.is_none());
+    let rejected = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("未验收的当前版本回合".into())],
+        },
+    });
+    assert!(rejected.writes.is_empty());
+    assert!(matches!(
+        rejected.events.as_slice(),
+        [RuntimeEventKind::RequestFailed { .. }]
+    ));
+}
+
+#[test]
+fn current_root_candidate_is_confined_to_the_ignored_live_harness() {
+    let mut protocol = current_waiting_for_setup();
+    protocol.current_root_candidate_for_live = true;
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for setup in &setup[..5] {
+        protocol.receive(setup.clone()).unwrap();
+    }
+    let response = protocol.receive(fixture_response(3)).unwrap();
+    assert!(response.events.is_empty());
+    protocol.receive(setup[5].clone()).unwrap();
+    for notification in current_display_notifications() {
+        protocol.receive(notification).unwrap();
+    }
+    let mut ready = Effects::default();
+    for setup in &setup[6..] {
+        ready = protocol.receive(setup.clone()).unwrap();
+    }
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+            ..
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("候选 live 门禁应完成精确当前版握手");
+    };
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"],
+        json!({
+            "newSession": true, "emptyHistoryRecovery": false, "closeSession": false,
+            "submit": true, "queuedSubmit": true, "steer": false, "approval": true,
+            "cancel": true, "resume": true, "localTools": false, "childTasks": false
+        })
+    );
+
+    let first = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("候选首轮".into())],
+        },
+    });
+    assert_eq!(first.writes[0]["method"], "session/prompt");
+    let second = protocol.command(RuntimeCommand {
+        generation: protocol.options.generation,
+        message_id: Uuid::new_v4(),
+        action: RuntimeAction::Submit {
+            input: vec![InputContent::Text("候选运行中后续输入".into())],
+        },
+    });
+    assert!(second.writes.is_empty() && second.events.is_empty());
+    assert_eq!(protocol.queued.len(), 1);
+}
+
+#[test]
+fn current_candidate_approval_is_open_only_inside_the_live_harness() {
+    let (mut closed, request) = pending_native_approval();
+    closed.probed_version = Some("1.0.40");
+    let rejected = closed.receive(request.clone()).unwrap();
+    assert!(rejected.events.is_empty());
+    assert_eq!(
+        rejected.writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+
+    let (mut candidate, request) = pending_native_approval();
+    candidate.probed_version = Some("1.0.40");
+    candidate.current_root_candidate_for_live = true;
+    let opened = candidate.receive(request).unwrap();
+    assert!(opened.writes.is_empty());
+    assert!(matches!(
+        opened.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { .. }]
+    ));
+}
+
+#[test]
+fn current_setup_rejects_unknown_reordered_duplicate_and_old_phases() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (name, mut messages) in [
+        ("unknown", current_setup_messages(&session_id)),
+        ("reordered", current_setup_messages(&session_id)),
+        ("duplicate", current_setup_messages(&session_id)),
+        ("old", current_setup_messages(&session_id)),
+    ] {
+        match name {
+            "unknown" => messages[0]["params"]["phase"] = json!("future_phase"),
+            "reordered" => messages.swap(0, 1),
+            "duplicate" => messages[1] = messages[0].clone(),
+            "old" => messages[0]["params"]["phase"] = json!("create_session"),
+            _ => unreachable!(),
+        }
+        let mut protocol = current_waiting_for_setup();
+        let result = messages
+            .into_iter()
+            .try_for_each(|message| protocol.receive(message).map(|_| ()));
+        assert!(result.is_err(), "{name} setup 必须 fail-closed");
+        assert!(protocol.session_id.is_none());
+    }
+}
+
+#[test]
+fn current_setup_requires_exact_fields_stable_identity_and_all_phases() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut protocol = current_waiting_for_setup();
+    let mut setup = current_setup_messages(&session_id);
+    setup[0]["params"]["legacy"] = json!(true);
+    assert!(protocol.receive(setup.remove(0)).is_err());
+
+    let mut protocol = current_waiting_for_setup();
+    let setup = current_setup_messages(&session_id);
+    for message in setup.into_iter().take(4) {
+        protocol.receive(message).unwrap();
+    }
+    assert!(protocol.receive(fixture_response(3)).is_err());
+
+    let mut protocol = current_waiting_for_setup();
+    let mut setup = current_setup_messages(&session_id);
+    setup[6]["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
+    for message in &setup[..5] {
+        protocol.receive(message.clone()).unwrap();
+    }
+    protocol.receive(fixture_response(3)).unwrap();
+    protocol.receive(setup[5].clone()).unwrap();
+    for notification in current_display_notifications() {
+        protocol.receive(notification).unwrap();
+    }
+    let result = setup[6..]
+        .iter()
+        .cloned()
+        .try_for_each(|message| protocol.receive(message).map(|_| ()));
+    assert!(result.is_err());
+    assert_eq!(protocol.session_id.as_deref(), Some(session_id.as_str()));
+}
+
+#[test]
+fn current_setup_requires_the_response_between_the_two_observed_phase_groups() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+
+    let mut early_response = current_waiting_for_setup();
+    for message in &setup[..4] {
+        early_response.receive(message.clone()).unwrap();
+    }
+    assert!(early_response.receive(fixture_response(3)).is_err());
+
+    let mut early_post_phase = current_waiting_for_setup();
+    for message in &setup[..5] {
+        early_post_phase.receive(message.clone()).unwrap();
+    }
+    assert!(early_post_phase.receive(setup[5].clone()).is_err());
+
+    let mut duplicate_after_response = current_waiting_for_setup();
+    for message in &setup[..5] {
+        duplicate_after_response.receive(message.clone()).unwrap();
+    }
+    duplicate_after_response
+        .receive(fixture_response(3))
+        .unwrap();
+    duplicate_after_response.receive(setup[5].clone()).unwrap();
+    assert!(duplicate_after_response.receive(setup[5].clone()).is_err());
+
+    let mut missing_response_ready = current_waiting_for_setup();
+    for message in &setup[..5] {
+        missing_response_ready.receive(message.clone()).unwrap();
+    }
+    missing_response_ready.receive(fixture_response(3)).unwrap();
+    assert!(missing_response_ready.receive(setup[6].clone()).is_err());
+
+    let mut changed_response_identity = current_waiting_for_setup();
+    for message in &setup[..5] {
+        changed_response_identity.receive(message.clone()).unwrap();
+    }
+    changed_response_identity
+        .receive(fixture_response(3))
+        .unwrap();
+    let mut changed = setup[5].clone();
+    changed["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
+    assert!(changed_response_identity.receive(changed).is_err());
+}
+
+#[test]
+fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
+    let mcp = json!({
+        "jsonrpc": "2.0",
+        "method": "_x.ai/mcp/servers_updated",
+        "params": {"mcpServers": []}
+    });
+    let mut duplicate_mcp = current_waiting_for_setup();
+    assert!(duplicate_mcp.receive(mcp).is_err());
+
+    let display = current_display_notifications();
+    let models = display[0].clone();
+    let settings = display[1].clone();
+    let announcements = display[2].clone();
+    let announcements_2 = display[3].clone();
+    let commands = display[4].clone();
+    let mut protocol = current_waiting_for_display_notifications();
+    let accepted = protocol.receive(models.clone()).unwrap();
+    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    assert_eq!(
+        protocol
+            .reported_metadata
+            .models
+            .as_ref()
+            .unwrap()
+            .current_model_id,
+        "grok-4.6"
+    );
+    let accepted = protocol.receive(settings.clone()).unwrap();
+    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    let accepted = protocol.receive(announcements.clone()).unwrap();
+    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    let accepted = protocol.receive(announcements_2.clone()).unwrap();
+    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    let accepted = protocol.receive(commands.clone()).unwrap();
+    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    assert!(protocol.skill_catalog.is_none());
+    assert!(protocol.creation_catalog_session.is_none());
+
+    for rejected in [
+        json!({"jsonrpc":"2.0","method":"unknown","params":{}}),
+        json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[],"extra":true}}),
+        json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":["foreign"]}}),
+    ] {
+        let mut protocol = current_waiting_for_setup();
+        assert!(protocol.receive(rejected).is_err());
+    }
+
+    let mut extra_model = models.clone();
+    extra_model["params"]["extra"] = json!(true);
+    let mut protocol = current_waiting_for_display_notifications();
+    assert!(protocol.receive(extra_model).is_err());
+    let mut changed_model = models.clone();
+    changed_model["params"]["availableModels"][0]["foreign"] = json!(true);
+    let mut protocol = current_waiting_for_display_notifications();
+    assert!(protocol.receive(changed_model).is_err());
+
+    let mut extra_setting = settings.clone();
+    extra_setting["params"]["foreign"] = json!(true);
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.receive(models.clone()).unwrap();
+    assert!(protocol.receive(extra_setting).is_err());
+    let mut missing = settings.clone();
+    missing["params"].as_object_mut().unwrap().remove("tips");
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.receive(models.clone()).unwrap();
+    assert!(protocol.receive(missing).is_err());
+    let mut permission = settings.clone();
+    permission["params"]["permission_mode"] = json!("auto");
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.receive(models.clone()).unwrap();
+    assert!(protocol.receive(permission).is_err());
+
+    let mut changed_announcement = announcements.clone();
+    changed_announcement["params"]["extra"] = json!(true);
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.receive(models.clone()).unwrap();
+    protocol.receive(settings.clone()).unwrap();
+    assert!(protocol.receive(changed_announcement).is_err());
+
+    let mut duplicate_generation = announcements_2;
+    duplicate_generation["params"]["gen"] = announcements["params"]["gen"].clone();
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.receive(models.clone()).unwrap();
+    protocol.receive(settings.clone()).unwrap();
+    protocol.receive(announcements).unwrap();
+    assert!(protocol.receive(duplicate_generation).is_err());
+
+    let mut wrong_order = current_waiting_for_display_notifications();
+    assert!(wrong_order.receive(settings).is_err());
+
+    let mut before_announcements = current_waiting_for_display_notifications();
+    before_announcements.receive(models.clone()).unwrap();
+    before_announcements.receive(display[1].clone()).unwrap();
+    assert!(before_announcements.receive(commands.clone()).is_err());
+
+    for mutation in ["session", "event", "count", "tools", "extra", "duplicate"] {
+        let mut protocol = current_waiting_for_display_notifications();
+        protocol.receive(models.clone()).unwrap();
+        protocol.receive(display[1].clone()).unwrap();
+        protocol.receive(display[2].clone()).unwrap();
+        protocol.receive(display[3].clone()).unwrap();
+        let mut changed = commands.clone();
+        match mutation {
+            "session" => changed["params"]["sessionId"] = json!(Uuid::new_v4().to_string()),
+            "event" => changed["params"]["_meta"]["eventId"] = json!("old-session-2"),
+            "count" => {
+                changed["params"]["update"]["availableCommands"]
+                    .as_array_mut()
+                    .unwrap()
+                    .pop();
+            }
+            "tools" => {
+                changed["params"]["update"]["_meta"]["tools"]
+                    .as_array_mut()
+                    .unwrap()
+                    .pop();
+            }
+            "extra" => changed["params"]["update"]["permissionMode"] = json!("auto"),
+            "duplicate" => {
+                protocol.receive(changed.clone()).unwrap();
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            protocol.receive(changed).is_err(),
+            "{mutation} 目录必须 fail-closed"
+        );
+        assert!(protocol.skill_catalog.is_none());
+        assert!(protocol.creation_catalog_session.is_none());
+    }
+}
+
+#[test]
+fn current_oauth_shape_requires_cached_token_without_starting_interactive_login() {
+    for mutate in ["missing", "reordered", "wrong_default"] {
+        let mut initialize = current_initialize();
+        match mutate {
+            "missing" => {
+                initialize["result"]["authMethods"] = json!([
+                    {"id":"grok.com","name":"Grok","description":"Sign in with Grok"}
+                ]);
+                initialize["result"]["_meta"]["defaultAuthMethodId"] = Value::Null;
+            }
+            "reordered" => initialize["result"]["authMethods"]
+                .as_array_mut()
+                .unwrap()
+                .reverse(),
+            "wrong_default" => {
+                initialize["result"]["_meta"]["defaultAuthMethodId"] = json!("grok.com")
+            }
+            _ => unreachable!(),
+        }
+        let mut protocol = GrokProtocol::new(options());
+        protocol.bind_cli_version("grok 1.0.40").unwrap();
+        protocol.initialize().unwrap();
+        assert!(protocol.receive(initialize).is_err(), "{mutate} 必须拒绝");
+        assert!(protocol.paired_version.is_none());
+        assert!(protocol.session_id.is_none());
+    }
+}
+
+#[test]
+fn initialize_binds_exact_capabilities_without_inventing_extension_methods() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.34");
+    initialize["result"]["_meta"]["x.ai/queue/interject"] = json!(true);
+    initialize["result"]["_meta"]["x.ai/skills"] = json!(true);
+    let expected_capabilities = initialize["result"]["agentCapabilities"].clone();
+
+    protocol.receive(initialize).unwrap();
+
+    assert_eq!(protocol.reported_capabilities, expected_capabilities);
+    assert!(protocol.reported_initialize_extensions.available_commands);
+    assert!(
+        protocol
+            .reported_initialize_extensions
+            .local_mcp_sdk_advertised
+    );
+    assert!(
+        !protocol
+            .reported_initialize_extensions
+            .queue_change_notifications
+    );
+    assert!(
+        !protocol
+            .reported_initialize_extensions
+            .queue_interject_requests
+    );
+    assert!(!protocol.reported_initialize_extensions.skills_methods);
+    assert_eq!(protocol.reported_metadata.available_commands.len(), 7);
+}
+
+#[test]
+fn duplicate_initialize_is_idempotent() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.34");
+    protocol.receive(initialize.clone()).unwrap();
+    let capabilities = protocol.reported_capabilities.clone();
+    let extensions = protocol.reported_initialize_extensions.clone();
+
+    let duplicate = protocol.receive(initialize.clone()).unwrap();
+    assert!(duplicate.writes.is_empty() && duplicate.events.is_empty());
+    assert_eq!(protocol.reported_capabilities, capabilities);
+    assert_eq!(protocol.reported_initialize_extensions, extensions);
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 2);
+}
+
+#[test]
+fn conflicting_old_initialize_cannot_replace_capability_binding() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.34");
+    protocol.receive(initialize.clone()).unwrap();
+    let capabilities = protocol.reported_capabilities.clone();
+    let extensions = protocol.reported_initialize_extensions.clone();
+
+    initialize["result"]["agentCapabilities"]["loadSession"] = json!(false);
+    assert!(protocol.receive(initialize).is_err());
+    assert_eq!(protocol.reported_capabilities, capabilities);
+    assert_eq!(protocol.reported_initialize_extensions, extensions);
+    assert_eq!(protocol.pending.as_ref().unwrap().id, 2);
+}
+
+#[test]
+fn missing_agent_capabilities_do_not_partially_bind() {
+    let mut missing = GrokProtocol::from_fixture(options());
+    missing.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]
+        .as_object_mut()
+        .unwrap()
+        .remove("agentCapabilities");
+    assert!(missing.receive(initialize).is_err());
+    assert!(missing.paired_version.is_none());
+    assert!(missing.reported_capabilities.is_null());
+    assert_eq!(
+        missing.reported_initialize_extensions,
+        super::ReportedInitializeExtensions::default()
+    );
+}
+
+#[test]
+fn malformed_available_commands_do_not_partially_bind() {
+    let mut malformed = GrokProtocol::from_fixture(options());
+    malformed.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["availableCommands"] = json!("not-a-catalog");
+    assert!(malformed.receive(initialize).is_err());
+    assert!(malformed.paired_version.is_none());
+    assert!(malformed.reported_capabilities.is_null());
+    assert_eq!(
+        malformed.reported_initialize_extensions,
+        super::ReportedInitializeExtensions::default()
+    );
+}
+
+#[test]
+fn missing_mcp_advertisement_prevents_session_open() {
+    let mut launch = options();
+    launch.local_tools = Some(LocalToolPermissions::default());
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    protocol.sdk.as_mut().unwrap().owned_process = true;
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]
+        .as_object_mut()
+        .unwrap()
+        .remove("x.ai/mcp/sdk");
+
+    let authentication = protocol.receive(initialize).unwrap();
+    assert_eq!(authentication.writes[0]["method"], "authenticate");
+    assert!(
+        !protocol
+            .reported_initialize_extensions
+            .local_mcp_sdk_advertised
+    );
+    assert!(protocol.receive(fixture_response(2)).is_err());
+    assert!(protocol.session_id.is_none());
+    assert!(protocol.sdk.as_ref().unwrap().ledger.is_none());
+}
+
+#[test]
+fn sdk_reverse_request_before_capability_binding_is_rejected() {
+    let mut launch = options();
+    launch.local_tools = Some(LocalToolPermissions::default());
+    let mut protocol = GrokProtocol::from_fixture(launch);
+    protocol.sdk.as_mut().unwrap().owned_process = true;
+    let request = catalog_registration(&protocol, 77, "server/discover");
+
+    assert!(protocol.receive(request).is_err());
+    assert!(
+        !protocol
+            .reported_initialize_extensions
+            .local_mcp_sdk_advertised
+    );
+}
+
+#[test]
+fn missing_available_commands_is_recorded_without_enabling_extension_methods() {
+    let mut protocol = GrokProtocol::from_fixture(options());
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]
+        .as_object_mut()
+        .unwrap()
+        .remove("availableCommands");
+    protocol.receive(initialize).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    let ready = protocol.receive(fixture_response(3)).unwrap();
+    assert!(!protocol.reported_initialize_extensions.available_commands);
+    assert!(protocol.reported_metadata.available_commands.is_empty());
+    let [
+        RuntimeEventKind::SessionReady {
+            effective_permissions,
+            ..
+        },
+    ] = ready.events.as_slice()
+    else {
+        panic!("缺少原生会话就绪");
+    };
+    assert!(
+        effective_permissions["verifiedCapabilities"]
+            .get("skills")
+            .is_none()
+    );
+    assert_eq!(
+        effective_permissions["verifiedCapabilities"]["steer"],
+        false
+    );
+}
+
+#[test]
+fn out_of_order_notification_does_not_create_capabilities() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    let notification = json!({"jsonrpc":"2.0","method":"_x.ai/queue/changed","params":{
+        "sessionId":"old-native-session","entries":[],"_meta":{"eventId":"old-event"}
+    }});
+
+    let early = protocol.receive(notification.clone()).unwrap();
+    assert!(early.writes.is_empty() && early.events.is_empty());
+    assert_eq!(
+        protocol.reported_initialize_extensions,
+        super::ReportedInitializeExtensions::default()
+    );
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
+fn stale_notification_cannot_replace_bound_capabilities() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.bind_cli_version("grok 1.0.34").unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = fixture_response(1);
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.34");
+    protocol.receive(initialize).unwrap();
+    let extensions = protocol.reported_initialize_extensions.clone();
+    let notification = json!({"jsonrpc":"2.0","method":"_x.ai/queue/changed","params":{
+        "sessionId":"old-native-session","entries":[],"_meta":{"eventId":"old-event"}
+    }});
+    let late = protocol.receive(notification).unwrap();
+    assert!(late.writes.is_empty() && late.events.is_empty());
+    assert_eq!(protocol.reported_initialize_extensions, extensions);
+    assert!(protocol.session_id.is_none());
+}
+
+#[test]
 fn resumed_connection_does_not_accept_a_handshake_from_another_supported_version() {
     let mut resumed = options();
     resumed.target = SessionTarget::Resume {
@@ -300,6 +1120,48 @@ fn latest_version_opens_only_a_correlated_exact_read_approval() {
     request["params"]["toolCall"] = tool;
 
     let effects = protocol.receive(request).unwrap();
+    assert!(effects.writes.is_empty());
+    assert!(matches!(
+        effects.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { approval_id, .. }] if approval_id == "grok:0"
+    ));
+    assert!(protocol.approvals.contains_key("grok:0"));
+}
+
+#[test]
+fn latest_fixed_read_policy_keeps_the_exact_read_approval_contract() {
+    let (mut protocol, mut request) = pending_native_approval();
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    protocol.options.cwd.clone_from(&cwd);
+    protocol.options.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    protocol.options.grok_profile = Some(
+        GrokCreationPolicyV1::compile(
+            &cwd,
+            "1.0.34",
+            "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e".into(),
+            "b".repeat(64),
+            None,
+            PermissionPolicy::GrokRestrictedReadV1,
+        )
+        .unwrap(),
+    );
+    protocol.probed_version = Some("1.0.34");
+    let call_id = request["params"]["toolCall"]["toolCallId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    request["params"]["toolCall"] = json!({
+        "toolCallId": call_id,
+        "kind": "read",
+        "rawInput": {"variant":"ReadFile", "target_file":cwd.join("verified.txt")},
+        "_meta": {"x.ai/tool": {
+            "version":1, "name":"read_file", "namespace":"grok_build", "read_only":true
+        }}
+    });
+
+    let effects = protocol.receive(request).unwrap();
+
     assert!(effects.writes.is_empty());
     assert!(matches!(
         effects.events.as_slice(),
@@ -392,6 +1254,10 @@ fn real_handshake_reports_verified_text_lifecycle_and_preserves_permission_limit
     assert_eq!(
         effective_permissions["reportedCapabilities"]["promptCapabilities"]["image"],
         false
+    );
+    assert_eq!(
+        effective_permissions["reportedCapabilities"]["mcpCapabilities"],
+        json!({"http":true,"sse":true})
     );
     assert_eq!(
         effective_permissions["verifiedCapabilities"]["resume"],
@@ -3874,6 +4740,10 @@ fn catalog_sdk_protocol() -> GrokProtocol {
     .unwrap();
     options.grok_profile = Some(profile.clone());
     let mut protocol = GrokProtocol::from_fixture(options);
+    // 此离线帮助器从已完成握手后的状态起步；只补入真实 initialize 的精确布尔字段。
+    protocol
+        .reported_initialize_extensions
+        .local_mcp_sdk_advertised = true;
     protocol.session_id = Some("catalog-native-session".into());
     let sdk = protocol.sdk.as_mut().unwrap();
     sdk.owned_process = true;

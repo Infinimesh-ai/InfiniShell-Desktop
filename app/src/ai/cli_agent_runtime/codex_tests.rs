@@ -95,6 +95,55 @@ fn start_captured_turn(protocol: &mut CodexProtocol, capture: &str) -> String {
     turn_id
 }
 
+fn turn_with_pending_native_execution(item_type: &str) -> (CodexProtocol, String, String) {
+    let mut protocol = ready_protocol(CANCEL_RESUME);
+    let turn_id = start_captured_turn(&mut protocol, CANCEL_RESUME);
+    protocol
+        .receive(captured_output(CANCEL_RESUME, |message| {
+            message["method"] == "turn/started"
+        }))
+        .unwrap();
+    let thread_id = protocol.session_id.clone().unwrap();
+    protocol
+        .receive(json!({
+            "method": "item/started",
+            "params": {
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "item": {"id": "native-1", "type": item_type, "command": "fixture.py cancel"},
+            },
+        }))
+        .unwrap();
+    (protocol, thread_id, turn_id)
+}
+
+fn cancel_turn_with_pending_native_execution(item_type: &str) -> (CodexProtocol, Effects) {
+    let (mut protocol, thread_id, turn_id) = turn_with_pending_native_execution(item_type);
+    let interrupt = protocol.command(command(
+        RuntimeAction::Interrupt {
+            turn_id: turn_id.clone(),
+        },
+        13,
+    ));
+    let acknowledgement = protocol
+        .receive(json!({"id": interrupt.writes[0]["id"], "result": {}}))
+        .unwrap();
+    assert!(matches!(
+        acknowledgement.events.as_slice(),
+        [RuntimeEventKind::MessageAccepted { .. }]
+    ));
+    let effects = protocol
+        .receive(json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": thread_id,
+                "turn": {"id": turn_id, "status": "interrupted", "items": []},
+            },
+        }))
+        .unwrap();
+    (protocol, effects)
+}
+
 #[test]
 fn real_two_turn_capture_only_finishes_at_native_completed_events() {
     let mut protocol = legacy_probed_protocol(options());
@@ -196,19 +245,233 @@ fn interrupt_acknowledgement_is_not_cancellation_completion() {
     let completed = captured_output(CANCEL_RESUME, |message| {
         message["method"] == "turn/completed"
     });
+    let cancelled = protocol.receive(completed.clone()).unwrap();
     assert!(matches!(
-        protocol
-            .receive(completed.clone())
-            .unwrap()
-            .events
-            .as_slice(),
+        cancelled.events.as_slice(),
         [RuntimeEventKind::TurnFinished {
             outcome: TurnOutcome::Cancelled,
             ..
         }]
     ));
+    assert!(cancelled.terminal_after_cleanup.is_none());
     assert!(protocol.receive(completed).unwrap().events.is_empty());
     assert!(protocol.receive(started).unwrap().events.is_empty());
+    let next = protocol.command(command(
+        RuntimeAction::Submit {
+            input: vec![InputContent::Text("取消后继续".into())],
+        },
+        14,
+    ));
+    assert_eq!(next.writes.len(), 1);
+}
+
+#[test]
+fn cancelled_turn_with_pending_command_waits_for_confirmed_cleanup() {
+    let (protocol, effects) = cancel_turn_with_pending_native_execution("commandExecution");
+    assert!(effects.events.is_empty());
+    assert!(matches!(
+        effects.terminal_after_cleanup.as_ref(),
+        Some(RuntimeEventKind::TurnFinished {
+            outcome: TurnOutcome::Cancelled,
+            ..
+        })
+    ));
+    let (sender, mut events) = mpsc::channel(2);
+
+    let result = futures::executor::block_on(flush_effects(
+        &protocol,
+        &mut Cursor::new(Vec::new()),
+        &sender,
+        effects,
+    ))
+    .unwrap();
+    let FlushOutcome::CleanupThenPublish(terminal) = result else {
+        panic!("未完成的原生执行必须进入清理后发布路径");
+    };
+    assert!(matches!(
+        events.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+
+    let cleanup = async {
+        assert!(matches!(
+            events.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        Ok(())
+    };
+    futures::executor::block_on(publish_terminal_after_cleanup(
+        &protocol, &sender, terminal, cleanup,
+    ))
+    .unwrap();
+    assert!(matches!(
+        events.try_recv().unwrap().kind,
+        RuntimeEventKind::TurnFinished {
+            outcome: TurnOutcome::Cancelled,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn cancelled_turn_with_pending_file_change_forces_disconnect() {
+    let (_, effects) = cancel_turn_with_pending_native_execution("fileChange");
+
+    assert!(effects.terminal_after_cleanup.is_some());
+}
+
+#[test]
+fn cancelled_turn_with_pending_mcp_call_forces_disconnect() {
+    let (_, effects) = cancel_turn_with_pending_native_execution("mcpToolCall");
+
+    assert!(effects.terminal_after_cleanup.is_some());
+}
+
+#[test]
+fn completed_or_failed_turn_with_pending_execution_becomes_deferred_failure() {
+    let (mut completed_protocol, completed_thread, completed_turn) =
+        turn_with_pending_native_execution("commandExecution");
+    let completed = completed_protocol
+        .receive(json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": completed_thread,
+                "turn": {"id": completed_turn, "status": "completed", "items": []},
+            },
+        }))
+        .unwrap();
+    let (mut failed_protocol, failed_thread, failed_turn) =
+        turn_with_pending_native_execution("commandExecution");
+    let failed = failed_protocol
+        .receive(json!({
+            "method": "error",
+            "params": {
+                "threadId": failed_thread,
+                "turnId": failed_turn,
+                "error": {"message": "native failure"},
+                "willRetry": false,
+            },
+        }))
+        .unwrap();
+
+    for effects in [completed, failed] {
+        assert!(effects.events.is_empty());
+        assert!(matches!(
+            effects.terminal_after_cleanup,
+            Some(RuntimeEventKind::TurnFinished {
+                outcome: TurnOutcome::Failed { ref message },
+                ..
+            }) if message == PENDING_NATIVE_EXECUTION_ERROR
+        ));
+    }
+}
+
+#[test]
+fn cleanup_failure_does_not_publish_a_deferred_terminal() {
+    let protocol = legacy_probed_protocol(options());
+    let (sender, mut events) = mpsc::channel(1);
+    let terminal = RuntimeEventKind::TurnFinished {
+        turn_id: "turn-1".into(),
+        outcome: TurnOutcome::Cancelled,
+        output: String::new(),
+    };
+
+    let result = futures::executor::block_on(publish_terminal_after_cleanup(
+        &protocol,
+        &sender,
+        terminal,
+        async { Err(RuntimeError::RequestTimedOut) },
+    ));
+
+    assert!(matches!(result, Err(RuntimeError::RequestTimedOut)));
+    assert!(matches!(
+        events.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn full_queue_after_cleanup_returns_backpressure_without_replacing_events() {
+    let protocol = legacy_probed_protocol(options());
+    let (sender, mut events) = mpsc::channel(1);
+    sender
+        .try_send(protocol.event(RuntimeEventKind::TurnStarted {
+            turn_id: "occupied".into(),
+        }))
+        .unwrap();
+    let terminal = RuntimeEventKind::TurnFinished {
+        turn_id: "turn-1".into(),
+        outcome: TurnOutcome::Cancelled,
+        output: String::new(),
+    };
+
+    let result = futures::executor::block_on(publish_terminal_after_cleanup(
+        &protocol,
+        &sender,
+        terminal,
+        async { Ok(()) },
+    ));
+
+    assert!(matches!(result, Err(RuntimeError::EventBackpressure)));
+    assert!(matches!(
+        events.try_recv().unwrap().kind,
+        RuntimeEventKind::TurnStarted { ref turn_id } if turn_id == "occupied"
+    ));
+    assert!(matches!(
+        events.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+}
+
+#[test]
+fn completed_native_execution_keeps_connection_after_cancel() {
+    let mut protocol = ready_protocol(CANCEL_RESUME);
+    let turn_id = start_captured_turn(&mut protocol, CANCEL_RESUME);
+    protocol
+        .receive(captured_output(CANCEL_RESUME, |message| {
+            message["method"] == "turn/started"
+        }))
+        .unwrap();
+    let thread_id = protocol.session_id.clone().unwrap();
+    protocol
+        .receive(json!({
+            "method": "item/started",
+            "params": {
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "item": {"id": "native-1", "type": "commandExecution", "command": "true"},
+            },
+        }))
+        .unwrap();
+    protocol
+        .receive(json!({
+            "method": "item/completed",
+            "params": {
+                "threadId": thread_id,
+                "turnId": turn_id,
+                "item": {"id": "native-1", "type": "commandExecution", "status": "completed"},
+            },
+        }))
+        .unwrap();
+
+    let cancelled = protocol
+        .receive(json!({
+            "method": "turn/completed",
+            "params": {
+                "threadId": thread_id,
+                "turn": {"id": turn_id, "status": "interrupted", "items": []},
+            },
+        }))
+        .unwrap();
+
+    assert!(cancelled.terminal_after_cleanup.is_none());
+    let next = protocol.command(command(
+        RuntimeAction::Submit {
+            input: vec![InputContent::Text("取消后继续".into())],
+        },
+        15,
+    ));
+    assert_eq!(next.writes.len(), 1);
 }
 
 #[test]
@@ -400,6 +663,7 @@ fn a_full_event_queue_fails_without_blocking_approval_control() {
         events: vec![RuntimeEventKind::TurnStarted {
             turn_id: "turn-2".into(),
         }],
+        terminal_after_cleanup: None,
     };
     let result = futures::executor::block_on(flush_effects(
         &protocol,
@@ -868,6 +1132,14 @@ fn unknown_version_probe_does_not_retain_a_previous_supported_version() {
         protocol.record_version_probe("codex-cli 0.155.1-alpha.1"),
         Err(RuntimeError::UnsupportedVersion(_))
     ));
+}
+
+#[test]
+fn updater_and_protocol_share_the_exact_supported_version_contract() {
+    assert!(supported_version("0.147.0"));
+    assert!(supported_version("0.155.1"));
+    assert!(!supported_version("0.155.10"));
+    assert!(!supported_version("0.155.1-alpha.1"));
 }
 
 #[test]

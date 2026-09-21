@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在 RUNNER_TEMP 中准备固定完整运行包；默认 Codex 0.147.0，可显式选择 0.155.1。"""
+"""在 RUNNER_TEMP 中准备固定完整运行包；默认 Codex 最新正式版 0.155.1。"""
 
 import argparse
 import hashlib
@@ -87,6 +87,7 @@ PACKAGES = {
     },
 }
 SUPPORTED_VERSIONS = (CODEX_VERSION, "0.155.1")
+DEFAULT_VERSION = "0.155.1"
 LATEST_MANIFEST_SHA256 = "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc"
 MAX_MEMBERS = 54
 MAX_FILE_BYTES = 512 * 1024 * 1024
@@ -323,7 +324,7 @@ def verified_version(executable, runner_temp, version=CODEX_VERSION):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--download-dir", type=Path, required=True)
-    parser.add_argument("--version", choices=SUPPORTED_VERSIONS, default=CODEX_VERSION)
+    parser.add_argument("--version", choices=SUPPORTED_VERSIONS, default=DEFAULT_VERSION)
     args = parser.parse_args()
     machine = platform.machine().lower()
     architecture = {"amd64": "x86_64", "x86_64": "x86_64", "arm64": "aarch64", "aarch64": "aarch64"}.get(machine)

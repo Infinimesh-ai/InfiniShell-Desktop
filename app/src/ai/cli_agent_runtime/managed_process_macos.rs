@@ -31,7 +31,8 @@ use uuid::Uuid;
 use super::{
     CLEANUP_TIMEOUT, EXEC_CONTROL_ENV, ExitReason, ExitReceipt, GRACEFUL_EXIT_TIMEOUT,
     HANDSHAKE_TIMEOUT, MAX_RECORD_BYTES, Manifest, WORKER_COMMAND, accept_authorized,
-    connect_authorized, read_record, sha256, write_receipt,
+    connect_authorized, copy_output_with_flush, execute_worker_executable, read_record, sha256,
+    write_receipt,
 };
 
 pub(super) const CONTAINMENT: &str = "macos_resource_coalition";
@@ -257,7 +258,40 @@ struct Job {
     listener: UnixListener,
 }
 
+fn job_program_arguments(executable: &Path, path: &Path) -> io::Result<Vec<String>> {
+    let text_path = |value: &Path| {
+        value
+            .to_str()
+            .map(str::to_owned)
+            .ok_or_else(|| io::Error::other("托管服务路径不是 UTF-8"))
+    };
+    let mut arguments = vec![text_path(executable)?];
+    #[cfg(test)]
+    if executable.extension() == Some(OsStr::new("sh")) {
+        // launchd 测试夹具显式经系统 shell 执行；产品 worker 是 Mach-O，不经过此分支。
+        arguments.insert(0, "/bin/sh".to_owned());
+    }
+    arguments.extend([
+        WORKER_COMMAND.to_owned(),
+        text_path(path)?,
+        "--execute".to_owned(),
+    ]);
+    Ok(arguments)
+}
+
 impl Job {
+    #[cfg(any(test, debug_assertions))]
+    fn capture_launchctl_state(&self) {
+        let output = Command::new("/bin/launchctl")
+            .args([OsStr::new("print"), OsStr::new(&self.service)])
+            .output();
+        if let Ok(output) = output {
+            let mut bytes = output.stdout;
+            bytes.extend_from_slice(&output.stderr);
+            let _ = fs::write(self.directory.join("launchctl-print.txt"), bytes);
+        }
+    }
+
     fn create(path: &Path, manifest: &Manifest, executable: &Path) -> io::Result<Self> {
         macos_boot_session()?;
         let directory = path
@@ -286,18 +320,14 @@ impl Job {
         };
         let mut config = plist::Dictionary::new();
         config.insert("Label".into(), plist::Value::String(job_label));
+        let program_arguments = job_program_arguments(executable, path)?;
         config.insert(
             "ProgramArguments".into(),
             plist::Value::Array(
-                vec![
-                    text_path(executable)?,
-                    WORKER_COMMAND.to_owned(),
-                    text_path(path)?,
-                    "--execute".to_owned(),
-                ]
-                .into_iter()
-                .map(plist::Value::String)
-                .collect(),
+                program_arguments
+                    .into_iter()
+                    .map(plist::Value::String)
+                    .collect(),
             ),
         );
         config.insert("KeepAlive".into(), plist::Value::Boolean(false));
@@ -312,13 +342,20 @@ impl Job {
             "EnvironmentVariables".into(),
             plist::Value::Dictionary(routing),
         );
+        #[cfg(any(test, debug_assertions))]
+        let (standard_output, standard_error) = (
+            text_path(&directory.join("macos-job.stdout"))?,
+            text_path(&directory.join("macos-job.stderr"))?,
+        );
+        #[cfg(not(any(test, debug_assertions)))]
+        let (standard_output, standard_error) = ("/dev/null".to_owned(), "/dev/null".to_owned());
         config.insert(
             "StandardOutPath".into(),
-            plist::Value::String("/dev/null".to_owned()),
+            plist::Value::String(standard_output),
         );
         config.insert(
             "StandardErrorPath".into(),
-            plist::Value::String("/dev/null".to_owned()),
+            plist::Value::String(standard_error),
         );
         let mut bytes = Vec::new();
         plist::Value::Dictionary(config)
@@ -386,7 +423,11 @@ impl Job {
                 {
                     thread::sleep(Duration::from_millis(10))
                 }
-                Err(error) => return Err(error),
+                Err(error) => {
+                    #[cfg(any(test, debug_assertions))]
+                    self.capture_launchctl_state();
+                    return Err(error);
+                }
             }
         };
         configure(&stream)?;
@@ -521,7 +562,7 @@ pub(super) fn run_execute(path: &Path, manifest: &Manifest) -> io::Result<()> {
     }
     // 子 worker 在自己的 TCP 授权前不会 exec；因此能先固定其 PID version 再允许真实 CLI。
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
-    let mut command = Command::new(std::env::current_exe()?);
+    let mut command = Command::new(execute_worker_executable()?);
     command
         .arg(WORKER_COMMAND)
         .arg(path)
@@ -633,11 +674,17 @@ fn execute(
         stop_flag.store(true, Ordering::Release);
         let _ = parent_events.send(Event::Stop(reason));
     });
-    let (mut control, wrapper) = job.accept(manifest, b'c')?;
+    let (mut control, wrapper) = job
+        .accept(manifest, b'c')
+        .map_err(|error| io::Error::new(error.kind(), format!("控制通道未连接：{error}")))?;
     let coalition = MacosCoalition::claim(wrapper)?;
     job.coalition = Some(coalition);
-    let (data, input_identity) = job.accept(manifest, b'i')?;
-    let (errors, error_identity) = job.accept(manifest, b'e')?;
+    let (data, input_identity) = job
+        .accept(manifest, b'i')
+        .map_err(|error| io::Error::new(error.kind(), format!("数据通道未连接：{error}")))?;
+    let (errors, error_identity) = job
+        .accept(manifest, b'e')
+        .map_err(|error| io::Error::new(error.kind(), format!("错误通道未连接：{error}")))?;
     if input_identity != wrapper || error_identity != wrapper {
         return Err(io::Error::other("托管 stdio 与控制通道身份不同"));
     }
@@ -693,7 +740,7 @@ fn execute(
     let mut child_output = data;
     thread::spawn(move || {
         let mut output = io::stdout().lock();
-        let result = io::copy(&mut child_output, &mut output).and_then(|_| output.flush());
+        let result = copy_output_with_flush(&mut child_output, &mut output).map(|_| ());
         let _ = output_events.send(Event::Stop(ExitReason::StdioClosed));
         let _ = output_done.send(result);
     });
@@ -786,7 +833,7 @@ fn execute(
 pub(super) fn run_supervisor(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io::Result<()> {
     let control = connect_authorized(manifest.parent_control, manifest)?;
     control.set_read_timeout(None)?;
-    let mut job = Job::create(path, manifest, &std::env::current_exe()?)?;
+    let mut job = Job::create(path, manifest, &execute_worker_executable()?)?;
     let result = execute(&mut job, manifest, bytes, control);
     let cleanup = job.cleanup();
     match (result, cleanup) {

@@ -596,9 +596,13 @@ fn native_deny_receipt_requires_permission_rejection_and_no_read_output() {
     leaked["updates"][1]["params"]["update"]["rawOutput"] = json!({"text":"不应读取"});
     assert!(!denied_read_not_executed(&leaked, "turn", "call"));
     let mut wrong_tool = replay.clone();
-    wrong_tool["updates"][2]["params"]["_meta"]["cancellationContext"]["tool_name"] = json!("write");
+    wrong_tool["updates"][2]["params"]["_meta"]["cancellationContext"]["tool_name"] =
+        json!("write");
     assert!(!denied_read_not_executed(&wrong_tool, "turn", "call"));
     let mut duplicate = replay.clone();
-    duplicate["updates"].as_array_mut().unwrap().push(replay["updates"][2].clone());
+    duplicate["updates"]
+        .as_array_mut()
+        .unwrap()
+        .push(replay["updates"][2].clone());
     assert!(!denied_read_not_executed(&duplicate, "turn", "call"));
 }

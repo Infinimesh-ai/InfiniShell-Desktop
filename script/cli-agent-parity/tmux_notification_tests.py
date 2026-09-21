@@ -14,7 +14,8 @@ from plugin_compatibility_tests import ASSETS, EMITTER
 
 
 class TmuxNotificationTests(unittest.TestCase):
-    def notify(self, agent, tmux, version=None, with_tty=True):
+    def notify(self, agent, tmux, version=None, with_tty=True, tmux_pane="%7",
+               expected_error=None):
         if os.name != "posix":
             self.fail("此测试需要真实 Unix 控制终端；Windows 原生传输须另行验证")
         import fcntl
@@ -30,16 +31,36 @@ class TmuxNotificationTests(unittest.TestCase):
             else:
                 # 此替身只打开协议广告门槛；通知脚本使用完整随附件。
                 (root / "scripts/should-use-structured.sh").write_text("should_use_structured() { return 0; }\n")
-            environment = {key: value for key, value in os.environ.items() if key not in ("TMUX", "CLAUDE_CODE_VERSION", "GROK_HOOK_EVENT", "GROK_SESSION_ID")}
+            inherited_session = {
+                "TMUX", "TMUX_PANE", "SSH_TTY", "SSH_CONNECTION", "SSH_CLIENT",
+                "CLAUDE_CODE_VERSION", "GROK_HOOK_EVENT", "GROK_SESSION_ID",
+            }
+            environment = {key: value for key, value in os.environ.items()
+                           if key not in inherited_session}
             environment.update(WARP_CLI_AGENT_PROTOCOL_VERSION="1", WARP_CLIENT_VERSION="infinishell-test-dev")
-            if tmux:
-                environment["TMUX"] = "isolated-byte-test"
             if version:
                 environment["CLAUDE_CODE_VERSION"] = version
             body = '{"response":"中文 $(touch INJECTED) %s"}' + "\x1b]0;escape\x07"
             raw = ("\x1b]777;notify;warp://cli-agent;" + body + "\x07").encode()
             master, slave = pty.openpty()
             tty.setraw(slave)
+            if tmux:
+                # 使用只认识本测试参数的 tmux 替身，不能继承宿主 pane 或连接到真实 tmux server。
+                fixture_bin = root / "fixture-bin"
+                fixture_bin.mkdir()
+                tmux_command = fixture_bin / "tmux"
+                tmux_command.write_text(
+                    "#!/bin/sh\n"
+                    "[ \"$#\" -eq 5 ] && [ \"$1\" = display-message ] && [ \"$2\" = -p ] "
+                    "&& [ \"$3\" = -t ] && [ \"$4\" = \"$TMUX_PANE\" ] "
+                    "&& [ \"$5\" = '#{pane_tty}' ] || exit 64\n"
+                    "printf '%s\\n' \"$INFINISHELL_TEST_TMUX_TTY\"\n",
+                    encoding="utf-8",
+                )
+                tmux_command.chmod(0o700)
+                environment["PATH"] = str(fixture_bin) + os.pathsep + environment.get("PATH", "")
+                environment.update(TMUX="isolated-byte-test", TMUX_PANE=tmux_pane,
+                                   INFINISHELL_TEST_TMUX_TTY=os.ttyname(slave))
             os.set_blocking(master, False)
             data = bytearray()
             finished = threading.Event()
@@ -65,7 +86,14 @@ class TmuxNotificationTests(unittest.TestCase):
                 reader = threading.Thread(target=drain_terminal)
                 reader.start()
                 stdout, stderr = process.communicate(timeout=5)
-                self.assertEqual(process.returncode, 0, stderr.decode(errors="replace"))
+                if expected_error is None:
+                    self.assertEqual(process.returncode, 0, stderr.decode(errors="replace"))
+                else:
+                    self.assertEqual(process.returncode, 1, stderr.decode(errors="replace"))
+                    self.assertEqual(
+                        stderr.decode(errors="replace").strip(),
+                        f"infinishell_codex_hook_transport_error: {expected_error}",
+                    )
                 finished.set()
                 reader.join(timeout=2)
                 while True:
@@ -100,6 +128,15 @@ class TmuxNotificationTests(unittest.TestCase):
             with self.subTest(agent=agent, version=version):
                 raw, received, stdout = self.notify(agent, True, version)
                 self.assertEqual(received, b"\x1bPtmux;" + raw.replace(b"\x1b", b"\x1b\x1b") + b"\x1b\\")
+                self.assertEqual(stdout, b"")
+
+    def test_invalid_tmux_pane_is_rejected_without_using_the_fixture_server(self):
+        for pane in ("", "7", "%", "%7x", "%1\n"):
+            with self.subTest(pane=repr(pane)):
+                _, received, stdout = self.notify(
+                    "codex", True, tmux_pane=pane, expected_error="invalid_tmux_pane"
+                )
+                self.assertEqual(received, b"")
                 self.assertEqual(stdout, b"")
 
     def test_modern_claude_uses_native_raw_sequence_even_with_tty(self):

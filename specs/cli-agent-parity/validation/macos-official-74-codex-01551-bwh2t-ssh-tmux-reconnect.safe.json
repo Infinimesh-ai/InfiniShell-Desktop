@@ -1,0 +1,122 @@
+{
+  "scope": "Codex 0.155.1 SSH disconnect and tmux detach/reattach",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true,
+  "host_alias": "bwh-2t",
+  "baseline_private_receipt_sha256": "8ee752aad881b734b69cbd3521f70b4b40f042f8be05533920360e0f775fe375",
+  "remote_inputs": {
+    "root": "<remote-private-root>",
+    "home": "/root",
+    "kernel": "Linux",
+    "architecture": "x86_64",
+    "codex_path": "<remote-private-root>/codex/package/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "codex_sha256": "0753dfe1d8b87a52436deb13eb1c549661ef4c84fee2c5aa688385eebeccb761",
+    "codex_package_sha256": "f110cccdd50b0be8130b84f45b3144ea775c233f1c8bd8226da6ee719d63d206",
+    "codex_version": "codex-cli 0.155.1",
+    "tmux_path": "<remote-private-root>/pkg/usr/bin/tmux",
+    "tmux_sha256": "3bdeba4db61fa25e569e5d1ca6466acfd193018c7bbc2bc924ec415ffa0c2e58",
+    "tmux_version": "tmux 3.6",
+    "jq_path": "<remote-private-root>/pkg/usr/bin/jq",
+    "jq_version": "jq-1.8.1",
+    "package_sha256": {
+      "jq_1.8.1-4ubuntu2_amd64.deb": "bb7f69de12414f6e52eea1da952ed7226b8e3fd9db74f93bb8ea3f2f39f4836f",
+      "libevent-core-2.1-7t64_2.1.12-stable-10build2_amd64.deb": "1423e63d2cccebd31900ecdaceb366279231efb4aa6e4a29188657100166141f",
+      "libjemalloc2_5.3.0-4_amd64.deb": "df00a1d37c735bfb1830418efb721c2c0b79cd0a735c3d35e4015eb6a4d2683d",
+      "libjq1_1.8.1-4ubuntu2_amd64.deb": "3ced45ef4154cce59ce9fc74cc606b7361fa1b2f088b31a903d54fbcee75cb43",
+      "libonig5_6.9.10-1build1_amd64.deb": "050ad79c8c02956d896407ff66fddcb24e114b307cde196a0226697cf643ef88",
+      "tmux_3.6a-2ubuntu0.1_amd64.deb": "c1df283beedf7c554a441d5b34e5801f3494fea1809c8c03917a5ff87a856e71"
+    }
+  },
+  "credentials_read_or_copied": false,
+  "product_terminal_view_ui_verified": false,
+  "cases": [
+    {
+      "method": "explicit-detach",
+      "passed": false,
+      "initial": {
+        "phase": "initial",
+        "disconnect_method": "explicit-detach",
+        "ssh_exit": -9,
+        "disconnect_initiated": false,
+        "trust_selected_in_native_tui": false,
+        "kept_existing_model_in_native_tui": false,
+        "prompt_sent_after_reattach": false,
+        "capture_error": {
+          "type": "RuntimeError",
+          "message": "initial PTY 超时"
+        },
+        "terminal_query_responses": {
+          "1b5b63": 1,
+          "1b5b3e63": 1,
+          "1b5d31303b3f1b5c": 1,
+          "1b5d31313b3f1b5c": 1
+        },
+        "ssh_stdout_sha256": "7ff6d8c031b9ab7621be167574376bd7b427ac3a4267d9768d3926f728c06b00",
+        "ssh_stdout_bytes": 3521,
+        "notifications": []
+      },
+      "after_disconnect": {
+        "session_exit": 0,
+        "sessions": [
+          "reconnect-explicit-detach|0"
+        ],
+        "pane_exit": 0,
+        "panes": [
+          "%0|0|41055|sh|/dev/pts/1"
+        ],
+        "client_exit": 0,
+        "clients": [],
+        "reports": [
+          "native-start.json"
+        ]
+      },
+      "reattach": {
+        "phase": "reattach",
+        "disconnect_method": null,
+        "ssh_exit": -9,
+        "disconnect_initiated": false,
+        "trust_selected_in_native_tui": false,
+        "kept_existing_model_in_native_tui": false,
+        "prompt_sent_after_reattach": true,
+        "capture_error": {
+          "type": "RuntimeError",
+          "message": "reattach PTY 超时"
+        },
+        "terminal_query_responses": {
+          "1b5b63": 1,
+          "1b5b3e63": 1,
+          "1b5d31303b3f1b5c": 1,
+          "1b5d31313b3f1b5c": 1
+        },
+        "ssh_stdout_sha256": "728bfd7c62c437587325976db4a6eb899fc5b95734b45f4c863a0f197ef47366",
+        "ssh_stdout_bytes": 4023,
+        "notifications": []
+      },
+      "native": {
+        "native-start": {
+          "pid": 41056,
+          "pgid": 41055,
+          "sid": 41055,
+          "tty": "/dev/pts/1",
+          "tmux": "/tmp/isp-4ef3cdabc0d5-tmux-on.sock,41054,0",
+          "tmux_pane": "%0",
+          "codex_pid": 41057
+        }
+      }
+    }
+  ],
+  "error": {
+    "type": "RuntimeError",
+    "message": "SSH/tmux 捕获失败"
+  },
+  "lifecycle_passed": false,
+  "passed": false,
+  "result": "lifecycle_failed",
+  "private_receipt": {
+    "path_recorded": false,
+    "sha256": "5c2a14df193be73c9d4c8784173d75553b7a1bc7d014adf1dce837e808c87fac",
+    "contains_raw_ssh_bytes": true
+  },
+  "safe_receipt_contains_raw_ssh_bytes": false,
+  "auth_material_in_receipt": false
+}

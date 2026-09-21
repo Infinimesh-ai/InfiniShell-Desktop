@@ -8,14 +8,18 @@ use futures_lite::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use warpui::r#async::FutureExt as _;
 
 use super::super::{
-    ManagedChild, confirmed_exit, create_generation_directory, generation_directory, spawn,
-    supervisor_executable, write_new_record,
+    ExpectedFileIdentity, ManagedChild, ManagedEnvironment, PreparedLaunchBinding, confirmed_exit,
+    confirmed_exit_with_binding, create_generation_directory, create_launch_manifest,
+    generation_directory, spawn, spawn_bound_update, supervisor_executable, write_new_record,
+    write_spawn_attempt,
 };
 use super::*;
 
 const FIXTURE_SOURCE: &str = r#"
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
+#include <mach-o/dyld.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +45,21 @@ static void beat(const char *directory, const char *name) {
 }
 int main(int argc, char **argv) {
     if (argc < 2) return 80;
+    if (!strcmp(argv[1], "atomic-update")) {
+        const char *install = getenv("CODEX_INSTALL_DIR");
+        const char *release = getenv("CODEX_RELEASE");
+        if (!install || !release) return 93;
+        char target[PATH_MAX], executed[PATH_MAX], image[PATH_MAX];
+        snprintf(target, sizeof(target), "%s/updated-version", install);
+        snprintf(executed, sizeof(executed), "%s/executed-path", install);
+        uint32_t image_size = sizeof(image);
+        if (_NSGetExecutablePath(image, &image_size) != 0) return 94;
+        int fd = open(target, O_WRONLY | O_CREAT | O_EXCL, 0600); if (fd < 0) return 95;
+        write_all(fd, release, strlen(release)); close(fd);
+        fd = open(executed, O_WRONLY | O_CREAT | O_EXCL, 0600); if (fd < 0) return 96;
+        write_all(fd, image, strlen(image)); close(fd);
+        return 0;
+    }
     if (!strcmp(argv[1], "echo")) {
         char b[4096]; ssize_t n;
         while ((n = read(0, b, sizeof(b))) > 0) write_all(1, b, (size_t)n);
@@ -69,6 +88,73 @@ int main(int argc, char **argv) {
     beat(argv[2], "root"); return 92;
 }
 "#;
+
+#[test]
+#[ignore = "需要新构建的真实 macOS worker 与本机 C 编译器；无模型"]
+fn supervised_macos_atomic_snapshot_executes_snapshot_and_targets_original_install_root() {
+    supervisor_executable().unwrap();
+    // macOS 的 `/var` 是 `/private/var` 别名；原子合同只接受无链接的规范化路径。
+    let directory = directory("infinishell-macos-atomic-update-")
+        .canonicalize()
+        .unwrap();
+    let executable = build_fixture(&directory);
+    let installation = directory.join("installation");
+    fs::create_dir(&installation).unwrap();
+    let generation = Uuid::new_v4();
+    let binding = PreparedLaunchBinding::native_file("a".repeat(64)).unwrap();
+    let expected = ExpectedFileIdentity::capture(&executable).unwrap();
+    let original_sha256 = expected.sha256.clone();
+    let environment = ManagedEnvironment {
+        values: vec![
+            (
+                "CODEX_INSTALL_DIR".into(),
+                installation.as_os_str().to_owned(),
+            ),
+            ("CODEX_RELEASE".into(), "0.155.1".into()),
+            ("CODEX_NON_INTERACTIVE".into(), "1".into()),
+        ],
+        remove: Vec::new(),
+    };
+    let child = block_on(spawn_bound_update(
+        &directory,
+        generation,
+        &executable,
+        &[OsString::from("atomic-update")],
+        &directory,
+        environment,
+        vec![expected],
+        &binding,
+    ))
+    .unwrap();
+    let receipt = block_on(child.finish_after_stdin_close()).unwrap();
+
+    assert_eq!(receipt.exit_code, Some(0));
+    assert_eq!(
+        confirmed_exit_with_binding(&directory, generation, &binding).unwrap(),
+        Some(receipt)
+    );
+    assert_eq!(
+        fs::read(installation.join("updated-version")).unwrap(),
+        b"0.155.1"
+    );
+    let executed = PathBuf::from(
+        String::from_utf8(fs::read(installation.join("executed-path")).unwrap()).unwrap(),
+    );
+    assert!(
+        executed.starts_with(
+            directory
+                .join("cli-agent-executable-snapshots")
+                .join(generation.to_string())
+        ),
+        "实际执行路径必须是受控快照：{}",
+        executed.display()
+    );
+    assert!(!executed.parent().unwrap().join("updated-version").exists());
+    assert_eq!(
+        ExpectedFileIdentity::capture(&executable).unwrap().sha256,
+        original_sha256
+    );
+}
 
 fn directory(name: &str) -> PathBuf {
     let directory = tempfile::Builder::new()
@@ -164,10 +250,13 @@ async fn spawn_captured_output(
         executable: executable.to_owned(),
         arguments: vec![OsString::from("echo")],
         cwd: directory.to_owned(),
+        expected_files: Vec::new(),
+        atomic_launch_kind: None,
+        atomic_cwd: None,
     };
-    let state = create_generation_directory(directory, generation).unwrap();
+    let (state, manifest_bytes) = create_launch_manifest(directory, &manifest).unwrap();
+    write_spawn_attempt(&state, generation, &manifest_bytes).unwrap();
     let path = state.join("manifest.json");
-    write_new_record(&path, &encode(&manifest).unwrap()).unwrap();
     let mut command = AsyncCommand::new(supervisor_executable().unwrap());
     command
         .arg(WORKER_COMMAND)
@@ -388,9 +477,14 @@ fn supervised_macos_live_domain_zero_timeout_never_writes_success() {
         executable: worker.clone(),
         arguments: Vec::new(),
         cwd: directory.clone(),
+        expected_files: Vec::new(),
+        atomic_launch_kind: None,
+        atomic_cwd: None,
     };
     let path = state.join("manifest.json");
-    write_new_record(&path, &encode(&manifest).unwrap()).unwrap();
+    let manifest_bytes = encode(&manifest).unwrap();
+    write_new_record(&path, &manifest_bytes).unwrap();
+    write_spawn_attempt(&state, generation, &manifest_bytes).unwrap();
     let mut job = Job::create(&path, &manifest, &worker).unwrap();
     let (control, identity) = job.accept(&manifest, b'c').unwrap();
     job.coalition = Some(MacosCoalition::claim(identity).unwrap());
@@ -427,9 +521,14 @@ fn supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper() {
         executable: worker.clone(),
         arguments: Vec::new(),
         cwd: directory.clone(),
+        expected_files: Vec::new(),
+        atomic_launch_kind: None,
+        atomic_cwd: None,
     };
     let path = state.join("manifest.json");
-    write_new_record(&path, &encode(&manifest).unwrap()).unwrap();
+    let manifest_bytes = encode(&manifest).unwrap();
+    write_new_record(&path, &manifest_bytes).unwrap();
+    write_spawn_attempt(&state, generation, &manifest_bytes).unwrap();
     let mut job = Job::create(&path, &manifest, &worker).unwrap();
     let (control, identity) = job.accept(&manifest, b'c').unwrap();
     job.coalition = Some(MacosCoalition::claim(identity).unwrap());

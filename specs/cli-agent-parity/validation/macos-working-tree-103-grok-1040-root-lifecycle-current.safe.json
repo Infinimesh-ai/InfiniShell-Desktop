@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_40_current_root_lifecycle_and_setup_race",
+  "recorded_at": "2026-09-21T15:22:10+08:00",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "worktree_dirty": true,
+    "same_commit_verified": false,
+    "full_goal_passed": false
+  },
+  "grok": {
+    "version": "1.0.40",
+    "revision": "eb1a2256660d",
+    "macos_arm64_sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+    "authentication": "oauth",
+    "credential_values_recorded": false,
+    "temporary_auth_copy_removed": true
+  },
+  "implemented_contract": {
+    "exact_cached_token_auth_shape": true,
+    "setup_phase_and_session_identity_validation": true,
+    "unknown_duplicate_reordered_or_injected_setup_rejected": true,
+    "empty_mcp_refresh_only": true,
+    "settings_and_catalog_shape_bounded": true,
+    "production_current_root_gate_open": false,
+    "test_only_candidate_gate": true
+  },
+  "observed_setup_variation": {
+    "classification": "actual_protocol_race",
+    "earlier_fresh_run_shape": "empty MCP refresh before or around authentication, then setup prefix, session/new response, response_ready and bounded catalog notifications",
+    "final_fresh_run_shape": "initialize response, authenticate response, empty MCP refresh, setup first five phases, models update before session/new response",
+    "single_fixed_sequence_safe": false,
+    "existing_home_full_lifecycle_verified": false
+  },
+  "final_live_attempt": {
+    "acceptance_passed": false,
+    "official_grok_model_tested": false,
+    "model_inputs_sent": 0,
+    "session_ready": false,
+    "two_rounds_verified": false,
+    "approval_allow_deny_verified": false,
+    "queued_followup_verified": false,
+    "cancel_continue_verified": false,
+    "resume_verified": false,
+    "result_recovery_verified": false,
+    "failure": "unexpected Grok models update position",
+    "public_receipt": {
+      "bytes": 632,
+      "sha256": "3fb464c377da6a1b743f0f69ef4294297631b7e212cfd9b445263973f8d2ae7e",
+      "path": "/Volumes/ORICO/grok-current-root-1040-fifteenth.ndjson"
+    },
+    "private_root": "/Volumes/ORICO/InfiniShellTmp/infinishell-grok-official-adapter-pjd92lwk"
+  },
+  "production_capabilities": {
+    "submit": false,
+    "queued_submit": false,
+    "approval": false,
+    "cancel": false,
+    "resume": false,
+    "skills": false,
+    "local_tools": false,
+    "child_tasks": false,
+    "same_turn_steering": false,
+    "close_session": false,
+    "empty_history_recovery": false
+  },
+  "gates": {
+    "grok_rust_passed": 137,
+    "grok_rust_failed": 0,
+    "python_shared_and_official_runner_passed": 36,
+    "python_shared_and_official_runner_failed": 0,
+    "rustfmt_check_passed": true,
+    "diff_check_passed": true,
+    "localization_change_required": false
+  },
+  "cleanup": {
+    "internal_supervisor_removed": true,
+    "internal_state_and_socket_removed": true,
+    "auth_copy_removed": true,
+    "external_private_root_contains_auth_json": false
+  },
+  "result": "Grok 1.0.40 remains fail-closed. The final live run proved cross-run setup notification ordering is not represented by one safe fixed sequence and reached no model input or managed root lifecycle."
+}

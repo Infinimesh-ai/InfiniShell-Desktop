@@ -127,6 +127,10 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
         Harness::Codex,
         &CLIAgentVersionStatus::Detected("0.147.0".into())
     ));
+    assert!(verified_version(
+        Harness::Codex,
+        &CLIAgentVersionStatus::Detected("0.155.1".into())
+    ));
     assert!(!verified_version(
         Harness::Codex,
         &CLIAgentVersionStatus::Detected("0.148.0".into())
@@ -154,6 +158,11 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
     assert!(verified_version(
         Harness::Grok,
         &CLIAgentVersionStatus::Detected("1.0.34".into())
+    ));
+    // 1.0.40 目前只有固定字节、认证和 setup 形状证据；尚未完成产品内 P0 回合验收。
+    assert!(!verified_version(
+        Harness::Grok,
+        &CLIAgentVersionStatus::Detected("1.0.40".into())
     ));
     assert!(!verified_version(
         Harness::Grok,

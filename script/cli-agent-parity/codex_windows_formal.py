@@ -19,15 +19,15 @@ def probe_bundle(repo, mode):
     bundle = repo / 'app/assets/bundled/cli-agent-plugins'
     if mode == 'formal':
         metadata, replacements = bundle_data(bundle, 'codex')
-        require(metadata['patch_revision'] == 4, '正式直验要求固定 rev4 配方')
+        require(metadata['patch_revision'] == 5, '正式直验要求固定 rev5 配方')
         source, source_bytes, hashes = source_bundle(bundle)
-        require(source['patch_revision'] == 4, '正式完整来源不是 rev4')
+        require(source['patch_revision'] == 5, '正式完整来源不是 rev5')
         for name, contents in replacements.items():
             require(hashes['plugins/warp/' + name] == hashlib.sha256(contents).hexdigest(),
                     '正式替换件与完整来源不一致')
         return metadata, replacements, hashlib.sha256(source_bytes).hexdigest()
     require(mode == 'candidate', '未知通知验收模式')
-    # 旧候选从保留的 rev3 原字节出发，禁止向正式 rev4 再次应用候选变换。
+    # 旧候选从保留的 rev3 原字节出发，禁止向正式 rev5 再次应用候选变换。
     previous = bundle / 'codex/revisions/rev3'
     metadata = json.loads(checked_file(previous, 'PATCH_METADATA.json').read_bytes())
     require(metadata['patch_revision'] == 3 and len(metadata['files']) == 4, '候选基线不是固定 rev3')

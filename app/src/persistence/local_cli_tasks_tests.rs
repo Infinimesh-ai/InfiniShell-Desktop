@@ -1556,6 +1556,158 @@ fn ordinary_parent_history_message_requires_authorization_and_one_atomic_claim()
 }
 
 #[test]
+fn ordinary_managed_message_is_claimed_once_without_manufacturing_native_ack() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let instruction = LocalCliMessage {
+        message_id: Uuid::new_v4().to_string(),
+        ..message()
+    };
+    insert_message(&mut connection, instruction.clone()).unwrap();
+
+    let claimed = claim_managed_message(&mut connection, instruction.clone(), &parent, &child)
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(claimed.state, LocalCliMessageState::Sent);
+    assert_eq!(claimed.receipt_kind, None);
+    assert_eq!(
+        claim_managed_message(&mut connection, instruction.clone(), &parent, &child).unwrap(),
+        None
+    );
+    let stored = read_message(&mut connection, &instruction.message_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(stored.state, LocalCliMessageState::Sent);
+    assert_eq!(stored.receipt_kind, None);
+}
+
+#[test]
+fn ordinary_managed_message_keeps_queued_when_receiver_identity_changed_before_claim() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let instruction = LocalCliMessage {
+        message_id: Uuid::new_v4().to_string(),
+        ..message()
+    };
+    insert_message(&mut connection, instruction.clone()).unwrap();
+    let mut running_child = child.clone();
+    running_child.revision = 1;
+    running_child.state = LocalCliTaskState::Running;
+    checkpoint(&mut connection, running_child.clone(), Some(1)).unwrap();
+
+    assert!(claim_managed_message(&mut connection, instruction.clone(), &parent, &child,).is_err());
+    assert_eq!(
+        read_message(&mut connection, &instruction.message_id).unwrap(),
+        Some(instruction.clone())
+    );
+    assert!(
+        claim_managed_message(
+            &mut connection,
+            instruction.clone(),
+            &parent,
+            &running_child,
+        )
+        .unwrap()
+        .is_some()
+    );
+    assert_eq!(
+        claim_managed_message(&mut connection, instruction, &parent, &running_child).unwrap(),
+        None
+    );
+}
+
+#[test]
+fn ordinary_managed_message_requires_sender_permission_at_claim_time() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let instruction = LocalCliMessage {
+        message_id: Uuid::new_v4().to_string(),
+        ..message()
+    };
+    insert_message(&mut connection, instruction.clone()).unwrap();
+    parent.revision = 1;
+    parent.config_json = "{}".into();
+    checkpoint(&mut connection, parent.clone(), Some(1)).unwrap();
+
+    assert!(claim_managed_message(&mut connection, instruction.clone(), &parent, &child,).is_err());
+    assert_eq!(
+        read_message(&mut connection, &instruction.message_id).unwrap(),
+        Some(instruction)
+    );
+}
+
+#[test]
+fn ordinary_managed_message_rejects_mismatched_parent_generation() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let instruction = LocalCliMessage {
+        message_id: Uuid::new_v4().to_string(),
+        ..message()
+    };
+    insert_message(&mut connection, instruction.clone()).unwrap();
+    let mut mismatched_child = child;
+    mismatched_child.parent_generation = Some(2);
+
+    assert!(
+        claim_managed_message(
+            &mut connection,
+            instruction.clone(),
+            &parent,
+            &mismatched_child,
+        )
+        .is_err()
+    );
+    assert_eq!(
+        read_message(&mut connection, &instruction.message_id).unwrap(),
+        Some(instruction)
+    );
+}
+
+#[test]
+fn ordinary_managed_message_rejects_internal_subjects() {
+    let mut connection = connection();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    checkpoint(&mut connection, parent.clone(), None).unwrap();
+    let child = task("child", Some("parent"));
+    checkpoint(&mut connection, child.clone(), None).unwrap();
+    let instruction = LocalCliMessage {
+        message_id: Uuid::new_v4().to_string(),
+        subject: "native_tool_result".into(),
+        ..message()
+    };
+    insert_message(&mut connection, instruction.clone()).unwrap();
+
+    assert!(claim_managed_message(&mut connection, instruction.clone(), &parent, &child,).is_err());
+    assert_eq!(
+        read_message(&mut connection, &instruction.message_id).unwrap(),
+        Some(instruction)
+    );
+}
+
+#[test]
 fn ordinary_child_progress_cannot_follow_its_parent_into_a_new_generation() {
     let mut connection = connection();
     let mut parent = task("parent", None);

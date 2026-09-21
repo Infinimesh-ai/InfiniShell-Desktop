@@ -20,6 +20,21 @@ fn task(id: &str, parent: Option<&str>) -> LocalCliTask {
     }
 }
 
+fn message(source: &LocalCliTask, target: &LocalCliTask) -> LocalCliMessage {
+    LocalCliMessage {
+        version: 1,
+        message_id: Uuid::new_v4().to_string(),
+        sender_task_id: source.task_id.clone(),
+        recipient_task_id: target.task_id.clone(),
+        sender_generation: source.generation,
+        recipient_generation: target.generation,
+        subject: "progress".into(),
+        body: "进度 中文\nEnglish 🧪".into(),
+        state: LocalCliMessageState::Queued,
+        receipt_kind: None,
+    }
+}
+
 #[test]
 fn spawn_limit_counts_active_children_and_rejects_missing_or_cyclic_ancestors() {
     let root = task("root", None);
@@ -81,6 +96,212 @@ fn cancelled_call_cannot_pass_the_side_effect_gate_even_while_its_turn_is_active
         .remove("call");
     assert!(check_current(&model, "parent", token, 1, "turn", "call").is_err());
     assert!(model.entries["parent"].snapshot.connected);
+}
+
+#[test]
+fn queued_managed_message_is_claimed_after_online_receiver_reserves_capacity() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("tasks.sqlite")).unwrap();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    let child = task("child", Some("parent"));
+    let offered = message(&parent, &child);
+    let runtime_generation = Uuid::new_v4();
+    let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+    let endpoint = ManagedTaskEndpoint {
+        task_id: child.task_id.clone(),
+        generation: child.generation,
+        harness: Harness::Codex,
+        runtime_generation,
+        active_turn_id: Some("active-turn".into()),
+        commands,
+    };
+    block_on(async {
+        checkpoint_task(&writer.sender, parent.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        checkpoint_task(&writer.sender, child.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        enqueue_message(&writer.sender, offered.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let delivery = dispatch_managed_message(
+            &writer.sender,
+            endpoint,
+            parent.clone(),
+            child.clone(),
+            offered.clone(),
+        );
+        let receive = async {
+            let request = receiver.recv().await.unwrap();
+            assert_eq!(request.message_id.to_string(), offered.message_id);
+            assert_eq!(request.expected_generation, child.generation);
+            assert!(request.from_mailbox);
+            assert!(matches!(
+                request.action,
+                RuntimeAction::Steer { ref expected_turn_id, ref input }
+                    if expected_turn_id == "active-turn"
+                        && input == &[InputContent::Text(
+                            "Subject: progress\n\n进度 中文\nEnglish 🧪".into()
+                        )]
+            ));
+            request.reply.send(Ok(())).unwrap();
+        };
+        let (state, ()) = futures::join!(delivery, receive);
+        assert_eq!(state.unwrap(), LocalCliMessageState::Sent);
+        let stored = load_messages(&writer.sender, child.task_id.clone(), child.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].state, LocalCliMessageState::Sent);
+        assert_eq!(stored[0].receipt_kind, None);
+        assert_eq!(
+            crate::ai::local_cli_mailbox::acknowledge_runtime_message(
+                &writer.sender,
+                &child.task_id,
+                child.generation,
+                &RuntimeEventKind::MessageAccepted {
+                    message_id: Uuid::parse_str(&offered.message_id).unwrap(),
+                    turn_id: Some("native-turn".into()),
+                },
+            )
+            .await
+            .unwrap(),
+            Some(LocalCliMessageState::Acknowledged)
+        );
+        let acknowledged = load_messages(&writer.sender, child.task_id, child.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(acknowledged[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            acknowledged[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn unavailable_managed_receiver_leaves_message_queued_for_recovery() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("tasks.sqlite")).unwrap();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    let child = task("child", Some("parent"));
+    let offered = message(&parent, &child);
+    let (commands, receiver) = tokio::sync::mpsc::channel(1);
+    drop(receiver);
+    let endpoint = ManagedTaskEndpoint {
+        task_id: child.task_id.clone(),
+        generation: child.generation,
+        harness: Harness::Claude,
+        runtime_generation: Uuid::new_v4(),
+        active_turn_id: None,
+        commands,
+    };
+    block_on(async {
+        checkpoint_task(&writer.sender, parent.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        checkpoint_task(&writer.sender, child.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            dispatch_managed_message(
+                &writer.sender,
+                endpoint,
+                parent,
+                child.clone(),
+                offered.clone(),
+            )
+            .await
+            .is_err()
+        );
+        let stored = load_messages(&writer.sender, child.task_id, child.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, [offered]);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn failed_managed_transport_keeps_claimed_message_sent_and_unconfirmed() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("tasks.sqlite")).unwrap();
+    let mut parent = task("parent", None);
+    parent.config_json =
+        json!({"local_tools":{"allow_spawn":false,"allow_message":true}}).to_string();
+    let child = task("child", Some("parent"));
+    let offered = message(&parent, &child);
+    let (commands, mut receiver) = tokio::sync::mpsc::channel(1);
+    let endpoint = ManagedTaskEndpoint {
+        task_id: child.task_id.clone(),
+        generation: child.generation,
+        harness: Harness::Grok,
+        runtime_generation: Uuid::new_v4(),
+        active_turn_id: Some("active-turn".into()),
+        commands,
+    };
+    block_on(async {
+        checkpoint_task(&writer.sender, parent.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        checkpoint_task(&writer.sender, child.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let delivery = dispatch_managed_message(
+            &writer.sender,
+            endpoint,
+            parent,
+            child.clone(),
+            offered.clone(),
+        );
+        let reject = async {
+            let request = receiver.recv().await.unwrap();
+            request.reply.send(Err("协议写入失败".into())).unwrap();
+        };
+        let (result, ()) = futures::join!(delivery, reject);
+        assert!(result.is_err());
+        let stored = load_messages(&writer.sender, child.task_id, child.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored[0].state, LocalCliMessageState::Sent);
+        assert_eq!(stored[0].receipt_kind, None);
+        assert_eq!(stored[0].message_id, offered.message_id);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
 }
 
 #[test]

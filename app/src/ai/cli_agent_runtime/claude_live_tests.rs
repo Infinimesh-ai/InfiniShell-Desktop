@@ -1,4 +1,4 @@
-//! 真实 Claude 适配器验收；只通过隔离运行器显式启动，不属于默认单元测试。
+//! 真实 Claude 适配器验收；只通过显式认证运行器启动，不属于默认单元测试。
 
 #[path = "claude_profile_live_tests.rs"]
 mod profile_live_tests;
@@ -568,7 +568,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "需要隔离运行器指定私有 Claude 配置或显式 API 环境；会消耗模型额度"]
+#[ignore = "需要运行器指定私有认证或用户授权的默认 Claude 在线账户；会消耗模型额度"]
 async fn real_claude_managed_lifecycle() {
     let root =
         PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").expect("必须由隔离运行器启动"))
@@ -578,15 +578,31 @@ async fn real_claude_managed_lifecycle() {
         fs::read_to_string(root.join(".infinishell-claude-live-probe")).unwrap(),
         "isolated Claude Rust adapter verification\n"
     );
-    let configuration = PathBuf::from(env::var_os("CLAUDE_CONFIG_DIR").expect("缺少显式私有配置"))
-        .canonicalize()
-        .unwrap();
-    let declared =
-        PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR").expect("缺少配置边界"))
+    let auth_mode = env::var("INFINISHELL_CLAUDE_LIVE_AUTH_MODE").expect("缺少认证模式边界");
+    match auth_mode.as_str() {
+        "private_config" => {
+            let configuration =
+                PathBuf::from(env::var_os("CLAUDE_CONFIG_DIR").expect("缺少显式私有配置"))
+                    .canonicalize()
+                    .unwrap();
+            let declared = PathBuf::from(
+                env::var_os("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR").expect("缺少配置边界"),
+            )
             .canonicalize()
             .unwrap();
-    assert_eq!(configuration, declared);
-    assert!(!root.starts_with(&configuration));
+            assert_eq!(configuration, declared);
+            assert!(!root.starts_with(&configuration));
+        }
+        "authorized_default_account" => {
+            assert!(env::var_os("CLAUDE_CONFIG_DIR").is_none());
+            assert!(env::var_os("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR").is_none());
+            let home = PathBuf::from(env::var_os("HOME").expect("默认账户模式缺少用户 HOME"))
+                .canonicalize()
+                .unwrap();
+            assert!(!home.starts_with(&root));
+        }
+        _ => panic!("不支持的 Claude 认证模式"),
+    }
     let mut evidence = Evidence {
         file: File::create(PathBuf::from(
             env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").expect("缺少证据路径"),
@@ -597,7 +613,8 @@ async fn real_claude_managed_lifecycle() {
     evidence
         .record(
             json!({"event":"acceptance_started", "scope":"rust_adapter_process_restart",
-        "credential_files_read_by_probe":false, "permission_policy":"Inherit"}),
+        "credential_files_read_by_rust_probe":false, "authentication_source":auth_mode,
+        "permission_policy":"Inherit"}),
         )
         .unwrap();
     let result = exercise(&root, &mut evidence).await;

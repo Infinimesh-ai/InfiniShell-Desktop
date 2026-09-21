@@ -1,0 +1,29 @@
+{
+  "cases": [
+    {
+      "mode": "tmux-on",
+      "parsed_cli_agent_events": 2,
+      "passed": true,
+      "pluggable_notifications": 2,
+      "ssh_stdout_sha256": "e91d13741754f32c3a842e344f6dd283882eff3a5f5c3fdf50654d3c27352186"
+    },
+    {
+      "mode": "tmux-on",
+      "parsed_cli_agent_events": 2,
+      "passed": true,
+      "pluggable_notifications": 2,
+      "ssh_stdout_sha256": "b1d14f2ad7540d3aecd696a792e377e2bea19362472cd9d2be86a97972c53fb0"
+    }
+  ],
+  "codex_version": "codex-cli 0.155.1",
+  "host_alias": "bwh-2t",
+  "input_private_receipt_sha256": "c71fb1d0fb689a51c73746a249e01882060866838894c1cbc8a204e56b264eb0",
+  "official_codex_hook_control_tty_compatible": true,
+  "passed": true,
+  "product_terminal_model_osc_parser_verified": true,
+  "product_terminal_view_ui_verified": false,
+  "remote_transport_passed": true,
+  "scope": "official Codex SSH/tmux bytes -> TerminalModel OSC 777 -> parse_event",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true
+}

@@ -1621,7 +1621,10 @@ impl ClaudeProtocol {
             "system"
                 if message["subtype"] == "status" && message.get("permissionMode").is_some() =>
             {
-                if self.options.claude_profile.is_some() && message["permissionMode"] != "plan" {
+                if self.options.claude_profile.is_some()
+                    && message["permissionMode"]
+                        != super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
+                {
                     return Err(super::claude_profile::reject("claude_profile_mode_changed"));
                 }
                 if let Some(observation) = &mut self.permission_observation {
@@ -1782,7 +1785,8 @@ impl ClaudeProtocol {
                                 || !response["response"]["pid"]
                                     .as_u64()
                                     .is_some_and(|pid| pid > 0)
-                                || response["response"]["current_permission_mode"] != "plan")
+                                || response["response"]["current_permission_mode"]
+                                    != super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE)
                         {
                             return Err(super::claude_profile::reject(
                                 "claude_profile_native_identity_changed",

@@ -13,8 +13,10 @@ from unittest import mock
 
 import run_claude_adapter_live as runner
 from run_claude_adapter_live import (
-    MARKER, PROJECT_SETTINGS, authenticated_environment, load_api_environment, prepare_project,
-    sanitize, sanitize_event, validate_paths, verified_acceptance,
+    MARKER, PROJECT_SETTINGS, authenticated_environment, authorized_account_summary,
+    authorized_default_account_environment, load_api_environment, prepare_project,
+    probe_authorized_default_account, sanitize, sanitize_event, validate_paths,
+    validate_auth_selection, verified_acceptance,
 )
 
 
@@ -155,6 +157,68 @@ class EnvironmentTests(unittest.TestCase):
                 self.assertNotIn(key, environment)
             self.assertEqual(settings.read_text(encoding="utf-8"), '{"existing":"preserve"}\n')
 
+    def test_default_account_environment_preserves_identity_without_private_auth_overrides(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            inherited = {
+                "PATH": "test-path", "HOME": "/Users/unit", "USER": "unit", "LOGNAME": "unit",
+                "SHELL": "/bin/zsh", "CLAUDE_CONFIG_DIR": "/private/claude",
+                "ANTHROPIC_API_KEY": "inherited-secret", "ANTHROPIC_AUTH_TOKEN": "inherited-token",
+                "ANTHROPIC_BASE_URL": "https://inherited.invalid", "HTTPS_PROXY": "inherited-proxy",
+            }
+            with mock.patch.dict(os.environ, inherited, clear=True):
+                environment = authorized_default_account_environment(root)
+            self.assertEqual(environment["HOME"], "/Users/unit")
+            self.assertEqual(environment["USER"], "unit")
+            self.assertEqual(environment["LOGNAME"], "unit")
+            self.assertEqual(environment["SHELL"], "/bin/zsh")
+            self.assertEqual(environment["PATH"], "test-path")
+            for key in ("CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                        "ANTHROPIC_BASE_URL", "HTTPS_PROXY"):
+                self.assertNotIn(key, environment)
+
+    def test_default_account_status_keeps_only_nonidentity_subscription_summary(self):
+        raw = {
+            "loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+            "subscriptionType": "pro", "email": "person@example.invalid",
+            "organizationId": "00000000-0000-4000-8000-000000000001", "accessToken": "secret",
+        }
+        self.assertEqual(authorized_account_summary(raw), {
+            "loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+            "subscriptionType": "pro",
+        })
+        for changed in (
+            raw | {"loggedIn": False}, raw | {"authMethod": "apiKey"},
+            raw | {"apiProvider": "bedrock"}, raw | {"subscriptionType": None},
+            raw | {"subscriptionType": "free"}, [],
+        ):
+            with self.subTest(value=changed), self.assertRaises(ValueError):
+                authorized_account_summary(changed)
+
+    def test_default_account_probe_uses_fixed_readonly_command_and_discards_identity_fields(self):
+        raw = {
+            "loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+            "subscriptionType": "pro", "email": "person@example.invalid", "token": "secret",
+        }
+        completed = SimpleNamespace(returncode=0, stdout=json.dumps(raw), stderr="private stderr")
+        with mock.patch.object(runner.subprocess, "run", return_value=completed) as run:
+            result = probe_authorized_default_account(
+                Path("/fixed/claude"), {"HOME": "/Users/unit"}, Path("/probe")
+            )
+        self.assertEqual(result, {key: raw[key] for key in
+                                  ("loggedIn", "authMethod", "apiProvider", "subscriptionType")})
+        run.assert_called_once_with(
+            ["/fixed/claude", "auth", "status", "--json"], cwd=Path("/probe"),
+            env={"HOME": "/Users/unit"}, capture_output=True, text=True, encoding="utf-8",
+            errors="strict", timeout=30,
+        )
+        with mock.patch.object(runner.subprocess, "run", return_value=SimpleNamespace(
+                returncode=1, stdout=json.dumps(raw), stderr="person@example.invalid org_secret_value")):
+            with self.assertRaisesRegex(ValueError, "状态检查失败") as raised:
+                probe_authorized_default_account(Path("/fixed/claude"), {}, Path("/probe"))
+        self.assertNotIn("person@", str(raised.exception))
+        self.assertNotIn("org_secret", str(raised.exception))
+
     def test_project_only_requests_write_approval_and_refuses_reinitialization(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -196,6 +260,16 @@ class EnvironmentTests(unittest.TestCase):
             self.assertTrue(cleaned["passed"])
             self.assertNotIn(secret, redact(json.dumps(event)))
             self.assertNotIn("private.invalid", encoded)
+            identity = sanitize_event({"email":"person@example.invalid", "organizationId":"org_secret_value",
+                                       "token":"secret-token", "message":"person@example.invalid"}, redact)
+            self.assertEqual(identity["email"], "<redacted>")
+            self.assertEqual(identity["organizationId"], "<redacted>")
+            self.assertEqual(identity["token"], "<redacted>")
+            self.assertEqual(identity["message"], "<redacted-email>")
+            invalid = redact('email=person@example.invalid organization_id=org_secret_value token=secret-token')
+            self.assertNotIn("person@example.invalid", invalid)
+            self.assertNotIn("org_secret_value", invalid)
+            self.assertNotIn("secret-token", invalid)
 
     def test_output_rejects_credentials_executables_and_existing_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -213,6 +287,29 @@ class EnvironmentTests(unittest.TestCase):
             args.output.write_text("old evidence", encoding="utf-8")
             with self.assertRaises(ValueError):
                 validate_paths(args)
+
+    def test_default_account_requires_explicit_opt_in_and_excludes_private_modes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            for name in ("claude", "libtest", "supervisor", "api.json"):
+                (root / name).write_text("fixture", encoding="utf-8")
+            (root / "config").mkdir()
+            (root / "home").mkdir()
+            common = dict(test_binary=root / "libtest", claude=root / "claude",
+                          supervisor=root / "supervisor", output=root / "events.ndjson",
+                          claude_version="2.1.278")
+            online = argparse.Namespace(**common, config_dir=None, auth_home=None,
+                                        api_environment_file=None, use_authorized_default_account=True)
+            validate_paths(online)
+            for changes in (
+                {"config_dir": root / "config"}, {"auth_home": root / "home"},
+                {"api_environment_file": root / "api.json"}, {"claude_version": "2.1.273"},
+                {"use_authorized_default_account": False},
+            ):
+                args = argparse.Namespace(**(vars(online) | changes))
+                with self.subTest(changes=changes), self.assertRaises(ValueError):
+                    validate_paths(args)
+            self.assertTrue(validate_auth_selection(online))
 
 
 class FixedVersionRunnerTests(unittest.TestCase):
@@ -242,6 +339,24 @@ class FixedVersionRunnerTests(unittest.TestCase):
                 runner.run(argparse.Namespace(claude=Path(temporary) / "claude", claude_version="2.1.278"))
             load_api.assert_not_called()
             spawn.assert_not_called()
+
+    def test_direct_default_account_run_rejects_private_inputs_before_reading_api(self):
+        with tempfile.TemporaryDirectory() as temporary, \
+                mock.patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                mock.patch.object(runner.tempfile, "mkdtemp", return_value=temporary), \
+                mock.patch.object(runner, "verify_version", return_value="2.1.278 (Claude Code)"), \
+                mock.patch.object(runner, "load_api_environment") as load_api, \
+                mock.patch.object(runner, "probe_authorized_default_account") as probe:
+            root = Path(temporary)
+            args = argparse.Namespace(
+                claude=root / "claude", claude_version="2.1.278",
+                use_authorized_default_account=True, config_dir=root / "config",
+                auth_home=root / "home", api_environment_file=root / "api.json",
+            )
+            with self.assertRaisesRegex(ValueError, "不能同时提供"):
+                runner.run(args)
+            load_api.assert_not_called()
+            probe.assert_not_called()
 
     def test_default_and_explicit_version_reach_runtime_and_metadata(self):
         for selected in (None, "2.1.278"):
@@ -279,6 +394,47 @@ class FixedVersionRunnerTests(unittest.TestCase):
                 self.assertEqual(metadata["cli_version"], f"{expected} (Claude Code)")
                 self.assertTrue(metadata["acceptance_passed"])
                 self.assertTrue(metadata["cli_binary_unchanged"])
+
+    def test_authorized_default_account_is_probed_before_lifecycle_without_config_override(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for name in ("claude", "libtest", "supervisor"):
+                (root / name).write_bytes(b"synthetic executable")
+            args = argparse.Namespace(
+                claude=root / "claude", claude_version="2.1.278", test_binary=root / "libtest",
+                supervisor=root / "supervisor", config_dir=None, auth_home=None,
+                api_environment_file=None, use_authorized_default_account=True,
+                output=root / "events.ndjson", model=None,
+            )
+            status = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                      "subscriptionType": "pro"}
+
+            def spawn(command, **kwargs):
+                self.assertNotIn("CLAUDE_CONFIG_DIR", kwargs["env"])
+                self.assertNotIn("INFINISHELL_CLAUDE_LIVE_CONFIG_DIR", kwargs["env"])
+                self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_AUTH_MODE"],
+                                 "authorized_default_account")
+                args.output.write_text("".join(json.dumps(row) + "\n" for row in complete_events()),
+                                       encoding="utf-8")
+                return SimpleNamespace(returncode=0, communicate=lambda timeout: (SUMMARY, None))
+
+            environment = {"HOME": str(Path.home()), "PATH": "test-path"}
+            with mock.patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}), \
+                    mock.patch.object(runner, "verify_version", return_value="2.1.278 (Claude Code)"), \
+                    mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                    mock.patch.object(runner, "authorized_default_account_environment",
+                                      return_value=environment.copy()), \
+                    mock.patch.object(runner, "probe_authorized_default_account", return_value=status) as probe, \
+                    mock.patch.object(runner.subprocess, "run", return_value=SimpleNamespace(stdout="")), \
+                    mock.patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                    mock.patch("builtins.print"):
+                self.assertEqual(runner.run(args), 0)
+            probe.assert_called_once_with(args.claude, environment, root / "project")
+            metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+            self.assertEqual(metadata["authentication_source"], "authorized_default_account")
+            self.assertEqual(metadata["authorized_default_account"], status)
+            self.assertFalse(metadata["private_config_supplied"])
+            self.assertTrue(metadata["default_user_home_preserved"])
 
 
 if __name__ == "__main__":

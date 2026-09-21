@@ -2319,7 +2319,9 @@ fn input_action_with_content(
 
 fn verified_version(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
     match (harness, version) {
-        (Harness::Codex, CLIAgentVersionStatus::Detected(version)) => version == "0.147.0",
+        (Harness::Codex, CLIAgentVersionStatus::Detected(version)) => {
+            super::codex::supported_version(version)
+        }
         (Harness::Claude, CLIAgentVersionStatus::Detected(version)) => {
             super::claude::supported_version(version)
         }

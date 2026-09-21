@@ -299,6 +299,932 @@ fn snapshot() -> ManagedTaskSnapshot {
     }
 }
 
+async fn persist_running_task(
+    sender: &std::sync::mpsc::SyncSender<ModelEvent>,
+    task: &mut LocalCliTask,
+) {
+    let mut queued = task.clone();
+    queued.revision = 0;
+    queued.state = LocalCliTaskState::Queued;
+    queued.result = None;
+    queued.terminal_evidence = None;
+    checkpoint_task(sender, queued, None)
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+
+    task.revision = 1;
+    task.state = LocalCliTaskState::Running;
+    checkpoint_task(sender, task.clone(), Some(task.generation))
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+}
+
+#[test]
+fn repeated_refresh_skips_every_runtime_already_owned_by_this_coordinator() {
+    let generation = Uuid::new_v4();
+    let owned = HashMap::from([("task-owned".to_owned(), generation)]);
+
+    assert!(runtime_host_is_owned(&owned, "task-owned"));
+    assert!(!runtime_host_is_owned(&owned, "task-other"));
+}
+
+fn recovery_options(state_dir: &std::path::Path, generation: Uuid) -> SessionOptions {
+    SessionOptions {
+        executable: std::env::current_exe().unwrap(),
+        cwd: state_dir.to_owned(),
+        state_dir: state_dir.to_owned(),
+        target: SessionTarget::New,
+        generation,
+        permission_policy: PermissionPolicy::ReadOnly,
+        permission_ceiling: None,
+        claude_profile: None,
+        grok_profile: None,
+        model: None,
+        local_tools: None,
+        selected_skills: Vec::new(),
+    }
+}
+
+#[test]
+fn recovery_marks_manifest_failure_without_launch_intent_unconfirmed_and_does_not_retry() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("startup-recovery.sqlite")).unwrap();
+    let generation = Uuid::new_v4();
+    let mut task = snapshot().task;
+    task.native_session_id = None;
+    task.config_json = json!({"runtime_generation": generation}).to_string();
+    block_on(async {
+        checkpoint_task(&writer.sender, task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        super::super::runtime_host::write_manifest_failure_receipt_for_test(
+            task.task_id.clone(),
+            task.generation,
+            Harness::Codex,
+            recovery_options(&state_dir, generation),
+        )
+        .unwrap();
+
+        let batch = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task],
+            &HashMap::new(),
+            &state_dir,
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            batch.hosts.is_empty(),
+            "缺少 launch intent 时不得构造重试连接"
+        );
+        assert_eq!(batch.records[0].state, LocalCliTaskState::Unconfirmed);
+        let config: Value = serde_json::from_str(&batch.records[0].config_json).unwrap();
+        assert_eq!(
+            config["runtime_host_start_state"],
+            "not_started_launch_intent_missing"
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn recovery_rejects_manifest_failure_receipt_for_a_different_database_task() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("startup-identity.sqlite")).unwrap();
+    let generation = Uuid::new_v4();
+    let mut task = snapshot().task;
+    task.native_session_id = None;
+    task.config_json = json!({"runtime_generation": generation}).to_string();
+    block_on(async {
+        checkpoint_task(&writer.sender, task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        super::super::runtime_host::write_manifest_failure_receipt_for_test(
+            "different-task".to_owned(),
+            task.generation,
+            Harness::Codex,
+            recovery_options(&state_dir, generation),
+        )
+        .unwrap();
+
+        let batch = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task],
+            &HashMap::new(),
+            &state_dir,
+        )
+        .await
+        .unwrap();
+
+        assert!(batch.hosts.is_empty());
+        assert_eq!(batch.records[0].state, LocalCliTaskState::Unconfirmed);
+        let config: Value = serde_json::from_str(&batch.records[0].config_json).unwrap();
+        assert_eq!(
+            config["runtime_host_start_state"],
+            "startup_evidence_identity_mismatch"
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn recovery_does_not_retry_a_spawn_cancelled_before_exit_was_confirmed() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("startup-cancelled.sqlite")).unwrap();
+    let generation = Uuid::new_v4();
+    let mut task = snapshot().task;
+    task.native_session_id = None;
+    task.config_json = json!({"runtime_generation": generation}).to_string();
+    block_on(async {
+        checkpoint_task(&writer.sender, task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        super::super::runtime_host::write_cancelled_startup_marker_for_test(
+            task.task_id.clone(),
+            task.generation,
+            Harness::Codex,
+            recovery_options(&state_dir, generation),
+        )
+        .unwrap();
+
+        let batch = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task],
+            &HashMap::new(),
+            &state_dir,
+        )
+        .await
+        .unwrap();
+
+        assert!(batch.hosts.is_empty(), "未确认退出不得自动重试");
+        assert_eq!(batch.records[0].state, LocalCliTaskState::Unconfirmed);
+        let config: Value = serde_json::from_str(&batch.records[0].config_json).unwrap();
+        assert_eq!(
+            config["runtime_host_start_state"],
+            "native_exit_unconfirmed"
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn native_session_mismatch_is_detected_before_runtime_owner_claim() {
+    let mut task = snapshot().task;
+    task.native_session_id = Some("saved-session".to_owned());
+    let host = super::super::runtime_host::RuntimeHostSnapshot {
+        native_session_id: Some("different-session".to_owned()),
+        ..Default::default()
+    };
+
+    assert!(native_session_mismatches(&task, &host));
+    assert!(!native_session_mismatches(
+        &task,
+        &super::super::runtime_host::RuntimeHostSnapshot {
+            native_session_id: None,
+            ..Default::default()
+        }
+    ));
+}
+
+#[test]
+fn committed_duplicate_is_acked_without_reapplying_state_and_next_event_continues() {
+    let token = Uuid::new_v4();
+    let (mut controller, _commands, _events_sender, _events) = channels(token);
+    let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+    controller.host_event_acks = Some(host_acks);
+    let (sender, _receiver) = std::sync::mpsc::sync_channel(1);
+    let turn_id = "turn-committed-before-crash".to_owned();
+    let mut state = snapshot();
+    state.task.state = LocalCliTaskState::Completed;
+    state.task.result = Some("saved-result".to_owned());
+    state.output = "saved-result".to_owned();
+    let mut accepted = HashSet::new();
+    let mut finished = HashSet::from([turn_id.clone()]);
+    let duplicate = RuntimeEvent {
+        generation: token,
+        native_session_id: state.task.native_session_id.clone(),
+        kind: RuntimeEventKind::TurnFinished {
+            turn_id: turn_id.clone(),
+            outcome: TurnOutcome::Completed,
+            output: "saved-result".to_owned(),
+        },
+    };
+    let next = RuntimeEvent {
+        generation: token,
+        native_session_id: state.task.native_session_id.clone(),
+        kind: RuntimeEventKind::Progress {
+            turn_id,
+            message: "next-event".to_owned(),
+        },
+    };
+
+    block_on(async {
+        assert!(
+            !commit_and_ack_runtime_event(
+                &sender,
+                &mut state,
+                &controller,
+                &duplicate,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap()
+            .committed,
+            "已提交的 TurnFinished 不得再次改写任务状态"
+        );
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        assert!(
+            commit_and_ack_runtime_event(
+                &sender,
+                &mut state,
+                &controller,
+                &next,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap()
+            .committed,
+            "重复事件 ACK 后必须继续处理后续事件"
+        );
+        assert_eq!(committed_events.try_recv(), Ok(()));
+    });
+    assert_eq!(state.task.result.as_deref(), Some("saved-result"));
+    assert_eq!(state.output, "saved-result");
+}
+
+#[test]
+fn duplicate_terminal_event_repairs_parent_result_before_advancing_host_ack() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("result-replay.sqlite"))
+            .unwrap();
+    block_on(async {
+        let mut parent = snapshot().task;
+        parent.task_id = "result-parent".into();
+        parent.native_session_id = None;
+        persist_running_task(&writer.sender, &mut parent).await;
+        let mut state = snapshot();
+        state.task.task_id = "result-child".into();
+        state.task.parent_task_id = Some(parent.task_id.clone());
+        state.task.parent_generation = Some(parent.generation);
+        persist_running_task(&writer.sender, &mut state.task).await;
+        state.active_turn_id = Some("turn-result-replay".into());
+        let token = Uuid::new_v4();
+        let finished = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::TurnFinished {
+                turn_id: "turn-result-replay".into(),
+                outcome: TurnOutcome::Completed,
+                output: "已提交但尚未生成父结果".into(),
+            },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished_turns = HashSet::new();
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &finished,
+                &mut accepted,
+                &mut finished_turns,
+            )
+            .await
+            .unwrap()
+        );
+        let before = load_task_messages(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            !before
+                .iter()
+                .any(|message| message.subject == "local_task_result")
+        );
+
+        let (mut controller, _commands, _events_sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let repaired = commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &finished,
+            &mut accepted,
+            &mut finished_turns,
+        )
+        .await
+        .unwrap();
+        assert!(!repaired.committed);
+        let message = repaired.result.expect("重复终态必须补齐父结果");
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        let saved = load_task_messages(&writer.sender, state.task.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            saved
+                .iter()
+                .filter(|stored| stored.subject == "local_task_result")
+                .count(),
+            1
+        );
+        assert!(saved.iter().any(|stored| stored == &message));
+
+        let repeated = commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &finished,
+            &mut accepted,
+            &mut finished_turns,
+        )
+        .await
+        .unwrap();
+        assert_eq!(repeated.result.unwrap().message_id, message.message_id);
+        assert_eq!(committed_events.try_recv(), Ok(()));
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn restart_repairs_a_committed_child_result_without_restarting_the_terminal_task() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("terminal-result-repair.sqlite"))
+            .unwrap();
+    block_on(async {
+        let mut parent = snapshot().task;
+        parent.task_id = "terminal-result-parent".into();
+        parent.native_session_id = None;
+        persist_running_task(&writer.sender, &mut parent).await;
+
+        let mut child = snapshot().task;
+        child.task_id = "terminal-result-child".into();
+        child.parent_task_id = Some(parent.task_id.clone());
+        child.parent_generation = Some(parent.generation);
+        persist_running_task(&writer.sender, &mut child).await;
+        child.revision += 1;
+        child.state = LocalCliTaskState::Completed;
+        child.result = Some("崩溃前已经提交的真实结果".into());
+        child.terminal_evidence = Some("原生终态收据".into());
+        checkpoint_task(&writer.sender, child.clone(), Some(child.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            load_task_messages(&writer.sender, child.task_id.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .is_empty(),
+            "模拟任务终态已提交而结果消息尚未生成的崩溃窗口"
+        );
+
+        for _ in 0..2 {
+            let batch = recover_runtime_hosts_in_state_dir(
+                &writer.sender,
+                vec![parent.clone(), child.clone()],
+                &HashMap::new(),
+                &state_dir,
+            )
+            .await
+            .unwrap();
+            assert!(batch.hosts.is_empty(), "终态子任务不能被重新启动");
+            assert_eq!(batch.results.len(), 1);
+            assert_eq!(batch.results[0].0, child);
+            assert_eq!(batch.results[0].1.state, LocalCliMessageState::Queued);
+            assert_eq!(batch.results[0].1.receipt_kind, None);
+        }
+
+        let messages = load_task_messages(&writer.sender, child.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            messages
+                .iter()
+                .filter(|message| message.subject == "local_task_result")
+                .count(),
+            1,
+            "确定性结果 ID 必须让重复恢复保持单条记录"
+        );
+        assert_eq!(messages[0].recipient_task_id, parent.task_id);
+        assert_eq!(messages[0].recipient_generation, parent.generation);
+        assert_eq!(messages[0].sender_generation, child.generation);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn restart_never_replays_a_child_result_after_delivery_became_unconfirmed() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer = crate::persistence::start_test_writer(
+        &directory.path().join("terminal-result-unconfirmed.sqlite"),
+    )
+    .unwrap();
+    block_on(async {
+        let mut parent = snapshot().task;
+        parent.task_id = "unconfirmed-result-parent".into();
+        parent.native_session_id = None;
+        persist_running_task(&writer.sender, &mut parent).await;
+
+        let mut child = snapshot().task;
+        child.task_id = "unconfirmed-result-child".into();
+        child.parent_task_id = Some(parent.task_id.clone());
+        child.parent_generation = Some(parent.generation);
+        persist_running_task(&writer.sender, &mut child).await;
+        child.revision += 1;
+        child.state = LocalCliTaskState::Completed;
+        child.result = Some("只允许投递一次的结果".into());
+        child.terminal_evidence = Some("原生完成收据".into());
+        checkpoint_task(&writer.sender, child.clone(), Some(child.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let message = enqueue_task_result(&writer.sender, child.task_id.clone(), child.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        acknowledge_message(
+            &writer.sender,
+            message.message_id.clone(),
+            parent.task_id.clone(),
+            parent.generation,
+            LocalCliMessageState::Sent,
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert!(
+            recover_terminal_task_result(&writer.sender, &child)
+                .await
+                .unwrap()
+                .is_none(),
+            "Sent 表示交付不确定，恢复不得把它重新排队"
+        );
+        let messages = load_task_messages(&writer.sender, child.task_id.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].state, LocalCliMessageState::Sent);
+        assert_eq!(messages[0].receipt_kind, None);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn local_tool_replay_repairs_missing_lease_before_acknowledging_event() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("tool-lease-repair.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = snapshot();
+        state.task.task_id = "tool-lease-repair".into();
+        state.task.state = LocalCliTaskState::Running;
+        state.active_turn_id = Some("turn-tool-lease-repair".into());
+        persist_running_task(&writer.sender, &mut state.task).await;
+        let request = NativeLocalToolRequest {
+            reply_target: super::super::local_tools::LocalToolReplyTarget::Codex {
+                request_id: json!("request-tool-lease-repair"),
+            },
+            call_id: "call-tool-lease-repair".into(),
+            turn_id: "turn-tool-lease-repair".into(),
+            tool: "inspect_local_tasks".into(),
+            arguments: json!({}),
+        };
+        let event = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::LocalToolRequested { request },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &event,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap(),
+            "LocalToolRequested 当前不在任务快照中记录去重标记"
+        );
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored
+                .iter()
+                .filter(|message| message.subject == LOCAL_TOOL_LEASE_SUBJECT)
+                .count(),
+            0,
+            "模拟业务事件已提交、租约尚未写入的崩溃窗口"
+        );
+
+        let (mut controller, _commands, _events_sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let replayed = commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &event,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert!(
+            replayed.committed,
+            "LocalToolRequested 重放当前仍返回已提交，租约修复不能依赖该布尔值"
+        );
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored
+                .iter()
+                .filter(|message| message.subject == LOCAL_TOOL_LEASE_SUBJECT)
+                .count(),
+            1
+        );
+
+        let repeated = commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &event,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert!(repeated.committed);
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored
+                .iter()
+                .filter(|message| message.subject == LOCAL_TOOL_LEASE_SUBJECT)
+                .count(),
+            1
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn live_reattach_catch_up_applies_cancellation_before_selecting_recovered_tools() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer = crate::persistence::start_test_writer(
+        &directory
+            .path()
+            .join("live-tool-cancellation-catch-up.sqlite"),
+    )
+    .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut task = snapshot().task;
+        task.task_id = "live-tool-cancellation-catch-up".into();
+        task.state = LocalCliTaskState::Running;
+        let turn_id = "turn-live-tool-cancellation".to_owned();
+        let request = NativeLocalToolRequest {
+            reply_target: super::super::local_tools::LocalToolReplyTarget::Codex {
+                request_id: json!("request-live-tool-cancellation"),
+            },
+            call_id: "call-live-tool-cancellation".into(),
+            turn_id: turn_id.clone(),
+            tool: "inspect_local_tasks".into(),
+            arguments: json!({}),
+        };
+        let requested = RuntimeEvent {
+            generation: token,
+            native_session_id: task.native_session_id.clone(),
+            kind: RuntimeEventKind::LocalToolRequested {
+                request: request.clone(),
+            },
+        };
+        let cancelled = RuntimeEvent {
+            generation: token,
+            native_session_id: task.native_session_id.clone(),
+            kind: RuntimeEventKind::LocalToolCancelled {
+                turn_id: turn_id.clone(),
+                call_id: request.call_id.clone(),
+            },
+        };
+        let mut host_snapshot = super::super::runtime_host::RuntimeHostSnapshot {
+            ready: true,
+            connected: true,
+            native_session_id: task.native_session_id.clone(),
+            active_turn_id: Some(turn_id),
+            ..Default::default()
+        };
+        host_snapshot.apply_recovered_event(&requested);
+        persist_running_task(&writer.sender, &mut task).await;
+        ensure_local_tool_lease(&writer.sender, &task, token, &request)
+            .await
+            .unwrap();
+        let mut protocol_state = protocol_state_from_host(&host_snapshot);
+        let mut state = snapshot_from_host(task, host_snapshot.clone());
+
+        let committed = commit_catch_up_runtime_event(
+            &writer.sender,
+            &mut state,
+            &mut host_snapshot,
+            &cancelled,
+            &mut protocol_state,
+        )
+        .await
+        .unwrap();
+
+        assert!(committed.committed);
+        assert!(host_snapshot.local_tools.is_empty());
+        let recovered_tools: Vec<_> = host_snapshot.local_tools.values().cloned().collect();
+        assert!(
+            recovered_tools.is_empty(),
+            "未 ACK 的取消必须在选择恢复工具前生效"
+        );
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            stored
+                .iter()
+                .all(|message| message.subject != "native_tool_call"),
+            "catch-up 屏障内不得启动本地工具副作用"
+        );
+        assert_eq!(
+            stored
+                .iter()
+                .filter(|message| message.subject == LOCAL_TOOL_LEASE_SUBJECT)
+                .count(),
+            1,
+            "已 ACK 的工具请求租约必须保留，但取消后不得执行"
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn local_tool_lease_is_idempotent_and_started_without_result_recovers_as_uncertain() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("tool-replay.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let mut state = snapshot();
+        state.task.task_id = "tool-recovery".into();
+        state.task.state = LocalCliTaskState::Running;
+        state.active_turn_id = Some("turn-tool-recovery".into());
+        persist_running_task(&writer.sender, &mut state.task).await;
+        let request = NativeLocalToolRequest {
+            reply_target: super::super::local_tools::LocalToolReplyTarget::Codex {
+                request_id: json!("request-tool-recovery"),
+            },
+            call_id: "call-tool-recovery".into(),
+            turn_id: "turn-tool-recovery".into(),
+            tool: "inspect_local_tasks".into(),
+            arguments: json!({}),
+        };
+        let event = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::LocalToolRequested {
+                request: request.clone(),
+            },
+        };
+        let (mut controller, _commands, _events_sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        for _ in 0..2 {
+            assert!(
+                commit_and_ack_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &controller,
+                    &event,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap()
+                .committed
+            );
+            assert_eq!(committed_events.try_recv(), Ok(()));
+        }
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            stored
+                .iter()
+                .filter(|message| message.subject == LOCAL_TOOL_LEASE_SUBJECT)
+                .count(),
+            1
+        );
+        assert!(
+            recovered_local_tool_completion(&writer.sender, &state.task, token, &request)
+                .await
+                .unwrap()
+                .is_none(),
+            "只有租约而没有调用记录时可安全开始"
+        );
+
+        let call_id = Uuid::new_v4();
+        let call = LocalCliMessage {
+            version: 1,
+            message_id: call_id.to_string(),
+            sender_task_id: state.task.task_id.clone(),
+            recipient_task_id: state.task.task_id.clone(),
+            sender_generation: 1,
+            recipient_generation: 1,
+            subject: "native_tool_call".into(),
+            body: serde_json::to_string(&request).unwrap(),
+            state: LocalCliMessageState::Queued,
+            receipt_kind: None,
+        };
+        enqueue_message(&writer.sender, call.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        acknowledge_message(
+            &writer.sender,
+            call.message_id,
+            state.task.task_id.clone(),
+            1,
+            LocalCliMessageState::Sent,
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        let uncertain =
+            recovered_local_tool_completion(&writer.sender, &state.task, token, &request)
+                .await
+                .unwrap()
+                .expect("已有调用但缺少结果必须收敛为不确定失败");
+        assert!(uncertain.receipt_id.is_none());
+        assert_eq!(
+            uncertain.result.as_ref().unwrap_err(),
+            "runtime_host.local_tool_execution_unconfirmed"
+        );
+        tools::prepare_tool_reply(&writer.sender, &state.task, &uncertain)
+            .await
+            .unwrap();
+        let recovered =
+            recovered_local_tool_completion(&writer.sender, &state.task, token, &request)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(recovered.result, uncertain.result);
+
+        let completed_request = NativeLocalToolRequest {
+            call_id: "call-tool-completed".into(),
+            ..request
+        };
+        ensure_local_tool_lease(&writer.sender, &state.task, token, &completed_request)
+            .await
+            .unwrap();
+        let completed_call_id = Uuid::new_v4();
+        let completed_call = LocalCliMessage {
+            version: 1,
+            message_id: completed_call_id.to_string(),
+            sender_task_id: state.task.task_id.clone(),
+            recipient_task_id: state.task.task_id.clone(),
+            sender_generation: 1,
+            recipient_generation: 1,
+            subject: "native_tool_call".into(),
+            body: serde_json::to_string(&completed_request).unwrap(),
+            state: LocalCliMessageState::Queued,
+            receipt_kind: None,
+        };
+        enqueue_message(&writer.sender, completed_call.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        acknowledge_message(
+            &writer.sender,
+            completed_call.message_id,
+            state.task.task_id.clone(),
+            1,
+            LocalCliMessageState::Sent,
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        let completed_result_id = local_tool_result_id(completed_call_id);
+        let completed_result: Result<Value, String> = Ok(json!({"tasks": []}));
+        enqueue_message(
+            &writer.sender,
+            LocalCliMessage {
+                version: 1,
+                message_id: completed_result_id.to_string(),
+                sender_task_id: state.task.task_id.clone(),
+                recipient_task_id: state.task.task_id.clone(),
+                sender_generation: 1,
+                recipient_generation: 1,
+                subject: "native_tool_result".into(),
+                body: serde_json::to_string(&completed_result).unwrap(),
+                state: LocalCliMessageState::Queued,
+                receipt_kind: None,
+            },
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        let completed =
+            recovered_local_tool_completion(&writer.sender, &state.task, token, &completed_request)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(completed.receipt_id, Some(completed_result_id));
+        assert_eq!(completed.result, completed_result);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn cross_generation_host_event_is_rejected_instead_of_waiting_for_an_ack() {
+    let state = snapshot();
+    let event = RuntimeEvent {
+        generation: Uuid::new_v4(),
+        native_session_id: state.task.native_session_id,
+        kind: RuntimeEventKind::Progress {
+            turn_id: "wrong-generation".to_owned(),
+            message: "must-fail-closed".to_owned(),
+        },
+    };
+
+    assert!(verify_runtime_event_generation(&event, Uuid::new_v4()).is_err());
+}
+
 fn event(snapshot: &ManagedTaskSnapshot, kind: RuntimeEventKind) -> RuntimeEvent {
     RuntimeEvent {
         generation: Uuid::new_v4(),
@@ -871,6 +1797,145 @@ fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_aft
 }
 
 #[test]
+fn offline_recovery_replays_a_committed_event_before_advancing_its_durable_watermark() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("runtime-host-recovery.sqlite");
+    let token = Uuid::new_v4();
+    let message_id = Uuid::new_v4();
+    let identity = RuntimeHostRecoveryIdentity {
+        runtime_generation: token,
+        host_instance_id: Uuid::new_v4(),
+        manifest_sha256: "manifest-a".to_owned(),
+    };
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    let (task_id, acknowledged) = block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"runtime_generation":token}).to_string();
+        checkpoint_task(&writer.sender, state.task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            message_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("跨崩溃恢复".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, message_id);
+        let acknowledged = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::MessageAccepted {
+                message_id,
+                turn_id: Some(message_id.to_string()),
+            },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &acknowledged,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        // 模拟 SQLite 事件/消息已提交，而 recovered-through 尚未推进即崩溃。
+        assert!(recovery_checkpoint(&state.task).unwrap().is_none());
+        (state.task.task_id, acknowledged)
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+
+    let restarted = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let task = load_tasks(&restarted.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .find(|task| task.task_id == task_id)
+            .unwrap();
+        let messages = load_messages(&restarted.sender, task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages[0].state, LocalCliMessageState::Acknowledged);
+        let mut state = ManagedTaskSnapshot {
+            task,
+            ready: true,
+            connected: true,
+            active_turn_id: None,
+            approvals: Vec::new(),
+            output: String::new(),
+            error: None,
+        };
+        let mut protocol = RecoveryProtocolState::default();
+        // 重放已提交的 ACK 必须保持幂等，同时重建下一事件所需的 accepted turn。
+        commit_runtime_event(
+            &restarted.sender,
+            &mut state,
+            &acknowledged,
+            &mut protocol.accepted_turns,
+            &mut protocol.finished_turns,
+        )
+        .await
+        .unwrap();
+        advance_recovery_protocol_state(&mut protocol, &acknowledged);
+        persist_recovery_checkpoint(&restarted.sender, &mut state.task, &identity, 1)
+            .await
+            .unwrap();
+        let started = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::TurnStarted {
+                turn_id: message_id.to_string(),
+            },
+        };
+        commit_runtime_event(
+            &restarted.sender,
+            &mut state,
+            &started,
+            &mut protocol.accepted_turns,
+            &mut protocol.finished_turns,
+        )
+        .await
+        .unwrap();
+        persist_recovery_checkpoint(&restarted.sender, &mut state.task, &identity, 2)
+            .await
+            .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        let expected_turn = message_id.to_string();
+        assert_eq!(
+            state.active_turn_id.as_deref(),
+            Some(expected_turn.as_str())
+        );
+        assert_eq!(
+            recovery_checkpoint(&state.task)
+                .unwrap()
+                .unwrap()
+                .recovered_through,
+            2
+        );
+    });
+    restarted.sender.send(ModelEvent::Terminate).unwrap();
+    restarted.handle.join().unwrap();
+}
+
+#[test]
 fn claude_queued_input_commits_receipt_before_advancing_the_execution_generation() {
     let directory = tempfile::tempdir().unwrap();
     let writer =
@@ -1151,6 +2216,21 @@ fn native_joined_input_keeps_the_execution_generation_and_requires_its_result() 
         assert_eq!(state.task.generation, 1);
         assert_eq!(state.output, "当前回合输出");
         assert_eq!(state.active_turn_id, Some(Uuid::from_u128(10).to_string()));
+        // 模拟 InputJoined 的业务提交完成、recovered-through 尚未推进即崩溃；
+        // 重启从前一 ACK 快照重建 accepted 后，必须只收敛水位而不再次要求 pending。
+        accepted.insert(id.to_string());
+        assert!(
+            !commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &joined,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap()
+        );
+        assert!(!accepted.contains(&id.to_string()));
         let execution_result = event(
             &state,
             RuntimeEventKind::TurnFinished {

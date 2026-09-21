@@ -153,6 +153,7 @@ struct LiveSession {
 enum LiveCapabilityProfile {
     Extended,
     P0,
+    CurrentRootCandidate,
 }
 
 impl Drop for LiveSession {
@@ -165,7 +166,7 @@ impl Drop for LiveSession {
 }
 
 impl LiveSession {
-    fn start(options: SessionOptions) -> Self {
+    fn start(options: SessionOptions, current_root_candidate_for_live: bool) -> Self {
         let generation = options.generation;
         let state_dir = options.state_dir.clone();
         let expected_native_id = match &options.target {
@@ -174,6 +175,7 @@ impl LiveSession {
         };
         let (controller, commands, sender, events) = channels(generation);
         let mut protocol = GrokProtocol::new(options);
+        protocol.current_root_candidate_for_live = current_root_candidate_for_live;
         let final_histories = Arc::new(Mutex::new(HashMap::new()));
         protocol.verified_final_histories_for_live = Some(final_histories.clone());
         let task = tokio::spawn(async move {
@@ -280,6 +282,23 @@ impl LiveSession {
                     "emptyHistoryRecovery",
                     "closeSession",
                     "queuedSubmit",
+                    "steer",
+                    "localTools",
+                    "childTasks",
+                ],
+            ),
+            LiveCapabilityProfile::CurrentRootCandidate => (
+                &[
+                    "newSession",
+                    "submit",
+                    "queuedSubmit",
+                    "approval",
+                    "cancel",
+                    "resume",
+                ],
+                &[
+                    "emptyHistoryRecovery",
+                    "closeSession",
                     "steer",
                     "localTools",
                     "childTasks",
@@ -695,7 +714,11 @@ fn completed(turn: &ObservedTurn, expected: &str) -> Result<(), String> {
     Ok(())
 }
 
-async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+async fn exercise(
+    root: &Path,
+    evidence: &mut Evidence,
+    current_root_candidate: bool,
+) -> Result<(), String> {
     let official = match env::var("INFINISHELL_GROK_LIVE_AUTH_MODE") {
         Ok(mode) if mode == "official-cached-token" => true,
         Ok(mode) => return Err(format!("不支持的验收认证模式：{mode}")),
@@ -706,13 +729,16 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         .join("project")
         .canonicalize()
         .map_err(|error| error.to_string())?;
+    let state_dir = env::var_os("INFINISHELL_GROK_LIVE_STATE_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("state"));
     let mut options = SessionOptions {
         executable: PathBuf::from(
             env::var_os("INFINISHELL_GROK_LIVE_EXECUTABLE")
                 .ok_or_else(|| "缺少固定 Grok 沙箱入口".to_owned())?,
         ),
         cwd: cwd.clone(),
-        state_dir: root.join("state"),
+        state_dir,
         target: SessionTarget::New,
         generation: Uuid::new_v4(),
         permission_policy: PermissionPolicy::Inherit,
@@ -723,9 +749,16 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options.clone());
+    let mut session = LiveSession::start(options.clone(), current_root_candidate);
     session
-        .ready(evidence, LiveCapabilityProfile::Extended)
+        .ready(
+            evidence,
+            if current_root_candidate {
+                LiveCapabilityProfile::CurrentRootCandidate
+            } else {
+                LiveCapabilityProfile::Extended
+            },
+        )
         .await?;
     let native_id = session
         .native_id
@@ -817,9 +850,16 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     options.target = SessionTarget::Resume {
         native_session_id: native_id.clone(),
     };
-    let mut resumed = LiveSession::start(options);
+    let mut resumed = LiveSession::start(options, current_root_candidate);
     resumed
-        .ready(evidence, LiveCapabilityProfile::Extended)
+        .ready(
+            evidence,
+            if current_root_candidate {
+                LiveCapabilityProfile::CurrentRootCandidate
+            } else {
+                LiveCapabilityProfile::Extended
+            },
+        )
         .await?;
     let recovered = run_turn(&mut resumed,"resume_result","INFINISHELL_GROK_ADAPTER：不要调用工具，只回复上一会话运行中追加指令要求记住的完整 QUEUED_APPLIED 标记。".into(),TurnMode::Plain,evidence).await?;
     completed(&recovered, &marker)?;
@@ -872,7 +912,7 @@ async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String>
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options.clone());
+    let mut session = LiveSession::start(options.clone(), false);
     session.ready(evidence, LiveCapabilityProfile::P0).await?;
     let native_id = session
         .native_id
@@ -927,7 +967,7 @@ async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String>
     options.target = SessionTarget::Resume {
         native_session_id: native_id.clone(),
     };
-    let mut resumed = LiveSession::start(options);
+    let mut resumed = LiveSession::start(options, false);
     resumed.ready(evidence, LiveCapabilityProfile::P0).await?;
     completed(
         &run_turn(
@@ -987,7 +1027,7 @@ async fn real_grok_managed_lifecycle() {
         "production_run_process":true,"production_run_transport":true,
         "production_runtime_commands":true,"test_only_internal_command_switch":false,
         "public_product_gate_open":false,"same_turn_steering_supported":false})).unwrap();
-    let result = exercise(&root, &mut evidence).await;
+    let result = exercise(&root, &mut evidence, false).await;
     if let Err(error) = &result {
         evidence
             .record(json!({"event":"acceptance_failed","reason":error}))
@@ -996,6 +1036,57 @@ async fn real_grok_managed_lifecycle() {
     assert!(
         result.is_ok(),
         "真实 Grok Rust 适配器验收未通过；请检查脱敏证据"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "必须由 Grok 1.0.40 官方隔离运行器显式启动；会消耗用户授权模型额度"]
+async fn real_grok_current_root_lifecycle() {
+    assert_eq!(
+        env::var("INFINISHELL_GROK_LIVE_PROFILE").as_deref(),
+        Ok("root-1.0.40")
+    );
+    let root =
+        PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("必须由隔离运行器启动"))
+            .canonicalize()
+            .expect("私有验收目录存在");
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-grok-live-probe")).unwrap(),
+        "isolated Grok Rust adapter verification\n"
+    );
+    assert_eq!(
+        PathBuf::from(env::var_os("GROK_HOME").expect("缺少私有 Grok HOME"))
+            .canonicalize()
+            .unwrap(),
+        root.join("home/.grok")
+    );
+    assert!(env::var_os("XAI_API_KEY").is_none());
+    assert!(env::var_os("ANTHROPIC_API_KEY").is_none());
+    assert!(env::var_os("ANTHROPIC_AUTH_TOKEN").is_none());
+    let mut evidence = Evidence {
+        file: File::create(PathBuf::from(
+            env::var_os("INFINISHELL_GROK_LIVE_ARTIFACT").expect("缺少证据路径"),
+        ))
+        .unwrap(),
+        root: root.clone(),
+    };
+    evidence
+        .record(json!({"event":"acceptance_started","scope":SCOPE,
+            "verified_scope":"current_root_candidate","credential_files_read_by_probe":false,
+            "production_run_process":true,"production_run_transport":true,
+            "production_runtime_commands":true,"test_only_current_candidate_gate":true,
+            "public_product_gate_open":false,"same_turn_steering_supported":false,
+            "skills_verified":false,"local_tools_verified":false,"child_tasks_verified":false}))
+        .unwrap();
+    let result = exercise(&root, &mut evidence, true).await;
+    if let Err(error) = &result {
+        evidence
+            .record(json!({"event":"acceptance_failed","reason":error}))
+            .unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "真实 Grok 1.0.40 根生命周期验收未通过；请检查脱敏证据"
     );
 }
 

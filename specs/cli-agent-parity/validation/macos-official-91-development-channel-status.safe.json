@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-09-20T22:47:15Z",
+  "scope": "development_cli_channel_status",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+    "working_tree_dirty": true
+  },
+  "codex": {
+    "version_output": "codex-cli 0.155.1",
+    "install_source": "homebrew_cask",
+    "selected_channel": "latest",
+    "current_for_selected_channel": true,
+    "evidence": "macos-official-89-codex-01551-development-upgrade.safe.json"
+  },
+  "claude": {
+    "version_output": "2.1.267 (Claude Code)",
+    "install_source": "homebrew_cask",
+    "bytes": 200489184,
+    "sha256": "a681f3008f0050029aeebcab3af51bb6a55ddeb625a3af3141a4416d43cd2558",
+    "homebrew_version": "2.1.267",
+    "official_stable_version": "2.1.267",
+    "direct_channel_query_succeeded": false,
+    "direct_channel_query_failure": "unauthenticated",
+    "selected_channel_confirmed": false
+  },
+  "grok": {
+    "version_output": "grok 1.0.34 (3736acbc8658)",
+    "install_source": "internal",
+    "bytes": 143016096,
+    "sha256": "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+    "selected_channel": "stable",
+    "current_version": "1.0.34",
+    "latest_for_selected_channel": "1.0.34",
+    "update_available": false,
+    "auto_update": null,
+    "check_error": null
+  },
+  "result": {
+    "codex_current": true,
+    "grok_current": true,
+    "claude_binary_matches_official_stable": true,
+    "claude_selected_channel_confirmed": false,
+    "product_channel_persistence_executed": false,
+    "full_goal_passed": false
+  },
+  "limitations": [
+    "Claude refused the selected-channel query because the CLI is not authenticated; matching the Homebrew version to official stable does not prove the saved product channel.",
+    "The checks do not execute InfiniShell channel transactions, application restart recovery, upgrades, downgrades, or manual channel switching.",
+    "The source working tree is not frozen or committed."
+  ]
+}

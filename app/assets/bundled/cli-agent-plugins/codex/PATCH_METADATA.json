@@ -1,5 +1,5 @@
 {
-  "patch_revision": 4,
+  "patch_revision": 5,
   "upstream_repository": "https://github.com/warpdotdev/codex-warp",
   "upstream_plugin": "warp",
   "compatible_bases": [
@@ -43,7 +43,7 @@
     },
     "scripts/warp-notify.sh": {
       "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
-      "replacement_sha256": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "replacement_sha256": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29",
       "mode": "0755"
     },
     "scripts/on-prompt-submit.sh": {

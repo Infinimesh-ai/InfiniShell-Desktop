@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "scope": "claude_2_1_278_authorized_default_account_managed_lifecycle",
+  "recorded_at": "2026-09-21T13:31:00+08:00",
+  "branch": "codex/cli-agent-parity",
+  "head": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "worktree_dirty": true,
+  "same_commit_verified": false,
+  "full_goal_passed": false,
+  "authentication": {
+    "source": "authorized_default_account",
+    "logged_in": true,
+    "auth_method": "claude.ai",
+    "api_provider": "firstParty",
+    "subscription_type": "pro",
+    "claude_config_dir_set": false,
+    "credential_access_boundary": "native_cli_only",
+    "credential_values_recorded": false,
+    "identity_fields_recorded": false,
+    "runner_copied_or_read_credentials": false
+  },
+  "inputs": {
+    "claude": {
+      "version": "2.1.278 (Claude Code)",
+      "bytes": 217695408,
+      "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+      "strict_codesign_verified": true
+    },
+    "test_binary": {
+      "bytes_at_execution": 875424008,
+      "sha256": "1b9dbb901c607b7af9b1199c2755f273512b5e4c13995c1b4c2e5e5c3a86c238",
+      "retained_at_same_path_after_execution": false,
+      "retention_note": "共享 Cargo 测试路径随后被后续定向编译覆盖；本记录不提升为最终冻结提交证据"
+    },
+    "supervisor": {
+      "bytes": 752327232,
+      "sha256": "6c98c97ae009efa33f91428819aff94f63c5a12a84980c49eaf4da87795dac3a",
+      "strict_codesign_verified": true
+    }
+  },
+  "authorized_account_run": {
+    "runner_test_exit_code": 0,
+    "acceptance_passed": true,
+    "event_count": 56,
+    "event_counts": {
+      "acceptance_started": 1,
+      "session_ready": 10,
+      "phase_started": 7,
+      "message_accepted": 9,
+      "turn_started": 8,
+      "turn_finished": 8,
+      "approval_requested": 2,
+      "approval_resolved": 2,
+      "command_dispatched": 2,
+      "file_effect_verified": 2,
+      "queued_input_submitted": 1,
+      "queued_input_result_verified": 1,
+      "connection_shutdown": 2,
+      "acceptance_passed": 1,
+      "acceptance_failed": 0
+    },
+    "two_rounds_verified": true,
+    "approval_allow_file_effect_verified": true,
+    "approval_deny_no_file_effect_verified": true,
+    "queued_followup_native_ack_verified": true,
+    "cancel_and_same_connection_continue_verified": true,
+    "new_process_same_native_session_resume_verified": true,
+    "project_settings_unchanged": true,
+    "same_turn_steering_supported": false,
+    "application_restart_and_ui_verified": false,
+    "parent_permission_ceiling_verified": false,
+    "private_artifacts": {
+      "metadata": {
+        "bytes": 2112,
+        "sha256": "964e7529382ed63ae810a80aa35aa81169bfa116f1f48370af526321cf5cffec"
+      },
+      "events": {
+        "bytes": 11366,
+        "sha256": "ca5ef0596a3e5c0e4898c5a3d35f8fbce9f608f3df331e3864fb71507856ee3e"
+      },
+      "test_output": {
+        "bytes": 38075,
+        "sha256": "89247f9afe94c06b11dc69e009064bef48c86a0c296707f569085b45ad8051c6"
+      },
+      "sensitive_pattern_scan_matches": 0
+    },
+    "outer_wrapper": {
+      "exit_code": 1,
+      "runner_had_already_completed": true,
+      "error": "zsh wrapper used the reserved read-only variable named status after the runner returned",
+      "model_run_repeated_for_wrapper_error": false
+    }
+  },
+  "preserved_isolated_login_failure": {
+    "acceptance_passed": false,
+    "test_exit_code": 101,
+    "isolated_auth_logged_in": false,
+    "first_real_turn_failed_not_logged_in": true,
+    "later_phases_not_reached": true,
+    "test_binary_sha256": "cbdd4c242bf06400460e7709bbb8b89a00eb26b410c305d5759cb11d4fd161ce",
+    "metadata_sha256": "99234f50e3172161ceedbdfd07a93eeab96915bc6cdc02fd4c3a6206b9104a24",
+    "events_sha256": "b11a02c600e96bc1f6956a89eec5d346f1cf9614e884966c04d1abcd149b7673",
+    "test_output_sha256": "de4e20e46ef35be04126339236483f9d4356dcb9436618f5f19ca3b99417f3e1",
+    "sensitive_pattern_scan_matches": 0
+  },
+  "new_mode_gates": {
+    "python_tests": {
+      "passed": 20,
+      "failed": 0
+    },
+    "rust_tests": {
+      "passed": 1,
+      "failed": 0
+    },
+    "py_compile_passed": true,
+    "rustfmt_check_passed": true,
+    "diff_check_passed": true
+  },
+  "result": "当前工作树上的 Claude 2.1.278 托管适配器进程级生命周期通过；隔离 OAuth 失败仍保留。尚非冻结提交、GUI 应用重启、父子任务或跨平台最终验收。"
+}

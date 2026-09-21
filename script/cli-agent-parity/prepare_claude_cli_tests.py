@@ -41,6 +41,14 @@ class FixedClaudeInputsTests(unittest.TestCase):
                 for target, (name, size, checksum) in contract["platforms"].items():
                     self.assertEqual(manifest["platforms"][target], {"binary": name, "size": size, "checksum": checksum})
 
+    def test_main_defaults_to_the_latest_verified_release(self):
+        argv = ["prepare_claude_cli.py", "--private-directory", "/not-used"]
+        with mock.patch.object(prepare.sys, "argv", argv), \
+                mock.patch.object(prepare, "release_contract", side_effect=RuntimeError("stop")) as contract, \
+                self.assertRaisesRegex(RuntimeError, "stop"):
+            prepare.main()
+        contract.assert_called_once_with("2.1.278")
+
     def test_binary_bytes_and_digest_must_belong_to_selected_version(self):
         # 缩小的合成文件只验证绑定关系；真实发行摘要由上面的原始 manifest 回归核对。
         with tempfile.TemporaryDirectory() as temporary:

@@ -29,6 +29,22 @@ use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeL
 
 pub(super) const VERIFIED_VERSION: &str = "1.0.30";
 pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
+pub(super) const CURRENT_VERSION: &str = "1.0.40";
+const CURRENT_SETUP_METHOD: &str = "_x.ai/session/setup";
+const CURRENT_SETUP_PHASES: [&str; 12] = [
+    "auth",
+    "resolve_workspace",
+    "folder_trust",
+    "plugin_registry",
+    "mcp_merge",
+    "response_ready",
+    "persistence_init",
+    "spawn_session_actor",
+    "model_switch",
+    "git_discovery",
+    "finalize_response",
+    "tool_overrides",
+];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
@@ -159,6 +175,14 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
     Ok(())
 }
 
+/// 只表示适配器有该版本的精确基础门禁；扩展生命周期仍由各能力的独立收据控制。
+pub(crate) fn supported_version(version: &str) -> bool {
+    matches!(
+        version,
+        VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION
+    )
+}
+
 fn verified_version(output: &str) -> Option<&'static str> {
     match output
         .trim()
@@ -167,6 +191,7 @@ fn verified_version(output: &str) -> Option<&'static str> {
     {
         Some(VERIFIED_VERSION) => Some(VERIFIED_VERSION),
         Some(P0_VERIFIED_VERSION) => Some(P0_VERIFIED_VERSION),
+        Some(CURRENT_VERSION) => Some(CURRENT_VERSION),
         Some(_) | None => None,
     }
 }
@@ -434,10 +459,49 @@ fn trace_live_protocol_ids(message: &Value) {
     // 隔离验收仅记录协议身份和状态；不记录提示、输出、工具参数或凭据。
     let params = &message["params"];
     let update = &params["update"];
+    let object_keys = |value: &Value| {
+        value.as_object().map(|object| {
+            let mut keys = object.keys().cloned().collect::<Vec<_>>();
+            keys.sort();
+            keys
+        })
+    };
+    let available_command_shapes = update["availableCommands"].as_array().map(|commands| {
+        commands
+            .iter()
+            .map(|command| {
+                json!({
+                    "keys": object_keys(command),
+                    "nameType": diagnostic_value_type(command.get("name")),
+                    "descriptionType": diagnostic_value_type(command.get("description")),
+                    "inputType": diagnostic_value_type(command.get("input")),
+                })
+            })
+            .collect::<Vec<_>>()
+    });
+    let value_types = |value: &Value| {
+        value.as_object().map(|object| {
+            let mut types = object
+                .iter()
+                .map(|(key, value)| (key.clone(), diagnostic_value_type(Some(value))))
+                .collect::<Vec<_>>();
+            types.sort_by(|left, right| left.0.cmp(&right.0));
+            types
+        })
+    };
     eprintln!(
         "GROK_NATIVE_PROTOCOL_IDS {}",
         json!({"id":message.get("id").map(|id| if id.is_string() {diagnostic_value(Some(id))} else {id.clone()}),"method":message.get("method"),
-            "sessionId":params.get("sessionId"),"sessionUpdate":update.get("sessionUpdate"),
+            "sessionId":params.get("sessionId"),"resultSessionId":message["result"].get("sessionId"),
+            "setupMethod":params.get("method"),"setupPhase":params.get("phase"),
+            "sessionUpdate":update.get("sessionUpdate"),
+            "paramsKeys":object_keys(params),"paramsMetaKeys":object_keys(&params["_meta"]),
+            "updateKeys":object_keys(update),"updateMetaKeys":object_keys(&update["_meta"]),
+            "paramsMetaTypes":value_types(&params["_meta"]),
+            "updateMetaTypes":value_types(&update["_meta"]),
+            "updateMetaToolsCount":update["_meta"]["tools"].as_array().map(Vec::len),
+            "availableCommandsCount":update["availableCommands"].as_array().map(Vec::len),
+            "availableCommandShapes":available_command_shapes,
             "eventId":params["_meta"].get("eventId"),"promptId":params["_meta"].get("promptId"),
             "streamStartMs":params["_meta"].get("streamStartMs"),"chunkId":params["_meta"].get("chunkId"),
             "toolCallId":update.get("toolCallId"),"status":update.get("status"),
@@ -695,6 +759,18 @@ struct PendingApproval {
     lease_permission: Option<Value>,
 }
 
+#[derive(Default)]
+struct CurrentSetupProgress {
+    next_phase: usize,
+    session_id: Option<String>,
+    response_received: bool,
+    models_received: bool,
+    settings_received: bool,
+    announcements_received: u8,
+    announcement_generation: Option<u64>,
+    commands_received: bool,
+}
+
 // 仅反序列化展示所需的实际原生字段，不把账号、路径或扩展凭据元数据带入快照。
 #[derive(Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -751,6 +827,46 @@ struct ReportedMetadata {
     models: Option<ReportedModels>,
     config_options: Vec<ReportedConfig>,
     available_commands: Vec<ReportedCommand>,
+}
+
+/// 只记录 initialize 实际返回且仓库已有精确字段证据的扩展能力。
+///
+/// queue/interject 目前只有二进制静态方法名，没有 initialize 字段或出站回执，
+/// 因此即使未来响应夹带同名字段也保持关闭，不能由字符串存在性推导协议能力。
+/// availableCommands 只是初始化目录，技能还必须由当前会话通知建立独立目录。
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReportedInitializeExtensions {
+    queue_change_notifications: bool,
+    queue_interject_requests: bool,
+    skills_methods: bool,
+    available_commands: bool,
+    local_mcp_sdk_advertised: bool,
+}
+
+impl ReportedInitializeExtensions {
+    fn decode(result: &Value) -> Result<(Self, Vec<ReportedCommand>), RuntimeError> {
+        let metadata = result
+            .get("_meta")
+            .and_then(Value::as_object)
+            .ok_or_else(|| RuntimeError::Protocol("missing Grok initialize metadata".into()))?;
+        let available_commands = match metadata.get("availableCommands") {
+            Some(commands) => decode_metadata(commands)?,
+            None => Vec::new(),
+        };
+        Ok((
+            Self {
+                queue_change_notifications: false,
+                queue_interject_requests: false,
+                skills_methods: false,
+                available_commands: metadata
+                    .get("availableCommands")
+                    .is_some_and(Value::is_array),
+                local_mcp_sdk_advertised: metadata.get("x.ai/mcp/sdk") == Some(&Value::Bool(true)),
+            },
+            available_commands,
+        ))
+    }
 }
 
 fn internal_skills_reload_success(message: &Value) -> bool {
@@ -866,7 +982,10 @@ struct GrokProtocol {
     task_input_written: bool,
     notification_ids: HashMap<String, [u8; 32]>,
     observed_prompt_ids: HashSet<String>,
+    current_mcp_refresh_received: bool,
+    current_setup: Option<CurrentSetupProgress>,
     reported_capabilities: Value,
+    reported_initialize_extensions: ReportedInitializeExtensions,
     reported_metadata: ReportedMetadata,
     closed: bool,
     sdk: Option<GrokSdkConnection>,
@@ -880,18 +999,55 @@ struct GrokProtocol {
     sdk_origin_probe: Option<sdk_origin_live_tests::SdkOriginProbe>,
     #[cfg(test)]
     verified_final_histories_for_live: Option<live_tests::VerifiedFinalHistories>,
+    #[cfg(test)]
+    current_root_candidate_for_live: bool,
 }
 
 impl GrokProtocol {
     fn baseline_lifecycle_verified(&self) -> bool {
         matches!(
             self.probed_version,
-            Some(VERIFIED_VERSION | P0_VERIFIED_VERSION)
+            Some(VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION)
         )
     }
 
     fn extended_lifecycle_verified(&self) -> bool {
         self.probed_version == Some(VERIFIED_VERSION)
+    }
+
+    fn prompt_lifecycle_verified(&self) -> bool {
+        self.baseline_lifecycle_verified()
+            && (self.probed_version != Some(CURRENT_VERSION)
+                || self.current_root_candidate_for_live())
+    }
+
+    fn queued_submit_verified(&self) -> bool {
+        self.extended_lifecycle_verified()
+            || (self.probed_version == Some(CURRENT_VERSION)
+                && self.current_root_candidate_for_live())
+    }
+
+    fn current_root_candidate_for_live(&self) -> bool {
+        #[cfg(test)]
+        {
+            self.current_root_candidate_for_live
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
+    }
+
+    fn fixed_read_policy_verified(&self) -> bool {
+        self.probed_version == Some(P0_VERIFIED_VERSION)
+            && self.options.selected_skills.is_empty()
+            && self.options.grok_profile.as_ref().is_some_and(|profile| {
+                profile.runtime_scope_verified(
+                    P0_VERIFIED_VERSION,
+                    self.options.local_tools,
+                    self.options.permission_policy,
+                )
+            })
     }
 
     #[cfg(test)]
@@ -955,7 +1111,10 @@ impl GrokProtocol {
             task_input_written: false,
             notification_ids: HashMap::new(),
             observed_prompt_ids: HashSet::new(),
+            current_mcp_refresh_received: false,
+            current_setup: None,
             reported_capabilities: Value::Null,
+            reported_initialize_extensions: ReportedInitializeExtensions::default(),
             reported_metadata: ReportedMetadata::default(),
             closed: false,
             sdk,
@@ -969,6 +1128,8 @@ impl GrokProtocol {
             sdk_origin_probe: None,
             #[cfg(test)]
             verified_final_histories_for_live: None,
+            #[cfg(test)]
+            current_root_candidate_for_live: false,
         }
     }
 
@@ -990,12 +1151,26 @@ impl GrokProtocol {
         self.paired_version = None;
         let version = verified_version(output)
             .ok_or_else(|| RuntimeError::UnsupportedVersion(output.trim().to_owned()))?;
-        // 新版仅继承 P0 生命周期；不继承旧版固定策略、技能与 SDK 租约的验收结论。
+        // 1.0.34 只开放已有原生收据覆盖的精确读取策略；写入、技能、SDK 租约和
+        // 扩展生命周期仍使用各自门禁，不能把一次读取审批外推为整版兼容。
+        let latest_scope_verified = self.options.selected_skills.is_empty()
+            && self.options.grok_profile.as_ref().is_some_and(|profile| {
+                profile.runtime_scope_verified(
+                    version,
+                    self.options.local_tools,
+                    self.options.permission_policy,
+                )
+            });
         if version != VERIFIED_VERSION
-            && (self.options.permission_policy != PermissionPolicy::Inherit
-                || self.options.grok_profile.is_some()
-                || self.options.local_tools.is_some()
-                || !self.options.selected_skills.is_empty())
+            && self.options.permission_policy != PermissionPolicy::Inherit
+            && !latest_scope_verified
+        {
+            return Err(RuntimeError::InvalidConfiguration(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
+        if version != VERIFIED_VERSION
+            && (self.options.local_tools.is_some() || !self.options.selected_skills.is_empty())
         {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
                 "cli-agent-grok-managed-unverified"
@@ -1194,6 +1369,11 @@ impl GrokProtocol {
     }
 
     fn receive_sdk(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
+        if !self.reported_initialize_extensions.local_mcp_sdk_advertised {
+            return Err(RuntimeError::Protocol(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
         let active_turn = self
             .prompt
             .as_ref()
@@ -1624,6 +1804,12 @@ impl GrokProtocol {
                 }
             }
             RuntimeAction::Submit { input } => {
+                if !self.prompt_lifecycle_verified() {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-managed-unverified"),
+                    );
+                }
                 if self.deferred_ready.is_some() {
                     return rejected_command(
                         command.message_id,
@@ -1670,7 +1856,7 @@ impl GrokProtocol {
                         crate::t!("cli-agent-grok-managed-unverified"),
                     );
                 }
-                if !self.extended_lifecycle_verified()
+                if !self.queued_submit_verified()
                     && (self.pending.is_some() || self.prompt.is_some())
                 {
                     return rejected_command(
@@ -1743,6 +1929,12 @@ impl GrokProtocol {
                 }
             }
             RuntimeAction::Interrupt { turn_id } => {
+                if !self.prompt_lifecycle_verified() {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-managed-unverified"),
+                    );
+                }
                 if let Some(effects) =
                     self.control_duplicate(command.message_id, &json!({"interrupt": turn_id}))
                 {
@@ -2010,7 +2202,13 @@ impl GrokProtocol {
         }
         let permission_verified = match self.probed_version {
             Some(VERIFIED_VERSION) => true,
-            Some(P0_VERIFIED_VERSION) => verified_latest_read_tool(&params["toolCall"]),
+            Some(P0_VERIFIED_VERSION)
+                if self.options.permission_policy == PermissionPolicy::Inherit
+                    || self.fixed_read_policy_verified() =>
+            {
+                verified_latest_read_tool(&params["toolCall"])
+            }
+            Some(CURRENT_VERSION) if self.current_root_candidate_for_live() => true,
             Some(_) | None => false,
         };
         if !permission_verified {
@@ -2570,6 +2768,13 @@ impl GrokProtocol {
         let (method, requested_id) = match &self.options.target {
             SessionTarget::New => ("session/new", None),
             SessionTarget::Resume { native_session_id } => {
+                if self.probed_version == Some(CURRENT_VERSION)
+                    && !self.current_root_candidate_for_live()
+                {
+                    return Err(RuntimeError::Protocol(crate::t!(
+                        "cli-agent-grok-managed-unverified"
+                    )));
+                }
                 if !valid_native_id(native_session_id) {
                     return Err(RuntimeError::Protocol(
                         "invalid Grok requested session id".into(),
@@ -2592,6 +2797,11 @@ impl GrokProtocol {
             // 独占冷进程同一固定输入；此请求不作为 warm load 降权或 native policy ACK。
             params["_meta"] = super::grok_profile::GrokCreationPolicyV1::creation_meta();
         }
+        if self.sdk.is_some() && !self.reported_initialize_extensions.local_mcp_sdk_advertised {
+            return Err(RuntimeError::Protocol(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
         if let Some(sdk) = &self.sdk {
             params["_meta"]["x.ai/mcp/servers"] = sdk.bridge.registration();
         }
@@ -2599,6 +2809,9 @@ impl GrokProtocol {
         if let Some(probe) = &self.sdk_origin_probe {
             probe.decorate_open_session(&mut params);
         }
+        self.current_setup = (self.probed_version == Some(CURRENT_VERSION)
+            && requested_id.is_none())
+        .then(CurrentSetupProgress::default);
         Ok(self.request(PendingKind::OpenSession { requested_id }, method, params))
     }
 
@@ -2758,31 +2971,52 @@ impl GrokProtocol {
                         "unverified Grok ACP protocol or agent version".into(),
                     ));
                 }
-                self.paired_version = self.probed_version;
                 let capabilities = result
                     .get("agentCapabilities")
                     .filter(|value| value.is_object())
                     .ok_or_else(|| {
                         RuntimeError::Protocol("missing Grok agent capabilities".into())
                     })?;
-                self.reported_capabilities = json!({
-                    "loadSession": capabilities.get("loadSession"),
-                    "promptCapabilities": capabilities.get("promptCapabilities"),
-                    "sessionCapabilities": capabilities.get("sessionCapabilities")
-                });
+                let (initialize_extensions, available_commands) =
+                    ReportedInitializeExtensions::decode(result)?;
                 // 只选择原生明确公布的无交互认证，不读取凭据或代替用户配置模型后端。
-                let method = ["cached_token", "xai.api_key"].into_iter().find(|id| {
-                    result["authMethods"].as_array().is_some_and(|methods| {
+                // 1.0.40 已登录 OAuth 的实测形状必须同时包含 cached_token 与 grok.com；
+                // 仅有交互式 grok.com 时继续关闭产品适配器，不能在后台弹出登录流程。
+                let methods = result["authMethods"].as_array();
+                let method = if self.probed_version == Some(CURRENT_VERSION) {
+                    let ids = methods.map(|methods| {
                         methods
                             .iter()
-                            .any(|method| method["id"].as_str() == Some(*id))
+                            .map(|method| method["id"].as_str())
+                            .collect::<Vec<_>>()
+                    });
+                    if ids.as_deref() == Some(&[Some("cached_token"), Some("grok.com")])
+                        && result["_meta"]["defaultAuthMethodId"] == "cached_token"
+                    {
+                        Some("cached_token")
+                    } else {
+                        None
+                    }
+                } else {
+                    ["cached_token", "xai.api_key"].into_iter().find(|id| {
+                        methods.is_some_and(|methods| {
+                            methods
+                                .iter()
+                                .any(|method| method["id"].as_str() == Some(*id))
+                        })
                     })
-                });
+                };
                 let Some(method) = method else {
                     return Err(RuntimeError::InvalidConfiguration(crate::t!(
                         "cli-agent-grok-managed-login-required"
                     )));
                 };
+                // 所有字段完成同一响应的版本和形状校验后再原子绑定；旧 initialize、
+                // 重投或缺字段响应不能替换当前连接的能力快照。
+                self.paired_version = self.probed_version;
+                self.reported_capabilities = capabilities.clone();
+                self.reported_initialize_extensions = initialize_extensions;
+                self.reported_metadata.available_commands = available_commands;
                 effects.writes.push(self.request(
                     PendingKind::Authenticate,
                     "authenticate",
@@ -2791,6 +3025,7 @@ impl GrokProtocol {
             }
             PendingKind::Authenticate => effects.writes.push(self.open_session()?),
             PendingKind::OpenSession { requested_id } => {
+                let new_session = requested_id.is_none();
                 let id = match requested_id {
                     Some(requested_id) => {
                         if [
@@ -2816,6 +3051,21 @@ impl GrokProtocol {
                         })?
                         .to_owned(),
                 };
+                if self.probed_version == Some(CURRENT_VERSION) && new_session {
+                    let setup = self.current_setup.as_mut().ok_or_else(|| {
+                        RuntimeError::Protocol("missing Grok 1.0.40 setup sequence".into())
+                    })?;
+                    if setup.next_phase != 5
+                        || setup.session_id.is_some()
+                        || setup.response_received
+                    {
+                        return Err(RuntimeError::Protocol(
+                            "incomplete or mismatched Grok 1.0.40 setup sequence".into(),
+                        ));
+                    }
+                    setup.session_id = Some(id.clone());
+                    setup.response_received = true;
+                }
                 self.session_id = Some(id.clone());
                 self.skill_catalog = self.early_skill_catalogs.remove(&id);
                 self.early_skill_catalogs.clear();
@@ -2840,6 +3090,7 @@ impl GrokProtocol {
                 }
                 self.update_metadata(result)?;
                 let baseline_lifecycle_verified = self.baseline_lifecycle_verified();
+                let prompt_lifecycle_verified = self.prompt_lifecycle_verified();
                 let extended_lifecycle_verified = self.extended_lifecycle_verified();
                 let effective_permissions = json!({
                     "requestedPolicy": self.options.grok_profile.as_ref().map(|profile| json!(profile.permission_policy())).unwrap_or_else(|| json!("inherit")), "effectiveNativePolicy": null,
@@ -2847,12 +3098,14 @@ impl GrokProtocol {
                     "grokCreationPolicyV1": self.options.grok_profile,
                     "permissionEnforcementVerified": false,
                     "reportedCapabilities": self.reported_capabilities,
+                    "reportedInitializeExtensions": self.reported_initialize_extensions,
                     "reportedMetadata": self.reported_metadata,
                     "verifiedCapabilities": {
                         "newSession": baseline_lifecycle_verified, "emptyHistoryRecovery": extended_lifecycle_verified, "closeSession": extended_lifecycle_verified,
-                        "submit": baseline_lifecycle_verified, "queuedSubmit": extended_lifecycle_verified, "steer": false, "approval": baseline_lifecycle_verified,
-                        "cancel": baseline_lifecycle_verified, "resume": baseline_lifecycle_verified && self.reported_capabilities["loadSession"] == true,
-                        "localTools": extended_lifecycle_verified && self.sdk.is_some(), "childTasks": extended_lifecycle_verified && self.options.grok_profile.as_ref().and_then(|profile| profile.local_tools()).is_some_and(|tools| tools.allow_spawn)
+                        "submit": prompt_lifecycle_verified, "queuedSubmit": self.queued_submit_verified(), "steer": false, "approval": prompt_lifecycle_verified,
+                        "cancel": prompt_lifecycle_verified, "resume": prompt_lifecycle_verified && self.reported_capabilities["loadSession"] == true,
+                        "localTools": extended_lifecycle_verified && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.sdk.is_some(),
+                        "childTasks": extended_lifecycle_verified && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.options.grok_profile.as_ref().and_then(|profile| profile.local_tools()).is_some_and(|tools| tools.allow_spawn)
                     }
                 });
                 super::permissions::verify_effective_permissions(
@@ -2861,8 +3114,9 @@ impl GrokProtocol {
                     &self.options.cwd,
                     &effective_permissions,
                 )?;
-                if (self.options.grok_profile.is_some()
-                    && self.creation_catalog_session != self.session_id)
+                if (self.probed_version == Some(CURRENT_VERSION) && new_session)
+                    || (self.options.grok_profile.is_some()
+                        && self.creation_catalog_session != self.session_id)
                     || (self.options.target == SessionTarget::New
                         && !self.options.selected_skills.is_empty()
                         && self.skill_catalog.is_none())
@@ -2927,7 +3181,238 @@ impl GrokProtocol {
         Ok(true)
     }
 
+    fn current_setup_notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
+        if self.probed_version != Some(CURRENT_VERSION) {
+            return Err(RuntimeError::Protocol(
+                "unexpected Grok session setup notification".into(),
+            ));
+        }
+        let outer = message
+            .as_object()
+            .filter(|outer| {
+                outer.len() == 3
+                    && outer.contains_key("jsonrpc")
+                    && outer.contains_key("method")
+                    && outer.contains_key("params")
+            })
+            .ok_or_else(|| RuntimeError::Protocol("invalid Grok setup envelope".into()))?;
+        let params = outer["params"]
+            .as_object()
+            .filter(|params| {
+                params.len() == 3
+                    && params.contains_key("method")
+                    && params.contains_key("phase")
+                    && params.contains_key("sessionId")
+            })
+            .ok_or_else(|| RuntimeError::Protocol("invalid Grok setup fields".into()))?;
+        if params["method"] != "session/new" {
+            return Err(RuntimeError::Protocol(
+                "unexpected Grok setup method".into(),
+            ));
+        }
+        let setup = self
+            .current_setup
+            .as_mut()
+            .ok_or_else(|| RuntimeError::Protocol("missing Grok 1.0.40 setup state".into()))?;
+        let waiting_for_response = matches!(
+            self.pending.as_ref().map(|pending| &pending.kind),
+            Some(PendingKind::OpenSession { requested_id: None })
+        );
+        if setup.next_phase < 5 {
+            if !waiting_for_response
+                || setup.response_received
+                || setup.session_id.is_some()
+                || setup.next_phase == 0 && !self.current_mcp_refresh_received
+            {
+                return Err(RuntimeError::Protocol(
+                    "unexpected Grok pre-response setup phase".into(),
+                ));
+            }
+        } else if waiting_for_response || !setup.response_received {
+            return Err(RuntimeError::Protocol(
+                "Grok post-response setup phase arrived before session/new response".into(),
+            ));
+        }
+        let expected = CURRENT_SETUP_PHASES
+            .get(setup.next_phase)
+            .ok_or_else(|| RuntimeError::Protocol("duplicate Grok 1.0.40 setup phase".into()))?;
+        if params["phase"].as_str() != Some(expected) {
+            return Err(RuntimeError::Protocol(
+                "unknown or out-of-order Grok 1.0.40 setup phase".into(),
+            ));
+        }
+        if setup.next_phase == 6
+            && (!setup.models_received
+                || !setup.settings_received
+                || setup.announcements_received != 2
+                || !setup.commands_received)
+        {
+            return Err(RuntimeError::Protocol(
+                "Grok setup advanced before fixed display notifications".into(),
+            ));
+        }
+        if setup.next_phase < 5 {
+            if !params["sessionId"].is_null() {
+                return Err(RuntimeError::Protocol(
+                    "Grok setup declared a session before persistence".into(),
+                ));
+            }
+        } else {
+            let session_id = params["sessionId"]
+                .as_str()
+                .filter(|session_id| valid_native_id(session_id))
+                .ok_or_else(|| {
+                    RuntimeError::Protocol("Grok setup has no valid session id".into())
+                })?;
+            if setup
+                .session_id
+                .as_deref()
+                .is_some_and(|existing| existing != session_id)
+            {
+                return Err(RuntimeError::Protocol(
+                    "Grok setup changed its session id".into(),
+                ));
+            }
+            if setup.session_id.as_deref() != Some(session_id) {
+                return Err(RuntimeError::Protocol(
+                    "Grok setup changed its session id".into(),
+                ));
+            }
+        }
+        setup.next_phase += 1;
+        if setup.next_phase != CURRENT_SETUP_PHASES.len() {
+            return Ok(Effects::default());
+        }
+        self.current_setup = None;
+        let (effective_permissions, began) = self.deferred_ready.take().ok_or_else(|| {
+            RuntimeError::Protocol("Grok setup completed without a deferred ready event".into())
+        })?;
+        if began.elapsed() >= REQUEST_TIMEOUT {
+            return Err(RuntimeError::RequestTimedOut);
+        }
+        Ok(Effects {
+            writes: Vec::new(),
+            events: vec![self.ready_event(effective_permissions)?],
+        })
+    }
+
     fn notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
+        if message["method"] == CURRENT_SETUP_METHOD {
+            return self.current_setup_notification(message);
+        }
+        if self.probed_version == Some(CURRENT_VERSION)
+            && (self.session_id.is_none() || self.current_setup.is_some())
+        {
+            if message
+                == &json!({
+                    "jsonrpc": "2.0",
+                    "method": "_x.ai/mcp/servers_updated",
+                    "params": {"mcpServers": []}
+                })
+            {
+                if self.current_mcp_refresh_received
+                    || self
+                        .current_setup
+                        .as_ref()
+                        .is_some_and(|setup| setup.next_phase != 0)
+                {
+                    return Err(RuntimeError::Protocol(
+                        "duplicate or late Grok MCP refresh".into(),
+                    ));
+                }
+                self.current_mcp_refresh_received = true;
+                return Ok(Effects::default());
+            }
+            if message["method"] == "_x.ai/models/update" {
+                let models = current_models_update(message)?;
+                let setup = self.current_setup.as_mut().filter(|setup| {
+                    setup.response_received
+                        && setup.next_phase == 6
+                        && !setup.models_received
+                        && !setup.settings_received
+                        && setup.announcements_received == 0
+                });
+                let Some(setup) = setup else {
+                    return Err(RuntimeError::Protocol(
+                        "unexpected Grok models update position".into(),
+                    ));
+                };
+                setup.models_received = true;
+                self.reported_metadata.models = Some(models);
+                return Ok(Effects::default());
+            }
+            if message["method"] == "_x.ai/settings/update" {
+                validate_current_settings_update(message)?;
+                let setup = self.current_setup.as_mut().filter(|setup| {
+                    setup.response_received
+                        && setup.next_phase == 6
+                        && setup.models_received
+                        && !setup.settings_received
+                        && setup.announcements_received == 0
+                });
+                let Some(setup) = setup else {
+                    return Err(RuntimeError::Protocol(
+                        "unexpected Grok settings update position".into(),
+                    ));
+                };
+                setup.settings_received = true;
+                return Ok(Effects::default());
+            }
+            if message["method"] == "_x.ai/announcements/update" {
+                let generation = validate_current_announcements_update(message)?;
+                let setup = self.current_setup.as_mut().filter(|setup| {
+                    setup.response_received
+                        && setup.next_phase == 6
+                        && setup.models_received
+                        && setup.settings_received
+                        && setup.announcements_received < 2
+                        && setup
+                            .announcement_generation
+                            .is_none_or(|previous| generation > previous)
+                });
+                let Some(setup) = setup else {
+                    return Err(RuntimeError::Protocol(
+                        "unexpected Grok announcements update position".into(),
+                    ));
+                };
+                setup.announcements_received += 1;
+                setup.announcement_generation = Some(generation);
+                return Ok(Effects::default());
+            }
+            if message["method"] == "session/update"
+                && message["params"]["update"]["sessionUpdate"] == "available_commands_update"
+            {
+                let session_id = self
+                    .current_setup
+                    .as_ref()
+                    .and_then(|setup| setup.session_id.as_deref())
+                    .ok_or_else(|| {
+                        RuntimeError::Protocol(
+                            "Grok command catalog arrived without a session".into(),
+                        )
+                    })?;
+                validate_current_available_commands_update(message, session_id)?;
+                let setup = self.current_setup.as_mut().filter(|setup| {
+                    setup.response_received
+                        && setup.next_phase == 6
+                        && setup.models_received
+                        && setup.settings_received
+                        && setup.announcements_received == 2
+                        && !setup.commands_received
+                });
+                let Some(setup) = setup else {
+                    return Err(RuntimeError::Protocol(
+                        "unexpected Grok command catalog position".into(),
+                    ));
+                };
+                // 当前版 fresh-home 只把该目录当握手信息；不绑定技能、工具或权限。
+                setup.commands_received = true;
+                return Ok(Effects::default());
+            }
+            return Err(RuntimeError::Protocol(
+                "unexpected Grok 1.0.40 handshake notification".into(),
+            ));
+        }
         // 原生可能先发目录再回复 session/new；探针和生产目录都按真实会话关联。
         #[cfg(all(test, unix))]
         if let Some(probe) = &self.skill_catalog_for_live {
@@ -3393,6 +3878,303 @@ fn message_fingerprint(message: &Value) -> Result<[u8; 32], RuntimeError> {
 fn decode_metadata<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, RuntimeError> {
     serde_json::from_value(value.clone())
         .map_err(|error| RuntimeError::Protocol(format!("invalid Grok display metadata: {error}")))
+}
+
+fn current_models_update(message: &Value) -> Result<ReportedModels, RuntimeError> {
+    let outer = message
+        .as_object()
+        .filter(|outer| {
+            outer.len() == 3
+                && outer.contains_key("jsonrpc")
+                && outer.contains_key("method")
+                && outer.contains_key("params")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok models update envelope".into()))?;
+    let params = outer["params"]
+        .as_object()
+        .filter(|params| {
+            params.len() == 2
+                && params.contains_key("currentModelId")
+                && params.contains_key("availableModels")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok models update fields".into()))?;
+    let entries = params["availableModels"]
+        .as_array()
+        .filter(|entries| entries.len() == 2)
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok models update entries".into()))?;
+    for entry in entries {
+        let entry = entry.as_object().filter(|entry| {
+            entry.contains_key("modelId")
+                && entry.contains_key("name")
+                && entry
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "modelId" | "name" | "description" | "_meta"))
+        });
+        if entry.is_none() {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok model display entry".into(),
+            ));
+        }
+    }
+    let models: ReportedModels = decode_metadata(&outer["params"])?;
+    if models.current_model_id != "grok-4.6"
+        || models
+            .available_models
+            .iter()
+            .map(|model| model.model_id.as_str())
+            .collect::<Vec<_>>()
+            != ["grok-4.6", "grok-4.5"]
+        || models
+            .available_models
+            .iter()
+            .any(|model| model.name.trim().is_empty())
+    {
+        return Err(RuntimeError::Protocol(
+            "unexpected Grok 1.0.40 model display identity".into(),
+        ));
+    }
+    Ok(models)
+}
+
+fn validate_current_settings_update(message: &Value) -> Result<(), RuntimeError> {
+    const KEYS: [&str; 23] = [
+        "allow_access",
+        "announcements",
+        "auto_permission_mode_enabled",
+        "campaigns",
+        "collapsed_edit_blocks",
+        "consent_gate",
+        "dock_enabled",
+        "gate_label",
+        "gate_message",
+        "gate_url",
+        "group_tool_verbs",
+        "permission_mode",
+        "privacy_banner_reshow_days",
+        "privacy_notice_rollout",
+        "prompt_suggestions_enabled",
+        "session_picker_grouped",
+        "sharing_enabled",
+        "show_resolved_model",
+        "slash_command_tags",
+        "subscription_tier_display",
+        "subscription_watch_interval_secs",
+        "terminal_theme_enabled",
+        "tips",
+    ];
+    let outer = message
+        .as_object()
+        .filter(|outer| {
+            outer.len() == 3
+                && outer.contains_key("jsonrpc")
+                && outer.contains_key("method")
+                && outer.contains_key("params")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok settings update envelope".into()))?;
+    let params = outer["params"]
+        .as_object()
+        .filter(|params| {
+            params.len() == KEYS.len() && KEYS.iter().all(|key| params.contains_key(*key))
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok settings update fields".into()))?;
+    let bool_fields = [
+        "allow_access",
+        "privacy_notice_rollout",
+        "sharing_enabled",
+        "show_resolved_model",
+    ];
+    let array_fields = ["announcements", "campaigns", "tips"];
+    let number_fields = [
+        "privacy_banner_reshow_days",
+        "subscription_watch_interval_secs",
+    ];
+    if bool_fields.iter().any(|key| !params[*key].is_boolean())
+        || array_fields.iter().any(|key| !params[*key].is_array())
+        || number_fields.iter().any(|key| !params[*key].is_number())
+        || !params["slash_command_tags"].is_object()
+        || !params["permission_mode"].is_null()
+        || !params["auto_permission_mode_enabled"].is_null()
+    {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok settings update value types".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_current_announcements_update(message: &Value) -> Result<u64, RuntimeError> {
+    const ANNOUNCEMENT_KEYS: [&str; 9] = [
+        "id",
+        "message",
+        "severity",
+        "title",
+        "cta",
+        "updated_at",
+        "expires_at",
+        "dismissible",
+        "persistent",
+    ];
+    let outer = message
+        .as_object()
+        .filter(|outer| {
+            outer.len() == 3
+                && outer.contains_key("jsonrpc")
+                && outer.contains_key("method")
+                && outer.contains_key("params")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok announcements envelope".into()))?;
+    let params = outer["params"]
+        .as_object()
+        .filter(|params| {
+            params.len() == 2 && params.contains_key("gen") && params.contains_key("announcements")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok announcements fields".into()))?;
+    let announcements = params["announcements"]
+        .as_array()
+        .filter(|announcements| announcements.len() <= 32)
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok announcements list".into()))?;
+    let generation = params["gen"]
+        .as_u64()
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok announcement generation".into()))?;
+    if announcements.iter().any(|announcement| {
+        announcement.as_object().is_none_or(|announcement| {
+            announcement.len() != ANNOUNCEMENT_KEYS.len()
+                || !ANNOUNCEMENT_KEYS
+                    .iter()
+                    .all(|key| announcement.contains_key(*key))
+                || !announcement["id"].is_string()
+                || !announcement["message"].is_string()
+                || !announcement["severity"].is_string()
+                || !announcement["title"].is_string()
+        })
+    }) {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok announcements values".into(),
+        ));
+    }
+    Ok(generation)
+}
+
+fn validate_current_available_commands_update(
+    message: &Value,
+    session_id: &str,
+) -> Result<(), RuntimeError> {
+    const COMMAND_HAS_META: [bool; 29] = [
+        false, false, false, false, false, true, false, false, false, true, true, true, true, true,
+        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    ];
+    const COMMAND_HAS_INPUT: [bool; 29] = [
+        true, true, false, false, true, true, true, true, true, true, false, false, false, true,
+        true, false, false, true, true, false, true, true, true, true, true, false, false, false,
+        true,
+    ];
+    let outer = message
+        .as_object()
+        .filter(|outer| {
+            outer.len() == 3
+                && outer["jsonrpc"] == "2.0"
+                && outer["method"] == "session/update"
+                && outer.contains_key("params")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog envelope".into()))?;
+    let params = outer["params"]
+        .as_object()
+        .filter(|params| {
+            params.len() == 3
+                && params.contains_key("sessionId")
+                && params.contains_key("update")
+                && params.contains_key("_meta")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog fields".into()))?;
+    if params["sessionId"].as_str() != Some(session_id) {
+        return Err(RuntimeError::Protocol(
+            "Grok command catalog changed its session id".into(),
+        ));
+    }
+    let expected_event_id = format!("{session_id}-2");
+    let params_meta = params["_meta"]
+        .as_object()
+        .filter(|meta| {
+            meta.len() == 5
+                && meta.contains_key("agentTimestampMs")
+                && meta.contains_key("eventId")
+                && meta.contains_key("totalTokens")
+                && meta.contains_key("updateParams")
+                && meta.contains_key("updateType")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog metadata".into()))?;
+    if !params_meta["agentTimestampMs"].is_number()
+        || params_meta["eventId"].as_str() != Some(expected_event_id.as_str())
+        || !params_meta["totalTokens"].is_number()
+        || !params_meta["updateParams"].is_object()
+        || params_meta["updateType"] != "available_commands_update"
+        || serde_json::to_vec(&params_meta["updateParams"])
+            .map_or(true, |value| value.len() > 128 * 1024)
+    {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog metadata values".into(),
+        ));
+    }
+    let update = params["update"]
+        .as_object()
+        .filter(|update| {
+            update.len() == 3
+                && update["sessionUpdate"] == "available_commands_update"
+                && update.contains_key("availableCommands")
+                && update.contains_key("_meta")
+        })
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog update".into()))?;
+    let commands = update["availableCommands"]
+        .as_array()
+        .filter(|commands| commands.len() == COMMAND_HAS_META.len())
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog entries".into()))?;
+    for (index, command) in commands.iter().enumerate() {
+        let command = command.as_object().filter(|command| {
+            command.len() == if COMMAND_HAS_META[index] { 4 } else { 3 }
+                && command.contains_key("name")
+                && command.contains_key("description")
+                && command.contains_key("input")
+                && command.contains_key("_meta") == COMMAND_HAS_META[index]
+        });
+        let Some(command) = command else {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok command catalog entry shape".into(),
+            ));
+        };
+        if command["name"]
+            .as_str()
+            .is_none_or(|name| name.is_empty() || name.len() > 128)
+            || command["description"]
+                .as_str()
+                .is_none_or(|description| description.len() > 4 * 1024)
+            || command["input"].is_object() != COMMAND_HAS_INPUT[index]
+            || command["input"].is_null() == COMMAND_HAS_INPUT[index]
+            || command.get("_meta").is_some_and(|meta| !meta.is_object())
+            || serde_json::to_vec(command).map_or(true, |value| value.len() > 16 * 1024)
+        {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok command catalog entry values".into(),
+            ));
+        }
+    }
+    let update_meta = update["_meta"]
+        .as_object()
+        .filter(|meta| meta.len() == 1 && meta.contains_key("tools"))
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command tool metadata".into()))?;
+    let tools = update_meta["tools"]
+        .as_array()
+        .filter(|tools| tools.len() == 27)
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command tool count".into()))?;
+    let mut names = HashSet::new();
+    if tools.iter().any(|tool| {
+        tool.as_str()
+            .is_none_or(|tool| tool.is_empty() || tool.len() > 128 || !names.insert(tool))
+    }) {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command tool values".into(),
+        ));
+    }
+    Ok(())
 }
 
 #[cfg(test)]

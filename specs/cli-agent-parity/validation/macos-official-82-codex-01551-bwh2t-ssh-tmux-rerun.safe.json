@@ -1,0 +1,959 @@
+{
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true,
+  "host_alias": "bwh-2t",
+  "remote_root_scope": "private_cache",
+  "prompt": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL",
+  "credentials_read_or_copied": false,
+  "product_ssh_ui_verified": false,
+  "product_osc_parser_verified": false,
+  "model_lifecycle_verified": false,
+  "cases": [
+    {
+      "mode": "direct",
+      "passed": true,
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": true,
+      "capture_error": null,
+      "terminal_query_responses": {
+        "1b5b366e": 1,
+        "1b5b63": 1,
+        "1b5b3f75": 1,
+        "1b5d31303b3f1b5c": 1,
+        "1b5d31313b3f1b5c": 1
+      },
+      "ssh_stdout_sha256": "7b40710ac5ee358a50499ac7daf9a8253ebd6ba009249d9d7a3b104850dcadf9",
+      "ssh_stdout_bytes": 14252,
+      "ssh_stderr": "<merged-into-control-pty>",
+      "native": {
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0c0c1-e96c-7570-9ece-018f1495e36b",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-38-48-01a0c0c1-e96c-7570-9ece-018f1495e36b.jsonl",
+            "cwd": "<remote-private-root>/work/direct",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 43585,
+          "ppid": 43368,
+          "pgid": 43585,
+          "sid": 43585,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 43585,
+              "name": "python3",
+              "ppid": 43368,
+              "pgid": 43585,
+              "sid": 43585,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43368,
+              "name": "codex",
+              "ppid": 43366,
+              "pgid": 43366,
+              "sid": 43366,
+              "tty_nr": 34816
+            },
+            {
+              "pid": 43366,
+              "name": "python3",
+              "ppid": 43363,
+              "pgid": 43366,
+              "sid": 43366,
+              "tty_nr": 34816
+            },
+            {
+              "pid": 43363,
+              "name": "sshd-session",
+              "ppid": 43349,
+              "pgid": 43349,
+              "sid": 43349,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43349,
+              "name": "sshd-session",
+              "ppid": 1558,
+              "pgid": 43349,
+              "sid": 43349,
+              "tty_nr": 0
+            },
+            {
+              "pid": 1558,
+              "name": "sshd",
+              "ppid": 1,
+              "pgid": 1558,
+              "sid": 1558,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43368,
+            "name": "codex",
+            "ppid": 43366,
+            "pgid": 43366,
+            "sid": 43366,
+            "tty_nr": 34816
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": null,
+            "TMUX_PANE": null,
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0c0c1-e96c-7570-9ece-018f1495e36b",
+            "turn_id": "01a0c0c1-e9d0-7221-8dc4-9df26fb89a82",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-38-48-01a0c0c1-e96c-7570-9ece-018f1495e36b.jsonl",
+            "cwd": "<remote-private-root>/work/direct",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 43607,
+          "ppid": 43368,
+          "pgid": 43607,
+          "sid": 43607,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 43607,
+              "name": "python3",
+              "ppid": 43368,
+              "pgid": 43607,
+              "sid": 43607,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43368,
+              "name": "codex",
+              "ppid": 43366,
+              "pgid": 43366,
+              "sid": 43366,
+              "tty_nr": 34816
+            },
+            {
+              "pid": 43366,
+              "name": "python3",
+              "ppid": 43363,
+              "pgid": 43366,
+              "sid": 43366,
+              "tty_nr": 34816
+            },
+            {
+              "pid": 43363,
+              "name": "sshd-session",
+              "ppid": 43349,
+              "pgid": 43349,
+              "sid": 43349,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43349,
+              "name": "sshd-session",
+              "ppid": 1558,
+              "pgid": 43349,
+              "sid": 43349,
+              "tty_nr": 0
+            },
+            {
+              "pid": 1558,
+              "name": "sshd",
+              "ppid": 1,
+              "pgid": 1558,
+              "sid": 1558,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43368,
+            "name": "codex",
+            "ppid": 43366,
+            "pgid": 43366,
+            "sid": 43366,
+            "tty_nr": 34816
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": null,
+            "TMUX_PANE": null,
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "native-exit": {
+          "pid": 43368,
+          "exit_code": 0,
+          "forced": false
+        },
+        "native-start": {
+          "pid": 43366,
+          "pgid": 43366,
+          "sid": 43366,
+          "tty": "/dev/pts/0",
+          "tmux": null,
+          "tmux_pane": null,
+          "codex_pid": 43368
+        }
+      },
+      "native_session_id": "01a0c0c1-e96c-7570-9ece-018f1495e36b",
+      "native_turn_id": "01a0c0c1-e9d0-7221-8dc4-9df26fb89a82",
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "01a0c0c1-e96c-7570-9ece-018f1495e36b",
+          "cwd": "<remote-private-root>/work/direct",
+          "project": "direct",
+          "plugin_version": "0.4.0"
+        },
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "prompt_submit",
+          "session_id": "01a0c0c1-e96c-7570-9ece-018f1495e36b",
+          "cwd": "<remote-private-root>/work/direct",
+          "project": "direct",
+          "turn_id": "01a0c0c1-e9d0-7221-8dc4-9df26fb89a82",
+          "query": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+        }
+      ],
+      "native_cli_hook_triggered": true,
+      "native_tui_blocked_observed": true,
+      "transport_received": true,
+      "official_reference_transport_compatible": true,
+      "transport_via_diagnostic_parent_tty_adapter": false,
+      "result": "transport_received"
+    },
+    {
+      "mode": "tmux-on",
+      "passed": true,
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": false,
+      "capture_error": null,
+      "terminal_query_responses": {
+        "1b5b63": 1,
+        "1b5b3e63": 1,
+        "1b5d31303b3f1b5c": 1,
+        "1b5d31313b3f1b5c": 1
+      },
+      "ssh_stdout_sha256": "3f6dbd6a79bef1fee7400385404c55bc049776b324bf9f3587815699dc582aed",
+      "ssh_stdout_bytes": 8956,
+      "ssh_stderr": "<merged-into-control-pty>",
+      "native": {
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0c0c2-02ec-7430-828b-4cd8413a9162",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-38-55-01a0c0c2-02ec-7430-828b-4cd8413a9162.jsonl",
+            "cwd": "<remote-private-root>/work/tmux-on",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 43887,
+          "ppid": 43682,
+          "pgid": 43887,
+          "sid": 43887,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 43887,
+              "name": "python3",
+              "ppid": 43682,
+              "pgid": 43887,
+              "sid": 43887,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43682,
+              "name": "codex",
+              "ppid": 43681,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43681,
+              "name": "python3",
+              "ppid": 43680,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43680,
+              "name": "sh",
+              "ppid": 43679,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43679,
+              "name": "tmux: server",
+              "ppid": 1,
+              "pgid": 43679,
+              "sid": 43679,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43682,
+            "name": "codex",
+            "ppid": 43681,
+            "pgid": 43680,
+            "sid": 43680,
+            "tty_nr": 34817
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "/tmp/isp-25f08de025d6-tmux-on.sock,43679,0",
+            "TMUX_PANE": "%0",
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0c0c2-02ec-7430-828b-4cd8413a9162",
+            "turn_id": "01a0c0c2-0340-7631-b17e-9267ba31a6b5",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-38-55-01a0c0c2-02ec-7430-828b-4cd8413a9162.jsonl",
+            "cwd": "<remote-private-root>/work/tmux-on",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 43911,
+          "ppid": 43682,
+          "pgid": 43911,
+          "sid": 43911,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 43911,
+              "name": "python3",
+              "ppid": 43682,
+              "pgid": 43911,
+              "sid": 43911,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43682,
+              "name": "codex",
+              "ppid": 43681,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43681,
+              "name": "python3",
+              "ppid": 43680,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43680,
+              "name": "sh",
+              "ppid": 43679,
+              "pgid": 43680,
+              "sid": 43680,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43679,
+              "name": "tmux: server",
+              "ppid": 1,
+              "pgid": 43679,
+              "sid": 43679,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43682,
+            "name": "codex",
+            "ppid": 43681,
+            "pgid": 43680,
+            "sid": 43680,
+            "tty_nr": 34817
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "/tmp/isp-25f08de025d6-tmux-on.sock,43679,0",
+            "TMUX_PANE": "%0",
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "native-exit": {
+          "pid": 43682,
+          "exit_code": 0,
+          "forced": false
+        },
+        "native-start": {
+          "pid": 43681,
+          "pgid": 43680,
+          "sid": 43680,
+          "tty": "/dev/pts/1",
+          "tmux": "/tmp/isp-25f08de025d6-tmux-on.sock,43679,0",
+          "tmux_pane": "%0",
+          "codex_pid": 43682
+        }
+      },
+      "native_session_id": "01a0c0c2-02ec-7430-828b-4cd8413a9162",
+      "native_turn_id": "01a0c0c2-0340-7631-b17e-9267ba31a6b5",
+      "notifications": [
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "session_start",
+          "session_id": "01a0c0c2-02ec-7430-828b-4cd8413a9162",
+          "cwd": "<remote-private-root>/work/tmux-on",
+          "project": "tmux-on",
+          "plugin_version": "0.4.0"
+        },
+        {
+          "v": 1,
+          "agent": "codex",
+          "event": "prompt_submit",
+          "session_id": "01a0c0c2-02ec-7430-828b-4cd8413a9162",
+          "cwd": "<remote-private-root>/work/tmux-on",
+          "project": "tmux-on",
+          "turn_id": "01a0c0c2-0340-7631-b17e-9267ba31a6b5",
+          "query": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+        }
+      ],
+      "native_cli_hook_triggered": true,
+      "native_tui_blocked_observed": true,
+      "transport_received": true,
+      "official_reference_transport_compatible": true,
+      "transport_via_diagnostic_parent_tty_adapter": false,
+      "result": "transport_received"
+    },
+    {
+      "mode": "tmux-off",
+      "passed": true,
+      "ssh_exit": 0,
+      "trust_selected_in_native_tui": true,
+      "kept_existing_model_in_native_tui": false,
+      "capture_error": null,
+      "terminal_query_responses": {
+        "1b5b63": 1,
+        "1b5b3e63": 1,
+        "1b5d31303b3f1b5c": 1,
+        "1b5d31313b3f1b5c": 1
+      },
+      "ssh_stdout_sha256": "4286dfef72609f602c34c75b369d4e21273469b2d0fe310ae07633576e4dbe77",
+      "ssh_stdout_bytes": 8272,
+      "ssh_stderr": "<merged-into-control-pty>",
+      "native": {
+        "SessionStart": {
+          "input": {
+            "session_id": "01a0c0c2-1c5a-7261-a6ce-b786fd627720",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-39-01-01a0c0c2-1c5a-7261-a6ce-b786fd627720.jsonl",
+            "cwd": "<remote-private-root>/work/tmux-off",
+            "hook_event_name": "SessionStart",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "source": "startup"
+          },
+          "pid": 44194,
+          "ppid": 43989,
+          "pgid": 44194,
+          "sid": 44194,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 44194,
+              "name": "python3",
+              "ppid": 43989,
+              "pgid": 44194,
+              "sid": 44194,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43989,
+              "name": "codex",
+              "ppid": 43988,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43988,
+              "name": "python3",
+              "ppid": 43987,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43987,
+              "name": "sh",
+              "ppid": 43986,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43986,
+              "name": "tmux: server",
+              "ppid": 1,
+              "pgid": 43986,
+              "sid": 43986,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43989,
+            "name": "codex",
+            "ppid": 43988,
+            "pgid": 43987,
+            "sid": 43987,
+            "tty_nr": 34817
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-session-start.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "/tmp/isp-25f08de025d6-tmux-off.sock,43986,0",
+            "TMUX_PANE": "%0",
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "UserPromptSubmit": {
+          "input": {
+            "session_id": "01a0c0c2-1c5a-7261-a6ce-b786fd627720",
+            "turn_id": "01a0c0c2-1caa-74c3-bf84-6a224010f15e",
+            "transcript_path": "<remote-private-root>/home/.codex/sessions/2026/09/20/rollout-2026-09-20T21-39-01-01a0c0c2-1c5a-7261-a6ce-b786fd627720.jsonl",
+            "cwd": "<remote-private-root>/work/tmux-off",
+            "hook_event_name": "UserPromptSubmit",
+            "model": "gpt-5.4",
+            "permission_mode": "default",
+            "prompt": "INFINISHELL_REMOTE_SSH_TMUX_NATIVE_HOOK_PROBE_DO_NOT_RUN_MODEL"
+          },
+          "pid": 44218,
+          "ppid": 43989,
+          "pgid": 44218,
+          "sid": 44218,
+          "stdio_isatty": {
+            "0": false,
+            "1": false,
+            "2": false
+          },
+          "ancestry": [
+            {
+              "pid": 44218,
+              "name": "python3",
+              "ppid": 43989,
+              "pgid": 44218,
+              "sid": 44218,
+              "tty_nr": 0
+            },
+            {
+              "pid": 43989,
+              "name": "codex",
+              "ppid": 43988,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43988,
+              "name": "python3",
+              "ppid": 43987,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43987,
+              "name": "sh",
+              "ppid": 43986,
+              "pgid": 43987,
+              "sid": 43987,
+              "tty_nr": 34817
+            },
+            {
+              "pid": 43986,
+              "name": "tmux: server",
+              "ppid": 1,
+              "pgid": 43986,
+              "sid": 43986,
+              "tty_nr": 0
+            }
+          ],
+          "hook_control_tty": {
+            "opened": false,
+            "errno": 6
+          },
+          "codex_parent": {
+            "pid": 43989,
+            "name": "codex",
+            "ppid": 43988,
+            "pgid": 43987,
+            "sid": 43987,
+            "tty_nr": 34817
+          },
+          "official_reference_exit": 0,
+          "official_reference_stdout": "",
+          "official_reference_stderr": "",
+          "diagnostic_parent_tty_adapter": false,
+          "reference_script": "on-prompt-submit.sh",
+          "reference_exit": 0,
+          "reference_stderr": "",
+          "environment": {
+            "PLUGIN_ROOT": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0",
+            "TMUX": "/tmp/isp-25f08de025d6-tmux-off.sock,43986,0",
+            "TMUX_PANE": "%0",
+            "SSH_TTY": "/dev/pts/0",
+            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
+            "WARP_CLIENT_VERSION": "remote-live-probe",
+            "TERM_PROGRAM": "WarpTerminal"
+          }
+        },
+        "native-exit": {
+          "pid": 43989,
+          "exit_code": 0,
+          "forced": false
+        },
+        "native-start": {
+          "pid": 43988,
+          "pgid": 43987,
+          "sid": 43987,
+          "tty": "/dev/pts/1",
+          "tmux": "/tmp/isp-25f08de025d6-tmux-off.sock,43986,0",
+          "tmux_pane": "%0",
+          "codex_pid": 43989
+        }
+      },
+      "native_session_id": "01a0c0c2-1c5a-7261-a6ce-b786fd627720",
+      "native_turn_id": "01a0c0c2-1caa-74c3-bf84-6a224010f15e",
+      "notifications": [],
+      "native_cli_hook_triggered": true,
+      "native_tui_blocked_observed": true,
+      "transport_received": false,
+      "official_reference_transport_compatible": true,
+      "transport_via_diagnostic_parent_tty_adapter": false,
+      "result": "blocking_observed"
+    }
+  ],
+  "remote_inputs": {
+    "root": "<remote-private-root>",
+    "home": "/root",
+    "kernel": "Linux",
+    "architecture": "x86_64",
+    "codex_path": "<remote-private-root>/codex/package/vendor/x86_64-unknown-linux-musl/bin/codex",
+    "codex_sha256": "0753dfe1d8b87a52436deb13eb1c549661ef4c84fee2c5aa688385eebeccb761",
+    "codex_package_sha256": "f110cccdd50b0be8130b84f45b3144ea775c233f1c8bd8226da6ee719d63d206",
+    "codex_version": "codex-cli 0.155.1",
+    "tmux_path": "<remote-private-root>/pkg/usr/bin/tmux",
+    "tmux_sha256": "3bdeba4db61fa25e569e5d1ca6466acfd193018c7bbc2bc924ec415ffa0c2e58",
+    "tmux_version": "tmux 3.6",
+    "jq_path": "<remote-private-root>/pkg/usr/bin/jq",
+    "jq_version": "jq-1.8.1",
+    "package_sha256": {
+      "jq_1.8.1-4ubuntu2_amd64.deb": "bb7f69de12414f6e52eea1da952ed7226b8e3fd9db74f93bb8ea3f2f39f4836f",
+      "libevent-core-2.1-7t64_2.1.12-stable-10build2_amd64.deb": "1423e63d2cccebd31900ecdaceb366279231efb4aa6e4a29188657100166141f",
+      "libjemalloc2_5.3.0-4_amd64.deb": "df00a1d37c735bfb1830418efb721c2c0b79cd0a735c3d35e4015eb6a4d2683d",
+      "libjq1_1.8.1-4ubuntu2_amd64.deb": "3ced45ef4154cce59ce9fc74cc606b7361fa1b2f088b31a903d54fbcee75cb43",
+      "libonig5_6.9.10-1build1_amd64.deb": "050ad79c8c02956d896407ff66fddcb24e114b307cde196a0226697cf643ef88",
+      "tmux_3.6a-2ubuntu0.1_amd64.deb": "c1df283beedf7c554a441d5b34e5801f3494fea1809c8c03917a5ff87a856e71"
+    }
+  },
+  "reference_tree_sha256": {
+    ".codex-plugin/plugin.json": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+    "hooks/hooks.json": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+    "scripts/build-payload.sh": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+    "scripts/on-permission-request.sh": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+    "scripts/on-post-tool-use.sh": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+    "scripts/on-prompt-submit.sh": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+    "scripts/on-session-start.sh": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+    "scripts/on-stop.sh": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+    "scripts/should-use-structured.sh": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+    "scripts/warp-notify.sh": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29"
+  },
+  "native_install": [
+    {
+      "arguments": [
+        "plugin",
+        "marketplace",
+        "add",
+        "<remote-private-root>/marketplace",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"installedRoot\": \"<remote-private-root>/marketplace\",\n  \"alreadyAdded\": false\n}\n",
+      "stderr": ""
+    },
+    {
+      "arguments": [
+        "plugin",
+        "add",
+        "ssh-transport-probe@infinishell-ssh-transport-probe",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\n  \"pluginId\": \"ssh-transport-probe@infinishell-ssh-transport-probe\",\n  \"name\": \"ssh-transport-probe\",\n  \"marketplaceName\": \"infinishell-ssh-transport-probe\",\n  \"version\": \"0.1.0\",\n  \"installedPath\": \"<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0\",\n  \"authPolicy\": \"ON_INSTALL\"\n}\n",
+      "stderr": ""
+    }
+  ],
+  "authorization_rpc": [
+    {
+      "channel": "stderr",
+      "value": "\u001b[2m2026-09-20T21:38:45.301163Z\u001b[0m \u001b[31mERROR\u001b[0m \u001b[2mcodex_app_server\u001b[0m\u001b[2m:\u001b[0m Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+      "observed_elapsed_ms": 2221
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 1,
+        "result": {
+          "userAgent": "infinishell_remote_ssh_probe/0.155.1 (Ubuntu 26.4.0; x86_64) WarpTerminal (infinishell_remote_ssh_probe; 0.1.0)",
+          "codexHome": "<remote-private-root>/home/.codex",
+          "platformFamily": "unix",
+          "platformOs": "linux"
+        }
+      },
+      "observed_elapsed_ms": 2323
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "method": "configWarning",
+        "params": {
+          "summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.",
+          "details": null
+        },
+        "emittedAtMs": 1789940325396
+      },
+      "observed_elapsed_ms": 2323
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "method": "remoteControl/status/changed",
+        "params": {
+          "status": "disabled",
+          "serverName": "cheerful-laser-5.localdomain",
+          "installationId": "d2038036-874a-4c6d-8449-89c7ad179b62",
+          "environmentId": null
+        },
+        "emittedAtMs": 1789940325396
+      },
+      "observed_elapsed_ms": 2323
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 2,
+        "result": {
+          "data": [
+            {
+              "cwd": "<remote-private-root>/work",
+              "hooks": [
+                {
+                  "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:session_start:0:0",
+                  "eventName": "sessionStart",
+                  "handlerType": "command",
+                  "command": "/usr/bin/python3 \"$PLUGIN_ROOT/native_hook.py\" session",
+                  "async": false,
+                  "matcher": null,
+                  "timeoutSec": 10,
+                  "statusMessage": null,
+                  "additionalContextLimit": null,
+                  "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                  "source": "plugin",
+                  "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                  "displayOrder": 0,
+                  "enabled": true,
+                  "isManaged": false,
+                  "currentHash": "sha256:af21412078e134f3611d6bb22f13dc65d0bbf38fbb9fa10c996bce5a42eabf5e",
+                  "trustStatus": "untrusted"
+                },
+                {
+                  "key": "ssh-transport-probe@infinishell-ssh-transport-probe:hooks/hooks.json:user_prompt_submit:0:0",
+                  "eventName": "userPromptSubmit",
+                  "handlerType": "command",
+                  "command": "/usr/bin/python3 \"$PLUGIN_ROOT/native_hook.py\" prompt",
+                  "async": false,
+                  "matcher": null,
+                  "timeoutSec": 10,
+                  "statusMessage": null,
+                  "additionalContextLimit": null,
+                  "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+                  "source": "plugin",
+                  "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+                  "displayOrder": 1,
+                  "enabled": true,
+                  "isManaged": false,
+                  "currentHash": "sha256:edf0c42c18d1198a1ca99ab5d5a339ae6052bf854c006c15763f1ad861325ce8",
+                  "trustStatus": "untrusted"
+                }
+              ],
+              "warnings": [],
+              "errors": []
+            }
+          ]
+        }
+      },
+      "observed_elapsed_ms": 2483
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 10,
+        "result": {
+          "status": "ok",
+          "version": "sha256:96809f473c285ebdeb02dbf98fba785a0690fe630148f9b306af6eaff0ded17f",
+          "filePath": "<remote-private-root>/home/.codex/config.toml",
+          "overriddenMetadata": null
+        }
+      },
+      "observed_elapsed_ms": 2642
+    },
+    {
+      "channel": "stdout",
+      "value": {
+        "id": 11,
+        "result": {
+          "status": "ok",
+          "version": "sha256:854dfa01abbbe17592a3b2ac56e247c81ee5bdf1f3d2a3da3d279cf251073e54",
+          "filePath": "<remote-private-root>/home/.codex/config.toml",
+          "overriddenMetadata": null
+        }
+      },
+      "observed_elapsed_ms": 2792
+    }
+  ],
+  "authorized_hooks": [
+    {
+      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+      "eventName": "sessionStart",
+      "command": "/usr/bin/python3 \"$PLUGIN_ROOT/native_hook.py\" session",
+      "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+      "trustStatus": "untrusted",
+      "currentHash": "sha256:af21412078e134f3611d6bb22f13dc65d0bbf38fbb9fa10c996bce5a42eabf5e"
+    },
+    {
+      "pluginId": "ssh-transport-probe@infinishell-ssh-transport-probe",
+      "eventName": "userPromptSubmit",
+      "command": "/usr/bin/python3 \"$PLUGIN_ROOT/native_hook.py\" prompt",
+      "sourcePath": "<remote-private-root>/home/.codex/plugins/cache/infinishell-ssh-transport-probe/ssh-transport-probe/0.1.0/hooks/hooks.json",
+      "trustStatus": "untrusted",
+      "currentHash": "sha256:edf0c42c18d1198a1ca99ab5d5a339ae6052bf854c006c15763f1ad861325ce8"
+    }
+  ],
+  "native_cli_hook_triggered": true,
+  "direct_transport_passed": true,
+  "tmux_passthrough_passed": true,
+  "tmux_blocking_observed": true,
+  "official_codex_hook_control_tty_compatible": true,
+  "remote_transport_passed": true,
+  "passed": true,
+  "result": "passed",
+  "private_receipt": {
+    "path_recorded": false,
+    "sha256": "2d789c8914b2b73e9d66e2e56376638982fe04b3cae19062c427fc925f213f11",
+    "contains_raw_ssh_bytes": true
+  },
+  "safe_receipt_contains_raw_ssh_bytes": false
+}

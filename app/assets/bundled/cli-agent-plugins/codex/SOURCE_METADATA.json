@@ -3,8 +3,8 @@
   "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
   "cli_contract_version": "0.147.0",
   "plugin_version": "0.4.0",
-  "patch_revision": 4,
-  "directory": "codex-warp-0.4.0-rev4",
+  "patch_revision": 5,
+  "directory": "codex-warp-0.4.0-rev5",
   "files": {
     ".agents/plugins/marketplace.json": {
       "upstream_sha256": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
@@ -178,7 +178,7 @@
     },
     "plugins/warp/scripts/warp-notify.sh": {
       "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
-      "sha256": "b0b75257e90f432d43848f051329664376ee8b662e8531ea8ab3c42d62c9017c",
+      "sha256": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29",
       "mode": 493
     },
     "tests/test-hooks.sh": {

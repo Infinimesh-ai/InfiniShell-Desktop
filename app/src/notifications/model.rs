@@ -259,7 +259,10 @@ impl NotificationsModel {
                         title,
                         description,
                         NotificationCategory::Request,
-                        NotificationSourceAgent::CLI { agent: *agent, is_ambient: metadata.is_ambient },
+                        NotificationSourceAgent::CLI {
+                            agent: *agent,
+                            is_ambient: metadata.is_ambient,
+                        },
                         NotificationOrigin::CLISession(*terminal_view_id),
                         *terminal_view_id,
                         vec![],

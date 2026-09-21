@@ -259,7 +259,13 @@ fn known_012_source_and_backup_preserve_all_four_original_files() {
     let source = write_012_bundle(directory.path());
     let original = validate_expected_tree(&source, "0.1.2").unwrap();
     for (name, digest) in LEGACY_012_SHA256 {
-        assert_eq!(format!("{:x}", Sha256::digest(&original.get(*name).unwrap().contents)), *digest);
+        assert_eq!(
+            format!(
+                "{:x}",
+                Sha256::digest(&original.get(*name).unwrap().contents)
+            ),
+            *digest
+        );
     }
     let backup = backup_plugin(&source, directory.path()).unwrap();
     write_bundle(directory.path()).unwrap();

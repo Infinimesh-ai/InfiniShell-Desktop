@@ -13,7 +13,66 @@ use serde_json::{Value, json};
 use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME, tool_definitions};
 use super::{PermissionPolicy, RuntimeError};
 
-const VERIFIED_VERSION: &str = "1.0.30";
+const LEGACY_VERIFIED_VERSION: &str = "1.0.30";
+const P0_VERIFIED_VERSION: &str = "1.0.34";
+const CURRENT_VERSION: &str = "1.0.40";
+// 这里只绑定官方固定字节；Linux/Windows 最新版仍须由运行时能力门禁和实机收据独立放行。
+const VERIFIED_EXECUTABLES: &[(&str, &str, &str, &str)] = &[
+    (
+        "macos",
+        "aarch64",
+        LEGACY_VERIFIED_VERSION,
+        "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
+    ),
+    (
+        "macos",
+        "aarch64",
+        P0_VERIFIED_VERSION,
+        "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+    ),
+    (
+        "macos",
+        "aarch64",
+        CURRENT_VERSION,
+        "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+    ),
+    (
+        "linux",
+        "x86_64",
+        LEGACY_VERIFIED_VERSION,
+        "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
+    ),
+    (
+        "linux",
+        "x86_64",
+        P0_VERIFIED_VERSION,
+        "be5905e107d2b8b5f3c142d21ecfe4c8fd32a913d2fd551b788707930c4dc80d",
+    ),
+    (
+        "linux",
+        "x86_64",
+        CURRENT_VERSION,
+        "92c997dfd109c0672d40d5ae6fbd15835d53ffaf12cf9ea124d22aaef3ff23fc",
+    ),
+    (
+        "windows",
+        "x86_64",
+        LEGACY_VERIFIED_VERSION,
+        "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
+    ),
+    (
+        "windows",
+        "x86_64",
+        P0_VERIFIED_VERSION,
+        "021d8f7f6bdf9db48b6c87e799cd99130a76c463e6e6a3161510839aed016d94",
+    ),
+    (
+        "windows",
+        "x86_64",
+        CURRENT_VERSION,
+        "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e",
+    ),
+];
 const PROFILE_NAME: &str = "infinishell-managed-grok-v1";
 const READ_TOOL: &str = "GrokBuild:read_file";
 const WRITE_TOOL: &str = "OpenCode:write";
@@ -98,7 +157,11 @@ impl GrokCreationPolicyV1 {
         local_tools: Option<LocalToolPermissions>,
         permission_policy: PermissionPolicy,
     ) -> Result<Self, RuntimeError> {
-        if cli_version != VERIFIED_VERSION || !cwd.is_absolute() {
+        if !matches!(
+            cli_version,
+            LEGACY_VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION
+        ) || !cwd.is_absolute()
+        {
             return Err(reject("grok_creation_policy_version_or_directory"));
         }
         let tool_set = match permission_policy {
@@ -152,6 +215,9 @@ impl GrokCreationPolicyV1 {
         config_sha256: String,
         permission_policy: PermissionPolicy,
     ) -> Result<(), RuntimeError> {
+        if !self.matches_cli_version(cli_version) {
+            return Err(reject("grok_creation_policy_cli_version_changed"));
+        }
         let current = Self::compile(
             cwd,
             cli_version,
@@ -173,6 +239,29 @@ impl GrokCreationPolicyV1 {
             GrokToolSet::Read => PermissionPolicy::GrokRestrictedReadV1,
             GrokToolSet::Files => PermissionPolicy::GrokRestrictedFilesV1,
         }
+    }
+
+    pub(super) fn matches_cli_version(&self, cli_version: &str) -> bool {
+        VERIFIED_EXECUTABLES.iter().any(|(_, _, version, digest)| {
+            *version == cli_version && *digest == self.executable_sha256.as_str()
+        })
+    }
+
+    /// 这里只描述已取得真实收据的生产启动范围；保存记录能够反序列化不等于该版本可执行。
+    pub(super) fn runtime_scope_verified(
+        &self,
+        cli_version: &str,
+        local_tools: Option<LocalToolPermissions>,
+        permission_policy: PermissionPolicy,
+    ) -> bool {
+        self.validate().is_ok()
+            && self.matches_cli_version(cli_version)
+            && self.local_tools == local_tools
+            && self.permission_policy() == permission_policy
+            && (cli_version == LEGACY_VERIFIED_VERSION
+                || (cli_version == P0_VERIFIED_VERSION
+                    && local_tools.is_none()
+                    && permission_policy == PermissionPolicy::GrokRestrictedReadV1))
     }
 
     pub(super) fn native_tool_ids(&self) -> Vec<&'static str> {
@@ -527,20 +616,28 @@ impl GrokCreationPolicyV1 {
     }
 
     pub(super) fn prepare(options: &super::SessionOptions) -> Result<GrokLaunch, RuntimeError> {
-        let digest = verified_executable_digest(&options.executable)?;
+        let (cli_version, digest) = verified_executable_digest(&options.executable)?;
         let config_digest = format!("{:x}", Sha256::digest(FIXED_CONFIGURATION.as_bytes()));
         let mut policy = Self::compile(
             &options.cwd,
-            VERIFIED_VERSION,
+            cli_version,
             digest,
             config_digest,
             options.local_tools,
             options.permission_policy,
         )?;
+        if !policy.runtime_scope_verified(
+            cli_version,
+            options.local_tools,
+            options.permission_policy,
+        ) {
+            // 必须早于目录、固定配置及认证副本写入；仅版本摘要匹配不能放行未验工具集。
+            return Err(reject("grok_creation_policy_scope_unverified"));
+        }
         if let Some(saved) = &options.grok_profile {
             saved.validate_launch(
                 &options.cwd,
-                VERIFIED_VERSION,
+                cli_version,
                 policy.executable_sha256.clone(),
                 policy.config_sha256.clone(),
                 options.permission_policy,
@@ -704,13 +801,13 @@ fn immutable_file(path: &Path, contents: &[u8]) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn verified_executable_digest(path: &Path) -> Result<String, RuntimeError> {
-    let expected = match (std::env::consts::OS, std::env::consts::ARCH) {
-        ("macos", "aarch64") => "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb",
-        ("linux", "x86_64") => "504dd6546ab991b75d36698242875ce461489cd1f8cd84285873cb55bd5c7d54",
-        ("windows", "x86_64") => "ca24ea63272ba7881261f4a52498d1f5bd884b01da25845990422a10dd315266",
-        _ => return Err(reject("grok_creation_platform_unverified")),
-    };
+fn verified_executable_digest(path: &Path) -> Result<(&'static str, String), RuntimeError> {
+    if !VERIFIED_EXECUTABLES
+        .iter()
+        .any(|(os, arch, _, _)| *os == std::env::consts::OS && *arch == std::env::consts::ARCH)
+    {
+        return Err(reject("grok_creation_platform_unverified"));
+    }
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha256::new();
     let mut bytes = [0u8; 64 * 1024];
@@ -722,10 +819,14 @@ fn verified_executable_digest(path: &Path) -> Result<String, RuntimeError> {
         digest.update(&bytes[..count]);
     }
     let digest = format!("{:x}", digest.finalize());
-    if digest != expected {
-        return Err(reject("grok_creation_executable_unverified"));
-    }
-    Ok(digest)
+    let version = VERIFIED_EXECUTABLES
+        .iter()
+        .find_map(|(os, arch, version, expected)| {
+            (*os == std::env::consts::OS && *arch == std::env::consts::ARCH && digest == *expected)
+                .then_some(*version)
+        })
+        .ok_or_else(|| reject("grok_creation_executable_unverified"))?;
+    Ok((version, digest))
 }
 
 #[cfg(test)]

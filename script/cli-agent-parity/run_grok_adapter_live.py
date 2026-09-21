@@ -278,7 +278,14 @@ class MessagesProxy:
         return not self.thread.is_alive() and drained
 
 
-def prepare_native(root, real_cli, credential_directory, port, binary_sha256=None):
+def prepare_native(
+    root,
+    real_cli,
+    credential_directory,
+    port,
+    binary_sha256=None,
+    leader_socket_root=None,
+):
     binary_sha256 = BINARY_SHA256 if binary_sha256 is None else binary_sha256
     configuration = f'''[cli]
 use_leader = true
@@ -313,24 +320,25 @@ tool = "any"
     settings.write_text(configuration, encoding="utf-8")
     # 包装器不改 CLI 参数，只为生产传入的独立 socket 增加精确沙箱白名单。
     wrapper = root / "grok-sandbox"
+    leader_socket_root = Path(leader_socket_root or root / "tmp").resolve()
     code = f'''#!{Path(sys.executable).resolve()}
 import hashlib,json,os,sys
 from pathlib import Path
-root=Path({str(root)!r}); native=Path({str(real_cli)!r}); args=sys.argv[1:]
+root=Path({str(root)!r}); socket_root=Path({str(leader_socket_root)!r}); native=Path({str(real_cli)!r}); args=sys.argv[1:]
 if hashlib.sha256(native.read_bytes()).hexdigest()!={binary_sha256!r}:raise SystemExit(91)
 profile={sandbox_profile(root, credential_directory, port)!r}
 if args==['--version']:kind='version';endpoint=None
 elif len(args)==4 and args[:3]==['agent','stdio','--leader-socket']:
  endpoint=Path(args[3]);resolved=endpoint.resolve()
- if not endpoint.is_absolute() or endpoint!=resolved or not resolved.is_relative_to(root/'tmp') or resolved.name!='leader.sock' or resolved.exists():raise SystemExit(92)
+ if not endpoint.is_absolute() or endpoint!=resolved or not resolved.is_relative_to(socket_root) or resolved.name!='leader.sock' or resolved.exists():raise SystemExit(92)
  parent=resolved.parent
  if parent.stat().st_uid!=os.getuid() or parent.stat().st_mode & 0o077:raise SystemExit(93)
  quoted=json.dumps(str(resolved))
- profile+='(allow network-bind network-inbound (literal '+quoted+'))(allow network-outbound (remote unix-socket (path-literal '+quoted+')))'
+ profile+='(allow file-write* (subpath '+json.dumps(str(socket_root))+'))(allow network-bind network-inbound (literal '+quoted+'))(allow network-outbound (remote unix-socket (path-literal '+quoted+')))'
  kind='private_leader'
 else:raise SystemExit(94)
 with (root/'wrapper-audit.ndjson').open('a') as evidence:
- evidence.write(json.dumps({{'event':'native_launch','kind':kind,'arguments_unchanged':True,'private_socket':str(endpoint.relative_to(root)) if endpoint else None}})+'\\n')
+ evidence.write(json.dumps({{'event':'native_launch','kind':kind,'arguments_unchanged':True,'private_socket':str(endpoint.relative_to(socket_root)) if endpoint else None}})+'\\n')
 os.execv('/usr/bin/sandbox-exec',['sandbox-exec','-p',profile,str(native),*args])
 '''
     wrapper.write_text(code, encoding="utf-8"); wrapper.chmod(0o700)

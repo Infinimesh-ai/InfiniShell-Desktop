@@ -12,16 +12,16 @@ use std::time::Duration;
 
 #[cfg(unix)]
 use nix::unistd::Uid;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
-use super::{cancelled_permission, run_process, Effects, GrokProtocol};
+use super::{Effects, GrokProtocol, cancelled_permission, run_process};
 use crate::ai::cli_agent_runtime::{
-    channels, managed_process, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
-    RuntimeError, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
+    InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError, RuntimeEventKind,
+    SessionOptions, SessionTarget, TurnOutcome, channels, managed_process,
 };
 
 const SCOPE: &str = "grok_native_sdk_origin_probe";
@@ -1786,9 +1786,11 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         report["private_error_capture_status"] =
             json!(state.private_error_capture_status.unwrap_or("not_observed"));
         report["private_error_response_bytes"] = json!(state.private_error_response_bytes);
-        report["private_response_envelope_status"] = json!(state
-            .private_response_envelope_status
-            .unwrap_or("not_observed"));
+        report["private_response_envelope_status"] = json!(
+            state
+                .private_response_envelope_status
+                .unwrap_or("not_observed")
+        );
         report["private_response_envelope_bytes"] = json!(state.private_response_envelope_bytes);
         report["private_response_envelope_sha256"] = json!(state.private_response_envelope_sha256);
     }
@@ -1893,9 +1895,11 @@ fn malformed_response_shape_is_saved_before_the_jsonrpc_guard() {
     assert_eq!(diagnostic["jsonrpc"]["type"], "boolean");
     assert_eq!(diagnostic["jsonrpc_is_2_0"], false);
     assert_eq!(diagnostic["error_code"], -32603);
-    assert!(!diagnostic
-        .to_string()
-        .contains("OFFLINE_MALFORMED_RESPONSE_BODY"));
+    assert!(
+        !diagnostic
+            .to_string()
+            .contains("OFFLINE_MALFORMED_RESPONSE_BODY")
+    );
     assert_eq!(state.sdk_requests, 0);
     assert_eq!(state.inspect_calls, 0);
 }
@@ -2188,7 +2192,7 @@ fn private_response_envelope_is_first_only_and_preserves_an_empty_file_on_budget
 #[cfg(unix)]
 #[test]
 fn private_envelope_directory_and_file_refuse_links_existing_files_and_shared_permissions() {
-    use std::os::unix::fs::{symlink, PermissionsExt};
+    use std::os::unix::fs::{PermissionsExt, symlink};
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o755)).unwrap();
     assert!(open_private_response_envelope(root.path()).is_err());
@@ -2304,7 +2308,7 @@ fn oversized_private_error_capture_preserves_an_empty_file() {
 #[cfg(unix)]
 #[test]
 fn private_error_file_refuses_a_symlink_and_never_overwrites_evidence() {
-    use std::os::unix::fs::{symlink, PermissionsExt};
+    use std::os::unix::fs::{PermissionsExt, symlink};
     let root = tempfile::tempdir().unwrap();
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700)).unwrap();
     let target = NamedTempFile::new().unwrap();
@@ -2433,10 +2437,12 @@ fn sdk_probe_matches_only_two_explicit_wire_methods_and_records_the_actual_metho
         assert_eq!(state.frames[0]["wire_method"], wire);
     }
     let mut probe = SdkOriginProbe::new(Uuid::new_v4());
-    assert!(probe
-        .receive(&json!({"jsonrpc":"2.0", "id":1, "method":"__x.ai/mcp/sdk_call", "params":{}}))
-        .unwrap()
-        .is_none());
+    assert!(
+        probe
+            .receive(&json!({"jsonrpc":"2.0", "id":1, "method":"__x.ai/mcp/sdk_call", "params":{}}))
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(probe.state.lock().unwrap().sdk_requests, 0);
 }
 
@@ -2458,9 +2464,11 @@ fn sdk_initialize_observation_records_only_presence_type_and_boolean_enablement(
         assert_eq!(state.frames[0]["sdk_capability_present"], true);
         assert_eq!(state.frames[0]["sdk_capability_type"], value_type(&value));
         assert_eq!(state.frames[0]["sdk_capability_enabled"], value == true);
-        assert!(!state.frames[0]
-            .to_string()
-            .contains("do-not-record-this-value"));
+        assert!(
+            !state.frames[0]
+                .to_string()
+                .contains("do-not-record-this-value")
+        );
     }
 }
 
@@ -2475,12 +2483,16 @@ fn mcp_status_session_match_requires_a_confirmed_present_native_session() {
     assert_eq!(first["session_id_matches"], false);
     let session = Uuid::new_v4().to_string();
     probe.confirm_runtime_session(&session).unwrap();
-    assert!(probe
-        .confirm_runtime_session(&Uuid::new_v4().to_string())
-        .is_err());
-    assert!(probe
-        .confirm_runtime_session("Bearer OFFLINE_SESSION_CANARY")
-        .is_err());
+    assert!(
+        probe
+            .confirm_runtime_session(&Uuid::new_v4().to_string())
+            .is_err()
+    );
+    assert!(
+        probe
+            .confirm_runtime_session("Bearer OFFLINE_SESSION_CANARY")
+            .is_err()
+    );
     probe
         .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{}}))
         .unwrap();
@@ -2586,9 +2598,11 @@ fn mcp_status_observations_are_bounded_and_only_match_three_exact_native_methods
             .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":total}}))
             .unwrap();
     }
-    assert!(probe
-        .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":MAX_RECORDS}}))
-        .is_err());
+    assert!(
+        probe
+            .receive(&json!({"method":"_x.ai/mcp/init_progress","params":{"total":MAX_RECORDS}}))
+            .is_err()
+    );
     assert_eq!(
         probe.report(None, None)["mcp_status_observation_count"],
         MAX_RECORDS
@@ -2998,10 +3012,12 @@ fn exact_native_tool_frame(session: &str, prompt: &str, tool: &str, initial: boo
 
 fn install_exact_tool_ledger(probe: &mut SdkOriginProbe, session: &str, prompt: &str, tool: &str) {
     for initial in [true, false] {
-        assert!(probe
-            .receive(&exact_native_tool_frame(session, prompt, tool, initial))
-            .unwrap()
-            .is_none());
+        assert!(
+            probe
+                .receive(&exact_native_tool_frame(session, prompt, tool, initial))
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
@@ -3096,8 +3112,8 @@ fn exact_inspect_approval_rejects_missing_confirmed_runtime_ledger_and_closed_wi
 }
 
 #[test]
-fn exact_inspect_approval_rejects_changed_payload_extra_keys_wrong_identity_and_other_allow_options(
-) {
+fn exact_inspect_approval_rejects_changed_payload_extra_keys_wrong_identity_and_other_allow_options()
+ {
     for mutation in 0..19 {
         let (mut probe, session, prompt, mut request) = exact_permission_probe();
         match mutation {
@@ -3315,9 +3331,11 @@ fn initial_final_ledger_before_started_does_not_authorize_until_real_runtime_con
     assert!(probe.confirm_runtime_started(&prompt).is_err());
     probe.confirm_runtime_ack(&prompt).unwrap();
     assert!(probe.confirm_runtime_ack(&prompt).is_err());
-    assert!(probe
-        .confirm_runtime_started(&Uuid::new_v4().to_string())
-        .is_err());
+    assert!(
+        probe
+            .confirm_runtime_started(&Uuid::new_v4().to_string())
+            .is_err()
+    );
     probe.confirm_runtime_started(&prompt).unwrap();
     assert!(probe.confirm_runtime_started(&prompt).is_err());
     let allowed = probe
@@ -3377,12 +3395,14 @@ fn calibrated_three_options_offer_permanent_permission_but_select_only_allow_onc
     assert_eq!(report["approval_allow_count"], 1);
     assert_eq!(report["approval_deny_count"], 0);
     assert_eq!(report["approval_all_denied"], false);
-    assert!(report["frames"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|frame| frame["event"] == "probe_approval_observed")
-        .all(|frame| frame["selected_option_id"] == "allow-once"));
+    assert!(
+        report["frames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|frame| frame["event"] == "probe_approval_observed")
+            .all(|frame| frame["selected_option_id"] == "allow-once")
+    );
     assert!(!report.to_string().contains("PERMANENT_LABEL_CANARY"));
     assert_eq!(report["native_origin_ledger_relation_verified"], false);
 }
@@ -3460,12 +3480,14 @@ fn exact_search_native_tool_frame(session: &str, prompt: &str, tool: &str, initi
 
 fn install_search_ledger(probe: &mut SdkOriginProbe, session: &str, prompt: &str, tool: &str) {
     for initial in [true, false] {
-        assert!(probe
-            .receive(&exact_search_native_tool_frame(
-                session, prompt, tool, initial
-            ))
-            .unwrap()
-            .is_none());
+        assert!(
+            probe
+                .receive(&exact_search_native_tool_frame(
+                    session, prompt, tool, initial
+                ))
+                .unwrap()
+                .is_none()
+        );
     }
 }
 
@@ -3509,9 +3531,11 @@ fn exact_readonly_search_allows_once_without_becoming_an_inspect_or_sdk_origin()
     assert_eq!(report["native_origin_ledger_relation_verified"], false);
     assert_eq!(report["origin_verification"], "unknown");
     assert!(!probe.state.lock().unwrap().tools["native-search-1"].probe_tool);
-    assert!(!report
-        .to_string()
-        .contains("infinishell-sdk-origin-probe inspect"));
+    assert!(
+        !report
+            .to_string()
+            .contains("infinishell-sdk-origin-probe inspect")
+    );
     assert!(probe.check().is_ok());
 }
 

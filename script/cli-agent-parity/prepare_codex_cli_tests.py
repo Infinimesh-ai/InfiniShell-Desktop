@@ -347,7 +347,7 @@ class RuntimeExtractionTests(unittest.TestCase):
             self.extract()
         self.assertEqual(outside.read_bytes(), self.bodies["bin/codex-code-mode-host"])
 
-    def test_main_returns_complete_runtime_entrypoint_on_supported_architectures(self):
+    def test_explicit_legacy_returns_complete_runtime_entrypoint_on_supported_architectures(self):
         for platform_name, machine, target in (("linux", "x86_64", "linux-x64"),
                                                 ("win32", "AMD64", "windows-x64"),
                                                 ("win32", "ARM64", "windows-arm64")):
@@ -365,7 +365,7 @@ class RuntimeExtractionTests(unittest.TestCase):
                         patch.object(prepare.sys, "platform", platform_name), \
                         patch.object(prepare.platform, "machine", return_value=machine), \
                         patch.dict(os.environ, {"RUNNER_TEMP": str(self.root)}, clear=True), \
-                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--download-dir", str(download)]), \
+                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--version", "0.147.0", "--download-dir", str(download)]), \
                         patch.object(prepare, "fetch_file", side_effect=fetch), \
                         patch.object(prepare, "verified_version") as version, redirect_stdout(stdout):
                     prepare.main()
@@ -411,7 +411,7 @@ class RuntimeExtractionTests(unittest.TestCase):
                 self.extract("0.155.1")
             self.assertEqual(resource.read_bytes(), b"preserve user change")
 
-    def test_main_explicit_latest_keeps_legacy_archive_and_selects_native_platform(self):
+    def test_main_defaults_to_latest_and_keeps_legacy_archive(self):
         for platform_name, machine, target in (("linux", "x86_64", "linux-x64"),
                                                ("win32", "AMD64", "windows-x64"),
                                                ("win32", "ARM64", "windows-arm64"),
@@ -434,7 +434,7 @@ class RuntimeExtractionTests(unittest.TestCase):
                         patch.object(prepare.sys, "platform", platform_name), \
                         patch.object(prepare.platform, "machine", return_value=machine), \
                         patch.dict(os.environ, {"RUNNER_TEMP": str(self.root)}, clear=True), \
-                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--version", "0.155.1", "--download-dir", str(download)]), \
+                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--download-dir", str(download)]), \
                         patch.object(prepare, "fetch_file", side_effect=fetch), \
                         patch.object(prepare, "verified_version") as version, redirect_stdout(stdout):
                     prepare.main()
@@ -533,14 +533,14 @@ class LatestRuntimeVersionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "CLI 版本"):
                 prepare.verified_version(root / "codex", root, "0.155.1")
 
-    def test_macos_legacy_default_and_unverified_architecture_remain_unavailable(self):
+    def test_macos_legacy_and_unverified_latest_architecture_remain_unavailable(self):
         with patch.object(prepare.sys, "platform", "darwin"), \
                 patch.object(prepare.platform, "machine", return_value="x86_64"), \
                 patch.object(prepare, "fetch_file") as fetch, redirect_stderr(io.StringIO()):
-            with patch.object(sys, "argv", ["prepare_codex_cli.py", "--download-dir", "unused"]):
+            with patch.object(sys, "argv", ["prepare_codex_cli.py", "--version", "0.147.0", "--download-dir", "unused"]):
                 with self.assertRaises(SystemExit):
                     prepare.main()
-            with patch.object(sys, "argv", ["prepare_codex_cli.py", "--version", "0.155.1", "--download-dir", "unused"]):
+            with patch.object(sys, "argv", ["prepare_codex_cli.py", "--download-dir", "unused"]):
                 with self.assertRaisesRegex(ValueError, "macOS ARM64"):
                     prepare.main()
             fetch.assert_not_called()

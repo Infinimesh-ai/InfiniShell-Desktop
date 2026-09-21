@@ -22,8 +22,9 @@ use crate::ai::cli_agent_runtime::local_tools::{
     TrustedLocalToolContext, bind_local_tool_call,
 };
 use crate::ai::cli_agent_runtime::permissions::ceiling_from_parent;
-use crate::ai::local_cli_mailbox::send_local_message;
-use crate::persistence::local_cli_tasks::{load_task_generations, load_task_messages};
+use crate::persistence::local_cli_tasks::{
+    claim_managed_message_if_current, load_task_generations, load_task_messages,
+};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent::CLIAgentInstallModel;
 
@@ -425,7 +426,7 @@ async fn send(
             receipt_kind: None,
         };
         let status = if let Some(endpoint) = endpoint {
-            send_local_message(sender, endpoint, message.clone())
+            dispatch_managed_message(sender, endpoint, source, target.clone(), message.clone())
                 .await
                 .map(|_| ())
         } else {
@@ -498,6 +499,81 @@ async fn send(
         }
     }
     Err(json!({"status":"unconfirmed","messages":dispatched.iter().map(|message|json!({"message_id":message.message_id,"state":message.state,"receipt_kind":message.receipt_kind})).collect::<Vec<_>>(),"retry":"inspect existing message IDs; do not resend automatically"}).to_string())
+}
+
+pub(super) async fn dispatch_managed_message(
+    sender: &SyncSender<ModelEvent>,
+    endpoint: ManagedTaskEndpoint,
+    source: LocalCliTask,
+    target: LocalCliTask,
+    message: LocalCliMessage,
+) -> Result<LocalCliMessageState, String> {
+    let command = managed_message_command(&endpoint, &message)?;
+    let outcome = enqueue_message(sender, message.clone())?
+        .await
+        .map_err(|_| "普通父子消息入队确认已关闭")??;
+    if let LocalCliEnqueueOutcome::Existing(state) = outcome
+        && state != LocalCliMessageState::Queued
+    {
+        return Ok(state);
+    }
+    // 先由在线接收端保留协议队列容量，再在同一 SQLite 事务中领取消息。
+    // 领取后的 Sent 是交付不确定边界；即使提交命令失败也不能自动重投。
+    let prepared = endpoint.prepare_send(command).await?;
+    let Some(claimed) = claim_managed_message_if_current(sender, message.clone(), source, target)?
+        .await
+        .map_err(|_| "普通父子消息领取确认已关闭")??
+    else {
+        let stored = load_messages(
+            sender,
+            message.recipient_task_id.clone(),
+            message.recipient_generation,
+        )?
+        .await
+        .map_err(|_| "普通父子消息状态读取确认已关闭")??;
+        return stored
+            .into_iter()
+            .find(|stored| stored.message_id == message.message_id)
+            .map(|stored| stored.state)
+            .ok_or_else(|| "已领取的普通父子消息丢失".to_owned());
+    };
+    prepared
+        .commit()
+        .await
+        .map_err(|_| crate::t!("cli-agent-status-disconnected"))??;
+    Ok(claimed.state)
+}
+
+fn managed_message_command(
+    endpoint: &ManagedTaskEndpoint,
+    message: &LocalCliMessage,
+) -> Result<RuntimeCommand, String> {
+    if endpoint.task_id != message.recipient_task_id
+        || endpoint.generation != message.recipient_generation
+    {
+        return Err("消息接收任务或运行代数不匹配".to_owned());
+    }
+    let message_id =
+        Uuid::parse_str(&message.message_id).map_err(|_| "托管消息 ID 必须是 UUID".to_owned())?;
+    let input = vec![InputContent::Text(format!(
+        "Subject: {}\n\n{}",
+        message.subject, message.body
+    ))];
+    let action = match endpoint.active_turn_id.clone() {
+        Some(_) if matches!(endpoint.harness, Harness::Claude | Harness::Grok) => {
+            RuntimeAction::Submit { input }
+        }
+        Some(expected_turn_id) => RuntimeAction::Steer {
+            expected_turn_id,
+            input,
+        },
+        None => RuntimeAction::Submit { input },
+    };
+    Ok(RuntimeCommand {
+        generation: endpoint.runtime_generation,
+        message_id,
+        action,
+    })
 }
 
 async fn spawn_children(

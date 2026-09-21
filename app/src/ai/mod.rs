@@ -44,9 +44,9 @@ pub mod geap_credentials;
 pub mod harness_availability;
 pub(crate) mod harness_display;
 pub(crate) mod llms;
-pub(crate) mod local_harness_setup;
 #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
 pub(crate) mod local_cli_mailbox;
+pub(crate) mod local_harness_setup;
 pub(crate) mod machine_memory;
 pub(crate) mod metadata_project_rules;
 pub mod onboarding;

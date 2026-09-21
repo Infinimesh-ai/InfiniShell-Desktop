@@ -1,0 +1,73 @@
+{
+  "generated_at_utc": "2026-09-20T20:44:39Z",
+  "scope": "Codex 0.155.1 SSH disconnect, tmux reattach, product parser and event-boundary summary",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_tree_dirty": true,
+  "host_alias": "bwh-2t",
+  "receipts": {
+    "fixed_input_baseline": {
+      "path": "macos-official-73-codex-01551-bwh2t-ssh-tmux.safe.json",
+      "sha256": "0957c2cb74b5b0fed387aa69b9a844f5026aab089bf2907d2308791edcd8cef4",
+      "passed": true
+    },
+    "first_reconnect_failure": {
+      "path": "macos-official-74-codex-01551-bwh2t-ssh-tmux-reconnect.safe.json",
+      "sha256": "b179b3575ea2854eea1d40c449621f6f5d256ab36611a030cfaf2b08b57f6b30",
+      "passed": false,
+      "reason": "interactive Codex had not submitted an initial prompt, so no native session hook started"
+    },
+    "second_reconnect_failure": {
+      "path": "macos-official-75-codex-01551-bwh2t-ssh-tmux-reconnect.safe.json",
+      "sha256": "10a1eb706dc9a7daa565aaa091301ee852d4169df691d54020a5b536b0fd9429",
+      "passed": false,
+      "reason": "reattach prompt was typed but carriage return did not submit it"
+    },
+    "real_reconnect_lifecycle": {
+      "path": "macos-official-76-codex-01551-bwh2t-ssh-tmux-reconnect.safe.json",
+      "sha256": "a3d7b7a6ebc998639e06ae56f4d8c32ed586ce3ac77815ca03c6a65e8111109a",
+      "lifecycle_passed": true,
+      "overall_passed": false
+    },
+    "pre_disconnect_product_parser": {
+      "path": "macos-official-77-codex-01551-bwh2t-pre-disconnect-product-osc-parser.safe.json",
+      "sha256": "3c110f86d88be445f059ce3ecb43bb5bdf926b736aa4e224ddfe925ce6a98b13",
+      "passed": true
+    },
+    "reattach_product_parser": {
+      "path": "macos-official-78-codex-01551-bwh2t-reattach-product-osc-parser.safe.json",
+      "sha256": "4708a0a8734ece158eacc117ff21b2cef41a367d6c0bf7b3df41c61875d9bd94",
+      "passed": true
+    }
+  },
+  "verified": {
+    "explicit_tmux_detach_then_reattach": true,
+    "local_ssh_process_sigkill_then_reattach": true,
+    "tmux_zero_clients_after_disconnect": true,
+    "tmux_pane_alive_after_disconnect": true,
+    "same_native_session_after_reattach": true,
+    "second_real_prompt_has_new_native_turn_id": true,
+    "old_session_start_replayed_on_reattach": false,
+    "complete_pre_disconnect_ssh_bytes_reach_terminal_model_and_parse_event": true,
+    "selected_real_reattach_bytes_reach_terminal_model_and_parse_event": true
+  },
+  "reattach_product_parser_input_boundary": {
+    "complete_live_product_stream": false,
+    "offline_product_parser_only": true,
+    "session_start_input": "exact OSC frame selected from the initial real SSH stream",
+    "prompt_submit_input": "complete real reattach SSH stream",
+    "input_private_receipt_sha256": "f41b5708472b6a601852a6ff6166769786c2a1923e0d3e9cf0f8fd7955fc5a2a",
+    "meaning": "proves the reattach prompt bytes pass TerminalModel and parse_event; it does not prove live UI continuity"
+  },
+  "insufficient_evidence": {
+    "same_identity_duplicate_actual_cli_triggered": false,
+    "out_of_order_actual_cli_triggered": false,
+    "old_event_product_state_rejection_verified": false,
+    "reason": "Codex hooks expose neither a native sequence nor an event id. The official CLI emitted ordered events and assigned a new turn id to the second real prompt; exact-identity duplicates and out-of-order events were not fabricated."
+  },
+  "product_terminal_view_ui_verified": false,
+  "credentials_read_or_copied": false,
+  "safe_receipt_contains_raw_ssh_bytes": false,
+  "auth_material_in_receipt": false,
+  "passed": false,
+  "result": "partial_evidence_duplicate_out_of_order_and_live_ui_insufficient"
+}

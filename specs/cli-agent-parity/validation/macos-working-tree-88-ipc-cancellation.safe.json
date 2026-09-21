@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "receipt": "IPC request cancellation and pending cleanup",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_state": "dirty_working_tree",
+  "files": {
+    "crates/ipc/src/client.rs": "de86d330da3471226067f23e0ce58c6125a382a8a0dd2110adab022efcf85523",
+    "crates/ipc/src/client_tests.rs": "41ffc737efe972c68fc88b0b651a70e5fb0cc24f1392040ef39a62666475fe63"
+  },
+  "tests": {
+    "command": "CARGO_TARGET_DIR=/private/tmp/infinishell-ipc-target.OZ6Tpi CARGO_PROFILE_TEST_DEBUG=0 cargo test -p ipc -- --nocapture --test-threads=1",
+    "passed": 11,
+    "failed": 0,
+    "doctest_failed": 0,
+    "doctest_ignored": 3
+  },
+  "clippy": {
+    "command": "cargo clippy -p ipc --all-targets --no-deps -- -D warnings",
+    "passed": true,
+    "full_dependency_clippy_passed": false,
+    "full_dependency_blocker": "Eight existing lints under crates/command/src/managed*.rs; no IPC lint was reported."
+  },
+  "covered_cases": [
+    "queued cancellation writes zero bytes",
+    "cancellation after registration but before write writes zero bytes",
+    "cancellation after a complete write removes the pending response",
+    "cancellation after the first written byte still completes the frame",
+    "4096 cancel-before-register updates do not grow the pending response map"
+  ],
+  "scope": {
+    "generic_ipc": true,
+    "runtime_host_integration": false,
+    "real_cli_lifecycle": false,
+    "cross_platform": false
+  },
+  "overall_product_acceptance": false
+}

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "receipt": "broad CLI parity Python discovery before fixture repair",
+  "source_commit": "e6e9d619318e87d0bb889df344c8570f97977e90",
+  "source_state": "dirty_working_tree",
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -p '*_tests.py' -v",
+  "working_directory": "script/cli-agent-parity",
+  "result": {
+    "tests_run": 989,
+    "failures": 18,
+    "errors": 2,
+    "skipped": 7,
+    "exit_code": 1,
+    "passed": false
+  },
+  "failure_classes": [
+    {
+      "kind": "fixture_version_drift",
+      "count": 2,
+      "module": "grok_fixed_acp_probe_tests",
+      "detail": "The fixed ACP response fixtures did not match the new 1.0.34 default identity."
+    },
+    {
+      "kind": "required_same_source_worker_missing",
+      "count": 17,
+      "module": "installed_grok_hook_tests",
+      "detail": "INFINISHELL_TEST_NOTIFY_WORKER was intentionally absent; these integration tests fail rather than skip or substitute an older binary."
+    },
+    {
+      "kind": "tmux_fixture_environment_leak",
+      "count": 1,
+      "module": "tmux_notification_tests",
+      "detail": "The Codex tmux case reached invalid_tmux_pane under the current inherited environment."
+    }
+  ],
+  "relevant_source_sha256": {
+    "grok_fixed_acp_probe.py": "407989c1dac24ca1d81f4c6eb8643fda6b91ccbc7ca2a7bf8ad649b43d9d0041",
+    "grok_fixed_acp_probe_tests.py": "6d41ecf007f798fa4df6a3313699930e7ead5d88de72e643d9790ac857d51b7e",
+    "tmux_notification_tests.py": "92db7e3ff22471d3bb25099412eb8a8932402face23e4ccae30ea1bb4f461e8d",
+    "installed_grok_hook_tests.py": "1a49636f33e0fa74223cf3e30b0b1b696b4605d3f6fd8a992daf50642b076b28"
+  },
+  "scope": {
+    "offline_python_discovery": true,
+    "same_source_native_worker_provided": false,
+    "cargo_or_gui_run": false,
+    "real_cli_lifecycle_run": false
+  },
+  "note": "This failure receipt is preserved even if the two offline fixture classes are repaired later. Worker-dependent failures require a current same-source native binary and are not converted to skips."
+}
