@@ -54,6 +54,30 @@ def receive(stream, count):
     return bytes(data)
 
 
+def write_private_json(path, value):
+    contents = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as destination:
+        destination.write(contents)
+        destination.flush()
+        os.fsync(destination.fileno())
+    return contents
+
+
+def write_launch_records(state, manifest, generation):
+    manifest_bytes = write_private_json(state / "manifest.json", manifest)
+    write_private_json(
+        state / "spawn-attempt.json",
+        {
+            "version": 1,
+            "generation": str(generation),
+            "attempt": str(uuid.uuid4()),
+            "manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        },
+    )
+    return state / "manifest.json"
+
+
 def idle_case(supervisor):
     with tempfile.TemporaryDirectory(prefix="infinishell-supervisor-idle-") as temporary:
         directory = Path(temporary).resolve()
@@ -70,9 +94,7 @@ def idle_case(supervisor):
                     return {"Windows": [int.from_bytes(encoded[index:index + 2], "little") for index in range(0, len(encoded), 2)]}
                 return {"Unix": list(os.fsencode(value))}
             manifest = {"version": 1, "launch_allowed": True, "generation": str(generation), "token": str(token), "parent_control": "127.0.0.1:" + str(listener.getsockname()[1]), "executable": str(Path(sys.executable).resolve()), "arguments": [argument("-c"), argument("pass")], "cwd": str(directory)}
-            path = state / "manifest.json"
-            path.write_text(json.dumps(manifest))
-            path.chmod(0o600)
+            path = write_launch_records(state, manifest, generation)
             process = subprocess.Popen([str(supervisor), "cli-agent-supervisor", str(path)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 control, _ = listener.accept()
