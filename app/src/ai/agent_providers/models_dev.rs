@@ -6,15 +6,14 @@
 //!
 //! 数据结构对齐 opencode 的 `provider/models.ts`:顶层是
 //! `{ <provider_id>: Provider }`,Provider 含 `models: { <model_id>: Model }`。
-//! 我们只关心模型元数据同步需要的几个字段:
-//! - provider: id / name / api / env(暗示需要哪个 env var)
-//! - model:    id / name / limit.context / limit.output / reasoning / tool_call
+//! catalog 有两个用途:
+//! - 运行时根据 attachment / modalities 自动推断附件能力;
+//! - 用户显式点击补全按钮时,为已配置模型更新上下文窗口、输出上限和能力元数据。
 //!
 //! 没列出的字段一律走 `serde(default)` + `#[allow(dead_code)]` 容忍。
 //!
-//! 设计取舍:**同步缓存读、异步网络拉**。读侧给 UI 用,要快;
-//! 拉侧后台 spawn,失败不弹错只 log,缓存读不到就给空数据,UI 展示
-//! "暂未拉取到 models.dev,请检查网络"。
+//! 设计取舍:**同步缓存读、异步网络拉**。读侧给附件能力推断使用,
+//! 拉侧后台 spawn,失败不弹错只 log;缓存读不到时由本地规则兜底。
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -128,8 +127,7 @@ fn cache_path() -> PathBuf {
     p
 }
 
-/// 读已加载的 catalog 副本(无锁等待 — 直接克隆)。
-/// 没数据返回 `None`,UI 应展示 "正在拉取" / 重试按钮。
+/// 读取已加载的 catalog 副本。未成功加载过时返回 `None`。
 pub fn cached() -> Option<Catalog> {
     state().read().ok().and_then(|s| s.catalog.clone())
 }
@@ -255,11 +253,7 @@ pub async fn fetch_and_cache(client: Client) -> Result<(), String> {
     Ok(())
 }
 
-/// 把 models.dev 的 Model 转换成本地 settings 用的 AgentProviderModel。
-///
-/// 默认把 catalog 推断的 image/pdf/audio 写进字段(用户首次同步时
-/// 直接看到模型能力被同步进 toml,不需要展开 detail 才看到)。
-/// 后续 sync 时调用方只往 None 槽位填新值,Some(_) 视为用户显式覆盖跳过。
+/// 把 models.dev 的 Model 转换成本地 settings 使用的模型元数据。
 pub fn into_agent_provider_model(model: &Model) -> crate::settings::AgentProviderModel {
     let caps = ModelCaps::from_model(model);
     crate::settings::AgentProviderModel {

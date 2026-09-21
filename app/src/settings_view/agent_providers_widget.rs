@@ -5,7 +5,8 @@
 //! - 每条 provider 一张卡片,卡片内含:
 //!   · `Name` / `Base URL` / `API Key` 三个输入框(仅编辑,不自动保存)
 //!   · 模型列表区: 表头 `显示名 | 模型 ID`,每行两个输入框 + `×` 删除按钮
-//!   · 底部按钮行: `+ 添加模型` `Fetch from API` `保存` `Remove` (provider)
+//!   · 底部按钮行: `+ 添加模型` `Refresh from API` `models.dev 补全`
+//!     `清空模型` `保存` `Remove` (provider)
 //!
 //! **保存行为**: 点"保存"按钮会把表单状态一次性下发到 `AISettings`
 //! 与 `AgentProviderSecrets`。输入框失焦/按 Enter 不会保存 —— 这是为了
@@ -121,6 +122,7 @@ struct ProviderRow {
     api_key_editor: ViewHandle<EditorView>,
     fetch_button_state: MouseStateHandle,
     sync_models_dev_button_state: MouseStateHandle,
+    clear_models_button_state: MouseStateHandle,
     save_button_state: MouseStateHandle,
     remove_button_state: MouseStateHandle,
     add_model_button_state: MouseStateHandle,
@@ -286,7 +288,8 @@ impl AgentProvidersWidget {
             rows.insert(provider.id.clone(), row);
         }
 
-        // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络)。
+        // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络),
+        // 供运行时自动推断能力与用户手动补全模型元数据。
         ctx.dispatch_typed_action_deferred(AISettingsPageAction::EnsureModelsDevLoaded);
 
         Self {
@@ -533,6 +536,7 @@ impl AgentProvidersWidget {
             api_key_editor,
             fetch_button_state: MouseStateHandle::default(),
             sync_models_dev_button_state: MouseStateHandle::default(),
+            clear_models_button_state: MouseStateHandle::default(),
             save_button_state: MouseStateHandle::default(),
             remove_button_state: MouseStateHandle::default(),
             add_model_button_state: MouseStateHandle::default(),
@@ -1441,6 +1445,15 @@ impl AgentProvidersWidget {
             },
             appearance,
         );
+        let clear_models_button = Self::render_card_button_preserving_draft(
+            crate::t!("settings-agent-providers-clear-models"),
+            row.clear_models_button_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ClearAgentProviderModels {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
         let sync_models_dev_button = Self::render_card_button_preserving_draft(
             crate::t!("settings-agent-providers-sync-models-dev"),
             row.sync_models_dev_button_state.clone(),
@@ -1485,16 +1498,19 @@ impl AgentProvidersWidget {
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        Container::new(add_model_button)
-                            .with_margin_right(8.)
-                            .finish(),
-                    )
-                    .with_child(Container::new(fetch_button).with_margin_right(8.).finish())
-                    .with_child(sync_models_dev_button)
-                    .finish(),
+                Expanded::new(
+                    1.,
+                    Wrap::row()
+                        .with_spacing(8.)
+                        .with_run_spacing(8.)
+                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                        .with_child(add_model_button)
+                        .with_child(fetch_button)
+                        .with_child(sync_models_dev_button)
+                        .with_child(clear_models_button)
+                        .finish(),
+                )
+                .finish(),
             )
             .with_child(
                 Container::new(
@@ -1504,7 +1520,7 @@ impl AgentProvidersWidget {
                         .with_child(remove_button)
                         .finish(),
                 )
-                // 与左侧主操作组（添加模型 / 抓取 / 同步）拉开明显间隔，
+                // 与左侧主操作组（添加 / 刷新 / 元数据补全 / 清空）拉开明显间隔，
                 // 避免 SpaceBetween 在卡片宽不够时两组贴在一起。
                 .with_margin_left(16.)
                 .finish(),
