@@ -32,7 +32,7 @@
 - 产品仍保持 `ManualOnly`，在产生副作用前 fail closed；候选 PE/调试器代码保留，但未接入生产自动替换路径。
 - Windows 上三款当前 CLI 均完成真实二进制身份、签名和 `--version` 验证：Codex `0.155.1`、Claude Code `2.1.278`、Grok Build `1.0.40`。
 - PE 结构与程序/祖先租约检查通过，但持有 cwd 句柄时叶子目录仍可改名；调试器进程树超过 30 秒不退出；三次 updater 参数运行均超时，且终止调试器后 Claude/Grok 根进程曾存活，已显式清理。
-- Codex 官方 Windows 资产已漂移：当前下载与 GitHub API digest 一致，但仓库冻结的旧 size/SHA 不匹配；在重新冻结前不得宣称安全自动升级通过。
+- [receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 已纠正资产结论：receipt104 错把 `0.155.1` 官方包与 legacy `0.147.0` 清单比较；版本选择后的仓内 `0.155.1` size/SHA 与 GitHub API digest 一致，无需修改产品摘要。cwd、debugger、退出收据和清理缺口不受此纠正影响。
 - 当前安全收据：`validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json`。
 
 ## 3. 当前提交已通过的定向门禁
@@ -58,7 +58,7 @@
 3. 先做定向闭环，不要因接手而立即重复全量构建。
 4. Grok：把 setup 绑定重构为基于相关原生事件的偏序/并发状态机，不再假定唯一通知顺序；先完成根生命周期，再开放固定审批、技能、本地工具和父子能力。
 5. Claude：先解决 macOS launchd + 外置 debug supervisor 的原生 I/O 启动问题，或生成更小的 release supervisor；随后用手动权限配置完成真实父子全链。不得退回计划模式，也不得放宽工具权限来换取通过。
-6. Windows：补齐 cwd 身份绑定、调试进程树退出和残留清理收据，重新冻结 Codex 官方资产；在这些条件完成前继续保持 `ManualOnly`。
+6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
 7. 继续剩余原范围：Codex 当前版完整生命周期与取消、Linux 实际原子替换、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及最终冻结提交的跨平台验证。
 8. 只有“要求→实现→CLI 版本→源码提交→模式/平台→收据→结果”矩阵中所有必需项在同一当前提交上通过，才可把 Goal 标记为 complete。
 

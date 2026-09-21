@@ -6,7 +6,7 @@
 
 当前 macOS／Linux 的三款 native 来源使用 `NativeFile`：macOS 已实现签名私有 generation 快照，Linux 已实现 sealed memfd＋`execveat`。Windows 已实现程序／祖先 replacement lease、PE32／PE32+ 有界解析和挂起启动，但真实 CLI 的普通或 delay import 闭包尚未绑定，故 native 来源仍明确返回 `ManualOnly`。npm、Homebrew 与未知脚本／helper 闭包同样保持 `ManualOnly`，WinGet 仍不可识别。macOS 已真实通过 Claude `2.1.267`→`2.1.278` 与 Grok `1.0.34`→`1.0.40`，但 Codex 当前目标、Linux 上机、Windows 真实 CLI、三款渠道切换与事务恢复尚未闭环，因此消费者自动升级总体仍未完成。
 
-[receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json) 已把 Windows 边界从“未绑定导入闭包”推进为实际失败：三款官方 CLI 的真实签名与导入已盘点，但 cwd 叶目录可在持有句柄时改名，debug 事件链不能在 30 秒内结束，三款 updater 无退出收据，终止 debugger 后 Claude／Grok 根进程曾残留。产品 `validate_update_execution` 与来源接线继续在任何事务副作用前拒绝 Windows；现有 PE/debugger 实现只是受限候选，不是可调用的自动升级路径。Codex 当前官方包与仓内固定摘要漂移又构成独立阻断。
+[receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json) 已把 Windows 边界从“未绑定导入闭包”推进为实际失败：三款官方 CLI 的真实签名与导入已盘点，但 cwd 叶目录可在持有句柄时改名，debug 事件链不能在 30 秒内结束，三款 updater 无退出收据，终止 debugger 后 Claude／Grok 根进程曾残留。产品 `validate_update_execution` 与来源接线继续在任何事务副作用前拒绝 Windows；现有 PE/debugger 实现只是受限候选，不是可调用的自动升级路径。[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 后续确认 receipt104 把 `0.155.1` 官方包误与 legacy `0.147.0` 清单比较；当前 `0.155.1` 官方摘要与版本选择后的仓内清单一致，资产漂移这一独立阻断撤回，但不改变上述 Windows 实际失败与 `ManualOnly` 边界。
 
 目标是让执行结果只有两种：
 

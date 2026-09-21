@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "scope": "codex_0_155_1_windows_asset_identity_correction",
+  "recorded_at": "2026-09-21T21:45:07+08:00",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "head": "6e289ab3929c971b631496f5e449301a8a400ac7",
+    "worktree_dirty": true,
+    "tracked_identity_inputs_match_head": true,
+    "same_commit_product_verification": false,
+    "full_goal_passed": false
+  },
+  "historical_receipt": {
+    "path": "validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json",
+    "preserved": true,
+    "incorrect_classification": "supply_chain_identity_drift_blocked",
+    "cause": "the observed Codex 0.155.1 asset was compared with the legacy Codex 0.147.0 PACKAGES entry instead of the version-selected 0.155.1 manifest"
+  },
+  "repository_identity": {
+    "version": "0.155.1",
+    "selector": "packages_for_version(\"0.155.1\")[\"windows-x64\"]",
+    "manifest": "script/cli-agent-parity/codex_0155_package_manifest.json",
+    "manifest_bytes": 20563,
+    "manifest_sha256": "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc",
+    "archive": "codex-package-x86_64-pc-windows-msvc.tar.gz",
+    "archive_bytes": 139547261,
+    "archive_sha256": "f45c273b7835c192aaa9cef5b93aa9528966ac7301444632de80a565a9bf14e8",
+    "entrypoint": "bin/codex.exe",
+    "entrypoint_bytes": 307108144,
+    "entrypoint_sha256": "eba0f32c976667cb9298efafd98513e823eeda7b576a03ec658bb8be8d336316"
+  },
+  "legacy_identity": {
+    "version": "0.147.0",
+    "selector": "PACKAGES[\"windows-x64\"]",
+    "archive_bytes": 126777040,
+    "archive_sha256": "c156c8feb8cb20197bf74d2c6daffed1fec0a8c21a03bc2ca90d7ff81927b0c5",
+    "must_not_be_compared_with_0_155_1": true
+  },
+  "official_release_api": {
+    "repository": "openai/codex",
+    "tag": "rust-v0.155.1",
+    "archive": "codex-package-x86_64-pc-windows-msvc.tar.gz",
+    "archive_bytes": 139547261,
+    "archive_sha256": "f45c273b7835c192aaa9cef5b93aa9528966ac7301444632de80a565a9bf14e8",
+    "updated_at": "2026-09-18T20:02:40Z",
+    "repository_manifest_matches": true
+  },
+  "correction": {
+    "codex_0_155_1_asset_drift_observed": false,
+    "repository_fixed_identity_matches_official_release": true,
+    "product_digest_change_required": false,
+    "receipt104_cwd_rename_failure_preserved": true,
+    "receipt104_debugger_exit_failure_preserved": true,
+    "receipt104_native_exit_gap_preserved": true,
+    "windows_product_execution_remains_manual_only": true
+  },
+  "result": "The Codex 0.155.1 Windows x64 release identity matches the repository version-selected manifest. Receipt104's asset-drift classification is withdrawn, while its independent cwd, debugger, cleanup and native-exit gaps remain open and Windows execution stays ManualOnly."
+}

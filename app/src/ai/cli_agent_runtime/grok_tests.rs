@@ -500,6 +500,57 @@ fn current_authenticated_shape_opens_only_after_the_exact_setup_sequence() {
 }
 
 #[test]
+fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    let display = current_display_notifications();
+
+    let mut models_before_response = current_waiting_for_setup();
+    for message in &setup[..5] {
+        models_before_response.receive(message.clone()).unwrap();
+    }
+    models_before_response.receive(display[0].clone()).unwrap();
+    models_before_response.receive(fixture_response(3)).unwrap();
+    models_before_response.receive(setup[5].clone()).unwrap();
+    for message in &display[1..] {
+        models_before_response.receive(message.clone()).unwrap();
+    }
+    let mut ready = Effects::default();
+    for message in &setup[6..] {
+        ready = models_before_response.receive(message.clone()).unwrap();
+    }
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+
+    let mut display_before_response = current_waiting_for_setup();
+    for message in &setup[..5] {
+        display_before_response.receive(message.clone()).unwrap();
+    }
+    for index in [1, 2, 0, 3, 4] {
+        display_before_response
+            .receive(display[index].clone())
+            .unwrap();
+    }
+    display_before_response
+        .receive(fixture_response(3))
+        .unwrap();
+    display_before_response.receive(setup[5].clone()).unwrap();
+    let mut ready = Effects::default();
+    for message in &setup[6..] {
+        ready = display_before_response.receive(message.clone()).unwrap();
+    }
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+}
+
+#[test]
 fn current_root_candidate_is_confined_to_the_ignored_live_harness() {
     let mut protocol = current_waiting_for_setup();
     protocol.current_root_candidate_for_live = true;
@@ -643,10 +694,21 @@ fn current_setup_requires_exact_fields_stable_identity_and_all_phases() {
         .try_for_each(|message| protocol.receive(message).map(|_| ()));
     assert!(result.is_err());
     assert_eq!(protocol.session_id.as_deref(), Some(session_id.as_str()));
+
+    let mut catalog_identity = current_waiting_for_setup();
+    for message in &current_setup_messages(&session_id)[..5] {
+        catalog_identity.receive(message.clone()).unwrap();
+    }
+    let foreign_session = Uuid::new_v4().to_string();
+    catalog_identity
+        .receive(current_command_catalog(&foreign_session))
+        .unwrap();
+    assert!(catalog_identity.receive(fixture_response(3)).is_err());
+    assert!(catalog_identity.session_id.is_none());
 }
 
 #[test]
-fn current_setup_requires_the_response_between_the_two_observed_phase_groups() {
+fn current_setup_requires_the_response_before_post_response_phases() {
     let session_id = fixture_response(3)["result"]["sessionId"]
         .as_str()
         .unwrap()
@@ -710,6 +772,9 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     let announcements = display[2].clone();
     let announcements_2 = display[3].clone();
     let commands = display[4].clone();
+    let mut too_early = current_waiting_for_setup();
+    assert!(too_early.receive(models.clone()).is_err());
+
     let mut protocol = current_waiting_for_display_notifications();
     let accepted = protocol.receive(models.clone()).unwrap();
     assert!(accepted.writes.is_empty() && accepted.events.is_empty());
@@ -732,6 +797,19 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     assert!(accepted.writes.is_empty() && accepted.events.is_empty());
     assert!(protocol.skill_catalog.is_none());
     assert!(protocol.creation_catalog_session.is_none());
+
+    let mut duplicate = current_waiting_for_display_notifications();
+    duplicate.receive(models.clone()).unwrap();
+    assert!(duplicate.receive(models.clone()).is_err());
+
+    let mut incomplete = current_waiting_for_display_notifications();
+    incomplete.receive(models.clone()).unwrap();
+    incomplete.receive(settings.clone()).unwrap();
+    incomplete.receive(announcements.clone()).unwrap();
+    incomplete.receive(announcements_2.clone()).unwrap();
+    let setup =
+        current_setup_messages(fixture_response(3)["result"]["sessionId"].as_str().unwrap());
+    assert!(incomplete.receive(setup[6].clone()).is_err());
 
     for rejected in [
         json!({"jsonrpc":"2.0","method":"unknown","params":{}}),
@@ -782,13 +860,12 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     protocol.receive(announcements).unwrap();
     assert!(protocol.receive(duplicate_generation).is_err());
 
-    let mut wrong_order = current_waiting_for_display_notifications();
-    assert!(wrong_order.receive(settings).is_err());
-
-    let mut before_announcements = current_waiting_for_display_notifications();
-    before_announcements.receive(models.clone()).unwrap();
-    before_announcements.receive(display[1].clone()).unwrap();
-    assert!(before_announcements.receive(commands.clone()).is_err());
+    let mut independent_order = current_waiting_for_display_notifications();
+    independent_order.receive(settings).unwrap();
+    independent_order.receive(display[2].clone()).unwrap();
+    independent_order.receive(models.clone()).unwrap();
+    independent_order.receive(commands.clone()).unwrap();
+    independent_order.receive(display[3].clone()).unwrap();
 
     for mutation in ["session", "event", "count", "tools", "extra", "duplicate"] {
         let mut protocol = current_waiting_for_display_notifications();

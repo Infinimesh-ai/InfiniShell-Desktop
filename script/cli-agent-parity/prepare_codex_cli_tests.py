@@ -493,6 +493,22 @@ class FixedRuntimeVersionTests(unittest.TestCase):
 
 
 class LatestRuntimeVersionTests(unittest.TestCase):
+    def test_windows_asset_identity_is_selected_by_explicit_version(self):
+        legacy = prepare.packages_for_version("0.147.0")["windows-x64"]
+        current = prepare.packages_for_version("0.155.1")["windows-x64"]
+        self.assertEqual(
+            (legacy["bytes"], legacy["sha256"]),
+            (126777040, "c156c8feb8cb20197bf74d2c6daffed1fec0a8c21a03bc2ca90d7ff81927b0c5"),
+        )
+        self.assertEqual(
+            (current["bytes"], current["sha256"]),
+            (139547261, "f45c273b7835c192aaa9cef5b93aa9528966ac7301444632de80a565a9bf14e8"),
+        )
+        self.assertNotEqual(
+            (legacy["bytes"], legacy["sha256"]),
+            (current["bytes"], current["sha256"]),
+        )
+
     def test_fixed_manifest_counts_and_metadata_are_per_platform(self):
         packages = prepare.packages_for_version("0.155.1")
         self.assertEqual({key: len(value["files"]) + len(value["directories"])

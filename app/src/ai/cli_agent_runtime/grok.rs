@@ -3055,15 +3055,21 @@ impl GrokProtocol {
                     let setup = self.current_setup.as_mut().ok_or_else(|| {
                         RuntimeError::Protocol("missing Grok 1.0.40 setup sequence".into())
                     })?;
-                    if setup.next_phase != 5
-                        || setup.session_id.is_some()
-                        || setup.response_received
-                    {
+                    if setup.next_phase != 5 || setup.response_received {
                         return Err(RuntimeError::Protocol(
                             "incomplete or mismatched Grok 1.0.40 setup sequence".into(),
                         ));
                     }
-                    setup.session_id = Some(id.clone());
+                    if setup
+                        .session_id
+                        .as_deref()
+                        .is_some_and(|existing| existing != id)
+                    {
+                        return Err(RuntimeError::Protocol(
+                            "Grok setup changed its session id".into(),
+                        ));
+                    }
+                    setup.session_id.get_or_insert_with(|| id.clone());
                     setup.response_received = true;
                 }
                 self.session_id = Some(id.clone());
@@ -3273,14 +3279,25 @@ impl GrokProtocol {
                     "Grok setup changed its session id".into(),
                 ));
             }
-            if setup.session_id.as_deref() != Some(session_id) {
-                return Err(RuntimeError::Protocol(
-                    "Grok setup changed its session id".into(),
-                ));
-            }
+            setup
+                .session_id
+                .get_or_insert_with(|| session_id.to_owned());
         }
         setup.next_phase += 1;
-        if setup.next_phase != CURRENT_SETUP_PHASES.len() {
+        self.finish_current_setup()
+    }
+
+    fn finish_current_setup(&mut self) -> Result<Effects, RuntimeError> {
+        let complete = self.current_setup.as_ref().is_some_and(|setup| {
+            setup.next_phase == CURRENT_SETUP_PHASES.len()
+                && setup.response_received
+                && setup.session_id.is_some()
+                && setup.models_received
+                && setup.settings_received
+                && setup.announcements_received == 2
+                && setup.commands_received
+        });
+        if !complete {
             return Ok(Effects::default());
         }
         self.current_setup = None;
@@ -3325,13 +3342,10 @@ impl GrokProtocol {
             }
             if message["method"] == "_x.ai/models/update" {
                 let models = current_models_update(message)?;
-                let setup = self.current_setup.as_mut().filter(|setup| {
-                    setup.response_received
-                        && setup.next_phase == 6
-                        && !setup.models_received
-                        && !setup.settings_received
-                        && setup.announcements_received == 0
-                });
+                let setup = self
+                    .current_setup
+                    .as_mut()
+                    .filter(|setup| setup.next_phase >= 5 && !setup.models_received);
                 let Some(setup) = setup else {
                     return Err(RuntimeError::Protocol(
                         "unexpected Grok models update position".into(),
@@ -3339,32 +3353,26 @@ impl GrokProtocol {
                 };
                 setup.models_received = true;
                 self.reported_metadata.models = Some(models);
-                return Ok(Effects::default());
+                return self.finish_current_setup();
             }
             if message["method"] == "_x.ai/settings/update" {
                 validate_current_settings_update(message)?;
-                let setup = self.current_setup.as_mut().filter(|setup| {
-                    setup.response_received
-                        && setup.next_phase == 6
-                        && setup.models_received
-                        && !setup.settings_received
-                        && setup.announcements_received == 0
-                });
+                let setup = self
+                    .current_setup
+                    .as_mut()
+                    .filter(|setup| setup.next_phase >= 5 && !setup.settings_received);
                 let Some(setup) = setup else {
                     return Err(RuntimeError::Protocol(
                         "unexpected Grok settings update position".into(),
                     ));
                 };
                 setup.settings_received = true;
-                return Ok(Effects::default());
+                return self.finish_current_setup();
             }
             if message["method"] == "_x.ai/announcements/update" {
                 let generation = validate_current_announcements_update(message)?;
                 let setup = self.current_setup.as_mut().filter(|setup| {
-                    setup.response_received
-                        && setup.next_phase == 6
-                        && setup.models_received
-                        && setup.settings_received
+                    setup.next_phase >= 5
                         && setup.announcements_received < 2
                         && setup
                             .announcement_generation
@@ -3377,37 +3385,42 @@ impl GrokProtocol {
                 };
                 setup.announcements_received += 1;
                 setup.announcement_generation = Some(generation);
-                return Ok(Effects::default());
+                return self.finish_current_setup();
             }
             if message["method"] == "session/update"
                 && message["params"]["update"]["sessionUpdate"] == "available_commands_update"
             {
-                let session_id = self
-                    .current_setup
-                    .as_ref()
-                    .and_then(|setup| setup.session_id.as_deref())
+                let session_id = message["params"]["sessionId"]
+                    .as_str()
+                    .filter(|session_id| valid_native_id(session_id))
                     .ok_or_else(|| {
                         RuntimeError::Protocol(
                             "Grok command catalog arrived without a session".into(),
                         )
+                    })?
+                    .to_owned();
+                let setup = self
+                    .current_setup
+                    .as_ref()
+                    .filter(|setup| setup.next_phase >= 5 && !setup.commands_received)
+                    .ok_or_else(|| {
+                        RuntimeError::Protocol("unexpected Grok command catalog position".into())
                     })?;
-                validate_current_available_commands_update(message, session_id)?;
-                let setup = self.current_setup.as_mut().filter(|setup| {
-                    setup.response_received
-                        && setup.next_phase == 6
-                        && setup.models_received
-                        && setup.settings_received
-                        && setup.announcements_received == 2
-                        && !setup.commands_received
-                });
-                let Some(setup) = setup else {
+                if setup
+                    .session_id
+                    .as_deref()
+                    .is_some_and(|existing| existing != session_id)
+                {
                     return Err(RuntimeError::Protocol(
-                        "unexpected Grok command catalog position".into(),
+                        "Grok command catalog changed its session id".into(),
                     ));
-                };
+                }
+                validate_current_available_commands_update(message, &session_id)?;
+                let setup = self.current_setup.as_mut().expect("setup 已验证存在");
                 // 当前版 fresh-home 只把该目录当握手信息；不绑定技能、工具或权限。
+                setup.session_id.get_or_insert(session_id);
                 setup.commands_received = true;
-                return Ok(Effects::default());
+                return self.finish_current_setup();
             }
             return Err(RuntimeError::Protocol(
                 "unexpected Grok 1.0.40 handshake notification".into(),
