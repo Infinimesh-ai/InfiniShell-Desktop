@@ -159,6 +159,18 @@ impl<T: Send + 'static> IdleTimeoutSender<T> {
             self.generation.fetch_add(1, Ordering::SeqCst);
         }
     }
+
+    /// 以 `value` 结束运行：正数 `idle_timeout` 延后完成，零值或 `None` 立即完成。
+    fn complete_with_optional_idle(&self, idle_timeout: Option<Duration>, value: T) {
+        match idle_timeout {
+            Some(Duration::ZERO) => {
+                self.cancel_idle_timeout();
+                self.end_run_now(value);
+            }
+            Some(idle_timeout) => self.end_run_after(idle_timeout, value),
+            None => self.end_run_now(value),
+        }
+    }
 }
 
 /// Options for initializing the agent driver.
@@ -1386,11 +1398,10 @@ impl AgentDriver {
                             | SDKConversationOutputStatus::Cancelled { .. } => {
                                 // Whether to keep the process alive after completion is controlled by
                                 // the `warp agent run --idle-on-complete[=<DURATION>]` flag.
-                                if let Some(idle_timeout) = me.idle_on_complete {
-                                    run_exit.end_run_after(idle_timeout, output_status);
-                                } else {
-                                    run_exit.end_run_now(output_status);
-                                }
+                                run_exit.complete_with_optional_idle(
+                                    me.idle_on_complete,
+                                    output_status,
+                                );
                             }
                             // For errors, check if we expect an automatic retry.
                             SDKConversationOutputStatus::Error { ref error } => {
@@ -1531,11 +1542,7 @@ impl AgentDriver {
                         CLIAgentSessionStatus::Success
                         | CLIAgentSessionStatus::Blocked { .. }
                         | CLIAgentSessionStatus::Cancelled => {
-                            if let Some(idle_timeout) = me.idle_on_complete {
-                                harness_exit.end_run_after(idle_timeout, ());
-                            } else {
-                                harness_exit.end_run_now(());
-                            }
+                            harness_exit.complete_with_optional_idle(me.idle_on_complete, ());
                         }
                         // harness 报错即刻结束 run:我方没有上游的 `idle_on_fail` 宽限窗口,
                         // 等价于上游 `idle_on_fail = None` 的默认行为。
@@ -1604,6 +1611,10 @@ impl Entity for AgentDriver {
 /// The only reason that `AgentDriver` is a singleton entity is to ensure the UI framework
 /// doesn't drop it. Generally, we should not assume there's only one running agent.
 impl SingletonEntity for AgentDriver {}
+
+#[cfg(test)]
+#[path = "driver_tests.rs"]
+mod tests;
 
 /// Write the run ID to stdout using the appropriate output format.
 pub(super) fn write_run_started(run_id: &str, output_format: OutputFormat) {
