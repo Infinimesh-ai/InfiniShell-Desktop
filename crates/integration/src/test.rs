@@ -20,6 +20,7 @@ mod keyboard_protocol;
 mod launch_configs;
 mod mcp_error_text_layout;
 mod notebooks;
+mod orchestration_navigation;
 mod osc8_hyperlinks;
 mod pane_restoration;
 #[cfg(target_os = "macos")]
@@ -70,6 +71,7 @@ pub use keyboard_protocol::*;
 pub use launch_configs::*;
 pub use mcp_error_text_layout::*;
 pub use notebooks::*;
+pub use orchestration_navigation::*;
 pub use osc8_hyperlinks::*;
 pub use pane_restoration::*;
 use parking_lot::Mutex;
