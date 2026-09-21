@@ -4,7 +4,7 @@
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
 - 工作分支：`codex/cli-agent-parity`。
-- 本轮代码与证据检查点：`c90d19ebd`（`完善 CLI 代理对齐与原子升级边界`），已推送到 `origin/codex/cli-agent-parity`。
+- 当前代码检查点：`ac0fa70eea4372675367dfa59ac0226396c613df`（`修复 Grok 恢复握手回放`），已推送到 `origin/codex/cli-agent-parity`；receipt106 的 supervisor、libtest 与真实 Grok root 候选链均绑定该干净提交。
 - 基线归档仍为 `e6e9d619318e87d0bb889df344c8570f97977e90`；此前受测代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。
 - 后续必须继续使用同一工作树和当前分支，不得从 `main` 重来，不得 `reset/clean` 根目录，也不得直接弹出整理前的完整 stash。
 
@@ -22,10 +22,10 @@
 ### 2.2 Grok Build 1.0.40
 
 - 当前实测正式版为 `1.0.40 (eb1a2256660d)`；macOS arm64 二进制 SHA-256 为 `3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2`。
-- 已补充当前认证形状、设置/目录/MCP 通知和固定平台夹具；候选能力仍只在测试门内，生产能力没有被错误放开。
-- 多次全新官方进程观察到 setup 通知顺序跨运行变化。最终严格运行在 `session/new` 响应前收到 `_x.ai/models/update`，以 `unexpected Grok models update position` 失败，模型输入数为 0。
-- 这证明当前按固定全序列绑定握手存在竞态。运行中追加、固定权限、允许/拒绝、技能、本地工具、子任务、双向原生 ACK、进度、结果回收和持久恢复仍未验收。
-- 当前安全收据：`validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json`。
+- receipt103 的固定全序握手失败保留；后续实现已按相关原生事件改为有界偏序，接受动态且有界的官方模型目录，并只为“当前版本、正在恢复、session 精确匹配、`isReplay=true`、已审核方法”放行 `session/load` 响应前历史回放，其他错误 session、非 replay 与未知方法继续 fail closed。
+- 干净提交 `ac0fa70e…` 的真实生产 supervisor／ACP root 候选链已通过：官方 `grok-4.7` 完成同一原生会话两轮、允许写入、拒绝无文件效果、运行中排队输入的原生 ACK 与下一轮结果、原生取消终态、完整历史核对，以及新进程恢复原会话和排队标记。两代 supervisor 均有 `cleanup_confirmed=true`，认证副本、内部 state、隧道与 staged 进程残留均已清理。
+- 能力仍由 test-only candidate gate 隔离，`public_product_gate_open=false`；same-turn steering、技能、本地工具、子任务、父权限上限、App 重启／GUI、产品网络隔离和其他平台没有由本收据证明。
+- 当前安全收据：[receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)；历史失败继续见 [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)。
 
 ### 2.3 Windows 原子升级与真实 CLI
 
@@ -37,11 +37,11 @@
 
 ## 3. 当前提交已通过的定向门禁
 
-- Python：Claude 适配器 `20/20`、Claude 协调器 `64/64`、Grok 官方运行器 `23/23`、自动升级验证器 `28/28`。
-- Rust：Claude profile `18/18`、Claude adapter profile `14/14`、Grok `137/137`、managed process `46/46`、i18n `11/11`。
-- `cargo check -p warp --features local_cli_managed_tasks` 通过。
+- 当前精确提交：Grok Rust `139/139`、Grok／supervisor 定向 Python `37/37`、i18n `11/11`。
+- `cargo check -p warp --features local_cli_managed_tasks` 和 `release-tui-debug-assertions` feature supervisor build 通过；同提交无模型 supervisor 探针 `2/2` 通过。
 - `cargo fmt --all -- --check`、`git diff --check` 通过。
-- 本轮最终修改没有新增用户可见文案；已有相关本地化修改已通过 i18n 单测。
+- 本轮最终修改没有新增或变动用户可见文案，无需本地化资源变更。
+- receipt102／104–105 的 Claude、Windows 和升级阶段门禁仍按各自快照保留，未冒充为 `ac0fa70e…` 上已重跑。
 - **未执行**同一冻结提交的最终 macOS/Linux/Windows 云端矩阵；也未完成 SSH/tmux 产品接收、真实 GUI IME/双语布局和全范围 P0–P5 生命周期，因此不能标记完成。
 
 ## 4. 本地磁盘与外置磁盘
@@ -54,9 +54,9 @@
 ## 5. 新会话的严格入口
 
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
-2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–104。
+2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–106。
 3. 先做定向闭环，不要因接手而立即重复全量构建。
-4. Grok：把 setup 绑定重构为基于相关原生事件的偏序/并发状态机，不再假定唯一通知顺序；先完成根生命周期，再开放固定审批、技能、本地工具和父子能力。
+4. Grok：receipt106 已完成当前版干净提交 root 候选链，不要无代码变化地重复消费模型额度；下一步保持产品入口关闭，分别补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，再决定是否开放对应能力。
 5. Claude：先解决 macOS launchd + 外置 debug supervisor 的原生 I/O 启动问题，或生成更小的 release supervisor；随后用手动权限配置完成真实父子全链。不得退回计划模式，也不得放宽工具权限来换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
 7. 继续剩余原范围：Codex 当前版完整生命周期与取消、Linux 实际原子替换、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及最终冻结提交的跨平台验证。

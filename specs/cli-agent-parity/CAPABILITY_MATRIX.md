@@ -1,17 +1,17 @@
 # CLI 能力矩阵
 
-> **当前状态更正（2026-09-21）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。已推送代码和同提交跨平台回归通过的事实保留，但 Grok 最新版托管能力、父子整链及真实远程产品验收仍有缺口。当前状态、证据与新 Goal 入口见 [复核与续接](HANDOFF_20260921_REOPEN.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
+> **当前状态更正（2026-09-22）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上通过 macOS 生产进程／传输 root 候选链，但正式产品入口与扩展、父子、GUI、远程和同提交跨平台仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，真实通过见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## 2026-09-21 receipt102–104 阶段补充矩阵
+## 2026-09-22 receipt102–106 阶段补充矩阵
 
-下表覆盖 receipt100／101 对相同要求的“当前”结论；旧表继续保留历史快照。源码仍是 `e6e9d619` 上的 dirty tree，尚未形成同提交跨平台证明。
+下表覆盖 receipt100／101 对相同要求的“当前”结论；旧表继续保留历史快照。Grok root 候选已绑定干净提交 `ac0fa70e…`，其余行仍按各自收据快照；尚未形成最终同提交跨平台证明。
 
 | 要求 | 实现 | CLI 版本 | 源码提交 | 模式／平台 | 收据 | 结果 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Claude 官方账户固定权限与父子链 | 默认账户模式不设置 `CLAUDE_CONFIG_DIR`；固定 profile 使用 restricted、空 setting sources、manual／原生 default、host prompts、Read/Edit 窄工具集、10 项 deny 与三 MCP ask；用户／项目／本地设置及不可验证管理员策略 fail closed | `2.1.278` | dirty tree on `e6e9d619` | stream-json／macOS | [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json) | **代码合同通过＋实链证据不足**：Python 84、profile 18、adapter profile 14 项通过。plan 历史尝试完成父任务两轮但拒绝父子 MCP；manual 最终尝试在 SessionReady 前因外置调试 supervisor 的 launchd EAGAIN 失败，父子 ACK／进度／结果／恢复均未验证 |
-| Grok 1.0.40 根生命周期 | 只绑定精确 OAuth 认证、setup 身份与有界通知／目录形状；当前版本能力仍由 test-only gate 隔离，生产不接收 submit／approval／cancel／resume | stable `1.0.40` | dirty tree on `e6e9d619` | ACP／macOS | [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json) | **实际协议竞态＋可靠降级**：Rust 137、runner 36 项通过；真实 fresh-home 握手通知顺序跨运行变化，最终在 session/new 响应与模型输入前拒绝。根生命周期、技能、本地工具与子任务全部未开放 |
+| Grok 1.0.40 根生命周期 | 精确 OAuth、偏序 setup、动态有界模型目录与相关 resume replay；当前版 root 能力仍由 test-only candidate gate 隔离，正式产品入口未开放 | stable `1.0.40`／官方 `grok-4.7` | clean `ac0fa70eea4372675367dfa59ac0226396c613df` | 生产 supervisor + ACP／macOS arm64 | [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)、[receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json) | **根候选实链通过／产品仍关闭**：保留 receipt103 的握手竞态失败；receipt106 同提交完成两轮、允许／拒绝、排队 ACK 与结果、取消、权威历史及新进程恢复，清理完整。same-turn steering、技能、本地工具、子任务、父权限上限、GUI、网络隔离与其他平台未验证 |
 | Windows 原子自动更新 | PE／导入／debugger 候选只保留受限代码；产品入口和三款来源在事务副作用前 `ManualOnly` | Codex `0.155.1`；Claude `2.1.278`；Grok `1.0.40` | dirty tree on `e6e9d619`；资产纠正核对 `6e289ab39` | Windows x64 实机；官方 API 核对 | [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)、[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) | **实际失败＋可靠降级**：PE 13、租约 2 项通过；cwd 可改名、debug 链不退出、Claude／Grok 强杀后曾残留，三款 updater 无退出收据。receipt104 的 Codex 漂移是误与 legacy `0.147.0` 清单比较；`0.155.1` 官方摘要与版本选择后的仓内清单一致，但其余 Windows 阻断仍成立 |
-| 阶段门禁与剩余总范围 | 当前根代理复跑 fmt／diff、Python、Claude／Grok／managed process、i18n 与 feature check；本阶段没有新增可见文案 | 三方 | dirty tree on `e6e9d619` | macOS 本地 | receipt102–104 | **阶段门禁通过但 Goal 未完成**：SSH／tmux 当前产品接收、真实 IME／双语布局、Linux 实际原子执行、Codex 当前产品生命周期、冻结同提交跨平台仍待下一会话 |
+| 阶段门禁与剩余总范围 | `ac0fa70e…` 已复跑 fmt／diff、Grok 139、Python 37、i18n 11、feature check、release supervisor build 与无模型探针 2；本阶段没有新增或变动可见文案 | 三方 | Grok clean `ac0fa70e…`；其余按各自快照 | macOS 本地 | receipt102–106 | **Grok root 候选通过但 Goal 未完成**：SSH／tmux 当前产品接收、真实 IME／双语布局、Linux 实际原子执行、Codex 当前产品生命周期、Grok 扩展／GUI与最终同提交跨平台仍待完成 |
 
 ## 2026-09-21 receipt100 当前矩阵
 
