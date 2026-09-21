@@ -31,19 +31,13 @@ pub(super) const VERIFIED_VERSION: &str = "1.0.30";
 pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
 pub(super) const CURRENT_VERSION: &str = "1.0.40";
 const CURRENT_SETUP_METHOD: &str = "_x.ai/session/setup";
-const CURRENT_SETUP_PHASES: [&str; 12] = [
+const CURRENT_SETUP_PHASES: [&str; 6] = [
     "auth",
     "resolve_workspace",
     "folder_trust",
     "plugin_registry",
     "mcp_merge",
     "response_ready",
-    "persistence_init",
-    "spawn_session_actor",
-    "model_switch",
-    "git_discovery",
-    "finalize_response",
-    "tool_overrides",
 ];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -3245,16 +3239,6 @@ impl GrokProtocol {
         if params["phase"].as_str() != Some(expected) {
             return Err(RuntimeError::Protocol(
                 "unknown or out-of-order Grok 1.0.40 setup phase".into(),
-            ));
-        }
-        if setup.next_phase == 6
-            && (!setup.models_received
-                || !setup.settings_received
-                || setup.announcements_received != 2
-                || !setup.commands_received)
-        {
-            return Err(RuntimeError::Protocol(
-                "Grok setup advanced before fixed display notifications".into(),
             ));
         }
         if setup.next_phase < 5 {

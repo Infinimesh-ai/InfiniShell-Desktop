@@ -458,13 +458,9 @@ fn current_authenticated_shape_opens_only_after_the_exact_setup_sequence() {
     let response = protocol.receive(fixture_response(3)).unwrap();
     assert!(response.writes.is_empty() && response.events.is_empty());
     protocol.receive(setup[5].clone()).unwrap();
-    for notification in current_display_notifications() {
-        protocol.receive(notification).unwrap();
-    }
     let mut ready = Effects::default();
-    for setup in &setup[6..] {
-        let effects = protocol.receive(setup.clone()).unwrap();
-        ready = effects;
+    for notification in current_display_notifications() {
+        ready = protocol.receive(notification).unwrap();
     }
     let [
         RuntimeEventKind::SessionReady {
@@ -515,11 +511,8 @@ fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
     models_before_response.receive(display[0].clone()).unwrap();
     models_before_response.receive(fixture_response(3)).unwrap();
     models_before_response.receive(setup[5].clone()).unwrap();
-    for message in &display[1..] {
-        models_before_response.receive(message.clone()).unwrap();
-    }
     let mut ready = Effects::default();
-    for message in &setup[6..] {
+    for message in &display[1..] {
         ready = models_before_response.receive(message.clone()).unwrap();
     }
     assert!(matches!(
@@ -539,11 +532,7 @@ fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
     display_before_response
         .receive(fixture_response(3))
         .unwrap();
-    display_before_response.receive(setup[5].clone()).unwrap();
-    let mut ready = Effects::default();
-    for message in &setup[6..] {
-        ready = display_before_response.receive(message.clone()).unwrap();
-    }
+    let ready = display_before_response.receive(setup[5].clone()).unwrap();
     assert!(matches!(
         ready.events.as_slice(),
         [RuntimeEventKind::SessionReady { .. }]
@@ -565,12 +554,9 @@ fn current_root_candidate_is_confined_to_the_ignored_live_harness() {
     let response = protocol.receive(fixture_response(3)).unwrap();
     assert!(response.events.is_empty());
     protocol.receive(setup[5].clone()).unwrap();
-    for notification in current_display_notifications() {
-        protocol.receive(notification).unwrap();
-    }
     let mut ready = Effects::default();
-    for setup in &setup[6..] {
-        ready = protocol.receive(setup.clone()).unwrap();
+    for notification in current_display_notifications() {
+        ready = protocol.receive(notification).unwrap();
     }
     let [
         RuntimeEventKind::SessionReady {
@@ -678,21 +664,25 @@ fn current_setup_requires_exact_fields_stable_identity_and_all_phases() {
     assert!(protocol.receive(fixture_response(3)).is_err());
 
     let mut protocol = current_waiting_for_setup();
-    let mut setup = current_setup_messages(&session_id);
-    setup[6]["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
+    let setup = current_setup_messages(&session_id);
     for message in &setup[..5] {
         protocol.receive(message.clone()).unwrap();
     }
     protocol.receive(fixture_response(3)).unwrap();
-    protocol.receive(setup[5].clone()).unwrap();
-    for notification in current_display_notifications() {
-        protocol.receive(notification).unwrap();
+    let mut changed = setup[5].clone();
+    changed["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
+    assert!(protocol.receive(changed).is_err());
+
+    let mut protocol = current_waiting_for_setup();
+    for message in &setup[..5] {
+        protocol.receive(message.clone()).unwrap();
     }
-    let result = setup[6..]
-        .iter()
-        .cloned()
-        .try_for_each(|message| protocol.receive(message).map(|_| ()));
-    assert!(result.is_err());
+    protocol.receive(fixture_response(3)).unwrap();
+    for notification in current_display_notifications() {
+        let effects = protocol.receive(notification).unwrap();
+        assert!(effects.events.is_empty());
+    }
+    assert!(protocol.current_setup.is_some());
     assert_eq!(protocol.session_id.as_deref(), Some(session_id.as_str()));
 
     let mut catalog_identity = current_waiting_for_setup();
@@ -737,12 +727,14 @@ fn current_setup_requires_the_response_before_post_response_phases() {
     duplicate_after_response.receive(setup[5].clone()).unwrap();
     assert!(duplicate_after_response.receive(setup[5].clone()).is_err());
 
-    let mut missing_response_ready = current_waiting_for_setup();
+    let mut internal_only_phase = current_waiting_for_setup();
     for message in &setup[..5] {
-        missing_response_ready.receive(message.clone()).unwrap();
+        internal_only_phase.receive(message.clone()).unwrap();
     }
-    missing_response_ready.receive(fixture_response(3)).unwrap();
-    assert!(missing_response_ready.receive(setup[6].clone()).is_err());
+    internal_only_phase.receive(fixture_response(3)).unwrap();
+    let mut hidden = setup[5].clone();
+    hidden["params"]["phase"] = json!("persistence_init");
+    assert!(internal_only_phase.receive(hidden).is_err());
 
     let mut changed_response_identity = current_waiting_for_setup();
     for message in &setup[..5] {
@@ -794,7 +786,11 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     let accepted = protocol.receive(announcements_2.clone()).unwrap();
     assert!(accepted.writes.is_empty() && accepted.events.is_empty());
     let accepted = protocol.receive(commands.clone()).unwrap();
-    assert!(accepted.writes.is_empty() && accepted.events.is_empty());
+    assert!(accepted.writes.is_empty());
+    assert!(matches!(
+        accepted.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
     assert!(protocol.skill_catalog.is_none());
     assert!(protocol.creation_catalog_session.is_none());
 
@@ -806,10 +802,9 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     incomplete.receive(models.clone()).unwrap();
     incomplete.receive(settings.clone()).unwrap();
     incomplete.receive(announcements.clone()).unwrap();
-    incomplete.receive(announcements_2.clone()).unwrap();
-    let setup =
-        current_setup_messages(fixture_response(3)["result"]["sessionId"].as_str().unwrap());
-    assert!(incomplete.receive(setup[6].clone()).is_err());
+    let effects = incomplete.receive(announcements_2.clone()).unwrap();
+    assert!(effects.events.is_empty());
+    assert!(incomplete.current_setup.is_some());
 
     for rejected in [
         json!({"jsonrpc":"2.0","method":"unknown","params":{}}),
