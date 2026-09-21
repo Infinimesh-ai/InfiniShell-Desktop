@@ -315,13 +315,30 @@ impl LiveSession {
                 return Err("真实测试不得打开未验证的 SDK 或同轮追加能力".into());
             }
         }
+        let current_model_id = match profile {
+            LiveCapabilityProfile::CurrentRootCandidate => {
+                let expected = env::var("INFINISHELL_GROK_LIVE_MODEL")
+                    .map_err(|_| "当前版根验收缺少固定模型".to_owned())?;
+                let models = &effective_permissions["reportedMetadata"]["models"];
+                if models["currentModelId"] != expected
+                    || !models["availableModels"].as_array().is_some_and(|models| {
+                        models.iter().any(|model| model["modelId"] == expected)
+                    })
+                {
+                    return Err("当前版根验收模型与官方目录不匹配".into());
+                }
+                Some(expected)
+            }
+            LiveCapabilityProfile::Extended | LiveCapabilityProfile::P0 => None,
+        };
         if self.native_id.is_none() {
             return Err("初始化缺少真实会话 ID".into());
         }
         evidence.record(
             json!({"event":"session_ready", "native_session_id":self.native_id,
             "public_product_gate_open":false,"permission_policy":"Inherit",
-            "permission_enforcement_verified":false,"scope":SCOPE}),
+            "permission_enforcement_verified":false,"scope":SCOPE,
+            "current_model_id":current_model_id}),
         )
     }
 

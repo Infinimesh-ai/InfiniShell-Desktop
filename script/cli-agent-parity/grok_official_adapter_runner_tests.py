@@ -337,7 +337,7 @@ tool = "write"
             profile["sha256"],
             "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
         )
-        self.assertEqual(profile["model"], "grok-4.6")
+        self.assertEqual(profile["model"], "grok-4.7")
         self.assertEqual(profile["max_acp_inputs"], 8)
         self.assertFalse(profile["public_product_gate_open"])
         self.assertTrue(profile["test_name"].endswith("real_grok_current_root_lifecycle"))
@@ -353,7 +353,7 @@ tool = "write"
                 profile["model"],
             )
             self.assertIn(profile["sha256"], wrapper.read_text())
-            self.assertIn('default = "grok-4.6"', settings.read_text())
+            self.assertIn('default = "grok-4.7"', settings.read_text())
 
     def test_current_formal_symlink_resolves_before_exact_digest_validation(self):
         with tempfile.TemporaryDirectory() as directory:

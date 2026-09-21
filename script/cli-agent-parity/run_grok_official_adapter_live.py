@@ -53,7 +53,7 @@ PROFILES = {
     CURRENT_ROOT_PROFILE: {
         "version": "grok 1.0.40 (eb1a2256660d)",
         "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
-        "model": "grok-4.6",
+        "model": "grok-4.7",
         "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_current_root_lifecycle",
         "max_acp_inputs": ACP_INPUTS,
         "project_files": ["approval-allow.txt"],
@@ -308,6 +308,7 @@ tool = "any"
 def public_events(events):
     # 官方令牌不被运行器解析，故公开证据采用字段值白名单，不能依赖已知密钥替换。
     fixed = {shared.SCOPE, MODEL_PATH, "Completed", "Cancelled", "Failed", "AllowOnce", "DenyOnce",
+        "grok-4.7",
         shared.RECEIPT_SOURCE,"PARITY_ONE", "PARITY_TWO", "APPROVED", "READY", "QUEUE_PARENT_DONE", "p0"}
     identifiers = {"event", "phase", "exit_reason"}
     result = []
@@ -500,7 +501,8 @@ def run(args):
             "INFINISHELL_GROK_LIVE_EXECUTABLE": str(wrapper), "INFINISHELL_GROK_LIVE_ARTIFACT": str(raw_path),
             "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
             "INFINISHELL_GROK_LIVE_STATE_DIR": str(state_root),
-            "INFINISHELL_GROK_LIVE_PROFILE": args.acceptance_profile})
+            "INFINISHELL_GROK_LIVE_PROFILE": args.acceptance_profile,
+            "INFINISHELL_GROK_LIVE_MODEL": profile["model"]})
         metadata["native_environment_names"] = sorted(environment)
         version = subprocess.run([str(wrapper), "--version"], cwd=root / "project", env=environment,
             capture_output=True, text=True, timeout=10, check=True)

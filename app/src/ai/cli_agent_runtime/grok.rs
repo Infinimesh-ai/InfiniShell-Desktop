@@ -3897,7 +3897,7 @@ fn current_models_update(message: &Value) -> Result<ReportedModels, RuntimeError
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok models update fields".into()))?;
     let entries = params["availableModels"]
         .as_array()
-        .filter(|entries| entries.len() == 2)
+        .filter(|entries| !entries.is_empty() && entries.len() <= 64)
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok models update entries".into()))?;
     for entry in entries {
         let entry = entry.as_object().filter(|entry| {
@@ -3907,24 +3907,40 @@ fn current_models_update(message: &Value) -> Result<ReportedModels, RuntimeError
                     .keys()
                     .all(|key| matches!(key.as_str(), "modelId" | "name" | "description" | "_meta"))
         });
-        if entry.is_none() {
+        let Some(entry) = entry else {
             return Err(RuntimeError::Protocol(
                 "invalid Grok model display entry".into(),
+            ));
+        };
+        if entry["modelId"]
+            .as_str()
+            .is_none_or(|id| id.is_empty() || id.len() > 128 || id.chars().any(char::is_control))
+            || entry["name"].as_str().is_none_or(|name| {
+                name.trim().is_empty() || name.len() > 512 || name.chars().any(char::is_control)
+            })
+            || entry.get("description").is_some_and(|description| {
+                description
+                    .as_str()
+                    .is_none_or(|description| description.len() > 4 * 1024)
+            })
+            || entry.get("_meta").is_some_and(|meta| !meta.is_object())
+            || serde_json::to_vec(entry).map_or(true, |value| value.len() > 16 * 1024)
+        {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok model display values".into(),
             ));
         }
     }
     let models: ReportedModels = decode_metadata(&outer["params"])?;
-    if models.current_model_id != "grok-4.6"
+    let mut model_ids = HashSet::new();
+    if models.current_model_id.is_empty()
+        || models.current_model_id.len() > 128
+        || models.current_model_id.chars().any(char::is_control)
         || models
             .available_models
             .iter()
-            .map(|model| model.model_id.as_str())
-            .collect::<Vec<_>>()
-            != ["grok-4.6", "grok-4.5"]
-        || models
-            .available_models
-            .iter()
-            .any(|model| model.name.trim().is_empty())
+            .any(|model| !model_ids.insert(model.model_id.as_str()))
+        || !model_ids.contains(models.current_model_id.as_str())
     {
         return Err(RuntimeError::Protocol(
             "unexpected Grok 1.0.40 model display identity".into(),

@@ -109,6 +109,15 @@ fn current_display_notifications() -> Vec<Value> {
             .unwrap()
             .clone(),
     ];
+    messages[0]["params"] = json!({
+        "currentModelId": "grok-4.7",
+        "availableModels": [
+            {"modelId":"grok-4.7","name":"Grok 4.7","description":"Frontier model"},
+            {"modelId":"grok-4.7-build-fast","name":"Grok 4.7 Fast","description":"Fast variant"},
+            {"modelId":"grok-4.6","name":"Grok 4.6"},
+            {"modelId":"grok-4.5","name":"Grok 4.5"}
+        ]
+    });
     messages.extend(
         fixture
             .into_iter()
@@ -777,7 +786,7 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
             .as_ref()
             .unwrap()
             .current_model_id,
-        "grok-4.6"
+        "grok-4.7"
     );
     let accepted = protocol.receive(settings.clone()).unwrap();
     assert!(accepted.writes.is_empty() && accepted.events.is_empty());
@@ -823,6 +832,35 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
     changed_model["params"]["availableModels"][0]["foreign"] = json!(true);
     let mut protocol = current_waiting_for_display_notifications();
     assert!(protocol.receive(changed_model).is_err());
+    let mut rejected_models = Vec::new();
+    let mut empty = models.clone();
+    empty["params"]["availableModels"] = json!([]);
+    rejected_models.push(("empty", empty));
+    let mut duplicate = models.clone();
+    let duplicate_entry = duplicate["params"]["availableModels"][0].clone();
+    duplicate["params"]["availableModels"]
+        .as_array_mut()
+        .unwrap()
+        .push(duplicate_entry);
+    rejected_models.push(("duplicate", duplicate));
+    let mut missing_current = models.clone();
+    missing_current["params"]["currentModelId"] = json!("grok-future");
+    rejected_models.push(("missing_current", missing_current));
+    let mut too_many = models.clone();
+    let repeated_entry = too_many["params"]["availableModels"][0].clone();
+    too_many["params"]["availableModels"] =
+        Value::Array((0..65).map(|_| repeated_entry.clone()).collect());
+    rejected_models.push(("too_many", too_many));
+    let mut long_name = models.clone();
+    long_name["params"]["availableModels"][0]["name"] = json!("x".repeat(513));
+    rejected_models.push(("long_name", long_name));
+    for (mutation, changed) in rejected_models {
+        let mut protocol = current_waiting_for_display_notifications();
+        assert!(
+            protocol.receive(changed).is_err(),
+            "{mutation} 模型目录必须 fail-closed"
+        );
+    }
 
     let mut extra_setting = settings.clone();
     extra_setting["params"]["foreign"] = json!(true);
