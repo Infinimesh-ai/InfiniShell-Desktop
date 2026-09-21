@@ -4116,16 +4116,36 @@ fn validate_current_available_commands_update(
                 && meta.contains_key("updateType")
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog metadata".into()))?;
-    if !params_meta["agentTimestampMs"].is_number()
-        || params_meta["eventId"].as_str() != Some(expected_event_id.as_str())
-        || !params_meta["totalTokens"].is_number()
-        || !params_meta["updateParams"].is_object()
-        || params_meta["updateType"] != "available_commands_update"
-        || serde_json::to_vec(&params_meta["updateParams"])
-            .map_or(true, |value| value.len() > 128 * 1024)
+    if !params_meta["agentTimestampMs"].is_number() {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog timestamp".into(),
+        ));
+    }
+    if params_meta["eventId"].as_str() != Some(expected_event_id.as_str()) {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog event id".into(),
+        ));
+    }
+    if !params_meta["totalTokens"].is_number() {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog token count".into(),
+        ));
+    }
+    if !params_meta["updateParams"].is_object() {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog update params".into(),
+        ));
+    }
+    if params_meta["updateType"] != "available_commands_update" {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok command catalog update type".into(),
+        ));
+    }
+    if serde_json::to_vec(&params_meta["updateParams"])
+        .map_or(true, |value| value.len() > 128 * 1024)
     {
         return Err(RuntimeError::Protocol(
-            "invalid Grok command catalog metadata values".into(),
+            "Grok command catalog update params are too large".into(),
         ));
     }
     let update = params["update"]
