@@ -95,6 +95,31 @@ fn current_waiting_for_setup() -> GrokProtocol {
     protocol
 }
 
+fn current_waiting_for_resume(session_id: &str) -> GrokProtocol {
+    let mut resumed = options();
+    resumed.target = SessionTarget::Resume {
+        native_session_id: session_id.into(),
+    };
+    let mut protocol = GrokProtocol::new(resumed);
+    protocol.current_root_candidate_for_live = true;
+    protocol
+        .bind_cli_version("grok 1.0.40 (eb1a2256660d)")
+        .unwrap();
+    protocol.initialize().unwrap();
+    protocol.receive(current_initialize()).unwrap();
+    protocol
+        .receive(json!({
+            "jsonrpc": "2.0",
+            "method": "_x.ai/mcp/servers_updated",
+            "params": {"mcpServers": []}
+        }))
+        .unwrap();
+    let opened = protocol.receive(fixture_response(2)).unwrap();
+    assert_eq!(opened.writes[0]["method"], "session/load");
+    assert_eq!(opened.writes[0]["params"]["sessionId"], session_id);
+    protocol
+}
+
 fn current_display_notifications() -> Vec<Value> {
     let fixture = authenticated_fixture();
     let mut messages = vec![
@@ -945,6 +970,60 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
         );
         assert!(protocol.skill_catalog.is_none());
         assert!(protocol.creation_catalog_session.is_none());
+    }
+}
+
+#[test]
+fn current_resume_accepts_only_correlated_replay_updates_before_load_response() {
+    let session_id = Uuid::new_v4().to_string();
+    let prompt_id = Uuid::new_v4().to_string();
+    let replay = json!({
+        "jsonrpc":"2.0",
+        "method":"session/update",
+        "params":{
+            "sessionId":session_id,
+            "_meta":{
+                "agentTimestampMs":1,
+                "eventId":format!("{session_id}-3"),
+                "isReplay":true,
+                "promptId":prompt_id,
+                "x.ai/leaderClientId":1
+            },
+            "update":{
+                "sessionUpdate":"user_message_chunk",
+                "content":{"type":"text","text":"历史输入"},
+                "_meta":{"modelId":"grok-4.7","promptIndex":1}
+            }
+        }
+    });
+    let mut protocol = current_waiting_for_resume(&session_id);
+    let effects = protocol.receive(replay.clone()).unwrap();
+    assert!(effects.writes.is_empty() && effects.events.is_empty());
+    assert!(protocol.observed_prompt_ids.contains(&prompt_id));
+    assert!(protocol.session_id.is_none());
+
+    for rejected in [
+        {
+            let mut value = replay.clone();
+            value["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
+            value
+        },
+        {
+            let mut value = replay.clone();
+            value["params"]["_meta"]["isReplay"] = json!(false);
+            value
+        },
+        {
+            let mut value = replay.clone();
+            value["method"] = json!("_x.ai/queue/changed");
+            value
+        },
+    ] {
+        assert!(
+            current_waiting_for_resume(&session_id)
+                .receive(rejected)
+                .is_err()
+        );
     }
 }
 

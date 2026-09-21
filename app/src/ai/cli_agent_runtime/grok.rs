@@ -3301,8 +3301,25 @@ impl GrokProtocol {
         if message["method"] == CURRENT_SETUP_METHOD {
             return self.current_setup_notification(message);
         }
+        let current_resume_replay = self.probed_version == Some(CURRENT_VERSION)
+            && self.session_id.is_none()
+            && self.current_setup.is_none()
+            && matches!(
+                message["method"].as_str(),
+                Some("session/update" | "_x.ai/session/update")
+            )
+            && message["params"]["_meta"]["isReplay"] == true
+            && self.pending.as_ref().is_some_and(|pending| {
+                matches!(
+                    &pending.kind,
+                    PendingKind::OpenSession {
+                        requested_id: Some(requested_id)
+                    } if message["params"]["sessionId"].as_str() == Some(requested_id)
+                )
+            });
         if self.probed_version == Some(CURRENT_VERSION)
             && (self.session_id.is_none() || self.current_setup.is_some())
+            && !current_resume_replay
         {
             if message
                 == &json!({
