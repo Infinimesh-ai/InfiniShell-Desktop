@@ -148,7 +148,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$RUNNER_TEMP/claude-21273-inputs")"
+          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$RUNNER_TEMP/claude-21278-inputs")"
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
@@ -290,7 +290,7 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-permission-observation.json
-            ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/claude-21278-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error
@@ -514,7 +514,7 @@ jobs:
         timeout-minutes: 10
         run: |
           $ErrorActionPreference = 'Stop'
-          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$env:RUNNER_TEMP\claude-21273-inputs"
+          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$env:RUNNER_TEMP\claude-21278-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
           "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -841,7 +841,7 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-permission-observation.json
-            ${{ runner.temp }}/claude-21273-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/claude-21278-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error

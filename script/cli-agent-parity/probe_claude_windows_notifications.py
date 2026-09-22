@@ -16,7 +16,8 @@ import unicodedata
 import uuid
 
 sys.dont_write_bytecode = True
-from prepare_claude_cli import isolated_environment, regular_file, verify_binary, verify_version
+from prepare_claude_cli import (DEFAULT_VERSION, RELEASE_CATALOG, isolated_environment,
+                                regular_file, verify_binary, verify_version)
 import apply_notification_patch as patch
 import probe_codex_windows_conpty as conpty_host
 from probe_codex_windows_conpty import MAX_OUTPUT, WinApi, notifications, run_conpty
@@ -142,7 +143,7 @@ def case_environment(root, dependencies, executable):
 
 
 def seed_completed_onboarding(root, project):
-    # 固定 2.1.273 的 Zyn/FB/lr/C9e：私有配置目录、NFC 与 Windows 正斜杠项目键。
+    # 固定受测版本的 Zyn/FB/lr/C9e：私有配置目录、NFC 与 Windows 正斜杠项目键。
     # 只信任本轮自建空目录；不增加账号、授权工具、危险模式或用户真实配置。
     key = unicodedata.normalize("NFC", project.resolve(strict=True).as_posix())
     value = {"hasCompletedOnboarding": True, "theme": "dark", "autoUpdates": False,
@@ -349,7 +350,8 @@ def owned_root(root):
 def load_configuration(path):
     value = bounded_json(path)
     require(type(value.get("schema")) is int and value["schema"] == SCHEMA
-            and isinstance(value.get("private_root"), str), "私有配置格式不符")
+            and isinstance(value.get("private_root"), str)
+            and value.get("claude_version") in RELEASE_CATALOG, "私有配置格式不符")
     root = Path(value["private_root"])
     owned_root(root)
     private_path(root, str(path), exists=True)
@@ -366,11 +368,12 @@ def run_driver(configuration):
     report = {"phase": "interactive_conpty", "passed": False, "scripts_instrumented": False,
               "fixture_completed_onboarding": True, "fixture_project_trust": True,
               "default_first_run_verified": False, "model_inputs_sent": 0, "forced_cleanup": False,
-              "native_child_attached": False, "native_session_start_received": False}
+              "native_child_attached": False, "native_session_start_received": False,
+              "expected_version": config["claude_version"]}
     job, process = WindowsProbeJob(), None
     try:
         executable = Path(config["executable"])
-        verify_binary(executable, "win32-x64")
+        verify_binary(executable, "win32-x64", config["claude_version"])
         env = case_environment(root, config["dependencies"], executable)
         seed_completed_onboarding(root, project)
         command = native_command(executable, plugin)
@@ -479,11 +482,12 @@ def run_worker(configuration):
     report = {"schema": SCHEMA, "passed": False, "path_cases": [], "transport_cases": [],
               "model_inputs_sent": 0, "credentials_provided": False, "credential_files_read": False,
               "product_installer_exercised": False, "full_lifecycle_verified": False,
-              "default_first_run_verified": False, "raw_pty_archived": False}
+              "default_first_run_verified": False, "raw_pty_archived": False,
+              "expected_version": config["claude_version"]}
     write_json(Path(config["worker_report"]), report, exclusive=True)
     try:
-        report["binary"] = verify_binary(executable, "win32-x64")
-        report["version"] = verify_version(executable, root)
+        report["binary"] = verify_binary(executable, "win32-x64", config["claude_version"])
+        report["version"] = verify_version(executable, root, config["claude_version"])
         dependencies = windows_environment(Path(config["bash"]), Path(config["jq"]))
         # Claude Windows 不从受控 PATH 中的 bash.exe 直接推导 Git Bash；只传递已与
         # msys-2.0.dll 一起验证的绝对路径，不恢复 runner 的其他环境。
@@ -545,7 +549,9 @@ def run_worker(configuration):
             except Exception as error:
                 case["failure"] = failure(error)
             write_json(Path(config["worker_report"]), report)
-        require(source_hashes(repo) == report["source_sha256"] and verify_binary(executable, "win32-x64") == report["binary"], "执行期间固定输入变化")
+        require(source_hashes(repo) == report["source_sha256"]
+                and verify_binary(executable, "win32-x64", config["claude_version"]) == report["binary"],
+                "执行期间固定输入变化")
         require({name: digest(path) for name, path in dependency_files.items()} == report["dependency_sha256"],
                 "执行期间原生依赖变化")
         report["inputs_unchanged"] = True
@@ -615,14 +621,15 @@ def public_run(args):
     report = {"schema": SCHEMA, "passed": False, "host_os": sys.platform, "outer_timeout_seconds": OUTER_TIMEOUT,
               "credentials_provided": False, "credential_files_read": False, "model_inputs_sent": 0,
               "fixture_completed_onboarding": True, "default_first_run_verified": False,
-              "production_windows_gate_changed": False, "forced_cleanup": False}
+              "production_windows_gate_changed": False, "forced_cleanup": False,
+              "expected_version": args.claude_version}
     write_json(output, report, exclusive=True)
     root, job, process = None, None, None
     try:
         require_native_host()
         executable = args.executable
         require(executable is not None and executable.is_absolute() and executable.name.lower() == "claude.exe", "需要固定原生 Claude 路径")
-        report["binary"] = verify_binary(executable, "win32-x64")
+        report["binary"] = verify_binary(executable, "win32-x64", args.claude_version)
         bash, jq = select_dependencies(args.bash_executable, args.jq_executable)
         root = Path(tempfile.mkdtemp(prefix="infinishell-claude-windows-notify-", dir=os.environ.get("RUNNER_TEMP"))).resolve()
         require(not root.is_relative_to(repo), "私有目录必须位于仓库外")
@@ -630,6 +637,7 @@ def public_run(args):
         env = isolated_environment(root / "controller")
         report["source_commit"] = identity(repo, env)
         config = {"schema": SCHEMA, "repo": str(repo), "private_root": str(root), "executable": str(executable),
+                  "claude_version": args.claude_version,
                   "bash": str(bash), "jq": str(jq), "worker_report": str(root / "worker.json")}
         config_path = root / "worker.config.json"
         write_json(config_path, config, exclusive=True)
@@ -681,6 +689,8 @@ def public_run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
+                        help=f"与准备器相同的精确官方版本；缺省为 {DEFAULT_VERSION}")
     for name in ("executable", "bash-executable", "jq-executable", "output", "worker-config", "driver-config"):
         parser.add_argument("--" + name, type=Path, help=argparse.SUPPRESS if name.endswith("config") else None)
     args = parser.parse_args()

@@ -14,8 +14,9 @@ import time
 import uuid
 
 sys.dont_write_bytecode = True
-from prepare_claude_cli import (VERSION, current_platform, isolated_environment,
-                                regular_file, require, verify_binary, verify_version)
+from prepare_claude_cli import (DEFAULT_VERSION, RELEASE_CATALOG, current_platform,
+                                isolated_environment, regular_file, require, verify_binary,
+                                verify_version)
 from probe_claude_no_credentials import Recorder, command
 
 TIMEOUT = 15
@@ -268,9 +269,9 @@ def write_settings(path, value):
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
-def run(executable, root, report):
-    report["binary"] = verify_binary(executable, current_platform())
-    report["cli_version"] = verify_version(executable, root)
+def run(executable, root, report, version):
+    report["binary"] = verify_binary(executable, current_platform(), version)
+    report["cli_version"] = verify_version(executable, root, version)
     env = isolated_environment(root)
     project, additional = root / "project 中文", root / "additional 目录"
     project.mkdir(); additional.mkdir()
@@ -355,12 +356,14 @@ def run(executable, root, report):
                                  "native_canonical_source_paths_returned": False,
                                  "relative_rule_authorization_executed": False}
     require(not (root / "claude/.credentials.json").exists(), "无凭据探针意外出现凭据文件")
-    require(verify_binary(executable, current_platform()) == report["binary"], "原生二进制在探测中变化")
+    require(verify_binary(executable, current_platform(), version) == report["binary"], "原生二进制在探测中变化")
     report["binary_unchanged_after_probe"] = True
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
+                        help=f"与准备器相同的精确官方版本；缺省为 {DEFAULT_VERSION}")
     parser.add_argument("--executable", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -373,7 +376,7 @@ def main():
             "报告必须位于源码外且不能覆盖原生文件或链接")
     require(not output.exists(), "不覆盖既有验证记录")
     output.parent.mkdir(parents=True, exist_ok=True)
-    report = {"passed": False, "expected_version": VERSION, "host_os": sys.platform,
+    report = {"passed": False, "expected_version": args.claude_version, "host_os": sys.platform,
               "credentials_provided": False, "model_commands_sent": 0, "tool_execution_tested": False,
               "production_rust_adapter_verified": False, "dispatch_authorized": False,
               "atomic_permission_ceiling_proven": False,
@@ -386,7 +389,7 @@ def main():
             root = Path(name).resolve()
             require(not root.is_relative_to(repository), "隔离目录必须位于源码外")
             try:
-                run(executable, root, report)
+                run(executable, root, report, args.claude_version)
                 report["passed"] = True
             finally:
                 report = scrub(report, root)

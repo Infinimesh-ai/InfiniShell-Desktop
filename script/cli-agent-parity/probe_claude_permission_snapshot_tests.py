@@ -8,6 +8,7 @@ import queue
 import sys
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -26,6 +27,14 @@ def snapshot():
 
 
 class ProjectionTests(unittest.TestCase):
+    def test_selected_release_version_is_used_before_native_launch(self):
+        executable = Path("/fixture/claude")
+        with mock.patch.object(probe, "current_platform", return_value="fixture-platform"), \
+             mock.patch.object(probe, "verify_binary", side_effect=ValueError("stop")) as verify, \
+             self.assertRaisesRegex(ValueError, "stop"):
+            probe.run(executable, Path("/fixture"), {}, "2.1.278")
+        verify.assert_called_once_with(executable, "fixture-platform", "2.1.278")
+
     def test_nonpermission_secrets_never_enter_projection_and_are_not_silently_accepted(self):
         value = {"effective": {**copy.deepcopy(probe.BASE), "env": {"ANTHROPIC_API_KEY": "secret-effective"}},
                  "sources": [{"source": "flagSettings", "settings": {**copy.deepcopy(probe.BASE),

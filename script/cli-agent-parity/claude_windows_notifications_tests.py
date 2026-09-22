@@ -213,10 +213,12 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             root = Path(directory).resolve()
             (root / ".probe-owned").write_bytes(probe.MARKER)
             path = root / "worker.config.json"
-            config = {"schema": 1, "private_root": str(root), "worker_report": str(root / "worker.json")}
+            config = {"schema": 1, "private_root": str(root), "claude_version": "2.1.278",
+                      "worker_report": str(root / "worker.json")}
             probe.write_json(path, config, exclusive=True)
             self.assertEqual(probe.load_configuration(path), config)
-            for key, item in (("schema", True), ("private_root", []), ("worker_report", str(root.parent / "outside.json")),
+            for key, item in (("schema", True), ("private_root", []), ("claude_version", "latest"),
+                              ("worker_report", str(root.parent / "outside.json")),
                               ("raw_output", str(root / ".." / "outside.bin"))):
                 probe.write_json(path, {**config, key: item})
                 with self.subTest(key=key), self.assertRaises(ValueError):
@@ -295,7 +297,8 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             outside = root / "outside.txt"
             outside.write_bytes(b"do not change")
             args = argparse.Namespace(output=root / "report.json", executable=root / "claude.exe",
-                                      bash_executable=root / "bash.exe", jq_executable=root / "jq.exe")
+                                      bash_executable=root / "bash.exe", jq_executable=root / "jq.exe",
+                                      claude_version="2.1.278")
             process, job = mock.Mock(), mock.Mock()
             process.wait.side_effect = [subprocess.TimeoutExpired("synthetic-worker", 420), 0]
             process.poll.return_value = None
@@ -327,7 +330,7 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
     def test_unsupported_platform_records_failure_without_process_or_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             args = argparse.Namespace(output=Path(directory).resolve() / "report.json", executable=None,
-                                      bash_executable=None, jq_executable=None)
+                                      bash_executable=None, jq_executable=None, claude_version="2.1.278")
             with mock.patch.object(probe, "require_native_host", side_effect=probe.ProbeFailure("需要原生 Windows x64 CPython")), \
                  mock.patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(probe.public_run(args), 1)
@@ -348,6 +351,7 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             raw.write_bytes(osc({**notification(), "session_id": session_id, "cwd": str(project)}))
             config = {"schema": 1, "private_root": str(root), "case_root": str(case_root), "project": str(project),
                       "plugin": str(plugin), "executable": str(root / "claude.exe"), "dependencies": {"PATH": "tools"},
+                      "claude_version": "2.1.278",
                       "session_id": session_id, "raw_output": str(raw), "driver_report": str(root / "driver.json"),
                       "plugin_hashes": {}}
             config_path = root / "driver.config.json"
@@ -385,11 +389,12 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             root = Path(directory).resolve()
             (root / ".probe-owned").write_bytes(probe.MARKER)
             config = {"schema": 1, "repo": str(REPO), "private_root": str(root), "executable": str(root / "claude.exe"),
-                      "worker_report": str(root / "worker.json")}
+                      "claude_version": "2.1.278", "worker_report": str(root / "worker.json")}
             config_path = root / "worker.config.json"
             probe.write_json(config_path, config, exclusive=True)
-            with mock.patch.object(probe, "verify_binary", side_effect=ValueError("synthetic native failure")):
+            with mock.patch.object(probe, "verify_binary", side_effect=ValueError("synthetic native failure")) as verify:
                 self.assertEqual(probe.run_worker(config_path), 1)
+            verify.assert_called_once_with(root / "claude.exe", "win32-x64", "2.1.278")
             report = probe.bounded_json(root / "worker.json")
             self.assertFalse(report["passed"])
             self.assertEqual(report["path_cases"], [])
@@ -400,6 +405,7 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             root = Path(directory).resolve()
             (root / ".probe-owned").write_bytes(probe.MARKER)
             config = {"schema": 1, "repo": str(REPO), "private_root": str(root), "executable": str(root / "claude.exe"),
+                      "claude_version": "2.1.278",
                       "worker_report": str(root / "worker.json"), "bash": str(root / "bash.exe"), "jq": str(root / "jq.exe")}
             config_path = root / "worker.config.json"
             probe.write_json(config_path, config, exclusive=True)

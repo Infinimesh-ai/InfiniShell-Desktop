@@ -15,8 +15,9 @@ import time
 import uuid
 
 sys.dont_write_bytecode = True
-from prepare_claude_cli import (VERSION, current_platform, isolated_environment,
-                                regular_file, require, verify_binary, verify_version)
+from prepare_claude_cli import (DEFAULT_VERSION, RELEASE_CATALOG, current_platform,
+                                isolated_environment, regular_file, require, verify_binary,
+                                verify_version)
 
 
 INITIALIZE_TIMEOUT = 30
@@ -170,11 +171,11 @@ def repository_identity(env):
     return {"repository_commit": result.stdout.strip(), "worktree_dirty": bool(status.stdout.strip())}
 
 
-def run(executable, root, report):
+def run(executable, root, report, version):
     env = isolated_environment(root)
     report.update(repository_identity(env))
-    report["binary"] = verify_binary(executable, current_platform())
-    report["cli_version"] = verify_version(executable, root)
+    report["binary"] = verify_binary(executable, current_platform(), version)
+    report["cli_version"] = verify_version(executable, root, version)
     project = root / "project"
     project.mkdir()
     recorder = Recorder(command(executable), env, project)
@@ -194,12 +195,14 @@ def run(executable, root, report):
     require(report["stdin_eof_exited_within_5s"] and report["exit_code_before_cleanup"] == 0
             and not report["forced_cleanup_used"], "原生空闲 EOF 没有自行正常退出")
     require(not (root / "claude/.credentials.json").exists(), "无凭据探测意外生成了账号凭据文件")
-    require(verify_binary(executable, current_platform()) == report["binary"], "探测期间原生文件改变")
+    require(verify_binary(executable, current_platform(), version) == report["binary"], "探测期间原生文件改变")
     report["binary_unchanged_after_probe"] = True
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
+                        help=f"与准备器相同的精确官方版本；缺省为 {DEFAULT_VERSION}")
     parser.add_argument("--executable", type=Path, required=True, help="固定摘要的原生 Claude 绝对路径，不接受安装器或脚本包装")
     parser.add_argument("--output", type=Path, required=True, help="源树外的 JSON 验证记录")
     args = parser.parse_args()
@@ -214,7 +217,7 @@ def main():
         regular_file(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     report = {"passed": False, "mode": "claude_initialize_and_idle_eof", "host_os": sys.platform,
-              "expected_version": VERSION, "credentials_provided": False, "model_commands_sent": 0,
+              "expected_version": args.claude_version, "credentials_provided": False, "model_commands_sent": 0,
               "native_session_association_confirmed": False, "production_rust_adapter_verified": False,
               "model_lifecycle_verified": False, "active_turn_tested": False, "tool_descendant_tested": False,
               "parent_sigkill_tested": False, "app_restart_and_ui_verified": False, "events": []}
@@ -222,7 +225,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix="infinishell-claude-no-credentials-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
             root = Path(temporary).resolve()
             require(not root.is_relative_to(repository), "临时配置必须位于源树外")
-            run(executable, root, report)
+            run(executable, root, report, args.claude_version)
         report["passed"] = True
     except Exception as error:
         report["failure"] = {"type": type(error).__name__, "message": str(error)}

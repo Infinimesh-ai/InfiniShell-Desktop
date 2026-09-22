@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+import probe_claude_no_credentials as probe
 from probe_claude_no_credentials import (Recorder, clean, command, isolated_environment,
                                         validate_initialize, validate_transcript)
 
@@ -78,6 +79,17 @@ def python_transport_fixture(root, source):
 
 
 class ClaudeNoCredentialsTests(unittest.TestCase):
+    def test_selected_release_version_is_used_before_native_launch(self):
+        executable = Path("/fixture/claude")
+        with tempfile.TemporaryDirectory() as temporary, \
+             mock.patch.object(probe, "isolated_environment", return_value={}), \
+             mock.patch.object(probe, "repository_identity", return_value={}), \
+             mock.patch.object(probe, "current_platform", return_value="fixture-platform"), \
+             mock.patch.object(probe, "verify_binary", side_effect=ValueError("stop")) as verify:
+            with self.assertRaisesRegex(ValueError, "stop"):
+                probe.run(executable, Path(temporary), {}, "2.1.278")
+        verify.assert_called_once_with(executable, "fixture-platform", "2.1.278")
+
     def test_initialize_requires_exact_success_identity_and_empty_pending_queues(self):
         validate_initialize(response(), "init-probe", 42)
         paths = {
