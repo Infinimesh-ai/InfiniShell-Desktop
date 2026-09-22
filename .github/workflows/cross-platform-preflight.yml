@@ -517,6 +517,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Codex preparation failed' }
           "INFINISHELL_TEST_CODEX_EXE=$codexExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      # 生产通知安装器的当前插件合同仍精确绑定 0.147.0；不要把最新版运行时冒充该合同。
+      - name: Prepare fixed Codex production installer contract
+        id: fixed_codex_installer
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $codexInstallerExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --version 0.147.0 --download-dir "$env:RUNNER_TEMP\codex-0147-installer-inputs"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Codex production installer contract preparation failed' }
+          "INFINISHELL_TEST_CODEX_INSTALLER_EXE=$codexInstallerExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Prepare fixed native Claude without credentials
         id: fixed_claude
         shell: pwsh
@@ -739,7 +750,7 @@ jobs:
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
         id: codex_source_installer
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.fixed_codex_installer.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 8
         env:
@@ -760,7 +771,7 @@ jobs:
           $systemDirectory = Join-Path $env:SYSTEMROOT 'System32'
           $powershellDirectory = Join-Path $systemDirectory 'WindowsPowerShell\v1.0'
           $env:PATH = "$(Split-Path $gitBash);$(Split-Path $jqExecutable);$powershellDirectory;$systemDirectory;$env:PATH"
-          python -B script/cli-agent-parity/run_codex_source_live.py --test-binary $executables[0] --codex "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-rust-source-installer.ndjson" --timeout 300
+          python -B script/cli-agent-parity/run_codex_source_live.py --test-binary $executables[0] --codex "$env:INFINISHELL_TEST_CODEX_INSTALLER_EXE" --output "$env:RUNNER_TEMP\codex-rust-source-installer.ndjson" --timeout 300
           if ($LASTEXITCODE -ne 0) { throw 'Production Codex installer migration or idempotent verification failed; no automatic retry' }
 
       - name: Preserve Windows Codex production installer evidence
