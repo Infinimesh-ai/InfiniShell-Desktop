@@ -480,6 +480,27 @@ fn enabled_native_result_evidence_records_the_complete_joined_batch() {
     );
 }
 
+#[test]
+fn native_result_evidence_marker_reaches_the_runtime_host_native_state() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join(NATIVE_RESULT_EVIDENCE_MARKER),
+        b"enabled\n",
+    )
+    .unwrap();
+    let native = root
+        .path()
+        .join("cli-agent-hosts")
+        .join(Uuid::from_u128(1).to_string())
+        .join("native");
+    std::fs::create_dir_all(&native).unwrap();
+
+    assert!(native_result_evidence_enabled(&native));
+    assert!(!native_result_evidence_enabled(
+        &root.path().join("unrelated").join("native")
+    ));
+}
+
 fn joined_cancellation_frames() -> (ClaudeProtocol, Value, Value, Value) {
     let (mut protocol, running) = running_protocol();
     let joined = Uuid::from_u128(11);

@@ -60,6 +60,30 @@ const MAX_IMAGE_MESSAGE_BYTES: usize = MAX_LINE_BYTES - 64 * 1024;
 const MAX_MESSAGE_RECORDS: usize = 4096;
 pub(crate) const NATIVE_RESULT_EVIDENCE_MARKER: &str = ".claude-native-result-evidence-v1";
 
+fn native_result_evidence_enabled(state_dir: &Path) -> bool {
+    if state_dir.join(NATIVE_RESULT_EVIDENCE_MARKER).is_file() {
+        return true;
+    }
+    let Some(generation_dir) = state_dir.parent() else {
+        return false;
+    };
+    let Some(hosts_dir) = generation_dir.parent() else {
+        return false;
+    };
+    if state_dir.file_name().and_then(|name| name.to_str()) != Some("native")
+        || hosts_dir.file_name().and_then(|name| name.to_str()) != Some("cli-agent-hosts")
+        || generation_dir
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_none_or(|generation| Uuid::parse_str(generation).is_err())
+    {
+        return false;
+    }
+    hosts_dir
+        .parent()
+        .is_some_and(|root| root.join(NATIVE_RESULT_EVIDENCE_MARKER).is_file())
+}
+
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
     if !options.executable.is_absolute() || !options.cwd.is_absolute() {
         return Err(RuntimeError::InvalidConfiguration(
@@ -739,10 +763,7 @@ struct ClaudeProtocol {
 
 impl ClaudeProtocol {
     fn new(options: SessionOptions) -> Self {
-        let native_result_evidence = options
-            .state_dir
-            .join(NATIVE_RESULT_EVIDENCE_MARKER)
-            .is_file();
+        let native_result_evidence = native_result_evidence_enabled(&options.state_dir);
         Self {
             options,
             // 旧离线协议夹具不派生进程；真实运行始终由 run_process 的本次探测重新绑定。
