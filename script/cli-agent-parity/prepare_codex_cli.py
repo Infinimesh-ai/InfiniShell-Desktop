@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import http.client
 from functools import lru_cache
 import json
 import os
@@ -15,6 +16,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 sys.dont_write_bytecode = True
@@ -97,6 +99,9 @@ LATEST_MANIFEST_SHA256 = "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d6
 MAX_MEMBERS = 54
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAYS = (2, 5)
+DOWNLOAD_ERRORS = (OSError, urllib.error.URLError, http.client.IncompleteRead)
 
 
 def release_contract(version):
@@ -138,28 +143,43 @@ def fetch_file(url, destination, digest, size=None):
                 "已存在的下载文件摘要不匹配，拒绝覆盖")
         return
     check_parent_chain(destination.parent)
-    descriptor, name = tempfile.mkstemp(prefix=".download-", dir=destination.parent)
-    temporary = Path(name)
-    try:
-        request = urllib.request.Request(url, headers={"User-Agent": "InfiniShell-fixed-package-verification"})
-        with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
-            require(response.url.startswith("https://"), "官方完整包下载重定向必须保留 HTTPS")
-            count = 0
-            while chunk := response.read(1024 * 1024):
-                count += len(chunk)
-                require(count <= size, "下载内容超过固定大小限制")
-                output.write(chunk)
-        require(count == size and sha256(temporary) == digest, "下载摘要或大小不匹配")
-        os.link(temporary, destination)
-    finally:
-        original_error = sys.exc_info()[1]
+    request = urllib.request.Request(url, headers={"User-Agent": "InfiniShell-fixed-package-verification"})
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        descriptor, name = tempfile.mkstemp(prefix=".download-", dir=destination.parent)
+        temporary = Path(name)
+        retry_error = None
         try:
-            temporary.unlink(missing_ok=True)
-        except OSError as error:
-            if original_error is not None:
-                original_error.add_note(f"完整包下载清理失败: {error}")
+            try:
+                with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
+                    require(response.url.startswith("https://"), "官方完整包下载重定向必须保留 HTTPS")
+                    count = 0
+                    while chunk := response.read(1024 * 1024):
+                        count += len(chunk)
+                        require(count <= size, "下载内容超过固定大小限制")
+                        output.write(chunk)
+            except DOWNLOAD_ERRORS as error:
+                retry_error = error
+                if attempt == DOWNLOAD_ATTEMPTS - 1:
+                    raise
             else:
-                raise
+                require(count == size and sha256(temporary) == digest, "下载摘要或大小不匹配")
+                os.link(temporary, destination)
+                return
+        finally:
+            original_error = sys.exc_info()[1]
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError as error:
+                if retry_error is not None:
+                    retry_error.add_note(f"完整包下载清理失败: {error}")
+                    raise retry_error
+                if original_error is not None:
+                    original_error.add_note(f"完整包下载清理失败: {error}")
+                else:
+                    raise
+        print(f"下载失败，将进行第 {attempt + 2}/{DOWNLOAD_ATTEMPTS} 次尝试: "
+              f"{type(retry_error).__name__}", file=sys.stderr)
+        time.sleep(DOWNLOAD_RETRY_DELAYS[attempt])
 
 
 def directory_without_links(path, *, private=False):

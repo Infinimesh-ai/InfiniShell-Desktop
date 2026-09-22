@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
@@ -12,6 +13,8 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.error
 import urllib.request
 
 
@@ -54,6 +57,9 @@ VERSION_RELEASES = {
     },
 }
 RELEASES = VERSION_RELEASES[VERSION]
+DOWNLOAD_ATTEMPTS = 3
+DOWNLOAD_RETRY_DELAYS = (2, 5)
+DOWNLOAD_ERRORS = (OSError, urllib.error.URLError, http.client.IncompleteRead)
 
 
 def require(condition, message):
@@ -195,30 +201,52 @@ def fetch(url, destination, expected_size, expected_sha256, version=VERSION):
         require(os.name == "nt" or destination.stat().st_mode & stat.S_IXUSR,
                 "已有文件不可执行，拒绝悄悄修改权限")
         return
-    descriptor, name = tempfile.mkstemp(prefix=".grok-download-", dir=destination.parent)
-    temporary = Path(name)
-    try:
-        request = urllib.request.Request(url, headers={"User-Agent": "InfiniShell-fixed-Grok-verification"})
-        with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
-            # 不跟随未核实的新发行位置；官方固定地址变化应先更新验证记录。
-            require(response.geturl() == url, "固定官方地址发生重定向")
-            checksum = hashlib.sha256()
-            count = 0
-            while chunk := response.read(1024 * 1024):
-                count += len(chunk)
-                require(count <= expected_size, "下载超过固定发布大小")
-                checksum.update(chunk)
-                output.write(chunk)
-            output.flush()
-            os.fsync(output.fileno())
-        require(count == expected_size and checksum.hexdigest() == expected_sha256,
-                "下载大小或摘要不匹配")
-        if os.name != "nt":
-            temporary.chmod(0o700)
-        # 原子创建并拒绝覆盖；临时名称释放后目标仍然只有一个硬链接。
-        os.link(temporary, destination)
-    finally:
-        temporary.unlink(missing_ok=True)
+    request = urllib.request.Request(url, headers={"User-Agent": "InfiniShell-fixed-Grok-verification"})
+    for attempt in range(DOWNLOAD_ATTEMPTS):
+        descriptor, name = tempfile.mkstemp(prefix=".grok-download-", dir=destination.parent)
+        temporary = Path(name)
+        retry_error = None
+        try:
+            try:
+                with os.fdopen(descriptor, "wb") as output, urllib.request.urlopen(request, timeout=60) as response:
+                    # 不跟随未核实的新发行位置；官方固定地址变化应先更新验证记录。
+                    require(response.geturl() == url, "固定官方地址发生重定向")
+                    checksum = hashlib.sha256()
+                    count = 0
+                    while chunk := response.read(1024 * 1024):
+                        count += len(chunk)
+                        require(count <= expected_size, "下载超过固定发布大小")
+                        checksum.update(chunk)
+                        output.write(chunk)
+                    output.flush()
+                    os.fsync(output.fileno())
+            except DOWNLOAD_ERRORS as error:
+                retry_error = error
+                if attempt == DOWNLOAD_ATTEMPTS - 1:
+                    raise
+            else:
+                require(count == expected_size and checksum.hexdigest() == expected_sha256,
+                        "下载大小或摘要不匹配")
+                if os.name != "nt":
+                    temporary.chmod(0o700)
+                # 原子创建并拒绝覆盖；临时名称释放后目标仍然只有一个硬链接。
+                os.link(temporary, destination)
+                return
+        finally:
+            original_error = sys.exc_info()[1]
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError as error:
+                if retry_error is not None:
+                    retry_error.add_note(f"Grok 下载清理失败: {error}")
+                    raise retry_error
+                if original_error is not None:
+                    original_error.add_note(f"Grok 下载清理失败: {error}")
+                else:
+                    raise
+        print(f"下载失败，将进行第 {attempt + 2}/{DOWNLOAD_ATTEMPTS} 次尝试: "
+              f"{type(retry_error).__name__}", file=sys.stderr)
+        time.sleep(DOWNLOAD_RETRY_DELAYS[attempt])
 
 
 def main():

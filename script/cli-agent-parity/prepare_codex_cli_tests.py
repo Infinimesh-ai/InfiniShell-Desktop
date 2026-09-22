@@ -609,6 +609,16 @@ class LatestPackageDownloadTests(unittest.TestCase):
         self.assertEqual(self.destination.stat().st_nlink, 1)
         self.assertEqual(list(self.root.iterdir()), [self.destination])
 
+    def test_transient_network_failure_retries_with_a_fresh_temporary_file(self):
+        with patch.object(prepare.urllib.request, "urlopen",
+                          side_effect=[TimeoutError("fixture-timeout"), self.response(self.body)]) as request, \
+                patch.object(prepare.time, "sleep") as sleep:
+            self.fetch()
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(2)
+        self.assertEqual(self.destination.read_bytes(), self.body)
+        self.assertEqual(list(self.root.iterdir()), [self.destination])
+
     def test_unknown_url_size_or_digest_cannot_start_a_download(self):
         with patch.object(prepare.urllib.request, "urlopen") as request:
             for url, digest, size in ((self.url.replace("0.155.1", "0.156.0"), self.package["sha256"], self.package["bytes"]),
@@ -630,9 +640,13 @@ class LatestPackageDownloadTests(unittest.TestCase):
 
     def test_bad_payload_is_never_published(self):
         for body in (b"short", self.body + b"extra", b"x" * len(self.body)):
-            with self.subTest(body=body), patch.object(prepare.urllib.request, "urlopen", return_value=self.response(body)):
+            with self.subTest(body=body), \
+                    patch.object(prepare.urllib.request, "urlopen", return_value=self.response(body)) as request, \
+                    patch.object(prepare.time, "sleep") as sleep:
                 with self.assertRaises(ValueError):
                     self.fetch()
+                request.assert_called_once()
+                sleep.assert_not_called()
                 self.assertEqual(list(self.root.iterdir()), [])
 
     def test_plain_http_redirect_is_rejected(self):

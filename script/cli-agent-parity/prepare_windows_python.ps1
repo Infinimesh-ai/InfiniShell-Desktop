@@ -11,7 +11,22 @@ New-Item -ItemType Directory -Path $operationRoot -ErrorAction Stop | Out-Null
 $archive = Join-Path $operationRoot 'python.zip'
 $package = Join-Path $operationRoot 'package'
 $source = "https://api.nuget.org/v3-flatcontainer/python/$version/python.$version.nupkg"
-Invoke-WebRequest -Uri $source -OutFile $archive -TimeoutSec 120
+$downloadAttempts = 3
+for ($attempt = 1; $attempt -le $downloadAttempts; $attempt++) {
+    Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+    try {
+        Invoke-WebRequest -Uri $source -OutFile $archive -TimeoutSec 120
+        break
+    }
+    catch {
+        Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+        if ($attempt -eq $downloadAttempts) {
+            throw
+        }
+        Write-Warning "Python package download failed; retrying attempt $($attempt + 1)/$downloadAttempts."
+        Start-Sleep -Seconds (2 * $attempt)
+    }
+}
 if ((Get-Item -LiteralPath $archive).Length -ne $expectedSize -or
     (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $expectedSha256) {
     throw 'The fixed Python package size or SHA256 does not match.'

@@ -165,13 +165,32 @@ class FixedClaudeInputsTests(unittest.TestCase):
                 opened.assert_called_once()
             self.assertEqual(sorted(path.name for path in target.parent.iterdir()), ["claude"])
 
+    def test_transient_network_failure_retries_without_publishing_a_partial_file(self):
+        payload = b"fixed test bytes"
+        checksum = hashlib.sha256(payload).hexdigest()
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "claude"
+            with mock.patch("prepare_claude_cli.urllib.request.urlopen",
+                            side_effect=[TimeoutError("fixture-timeout"), io.BytesIO(payload)]) as opened, \
+                    mock.patch.object(prepare.time, "sleep") as sleep:
+                fetch(BASE_URL + "/fixture", target, len(payload), checksum)
+            self.assertEqual(opened.call_count, 2)
+            sleep.assert_called_once_with(2)
+            self.assertEqual(target.read_bytes(), payload)
+            self.assertEqual(sorted(path.name for path in target.parent.iterdir()), ["claude"])
+
     def test_failed_download_and_custom_cache_never_replace_a_file(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "claude"
             for payload in (b"too long", b"bad"):
-                with self.subTest(payload=payload), mock.patch("prepare_claude_cli.urllib.request.urlopen", return_value=io.BytesIO(payload)):
+                with self.subTest(payload=payload), \
+                        mock.patch("prepare_claude_cli.urllib.request.urlopen",
+                                   return_value=io.BytesIO(payload)) as opened, \
+                        mock.patch.object(prepare.time, "sleep") as sleep:
                     with self.assertRaises(ValueError):
                         fetch(BASE_URL + "/fixture", target, 3, hashlib.sha256(b"yes").hexdigest())
+                opened.assert_called_once()
+                sleep.assert_not_called()
                 self.assertFalse(target.exists())
                 self.assertFalse(list(target.parent.iterdir()))
             target.write_bytes(b"user modification")

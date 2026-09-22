@@ -221,6 +221,21 @@ class FixedGrokInputsTests(unittest.TestCase):
                 opened.assert_called_once()
             self.assertEqual([item.name for item in path.parent.iterdir()], ["grok"])
 
+    def test_transient_network_failure_retries_without_publishing_a_partial_file(self):
+        payload = elf_header()
+        checksum = hashlib.sha256(payload).hexdigest()
+        url = f"{grok.BASE_URL}/{grok.RELEASES['linux-x64'][0]}"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "grok"
+            with mock.patch.object(grok.urllib.request, "urlopen",
+                                   side_effect=[TimeoutError("fixture-timeout"), response(payload, url)]) as opened, \
+                    mock.patch.object(grok.time, "sleep") as sleep:
+                grok.fetch(url, path, len(payload), checksum)
+            self.assertEqual(opened.call_count, 2)
+            sleep.assert_called_once_with(2)
+            self.assertEqual(path.read_bytes(), payload)
+            self.assertEqual([item.name for item in path.parent.iterdir()], ["grok"])
+
     def test_bad_download_redirect_and_modified_cache_fail_without_replacement(self):
         url = f"{grok.BASE_URL}/{grok.RELEASES['linux-x64'][0]}"
         checksum = hashlib.sha256(b"yes").hexdigest()
@@ -229,9 +244,12 @@ class FixedGrokInputsTests(unittest.TestCase):
             for payload, actual_url in [(b"too long", url), (b"bad", url), (b"y", url),
                                          (b"yes", "https://example.invalid/unreviewed")]:
                 with self.subTest(payload=payload, actual_url=actual_url), mock.patch.object(
-                        grok.urllib.request, "urlopen", return_value=response(payload, actual_url)):
+                        grok.urllib.request, "urlopen", return_value=response(payload, actual_url)) as opened, \
+                        mock.patch.object(grok.time, "sleep") as sleep:
                     with self.assertRaises(ValueError):
                         grok.fetch(url, path, 3, checksum)
+                opened.assert_called_once()
+                sleep.assert_not_called()
                 self.assertFalse(list(path.parent.iterdir()))
             path.write_bytes(b"user changes")
             with self.assertRaises(ValueError):
