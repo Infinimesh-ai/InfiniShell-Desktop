@@ -458,8 +458,9 @@ jobs:
           python -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Claude 托管 PNG 验收证据校验失败' }
           python -B script/cli-agent-parity/codex_source_runner_tests.py -v
-          python -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Codex source migration evidence validation failed' }
+          python -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Codex journal recovery evidence validation failed' }
           python -B script/cli-agent-parity/grok_adapter_runner_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Grok adapter evidence validation failed' }
           python -B script/cli-agent-parity/grok_coordinator_runner_tests.py -v
@@ -491,8 +492,9 @@ jobs:
           python -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Native persistent source cleanup validation failed' }
           python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Codex package preparation validation failed' }
           python -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI extraction validation failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI autoupdate validation failed' }
           python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
           python -B script/cli-agent-parity/claude_windows_notifications_tests.py -v

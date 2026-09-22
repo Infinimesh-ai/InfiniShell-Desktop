@@ -102,6 +102,7 @@ MAX_TOTAL_BYTES = 512 * 1024 * 1024
 DOWNLOAD_ATTEMPTS = 3
 DOWNLOAD_RETRY_DELAYS = (2, 5)
 DOWNLOAD_ERRORS = (OSError, urllib.error.URLError, http.client.IncompleteRead)
+STAGING_CLEANUP_ATTEMPTS = 20
 
 
 def release_contract(version):
@@ -314,14 +315,14 @@ def extract_runtime_package(archive, destination, target, version=CODEX_VERSION)
         original_error = sys.exc_info()[1]
         cleanup_errors = []
         if staging is not None:
-            for attempt in range(5):
+            for attempt in range(STAGING_CLEANUP_ATTEMPTS):
                 try:
                     shutil.rmtree(staging)
                     break
                 except FileNotFoundError:
                     break
                 except OSError as error:
-                    if attempt == 4:
+                    if attempt == STAGING_CLEANUP_ATTEMPTS - 1:
                         cleanup_errors.append(error)
                     else:
                         # Windows 防病毒或归档读句柄可能短暂延迟解除；只重试本进程的私有 staging。

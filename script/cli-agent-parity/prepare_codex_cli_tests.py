@@ -280,9 +280,14 @@ class RuntimeExtractionTests(unittest.TestCase):
 
     def test_cleanup_failure_keeps_original_error_and_releases_owned_lock(self):
         self.write_archive([entry for entry in self.entries if entry[0] != "bin/codex-code-mode-host"])
-        with patch.object(prepare.shutil, "rmtree", side_effect=OSError("fixture-cleanup-failed")):
+        with patch.object(prepare.shutil, "rmtree", side_effect=OSError("fixture-cleanup-failed")) as remove, \
+                patch.object(prepare.time, "sleep") as sleep:
             with self.assertRaisesRegex(ValueError, "完整归档有缺失成员") as failure:
                 self.extract()
+        self.assertEqual(remove.call_count, prepare.STAGING_CLEANUP_ATTEMPTS)
+        self.assertEqual(sleep.call_count, prepare.STAGING_CLEANUP_ATTEMPTS - 1)
+        sleep.assert_any_call(0.05)
+        sleep.assert_any_call(0.05 * (prepare.STAGING_CLEANUP_ATTEMPTS - 1))
         self.assertIn("fixture-cleanup-failed", " ".join(failure.exception.__notes__))
         self.assertFalse(self.destination.exists())
         self.assertFalse(self.destination.with_name("runtime.prepare-lock").exists())
