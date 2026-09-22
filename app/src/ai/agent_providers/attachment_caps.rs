@@ -68,8 +68,8 @@ pub fn caps_for(api_type: AgentProviderApiType, model_id: &str) -> AttachmentCap
 
 /// 解析单个模型的最终 capability,**带用户三态覆盖**。三层优先级:
 /// 1. 用户在 settings 显式 `Some(_)` → 直接用,绕过推断
-/// 2. `None` → models.dev catalog 推断
-/// 3. catalog miss → substring fallback
+/// 2. `None` → 模型持久化的 models.dev 快照
+/// 3. 快照缺失时查进程目录;仍 miss 才走 substring fallback
 ///
 /// `provider_id` 用于 catalog 的 provider 精确匹配(应对 OpenRouter 这种聚合
 /// provider 的特殊路径);catalog miss 时降级走 fallback 不需要 provider_id。
@@ -78,7 +78,13 @@ pub fn resolve_for_model(
     api_type: AgentProviderApiType,
     model: &AgentProviderModel,
 ) -> AttachmentCaps {
-    let inferred = if let Some(c) = models_dev::lookup_caps(provider_id, &model.id) {
+    let inferred = if let Some(metadata) = &model.catalog_metadata {
+        AttachmentCaps {
+            images: metadata.image,
+            pdf: metadata.pdf,
+            audio: metadata.audio && api_type != AgentProviderApiType::OpenAiResp,
+        }
+    } else if let Some(c) = models_dev::lookup_caps(provider_id, &model.id) {
         AttachmentCaps {
             images: c.vision,
             pdf: c.pdf,

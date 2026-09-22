@@ -1482,7 +1482,7 @@ pub(crate) fn byop_context_window(
                 .models
                 .iter()
                 .find(|model| model.id == model_id)
-                .map(|model| model.context_window),
+                .map(|model| model.effective_context_window()),
         )
         .filter(|limit| *limit > 0)
         .min()
@@ -1578,7 +1578,7 @@ pub(crate) fn prepare_byop_compaction(
             .models
             .iter()
             .find(|model| model.id == model_id)
-            .map(|model| model.max_output_tokens)
+            .map(|model| model.effective_max_output_tokens())
             .filter(|limit| *limit > 0)
             .unwrap_or(8_000)
             .min(8_000)

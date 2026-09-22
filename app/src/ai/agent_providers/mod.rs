@@ -83,11 +83,7 @@ fn build_byop_llm_infos(app: &AppContext) -> Vec<LLMInfo> {
             if model.id.trim().is_empty() {
                 continue;
             }
-            let display_name = if model.name.trim().is_empty() {
-                model.id.clone()
-            } else {
-                model.name.clone()
-            };
+            let display_name = model.effective_name().to_owned();
             // 三层优先级解析最终能力:用户在 settings 三态 chip 强制开关 →
             // models.dev catalog 推断 → substring fallback。
             // 这个函数也是 chat_stream 决策塞 ContentPart::Binary 时用的同一个,

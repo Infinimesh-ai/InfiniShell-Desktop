@@ -939,6 +939,105 @@ fn extra_headers_round_trip() {
     assert_eq!(provider.extra_headers, deserialized.extra_headers);
 }
 
+#[test]
+fn agent_provider_model_migrates_legacy_defaults_to_auto() {
+    let model: AgentProviderModel = toml::from_str(
+        r#"
+        name = "deepseek-chat"
+        id = "deepseek-chat"
+        "#,
+    )
+    .expect("legacy model should deserialize");
+
+    assert_eq!(model.name, "");
+    assert_eq!(model.reasoning, None);
+    assert_eq!(model.tool_call, None);
+    assert!(!model.effective_reasoning());
+    assert!(model.effective_tool_call());
+}
+
+#[test]
+fn agent_provider_model_preserves_legacy_non_default_values_as_overrides() {
+    let model: AgentProviderModel = toml::from_str(
+        r#"
+        name = "My model"
+        id = "model-a"
+        context_window = 64000
+        max_output_tokens = 4096
+        reasoning = true
+        tool_call = false
+        image = false
+        "#,
+    )
+    .expect("legacy model should deserialize");
+
+    assert_eq!(model.name, "My model");
+    assert_eq!(model.context_window, 64_000);
+    assert_eq!(model.max_output_tokens, 4_096);
+    assert_eq!(model.reasoning, Some(true));
+    assert_eq!(model.tool_call, Some(false));
+    assert_eq!(model.image, Some(false));
+    assert_eq!(model.manual_override_count(), 6);
+}
+
+#[test]
+fn agent_provider_model_catalog_snapshot_round_trips_without_overwriting_overrides() {
+    let mut model = AgentProviderModel::from_id("model-a".to_string());
+    model.context_window = 64_000;
+    model.reasoning = Some(false);
+    model.catalog_metadata = Some(AgentProviderModelCatalogMetadata {
+        name: "Catalog A".to_string(),
+        context_window: 128_000,
+        max_output_tokens: 16_000,
+        reasoning: true,
+        tool_call: true,
+        image: true,
+        pdf: true,
+        audio: false,
+        provider_id: "provider-a".to_string(),
+        model_id: "model-a".to_string(),
+        match_confidence: AgentProviderModelCatalogMatch::ProviderAndModel,
+        updated_at_unix_seconds: 123,
+    });
+
+    let serialized = toml::to_string(&model).expect("model should serialize");
+    let restored: AgentProviderModel =
+        toml::from_str(&serialized).expect("model should deserialize");
+
+    assert_eq!(restored, model);
+    assert_eq!(restored.effective_name(), "Catalog A");
+    assert_eq!(restored.effective_context_window(), 64_000);
+    assert_eq!(restored.effective_max_output_tokens(), 16_000);
+    assert!(!restored.effective_reasoning());
+}
+
+#[test]
+fn changing_model_id_resets_model_specific_state() {
+    let mut model = AgentProviderModel::from_id("old-model".to_string());
+    model.name = "Old alias".to_string();
+    model.context_window = 64_000;
+    model.reasoning = Some(true);
+    model.models_dev_provider_id = Some("provider-a".to_string());
+    model.catalog_metadata = Some(AgentProviderModelCatalogMetadata {
+        name: "Old catalog model".to_string(),
+        context_window: 128_000,
+        max_output_tokens: 8_000,
+        reasoning: true,
+        tool_call: true,
+        image: false,
+        pdf: false,
+        audio: false,
+        provider_id: "provider-a".to_string(),
+        model_id: "old-model".to_string(),
+        match_confidence: AgentProviderModelCatalogMatch::Explicit,
+        updated_at_unix_seconds: 123,
+    });
+
+    model.reset_for_model_id("new-model".to_string());
+
+    assert_eq!(model, AgentProviderModel::from_id("new-model".to_string()));
+}
+
 // VOICE_INPUT_LANGUAGES catalog tests
 
 #[test]

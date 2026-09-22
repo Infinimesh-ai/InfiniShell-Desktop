@@ -14,7 +14,7 @@ fn api_refresh_replaces_stale_models_and_preserves_matching_metadata() {
     retained.name = "自定义别名".to_string();
     retained.context_window = 128_000;
     retained.max_output_tokens = 16_000;
-    retained.reasoning = true;
+    retained.reasoning = Some(true);
     retained.image = Some(false);
 
     let existing = vec![
@@ -85,18 +85,21 @@ fn models_dev_sync_enriches_existing_models_without_adding_catalog_entries() {
         },
     )]);
 
-    let (models, summary) = models_dev_synced_models(&provider, &catalog);
+    let (models, summary) = models_dev_synced_models(&provider, &catalog, 123);
 
     assert_eq!(summary.matched, 1);
     assert_eq!(summary.changed, 1);
     assert_eq!(models.len(), 2);
     assert_eq!(models[0].name, "用户别名");
-    assert_eq!(models[0].context_window, 128_000);
-    assert_eq!(models[0].max_output_tokens, 32_000);
-    assert!(models[0].reasoning);
-    assert!(!models[0].tool_call);
+    assert_eq!(models[0].context_window, 0);
+    assert_eq!(models[0].max_output_tokens, 0);
+    assert_eq!(models[0].effective_context_window(), 128_000);
+    assert_eq!(models[0].effective_max_output_tokens(), 32_000);
+    assert!(models[0].effective_reasoning());
+    assert!(!models[0].effective_tool_call());
     assert_eq!(models[0].image, Some(false));
-    assert_eq!(models[0].pdf, Some(true));
+    assert_eq!(models[0].pdf, None);
+    assert!(models[0].catalog_metadata.as_ref().unwrap().pdf);
     assert_eq!(models[1].id, "local-only");
 }
 
@@ -144,15 +147,149 @@ fn models_dev_auto_enrichment_only_updates_requested_models() {
     )]);
 
     let targets = HashSet::from(["new-model".to_string()]);
-    let (models, summary) = models_dev_enriched_models(&provider, &catalog, &targets);
+    let (models, summary) = models_dev_enriched_models(&provider, &catalog, &targets, 456);
 
     assert_eq!(summary.matched, 1);
     assert_eq!(summary.changed, 1);
-    assert_eq!(models[0].name, "New model");
-    assert_eq!(models[0].context_window, 200_000);
-    assert!(models[0].reasoning);
+    assert_eq!(models[0].name, "");
+    assert_eq!(models[0].effective_name(), "New model");
+    assert_eq!(models[0].effective_context_window(), 200_000);
+    assert!(models[0].effective_reasoning());
     assert_eq!(
         models[1],
         AgentProviderModel::from_id("existing-model".to_string())
     );
+}
+
+#[test]
+fn models_dev_sync_preserves_every_manual_override() {
+    let mut model = AgentProviderModel::from_id("model-a".to_string());
+    model.name = "My alias".to_string();
+    model.context_window = 64_000;
+    model.max_output_tokens = 4_000;
+    model.reasoning = Some(false);
+    model.tool_call = Some(true);
+    model.image = Some(false);
+    model.pdf = Some(false);
+    model.audio = Some(true);
+
+    let mut provider = AgentProvider::new_empty();
+    provider.models = vec![model];
+    let catalog = BTreeMap::from([(
+        "catalog-provider".to_string(),
+        Provider {
+            models: BTreeMap::from([(
+                "model-a".to_string(),
+                Model {
+                    id: "model-a".to_string(),
+                    name: "Catalog name".to_string(),
+                    reasoning: true,
+                    tool_call: false,
+                    attachment: true,
+                    modalities: ModelModalities {
+                        input: vec!["image".to_string()],
+                        output: vec!["text".to_string()],
+                    },
+                    limit: ModelLimit {
+                        context: 200_000,
+                        output: 32_000,
+                    },
+                    ..Default::default()
+                },
+            )]),
+            ..Default::default()
+        },
+    )]);
+
+    let (models, summary) = models_dev_synced_models(&provider, &catalog, 789);
+
+    assert_eq!(summary.preserved_overrides, 8);
+    assert_eq!(models[0].effective_name(), "My alias");
+    assert_eq!(models[0].effective_context_window(), 64_000);
+    assert_eq!(models[0].effective_max_output_tokens(), 4_000);
+    assert!(!models[0].effective_reasoning());
+    assert!(models[0].effective_tool_call());
+    assert_eq!(models[0].image, Some(false));
+    assert_eq!(models[0].pdf, Some(false));
+    assert_eq!(models[0].audio, Some(true));
+}
+
+#[test]
+fn duplicate_global_model_id_requires_an_explicit_mapping() {
+    let mut provider = AgentProvider::new_empty();
+    provider.models = vec![AgentProviderModel::from_id("shared-model".to_string())];
+    let catalog: Catalog = BTreeMap::from([
+        (
+            "provider-a".to_string(),
+            Provider {
+                models: BTreeMap::from([(
+                    "shared-model".to_string(),
+                    Model {
+                        id: "shared-model".to_string(),
+                        name: "A".to_string(),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
+        ),
+        (
+            "provider-b".to_string(),
+            Provider {
+                models: BTreeMap::from([(
+                    "shared-model".to_string(),
+                    Model {
+                        id: "shared-model".to_string(),
+                        name: "B".to_string(),
+                        ..Default::default()
+                    },
+                )]),
+                ..Default::default()
+            },
+        ),
+    ]);
+
+    let (models, summary) = models_dev_synced_models(&provider, &catalog, 100);
+    assert_eq!(summary.matched, 0);
+    assert!(models[0].catalog_metadata.is_none());
+
+    provider.models[0].models_dev_provider_id = Some("provider-b".to_string());
+    let (models, summary) = models_dev_synced_models(&provider, &catalog, 101);
+    assert_eq!(summary.matched, 1);
+    assert_eq!(models[0].effective_name(), "B");
+    assert_eq!(
+        models[0]
+            .catalog_metadata
+            .as_ref()
+            .unwrap()
+            .match_confidence,
+        crate::settings::AgentProviderModelCatalogMatch::Explicit
+    );
+}
+
+#[test]
+fn manual_sync_clears_a_snapshot_that_no_longer_matches() {
+    let mut model = AgentProviderModel::from_id("removed-model".to_string());
+    model.catalog_metadata = Some(crate::settings::AgentProviderModelCatalogMetadata {
+        name: "Removed".to_string(),
+        context_window: 100_000,
+        max_output_tokens: 8_000,
+        reasoning: false,
+        tool_call: true,
+        image: false,
+        pdf: false,
+        audio: false,
+        provider_id: "old-provider".to_string(),
+        model_id: "removed-model".to_string(),
+        match_confidence: crate::settings::AgentProviderModelCatalogMatch::UniqueModelId,
+        updated_at_unix_seconds: 1,
+    });
+    let mut provider = AgentProvider::new_empty();
+    provider.models = vec![model];
+
+    let (models, summary) = models_dev_synced_models(&provider, &Catalog::new(), 200);
+
+    assert_eq!(summary.cleared, 1);
+    assert!(models[0].catalog_metadata.is_none());
+    assert_eq!(models[0].effective_context_window(), 0);
 }

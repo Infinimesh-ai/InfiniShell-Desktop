@@ -1435,41 +1435,81 @@ impl AgentProvider {
 
 impl settings_value::SettingsValue for AgentProvider {}
 
-/// 单条模型条目: `name` 是用户在 model picker 中看到的显示名,
-/// `id` 是真正发给上游 OpenAI 兼容 API 的 `model` 字段值。
+/// models.dev 目录匹配的置信来源。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentProviderModelCatalogMatch {
+    /// 用户显式指定了 models.dev provider/model 映射。
+    Explicit,
+    /// 自定义供应商的 URL 或名称与目录供应商匹配,再按模型 ID 命中。
+    ProviderAndModel,
+    /// 模型 ID 在整个目录中只出现一次。
+    UniqueModelId,
+}
+
+/// 一条持久化的 models.dev 元数据快照。
+///
+/// 快照与用户覆盖分开保存:刷新目录只替换这里,绝不改写用户手动设置。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AgentProviderModelCatalogMetadata {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub context_window: u32,
+    #[serde(default, skip_serializing_if = "is_zero_u32")]
+    pub max_output_tokens: u32,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub reasoning: bool,
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub tool_call: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub image: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub pdf: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub audio: bool,
+    pub provider_id: String,
+    pub model_id: String,
+    pub match_confidence: AgentProviderModelCatalogMatch,
+    /// 目录缓存时间,Unix 秒。0 表示旧快照没有可用时间信息。
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub updated_at_unix_seconds: u64,
+}
+
+/// 单条模型条目。`id` 是真正发给上游 API 的 `model` 字段值;
+/// 其它顶层字段是用户覆盖层,空值 / `0` / `None` 表示 Auto。
 ///
 /// 序列化为 toml 时形如:
 /// ```toml
 /// [[agent_providers.models]]
-/// name = "DS V3 通用"
-/// id   = "deepseek-chat"
+/// id = "deepseek-chat"
+/// context_window = 64000 # 可选的用户覆盖
 /// ```
 ///
 /// 反序列化兼容老格式 `models = ["deepseek-chat", "deepseek-coder"]`
-/// (每个字符串视为 `{ name = id, id = id }`),便于现有用户无痛升级。
+/// 及旧版扁平元数据。旧版非默认值会保守迁移成用户覆盖,避免升级改变行为。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, schemars::JsonSchema)]
 pub struct AgentProviderModel {
+    /// 用户自定义别名。空字符串表示 Auto:目录名称 → 模型 ID。
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
     pub id: String,
 
-    /// 上下文窗口(tokens)。来源:用户填或 models.dev 自动带入。
-    /// 0 表示未知 — 请求使用默认安全预算，仍限制单条和累计工具输出。
+    /// 用户覆盖的上下文窗口(tokens)。0 表示 Auto。
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub context_window: u32,
 
-    /// 单次最大输出 tokens。0 表示未指定。
+    /// 用户覆盖的单次最大输出 tokens。0 表示 Auto。
     #[serde(default, skip_serializing_if = "is_zero_u32")]
     pub max_output_tokens: u32,
 
-    /// 是否支持 reasoning(思考/CoT)输出。
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub reasoning: bool,
+    /// reasoning 能力覆盖。`None` 表示 Auto。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
 
-    /// 是否支持 function/tool calling。
-    /// 默认 `true` — 老配置升级 + 用户手填新 model 时不要默认禁工具,
-    /// 不支持工具调用的模型由 models.dev 数据带入显式 false。
-    #[serde(default = "default_true", skip_serializing_if = "is_true")]
-    pub tool_call: bool,
+    /// function/tool calling 能力覆盖。`None` 表示 Auto。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call: Option<bool>,
 
     // ----- 多模态附件 capability,三态语义:
     // - `None`(toml 字段缺省)= Auto: 运行时按 models.dev catalog → substring fallback 推断
@@ -1487,9 +1527,23 @@ pub struct AgentProviderModel {
     /// 是否支持音频输入(audio/* MIME)。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub audio: Option<bool>,
+
+    /// 显式指定 models.dev provider。用于自定义网关无法通过 URL/名称匹配的情况。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub models_dev_provider_id: Option<String>,
+    /// 显式指定 models.dev model。缺省时沿用本条目的 `id`。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub models_dev_model_id: Option<String>,
+
+    /// models.dev 最后一次成功匹配的目录快照。刷新只替换该字段。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog_metadata: Option<AgentProviderModelCatalogMetadata>,
 }
 
 fn is_zero_u32(v: &u32) -> bool {
+    *v == 0
+}
+fn is_zero_u64(v: &u64) -> bool {
     *v == 0
 }
 fn is_false(v: &bool) -> bool {
@@ -1505,16 +1559,106 @@ fn default_true() -> bool {
 impl AgentProviderModel {
     pub fn from_id(id: String) -> Self {
         Self {
-            name: id.clone(),
+            name: String::new(),
             id,
             context_window: 0,
             max_output_tokens: 0,
-            reasoning: false,
-            tool_call: true,
+            reasoning: None,
+            tool_call: None,
             image: None,
             pdf: None,
             audio: None,
+            models_dev_provider_id: None,
+            models_dev_model_id: None,
+            catalog_metadata: None,
         }
+    }
+
+    pub fn effective_name(&self) -> &str {
+        if !self.name.trim().is_empty() {
+            &self.name
+        } else if let Some(metadata) = self
+            .catalog_metadata
+            .as_ref()
+            .filter(|metadata| !metadata.name.trim().is_empty())
+        {
+            &metadata.name
+        } else {
+            &self.id
+        }
+    }
+
+    pub fn effective_context_window(&self) -> u32 {
+        if self.context_window > 0 {
+            self.context_window
+        } else {
+            self.catalog_metadata
+                .as_ref()
+                .map(|metadata| metadata.context_window)
+                .unwrap_or(0)
+        }
+    }
+
+    pub fn effective_max_output_tokens(&self) -> u32 {
+        if self.max_output_tokens > 0 {
+            self.max_output_tokens
+        } else {
+            self.catalog_metadata
+                .as_ref()
+                .map(|metadata| metadata.max_output_tokens)
+                .unwrap_or(0)
+        }
+    }
+
+    pub fn effective_reasoning(&self) -> bool {
+        self.reasoning
+            .or_else(|| {
+                self.catalog_metadata
+                    .as_ref()
+                    .map(|metadata| metadata.reasoning)
+            })
+            .unwrap_or(false)
+    }
+
+    pub fn effective_tool_call(&self) -> bool {
+        self.tool_call
+            .or_else(|| {
+                self.catalog_metadata
+                    .as_ref()
+                    .map(|metadata| metadata.tool_call)
+            })
+            .unwrap_or(true)
+    }
+
+    pub fn manual_override_count(&self) -> usize {
+        usize::from(!self.name.trim().is_empty())
+            + usize::from(self.context_window > 0)
+            + usize::from(self.max_output_tokens > 0)
+            + usize::from(self.reasoning.is_some())
+            + usize::from(self.tool_call.is_some())
+            + usize::from(self.image.is_some())
+            + usize::from(self.pdf.is_some())
+            + usize::from(self.audio.is_some())
+    }
+
+    pub fn reset_metadata_overrides(&mut self) {
+        self.name.clear();
+        self.context_window = 0;
+        self.max_output_tokens = 0;
+        self.reasoning = None;
+        self.tool_call = None;
+        self.image = None;
+        self.pdf = None;
+        self.audio = None;
+    }
+
+    /// 模型 ID 改变后不能沿用旧模型的能力覆盖或目录绑定。
+    pub fn reset_for_model_id(&mut self, id: String) {
+        self.id = id;
+        self.reset_metadata_overrides();
+        self.models_dev_provider_id = None;
+        self.models_dev_model_id = None;
+        self.catalog_metadata = None;
     }
 }
 
@@ -1536,15 +1680,21 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
                 #[serde(default)]
                 max_output_tokens: u32,
                 #[serde(default)]
-                reasoning: bool,
-                #[serde(default = "default_true")]
-                tool_call: bool,
+                reasoning: Option<bool>,
+                #[serde(default)]
+                tool_call: Option<bool>,
                 #[serde(default)]
                 image: Option<bool>,
                 #[serde(default)]
                 pdf: Option<bool>,
                 #[serde(default)]
                 audio: Option<bool>,
+                #[serde(default)]
+                models_dev_provider_id: Option<String>,
+                #[serde(default)]
+                models_dev_model_id: Option<String>,
+                #[serde(default)]
+                catalog_metadata: Option<AgentProviderModelCatalogMetadata>,
             },
         }
         match Either::deserialize(deserializer)? {
@@ -1559,8 +1709,12 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
                 image,
                 pdf,
                 audio,
+                models_dev_provider_id,
+                models_dev_model_id,
+                catalog_metadata,
             } => {
-                let name = if name.is_empty() { id.clone() } else { name };
+                // 老版 `from_id` 会把默认显示名写成与 id 相同;迁移后恢复 Auto 语义。
+                let name = if name == id { String::new() } else { name };
                 Ok(AgentProviderModel {
                     name,
                     id,
@@ -1571,6 +1725,11 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
                     image,
                     pdf,
                     audio,
+                    models_dev_provider_id: models_dev_provider_id
+                        .filter(|value| !value.trim().is_empty()),
+                    models_dev_model_id: models_dev_model_id
+                        .filter(|value| !value.trim().is_empty()),
+                    catalog_metadata,
                 })
             }
         }
