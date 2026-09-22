@@ -208,7 +208,7 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(result, {key: raw[key] for key in
                                   ("loggedIn", "authMethod", "apiProvider", "subscriptionType")})
         run.assert_called_once_with(
-            ["/fixed/claude", "auth", "status", "--json"], cwd=Path("/probe"),
+            [str(Path("/fixed/claude")), "auth", "status", "--json"], cwd=Path("/probe"),
             env={"HOME": "/Users/unit"}, capture_output=True, text=True, encoding="utf-8",
             errors="strict", timeout=30,
         )

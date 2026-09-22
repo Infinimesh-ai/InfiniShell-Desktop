@@ -115,6 +115,14 @@ impl WindowsDirectoryLease {
         {
             return Err(error("managed_process.atomic_windows_cwd_identity_changed"));
         }
+        let current_path_identity = open_ancestor(&self.execution_path)
+            .and_then(|file| inspect_handle(&file))
+            .map_err(|_| error("managed_process.atomic_windows_cwd_identity_changed"))?;
+        if current_path_identity.id != self.identity
+            || !is_plain_kind(current_path_identity.attributes, true)
+        {
+            return Err(error("managed_process.atomic_windows_cwd_identity_changed"));
+        }
         Ok(())
     }
 }

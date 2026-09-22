@@ -1,9 +1,9 @@
 use std::fs::{self, OpenOptions};
 use std::io::{Seek as _, Write as _};
 use std::os::windows::ffi::OsStrExt as _;
-use std::os::windows::fs::{symlink_dir, symlink_file};
 use std::process::Stdio;
 
+use command::blocking::Command as BlockingCommand;
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Threading::DEBUG_PROCESS;
 use windows::core::PCWSTR;
@@ -118,11 +118,29 @@ fn verify_pe_bytes(bytes: &[u8]) -> io::Result<()> {
     require_pe(&mut file, bytes.len() as u64)
 }
 
+fn create_directory_junction(target: &Path, link: &Path) {
+    let command_processor = std::env::var_os("COMSPEC").expect("Windows 必须提供 COMSPEC");
+    let output = BlockingCommand::new(command_processor)
+        .arg("/D")
+        .arg("/C")
+        .arg("mklink")
+        .arg("/J")
+        .arg(link)
+        .arg(target)
+        .output()
+        .expect("Windows 验收机必须能运行 mklink /J");
+    assert!(
+        output.status.success(),
+        "Windows 验收机必须允许创建测试 junction：{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn reparse_program_is_rejected() {
     let fixture = Fixture::new();
     let link = fixture.bin.join("linked-updater.exe");
-    symlink_file(&fixture.program, &link).expect("Windows 验收机必须允许创建测试符号链接");
+    create_directory_junction(&fixture.bin, &link);
     let mut expected = fixture.expected();
     expected.path = link.clone();
     expected.canonical_path = link;
@@ -134,7 +152,7 @@ fn reparse_program_is_rejected() {
 fn reparse_ancestor_is_rejected() {
     let fixture = Fixture::new();
     let linked_bin = fixture.directory.path().join("linked-bin");
-    symlink_dir(&fixture.bin, &linked_bin).expect("Windows 验收机必须允许创建测试目录链接");
+    create_directory_junction(&fixture.bin, &linked_bin);
     let linked_program = linked_bin.join("updater.exe");
     let mut expected = fixture.expected();
     expected.path = linked_program.clone();

@@ -330,10 +330,12 @@ impl Server {
                         | ProtocolError::FrameAllocationFailed { .. }) => {
                             // The socket is disconnected, so exit.
                             log::warn!("IPC server connection failed: {error:?}");
+                            response_tx.close();
                             break;
                         }
                         ProtocolError::Other(error) => {
                             log::warn!("Unknown error occurred when receiving request: {error}");
+                            response_tx.close();
                             break;
                         }
                     }

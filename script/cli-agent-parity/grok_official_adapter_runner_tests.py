@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import socket
 import stat
+import sys
 import tempfile
 import time
 from types import SimpleNamespace
@@ -355,6 +356,7 @@ tool = "write"
             self.assertIn(profile["sha256"], wrapper.read_text())
             self.assertIn('default = "grok-4.7"', settings.read_text())
 
+    @unittest.skipUnless(sys.platform == "darwin", "正式安装链接只在 macOS 验证")
     def test_current_formal_symlink_resolves_before_exact_digest_validation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

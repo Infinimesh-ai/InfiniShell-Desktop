@@ -423,6 +423,13 @@ fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
     }
     let directory = controlled_home();
     let plugin = directory.path().join("plugins/cache/codex-warp/warp/0.4.0");
+    fs::write(
+        plugin.join("scripts/warp-notify.sh"),
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev4/scripts/warp-notify.sh"
+        ),
+    )
+    .unwrap();
     let tree = source["resource_tree_sha256"].as_object().unwrap();
     assert_eq!(tree.len(), 10);
     for (relative, expected) in tree {
