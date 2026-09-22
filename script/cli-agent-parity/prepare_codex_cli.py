@@ -102,7 +102,7 @@ MAX_TOTAL_BYTES = 512 * 1024 * 1024
 DOWNLOAD_ATTEMPTS = 3
 DOWNLOAD_RETRY_DELAYS = (2, 5)
 DOWNLOAD_ERRORS = (OSError, urllib.error.URLError, http.client.IncompleteRead)
-STAGING_CLEANUP_ATTEMPTS = 20
+STAGING_CLEANUP_ATTEMPTS = 5
 
 
 def release_contract(version):
@@ -303,8 +303,10 @@ def extract_runtime_package(archive, destination, target, version=CODEX_VERSION)
                     output.flush()
                     os.fsync(output.fileno())
                 require(count == size and checksum.hexdigest() == digest, "归档成员内容不匹配固定摘要")
-                # 保留所需读写/执行语义，只给当前用户权限，不复制官方包的组/其他写权限。
-                path.chmod(mode & 0o700)
+                # POSIX 仅保留当前用户所需权限。Windows chmod 只会切换只读属性，若把
+                # 官方 0555 资源设为只读，后续校验失败便无法原子回滚 staging。
+                if os.name != "nt":
+                    path.chmod(mode & 0o700)
         require(seen == set(package["files"]) | set(package["directories"]), "完整归档有缺失成员")
         verify_runtime_tree(staging, package, version)
         require(not destination.exists() and not destination.is_symlink(), "发布目标在解包期间发生变化")

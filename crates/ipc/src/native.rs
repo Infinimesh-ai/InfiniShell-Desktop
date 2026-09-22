@@ -1,13 +1,33 @@
 //! This module implements IPC transport on top of the `interprocess` crate, which uses Unix Domain
 //! Sockets on Unix platforms and named pipes on Windows under the hood.
+#[cfg(unix)]
+use std::path::Path;
+
 use async_compat::CompatExt as _;
 use futures::{AsyncRead, AsyncWrite};
+#[cfg(unix)]
+use interprocess::local_socket::GenericFilePath;
+#[cfg(windows)]
+use interprocess::local_socket::GenericNamespaced;
+use interprocess::local_socket::{ListenerOptions, Name, tokio::prelude::*};
 
 use crate::ConnectionAddress;
 
-pub(crate) mod client {
-    use interprocess::local_socket::tokio::LocalSocketStream;
+fn connection_name(connection_address: &ConnectionAddress) -> std::io::Result<Name<'_>> {
+    #[cfg(unix)]
+    {
+        Path::new(&connection_address.0).to_fs_name::<GenericFilePath>()
+    }
+    #[cfg(windows)]
+    {
+        connection_address
+            .0
+            .as_str()
+            .to_ns_name::<GenericNamespaced>()
+    }
+}
 
+pub(crate) mod client {
     use super::*;
     use crate::client::{ClientError, InitializationError, Result};
 
@@ -16,17 +36,18 @@ pub(crate) mod client {
     pub async fn connect_client(
         connection_address: ConnectionAddress,
     ) -> Result<(impl AsyncRead + Unpin, impl AsyncWrite + Unpin)> {
-        let stream = LocalSocketStream::connect(connection_address.0.as_str())
+        let name = connection_name(&connection_address)
+            .map_err(|e| ClientError::Initialization(InitializationError::Io(e)))?;
+        let stream = LocalSocketStream::connect(name)
             .compat()
             .await
             .map_err(|e| ClientError::Initialization(InitializationError::Io(e)))?;
-        Ok(stream.into_split())
+        let (reader, writer) = stream.split();
+        Ok((reader.compat(), writer.compat()))
     }
 }
 
 pub(crate) mod server {
-    use interprocess::local_socket::tokio::{LocalSocketListener, LocalSocketStream};
-
     use super::*;
     use crate::server::{InitializationError, Result, ServerError};
 
@@ -36,7 +57,8 @@ pub(crate) mod server {
 
     impl ConnectionImpl {
         pub fn into_split(self) -> (impl AsyncRead + Unpin, impl AsyncWrite + Unpin) {
-            self.stream.into_split()
+            let (reader, writer) = self.stream.split();
+            (reader.compat(), writer.compat())
         }
     }
 
@@ -46,8 +68,10 @@ pub(crate) mod server {
 
     impl ConnectionListenerImpl {
         pub fn new(connection_address: ConnectionAddress) -> Result<Self> {
+            let name = connection_name(&connection_address)
+                .map_err(|e| ServerError::Initialization(InitializationError::Io(e)))?;
             let listener = warpui_core::r#async::block_on(
-                async move { LocalSocketListener::bind(connection_address.to_string()) }.compat(),
+                async move { ListenerOptions::new().name(name).create_tokio() }.compat(),
             )
             .map_err(|e| ServerError::Initialization(InitializationError::Io(e)))?;
             Ok(Self { listener })

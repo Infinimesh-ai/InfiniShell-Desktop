@@ -24,4 +24,4 @@ warpui_core.workspace = true
 parking_lot.workspace = true
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
-interprocess = {version = "1.2.1", features = ["tokio_support"]}
+interprocess = {version = "2.4.4", features = ["tokio"]}
