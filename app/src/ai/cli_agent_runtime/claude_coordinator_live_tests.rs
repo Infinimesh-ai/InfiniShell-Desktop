@@ -721,6 +721,7 @@ fn real_claude_fixed_profile_parent_child() {
         .canonicalize()
         .unwrap();
     let state = current_state_dir();
+    fs::create_dir_all(&state).unwrap();
     fs::write(
         state.join(super::super::claude::NATIVE_RESULT_EVIDENCE_MARKER),
         b"real_claude_production_coordinator\n",
