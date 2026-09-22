@@ -313,6 +313,21 @@ impl Client {
         background_executor: Arc<Background>,
         max_frame_bytes: Option<usize>,
     ) -> Result<Self> {
+        #[cfg(windows)]
+        let (reader, writer) = {
+            // Windows 命名管道会绑定创建它的 Tokio reactor；连接与后续 I/O 必须在同一
+            // background runtime 中运行，否则 stream 可能已连接却永远无法完成读写。
+            let (connection_tx, connection_rx) = oneshot::channel();
+            background_executor
+                .spawn(async move {
+                    let _ = connection_tx.send(connect_client(connection_address).await);
+                })
+                .detach();
+            connection_rx
+                .await
+                .map_err(|_| ClientError::Disconnected)??
+        };
+        #[cfg(not(windows))]
         let (reader, writer) = connect_client(connection_address).await?;
         let (disconnect_tx, disconnect_rx) = async_channel::bounded(1);
         let (pending_request_info_tx, pending_request_info_rx) = async_channel::unbounded();

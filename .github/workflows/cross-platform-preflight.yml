@@ -216,6 +216,13 @@ jobs:
         shell: bash
         run: cargo check -p warp --lib
 
+      # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；Linux 同步执行同一合同。
+      - name: Test IPC frame-limit recovery
+        shell: bash
+        run: >-
+          cargo nextest run --no-fail-fast -p ipc --lib
+          -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
+
       - name: Test agent lifecycle, terminal cancellation, and Responses integration
         shell: bash
         run: >-
@@ -697,6 +704,14 @@ jobs:
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         run: cargo check -p warp --lib
+
+      # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；直接覆盖超大帧后的恢复路径。
+      - name: Test IPC frame-limit recovery
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: >-
+          cargo nextest run --no-fail-fast -p ipc --lib
+          -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
 
       - name: Build InfiniShell SSH worker
         id: ssh_worker
