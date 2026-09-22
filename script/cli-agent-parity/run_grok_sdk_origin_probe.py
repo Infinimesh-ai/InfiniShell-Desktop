@@ -151,11 +151,11 @@ def prepare_probe_native(root, native, source_home, port):
     boundary = "if args==['--version']:"
     leader = """elif len(args)==4 and args[:3]==['agent','stdio','--leader-socket']:
  endpoint=Path(args[3]);resolved=endpoint.resolve()
- if not endpoint.is_absolute() or endpoint!=resolved or not resolved.is_relative_to(root/'tmp') or resolved.name!='leader.sock' or resolved.exists():raise SystemExit(92)
+ if not endpoint.is_absolute() or endpoint!=resolved or not resolved.is_relative_to(socket_root) or resolved.name!='leader.sock' or resolved.exists():raise SystemExit(92)
  parent=resolved.parent
  if parent.stat().st_uid!=os.getuid() or parent.stat().st_mode & 0o077:raise SystemExit(93)
  quoted=json.dumps(str(resolved))
- profile+='(allow network-bind network-inbound (literal '+quoted+'))(allow network-outbound (remote unix-socket (path-literal '+quoted+')))'
+ profile+='(allow file-write* (subpath '+json.dumps(str(socket_root))+'))(allow network-bind network-inbound (literal '+quoted+'))(allow network-outbound (remote unix-socket (path-literal '+quoted+')))'
  kind='private_leader'
 """
     if code.count(boundary) != 1 or code.count(leader) != 1:
