@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""隔离验证 Codex 0.147 原生插件注册表生命周期；不调用模型或产品安装器。"""
+"""隔离验证固定 Codex 原生插件注册表生命周期；不调用模型或产品安装器。"""
 
 import argparse
 import hashlib
@@ -13,7 +13,8 @@ import tempfile
 import tomllib
 
 sys.dont_write_bytecode = True
-from codex_windows_hook_inputs import CODEX_COMMIT, PLUGIN_COMMIT, fetch_file, plugin_base, require, verify_plugin
+from codex_windows_hook_inputs import PLUGIN_COMMIT, fetch_file, plugin_base, require, verify_plugin
+from prepare_codex_cli import DEFAULT_VERSION, SUPPORTED_VERSIONS, release_contract, require_cli_version
 from probe_codex_windows_hooks import NativeRecorder
 
 
@@ -137,10 +138,10 @@ class Probe:
             recorder.close()
 
 
-def run_probe(executable, upstream, directory, report):
+def run_probe(executable, upstream, directory, report, version):
     probe = Probe(executable, directory, report)
     report['cli'] = probe.command(['--version']).strip()
-    require(report['cli'] == 'codex-cli 0.147.0', '只允许受测 Codex 0.147.0')
+    require_cli_version(report['cli'], version)
     report['executable_sha256'] = file_hash(executable)
     probe.command(['plugin', '--help'])
     for operation in ('disable', 'enable', 'update'):
@@ -212,6 +213,7 @@ def run_probe(executable, upstream, directory, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--codex-executable', type=Path, required=True)
+    parser.add_argument('--codex-version', choices=SUPPORTED_VERSIONS, default=DEFAULT_VERSION)
     parser.add_argument('--upstream-plugin', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
@@ -220,7 +222,9 @@ def main():
     require(not args.output.resolve().is_relative_to(repo), '证据输出必须位于源树外')
     require(not Path(tempfile.gettempdir()).resolve().is_relative_to(repo), '临时 HOME 必须位于源树外')
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    report = {'passed': False, 'host_os': sys.platform, 'codex_source_commit': CODEX_COMMIT,
+    release = release_contract(args.codex_version)
+    report = {'passed': False, 'host_os': sys.platform, 'expected_codex_version': release['version'],
+              'codex_release_tag': release['tag'], 'codex_source_commit': release['commit'],
               'plugin_source_commit': PLUGIN_COMMIT, 'commands': [], 'states': {}, 'config_api_traces': [],
               'hook_listings': [], 'checks': {}, 'credentials_provided': False, 'model_entrypoints_called': [],
               'app_server_rpc_methods': ['initialize', 'config/value/write', 'hooks/list'],
@@ -239,7 +243,7 @@ def main():
                                upstream / name, digest)
             require(upstream.is_absolute(), '上游原始目录必须是绝对路径')
             verify_plugin(upstream, base)
-            run_probe(args.codex_executable.resolve(), upstream, directory, report)
+            run_probe(args.codex_executable.resolve(), upstream, directory, report, args.codex_version)
             verify_plugin(upstream, base)
         report['passed'] = True
     except Exception as error:

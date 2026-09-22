@@ -493,6 +493,20 @@ class FixedRuntimeVersionTests(unittest.TestCase):
 
 
 class LatestRuntimeVersionTests(unittest.TestCase):
+    def test_release_contracts_bind_version_tag_commit_and_cli_output(self):
+        self.assertEqual(prepare.release_contract("0.147.0"), {
+            "version": "0.147.0", "tag": "rust-v0.147.0",
+            "commit": "be6e8eac029b183056b7e4402879f15d2c85f61b", "cli": "codex-cli 0.147.0",
+        })
+        self.assertEqual(prepare.release_contract("0.155.1"), {
+            "version": "0.155.1", "tag": "rust-v0.155.1",
+            "commit": "be2951ea34f0d295ed0becf97079f92fa5f6950e", "cli": "codex-cli 0.155.1",
+        })
+        self.assertEqual(prepare.require_cli_version("codex-cli 0.155.1", "0.155.1")["commit"],
+                         "be2951ea34f0d295ed0becf97079f92fa5f6950e")
+        with self.assertRaisesRegex(ValueError, "CLI 版本"):
+            prepare.require_cli_version("codex-cli 0.147.0", "0.155.1")
+
     def test_windows_asset_identity_is_selected_by_explicit_version(self):
         legacy = prepare.packages_for_version("0.147.0")["windows-x64"]
         current = prepare.packages_for_version("0.155.1")["windows-x64"]

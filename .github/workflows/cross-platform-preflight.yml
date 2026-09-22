@@ -139,7 +139,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --download-dir "$RUNNER_TEMP/codex-0147-inputs")"
+          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --version 0.155.1 --download-dir "$RUNNER_TEMP/codex-01551-inputs")"
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
@@ -148,7 +148,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$RUNNER_TEMP/claude-21278-inputs")"
+          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.278 --download-dir "$RUNNER_TEMP/claude-21278-inputs")"
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
@@ -171,7 +171,7 @@ jobs:
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
+          python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.278 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
 
       - name: Verify native Claude permission observations without credentials
         if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
@@ -179,21 +179,21 @@ jobs:
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
+          python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.278 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
 
       - name: Verify native Codex plugin registry failure recovery
         shell: bash
         timeout-minutes: 5
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
+          python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.155.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
 
       - name: Verify native Codex persistent plugin source
         shell: bash
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
+          python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.155.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
 
       - name: Test Claude and Codex Bash notification payloads
         shell: bash
@@ -504,7 +504,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --download-dir "$env:RUNNER_TEMP\codex-0147-hook-inputs"
+          $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --version 0.155.1 --download-dir "$env:RUNNER_TEMP\codex-01551-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Codex preparation failed' }
           "INFINISHELL_TEST_CODEX_EXE=$codexExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -514,7 +514,7 @@ jobs:
         timeout-minutes: 10
         run: |
           $ErrorActionPreference = 'Stop'
-          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --download-dir "$env:RUNNER_TEMP\claude-21278-inputs"
+          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.278 --download-dir "$env:RUNNER_TEMP\claude-21278-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
           "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -542,7 +542,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_no_credentials.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
+          python -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude initialize and idle EOF validation failed' }
 
       - name: Verify native Claude permission observations without credentials
@@ -552,7 +552,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_permission_snapshot.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-permission-observation.json"
+          python -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-permission-observation.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude permission observation validation failed' }
 
       - name: Verify native Codex plugin registry failure recovery
@@ -561,7 +561,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-lifecycle.json"
+          python -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.155.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-lifecycle.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex plugin registry failure recovery failed' }
 
       - name: Verify native Codex persistent plugin source
@@ -570,7 +570,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-cache-refresh.json"
+          python -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.155.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-cache-refresh.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex persistent plugin source validation failed' }
 
       # 单独验证 Git Bash/jq，不将原生文件事务通过冒充 Windows hooks 已通过。
@@ -680,7 +680,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-windows-notifications.json')
+          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-windows-notifications.json')
           if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 原生 SessionStart 通知未通过，保留门控关闭' }
 
       - name: Preserve Claude Windows native notification evidence

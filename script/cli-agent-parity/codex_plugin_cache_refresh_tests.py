@@ -397,7 +397,8 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
             self.assertEqual(wait['timeout_seconds'], 100)
             self.assertEqual(wait['elapsed_ns'], 25_000_000_019)
             self.assertTrue(wait['final_observation']['cache_matches_expected'])
-            self.assertEqual(wait['final_observation']['last_revision'], probe.PLUGIN_COMMIT)
+            self.assertEqual(wait['final_observation']['revision'], probe.PLUGIN_COMMIT)
+            self.assertEqual(trace['background_revision_provenance'], 'config_last_revision')
 
     def test_timeout_keeps_diagnostics_when_only_tree_or_revision_matches(self):
         for cache_matches, revision_matches in ((True, False), (False, True)):
@@ -466,10 +467,33 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
             (home / 'config.toml').write_text(f'[marketplaces.codex-warp]\nlast_revision = "{secret}"\n',
                                             encoding='utf-8')
             observed = probe.background_refresh_snapshot(cache, expected, home)
-            self.assertIsNone(observed['last_revision'])
-            self.assertEqual(observed['last_revision_state'], 'invalid')
+            self.assertIsNone(observed['revision'])
+            self.assertEqual(observed['revision_state'], 'invalid')
             self.assertFalse(observed['revision_matches_expected'])
             self.assertNotIn(secret, json.dumps(observed))
+
+    def test_current_release_uses_exact_installed_marketplace_metadata(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            cache, expected = self.files(home, True, False)
+            marketplace = home / 'marketplace'
+            marketplace.mkdir()
+            metadata = {'source_type': 'git', 'source': probe.UPSTREAM_URL,
+                        'ref_name': probe.PLUGIN_COMMIT, 'sparse_paths': [],
+                        'revision': probe.PLUGIN_COMMIT}
+            (marketplace / '.codex-marketplace-install.json').write_text(
+                json.dumps(metadata), encoding='utf-8')
+            self.assertTrue(probe.background_refresh_published(
+                cache, expected, home, marketplace, '0.155.1'))
+            observed = probe.background_refresh_snapshot(
+                cache, expected, home, marketplace, '0.155.1')
+            self.assertEqual(observed['revision_provenance'], 'installed_marketplace_metadata')
+            self.assertTrue(observed['marketplace_contract_matches_expected'])
+            metadata['source'] = 'https://example.invalid/replaced.git'
+            (marketplace / '.codex-marketplace-install.json').write_text(
+                json.dumps(metadata), encoding='utf-8')
+            self.assertFalse(probe.background_refresh_published(
+                cache, expected, home, marketplace, '0.155.1'))
 
 
 if __name__ == '__main__':

@@ -18,7 +18,8 @@ import time
 import urllib.request
 
 sys.dont_write_bytecode = True
-from codex_windows_hook_inputs import CODEX_VERSION, fetch_file as fetch_legacy_file, regular_file, require, sha256
+from codex_windows_hook_inputs import (CODEX_COMMIT, CODEX_VERSION, fetch_file as fetch_legacy_file,
+                                       regular_file, require, sha256)
 
 
 # 来自固定官方完整 package 的实际成员；路径、大小、模式和摘要都属于输入契约。
@@ -86,12 +87,27 @@ PACKAGES = {
         },
     },
 }
-SUPPORTED_VERSIONS = (CODEX_VERSION, "0.155.1")
+RELEASES = {
+    CODEX_VERSION: {"tag": f"rust-v{CODEX_VERSION}", "commit": CODEX_COMMIT},
+    "0.155.1": {"tag": "rust-v0.155.1", "commit": "be2951ea34f0d295ed0becf97079f92fa5f6950e"},
+}
+SUPPORTED_VERSIONS = tuple(RELEASES)
 DEFAULT_VERSION = "0.155.1"
 LATEST_MANIFEST_SHA256 = "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc"
 MAX_MEMBERS = 54
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
+
+
+def release_contract(version):
+    require(version in RELEASES, "没有此版本的固定官方 release 身份")
+    return {"version": version, **RELEASES[version], "cli": f"codex-cli {version}"}
+
+
+def require_cli_version(output, version):
+    contract = release_contract(version)
+    require(output == contract["cli"], "固定文件报告的 CLI 版本不匹配")
+    return contract
 
 
 @lru_cache(maxsize=2)
@@ -304,7 +320,7 @@ def extract_runtime_package(archive, destination, target, version=CODEX_VERSION)
 
 
 def verified_version(executable, runner_temp, version=CODEX_VERSION):
-    require(version in SUPPORTED_VERSIONS, "没有此版本的固定官方完整包清单")
+    release_contract(version)
     allowed = {"PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "PATHEXT", "LANG", "LC_ALL"}
     environment = {key: value for key, value in os.environ.items() if key.upper() in allowed}
     with tempfile.TemporaryDirectory(prefix="codex-version-", dir=runner_temp) as temporary:
@@ -318,7 +334,7 @@ def verified_version(executable, runner_temp, version=CODEX_VERSION):
         (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8")
         result = subprocess.run([str(executable), "--version"], cwd=root, env=environment,
                                 capture_output=True, text=True, timeout=10, check=True)
-    require(result.stdout.strip() == f"codex-cli {version}", "固定文件报告的 CLI 版本不匹配")
+    require_cli_version(result.stdout.strip(), version)
 
 
 def main():

@@ -18,15 +18,16 @@ import tomllib
 
 sys.dont_write_bytecode = True
 from apply_notification_patch import apply_files, bundle_data, default_bundle
-from codex_windows_hook_inputs import CODEX_COMMIT, PLUGIN_COMMIT, plugin_base, require, verify_plugin
+from codex_windows_hook_inputs import CODEX_VERSION, PLUGIN_COMMIT, plugin_base, require, verify_plugin
+from prepare_codex_cli import DEFAULT_VERSION, SUPPORTED_VERSIONS, release_contract, require_cli_version
 from probe_codex_plugin_lifecycle import tree_hashes
 from probe_codex_windows_hooks import NativeRecorder
 
 
 PLUGIN_ID = 'warp@codex-warp'
 UPSTREAM_URL = 'https://github.com/warpdotdev/codex-warp.git'
-# 固定 be6e8eac029b183056b7e4402879f15d2c85f61b 的 core-plugins/src/marketplace_upgrade.rs
-# 将每次 Git 操作限为 30 秒；marketplace_upgrade/git.rs 的固定 SHA、无 sparse 路径
+# 固定 release 的 core-plugins/src/marketplace_upgrade.rs 将每次 Git 操作限为 30 秒；
+# marketplace_upgrade/git.rs 的固定 SHA、无 sparse 路径
 # 依次执行 clone、checkout、rev-parse，再留 10 秒发布配置与缓存；不能提前将正常等待判为失败。
 BACKGROUND_REFRESH_TIMEOUT_SECONDS = 3 * 30 + 10
 BACKGROUND_REFRESH_POLL_SECONDS = 0.25
@@ -386,7 +387,8 @@ def cli(executable, arguments, env, directory, report, expected_code=0):
     return completed.stdout
 
 
-def native_listing(executable, env, directory, report, stage, cache, expected_revert=None, disable_id=None):
+def native_listing(executable, env, directory, report, stage, cache, expected_revert=None,
+                   marketplace_root=None, codex_version=CODEX_VERSION, disable_id=None):
     trace = {'stage': stage, 'events': [], 'process_cleanup': {}}
     report['app_server_traces'].append(trace)
     recorder = CacheRefreshRecorder([str(executable), 'app-server', '--stdio'], env, directory,
@@ -414,11 +416,12 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
                 while time.monotonic_ns() < deadline:
                     try:
                         if not revision_observed:
-                            revision = configuration(Path(env['CODEX_HOME'])).get(
-                                'marketplaces', {}).get('codex-warp', {}).get('last_revision')
-                            if revision == PLUGIN_COMMIT:
+                            evidence = marketplace_revision_evidence(
+                                Path(env['CODEX_HOME']), marketplace_root, codex_version)
+                            if evidence['revision_matches_expected'] and evidence['contract_matches_expected']:
                                 revision_observed = True
                                 trace['background_revision_published'] = PLUGIN_COMMIT
+                                trace['background_revision_provenance'] = evidence['provenance']
                             time.sleep(BACKGROUND_REFRESH_POLL_SECONDS)
                             continue
                         if tree_hashes(cache) == expected_revert:
@@ -436,7 +439,8 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
                 trace['background_refresh_wait'] = {
                     'timeout_seconds': BACKGROUND_REFRESH_TIMEOUT_SECONDS,
                     'elapsed_ns': elapsed_ns,
-                    'final_observation': background_refresh_snapshot(cache, expected_revert, Path(env['CODEX_HOME'])),
+                    'final_observation': background_refresh_snapshot(
+                        cache, expected_revert, Path(env['CODEX_HOME']), marketplace_root, codex_version),
                 }
         return hooks
     finally:
@@ -449,15 +453,32 @@ def native_listing(executable, env, directory, report, stage, cache, expected_re
                 raise
 
 
-def background_refresh_published(cache, expected_tree, home):
-    # 固定上游先发布 revision，再刷新缓存；两项都观察到才进入退出阶段。
-    return (configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision') == PLUGIN_COMMIT
+def marketplace_revision_evidence(home, marketplace_root=None, codex_version=CODEX_VERSION):
+    if codex_version == CODEX_VERSION:
+        revision = configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision')
+        return {'provenance': 'config_last_revision', 'revision': revision,
+                'revision_matches_expected': revision == PLUGIN_COMMIT, 'contract_matches_expected': True}
+    require(codex_version == '0.155.1' and marketplace_root is not None,
+            '新版固定 marketplace revision 缺少受控来源目录')
+    metadata = json.loads((marketplace_root / '.codex-marketplace-install.json').read_text(encoding='utf-8'))
+    expected = {'source_type': 'git', 'source': UPSTREAM_URL, 'ref_name': PLUGIN_COMMIT,
+                'sparse_paths': [], 'revision': PLUGIN_COMMIT}
+    return {'provenance': 'installed_marketplace_metadata', 'revision': metadata.get('revision'),
+            'revision_matches_expected': metadata.get('revision') == PLUGIN_COMMIT,
+            'contract_matches_expected': metadata == expected}
+
+
+def background_refresh_published(cache, expected_tree, home, marketplace_root=None, codex_version=CODEX_VERSION):
+    # 固定上游先发布版本身份，再刷新缓存；两项都观察到才进入退出阶段。
+    evidence = marketplace_revision_evidence(home, marketplace_root, codex_version)
+    return (evidence['revision_matches_expected'] and evidence['contract_matches_expected']
             and tree_hashes(cache) == expected_tree)
 
 
-def background_refresh_snapshot(cache, expected_tree, home):
+def background_refresh_snapshot(cache, expected_tree, home, marketplace_root=None, codex_version=CODEX_VERSION):
     snapshot = {'cache_tree_sha256': None, 'cache_file_count': None, 'cache_matches_expected': None,
-                'last_revision': None, 'last_revision_state': 'unavailable', 'revision_matches_expected': None}
+                'revision': None, 'revision_state': 'unavailable', 'revision_matches_expected': None,
+                'revision_provenance': None, 'marketplace_contract_matches_expected': None}
 
     def read_error(error):
         # 异常正文可能带配置原文或绝对路径，只保留类型与数字错误码。
@@ -473,12 +494,15 @@ def background_refresh_snapshot(cache, expected_tree, home):
     except Exception as error:
         snapshot['cache_read_error'] = read_error(error)
     try:
-        revision = configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision')
+        evidence = marketplace_revision_evidence(home, marketplace_root, codex_version)
+        revision = evidence['revision']
         valid = (isinstance(revision, str) and len(revision) == 40
                  and all(character in '0123456789abcdefABCDEF' for character in revision))
-        snapshot.update(last_revision=revision if valid else None,
-                        last_revision_state='valid' if valid else 'absent' if revision is None else 'invalid',
-                        revision_matches_expected=revision == PLUGIN_COMMIT)
+        snapshot.update(revision=revision if valid else None,
+                        revision_state='valid' if valid else 'absent' if revision is None else 'invalid',
+                        revision_matches_expected=evidence['revision_matches_expected'],
+                        revision_provenance=evidence['provenance'],
+                        marketplace_contract_matches_expected=evidence['contract_matches_expected'])
     except Exception as error:
         snapshot['configuration_read_error'] = read_error(error)
     return snapshot
@@ -499,7 +523,7 @@ def verify_complete_git_source(root, env):
     return {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in tracked}
 
 
-def run(executable, directory, report):
+def run(executable, directory, report, codex_version):
     repo = Path(__file__).resolve().parents[2]
     metadata, replacements = bundle_data(default_bundle(), 'codex')
     raw_tree = plugin_base(repo)['tree_sha256']
@@ -516,7 +540,7 @@ def run(executable, directory, report):
         Path(env[key]).mkdir(parents=True)
     (home / 'config.toml').write_text('approval_policy = "on-request"\nsandbox_mode = "read-only"\n', encoding='utf-8')
     version = cli(executable, ['--version'], env, directory, report).strip()
-    require(version == 'codex-cli 0.147.0', '必须使用固定 Codex 0.147.0')
+    require_cli_version(version, codex_version)
     report['cli'] = version
     with executable.open('rb') as source:
         report['executable_sha256'] = hashlib.file_digest(source, 'sha256').hexdigest()
@@ -535,10 +559,13 @@ def run(executable, directory, report):
     report['cache_only_before_restart'] = {'tree': tree_hashes(cache), 'config': configuration(home)}
     require(configuration(home)['marketplaces']['codex-warp'].get('last_revision') is None,
             '原生首次 add 的配置与已知触发前提不符')
-    native_listing(executable, env, directory, report, 'cache_only_restart', cache, expected_revert=raw_tree)
-    report['cache_only_after_restart'] = {'tree': tree_hashes(cache), 'config': configuration(home)}
-    require(configuration(home)['marketplaces']['codex-warp']['last_revision'] == PLUGIN_COMMIT,
-            '原生后台没有记录实际刷新修订')
+    native_listing(executable, env, directory, report, 'cache_only_restart', cache, expected_revert=raw_tree,
+                   marketplace_root=git_source, codex_version=codex_version)
+    revision_evidence = marketplace_revision_evidence(home, git_source, codex_version)
+    report['cache_only_after_restart'] = {'tree': tree_hashes(cache), 'config': configuration(home),
+                                          'revision_evidence': revision_evidence}
+    require(revision_evidence['revision_matches_expected'] and revision_evidence['contract_matches_expected'],
+            '原生后台没有记录固定来源修订和来源合同')
     require(verify_complete_git_source(git_source, env) == complete_source, '后台来源偏离固定提交')
 
     orchestration = json.loads(cli(executable, ['plugin', 'add', 'orchestration@codex-warp', '--json'],
@@ -551,7 +578,7 @@ def run(executable, directory, report):
                    disable_id='orchestration@codex-warp')
 
     # 保留完整固定 marketplace 的全部插件；不能只留下 warp 而破坏同来源的 orchestration。
-    owned_source = directory / 'owned-source/codex-0.147.0-rev3/codex-warp'
+    owned_source = directory / f'owned-source/codex-{codex_version}-rev3/codex-warp'
     owned_source.mkdir(parents=True)
     for name in complete_source:
         target = owned_source / name
@@ -637,7 +664,7 @@ def run(executable, directory, report):
         'native_remove_add_failure_gap_observed': True, 'disabled_native_source_recovery_preserved_cache': True}
 
 
-def run_and_cleanup(executable, directory, report):
+def run_and_cleanup(executable, directory, report, codex_version=DEFAULT_VERSION):
     # 主入口独占创建私有目录；保留初始身份，拒绝给被替换的目录解除文件属性。
     try:
         root_metadata = directory.lstat()
@@ -648,7 +675,7 @@ def run_and_cleanup(executable, directory, report):
     except OSError:
         original_root = None
     try:
-        run(executable, directory, report)
+        run(executable, directory, report, codex_version)
     except BaseException as error:
         report['failure'] = failure_record(error)
         # 保留失败现场；不得在活跃后台 Git 的目录上盲删并覆盖最初异常。
@@ -668,18 +695,22 @@ def run_and_cleanup(executable, directory, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--codex-executable', type=Path, required=True)
+    parser.add_argument('--codex-version', choices=SUPPORTED_VERSIONS, default=DEFAULT_VERSION)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[2]
     require(args.output.is_absolute() and not args.output.resolve().is_relative_to(repo), '输出必须在源树外')
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    report = {'passed': False, 'codex_source_commit': CODEX_COMMIT, 'plugin_source_commit': PLUGIN_COMMIT,
+    release = release_contract(args.codex_version)
+    report = {'passed': False, 'expected_codex_version': release['version'],
+              'codex_release_tag': release['tag'], 'codex_source_commit': release['commit'],
+              'plugin_source_commit': PLUGIN_COMMIT,
               'host_os': sys.platform, 'commands': [], 'app_server_traces': [], 'credentials_provided': False,
               'thread_or_turn_created': False, 'product_installer_fixed': False, 'native_pty_verified': False}
     try:
         directory = Path(tempfile.mkdtemp(prefix='infinishell-cache-refresh-')).resolve()
         require(not directory.is_relative_to(repo), '隔离 HOME 必须在源树外')
-        run_and_cleanup(args.codex_executable.resolve(), directory, report)
+        run_and_cleanup(args.codex_executable.resolve(), directory, report, args.codex_version)
         report['passed'] = True
     except Exception as error:
         report.setdefault('failure', failure_record(error))
