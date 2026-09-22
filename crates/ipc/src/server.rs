@@ -4,7 +4,7 @@ use std::sync::Arc;
 use async_channel::{Receiver, Sender};
 use async_trait::async_trait;
 use futures::io::BufReader;
-use futures::{AsyncRead, AsyncWrite};
+use futures::{AsyncRead, AsyncWrite, FutureExt as _};
 use warpui_core::r#async::executor::{Background, BackgroundTask};
 
 use super::protocol::{
@@ -177,8 +177,7 @@ impl ServerBuilder {
 
 /// Serves registered `Service` implementations over platform-specific IPC transport.
 ///
-/// Two background tasks are spawned for each client connection -- one for processing incoming
-/// requests and one for sending outgoing responses.
+/// 每个客户端连接由一个后台任务监督入站请求与出站响应；任一方向结束时同时释放整条连接。
 pub struct Server {
     _tasks: Vec<BackgroundTask>,
 }
@@ -187,9 +186,8 @@ impl Server {
     /// Runs the main server tasks.
     ///
     /// Two main tasks are spawned immediately -- one for listening for incoming client connections
-    /// and one for "accepting" connections that were found. When "accepting" a connection, two
-    /// additional connection-specific tasks are spawned -- one for processing incoming requests
-    /// and one for sending outbound responses.
+    /// and one for "accepting" connections that were found. When "accepting" a connection, one
+    /// additional connection-specific task is spawned to supervise both directions.
     fn run(
         connection_address: ConnectionAddress,
         services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
@@ -240,8 +238,8 @@ impl Server {
         }
     }
 
-    /// Receives new connections from the given `Receiver` and spawns dedicated background tasks
-    /// for processing incoming request messages and outgoing response messages.
+    /// Receives new connections from the given `Receiver` and spawns one dedicated background
+    /// task for each connection.
     async fn accept_new_connections(
         services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
         max_frame_bytes: Option<usize>,
@@ -259,19 +257,31 @@ impl Server {
             };
 
             let (reader, writer) = connection.into_split();
-            let (response_tx, response_rx) = async_channel::unbounded::<Response>();
-
-            tasks.push(background_executor.spawn(Self::handle_incoming_requests(
+            tasks.push(background_executor.spawn(Self::handle_connection(
                 reader,
+                writer,
                 services.clone(),
                 max_frame_bytes,
-                response_tx,
             )));
-            tasks.push(background_executor.spawn(Self::handle_outgoing_responses(
-                writer,
-                max_frame_bytes,
-                response_rx,
-            )));
+        }
+    }
+
+    /// 同时监督连接的读写方向；任一方向结束时，立即取消另一方向并释放两端句柄。
+    async fn handle_connection(
+        reader: impl AsyncRead + Unpin,
+        writer: impl AsyncWrite + Unpin,
+        services: HashMap<ServiceId, Box<dyn AnyServiceImpl>>,
+        max_frame_bytes: Option<usize>,
+    ) {
+        let (response_tx, response_rx) = async_channel::unbounded::<Response>();
+        let incoming =
+            Self::handle_incoming_requests(reader, services, max_frame_bytes, response_tx).fuse();
+        let outgoing = Self::handle_outgoing_responses(writer, max_frame_bytes, response_rx).fuse();
+        futures::pin_mut!(incoming, outgoing);
+
+        futures::select! {
+            () = incoming => {}
+            () = outgoing => {}
         }
     }
 
@@ -330,12 +340,10 @@ impl Server {
                         | ProtocolError::FrameAllocationFailed { .. }) => {
                             // The socket is disconnected, so exit.
                             log::warn!("IPC server connection failed: {error:?}");
-                            response_tx.close();
                             break;
                         }
                         ProtocolError::Other(error) => {
                             log::warn!("Unknown error occurred when receiving request: {error}");
-                            response_tx.close();
                             break;
                         }
                     }
