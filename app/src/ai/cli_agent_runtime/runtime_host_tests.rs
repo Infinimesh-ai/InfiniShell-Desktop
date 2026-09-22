@@ -2112,6 +2112,9 @@ fn run_old_gui(root: &Path) {
         "网络重试只能返回相同或更强的持久命令状态"
     );
     wait_for_events(&client, acknowledged_sequence, second_message);
+    if root.join("complete-after-second").is_file() {
+        write_new_record(&root.join("second-accepted-observed"), b"observed").unwrap();
+    }
     let commands = fs::read_to_string(root.join("commands.log")).unwrap();
     let commands: Vec<_> = commands.lines().collect();
     assert_eq!(
@@ -2327,6 +2330,7 @@ fn run_fake_cli(root: &Path) {
             break;
         }
         if submitted == 2 && root.join("complete-after-second").is_file() {
+            wait_for_file(&root.join("second-accepted-observed"));
             break;
         }
     }
