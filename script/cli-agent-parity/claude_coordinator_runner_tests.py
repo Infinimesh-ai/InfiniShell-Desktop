@@ -13,13 +13,7 @@ from unittest.mock import patch
 import run_claude_coordinator_live as runner
 
 
-OUTPUT = "test result: ok. 1 passed; 0 failed; 0 ignored; 99 filtered out;\n" + "\n".join(
-    "CLAUDE_NATIVE_PROTOCOL_IDS " + json.dumps({"type": "result", "subtype": "success",
-        "uuid": f"result-{task_id}-{generation}", "session_id": native_id,
-        "user_message_uuid": f"{task_id}-{generation}", "user_message_uuids": [f"{task_id}-{generation}"]})
-    for task_id, native_id in (("00000000-0000-4000-8000-000000000001", "parent-native-1"),
-                               ("00000000-0000-4000-8000-000000000002", "child-native-1"))
-    for generation in (1, 2))
+OUTPUT = "test result: ok. 1 passed; 0 failed; 0 ignored; 99 filtered out;\n"
 PARENT = "00000000-0000-4000-8000-000000000001"
 CHILD = "00000000-0000-4000-8000-000000000002"
 
@@ -121,15 +115,28 @@ def fixture(version=runner.VERSION):
                           "new_string": markers["initial"], "replace_all": False}}}})
     runtime = []
     for saved in (parent_one, parent_two, parent_three, parent_four, child_one, child_two):
+        task_id, generation = saved["task_id"], saved["generation"]
         proof = json.loads(saved["terminal_evidence"])
         process = json.loads(saved["config_json"])["runtime_generation"]
-        for kind in ({"TurnStarted": {"turn_id": proof["event"]["TurnFinished"]["turn_id"]}}, proof["event"]):
+        turn_id = proof["event"]["TurnFinished"]["turn_id"]
+        for kind in ({"TurnStarted": {"turn_id": turn_id}},
+                     {"Progress": {"turn_id": turn_id, "message": json.dumps({
+                         "kind": "native_result_correlated_v1",
+                         "result_id": f"result-{task_id}-{generation}", "subtype": "success",
+                         "primary_input_id": turn_id, "input_ids": [turn_id]})}},
+                     proof["event"]):
             runtime.append({"event": "runtime", "task": saved,
                             "runtime": {"native_session_id": saved["native_session_id"], "generation": process, "kind": kind}})
     cleanup = [{"event": "cleanup_confirmed", "task_id": task_id,
-                "receipt": {"cleanup_confirmed": True, "generation": process, "containment": "macos_coalition",
-                            "manifest_sha256": "b" * 64}}
-               for task_id, process in ((PARENT, "parent-process-1"), (CHILD, "child-process-1"))]
+                "receipt": {"version": 2, "runtime_generation": process,
+                            "host_instance_id": host_instance_id, "native_process": "exited",
+                            "adapter_succeeded": True, "adapter_task_terminated": True,
+                            "event_journal_completed": True, "last_event_sequence": 12,
+                            "acknowledged_sequence": 11, "manifest_sha256": "b" * 64,
+                            "journal_sha256": "c" * 64, "native_cleanup_sha256": "d" * 64}}
+               for task_id, process, host_instance_id in (
+                   (PARENT, "parent-process-1", "00000000-0000-4000-8000-000000000011"),
+                   (CHILD, "child-process-1", "00000000-0000-4000-8000-000000000012"))]
     return [
         {"event": "acceptance_started", "scope": runner.SCOPE},
         {"event": "native_ack_before_child_edit_allow", "child_id": CHILD, "child_generation": 1,
@@ -228,25 +235,25 @@ def batch_fixture(parent_joined=True, child_joined=True):
     finished["native_inputs"] = 4 + len(chain["child_generations"])
     finished["joined_inputs"] = sum(1 for row in events if row.get("event") == "runtime" and "InputJoined" in row["runtime"]["kind"])
     finished["native_executions"] = finished["native_inputs"] - finished["joined_inputs"]
+    for row in events:
+        progress = row.get("runtime", {}).get("kind", {}).get("Progress")
+        if not isinstance(progress, dict):
+            continue
+        correlation = json.loads(progress["message"])
+        if correlation.get("kind") != "native_result_correlated_v1":
+            continue
+        config = json.loads(row["task"]["config_json"])
+        turn_id = json.loads(row["task"]["terminal_evidence"])["event"]["TurnFinished"]["turn_id"]
+        joined = [record["message_id"] for record in config.get("claude_joined_inputs", [])
+                  if record["turn_id"] == turn_id]
+        correlation["input_ids"] = [turn_id, *joined]
+        correlation["primary_input_id"] = correlation["input_ids"][-1]
+        progress["message"] = json.dumps(correlation)
     return events
 
 
-def native_output(events):
-    chain = next(row for row in events if row["event"] == "saved_chain_verified")
-    records = []
-    for row in events:
-        if row.get("event") != "runtime" or "TurnStarted" not in row["runtime"]["kind"]:
-            continue
-        turn_id = row["runtime"]["kind"]["TurnStarted"]["turn_id"]
-        task_id, generation = row["task"]["task_id"], row["task"]["generation"]
-        task = next(task for task in chain["parent_generations" if task_id == PARENT else "child_generations"]
-                    if task["generation"] == generation)
-        joined = json.loads(task["config_json"]).get("claude_joined_inputs", [])
-        ids = [turn_id, *[record["message_id"] for record in joined if record["turn_id"] == turn_id]]
-        records.append("CLAUDE_NATIVE_PROTOCOL_IDS " + json.dumps({"type": "result", "subtype": "success",
-            "uuid": "native-result-" + turn_id, "session_id": task["native_session_id"],
-            "user_message_uuid": ids[-1], "user_message_uuids": ids}))
-    return "test result: ok. 1 passed; 0 failed; 0 ignored; 99 filtered out;\n" + "\n".join(records)
+def native_output(_events):
+    return OUTPUT
 
 
 OUTPUT = native_output(fixture())
@@ -353,12 +360,23 @@ class AcceptanceTests(unittest.TestCase):
 
     def test_cleanup_receipt_must_match_actual_generation(self):
         row = next(row for row in self.events if row["event"] == "cleanup_confirmed")
-        row["receipt"]["generation"] = "old-process"
+        row["receipt"]["runtime_generation"] = "old-process"
         self.assertFalse(self.verify())
 
-    def test_not_started_cleanup_cannot_prove_native_process_cleanup(self):
+    def test_runtime_host_cleanup_requires_confirmed_native_exit(self):
         row = next(row for row in self.events if row["event"] == "cleanup_confirmed")
-        row["receipt"]["containment"] = "not_started"
+        row["receipt"]["native_process"] = "unconfirmed"
+        self.assertFalse(self.verify())
+
+    def test_runtime_host_cleanup_allows_a_sealed_final_event_without_a_late_ack(self):
+        row = next(row for row in self.events if row["event"] == "cleanup_confirmed")
+        row["receipt"]["last_event_sequence"] = 42
+        row["receipt"]["acknowledged_sequence"] = 41
+        self.assertTrue(self.verify())
+
+    def test_runtime_host_cleanup_rejects_an_ack_past_the_journal_end(self):
+        row = next(row for row in self.events if row["event"] == "cleanup_confirmed")
+        row["receipt"]["acknowledged_sequence"] = row["receipt"]["last_event_sequence"] + 1
         self.assertFalse(self.verify())
 
     def test_malformed_evidence_does_not_raise_or_pass(self):
@@ -398,8 +416,14 @@ class BatchAcceptanceTests(unittest.TestCase):
         self.assertFalse(self.verify())
 
     def test_last_uuid_alone_cannot_complete_joined_batch(self):
-        rows = runner._native_results(self.output)
-        self.output = self.output.replace(json.dumps([f"{CHILD}-1", f"{CHILD}-2"]), json.dumps([f"{CHILD}-2"]))
+        rows = runner._native_result_correlations(self.events)
+        row = next(row for row in self.events if row.get("event") == "runtime"
+                   and row["task"]["task_id"] == CHILD
+                   and "Progress" in row["runtime"]["kind"])
+        progress = row["runtime"]["kind"]["Progress"]
+        correlation = json.loads(progress["message"])
+        correlation["input_ids"] = [correlation["primary_input_id"]]
+        progress["message"] = json.dumps(correlation)
         self.assertEqual(len(rows), 2)
         self.assertFalse(self.verify())
 
@@ -421,7 +445,8 @@ class BatchAcceptanceTests(unittest.TestCase):
         self.assertFalse(self.verify())
 
     def test_missing_native_result_trace_cannot_prove_completion(self):
-        self.output = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        self.events = [row for row in self.events if not (row.get("event") == "runtime"
+                       and "Progress" in row["runtime"]["kind"])]
         self.assertFalse(self.verify())
 
     def test_five_inputs_are_valid_under_six_input_upper_bound(self):

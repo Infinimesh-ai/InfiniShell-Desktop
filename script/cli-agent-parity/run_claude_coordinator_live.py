@@ -177,21 +177,25 @@ def _native_ack(message, source, target, sender_generation, subject):
             and message.get("receipt_kind") == "native_protocol")
 
 
-def _native_results(output):
+def _native_result_correlations(events):
     records = []
-    for line in output.splitlines():
-        if not line.startswith("CLAUDE_NATIVE_PROTOCOL_IDS "):
+    for row in events:
+        if not isinstance(row, dict) or row.get("event") != "runtime":
             continue
-        value = json.loads(line.partition(" ")[2])
-        if not isinstance(value, dict):
-            raise ValueError("原生协议标识记录必须为对象")
-        if value.get("type") == "result":
-            records.append({key: value.get(key) for key in (
-                "uuid", "session_id", "subtype", "user_message_uuid", "user_message_uuids")})
+        progress = row.get("runtime", {}).get("kind", {}).get("Progress")
+        try:
+            value = json.loads(progress["message"]) if isinstance(progress, dict) else None
+        except (KeyError, TypeError, ValueError):
+            value = None
+        if isinstance(value, dict) and value.get("kind") == "native_result_correlated_v1":
+            records.append({"result_id": value.get("result_id"),
+                "session_id": row["runtime"].get("native_session_id"),
+                "subtype": value.get("subtype"), "primary_input_id": value.get("primary_input_id"),
+                "input_ids": value.get("input_ids")})
     return records
 
 
-def _audit_inputs(output, runtime, histories, expected, metrics):
+def _audit_inputs(runtime, histories, expected, metrics):
     """按输入到执行的真实关联审核，允许一份原生结果覆盖多个已合并输入。"""
     starts = [(index, row) for index, row in enumerate(runtime) if "TurnStarted" in row["runtime"]["kind"]]
     joins = [(index, row) for index, row in enumerate(runtime) if "InputJoined" in row["runtime"]["kind"]]
@@ -283,16 +287,15 @@ def _audit_inputs(output, runtime, histories, expected, metrics):
                 or ready.get("claudeRestrictedFilesV1") != config["claude_profile"]
                 or ready.get("fixedProfileSha256") != config["effective_permissions"].get("fixedProfileSha256")):
             return False
-    native_results = _native_results(output)
-    if len(native_results) != len(executions) or len({row.get("uuid") for row in native_results}) != len(native_results):
+    native_results = _native_result_correlations(runtime)
+    if (len(native_results) != len(executions)
+            or len({row.get("result_id") for row in native_results}) != len(native_results)):
         return False
     observed = set()
     for result in native_results:
-        ids = result.get("user_message_uuids")
-        if ids is None:
-            ids = [result.get("user_message_uuid")]
+        ids = result.get("input_ids")
         if (not isinstance(ids, list) or not ids or len(ids) != len(set(ids))
-                or result.get("user_message_uuid") not in ids or not result.get("uuid")
+                or result.get("primary_input_id") not in ids or not result.get("result_id")
                 or result.get("subtype") != "success"):
             return False
         matches = [key for key, execution in executions.items()
@@ -301,6 +304,28 @@ def _audit_inputs(output, runtime, histories, expected, metrics):
             return False
         observed.add(matches[0])
     return observed == set(executions)
+
+
+def _runtime_host_cleanup_receipt(receipt, runtime_generation):
+    if not isinstance(receipt, dict):
+        return False
+    try:
+        uuid.UUID(receipt["host_instance_id"])
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
+    last = receipt.get("last_event_sequence")
+    acknowledged = receipt.get("acknowledged_sequence")
+    return (receipt.get("version") == 2
+            and receipt.get("runtime_generation") == runtime_generation
+            and receipt.get("native_process") == "exited"
+            and receipt.get("adapter_succeeded") is True
+            and receipt.get("adapter_task_terminated") is True
+            and receipt.get("event_journal_completed") is True
+            and all(re.fullmatch(r"[0-9a-f]{64}", receipt.get(key, "")) for key in (
+                "manifest_sha256", "journal_sha256", "native_cleanup_sha256"))
+            and isinstance(last, int) and not isinstance(last, bool) and last >= 0
+            and isinstance(acknowledged, int) and not isinstance(acknowledged, bool)
+            and 0 <= acknowledged <= last)
 
 
 def verified_acceptance(exit_code, output, events, expected_version=VERSION):
@@ -500,15 +525,12 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
             expected_inputs[(message["recipient_task_id"], message["message_id"])] = {
                 "marker": marker, "submission_generation": message["recipient_generation"]}
         if len(expected_inputs) != 4 + child_generation or not _audit_inputs(
-                output, runtime, all_histories, expected_inputs, finished):
+                runtime, all_histories, expected_inputs, finished):
             return False
         cleanup = [row for row in events if row.get("event") == "cleanup_confirmed"]
         return (len(cleanup) == 2 and {row.get("task_id") for row in cleanup} == {parent_id, child_id}
-                and all(row.get("receipt", {}).get("cleanup_confirmed") is True
-                    and row["receipt"].get("containment") not in (None, "", "not_started")
-                    and row["receipt"].get("generation") == json.loads(
-                        parent["config_json"] if row["task_id"] == parent_id else child["config_json"])["runtime_generation"]
-                    and re.fullmatch(r"[0-9a-f]{64}", row["receipt"].get("manifest_sha256", ""))
+                and all(_runtime_host_cleanup_receipt(row.get("receipt"), json.loads(
+                    parent["config_json"] if row["task_id"] == parent_id else child["config_json"])["runtime_generation"])
                     for row in cleanup))
     except (KeyError, TypeError, ValueError, AttributeError):
         return False
@@ -630,10 +652,11 @@ def run(args):
             process.wait(timeout=15)
             raise
         metadata["test_exit_code"] = process.returncode
-        metadata["native_result_correlations"] = base.sanitize_event(_native_results(output), redact)
         raw_text = redact(raw_artifact.read_text(encoding="utf-8"))
         raw_artifact.write_text(raw_text, encoding="utf-8")
         raw_events = [json.loads(line) for line in raw_text.splitlines() if line.strip()]
+        metadata["native_result_correlations"] = base.sanitize_event(
+            _native_result_correlations(raw_events), redact)
         # 验收先审核私有全树，再审核公开摘要；删除字段不能把失败记录变成通过。
         private_verified = verified_acceptance(process.returncode, output,
             [base.sanitize_event(row, redact) for row in raw_events], selected_version)

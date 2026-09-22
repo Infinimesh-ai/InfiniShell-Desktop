@@ -454,6 +454,32 @@ fn native_batch_result_finishes_joined_inputs_before_the_active_execution() {
     assert_eq!(protocol.active_turn, None);
 }
 
+#[test]
+fn enabled_native_result_evidence_records_the_complete_joined_batch() {
+    let (mut protocol, running) = running_protocol();
+    let joined = Uuid::from_u128(11);
+    protocol.native_result_evidence = true;
+    protocol.command(submit(joined, "追加输入"));
+    protocol.receive(lifecycle(joined, "started")).unwrap();
+    let result_id = Uuid::from_u128(12).to_string();
+    let session_id = protocol.session_id.clone().unwrap();
+    let result = json!({"type":"result","subtype":"success","is_error":false,
+        "uuid":result_id,"session_id":session_id,"user_message_uuid":joined,
+        "user_message_uuids":[running,joined],"result":"JOINT_RESULT"});
+
+    let effects = protocol.receive(result).unwrap();
+
+    let RuntimeEventKind::Progress { turn_id, message } = &effects.events[0] else {
+        panic!("缺少原生结果批次证据");
+    };
+    assert_eq!(turn_id, &running.to_string());
+    assert_eq!(
+        serde_json::from_str::<Value>(message).unwrap(),
+        json!({"kind":"native_result_correlated_v1","result_id":result_id,"subtype":"success",
+            "primary_input_id":joined,"input_ids":[joined,running]})
+    );
+}
+
 fn joined_cancellation_frames() -> (ClaudeProtocol, Value, Value, Value) {
     let (mut protocol, running) = running_protocol();
     let joined = Uuid::from_u128(11);

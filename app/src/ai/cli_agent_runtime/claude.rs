@@ -58,6 +58,7 @@ const MAX_INPUT_BYTES: usize = 1024 * 1024;
 // 图片回放会增加原生字段；保留 64 KiB 余量，入站仍按 8 MiB 严格封顶。
 const MAX_IMAGE_MESSAGE_BYTES: usize = MAX_LINE_BYTES - 64 * 1024;
 const MAX_MESSAGE_RECORDS: usize = 4096;
+pub(crate) const NATIVE_RESULT_EVIDENCE_MARKER: &str = ".claude-native-result-evidence-v1";
 
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
     if !options.executable.is_absolute() || !options.cwd.is_absolute() {
@@ -731,12 +732,17 @@ struct ClaudeProtocol {
     profile_assistant_messages: HashMap<String, Uuid>,
     profile_pending_command: Option<(Uuid, RuntimeAction)>,
     profile_command_authorized: bool,
+    native_result_evidence: bool,
     #[cfg(test)]
     native_ids_for_live: Option<Arc<Mutex<Vec<Value>>>>,
 }
 
 impl ClaudeProtocol {
     fn new(options: SessionOptions) -> Self {
+        let native_result_evidence = options
+            .state_dir
+            .join(NATIVE_RESULT_EVIDENCE_MARKER)
+            .is_file();
         Self {
             options,
             // 旧离线协议夹具不派生进程；真实运行始终由 run_process 的本次探测重新绑定。
@@ -772,6 +778,7 @@ impl ClaudeProtocol {
             profile_assistant_messages: HashMap::new(),
             profile_pending_command: None,
             profile_command_authorized: false,
+            native_result_evidence,
             #[cfg(test)]
             native_ids_for_live: None,
         }
@@ -1508,6 +1515,19 @@ impl ClaudeProtocol {
                                 .into(),
                         ));
                     }
+                }
+                if self.native_result_evidence {
+                    effects.events.push(RuntimeEventKind::Progress {
+                        turn_id: self.execution_turn(turn_ids[0]).to_string(),
+                        message: json!({
+                            "kind":"native_result_correlated_v1",
+                            "result_id":required_string(&message, "uuid")?,
+                            "subtype":required_string(&message, "subtype")?,
+                            "primary_input_id":correlated_turn(&message),
+                            "input_ids":turn_ids,
+                        })
+                        .to_string(),
+                    });
                 }
                 // 先保存每条合并输入的原生结果，再关闭真实活跃执行。
                 turn_ids.sort_by_key(|id| {

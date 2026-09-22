@@ -721,6 +721,11 @@ fn real_claude_fixed_profile_parent_child() {
         .canonicalize()
         .unwrap();
     let state = current_state_dir();
+    fs::write(
+        state.join(super::super::claude::NATIVE_RESULT_EVIDENCE_MARKER),
+        b"real_claude_production_coordinator\n",
+    )
+    .unwrap();
     let auth_mode = env::var("INFINISHELL_CLAUDE_LIVE_AUTH_MODE").expect("缺少认证模式边界");
     match auth_mode.as_str() {
         "private_api" => {
