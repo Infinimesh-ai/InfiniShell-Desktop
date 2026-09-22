@@ -1640,7 +1640,7 @@ settings-update-environment-description-placeholder = e.g., this environment is 
 # 此锚点下放 settings_view/agent_providers_widget.rs 字符串
 # 命名前缀:settings-agent-providers-*
 settings-agent-providers-title = Agent providers
-settings-agent-providers-description = Configure custom agent providers across multiple protocols: OpenAI-compatible services (DeepSeek, Zhipu GLM, Moonshot, DashScope, SiliconFlow, OpenRouter, and others), Anthropic, Gemini, and local Ollama. You can add models manually, refresh the complete list from the provider API, and enrich model limits and capabilities from models.dev. Provider metadata is stored in the local settings.toml file; API keys are stored securely in the system keychain.
+settings-agent-providers-description = Configure custom agent providers across multiple protocols: OpenAI-compatible services (DeepSeek, Zhipu GLM, Moonshot, DashScope, SiliconFlow, OpenRouter, and others), Anthropic, Gemini, and local Ollama. You can add models manually or refresh the complete list from the provider API. New models are automatically enriched with limits and capabilities from models.dev; the catalog never adds models to your list. Provider metadata is stored in the local settings.toml file; API keys are stored securely in the system keychain.
 settings-agent-providers-empty = No providers configured yet. Click [+ Add provider] in the top-right to add one.
 settings-agent-providers-placeholder-display-name = No custom provider configured — add one in Settings → AI
 settings-agent-providers-placeholder-base-model-name = Not configured
@@ -1691,7 +1691,7 @@ settings-agent-providers-extra-headers = Extra headers
 settings-agent-providers-add-header = + Add header
 settings-agent-providers-fetch-from-api = Refresh from API
 settings-agent-providers-clear-models = Clear models
-settings-agent-providers-sync-models-dev = Update from models.dev
+settings-agent-providers-sync-models-dev = Refresh models.dev metadata
 settings-agent-providers-models-dev-loading = Loading model metadata from models.dev…
 settings-agent-providers-models-dev-updated = Updated metadata for { $count } models from models.dev.
 settings-agent-providers-models-dev-up-to-date = Model metadata is already up to date.

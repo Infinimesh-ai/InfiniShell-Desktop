@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
-use super::{models_dev_synced_models, refreshed_agent_provider_models};
+use super::{
+    models_dev_enriched_models, models_dev_synced_models, refreshed_agent_provider_models,
+};
 use crate::ai::agent_providers::models_dev::{
     Catalog, Model, ModelLimit, ModelModalities, Provider,
 };
@@ -96,4 +98,61 @@ fn models_dev_sync_enriches_existing_models_without_adding_catalog_entries() {
     assert_eq!(models[0].image, Some(false));
     assert_eq!(models[0].pdf, Some(true));
     assert_eq!(models[1].id, "local-only");
+}
+
+#[test]
+fn models_dev_auto_enrichment_only_updates_requested_models() {
+    let mut provider = AgentProvider::new_empty();
+    provider.models = vec![
+        AgentProviderModel::from_id("new-model".to_string()),
+        AgentProviderModel::from_id("existing-model".to_string()),
+    ];
+
+    let catalog: Catalog = BTreeMap::from([(
+        "catalog-provider".to_string(),
+        Provider {
+            models: BTreeMap::from([
+                (
+                    "new-model".to_string(),
+                    Model {
+                        id: "new-model".to_string(),
+                        name: "New model".to_string(),
+                        reasoning: true,
+                        limit: ModelLimit {
+                            context: 200_000,
+                            output: 20_000,
+                        },
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "existing-model".to_string(),
+                    Model {
+                        id: "existing-model".to_string(),
+                        name: "Existing model".to_string(),
+                        reasoning: true,
+                        limit: ModelLimit {
+                            context: 100_000,
+                            output: 10_000,
+                        },
+                        ..Default::default()
+                    },
+                ),
+            ]),
+            ..Default::default()
+        },
+    )]);
+
+    let targets = HashSet::from(["new-model".to_string()]);
+    let (models, summary) = models_dev_enriched_models(&provider, &catalog, &targets);
+
+    assert_eq!(summary.matched, 1);
+    assert_eq!(summary.changed, 1);
+    assert_eq!(models[0].name, "New model");
+    assert_eq!(models[0].context_window, 200_000);
+    assert!(models[0].reasoning);
+    assert_eq!(
+        models[1],
+        AgentProviderModel::from_id("existing-model".to_string())
+    );
 }

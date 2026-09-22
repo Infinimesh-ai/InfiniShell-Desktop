@@ -8,7 +8,8 @@
 //! `{ <provider_id>: Provider }`,Provider 含 `models: { <model_id>: Model }`。
 //! catalog 有两个用途:
 //! - 运行时根据 attachment / modalities 自动推断附件能力;
-//! - 用户显式点击补全按钮时,为已配置模型更新上下文窗口、输出上限和能力元数据。
+//! - API 新发现模型或用户保存新模型 ID 时自动补全元数据,并允许用户手动强制刷新。
+//!   两种路径都只更新已配置模型,绝不借 catalog 追加模型。
 //!
 //! 没列出的字段一律走 `serde(default)` + `#[allow(dead_code)]` 容忍。
 //!

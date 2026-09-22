@@ -1614,7 +1614,7 @@ settings-update-environment-description-placeholder = 例如，这个环境适�
 
 # --- ANCHOR-SUB-AGENT-PROVIDERS (agent-settings-agent-providers) ---
 settings-agent-providers-title = 智能体提供商
-settings-agent-providers-description = 配置支持多种协议的自定义智能体提供商，包括兼容 OpenAI 的服务（DeepSeek、智谱 GLM、Moonshot、通义千问 DashScope、SiliconFlow、OpenRouter 等）、Anthropic、Gemini 和本地 Ollama。你可以手动添加模型，通过提供商 API 刷新完整模型列表，并使用 models.dev 补全模型上限和能力元数据。提供商元数据存储在本地 settings.toml，API 密钥则安全存储在系统密钥库中。
+settings-agent-providers-description = 配置支持多种协议的自定义智能体提供商，包括兼容 OpenAI 的服务（DeepSeek、智谱 GLM、Moonshot、通义千问 DashScope、SiliconFlow、OpenRouter 等）、Anthropic、Gemini 和本地 Ollama。你可以手动添加模型，也可以通过提供商 API 刷新完整列表。新模型会自动从 models.dev 补全上限和能力元数据，该目录绝不会向列表追加模型。提供商元数据存储在本地 settings.toml，API 密钥则安全存储在系统密钥库中。
 settings-agent-providers-empty = 尚未配置任何提供商。点击右上角 [+ 添加提供商] 按钮添加。
 settings-agent-providers-placeholder-display-name = 未配置自定义提供商 — 请到设置 → AI 添加
 settings-agent-providers-placeholder-base-model-name = 未配置
@@ -1665,7 +1665,7 @@ settings-agent-providers-extra-headers = 附加请求头
 settings-agent-providers-add-header = + 添加请求头
 settings-agent-providers-fetch-from-api = 从 API 刷新
 settings-agent-providers-clear-models = 清空模型
-settings-agent-providers-sync-models-dev = models.dev 更新
+settings-agent-providers-sync-models-dev = 刷新 models.dev 元数据
 settings-agent-providers-models-dev-loading = 正在从 models.dev 加载模型元数据……
 settings-agent-providers-models-dev-updated = 已从 models.dev 更新 { $count } 个模型的元数据。
 settings-agent-providers-models-dev-up-to-date = 模型元数据已是最新。

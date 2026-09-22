@@ -627,6 +627,9 @@ pub fn init_actions_from_parent_view<T: Action + Clone>(
 pub struct AISettingsPageView {
     page: PageType<Self>,
     active_subpage: Option<AISubpage>,
+    models_dev_load_in_flight: bool,
+    pending_models_dev_enrichment: HashMap<String, HashSet<String>>,
+    pending_models_dev_manual_sync: HashSet<String>,
     voice_input_toggle_key_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     voice_input_language_dropdown: ViewHandle<FilterableDropdown<AISettingsPageAction>>,
     local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
@@ -1970,6 +1973,9 @@ impl AISettingsPageView {
         Self {
             page: Self::build_page(None, ctx),
             active_subpage: None,
+            models_dev_load_in_flight: false,
+            pending_models_dev_enrichment: HashMap::new(),
+            pending_models_dev_manual_sync: HashSet::new(),
             voice_input_toggle_key_dropdown,
             voice_input_language_dropdown,
             autodetection_denylist_editor,
@@ -3637,7 +3643,8 @@ impl AISettingsPageView {
         headers: &[(String, String)],
         models: &[(usize, String, String, u32, u32)],
         ctx: &mut ViewContext<Self>,
-    ) {
+    ) -> HashSet<String> {
+        let mut changed_model_ids = HashSet::new();
         AISettings::handle(ctx).update(ctx, |settings, ctx| {
             let mut providers = settings.agent_providers.value().clone();
             if let Some(p) = providers.iter_mut().find(|p| p.id == provider_id) {
@@ -3647,7 +3654,15 @@ impl AISettingsPageView {
                 // 按 model_index 更新，跳过越界索引（rebuild 中间表单与 settings 可能短暂不一致）。
                 for (idx, m_name, m_id, ctx_window, max_out) in models {
                     if let Some(m) = p.models.get_mut(*idx) {
-                        m.name = m_name.clone();
+                        let previous_id = m.id.clone();
+                        if previous_id != *m_id && !m_id.trim().is_empty() {
+                            changed_model_ids.insert(m_id.clone());
+                        }
+                        m.name = if previous_id != *m_id && *m_name == previous_id {
+                            m_id.clone()
+                        } else {
+                            m_name.clone()
+                        };
                         m.id = m_id.clone();
                         m.context_window = *ctx_window;
                         m.max_output_tokens = *max_out;
@@ -3662,6 +3677,101 @@ impl AISettingsPageView {
                 secrets.set(provider_id, api_key.to_owned(), ctx);
             },
         );
+        changed_model_ids
+    }
+
+    fn queue_models_dev_enrichment(
+        &mut self,
+        provider_id: &str,
+        model_ids: impl IntoIterator<Item = String>,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let pending = self
+            .pending_models_dev_enrichment
+            .entry(provider_id.to_owned())
+            .or_default();
+        pending.extend(model_ids.into_iter().filter(|id| !id.trim().is_empty()));
+        if pending.is_empty() {
+            self.pending_models_dev_enrichment.remove(provider_id);
+            return;
+        }
+        self.ensure_models_dev_catalog(false, ctx);
+    }
+
+    fn ensure_models_dev_catalog(&mut self, force_refresh: bool, ctx: &mut ViewContext<Self>) {
+        use crate::ai::agent_providers::models_dev;
+
+        if models_dev::cached().is_none() {
+            models_dev::load_from_disk();
+        }
+        if self.models_dev_load_in_flight {
+            return;
+        }
+        if !force_refresh && !models_dev::is_stale() {
+            if let Some(catalog) = models_dev::cached() {
+                self.complete_pending_models_dev_updates(&catalog, ctx);
+            }
+            return;
+        }
+
+        self.models_dev_load_in_flight = true;
+        let client = http_client::Client::new();
+        ctx.spawn(
+            async move { models_dev::fetch_and_cache(client).await },
+            |view, result, ctx| {
+                view.models_dev_load_in_flight = false;
+                match result {
+                    Ok(()) => {
+                        if let Some(catalog) = models_dev::cached() {
+                            view.complete_pending_models_dev_updates(&catalog, ctx);
+                        } else {
+                            view.fail_pending_models_dev_manual_sync(ctx);
+                        }
+                    }
+                    Err(error) => {
+                        log::warn!("[models.dev] 拉取失败: {error}");
+                        if let Some(catalog) = models_dev::cached() {
+                            view.complete_pending_models_dev_updates(&catalog, ctx);
+                        } else {
+                            view.fail_pending_models_dev_manual_sync(ctx);
+                        }
+                    }
+                }
+            },
+        );
+    }
+
+    fn complete_pending_models_dev_updates(
+        &mut self,
+        catalog: &crate::ai::agent_providers::models_dev::Catalog,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        let enrichment = std::mem::take(&mut self.pending_models_dev_enrichment);
+        let manual_sync = std::mem::take(&mut self.pending_models_dev_manual_sync);
+        let had_pending_updates = !enrichment.is_empty() || !manual_sync.is_empty();
+        if !enrichment.is_empty() {
+            complete_models_dev_enrichment(self, enrichment, catalog, ctx);
+        }
+
+        for provider_id in manual_sync {
+            complete_models_dev_sync(self, &provider_id, catalog, ctx);
+        }
+        if !had_pending_updates {
+            ctx.notify();
+        }
+    }
+
+    fn fail_pending_models_dev_manual_sync(&mut self, ctx: &mut ViewContext<Self>) {
+        if !self.pending_models_dev_manual_sync.is_empty() {
+            self.pending_models_dev_manual_sync.clear();
+            show_agent_provider_toast(
+                crate::t!("settings-agent-providers-models-dev-load-failed"),
+                ToastFlavor::Error,
+                ctx,
+            );
+        } else {
+            ctx.notify();
+        }
     }
 }
 
@@ -3921,7 +4031,7 @@ pub enum AISettingsPageAction {
     },
     /// 触发一次 models.dev 目录加载(磁盘缓存 + 必要时网络刷新)。Providers 子页打开即触发。
     EnsureModelsDevLoaded,
-    /// 使用 models.dev 为 provider 已配置的模型补全上下文窗口与能力元数据。
+    /// 强制刷新 models.dev 目录,并更新 provider 已配置模型的元数据。
     SyncProviderModelsFromModelsDev {
         provider_id: String,
     },
@@ -3996,13 +4106,14 @@ struct ModelsDevSyncSummary {
     changed: usize,
 }
 
-/// 使用 models.dev 补全已配置模型的元数据,但不借此增删模型列表。
+/// 使用 models.dev 更新已配置模型的元数据,但不借此增删模型列表。
 ///
 /// 先按 provider URL / 名称选择优先 catalog;匹配不到 provider 时,
 /// 仍按模型 ID 扫描整个 catalog,因此聚合网关和自定义名称也能补全。
-fn models_dev_synced_models(
+fn models_dev_updated_models(
     provider: &crate::settings::AgentProvider,
     catalog: &crate::ai::agent_providers::models_dev::Catalog,
+    target_model_ids: Option<&HashSet<String>>,
 ) -> (
     Vec<crate::settings::AgentProviderModel>,
     ModelsDevSyncSummary,
@@ -4051,6 +4162,9 @@ fn models_dev_synced_models(
     let mut models = provider.models.clone();
     let mut summary = ModelsDevSyncSummary::default();
     for model in &mut models {
+        if target_model_ids.is_some_and(|ids| !ids.contains(&model.id)) {
+            continue;
+        }
         let Some(catalog_model) = find_model(&model.id) else {
             continue;
         };
@@ -4063,7 +4177,7 @@ fn models_dev_synced_models(
         model.max_output_tokens = metadata.max_output_tokens;
         model.reasoning = metadata.reasoning;
         model.tool_call = metadata.tool_call;
-        if model.name.trim().is_empty() {
+        if model.name.trim().is_empty() || model.name == model.id {
             model.name = metadata.name;
         }
         if model.image.is_none() {
@@ -4081,6 +4195,27 @@ fn models_dev_synced_models(
     }
 
     (models, summary)
+}
+
+fn models_dev_synced_models(
+    provider: &crate::settings::AgentProvider,
+    catalog: &crate::ai::agent_providers::models_dev::Catalog,
+) -> (
+    Vec<crate::settings::AgentProviderModel>,
+    ModelsDevSyncSummary,
+) {
+    models_dev_updated_models(provider, catalog, None)
+}
+
+fn models_dev_enriched_models(
+    provider: &crate::settings::AgentProvider,
+    catalog: &crate::ai::agent_providers::models_dev::Catalog,
+    target_model_ids: &HashSet<String>,
+) -> (
+    Vec<crate::settings::AgentProviderModel>,
+    ModelsDevSyncSummary,
+) {
+    models_dev_updated_models(provider, catalog, Some(target_model_ids))
 }
 
 fn show_agent_provider_toast(
@@ -4142,6 +4277,37 @@ fn complete_models_dev_sync(
     show_agent_provider_toast(message, flavor, ctx);
 
     if summary.changed > 0 {
+        view.rebuild_current_page(ctx);
+    } else {
+        ctx.notify();
+    }
+}
+
+fn complete_models_dev_enrichment(
+    view: &mut AISettingsPageView,
+    pending: HashMap<String, HashSet<String>>,
+    catalog: &crate::ai::agent_providers::models_dev::Catalog,
+    ctx: &mut ViewContext<AISettingsPageView>,
+) {
+    let mut changed = 0;
+    AISettings::handle(ctx).update(ctx, |settings, ctx| {
+        let mut providers = settings.agent_providers.value().clone();
+        for provider in &mut providers {
+            let Some(target_model_ids) = pending.get(&provider.id) else {
+                continue;
+            };
+            let (models, summary) = models_dev_enriched_models(provider, catalog, target_model_ids);
+            if summary.changed > 0 {
+                provider.models = models;
+                changed += summary.changed;
+            }
+        }
+        if changed > 0 {
+            let _ = settings.agent_providers.set_value(providers, ctx);
+        }
+    });
+
+    if changed > 0 {
         view.rebuild_current_page(ctx);
     } else {
         ctx.notify();
@@ -5136,7 +5302,7 @@ impl TypedActionView for AISettingsPageView {
                 headers,
                 models,
             } => {
-                Self::save_agent_provider_edits(
+                let changed_model_ids = Self::save_agent_provider_edits(
                     provider_id,
                     name,
                     base_url,
@@ -5145,6 +5311,7 @@ impl TypedActionView for AISettingsPageView {
                     models,
                     ctx,
                 );
+                self.queue_models_dev_enrichment(provider_id, changed_model_ids, ctx);
                 ctx.notify();
             }
             AISettingsPageAction::SaveAgentProviderEditsThen {
@@ -5156,7 +5323,7 @@ impl TypedActionView for AISettingsPageView {
                 models,
                 action,
             } => {
-                Self::save_agent_provider_edits(
+                let changed_model_ids = Self::save_agent_provider_edits(
                     provider_id,
                     name,
                     base_url,
@@ -5165,6 +5332,7 @@ impl TypedActionView for AISettingsPageView {
                     models,
                     ctx,
                 );
+                self.queue_models_dev_enrichment(provider_id, changed_model_ids, ctx);
                 self.handle_action(action.as_ref(), ctx);
             }
             AISettingsPageAction::UpdateAgentProviderModels {
@@ -5241,15 +5409,20 @@ impl TypedActionView for AISettingsPageView {
                 model_index,
                 id,
             } => {
+                let mut changed_model_id = None;
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     let mut providers = settings.agent_providers.value().clone();
                     if let Some(p) = providers.iter_mut().find(|p| p.id == *provider_id) {
                         if let Some(m) = p.models.get_mut(*model_index) {
+                            if m.id != *id && !id.trim().is_empty() {
+                                changed_model_id = Some(id.clone());
+                            }
                             m.id = id.clone();
                         }
                     }
                     let _ = settings.agent_providers.set_value(providers, ctx);
                 });
+                self.queue_models_dev_enrichment(provider_id, changed_model_id, ctx);
                 ctx.notify();
             }
             AISettingsPageAction::UpdateAgentProviderModelContextWindow {
@@ -5306,21 +5479,38 @@ impl TypedActionView for AISettingsPageView {
                     },
                     move |view, result, ctx| match result {
                         Ok(fetched) => {
+                            let mut discovered_model_ids = Vec::new();
                             AISettings::handle(ctx).update(ctx, |settings, ctx| {
                                 let mut providers = settings.agent_providers.value().clone();
                                 if let Some(p) = providers
                                     .iter_mut()
                                     .find(|p| p.id == provider_id_for_handler)
                                 {
-                                    p.models = refreshed_agent_provider_models(
+                                    let existing_ids = p
+                                        .models
+                                        .iter()
+                                        .map(|model| model.id.as_str())
+                                        .collect::<HashSet<_>>();
+                                    let models = refreshed_agent_provider_models(
                                         &p.models,
                                         fetched.into_iter().map(|model| model.id),
                                     );
+                                    discovered_model_ids = models
+                                        .iter()
+                                        .filter(|model| !existing_ids.contains(model.id.as_str()))
+                                        .map(|model| model.id.clone())
+                                        .collect();
+                                    p.models = models;
                                 }
                                 let _ = settings.agent_providers.set_value(providers, ctx);
                             });
                             // 模型行数可能变了,需要 rebuild widget rows。
                             view.rebuild_current_page(ctx);
+                            view.queue_models_dev_enrichment(
+                                &provider_id_for_handler,
+                                discovered_model_ids,
+                                ctx,
+                            );
                         }
                         Err(e) => {
                             log::error!(
@@ -5376,68 +5566,17 @@ impl TypedActionView for AISettingsPageView {
                 ctx.notify();
             }
             AISettingsPageAction::EnsureModelsDevLoaded => {
-                use crate::ai::agent_providers::models_dev;
-                let had_disk = models_dev::load_from_disk();
-                if !had_disk || models_dev::is_stale() {
-                    let client = http_client::Client::new();
-                    ctx.spawn(
-                        async move { models_dev::fetch_and_cache(client).await },
-                        |view, result, ctx| match result {
-                            Ok(()) => {
-                                view.rebuild_current_page(ctx);
-                            }
-                            Err(e) => {
-                                log::warn!("[models.dev] 拉取失败: {e}");
-                                ctx.notify();
-                            }
-                        },
-                    );
-                } else {
-                    ctx.notify();
-                }
+                self.ensure_models_dev_catalog(false, ctx);
             }
             AISettingsPageAction::SyncProviderModelsFromModelsDev { provider_id } => {
-                use crate::ai::agent_providers::models_dev;
-                if let Some(catalog) = models_dev::cached().filter(|_| !models_dev::is_stale()) {
-                    complete_models_dev_sync(self, provider_id, &catalog, ctx);
-                    return;
-                }
-
+                self.pending_models_dev_manual_sync
+                    .insert(provider_id.clone());
                 show_agent_provider_toast(
                     crate::t!("settings-agent-providers-models-dev-loading"),
                     ToastFlavor::Default,
                     ctx,
                 );
-                let provider_id = provider_id.clone();
-                let client = http_client::Client::new();
-                ctx.spawn(
-                    async move { models_dev::fetch_and_cache(client).await },
-                    move |view, result, ctx| match result {
-                        Ok(()) => {
-                            if let Some(catalog) = models_dev::cached() {
-                                complete_models_dev_sync(view, &provider_id, &catalog, ctx);
-                            } else {
-                                show_agent_provider_toast(
-                                    crate::t!("settings-agent-providers-models-dev-load-failed"),
-                                    ToastFlavor::Error,
-                                    ctx,
-                                );
-                            }
-                        }
-                        Err(error) => {
-                            log::warn!("[models.dev] 手动补全元数据失败: {error}");
-                            if let Some(catalog) = models_dev::cached() {
-                                complete_models_dev_sync(view, &provider_id, &catalog, ctx);
-                            } else {
-                                show_agent_provider_toast(
-                                    crate::t!("settings-agent-providers-models-dev-load-failed"),
-                                    ToastFlavor::Error,
-                                    ctx,
-                                );
-                            }
-                        }
-                    },
-                );
+                self.ensure_models_dev_catalog(true, ctx);
             }
             AISettingsPageAction::ToggleAgentProviderModelExpanded {
                 provider_id,

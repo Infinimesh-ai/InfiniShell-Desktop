@@ -5,7 +5,7 @@
 //! - 每条 provider 一张卡片,卡片内含:
 //!   · `Name` / `Base URL` / `API Key` 三个输入框(仅编辑,不自动保存)
 //!   · 模型列表区: 表头 `显示名 | 模型 ID`,每行两个输入框 + `×` 删除按钮
-//!   · 底部按钮行: `+ 添加模型` `Refresh from API` `models.dev 补全`
+//!   · 底部按钮行: `+ 添加模型` `Refresh from API` `models.dev 刷新`
 //!     `清空模型` `保存` `Remove` (provider)
 //!
 //! **保存行为**: 点"保存"按钮会把表单状态一次性下发到 `AISettings`
@@ -289,7 +289,7 @@ impl AgentProvidersWidget {
         }
 
         // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络),
-        // 供运行时自动推断能力与用户手动补全模型元数据。
+        // 供运行时能力推断、自动补全新模型以及用户手动刷新元数据。
         ctx.dispatch_typed_action_deferred(AISettingsPageAction::EnsureModelsDevLoaded);
 
         Self {
