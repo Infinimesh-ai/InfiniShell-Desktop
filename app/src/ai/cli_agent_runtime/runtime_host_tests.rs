@@ -2048,6 +2048,16 @@ fn wait_for_events(
 }
 
 #[cfg(unix)]
+fn non_failure_disposition_rank(disposition: HostCommandDisposition) -> Option<u8> {
+    match disposition {
+        HostCommandDisposition::Recorded => Some(0),
+        HostCommandDisposition::DeliveredToAdapter => Some(1),
+        HostCommandDisposition::NativeAccepted => Some(2),
+        HostCommandDisposition::Failed => None,
+    }
+}
+
+#[cfg(unix)]
 fn run_old_gui(root: &Path) {
     let generation = Uuid::new_v4();
     let record = create_record(
@@ -2091,8 +2101,35 @@ fn run_old_gui(root: &Path) {
     };
     let original = block_on(client.send_command(second.clone())).unwrap();
     let retry = block_on(client.send_command(second)).unwrap();
-    assert_eq!(original, retry, "同一 message_id 的网络重试不得再次投递");
+    assert_eq!(original.message_id, retry.message_id);
+    assert_eq!(original.digest, retry.digest);
+    let original_rank =
+        non_failure_disposition_rank(original.disposition).expect("假 CLI 的首次命令状态不得失败");
+    let retry_rank =
+        non_failure_disposition_rank(retry.disposition).expect("假 CLI 的重试命令状态不得失败");
+    assert!(
+        retry_rank >= original_rank,
+        "网络重试只能返回相同或更强的持久命令状态"
+    );
     wait_for_events(&client, acknowledged_sequence, second_message);
+    let commands = fs::read_to_string(root.join("commands.log")).unwrap();
+    let commands: Vec<_> = commands.lines().collect();
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|message| **message == first_message.to_string())
+            .count(),
+        1,
+        "首个输入必须只投递一次"
+    );
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|message| **message == second_message.to_string())
+            .count(),
+        1,
+        "同一 message_id 的网络重试不得再次投递"
+    );
     write_new_record(
         &root.join("handoff.json"),
         &serde_json::to_vec(&ProcessHandoff {
