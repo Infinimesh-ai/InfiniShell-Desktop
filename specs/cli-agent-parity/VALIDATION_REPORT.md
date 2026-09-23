@@ -2,7 +2,7 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## receipt115–124 后续增量（2026-09-23）
+## receipt115–125 后续增量（2026-09-23）
 
 - [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098 精确绑定 `645e8b4f…`，Linux／Windows 两 job 均失败。Linux 原生 Grok hook 测试 17 项中 13 通过、2 错误、2 跳过：一次 Node subprocess 超过夹具的 5 秒，一次真实 main 缺少通知；原始日志未证明共同原因。Windows 两个严格 Job 调试测试各重试三次，都在挂起根进程后等待首个调试事件时超过外层 30 秒，未取得根映像或完整原生退出结论。六个 artifact／31 文件已在仓库外做无符号链接、JSON／NDJSON 与常见敏感模式核验；两台 runner 结算后在线空闲。当前 Windows 顺序／有界等待修复尚未由本收据测试。
 - [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：固定 Grok `1.0.41 (4220f3b224a6)` 在 macOS arm64 的第一次原生零输入尝试因官方 marketplace 初始化改变私有配置而按严格字节审计失败；第二次使用既有精确例外后，通过 initialize、cached-token authenticate、session/new 与 EOF 退出，0 模型输入、0 业务工具，隔离认证副本、隧道及根目录清理完成。离线 runner 4／4。没有测量解密后的 HTTP 模型请求，也没有验证产品托管、审批、取消、恢复、GUI 或其他平台。
@@ -13,7 +13,8 @@
 - [receipt120](validation/cross-platform-preflight-120-84a174f9.safe.json)：聚焦 [run 35837274454](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35837274454) 精确绑定 `84a174f9…`。Linux 34 步成功／2 跳过，安装版 Grok `1.0.40` hook 15 通过／2 环境跳过；Windows 44 步成功／1 失败／3 跳过。系统命令严格 Job 原生退出测试 0.326 秒通过；非系统 DLL 拒绝测试三次均在根主线程恢复后到外层 30 秒超时，未取得根映像事件确认，也未定位耗时发生的阶段。严格 Job 包装器报告清理完成，无独立活动进程计数；6 个 artifact／37 文件在仓库外审计，结构、JSON／NDJSON 和常见敏感模式核验通过。原子 DLL 拒绝、三款产品升级、GUI、full workspace 与总 Goal 均未通过。
 - [receipt124](validation/macos-working-tree-124-grok-1041-rust-adapter-zero-input.safe.json)：`932167716…` 基础上的未清洁工作树以固定官方 Grok `1.0.41`、隔离 wrapper、实际 Rust test-only adapter 完成默认 leader 零输入目录握手。30 条目录中的唯一选定本地技能规范路径匹配；进程、私有认证副本、隧道、项目快照清理通过。首次 wrapper 身份误校验在原生启动前失败，负证据保留；修正后第二次通过，模型输入／审批／工具均为 0。完整技能组合、正式产品门禁、同提交与跨平台未通过；无需本地化资源变更。
 - [receipt123](validation/cross-platform-preflight-123-93216771.safe.json)：Windows 专项 [run 35847734427](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35847734427) 精确绑定 `932167716…`，Windows 46 步成功／0 失败／2 跳过；Linux job 按输入跳过。严格 Job 两项首试通过：系统进程原生退出 0.352 秒、非系统 DLL 拒绝 32.788 秒。受测源码要求精确拒绝错误、恶意 DLL 标记不存在、Job 清理及回执匹配；成功测试的内部阶段毫秒和独立 ActiveProcesses 数值未公开，故不把旧 30 秒超时归因到特定步骤。5 artifact／24 文件在仓库外完成结构、JSON／NDJSON 和常见敏感模式审计。三款真实产品升级、GUI、full workspace 与总 Goal 仍未通过。
-- Codex `0.155.1` 运行中工具取消：新增只在固定原生执行项开始且私有 Python 父子进程均存活后才发取消的真实 Rust adapter 夹具，要求原生 ACK、同代托管进程树清理回执、父子零残留和取消终态先于断线。外层 runner 核对固定版本及私有进程身份，安全兜底若被触发则整个测试失败。目前只有离线脚本和编译门禁，尚无真实模型回合或干净提交收据，不改写 [receipt92](validation/macos-official-92-codex-01551-native-lifecycle.safe.json) 的取消残留失败；无需本地化资源变更。
+- Codex `0.155.1` 运行中工具取消：新增只在固定原生执行项开始且私有 Python 父子进程均存活后才发取消的真实 Rust adapter 夹具，要求原生 ACK、同代托管进程树清理回执、父子零残留和取消终态先于断线。外层 runner 核对固定版本及私有进程身份，安全兜底若被触发则整个测试失败。首次实链结果见 receipt125；无需本地化资源变更。
+- [receipt125](validation/macos-clean-commit-125-cddafab7-zero-input-and-cancel-failed.safe.json)：干净提交 `cddafab7…` 的签名 supervisor 与固定 CLI 完成 Grok `1.0.41` 实际 Rust adapter 零输入默认 leader 目录，30 条中唯一选定技能路径匹配、原生清理确认；完整技能模型回合及正式版本门禁仍关闭。同一 SHA 的 Codex `0.155.1` 运行中工具取消真实尝试仅安全投影到 SessionReady／提交阶段，工具开始、取消和终态均未记录；原生输入是否接受与失败事件类别未知，尽管外层审计 0 残留且未兜底强杀，也必须计失败，receipt92 不被覆盖。无模型 supervisor 夹具在外置盘 libtest 上缺根心跳，内置 `/private/tmp` 同摘要副本 2／2 通过；不据此臆断 macOS 授权弹窗具体机制。
 
 ## receipt102–114 当前阶段增量（2026-09-23）
 

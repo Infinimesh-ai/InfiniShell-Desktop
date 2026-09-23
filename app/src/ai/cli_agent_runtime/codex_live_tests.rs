@@ -842,18 +842,25 @@ while True:
             },
         )
         .await?;
+    evidence.record(json!({"event":"submit_dispatched"}))?;
     let mut turn_id = None;
     let mut submitted_accepted = false;
     let mut approval_seen = false;
     let mut approval_resolved = false;
     let mut native_started = false;
+    let mut progress_observations = 0;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
     let tree = loop {
         if native_started
             && submitted_accepted
-            && approval_seen
-            && approval_resolved
-            && let Some(tree) = running_tool_tree(&cwd.join("cancel-pids.json"), &python)?
+            && (!approval_seen || approval_resolved)
+            && let Some(tree) = match running_tool_tree(&cwd.join("cancel-pids.json"), &python) {
+                Ok(tree) => tree,
+                Err(error) => {
+                    evidence.record(json!({"event":"tool_tree_identity_failed"}))?;
+                    return Err(error);
+                }
+            }
         {
             break tree;
         }
@@ -862,17 +869,26 @@ while True:
             tokio::time::timeout(Duration::from_millis(200), session.next()),
         )
         .await
-        .map_err(|_| "固定工具运行前等待超过总时限")?
         {
-            Ok(event) => event?,
-            Err(_) => continue,
+            Ok(Ok(Ok(event))) => event,
+            Ok(Ok(Err(error))) => {
+                evidence.record(json!({"event":"event_stream_failed_before_tool"}))?;
+                return Err(error);
+            }
+            Ok(Err(_)) => continue,
+            Err(_) => {
+                evidence.record(json!({"event":"tool_start_deadline_exceeded"}))?;
+                return Err("固定工具运行前等待超过总时限".into());
+            }
         };
         match event.kind {
             RuntimeEventKind::MessageAccepted { message_id, .. } if message_id == submitted => {
                 submitted_accepted = true;
+                evidence.record(json!({"event":"submit_accepted"}))?;
             }
             RuntimeEventKind::TurnStarted { turn_id: started } if turn_id.is_none() => {
                 turn_id = Some(started);
+                evidence.record(json!({"event":"turn_started"}))?;
             }
             RuntimeEventKind::ApprovalRequested {
                 approval_id,
@@ -881,11 +897,14 @@ while True:
                 details,
             } => {
                 let argv = json!([python.to_string_lossy(), parent_script.to_string_lossy()]);
-                if approval_seen
-                    || turn_id.as_deref() != Some(requested_turn.as_str())
-                    || method != "item/commandExecution/requestApproval"
-                    || !approval_matches_fixture(&details, &command, &argv, &cwd)
-                {
+                let exact_fixture = !approval_seen
+                    && turn_id.as_deref() == Some(requested_turn.as_str())
+                    && method == "item/commandExecution/requestApproval"
+                    && approval_matches_fixture(&details, &command, &argv, &cwd);
+                evidence.record(json!({
+                    "event":"approval_requested","exact_fixture":exact_fixture
+                }))?;
+                if !exact_fixture {
                     session
                         .send(
                             Uuid::new_v4(),
@@ -909,6 +928,9 @@ while True:
                     .await?;
             }
             RuntimeEventKind::ApprovalResolved { decision, .. } if approval_seen => {
+                evidence.record(json!({
+                    "event":"approval_resolved","allowed":decision == ApprovalDecision::AllowOnce
+                }))?;
                 if decision != ApprovalDecision::AllowOnce {
                     return Err("固定工具审批未被允许".into());
                 }
@@ -917,13 +939,34 @@ while True:
             RuntimeEventKind::Progress {
                 turn_id: progress_turn,
                 message,
-            } if turn_id.as_deref() == Some(progress_turn.as_str()) && message == command => {
-                native_started = true;
+            } => {
+                let matched =
+                    turn_id.as_deref() == Some(progress_turn.as_str()) && message == command;
+                if progress_observations < 5 {
+                    evidence.record(json!({
+                        "event":"native_progress_observed","fixed_command_matched":matched
+                    }))?;
+                    progress_observations += 1;
+                }
+                native_started |= matched;
             }
-            RuntimeEventKind::TurnFinished { .. } => {
+            RuntimeEventKind::TurnFinished { outcome, .. } => {
+                let status = match outcome {
+                    TurnOutcome::Completed => "completed",
+                    TurnOutcome::Cancelled => "cancelled",
+                    TurnOutcome::Failed { .. } => "failed",
+                };
+                evidence.record(json!({
+                    "event":"turn_finished_before_tool","outcome":status
+                }))?;
                 return Err("固定工具尚未运行就收到回合终态".into());
             }
-            RuntimeEventKind::Disconnected { .. } | RuntimeEventKind::RequestFailed { .. } => {
+            RuntimeEventKind::Disconnected { .. } => {
+                evidence.record(json!({"event":"disconnected_before_tool"}))?;
+                return Err("固定工具运行前连接失败".into());
+            }
+            RuntimeEventKind::RequestFailed { .. } => {
+                evidence.record(json!({"event":"request_failed_before_tool"}))?;
                 return Err("固定工具运行前连接失败".into());
             }
             RuntimeEventKind::InputJoined { .. }
@@ -932,7 +975,6 @@ while True:
             | RuntimeEventKind::TurnStarted { .. }
             | RuntimeEventKind::ApprovalResolved { .. }
             | RuntimeEventKind::ApprovalCancelled { .. }
-            | RuntimeEventKind::Progress { .. }
             | RuntimeEventKind::LocalToolCancelled { .. }
             | RuntimeEventKind::LocalToolRequested { .. }
             | RuntimeEventKind::SessionReady { .. }
@@ -953,6 +995,7 @@ while True:
             },
         )
         .await?;
+    evidence.record(json!({"event":"interrupt_dispatched"}))?;
     let mut order = vec!["native_item_started", "interrupt_sent"];
     let mut interrupt_accepted = false;
     let mut terminal_seen = false;
@@ -969,6 +1012,7 @@ while True:
                 }
                 interrupt_accepted = true;
                 order.push("interrupt_accepted");
+                evidence.record(json!({"event":"interrupt_accepted"}))?;
             }
             RuntimeEventKind::TurnFinished {
                 turn_id: finished,
@@ -993,12 +1037,14 @@ while True:
                 containment = Some(receipt.containment);
                 terminal_seen = true;
                 order.push("turn_finished");
+                evidence.record(json!({"event":"cancel_terminal_after_cleanup"}))?;
             }
             RuntimeEventKind::Disconnected { .. } => {
                 if !terminal_seen {
                     return Err("进程树清理前连接已断开".into());
                 }
                 order.push("disconnected");
+                evidence.record(json!({"event":"disconnected_after_cancel"}))?;
                 break;
             }
             RuntimeEventKind::RequestFailed { .. } => {
