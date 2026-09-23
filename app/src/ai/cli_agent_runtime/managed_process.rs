@@ -1778,7 +1778,15 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     command.creation_flags(windows::Win32::System::Threading::DEBUG_PROCESS.0);
                     executable.verify_command_for_suspended_spawn(&command)?;
                     cwd.verify_for_spawn()?;
-                    let suspended = command.spawn_suspended()?;
+                    let suspended = command.spawn_suspended_with_child_on_error().map_err(
+                        |(failure, child)| {
+                            if let Some(mut child) = child {
+                                let _ = child.kill();
+                                // 调试事件尚未继续，外层严格 Job 负责有界确认整树退出。
+                            }
+                            failure
+                        },
+                    )?;
                     let root_process_id = suspended.id();
                     let mut child = match suspended.resume_with_child_on_error() {
                         Ok(child) => child,

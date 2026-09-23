@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde_json::{Value, json};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -16,7 +17,7 @@ use super::connect;
 use crate::ai::cli_agent_runtime::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
     RuntimeController, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
-    TurnOutcome,
+    TurnOutcome, managed_process,
 };
 
 const EVENT_TIMEOUT: Duration = Duration::from_secs(90);
@@ -93,6 +94,14 @@ impl LiveSession {
     }
 
     async fn ready(&mut self, evidence: &mut Evidence) -> Result<String, String> {
+        self.ready_with_projection(evidence, true).await
+    }
+
+    async fn ready_with_projection(
+        &mut self,
+        evidence: &mut Evidence,
+        include_native_id: bool,
+    ) -> Result<String, String> {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
             effective_permissions,
@@ -110,10 +119,17 @@ impl LiveSession {
         {
             return Err(format!("原生权限与验收策略不一致：{effective_permissions}"));
         }
-        evidence.record(json!({
-            "event": "session_ready", "native_session_id": native_id,
-            "permissions": effective_permissions
-        }))?;
+        if include_native_id {
+            evidence.record(json!({
+                "event": "session_ready", "native_session_id": native_id,
+                "permissions": effective_permissions
+            }))?;
+        } else {
+            evidence.record(json!({
+                "event": "session_ready", "native_session_id_present": true,
+                "permissions": effective_permissions
+            }))?;
+        }
         self.native_id = Some(native_id.clone());
         Ok(native_id)
     }
@@ -696,6 +712,375 @@ async fn real_codex_managed_lifecycle() {
         result.is_ok(),
         "真实 Codex 适配器验收未通过；请检查脱敏证据文件"
     );
+}
+
+#[derive(Clone, Copy)]
+struct ToolTree {
+    parent: (Pid, u64),
+    leaf: (Pid, u64),
+}
+
+fn running_tool_tree(marker: &Path, python: &Path) -> Result<Option<ToolTree>, String> {
+    let bytes = match fs::read(marker) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+    };
+    if bytes.len() > 128 {
+        return Err("工具进程标记超出固定大小".into());
+    }
+    let marker: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    let parent = marker["parent"]
+        .as_u64()
+        .and_then(|pid| u32::try_from(pid).ok())
+        .filter(|pid| *pid > 0)
+        .ok_or("工具父进程标记无效")?;
+    let leaf = marker["leaf"]
+        .as_u64()
+        .and_then(|pid| u32::try_from(pid).ok())
+        .filter(|pid| *pid > 0 && *pid != parent)
+        .ok_or("工具子进程标记无效")?;
+    let parent_pid = Pid::from_u32(parent);
+    let leaf_pid = Pid::from_u32(leaf);
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[parent_pid, leaf_pid]),
+        true,
+        ProcessRefreshKind::nothing().with_exe(UpdateKind::Always),
+    );
+    let expected = python.canonicalize().map_err(|error| error.to_string())?;
+    let Some(parent_process) = system.process(parent_pid) else {
+        return Ok(None);
+    };
+    let Some(leaf_process) = system.process(leaf_pid) else {
+        return Ok(None);
+    };
+    if leaf_process.parent() != Some(parent_pid)
+        || parent_process
+            .exe()
+            .and_then(|path| path.canonicalize().ok())
+            != Some(expected.clone())
+        || leaf_process.exe().and_then(|path| path.canonicalize().ok()) != Some(expected)
+    {
+        return Err("固定工具进程树身份不匹配".into());
+    }
+    Ok(Some(ToolTree {
+        parent: (parent_pid, parent_process.start_time()),
+        leaf: (leaf_pid, leaf_process.start_time()),
+    }))
+}
+
+fn tool_tree_has_zero_residual(tree: ToolTree) -> bool {
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[tree.parent.0, tree.leaf.0]),
+        true,
+        ProcessRefreshKind::nothing(),
+    );
+    [tree.parent, tree.leaf].into_iter().all(|(pid, started)| {
+        system
+            .process(pid)
+            .is_none_or(|process| process.start_time() != started)
+    })
+}
+
+async fn exercise_running_tool_cancel(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+    let cwd = root
+        .join("project")
+        .canonicalize()
+        .map_err(|error| error.to_string())?;
+    let python =
+        PathBuf::from(env::var_os("INFINISHELL_CODEX_LIVE_PYTHON").ok_or("缺少固定 Python 路径")?);
+    let executable = PathBuf::from(
+        env::var_os("INFINISHELL_CODEX_LIVE_EXECUTABLE").ok_or("缺少显式 Codex 可执行路径")?,
+    );
+    fs::write(
+        cwd.join("cancel-leaf.py"),
+        "import time\nwhile True:\n    time.sleep(1)\n",
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(
+        cwd.join("cancel-parent.py"),
+        r#"import json, os, pathlib, subprocess, sys, time
+leaf = subprocess.Popen([sys.executable, str(pathlib.Path(__file__).with_name('cancel-leaf.py'))])
+marker = pathlib.Path('cancel-pids.json')
+temporary = marker.with_suffix('.tmp')
+temporary.write_text(json.dumps({'parent': os.getpid(), 'leaf': leaf.pid}))
+temporary.replace(marker)
+while True:
+    time.sleep(1)
+"#,
+    )
+    .map_err(|error| error.to_string())?;
+    let parent_script = cwd.join("cancel-parent.py");
+    let command = quoted_command(&python.to_string_lossy(), &parent_script.to_string_lossy());
+    let options = SessionOptions {
+        executable,
+        cwd: cwd.clone(),
+        state_dir: root.to_owned(),
+        target: SessionTarget::New,
+        generation: Uuid::new_v4(),
+        permission_policy: PermissionPolicy::WorkspaceWrite,
+        permission_ceiling: None,
+        claude_profile: None,
+        grok_profile: None,
+        model: None,
+        local_tools: None,
+        selected_skills: Vec::new(),
+    };
+    let mut session = LiveSession::start(options)?;
+    session.ready_with_projection(evidence, false).await?;
+    evidence.record(json!({"event":"phase_started","phase":"running_tool_cancel"}))?;
+    let submitted = Uuid::new_v4();
+    session
+        .send(
+            submitted,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text(format!(
+                    "这是临时项目中的取消与进程树测试。只调用 exec_command 一次，原样运行以下命令：\n{command}\n等待命令运行，不要改写命令、运行其他工具或提前结束回合。"
+                ))],
+            },
+        )
+        .await?;
+    let mut turn_id = None;
+    let mut submitted_accepted = false;
+    let mut approval_seen = false;
+    let mut approval_resolved = false;
+    let mut native_started = false;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    let tree = loop {
+        if native_started
+            && submitted_accepted
+            && approval_seen
+            && approval_resolved
+            && let Some(tree) = running_tool_tree(&cwd.join("cancel-pids.json"), &python)?
+        {
+            break tree;
+        }
+        let event = match tokio::time::timeout_at(
+            deadline,
+            tokio::time::timeout(Duration::from_millis(200), session.next()),
+        )
+        .await
+        .map_err(|_| "固定工具运行前等待超过总时限")?
+        {
+            Ok(event) => event?,
+            Err(_) => continue,
+        };
+        match event.kind {
+            RuntimeEventKind::MessageAccepted { message_id, .. } if message_id == submitted => {
+                submitted_accepted = true;
+            }
+            RuntimeEventKind::TurnStarted { turn_id: started } if turn_id.is_none() => {
+                turn_id = Some(started);
+            }
+            RuntimeEventKind::ApprovalRequested {
+                approval_id,
+                turn_id: requested_turn,
+                method,
+                details,
+            } => {
+                let argv = json!([python.to_string_lossy(), parent_script.to_string_lossy()]);
+                if approval_seen
+                    || turn_id.as_deref() != Some(requested_turn.as_str())
+                    || method != "item/commandExecution/requestApproval"
+                    || !approval_matches_fixture(&details, &command, &argv, &cwd)
+                {
+                    session
+                        .send(
+                            Uuid::new_v4(),
+                            RuntimeAction::RespondApproval {
+                                approval_id,
+                                decision: ApprovalDecision::DenyOnce,
+                            },
+                        )
+                        .await?;
+                    return Err("固定工具审批内容不匹配，已拒绝".into());
+                }
+                approval_seen = true;
+                session
+                    .send(
+                        Uuid::new_v4(),
+                        RuntimeAction::RespondApproval {
+                            approval_id,
+                            decision: ApprovalDecision::AllowOnce,
+                        },
+                    )
+                    .await?;
+            }
+            RuntimeEventKind::ApprovalResolved { decision, .. } if approval_seen => {
+                if decision != ApprovalDecision::AllowOnce {
+                    return Err("固定工具审批未被允许".into());
+                }
+                approval_resolved = true;
+            }
+            RuntimeEventKind::Progress {
+                turn_id: progress_turn,
+                message,
+            } if turn_id.as_deref() == Some(progress_turn.as_str()) && message == command => {
+                native_started = true;
+            }
+            RuntimeEventKind::TurnFinished { .. } => {
+                return Err("固定工具尚未运行就收到回合终态".into());
+            }
+            RuntimeEventKind::Disconnected { .. } | RuntimeEventKind::RequestFailed { .. } => {
+                return Err("固定工具运行前连接失败".into());
+            }
+            RuntimeEventKind::InputJoined { .. }
+            | RuntimeEventKind::CommandDispatched { .. }
+            | RuntimeEventKind::MessageAccepted { .. }
+            | RuntimeEventKind::TurnStarted { .. }
+            | RuntimeEventKind::ApprovalResolved { .. }
+            | RuntimeEventKind::ApprovalCancelled { .. }
+            | RuntimeEventKind::Progress { .. }
+            | RuntimeEventKind::LocalToolCancelled { .. }
+            | RuntimeEventKind::LocalToolRequested { .. }
+            | RuntimeEventKind::SessionReady { .. }
+            | RuntimeEventKind::TextDelta { .. } => {}
+        }
+    };
+    let turn_id = turn_id.ok_or("没有原生回合 ID")?;
+    evidence.record(json!({
+        "event":"running_tool_observed","native_item_started":true,
+        "parent_and_leaf_alive":true,"parent_child_identity_verified":true
+    }))?;
+    let interrupt = Uuid::new_v4();
+    session
+        .send(
+            interrupt,
+            RuntimeAction::Interrupt {
+                turn_id: turn_id.clone(),
+            },
+        )
+        .await?;
+    let mut order = vec!["native_item_started", "interrupt_sent"];
+    let mut interrupt_accepted = false;
+    let mut terminal_seen = false;
+    let mut containment = None;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
+    loop {
+        let event = tokio::time::timeout_at(deadline, session.next())
+            .await
+            .map_err(|_| "取消后等待适配器终态超过总时限")??;
+        match event.kind {
+            RuntimeEventKind::MessageAccepted { message_id, .. } if message_id == interrupt => {
+                if interrupt_accepted {
+                    return Err("重复的原生取消确认".into());
+                }
+                interrupt_accepted = true;
+                order.push("interrupt_accepted");
+            }
+            RuntimeEventKind::TurnFinished {
+                turn_id: finished,
+                outcome,
+                ..
+            } => {
+                if terminal_seen || finished != turn_id || outcome != TurnOutcome::Cancelled {
+                    return Err("运行中取消终态与原生回合不匹配".into());
+                }
+                let receipt = managed_process::confirmed_exit(root, session.generation)
+                    .map_err(|error| error.to_string())?
+                    .ok_or("取消终态发布前没有同代进程树退出回执")?;
+                if !receipt.cleanup_confirmed
+                    || !matches!(
+                        receipt.containment.as_str(),
+                        "macos_resource_coalition" | "linux_subtree" | "windows_job"
+                    )
+                    || !tool_tree_has_zero_residual(tree)
+                {
+                    return Err("取消终态发布时进程树清理未获确认".into());
+                }
+                containment = Some(receipt.containment);
+                terminal_seen = true;
+                order.push("turn_finished");
+            }
+            RuntimeEventKind::Disconnected { .. } => {
+                if !terminal_seen {
+                    return Err("进程树清理前连接已断开".into());
+                }
+                order.push("disconnected");
+                break;
+            }
+            RuntimeEventKind::RequestFailed { .. } => {
+                return Err("真实取消请求失败".into());
+            }
+            RuntimeEventKind::InputJoined { .. }
+            | RuntimeEventKind::CommandDispatched { .. }
+            | RuntimeEventKind::MessageAccepted { .. }
+            | RuntimeEventKind::TurnStarted { .. }
+            | RuntimeEventKind::ApprovalRequested { .. }
+            | RuntimeEventKind::ApprovalResolved { .. }
+            | RuntimeEventKind::ApprovalCancelled { .. }
+            | RuntimeEventKind::Progress { .. }
+            | RuntimeEventKind::LocalToolCancelled { .. }
+            | RuntimeEventKind::LocalToolRequested { .. }
+            | RuntimeEventKind::SessionReady { .. }
+            | RuntimeEventKind::TextDelta { .. } => {}
+        }
+    }
+    let mut task = session.task.take().ok_or("适配器任务已丢失")?;
+    let task_result = tokio::time::timeout(Duration::from_secs(10), &mut task)
+        .await
+        .map_err(|_| "清理后适配器任务未退出")?
+        .map_err(|error| error.to_string())?;
+    if task_result.is_ok()
+        || !interrupt_accepted
+        || order
+            != vec![
+                "native_item_started",
+                "interrupt_sent",
+                "interrupt_accepted",
+                "turn_finished",
+                "disconnected",
+            ]
+    {
+        return Err("取消 ACK 或清理后终态顺序不符合合同".into());
+    }
+    evidence.record(json!({
+        "event":"running_tool_cancel_finished","passed":true,
+        "native_item_started_before_interrupt":true,
+        "interrupt_native_ack":true,"same_generation_receipt":true,
+        "cleanup_confirmed":true,"tool_tree_zero_residual":true,
+        "terminal_before_disconnected":true,"event_order":order,
+        "containment":containment.expect("已取得同代退出回执")
+    }))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "仅由 run_codex_adapter_live.py 的 running-tool-cancel 显式启用；会消耗模型额度"]
+async fn real_codex_running_tool_cancel() {
+    assert!(
+        matches!(
+            env::var("INFINISHELL_CODEX_RUNNING_TOOL_CANCEL").as_deref(),
+            Ok("1")
+        ),
+        "缺少运行中工具取消的显式授权标记"
+    );
+    let root = PathBuf::from(
+        env::var_os("INFINISHELL_CODEX_LIVE_ROOT").expect("必须由隔离运行脚本启动此测试"),
+    );
+    let root = root.canonicalize().expect("隔离目录必须存在");
+    assert!(root.join(".infinishell-live-probe").is_file());
+    let configuration =
+        PathBuf::from(env::var_os("CODEX_HOME").expect("必须显式设置隔离 CODEX_HOME"));
+    assert_eq!(configuration.canonicalize().unwrap(), root.join("codex"));
+    let artifact = PathBuf::from(
+        env::var_os("INFINISHELL_CODEX_LIVE_ARTIFACT").expect("必须提供证据输出路径"),
+    );
+    let mut evidence = Evidence {
+        file: File::create(artifact).expect("证据文件可写"),
+        root: root.clone(),
+    };
+    evidence
+        .record(json!({"event":"acceptance_started","scope":"rust_adapter_running_tool_cancel"}))
+        .unwrap();
+    let result = exercise_running_tool_cancel(&root, &mut evidence).await;
+    if result.is_err() {
+        evidence
+            .record(json!({"event":"acceptance_failed","scope":"rust_adapter_running_tool_cancel"}))
+            .unwrap();
+    }
+    assert!(result.is_ok(), "真实 Codex 运行中工具取消验收未通过");
 }
 
 async fn run_inspect_tool_turn(

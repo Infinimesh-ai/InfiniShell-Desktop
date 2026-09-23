@@ -9,14 +9,56 @@ from unittest import mock
 
 from run_codex_adapter_live import (
     VERSION_PROBE_TIMEOUT_SECONDS,
+    audit_and_cleanup_fixture,
     idle_crash_environment,
     missing_session_environment,
+    owned_fixture_pids,
+    owned_native_root_pids,
+    owned_supervisor_pids,
     probe_version,
     verified_acceptance,
 )
 
 
 class AcceptanceEvidenceTests(unittest.TestCase):
+    def test_fixed_tool_cleanup_targets_only_private_fixture_and_is_not_product_proof(self):
+        root = Path("/private/tmp/codex-fixture-unique")
+        scripts = {41: f"python {root / 'project/cancel-parent.py'}",
+                   42: f"python {root / 'project/cancel-leaf.py'}",
+                   43: "python /another/project/cancel-parent.py"}
+        self.assertEqual(owned_fixture_pids(root, scripts), {41, 42})
+        with mock.patch("run_codex_adapter_live.macos_native_root_pids", return_value=set()), \
+                mock.patch("run_codex_adapter_live.process_commands", side_effect=[scripts, scripts, scripts, {}, {}]), \
+                mock.patch("run_codex_adapter_live.time.monotonic", side_effect=[0, 21, 22]), \
+                mock.patch("run_codex_adapter_live.os.kill") as kill, \
+                mock.patch("run_codex_adapter_live.time.sleep"):
+            result = audit_and_cleanup_fixture(root, Path("/usr/bin/codex"), Path("/opt/infinishell"))
+        self.assertTrue(result["fallback_attempted"])
+        self.assertTrue(result["zero_residual"])
+        self.assertFalse(result["audit_error"])
+        self.assertEqual({call.args[0] for call in kill.call_args_list}, {41, 42})
+
+    def test_native_root_fallback_requires_private_cwd_and_exact_cli_path(self):
+        root = Path("/private/tmp/codex-fixture-unique")
+        codex = Path("/opt/codex/codex")
+        commands = {41: f"{codex} app-server", 42: "/another/codex app-server"}
+        inspected = mock.Mock(stdout=f"p41\nfcwd\nn{root / 'project'}\n")
+        with mock.patch("run_codex_adapter_live.process_commands", return_value=commands), \
+                mock.patch("run_codex_adapter_live.subprocess.run", return_value=inspected):
+            self.assertEqual(owned_native_root_pids(root, codex, {41, 42}), {41})
+        inspected.stdout = "p41\nfcwd\nn/another/project\n"
+        with mock.patch("run_codex_adapter_live.process_commands", return_value=commands), \
+                mock.patch("run_codex_adapter_live.subprocess.run", return_value=inspected):
+            self.assertEqual(owned_native_root_pids(root, codex, {41}), set())
+
+    def test_supervisor_cleanup_requires_private_manifest_and_exact_executable(self):
+        root = Path("/private/tmp/codex-fixture-unique")
+        supervisor = Path("/opt/infinishell")
+        commands = {41: f"{supervisor} cli-agent-supervisor {root / 'cli-agent-processes/one/manifest.json'}",
+                    42: f"{supervisor} cli-agent-supervisor /another/root/manifest.json",
+                    43: f"/another/infinishell cli-agent-supervisor {root / 'cli-agent-processes/one/manifest.json'}"}
+        self.assertEqual(owned_supervisor_pids(root, supervisor, commands), {41})
+
     def test_version_probe_preserves_special_path_and_allows_cold_scan_budget(self):
         executable = Path("C:/runner temp/codex shim 中文 & path/codex.cmd")
         environment = {"PATH": "isolated"}
@@ -38,6 +80,15 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         zero = "test result: ok. 0 passed; 0 failed; 0 ignored;"
         cases = {
             "lifecycle": {"event": "acceptance_passed"},
+            "running-tool-cancel": {
+                "event": "running_tool_cancel_finished", "passed": True,
+                "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
+                "same_generation_receipt": True, "cleanup_confirmed": True,
+                "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
+                "event_order": ["native_item_started", "interrupt_sent", "interrupt_accepted",
+                                "turn_finished", "disconnected"],
+                "containment": "macos_resource_coalition",
+            },
             "local-tools-restore": {"event": "tool_restore_probe_finished", "passed": True},
             "image-input": {"event": "image_probe_finished", "passed": True},
             "missing-session": {"event": "missing_session_probe_finished", "passed": True},
@@ -51,6 +102,29 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 self.assertFalse(verified_acceptance(case, 1, summary, [event]))
                 self.assertFalse(verified_acceptance(case, 0, zero, [event]))
                 self.assertFalse(verified_acceptance(case, 0, summary, []))
+
+    def test_running_tool_cancel_rejects_missing_cleanup_or_wrong_order(self):
+        summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        valid = {
+            "event": "running_tool_cancel_finished", "passed": True,
+            "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
+            "same_generation_receipt": True, "cleanup_confirmed": True,
+            "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
+            "event_order": ["native_item_started", "interrupt_sent", "interrupt_accepted",
+                            "turn_finished", "disconnected"],
+            "containment": "macos_resource_coalition",
+        }
+        self.assertTrue(verified_acceptance("running-tool-cancel", 0, summary, [valid]))
+        for key in ("native_item_started_before_interrupt", "interrupt_native_ack",
+                    "same_generation_receipt", "cleanup_confirmed", "tool_tree_zero_residual",
+                    "terminal_before_disconnected"):
+            with self.subTest(key=key):
+                self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
+                                                     [valid | {key: False}]))
+        self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
+                                             [valid | {"event_order": list(reversed(valid["event_order"]))}]))
+        self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
+                                             [valid | {"containment": "unix_process_group"}]))
 
     def test_image_check_cannot_reuse_another_probe_or_failed_result(self):
         summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"

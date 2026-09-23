@@ -94,7 +94,12 @@ fn composed_prompt(context: &Path) -> String {
     )
 }
 
-async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String> {
+async fn exercise(
+    root: &Path,
+    mode: &str,
+    test_candidate_1041: bool,
+    file: &mut File,
+) -> Result<(), String> {
     let before = fs::read_to_string(root.join(SKILL_PATH)).map_err(|_| "技能夹具不可读")?;
     let sentinel = sentinel_from_skill(&before)?;
     let context_before =
@@ -153,6 +158,13 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
     if mode == "leader" || catalog_only {
         protocol.current_root_candidate_for_live = true;
         protocol.current_selected_skill_candidate_for_live = true;
+    }
+    protocol.test_only_1041_profile = test_candidate_1041;
+    if test_candidate_1041 {
+        protocol.test_only_1041_native_binary = Some(PathBuf::from(
+            env::var_os("INFINISHELL_GROK_TEST_CANDIDATE_NATIVE")
+                .ok_or("缺少固定的 Grok 1.0.41 原生二进制路径")?,
+        ));
     }
     protocol.catalog_direct_for_live = mode == "direct_catalog";
     // 完整组合保留生产 argv；目录直连对照仅在本测试标记下覆盖入口。
@@ -480,6 +492,11 @@ async fn authenticated_selected_skill_default_entry() {
         mode.as_str(),
         "leader" | "sdk" | "leader_catalog" | "direct_catalog"
     ));
+    let test_candidate_1041 = env::var("INFINISHELL_GROK_TEST_CANDIDATE_1041").ok();
+    assert!(
+        test_candidate_1041.is_none()
+            || test_candidate_1041.as_deref() == Some("1") && mode == "leader_catalog"
+    );
     assert_eq!(
         fs::read_to_string(root.join(".infinishell-grok-live-probe")).unwrap(),
         "isolated Grok Rust adapter verification\n"
@@ -505,7 +522,9 @@ async fn authenticated_selected_skill_default_entry() {
         "production_connect_path":true,"test_agent_profile_override":false,"fixture_project_trust":true,
         "typed_selected_skill":true,"secret_in_submitted_prompt":false,"credential_values_recorded":false})).unwrap();
     assert!(
-        exercise(&root, &mode, &mut file).await.is_ok(),
+        exercise(&root, &mode, test_candidate_1041.is_some(), &mut file)
+            .await
+            .is_ok(),
         "默认入口技能组合验收失败；请查安全投影"
     );
 }

@@ -6,6 +6,8 @@ use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
 #[cfg(test)]
+use std::path::PathBuf;
+#[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -229,7 +231,18 @@ async fn run_process(
                 "cli-agent-grok-managed-unverified"
             )));
         }
-        verify_test_candidate_binary(&protocol.options.executable)?;
+        let native = protocol
+            .test_only_1041_native_binary
+            .as_deref()
+            .ok_or_else(|| {
+                RuntimeError::InvalidConfiguration("Grok 1.0.41 test native binary missing".into())
+            })?;
+        if native == protocol.options.executable.as_path() {
+            return Err(RuntimeError::InvalidConfiguration(
+                "Grok 1.0.41 test isolation wrapper missing".into(),
+            ));
+        }
+        verify_test_candidate_binary(native)?;
     }
     let launch = if matches!(
         protocol.options.permission_policy,
@@ -393,7 +406,11 @@ async fn run_process(
 
 #[cfg(test)]
 fn verify_test_candidate_binary(path: &Path) -> Result<(), RuntimeError> {
-    if std::fs::metadata(path)?.len() != TEST_CANDIDATE_BYTES {
+    if !path.is_absolute()
+        || path.canonicalize()? != path
+        || !std::fs::symlink_metadata(path)?.file_type().is_file()
+        || std::fs::metadata(path)?.len() != TEST_CANDIDATE_BYTES
+    {
         return Err(RuntimeError::UnsupportedVersion(
             "Grok 1.0.41 test binary identity mismatch".into(),
         ));
@@ -1066,6 +1083,8 @@ struct GrokProtocol {
     current_selected_skill_candidate_for_live: bool,
     #[cfg(test)]
     test_only_1041_profile: bool,
+    #[cfg(test)]
+    test_only_1041_native_binary: Option<PathBuf>,
 }
 
 impl GrokProtocol {
@@ -1265,6 +1284,8 @@ impl GrokProtocol {
             current_selected_skill_candidate_for_live: false,
             #[cfg(test)]
             test_only_1041_profile: false,
+            #[cfg(test)]
+            test_only_1041_native_binary: None,
         }
     }
 

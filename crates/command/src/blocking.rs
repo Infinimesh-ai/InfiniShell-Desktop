@@ -581,6 +581,24 @@ impl Command {
     /// 如果未恢复就丢弃返回值，子进程会被终止并等待回收。
     #[cfg(windows)]
     pub fn spawn_suspended(&mut self) -> io::Result<SuspendedChild> {
+        SuspendedChild::from_child(self.spawn_suspended_child()?)
+    }
+
+    /// 严格 Job 中使用：线程发现失败时移交已派生的子进程，避免等待未继续的调试事件。
+    /// 派生本身失败时尚无子进程，错误中的第二项为 `None`。
+    #[cfg(windows)]
+    pub fn spawn_suspended_with_child_on_error(
+        &mut self,
+    ) -> std::result::Result<SuspendedChild, (io::Error, Option<Child>)> {
+        let child = self
+            .spawn_suspended_child()
+            .map_err(|error| (error, None))?;
+        SuspendedChild::from_child_with_child_on_error(child)
+            .map_err(|(error, child)| (error, Some(child)))
+    }
+
+    #[cfg(windows)]
+    fn spawn_suspended_child(&mut self) -> io::Result<Child> {
         use std::os::windows::process::CommandExt as _;
 
         if self.stdin_is_default {
@@ -611,7 +629,7 @@ impl Command {
             }
         }
 
-        SuspendedChild::from_child(child)
+        Ok(child)
     }
 
     /// Executes the command as a child process, waiting for it to finish and

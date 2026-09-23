@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use command::blocking::Command as BlockingCommand;
 use command::managed::{Containment, ManagedTree};
+use command::windows::SuspendedChild;
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Threading::DEBUG_PROCESS;
 use windows::core::PCWSTR;
@@ -125,7 +126,19 @@ fn await_debug_driver_authorization() {
     assert_eq!(authorization, [b'1']);
 }
 
-fn resume_debuggee(suspended: command::windows::SuspendedChild) -> std::process::Child {
+fn spawn_debuggee(command: &mut Command) -> SuspendedChild {
+    match command.spawn_suspended_with_child_on_error() {
+        Ok(suspended) => suspended,
+        Err((failure, child)) => {
+            if let Some(mut child) = child {
+                let _ = child.kill();
+            }
+            panic!("调试夹具挂起派生失败，外层严格 Job 负责整树清理：{failure}");
+        }
+    }
+}
+
+fn resume_debuggee(suspended: SuspendedChild) -> std::process::Child {
     match suspended.resume_with_child_on_error() {
         Ok(child) => child,
         Err((failure, mut child)) => {
@@ -381,7 +394,7 @@ fn debug_session_runs_system_only_process_to_native_exit() {
     executable
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
-    let suspended = command.spawn_suspended().unwrap();
+    let suspended = spawn_debuggee(&mut command);
     let root_process_id = suspended.id();
     let mut child = resume_debuggee(suspended);
     eprintln!("Windows 调试夹具：系统命令主线程已恢复，等待根映像初始事件");
@@ -457,7 +470,7 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
     executable
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
-    let suspended = command.spawn_suspended().unwrap();
+    let suspended = spawn_debuggee(&mut command);
     let root_process_id = suspended.id();
     let mut child = resume_debuggee(suspended);
     eprintln!("Windows 调试夹具：真实 CLI 主线程已恢复，等待根映像初始事件");
@@ -553,7 +566,7 @@ fn debug_session_rejects_non_system_dynamic_image_before_continue() {
         stage_started.elapsed().as_millis()
     );
     stage_started = Instant::now();
-    let suspended = command.spawn_suspended().unwrap();
+    let suspended = spawn_debuggee(&mut command);
     eprintln!(
         "Windows DLL 拒绝诊断：挂起派生耗时={}ms，开始恢复主线程",
         stage_started.elapsed().as_millis()

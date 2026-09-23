@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "scope": "focused_windows_only_preflight_with_atomic_image_debug",
+  "run": {
+    "id": 35847734427,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35847734427",
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "event": "workflow_dispatch",
+    "head_sha": "932167716608d48646bf532b8c99bfa11416d5dd",
+    "linux_x64": false,
+    "windows_x64": true,
+    "full_workspace_tests": false,
+    "run_atomic_windows_debug": true,
+    "conclusion": "success"
+  },
+  "jobs": {
+    "linux_x64": {
+      "conclusion": "skipped",
+      "verified_by_this_run": false
+    },
+    "windows_x64": {
+      "conclusion": "success",
+      "successful_steps": 46,
+      "failed_steps": 0,
+      "skipped_steps": 2,
+      "first_failed_step": null,
+      "skipped_step_names": [
+        "Compile GUI integration tests",
+        "Run desktop workspace unit tests"
+      ],
+      "focused_step_timings_utc": {
+        "check_infinishell_desktop": {
+          "started_at": "2026-09-23T10:24:49Z",
+          "completed_at": "2026-09-23T10:39:57Z"
+        },
+        "build_ssh_worker": {
+          "started_at": "2026-09-23T10:40:55Z",
+          "completed_at": "2026-09-23T10:59:29Z"
+        },
+        "agent_lifecycle_terminal_cancellation_responses": {
+          "started_at": "2026-09-23T10:59:31Z",
+          "completed_at": "2026-09-23T11:19:10Z"
+        },
+        "atomic_image_debug_strict_job": {
+          "started_at": "2026-09-23T11:29:37Z",
+          "completed_at": "2026-09-23T11:30:15Z"
+        }
+      },
+      "atomic_image_debug_strict_job": {
+        "conclusion": "success",
+        "nextest_summary": "2 tests run: 2 passed, 7340 skipped; 33.171 seconds",
+        "nextest_retry_count_observed": 0,
+        "system_only_native_exit_test": {
+          "name": "debug_session_runs_system_only_process_to_native_exit",
+          "conclusion": "passed",
+          "nextest_duration_seconds": 0.352,
+          "source_asserts_native_success_and_receipt_match": true
+        },
+        "non_system_dynamic_image_rejection_test": {
+          "name": "debug_session_rejects_non_system_dynamic_image_before_continue",
+          "conclusion": "passed",
+          "nextest_duration_seconds": 32.788,
+          "outer_driver_timeout_seconds_at_tested_sha": 120,
+          "nextest_slow_timeout_seconds_at_tested_sha": 150,
+          "nextest_retries_configured_at_tested_sha": 0,
+          "source_asserts_exact_outside_system_directory_error": true,
+          "source_asserts_untrusted_dll_load_marker_absent": true,
+          "source_requires_strict_job_cleanup_and_receipt_match_for_pass": true,
+          "non_system_dll_rejection_before_execution_supported_by_test_pass": true,
+          "independent_active_processes_zero_value_logged": false,
+          "individual_diagnostic_stage_milliseconds_published_in_run_log": false,
+          "published_log_boundary": "Nextest captured successful test stdout and stderr; the run log contains the PASS and total duration, but not the inner diagnostic stage timings or an independent ActiveProcesses value."
+        }
+      },
+      "host_crash_supervisor_step": "success",
+      "native_recovery_and_idle_crash_step": "success",
+      "production_notification_installer_step": "success"
+    }
+  },
+  "runner_status_after_completion": {
+    "linux_x64": "online_idle",
+    "windows_x64": "online_busy",
+    "windows_busy_attribution_to_this_completed_run_established": false
+  },
+  "downloaded_artifacts": {
+    "artifact_count": 5,
+    "file_count": 24,
+    "symlink_count": 0,
+    "json_ndjson_parse_failures": 0,
+    "common_credential_or_email_pattern_hits": 0,
+    "relative_file_manifest_sha256": "0a2465ccf866cf1ee62468c483b0f105d3247937fc761e56033f81b033f13ce4",
+    "groups": {
+      "claude-windows-notifications": {"files": 1, "manifest_sha256": "5a5b56887cb2862fb588b70f950c169090d4a40f2f1723b90dc0961c94c92684"},
+      "cli-windows-native-boundaries": {"files": 16, "manifest_sha256": "67dd3da7911c3c1304c09660404d693cfbdfd0954a375b3ac0e2d53e4b7e365f"},
+      "codex-windows-conpty": {"files": 3, "manifest_sha256": "829f7e4ff68cc9b7d3a454a2d9c802364b9c0cdefcc11ce4d780c5edc58415ce"},
+      "codex-windows-native-hooks": {"files": 1, "manifest_sha256": "b743cc141db4cc6c56bebfe7d6f41b64a827509dc3b5dfe2a4b202dfc61f324b"},
+      "codex-windows-production-installer": {"files": 3, "manifest_sha256": "d90fd05330b43dd45458babb7f132f91dd324f6f512f4820ff225aa7d113b8e1"}
+    }
+  },
+  "boundaries": {
+    "same_commit_linux_verified": false,
+    "same_commit_macos_verified": false,
+    "full_workspace_verified": false,
+    "gui_integration_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}

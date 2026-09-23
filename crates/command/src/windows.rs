@@ -17,16 +17,30 @@ pub struct SuspendedChild {
 }
 
 impl SuspendedChild {
-    pub(crate) fn from_child(mut child: Child) -> io::Result<Self> {
-        match find_only_thread(child.id()) {
+    pub(crate) fn from_child(child: Child) -> io::Result<Self> {
+        Self::from_child_with_child_on_error(child).map_err(|(error, mut child)| {
+            terminate_and_wait(&mut child);
+            error
+        })
+    }
+
+    pub(crate) fn from_child_with_child_on_error(
+        child: Child,
+    ) -> std::result::Result<Self, (io::Error, Child)> {
+        let primary_thread = find_only_thread(child.id());
+        Self::from_child_with_primary_thread(child, primary_thread)
+    }
+
+    fn from_child_with_primary_thread(
+        child: Child,
+        primary_thread: io::Result<OwnedHandle>,
+    ) -> std::result::Result<Self, (io::Error, Child)> {
+        match primary_thread {
             Ok(primary_thread) => Ok(Self {
                 child: Some(child),
                 primary_thread: Some(primary_thread),
             }),
-            Err(error) => {
-                terminate_and_wait(&mut child);
-                Err(error)
-            }
+            Err(error) => Err((error, child)),
         }
     }
 

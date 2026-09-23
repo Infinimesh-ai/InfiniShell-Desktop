@@ -36,6 +36,19 @@ def evidence(mode="leader"):
 
 
 class SelectedSkillRunnerTests(unittest.TestCase):
+    def test_1041_candidate_refuses_any_model_input_before_creating_artifacts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "result.ndjson"
+            args = SimpleNamespace(output=output, mode="leader", max_native_inputs=1,
+                test_candidate_1041_catalog=True)
+            with self.assertRaisesRegex(ValueError, "零输入"):
+                runner.run(args)
+            self.assertFalse(output.exists())
+            args.mode = "leader_catalog"
+            with self.assertRaisesRegex(ValueError, "零输入"):
+                runner.run(args)
+            self.assertFalse(output.exists())
+
     def test_complete_file_evidence_proves_only_one_default_entry_combination(self):
         raw = "\n".join(json.dumps(row) for row in evidence()).encode()
         with mock.patch.object(runner.isolation, "private_bytes", return_value=raw) as read:

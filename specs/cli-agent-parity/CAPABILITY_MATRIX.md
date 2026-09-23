@@ -2,7 +2,7 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json) 和 [receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## 2026-09-23 receipt115–122 增量
+## 2026-09-23 receipt115–124 增量
 
 | 要求 | 当前证据 | 结果与边界 |
 | --- | --- | --- |
@@ -13,6 +13,9 @@
 | Grok `1.0.41` 选定技能与设置广播 | [receipt118](validation/macos-working-tree-118-grok-1041-selected-skill-catalog.safe.json) 保留旧 23 字段拒绝；[receipt119](validation/macos-working-tree-119-grok-1041-settings-schema.safe.json) 定位唯一新增布尔字段；test-only 精确 24 字段候选 Rust 7／7、旧版 13／13、隔离 check 通过；[receipt121](validation/macos-working-tree-121-grok-1041-selected-skill-catalog.safe.json) raw ACP 零输入 30 条目录中唯一技能路径匹配 | **目录候选通过／产品仍关闭**：首次公告通知拒绝保留；正式 `supported_version`／`verified_version` 仍拒绝新版。Rust 产品适配器完整原生目录未实测，不把 raw ACP 结果外推为产品技能可用 |
 | Grok `1.0.41` 单次真实输入 | [receipt122](validation/macos-working-tree-122-grok-1041-selected-skill-turn.safe.json)：唯一一次 stdin 写入并 flush 后，原生通知会话归属不匹配；无 prompt ACK，审批 0，清理确认 | **失败／接受状态未知**：先前 P0 构造器零输入拒绝保留；已发业务输入不重试。历史、工具、最终技能标记和 Rust 产品适配器均未验证 |
 | `84a174f9…` 同提交 Linux／Windows 聚焦预检 | [receipt120](validation/cross-platform-preflight-120-84a174f9.safe.json)：[run 35837274454](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35837274454)；Linux 34 成功／2 跳过，Windows 44 成功／1 失败／3 跳过；6 artifact／37 文件安全核验通过 | **Linux 通过／Windows 严格 Job 诊断失败**：安装版 Grok `1.0.40` hook 15 通过／2 环境跳过；Windows 系统命令原生退出测试通过，非系统 DLL 拒绝测试三次到外层 30 秒仍未取得根映像事件确认，原因未定位。未证明 DLL 拒绝或 Windows 原子产品升级；GUI 与 full workspace 按输入跳过 |
+| Grok `1.0.41` Rust adapter 零输入目录 | [receipt124](validation/macos-working-tree-124-grok-1041-rust-adapter-zero-input.safe.json)：`932167716…` 基础上的未清洁工作树，官方固定二进制与 test-only Rust `connect_protocol`，默认 leader 的 30 条目录中唯一选定本地技能路径匹配，原生退出／清理确认；首轮 wrapper 身份误校验失败保留 | **零输入候选通过／产品仍关闭**：模型输入、审批、工具均为 0；没有完整技能回合或同提交验收。正式 `supported_version`／`verified_version` 仍拒绝 `1.0.41` |
+| `932167716…` Windows 严格 Job 聚焦预检 | [receipt123](validation/cross-platform-preflight-123-93216771.safe.json)：[run 35847734427](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35847734427)；Windows 46 成功／0 失败／2 跳过，Linux 按输入跳过；严格 Job 系统进程原生退出 0.352 秒、非系统 DLL 拒绝 32.788 秒，均首试通过 | **受测拒绝链通过／产品自动升级仍关闭**：测试断言精确拒绝错误、恶意 DLL 标记不存在、严格 Job 清理和回执匹配；成功测试的内部阶段耗时及独立 ActiveProcesses 数值未公开。此 run 不证明三款真实 CLI 原子升级、Linux／macOS 同提交、GUI 或 full workspace |
+| Codex `0.155.1` 运行中工具取消 | 当前工作树新增显式模型验收夹具：只有原生执行项已开始且固定 Python 父子进程均存活，才发送取消；随后检查原生 ACK、同代清理回执、父子零残留及取消终态顺序。外层脚本仅对私有夹具作身份限定的残留审计和失败兜底 | **实链待运行**：离线夹具与编译不补齐 receipt92 的运行中工具残留失败；须在当前干净提交、同源签名 supervisor 和隔离认证副本上实测 |
 
 ## 2026-09-23 receipt102–114 阶段补充矩阵
 

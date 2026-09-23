@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::{
-    Effects, GrokProtocol, REQUEST_TIMEOUT, flush_effects, supported_version,
+    Effects, GrokProtocol, REQUEST_TIMEOUT, flush_effects, run_process, supported_version,
     validate_current_settings_update, validate_options, verified_version,
     verify_test_candidate_binary,
 };
@@ -291,6 +291,32 @@ fn test_candidate_1041_requires_explicit_profile_and_exact_native_version_text()
 fn test_candidate_1041_rejects_binary_without_fixed_size() {
     let file = tempfile::NamedTempFile::new().unwrap();
     assert!(verify_test_candidate_binary(file.path()).is_err());
+}
+
+#[tokio::test]
+async fn test_candidate_1041_requires_a_distinct_native_binary_before_launch() {
+    let mut selected = options();
+    selected.selected_skills.push(SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: selected.cwd.join("SKILL.md"),
+    });
+    let mut protocol = GrokProtocol::new(selected);
+    protocol.current_root_candidate_for_live = true;
+    protocol.current_selected_skill_candidate_for_live = true;
+    protocol.test_only_1041_profile = true;
+    let (_commands, receiver) = mpsc::channel(1);
+    let (events, _event_receiver) = mpsc::channel(1);
+    assert!(matches!(
+        run_process(&mut protocol, receiver, &events).await,
+        Err(RuntimeError::InvalidConfiguration(_))
+    ));
+
+    protocol.test_only_1041_native_binary = Some(protocol.options.executable.clone());
+    let (_commands, receiver) = mpsc::channel(1);
+    assert!(matches!(
+        run_process(&mut protocol, receiver, &events).await,
+        Err(RuntimeError::InvalidConfiguration(_))
+    ));
 }
 
 #[test]

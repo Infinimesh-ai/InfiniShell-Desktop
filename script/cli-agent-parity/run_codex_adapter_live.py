@@ -11,10 +11,12 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 
 
 TEST_CASES = {
     "lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_managed_lifecycle",
+    "running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_running_tool_cancel",
     "local-tools-restore": "ai::cli_agent_runtime::codex::live_tests::real_codex_local_tool_restore",
     "image-input": "ai::cli_agent_runtime::codex::live_tests::real_codex_image_input",
     "missing-session": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
@@ -51,6 +53,20 @@ def verified_acceptance(test_case, exit_code, output, events):
         return False
     if test_case == "lifecycle":
         return any(event.get("event") == "acceptance_passed" for event in events)
+    if test_case == "running-tool-cancel":
+        expected_order = ["native_item_started", "interrupt_sent", "interrupt_accepted",
+                          "turn_finished", "disconnected"]
+        return any(event.get("event") == "running_tool_cancel_finished"
+                   and event.get("passed") is True
+                   and event.get("native_item_started_before_interrupt") is True
+                   and event.get("interrupt_native_ack") is True
+                   and event.get("same_generation_receipt") is True
+                   and event.get("cleanup_confirmed") is True
+                   and event.get("tool_tree_zero_residual") is True
+                   and event.get("terminal_before_disconnected") is True
+                   and event.get("event_order") == expected_order
+                   and event.get("containment") in {"macos_resource_coalition", "linux_subtree", "windows_job"}
+                   for event in events)
     if test_case == "missing-session":
         return any(event.get("event") == "missing_session_probe_finished" and event.get("passed") is True for event in events)
     if test_case == "idle-crash":
@@ -115,8 +131,14 @@ def probe_version(executable, environment):
 def terminate(process, own_process_only=False):
     if own_process_only:
         # 只终止运行器持有的 libtest 子进程；原生 CLI 由独立监督者在控制 EOF 后收尾。
-        process.kill()
-        process.wait(timeout=10)
+        try:
+            process.kill()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
         return
     if os.name == "nt":
         subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
@@ -138,10 +160,163 @@ def terminate(process, own_process_only=False):
         process.wait()
 
 
+def process_commands():
+    # 只在私有测试目录中匹配本次固定脚本；扫描结果不写入证据。
+    if os.name == "nt":
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine | ConvertTo-Json -Compress"],
+            capture_output=True, text=True, timeout=10, check=True)
+        rows = json.loads(result.stdout)
+        if isinstance(rows, dict):
+            rows = [rows]
+        return {int(row["ProcessId"]): row["CommandLine"] or "" for row in rows}
+    result = subprocess.run(["ps", "-Aww", "-o", "pid=", "-o", "command="],
+                            capture_output=True, text=True, timeout=10, check=True)
+    commands = {}
+    for line in result.stdout.splitlines():
+        parts = line.strip().split(maxsplit=1)
+        if len(parts) == 2 and parts[0].isdigit():
+            commands[int(parts[0])] = parts[1]
+    return commands
+
+
+def owned_fixture_pids(root, commands):
+    scripts = [str(root / "project" / name) for name in ("cancel-parent.py", "cancel-leaf.py")]
+    return {pid for pid, command in commands.items()
+            if pid != os.getpid() and any(script in command for script in scripts)}
+
+
+def owned_supervisor_pids(root, supervisor, commands):
+    marker = str(root / "cli-agent-processes")
+    return {pid for pid, command in commands.items()
+            if pid != os.getpid() and str(supervisor) in command
+            and "cli-agent-supervisor" in command and marker in command}
+
+
+def macos_native_root_pids(root, codex):
+    if sys.platform != "darwin":
+        return set()
+    processes = root / "cli-agent-processes"
+    if not processes.is_dir():
+        return set()
+    owned = set()
+    for claim in processes.glob("*/macos-native.json"):
+        if claim.stat().st_size > 4096:
+            raise ValueError("原生进程身份记录超出固定大小")
+        native = json.loads(claim.read_text())
+        manifest = json.loads((claim.parent / "manifest.json").read_text())
+        if native.get("generation") != claim.parent.name or Path(manifest["executable"]).resolve() != codex:
+            raise ValueError("原生进程身份与本次 CLI 启动不匹配")
+        pid = native.get("identity", {}).get("pid")
+        if type(pid) is not int or pid <= 0:
+            raise ValueError("原生进程身份无效")
+        owned.add(pid)
+    return owned
+
+
+def owned_native_root_pids(root, codex, candidates):
+    if not candidates:
+        return set()
+    # 原生记录的 PID、官方可执行路径和私有 cwd 均匹配时，才可强制清理本次根进程。
+    commands = process_commands()
+    owned = set()
+    for pid in candidates:
+        if str(codex) not in commands.get(pid, ""):
+            continue
+        result = subprocess.run(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+                                capture_output=True, text=True, timeout=5, check=False)
+        if f"n{root / 'project'}" in result.stdout.splitlines():
+            owned.add(pid)
+    return owned
+
+
+def audit_and_cleanup_fixture(root, codex, supervisor):
+    # 本函数只给安全兜底和独立残留审计使用；其结果绝不替代产品 exit receipt。
+    audit = {"fallback_attempted": False, "zero_residual": False,
+             "unverified_native_root": False, "audit_error": False,
+             "observed_tool_processes": 0, "observed_native_roots": 0,
+             "observed_supervisors": 0, "residual_tool_processes": 0,
+             "residual_native_roots": 0, "residual_supervisors": 0}
+    try:
+        native_candidates = macos_native_root_pids(root, codex)
+        deadline = time.monotonic() + 20
+        while True:
+            commands = process_commands()
+            tools = owned_fixture_pids(root, commands)
+            roots = owned_native_root_pids(root, codex, native_candidates)
+            supervisors = owned_supervisor_pids(root, supervisor, commands)
+            audit["observed_tool_processes"] = max(audit["observed_tool_processes"], len(tools))
+            audit["observed_native_roots"] = max(audit["observed_native_roots"], len(roots))
+            audit["observed_supervisors"] = max(audit["observed_supervisors"], len(supervisors))
+            if not tools and not roots and not supervisors:
+                audit["zero_residual"] = True
+                break
+            if time.monotonic() >= deadline:
+                audit["fallback_attempted"] = True
+                for pid in tools | roots | supervisors:
+                    # 每次发送强制信号前重新核对本次随机目录或私有 CODEX_HOME 身份。
+                    current = process_commands()
+                    confirmed_tools = owned_fixture_pids(root, current)
+                    confirmed_roots = owned_native_root_pids(root, codex, native_candidates)
+                    confirmed_supervisors = owned_supervisor_pids(root, supervisor, current)
+                    if pid not in confirmed_tools | confirmed_roots | confirmed_supervisors:
+                        continue
+                    if os.name == "nt":
+                        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                       timeout=5, check=False)
+                    else:
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                verify_deadline = time.monotonic() + 10
+                while True:
+                    current = process_commands()
+                    remaining = owned_fixture_pids(root, current)
+                    remaining |= owned_native_root_pids(root, codex, native_candidates)
+                    remaining |= owned_supervisor_pids(root, supervisor, current)
+                    if not remaining or time.monotonic() >= verify_deadline:
+                        audit["zero_residual"] = not remaining
+                        break
+                    time.sleep(0.25)
+                break
+            time.sleep(0.25)
+        final_commands = process_commands()
+        audit["residual_tool_processes"] = len(owned_fixture_pids(root, final_commands))
+        audit["residual_native_roots"] = len(owned_native_root_pids(root, codex, native_candidates))
+        audit["residual_supervisors"] = len(owned_supervisor_pids(root, supervisor, final_commands))
+        audit["zero_residual"] = (audit["residual_tool_processes"] == 0
+                                  and audit["residual_native_roots"] == 0
+                                  and audit["residual_supervisors"] == 0)
+        alive = native_candidates & final_commands.keys()
+        audit["unverified_native_root"] = bool(alive - owned_native_root_pids(root, codex, native_candidates))
+    except Exception:
+        audit["audit_error"] = True
+    if audit["audit_error"] or audit["unverified_native_root"]:
+        audit["zero_residual"] = False
+    return audit
+
+
 def sanitize(text, root):
     for directory in (root, root.resolve(), Path.home()):
         text = text.replace(str(directory), "<probe-root>" if directory != Path.home() else "<user-home>")
     return re.sub(r"(?:sk-[A-Za-z0-9_-]{16,}|Bearer [A-Za-z0-9_.-]+)", "<redacted>", text)
+
+
+def stopped_output(process, metadata):
+    try:
+        return process.communicate(timeout=10)[0]
+    except subprocess.TimeoutExpired:
+        # 子孙进程误持有 libtest 的输出管道时也不能无限等待。
+        if process.stdout is not None:
+            try:
+                process.stdout.close()
+            except OSError:
+                pass
+        metadata["test_output_incomplete"] = True
+        return ""
 
 
 def run(args):
@@ -150,7 +325,8 @@ def run(args):
     metadata = {
         "test": test_name,
         "test_case": args.test_case,
-        "scope": {"image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
+        "scope": {"running-tool-cancel": "rust_adapter_running_tool_cancel",
+                  "image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
                   "idle-crash": "rust_adapter_idle_crash_after_native_ready"}.get(
             args.test_case, "rust_adapter_process_restart"),
         "credentials_provided": args.test_case not in UNAUTHENTICATED_CASES,
@@ -196,10 +372,17 @@ def run(args):
             "INFINISHELL_CODEX_LIVE_ARTIFACT": str(args.output),
             "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
         })
+        if args.test_case == "running-tool-cancel":
+            environment["INFINISHELL_CODEX_RUNNING_TOOL_CANCEL"] = "1"
         version = probe_version(args.codex, environment)
         metadata["cli_version"] = version.stdout.strip()
-        # 清空本次输出，避免筛选器未匹配时错误采用上一次的成功记录。
+        # 清空本次输出，避免筛选器未匹配或版本不符时采用上一次的成功记录。
         args.output.write_text("")
+        if args.test_case == "running-tool-cancel" and metadata["cli_version"] != "codex-cli 0.155.1":
+            metadata["acceptance_passed"] = False
+            metadata["version_mismatch"] = True
+            args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+            return 1
         command = [str(args.test_binary), test_name, "--exact", "--ignored", "--nocapture", "--test-threads=1"]
         platform_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
         process = subprocess.Popen(command, cwd=repository, env=environment,
@@ -208,20 +391,38 @@ def run(args):
         try:
             output, _ = process.communicate(timeout=120 if args.test_case in UNAUTHENTICATED_CASES else 900)
         except subprocess.TimeoutExpired:
-            terminate(process, own_process_only=args.test_case == "idle-crash")
-            output, _ = process.communicate()
+            terminate(process, own_process_only=args.test_case in {"idle-crash", "running-tool-cancel"})
+            output = stopped_output(process, metadata) if args.test_case == "running-tool-cancel" else process.communicate()[0]
             metadata["timed_out"] = True
         except BaseException:
-            terminate(process, own_process_only=args.test_case == "idle-crash")
-            raise
+            terminate(process, own_process_only=args.test_case in {"idle-crash", "running-tool-cancel"})
+            if args.test_case != "running-tool-cancel":
+                raise
+            output = stopped_output(process, metadata)
+            metadata["runner_interrupted"] = True
+        if args.test_case == "running-tool-cancel":
+            metadata["harness_cleanup"] = audit_and_cleanup_fixture(root, args.codex, args.supervisor)
+            metadata["libtest_reaped"] = process.poll() is not None
         metadata["test_exit_code"] = process.returncode
         output_path = args.output.with_suffix(".test-output.txt")
         output_path.write_text(sanitize(output, root), encoding="utf-8")
         # 测试筛选器没有匹配时 libtest 仍返回 0，因此还必须核验真实验收终态。
         events = []
         if args.output.exists():
-            events = [json.loads(line) for line in args.output.read_text().splitlines()]
+            try:
+                events = [json.loads(line) for line in args.output.read_text().splitlines()]
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                metadata["invalid_evidence"] = True
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
+                                         and not metadata.get("runner_interrupted", False)
+                                         and not metadata.get("invalid_evidence", False)
+                                         and (args.test_case != "running-tool-cancel" or (
+                                             metadata["libtest_reaped"]
+                                             and
+                                             metadata["harness_cleanup"]["zero_residual"]
+                                             and not metadata["harness_cleanup"]["fallback_attempted"]
+                                             and not metadata["harness_cleanup"]["unverified_native_root"]
+                                             and not metadata["harness_cleanup"]["audit_error"]))
                                          and verified_acceptance(args.test_case, process.returncode, output, events))
         args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         print("真实 Rust Codex 适配器验收" + ("通过" if metadata["acceptance_passed"] else "未通过"))
@@ -231,7 +432,7 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--test-case", choices=TEST_CASES, default="lifecycle", help="选择生命周期、本地工具保存恢复、图片、无凭据缺失会话或原生空闲崩溃验收")
+    parser.add_argument("--test-case", choices=TEST_CASES, default="lifecycle", help="选择生命周期、运行中工具取消、本地工具保存恢复、图片、无凭据缺失会话或原生空闲崩溃验收")
     parser.add_argument("--test-binary", type=Path, required=True, help="cargo test --no-run 生成的 warp libtest 可执行文件")
     parser.add_argument("--codex", type=Path, required=True)
     parser.add_argument("--supervisor", type=Path, required=True, help="与适配器代码同提交构建、支持隐藏 worker 的 InfiniShell 主程序或 TUI 二进制")

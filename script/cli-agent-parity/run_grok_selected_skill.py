@@ -16,6 +16,9 @@ import run_grok_native_skill as native
 
 lease, isolation, official, shared = native.lease, native.isolation, native.official, native.shared
 CURRENT = official.PROFILES[official.CURRENT_ROOT_PROFILE]
+CANDIDATE_1041 = {"version": "grok 1.0.41 (4220f3b224a6)",
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "model": "grok-4.7"}
 SCOPE = "authenticated_selected_skill_default_entry"
 TEST_NAME = "ai::cli_agent_runtime::grok::selected_skill_live_tests::" + SCOPE
 CATALOG_MODES = {"leader_catalog", "direct_catalog"}
@@ -94,12 +97,12 @@ def observation(exit_code, events, mode, expected_hash):
     return result
 
 
-def prepare_native(root, executable, source_home, port, mode):
+def prepare_native(root, executable, source_home, port, mode, profile=CURRENT):
     if mode == "sdk":
         wrapper, settings = isolation.prepare_probe_native(root, executable, source_home, port)
     elif mode in {"leader", "leader_catalog", "direct_catalog"}:
         wrapper, settings = official.prepare_native(root, executable, source_home, port,
-            binary_sha256=CURRENT["sha256"], model=CURRENT["model"])
+            binary_sha256=profile["sha256"], model=profile["model"])
         code = wrapper.read_text(encoding="utf-8")
         if mode == "direct_catalog":
             leader = """elif len(args)==4 and args[:3]==['agent','stdio','--leader-socket']:
@@ -182,6 +185,10 @@ def boundary_passed(metadata, launches, tunnel, mode):
 
 def run(args):
     catalog_only = args.mode in CATALOG_MODES
+    test_candidate_1041 = getattr(args, "test_candidate_1041_catalog", False)
+    if test_candidate_1041 and (args.mode != "leader_catalog" or args.max_native_inputs != 0):
+        raise ValueError("1.0.41 候选仅允许零输入默认 leader 目录")
+    profile = CANDIDATE_1041 if test_candidate_1041 else CURRENT
     args.output.parent.mkdir(parents=True, exist_ok=True)
     isolation.reserve_artifacts(args.output)
     root = Path(tempfile.mkdtemp(prefix="infinishell-grok-selected-skill-", dir="/private/tmp")).resolve()
@@ -208,7 +215,8 @@ def run(args):
         auth_copy_method="opaque_auth_json_only", allowed_https_hosts=sorted(official.OFFICIAL_HOSTS),
         http_model_calls_observable=False, http_model_call_budget_enforced=False, tls_decrypted=False,
         same_commit_verified_by_runner=False, grok_sha256=shared.digest(args.grok),
-        verified_cli_version=CURRENT["version"], requested_model=CURRENT["model"],
+        verified_cli_version=profile["version"], requested_model=profile["model"],
+        test_only_1041_profile=test_candidate_1041,
         test_binary_sha256=shared.digest(args.test_binary), supervisor_sha256=shared.digest(args.supervisor))
     events, launches, settings, before_settings = [], [], None, None
     with isolation.bounded_tunnel(args.timeout) as tunnel:
@@ -217,19 +225,23 @@ def run(args):
             official.copy_private_auth(args.official_grok_home, root / "home/.grok")
             metadata["sandbox_canary"] = shared.network_canary(root, args.official_grok_home / "auth.json", port)
             metadata["project_write_canary"] = isolation.project_write_canary(root, args.official_grok_home, port, tunnel.deadline - time.monotonic())
-            wrapper, settings = prepare_native(root, args.grok, args.official_grok_home, port, args.mode)
+            wrapper, settings = prepare_native(root, args.grok, args.official_grok_home, port,
+                args.mode, profile)
             before_settings = settings.read_bytes()
             environment = official.official_environment(root, port)
             environment.update(INFINISHELL_GROK_LIVE_ROOT=str(root), INFINISHELL_GROK_LIVE_EXECUTABLE=str(wrapper),
                 INFINISHELL_GROK_LIVE_ARTIFACT=str(raw), INFINISHELL_CLI_SUPERVISOR_EXECUTABLE=str(args.supervisor),
                 INFINISHELL_GROK_SELECTED_SKILL_MODE=args.mode,
                 CLAUDE_CONFIG_DIR=str(root / "home/.claude"), CODEX_HOME=str(root / "home/.codex"))
+            if test_candidate_1041:
+                environment["INFINISHELL_GROK_TEST_CANDIDATE_1041"] = "1"
+                environment["INFINISHELL_GROK_TEST_CANDIDATE_NATIVE"] = str(args.grok)
             remaining = tunnel.deadline - time.monotonic()
             if remaining <= 0 or tunnel.forwarded != 0 or any(sentinel in value or context in value for value in environment.values()):
                 raise ValueError("输入前隔离边界失败")
             version = subprocess.run([str(wrapper), "--version"], env=environment, cwd=root / "project",
                 capture_output=True, text=True, timeout=min(10, remaining), check=True)
-            if version.stdout.strip() != CURRENT["version"] or tunnel.forwarded != 0:
+            if version.stdout.strip() != profile["version"] or tunnel.forwarded != 0:
                 raise ValueError("固定 CLI 版本或网络预算不匹配")
             command = [str(args.test_binary), TEST_NAME, "--exact", "--ignored", "--nocapture", "--test-threads=1"]
             with os.fdopen(os.open(root / "private-test-output.txt", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "wb") as output:
@@ -290,12 +302,16 @@ def main():
         parser.add_argument("--" + option, type=Path, required=True)
     parser.add_argument("--mode", choices=("leader", "leader_catalog", "direct_catalog"), required=True)
     parser.add_argument("--max-native-inputs", type=int, default=1)
+    parser.add_argument("--test-candidate-1041-catalog", action="store_true")
     parser.add_argument("--timeout", type=int, default=lease.MAX_DEADLINE)
     args = parser.parse_args()
     try:
         if args.max_native_inputs != (0 if args.mode in CATALOG_MODES else 1):
             raise ValueError("模型输入预算与入口类型不匹配")
-        isolation.validate_paths(args, CURRENT["sha256"],
+        if args.test_candidate_1041_catalog and args.mode != "leader_catalog":
+            raise ValueError("1.0.41 候选仅允许零输入默认 leader 目录")
+        profile = CANDIDATE_1041 if args.test_candidate_1041_catalog else CURRENT
+        isolation.validate_paths(args, profile["sha256"],
             expected_inputs=0 if args.mode in CATALOG_MODES else 1)
         return run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:

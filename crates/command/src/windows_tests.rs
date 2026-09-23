@@ -1,5 +1,7 @@
+use super::SuspendedChild;
 use crate::blocking::Command;
 use std::fs;
+use std::io;
 use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::process::Stdio;
 
@@ -52,6 +54,36 @@ fn dropping_suspended_child_terminates_and_waits() {
     let wait = unsafe { WaitForSingleObject(HANDLE(process.as_raw_handle()), 0) };
     assert_eq!(wait, WAIT_OBJECT_0, "Drop 返回前必须完成进程终止");
     assert!(!marker.exists(), "Drop 不得间接恢复子进程");
+}
+
+#[test]
+fn thread_discovery_failure_returns_suspended_child_without_waiting() {
+    let directory = tempfile::tempdir().unwrap();
+    let marker = directory.path().join("must-not-run");
+    let mut suspended = fixture_command(&marker).spawn_suspended().unwrap();
+    let child = suspended.child.take().unwrap();
+    drop(suspended);
+
+    let (failure, mut child) = SuspendedChild::from_child_with_primary_thread(
+        child,
+        Err(io::Error::other("注入线程发现失败")),
+    )
+    .unwrap_err();
+    assert_eq!(failure.kind(), io::ErrorKind::Other);
+    assert!(child.try_wait().unwrap().is_none());
+    child.kill().unwrap();
+    child.wait().unwrap();
+    assert!(!marker.exists(), "线程发现失败后不得执行用户代码");
+}
+
+#[test]
+fn spawn_suspended_failure_before_creation_has_no_child() {
+    let directory = tempfile::tempdir().unwrap();
+    let missing = directory.path().join("missing.exe");
+    let (_, child) = Command::new(missing)
+        .spawn_suspended_with_child_on_error()
+        .unwrap_err();
+    assert!(child.is_none());
 }
 
 #[test]
