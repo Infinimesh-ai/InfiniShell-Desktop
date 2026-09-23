@@ -1,5 +1,11 @@
 # CLI Agent Parity 阶段检查点交接（更新至 2026-09-24）
 
+## 2026-09-24 存储清理续记
+
+- 用户授权清理临时占用后，已对内置 `/private/tmp/infinishell-parity-cargo-internal` 执行 `cargo clean --target-dir`，并清理 32 个无人使用的旧测试运行目录；内置盘可用空间由约 49 GiB 增至 121 GiB。下文“内置副本保留”的描述仅是清理前的历史快照。
+- ACASIS 上已清理独立旧 Cargo 构建目录 `InfiniShell-Desktop-parity-internal-cache-20260924`、`cli-parity-ipc-fix-8d2abb`、`InfiniShell-Desktop-grok1041`、`InfiniShell-Desktop-cli-agent-parity-windows-check`，以及 `InfiniShell-Desktop-cli-agent-parity-e846c137d` 中的开发和 TUI 构建产物；该目录内的官方 Codex／Claude 包保留。外置盘已用空间由约 423 GiB 降至 229 GiB。
+- 当前 `.envrc` 与仓库 `target` 链接所指的 `/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop` 未清理。外置 `InfiniShell-Desktop-tmp-offload-20260921` 含原始 GUI 验证记录，阶段收据、工作树、归档及 Parallels 虚拟机也保留。后续需要旧独立目标中的测试二进制时须重新构建，不能把已删除的产物当成现存验收证据。
+
 ## 后续开发节奏与主分支基线（2026-09-24）
 
 - 用户已暂停本阶段的继续开发；本次只记录后续策略并合入主分支更新，不启动新的 CLI Agent 功能开发，也不据此宣布总目标验收完成。
