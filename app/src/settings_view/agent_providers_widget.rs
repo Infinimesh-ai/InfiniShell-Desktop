@@ -552,14 +552,12 @@ impl AgentProvidersWidget {
 
         // ---- Base URL 编辑器 ----
         let initial_base_url = provider.base_url.clone();
+        let base_url_placeholder = provider.api_type.default_base_url().to_owned();
         let base_url_editor = ctx.add_typed_action_view(move |ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let options = single_line_editor_options(appearance, false);
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text(
-                crate::t!("settings-agent-providers-base-url-placeholder"),
-                ctx,
-            );
+            editor.set_placeholder_text(base_url_placeholder, ctx);
             if !initial_base_url.is_empty() {
                 editor.set_buffer_text(&initial_base_url, ctx);
             }
@@ -631,7 +629,7 @@ impl AgentProvidersWidget {
     }
 
     /// 渲染 "API Type" 行:5 个 chip 横排,当前选中的高亮显示。
-    /// 点击 chip 即 dispatch `SetAgentProviderApiType`,后端会顺手填默认 endpoint。
+    /// 点击 chip 即 dispatch `SetAgentProviderApiType`,自动默认端点随协议切换。
     fn render_api_type_field(
         &self,
         provider: &AgentProvider,

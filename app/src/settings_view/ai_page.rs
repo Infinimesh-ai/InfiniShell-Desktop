@@ -5453,12 +5453,7 @@ impl TypedActionView for AISettingsPageView {
                 AISettings::handle(ctx).update(ctx, |settings, ctx| {
                     let mut providers = settings.agent_providers.value().clone();
                     if let Some(p) = providers.iter_mut().find(|p| p.id == *provider_id) {
-                        p.api_type = *api_type;
-                        // 若 base_url 为空,顺手填该类型的默认 endpoint(便于新手)。
-                        // 用户已自填 base_url 时不动。
-                        if p.base_url.trim().is_empty() {
-                            p.base_url = api_type.default_base_url().to_owned();
-                        }
+                        p.set_api_type(*api_type);
                     }
                     let _ = settings.agent_providers.set_value(providers, ctx);
                 });
@@ -5780,6 +5775,11 @@ impl TypedActionView for AISettingsPageView {
                     .get(&provider_id)
                     .map(str::to_owned);
                 let requested_base_url = provider.base_url.clone();
+                let effective_base_url = if requested_base_url.trim().is_empty() {
+                    provider.api_type.default_base_url().to_owned()
+                } else {
+                    requested_base_url.clone()
+                };
                 let requested_api_key = api_key.clone();
                 let revision = self
                     .api_model_fetch_revision
@@ -5793,7 +5793,7 @@ impl TypedActionView for AISettingsPageView {
                     async move {
                         crate::ai::agent_providers::fetch_openai_compatible_models(
                             client,
-                            &provider.base_url,
+                            &effective_base_url,
                             api_key.as_deref(),
                         )
                         .await

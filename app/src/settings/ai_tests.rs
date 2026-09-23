@@ -940,6 +940,20 @@ fn extra_headers_round_trip() {
 }
 
 #[test]
+fn switching_agent_provider_api_type_updates_only_default_urls() {
+    let mut provider = AgentProvider::new_empty();
+    provider.set_api_type(AgentProviderApiType::DeepSeek);
+    assert_eq!(provider.base_url, "https://api.deepseek.com/v1/");
+
+    provider.set_api_type(AgentProviderApiType::OpenAi);
+    assert_eq!(provider.base_url, "https://api.openai.com/v1/");
+
+    provider.base_url = "https://gateway.example.com/v1".to_string();
+    provider.set_api_type(AgentProviderApiType::DeepSeek);
+    assert_eq!(provider.base_url, "https://gateway.example.com/v1");
+}
+
+#[test]
 fn agent_provider_model_migrates_legacy_defaults_to_auto() {
     let model: AgentProviderModel = toml::from_str(
         r#"

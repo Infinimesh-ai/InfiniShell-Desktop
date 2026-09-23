@@ -1393,8 +1393,8 @@ pub struct AgentProvider {
     #[serde(default)]
     pub api_type: AgentProviderApiType,
 
-    /// API base URL,例如 `https://api.deepseek.com/v1`、`http://localhost:11434`。
-    /// 不要带尾随斜杠,但代码侧会做容错。
+    /// API base URL,例如 `https://api.deepseek.com/v1/`、`http://localhost:11434/`。
+    /// 默认地址带尾随斜杠;手填地址缺少时,客户端会做容错。
     pub base_url: String,
 
     /// 用户配置的、希望暴露给 Agent 选择的模型列表。
@@ -1429,6 +1429,16 @@ impl AgentProvider {
             models: Vec::new(),
             extra_headers: Vec::new(),
             responses: AgentProviderResponsesOptions::default(),
+        }
+    }
+
+    /// 切换协议时更新自动默认地址，不覆盖用户填写的自定义端点。
+    pub fn set_api_type(&mut self, api_type: AgentProviderApiType) {
+        let uses_default_url =
+            self.base_url.trim().is_empty() || self.base_url == self.api_type.default_base_url();
+        self.api_type = api_type;
+        if uses_default_url {
+            self.base_url = api_type.default_base_url().to_owned();
         }
     }
 }
