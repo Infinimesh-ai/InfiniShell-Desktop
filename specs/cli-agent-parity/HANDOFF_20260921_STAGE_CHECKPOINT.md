@@ -4,7 +4,7 @@
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
 - 工作分支：`codex/cli-agent-parity`。
-- 已结算的跨平台代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。更新的聚焦矩阵 [run 35815324806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35815324806) 绑定 `2c4880f15ead4fb929ee8eeef7a463a250a47ee7`，包含 Windows 严格 Job 调试夹具，交接写入时尚未结算；后续提交不自动继承其结果。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`，没有冒充在当前提交重跑真实模型链。
+- 已结算的跨平台代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。更新的聚焦矩阵 [run 35815324806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35815324806) 绑定 `2c4880f15ead4fb929ee8eeef7a463a250a47ee7`，Linux 成功、Windows 因严格 Job 的内层 ignored 测试名称失配而失败，见 [receipt112](validation/cross-platform-preflight-112-2c4880f-windows-debug-fixture.safe.json)；后续提交不自动继承其结果。Grok 单技能修复已推送为 `eebf08b96cff09bbe7fbfd13841aee93a42234f6`，receipt111 的真实实链仍发生在提交前工作树，未冒充该 SHA 的同提交矩阵。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`。
 - 基线归档仍为 `e6e9d619318e87d0bb889df344c8570f97977e90`；此前受测代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。
 - 后续必须继续使用同一工作树和当前分支，不得从 `main` 重来，不得 `reset/clean` 根目录，也不得直接弹出整理前的完整 stash。
 
@@ -36,6 +36,7 @@
 - Windows 上三款当前 CLI 均完成真实二进制身份、签名和 `--version` 验证：Codex `0.155.1`、Claude Code `2.1.278`、Grok Build `1.0.40`。
 - PE 结构与程序/祖先租约检查通过，但持有 cwd 句柄时叶子目录仍可改名；调试器进程树超过 30 秒不退出；三次 updater 参数运行均超时，且终止调试器后 Claude/Grok 根进程曾存活，已显式清理。
 - [receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 已纠正资产结论：receipt104 错把 `0.155.1` 官方包与 legacy `0.147.0` 清单比较；版本选择后的仓内 `0.155.1` size/SHA 与 GitHub API digest 一致，无需修改产品摘要。cwd、debugger、退出收据和清理缺口不受此纠正影响。
+- receipt112 的 Windows 严格 Job 诊断并未实际进入 image-debug 执行：外层两个 ignored 测试各重试三次，内层 `--exact` 都筛出 0 项，随后读取未生成的退出回执时报错。当前候选仅修正测试名去掉 crate 前缀；必须在新提交的 Windows 实机重跑后才可对原子 debug 退出／拒绝下结论，receipt104 的真实阻断不被此夹具问题覆盖。
 - 当前安全收据：`validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json`。
 
 ### 2.4 同提交 Linux／Windows 聚焦预检
@@ -45,6 +46,7 @@
 - 6 个 artifact 共 37 个文件已下载到仓库外临时目录并逐份核对；JSON／NDJSON 解析失败为 0，邮箱与常见凭据形态扫描均为 0，只把大小、SHA／manifest 摘要和允许字段写入 [receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)。
 - 该 run 是聚焦跨平台边界证据，不含同提交 macOS、GUI integration 或 full workspace；因此总 Goal 继续 active。
 - 复核该 Linux job 原始日志后，[receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) 确认密封 memfd 的真实 `execveat` 参数／环境／cwd 夹具及失败后禁止 pathname 回退均在 Linux x64 实机通过；此前“Linux `execveat` 完全未运行”的阶段表述已过时。三款 CLI 的 Linux 产品升级事务、退出回执与恢复仍未运行。
+- [receipt112](validation/cross-platform-preflight-112-2c4880f-windows-debug-fixture.safe.json) 对 run 35815324806 的两 job 做了结算：Linux 34 成功／2 跳过；Windows 44 成功／1 失败／3 跳过，首败是严格 Job 的内层 `--exact` 测试名错误。6 个 artifact 共 37 个文件已在仓库外下载，JSON／NDJSON 可解析、无符号链接，常见凭据与邮箱模式扫描为 0；这仍是失败的聚焦矩阵，不能替代更新源码的跨平台验收。
 - 2026-09-23 的 [receipt110](validation/macos-working-tree-110-grok-1040-selected-skill-gate-failed.safe.json) 保留 Grok `1.0.40` 默认入口单技能候选的负证据：用户重新登录后原生会话创建成功，私有原生日志在同一进程／会话两次公告目标技能名，但 ACP 接收路径缺少输入前的 `available_commands_update`，30 秒后按请求超时失败；公告日志不等于原生路径目录交付。0 次产品输入，正式技能门禁未开放。私有认证副本已移除；仅测试夹具接受固定 marketplace 初始化或单字段 purge。
 - receipt111 的输入前观察器移到静态目录形状验证前，重新实测发现默认 leader 实际交付 30 条 ACP 命令（含唯一技能），旧 29 条硬编码会拒绝。receipt110 当时“未观察到”仍保留为历史失败，但不能再解释为官方 CLI 从不送达目录；修复后的默认入口组合独立通过。直连 `--no-leader` 则送达不同的 10 条目录并被当前适配器拒绝，仅作零输入对照，不推广为产品入口。
 
@@ -75,7 +77,7 @@
 4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的原先负收据保留。receipt111 已定位目录实际送达而静态 29 条验证器拒绝选定技能额外条目，并在 dirty tree 上通过默认 leader 的单技能真实输入、唯一路径、精确只读审批、历史及最终标记；直连的不同目录仍失败。先补冻结提交上的真实链与当前源码的同提交证据，再补本地工具、子任务／父权限上限、App 重启／GUI和网络隔离，不得因 macOS 隔离候选通过就开放正式功能。
 5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
-7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测，不要无代码变化地重复派发相同矩阵。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
+7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测；receipt112 的更新矩阵在旧 SHA `2c4880f…` 因 Windows 诊断夹具筛选错误失败。先对当前夹具修复做本地门禁、精确提交／推送，并重发最小 Linux／Windows 矩阵，确认 Windows 内层真实执行且检查退出／拒绝收据。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
 8. 只有“要求→实现→CLI 版本→源码提交→模式/平台→收据→结果”矩阵中所有必需项在同一当前提交上通过，才可把 Goal 标记为 complete。
 
 ## 6. 安全边界

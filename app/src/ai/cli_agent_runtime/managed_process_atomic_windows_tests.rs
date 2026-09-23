@@ -55,7 +55,10 @@ const DEBUG_DRIVER_RECEIPT_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_RECEIPT
 const DEBUG_DRIVER_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn run_debug_fixture_in_strict_job(test_name: &str) {
-    let exact_name = format!("{}::{test_name}", module_path!());
+    let (_, test_module) = module_path!()
+        .split_once("::")
+        .expect("测试模块路径应包含 crate 名称");
+    let exact_name = format!("{test_module}::{test_name}");
     let directory = tempfile::tempdir().unwrap();
     let receipt = directory.path().join("native-exit.txt");
     let mut command = Command::new(std::env::current_exe().unwrap());
