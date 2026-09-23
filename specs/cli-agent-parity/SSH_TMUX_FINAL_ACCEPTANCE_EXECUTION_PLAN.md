@@ -6,6 +6,8 @@
 
 ~/.ssh/config 的受控解析确认 `ubuntu-infinishell-build` 与 `win-infinishell-build` 两个别名存在，显式 stanza 有 IdentityFile 指令；只输出别名及布尔，没有输出地址、私钥路径或配置全文，也未读取或 stat 密钥文件。未展开有效 SSH 配置、未连接，远端 OS、CLI 安装、插件及模型授权仍未知。优先使用这两个专用构建机候选，先取得实际平台与可用身份的安全前置证据，不能据名字或已有别名判 remote ready。
 
+2026-09-23 追加只读连接前置证据：在 `BatchMode=yes`、`StrictHostKeyChecking=yes`、8 秒连接期限下，`ubuntu-infinishell-build` 的 `uname -sm` 返回 `Linux x86_64`，`tmux -V` 返回 `tmux 3.2a`；`win-infinishell-build` 经 `cmd.exe /c echo %OS%` 返回 `Windows_NT`。两台构建机的非交互 SSH PATH 探针均未解析到 `codex`、`claude`、`grok`，这不能推出二进制未安装，但说明当前入口无法直接开展三款 CLI 的在线验收；后续须在受控会话中核对固定安装路径、版本与来源。第一次 Windows `ver` 调用因远端 shell 引号组合失败，不是连接或产品功能失败。Windows SSH 提示当前连接未使用后量子密钥交换；此安全提示需独立处理，不用它替代 CLI/SSH/tmux 功能结论。本轮没有读取凭据或私钥内容、改动远端配置、启动 CLI／tmux server、连接 GUI，也没有验证 tmux passthrough、当前 worker 构建来源、远端授权或任何产品验收项。
+
 现有入口及其真实边界：
 
 | 入口 | 可复用行为 | 不能据此证明 |

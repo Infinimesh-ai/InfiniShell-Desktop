@@ -29,6 +29,7 @@
 - 能力仍由 test-only candidate gate 隔离，`public_product_gate_open=false`；same-turn steering、技能、本地工具、子任务、父权限上限、App 重启／GUI、产品网络隔离和其他平台没有由本收据证明。
 - 当前安全收据：[receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)；历史失败继续见 [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)。
 - 新的 [receipt111](validation/macos-working-tree-111-grok-1040-selected-skill-combination.safe.json) 在当前工作树上完成默认 leader＋单个显式选定技能的 macOS 隔离实链：原生 ACP 目录由基线 29 条增至 30 条，第 9 位是规范路径与名称匹配的唯一技能；零输入握手通过后，真实 1 次输入／接收、1 次精确只读审批、1 次上下文读取、3 次原生工具事件、唯一 slash 的最终历史与随机技能标记均核对通过。原生进程、隧道和认证副本清理确认。原有静态 29 条目录验证器是本轮首个可修复失败点，现只对单技能的精确额外条目放行；产品正式门禁仍关闭，GUI 与同提交跨平台未验收。
+- [receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) 已在干净提交 `4b12091e788fb79f7bbf12c1fbf67d98c52aabe3` 的 macOS arm64 重新完成固定 Grok `1.0.40` 的 0 输入目录握手及 1 次真实选定技能组合：30 条目录含唯一绑定技能，1 次输入／接收、1 次精确只读审批、1 次上下文读取、3 条原生工具事件、最终历史与随机标记匹配，密封退出和隔离清理确认。用户重新登录后默认 `grok` 已指向 `1.0.41`，该新版未被本收据验收；外置盘 supervisor 的预检 EAGAIN 保留为环境失败。原登录文件未变，临时认证副本已删。正式产品门禁、GUI、当前默认新版和同提交跨平台全范围仍未验收。
 
 ### 2.3 Windows 原子升级与真实 CLI
 
@@ -74,7 +75,7 @@
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
 2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–108。
 3. 先做定向闭环，不要因接手而立即重复全量构建。
-4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的原先负收据保留。receipt111 已定位目录实际送达而静态 29 条验证器拒绝选定技能额外条目，并在 dirty tree 上通过默认 leader 的单技能真实输入、唯一路径、精确只读审批、历史及最终标记；直连的不同目录仍失败。先补冻结提交上的真实链与当前源码的同提交证据，再补本地工具、子任务／父权限上限、App 重启／GUI和网络隔离，不得因 macOS 隔离候选通过就开放正式功能。
+4. Grok：receipt106 已完成 `ac0fa70e…` 的固定 `1.0.40` 干净提交 root 候选链；receipt110 的原先负收据保留。receipt111 定位目录实际送达而旧 29 条验证器拒绝唯一技能增量；receipt113 又在干净 `4b12091e…` 上通过默认 leader 的单技能真实输入、唯一路径、精确只读审批、历史及最终标记。直连的不同目录仍失败。继续补本地工具、子任务／父权限上限、App 重启／GUI、产品网络隔离和当前默认 `1.0.41` 的独立版本评估；不得因 macOS 隔离候选通过就开放正式功能。
 5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
 7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测；receipt112 的更新矩阵在旧 SHA `2c4880f…` 因 Windows 诊断夹具筛选错误失败。先对当前夹具修复做本地门禁、精确提交／推送，并重发最小 Linux／Windows 矩阵，确认 Windows 内层真实执行且检查退出／拒绝收据。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
