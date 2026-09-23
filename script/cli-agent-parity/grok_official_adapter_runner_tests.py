@@ -19,7 +19,8 @@ from unittest.mock import patch
 import run_grok_adapter_live as shared
 from grok_adapter_runner_tests import acceptance_fixture, final_response_fields
 from run_grok_official_adapter_live import (
-    CURRENT_ROOT_PROFILE, MODEL, PROFILES, P0_PROFILE, OfficialTunnel, audit_private_settings,
+    CANDIDATE_1041_P0_PROFILE, CURRENT_ROOT_PROFILE, MODEL, PROFILES, P0_PROFILE,
+    OfficialTunnel, audit_private_settings,
     copy_private_auth, main, official_environment, prepare_native, public_events,
     rejected_origin_event, validate_paths, verified_p0_acceptance,
 )
@@ -63,6 +64,24 @@ def p0_acceptance_fixture():
             "native_session_id": native, "queued_submissions_observed_inside_adapter": 0},
         {"event": "connection_shutdown", "cleanup_confirmed": True,
             "native_session_id": native, "queued_submissions_observed_inside_adapter": 0}])
+    return events
+
+
+def candidate_1041_p0_acceptance_fixture():
+    events = p0_acceptance_fixture()
+    events[0].update({"verified_scope": CANDIDATE_1041_P0_PROFILE,
+        "test_only_candidate_1041": True, "zero_input_handshake_verified": True,
+        "public_product_gate_open": False})
+    handshake = "native-zero-input"
+    events.insert(0, {"event": "acceptance_started",
+        "verified_scope": CANDIDATE_1041_P0_PROFILE,
+        "test_only_candidate_1041": True, "max_native_inputs": 4,
+        "public_product_gate_open": False})
+    events.insert(1, {"event": "connection_shutdown", "cleanup_confirmed": True,
+        "native_session_id": handshake, "queued_submissions_observed_inside_adapter": 0})
+    events.insert(2, {"event": "candidate_zero_input_handshake_verified",
+        "native_session_id": handshake, "model_inputs_sent": 0,
+        "verified_cli_version": "1.0.41", "cleanup_confirmed": True})
     return events
 
 
@@ -318,6 +337,48 @@ tool = "write"
             events = p0_acceptance_fixture()
             change(events)
             self.assertFalse(verified_p0_acceptance(0, output, events))
+
+    def test_candidate_1041_p0_acceptance_keeps_version_handshake_and_four_inputs_distinct(self):
+        output = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        events = candidate_1041_p0_acceptance_fixture()
+        self.assertTrue(verified_p0_acceptance(0, output, events, candidate_1041=True))
+        self.assertFalse(verified_p0_acceptance(0, output, events))
+        self.assertFalse(verified_p0_acceptance(0, output, p0_acceptance_fixture(), candidate_1041=True))
+        changes = [
+            lambda items: items.pop(2),
+            lambda items: items[2].update({"verified_cli_version": "1.0.40"}),
+            lambda items: items[2].update({"model_inputs_sent": 1}),
+            lambda items: items[2].update({"native_session_id": "native-p0"}),
+            lambda items: items[1].update({"cleanup_confirmed": False}),
+            lambda items: items[0].update({"max_native_inputs": 8}),
+            lambda items: items[3].update({"public_product_gate_open": True}),
+            lambda items: items.append({"event": "queued_input_submitted"}),
+            lambda items: next(item for item in items if item.get("event") == "approval_requested")
+                .update({"exact_read_fixture": False}),
+        ]
+        for change in changes:
+            with self.subTest(change=changes.index(change)):
+                altered = candidate_1041_p0_acceptance_fixture()
+                change(altered)
+                self.assertFalse(verified_p0_acceptance(0, output, altered, candidate_1041=True))
+
+    def test_candidate_1041_p0_profile_pins_binary_model_and_closed_gate(self):
+        profile = PROFILES[CANDIDATE_1041_P0_PROFILE]
+        self.assertEqual(profile["version"], "grok 1.0.41 (4220f3b224a6)")
+        self.assertEqual(profile["sha256"],
+            "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d")
+        self.assertEqual(profile["model"], "grok-4.7")
+        self.assertEqual(profile["max_acp_inputs"], 4)
+        self.assertEqual(profile["project_files"], ["allow.txt", "deny.txt"])
+        self.assertFalse(profile["public_product_gate_open"])
+        self.assertTrue(profile["test_name"].endswith("real_grok_candidate_1041_p0_lifecycle"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "home/.grok").mkdir(parents=True)
+            wrapper, settings = prepare_native(root, Path("/tmp/fixed-grok"),
+                Path("/tmp/auth-source"), 12345, profile["sha256"], profile["model"])
+            self.assertIn(profile["sha256"], wrapper.read_text())
+            self.assertIn('default = "grok-4.7"', settings.read_text())
 
     def test_p0_profile_pins_version_hash_test_and_four_input_budget(self):
         profile = PROFILES[P0_PROFILE]

@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "scope": "macos_working_tree_codex_01561_test_only_running_tool_cancel",
+  "observed_at_utc": "2026-09-23 15:52 UTC",
+  "source": {
+    "head": "a25701d2624d28528983b71b6e4616101fb9b712",
+    "worktree_dirty_at_execution": true,
+    "codex_three_file_diff_sha256": "abd29ffe3d8365317238b26f377d072084a4184b99868a950d933461ba6c892d",
+    "same_clean_commit_acceptance": false,
+    "platform": "macos-arm64"
+  },
+  "binaries": {
+    "official_fixed_full_package_verified_by_runner": true,
+    "official_cli_version": "codex-cli 0.156.1",
+    "rust_libtest_sha256": "6508dd864ba041fa36c2e5f79db26a2ad29e753b38b2d8a70417898245493b5c",
+    "same_product_supervisor_sha256": "04dd4fb0483428324fc491cca1dc48e57611cddb5af080a4d1fcf2ace7b9cf76",
+    "libtest_and_supervisor_strict_codesign_verified": true
+  },
+  "test": {
+    "case": "candidate-01561-running-tool-cancel",
+    "scope": "rust_adapter_01561_test_only_running_tool_cancel",
+    "test_only_candidate": true,
+    "runner_exit_code": 0,
+    "libtest_exit_code": 0,
+    "acceptance_passed": true,
+    "safe_event_count": 15,
+    "safe_event_types": {
+      "acceptance_started": 1,
+      "approval_requested": 1,
+      "approval_resolved": 1,
+      "cancel_terminal_after_cleanup": 1,
+      "disconnected_after_cancel": 1,
+      "interrupt_accepted": 1,
+      "interrupt_dispatched": 1,
+      "native_progress_observed": 1,
+      "phase_started": 1,
+      "running_tool_cancel_finished": 1,
+      "running_tool_observed": 1,
+      "session_ready": 1,
+      "submit_accepted": 1,
+      "submit_dispatched": 1,
+      "turn_started": 1
+    },
+    "native_item_started_before_interrupt": true,
+    "interrupt_native_ack": true,
+    "same_generation_receipt": true,
+    "cleanup_confirmed": true,
+    "tool_tree_zero_residual": true,
+    "terminal_before_disconnected": true,
+    "event_order": [
+      "native_item_started",
+      "interrupt_sent",
+      "interrupt_accepted",
+      "turn_finished",
+      "disconnected"
+    ],
+    "containment": "macos_resource_coalition",
+    "libtest_reaped": true,
+    "outer_cleanup_audit": {
+      "fallback_attempted": false,
+      "zero_residual": true,
+      "unverified_native_root": false,
+      "audit_error": false,
+      "observed_tool_processes": 0,
+      "observed_native_roots": 0,
+      "observed_supervisors": 0,
+      "residual_tool_processes": 0,
+      "residual_native_roots": 0,
+      "residual_supervisors": 0
+    }
+  },
+  "boundaries": {
+    "model_input_sent": true,
+    "http_model_request_count_independently_observed": false,
+    "official_version_production_gate_open": false,
+    "clean_commit_retest_required": true,
+    "app_restart_or_gui_verified": false,
+    "ssh_tmux_verified": false,
+    "linux_windows_verified": false,
+    "automatic_upgrade_verified": false,
+    "full_cli_parity_goal_complete": false
+  },
+  "private_evidence_sha256": "ba4bc8ed5b5f1be76d55e76a426c84c22f2e92ab93d917231bb84c52e593bc67",
+  "raw_model_output_or_credentials_copied_to_repository": false
+}

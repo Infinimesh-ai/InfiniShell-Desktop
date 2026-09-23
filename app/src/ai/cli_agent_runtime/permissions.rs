@@ -4,6 +4,11 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+#[cfg(all(
+    feature = "local_fs",
+    any(test, feature = "claude_21280_test_candidate")
+))]
+use uuid::Uuid;
 
 use super::RuntimeError;
 pub use super::claude_profile::ClaudeRestrictedFilesV1;
@@ -33,6 +38,18 @@ enum NativePermissions {
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct ClaudePermissionProof {
     claude_restricted_files_v1: ClaudeRestrictedFilesV1,
+}
+
+#[cfg(all(
+    feature = "local_fs",
+    any(test, feature = "claude_21280_test_candidate")
+))]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct ClaudeTestCandidate21280Proof {
+    runtime_generation: Uuid,
+    native_session_id: String,
+    profile_sha256: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -98,6 +115,41 @@ fn parse_permissions(value: &Value) -> Option<CodexPermissions> {
     Some(permissions)
 }
 
+#[cfg(feature = "local_fs")]
+fn claude_parent_version_verified(
+    parent: &LocalCliTask,
+    config: &Value,
+    observed: &Value,
+    profile: &ClaudeRestrictedFilesV1,
+) -> bool {
+    let Some(version) = config.get("cli_version").and_then(Value::as_str) else {
+        return false;
+    };
+    if super::claude::supported_version(version) {
+        return true;
+    }
+    #[cfg(any(test, feature = "claude_21280_test_candidate"))]
+    if cfg!(debug_assertions) && version == "2.1.280" {
+        let Some(executable_digest) = super::claude::test_candidate_executable_digest() else {
+            return false;
+        };
+        let Ok(proof) = serde_json::from_value::<ClaudeTestCandidate21280Proof>(
+            observed["claudeTestCandidate21280Proof"].clone(),
+        ) else {
+            return false;
+        };
+        return !proof.runtime_generation.is_nil()
+            && config["cli_version_runtime_generation"] == json!(proof.runtime_generation)
+            && parent.native_session_id.as_deref() == Some(proof.native_session_id.as_str())
+            && observed["fixedProfileSha256"] == json!(profile.digest())
+            && proof.profile_sha256 == profile.digest()
+            && json!(profile)["executableSha256"] == executable_digest;
+    }
+    #[cfg(not(any(test, feature = "claude_21280_test_candidate")))]
+    let _ = (parent, observed, profile);
+    false
+}
+
 /// 调用方必须传入 SQLite 已提交的父记录；恢复时读取创建子任务时的固定父代。
 #[cfg(feature = "local_fs")]
 pub(crate) fn ceiling_from_parent(
@@ -128,11 +180,7 @@ pub(crate) fn ceiling_from_parent(
             NativePermissions::Codex(parse_permissions(&observed).ok_or_else(reject)?)
         }
         "claude"
-            if config
-                .get("cli_version")
-                .and_then(Value::as_str)
-                .is_some_and(super::claude::supported_version)
-                && config["permission_policy"] == "ClaudeRestrictedFilesV1"
+            if config["permission_policy"] == "ClaudeRestrictedFilesV1"
                 && observed["fixedProfileVerified"] == true
                 && observed["permissionMode"]
                     == super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
@@ -142,6 +190,9 @@ pub(crate) fn ceiling_from_parent(
                 serde_json::from_value(observed["claudeRestrictedFilesV1"].clone())
                     .map_err(|_| reject())?;
             profile.validate(Path::new(&parent.working_directory))?;
+            if !claude_parent_version_verified(parent, &config, &observed, &profile) {
+                return Err(reject());
+            }
             NativePermissions::Claude(ClaudePermissionProof {
                 claude_restricted_files_v1: profile,
             })

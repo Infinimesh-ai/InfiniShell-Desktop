@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """真实验收运行器必须同时取得测试匹配、退出成功及对应协议终态。"""
 
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -86,10 +87,13 @@ class AcceptanceEvidenceTests(unittest.TestCase):
 
     def test_candidate_01561_requires_fixed_complete_package_before_artifacts(self):
         with tempfile.TemporaryDirectory(prefix="codex-candidate-test-") as temporary:
-            root = Path(temporary) / "package"
+            root = Path(temporary).resolve(strict=True) / "package"
             (root / "bin").mkdir(parents=True)
             executable = root / "bin/codex"
             executable.write_bytes(b"fixture")
+            executable = executable.resolve(strict=True)
+            root = executable.parent.parent
+            self.assertEqual(executable.resolve(strict=True), executable)
             package = {"entrypoint": "bin/codex"}
             with mock.patch("run_codex_adapter_live.sys.platform", "darwin"), \
                     mock.patch("run_codex_adapter_live.platform.machine", return_value="arm64"), \
@@ -103,7 +107,8 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "固定完整包的入口"):
                     verify_candidate_01561_package(root / "bin/not-codex")
             output = Path(temporary) / "receipt.ndjson"
-            for case in ("candidate-01561-missing-session", "candidate-01561-lifecycle"):
+            for case in ("candidate-01561-missing-session", "candidate-01561-lifecycle",
+                         "candidate-01561-running-tool-cancel"):
                 with self.subTest(case=case):
                     args = SimpleNamespace(test_case=case, codex=executable, output=output)
                     with mock.patch("run_codex_adapter_live.verify_candidate_01561_package",
@@ -116,10 +121,13 @@ class AcceptanceEvidenceTests(unittest.TestCase):
 
     def test_candidate_01561_windows_package_entrypoint_supports_private_temp_path(self):
         with tempfile.TemporaryDirectory(prefix="runner 临时 & ") as temporary:
-            root = Path(temporary) / "codex package"
+            root = Path(temporary).resolve(strict=True) / "codex package"
             (root / "bin").mkdir(parents=True)
             executable = root / "bin/codex.exe"
             executable.write_bytes(b"fixture")
+            executable = executable.resolve(strict=True)
+            root = executable.parent.parent
+            self.assertEqual(executable.resolve(strict=True), executable)
             package = {"entrypoint": "bin/codex.exe"}
             for machine, target in (("AMD64", "windows-x64"), ("ARM64", "windows-arm64")):
                 with self.subTest(machine=machine), \
@@ -131,6 +139,46 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                                    return_value=executable) as verified:
                     self.assertEqual(verify_candidate_01561_package(executable), target)
                     verified.assert_called_once_with(root, package, "0.156.1")
+
+    def test_candidate_01561_rejects_noncanonical_entrypoint(self):
+        with tempfile.TemporaryDirectory(prefix="codex-entrypoint-test-") as temporary:
+            root = Path(temporary).resolve(strict=True) / "package"
+            (root / "bin").mkdir(parents=True)
+            executable = root / "bin/codex"
+            executable.write_bytes(b"fixture")
+            noncanonical = root / "bin/../bin/codex"
+            self.assertTrue(noncanonical.is_file())
+            self.assertNotEqual(noncanonical.resolve(strict=True), noncanonical)
+            with mock.patch("run_codex_adapter_live.sys.platform", "darwin"), \
+                    mock.patch("run_codex_adapter_live.platform.machine", return_value="arm64"), \
+                    mock.patch("run_codex_adapter_live.prepare.packages_for_version",
+                               return_value={"macos-arm64": {"entrypoint": "bin/codex"}}), \
+                    mock.patch("run_codex_adapter_live.prepare.verify_runtime_tree") as verified:
+                with self.assertRaisesRegex(ValueError, "固定完整包的入口"):
+                    verify_candidate_01561_package(noncanonical)
+                verified.assert_not_called()
+
+    def test_candidate_01561_rejects_symlink_entrypoint(self):
+        with tempfile.TemporaryDirectory(prefix="codex-entrypoint-test-") as temporary:
+            root = Path(temporary).resolve(strict=True) / "package"
+            (root / "bin").mkdir(parents=True)
+            native = root / "bin/native"
+            native.write_bytes(b"fixture")
+            link = root / "bin/codex"
+            try:
+                link.symlink_to(native)
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"当前系统不能创建测试符号链接：{type(error).__name__}")
+            self.assertTrue(link.is_file())
+            self.assertNotEqual(link.resolve(strict=True), link)
+            with mock.patch("run_codex_adapter_live.sys.platform", "darwin"), \
+                    mock.patch("run_codex_adapter_live.platform.machine", return_value="arm64"), \
+                    mock.patch("run_codex_adapter_live.prepare.packages_for_version",
+                               return_value={"macos-arm64": {"entrypoint": "bin/codex"}}), \
+                    mock.patch("run_codex_adapter_live.prepare.verify_runtime_tree") as verified:
+                with self.assertRaisesRegex(ValueError, "固定完整包的入口"):
+                    verify_candidate_01561_package(link)
+                verified.assert_not_called()
 
     def test_candidate_01561_lifecycle_uses_runner_temp_before_credential_copy(self):
         with tempfile.TemporaryDirectory(prefix="runner 临时 & ") as temporary:
@@ -164,6 +212,18 @@ class AcceptanceEvidenceTests(unittest.TestCase):
             },
             "running-tool-cancel": {
                 "event": "running_tool_cancel_finished", "passed": True,
+                "scope": "rust_adapter_running_tool_cancel", "test_only_candidate_01561": False,
+                "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
+                "same_generation_receipt": True, "cleanup_confirmed": True,
+                "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
+                "event_order": ["native_item_started", "interrupt_sent", "interrupt_accepted",
+                                "turn_finished", "disconnected"],
+                "containment": "macos_resource_coalition",
+            },
+            "candidate-01561-running-tool-cancel": {
+                "event": "running_tool_cancel_finished", "passed": True,
+                "scope": "rust_adapter_01561_test_only_running_tool_cancel",
+                "test_only_candidate_01561": True,
                 "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
                 "same_generation_receipt": True, "cleanup_confirmed": True,
                 "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
@@ -204,6 +264,7 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"
         valid = {
             "event": "running_tool_cancel_finished", "passed": True,
+            "scope": "rust_adapter_running_tool_cancel", "test_only_candidate_01561": False,
             "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
             "same_generation_receipt": True, "cleanup_confirmed": True,
             "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
@@ -211,17 +272,79 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                             "turn_finished", "disconnected"],
             "containment": "macos_resource_coalition",
         }
-        self.assertTrue(verified_acceptance("running-tool-cancel", 0, summary, [valid]))
-        for key in ("native_item_started_before_interrupt", "interrupt_native_ack",
-                    "same_generation_receipt", "cleanup_confirmed", "tool_tree_zero_residual",
-                    "terminal_before_disconnected"):
-            with self.subTest(key=key):
-                self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
-                                                     [valid | {key: False}]))
-        self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
-                                             [valid | {"event_order": list(reversed(valid["event_order"]))}]))
-        self.assertFalse(verified_acceptance("running-tool-cancel", 0, summary,
-                                             [valid | {"containment": "unix_process_group"}]))
+        for case, scope, candidate in (
+            ("running-tool-cancel", "rust_adapter_running_tool_cancel", False),
+            ("candidate-01561-running-tool-cancel", "rust_adapter_01561_test_only_running_tool_cancel", True),
+        ):
+            event = valid | {"scope": scope, "test_only_candidate_01561": candidate}
+            with self.subTest(case=case):
+                self.assertTrue(verified_acceptance(case, 0, summary, [event]))
+                for key in ("native_item_started_before_interrupt", "interrupt_native_ack",
+                            "same_generation_receipt", "cleanup_confirmed", "tool_tree_zero_residual",
+                            "terminal_before_disconnected"):
+                    with self.subTest(key=key):
+                        self.assertFalse(verified_acceptance(case, 0, summary,
+                                                             [event | {key: False}]))
+                self.assertFalse(verified_acceptance(case, 0, summary,
+                                                     [event | {"event_order": list(reversed(event["event_order"]))}]))
+                self.assertFalse(verified_acceptance(case, 0, summary,
+                                                     [event | {"containment": "unix_process_group"}]))
+                self.assertFalse(verified_acceptance(case, 0, summary,
+                                                     [event | {"test_only_candidate_01561": not candidate}]))
+                self.assertFalse(verified_acceptance(case, 0, summary,
+                                                     [event | {"scope": "other"}]))
+
+    def test_candidate_01561_running_tool_cancel_keeps_outer_cleanup_gate(self):
+        with tempfile.TemporaryDirectory(prefix="codex-cancel-runner-") as temporary:
+            root = Path(temporary)
+            for name in ("codex", "warp-tests", "warp"):
+                (root / name).write_bytes(b"fixture")
+            credentials = root / "fixture-auth.json"
+            credentials.write_bytes(b"{}")
+            output = root / "receipt.ndjson"
+            args = SimpleNamespace(test_case="candidate-01561-running-tool-cancel",
+                                   codex=root / "codex", test_binary=root / "warp-tests",
+                                   supervisor=root / "warp", credential_source=credentials,
+                                   output=output)
+            event = {
+                "event": "running_tool_cancel_finished", "passed": True,
+                "scope": "rust_adapter_01561_test_only_running_tool_cancel",
+                "test_only_candidate_01561": True,
+                "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
+                "same_generation_receipt": True, "cleanup_confirmed": True,
+                "tool_tree_zero_residual": True, "terminal_before_disconnected": True,
+                "event_order": ["native_item_started", "interrupt_sent", "interrupt_accepted",
+                                "turn_finished", "disconnected"],
+                "containment": "macos_resource_coalition",
+            }
+            process = mock.Mock(returncode=0)
+            process.communicate.return_value = ("test result: ok. 1 passed; 0 failed; 0 ignored;", None)
+            process.poll.return_value = 0
+
+            def start_test(*_args, **kwargs):
+                self.assertEqual(kwargs["env"]["INFINISHELL_CODEX_RUNNING_TOOL_CANCEL"], "1")
+                self.assertEqual(kwargs["env"]["INFINISHELL_CODEX_TEST_CANDIDATE_01561"], "1")
+                output.write_text(json.dumps(event) + "\n", encoding="utf-8")
+                return process
+
+            audit = {"zero_residual": True, "fallback_attempted": False,
+                     "unverified_native_root": False, "audit_error": False}
+            with mock.patch("run_codex_adapter_live.verify_candidate_01561_package") as verified, \
+                    mock.patch("run_codex_adapter_live.subprocess.run",
+                               side_effect=[mock.Mock(stdout="a25701d2\n"),
+                                            mock.Mock(stdout=""),
+                                            mock.Mock(stdout="a25701d2\n"),
+                                            mock.Mock(stdout="")]), \
+                    mock.patch("run_codex_adapter_live.probe_version",
+                               return_value=mock.Mock(stdout="codex-cli 0.156.1\n")), \
+                    mock.patch("run_codex_adapter_live.subprocess.Popen", side_effect=start_test), \
+                    mock.patch("run_codex_adapter_live.audit_and_cleanup_fixture",
+                               side_effect=[audit, audit | {"zero_residual": False}]) as cleanup, \
+                    mock.patch("builtins.print"):
+                self.assertEqual(run(args), 0)
+                self.assertEqual(run(args), 1)
+            self.assertEqual(verified.call_count, 2)
+            self.assertEqual(cleanup.call_count, 2)
 
     def test_image_check_cannot_reuse_another_probe_or_failed_result(self):
         summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"

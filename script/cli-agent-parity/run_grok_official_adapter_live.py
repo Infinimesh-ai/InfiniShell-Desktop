@@ -30,6 +30,7 @@ ACP_INPUTS = 8
 MAX_TUNNELS = 32
 MAX_BYTES = 32 * 1024 * 1024
 P0_PROFILE = "p0-1.0.34"
+CANDIDATE_1041_P0_PROFILE = "p0-test-only-1.0.41"
 CURRENT_ROOT_PROFILE = "root-1.0.40"
 PROFILES = {
     "full-1.0.30": {
@@ -49,6 +50,15 @@ PROFILES = {
         "max_acp_inputs": 4,
         "project_files": ["allow.txt", "deny.txt"],
         "public_product_gate_open": True,
+    },
+    CANDIDATE_1041_P0_PROFILE: {
+        "version": "grok 1.0.41 (4220f3b224a6)",
+        "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        "model": "grok-4.7",
+        "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_candidate_1041_p0_lifecycle",
+        "max_acp_inputs": 4,
+        "project_files": ["allow.txt", "deny.txt"],
+        "public_product_gate_open": False,
     },
     CURRENT_ROOT_PROFILE: {
         "version": "grok 1.0.40 (eb1a2256660d)",
@@ -308,7 +318,7 @@ tool = "any"
 def public_events(events):
     # 官方令牌不被运行器解析，故公开证据采用字段值白名单，不能依赖已知密钥替换。
     fixed = {shared.SCOPE, MODEL_PATH, "Completed", "Cancelled", "Failed", "AllowOnce", "DenyOnce",
-        "grok-4.7",
+        "grok-4.7", "1.0.41", CANDIDATE_1041_P0_PROFILE,
         shared.RECEIPT_SOURCE,"PARITY_ONE", "PARITY_TWO", "APPROVED", "READY", "QUEUE_PARENT_DONE", "p0"}
     identifiers = {"event", "phase", "exit_reason"}
     result = []
@@ -331,7 +341,7 @@ def public_events(events):
     return result
 
 
-def verified_p0_acceptance(exit_code, output, events):
+def verified_p0_acceptance(exit_code, output, events, *, candidate_1041=False):
     if exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
         return False
     endings = [event for event in events if event.get("event") == "acceptance_passed"]
@@ -339,10 +349,11 @@ def verified_p0_acceptance(exit_code, output, events):
         return False
     ending = endings[0]
     native = ending.get("native_session_id")
+    verified_scope = CANDIDATE_1041_P0_PROFILE if candidate_1041 else "p0"
     if (not isinstance(native, str) or not native or ending.get("scope") != shared.SCOPE
-            or ending.get("verified_scope") != "p0"
+            or ending.get("verified_scope") != verified_scope
             or ending.get("official_grok_model_tested") is not True
-            or ending.get("public_product_gate_open") is not True
+            or ending.get("public_product_gate_open") is not (not candidate_1041)
             or ending.get("full_cli_parity_acceptance_passed") is not False
             or ending.get("read_approval_verified") is not True
             or ending.get("queued_input_verified") is not False
@@ -350,6 +361,24 @@ def verified_p0_acceptance(exit_code, output, events):
                 "write_approval_verified", "close_session_verified", "app_restart_and_ui_verified",
                 "parent_permission_ceiling_verified"))):
         return False
+    if candidate_1041:
+        started = [event for event in events if event.get("event") == "acceptance_started"]
+        handshakes = [event for event in events
+            if event.get("event") == "candidate_zero_input_handshake_verified"]
+        if (ending.get("test_only_candidate_1041") is not True
+                or ending.get("zero_input_handshake_verified") is not True
+                or len(started) != 1 or started[0].get("verified_scope") != verified_scope
+                or started[0].get("test_only_candidate_1041") is not True
+                or started[0].get("max_native_inputs") != 4
+                or started[0].get("public_product_gate_open") is not False
+                or len(handshakes) != 1
+                or handshakes[0].get("verified_cli_version") != "1.0.41"
+                or handshakes[0].get("model_inputs_sent") != 0
+                or handshakes[0].get("cleanup_confirmed") is not True
+                or not isinstance(handshakes[0].get("native_session_id"), str)
+                or not handshakes[0]["native_session_id"]
+                or handshakes[0]["native_session_id"] == native):
+            return False
     results = [event for event in events if event.get("event") == "turn_finished"]
     if (len(results) != 4 or len({event.get("turn_id") for event in results}) != 4
             or any(event.get("native_session_id") != native for event in results)
@@ -375,6 +404,8 @@ def verified_p0_acceptance(exit_code, output, events):
         if sum(event.get("event") == "turn_started"
                 and event.get("turn_id") == result.get("turn_id") for event in events) != 1:
             return False
+    if candidate_1041 and sum(event.get("event") == "message_accepted" for event in events) != 4:
+        return False
     for phase, decision in (("p0_read_allow", "AllowOnce"), ("p0_read_deny", "DenyOnce")):
         approvals = [event for event in events if event.get("event") == "approval_requested"
             and event.get("phase") == phase]
@@ -390,10 +421,14 @@ def verified_p0_acceptance(exit_code, output, events):
             for event in events):
         return False
     shutdowns = [event for event in events if event.get("event") == "connection_shutdown"]
-    return (len(shutdowns) == 2
-        and [event.get("queued_submissions_observed_inside_adapter") for event in shutdowns] == [0, 0]
+    expected_shutdown_ids = ([handshakes[0]["native_session_id"], native, native]
+        if candidate_1041 else [native, native])
+    return (len(shutdowns) == len(expected_shutdown_ids)
+        and [event.get("queued_submissions_observed_inside_adapter") for event in shutdowns]
+            == [0] * len(expected_shutdown_ids)
         and all(event.get("cleanup_confirmed") is True
-            and event.get("native_session_id") == native for event in shutdowns))
+            and event.get("native_session_id") == expected_id
+            for event, expected_id in zip(shutdowns, expected_shutdown_ids)))
 
 
 def validate_paths(args):
@@ -475,7 +510,8 @@ def run(args):
         "test_only_internal_command_switch": False, "production_runtime_commands": True,
         "native_received_real_credential": True, "public_credential_values_recorded": False,
         "auth_copy_method": "opaque_auth_json_only", "private_workspace": str(root),
-        "max_acp_inputs": ACP_INPUTS, "acp_budget_source": "固定 libtest 的 8 个输入",
+        "max_acp_inputs": profile["max_acp_inputs"],
+        "acp_budget_source": f"固定 libtest 的 {profile['max_acp_inputs']} 个输入",
         "http_model_call_budget_enforced": False, "cost_budget_enforced": False,
         "deadline_seconds": args.timeout, "max_tls_connections": MAX_TUNNELS,
         "max_tls_bytes": MAX_BYTES, "allowed_https_hosts": sorted(OFFICIAL_HOSTS),
@@ -503,6 +539,9 @@ def run(args):
             "INFINISHELL_GROK_LIVE_STATE_DIR": str(state_root),
             "INFINISHELL_GROK_LIVE_PROFILE": args.acceptance_profile,
             "INFINISHELL_GROK_LIVE_MODEL": profile["model"]})
+        if args.acceptance_profile == CANDIDATE_1041_P0_PROFILE:
+            environment["INFINISHELL_GROK_TEST_CANDIDATE_1041"] = "1"
+            environment["INFINISHELL_GROK_TEST_CANDIDATE_NATIVE"] = str(args.grok)
         metadata["native_environment_names"] = sorted(environment)
         version = subprocess.run([str(wrapper), "--version"], cwd=root / "project", env=environment,
             capture_output=True, text=True, timeout=10, check=True)
@@ -534,13 +573,16 @@ def run(args):
         metadata["private_settings_unchanged"] = metadata["private_settings_audit"]["bytes_unchanged"]
         metadata["project_files"] = sorted(str(path.relative_to(root / "project")) for path in (root / "project").rglob("*") if path.is_file())
         model_tunnel = any(item == {"event": "official_tunnel_opened", "host": "cli-chat-proxy.grok.com"} for item in tunnel.events)
-        passed = (verified_p0_acceptance(process.returncode, output, events)
-            if args.acceptance_profile == P0_PROFILE
+        passed = (verified_p0_acceptance(process.returncode, output, events,
+                candidate_1041=args.acceptance_profile == CANDIDATE_1041_P0_PROFILE)
+            if args.acceptance_profile in (P0_PROFILE, CANDIDATE_1041_P0_PROFILE)
             else shared.verified_acceptance(process.returncode, output, events, official=True))
+        expected_leaders = 3 if args.acceptance_profile == CANDIDATE_1041_P0_PROFILE else 2
         metadata["acceptance_passed"] = (passed and model_tunnel and not metadata.get("timed_out", False)
             and metadata["private_settings_audit"]["settings_scope_verified"]
             and metadata["project_files"] == profile["project_files"]
-            and len(leaders) == 2 and len({item["private_socket"] for item in leaders}) == 2)
+            and len(leaders) == expected_leaders
+            and len({item["private_socket"] for item in leaders}) == expected_leaders)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         # 异常可能包含原生响应，公开报告仅记录类型，原生输出保存在 0700 工作目录。
         metadata["runner_error_type"] = type(error).__name__

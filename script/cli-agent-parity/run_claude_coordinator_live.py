@@ -4,6 +4,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -17,6 +18,37 @@ from prepare_claude_cli import RELEASE_CATALOG, VERSION, current_platform, verif
 
 TEST_NAME = "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child"
 SCOPE = "real_claude_production_coordinator"
+TEST_CANDIDATE_VERSION = "2.1.280"
+TEST_CANDIDATE_BUILD_ARGUMENT = "--infinishell-claude-21280-test-build"
+TEST_CANDIDATE_BUILD_MARKER = "infinishell-claude-21280-test-build-v1"
+TEST_CANDIDATE_STATE_MARKER_CONTENT = "isolated Claude Code 2.1.280 coordinator candidate\n"
+
+
+def coordinator_candidate(args):
+    version = getattr(args, "claude_version", VERSION)
+    enabled = getattr(args, "allow_claude_21280_coordinator_candidate", False)
+    if (version == TEST_CANDIDATE_VERSION) != enabled:
+        raise ValueError("Claude 2.1.280 父子验收须显式选择专用测试构建")
+    if enabled and not getattr(args, "use_authorized_default_account", False):
+        raise ValueError("Claude 2.1.280 父子候选仅使用显式授权的默认账户")
+    if enabled and any(getattr(args, name, None) is not None for name in
+                       ("config_dir", "auth_home", "api_environment_file")):
+        raise ValueError("Claude 2.1.280 父子候选不能指定私有认证路径或 API 环境")
+    return enabled
+
+
+def verify_candidate_supervisor(path):
+    environment = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    if sys.platform == "darwin":
+        signature = subprocess.run(["/usr/bin/codesign", "--verify", "--strict", str(path)],
+                                   env=environment, capture_output=True, timeout=10)
+        if signature.returncode != 0:
+            raise ValueError("Claude 专用测试 supervisor 签名核对失败")
+    probe = subprocess.run([str(path), TEST_CANDIDATE_BUILD_ARGUMENT], env=environment,
+                           capture_output=True, text=True, timeout=5)
+    if (probe.returncode != 0 or probe.stdout != TEST_CANDIDATE_BUILD_MARKER + "\n"
+            or probe.stderr):
+        raise ValueError("supervisor 未声明 Claude 2.1.280 专用测试构建")
 
 
 def _value_sha256(value):
@@ -99,12 +131,13 @@ def project_public_events(events, redact):
 
 
 def validate_auth_selection(args):
+    candidate = coordinator_candidate(args)
     default_account = getattr(args, "use_authorized_default_account", False)
     api_file = getattr(args, "api_environment_file", None)
     if default_account:
         if api_file is not None:
             raise ValueError("默认在线账户模式不能同时提供 API 环境")
-        if getattr(args, "claude_version", VERSION) != base.DEFAULT_ACCOUNT_VERSION:
+        if getattr(args, "claude_version", VERSION) != base.DEFAULT_ACCOUNT_VERSION and not candidate:
             raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278")
     elif api_file is None:
         raise ValueError("私有 API 模式必须提供 api-environment-file")
@@ -538,6 +571,15 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
 
 def run(args):
     # 先按固定发行摘要校验；不向任意 PATH 命中的程序传入 API 环境执行 --version。
+    candidate = coordinator_candidate(args)
+    if candidate:
+        # 共用基础路径校验，临时映射其同版本候选标记。
+        args.auth_home, args.config_dir = None, None
+        args.allow_claude_21280_candidate = True
+        try:
+            base.validate_paths(args)
+        finally:
+            del args.allow_claude_21280_candidate
     selected_version = getattr(args, "claude_version", VERSION)
     target = current_platform()
     verified_cli = verify_binary(args.claude, target, selected_version)
@@ -545,6 +587,8 @@ def run(args):
     detected = verify_version(args.claude, root, selected_version)
     if verify_binary(args.claude, target, selected_version) != verified_cli:
         raise ValueError("原生 Claude 在版本探测期间变化")
+    if candidate:
+        verify_candidate_supervisor(args.supervisor)
     default_account = validate_auth_selection(args)
     api_environment = ({} if default_account else
                        base.load_api_environment(args.api_environment_file))
@@ -558,6 +602,9 @@ def run(args):
         base.validate_paths(args)
     settings = base.prepare_project(root)
     (root / ".infinishell-claude-coordinator-probe").write_text(SCOPE, encoding="utf-8")
+    if candidate:
+        with (root / base.TEST_CANDIDATE_MARKER).open("x", encoding="utf-8", newline="\n") as target_file:
+            target_file.write(base.TEST_CANDIDATE_MARKER_CONTENT)
     blocked = root / "project/blocked.txt"
     blocked.write_text("This file is outside the allowed read policy.\n", encoding="utf-8")
     child_file = root / "project/child-approved.txt"
@@ -592,6 +639,8 @@ def run(args):
         "INFINISHELL_CLAUDE_LIVE_MODEL": args.model,
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
     })
+    if candidate:
+        environment["INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280"] = "1"
     if args.config_dir is not None:
         environment["INFINISHELL_CLAUDE_LIVE_CONFIG_DIR"] = str(args.config_dir)
     if data_profile is not None:
@@ -616,6 +665,8 @@ def run(args):
         "http_request_count_verified": False, "runner_timeout_seconds": 600, "acceptance_passed": False,
         "public_evidence_projection_version": 1, "private_raw_evidence_preserved": True,
         "private_raw_evidence_filename": raw_artifact.name,
+        "test_only_coordinator_candidate_21280": candidate,
+        "candidate_supervisor_marker_verified": candidate,
     }
     if account_status is not None:
         metadata["authorized_default_account"] = account_status
@@ -652,6 +703,9 @@ def run(args):
             process.wait(timeout=15)
             raise
         metadata["test_exit_code"] = process.returncode
+        if candidate:
+            metadata["candidate_supervisor_binary_unchanged"] = (
+                base.digest(args.supervisor) == metadata["supervisor_binary_sha256"])
         raw_text = redact(raw_artifact.read_text(encoding="utf-8"))
         raw_artifact.write_text(raw_text, encoding="utf-8")
         raw_events = [json.loads(line) for line in raw_text.splitlines() if line.strip()]
@@ -668,6 +722,7 @@ def run(args):
         metadata["denied_read_fixture_unchanged"] = base.digest(blocked) == blocked_digest
         metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_version) == verified_cli
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
+            and (not candidate or metadata["candidate_supervisor_binary_unchanged"])
             and metadata["project_settings_unchanged"] and metadata["denied_read_fixture_unchanged"]
             and metadata["cli_binary_unchanged"]
             and private_verified and verified_acceptance(process.returncode, output, events, selected_version))
@@ -725,6 +780,8 @@ def main():
     parser.add_argument("--claude", type=Path, required=True)
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=VERSION,
                         help="精确官方版本；私有 API 模式缺省保留 2.1.273")
+    parser.add_argument("--allow-claude-21280-coordinator-candidate", action="store_true",
+                        help="仅专用测试构建；显式启用 Claude 2.1.280 父子候选")
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--api-environment-file", type=Path)
     parser.add_argument("--use-authorized-default-account", action="store_true",

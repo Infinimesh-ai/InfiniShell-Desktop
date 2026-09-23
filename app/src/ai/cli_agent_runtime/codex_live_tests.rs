@@ -936,7 +936,11 @@ fn tool_tree_has_zero_residual(tree: ToolTree) -> bool {
     })
 }
 
-async fn exercise_running_tool_cancel(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+async fn exercise_running_tool_cancel(
+    root: &Path,
+    evidence: &mut Evidence,
+    test_candidate_01561: bool,
+) -> Result<(), String> {
     let cwd = root
         .join("project")
         .canonicalize()
@@ -980,7 +984,7 @@ while True:
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options)?;
+    let mut session = LiveSession::start_with_candidate(options, test_candidate_01561)?;
     session.ready_with_projection(evidence, false).await?;
     evidence.record(json!({"event":"phase_started","phase":"running_tool_cancel"}))?;
     let submitted = Uuid::new_v4();
@@ -1258,6 +1262,12 @@ while True:
     }
     evidence.record(json!({
         "event":"running_tool_cancel_finished","passed":true,
+        "scope": if test_candidate_01561 {
+            "rust_adapter_01561_test_only_running_tool_cancel"
+        } else {
+            "rust_adapter_running_tool_cancel"
+        },
+        "test_only_candidate_01561":test_candidate_01561,
         "native_item_started_before_interrupt":true,
         "interrupt_native_ack":true,"same_generation_receipt":true,
         "cleanup_confirmed":true,"tool_tree_zero_residual":true,
@@ -1269,6 +1279,16 @@ while True:
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "仅由 run_codex_adapter_live.py 的 running-tool-cancel 显式启用；会消耗模型额度"]
 async fn real_codex_running_tool_cancel() {
+    run_running_tool_cancel(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "仅由 run_codex_adapter_live.py 的 candidate-01561-running-tool-cancel 显式启用；会消耗模型额度"]
+async fn real_codex_candidate_01561_running_tool_cancel() {
+    run_running_tool_cancel(true).await;
+}
+
+async fn run_running_tool_cancel(test_candidate_01561: bool) {
     assert!(
         matches!(
             env::var("INFINISHELL_CODEX_RUNNING_TOOL_CANCEL").as_deref(),
@@ -1276,6 +1296,20 @@ async fn real_codex_running_tool_cancel() {
         ),
         "缺少运行中工具取消的显式授权标记"
     );
+    if test_candidate_01561 {
+        assert_eq!(
+            env::var("INFINISHELL_CODEX_TEST_CANDIDATE_01561")
+                .ok()
+                .as_deref(),
+            Some("1"),
+            "必须由固定完整包候选运行器显式启用"
+        );
+    }
+    let scope = if test_candidate_01561 {
+        "rust_adapter_01561_test_only_running_tool_cancel"
+    } else {
+        "rust_adapter_running_tool_cancel"
+    };
     let root = PathBuf::from(
         env::var_os("INFINISHELL_CODEX_LIVE_ROOT").expect("必须由隔离运行脚本启动此测试"),
     );
@@ -1292,12 +1326,14 @@ async fn real_codex_running_tool_cancel() {
         root: root.clone(),
     };
     evidence
-        .record(json!({"event":"acceptance_started","scope":"rust_adapter_running_tool_cancel"}))
+        .record(json!({"event":"acceptance_started","scope":scope,
+            "test_only_candidate_01561":test_candidate_01561}))
         .unwrap();
-    let result = exercise_running_tool_cancel(&root, &mut evidence).await;
+    let result = exercise_running_tool_cancel(&root, &mut evidence, test_candidate_01561).await;
     if result.is_err() {
         evidence
-            .record(json!({"event":"acceptance_failed","scope":"rust_adapter_running_tool_cancel"}))
+            .record(json!({"event":"acceptance_failed","scope":scope,
+                "test_only_candidate_01561":test_candidate_01561}))
             .unwrap();
     }
     assert!(result.is_ok(), "真实 Codex 运行中工具取消验收未通过");

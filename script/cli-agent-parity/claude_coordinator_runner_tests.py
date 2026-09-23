@@ -718,12 +718,101 @@ class FixedVersionCoordinatorTests(unittest.TestCase):
             with patch.object(runner.base, "load_api_environment") as load_api, \
                     patch.object(runner, "verify_version") as probe, \
                     patch.object(runner.subprocess, "Popen") as spawn:
-                for version in ("2.1.273", "2.1.278", "latest", "2.1.279"):
+                for version in ("2.1.273", "2.1.278", "2.1.280", "latest", "2.1.279"):
                     with self.subTest(version=version), self.assertRaises(ValueError):
                         runner.run(argparse.Namespace(claude=executable, claude_version=version))
                 load_api.assert_not_called()
                 probe.assert_not_called()
                 spawn.assert_not_called()
+
+    def test_candidate_requires_version_flag_and_authorized_account_before_probe(self):
+        with patch.object(runner, "verify_binary") as verify, \
+                patch.object(runner.base, "load_api_environment") as load_api, \
+                patch.object(runner.subprocess, "Popen") as spawn:
+            for version, enabled, account in (
+                ("2.1.280", False, True), ("2.1.278", True, True),
+                ("2.1.280", True, False),
+            ):
+                with self.subTest(version=version, enabled=enabled, account=account):
+                    args = argparse.Namespace(claude_version=version,
+                        allow_claude_21280_coordinator_candidate=enabled,
+                        use_authorized_default_account=account)
+                    with self.assertRaises(ValueError):
+                        runner.run(args)
+            with self.assertRaises(ValueError):
+                runner.run(argparse.Namespace(
+                    claude_version="2.1.280", allow_claude_21280_coordinator_candidate=True,
+                    use_authorized_default_account=True, config_dir=Path("/private/config")))
+            verify.assert_not_called()
+            load_api.assert_not_called()
+            spawn.assert_not_called()
+
+    def test_candidate_supervisor_probe_rejects_missing_build_marker(self):
+        path = Path("/private/tmp/synthetic-supervisor")
+        for code, output, error in ((1, "", ""), (0, "wrong\n", ""),
+                                    (0, runner.TEST_CANDIDATE_BUILD_MARKER + "\n", "extra")):
+            with self.subTest(code=code, output=output, error=error), \
+                    patch.object(runner.sys, "platform", "linux"), \
+                    patch.object(runner.subprocess, "run", return_value=SimpleNamespace(
+                        returncode=code, stdout=output, stderr=error)):
+                with self.assertRaises(ValueError):
+                    runner.verify_candidate_supervisor(path)
+
+    def test_candidate_280_keeps_parent_child_audit_and_build_marker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for name in ("claude-fixture", "libtest", "supervisor"):
+                (root / name).write_bytes(b"synthetic executable")
+            args = argparse.Namespace(
+                claude=root / "claude-fixture", claude_version="2.1.280",
+                allow_claude_21280_coordinator_candidate=True,
+                test_binary=root / "libtest", supervisor=root / "supervisor",
+                api_environment_file=None, use_authorized_default_account=True,
+                output=root / "events.ndjson", model="claude-sonnet-4-6",
+                config_dir=None, auth_home=None,
+            )
+            status = {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                      "subscriptionType": "pro"}
+
+            def command(command, **kwargs):
+                if command[0] == "/usr/bin/codesign":
+                    return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
+                if command == [str(args.supervisor), runner.TEST_CANDIDATE_BUILD_ARGUMENT]:
+                    return SimpleNamespace(returncode=0,
+                        stdout=runner.TEST_CANDIDATE_BUILD_MARKER + "\n", stderr="")
+                return SimpleNamespace(stdout="")
+
+            def spawn(command, **kwargs):
+                environment = kwargs["env"]
+                self.assertEqual(environment["INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280"], "1")
+                self.assertEqual(environment["INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION"], "2.1.280")
+                marker = Path(environment["INFINISHELL_CLAUDE_LIVE_ROOT"]) / runner.base.TEST_CANDIDATE_MARKER
+                self.assertEqual(marker.read_text(), runner.base.TEST_CANDIDATE_MARKER_CONTENT)
+                self.assertRegex(environment["WARP_DATA_PROFILE"],
+                                 r"^claude-coordinator-[0-9a-f]{32}$")
+                Path(environment["INFINISHELL_CLAUDE_LIVE_ARTIFACT"]).write_text(
+                    "".join(json.dumps(row) + "\n" for row in fixture("2.1.280")),
+                    encoding="utf-8")
+                return SimpleNamespace(returncode=0, communicate=lambda timeout: (OUTPUT, None))
+
+            with patch.object(runner, "current_platform", return_value="darwin-arm64"), \
+                    patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}) as verify, \
+                    patch.object(runner, "verify_version", return_value="2.1.280 (Claude Code)"), \
+                    patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                    patch.object(runner.base, "authorized_default_account_environment",
+                                 return_value={"HOME": str(Path.home()), "PATH": "/safe/bin"}), \
+                    patch.object(runner.base, "probe_authorized_default_account", return_value=status), \
+                    patch.object(runner.subprocess, "run", side_effect=command), \
+                    patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                    patch("builtins.print"):
+                self.assertEqual(runner.run(args), 0)
+            self.assertEqual(verify.call_count, 3)
+            self.assertTrue(all(call.args[-1] == "2.1.280" for call in verify.call_args_list))
+            metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+            self.assertTrue(metadata["test_only_coordinator_candidate_21280"])
+            self.assertTrue(metadata["candidate_supervisor_marker_verified"])
+            self.assertTrue(metadata["candidate_supervisor_binary_unchanged"])
+            self.assertTrue(metadata["acceptance_passed"])
 
     def test_probe_failure_stops_before_api_read(self):
         with tempfile.TemporaryDirectory() as temporary, \

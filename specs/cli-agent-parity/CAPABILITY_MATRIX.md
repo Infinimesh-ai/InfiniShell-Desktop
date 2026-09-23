@@ -2,6 +2,22 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；Codex `0.155.1` 已在干净 `c2ed42fe…` 上通过 macOS 产品适配器运行中工具取消；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)、[receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) 和 [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
+## 2026-09-24 当前 dirty 增量
+
+| 要求 | 当前证据 | 结果与边界 |
+| --- | --- | --- |
+| Claude `2.1.280` 父子权限与结果交付 | [receipt145](validation/macos-working-tree-145-a25701d2-claude-21280-parent-child-owned.safe.json)：真实父子派发、受限权限继承、子任务文件效果、双向原生 ACK、自动结果及两代监督清理 | **dirty tree 的 test-only 候选通过**；receipt142 首次失败保留，正式门禁、GUI、SSH／tmux 和同 SHA 跨平台仍缺 |
+| Grok `1.0.41` 完整 P0 | [receipt146](validation/macos-working-tree-146-a25701d2-grok-1041-p0-external-failures.safe.json) 外置尝试；[receipt147](validation/macos-working-tree-147-a25701d2-grok-1041-p0-internal-missing-catalog.safe.json) 内置复测 | **失败／正式门禁关闭**：第一会话零输入握手通过；第二会话原生 leader 内部广播命令，但 ACP 未交付目录，初始化超时，0 次业务输入。模型回合、审批、取消及恢复未验收 |
+
+## 2026-09-23 当前提交的最新版候选
+
+| 要求 | `a25701d2…` 的实测证据 | 结果与边界 |
+| --- | --- | --- |
+| Codex `0.156.1` 在线托管生命周期 | [receipt137](validation/macos-clean-commit-137-a25701d2-codex-01561-lifecycle.safe.json)：macOS arm64 干净提交、官方固定完整包、同源签名监督者；文本双轮、审批允许／拒绝及文件效果、追加、取消、进程重启恢复 | **test-only 候选通过**；正式版本门禁、运行中工具树取消、GUI、SSH／tmux、跨平台和升级未通过 |
+| Claude `2.1.280` 在线托管基本链 | [receipt139](validation/macos-clean-commit-139-a25701d2-claude-21280-lifecycle.safe.json)：同提交干净工作树、已授权默认账户，允许／拒绝、排队输入、取消及重启恢复 | **test-only 候选通过**；正式门禁、父子受限策略、GUI、SSH／tmux、跨平台和升级未通过 |
+| Grok `1.0.41` 所选技能 | [receipt140](validation/macos-clean-commit-140-a25701d2-grok-1041-selected-skill.safe.json)：同提交零输入目录及一次真实默认 leader 技能回合、精确只读审批、上下文读取和历史匹配 | **test-only 候选通过**；正式门禁、完整生命周期、GUI、SSH／tmux、跨平台和升级未通过 |
+| Codex `0.156.1` 运行中工具取消 | [receipt141](validation/macos-working-tree-141-a25701d2-codex-01561-running-tool-cancel.safe.json)：未提交增量的 macOS arm64 真实工具开始、取消 ACK、同代清理、父子零残留及五事件顺序 | **dirty tree 的 test-only 候选通过**；仍需干净提交复验，正式门禁和其他平台未通过 |
+
 ## 2026-09-23 receipt115–128 增量
 
 | 要求 | 当前证据 | 结果与边界 |

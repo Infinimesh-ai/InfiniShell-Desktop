@@ -147,6 +147,7 @@ struct LiveSession {
     expected_native_id: Option<String>,
     state_dir: PathBuf,
     final_histories: VerifiedFinalHistories,
+    test_candidate_1041_p0: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -167,15 +168,31 @@ impl Drop for LiveSession {
 
 impl LiveSession {
     fn start(options: SessionOptions, current_root_candidate_for_live: bool) -> Self {
-        let generation = options.generation;
-        let state_dir = options.state_dir.clone();
-        let expected_native_id = match &options.target {
+        let mut protocol = GrokProtocol::new(options);
+        protocol.current_root_candidate_for_live = current_root_candidate_for_live;
+        Self::start_protocol(protocol, false)
+    }
+
+    fn start_candidate_1041_p0(options: SessionOptions) -> Result<Self, String> {
+        let native = PathBuf::from(
+            env::var_os("INFINISHELL_GROK_TEST_CANDIDATE_NATIVE")
+                .ok_or("缺少固定的 Grok 1.0.41 原生二进制路径")?,
+        );
+        let mut protocol = GrokProtocol::new(options);
+        protocol.test_only_1041_profile = true;
+        protocol.test_only_1041_p0_for_live = true;
+        protocol.test_only_1041_native_binary = Some(native);
+        Ok(Self::start_protocol(protocol, true))
+    }
+
+    fn start_protocol(mut protocol: GrokProtocol, test_candidate_1041_p0: bool) -> Self {
+        let generation = protocol.options.generation;
+        let state_dir = protocol.options.state_dir.clone();
+        let expected_native_id = match &protocol.options.target {
             SessionTarget::New => None,
             SessionTarget::Resume { native_session_id } => Some(native_session_id.clone()),
         };
         let (controller, commands, sender, events) = channels(generation);
-        let mut protocol = GrokProtocol::new(options);
-        protocol.current_root_candidate_for_live = current_root_candidate_for_live;
         let final_histories = Arc::new(Mutex::new(HashMap::new()));
         protocol.verified_final_histories_for_live = Some(final_histories.clone());
         let task = tokio::spawn(async move {
@@ -196,6 +213,7 @@ impl LiveSession {
             expected_native_id,
             state_dir,
             final_histories,
+            test_candidate_1041_p0,
         }
     }
 
@@ -255,6 +273,7 @@ impl LiveSession {
     ) -> Result<(), String> {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
+            verified_cli_version,
             effective_permissions,
             ..
         } = event.kind
@@ -262,6 +281,9 @@ impl LiveSession {
             evidence.record(json!({"event":"initialization_failed","kind":event.kind}))?;
             return Err("Grok 未完成真实初始化".into());
         };
+        if self.test_candidate_1041_p0 && verified_cli_version.as_deref() != Some("1.0.41") {
+            return Err("Grok 1.0.41 P0 会话版本不匹配".into());
+        }
         let (enabled, disabled): (&[&str], &[&str]) = match profile {
             LiveCapabilityProfile::Extended => (
                 &[
@@ -316,7 +338,7 @@ impl LiveSession {
             }
         }
         let current_model_id = match profile {
-            LiveCapabilityProfile::CurrentRootCandidate => {
+            LiveCapabilityProfile::CurrentRootCandidate if !self.test_candidate_1041_p0 => {
                 let expected = env::var("INFINISHELL_GROK_LIVE_MODEL")
                     .map_err(|_| "当前版根验收缺少固定模型".to_owned())?;
                 let models = &effective_permissions["reportedMetadata"]["models"];
@@ -329,7 +351,22 @@ impl LiveSession {
                 }
                 Some(expected)
             }
-            LiveCapabilityProfile::Extended | LiveCapabilityProfile::P0 => None,
+            LiveCapabilityProfile::P0 if self.test_candidate_1041_p0 => {
+                let expected = env::var("INFINISHELL_GROK_LIVE_MODEL")
+                    .map_err(|_| "1.0.41 P0 验收缺少固定模型".to_owned())?;
+                let models = &effective_permissions["reportedMetadata"]["models"];
+                if models["currentModelId"] != expected
+                    || !models["availableModels"].as_array().is_some_and(|models| {
+                        models.iter().any(|model| model["modelId"] == expected)
+                    })
+                {
+                    return Err("1.0.41 P0 模型与官方目录不匹配".into());
+                }
+                Some(expected)
+            }
+            LiveCapabilityProfile::Extended
+            | LiveCapabilityProfile::P0
+            | LiveCapabilityProfile::CurrentRootCandidate => None,
         };
         if self.native_id.is_none() {
             return Err("初始化缺少真实会话 ID".into());
@@ -893,7 +930,22 @@ async fn exercise(
         "model_path":if official { "Grok Build + 官方缓存登录" } else { "Grok Build + 自定义 Claude 后端" }}))
 }
 
-async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+fn start_p0_session(
+    options: SessionOptions,
+    test_candidate_1041: bool,
+) -> Result<LiveSession, String> {
+    if test_candidate_1041 {
+        LiveSession::start_candidate_1041_p0(options)
+    } else {
+        Ok(LiveSession::start(options, false))
+    }
+}
+
+async fn exercise_p0(
+    root: &Path,
+    evidence: &mut Evidence,
+    test_candidate_1041: bool,
+) -> Result<(), String> {
     let cwd = root
         .join("project")
         .canonicalize()
@@ -929,7 +981,22 @@ async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String>
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options.clone(), false);
+    if test_candidate_1041 {
+        let mut handshake = start_p0_session(options.clone(), true)?;
+        handshake.ready(evidence, LiveCapabilityProfile::P0).await?;
+        let handshake_id = handshake
+            .native_id
+            .clone()
+            .ok_or("零输入握手缺少会话身份")?;
+        if handshake.shutdown(evidence).await? != 0 {
+            return Err("零输入握手出现未验收的排队输入".into());
+        }
+        evidence.record(json!({"event":"candidate_zero_input_handshake_verified",
+            "native_session_id":handshake_id,"model_inputs_sent":0,
+            "verified_cli_version":"1.0.41","cleanup_confirmed":true}))?;
+        options.generation = Uuid::new_v4();
+    }
+    let mut session = start_p0_session(options.clone(), test_candidate_1041)?;
     session.ready(evidence, LiveCapabilityProfile::P0).await?;
     let native_id = session
         .native_id
@@ -984,7 +1051,7 @@ async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String>
     options.target = SessionTarget::Resume {
         native_session_id: native_id.clone(),
     };
-    let mut resumed = LiveSession::start(options, false);
+    let mut resumed = start_p0_session(options, test_candidate_1041)?;
     resumed.ready(evidence, LiveCapabilityProfile::P0).await?;
     completed(
         &run_turn(
@@ -1005,7 +1072,11 @@ async fn exercise_p0(root: &Path, evidence: &mut Evidence) -> Result<(), String>
         return Err("P0 恢复阶段不得出现未验收的排队输入".into());
     }
     evidence.record(json!({"event":"acceptance_passed","scope":SCOPE,
-        "native_session_id":native_id,"verified_scope":"p0","public_product_gate_open":true,
+        "native_session_id":native_id,
+        "verified_scope":if test_candidate_1041 { "p0-test-only-1.0.41" } else { "p0" },
+        "test_only_candidate_1041":test_candidate_1041,
+        "zero_input_handshake_verified":test_candidate_1041,
+        "public_product_gate_open":!test_candidate_1041,
         "full_cli_parity_acceptance_passed":false,"queued_input_verified":false,
         "same_turn_steering_supported":false,"read_approval_verified":true,
         "write_approval_verified":false,"close_session_verified":false,
@@ -1110,10 +1181,32 @@ async fn real_grok_current_root_lifecycle() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "必须由 Grok 1.0.34 官方隔离运行器显式启动；会消耗用户授权模型额度"]
 async fn real_grok_p0_lifecycle() {
+    run_p0_lifecycle(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "必须由 Grok 1.0.41 官方隔离运行器显式启动；最多四次模型输入"]
+async fn real_grok_candidate_1041_p0_lifecycle() {
+    run_p0_lifecycle(true).await;
+}
+
+async fn run_p0_lifecycle(test_candidate_1041: bool) {
     assert_eq!(
         env::var("INFINISHELL_GROK_LIVE_PROFILE").as_deref(),
-        Ok("p0-1.0.34")
+        Ok(if test_candidate_1041 {
+            "p0-test-only-1.0.41"
+        } else {
+            "p0-1.0.34"
+        })
     );
+    if test_candidate_1041 {
+        assert_eq!(
+            env::var("INFINISHELL_GROK_TEST_CANDIDATE_1041")
+                .ok()
+                .as_deref(),
+            Some("1")
+        );
+    }
     let root =
         PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("必须由隔离运行器启动"))
             .canonicalize()
@@ -1140,13 +1233,15 @@ async fn real_grok_p0_lifecycle() {
     };
     evidence
         .record(json!({"event":"acceptance_started","scope":SCOPE,
-            "verified_scope":"p0","credential_files_read_by_probe":false,
+            "verified_scope":if test_candidate_1041 { "p0-test-only-1.0.41" } else { "p0" },
+            "test_only_candidate_1041":test_candidate_1041,
+            "max_native_inputs":4,"credential_files_read_by_probe":false,
             "production_run_process":true,"production_run_transport":true,
             "production_runtime_commands":true,"test_only_internal_command_switch":false,
-            "public_product_gate_open":true,"full_cli_parity_acceptance_passed":false,
+            "public_product_gate_open":!test_candidate_1041,"full_cli_parity_acceptance_passed":false,
             "same_turn_steering_supported":false}))
         .unwrap();
-    let result = exercise_p0(&root, &mut evidence).await;
+    let result = exercise_p0(&root, &mut evidence, test_candidate_1041).await;
     if let Err(error) = &result {
         evidence
             .record(json!({"event":"acceptance_failed","reason":error}))
@@ -1154,7 +1249,7 @@ async fn real_grok_p0_lifecycle() {
     }
     assert!(
         result.is_ok(),
-        "真实 Grok 1.0.34 P0 适配器验收未通过；请检查脱敏证据"
+        "真实 Grok P0 适配器验收未通过；请检查脱敏证据"
     );
 }
 

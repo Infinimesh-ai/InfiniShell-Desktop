@@ -310,6 +310,75 @@ fn test_candidate_1041_selected_skill_only_opens_test_lifecycle() {
 }
 
 #[test]
+fn test_candidate_1041_p0_requires_exact_inherit_without_skill_or_local_tools() {
+    let mut candidate = GrokProtocol::new(options());
+    candidate.test_only_1041_profile = true;
+    candidate.test_only_1041_p0_for_live = true;
+    candidate
+        .bind_cli_version("grok 1.0.41 (4220f3b224a6)")
+        .unwrap();
+    assert!(candidate.test_candidate_p0_for_live());
+    assert!(candidate.baseline_lifecycle_verified());
+    assert!(candidate.prompt_lifecycle_verified());
+    assert!(!candidate.queued_submit_verified());
+    assert!(!candidate.extended_lifecycle_verified());
+    assert!(!supported_version("1.0.41"));
+
+    candidate.options.selected_skills.push(SelectedLocalSkill {
+        name: "unexpected-skill".into(),
+        path: candidate.options.cwd.join("SKILL.md"),
+    });
+    assert!(!candidate.test_candidate_p0_for_live());
+    candidate.options.selected_skills.clear();
+    candidate.options.local_tools = Some(LocalToolPermissions {
+        allow_spawn: false,
+        allow_message: false,
+    });
+    assert!(!candidate.test_candidate_p0_for_live());
+    candidate.options.local_tools = None;
+    candidate.current_root_candidate_for_live = true;
+    assert!(!candidate.test_candidate_p0_for_live());
+    candidate.current_root_candidate_for_live = false;
+    candidate.options.permission_policy = PermissionPolicy::GrokRestrictedReadV1;
+    assert!(!candidate.test_candidate_p0_for_live());
+}
+
+#[test]
+fn test_candidate_1041_p0_only_forwards_correlated_exact_read_approval() {
+    let (mut candidate, mut request) = pending_native_approval();
+    candidate.probed_version = Some("1.0.41");
+    candidate.test_only_1041_profile = true;
+    candidate.test_only_1041_p0_for_live = true;
+    let call_id = request["params"]["toolCall"]["toolCallId"].clone();
+    request["params"]["toolCall"] = json!({
+        "toolCallId": call_id,
+        "kind": "read",
+        "rawInput": {"variant": "ReadFile", "target_file": "verified.txt"},
+        "_meta": {"x.ai/tool": {
+            "version": 1, "name": "read_file", "namespace": "grok_build", "read_only": true
+        }}
+    });
+    let opened = candidate.receive(request.clone()).unwrap();
+    assert!(opened.writes.is_empty());
+    assert!(matches!(
+        opened.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { .. }]
+    ));
+
+    let (mut write_candidate, _) = pending_native_approval();
+    write_candidate.probed_version = Some("1.0.41");
+    write_candidate.test_only_1041_profile = true;
+    write_candidate.test_only_1041_p0_for_live = true;
+    request["params"]["toolCall"]["kind"] = json!("write");
+    let rejected = write_candidate.receive(request).unwrap();
+    assert!(rejected.events.is_empty());
+    assert_eq!(
+        rejected.writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+}
+
+#[test]
 fn test_candidate_1041_only_forwards_correlated_exact_read_approval() {
     let (mut candidate, mut request) = pending_native_approval();
     candidate.probed_version = Some("1.0.41");
@@ -366,6 +435,26 @@ async fn test_candidate_1041_requires_a_distinct_native_binary_before_launch() {
     protocol.current_root_candidate_for_live = true;
     protocol.current_selected_skill_candidate_for_live = true;
     protocol.test_only_1041_profile = true;
+    let (_commands, receiver) = mpsc::channel(1);
+    let (events, _event_receiver) = mpsc::channel(1);
+    assert!(matches!(
+        run_process(&mut protocol, receiver, &events).await,
+        Err(RuntimeError::InvalidConfiguration(_))
+    ));
+
+    protocol.test_only_1041_native_binary = Some(protocol.options.executable.clone());
+    let (_commands, receiver) = mpsc::channel(1);
+    assert!(matches!(
+        run_process(&mut protocol, receiver, &events).await,
+        Err(RuntimeError::InvalidConfiguration(_))
+    ));
+}
+
+#[tokio::test]
+async fn test_candidate_1041_p0_requires_a_distinct_native_binary_before_launch() {
+    let mut protocol = GrokProtocol::new(options());
+    protocol.test_only_1041_profile = true;
+    protocol.test_only_1041_p0_for_live = true;
     let (_commands, receiver) = mpsc::channel(1);
     let (events, _event_receiver) = mpsc::channel(1);
     assert!(matches!(

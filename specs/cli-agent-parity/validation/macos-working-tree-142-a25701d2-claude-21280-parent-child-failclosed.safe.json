@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "scope": "claude_2_1_280_test_only_parent_child_coordinator_fail_closed",
+  "checked_at_utc": "2026-09-23T16:32:00Z",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "base_sha": "a25701d2624d28528983b71b6e4616101fb9b712",
+    "working_tree_clean_at_execution": false,
+    "candidate_committed": false
+  },
+  "platform": "macos-arm64",
+  "binary": {
+    "official_claude_version": "2.1.280 (Claude Code)",
+    "official_claude_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+    "signed_test_binary_sha256": "4db60969fbceb64faa26d38a2d8c8c968b6d369eb026aaebb175995e7e3001da",
+    "signed_feature_supervisor_sha256": "43c8ac54da0a3a4ea153809c9c68409921713ff912f000648d63658c0b706b7b",
+    "test_build_marker_verified": true,
+    "supervisor_signature_strict_verified": true
+  },
+  "no_model_preflight": {
+    "supervisor_startup_cases_passed": 2,
+    "supervisor_startup_cases_total": 2
+  },
+  "real_parent_child_attempt": {
+    "passed": false,
+    "runner_exit_code": 1,
+    "rust_test_exit_code": 101,
+    "public_event_count": 17,
+    "parent_native_input_accepted": true,
+    "parent_run_agents_tool_requested": true,
+    "parent_run_agents_approval_allowed": true,
+    "child_task_created": false,
+    "parent_turn_outcome": "Completed",
+    "failure_reason": "父任务在父子验收完成前提前结束",
+    "model_visible_tool_rejection_category": "parent_permissions_unverifiable",
+    "source_diagnosis": "父任务保存的 2.1.280 固定权限证明已标记 verified，但 ceiling_from_parent 仍只接受正式 supported_version 列表中的旧版；候选父权限上限在创建子任务前被拒。",
+    "source_fix_verified_by_new_live_attempt": false,
+    "child_fixture_unchanged": true,
+    "blocked_fixture_unchanged": true,
+    "public_projection_sha256": "1be66f584f86ee2f9cf0b2122aca310315fbfb9d9d358261946a04aa0daf8a85"
+  },
+  "cleanup": {
+    "parent_supervisor_exit_receipt_observed": true,
+    "adapter_succeeded": true,
+    "adapter_task_terminated": true,
+    "event_journal_completed": true,
+    "native_process_state": "exited",
+    "matching_private_root_processes_remaining": 0,
+    "private_raw_evidence_preserved_outside_repository": true,
+    "credentials_or_raw_transcript_in_repository": false
+  },
+  "boundaries": {
+    "public_product_21280_gate_open": false,
+    "parent_child_permission_ceiling_verified": false,
+    "full_cli_parity_acceptance_passed": false,
+    "real_gui_verified": false,
+    "http_model_request_count_observable": false,
+    "user_facing_copy_changed": false
+  }
+}

@@ -226,7 +226,14 @@ async fn run_process(
 ) -> Result<(), RuntimeError> {
     #[cfg(test)]
     if protocol.test_only_1041_profile {
-        if !protocol.current_selected_skill_candidate_for_live() {
+        if protocol.test_only_1041_p0_for_live {
+            validate_options(&protocol.options)?;
+        }
+        if !(if protocol.test_only_1041_p0_for_live {
+            protocol.test_candidate_p0_for_live()
+        } else {
+            protocol.current_selected_skill_candidate_for_live()
+        }) {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
                 "cli-agent-grok-managed-unverified"
             )));
@@ -1084,6 +1091,8 @@ struct GrokProtocol {
     #[cfg(test)]
     test_only_1041_profile: bool,
     #[cfg(test)]
+    test_only_1041_p0_for_live: bool,
+    #[cfg(test)]
     test_only_1041_native_binary: Option<PathBuf>,
 }
 
@@ -1122,7 +1131,9 @@ impl GrokProtocol {
         matches!(
             self.probed_version,
             Some(VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION)
-        ) || (self.test_candidate_settings() && self.current_selected_skill_candidate_for_live())
+        ) || (self.test_candidate_settings()
+            && (self.current_selected_skill_candidate_for_live()
+                || self.test_candidate_p0_for_live()))
     }
 
     fn extended_lifecycle_verified(&self) -> bool {
@@ -1131,7 +1142,9 @@ impl GrokProtocol {
 
     fn prompt_lifecycle_verified(&self) -> bool {
         self.baseline_lifecycle_verified()
-            && (!self.current_protocol() || self.current_root_candidate_for_live())
+            && (!self.current_protocol()
+                || self.current_root_candidate_for_live()
+                || self.test_candidate_p0_for_live())
     }
 
     fn queued_submit_verified(&self) -> bool {
@@ -1158,6 +1171,28 @@ impl GrokProtocol {
                 && self.options.permission_policy == PermissionPolicy::Inherit
                 && self.options.local_tools.is_none()
                 && self.options.selected_skills.len() == 1
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
+    }
+
+    fn test_candidate_p0_for_live(&self) -> bool {
+        #[cfg(test)]
+        {
+            self.test_only_1041_profile
+                && self.test_only_1041_p0_for_live
+                && !self.current_root_candidate_for_live
+                && !self.current_selected_skill_candidate_for_live
+                && self.options.permission_policy == PermissionPolicy::Inherit
+                && self.options.permission_ceiling.is_none()
+                && self.options.grok_profile.is_none()
+                && self.options.claude_profile.is_none()
+                && self.options.model.is_none()
+                && self.options.local_tools.is_none()
+                && self.sdk.is_none()
+                && self.options.selected_skills.is_empty()
         }
         #[cfg(not(test))]
         {
@@ -1284,6 +1319,8 @@ impl GrokProtocol {
             current_selected_skill_candidate_for_live: false,
             #[cfg(test)]
             test_only_1041_profile: false,
+            #[cfg(test)]
+            test_only_1041_p0_for_live: false,
             #[cfg(test)]
             test_only_1041_native_binary: None,
         }
@@ -2382,7 +2419,8 @@ impl GrokProtocol {
             #[cfg(test)]
             Some(TEST_CANDIDATE_VERSION)
                 if self.test_candidate_settings()
-                    && self.current_selected_skill_candidate_for_live() =>
+                    && (self.current_selected_skill_candidate_for_live()
+                        || self.test_candidate_p0_for_live()) =>
             {
                 verified_latest_read_tool(&params["toolCall"])
             }
@@ -2945,7 +2983,10 @@ impl GrokProtocol {
         let (method, requested_id) = match &self.options.target {
             SessionTarget::New => ("session/new", None),
             SessionTarget::Resume { native_session_id } => {
-                if self.current_protocol() && !self.current_root_candidate_for_live() {
+                if self.current_protocol()
+                    && !self.current_root_candidate_for_live()
+                    && !self.test_candidate_p0_for_live()
+                {
                     return Err(RuntimeError::Protocol(crate::t!(
                         "cli-agent-grok-managed-unverified"
                     )));

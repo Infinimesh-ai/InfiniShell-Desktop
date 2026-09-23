@@ -27,6 +27,23 @@ pub static AmdPowerXpressRequestHighPerformance: u32 = 1;
 
 // Zap OSS 构建的入口,简单包一层 warp::run()。
 fn main() -> Result<()> {
+    if std::env::args_os().nth(1).as_deref()
+        == Some(std::ffi::OsStr::new(
+            "--infinishell-claude-21280-test-build",
+        ))
+    {
+        anyhow::ensure!(
+            std::env::args_os().count() == 2,
+            "测试构建标记不接受其他参数"
+        );
+        #[cfg(all(feature = "claude_21280_test_candidate", debug_assertions))]
+        {
+            println!("infinishell-claude-21280-test-build-v1");
+            return Ok(());
+        }
+        #[cfg(not(all(feature = "claude_21280_test_candidate", debug_assertions)))]
+        anyhow::bail!("Claude 测试构建功能未启用");
+    }
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {

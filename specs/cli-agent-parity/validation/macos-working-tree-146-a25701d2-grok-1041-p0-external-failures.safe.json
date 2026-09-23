@@ -1,0 +1,66 @@
+{
+  "receipt": 146,
+  "timestamp_utc": "2026-09-23T17:54:40.722435+00:00",
+  "source_commit": "a25701d2624d28528983b71b6e4616101fb9b712",
+  "source_app_script_diff_sha256": "62e67df4b431f96b9562a090072379b1f4bf942b5d9ce02e19d383029a0c5d20",
+  "worktree_dirty": true,
+  "platform": "macos-arm64",
+  "cli": "Grok Build",
+  "cli_version": "1.0.41",
+  "mode": "test-only P0 official adapter",
+  "storage": "ACASIS-backed APFS sparsebundle with ownership enabled",
+  "acceptance_passed": false,
+  "public_product_gate_open": false,
+  "runs": [
+    {
+      "run": "grok-1041-p0-owned-1",
+      "public_evidence_sha256": "d3c68d2feb1fc7fb28cef1577fb04d8a13c3b1d5c8037bdd19e88acc62fddef5",
+      "metadata_sha256": "265406d3272cb3c8b843bac3b8c895d18377af2fa52d5f0e6aaa7c373028bab0",
+      "public_event_names": [
+        "acceptance_started",
+        "initialization_failed",
+        "acceptance_failed"
+      ],
+      "test_exit_code": 101,
+      "grok_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+      "libtest_sha256": "5fa45cea5e3d6efd5fb0132282fe9af9da7b0082959458e08c863dd1fcb1baf6",
+      "supervisor_sha256": "5b3963b68f04c1b3b737e6ea066d980c4ac57e394fd05e69f96f1441304c824b",
+      "private_auth_copy_removed": true,
+      "supervisor_state_removed": true,
+      "tunnels_stopped": true
+    },
+    {
+      "run": "grok-1041-p0-owned-short-2",
+      "public_evidence_sha256": "a7f5c68b31b85c1f9edc0b2a9d6861d82eda192ee08c988295739fcbcd79858e",
+      "metadata_sha256": "fec27a1bf578a827de92a5b652338facac4ed4df8a06e7891ec1f98e4bad6995",
+      "public_event_names": [
+        "acceptance_started",
+        "session_ready",
+        "connection_shutdown",
+        "candidate_zero_input_handshake_verified",
+        "initialization_failed",
+        "acceptance_failed"
+      ],
+      "test_exit_code": 101,
+      "grok_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+      "libtest_sha256": "5fa45cea5e3d6efd5fb0132282fe9af9da7b0082959458e08c863dd1fcb1baf6",
+      "supervisor_sha256": "5b3963b68f04c1b3b737e6ea066d980c4ac57e394fd05e69f96f1441304c824b",
+      "private_auth_copy_removed": true,
+      "supervisor_state_removed": true,
+      "tunnels_stopped": true
+    }
+  ],
+  "diagnosis": {
+    "first_run": "Native Unix socket pathname exceeded SUN_LEN; initialization failed before session ready.",
+    "second_run": "Shorter /Volumes/P mount enabled first zero-input handshake and native cleanup; second new session timed out during initialization before run_turn.",
+    "second_run_model_inputs_sent_before_failure": 0,
+    "second_run_native_catalog_observation": "Private native log reports command_count 32 for second session; catalog contents and reason for timeout not yet verified.",
+    "http_model_requests_independently_verified": false
+  },
+  "limitations": [
+    "No Grok P0 model or approval acceptance",
+    "Dirty source, not final SHA",
+    "Private logs and authentication remain outside repository"
+  ],
+  "historical_failures_preserved": true
+}

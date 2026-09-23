@@ -209,6 +209,88 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
     assert!(ceiling_from_parent(&task, "codex").is_err());
 }
 
+#[cfg(all(feature = "local_fs", debug_assertions))]
+#[test]
+fn claude_21280_parent_requires_bound_test_candidate_proof() {
+    let Some(executable_digest) = super::super::claude::test_candidate_executable_digest() else {
+        return;
+    };
+    let mut task = parent(json!({}));
+    task.harness = "claude".into();
+    task.native_session_id = Some(uuid::Uuid::new_v4().to_string());
+    let profile = json!({"version":1,"workingDirectory":task.working_directory,
+        "canonicalWorkingDirectory":std::fs::canonicalize(&task.working_directory).unwrap(),
+        "executableSha256":executable_digest,
+        "denyRules":[],"sourceRules":[],"localTools":{"allow_spawn":true,"allow_message":true}});
+    let parsed: ClaudeRestrictedFilesV1 = serde_json::from_value(profile.clone()).unwrap();
+    let digest = parsed.digest();
+    let runtime_generation = uuid::Uuid::new_v4();
+    let mut effective = json!({"permissionMode":"default","fixedProfileVerified":true,
+    "fixedProfileSha256":digest,"claudeRestrictedFilesV1":profile,
+    "claudeTestCandidate21280Proof":{
+        "runtimeGeneration":runtime_generation,
+        "nativeSessionId":task.native_session_id,
+        "profileSha256":digest,
+    }});
+    let config = |observed: &Value| {
+        json!({"cli_version":"2.1.280",
+        "cli_version_runtime_generation":runtime_generation,
+        "permission_policy":"ClaudeRestrictedFilesV1",
+        "claude_profile":profile,"effective_permissions":observed})
+        .to_string()
+    };
+    task.config_json = config(&effective);
+    let ceiling = ceiling_from_parent(&task, "claude").unwrap();
+    assert!(ceiling.claude_profile().is_some());
+    verify_effective_permissions(
+        Some(&ceiling),
+        "claude",
+        Path::new(&task.working_directory),
+        &effective,
+    )
+    .unwrap();
+
+    for (field, replacement) in [
+        ("runtimeGeneration", json!(uuid::Uuid::new_v4())),
+        ("nativeSessionId", json!("forged-session")),
+        ("profileSha256", json!("forged-digest")),
+    ] {
+        let mut forged = effective.clone();
+        forged["claudeTestCandidate21280Proof"][field] = replacement;
+        task.config_json = config(&forged);
+        assert!(ceiling_from_parent(&task, "claude").is_err());
+    }
+    effective
+        .as_object_mut()
+        .unwrap()
+        .remove("claudeTestCandidate21280Proof");
+    task.config_json = config(&effective);
+    assert!(ceiling_from_parent(&task, "claude").is_err());
+    effective["claudeTestCandidate21280Proof"] = json!(true);
+    task.config_json = config(&effective);
+    assert!(ceiling_from_parent(&task, "claude").is_err());
+    effective["claudeTestCandidate21280Proof"] = json!({
+        "runtimeGeneration":runtime_generation,
+        "nativeSessionId":task.native_session_id,
+        "profileSha256":digest,
+        "unexpected":true,
+    });
+    task.config_json = config(&effective);
+    assert!(ceiling_from_parent(&task, "claude").is_err());
+
+    let mut old_profile = profile.clone();
+    old_profile["executableSha256"] =
+        json!("953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb");
+    let old: ClaudeRestrictedFilesV1 = serde_json::from_value(old_profile.clone()).unwrap();
+    let old_effective = json!({"permissionMode":"default","fixedProfileVerified":true,
+        "claudeRestrictedFilesV1":old_profile});
+    task.config_json = json!({"cli_version":"2.1.278",
+        "permission_policy":"ClaudeRestrictedFilesV1",
+        "claude_profile":old,"effective_permissions":old_effective})
+    .to_string();
+    assert!(ceiling_from_parent(&task, "claude").is_ok());
+}
+
 #[cfg(feature = "local_fs")]
 #[test]
 fn fixed_claude_profile_requires_the_saved_policy_and_cannot_be_inferred_from_mode() {

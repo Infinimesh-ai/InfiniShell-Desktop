@@ -21,6 +21,7 @@ TEST_CASES = {
     "lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_managed_lifecycle",
     "candidate-01561-lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_candidate_01561_managed_lifecycle",
     "running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_running_tool_cancel",
+    "candidate-01561-running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_candidate_01561_running_tool_cancel",
     "local-tools-restore": "ai::cli_agent_runtime::codex::live_tests::real_codex_local_tool_restore",
     "image-input": "ai::cli_agent_runtime::codex::live_tests::real_codex_image_input",
     "missing-session": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
@@ -30,6 +31,7 @@ TEST_CASES = {
 
 
 UNAUTHENTICATED_CASES = {"missing-session", "candidate-01561-missing-session", "idle-crash"}
+RUNNING_TOOL_CANCEL_CASES = {"running-tool-cancel", "candidate-01561-running-tool-cancel"}
 VERSION_PROBE_TIMEOUT_SECONDS = 30
 
 
@@ -64,11 +66,15 @@ def verified_acceptance(test_case, exit_code, output, events):
                    and event.get("test_only_candidate_01561") is True
                    and event.get("app_restart_and_ui_verified") is False
                    for event in events)
-    if test_case == "running-tool-cancel":
+    if test_case in RUNNING_TOOL_CANCEL_CASES:
+        candidate_01561 = test_case == "candidate-01561-running-tool-cancel"
         expected_order = ["native_item_started", "interrupt_sent", "interrupt_accepted",
                           "turn_finished", "disconnected"]
         return any(event.get("event") == "running_tool_cancel_finished"
                    and event.get("passed") is True
+                   and event.get("scope") == ("rust_adapter_01561_test_only_running_tool_cancel"
+                                              if candidate_01561 else "rust_adapter_running_tool_cancel")
+                   and event.get("test_only_candidate_01561") is candidate_01561
                    and event.get("native_item_started_before_interrupt") is True
                    and event.get("interrupt_native_ack") is True
                    and event.get("same_generation_receipt") is True
@@ -355,7 +361,9 @@ def stopped_output(process, metadata):
 
 
 def run(args):
-    candidate_01561 = args.test_case in {"candidate-01561-missing-session", "candidate-01561-lifecycle"}
+    candidate_01561 = args.test_case in {"candidate-01561-missing-session", "candidate-01561-lifecycle",
+                                           "candidate-01561-running-tool-cancel"}
+    running_tool_cancel = args.test_case in RUNNING_TOOL_CANCEL_CASES
     if candidate_01561:
         verify_candidate_01561_package(args.codex)
     repository = Path(__file__).resolve().parents[2]
@@ -364,6 +372,7 @@ def run(args):
         "test": test_name,
         "test_case": args.test_case,
         "scope": {"running-tool-cancel": "rust_adapter_running_tool_cancel",
+                  "candidate-01561-running-tool-cancel": "rust_adapter_01561_test_only_running_tool_cancel",
                   "image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
                   "candidate-01561-missing-session": "rust_adapter_01561_test_only_zero_input_missing_session",
                   "candidate-01561-lifecycle": "rust_adapter_01561_test_only_process_restart",
@@ -386,7 +395,7 @@ def run(args):
     metadata["worktree_dirty"] = bool(status.stdout.strip())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary_parent = (os.environ.get("RUNNER_TEMP") if args.test_case in UNAUTHENTICATED_CASES
-                        or args.test_case == "candidate-01561-lifecycle" else None)
+                        or candidate_01561 else None)
     with tempfile.TemporaryDirectory(prefix="infinishell-codex-adapter-", dir=temporary_parent) as temporary:
         root = Path(temporary).resolve()
         configuration = root / "codex"
@@ -416,14 +425,14 @@ def run(args):
         })
         if candidate_01561:
             environment["INFINISHELL_CODEX_TEST_CANDIDATE_01561"] = "1"
-        if args.test_case == "running-tool-cancel":
+        if running_tool_cancel:
             environment["INFINISHELL_CODEX_RUNNING_TOOL_CANCEL"] = "1"
         version = probe_version(args.codex, environment)
         metadata["cli_version"] = version.stdout.strip()
         # 清空本次输出，避免筛选器未匹配或版本不符时采用上一次的成功记录。
         args.output.write_text("")
         expected_version = ("codex-cli 0.156.1" if candidate_01561 else
-                            "codex-cli 0.155.1" if args.test_case == "running-tool-cancel" else None)
+                            "codex-cli 0.155.1" if running_tool_cancel else None)
         if expected_version is not None and metadata["cli_version"] != expected_version:
             metadata["acceptance_passed"] = False
             metadata["version_mismatch"] = True
@@ -437,16 +446,16 @@ def run(args):
         try:
             output, _ = process.communicate(timeout=120 if args.test_case in UNAUTHENTICATED_CASES else 900)
         except subprocess.TimeoutExpired:
-            terminate(process, own_process_only=args.test_case in {"idle-crash", "running-tool-cancel"})
-            output = stopped_output(process, metadata) if args.test_case == "running-tool-cancel" else process.communicate()[0]
+            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel)
+            output = stopped_output(process, metadata) if running_tool_cancel else process.communicate()[0]
             metadata["timed_out"] = True
         except BaseException:
-            terminate(process, own_process_only=args.test_case in {"idle-crash", "running-tool-cancel"})
-            if args.test_case != "running-tool-cancel":
+            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel)
+            if not running_tool_cancel:
                 raise
             output = stopped_output(process, metadata)
             metadata["runner_interrupted"] = True
-        if args.test_case == "running-tool-cancel":
+        if running_tool_cancel:
             metadata["harness_cleanup"] = audit_and_cleanup_fixture(root, args.codex, args.supervisor)
             metadata["libtest_reaped"] = process.poll() is not None
         metadata["test_exit_code"] = process.returncode
@@ -462,7 +471,7 @@ def run(args):
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
                                          and not metadata.get("runner_interrupted", False)
                                          and not metadata.get("invalid_evidence", False)
-                                         and (args.test_case != "running-tool-cancel" or (
+                                         and (not running_tool_cancel or (
                                              metadata["libtest_reaped"]
                                              and
                                              metadata["harness_cleanup"]["zero_residual"]

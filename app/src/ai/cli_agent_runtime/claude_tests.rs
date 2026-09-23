@@ -245,6 +245,90 @@ fn test_candidate_21280_requires_explicit_binding_and_exact_init() {
 }
 
 #[test]
+fn test_candidate_21280_parent_proof_requires_gate_and_version_pair() {
+    let Some(executable_digest) = test_candidate_executable_digest() else {
+        return;
+    };
+    let mut protocol = ready_protocol();
+    let profile: super::super::claude_profile::ClaudeRestrictedFilesV1 =
+        serde_json::from_value(json!({
+            "version":1,"workingDirectory":protocol.options.cwd,
+            "canonicalWorkingDirectory":std::fs::canonicalize(&protocol.options.cwd).unwrap(),
+            "executableSha256":executable_digest,
+            "denyRules":[],"sourceRules":[],
+            "localTools":{"allow_spawn":true,"allow_message":true},
+        }))
+        .unwrap();
+    let digest = profile.digest();
+    protocol.options.claude_profile = Some(profile);
+    protocol.test_candidate_21280 = true;
+    protocol.session_id = Some("3ddff71c-4062-4198-a130-502e4c15684e".into());
+    protocol.paired_version = Some(TEST_CANDIDATE_VERSION);
+    let RuntimeEventKind::SessionReady {
+        effective_permissions,
+        ..
+    } = protocol.ready_event()
+    else {
+        panic!("候选必须产生 SessionReady");
+    };
+    assert_eq!(
+        effective_permissions["claudeTestCandidate21280Proof"],
+        json!({"runtimeGeneration":protocol.options.generation,
+            "nativeSessionId":protocol.session_id.as_deref(),
+            "profileSha256":digest})
+    );
+    protocol.paired_version = None;
+    let RuntimeEventKind::SessionReady {
+        effective_permissions,
+        ..
+    } = protocol.ready_event()
+    else {
+        panic!("候选必须产生 SessionReady");
+    };
+    assert!(
+        effective_permissions
+            .get("claudeTestCandidate21280Proof")
+            .is_none()
+    );
+    protocol.paired_version = Some(TEST_CANDIDATE_VERSION);
+    protocol.test_candidate_21280 = false;
+    let RuntimeEventKind::SessionReady {
+        effective_permissions,
+        ..
+    } = protocol.ready_event()
+    else {
+        panic!("候选必须产生 SessionReady");
+    };
+    assert!(
+        effective_permissions
+            .get("claudeTestCandidate21280Proof")
+            .is_none()
+    );
+}
+
+#[test]
+fn test_candidate_coordinator_state_root_requires_exact_host_shape() {
+    let directory = tempfile::tempdir().unwrap();
+    let state = directory.path().join("state");
+    std::fs::create_dir(&state).unwrap();
+    std::fs::write(state.join(TEST_CANDIDATE_MARKER), b"candidate").unwrap();
+    assert_eq!(test_candidate_state_root(&state), Some(state.as_path()));
+    let native = state
+        .join("cli-agent-hosts")
+        .join(Uuid::new_v4().to_string())
+        .join("native");
+    assert_eq!(test_candidate_state_root(&native), Some(state.as_path()));
+    assert!(test_candidate_state_root(&state.join("other/native")).is_none());
+    assert!(test_candidate_state_root(&state.join("cli-agent-hosts/not-a-uuid/native")).is_none());
+    assert!(
+        test_candidate_state_root(
+            &state.join("wrong-hosts/00000000-0000-4000-8000-000000000001/native")
+        )
+        .is_none()
+    );
+}
+
+#[test]
 fn supported_versions_cannot_mix_probe_and_init() {
     for (output, version) in [
         ("2.1.273 (Claude Code)", "2.1.278"),

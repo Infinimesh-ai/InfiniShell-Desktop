@@ -4,7 +4,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 
-use super::{executable_digest, expected_executable_digests};
+use super::{executable_digest, expected_executable_digests, test_candidate_executable_digest};
 
 const RELEASE_273: &str = include_str!(
     "../../../../specs/cli-agent-parity/fixtures/claude-2.1.273-release-manifest.json"
@@ -94,5 +94,25 @@ fn executable_contents_must_match_a_fixed_release_digest() {
     file.write_all(b"synthetic executable with an untrusted digest")
         .unwrap();
 
-    assert!(executable_digest(file.path()).is_err());
+    assert!(executable_digest(file.path(), false).is_err());
+    assert!(executable_digest(file.path(), true).is_err());
+}
+
+#[test]
+fn test_candidate_digest_is_distinct_from_product_releases() {
+    for (os, arch) in [
+        ("macos", "aarch64"),
+        ("macos", "x86_64"),
+        ("linux", "x86_64"),
+        ("windows", "x86_64"),
+    ] {
+        let candidate = test_candidate_executable_digest(os, arch).unwrap();
+        assert_eq!(candidate.len(), 64);
+        assert!(
+            !expected_executable_digests(os, arch)
+                .unwrap()
+                .contains(&candidate)
+        );
+    }
+    assert!(test_candidate_executable_digest("linux", "aarch64").is_none());
 }

@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_41_test_only_selected_skill_clean_commit",
+  "observed_at_utc": "2026-09-23 15:34 UTC",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "commit": "a25701d2624d28528983b71b6e4616101fb9b712",
+    "worktree_clean_at_execution_verified_by_temporary_receipt_holding": true,
+    "runner_itself_checks_same_commit": false,
+    "platform": "macos-arm64"
+  },
+  "artifacts": {
+    "official_version": "grok 1.0.41 (4220f3b224a6)",
+    "official_binary_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "rust_libtest_sha256": "5d019d2fb85d0d528f7dd723e99244acc689401cb11117413eafcc42552666a1",
+    "same_source_supervisor_sha256": "04dd4fb0483428324fc491cca1dc48e57611cddb5af080a4d1fcf2ace7b9cf76"
+  },
+  "zero_input_preflight": {
+    "runner_exit_code": 0,
+    "catalog_transport_handshake_verified": true,
+    "selected_skill_path_bound_before_input": true,
+    "native_inputs_sent": 0,
+    "safe_projection_sha256": "dc0e74a5dd7f1d598babf025e642041b4a9a589d990900a98ab1eea7acff1fcd",
+    "metadata_sha256": "be9426d92b49ac91cb03659a124aaca16d85c7345f1a70e77efbddf5f3e68c29"
+  },
+  "single_input": {
+    "runner_exit_code": 0,
+    "case_passed": true,
+    "boundary_passed": true,
+    "submitted_input_count": 1,
+    "native_accepted_input_count": 1,
+    "exact_read_only_approval_count": 1,
+    "verified_native_context_read_count": 1,
+    "native_tool_event_count": 3,
+    "final_history_verified": true,
+    "sentinel_matched": true,
+    "default_entrypoint_verified": true,
+    "product_selected_skill_combination_verified": true,
+    "transport_closed": true,
+    "supervisor_cleanup_confirmed": true,
+    "project_snapshot_unchanged": true,
+    "safe_projection_sha256": "97b6045f260239109d1cfcdf48d2dbcb356f37ac5a89dd7617014bf101cd4f96",
+    "metadata_sha256": "b16fea6b5d66b5185452a1cf0377f72b7df94ea834a23e2f8c97ef027d226fe3"
+  },
+  "isolation": {
+    "source_auth_home_private_mode": "0700",
+    "temporary_auth_source_copy_removed": true,
+    "runner_private_auth_copy_removed": true,
+    "original_auth_stat_unchanged": true,
+    "network_tunnel_bounded_and_closed": true,
+    "native_marketplace_initialization_only": true,
+    "http_model_call_count_independently_observed": false
+  },
+  "initial_setup_refusal": {
+    "original_default_grok_home_mode_not_private": true,
+    "model_inputs_sent": 0
+  },
+  "boundaries": {
+    "formal_1_0_41_runtime_gate_open": false,
+    "gui_composer_verified": false,
+    "ssh_tmux_verified": false,
+    "linux_windows_same_commit_verified_by_this_receipt": false,
+    "three_cli_atomic_upgrade_verified": false,
+    "full_cli_parity_goal_complete": false
+  },
+  "raw_frames_or_credentials_copied_to_repository": false
+}

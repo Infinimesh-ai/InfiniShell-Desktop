@@ -44,37 +44,142 @@ const SUPPORTED_VERSIONS: [(&str, &str); 2] = [
     ("2.1.273 (Claude Code)", "2.1.273"),
     ("2.1.278 (Claude Code)", "2.1.278"),
 ];
-#[cfg(test)]
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
 const TEST_CANDIDATE_VERSION: &str = "2.1.280";
 // 无凭据 init/EOF 只覆盖 P0；候选完整任务链仍须单独真实验收。
-#[cfg(test)]
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
 const TEST_CANDIDATE_OUTPUT: &str = "2.1.280 (Claude Code)";
-#[cfg(test)]
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
 const TEST_CANDIDATE_MARKER: &str = ".infinishell-claude-21280-candidate";
 
-#[cfg(test)]
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
+fn test_candidate_state_root(state_dir: &Path) -> Option<&Path> {
+    if state_dir.join(TEST_CANDIDATE_MARKER).is_file() {
+        return Some(state_dir);
+    }
+    if state_dir.file_name() != Some(std::ffi::OsStr::new("native")) {
+        return None;
+    }
+    let generation = state_dir.parent()?;
+    Uuid::parse_str(generation.file_name()?.to_str()?).ok()?;
+    let hosts = generation.parent()?;
+    if hosts.file_name() != Some(std::ffi::OsStr::new("cli-agent-hosts")) {
+        return None;
+    }
+    hosts.parent()
+}
+
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
 fn test_candidate_enabled(options: &SessionOptions) -> bool {
-    std::env::var("INFINISHELL_CLAUDE_LIVE_CANDIDATE_21280").as_deref() == Ok("1")
-        && std::env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION").as_deref()
-            == Ok(TEST_CANDIDATE_VERSION)
-        && std::env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").as_deref()
-            == Some(options.executable.as_os_str())
-        && std::env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").as_deref()
-            == Some(options.state_dir.as_os_str())
-        && std::fs::read(options.state_dir.join(TEST_CANDIDATE_MARKER))
+    if !cfg!(debug_assertions) {
+        return false;
+    }
+    let Some(root) = std::env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT") else {
+        return false;
+    };
+    let root = Path::new(&root);
+    let Ok(project) = root.join("project").canonicalize() else {
+        return false;
+    };
+    if std::env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION").as_deref()
+        != Ok(TEST_CANDIDATE_VERSION)
+        || std::env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").as_deref()
+            != Some(options.executable.as_os_str())
+        || !root.is_absolute()
+        || options.cwd.canonicalize().ok().as_deref() != Some(project.as_path())
+        || !options.selected_skills.is_empty()
+        || std::fs::read(root.join(TEST_CANDIDATE_MARKER))
             .ok()
             .as_deref()
-            == Some(b"isolated Claude Code 2.1.280 test candidate\n".as_slice())
+            != Some(b"isolated Claude Code 2.1.280 test candidate\n".as_slice())
+    {
+        return false;
+    }
+    if std::env::var("INFINISHELL_CLAUDE_LIVE_CANDIDATE_21280").as_deref() == Ok("1")
+        && options.state_dir == root
         && options.permission_policy == PermissionPolicy::Inherit
         && options.claude_profile.is_none()
         && options.local_tools.is_none()
-        && options.selected_skills.is_empty()
+    {
+        return true;
+    }
+    if std::env::var("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").as_deref() != Ok("1")
+        || std::env::var("INFINISHELL_CLAUDE_LIVE_AUTH_MODE").as_deref()
+            != Ok("authorized_default_account")
+        || std::env::var_os("CLAUDE_CONFIG_DIR").is_some()
+        || std::env::var_os("ANTHROPIC_API_KEY").is_some()
+        || std::env::var_os("ANTHROPIC_AUTH_TOKEN").is_some()
+        || options.permission_policy != PermissionPolicy::ClaudeRestrictedFilesV1
+        || options.local_tools
+            != Some(super::local_tools::LocalToolPermissions {
+                allow_spawn: true,
+                allow_message: true,
+            })
+        || std::fs::read_to_string(root.join(".infinishell-claude-coordinator-probe"))
+            .ok()
+            .as_deref()
+            != Some("real_claude_production_coordinator")
+    {
+        return false;
+    }
+    let Some(profile) = std::env::var("WARP_DATA_PROFILE").ok() else {
+        return false;
+    };
+    let Some(suffix) = profile.strip_prefix("claude-coordinator-") else {
+        return false;
+    };
+    if suffix.len() != 32
+        || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || std::env::var("INFINISHELL_CLAUDE_LIVE_STATE_PROFILE")
+            .ok()
+            .as_deref()
+            != Some(profile.as_str())
+    {
+        return false;
+    }
+    let Some(state_root) = test_candidate_state_root(&options.state_dir) else {
+        return false;
+    };
+    let Some(home) = std::env::var_os("HOME") else {
+        return false;
+    };
+    let (Ok(state_root), Ok(home)) = (state_root.canonicalize(), Path::new(&home).canonicalize())
+    else {
+        return false;
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let Ok(metadata) = std::fs::metadata(&state_root) else {
+            return false;
+        };
+        if metadata.permissions().mode() & 0o077 != 0 {
+            return false;
+        }
+    }
+    state_root.starts_with(home)
+        && state_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.ends_with(&profile))
+        && std::fs::read(state_root.join(TEST_CANDIDATE_MARKER))
+            .ok()
+            .as_deref()
+            == Some(b"isolated Claude Code 2.1.280 coordinator candidate\n".as_slice())
 }
 
 pub(crate) fn supported_version(version: &str) -> bool {
     SUPPORTED_VERSIONS
         .iter()
         .any(|(_, supported)| *supported == version)
+}
+
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
+pub(super) fn test_candidate_executable_digest() -> Option<&'static str> {
+    profile_preflight::test_candidate_executable_digest(
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+    )
 }
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -141,7 +246,7 @@ async fn run_process(
     commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
-    #[cfg(test)]
+    #[cfg(any(test, feature = "claude_21280_test_candidate"))]
     {
         protocol.test_candidate_21280 = test_candidate_enabled(&protocol.options);
     }
@@ -787,7 +892,7 @@ struct ClaudeProtocol {
     profile_pending_command: Option<(Uuid, RuntimeAction)>,
     profile_command_authorized: bool,
     native_result_evidence: bool,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "claude_21280_test_candidate"))]
     test_candidate_21280: bool,
     #[cfg(test)]
     native_ids_for_live: Option<Arc<Mutex<Vec<Value>>>>,
@@ -832,7 +937,7 @@ impl ClaudeProtocol {
             profile_pending_command: None,
             profile_command_authorized: false,
             native_result_evidence,
-            #[cfg(test)]
+            #[cfg(any(test, feature = "claude_21280_test_candidate"))]
             test_candidate_21280: false,
             #[cfg(test)]
             native_ids_for_live: None,
@@ -842,7 +947,7 @@ impl ClaudeProtocol {
     fn bind_probed_version(&mut self, succeeded: bool, detected: &str) -> Result<(), RuntimeError> {
         self.probed_version = None;
         self.paired_version = None;
-        #[cfg(test)]
+        #[cfg(any(test, feature = "claude_21280_test_candidate"))]
         if succeeded && self.test_candidate_21280 && detected == TEST_CANDIDATE_OUTPUT {
             self.probed_version = Some(TEST_CANDIDATE_VERSION);
             return Ok(());
@@ -966,6 +1071,18 @@ impl ClaudeProtocol {
             effective_permissions["claudeRestrictedFilesV1"] = json!(profile);
             effective_permissions["fixedProfileVerified"] = json!(self.profile_error.is_none());
             effective_permissions["fixedProfileSha256"] = json!(profile.digest());
+            #[cfg(any(test, feature = "claude_21280_test_candidate"))]
+            if self.test_candidate_21280
+                && self.paired_version == Some(TEST_CANDIDATE_VERSION)
+                && self.profile_error.is_none()
+                && let Some(native_session_id) = &self.session_id
+            {
+                effective_permissions["claudeTestCandidate21280Proof"] = json!({
+                    "runtimeGeneration":self.options.generation,
+                    "nativeSessionId":native_session_id,
+                    "profileSha256":profile.digest(),
+                });
+            }
         }
         if let Some(observation) = &self.permission_observation {
             effective_permissions["permissionObservation"] = observation.value();

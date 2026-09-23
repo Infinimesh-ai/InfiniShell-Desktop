@@ -706,6 +706,13 @@ fn real_claude_fixed_profile_parent_child() {
     // 运行器预期值只用于安装快照；可信版本仍由真实探测与 system/init 配对后落库。
     let expected_version = match env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION") {
         Ok(version) if matches!(version.as_str(), "2.1.273" | "2.1.278") => version,
+        Ok(version)
+            if version == "2.1.280"
+                && env::var("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").as_deref()
+                    == Ok("1") =>
+        {
+            version
+        }
         Err(env::VarError::NotPresent) => "2.1.273".to_owned(),
         Ok(_) | Err(env::VarError::NotUnicode(_)) => panic!("未验证的 Claude 验收版本"),
     };
@@ -722,6 +729,13 @@ fn real_claude_fixed_profile_parent_child() {
         .unwrap();
     let state = current_state_dir();
     fs::create_dir_all(&state).unwrap();
+    if expected_version == "2.1.280" {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            fs::set_permissions(&state, fs::Permissions::from_mode(0o700)).unwrap();
+        }
+    }
     fs::write(
         state.join(super::super::claude::NATIVE_RESULT_EVIDENCE_MARKER),
         b"real_claude_production_coordinator\n",
@@ -747,6 +761,18 @@ fn real_claude_fixed_profile_parent_child() {
             assert!(state.to_string_lossy().contains(&profile));
         }
         _ => panic!("不支持的 Claude 协调器认证模式"),
+    }
+    if expected_version == "2.1.280" {
+        assert_eq!(auth_mode, "authorized_default_account");
+        assert_eq!(
+            fs::read_to_string(root.join(".infinishell-claude-21280-candidate")).unwrap(),
+            "isolated Claude Code 2.1.280 test candidate\n"
+        );
+        fs::write(
+            state.join(".infinishell-claude-21280-candidate"),
+            b"isolated Claude Code 2.1.280 coordinator candidate\n",
+        )
+        .unwrap();
     }
     let artifact =
         PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").expect("缺少私有证据路径"))

@@ -27,7 +27,11 @@ pub(super) async fn prepare(
     if options.target != SessionTarget::New && options.claude_profile.is_none() {
         return Err(reject("claude_profile_resume_missing"));
     }
-    let digest = executable_digest(&options.executable)?;
+    #[cfg(any(test, feature = "claude_21280_test_candidate"))]
+    let candidate = super::test_candidate_enabled(options);
+    #[cfg(not(any(test, feature = "claude_21280_test_candidate")))]
+    let candidate = false;
+    let digest = executable_digest(&options.executable, candidate)?;
     let arguments = [
         "--print",
         "--input-format=stream-json",
@@ -151,7 +155,7 @@ async fn query(
     .map_err(|_| reject("claude_profile_preflight_timeout"))?
 }
 
-fn executable_digest(path: &Path) -> Result<String, RuntimeError> {
+fn executable_digest(path: &Path, candidate: bool) -> Result<String, RuntimeError> {
     let expected = expected_executable_digests(std::env::consts::OS, std::env::consts::ARCH)?;
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha256::new();
@@ -164,10 +168,38 @@ fn executable_digest(path: &Path) -> Result<String, RuntimeError> {
         digest.update(&bytes[..count]);
     }
     let actual = format!("{:x}", digest.finalize());
-    if !expected.contains(&actual.as_str()) {
+    #[cfg(any(test, feature = "claude_21280_test_candidate"))]
+    let candidate_matches = candidate
+        && test_candidate_executable_digest(std::env::consts::OS, std::env::consts::ARCH)
+            == Some(actual.as_str());
+    #[cfg(not(any(test, feature = "claude_21280_test_candidate")))]
+    let candidate_matches = {
+        let _ = candidate;
+        false
+    };
+    if !expected.contains(&actual.as_str()) && !candidate_matches {
         return Err(reject("claude_profile_executable_unverified"));
     }
     Ok(actual)
+}
+
+#[cfg(any(test, feature = "claude_21280_test_candidate"))]
+pub(super) fn test_candidate_executable_digest(os: &str, arch: &str) -> Option<&'static str> {
+    match (os, arch) {
+        ("macos", "aarch64") => {
+            Some("387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d")
+        }
+        ("macos", "x86_64") => {
+            Some("c1d32d87630482250633208ab77855429b24010ae3086a7ff7539b57b93168d4")
+        }
+        ("linux", "x86_64") => {
+            Some("1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b")
+        }
+        ("windows", "x86_64") => {
+            Some("0e4195524b73eb77efbdf3e2b36de5322a29f0ca575dfd2d9b4f946b1d425469")
+        }
+        _ => None,
+    }
 }
 
 fn expected_executable_digests(os: &str, arch: &str) -> Result<[&'static str; 2], RuntimeError> {
