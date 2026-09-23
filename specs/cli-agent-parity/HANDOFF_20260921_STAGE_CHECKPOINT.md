@@ -3,6 +3,8 @@
 ## 1. 阶段结论
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
+- 2026-09-23 最新增量：[receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json) 已结算 `645e8b4f…` 的 run 35827672098：Linux 28 成功／1 失败／7 跳过，Grok 原生通知 hook 夹具发生 5 秒超时和一次通知缺失；Windows 44 成功／1 失败／3 跳过，两个严格 Job 原子调试测试每项重试三次，均在已挂起进程等待首事件时超时。六份 artifact／31 个文件在仓库外核验，无符号链接、JSON／NDJSON 解析错误或常见凭据／邮箱模式命中。当前候选把 Windows 主线程恢复移到首事件等待前，给初始事件和会话加有界超时，并在错误路径请求终止；仍需新 SHA 的 Windows 实机确认，`ManualOnly` 不变。
+- 固定官方 Grok `1.0.41` 的 [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json) 在 macOS arm64 隔离环境通过一次原生 ACP 零输入 initialize／authenticate／session/new 和 EOF 退出；首次试验因 CLI 自身 marketplace 初始化改变私有配置而严格审计失败，第二次仅按已审核的 marketplace 例外通过。没有模型输入、业务工具、产品托管链或跨平台结论，正式门禁继续关闭。安装版通知 worker 的本机复制产物首次协议启动耗时约 6.9 秒，超过 hook 的 500 毫秒协议预算；显式冷启动预检后的同一测试组为 15 通过／2 环境跳过。这只证明已就绪路径，冷启动产品投递仍待单独闭环。
 - 工作分支：`codex/cli-agent-parity`。
 - 已结算的跨平台代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。更新的聚焦矩阵 [run 35815324806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35815324806) 绑定 `2c4880f15ead4fb929ee8eeef7a463a250a47ee7`，Linux 成功、Windows 因严格 Job 的内层 ignored 测试名称失配而失败，见 [receipt112](validation/cross-platform-preflight-112-2c4880f-windows-debug-fixture.safe.json)；[run 35821695492](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35821695492) 绑定 `4b12091e…`，Linux 成功、Windows 在 Grok Unix-only 测试编译处首败，见 [receipt114](validation/cross-platform-preflight-114-4b12091-grok-unix-test-gate.safe.json)，严格原子诊断仍未执行。后续提交不自动继承这些结果。Grok 单技能修复已推送为 `eebf08b96cff09bbe7fbfd13841aee93a42234f6`，receipt111 的真实实链仍发生在提交前工作树，未冒充该 SHA 的同提交矩阵。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`。
 - 基线归档仍为 `e6e9d619318e87d0bb889df344c8570f97977e90`；此前受测代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。
@@ -39,6 +41,7 @@
 - [receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 已纠正资产结论：receipt104 错把 `0.155.1` 官方包与 legacy `0.147.0` 清单比较；版本选择后的仓内 `0.155.1` size/SHA 与 GitHub API digest 一致，无需修改产品摘要。cwd、debugger、退出收据和清理缺口不受此纠正影响。
 - receipt112 的 Windows 严格 Job 诊断并未实际进入 image-debug 执行：外层两个 ignored 测试各重试三次，内层 `--exact` 都筛出 0 项，随后读取未生成的退出回执时报错。当前候选仅修正测试名去掉 crate 前缀；必须在新提交的 Windows 实机重跑后才可对原子 debug 退出／拒绝下结论，receipt104 的真实阻断不被此夹具问题覆盖。
 - 当前安全收据：`validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json`。
+- 本轮 Windows 首事件顺序候选仍有单独异常路径：通用 `SuspendedChild::resume()` 若 `ResumeThread` 自身失败，其 Drop 会请求 kill 后无界 wait；这条路径尚未改动或实测，不得据候选推断完整异常生命周期通过。
 
 ### 2.4 同提交 Linux／Windows 聚焦预检
 

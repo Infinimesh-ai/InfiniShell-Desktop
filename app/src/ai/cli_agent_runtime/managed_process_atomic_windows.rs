@@ -14,6 +14,7 @@ use std::os::windows::fs::OpenOptionsExt as _;
 use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus};
+use std::time::{Duration, Instant};
 
 use command::blocking::Command;
 use windows::Win32::Foundation::{
@@ -49,7 +50,9 @@ const IMPORT_DESCRIPTOR_BYTES: u64 = 20;
 const DELAY_IMPORT_DESCRIPTOR_BYTES: u64 = 32;
 const MAX_IMPORT_DIRECTORY_BYTES: u64 = 1024 * 1024;
 const MAX_IMPORT_NAME_BYTES: u64 = 260;
-const DEBUG_DRAIN_TIMEOUT_MS: u32 = 5_000;
+const DEBUG_INITIAL_TIMEOUT: Duration = Duration::from_secs(20);
+const DEBUG_SESSION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
+const DEBUG_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_WINDOWS_PATH_U16: usize = 32_768;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -175,33 +178,33 @@ impl WindowsReplacementLease {
         self.verify_for_spawn()
     }
 
-    /// 接管新建进程的首个调试事件，并用调试事件携带的 image handle 复核根映像。
+    /// 在主线程已恢复后接管首个调试事件，并用事件携带的 image handle 复核根映像。
     ///
-    /// `CREATE_SUSPENDED` 此时仍保留一层显式挂起；首事件继续后也不会执行 loader。
+    /// 首事件在用户态执行前送达；校验完成前保留程序与祖先租约，也不继续该事件。
     pub(super) fn begin_image_debug_session(
         self,
         root_process_id: u32,
     ) -> io::Result<WindowsImageDebugSession> {
-        let WindowsReplacementLease {
-            program_identity,
-            expected_sha256,
-            system_directory,
-            ..
-        } = self;
         let mut session = WindowsImageDebugSession {
             root_process_id,
-            expected_program_id: program_identity.id,
-            expected_program_size: program_identity.size,
-            expected_program_sha256: expected_sha256,
-            system_directory,
+            expected_program_id: self.program_identity.id,
+            expected_program_size: self.program_identity.size,
+            expected_program_sha256: self.expected_sha256.clone(),
+            system_directory: AncestorLease {
+                file: self.system_directory.file.try_clone()?,
+                identity: self.system_directory.identity,
+            },
             processes: HashMap::new(),
             initial_breakpoints: HashSet::new(),
         };
-        let event = wait_for_debug_event(u32::MAX)?;
+        let event = wait_for_debug_event_until(
+            Instant::now() + DEBUG_INITIAL_TIMEOUT,
+            "managed_process.atomic_windows_initial_debug_event_timed_out",
+        )?;
         if event.dwDebugEventCode != CREATE_PROCESS_DEBUG_EVENT
             || event.dwProcessId != root_process_id
         {
-            let _ = continue_debug_event(&event, DBG_CONTINUE);
+            // 未识别首事件时不放行任何用户态执行；外层严格 Job 清理整棵树。
             return Err(error(
                 "managed_process.atomic_windows_initial_debug_event_invalid",
             ));
@@ -210,6 +213,7 @@ impl WindowsReplacementLease {
             session.reject_event_and_drain(&event);
             return Err(failure);
         }
+        drop(self);
         continue_debug_event(&event, DBG_CONTINUE)?;
         Ok(session)
     }
@@ -223,8 +227,12 @@ impl WindowsImageDebugSession {
     /// debuggee，再继续并排空事件，未验证映像没有执行窗口。
     pub(super) fn wait_for_exit(&mut self, child: &mut Child) -> io::Result<ExitStatus> {
         let mut root_exit_observed = false;
+        let deadline = Instant::now() + DEBUG_SESSION_TIMEOUT;
         loop {
-            let event = wait_for_debug_event(u32::MAX)?;
+            let event = wait_for_debug_event_until(
+                deadline,
+                "managed_process.atomic_windows_debug_session_timed_out",
+            )?;
             let continue_status = match self.validate_event(&event) {
                 Ok(status) => status,
                 Err(failure) => {
@@ -361,20 +369,30 @@ impl WindowsImageDebugSession {
     fn reject_event_and_drain(&mut self, event: &DEBUG_EVENT) {
         for process in self.processes.values() {
             let handle = HANDLE(process.as_raw_handle());
-            let _ = unsafe { TerminateProcess(handle, 1) };
+            if unsafe { TerminateProcess(handle, 1) }.is_err() {
+                // 无法确认终止时不继续未验证事件，交由外层严格 Job 清理。
+                return;
+            }
         }
         let _ = continue_debug_event(event, DBG_CONTINUE);
+        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
         while !self.processes.is_empty() {
-            let Ok(next) = wait_for_debug_event(DEBUG_DRAIN_TIMEOUT_MS) else {
+            let Ok(next) = wait_for_debug_event_until(
+                deadline,
+                "managed_process.atomic_windows_debug_drain_timed_out",
+            ) else {
                 break;
             };
             if next.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT {
                 let information = unsafe { next.u.CreateProcessInfo };
-                if let Ok(process) = owned_handle(information.hProcess) {
-                    let handle = HANDLE(process.as_raw_handle());
-                    let _ = unsafe { TerminateProcess(handle, 1) };
-                    self.processes.insert(next.dwProcessId, process);
+                let Ok(process) = owned_handle(information.hProcess) else {
+                    return;
+                };
+                let handle = HANDLE(process.as_raw_handle());
+                if unsafe { TerminateProcess(handle, 1) }.is_err() {
+                    return;
                 }
+                self.processes.insert(next.dwProcessId, process);
                 let _ = close_owned_handle(information.hThread);
                 if !information.hFile.is_invalid() {
                     let _ = file_from_debug_handle(information.hFile);
@@ -602,6 +620,26 @@ fn wait_for_debug_event(timeout_ms: u32) -> io::Result<DEBUG_EVENT> {
     let mut event = DEBUG_EVENT::default();
     unsafe { WaitForDebugEvent(&mut event, timeout_ms) }.map_err(io::Error::other)?;
     Ok(event)
+}
+
+fn wait_for_debug_event_until(
+    deadline: Instant,
+    timeout_message: &'static str,
+) -> io::Result<DEBUG_EVENT> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
+    }
+    let timeout_ms = u32::try_from(remaining.as_millis())
+        .unwrap_or(u32::MAX)
+        .max(1);
+    wait_for_debug_event(timeout_ms).map_err(|failure| {
+        if Instant::now() >= deadline {
+            io::Error::new(io::ErrorKind::TimedOut, timeout_message)
+        } else {
+            failure
+        }
+    })
 }
 
 fn continue_debug_event(

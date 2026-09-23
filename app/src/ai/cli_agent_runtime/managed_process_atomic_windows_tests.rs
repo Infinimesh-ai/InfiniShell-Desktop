@@ -362,13 +362,14 @@ fn debug_session_runs_system_only_process_to_native_exit() {
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
     let suspended = command.spawn_suspended().unwrap();
-    eprintln!("Windows 调试夹具：系统命令已挂起启动，等待根映像初始事件");
-    let mut debug = executable
-        .begin_image_debug_session(suspended.id())
-        .unwrap();
-    eprintln!("Windows 调试夹具：根映像初始事件已确认，准备恢复主线程");
-    drop(cwd);
+    let root_process_id = suspended.id();
     let mut child = suspended.resume().unwrap();
+    eprintln!("Windows 调试夹具：系统命令主线程已恢复，等待根映像初始事件");
+    let mut debug = executable
+        .begin_image_debug_session(root_process_id)
+        .unwrap();
+    eprintln!("Windows 调试夹具：根映像初始事件已确认并继续");
+    drop(cwd);
 
     let status = debug.wait_for_exit(&mut child).unwrap();
     eprintln!("Windows 调试夹具：根进程及调试子树已退出，原生状态：{status}");
@@ -434,13 +435,14 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
     let suspended = command.spawn_suspended().unwrap();
-    eprintln!("Windows 调试夹具：真实 CLI 已挂起启动，等待根映像初始事件");
-    let mut debug = executable
-        .begin_image_debug_session(suspended.id())
-        .unwrap();
-    eprintln!("Windows 调试夹具：真实 CLI 根映像初始事件已确认，准备恢复主线程");
-    drop(cwd);
+    let root_process_id = suspended.id();
     let mut child = suspended.resume().unwrap();
+    eprintln!("Windows 调试夹具：真实 CLI 主线程已恢复，等待根映像初始事件");
+    let mut debug = executable
+        .begin_image_debug_session(root_process_id)
+        .unwrap();
+    eprintln!("Windows 调试夹具：真实 CLI 根映像初始事件已确认并继续");
+    drop(cwd);
 
     let status = debug.wait_for_exit(&mut child).unwrap();
     eprintln!("Windows 调试夹具：真实 CLI 根进程及调试子树已退出，原生状态：{status}");
@@ -505,13 +507,14 @@ fn debug_session_rejects_non_system_dynamic_image_before_continue() {
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
     let suspended = command.spawn_suspended().unwrap();
-    eprintln!("Windows 调试夹具：DLL 拒绝用例已挂起启动，等待根映像初始事件");
+    let root_process_id = suspended.id();
+    let mut child = suspended.resume().unwrap();
+    eprintln!("Windows 调试夹具：DLL 拒绝用例主线程已恢复，等待根映像初始事件");
     let mut debug = executable
-        .begin_image_debug_session(suspended.id())
+        .begin_image_debug_session(root_process_id)
         .unwrap();
     eprintln!("Windows 调试夹具：非系统 DLL 拒绝用例的根映像初始事件已确认");
     drop(cwd);
-    let mut child = suspended.resume().unwrap();
 
     let failure = debug.wait_for_exit(&mut child).unwrap_err();
     eprintln!("Windows 调试夹具：非系统 DLL 已拒绝并返回：{failure}");

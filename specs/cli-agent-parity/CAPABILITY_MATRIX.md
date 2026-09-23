@@ -2,6 +2,14 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json) 和 [receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
+## 2026-09-23 receipt115–116 增量
+
+| 要求 | 当前证据 | 结果与边界 |
+| --- | --- | --- |
+| `645e8b4f…` 同提交 Linux／Windows 聚焦预检 | [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098；Linux 28 成功／1 失败／7 跳过，Windows 44 成功／1 失败／3 跳过；6 artifact／31 文件结构及常见敏感模式核验通过 | **两个平台均失败**。Linux hook 夹具发生 5 秒超时及通知缺失，原始日志未证明共同原因；Windows 两项严格 Job 测试每项重试三次，都在首个 debug event 前超时。Windows 主线程恢复顺序及有界超时已形成未受测候选；原子执行、GUI、full workspace 和最终同提交验收均未通过 |
+| 官方 Grok `1.0.41` 零输入 P0 | [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：macOS arm64 固定二进制 SHA，真实 ACP initialize／authenticate／session/new／EOF，0 模型输入、0 业务工具，隔离认证副本与隧道清理 | **零输入候选通过／产品仍关闭**。首次配置逐字节审计因官方 marketplace 初始化失败；第二次仅按已审核范围通过。模型回合、审批、取消、恢复、技能、工具、子任务、GUI 和跨平台未验；不继承 `1.0.40` 的能力结论 |
+| 安装版 Grok hook 冷启动 | 本机复制后的原生 worker 首次 `--protocol-version` 约 6.9 秒；显式预检后测试为 15 通过／2 环境跳过 | **冷路径未验收**：500 毫秒协议预算下首次投递不能据预热后的通过计成功；Linux receipt115 的两项错误仍保留。当前夹具将冷启动身份与已就绪终端路径分开记录，尚未证明生产安装路径冷启动可靠 |
+
 ## 2026-09-23 receipt102–114 阶段补充矩阵
 
 下表覆盖 receipt100／101 对相同要求的“当前”结论；旧表继续保留历史快照。Grok root 候选绑定干净提交 `ac0fa70e…`，Claude 父子链绑定干净提交 `45ba0d11…`，Linux／Windows 聚焦预检绑定 `c25221a22…`；这些不同提交的证据不能拼成最终同提交全范围证明。

@@ -2,6 +2,12 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
+## receipt115–116 后续增量（2026-09-23）
+
+- [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098 精确绑定 `645e8b4f…`，Linux／Windows 两 job 均失败。Linux 原生 Grok hook 测试 17 项中 13 通过、2 错误、2 跳过：一次 Node subprocess 超过夹具的 5 秒，一次真实 main 缺少通知；原始日志未证明共同原因。Windows 两个严格 Job 调试测试各重试三次，都在挂起根进程后等待首个调试事件时超过外层 30 秒，未取得根映像或完整原生退出结论。六个 artifact／31 文件已在仓库外做无符号链接、JSON／NDJSON 与常见敏感模式核验；两台 runner 结算后在线空闲。当前 Windows 顺序／有界等待修复尚未由本收据测试。
+- [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：固定 Grok `1.0.41 (4220f3b224a6)` 在 macOS arm64 的第一次原生零输入尝试因官方 marketplace 初始化改变私有配置而按严格字节审计失败；第二次使用既有精确例外后，通过 initialize、cached-token authenticate、session/new 与 EOF 退出，0 模型输入、0 业务工具，隔离认证副本、隧道及根目录清理完成。离线 runner 4／4。没有测量解密后的 HTTP 模型请求，也没有验证产品托管、审批、取消、恢复、GUI 或其他平台。
+- 本机安装版 Grok hook 诊断：复制后的 worker 首次协议启动约 6.9 秒，超出 hook 500 毫秒协议探测预算；显式冷启动预检后原生终端测试 15 通过／2 环境跳过。夹具只记录已就绪路径通过，不把预热当作产品冷启动投递成功。新增代码与夹具无用户可见文案变动，无需本地化资源变更。
+
 ## receipt102–114 当前阶段增量（2026-09-23）
 
 - [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json)：官方在线订阅与固定 `2.1.278` 的默认账户模式不读取或复制凭据，隔离 user／project／local 设置，管理员策略不可验证时失败关闭。manual／原生 default 审批合同的 Python 84、Claude profile 18、adapter profile 14 项通过。此前 plan 模式父任务两轮完成但父子 MCP 被原生计划约束拒绝；最终 manual 实链使用冻结 test／supervisor／CLI 字节，却在 SessionReady 和模型输入前因外置调试 supervisor 的 macOS launchd 接管 EAGAIN 中断。因此父子双向 ACK、进度、结果与恢复仍无当前实链结论。

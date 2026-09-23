@@ -104,7 +104,7 @@ def verify_installed_hook(node, node_sha256, hook, hook_sha256, worker, worker_s
         prefix = b"\x1b]777;notify;warp://cli-agent;"
         raw = bytes(chunks["tty"])
         if not raw.startswith(prefix) or not raw.endswith(b"\x07"):
-            raise ValueError("hook_main_notification_missing")
+            raise ValueError(f"hook_main_notification_missing:tty_bytes={len(raw)}")
         notification = json.loads(raw[len(prefix):-1])
         if (set(notification) != {"v", "agent", "event", "session_id", "plugin_version", "event_id"}
                 or type(notification["v"]) is not int or notification["v"] != 1

@@ -1779,10 +1779,25 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     executable.verify_command_for_suspended_spawn(&command)?;
                     cwd.verify_for_spawn()?;
                     let suspended = command.spawn_suspended()?;
-                    let mut image_debug = executable.begin_image_debug_session(suspended.id())?;
-                    drop(cwd);
+                    let root_process_id = suspended.id();
                     let mut child = suspended.resume()?;
-                    let status = image_debug.wait_for_exit(&mut child)?;
+                    let mut image_debug =
+                        match executable.begin_image_debug_session(root_process_id) {
+                            Ok(session) => session,
+                            Err(failure) => {
+                                let _ = child.kill();
+                                // 外层严格 Job 负责整树终止及零残留确认，然后才写退出回执。
+                                return Err(failure);
+                            }
+                        };
+                    drop(cwd);
+                    let status = match image_debug.wait_for_exit(&mut child) {
+                        Ok(status) => status,
+                        Err(failure) => {
+                            let _ = child.kill();
+                            return Err(failure);
+                        }
+                    };
                     if status.success() {
                         return Ok(());
                     }

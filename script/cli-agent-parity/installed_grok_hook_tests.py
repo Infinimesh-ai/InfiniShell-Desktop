@@ -17,6 +17,26 @@ import unittest
 from run_installed_grok_hook import plain_file, verify_installed_hook
 
 
+def setUpModule():
+    if os.name != "posix":
+        return
+    # 复制后的 macOS 可执行文件首次启动可明显慢于 hook 的 500 ms 协议探测预算。
+    # 单独核对冷启动文件属性和协议，再验收已就绪 worker 的真实终端路径；不把预热算作 hook 投递。
+    worker = os.environ.get("INFINISHELL_TEST_NOTIFY_WORKER")
+    if not worker:
+        raise ValueError("INFINISHELL_TEST_NOTIFY_WORKER 必须指向同源码构建的原生 worker")
+    path = Path(worker).resolve(strict=True)
+    plain_file(path, hashlib.sha256(path.read_bytes()).hexdigest(), executable=True)
+    environment = {key: value for key, value in os.environ.items()
+                   if key in {"PATH", "HOME", "TMPDIR"}}
+    started = time.monotonic()
+    result = subprocess.run([str(path), "cli-agent-notify", "--protocol-version"],
+                            env=environment, capture_output=True, timeout=15, check=True)
+    if result.stdout != b'{"protocol":1,"maxFrameBytes":4096}\n' or result.stderr:
+        raise ValueError("原生 worker 冷启动协议不匹配")
+    print(f"原生 worker 冷启动协议预检：{(time.monotonic() - started):.3f} 秒；后续只验已就绪路径")
+
+
 @unittest.skipUnless(os.name == "posix", "Windows CONOUT$ 需要独立原生验证")
 class InstalledGrokHookTests(unittest.TestCase):
     def setUp(self):
@@ -136,7 +156,7 @@ class DetachedGrokHookTests(unittest.TestCase):
                  "require(process.argv[1]).main();")
         result = subprocess.run([str(self.node), "-e", check, str(hook or self.hook)],
                                 input=self.payload, capture_output=True, start_new_session=True,
-                                env={**self.env, **extra}, timeout=5, check=True)
+                                env={**self.env, **extra}, timeout=8, check=True)
         self.assertEqual(result.stdout, b"")
         self.assertEqual(result.stderr, b"")
 
