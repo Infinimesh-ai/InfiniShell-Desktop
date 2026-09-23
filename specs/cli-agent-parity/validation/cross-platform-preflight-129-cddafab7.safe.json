@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "scope": "focused_linux_windows_preflight_with_windows_python_fixture_failure",
+  "run": {
+    "id": 35856999722,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35856999722",
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "event": "workflow_dispatch",
+    "head_sha": "cddafab7fae14b8db4fb8c15d026c544c164226f",
+    "linux_x64": true,
+    "windows_x64": true,
+    "full_workspace_tests": false,
+    "run_atomic_windows_debug": true,
+    "conclusion": "failure"
+  },
+  "jobs": {
+    "linux_x64": {
+      "conclusion": "success",
+      "successful_steps": 34,
+      "failed_steps": 0,
+      "skipped_steps": 2,
+      "installed_grok_hook_step": "success",
+      "installed_grok_hook_result": "17 tests: 15 passed, 2 skipped",
+      "host_crash_supervisor_step": "success",
+      "native_recovery_and_idle_crash_step": "success",
+      "gui_integration_step": "skipped",
+      "desktop_workspace_unit_test_step": "skipped"
+    },
+    "windows_x64": {
+      "conclusion": "failure",
+      "successful_steps": 29,
+      "failed_steps": 2,
+      "skipped_steps": 17,
+      "first_failed_step": {
+        "name": "Test notification patch file transactions",
+        "started_at": "2026-09-23T12:09:49Z",
+        "completed_at": "2026-09-23T12:09:58Z",
+        "failed_suite": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+        "failed_test": "test_fixed_tool_cleanup_targets_only_private_fixture_and_is_not_product_proof",
+        "failure_class": "Python unittest AssertionError in a platform-specific test fixture expectation",
+        "observed_assertion": "The test expected mocked os.kill calls for fixture PIDs 41 and 42; neither call was recorded.",
+        "tested_sha_source_explanation": "The Windows branch of audit_and_cleanup_fixture invokes taskkill for confirmed fixture PIDs, while this test checks a mocked os.kill call list. The mismatch explains this assertion without establishing a product process-tree cleanup failure.",
+        "notification_patch_suite_result_before_failure": "18 tests: 16 passed, 2 skipped",
+        "persistent_codex_source_suite_result_before_failure": "13 tests: 12 passed, 1 skipped",
+        "codex_adapter_suite_result": "13 tests: 12 passed, 1 failed",
+        "step_exit_code": 1,
+        "remaining_python_suites_in_step_executed": false
+      },
+      "second_failed_step": {
+        "name": "Preserve Windows native CLI boundary evidence",
+        "started_at": "2026-09-23T13:24:21Z",
+        "completed_at": "2026-09-23T13:24:22Z",
+        "failure_class": "actions/upload-artifact no files found with if-no-files-found: error",
+        "observed": "The requested Windows native boundary evidence paths under the runner temporary directory were absent; the associated evidence-producing prerequisites had been skipped after the earlier Python failure.",
+        "cli_windows_native_boundaries_artifact_uploaded": false
+      },
+      "skipped_boundary_steps": [
+        "Prepare fixed native Codex without credentials",
+        "Prepare fixed Codex production installer contract",
+        "Prepare fixed native Claude without credentials",
+        "Prepare fixed native Grok without credentials",
+        "Verify fixed Grok unauthenticated ACP boundaries",
+        "Verify native Claude initialization and idle EOF",
+        "Verify native Claude permission observations without credentials",
+        "Verify native Codex plugin registry failure recovery",
+        "Verify native Codex persistent plugin source",
+        "Verify Claude Windows native SessionStart notification without credentials",
+        "Preserve Claude Windows native notification evidence",
+        "Verify Windows Codex production notification installer without credentials",
+        "Preserve Windows Codex production installer evidence",
+        "Verify native recovery and idle-crash boundaries without credentials"
+      ],
+      "atomic_image_debug_strict_job": {
+        "conclusion": "success",
+        "started_at": "2026-09-23T13:16:09Z",
+        "completed_at": "2026-09-23T13:16:47Z",
+        "nextest_summary": "2 tests run: 2 passed, 7342 skipped; 32.686 seconds",
+        "nextest_retry_count_observed": 0,
+        "non_system_dynamic_image_rejection_test_seconds": 32.268,
+        "system_only_native_exit_test_seconds": 0.387,
+        "does_not_override_job_failure": true
+      },
+      "check_infinishell_desktop_step": "success",
+      "agent_lifecycle_terminal_cancellation_responses_step": "success",
+      "host_crash_supervisor_step": "success",
+      "gui_integration_step": "skipped",
+      "desktop_workspace_unit_test_step": "skipped"
+    }
+  },
+  "runner_status_after_completion": {
+    "linux_x64": "online_idle",
+    "windows_x64": "online_idle"
+  },
+  "downloaded_artifacts": {
+    "artifact_count": 3,
+    "file_count": 17,
+    "symlink_count": 0,
+    "json_ndjson_parse_failures": 0,
+    "common_credential_or_email_pattern_hits": 0,
+    "relative_file_manifest_sha256": "4edcda68dbfb0361781eb8deb91356e301519e8bc68fac1cfa29be9c1cde3a9c",
+    "groups": {
+      "cli-linux-native-boundaries": {"files": 13, "manifest_sha256": "3c0a6cadc940da061b18f97553b9d837c72e453fe74c22ad7321837944836a6f"},
+      "codex-windows-conpty": {"files": 3, "manifest_sha256": "c1309be1d57540078e41d972e8efc7a766760d6488f46471eee55baa6e8a1f2b"},
+      "codex-windows-native-hooks": {"files": 1, "manifest_sha256": "8c1ea43ef5d544d9720eec30353cee147b735ce0ca0da17b94e5b17707ddebd6"}
+    }
+  },
+  "boundaries": {
+    "same_commit_macos_verified": false,
+    "full_workspace_verified": false,
+    "gui_integration_verified": false,
+    "windows_fixed_native_cli_boundaries_verified": false,
+    "subsequent_source_fixes_verified_by_this_run": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}
