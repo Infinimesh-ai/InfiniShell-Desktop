@@ -60,6 +60,14 @@
     "tunnels_stopped": true,
     "case_passed": false
   },
+  "post_run_private_log_audit": {
+    "native_slash_advertise_events": 2,
+    "same_native_pid_and_session": true,
+    "target_skill_name_present_in_both": true,
+    "advertise_trigger": "session_start",
+    "acp_available_commands_update_observed": false,
+    "interpretation": "Native discovery and advertisement logging do not prove ACP notification delivery or selected-skill path binding."
+  },
   "boundaries": {
     "official_selected_skill_catalog_verified": false,
     "one_model_input_exercised": false,
@@ -69,5 +77,5 @@
     "full_cli_parity_acceptance_passed": false
   },
   "sensitive_values_or_raw_native_logs_copied_to_repository": false,
-  "result": "After a fresh user login the native session was created, but the required available_commands_update and selected skill path were not observed before the bounded setup timed out. No product model input was submitted. This is negative evidence, not skill acceptance."
+  "result": "After a fresh user login the native session was created and its private log advertised the target skill name, but the required ACP available_commands_update and selected skill path were not observed before the bounded setup timed out. No product model input was submitted. This is negative evidence, not skill acceptance."
 }

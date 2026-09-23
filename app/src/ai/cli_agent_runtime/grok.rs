@@ -3442,8 +3442,23 @@ impl GrokProtocol {
                     ));
                 }
                 validate_current_available_commands_update(message, &session_id)?;
+                #[cfg(all(test, unix))]
+                if let Some(probe) = &self.skill_catalog_for_live {
+                    probe.observe(message, self.submitted_messages.is_empty());
+                }
+                if self.options.permission_policy == PermissionPolicy::Inherit {
+                    let catalog = skills::SkillCatalog::from_native(
+                        &message["params"]["update"]["availableCommands"],
+                    )
+                    .map_err(RuntimeError::Protocol)?;
+                    if self.session_id.as_deref() == Some(session_id.as_str()) {
+                        self.skill_catalog = Some(catalog);
+                    } else {
+                        self.early_skill_catalogs
+                            .insert(session_id.clone(), catalog);
+                    }
+                }
                 let setup = self.current_setup.as_mut().expect("setup 已验证存在");
-                // 当前版 fresh-home 只把该目录当握手信息；不绑定技能、工具或权限。
                 setup.session_id.get_or_insert(session_id);
                 setup.commands_received = true;
                 return self.finish_current_setup();

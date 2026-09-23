@@ -4,7 +4,7 @@
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
 - 工作分支：`codex/cli-agent-parity`。
-- 当前产品代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），已推送到 `origin/codex/cli-agent-parity`；receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`，没有冒充在当前提交重跑真实模型链。
+- 已结算的跨平台代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。更新的聚焦矩阵 [run 35815324806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35815324806) 绑定 `2c4880f15ead4fb929ee8eeef7a463a250a47ee7`，包含 Windows 严格 Job 调试夹具，交接写入时尚未结算；后续提交不自动继承其结果。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`，没有冒充在当前提交重跑真实模型链。
 - 基线归档仍为 `e6e9d619318e87d0bb889df344c8570f97977e90`；此前受测代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。
 - 后续必须继续使用同一工作树和当前分支，不得从 `main` 重来，不得 `reset/clean` 根目录，也不得直接弹出整理前的完整 stash。
 
@@ -44,15 +44,16 @@
 - 6 个 artifact 共 37 个文件已下载到仓库外临时目录并逐份核对；JSON／NDJSON 解析失败为 0，邮箱与常见凭据形态扫描均为 0，只把大小、SHA／manifest 摘要和允许字段写入 [receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)。
 - 该 run 是聚焦跨平台边界证据，不含同提交 macOS、GUI integration 或 full workspace；因此总 Goal 继续 active。
 - 复核该 Linux job 原始日志后，[receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) 确认密封 memfd 的真实 `execveat` 参数／环境／cwd 夹具及失败后禁止 pathname 回退均在 Linux x64 实机通过；此前“Linux `execveat` 完全未运行”的阶段表述已过时。三款 CLI 的 Linux 产品升级事务、退出回执与恢复仍未运行。
-- 2026-09-23 的 [receipt110](validation/macos-working-tree-110-grok-1040-selected-skill-gate-failed.safe.json) 保留 Grok `1.0.40` 默认入口单技能候选的负证据：用户重新登录后原生会话创建成功，但缺少输入前的技能目录更新，30 秒后按请求超时失败；0 次产品输入，正式技能门禁未开放。私有认证副本已移除；仅测试夹具接受固定 marketplace 初始化或单字段 purge。
+- 2026-09-23 的 [receipt110](validation/macos-working-tree-110-grok-1040-selected-skill-gate-failed.safe.json) 保留 Grok `1.0.40` 默认入口单技能候选的负证据：用户重新登录后原生会话创建成功，私有原生日志在同一进程／会话两次公告目标技能名，但 ACP 接收路径缺少输入前的 `available_commands_update`，30 秒后按请求超时失败；公告日志不等于原生路径目录交付。0 次产品输入，正式技能门禁未开放。私有认证副本已移除；仅测试夹具接受固定 marketplace 初始化或单字段 purge。
 
-## 3. 当前提交已通过的定向门禁
+## 3. 已通过的定向门禁与版本边界
 
 - `c25221a22…` 本地隔离 target 的 `cargo check -p warp --features local_cli_managed_tasks` 通过；Codex source runner Python `16/16`、准备器 Python `48/48`、YAML 解析、actionlint（仅允许仓库自定义 runner label）和 diff check 通过。
 - receipt107 的 Claude 原生结果证据 `2/2`、Claude Rust `117/117`、协调器 Rust `63/63`、Claude 外层审计 Python `66/66`、i18n `11/11`、feature supervisor build、无模型探针 `2/2` 与真实父子链仍绑定 `45ba0d11…`。
 - `cargo fmt --all -- --check`、`git diff --check` 通过。
 - 本轮最终修改没有新增或变动用户可见文案，无需本地化资源变更。
 - receipt106 的 Grok `139/139` 与 Python `37/37` 仍按 `ac0fa70e…` 快照保留；receipt102／104–105 的历史 Claude、Windows 和升级阶段门禁也只属于各自快照。
+- Grok 当前版目录绑定修复的离线 `current_` 回归 `12/12` 通过，覆盖目录先于／后于 `session/new` 响应及输入前观察器；这不证明官方 `1.0.40` 已实际送达 ACP 目录，也不证明选定技能实链成功。
 - `c25221a22…` 的 Linux／Windows 聚焦矩阵已通过，但同提交 macOS、full workspace、SSH/tmux 完整产品接收、真实 GUI IME／双语布局和全范围 P0–P5 生命周期仍未完成，因此不能标记完成。
 
 ## 4. 本地磁盘与外置磁盘
@@ -68,7 +69,7 @@
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
 2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–108。
 3. 先做定向闭环，不要因接手而立即重复全量构建。
-4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的单技能候选在新登录后仍缺输入前目录更新而失败，0 次模型输入。不要绕过唯一原生路径校验或盲目重复模型探针；先定位当前版技能发现与 setup 时序，再补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，最后决定是否开放对应能力。
+4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的单技能候选在新登录后原生日志虽公告技能名，ACP 目录仍未到达，0 次模型输入。后续发现当前版 setup 分支即使收到目录也未交给技能观察器与会话目录绑定；该独立适配器缺口的离线修复不能倒填 receipt110 的实链结果。不要绕过唯一原生路径校验或盲目重复模型探针；先定位当前版 ACP 公告交付，再补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，最后决定是否开放对应能力。
 5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
 7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测，不要无代码变化地重复派发相同矩阵。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。

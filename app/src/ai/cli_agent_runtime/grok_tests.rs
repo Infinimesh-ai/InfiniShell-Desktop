@@ -553,6 +553,7 @@ fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
         ready.events.as_slice(),
         [RuntimeEventKind::SessionReady { .. }]
     ));
+    assert!(models_before_response.skill_catalog.is_some());
 
     let mut display_before_response = current_waiting_for_setup();
     for message in &setup[..5] {
@@ -571,6 +572,25 @@ fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
         ready.events.as_slice(),
         [RuntimeEventKind::SessionReady { .. }]
     ));
+    assert!(display_before_response.skill_catalog.is_some());
+    assert!(display_before_response.early_skill_catalogs.is_empty());
+}
+
+#[test]
+fn current_command_catalog_reaches_the_selected_skill_observer_before_input() {
+    let mut protocol = current_waiting_for_display_notifications();
+    let session_id = protocol.session_id.clone().unwrap();
+    let probe = super::native_skill_live_tests::SkillCatalogProbe::new(PathBuf::from(
+        "/nonexistent/infinishell-native-skill/SKILL.md",
+    ));
+    protocol.skill_catalog_for_live = Some(probe.clone());
+    for notification in current_display_notifications() {
+        protocol.receive(notification).unwrap();
+    }
+    let evidence = probe.evidence(Some(&session_id), "visible");
+    assert_eq!(evidence["snapshots"].as_array().unwrap().len(), 1);
+    assert_eq!(evidence["snapshots"][0]["before_first_submit"], true);
+    assert!(protocol.skill_catalog.is_some());
 }
 
 #[test]
@@ -852,7 +872,7 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
         accepted.events.as_slice(),
         [RuntimeEventKind::SessionReady { .. }]
     ));
-    assert!(protocol.skill_catalog.is_none());
+    assert!(protocol.skill_catalog.is_some());
     assert!(protocol.creation_catalog_session.is_none());
 
     let mut duplicate = current_waiting_for_display_notifications();
@@ -995,7 +1015,7 @@ fn current_handshake_allows_only_the_exact_empty_mcp_refresh() {
             protocol.receive(changed).is_err(),
             "{mutation} 目录必须 fail-closed"
         );
-        assert!(protocol.skill_catalog.is_none());
+        assert_eq!(protocol.skill_catalog.is_some(), mutation == "duplicate");
         assert!(protocol.creation_catalog_session.is_none());
     }
 }
