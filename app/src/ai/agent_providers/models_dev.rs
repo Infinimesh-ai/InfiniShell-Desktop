@@ -6,15 +6,15 @@
 //!
 //! 数据结构对齐 opencode 的 `provider/models.ts`:顶层是
 //! `{ <provider_id>: Provider }`,Provider 含 `models: { <model_id>: Model }`。
-//! 我们只关心模型元数据同步需要的几个字段:
-//! - provider: id / name / api / env(暗示需要哪个 env var)
-//! - model:    id / name / limit.context / limit.output / reasoning / tool_call
+//! catalog 有两个用途:
+//! - 运行时根据 attachment / modalities 自动推断附件能力;
+//! - API 新发现模型或用户保存新模型 ID 时自动补全元数据,并允许用户手动强制刷新。
+//!   两种路径都只更新已配置模型,绝不借 catalog 追加模型。
 //!
 //! 没列出的字段一律走 `serde(default)` + `#[allow(dead_code)]` 容忍。
 //!
-//! 设计取舍:**同步缓存读、异步网络拉**。读侧给 UI 用,要快;
-//! 拉侧后台 spawn,失败不弹错只 log,缓存读不到就给空数据,UI 展示
-//! "暂未拉取到 models.dev,请检查网络"。
+//! 设计取舍:**同步缓存读、异步网络拉**。读侧给附件能力推断使用,
+//! 拉侧后台 spawn,失败不弹错只 log;缓存读不到时由本地规则兜底。
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -128,10 +128,31 @@ fn cache_path() -> PathBuf {
     p
 }
 
-/// 读已加载的 catalog 副本(无锁等待 — 直接克隆)。
-/// 没数据返回 `None`,UI 应展示 "正在拉取" / 重试按钮。
+/// 读取已加载的 catalog 副本。未成功加载过时返回 `None`。
 pub fn cached() -> Option<Catalog> {
     state().read().ok().and_then(|s| s.catalog.clone())
+}
+
+/// 当前目录缓存的时间戳。用于把一次匹配固化为可离线使用的模型快照。
+pub fn loaded_at_unix_seconds() -> u64 {
+    state()
+        .read()
+        .ok()
+        .and_then(|state| state.loaded_at)
+        .and_then(|time| time.duration_since(SystemTime::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+/// 持久化快照是否已超过 models.dev 缓存 TTL。
+pub fn snapshot_is_stale(updated_at_unix_seconds: u64) -> bool {
+    if updated_at_unix_seconds == 0 {
+        return true;
+    }
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH + Duration::from_secs(updated_at_unix_seconds))
+        .map(|age| age > CACHE_TTL)
+        .unwrap_or(true)
 }
 
 /// 一个模型从 models.dev 抽出的能力快照,用于 BYOP UI / chat_stream 决策附件类型。
@@ -156,10 +177,8 @@ impl ModelCaps {
 
 /// 在已加载的 catalog 里按 model_id 查找,返回该模型在 models.dev 上声明的能力。
 ///
-/// 优先用 `provider_id` 精确匹配 catalog provider key;miss 时退化到「全 catalog
-/// 扫描第一个 model.id 命中」。这样既能精确匹配(用户填的 provider.id 与 models.dev
-/// 一致时),又能应对用户自定义 provider id(比如 "openrouter" 或 "siliconflow"
-/// 这种聚合 provider 转发上游模型,id 与 models.dev 上游 provider 不同)。
+/// 优先用 `provider_id` 精确匹配 catalog provider key;miss 时仅在模型 ID 全局唯一时
+/// 返回结果。重复 ID 不擅自选择某个供应商,避免给自定义网关套用错误能力。
 pub fn lookup_caps(provider_id: &str, model_id: &str) -> Option<ModelCaps> {
     let s = state().read().ok()?;
     let catalog = s.catalog.as_ref()?;
@@ -168,12 +187,17 @@ pub fn lookup_caps(provider_id: &str, model_id: &str) -> Option<ModelCaps> {
             return Some(ModelCaps::from_model(m));
         }
     }
-    for p in catalog.values() {
-        if let Some(m) = p.models.get(model_id) {
-            return Some(ModelCaps::from_model(m));
-        }
+    let mut matches = catalog.values().filter_map(|provider| {
+        provider
+            .models
+            .get(model_id)
+            .or_else(|| provider.models.values().find(|model| model.id == model_id))
+    });
+    let model = matches.next()?;
+    if matches.next().is_some() {
+        return None;
     }
-    None
+    Some(ModelCaps::from_model(model))
 }
 
 /// 把磁盘缓存读进内存(同步,非阻塞;只在 process 启动或 UI 第一次需要时调用)。
@@ -255,26 +279,32 @@ pub async fn fetch_and_cache(client: Client) -> Result<(), String> {
     Ok(())
 }
 
-/// 把 models.dev 的 Model 转换成本地 settings 用的 AgentProviderModel。
-///
-/// 默认把 catalog 推断的 image/pdf/audio 写进字段(用户首次同步时
-/// 直接看到模型能力被同步进 toml,不需要展开 detail 才看到)。
-/// 后续 sync 时调用方只往 None 槽位填新值,Some(_) 视为用户显式覆盖跳过。
-pub fn into_agent_provider_model(model: &Model) -> crate::settings::AgentProviderModel {
+/// 把 models.dev 模型转换为独立的持久化目录快照。
+pub fn into_catalog_metadata(
+    provider_id: String,
+    model_id: String,
+    match_confidence: crate::settings::AgentProviderModelCatalogMatch,
+    updated_at_unix_seconds: u64,
+    model: &Model,
+) -> crate::settings::AgentProviderModelCatalogMetadata {
     let caps = ModelCaps::from_model(model);
-    crate::settings::AgentProviderModel {
+    crate::settings::AgentProviderModelCatalogMetadata {
         name: if model.name.is_empty() {
             model.id.clone()
         } else {
             model.name.clone()
         },
-        id: model.id.clone(),
         context_window: model.limit.context,
         max_output_tokens: model.limit.output,
         reasoning: model.reasoning,
         tool_call: model.tool_call,
-        image: Some(caps.vision),
-        pdf: Some(caps.pdf),
-        audio: Some(caps.audio),
+        image: caps.vision,
+        pdf: caps.pdf,
+        audio: caps.audio,
+        provider_id,
+        model_id,
+        match_confidence,
+        updated_at_unix_seconds,
+        unmatched_in_latest_catalog: false,
     }
 }
