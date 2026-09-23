@@ -205,6 +205,46 @@ fn supported_versions_require_matching_probe_and_init() {
 }
 
 #[test]
+fn test_candidate_21280_requires_explicit_binding_and_exact_init() {
+    assert!(!supported_version("2.1.280"));
+    let mut protocol = ready_protocol();
+    assert!(matches!(
+        protocol.bind_probed_version(true, TEST_CANDIDATE_OUTPUT),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    protocol.test_candidate_21280 = true;
+    for output in [
+        "2.1.280",
+        "2.1.280-beta (Claude Code)",
+        "2.1.281 (Claude Code)",
+    ] {
+        assert!(matches!(
+            protocol.bind_probed_version(true, output),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+    assert!(matches!(
+        protocol.bind_probed_version(false, TEST_CANDIDATE_OUTPUT),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    protocol
+        .bind_probed_version(true, TEST_CANDIDATE_OUTPUT)
+        .unwrap();
+    assert!(matches!(
+        protocol.receive(version_init(json!("2.1.278"))),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    let ready = protocol
+        .receive(version_init(json!(TEST_CANDIDATE_VERSION)))
+        .unwrap();
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { verified_cli_version: Some(version), .. }]
+            if version == TEST_CANDIDATE_VERSION
+    ));
+}
+
+#[test]
 fn supported_versions_cannot_mix_probe_and_init() {
     for (output, version) in [
         ("2.1.273 (Claude Code)", "2.1.278"),

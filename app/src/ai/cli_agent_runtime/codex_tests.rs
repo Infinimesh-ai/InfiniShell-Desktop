@@ -746,11 +746,21 @@ async fn live_codex_missing_session_is_not_replaced() {
         native_session_id: native_session_id.clone(),
     };
     let state_dir = settings.state_dir.clone();
+    let candidate_01561 = match env::var("INFINISHELL_CODEX_TEST_CANDIDATE_01561")
+        .ok()
+        .as_deref()
+    {
+        None => false,
+        Some("1") => true,
+        Some(_) => panic!("仅接受显式的 0.156.1 test-only 标记"),
+    };
+    let mut protocol = CodexProtocol::new(settings);
+    protocol.test_only_01561_profile = candidate_01561;
     let RuntimeConnection {
         controller,
         mut events,
         task,
-    } = connect(settings).unwrap();
+    } = super::connect_protocol(protocol).unwrap();
     // 保留 controller，但不发送 Submit、Steer 或任何模型输入。
     let result = tokio::time::timeout(Duration::from_secs(60), task).await;
     let mut observed_events = Vec::new();
@@ -774,6 +784,7 @@ async fn live_codex_missing_session_is_not_replaced() {
         "exit_receipt": confirmed_receipt.as_ref().ok().and_then(Option::as_ref),
         "receipt_error": confirmed_receipt.as_ref().err().map(ToString::to_string),
         "credentials_provided": false, "model_commands_sent": 0,
+        "test_only_candidate_01561": candidate_01561,
         "native_exit_code_origin_verified": false,
     });
     fs::write(&artifact, format!("{observed}\n")).unwrap();
@@ -815,6 +826,7 @@ async fn live_codex_missing_session_is_not_replaced() {
         "native_session_id": native_session_id, "native_error": native_error,
         "generation": generation, "credentials_provided": false,
         "model_commands_sent": 0, "runtime_event_count": 1,
+        "test_only_candidate_01561": candidate_01561,
         "exit_receipt": receipt,
         "native_exit_code_origin_verified": false,
     });
@@ -1138,8 +1150,45 @@ fn unknown_version_probe_does_not_retain_a_previous_supported_version() {
 fn updater_and_protocol_share_the_exact_supported_version_contract() {
     assert!(supported_version("0.147.0"));
     assert!(supported_version("0.155.1"));
+    assert!(!supported_version("0.156.1"));
     assert!(!supported_version("0.155.10"));
     assert!(!supported_version("0.155.1-alpha.1"));
+}
+
+#[test]
+fn test_only_01561_candidate_requires_opt_in_and_matching_handshake() {
+    let mut normal = CodexProtocol::new(options());
+    assert!(matches!(
+        normal.record_version_probe("codex-cli 0.156.1"),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    let mut candidate = CodexProtocol::new(options());
+    candidate.test_only_01561_profile = true;
+    for output in ["codex-cli 0.155.1", "codex-cli 0.156.1-alpha.1"] {
+        assert!(matches!(
+            candidate.record_version_probe(output),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+    }
+    candidate.record_version_probe("codex-cli 0.156.1").unwrap();
+    candidate.initialize();
+    assert!(matches!(
+        candidate.receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.155.1 (Linux; x86_64)"
+        }})),
+        Err(RuntimeError::UnsupportedVersion(_))
+    ));
+    let mut matching = CodexProtocol::new(options());
+    matching.test_only_01561_profile = true;
+    matching.record_version_probe("codex-cli 0.156.1").unwrap();
+    matching.initialize();
+    let effects = matching
+        .receive(json!({"id":1,"result":{
+            "userAgent":"infinishell/0.156.1 (Linux; x86_64)"
+        }}))
+        .unwrap();
+    assert_eq!(effects.writes[1]["method"], "thread/start");
+    assert_eq!(matching.paired_version, Some("0.156.1"));
 }
 
 #[test]

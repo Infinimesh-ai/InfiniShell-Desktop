@@ -6,12 +6,15 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import re
 import signal
 import subprocess
 import sys
 import tempfile
 import time
+
+import prepare_codex_cli as prepare
 
 
 TEST_CASES = {
@@ -20,11 +23,12 @@ TEST_CASES = {
     "local-tools-restore": "ai::cli_agent_runtime::codex::live_tests::real_codex_local_tool_restore",
     "image-input": "ai::cli_agent_runtime::codex::live_tests::real_codex_image_input",
     "missing-session": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
+    "candidate-01561-missing-session": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
     "idle-crash": "ai::cli_agent_runtime::codex::tests::idle_crash::live_codex_idle_crash_after_ready_disconnects_once",
 }
 
 
-UNAUTHENTICATED_CASES = {"missing-session", "idle-crash"}
+UNAUTHENTICATED_CASES = {"missing-session", "candidate-01561-missing-session", "idle-crash"}
 VERSION_PROBE_TIMEOUT_SECONDS = 30
 
 
@@ -66,6 +70,11 @@ def verified_acceptance(test_case, exit_code, output, events):
                    and event.get("terminal_before_disconnected") is True
                    and event.get("event_order") == expected_order
                    and event.get("containment") in {"macos_resource_coalition", "linux_subtree", "windows_job"}
+                   for event in events)
+    if test_case == "candidate-01561-missing-session":
+        return any(event.get("event") == "missing_session_probe_finished" and event.get("passed") is True
+                   and event.get("test_only_candidate_01561") is True
+                   and event.get("credentials_provided") is False and event.get("model_commands_sent") == 0
                    for event in events)
     if test_case == "missing-session":
         return any(event.get("event") == "missing_session_probe_finished" and event.get("passed") is True for event in events)
@@ -126,6 +135,25 @@ def probe_version(executable, environment):
     return subprocess.run([str(executable), "--version"], env=environment,
                           text=True, capture_output=True,
                           timeout=VERSION_PROBE_TIMEOUT_SECONDS, check=True)
+
+
+def verify_candidate_01561_package(executable):
+    architecture = {"amd64": "x86_64", "x86_64": "x86_64",
+                    "arm64": "aarch64", "aarch64": "aarch64"}.get(platform.machine().lower())
+    target = {("linux", "x86_64"): "linux-x64", ("win32", "x86_64"): "windows-x64",
+              ("win32", "aarch64"): "windows-arm64", ("darwin", "aarch64"): "macos-arm64"}.get(
+                  (sys.platform, architecture))
+    if target is None:
+        raise ValueError("0.156.1 test-only 候选没有此平台的固定完整包")
+    package = prepare.packages_for_version("0.156.1")[target]
+    runtime = executable.parent.parent
+    if (not executable.is_absolute() or not executable.is_file()
+            or executable.resolve(strict=True) != executable
+            or executable != runtime / package["entrypoint"]):
+        raise ValueError("0.156.1 test-only 候选必须使用固定完整包的入口")
+    if prepare.verify_runtime_tree(runtime, package, "0.156.1") != executable:
+        raise ValueError("0.156.1 test-only 候选完整包身份不匹配")
+    return target
 
 
 def terminate(process, own_process_only=False):
@@ -320,6 +348,9 @@ def stopped_output(process, metadata):
 
 
 def run(args):
+    candidate_01561 = args.test_case == "candidate-01561-missing-session"
+    if candidate_01561:
+        verify_candidate_01561_package(args.codex)
     repository = Path(__file__).resolve().parents[2]
     test_name = TEST_CASES[args.test_case]
     metadata = {
@@ -327,6 +358,7 @@ def run(args):
         "test_case": args.test_case,
         "scope": {"running-tool-cancel": "rust_adapter_running_tool_cancel",
                   "image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
+                  "candidate-01561-missing-session": "rust_adapter_01561_test_only_zero_input_missing_session",
                   "idle-crash": "rust_adapter_idle_crash_after_native_ready"}.get(
             args.test_case, "rust_adapter_process_restart"),
         "credentials_provided": args.test_case not in UNAUTHENTICATED_CASES,
@@ -336,6 +368,7 @@ def run(args):
         "supervisor_binary_sha256": digest(args.supervisor),
         "supervised_process_lifecycle": True,
         "platform": sys.platform,
+        "test_only_candidate_01561": candidate_01561,
     }
     commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repository,
                             text=True, capture_output=True, check=True)
@@ -372,13 +405,17 @@ def run(args):
             "INFINISHELL_CODEX_LIVE_ARTIFACT": str(args.output),
             "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
         })
+        if candidate_01561:
+            environment["INFINISHELL_CODEX_TEST_CANDIDATE_01561"] = "1"
         if args.test_case == "running-tool-cancel":
             environment["INFINISHELL_CODEX_RUNNING_TOOL_CANCEL"] = "1"
         version = probe_version(args.codex, environment)
         metadata["cli_version"] = version.stdout.strip()
         # 清空本次输出，避免筛选器未匹配或版本不符时采用上一次的成功记录。
         args.output.write_text("")
-        if args.test_case == "running-tool-cancel" and metadata["cli_version"] != "codex-cli 0.155.1":
+        expected_version = ("codex-cli 0.156.1" if candidate_01561 else
+                            "codex-cli 0.155.1" if args.test_case == "running-tool-cancel" else None)
+        if expected_version is not None and metadata["cli_version"] != expected_version:
             metadata["acceptance_passed"] = False
             metadata["version_mismatch"] = True
             args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")

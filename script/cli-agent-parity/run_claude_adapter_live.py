@@ -20,6 +20,9 @@ MARKER = "isolated Claude Rust adapter verification\n"
 PROJECT_SETTINGS = {"permissions": {"defaultMode": "default", "ask": ["Write"]}}
 API_ENVIRONMENT_KEYS = {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"}
 DEFAULT_ACCOUNT_VERSION = "2.1.278"
+TEST_CANDIDATE_VERSION = "2.1.280"
+TEST_CANDIDATE_MARKER = ".infinishell-claude-21280-candidate"
+TEST_CANDIDATE_MARKER_CONTENT = "isolated Claude Code 2.1.280 test candidate\n"
 SENSITIVE_IDENTITY_KEYS = {
     "email", "emailaddress", "organization", "organizationid", "orgid", "token",
     "accesstoken", "refreshtoken",
@@ -267,7 +270,16 @@ def verified_acceptance(exit_code, output, events):
     return len(shutdowns) == 2 and all(event.get("native_session_id") == native_id for event in shutdowns)
 
 
+def selected_version(args):
+    version = getattr(args, "claude_version", DEFAULT_VERSION)
+    candidate = getattr(args, "allow_claude_21280_candidate", False)
+    if (version == TEST_CANDIDATE_VERSION) != candidate:
+        raise ValueError("Claude 2.1.280 仅接受显式测试候选标记，其他版本禁止使用该标记")
+    return version
+
+
 def validate_auth_selection(args):
+    version = selected_version(args)
     default_account = getattr(args, "use_authorized_default_account", False)
     config_dir = getattr(args, "config_dir", None)
     auth_home = getattr(args, "auth_home", None)
@@ -275,8 +287,8 @@ def validate_auth_selection(args):
     if default_account:
         if any(path is not None for path in (config_dir, auth_home, api_file)):
             raise ValueError("默认在线账户模式不能同时提供私有配置、私有 HOME 或 API 环境")
-        if getattr(args, "claude_version", DEFAULT_VERSION) != DEFAULT_ACCOUNT_VERSION:
-            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278")
+        if version != DEFAULT_ACCOUNT_VERSION and version != TEST_CANDIDATE_VERSION:
+            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278 或显式测试候选 2.1.280")
     elif config_dir is None or auth_home is None:
         raise ValueError("私有认证模式必须同时提供 config-dir 与 auth-home")
     return default_account
@@ -324,17 +336,21 @@ def validate_paths(args):
 def run(args):
     repository = Path(__file__).resolve().parents[2]
     # 先核对固定文件及无认证版本输出，再读取显式 API 环境；旧派生运行器缺省仍使用 273。
-    selected_version = getattr(args, "claude_version", DEFAULT_VERSION)
+    selected_cli_version = selected_version(args)
     target = current_platform()
-    verified_cli = verify_binary(args.claude, target, selected_version)
+    verified_cli = verify_binary(args.claude, target, selected_cli_version)
     root = Path(tempfile.mkdtemp(prefix="infinishell-claude-adapter-")).resolve()
-    detected = verify_version(args.claude, root, selected_version)
-    if verify_binary(args.claude, target, selected_version) != verified_cli:
+    detected = verify_version(args.claude, root, selected_cli_version)
+    if verify_binary(args.claude, target, selected_cli_version) != verified_cli:
         raise ValueError("原生 Claude 在版本探测期间变化")
     default_account = validate_auth_selection(args)
     api_environment = ({} if default_account else
                        load_api_environment(getattr(args, "api_environment_file", None)))
     settings = prepare_project(root)
+    candidate = selected_cli_version == TEST_CANDIDATE_VERSION
+    if candidate:
+        with (root / TEST_CANDIDATE_MARKER).open("x", encoding="utf-8", newline="\n") as target_file:
+            target_file.write(TEST_CANDIDATE_MARKER_CONTENT)
     account_status = None
     if default_account:
         environment = authorized_default_account_environment(root)
@@ -353,10 +369,12 @@ def run(args):
         "INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
         "INFINISHELL_CLAUDE_LIVE_AUTH_MODE": auth_mode,
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
-        "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
+        "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_cli_version,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(args.output),
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
     })
+    if candidate:
+        environment["INFINISHELL_CLAUDE_LIVE_CANDIDATE_21280"] = "1"
     if config_dir is not None:
         environment["INFINISHELL_CLAUDE_LIVE_CONFIG_DIR"] = str(config_dir)
     if getattr(args, "model", None):
@@ -377,7 +395,8 @@ def run(args):
         "private_workspace": str(root), "project_settings_sha256": digest(settings),
         "test_binary_sha256": digest(args.test_binary), "cli_binary_sha256": digest(args.claude),
         "supervisor_binary_sha256": digest(args.supervisor), "acceptance_passed": False,
-        "cli_version": detected, "requested_cli_version": selected_version, "cli": verified_cli,
+        "cli_version": detected, "requested_cli_version": selected_cli_version, "cli": verified_cli,
+        "test_only_candidate_21280": candidate,
     }
     if account_status is not None:
         metadata["authorized_default_account"] = account_status
@@ -421,7 +440,7 @@ def run(args):
         args.output.write_text("".join(json.dumps(event, ensure_ascii=False) + "\n" for event in events),
                                encoding="utf-8", newline="\n")
         metadata["project_settings_unchanged"] = digest(settings) == metadata["project_settings_sha256"]
-        metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_version) == verified_cli
+        metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_cli_version) == verified_cli
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
             and metadata["project_settings_unchanged"] and metadata["cli_binary_unchanged"]
             and verified_acceptance(process.returncode, output, events))
@@ -448,6 +467,8 @@ def main():
     parser.add_argument("--claude", type=Path, required=True, help="所选固定官方版本的原生可执行文件")
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
                         help=f"精确官方版本；缺省为 {DEFAULT_VERSION}")
+    parser.add_argument("--allow-claude-21280-candidate", action="store_true",
+                        help="仅测试构建可用；显式启用固定官方 Claude 2.1.280 候选")
     parser.add_argument("--supervisor", type=Path, required=True, help="同提交的主程序或 TUI 监督入口")
     parser.add_argument("--config-dir", type=Path, help="私有 CLAUDE_CONFIG_DIR；使用已有登录或显式 API 环境")
     parser.add_argument("--auth-home", type=Path, help="登录时使用的私有 HOME/USERPROFILE")

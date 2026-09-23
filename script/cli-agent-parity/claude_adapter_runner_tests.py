@@ -310,6 +310,14 @@ class EnvironmentTests(unittest.TestCase):
                 with self.subTest(changes=changes), self.assertRaises(ValueError):
                     validate_paths(args)
             self.assertTrue(validate_auth_selection(online))
+            candidate = argparse.Namespace(**(vars(online) | {
+                "claude_version": "2.1.280", "allow_claude_21280_candidate": True,
+            }))
+            self.assertTrue(validate_auth_selection(candidate))
+            with self.assertRaises(ValueError):
+                validate_auth_selection(argparse.Namespace(**(vars(candidate) | {
+                    "allow_claude_21280_candidate": False,
+                })))
 
 
 class FixedVersionRunnerTests(unittest.TestCase):
@@ -321,12 +329,61 @@ class FixedVersionRunnerTests(unittest.TestCase):
             with mock.patch.object(runner, "load_api_environment") as load_api, \
                     mock.patch.object(runner, "verify_version") as probe, \
                     mock.patch.object(runner.subprocess, "Popen") as spawn:
-                for version in ("2.1.273", "2.1.278", "latest", "2.1.279"):
+                for version in ("2.1.273", "2.1.278", "2.1.280", "latest", "2.1.279"):
                     with self.subTest(version=version), self.assertRaises(ValueError):
                         runner.run(argparse.Namespace(claude=executable, claude_version=version))
                 load_api.assert_not_called()
                 probe.assert_not_called()
                 spawn.assert_not_called()
+
+    def test_candidate_requires_exact_opt_in_before_binary_or_auth_probe(self):
+        with mock.patch.object(runner, "verify_binary") as verify, \
+                mock.patch.object(runner, "load_api_environment") as load_api, \
+                mock.patch.object(runner.subprocess, "Popen") as spawn:
+            for version, enabled in (("2.1.280", False), ("2.1.278", True),
+                                     ("2.1.273", True), ("latest", True)):
+                with self.subTest(version=version, enabled=enabled), self.assertRaises(ValueError):
+                    runner.run(argparse.Namespace(claude_version=version,
+                                                  allow_claude_21280_candidate=enabled))
+            verify.assert_not_called()
+            load_api.assert_not_called()
+            spawn.assert_not_called()
+
+    def test_candidate_uses_verified_binary_and_private_test_marker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for name in ("claude", "libtest", "supervisor"):
+                (root / name).write_bytes(b"synthetic executable")
+            (root / "config").mkdir()
+            (root / "home").mkdir()
+            args = argparse.Namespace(
+                claude=root / "claude", claude_version="2.1.280",
+                allow_claude_21280_candidate=True,
+                test_binary=root / "libtest", supervisor=root / "supervisor",
+                config_dir=root / "config", auth_home=root / "home",
+                api_environment_file=None, output=root / "events.ndjson", model=None,
+            )
+
+            def spawn(command, **kwargs):
+                self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_CANDIDATE_21280"], "1")
+                self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION"], "2.1.280")
+                marker = Path(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_ROOT"]) / runner.TEST_CANDIDATE_MARKER
+                self.assertEqual(marker.read_text(), runner.TEST_CANDIDATE_MARKER_CONTENT)
+                args.output.write_text("".join(json.dumps(row) + "\n" for row in complete_events()), encoding="utf-8")
+                return SimpleNamespace(returncode=0, communicate=lambda timeout: (SUMMARY, None))
+
+            with mock.patch.object(runner, "verify_binary", return_value={"sha256": "synthetic"}) as verify, \
+                    mock.patch.object(runner, "verify_version", return_value="2.1.280 (Claude Code)"), \
+                    mock.patch.object(runner.tempfile, "mkdtemp", return_value=str(root)), \
+                    mock.patch.object(runner.subprocess, "run", return_value=SimpleNamespace(stdout="")), \
+                    mock.patch.object(runner.subprocess, "Popen", side_effect=spawn), \
+                    mock.patch("builtins.print"):
+                self.assertEqual(runner.run(args), 0)
+            self.assertEqual(verify.call_count, 3)
+            self.assertTrue(all(call.args[-1] == "2.1.280" for call in verify.call_args_list))
+            metadata = json.loads(args.output.with_suffix(".metadata.json").read_text())
+            self.assertTrue(metadata["test_only_candidate_21280"])
+            self.assertTrue(metadata["acceptance_passed"])
 
     def test_probe_failure_stops_before_api_read(self):
         with tempfile.TemporaryDirectory() as temporary, \

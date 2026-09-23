@@ -24,6 +24,8 @@ use super::{
 };
 
 const SUPPORTED_VERSIONS: [&str; 2] = ["0.147.0", "0.155.1"];
+#[cfg(test)]
+const TEST_CANDIDATE_VERSION: &str = "0.156.1";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_LINE_BYTES: usize = 8 * 1024 * 1024;
@@ -37,6 +39,11 @@ pub(crate) fn supported_version(version: &str) -> bool {
 }
 
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
+    connect_protocol(CodexProtocol::new(options))
+}
+
+fn connect_protocol(protocol: CodexProtocol) -> Result<RuntimeConnection, RuntimeError> {
+    let options = &protocol.options;
     if options.grok_profile.is_some()
         || !options.executable.is_absolute()
         || !options.cwd.is_absolute()
@@ -54,7 +61,7 @@ pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeErro
     }
     let (controller, commands, sender, events) = channels(options.generation);
     let task = Box::pin(async move {
-        let mut protocol = CodexProtocol::new(options);
+        let mut protocol = protocol;
         let result = run_process(&mut protocol, commands, &sender).await;
         let reason = match &result {
             Ok(()) => "runtime connection closed".to_string(),
@@ -381,6 +388,8 @@ struct CodexProtocol {
     finished_turns: HashSet<String>,
     approvals: HashMap<String, PendingApproval>,
     local_tools: HashMap<String, PendingLocalTool>,
+    #[cfg(test)]
+    test_only_01561_profile: bool,
 }
 
 impl CodexProtocol {
@@ -397,12 +406,18 @@ impl CodexProtocol {
             finished_turns: HashSet::new(),
             approvals: HashMap::new(),
             local_tools: HashMap::new(),
+            #[cfg(test)]
+            test_only_01561_profile: false,
         }
     }
 
     fn record_version_probe(&mut self, detected: &str) -> Result<(), RuntimeError> {
         self.paired_version = None;
         self.probed_version = detected.strip_prefix("codex-cli ").and_then(|version| {
+            #[cfg(test)]
+            if self.test_only_01561_profile {
+                return (version == TEST_CANDIDATE_VERSION).then_some(TEST_CANDIDATE_VERSION);
+            }
             supported_version(version)
                 .then(|| {
                     SUPPORTED_VERSIONS

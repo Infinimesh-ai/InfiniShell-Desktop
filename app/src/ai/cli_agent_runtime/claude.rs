@@ -44,6 +44,32 @@ const SUPPORTED_VERSIONS: [(&str, &str); 2] = [
     ("2.1.273 (Claude Code)", "2.1.273"),
     ("2.1.278 (Claude Code)", "2.1.278"),
 ];
+#[cfg(test)]
+const TEST_CANDIDATE_VERSION: &str = "2.1.280";
+// 无凭据 init/EOF 只覆盖 P0；候选完整任务链仍须单独真实验收。
+#[cfg(test)]
+const TEST_CANDIDATE_OUTPUT: &str = "2.1.280 (Claude Code)";
+#[cfg(test)]
+const TEST_CANDIDATE_MARKER: &str = ".infinishell-claude-21280-candidate";
+
+#[cfg(test)]
+fn test_candidate_enabled(options: &SessionOptions) -> bool {
+    std::env::var("INFINISHELL_CLAUDE_LIVE_CANDIDATE_21280").as_deref() == Ok("1")
+        && std::env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION").as_deref()
+            == Ok(TEST_CANDIDATE_VERSION)
+        && std::env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").as_deref()
+            == Some(options.executable.as_os_str())
+        && std::env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").as_deref()
+            == Some(options.state_dir.as_os_str())
+        && std::fs::read(options.state_dir.join(TEST_CANDIDATE_MARKER))
+            .ok()
+            .as_deref()
+            == Some(b"isolated Claude Code 2.1.280 test candidate\n".as_slice())
+        && options.permission_policy == PermissionPolicy::Inherit
+        && options.claude_profile.is_none()
+        && options.local_tools.is_none()
+        && options.selected_skills.is_empty()
+}
 
 pub(crate) fn supported_version(version: &str) -> bool {
     SUPPORTED_VERSIONS
@@ -115,6 +141,10 @@ async fn run_process(
     commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
+    #[cfg(test)]
+    {
+        protocol.test_candidate_21280 = test_candidate_enabled(&protocol.options);
+    }
     if protocol.options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV1 {
         let profile = profile_preflight::prepare(&protocol.options).await?;
         protocol.options.claude_profile = Some(profile);
@@ -758,6 +788,8 @@ struct ClaudeProtocol {
     profile_command_authorized: bool,
     native_result_evidence: bool,
     #[cfg(test)]
+    test_candidate_21280: bool,
+    #[cfg(test)]
     native_ids_for_live: Option<Arc<Mutex<Vec<Value>>>>,
 }
 
@@ -801,6 +833,8 @@ impl ClaudeProtocol {
             profile_command_authorized: false,
             native_result_evidence,
             #[cfg(test)]
+            test_candidate_21280: false,
+            #[cfg(test)]
             native_ids_for_live: None,
         }
     }
@@ -808,6 +842,11 @@ impl ClaudeProtocol {
     fn bind_probed_version(&mut self, succeeded: bool, detected: &str) -> Result<(), RuntimeError> {
         self.probed_version = None;
         self.paired_version = None;
+        #[cfg(test)]
+        if succeeded && self.test_candidate_21280 && detected == TEST_CANDIDATE_OUTPUT {
+            self.probed_version = Some(TEST_CANDIDATE_VERSION);
+            return Ok(());
+        }
         if succeeded
             && let Some((_, version)) = SUPPORTED_VERSIONS
                 .iter()
