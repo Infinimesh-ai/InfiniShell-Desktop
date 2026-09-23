@@ -31,12 +31,18 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 mock.patch("run_codex_adapter_live.process_commands", side_effect=[scripts, scripts, scripts, {}, {}]), \
                 mock.patch("run_codex_adapter_live.time.monotonic", side_effect=[0, 21, 22]), \
                 mock.patch("run_codex_adapter_live.os.kill") as kill, \
+                mock.patch("run_codex_adapter_live.subprocess.run") as run, \
                 mock.patch("run_codex_adapter_live.time.sleep"):
             result = audit_and_cleanup_fixture(root, Path("/usr/bin/codex"), Path("/opt/infinishell"))
         self.assertTrue(result["fallback_attempted"])
         self.assertTrue(result["zero_residual"])
         self.assertFalse(result["audit_error"])
-        self.assertEqual({call.args[0] for call in kill.call_args_list}, {41, 42})
+        if os.name == "nt":
+            self.assertEqual({int(call.args[0][2]) for call in run.call_args_list}, {41, 42})
+            kill.assert_not_called()
+        else:
+            self.assertEqual({call.args[0] for call in kill.call_args_list}, {41, 42})
+            run.assert_not_called()
 
     def test_native_root_fallback_requires_private_cwd_and_exact_cli_path(self):
         root = Path("/private/tmp/codex-fixture-unique")

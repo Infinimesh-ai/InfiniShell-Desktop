@@ -473,18 +473,42 @@ fn quoted_command(program: &str, script: &str) -> String {
     }
 }
 
+fn fixed_command_shell_argv(actual: &str, command: &str) -> Option<Vec<String>> {
+    shell_words::split(actual).ok().filter(|parts| {
+        cfg!(unix)
+            && parts.len() == 3
+            && matches!(parts[0].as_str(), "/bin/zsh" | "/bin/bash" | "/bin/sh")
+            && matches!(parts[1].as_str(), "-lc" | "-c")
+            && parts[2] == command
+    })
+}
+
+fn fixed_command_progress_kind(actual: &str, command: &str) -> &'static str {
+    if actual == command {
+        "direct"
+    } else if fixed_command_shell_argv(actual, command).is_some() {
+        "shell_wrapper"
+    } else {
+        "other"
+    }
+}
+
+fn fixed_command_completed(message: &str, command: &str) -> bool {
+    serde_json::from_str::<Value>(message)
+        .ok()
+        .is_some_and(|item| {
+            item["type"] == "commandExecution"
+                && item["command"]
+                    .as_str()
+                    .is_some_and(|actual| fixed_command_progress_kind(actual, command) != "other")
+        })
+}
+
 fn approval_matches_fixture(details: &Value, command: &str, argv: &Value, cwd: &Path) -> bool {
     // Codex 可能提议直接 argv 或完整 shell argv。两者都必须严格对应固定测试命令，不能只比前缀。
     let shell_argv = details["command"]
         .as_str()
-        .and_then(|command| shell_words::split(command).ok())
-        .filter(|parts| {
-            cfg!(unix)
-                && parts.len() == 3
-                && matches!(parts[0].as_str(), "/bin/zsh" | "/bin/bash" | "/bin/sh")
-                && matches!(parts[1].as_str(), "-lc" | "-c")
-                && parts[2] == command
-        });
+        .and_then(|actual| fixed_command_shell_argv(actual, command));
     let actual_command_matches = details["command"] == command || shell_argv.is_some();
     let policy_matches = details["proposedExecpolicyAmendment"] == *argv
         || shell_argv.is_some_and(|parts| details["proposedExecpolicyAmendment"] == json!(parts));
@@ -496,6 +520,36 @@ fn approval_matches_fixture(details: &Value, command: &str, argv: &Value, cwd: &
         && details["cwd"]
             .as_str()
             .is_some_and(|path| Path::new(path).canonicalize().ok().as_deref() == Some(cwd))
+}
+
+#[test]
+#[cfg(unix)]
+fn native_progress_accepts_only_exact_fixed_command_or_shell_wrapper() {
+    let command = quoted_command("/usr/bin/python3", "/private/tmp/cancel-parent.py");
+    let wrapper = shell_words::join(["/bin/zsh", "-lc", command.as_str()]);
+    assert_eq!(fixed_command_progress_kind(&command, &command), "direct");
+    assert_eq!(
+        fixed_command_progress_kind(&wrapper, &command),
+        "shell_wrapper"
+    );
+    assert_eq!(
+        fixed_command_progress_kind(&format!("{wrapper}; another-command"), &command),
+        "other"
+    );
+    assert_eq!(
+        fixed_command_progress_kind(
+            &shell_words::join(["/bin/zsh", "-lc", "another-command"]),
+            &command
+        ),
+        "other"
+    );
+    let completed = json!({"type":"commandExecution","command":wrapper}).to_string();
+    assert_eq!(fixed_command_progress_kind(&completed, &command), "other");
+    assert!(fixed_command_completed(&completed, &command));
+    assert!(!fixed_command_completed(
+        &json!({"type":"commandExecution","command":"another-command"}).to_string(),
+        &command
+    ));
 }
 
 #[test]
@@ -848,6 +902,7 @@ while True:
     let mut approval_seen = false;
     let mut approval_resolved = false;
     let mut native_started = false;
+    let mut native_item_completed = false;
     let mut progress_observations = 0;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(120);
     let tree = loop {
@@ -940,24 +995,45 @@ while True:
                 turn_id: progress_turn,
                 message,
             } => {
-                let matched =
-                    turn_id.as_deref() == Some(progress_turn.as_str()) && message == command;
+                let same_turn = turn_id.as_deref() == Some(progress_turn.as_str());
+                let match_kind = if same_turn {
+                    fixed_command_progress_kind(&message, &command)
+                } else {
+                    "other"
+                };
+                let matched = match_kind != "other";
+                let completed_item_matches =
+                    same_turn && fixed_command_completed(&message, &command);
                 if progress_observations < 5 {
                     evidence.record(json!({
-                        "event":"native_progress_observed","fixed_command_matched":matched
+                        "event":"native_progress_observed","fixed_command_matched":matched,
+                        "match_kind":match_kind,"fixed_command_completed":completed_item_matches
                     }))?;
                     progress_observations += 1;
                 }
                 native_started |= matched;
+                native_item_completed |= completed_item_matches;
             }
             RuntimeEventKind::TurnFinished { outcome, .. } => {
-                let status = match outcome {
-                    TurnOutcome::Completed => "completed",
-                    TurnOutcome::Cancelled => "cancelled",
-                    TurnOutcome::Failed { .. } => "failed",
+                let (status, failure_kind) = match outcome {
+                    TurnOutcome::Completed => ("completed", "none"),
+                    TurnOutcome::Cancelled => ("cancelled", "none"),
+                    TurnOutcome::Failed { message }
+                        if message
+                            == "app-server ended the turn before every native execution reached a terminal state" =>
+                    {
+                        ("failed", "pending_native_execution")
+                    }
+                    TurnOutcome::Failed { message } if message == "Codex turn failed" => {
+                        ("failed", "generic_native_failure")
+                    }
+                    TurnOutcome::Failed { .. } => ("failed", "other_native_failure"),
                 };
                 evidence.record(json!({
-                    "event":"turn_finished_before_tool","outcome":status
+                    "event":"turn_finished_before_tool","outcome":status,
+                    "failure_kind":failure_kind,"fixed_command_started":native_started,
+                    "fixed_command_completed":native_item_completed,
+                    "tool_marker_present":cwd.join("cancel-pids.json").exists()
                 }))?;
                 return Err("固定工具尚未运行就收到回合终态".into());
             }
