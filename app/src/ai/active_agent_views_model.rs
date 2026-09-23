@@ -240,6 +240,17 @@ impl ActiveAgentViewsModel {
         }
     }
 
+    /// 终端视图是否仍属于已挂载的 pane，包括隐藏的子 Agent pane。
+    pub(crate) fn is_terminal_view_attached(
+        &self,
+        terminal_view_id: EntityId,
+        ctx: &AppContext,
+    ) -> bool {
+        self.agent_view_handles
+            .get(&terminal_view_id)
+            .is_some_and(|handles| handles.controller.upgrade(ctx).is_some())
+    }
+
     pub fn handle_pane_focus_change(
         &mut self,
         window_id: WindowId,

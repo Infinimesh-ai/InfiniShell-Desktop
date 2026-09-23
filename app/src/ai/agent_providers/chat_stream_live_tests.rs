@@ -219,7 +219,8 @@ async fn live_request(
         needs_create_task: false,
         lrc_command_id: None,
         lrc_should_spawn_subagent: false,
-        context_window: (target.model.context_window > 0).then_some(target.model.context_window),
+        context_window: (target.model.effective_context_window() > 0)
+            .then_some(target.model.effective_context_window()),
         cancellation_rx,
         attachment_caps: attachment_caps::resolve_for_model(
             &target.provider.id,
@@ -365,8 +366,8 @@ async fn live_byop_large_log_summary_and_resume() {
         }],
     );
     params.model = llm_id::encode(&target.provider.id, &target.model.id);
-    params.context_window_limit =
-        (target.model.context_window > 0).then_some(target.model.context_window);
+    params.context_window_limit = (target.model.effective_context_window() > 0)
+        .then_some(target.model.effective_context_window());
     let original_log_bytes = params.tasks[0].messages[2].server_message_data.len();
     assert!(original_log_bytes > 4_000_000);
     let (request, report) =

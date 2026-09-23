@@ -40,6 +40,7 @@ use warpui::{
     ViewHandle, WeakViewHandle, WindowId,
 };
 
+use crate::ai::active_agent_views_model::ActiveAgentViewsModel;
 use crate::ai::agent::api::ServerConversationToken;
 use crate::ai::agent::conversation::{AIAgentHarness, AIConversation, AIConversationId};
 use crate::ai::agent_conversations_model::{
@@ -166,6 +167,11 @@ pub mod pane;
 pub mod tree;
 pub mod working_directories;
 use focus_state::PaneGroupFocusState;
+
+#[cfg(test)]
+#[path = "mod_tests.rs"]
+mod tests;
+
 pub use pane::ai_document_pane::AIDocumentPane;
 pub use pane::ai_fact_pane::AIFactPane;
 pub use pane::code_diff_pane::CodeDiffPane;
@@ -2715,14 +2721,21 @@ impl PaneGroup {
         pane_group
     }
 
-    /// Returns the terminal view currently owning `conversation_id`, even if
-    /// that owner lives outside this pane group.
+    /// 返回会话当前的所有者，但排除为撤销关闭而保留的 detached pane。
     fn terminal_view_id_for_owned_conversation(
         &self,
         conversation_id: AIConversationId,
         ctx: &AppContext,
     ) -> Option<EntityId> {
-        BlocklistAIHistoryModel::as_ref(ctx).terminal_surface_id_for_conversation(&conversation_id)
+        BlocklistAIHistoryModel::as_ref(ctx)
+            .terminal_surface_id_for_conversation(&conversation_id)
+            .filter(|terminal_view_id| {
+                // 撤销关闭会在 pane detach 后保留其视图与会话，不能把它误判为当前所有者。
+                self.find_pane_id_for_terminal_view(*terminal_view_id, ctx)
+                    .is_some_and(|pane_id| !self.is_pane_hidden_for_close(pane_id))
+                    || ActiveAgentViewsModel::as_ref(ctx)
+                        .is_terminal_view_attached(*terminal_view_id, ctx)
+            })
     }
 
     fn pane_id_for_owned_conversation(
@@ -4200,6 +4213,8 @@ impl PaneGroup {
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         let tracked_child_pane = self.child_agent_panes.remove(&conversation_id);
+        self.pending_remote_child_hydrations
+            .retain(|_, child_id| *child_id != conversation_id);
         let split_off_child_pane = self.child_agent_origin.as_ref().and_then(|origin| {
             (origin.conversation_id == conversation_id)
                 .then(|| self.pane_id_for_conversation_owner(conversation_id, ctx))
@@ -6299,7 +6314,8 @@ impl PaneGroup {
             if let Some(owner_view_id) = BlocklistAIHistoryModel::as_ref(ctx)
                 .terminal_surface_id_for_conversation(&conversation_id)
             {
-                ctx.dispatch_typed_action(&WorkspaceAction::FocusTerminalViewInWorkspace {
+                // Workspace 导航会读取当前 pane group，因此需要等此调用返回后再执行。
+                ctx.dispatch_typed_action_deferred(WorkspaceAction::FocusTerminalViewInWorkspace {
                     terminal_view_id: owner_view_id,
                 });
                 return;
@@ -6859,6 +6875,7 @@ impl PaneGroup {
 
     /// Reattach all panes to this group. This is called when a closed tab is restored.
     pub fn reattach_panes(&mut self, ctx: &mut ViewContext<Self>) {
+        self.remove_transferred_child_agent_panes(ctx);
         let pane_ids = self.pane_contents.keys().copied().collect_vec();
         for pane_id in pane_ids {
             let Some(pane) = self.pane_contents.get(&pane_id) else {
@@ -6866,6 +6883,23 @@ impl PaneGroup {
             };
             self.attach_pane(pane.as_ref(), ctx);
             self.restore_missing_child_agent_panes_for_terminal_pane_if_needed(pane_id, ctx);
+        }
+    }
+
+    fn remove_transferred_child_agent_panes(&mut self, ctx: &mut ViewContext<Self>) {
+        let transferred_children = self
+            .child_agent_panes
+            .iter()
+            .filter_map(|(conversation_id, pane_id)| {
+                let owner = BlocklistAIHistoryModel::as_ref(ctx)
+                    .terminal_surface_id_for_conversation(conversation_id)?;
+                let terminal_view = self.terminal_view_from_pane_id(*pane_id, ctx)?;
+                (owner != terminal_view.id()).then_some(*conversation_id)
+            })
+            .collect_vec();
+
+        for conversation_id in transferred_children {
+            self.discard_child_agent_pane_for_conversation(conversation_id, ctx);
         }
     }
 

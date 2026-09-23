@@ -2037,6 +2037,26 @@ impl BlocklistAIHistoryModel {
         );
     }
 
+    /// 清理已关闭 surface，但不会向持有已转移会话的 controller 发送通知。
+    pub(crate) fn clear_conversations_for_closed_terminal_surface(
+        &mut self,
+        terminal_surface_id: EntityId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self
+            .live_conversation_ids_for_terminal_surface
+            .get(&terminal_surface_id)
+            .is_none_or(Vec::is_empty)
+        {
+            self.active_conversation_for_terminal_surface
+                .remove(&terminal_surface_id);
+            self.live_conversation_ids_for_terminal_surface
+                .remove(&terminal_surface_id);
+            return;
+        }
+        self.clear_conversations_for_terminal_surface(terminal_surface_id, ctx);
+    }
+
     /// Handle removing a conversation from the history model, blocklist and in-memory.
     pub fn remove_conversation(
         &mut self,

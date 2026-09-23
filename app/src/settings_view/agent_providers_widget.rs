@@ -5,7 +5,8 @@
 //! - 每条 provider 一张卡片,卡片内含:
 //!   · `Name` / `Base URL` / `API Key` 三个输入框(仅编辑,不自动保存)
 //!   · 模型列表区: 表头 `显示名 | 模型 ID`,每行两个输入框 + `×` 删除按钮
-//!   · 底部按钮行: `+ 添加模型` `Fetch from API` `保存` `Remove` (provider)
+//!   · 底部按钮行: `+ 添加模型` `Refresh from API` `models.dev 刷新`
+//!     `清空模型` `保存` `Remove` (provider)
 //!
 //! **保存行为**: 点"保存"按钮会把表单状态一次性下发到 `AISettings`
 //! 与 `AgentProviderSecrets`。输入框失焦/按 Enter 不会保存 —— 这是为了
@@ -36,7 +37,10 @@ use warpui::ui_components::button::ButtonVariant;
 use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 
-use super::ai_page::{AISettingsPageAction, AISettingsPageView, ModelCapabilityKind};
+use super::ai_page::{
+    AISettingsPageAction, AISettingsPageView, AgentProviderModelDraft,
+    AgentProviderModelDraftEditors, ModelCapabilityKind,
+};
 use super::settings_page::{HEADER_PADDING, SettingsWidget, build_sub_header};
 use crate::ai::agent_providers::AgentProviderSecrets;
 use crate::appearance::Appearance;
@@ -93,6 +97,8 @@ struct ModelRow {
     id_editor: ViewHandle<EditorView>,
     context_editor: ViewHandle<EditorView>,
     output_editor: ViewHandle<EditorView>,
+    models_dev_provider_editor: ViewHandle<EditorView>,
+    models_dev_model_editor: ViewHandle<EditorView>,
     /// detail panel 内的删除按钮。
     remove_button_state: MouseStateHandle,
     /// row 末尾 chevron 右侧的快速删除按钮。
@@ -106,6 +112,7 @@ struct ModelRow {
     /// detail panel 内 reasoning / tool_call 两个 bool toggle 的状态。
     reasoning_chip_state: MouseStateHandle,
     tool_call_chip_state: MouseStateHandle,
+    reset_overrides_button_state: MouseStateHandle,
 }
 
 struct HeaderRow {
@@ -121,6 +128,7 @@ struct ProviderRow {
     api_key_editor: ViewHandle<EditorView>,
     fetch_button_state: MouseStateHandle,
     sync_models_dev_button_state: MouseStateHandle,
+    clear_models_button_state: MouseStateHandle,
     save_button_state: MouseStateHandle,
     remove_button_state: MouseStateHandle,
     add_model_button_state: MouseStateHandle,
@@ -139,13 +147,16 @@ struct ProviderRow {
     model_rows: Vec<ModelRow>,
 }
 
-type ModelDraftEditorHandles = (
-    usize,
-    ViewHandle<EditorView>,
-    ViewHandle<EditorView>,
-    ViewHandle<EditorView>,
-    ViewHandle<EditorView>,
-);
+#[derive(Clone)]
+struct ModelDraftEditorHandles {
+    index: usize,
+    name: ViewHandle<EditorView>,
+    id: ViewHandle<EditorView>,
+    context: ViewHandle<EditorView>,
+    output: ViewHandle<EditorView>,
+    models_dev_provider: ViewHandle<EditorView>,
+    models_dev_model: ViewHandle<EditorView>,
+}
 
 #[derive(Clone)]
 struct ProviderDraftEditors {
@@ -173,14 +184,14 @@ impl ProviderDraftEditors {
                 .model_rows
                 .iter()
                 .enumerate()
-                .map(|(idx, m)| {
-                    (
-                        idx,
-                        m.name_editor.clone(),
-                        m.id_editor.clone(),
-                        m.context_editor.clone(),
-                        m.output_editor.clone(),
-                    )
+                .map(|(index, model)| ModelDraftEditorHandles {
+                    index,
+                    name: model.name_editor.clone(),
+                    id: model.id_editor.clone(),
+                    context: model.context_editor.clone(),
+                    output: model.output_editor.clone(),
+                    models_dev_provider: model.models_dev_provider_editor.clone(),
+                    models_dev_model: model.models_dev_model_editor.clone(),
                 })
                 .collect(),
         }
@@ -232,7 +243,7 @@ impl ProviderDraftEditors {
             String,
             String,
             Vec<(String, String)>,
-            Vec<(usize, String, String, u32, u32)>,
+            Vec<AgentProviderModelDraft>,
         ) -> AISettingsPageAction,
     ) -> AISettingsPageAction {
         let name = self.name_editor.as_ref(app).buffer_text(app);
@@ -248,15 +259,24 @@ impl ProviderDraftEditors {
                 )
             })
             .collect();
-        let models: Vec<(usize, String, String, u32, u32)> = self
+        let models: Vec<AgentProviderModelDraft> = self
             .model_editors
             .iter()
-            .map(|(idx, name_e, id_e, ctx_e, out_e)| {
-                let m_name = name_e.as_ref(app).buffer_text(app);
-                let m_id = id_e.as_ref(app).buffer_text(app);
-                let context_window = parse_token_count(&ctx_e.as_ref(app).buffer_text(app));
-                let max_output_tokens = parse_token_count(&out_e.as_ref(app).buffer_text(app));
-                (*idx, m_name, m_id, context_window, max_output_tokens)
+            .map(|model| AgentProviderModelDraft {
+                index: model.index,
+                editors: Some(AgentProviderModelDraftEditors {
+                    name: model.name.clone(),
+                    context: model.context.clone(),
+                    output: model.output.clone(),
+                    models_dev_provider: model.models_dev_provider.clone(),
+                    models_dev_model: model.models_dev_model.clone(),
+                }),
+                name: model.name.as_ref(app).buffer_text(app),
+                id: model.id.as_ref(app).buffer_text(app),
+                context_window: parse_token_count(&model.context.as_ref(app).buffer_text(app)),
+                max_output_tokens: parse_token_count(&model.output.as_ref(app).buffer_text(app)),
+                models_dev_provider_id: model.models_dev_provider.as_ref(app).buffer_text(app),
+                models_dev_model_id: model.models_dev_model.as_ref(app).buffer_text(app),
             })
             .collect();
 
@@ -286,7 +306,8 @@ impl AgentProvidersWidget {
             rows.insert(provider.id.clone(), row);
         }
 
-        // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络)。
+        // 进入页面即触发一次目录加载(磁盘缓存 + 必要时网络),
+        // 供运行时能力推断、自动补全新模型以及用户手动刷新元数据。
         ctx.dispatch_typed_action_deferred(AISettingsPageAction::EnsureModelsDevLoaded);
 
         Self {
@@ -302,14 +323,20 @@ impl AgentProvidersWidget {
     ) -> ModelRow {
         // ---- name 编辑器 ----
         let initial_name = model.name.clone();
+        let automatic_name = model.effective_name().to_owned();
         let name_editor = ctx.add_typed_action_view(move |ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let options = single_line_editor_options(appearance, false);
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text(
-                crate::t!("settings-agent-providers-model-name-placeholder"),
-                ctx,
-            );
+            let placeholder = if automatic_name.is_empty() {
+                crate::t!("settings-agent-providers-model-name-placeholder")
+            } else {
+                crate::t!(
+                    "settings-agent-providers-model-auto-value",
+                    value = automatic_name.as_str()
+                )
+            };
+            editor.set_placeholder_text(placeholder, ctx);
             if !initial_name.is_empty() {
                 editor.set_buffer_text(&initial_name, ctx);
             }
@@ -345,14 +372,20 @@ impl AgentProvidersWidget {
         } else {
             model.context_window.to_string()
         };
+        let automatic_context = model.effective_context_window();
         let context_editor = ctx.add_typed_action_view(move |ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let options = single_line_editor_options(appearance, false);
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text(
-                crate::t!("settings-agent-providers-model-context-placeholder"),
-                ctx,
-            );
+            let placeholder = if automatic_context == 0 {
+                crate::t!("settings-agent-providers-model-context-placeholder")
+            } else {
+                crate::t!(
+                    "settings-agent-providers-model-auto-value",
+                    value = automatic_context
+                )
+            };
+            editor.set_placeholder_text(placeholder, ctx);
             if !initial_context.is_empty() {
                 editor.set_buffer_text(&initial_context, ctx);
             }
@@ -368,14 +401,20 @@ impl AgentProvidersWidget {
         } else {
             model.max_output_tokens.to_string()
         };
+        let automatic_output = model.effective_max_output_tokens();
         let output_editor = ctx.add_typed_action_view(move |ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let options = single_line_editor_options(appearance, false);
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text(
-                crate::t!("settings-agent-providers-model-output-placeholder"),
-                ctx,
-            );
+            let placeholder = if automatic_output == 0 {
+                crate::t!("settings-agent-providers-model-output-placeholder")
+            } else {
+                crate::t!(
+                    "settings-agent-providers-model-auto-value",
+                    value = automatic_output
+                )
+            };
+            editor.set_placeholder_text(placeholder, ctx);
             if !initial_output.is_empty() {
                 editor.set_buffer_text(&initial_output, ctx);
             }
@@ -385,11 +424,49 @@ impl AgentProvidersWidget {
             collapse_selection_if_blurred(&editor, event, ctx);
         });
 
+        let initial_models_dev_provider = model.models_dev_provider_id.clone().unwrap_or_default();
+        let models_dev_provider_editor = ctx.add_typed_action_view(move |ctx| {
+            let appearance = Appearance::handle(ctx).as_ref(ctx);
+            let options = single_line_editor_options(appearance, false);
+            let mut editor = EditorView::single_line(options, ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-models-dev-provider-placeholder"),
+                ctx,
+            );
+            if !initial_models_dev_provider.is_empty() {
+                editor.set_buffer_text(&initial_models_dev_provider, ctx);
+            }
+            editor
+        });
+        ctx.subscribe_to_view(&models_dev_provider_editor, move |_, editor, event, ctx| {
+            collapse_selection_if_blurred(&editor, event, ctx);
+        });
+
+        let initial_models_dev_model = model.models_dev_model_id.clone().unwrap_or_default();
+        let models_dev_model_editor = ctx.add_typed_action_view(move |ctx| {
+            let appearance = Appearance::handle(ctx).as_ref(ctx);
+            let options = single_line_editor_options(appearance, false);
+            let mut editor = EditorView::single_line(options, ctx);
+            editor.set_placeholder_text(
+                crate::t!("settings-agent-providers-models-dev-model-placeholder"),
+                ctx,
+            );
+            if !initial_models_dev_model.is_empty() {
+                editor.set_buffer_text(&initial_models_dev_model, ctx);
+            }
+            editor
+        });
+        ctx.subscribe_to_view(&models_dev_model_editor, move |_, editor, event, ctx| {
+            collapse_selection_if_blurred(&editor, event, ctx);
+        });
+
         ModelRow {
             name_editor,
             id_editor,
             context_editor,
             output_editor,
+            models_dev_provider_editor,
+            models_dev_model_editor,
             remove_button_state: MouseStateHandle::default(),
             quick_remove_button_state: MouseStateHandle::default(),
             expand_button_state: MouseStateHandle::default(),
@@ -398,6 +475,7 @@ impl AgentProvidersWidget {
             audio_chip_state: MouseStateHandle::default(),
             reasoning_chip_state: MouseStateHandle::default(),
             tool_call_chip_state: MouseStateHandle::default(),
+            reset_overrides_button_state: MouseStateHandle::default(),
         }
     }
 
@@ -474,14 +552,12 @@ impl AgentProvidersWidget {
 
         // ---- Base URL 编辑器 ----
         let initial_base_url = provider.base_url.clone();
+        let base_url_placeholder = provider.api_type.default_base_url().to_owned();
         let base_url_editor = ctx.add_typed_action_view(move |ctx| {
             let appearance = Appearance::handle(ctx).as_ref(ctx);
             let options = single_line_editor_options(appearance, false);
             let mut editor = EditorView::single_line(options, ctx);
-            editor.set_placeholder_text(
-                crate::t!("settings-agent-providers-base-url-placeholder"),
-                ctx,
-            );
+            editor.set_placeholder_text(base_url_placeholder, ctx);
             if !initial_base_url.is_empty() {
                 editor.set_buffer_text(&initial_base_url, ctx);
             }
@@ -533,6 +609,7 @@ impl AgentProvidersWidget {
             api_key_editor,
             fetch_button_state: MouseStateHandle::default(),
             sync_models_dev_button_state: MouseStateHandle::default(),
+            clear_models_button_state: MouseStateHandle::default(),
             save_button_state: MouseStateHandle::default(),
             remove_button_state: MouseStateHandle::default(),
             add_model_button_state: MouseStateHandle::default(),
@@ -552,7 +629,7 @@ impl AgentProvidersWidget {
     }
 
     /// 渲染 "API Type" 行:5 个 chip 横排,当前选中的高亮显示。
-    /// 点击 chip 即 dispatch `SetAgentProviderApiType`,后端会顺手填默认 endpoint。
+    /// 点击 chip 即 dispatch `SetAgentProviderApiType`,自动默认端点随协议切换。
     fn render_api_type_field(
         &self,
         provider: &AgentProvider,
@@ -981,8 +1058,9 @@ impl AgentProvidersWidget {
 
     /// 单条模型的展开 detail 面板:
     /// - Modalities: image / pdf / audio 三态 chip(Auto / On / Off)
-    /// - Capabilities: reasoning / tool_call 两个 bool chip
-    /// - 底部 Remove 按钮
+    /// - Capabilities: reasoning / tool_call 三态 chip
+    /// - models.dev 匹配状态与可选显式映射
+    /// - 底部重置覆盖 / Remove 按钮
     fn render_model_detail_panel(
         provider: &AgentProvider,
         index: usize,
@@ -1008,21 +1086,47 @@ impl AgentProvidersWidget {
         .with_margin_bottom(FIELD_LABEL_MARGIN_BOTTOM)
         .finish();
 
+        let state_label = |label: &str, slot: Option<bool>, effective: bool| {
+            let state = match slot {
+                None => crate::t!(
+                    "settings-agent-providers-model-state-auto",
+                    value = if effective {
+                        crate::t!("settings-agent-providers-model-state-on")
+                    } else {
+                        crate::t!("settings-agent-providers-model-state-off")
+                    }
+                ),
+                Some(true) => crate::t!("settings-agent-providers-model-state-on"),
+                Some(false) => crate::t!("settings-agent-providers-model-state-off"),
+            };
+            crate::t!(
+                "settings-agent-providers-model-state-label",
+                label = label,
+                state = state.as_str()
+            )
+        };
+
+        let inferred_caps = if let Some(metadata) = model.catalog_metadata.as_ref() {
+            crate::ai::agent_providers::attachment_caps::AttachmentCaps {
+                images: metadata.image,
+                pdf: metadata.pdf,
+                audio: metadata.audio && provider.api_type != AgentProviderApiType::OpenAiResp,
+            }
+        } else {
+            crate::ai::agent_providers::attachment_caps::inferred_for_model(
+                &provider.id,
+                provider.api_type,
+                &model.id,
+            )
+        };
         let modality_chip = |label: &str,
                              slot: Option<bool>,
+                             effective: bool,
                              state: MouseStateHandle,
                              kind: ModelCapabilityKind|
          -> Box<dyn Element> {
-            // 三态视觉:Auto = 裸标签 / On = `● label` / Off = `○ label`。
-            // 沿用现有 ApiType / ReasoningEffort chip 的 `● {label}` selected 风格,
-            // Off 用空心圆 ○ 跟实心 ● 对照,Auto 不带前缀(跟未选中态一致)。
-            let chip_label = match slot {
-                None => label.to_string(),
-                Some(true) => format!("● {label}"),
-                Some(false) => format!("○ {label}"),
-            };
             Self::render_card_button_preserving_draft(
-                chip_label,
+                state_label(label, slot, effective),
                 state,
                 draft_editors.clone(),
                 AISettingsPageAction::CycleAgentProviderModelCapability {
@@ -1041,18 +1145,21 @@ impl AgentProvidersWidget {
             .with_child(modality_chip(
                 &crate::t!("settings-agent-providers-model-modality-image"),
                 model.image,
+                inferred_caps.images,
                 row.image_chip_state.clone(),
                 ModelCapabilityKind::Image,
             ))
             .with_child(modality_chip(
                 &crate::t!("settings-agent-providers-model-modality-pdf"),
                 model.pdf,
+                inferred_caps.pdf,
                 row.pdf_chip_state.clone(),
                 ModelCapabilityKind::Pdf,
             ))
             .with_child(modality_chip(
                 &crate::t!("settings-agent-providers-model-modality-audio"),
                 model.audio,
+                inferred_caps.audio,
                 row.audio_chip_state.clone(),
                 ModelCapabilityKind::Audio,
             ))
@@ -1073,17 +1180,13 @@ impl AgentProvidersWidget {
         .finish();
 
         let bool_chip = |label: &str,
-                         on: bool,
+                         slot: Option<bool>,
+                         effective: bool,
                          state: MouseStateHandle,
                          action: AISettingsPageAction|
          -> Box<dyn Element> {
-            let chip_label = if on {
-                format!("● {label}")
-            } else {
-                format!("○ {label}")
-            };
             Self::render_card_button_preserving_draft(
-                chip_label,
+                state_label(label, slot, effective),
                 state,
                 draft_editors.clone(),
                 action,
@@ -1098,6 +1201,7 @@ impl AgentProvidersWidget {
             .with_child(bool_chip(
                 &crate::t!("settings-agent-providers-model-capability-reasoning"),
                 model.reasoning,
+                model.effective_reasoning(),
                 row.reasoning_chip_state.clone(),
                 AISettingsPageAction::ToggleAgentProviderModelReasoning {
                     provider_id: provider.id.clone(),
@@ -1107,6 +1211,7 @@ impl AgentProvidersWidget {
             .with_child(bool_chip(
                 &crate::t!("settings-agent-providers-model-capability-tool-calling"),
                 model.tool_call,
+                model.effective_tool_call(),
                 row.tool_call_chip_state.clone(),
                 AISettingsPageAction::ToggleAgentProviderModelToolCall {
                     provider_id: provider.id.clone(),
@@ -1115,7 +1220,120 @@ impl AgentProvidersWidget {
             ))
             .finish();
 
-        // ---- Remove 按钮(展开后才出现,避免折叠态误删)----
+        let metadata_status = if let Some(metadata) = &model.catalog_metadata {
+            let confidence = match metadata.match_confidence {
+                crate::settings::AgentProviderModelCatalogMatch::Explicit => {
+                    crate::t!("settings-agent-providers-models-dev-match-explicit")
+                }
+                crate::settings::AgentProviderModelCatalogMatch::ProviderAndModel => {
+                    crate::t!("settings-agent-providers-models-dev-match-provider")
+                }
+                crate::settings::AgentProviderModelCatalogMatch::UniqueModelId => {
+                    crate::t!("settings-agent-providers-models-dev-match-unique")
+                }
+            };
+            let freshness = if metadata.unmatched_in_latest_catalog {
+                crate::t!("settings-agent-providers-models-dev-snapshot-unmatched")
+            } else if crate::ai::agent_providers::models_dev::snapshot_is_stale(
+                metadata.updated_at_unix_seconds,
+            ) {
+                crate::t!("settings-agent-providers-models-dev-snapshot-stale")
+            } else {
+                crate::t!("settings-agent-providers-models-dev-snapshot-current")
+            };
+            crate::t!(
+                "settings-agent-providers-models-dev-match-status",
+                provider = metadata.provider_id.as_str(),
+                model = metadata.model_id.as_str(),
+                confidence = confidence.as_str(),
+                freshness = freshness.as_str()
+            )
+        } else {
+            crate::t!("settings-agent-providers-models-dev-match-none")
+        };
+        let metadata_status = Container::new(
+            Text::new(
+                metadata_status,
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
+            )
+            .with_color(appearance.theme().disabled_ui_text_color().into())
+            .soft_wrap(true)
+            .finish(),
+        )
+        .with_margin_top(FIELD_LABEL_MARGIN_TOP)
+        .finish();
+
+        let override_hint = (model.catalog_metadata.is_some() && model.manual_override_count() > 0)
+            .then(|| {
+                Container::new(
+                    Text::new(
+                        crate::t!("settings-agent-providers-models-dev-overrides-hint"),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(appearance.theme().disabled_ui_text_color().into())
+                    .soft_wrap(true)
+                    .finish(),
+                )
+                .with_margin_top(2.)
+                .finish()
+            });
+
+        let mapping_label = Container::new(
+            Text::new(
+                crate::t!("settings-agent-providers-models-dev-mapping"),
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
+            )
+            .with_color(label_color.into())
+            .finish(),
+        )
+        .with_margin_top(FIELD_LABEL_MARGIN_TOP)
+        .with_margin_bottom(FIELD_LABEL_MARGIN_BOTTOM)
+        .finish();
+        let mapping_row = Flex::row()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(
+                Expanded::new(
+                    1.,
+                    Container::new(ChildView::new(&row.models_dev_provider_editor).finish())
+                        .with_margin_right(MODEL_ROW_GAP)
+                        .finish(),
+                )
+                .finish(),
+            )
+            .with_child(
+                Expanded::new(1., ChildView::new(&row.models_dev_model_editor).finish()).finish(),
+            )
+            .finish();
+        let mapping_hint = Container::new(
+            Text::new(
+                crate::t!("settings-agent-providers-models-dev-mapping-hint"),
+                appearance.ui_font_family(),
+                appearance.ui_font_size(),
+            )
+            .with_color(appearance.theme().disabled_ui_text_color().into())
+            .soft_wrap(true)
+            .finish(),
+        )
+        .with_margin_top(2.)
+        .finish();
+
+        // ---- 重置覆盖 / Remove 按钮(展开后才出现,避免折叠态误删)----
+        let reset_overrides_button = Self::render_card_button_preserving_draft(
+            crate::t!(
+                "settings-agent-providers-reset-model-overrides",
+                count = model.manual_override_count()
+            ),
+            row.reset_overrides_button_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ResetAgentProviderModelOverrides {
+                provider_id: provider.id.clone(),
+                model_index: index,
+            },
+            appearance,
+        );
         let remove_button = Self::render_card_button_preserving_draft(
             crate::t!("settings-agent-providers-remove-model"),
             row.remove_button_state.clone(),
@@ -1130,6 +1348,11 @@ impl AgentProvidersWidget {
         let remove_row = Container::new(
             Flex::row()
                 .with_main_axis_alignment(MainAxisAlignment::End)
+                .with_child(
+                    Container::new(reset_overrides_button)
+                        .with_margin_right(MODEL_ROW_GAP)
+                        .finish(),
+                )
                 .with_child(remove_button)
                 .finish(),
         )
@@ -1137,20 +1360,26 @@ impl AgentProvidersWidget {
         .finish();
 
         // 整体 detail panel 用一个稍内缩 + 边框样式,跟主 row 拉开层级。
-        Container::new(
-            Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                .with_child(modalities_label)
-                .with_child(modalities_row)
-                .with_child(capabilities_label)
-                .with_child(capabilities_row)
-                .with_child(remove_row)
-                .finish(),
-        )
-        .with_margin_top(4.)
-        .with_margin_left(12.)
-        .with_margin_bottom(8.)
-        .finish()
+        let mut detail_panel = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(modalities_label)
+            .with_child(modalities_row)
+            .with_child(capabilities_label)
+            .with_child(capabilities_row)
+            .with_child(metadata_status);
+        if let Some(override_hint) = override_hint {
+            detail_panel.add_child(override_hint);
+        }
+        detail_panel.add_child(mapping_label);
+        detail_panel.add_child(mapping_row);
+        detail_panel.add_child(mapping_hint);
+        detail_panel.add_child(remove_row);
+
+        Container::new(detail_panel.finish())
+            .with_margin_top(4.)
+            .with_margin_left(12.)
+            .with_margin_bottom(8.)
+            .finish()
     }
 
     fn render_provider_card(
@@ -1441,6 +1670,15 @@ impl AgentProvidersWidget {
             },
             appearance,
         );
+        let clear_models_button = Self::render_card_button_preserving_draft(
+            crate::t!("settings-agent-providers-clear-models"),
+            row.clear_models_button_state.clone(),
+            draft_editors.clone(),
+            AISettingsPageAction::ClearAgentProviderModels {
+                provider_id: provider.id.clone(),
+            },
+            appearance,
+        );
         let sync_models_dev_button = Self::render_card_button_preserving_draft(
             crate::t!("settings-agent-providers-sync-models-dev"),
             row.sync_models_dev_button_state.clone(),
@@ -1485,16 +1723,19 @@ impl AgentProvidersWidget {
             .with_main_axis_alignment(MainAxisAlignment::SpaceBetween)
             .with_cross_axis_alignment(CrossAxisAlignment::Center)
             .with_child(
-                Flex::row()
-                    .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                    .with_child(
-                        Container::new(add_model_button)
-                            .with_margin_right(8.)
-                            .finish(),
-                    )
-                    .with_child(Container::new(fetch_button).with_margin_right(8.).finish())
-                    .with_child(sync_models_dev_button)
-                    .finish(),
+                Expanded::new(
+                    1.,
+                    Wrap::row()
+                        .with_spacing(8.)
+                        .with_run_spacing(8.)
+                        .with_cross_axis_alignment(CrossAxisAlignment::Center)
+                        .with_child(add_model_button)
+                        .with_child(fetch_button)
+                        .with_child(sync_models_dev_button)
+                        .with_child(clear_models_button)
+                        .finish(),
+                )
+                .finish(),
             )
             .with_child(
                 Container::new(
@@ -1504,7 +1745,7 @@ impl AgentProvidersWidget {
                         .with_child(remove_button)
                         .finish(),
                 )
-                // 与左侧主操作组（添加模型 / 抓取 / 同步）拉开明显间隔，
+                // 与左侧主操作组（添加 / 刷新 / 元数据补全 / 清空）拉开明显间隔，
                 // 避免 SpaceBetween 在卡片宽不够时两组贴在一起。
                 .with_margin_left(16.)
                 .finish(),
@@ -1534,6 +1775,20 @@ impl AgentProvidersWidget {
                 .finish(),
         );
         content.add_child(Container::new(bottom_row).with_margin_top(10.).finish());
+        content.add_child(
+            Container::new(
+                Text::new(
+                    crate::t!("settings-agent-providers-fetch-hint"),
+                    appearance.ui_font_family(),
+                    appearance.ui_font_size(),
+                )
+                .with_color(appearance.theme().disabled_ui_text_color().into())
+                .soft_wrap(true)
+                .finish(),
+            )
+            .with_margin_top(4.)
+            .finish(),
+        );
 
         Container::new(content.finish())
             .with_background(appearance.theme().surface_1())
@@ -1638,7 +1893,7 @@ impl SettingsWidget for AgentProvidersWidget {
     type View = AISettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "agent provider providers custom openai responses compatible deepseek glm moonshot dashscope qwen ollama base url api key models save state websocket background compaction programmatic multi-agent ZDR 提供商 自定义 模型 保存 状态 后台 压缩"
+        "agent provider providers custom openai responses compatible deepseek glm moonshot dashscope qwen ollama base url api key models models.dev metadata auto override mapping reset save state websocket background compaction programmatic multi-agent ZDR 提供商 自定义 模型 元数据 自动 覆盖 映射 重置 保存 状态 后台 压缩"
     }
 
     fn render(

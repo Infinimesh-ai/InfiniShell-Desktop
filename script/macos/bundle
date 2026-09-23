@@ -522,6 +522,13 @@ elif [[ "$ARTIFACT" == app ]]; then
   FEATURES="$FEATURES,gui,nld_classifier_v3,nld_heuristic_v2"
 fi
 
+# InfiniShell OSS 桌面版只发布 Apple Silicon。x86_64 架构继续用于
+# `--artifact cli` 生成 SSH/remote-server 扩展,但不能生成桌面 App 或 universal DMG。
+if [[ "$RELEASE_CHANNEL" == "oss" && "$ARTIFACT" == "app" && "$TARGET_ARCH" != "$ARM_ARCH" ]]; then
+  echo "InfiniShell OSS macOS desktop builds require --arch $ARM_ARCH; x86_64 is supported only for --artifact cli." >&2
+  exit 1
+fi
+
 # If we're building a universal bundle for the app artifact, make sure the additional target is available.
 if [[ $UNIVERSAL_BINARY = true ]]; then
     rustup target add "$ADDITIONAL_TARGET"

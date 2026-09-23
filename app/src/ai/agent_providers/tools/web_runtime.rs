@@ -28,7 +28,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use reqwest::StatusCode;
 use reqwest::header::{ACCEPT, ACCEPT_LANGUAGE, CONTENT_LENGTH, CONTENT_TYPE, USER_AGENT};
 use reqwest::redirect::Policy;
-use serde::{Deserialize, Serialize};
+use serde::de::Error as _;
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Value, json};
 
 use super::exa;
@@ -585,14 +586,41 @@ fn unwrap_links(s: &str) -> String {
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchToolArgs {
     pub query: String,
-    #[serde(rename = "numResults", default)]
+    #[serde(
+        rename = "numResults",
+        default,
+        deserialize_with = "deserialize_optional_u32"
+    )]
     pub num_results: Option<u32>,
     #[serde(default)]
     pub livecrawl: Option<String>,
     #[serde(rename = "type", default)]
     pub search_type: Option<String>,
-    #[serde(rename = "contextMaxCharacters", default)]
+    #[serde(
+        rename = "contextMaxCharacters",
+        default,
+        deserialize_with = "deserialize_optional_u32"
+    )]
     pub context_max_characters: Option<u32>,
+}
+
+// 部分模型将整数输出为数字字符串；只在搜索参数入口兼容，保留 u32 的取值范围。
+fn deserialize_optional_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumberOrString {
+        Number(u32),
+        String(String),
+    }
+
+    match Option::<NumberOrString>::deserialize(deserializer)? {
+        Some(NumberOrString::Number(value)) => Ok(Some(value)),
+        Some(NumberOrString::String(value)) => value.parse().map(Some).map_err(D::Error::custom),
+        None => Ok(None),
+    }
 }
 
 impl SearchToolArgs {

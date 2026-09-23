@@ -85,7 +85,7 @@ fn byop_dispatch_info(
         .models
         .iter()
         .find(|m| m.id == model_id)
-        .map(|m| m.context_window)
+        .map(|m| m.effective_context_window())
         .filter(|n| *n > 0);
     let conversation_id = ai_identifiers.client_conversation_id.as_ref()?;
     let history = BlocklistAIHistoryModel::as_ref(ctx);

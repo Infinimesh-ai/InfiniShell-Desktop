@@ -380,8 +380,10 @@ WARP_DATA_PROFILE=windows-ssh-dev \
   "$dev_app/Contents/MacOS/infinishell"
 ```
 
-Intel Mac 把 target 改为 `x86_64-apple-darwin`。`fast_dev` 跳过登录流程;
-`WARP_DATA_PROFILE` 隔离开发设置和状态。
+InfiniShell 桌面客户端只支持 Apple Silicon；不要把客户端 target 改为
+`x86_64-apple-darwin`。该 target 仅用于 `--artifact cli` 构建 Intel Mac 的
+SSH/remote-server 扩展。`fast_dev` 跳过登录流程；`WARP_DATA_PROFILE` 隔离开发
+设置和状态。
 
 后续只改客户端 Rust 代码时,复用 `.app` 壳并替换二进制即可:
 
