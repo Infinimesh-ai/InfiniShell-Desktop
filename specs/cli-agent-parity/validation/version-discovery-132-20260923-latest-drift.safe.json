@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "scope": "official_latest_cli_version_discovery_and_codex_zero_input_preflight",
+  "checked_at_utc": "2026-09-23T13:37:09Z",
+  "repository_source_observed": "e096882034479bbffbea00d5fd30531238ccb795",
+  "codex": {
+    "official_release_url": "https://github.com/openai/codex/releases/tag/rust-v0.156.1",
+    "tag": "rust-v0.156.1",
+    "release_published_at_utc": "2026-09-23T02:41:36Z",
+    "draft": false,
+    "prerelease": false,
+    "tag_commit": "b412ff32c417f855c2b2d1581b77058eed87c84b",
+    "macos_arm64_full_package_bytes": 127394863,
+    "macos_arm64_full_package_sha256": "fea42f9625091f011e38f059da974d52e57ba31831648bb1c7f0b1a385fde547",
+    "macos_arm64_binary_bytes": 238138912,
+    "macos_arm64_binary_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+    "strict_codesign_verified": true,
+    "isolated_internal_version_output": "codex-cli 0.156.1",
+    "isolated_no_credential_app_server_initialize_result": true,
+    "initialize_reported_01561": true,
+    "initialized_then_eof_exit_code": 0,
+    "model_inputs_sent": 0,
+    "isolated_home_removed": true,
+    "currently_installed_development_cli": "codex-cli 0.155.1",
+    "product_01561_version_gate_open": false
+  },
+  "claude": {
+    "official_latest_endpoint": "https://downloads.claude.ai/claude-code-releases/latest",
+    "latest": "2.1.280",
+    "official_npm_package": "@anthropic-ai/claude-code",
+    "npm_latest_dist_tag": "2.1.280",
+    "npm_stable_dist_tag": "2.1.267",
+    "official_manifest_bytes": 2161,
+    "official_manifest_sha256": "6d9840c779f76b2a7e974aa3476be24d1ea477f5dc96abd0096be28a58cb7120",
+    "release_commit": "80abbfe7d7232280011ff01a21ae3338f4c6e372",
+    "macos_arm64_binary_bytes": 217254576,
+    "macos_arm64_binary_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+    "strict_codesign_verified": true,
+    "isolated_internal_version_output": "2.1.280 (Claude Code)",
+    "isolated_internal_help_exit_code": 0,
+    "isolated_internal_help_sha256": "23937937c79878eb95be2a6676d46730328adc03413f4a50f1b6d1852e7d52f3",
+    "model_inputs_sent": 0,
+    "currently_installed_development_cli": "2.1.267 (Claude Code)",
+    "product_21280_version_gate_open": false
+  },
+  "grok": {
+    "official_cli_update_check_in_isolated_home": true,
+    "stable_version_reported": "1.0.41",
+    "installed_version": "grok 1.0.41 (4220f3b224a6)",
+    "isolated_auth_created": false,
+    "product_1041_version_gate_open": false
+  },
+  "boundaries": {
+    "version_discovery_is_product_lifecycle_verification": false,
+    "codex_no_model_handshake_is_managed_turn_verification": false,
+    "latest_versions_frozen_for_final_acceptance": false,
+    "full_cli_parity_acceptance_passed": false
+  }
+}

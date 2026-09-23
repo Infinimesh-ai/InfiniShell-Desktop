@@ -3,6 +3,7 @@
 ## 1. 阶段结论
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
+- [receipt132](validation/version-discovery-132-20260923-latest-drift.safe.json) 在 2026-09-23 13:37 UTC 发现最新版目标漂移：OpenAI 官方稳定发布 Codex `0.156.1`，Claude 官方 latest 为 `2.1.280`，Grok stable 隔离更新查询仍为 `1.0.41`。官方 Codex macOS arm64 完整包摘要、严格签名、内置盘版本与无凭据零输入 app-server initialize／EOF 已核对；正式 `0.156.1` 和 Claude `2.1.280` 产品门禁尚未开放。此前 `0.155.1`／`2.1.278` 实链保留为旧版本基线，最终最新版验收必须在新版本和最终源码 SHA 独立重做。
 - 2026-09-23 历史失败：[receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json) 已结算 `645e8b4f…` 的 run 35827672098：Linux 28 成功／1 失败／7 跳过，Grok 原生通知 hook 夹具发生 5 秒超时和一次通知缺失；Windows 44 成功／1 失败／3 跳过，两个严格 Job 原子调试测试每项重试三次，均在已挂起进程等待首事件时超时。六份 artifact／31 个文件在仓库外核验，无符号链接、JSON／NDJSON 解析错误或常见凭据／邮箱模式命中。后续结果见 receipt120，`ManualOnly` 不变。
 - 固定官方 Grok `1.0.41` 的 [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json) 在 macOS arm64 隔离环境通过一次原生 ACP 零输入 initialize／authenticate／session/new 和 EOF 退出；首次试验因 CLI 自身 marketplace 初始化改变私有配置而严格审计失败，第二次仅按已审核的 marketplace 例外通过。没有模型输入、业务工具、产品托管链或跨平台结论，正式门禁继续关闭。安装版通知 worker 的本机复制产物首次协议启动耗时约 6.9 秒，超过 hook 的 500 毫秒协议预算；显式冷启动预检后的同一测试组为 15 通过／2 环境跳过。这只证明已就绪路径，冷启动产品投递仍待单独闭环。
 - [receipt117](validation/macos-clean-commit-117-grok-1041-zero-input-p0.safe.json) 将相同官方 `1.0.41` 零输入 ACP 探针在干净提交 `84a174f9ecf142c286fc97d3f17664d232dce1c9` 上重跑通过：0 模型输入、0 业务工具、原生 EOF 退出 0、认证副本与隧道清理。仍只有 P0 候选范围，不把不同提交的结果拼作总验收。

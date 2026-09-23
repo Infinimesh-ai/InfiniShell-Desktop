@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""准备显式选择的官方固定 Claude 文件；默认最新正式版，不安装或改写已有 CLI。"""
+"""准备显式选择的官方固定 Claude 文件；默认当前运行时基线，不安装或改写已有 CLI。"""
 
 import argparse
 import hashlib
@@ -44,6 +44,17 @@ RELEASE_CATALOG = {
             "win32-x64": ("claude.exe", 237232800, "006ea5c8638f67f10a5ae66bb232fd267c9f6af294e3f03f4cfcf1fd3f2cced8"),
             "darwin-arm64": ("claude", 217695408, "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"),
             "darwin-x64": ("claude", 226521952, "c522425e3d42275d2ac2238757ef8ba7f80d165a934044ec5a7a5fd7d7b9950b"),
+        },
+    },
+    "2.1.280": {
+        "commit": "80abbfe7d7232280011ff01a21ae3338f4c6e372",
+        "manifest_sha256": "6d9840c779f76b2a7e974aa3476be24d1ea477f5dc96abd0096be28a58cb7120",
+        "manifest_size": 2161,
+        "platforms": {
+            "linux-x64": ("claude", 233709640, "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b"),
+            "win32-x64": ("claude.exe", 237100192, "0e4195524b73eb77efbdf3e2b36de5322a29f0ca575dfd2d9b4f946b1d425469"),
+            "darwin-arm64": ("claude", 217254576, "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d"),
+            "darwin-x64": ("claude", 225565024, "c1d32d87630482250633208ab77855429b24010ae3086a7ff7539b57b93168d4"),
         },
     },
 }
@@ -211,7 +222,7 @@ def fetch(url, destination, expected_size, expected_sha256, executable=False, ve
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--claude-version", choices=tuple(RELEASE_CATALOG), default=DEFAULT_VERSION,
-                        help=f"精确官方版本；缺省使用最新正式版 {DEFAULT_VERSION}")
+                        help=f"精确官方版本；缺省使用当前运行时基线 {DEFAULT_VERSION}")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--download-dir", type=Path, help="RUNNER_TEMP 内的专用下载目录")
     group.add_argument("--private-directory", type=Path, help="显式指定源树外的新私有目录；已有目录必须带本准备器标记")

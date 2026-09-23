@@ -28,7 +28,7 @@ class FixedClaudeInputsTests(unittest.TestCase):
             self.assertEqual(manifest["platforms"][platform], {"binary": name, "size": size, "checksum": checksum})
 
     def test_explicit_versions_match_their_own_archived_official_manifest(self):
-        self.assertEqual(tuple(prepare.RELEASE_CATALOG), ("2.1.273", "2.1.278"))
+        self.assertEqual(tuple(prepare.RELEASE_CATALOG), ("2.1.273", "2.1.278", "2.1.280"))
         self.assertEqual(VERSION, "2.1.273")
         for version, contract in prepare.RELEASE_CATALOG.items():
             with self.subTest(version=version):
@@ -41,7 +41,7 @@ class FixedClaudeInputsTests(unittest.TestCase):
                 for target, (name, size, checksum) in contract["platforms"].items():
                     self.assertEqual(manifest["platforms"][target], {"binary": name, "size": size, "checksum": checksum})
 
-    def test_main_defaults_to_the_latest_verified_release(self):
+    def test_main_defaults_to_the_current_runtime_baseline(self):
         argv = ["prepare_claude_cli.py", "--private-directory", "/not-used"]
         with mock.patch.object(prepare.sys, "argv", argv), \
                 mock.patch.object(prepare, "release_contract", side_effect=RuntimeError("stop")) as contract, \
@@ -55,12 +55,12 @@ class FixedClaudeInputsTests(unittest.TestCase):
             path = Path(temporary) / "claude"
             contracts = {version: {"platforms": {"darwin-arm64": (
                 "claude", len(version), hashlib.sha256(version.encode()).hexdigest())}}
-                for version in ("2.1.273", "2.1.278")}
+                for version in ("2.1.273", "2.1.278", "2.1.280")}
             with mock.patch.dict(prepare.RELEASE_CATALOG, contracts):
                 for version in contracts:
                     path.write_bytes(version.encode())
                     self.assertIn(f"/{version}/", prepare.verify_binary(path, "darwin-arm64", version)["url"])
-                    other = "2.1.278" if version == "2.1.273" else "2.1.273"
+                    other = "2.1.273" if version != "2.1.273" else "2.1.280"
                     with self.assertRaises(ValueError):
                         prepare.verify_binary(path, "darwin-arm64", other)
                     path.write_bytes(version.encode() + b"extra")
@@ -75,12 +75,12 @@ class FixedClaudeInputsTests(unittest.TestCase):
             root = Path(temporary)
             with mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "synthetic-secret"}), \
                     mock.patch.object(prepare.subprocess, "run") as run:
-                for expected in ("2.1.273", "2.1.278"):
+                for expected in ("2.1.273", "2.1.278", "2.1.280"):
                     run.return_value = SimpleNamespace(stdout=f"{expected} (Claude Code)\n")
                     self.assertEqual(prepare.verify_version(root / "claude", root, expected),
                                      f"{expected} (Claude Code)")
                     self.assertNotIn("ANTHROPIC_API_KEY", run.call_args.kwargs["env"])
-                    other = "2.1.278" if expected == "2.1.273" else "2.1.273"
+                    other = "2.1.273" if expected != "2.1.273" else "2.1.280"
                     with self.assertRaises(ValueError):
                         prepare.verify_version(root / "claude", root, other)
                 run.reset_mock()

@@ -67,9 +67,9 @@ class RuntimeExtractionTests(unittest.TestCase):
     def extract(self, version=prepare.CODEX_VERSION):
         return prepare.extract_runtime_package(self.archive, self.destination, self.target, version)
 
-    def latest_fixture(self, target):
+    def latest_fixture(self, target, version="0.155.1"):
         self.target = target
-        self.package = deepcopy(prepare.packages_for_version("0.155.1")[target])
+        self.package = deepcopy(prepare.packages_for_version(version)[target])
         self.bodies = {name: (json.dumps(self.package["metadata"]).encode()
                              if name == "codex-package.json" else ("fixture:" + name).encode())
                        for name in self.package["files"]}
@@ -416,7 +416,51 @@ class RuntimeExtractionTests(unittest.TestCase):
                 self.extract("0.155.1")
             self.assertEqual(resource.read_bytes(), b"preserve user change")
 
-    def test_main_defaults_to_latest_and_keeps_legacy_archive(self):
+    def test_optional_01561_windows_voice_runtime_is_complete_and_tampering_is_rejected(self):
+        for target in ("windows-x64", "windows-arm64"):
+            with self.subTest(target=target):
+                self.latest_fixture(target, "0.156.1")
+                self.destination = self.root / target
+                with patch.dict(prepare.packages_for_version("0.156.1"), {target: self.package}):
+                    self.assertEqual(self.extract("0.156.1"),
+                                     self.destination / self.package["entrypoint"])
+                    voice = self.destination / "codex-resources/voice/bin/codex-voice-host.exe"
+                    self.assertTrue(voice.is_file())
+                    voice.write_bytes(b"modified voice runtime")
+                    with self.assertRaisesRegex(ValueError, "大小或摘要不匹配"):
+                        self.extract("0.156.1")
+                    self.assertEqual(voice.read_bytes(), b"modified voice runtime")
+
+    def test_optional_01561_four_platforms_use_explicit_version_cache(self):
+        for platform_name, machine, target in (("linux", "x86_64", "linux-x64"),
+                                               ("win32", "AMD64", "windows-x64"),
+                                               ("win32", "ARM64", "windows-arm64"),
+                                               ("darwin", "arm64", "macos-arm64")):
+            with self.subTest(target=target):
+                self.latest_fixture(target, "0.156.1")
+                download = self.root / target
+
+                def fetch(url, destination, digest, size):
+                    self.assertEqual(url, f"https://github.com/openai/codex/releases/download/rust-v0.156.1/{self.package['archive']}")
+                    self.assertEqual(destination.name, "0.156.1-" + self.package["archive"])
+                    self.assertEqual((digest, size), (self.package["sha256"], self.package["bytes"]))
+                    shutil.copyfile(self.archive, destination)
+
+                stdout = io.StringIO()
+                with patch.dict(prepare.packages_for_version("0.156.1"), {target: self.package}), \
+                        patch.object(prepare.sys, "platform", platform_name), \
+                        patch.object(prepare.platform, "machine", return_value=machine), \
+                        patch.dict(os.environ, {"RUNNER_TEMP": str(self.root)}, clear=True), \
+                        patch.object(sys, "argv", ["prepare_codex_cli.py", "--version", "0.156.1",
+                                                "--download-dir", str(download)]), \
+                        patch.object(prepare, "fetch_file", side_effect=fetch), \
+                        patch.object(prepare, "verified_version") as version, redirect_stdout(stdout):
+                    prepare.main()
+                executable = download / f"runtime-0.156.1-{target}" / self.package["entrypoint"]
+                self.assertEqual(stdout.getvalue(), f"{executable}\n")
+                version.assert_called_once_with(executable, self.root, "0.156.1")
+
+    def test_main_keeps_01551_default_and_legacy_archive(self):
         for platform_name, machine, target in (("linux", "x86_64", "linux-x64"),
                                                ("win32", "AMD64", "windows-x64"),
                                                ("win32", "ARM64", "windows-arm64"),
@@ -499,6 +543,7 @@ class FixedRuntimeVersionTests(unittest.TestCase):
 
 class LatestRuntimeVersionTests(unittest.TestCase):
     def test_release_contracts_bind_version_tag_commit_and_cli_output(self):
+        self.assertEqual(prepare.DEFAULT_VERSION, "0.155.1")
         self.assertEqual(prepare.release_contract("0.147.0"), {
             "version": "0.147.0", "tag": "rust-v0.147.0",
             "commit": "be6e8eac029b183056b7e4402879f15d2c85f61b", "cli": "codex-cli 0.147.0",
@@ -509,6 +554,10 @@ class LatestRuntimeVersionTests(unittest.TestCase):
         })
         self.assertEqual(prepare.require_cli_version("codex-cli 0.155.1", "0.155.1")["commit"],
                          "be2951ea34f0d295ed0becf97079f92fa5f6950e")
+        self.assertEqual(prepare.release_contract("0.156.1"), {
+            "version": "0.156.1", "tag": "rust-v0.156.1",
+            "commit": "b412ff32c417f855c2b2d1581b77058eed87c84b", "cli": "codex-cli 0.156.1",
+        })
         with self.assertRaisesRegex(ValueError, "CLI 版本"):
             prepare.require_cli_version("codex-cli 0.147.0", "0.155.1")
 
@@ -539,6 +588,15 @@ class LatestRuntimeVersionTests(unittest.TestCase):
                 self.assertEqual(package["metadata"]["version"], "0.155.1")
                 self.assertEqual(package["metadata"]["target"], package["target"])
 
+        candidate = prepare.packages_for_version("0.156.1")
+        self.assertEqual({key: len(value["files"]) + len(value["directories"])
+                          for key, value in candidate.items()},
+                         {"linux-x64": 54, "windows-x64": 51, "windows-arm64": 51, "macos-arm64": 52})
+        for package in candidate.values():
+            with self.subTest(target=package["target"]):
+                self.assertEqual(prepare.expected_metadata(package, "0.156.1"), package["metadata"])
+                self.assertEqual(package["metadata"]["version"], "0.156.1")
+
     def test_unknown_version_is_rejected_before_file_or_process_access(self):
         with patch.object(prepare, "regular_file") as regular, patch.object(prepare.subprocess, "run") as run:
             with self.assertRaises(ValueError):
@@ -552,8 +610,9 @@ class LatestRuntimeVersionTests(unittest.TestCase):
         prepare.packages_for_version.cache_clear()
         try:
             with patch.object(prepare, "sha256", return_value="0" * 64):
-                with self.assertRaisesRegex(ValueError, "清单大小或摘要"):
-                    prepare.packages_for_version("0.155.1")
+                for version in ("0.155.1", "0.156.1"):
+                    with self.subTest(version=version), self.assertRaisesRegex(ValueError, "清单大小或摘要"):
+                        prepare.packages_for_version(version)
         finally:
             prepare.packages_for_version.cache_clear()
 
@@ -613,6 +672,23 @@ class LatestPackageDownloadTests(unittest.TestCase):
         self.assertEqual(self.destination.read_bytes(), self.body)
         self.assertEqual(self.destination.stat().st_nlink, 1)
         self.assertEqual(list(self.root.iterdir()), [self.destination])
+
+    def test_optional_01561_download_requires_its_own_fixed_asset_identity(self):
+        package = deepcopy(prepare.packages_for_version("0.156.1")["linux-x64"])
+        package["sha256"] = hashlib.sha256(self.body).hexdigest()
+        package["bytes"] = len(self.body)
+        url = f"https://github.com/openai/codex/releases/download/rust-v0.156.1/{package['archive']}"
+        destination = self.root / "0.156.1-package.tar.gz"
+        with patch.dict(prepare.packages_for_version("0.156.1"), {"linux-x64": package}), \
+                patch.object(prepare.urllib.request, "urlopen", return_value=self.response(self.body)) as request:
+            prepare.fetch_file(url, destination, package["sha256"], package["bytes"])
+            request.assert_called_once()
+            for digest, size in (("0" * 64, package["bytes"]),
+                                 (package["sha256"], package["bytes"] + 1)):
+                with self.assertRaises(ValueError):
+                    prepare.fetch_file(url, self.root / "rejected.tar.gz", digest, size)
+        self.assertEqual(destination.read_bytes(), self.body)
+        self.assertFalse((self.root / "rejected.tar.gz").exists())
 
     def test_transient_network_failure_retries_with_a_fresh_temporary_file(self):
         with patch.object(prepare.urllib.request, "urlopen",

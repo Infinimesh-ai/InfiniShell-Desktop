@@ -2,6 +2,8 @@
 
 ## 范围与当前状态
 
+2026-09-23 13:37 UTC 最新复核见 [receipt132](validation/version-discovery-132-20260923-latest-drift.safe.json)：Codex 官方稳定版已发布 `0.156.1`，Claude 官方 latest 为 `2.1.280`，Grok stable 隔离查询仍为 `1.0.41`。下文 `0.155.1`／`2.1.278` 版本与渠道表保留为 2026-09-21 历史快照；新版 Codex 仅通过零输入协议预检，新版 Claude 尚无产品实链，最终自动升级与 P0–P5 不得沿用旧版结论。
+
 2026-09-19 用户明确要求在当前 P0–P5 Goal 内增加 Codex CLI、Claude Code、Grok Build 自动升级，消费者与开发环境均跟进最新版。历史 source43–56 的真实升级、渠道与 Claude 链按各自快照保留；当前工作树进一步实现结构化 LaunchBinding、binding digest、事务 sidecar，以及 macOS 签名私有快照、Linux sealed memfd＋`execveat`、Windows replacement lease／挂起启动。macOS 快照已修复扩展属性逐字节镜像，当前同源产品用例真实完成 Claude `2.1.267`→`2.1.278` 与 Grok `1.0.34`→`1.0.40`；两者均只调用一次 execute、没有模型输入或凭据、配置及旧／参考二进制保持。此前不安全祖先拒绝、xattr 失败和 Grok inspect 网络失败继续保留。Codex 当前产品目标、Linux 实际执行、Windows 真实依赖闭包、三款渠道切换及事务恢复仍未全部通过，因此消费者自动升级总体未完成。当前边界见 [receipt100](validation/macos-working-tree-100-auth-autoupdate-live.safe.json) 与 [receipt99](validation/macos-working-tree-99-atomic-update-current.safe.json)，Runtime Host 与来源门禁见 [receipt98](validation/macos-working-tree-98-current-runtime-binding-gates.safe.json)，历史候选边界见[原验证记录](OFFICIAL_42_AUTOUPDATE_VERIFICATION.md)。
 
 2026-09-21 Windows 实机补验进一步证明当前挂起调试候选不能发布：cwd 句柄不能阻止叶目录改名，调试事件链不能可靠退出，Claude／Grok 在 debugger 被终止后曾保留根进程，三款真实 updater 参数均没有原生退出收据。因此 Windows 产品入口与三款来源继续在事务副作用前 `ManualOnly`，详见 [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)。[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 后续确认 receipt104 的 Codex `0.155.1` 资产漂移是误与 legacy `0.147.0` 清单比较；版本选择后的仓内清单与当前 GitHub API digest 一致，无需改产品摘要。这一纠正不改变 cwd 路径绑定、debug tree 终止、Job 清理和原生退出收据的实际缺口；这些条件完成前仍不能开放。

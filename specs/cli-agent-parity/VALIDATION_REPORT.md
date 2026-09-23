@@ -4,6 +4,7 @@
 
 ## receipt115–128 后续增量（2026-09-23）
 
+- [receipt132](validation/version-discovery-132-20260923-latest-drift.safe.json)：2026-09-23 13:37 UTC 的官方来源核对显示 Codex 稳定版已为 `0.156.1`、Claude latest 为 `2.1.280`，隔离 Grok stable 查询仍为 `1.0.41`。官方 Codex macOS arm64 完整包摘要与签名、内置盘 `--version` 和无凭据零输入 app-server initialize／EOF 通过；Claude 官方 manifest 与二进制摘要、严格签名及内置盘 `--version`／`--help` 通过。两款新版仅新增显式可选的固定包准备支持，现有默认版本与正式运行时门禁不变；Codex 准备器 51／51、Claude 准备器 12／12、`cargo check -p warp` 通过。预检没有任何模型输入，不是新版产品任务、审批、取消或自动升级验收。旧版实链继续按原 SHA 保留，最终目标需更新；无用户可见文案变化，无需本地化变更。
 - [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098 精确绑定 `645e8b4f…`，Linux／Windows 两 job 均失败。Linux 原生 Grok hook 测试 17 项中 13 通过、2 错误、2 跳过：一次 Node subprocess 超过夹具的 5 秒，一次真实 main 缺少通知；原始日志未证明共同原因。Windows 两个严格 Job 调试测试各重试三次，都在挂起根进程后等待首个调试事件时超过外层 30 秒，未取得根映像或完整原生退出结论。六个 artifact／31 文件已在仓库外做无符号链接、JSON／NDJSON 与常见敏感模式核验；两台 runner 结算后在线空闲。当前 Windows 顺序／有界等待修复尚未由本收据测试。
 - [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：固定 Grok `1.0.41 (4220f3b224a6)` 在 macOS arm64 的第一次原生零输入尝试因官方 marketplace 初始化改变私有配置而按严格字节审计失败；第二次使用既有精确例外后，通过 initialize、cached-token authenticate、session/new 与 EOF 退出，0 模型输入、0 业务工具，隔离认证副本、隧道及根目录清理完成。离线 runner 4／4。没有测量解密后的 HTTP 模型请求，也没有验证产品托管、审批、取消、恢复、GUI 或其他平台。
 - 本机安装版 Grok hook 诊断：复制后的 worker 首次协议启动约 6.9 秒，超出 hook 500 毫秒协议探测预算；显式冷启动预检后原生终端测试 15 通过／2 环境跳过。夹具只记录已就绪路径通过，不把预热当作产品冷启动投递成功。新增代码与夹具无用户可见文案变动，无需本地化资源变更。

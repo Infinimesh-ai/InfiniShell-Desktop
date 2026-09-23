@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""在 RUNNER_TEMP 中准备固定完整运行包；默认 Codex 最新正式版 0.155.1。"""
+"""在 RUNNER_TEMP 中准备固定完整运行包；默认 0.155.1，0.156.1 需显式选择。"""
 
 import argparse
 import hashlib
@@ -92,10 +92,14 @@ PACKAGES = {
 RELEASES = {
     CODEX_VERSION: {"tag": f"rust-v{CODEX_VERSION}", "commit": CODEX_COMMIT},
     "0.155.1": {"tag": "rust-v0.155.1", "commit": "be2951ea34f0d295ed0becf97079f92fa5f6950e"},
+    "0.156.1": {"tag": "rust-v0.156.1", "commit": "b412ff32c417f855c2b2d1581b77058eed87c84b"},
 }
 SUPPORTED_VERSIONS = tuple(RELEASES)
 DEFAULT_VERSION = "0.155.1"
-LATEST_MANIFEST_SHA256 = "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc"
+MANIFESTS = {
+    "0.155.1": ("codex_0155_package_manifest.json", "cda8cf440c9a4431277fd901e936a6dc1fa893a1ae3a9f9ca8a0d67e2dc71bbc"),
+    "0.156.1": ("codex_0156_package_manifest.json", "1310362f3beb9c051e8ca5add122ea2624e7465139d271a64b1b1cee148e845a"),
+}
 MAX_MEMBERS = 54
 MAX_FILE_BYTES = 512 * 1024 * 1024
 MAX_TOTAL_BYTES = 512 * 1024 * 1024
@@ -116,14 +120,15 @@ def require_cli_version(output, version):
     return contract
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=3)
 def packages_for_version(version):
     if version == CODEX_VERSION:
         return PACKAGES
-    require(version == "0.155.1", "没有此版本的固定官方完整包清单")
-    manifest = Path(__file__).with_name("codex_0155_package_manifest.json")
+    require(version in MANIFESTS, "没有此版本的固定官方完整包清单")
+    name, digest = MANIFESTS[version]
+    manifest = Path(__file__).with_name(name)
     require(regular_file(manifest).stat().st_size <= 64 * 1024 and
-            sha256(manifest) == LATEST_MANIFEST_SHA256, "新版固定包清单大小或摘要不匹配")
+            sha256(manifest) == digest, "新版固定包清单大小或摘要不匹配")
     data = json.loads(manifest.read_text(encoding="utf-8"))
     require(data["version"] == version and data["release_tag"] == f"rust-v{version}" and
             set(data["packages"]) == {"linux-x64", "windows-x64", "windows-arm64", "macos-arm64"},
@@ -135,8 +140,11 @@ def fetch_file(url, destination, digest, size=None):
     if url.startswith(f"https://github.com/openai/codex/releases/download/rust-v{CODEX_VERSION}/"):
         return fetch_legacy_file(url, destination, digest, size)
     # 新版只接受随准备器固定的完整包三元组，不放宽旧 hook 下载器的发布范围。
-    packages = packages_for_version("0.155.1").values()
-    require(any(url == f"https://github.com/openai/codex/releases/download/rust-v0.155.1/{p['archive']}" and
+    version = next((version for version in MANIFESTS if url.startswith(
+        f"https://github.com/openai/codex/releases/download/rust-v{version}/")), None)
+    require(version is not None, "只允许固定新版官方完整包的 URL、大小和摘要")
+    packages = packages_for_version(version).values()
+    require(any(url == f"https://github.com/openai/codex/releases/download/rust-v{version}/{p['archive']}" and
                 digest == p["sha256"] and size == p["bytes"] for p in packages),
             "只允许固定新版官方完整包的 URL、大小和摘要")
     if destination.exists() or destination.is_symlink():
@@ -216,7 +224,7 @@ def check_parent_chain(path):
 
 def expected_metadata(package, version=CODEX_VERSION):
     if version != CODEX_VERSION:
-        require(version == "0.155.1", "没有此版本的固定布局元数据")
+        require(version in MANIFESTS, "没有此版本的固定布局元数据")
         metadata = package["metadata"]
         require(metadata["version"] == version and metadata["target"] == package["target"] and
                 metadata["entrypoint"] == package["entrypoint"], "所选版本与固定布局元数据不匹配")
@@ -373,11 +381,11 @@ def main():
     elif sys.platform == "win32":
         require(architecture in ("x86_64", "aarch64"), "当前 Windows 架构没有固定官方摘要")
         target = "windows-x64" if architecture == "x86_64" else "windows-arm64"
-    elif sys.platform == "darwin" and args.version == "0.155.1":
+    elif sys.platform == "darwin" and args.version in MANIFESTS:
         require(architecture == "aarch64", "当前仅核实新版 macOS ARM64 官方完整包")
         target = "macos-arm64"
     else:
-        parser.error("此版本或平台没有固定完整包；macOS 仅支持显式选择 0.155.1 ARM64")
+        parser.error("此版本或平台没有固定完整包；macOS 仅支持 0.155.1 或 0.156.1 ARM64")
     require("RUNNER_TEMP" in os.environ, "必须显式提供 RUNNER_TEMP")
     runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve(strict=True)
     repository = Path(__file__).resolve().parents[2]
