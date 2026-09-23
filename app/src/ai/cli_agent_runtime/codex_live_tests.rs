@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 use std::env;
+#[cfg(target_os = "macos")]
+use std::ffi::OsStr;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -783,13 +785,13 @@ fn running_tool_tree(marker: &Path, python: &Path) -> Result<Option<ToolTree>, S
     if bytes.len() > 128 {
         return Err("工具进程标记超出固定大小".into());
     }
-    let marker: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
-    let parent = marker["parent"]
+    let marker_value: Value = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    let parent = marker_value["parent"]
         .as_u64()
         .and_then(|pid| u32::try_from(pid).ok())
         .filter(|pid| *pid > 0)
         .ok_or("工具父进程标记无效")?;
-    let leaf = marker["leaf"]
+    let leaf = marker_value["leaf"]
         .as_u64()
         .and_then(|pid| u32::try_from(pid).ok())
         .filter(|pid| *pid > 0 && *pid != parent)
@@ -800,21 +802,51 @@ fn running_tool_tree(marker: &Path, python: &Path) -> Result<Option<ToolTree>, S
     system.refresh_processes_specifics(
         ProcessesToUpdate::Some(&[parent_pid, leaf_pid]),
         true,
-        ProcessRefreshKind::nothing().with_exe(UpdateKind::Always),
+        ProcessRefreshKind::nothing()
+            .with_exe(UpdateKind::Always)
+            .with_cmd(UpdateKind::Always),
     );
     let expected = python.canonicalize().map_err(|error| error.to_string())?;
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
+    let mut expected_executables = vec![expected.clone()];
+    #[cfg(target_os = "macos")]
+    if let Some(version) = expected.parent().and_then(Path::parent)
+        && version.parent().and_then(Path::file_name) == Some(OsStr::new("Versions"))
+        && version
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::file_name)
+            == Some(OsStr::new("Python.framework"))
+        && let Ok(app_executable) = version
+            .join("Resources/Python.app/Contents/MacOS/Python")
+            .canonicalize()
+    {
+        expected_executables.push(app_executable);
+    }
     let Some(parent_process) = system.process(parent_pid) else {
         return Ok(None);
     };
     let Some(leaf_process) = system.process(leaf_pid) else {
         return Ok(None);
     };
-    if leaf_process.parent() != Some(parent_pid)
-        || parent_process
+    let script_matches = |process: &sysinfo::Process, name| {
+        let script = marker.parent().expect("marker has parent").join(name);
+        process
+            .cmd()
+            .iter()
+            .any(|arg| Path::new(arg).canonicalize().ok().as_deref() == Some(script.as_path()))
+    };
+    let executable_matches = |process: &sysinfo::Process| {
+        process
             .exe()
             .and_then(|path| path.canonicalize().ok())
-            != Some(expected.clone())
-        || leaf_process.exe().and_then(|path| path.canonicalize().ok()) != Some(expected)
+            .is_some_and(|path| expected_executables.contains(&path))
+    };
+    if leaf_process.parent() != Some(parent_pid)
+        || !executable_matches(parent_process)
+        || !executable_matches(leaf_process)
+        || !script_matches(parent_process, "cancel-parent.py")
+        || !script_matches(leaf_process, "cancel-leaf.py")
     {
         return Err("固定工具进程树身份不匹配".into());
     }
@@ -822,6 +854,15 @@ fn running_tool_tree(marker: &Path, python: &Path) -> Result<Option<ToolTree>, S
         parent: (parent_pid, parent_process.start_time()),
         leaf: (leaf_pid, leaf_process.start_time()),
     }))
+}
+
+#[test]
+#[cfg(unix)]
+#[ignore = "需要显式传入本机无模型 Python 父子进程标记"]
+fn live_python_parent_child_identity_fixture() {
+    let marker = PathBuf::from(env::var_os("INFINISHELL_CODEX_TREE_MARKER").unwrap());
+    let python = PathBuf::from(env::var_os("INFINISHELL_CODEX_LIVE_PYTHON").unwrap());
+    assert!(running_tool_tree(&marker, &python).unwrap().is_some());
 }
 
 fn tool_tree_has_zero_residual(tree: ToolTree) -> bool {

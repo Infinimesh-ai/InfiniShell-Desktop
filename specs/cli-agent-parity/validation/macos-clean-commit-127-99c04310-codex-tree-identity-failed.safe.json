@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "scope": "macos_clean_commit_codex_running_tool_cancel_tree_identity_failure",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "sha": "99c04310267c65f231402399ebfab1a8a6aca58e",
+    "local_remote_sha_matched_before_execution": true,
+    "working_tree_clean_at_execution": true,
+    "platform": "macos-arm64"
+  },
+  "built_from_source": {
+    "internal_system_temp_libtest_sha256": "39aeab511434c91aa94339b8a96e036eb7bab1cc26630d36c8e682d39de8f6fe",
+    "signed_supervisor_sha256": "6daf2cca1e8b3b45c9915fc2f193233c61647aa186faf4404bae00f85d351d88",
+    "libtest_and_supervisor_codesign_strict_verified": true
+  },
+  "supervisor_no_model_preflight": {
+    "same_internal_libtest_and_supervisor": true,
+    "cases_passed": 2,
+    "cases_total": 2,
+    "private_receipt_sha256": "01963544f6ed7d0463d120e839ea5981755bf08de72f4ca3830061889c204b57"
+  },
+  "codex_01551_running_tool_cancel": {
+    "official_version": "codex-cli 0.155.1",
+    "official_binary_sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+    "real_rust_adapter_used": true,
+    "model_case_attempted": true,
+    "runner_exit_code": 1,
+    "libtest_exit_code": 101,
+    "native_submit_ack_recorded": true,
+    "same_turn_progress_matched_exact_fixed_shell_wrapper": true,
+    "fixed_command_completed_before_failure": false,
+    "fixed_command_approval_requested_and_allowed": true,
+    "tool_tree_identity_check_failed": true,
+    "tool_tree_identity_failure_subcategory_recorded": false,
+    "interrupt_sent_recorded": false,
+    "native_terminal_outcome_recorded": false,
+    "harness_fallback_kill_attempted": false,
+    "harness_residual_audit_zero": true,
+    "product_running_tool_cancel_passed": false,
+    "receipt_92_failure_replaced": false,
+    "private_safe_projection_sha256": "8cea964aa738191adadf77186b21262712cbb3de0abf181bede0dd5afc04ae2c",
+    "private_runner_metadata_sha256": "a22a3a49098f277b8bd03c3e3c41f6090b16b2b14f9feb2fd3e42424bfc619ec"
+  },
+  "boundaries": {
+    "raw_native_frames_or_credential_values_copied_to_repository": false,
+    "private_outputs_only_outside_repository": true,
+    "exact_tree_identity_failure_cause_confirmed": false,
+    "three_cli_atomic_upgrade_verified": false,
+    "gui_or_ssh_tmux_verified": false,
+    "full_workspace_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  }
+}
