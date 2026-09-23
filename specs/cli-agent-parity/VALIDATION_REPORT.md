@@ -1,16 +1,20 @@
 # CLI 对齐验证记录
 
-> **当前状态更正（2026-09-22）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，但产品入口、技能、本地工具、子任务、GUI、远程与跨平台仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
+> **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## receipt102–106 当前阶段终态（2026-09-22）
+## receipt102–108 当前阶段终态（2026-09-23）
 
 - [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json)：官方在线订阅与固定 `2.1.278` 的默认账户模式不读取或复制凭据，隔离 user／project／local 设置，管理员策略不可验证时失败关闭。manual／原生 default 审批合同的 Python 84、Claude profile 18、adapter profile 14 项通过。此前 plan 模式父任务两轮完成但父子 MCP 被原生计划约束拒绝；最终 manual 实链使用冻结 test／supervisor／CLI 字节，却在 SessionReady 和模型输入前因外置调试 supervisor 的 macOS launchd 接管 EAGAIN 中断。因此父子双向 ACK、进度、结果与恢复仍无当前实链结论。
 - [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)：Grok `1.0.40` 的精确认证、setup 会话身份、通知和命令目录边界已有 137 项 Rust 与 36 项 runner 回归；真实 fresh-home 运行则观察到 MCP／models／response_ready 等握手通知跨运行换序，最终一次在 `session/new` 响应前收到 models update 并严格拒绝。模型输入为 0；生产 submit、queued submit、审批、取消、恢复、技能、本地工具、子任务与其他扩展全部保持关闭。
 - [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)：Windows 实机核对三款官方 x64 CLI 的版本、SHA 与有效 Authenticode。PE 结构 13／13、程序／祖先租约 2／2 通过，但 cwd 叶目录仍可改名，`cmd.exe` 调试链超时，三款 updater 均无原生退出收据，终止 debugger 后 Claude／Grok 根进程曾残留。产品入口及来源因此继续在副作用前 `ManualOnly`，候选代码不计可发布支持。
 - [receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json)：纠正 receipt104 的 Codex 资产分类。`0.155.1` 官方 Windows x64 包的 size、SHA-256 与入口二进制身份均已由 `packages_for_version("0.155.1")` 对应清单冻结，并与当前 GitHub release API 一致；receipt104 误用了 legacy `0.147.0` 的 `PACKAGES` 条目。撤回资产漂移结论，不改写 receipt104，也不扩大为 Windows 自动升级通过；cwd、debugger、Job 清理、原生退出和同提交验证仍待闭环。
 - [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)：保留 receipt103 的真实失败并记录后续闭环。干净提交 `ac0fa70e…` 的签名 release supervisor、feature libtest 与官方 Grok `1.0.40` 精确摘要完成无模型启动探针及 root 候选实链；`grok-4.7` 同一原生会话的两轮、允许／拒绝文件效果、排队输入原生 ACK 与结果、取消、权威历史和新进程恢复全部通过，两代清理、认证副本、内部 state、隧道与 staged 进程残留均核对。`public_product_gate_open=false`；same-turn steering、技能、本地工具、子任务、父权限上限、App 重启／GUI、产品网络隔离、Linux／Windows 和完整 Goal 均未由该收据证明。
-- receipt106 的精确代码提交已通过：Grok Rust 139、Grok／supervisor 定向 Python 37、i18n 11、`cargo check -p warp --features local_cli_managed_tasks`、feature release supervisor build、无模型 supervisor 探针 2，以及全仓 fmt／diff check。没有新增或变动用户可见文案，无需本地化资源变更。receipt102／104–105 的 Claude、Windows 和升级门禁仍只属于各自快照；Linux／Windows 同提交与完整 Goal 未通过。
-- 本轮将约 10 GiB 的旧 worker、GUI、IPC、升级夹具与 CLI 缓存从内置盘迁到 `/Volumes/ORICO/InfiniShell-Desktop-local-offload-20260921`，内置可用空间由约 1.8 GiB 提升到约 14 GiB；Cargo 与后续临时根位于 ORICO。未迁移认证数据；跨卷归档中一个已停止进程的 Unix socket 无法复制，不属于持久证据。
+- [receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)：保留 receipt102 的计划模式拒绝与外置 debug supervisor `EAGAIN` 失败，并记录 release supervisor 闭环。干净提交 `45ba0d11…` 的官方 Claude Code `2.1.278`／`claude-sonnet-4-6` 生产 runtime-host 父子链完成 5 次审批、4 次原生本地工具、5 输入／3 执行、2 次合并、双向 ACK、自动子结果投递与 inspect；3 条受隔离标记控制的原生结果关联覆盖 2／2／1 个输入。父子 v2 退出账本的 `last/ack` 为 `23/22`、`36/35`，原生退出、adapter 和 journal 均确认；runner、私有／公开双审计和敏感值扫描全部通过。
+- [receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)：run 35746148046 在精确提交 `c25221a22…` 上完成 Linux x64／Windows x64 聚焦预检。Linux 34、Windows 45 个步骤成功，各有 2 个 full-workspace 步骤按输入跳过；Windows 的通知补丁事务、IPC 恢复、SSH worker、生命周期／取消／Responses、生产 Rust 通知安装器、双语 TUI、进程所有权、宿主崩溃清理、无凭据恢复和 rust-genai 均通过。
+- Windows 同一 job 用 Codex `0.155.1` 执行当前运行时探针，用精确 `0.147.0` 官方包执行仍绑定该版本的生产通知安装器合同。安装器 metadata 为 `accepted=true`、退出 0、无超时、无凭据、0 模型命令、migration 通过、EOF 与私有根清理确认；原生 hook 实际执行、完整受监督进程树清理及 App 重启／UI 仍为 false，不能扩大为三款自动原子升级通过。
+- receipt108 的 6 个 artifacts／37 个文件均在仓库外下载并核对；JSON／NDJSON 解析失败 0，邮箱与常见凭据形态扫描 0，只保存 artifact 大小、内容 manifest SHA 和生产安装器三文件摘要。原始 NDJSON、PTY 与测试输出没有复制到仓库。
+- 当前本地 `c25221a22…` 门禁还包括隔离 target 的 `cargo check -p warp --features local_cli_managed_tasks`、Codex runner Python 16、准备器 Python 48、YAML、actionlint 和 diff check。没有用户可见产品文案变化，无需本地化资源变更。receipt107 的 Claude 门禁仍属于 `45ba0d11…`，receipt106 的 Grok 门禁仍属于 `ac0fa70e…`。
+- 历史约 10 GiB 归档仍位于 `/Volumes/ORICO/InfiniShell-Desktop-local-offload-20260921`；当前 `.envrc` 临时根与 Cargo target 已位于 ACASIS。本轮 launchd／Unix socket 验收显式使用系统 `/private/tmp`，避免把外置临时目录失败误判为产品失败。未迁移认证数据。
 
 ## receipt101 Claude 官方在线账户托管生命周期（2026-09-21）
 
@@ -183,7 +187,9 @@ Resume最新startup的原生ID为null／关联false，夹具以 `resume_ready_id
 
 [CI10 b3d8](TENTH_PLATFORM_RUN_B3D8.md)的Linux x64／Windows x64所选门禁通过，`full_workspace_tests=false`；不包含其后固定策略、完整历史及布局修改。Windows实际五项Codex hook注册、两项ConPTY通知通过，另外三项实效不能从注册推定。固定完整运行包的新准备器27项离线回归与异平台静态提取见 [准备说明](CODEX_FIXED_RUNTIME_PREPARATION.md)；异平台提取不是异平台执行，Windows ACL及ARM64执行边界仍按原报告保留。
 
-根代理最近实际API核对Linux／Windows runner均online、busy=false；00:01的Linux离线观察保留为 [历史可用性](validation/runner-availability-20260918-0001.json)。真正dispatch前须重新核对留证，当前可用性不计新的平台门禁通过。不存在整个Goal因此无法独立推进的结论。
+[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json) 对应的 [run 35746148046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35746148046) 是当前最新的同提交 Linux／Windows 聚焦预检：两个 job 均成功，且 artifact 已核验。它使用 `full_workspace_tests=false`，所以不能替代同提交 macOS、GUI integration、完整 workspace、真实 GUI／IME、SSH／tmux 完整产品链或全范围 P0–P5 验收。
+
+run 35746148046 结算后实际 API 核对 Linux／Windows runner 均 online；00:01 的 Linux 离线观察保留为 [历史可用性](validation/runner-availability-20260918-0001.json)。runner 可用性不计平台门禁通过，真正证据以精确 SHA 的 job／artifact 为准。不存在整个 Goal 因此无法独立推进的结论。
 
 SSH／tmux的 [构造通知](SSH_TMUX_VERIFICATION.md) 与 [真实Codex原生TUI传输](CODEX_NATIVE_SSH_TMUX_VERIFICATION.md)分开记录；模型HTTP为零的探针不等于三方完整在线交互、输入、审批、重启和恢复。远端只通过仓库cross-platform-preflight workflow，在本地新门禁通过、实际修改提交推送且headSha一致后验证。最终按仓库要求执行全工作区门禁，不能以选定筛选覆盖替代。
 

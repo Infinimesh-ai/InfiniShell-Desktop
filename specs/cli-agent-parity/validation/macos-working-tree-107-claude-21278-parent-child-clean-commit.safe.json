@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "scope": "claude_2_1_278_parent_child_clean_commit",
+  "recorded_at": "2026-09-22T13:14:22+08:00",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "head": "45ba0d11972d94b1c5bf289eb50938bcfd09a44b",
+    "remote_head": "45ba0d11972d94b1c5bf289eb50938bcfd09a44b",
+    "worktree_dirty": false,
+    "same_commit_verified": true,
+    "full_goal_passed": false
+  },
+  "claude": {
+    "version": "2.1.278",
+    "reported_version": "2.1.278 (Claude Code)",
+    "macos_arm64_sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6",
+    "authentication": "authorized_default_account",
+    "requested_model": "claude-sonnet-4-6",
+    "credential_values_recorded": false,
+    "runner_modifies_auth_configuration": false,
+    "native_cli_credential_access_expected": true,
+    "isolated_data_profile": "claude-coordinator-818f088963de416d8fa0e69c0c3a03c1"
+  },
+  "built_artifacts": {
+    "profile": "release-tui-debug-assertions",
+    "feature": "local_cli_managed_tasks",
+    "supervisor_bytes": 288373344,
+    "supervisor_sha256": "0a784632f3a1701496106dc73247ca6c2ce22e1c892531ff07d615a0e66103f4",
+    "test_binary_bytes": 872770336,
+    "test_binary_sha256": "320b953bbbf32c80e4fc9aa7a74f1e1f075d53fa246e6ec17e3d90125cb0765f",
+    "codesign_verified": true
+  },
+  "no_model_supervisor_probe": {
+    "passed": true,
+    "cases_passed": 2,
+    "cases_failed": 0,
+    "models_requested": false,
+    "cleanup_confirmed": true,
+    "bytes": 1535,
+    "sha256": "c6859027dc6d771860f036f99070e0fb23f23189cd12cfe97a9a81d855082d55",
+    "path": "/private/tmp/infinishell-supervisor-probe-45ba0d119.json"
+  },
+  "parent_child_lifecycle": {
+    "acceptance_passed": true,
+    "production_runtime_host": true,
+    "production_spawn_verified": true,
+    "fixed_profile_equal": true,
+    "native_message_ack_both_directions": true,
+    "automatic_result_delivery_ack_verified": true,
+    "final_result_via_inspect": true,
+    "child_edit_effect_verified": true,
+    "approvals_allowed": 5,
+    "native_tool_calls": 4,
+    "native_inputs": 5,
+    "native_executions": 3,
+    "joined_inputs": 2,
+    "native_result_correlations": 3,
+    "native_result_input_counts": [
+      2,
+      2,
+      1
+    ],
+    "real_gui_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "runtime_host_cleanup": {
+    "receipts": 2,
+    "versions": [
+      2,
+      2
+    ],
+    "last_event_sequences": [
+      23,
+      36
+    ],
+    "acknowledged_sequences": [
+      22,
+      35
+    ],
+    "native_process_exited": true,
+    "adapter_succeeded": true,
+    "adapter_task_terminated": true,
+    "event_journal_completed": true
+  },
+  "public_evidence": {
+    "events": 67,
+    "ndjson": {
+      "bytes": 120880,
+      "sha256": "73da1f40dc17ed91da907e97d72a959363cc11bdd5ef4de25c68d6892807a133",
+      "path": "/private/tmp/claude-coordinator-45ba0d119.ndjson"
+    },
+    "metadata": {
+      "bytes": 3966,
+      "sha256": "947428c7d49d2d1b90bc470ed95c586d6c9d77af98ff91209eeb7200569f74f8",
+      "path": "/private/tmp/claude-coordinator-45ba0d119.metadata.json"
+    },
+    "test_output": {
+      "bytes": 1549,
+      "sha256": "cda87f3b071b9884dbe75c3fbc678f7dc0c4a84c4ccdc42a4d66cbc614521556",
+      "path": "/private/tmp/claude-coordinator-45ba0d119.test-output.txt"
+    }
+  },
+  "private_evidence": {
+    "preserved": true,
+    "root": "/private/tmp/infinishell-claude-coordinator-09swgov_",
+    "raw_ndjson_bytes": 946341,
+    "raw_ndjson_sha256": "53d5d20d3b5f89b3e8b96a1e4dad48924fa4a86dacb81d98dc475f33f5d7cc3f",
+    "raw_test_output_bytes": 1549,
+    "raw_test_output_sha256": "cda87f3b071b9884dbe75c3fbc678f7dc0c4a84c4ccdc42a4d66cbc614521556",
+    "sqlite_bytes": 626688,
+    "sqlite_sha256": "f7c1ef875d7d18c3c0886e2f1e085e74b7c0817457aa157fc4ad28471133ffcd"
+  },
+  "integrity_boundary": {
+    "test_exit_code": 0,
+    "worktree_dirty_during_run": false,
+    "project_settings_unchanged": true,
+    "denied_read_fixture_unchanged": true,
+    "cli_binary_unchanged": true,
+    "sensitive_value_scan_passed": true,
+    "private_and_public_acceptance_verified": true
+  },
+  "gates": {
+    "native_result_evidence_tests_passed": 2,
+    "claude_rust_passed": 117,
+    "claude_rust_failed": 0,
+    "coordinator_rust_passed": 63,
+    "coordinator_rust_failed": 0,
+    "python_targeted_runner_passed": 66,
+    "python_targeted_runner_failed": 0,
+    "i18n_passed": 11,
+    "i18n_failed": 0,
+    "feature_cargo_check_passed": true,
+    "release_supervisor_build_passed": true,
+    "rustfmt_check_passed": true,
+    "diff_check_passed": true,
+    "localization_change_required": false
+  },
+  "remaining": {
+    "real_gui_verified": false,
+    "gui_ime_and_bilingual_layout_verified": false,
+    "ssh_tmux_product_acceptance_verified": false,
+    "linux_verified_on_same_commit": false,
+    "windows_verified_on_same_commit": false,
+    "full_abnormal_lifecycle_matrix_verified": false,
+    "full_p0_p5_parity_verified": false,
+    "full_workspace_verified": false
+  },
+  "result": "Claude Code 2.1.278 passed the clean-commit macOS production runtime-host parent-child chain with fixed restricted permissions, native local tools, joined inputs, bidirectional native message acknowledgements, automatic child-result delivery, explicit native result correlations and sealed v2 cleanup receipts. This receipt does not cover real GUI, IME or bilingual layout, SSH/tmux product acceptance, other platforms, the full abnormal lifecycle matrix or the full Goal."
+}

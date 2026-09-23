@@ -1,10 +1,10 @@
-# CLI Agent Parity 阶段检查点交接（2026-09-21）
+# CLI Agent Parity 阶段检查点交接（更新至 2026-09-23）
 
 ## 1. 阶段结论
 
 - 总 Goal 仍为 **active / 未完成**。本轮仅冻结当前实现、真实验证结果和失败收据，不得据此恢复此前“全部完成”的结论。
 - 工作分支：`codex/cli-agent-parity`。
-- 当前代码检查点：`ac0fa70eea4372675367dfa59ac0226396c613df`（`修复 Grok 恢复握手回放`），已推送到 `origin/codex/cli-agent-parity`；receipt106 的 supervisor、libtest 与真实 Grok root 候选链均绑定该干净提交。
+- 当前产品代码检查点：`c25221a22b03c28ca8c8538bee9229ca1bb0ec87`（`修复 Windows Codex 安装器固定版本`），已推送到 `origin/codex/cli-agent-parity`；receipt108 的 Linux／Windows 聚焦预检绑定该精确提交。receipt107 的 Claude 父子链仍绑定 `45ba0d11…`，receipt106 的 Grok root 候选链仍绑定 `ac0fa70e…`，没有冒充在当前提交重跑真实模型链。
 - 基线归档仍为 `e6e9d619318e87d0bb889df344c8570f97977e90`；此前受测代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。
 - 后续必须继续使用同一工作树和当前分支，不得从 `main` 重来，不得 `reset/clean` 根目录，也不得直接弹出整理前的完整 stash。
 
@@ -15,9 +15,11 @@
 - 默认在线账户认证已验证为可用；安全收据只记录登录状态、账户来源和套餐类型，不记录身份、邮箱、组织或令牌。
 - 适配器与协调器增加了显式 `--use-authorized-default-account` 路径：该模式不注入 `CLAUDE_CONFIG_DIR`，并与隔离配置模式互斥。
 - 当前固定权限配置已收紧到 `restricted + manual + host permission prompts + Read/Edit`，拒绝用户、项目、本地设置源，并对管理策略异常 fail closed。
-- 计划模式实测已到达根会话、两轮交互、ACK、结果与清理，但计划约束拒绝了父子派发和双向消息，因此不能作为父子验收。
-- 手动权限模式的当前提交实测在 macOS 外置磁盘 debug supervisor 经 launchd 接管原生 I/O 时触发 `EAGAIN`，在 `SessionReady`、模型输入和父子派发前退出；此项属于 **证据不足 / 启动阻塞**，不是父子功能通过或失败。
-- 当前安全收据：`validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json`。
+- receipt102 的计划模式拒绝与外置 debug supervisor `EAGAIN` 启动失败继续保留，未被后续成功改写。当前验收明确使用系统 `/private/tmp`、签名 release supervisor 和隔离 `WARP_DATA_PROFILE`，不再把外置临时目录的 launchd／Unix socket 问题混入产品结论。
+- 干净提交 `45ba0d11…` 的真实生产 runtime-host 父子链已通过：官方 `claude-sonnet-4-6` 完成子任务创建、5 次逐次审批、4 次原生本地工具、5 个输入／3 个执行、2 次原生输入合并、父子双向原生 ACK、自动子结果投递与最终 inspect。三条只在隔离验收标记启用时产生的原生结果关联分别覆盖 2／2／1 个输入；普通会话事件序列不变。
+- 父子 runtime-host 均产生 v2 密封退出账本，`last/ack` 分别为 `23/22`、`36/35`，原生进程退出、adapter 成功／终止和 event journal 完成都已核对；runner 退出 0，私有与公开双重审计及敏感值扫描均通过。
+- 本收据仍不证明真实 GUI 父子操作、IME／双语布局、SSH／tmux、Linux／Windows、完整异常生命周期或全量 P0–P5。
+- 当前安全收据：[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)；历史失败继续见 [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json)。
 
 ### 2.2 Grok Build 1.0.40
 
@@ -35,31 +37,39 @@
 - [receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 已纠正资产结论：receipt104 错把 `0.155.1` 官方包与 legacy `0.147.0` 清单比较；版本选择后的仓内 `0.155.1` size/SHA 与 GitHub API digest 一致，无需修改产品摘要。cwd、debugger、退出收据和清理缺口不受此纠正影响。
 - 当前安全收据：`validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json`。
 
+### 2.4 同提交 Linux／Windows 聚焦预检
+
+- [run 35746148046](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35746148046) 在精确提交 `c25221a22…` 上结算成功：Linux x64 为 34 个成功步骤、2 个按 `full_workspace_tests=false` 跳过；Windows x64 为 45 个成功步骤、2 个同样跳过。两个 job 的 check、IPC frame-limit 恢复、生命周期／取消／Responses、双语 TUI、进程所有权、supervisor、宿主崩溃清理、无凭据原生恢复和 rust-genai 均通过。
+- Windows 同一 job 同时验证 Codex `0.155.1` 当前运行时与专用于生产通知安装器合同的官方 `0.147.0` 包；生产 Rust 安装器 metadata 为 `accepted=true`、退出 0、无超时、无凭据、0 个模型命令、migration 通过、EOF 与私有根清理确认。它没有验证原生 hook 实际执行、完整受监督进程树清理或 App 重启／UI，不能回填为三款自动原子升级通过。
+- 6 个 artifact 共 37 个文件已下载到仓库外临时目录并逐份核对；JSON／NDJSON 解析失败为 0，邮箱与常见凭据形态扫描均为 0，只把大小、SHA／manifest 摘要和允许字段写入 [receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)。
+- 该 run 是聚焦跨平台边界证据，不含同提交 macOS、GUI integration 或 full workspace；因此总 Goal 继续 active。
+
 ## 3. 当前提交已通过的定向门禁
 
-- 当前精确提交：Grok Rust `139/139`、Grok／supervisor 定向 Python `37/37`、i18n `11/11`。
-- `cargo check -p warp --features local_cli_managed_tasks` 和 `release-tui-debug-assertions` feature supervisor build 通过；同提交无模型 supervisor 探针 `2/2` 通过。
+- `c25221a22…` 本地隔离 target 的 `cargo check -p warp --features local_cli_managed_tasks` 通过；Codex source runner Python `16/16`、准备器 Python `48/48`、YAML 解析、actionlint（仅允许仓库自定义 runner label）和 diff check 通过。
+- receipt107 的 Claude 原生结果证据 `2/2`、Claude Rust `117/117`、协调器 Rust `63/63`、Claude 外层审计 Python `66/66`、i18n `11/11`、feature supervisor build、无模型探针 `2/2` 与真实父子链仍绑定 `45ba0d11…`。
 - `cargo fmt --all -- --check`、`git diff --check` 通过。
 - 本轮最终修改没有新增或变动用户可见文案，无需本地化资源变更。
-- receipt102／104–105 的 Claude、Windows 和升级阶段门禁仍按各自快照保留，未冒充为 `ac0fa70e…` 上已重跑。
-- **未执行**同一冻结提交的最终 macOS/Linux/Windows 云端矩阵；也未完成 SSH/tmux 产品接收、真实 GUI IME/双语布局和全范围 P0–P5 生命周期，因此不能标记完成。
+- receipt106 的 Grok `139/139` 与 Python `37/37` 仍按 `ac0fa70e…` 快照保留；receipt102／104–105 的历史 Claude、Windows 和升级阶段门禁也只属于各自快照。
+- `c25221a22…` 的 Linux／Windows 聚焦矩阵已通过，但同提交 macOS、full workspace、SSH/tmux 完整产品接收、真实 GUI IME／双语布局和全范围 P0–P5 生命周期仍未完成，因此不能标记完成。
 
 ## 4. 本地磁盘与外置磁盘
 
 - 已将约 10 GiB 可迁移的任务缓存、旧 worker、GUI/IPC/自动升级临时目录、Claude 隔离配置和 Grok 旧临时目录迁往：`/Volumes/ORICO/InfiniShell-Desktop-local-offload-20260921`。
-- 当前外置临时目录：`/Volumes/ORICO/InfiniShell-Desktop-tmp`；Cargo target：`/Volumes/ORICO/CargoTarget/InfiniShell-Desktop`。
-- 内置磁盘可用空间从约 1.8 GiB 恢复到约 14 GiB；没有移动认证材料，也没有广泛清理用户数据。
+- 当前 `.envrc` 外置临时目录：`/Volumes/ACASIS/InfiniShell-Desktop-tmp`；默认 Cargo target：`/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop`。本轮定向构建使用 `/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop-cli-agent-parity-e846c137d`。
+- launchd／Unix socket 真实探针显式覆盖 `TMPDIR`／`TEMP`／`TMP=/private/tmp`；默认外置临时目录会导致同一二进制启动失败，不能用该环境失败否定产品链。
+- 当前内置磁盘约 105 GiB 可用、ACASIS 约 1.6 TiB 可用；没有移动认证材料，也没有广泛清理用户数据。
 - 详细记录见 `WORKSPACE_CLEANUP_20260921.md`。
 
 ## 5. 新会话的严格入口
 
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
-2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–106。
+2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–108。
 3. 先做定向闭环，不要因接手而立即重复全量构建。
-4. Grok：receipt106 已完成当前版干净提交 root 候选链，不要无代码变化地重复消费模型额度；下一步保持产品入口关闭，分别补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，再决定是否开放对应能力。
-5. Claude：先解决 macOS launchd + 外置 debug supervisor 的原生 I/O 启动问题，或生成更小的 release supervisor；随后用手动权限配置完成真实父子全链。不得退回计划模式，也不得放宽工具权限来换取通过。
+4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链，不要无代码变化地重复消费模型额度；下一步保持产品入口关闭，分别补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，再决定是否开放对应能力。
+5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
-7. 继续剩余原范围：Codex 当前版完整生命周期与取消、Linux 实际原子替换、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及最终冻结提交的跨平台验证。
+7. receipt108 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检，不要无代码变化地重复派发相同矩阵。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 实际原子替换、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
 8. 只有“要求→实现→CLI 版本→源码提交→模式/平台→收据→结果”矩阵中所有必需项在同一当前提交上通过，才可把 Goal 标记为 complete。
 
 ## 6. 安全边界
