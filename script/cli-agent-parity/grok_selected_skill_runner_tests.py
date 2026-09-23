@@ -70,6 +70,23 @@ class SelectedSkillRunnerTests(unittest.TestCase):
         self.assertFalse(runner.observation(101, evidence(), "leader", EXPECTED)["case_passed"])
         self.assertFalse(runner.observation(0, evidence(), "leader", "f" * 64)["case_passed"])
 
+    def test_zero_input_catalog_transport_never_claims_the_full_skill_combination(self):
+        rows = evidence("direct_catalog")
+        rows[-1].update(passed=False, default_entrypoint_verified=False,
+            product_selected_skill_combination_verified=False, final_history_verified=False,
+            sentinel_matched=False, exact_context_read_only_verified=False,
+            final_response_sha256=None)
+        rows[-1].update({key: 0 for key in runner.COUNTERS})
+        result = runner.observation(0, rows, "direct_catalog", EXPECTED)
+        self.assertTrue(result["catalog_transport_handshake_verified"])
+        self.assertFalse(result["case_passed"])
+        self.assertFalse(result["product_selected_skill_combination_verified"])
+        rows[-1]["submitted_input_count"] = 1
+        self.assertFalse(runner.observation(0, rows, "direct_catalog", EXPECTED)["catalog_transport_handshake_verified"])
+        rows[-1]["submitted_input_count"] = 0
+        rows[1]["snapshots"][0]["path_matches_selected"] = False
+        self.assertFalse(runner.observation(0, rows, "direct_catalog", EXPECTED)["catalog_transport_handshake_verified"])
+
     def test_unknown_public_fields_replays_and_truncation_are_rejected(self):
         rows = evidence()
         rows[1]["snapshots"][0]["path"] = "private path"
@@ -120,7 +137,10 @@ class SelectedSkillRunnerTests(unittest.TestCase):
         launches = [{"kind": kind, "arguments_unchanged": kind == "version", "synthetic_project_trust_requested": kind != "version"}
                     for kind in ("version", "version", "private_leader")]
         self.assertTrue(runner.boundary_passed(metadata, launches, tunnel, "leader"))
+        self.assertTrue(runner.boundary_passed(metadata, launches, tunnel, "leader_catalog"))
         self.assertFalse(runner.boundary_passed(metadata, launches, tunnel, "sdk"))
+        direct = [dict(row, kind="direct_agent") if row["kind"] == "private_leader" else row for row in launches]
+        self.assertTrue(runner.boundary_passed(metadata, direct, tunnel, "direct_catalog"))
         self.assertFalse(runner.boundary_passed(metadata, launches + launches[-1:], tunnel, "leader"))
         changed = dict(metadata, tunnels_stopped=False)
         self.assertFalse(runner.boundary_passed(changed, launches, tunnel, "leader"))
@@ -152,6 +172,8 @@ class SelectedSkillRunnerTests(unittest.TestCase):
             native.write_bytes(b"offline native")
             environment = {"HOME": str(root / "home"), "GROK_HOME": str(root / "home/.grok")}
             for mode, argv in (("leader", ["agent", "stdio", "--leader-socket", str(root / "tmp/leader/leader.sock")]),
+                               ("leader_catalog", ["agent", "stdio", "--leader-socket", str(root / "tmp/leader/leader.sock")]),
+                               ("direct_catalog", ["agent", "--no-leader", "stdio"]),
                                ("sdk", ["agent", "--no-leader", "stdio"])):
                 with mock.patch.dict(runner.CURRENT, sha256=runner.shared.digest(native)), \
                         mock.patch.object(runner.shared, "BINARY_SHA256", runner.shared.digest(native)):

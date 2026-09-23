@@ -273,6 +273,9 @@ class ProbeRunnerTests(unittest.TestCase):
             self.args.max_native_inputs = budget
             with self.assertRaises(ValueError):
                 self.validate()
+        self.args.max_native_inputs = 0
+        with patch.object(runner.sys, "platform", "darwin"), patch.object(runner.shared, "digest", return_value=runner.shared.BINARY_SHA256):
+            runner.validate_paths(self.args, expected_inputs=0)
         self.args.max_native_inputs = 1
         for deadline in (29, 451, 900):
             self.args.timeout = deadline

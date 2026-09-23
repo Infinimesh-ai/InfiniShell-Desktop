@@ -652,7 +652,7 @@ def reserve_artifacts(output):
         raise
 
 
-def validate_paths(args, expected_sha256=shared.BINARY_SHA256):
+def validate_paths(args, expected_sha256=shared.BINARY_SHA256, expected_inputs=MAX_NATIVE_INPUTS):
     if sys.platform != "darwin":
         raise ValueError("官方原生 SDK 隔离探针目前只验证 macOS")
     for name in ("test_binary", "grok", "supervisor"):
@@ -666,8 +666,8 @@ def validate_paths(args, expected_sha256=shared.BINARY_SHA256):
     if home.is_symlink() or not home.is_dir() or home.stat().st_uid != os.getuid() or home.stat().st_mode & 0o077:
         raise ValueError("需要当前用户独占的专用 GROK_HOME")
     args.official_grok_home = home.resolve(strict=True)
-    if args.max_native_inputs != MAX_NATIVE_INPUTS or not 30 <= args.timeout <= MAX_DEADLINE:
-        raise ValueError("固定探针只允许 1 个原生输入与 30–450 秒期限")
+    if expected_inputs not in (0, MAX_NATIVE_INPUTS) or args.max_native_inputs != expected_inputs or not 30 <= args.timeout <= MAX_DEADLINE:
+        raise ValueError("固定探针输入预算或期限不匹配")
     if args.output.is_symlink():
         raise ValueError("证据路径不能是符号链接")
     args.output = args.output.resolve()

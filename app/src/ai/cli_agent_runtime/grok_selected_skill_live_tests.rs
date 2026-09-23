@@ -149,11 +149,13 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
     };
     validate_options(&options).map_err(|_| "生产参数拒绝")?;
     let mut protocol = GrokProtocol::new(options);
-    if mode == "leader" {
+    let catalog_only = matches!(mode, "leader_catalog" | "direct_catalog");
+    if mode == "leader" || catalog_only {
         protocol.current_root_candidate_for_live = true;
         protocol.current_selected_skill_candidate_for_live = true;
     }
-    // 保留生产默认 argv；仅挂接无副作用的目录与最终历史观察器。
+    protocol.catalog_direct_for_live = mode == "direct_catalog";
+    // 完整组合保留生产 argv；目录直连对照仅在本测试标记下覆盖入口。
     let catalog = SkillCatalogProbe::new(skill_path.clone());
     protocol.skill_catalog_for_live = Some(catalog.clone());
     let histories = Arc::new(Mutex::new(HashMap::new()));
@@ -198,6 +200,9 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
                 RuntimeEventKind::SessionReady { .. } => {
                     if submitted != 0 || session.is_none() {
                         return Err("重复或无身份初始化".into());
+                    }
+                    if catalog_only {
+                        return Ok(());
                     }
                     let catalog_ready = catalog.evidence(session.as_deref(), "visible");
                     if catalog_ready["overflow"] != false
@@ -382,7 +387,7 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
         }
     }
     .await;
-    if submitted == 0 {
+    if submitted == 0 && !catalog_only {
         // 首次输入前的错误只含静态阶段描述，不包含技能文本或凭据。
         eprintln!("Grok 技能候选输入前阶段：{result:?}");
     }
@@ -425,6 +430,23 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
         && pending_approvals.is_empty()
         && controls.is_empty();
     let mut catalog_evidence = catalog.evidence(session.as_deref(), "visible");
+    let catalog_handshake_verified = catalog_only
+        && result.is_ok()
+        && transport_ok
+        && cleanup
+        && skill_unchanged
+        && submitted == 0
+        && accepted == 0
+        && catalog_evidence["overflow"] == false
+        && catalog_evidence["snapshots"]
+            .as_array()
+            .and_then(|rows| rows.last())
+            .is_some_and(|row| {
+                row["before_first_submit"] == true
+                    && row["selected_name_count"] == 1
+                    && row["path_matches_selected"] == true
+                    && row["bare_name_matches"] == true
+            });
     catalog_evidence["scope"] = json!(SCOPE);
     catalog_evidence["case"] = json!(mode);
     record(file, catalog_evidence)?;
@@ -440,7 +462,7 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
         "exact_context_read_only_verified":read_scope_verified,"transport_closed":transport_ok,"cleanup_confirmed":cleanup,
         "project_snapshot_unchanged":skill_unchanged,"full_cli_parity_acceptance_passed":false}),
     )?;
-    if passed {
+    if passed || catalog_handshake_verified {
         Ok(())
     } else {
         Err("默认入口技能组合验收未通过".into())
@@ -448,13 +470,16 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "必须由隔离运行器启动；每次一个真实输入，会消耗已授权额度"]
+#[ignore = "必须由隔离运行器启动；目录对照零输入，完整组合最多一个真实输入"]
 async fn authenticated_selected_skill_default_entry() {
     let root = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("缺少隔离根目录"))
         .canonicalize()
         .unwrap();
     let mode = env::var("INFINISHELL_GROK_SELECTED_SKILL_MODE").expect("缺少入口类型");
-    assert!(matches!(mode.as_str(), "leader" | "sdk"));
+    assert!(matches!(
+        mode.as_str(),
+        "leader" | "sdk" | "leader_catalog" | "direct_catalog"
+    ));
     assert_eq!(
         fs::read_to_string(root.join(".infinishell-grok-live-probe")).unwrap(),
         "isolated Grok Rust adapter verification\n"
@@ -475,7 +500,8 @@ async fn authenticated_selected_skill_default_entry() {
     let artifact = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ARTIFACT").unwrap());
     assert_eq!(artifact, root.join("private-evidence.ndjson"));
     let mut file = File::create(artifact).unwrap();
-    record(&mut file, json!({"event":"selected_skill_started","scope":SCOPE,"case":mode,"max_native_inputs":1,
+    let max_native_inputs = if mode.ends_with("_catalog") { 0 } else { 1 };
+    record(&mut file, json!({"event":"selected_skill_started","scope":SCOPE,"case":mode,"max_native_inputs":max_native_inputs,
         "production_connect_path":true,"test_agent_profile_override":false,"fixture_project_trust":true,
         "typed_selected_skill":true,"secret_in_submitted_prompt":false,"credential_values_recorded":false})).unwrap();
     assert!(

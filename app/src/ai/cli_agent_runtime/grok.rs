@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
+use std::path::Path;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ use super::{
 };
 
 use super::grok_tool_lease::{GrokToolLeaseLedger, GrokToolLeaseState, VerifiedGrokToolLease};
+use super::local_skills::SelectedLocalSkill;
 use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeLocalToolRequest};
 
 pub(super) const VERIFIED_VERSION: &str = "1.0.30";
@@ -37,6 +39,20 @@ const CURRENT_SETUP_PHASES: [&str; 6] = [
     "folder_trust",
     "plugin_registry",
     "mcp_merge",
+    "response_ready",
+];
+#[cfg(all(test, unix))]
+const DIRECT_CATALOG_SETUP_PHASES: [&str; 11] = [
+    "auth",
+    "resolve_workspace",
+    "folder_trust",
+    "plugin_registry",
+    "mcp_merge",
+    "persistence_init",
+    "spawn_session_actor",
+    "git_discovery",
+    "finalize_response",
+    "tool_overrides",
     "response_ready",
 ];
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -246,6 +262,8 @@ async fn run_process(
     let direct_sdk = protocol.options.local_tools.is_some();
     #[cfg(test)]
     let direct_sdk = direct_sdk || protocol.sdk_origin_probe.is_some();
+    #[cfg(all(test, unix))]
+    let direct_sdk = direct_sdk || protocol.catalog_direct_for_live;
     let arguments = if let Some(launch) = &launch {
         vec![
             OsString::from("agent"),
@@ -961,6 +979,10 @@ struct GrokProtocol {
     skill_profile_for_live: Option<std::path::PathBuf>,
     #[cfg(all(test, unix))]
     skill_catalog_for_live: Option<native_skill_live_tests::SkillCatalogProbe>,
+    #[cfg(all(test, unix))]
+    catalog_direct_for_live: bool,
+    #[cfg(all(test, unix))]
+    direct_mcp_initialized_received: bool,
     options: SessionOptions,
     session_id: Option<String>,
     next_id: u64,
@@ -1049,6 +1071,25 @@ impl GrokProtocol {
         }
     }
 
+    fn catalog_direct_for_live(&self) -> bool {
+        #[cfg(all(test, unix))]
+        {
+            self.catalog_direct_for_live
+        }
+        #[cfg(not(all(test, unix)))]
+        {
+            false
+        }
+    }
+
+    fn current_setup_phases(&self) -> &'static [&'static str] {
+        #[cfg(all(test, unix))]
+        if self.catalog_direct_for_live {
+            return &DIRECT_CATALOG_SETUP_PHASES;
+        }
+        &CURRENT_SETUP_PHASES
+    }
+
     fn fixed_read_policy_verified(&self) -> bool {
         self.probed_version == Some(P0_VERIFIED_VERSION)
             && self.options.selected_skills.is_empty()
@@ -1107,6 +1148,10 @@ impl GrokProtocol {
             skill_profile_for_live: None,
             #[cfg(all(test, unix))]
             skill_catalog_for_live: None,
+            #[cfg(all(test, unix))]
+            catalog_direct_for_live: false,
+            #[cfg(all(test, unix))]
+            direct_mcp_initialized_received: false,
             options,
             session_id: None,
             next_id: 0,
@@ -3071,10 +3116,14 @@ impl GrokProtocol {
                         .to_owned(),
                 };
                 if self.probed_version == Some(CURRENT_VERSION) && new_session {
+                    let direct_catalog = self.catalog_direct_for_live();
                     let setup = self.current_setup.as_mut().ok_or_else(|| {
                         RuntimeError::Protocol("missing Grok 1.0.40 setup sequence".into())
                     })?;
-                    if setup.next_phase != 5 || setup.response_received {
+                    if (!direct_catalog && setup.next_phase != 5)
+                        || (direct_catalog && !(5..=11).contains(&setup.next_phase))
+                        || setup.response_received
+                    {
                         return Err(RuntimeError::Protocol(
                             "incomplete or mismatched Grok 1.0.40 setup sequence".into(),
                         ));
@@ -3151,6 +3200,14 @@ impl GrokProtocol {
                     effects
                         .events
                         .push(self.ready_event(effective_permissions)?);
+                }
+                if self.probed_version == Some(CURRENT_VERSION)
+                    && new_session
+                    && self.catalog_direct_for_live()
+                {
+                    let ready = self.finish_current_setup()?;
+                    effects.writes.extend(ready.writes);
+                    effects.events.extend(ready.events);
                 }
             }
             PendingKind::Prompt => {
@@ -3235,6 +3292,8 @@ impl GrokProtocol {
                 "unexpected Grok setup method".into(),
             ));
         }
+        let direct_catalog = self.catalog_direct_for_live();
+        let setup_phases = self.current_setup_phases();
         let setup = self
             .current_setup
             .as_mut()
@@ -3253,12 +3312,14 @@ impl GrokProtocol {
                     "unexpected Grok pre-response setup phase".into(),
                 ));
             }
-        } else if waiting_for_response || !setup.response_received {
+        } else if (!direct_catalog && (waiting_for_response || !setup.response_received))
+            || (direct_catalog && !waiting_for_response && !setup.response_received)
+        {
             return Err(RuntimeError::Protocol(
                 "Grok post-response setup phase arrived before session/new response".into(),
             ));
         }
-        let expected = CURRENT_SETUP_PHASES
+        let expected = setup_phases
             .get(setup.next_phase)
             .ok_or_else(|| RuntimeError::Protocol("duplicate Grok 1.0.40 setup phase".into()))?;
         if params["phase"].as_str() != Some(expected) {
@@ -3297,8 +3358,9 @@ impl GrokProtocol {
     }
 
     fn finish_current_setup(&mut self) -> Result<Effects, RuntimeError> {
+        let setup_phase_count = self.current_setup_phases().len();
         let complete = self.current_setup.as_ref().is_some_and(|setup| {
-            setup.next_phase == CURRENT_SETUP_PHASES.len()
+            setup.next_phase == setup_phase_count
                 && setup.response_received
                 && setup.session_id.is_some()
                 && setup.models_received
@@ -3325,6 +3387,26 @@ impl GrokProtocol {
     fn notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
         if message["method"] == CURRENT_SETUP_METHOD {
             return self.current_setup_notification(message);
+        }
+        #[cfg(all(test, unix))]
+        if self.catalog_direct_for_live && message["method"] == "_x.ai/mcp_initialized" {
+            let valid = message.as_object().is_some_and(|outer| outer.len() == 3)
+                && message["jsonrpc"] == "2.0"
+                && message["params"].as_object().is_some_and(|params| {
+                    params.len() == 3
+                        && params["sessionId"].as_str() == self.session_id.as_deref()
+                        && params["mcpToolCount"].as_u64() == Some(0)
+                        && params["elapsedMs"].as_u64().is_some()
+                })
+                && self.current_setup.is_some()
+                && !self.direct_mcp_initialized_received;
+            if !valid {
+                return Err(RuntimeError::Protocol(
+                    "unexpected Grok direct catalog MCP initialization".into(),
+                ));
+            }
+            self.direct_mcp_initialized_received = true;
+            return Ok(Effects::default());
         }
         let current_resume_replay = self.probed_version == Some(CURRENT_VERSION)
             && self.session_id.is_none()
@@ -3441,11 +3523,15 @@ impl GrokProtocol {
                         "Grok command catalog changed its session id".into(),
                     ));
                 }
-                validate_current_available_commands_update(message, &session_id)?;
                 #[cfg(all(test, unix))]
                 if let Some(probe) = &self.skill_catalog_for_live {
                     probe.observe(message, self.submitted_messages.is_empty());
                 }
+                validate_current_available_commands_update(
+                    message,
+                    &session_id,
+                    self.options.selected_skills.first(),
+                )?;
                 if self.options.permission_policy == PermissionPolicy::Inherit {
                     let catalog = skills::SkillCatalog::from_native(
                         &message["params"]["update"]["availableCommands"],
@@ -4128,6 +4214,7 @@ fn validate_current_announcements_update(message: &Value) -> Result<u64, Runtime
 fn validate_current_available_commands_update(
     message: &Value,
     session_id: &str,
+    selected_skill: Option<&SelectedLocalSkill>,
 ) -> Result<(), RuntimeError> {
     const COMMAND_HAS_META: [bool; 29] = [
         false, false, false, false, false, true, false, false, false, true, true, true, true, true,
@@ -4216,15 +4303,21 @@ fn validate_current_available_commands_update(
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog update".into()))?;
     let commands = update["availableCommands"]
         .as_array()
-        .filter(|commands| commands.len() == COMMAND_HAS_META.len())
+        .filter(|commands| {
+            commands.len() == COMMAND_HAS_META.len() + usize::from(selected_skill.is_some())
+        })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog entries".into()))?;
     for (index, command) in commands.iter().enumerate() {
+        let is_selected_skill = selected_skill.is_some() && index == 9;
+        let base_index = index - usize::from(selected_skill.is_some() && index > 9);
+        let has_meta = is_selected_skill || COMMAND_HAS_META[base_index];
+        let has_input = !is_selected_skill && COMMAND_HAS_INPUT[base_index];
         let command = command.as_object().filter(|command| {
-            command.len() == if COMMAND_HAS_META[index] { 4 } else { 3 }
+            command.len() == if has_meta { 4 } else { 3 }
                 && command.contains_key("name")
                 && command.contains_key("description")
                 && command.contains_key("input")
-                && command.contains_key("_meta") == COMMAND_HAS_META[index]
+                && command.contains_key("_meta") == has_meta
         });
         let Some(command) = command else {
             return Err(RuntimeError::Protocol(
@@ -4237,14 +4330,30 @@ fn validate_current_available_commands_update(
             || command["description"]
                 .as_str()
                 .is_none_or(|description| description.len() > 4 * 1024)
-            || command["input"].is_object() != COMMAND_HAS_INPUT[index]
-            || command["input"].is_null() == COMMAND_HAS_INPUT[index]
+            || command["input"].is_object() != has_input
+            || command["input"].is_null() == has_input
             || command.get("_meta").is_some_and(|meta| !meta.is_object())
             || serde_json::to_vec(command).map_or(true, |value| value.len() > 16 * 1024)
         {
             return Err(RuntimeError::Protocol(
                 "invalid Grok command catalog entry values".into(),
             ));
+        }
+        if let Some(selected_skill) = selected_skill.filter(|_| is_selected_skill) {
+            let selected_path = selected_skill.path.canonicalize().ok();
+            let command_path = command["_meta"]["path"]
+                .as_str()
+                .map(Path::new)
+                .filter(|path| path.is_absolute())
+                .and_then(|path| path.canonicalize().ok());
+            if command["_meta"]["bareName"].as_str() != Some(selected_skill.name.as_str())
+                || command["_meta"]["scope"] != "local"
+                || !selected_path.is_some_and(|selected_path| command_path == Some(selected_path))
+            {
+                return Err(RuntimeError::Protocol(
+                    "Grok selected skill catalog path or identity changed".into(),
+                ));
+            }
         }
     }
     let update_meta = update["_meta"]

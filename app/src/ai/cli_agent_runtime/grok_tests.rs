@@ -594,6 +594,52 @@ fn current_command_catalog_reaches_the_selected_skill_observer_before_input() {
 }
 
 #[test]
+fn current_selected_skill_catalog_accepts_only_the_bound_extra_entry() {
+    let directory = tempfile::tempdir().unwrap();
+    let skill_path = directory.path().join("SKILL.md");
+    std::fs::write(&skill_path, "selected skill fixture").unwrap();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut catalog = current_command_catalog(&session_id);
+    catalog["params"]["update"]["availableCommands"]
+        .as_array_mut()
+        .unwrap()
+        .insert(
+            9,
+            json!({
+                "name":"infinishell-native-skill","description":"selected fixture","input":null,
+                "_meta":{"scope":"local","bareName":"infinishell-native-skill","path":skill_path}
+            }),
+        );
+    let selected = SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: skill_path,
+    };
+    let mut protocol = current_waiting_for_display_notifications();
+    protocol.options.selected_skills.push(selected.clone());
+    for notification in current_display_notifications().into_iter().take(4) {
+        protocol.receive(notification).unwrap();
+    }
+    let ready = protocol.receive(catalog.clone()).unwrap();
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+    assert!(protocol.skill_catalog.is_some());
+
+    let mut without_selection = current_waiting_for_display_notifications();
+    assert!(without_selection.receive(catalog.clone()).is_err());
+
+    let mut wrong_path = current_waiting_for_display_notifications();
+    wrong_path.options.selected_skills.push(selected);
+    catalog["params"]["update"]["availableCommands"][9]["_meta"]["path"] =
+        json!(directory.path().join("other.md"));
+    assert!(wrong_path.receive(catalog).is_err());
+}
+
+#[test]
 fn current_root_candidate_is_confined_to_the_ignored_live_harness() {
     let mut protocol = current_waiting_for_setup();
     protocol.current_root_candidate_for_live = true;
@@ -827,6 +873,91 @@ fn current_setup_requires_the_response_before_post_response_phases() {
     let mut changed = setup[5].clone();
     changed["params"]["sessionId"] = json!(Uuid::new_v4().to_string());
     assert!(changed_response_identity.receive(changed).is_err());
+}
+
+#[cfg(unix)]
+#[test]
+fn direct_catalog_probe_accepts_its_eleven_correlated_native_phases_without_model_input() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut protocol = current_waiting_for_setup();
+    protocol.catalog_direct_for_live = true;
+    for message in &current_setup_messages(&session_id)[..5] {
+        protocol.receive(message.clone()).unwrap();
+    }
+    let persistence = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"persistence_init","sessionId":session_id.clone()}});
+    let spawn = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"spawn_session_actor","sessionId":session_id}});
+    assert!(protocol.receive(persistence).unwrap().events.is_empty());
+    assert!(protocol.receive(spawn).unwrap().events.is_empty());
+    assert!(
+        protocol
+            .receive(fixture_response(3))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let git_discovery = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"git_discovery","sessionId":session_id.clone()}});
+    assert!(protocol.receive(git_discovery).unwrap().events.is_empty());
+    let finalize_response = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"finalize_response","sessionId":session_id.clone()}});
+    assert!(
+        protocol
+            .receive(finalize_response)
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let tool_overrides = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"tool_overrides","sessionId":session_id.clone()}});
+    assert!(protocol.receive(tool_overrides).unwrap().events.is_empty());
+    let response_ready = json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+        "method":"session/new","phase":"response_ready","sessionId":session_id}});
+    assert!(protocol.receive(response_ready).unwrap().events.is_empty());
+    let mcp_initialized = json!({"jsonrpc":"2.0","method":"_x.ai/mcp_initialized","params":{
+        "sessionId":session_id,"mcpToolCount":0,"elapsedMs":1}});
+    assert!(
+        protocol
+            .receive(mcp_initialized.clone())
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(protocol.receive(mcp_initialized).is_err());
+    let mut ready = Effects::default();
+    for message in current_display_notifications() {
+        ready = protocol.receive(message).unwrap();
+    }
+    assert!(matches!(
+        ready.events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+    assert!(protocol.skill_catalog.is_some());
+    assert!(protocol.submitted_messages.is_empty());
+}
+
+#[cfg(unix)]
+#[test]
+fn direct_catalog_probe_rejects_a_changed_pre_response_session_identity() {
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut protocol = current_waiting_for_setup();
+    protocol.catalog_direct_for_live = true;
+    for message in &current_setup_messages(&session_id)[..5] {
+        protocol.receive(message.clone()).unwrap();
+    }
+    protocol
+        .receive(json!({"jsonrpc":"2.0","method":"_x.ai/session/setup","params":{
+            "method":"session/new","phase":"persistence_init","sessionId":Uuid::new_v4().to_string()}}))
+        .unwrap();
+    assert!(protocol.receive(fixture_response(3)).is_err());
+    assert!(protocol.session_id.is_none());
 }
 
 #[test]

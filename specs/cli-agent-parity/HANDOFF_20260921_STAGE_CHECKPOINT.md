@@ -28,6 +28,7 @@
 - 干净提交 `ac0fa70e…` 的真实生产 supervisor／ACP root 候选链已通过：官方 `grok-4.7` 完成同一原生会话两轮、允许写入、拒绝无文件效果、运行中排队输入的原生 ACK 与下一轮结果、原生取消终态、完整历史核对，以及新进程恢复原会话和排队标记。两代 supervisor 均有 `cleanup_confirmed=true`，认证副本、内部 state、隧道与 staged 进程残留均已清理。
 - 能力仍由 test-only candidate gate 隔离，`public_product_gate_open=false`；same-turn steering、技能、本地工具、子任务、父权限上限、App 重启／GUI、产品网络隔离和其他平台没有由本收据证明。
 - 当前安全收据：[receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)；历史失败继续见 [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)。
+- 新的 [receipt111](validation/macos-working-tree-111-grok-1040-selected-skill-combination.safe.json) 在当前工作树上完成默认 leader＋单个显式选定技能的 macOS 隔离实链：原生 ACP 目录由基线 29 条增至 30 条，第 9 位是规范路径与名称匹配的唯一技能；零输入握手通过后，真实 1 次输入／接收、1 次精确只读审批、1 次上下文读取、3 次原生工具事件、唯一 slash 的最终历史与随机技能标记均核对通过。原生进程、隧道和认证副本清理确认。原有静态 29 条目录验证器是本轮首个可修复失败点，现只对单技能的精确额外条目放行；产品正式门禁仍关闭，GUI 与同提交跨平台未验收。
 
 ### 2.3 Windows 原子升级与真实 CLI
 
@@ -45,6 +46,7 @@
 - 该 run 是聚焦跨平台边界证据，不含同提交 macOS、GUI integration 或 full workspace；因此总 Goal 继续 active。
 - 复核该 Linux job 原始日志后，[receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) 确认密封 memfd 的真实 `execveat` 参数／环境／cwd 夹具及失败后禁止 pathname 回退均在 Linux x64 实机通过；此前“Linux `execveat` 完全未运行”的阶段表述已过时。三款 CLI 的 Linux 产品升级事务、退出回执与恢复仍未运行。
 - 2026-09-23 的 [receipt110](validation/macos-working-tree-110-grok-1040-selected-skill-gate-failed.safe.json) 保留 Grok `1.0.40` 默认入口单技能候选的负证据：用户重新登录后原生会话创建成功，私有原生日志在同一进程／会话两次公告目标技能名，但 ACP 接收路径缺少输入前的 `available_commands_update`，30 秒后按请求超时失败；公告日志不等于原生路径目录交付。0 次产品输入，正式技能门禁未开放。私有认证副本已移除；仅测试夹具接受固定 marketplace 初始化或单字段 purge。
+- receipt111 的输入前观察器移到静态目录形状验证前，重新实测发现默认 leader 实际交付 30 条 ACP 命令（含唯一技能），旧 29 条硬编码会拒绝。receipt110 当时“未观察到”仍保留为历史失败，但不能再解释为官方 CLI 从不送达目录；修复后的默认入口组合独立通过。直连 `--no-leader` 则送达不同的 10 条目录并被当前适配器拒绝，仅作零输入对照，不推广为产品入口。
 
 ## 3. 已通过的定向门禁与版本边界
 
@@ -54,6 +56,7 @@
 - 本轮最终修改没有新增或变动用户可见文案，无需本地化资源变更。
 - receipt106 的 Grok `139/139` 与 Python `37/37` 仍按 `ac0fa70e…` 快照保留；receipt102／104–105 的历史 Claude、Windows 和升级阶段门禁也只属于各自快照。
 - Grok 当前版目录绑定修复的离线 `current_` 回归 `12/12` 通过，覆盖目录先于／后于 `session/new` 响应及输入前观察器；这不证明官方 `1.0.40` 已实际送达 ACP 目录，也不证明选定技能实链成功。
+- receipt111 后续门禁：Grok 定向 Rust `236/236`、选定技能 runner Python `12/12`、SDK origin runner Python `108/108`、默认及 `local_cli_managed_tasks` 两种 `cargo check -p warp`、i18n `11/11` 已通过；本轮无新增或变动用户可见文案，无需本地化资源变更。真实单技能链仍绑定 dirty tree，不等于冻结提交或全量 P0–P5 验收。
 - `c25221a22…` 的 Linux／Windows 聚焦矩阵已通过，但同提交 macOS、full workspace、SSH/tmux 完整产品接收、真实 GUI IME／双语布局和全范围 P0–P5 生命周期仍未完成，因此不能标记完成。
 
 ## 4. 本地磁盘与外置磁盘
@@ -69,7 +72,7 @@
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
 2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md` 和收据 102–108。
 3. 先做定向闭环，不要因接手而立即重复全量构建。
-4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的单技能候选在新登录后原生日志虽公告技能名，ACP 目录仍未到达，0 次模型输入。后续发现当前版 setup 分支即使收到目录也未交给技能观察器与会话目录绑定；该独立适配器缺口的离线修复不能倒填 receipt110 的实链结果。不要绕过唯一原生路径校验或盲目重复模型探针；先定位当前版 ACP 公告交付，再补技能、本地工具、子任务／父权限上限、App 重启／GUI和网络隔离的独立真实收据，最后决定是否开放对应能力。
+4. Grok：receipt106 已完成 `ac0fa70e…` 的当前版干净提交 root 候选链；receipt110 的原先负收据保留。receipt111 已定位目录实际送达而静态 29 条验证器拒绝选定技能额外条目，并在 dirty tree 上通过默认 leader 的单技能真实输入、唯一路径、精确只读审批、历史及最终标记；直连的不同目录仍失败。先补冻结提交上的真实链与当前源码的同提交证据，再补本地工具、子任务／父权限上限、App 重启／GUI和网络隔离，不得因 macOS 隔离候选通过就开放正式功能。
 5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
 7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测，不要无代码变化地重复派发相同矩阵。继续剩余原范围：Codex 当前版完整产品生命周期与取消、Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
