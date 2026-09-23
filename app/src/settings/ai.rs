@@ -1474,6 +1474,9 @@ pub struct AgentProviderModelCatalogMetadata {
     /// 目录缓存时间,Unix 秒。0 表示旧快照没有可用时间信息。
     #[serde(default, skip_serializing_if = "is_zero_u64")]
     pub updated_at_unix_seconds: u64,
+    /// 最新目录未匹配时保留旧快照，直到重新匹配或用户更换模型。
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub unmatched_in_latest_catalog: bool,
 }
 
 /// 单条模型条目。`id` 是真正发给上游 API 的 `model` 字段值;
@@ -1494,6 +1497,10 @@ pub struct AgentProviderModel {
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
     pub id: String,
+
+    /// API 发现的模型；刷新时仅移除不再由 API 返回的此类条目。
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub api_discovered: bool,
 
     /// 用户覆盖的上下文窗口(tokens)。0 表示 Auto。
     #[serde(default, skip_serializing_if = "is_zero_u32")]
@@ -1561,6 +1568,7 @@ impl AgentProviderModel {
         Self {
             name: String::new(),
             id,
+            api_discovered: false,
             context_window: 0,
             max_output_tokens: 0,
             reasoning: None,
@@ -1655,6 +1663,7 @@ impl AgentProviderModel {
     /// 模型 ID 改变后不能沿用旧模型的能力覆盖或目录绑定。
     pub fn reset_for_model_id(&mut self, id: String) {
         self.id = id;
+        self.api_discovered = false;
         self.reset_metadata_overrides();
         self.models_dev_provider_id = None;
         self.models_dev_model_id = None;
@@ -1675,6 +1684,8 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
                 #[serde(default)]
                 name: String,
                 id: String,
+                #[serde(default)]
+                api_discovered: bool,
                 #[serde(default)]
                 context_window: u32,
                 #[serde(default)]
@@ -1702,6 +1713,7 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
             Either::Full {
                 name,
                 id,
+                api_discovered,
                 context_window,
                 max_output_tokens,
                 reasoning,
@@ -1718,6 +1730,7 @@ impl<'de> Deserialize<'de> for AgentProviderModel {
                 Ok(AgentProviderModel {
                     name,
                     id,
+                    api_discovered,
                     context_window,
                     max_output_tokens,
                     reasoning,

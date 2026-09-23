@@ -305,5 +305,6 @@ pub fn into_catalog_metadata(
         model_id,
         match_confidence,
         updated_at_unix_seconds,
+        unmatched_in_latest_catalog: false,
     }
 }

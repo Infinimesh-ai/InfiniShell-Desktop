@@ -38,7 +38,8 @@ use warpui::ui_components::components::{Coords, UiComponent, UiComponentStyles};
 use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 
 use super::ai_page::{
-    AISettingsPageAction, AISettingsPageView, AgentProviderModelDraft, ModelCapabilityKind,
+    AISettingsPageAction, AISettingsPageView, AgentProviderModelDraft,
+    AgentProviderModelDraftEditors, ModelCapabilityKind,
 };
 use super::settings_page::{HEADER_PADDING, SettingsWidget, build_sub_header};
 use crate::ai::agent_providers::AgentProviderSecrets;
@@ -263,6 +264,13 @@ impl ProviderDraftEditors {
             .iter()
             .map(|model| AgentProviderModelDraft {
                 index: model.index,
+                editors: Some(AgentProviderModelDraftEditors {
+                    name: model.name.clone(),
+                    context: model.context.clone(),
+                    output: model.output.clone(),
+                    models_dev_provider: model.models_dev_provider.clone(),
+                    models_dev_model: model.models_dev_model.clone(),
+                }),
                 name: model.name.as_ref(app).buffer_text(app),
                 id: model.id.as_ref(app).buffer_text(app),
                 context_window: parse_token_count(&model.context.as_ref(app).buffer_text(app)),
@@ -1226,7 +1234,9 @@ impl AgentProvidersWidget {
                     crate::t!("settings-agent-providers-models-dev-match-unique")
                 }
             };
-            let freshness = if crate::ai::agent_providers::models_dev::snapshot_is_stale(
+            let freshness = if metadata.unmatched_in_latest_catalog {
+                crate::t!("settings-agent-providers-models-dev-snapshot-unmatched")
+            } else if crate::ai::agent_providers::models_dev::snapshot_is_stale(
                 metadata.updated_at_unix_seconds,
             ) {
                 crate::t!("settings-agent-providers-models-dev-snapshot-stale")
@@ -1255,6 +1265,22 @@ impl AgentProvidersWidget {
         )
         .with_margin_top(FIELD_LABEL_MARGIN_TOP)
         .finish();
+
+        let override_hint = (model.catalog_metadata.is_some() && model.manual_override_count() > 0)
+            .then(|| {
+                Container::new(
+                    Text::new(
+                        crate::t!("settings-agent-providers-models-dev-overrides-hint"),
+                        appearance.ui_font_family(),
+                        appearance.ui_font_size(),
+                    )
+                    .with_color(appearance.theme().disabled_ui_text_color().into())
+                    .soft_wrap(true)
+                    .finish(),
+                )
+                .with_margin_top(2.)
+                .finish()
+            });
 
         let mapping_label = Container::new(
             Text::new(
@@ -1336,24 +1362,26 @@ impl AgentProvidersWidget {
         .finish();
 
         // 整体 detail panel 用一个稍内缩 + 边框样式,跟主 row 拉开层级。
-        Container::new(
-            Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
-                .with_child(modalities_label)
-                .with_child(modalities_row)
-                .with_child(capabilities_label)
-                .with_child(capabilities_row)
-                .with_child(metadata_status)
-                .with_child(mapping_label)
-                .with_child(mapping_row)
-                .with_child(mapping_hint)
-                .with_child(remove_row)
-                .finish(),
-        )
-        .with_margin_top(4.)
-        .with_margin_left(12.)
-        .with_margin_bottom(8.)
-        .finish()
+        let mut detail_panel = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Stretch)
+            .with_child(modalities_label)
+            .with_child(modalities_row)
+            .with_child(capabilities_label)
+            .with_child(capabilities_row)
+            .with_child(metadata_status);
+        if let Some(override_hint) = override_hint {
+            detail_panel.add_child(override_hint);
+        }
+        detail_panel.add_child(mapping_label);
+        detail_panel.add_child(mapping_row);
+        detail_panel.add_child(mapping_hint);
+        detail_panel.add_child(remove_row);
+
+        Container::new(detail_panel.finish())
+            .with_margin_top(4.)
+            .with_margin_left(12.)
+            .with_margin_bottom(8.)
+            .finish()
     }
 
     fn render_provider_card(
@@ -1749,6 +1777,20 @@ impl AgentProvidersWidget {
                 .finish(),
         );
         content.add_child(Container::new(bottom_row).with_margin_top(10.).finish());
+        content.add_child(
+            Container::new(
+                Text::new(
+                    crate::t!("settings-agent-providers-fetch-hint"),
+                    appearance.ui_font_family(),
+                    appearance.ui_font_size(),
+                )
+                .with_color(appearance.theme().disabled_ui_text_color().into())
+                .soft_wrap(true)
+                .finish(),
+            )
+            .with_margin_top(4.)
+            .finish(),
+        );
 
         Container::new(content.finish())
             .with_background(appearance.theme().surface_1())

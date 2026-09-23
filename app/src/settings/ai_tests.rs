@@ -952,6 +952,7 @@ fn agent_provider_model_migrates_legacy_defaults_to_auto() {
     assert_eq!(model.name, "");
     assert_eq!(model.reasoning, None);
     assert_eq!(model.tool_call, None);
+    assert!(!model.api_discovered);
     assert!(!model.effective_reasoning());
     assert!(model.effective_tool_call());
 }
@@ -998,9 +999,12 @@ fn agent_provider_model_catalog_snapshot_round_trips_without_overwriting_overrid
         model_id: "model-a".to_string(),
         match_confidence: AgentProviderModelCatalogMatch::ProviderAndModel,
         updated_at_unix_seconds: 123,
+        unmatched_in_latest_catalog: false,
     });
 
     let serialized = toml::to_string(&model).expect("model should serialize");
+    assert!(!serialized.contains("api_discovered"));
+    assert!(!serialized.contains("unmatched_in_latest_catalog"));
     let restored: AgentProviderModel =
         toml::from_str(&serialized).expect("model should deserialize");
 
@@ -1012,8 +1016,51 @@ fn agent_provider_model_catalog_snapshot_round_trips_without_overwriting_overrid
 }
 
 #[test]
+fn api_discovered_model_round_trips_and_can_become_manual_after_id_change() {
+    let mut model = AgentProviderModel::from_id("model-a".to_string());
+    model.api_discovered = true;
+
+    let serialized = toml::to_string(&model).expect("model should serialize");
+    assert!(serialized.contains("api_discovered = true"));
+    let restored: AgentProviderModel =
+        toml::from_str(&serialized).expect("model should deserialize");
+    assert!(restored.api_discovered);
+
+    model.reset_for_model_id("model-b".to_string());
+    assert!(!model.api_discovered);
+}
+
+#[test]
+fn unmatched_catalog_snapshot_round_trips_and_preserves_effective_metadata() {
+    let mut model = AgentProviderModel::from_id("model-a".to_string());
+    model.catalog_metadata = Some(AgentProviderModelCatalogMetadata {
+        name: "Catalog A".to_string(),
+        context_window: 128_000,
+        max_output_tokens: 16_000,
+        reasoning: true,
+        tool_call: true,
+        image: true,
+        pdf: false,
+        audio: false,
+        provider_id: "provider-a".to_string(),
+        model_id: "model-a".to_string(),
+        match_confidence: AgentProviderModelCatalogMatch::ProviderAndModel,
+        updated_at_unix_seconds: 123,
+        unmatched_in_latest_catalog: true,
+    });
+
+    let serialized = toml::to_string(&model).expect("model should serialize");
+    assert!(serialized.contains("unmatched_in_latest_catalog = true"));
+    let restored: AgentProviderModel =
+        toml::from_str(&serialized).expect("model should deserialize");
+    assert_eq!(restored, model);
+    assert_eq!(restored.effective_context_window(), 128_000);
+}
+
+#[test]
 fn changing_model_id_resets_model_specific_state() {
     let mut model = AgentProviderModel::from_id("old-model".to_string());
+    model.api_discovered = true;
     model.name = "Old alias".to_string();
     model.context_window = 64_000;
     model.reasoning = Some(true);
@@ -1031,6 +1078,7 @@ fn changing_model_id_resets_model_specific_state() {
         model_id: "old-model".to_string(),
         match_confidence: AgentProviderModelCatalogMatch::Explicit,
         updated_at_unix_seconds: 123,
+        unmatched_in_latest_catalog: true,
     });
 
     model.reset_for_model_id("new-model".to_string());

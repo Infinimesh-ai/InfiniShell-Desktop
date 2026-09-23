@@ -631,6 +631,7 @@ pub struct AISettingsPageView {
     models_dev_force_refresh_pending: bool,
     pending_models_dev_enrichment: HashMap<String, HashSet<String>>,
     pending_models_dev_manual_sync: HashSet<String>,
+    api_model_fetch_revision: HashMap<String, u64>,
     voice_input_toggle_key_dropdown: ViewHandle<Dropdown<AISettingsPageAction>>,
     voice_input_language_dropdown: ViewHandle<FilterableDropdown<AISettingsPageAction>>,
     local_only_icon_tooltip_states: RefCell<HashMap<String, MouseStateHandle>>,
@@ -1978,6 +1979,7 @@ impl AISettingsPageView {
             models_dev_force_refresh_pending: false,
             pending_models_dev_enrichment: HashMap::new(),
             pending_models_dev_manual_sync: HashSet::new(),
+            api_model_fetch_revision: HashMap::new(),
             voice_input_toggle_key_dropdown,
             voice_input_language_dropdown,
             autodetection_denylist_editor,
@@ -3648,6 +3650,7 @@ impl AISettingsPageView {
     ) -> (HashSet<String>, usize) {
         let mut changed_model_ids = HashSet::new();
         let mut reset_model_count = 0;
+        let mut reset_previous_models = HashMap::new();
         AISettings::handle(ctx).update(ctx, |settings, ctx| {
             let mut providers = settings.agent_providers.value().clone();
             if let Some(p) = providers.iter_mut().find(|p| p.id == provider_id) {
@@ -3657,57 +3660,15 @@ impl AISettingsPageView {
                 // 按 model_index 更新，跳过越界索引（rebuild 中间表单与 settings 可能短暂不一致）。
                 for draft in models {
                     if let Some(m) = p.models.get_mut(draft.index) {
-                        let previous_id = m.id.clone();
-                        if previous_id != draft.id && !draft.id.trim().is_empty() {
-                            let had_previous_model = !previous_id.trim().is_empty();
-                            let previous_name = m.name.clone();
-                            let previous_context_window = m.context_window;
-                            let previous_max_output_tokens = m.max_output_tokens;
-                            let previous_models_dev_provider_id =
-                                m.models_dev_provider_id.clone().unwrap_or_default();
-                            let previous_models_dev_model_id =
-                                m.models_dev_model_id.clone().unwrap_or_default();
-
-                            m.reset_for_model_id(draft.id.clone());
-                            // ID 改动默认不沿用旧模型覆盖;同一次保存中明确改过的值仍视为新模型设置。
-                            if draft.name != previous_name {
-                                m.name = draft.name.clone();
-                            }
-                            if draft.context_window != previous_context_window {
-                                m.context_window = draft.context_window;
-                            }
-                            if draft.max_output_tokens != previous_max_output_tokens {
-                                m.max_output_tokens = draft.max_output_tokens;
-                            }
-                            if draft.models_dev_provider_id != previous_models_dev_provider_id {
-                                m.models_dev_provider_id =
-                                    non_empty_string(draft.models_dev_provider_id.clone());
-                            }
-                            if draft.models_dev_model_id != previous_models_dev_model_id {
-                                m.models_dev_model_id =
-                                    non_empty_string(draft.models_dev_model_id.clone());
-                            }
-                            changed_model_ids.insert(draft.id.clone());
-                            reset_model_count += usize::from(had_previous_model);
-                        } else {
-                            let mapping_changed = m.models_dev_provider_id.as_deref()
-                                != non_empty_str(&draft.models_dev_provider_id)
-                                || m.models_dev_model_id.as_deref()
-                                    != non_empty_str(&draft.models_dev_model_id);
-                            m.name = draft.name.clone();
-                            m.id = draft.id.clone();
-                            m.context_window = draft.context_window;
-                            m.max_output_tokens = draft.max_output_tokens;
-                            m.models_dev_provider_id =
-                                non_empty_string(draft.models_dev_provider_id.clone());
-                            m.models_dev_model_id =
-                                non_empty_string(draft.models_dev_model_id.clone());
-                            if mapping_changed {
-                                m.catalog_metadata = None;
-                                if !m.id.trim().is_empty() {
-                                    changed_model_ids.insert(m.id.clone());
-                                }
-                            }
+                        let previous_model = m.clone();
+                        let (id_changed, mapping_changed) =
+                            apply_agent_provider_model_draft(m, draft);
+                        if id_changed {
+                            reset_model_count += usize::from(!previous_model.id.is_empty());
+                            reset_previous_models.insert(draft.index, previous_model);
+                        }
+                        if (id_changed || mapping_changed) && !m.id.trim().is_empty() {
+                            changed_model_ids.insert(m.id.clone());
                         }
                     }
                 }
@@ -3720,6 +3681,11 @@ impl AISettingsPageView {
                 secrets.set(provider_id, api_key.to_owned(), ctx);
             },
         );
+        for draft in models {
+            if let Some(previous) = reset_previous_models.get(&draft.index) {
+                draft.clear_unchanged_old_editors(previous, ctx);
+            }
+        }
         (changed_model_ids, reset_model_count)
     }
 
@@ -4141,6 +4107,116 @@ pub struct AgentProviderModelDraft {
     pub max_output_tokens: u32,
     pub models_dev_provider_id: String,
     pub models_dev_model_id: String,
+    pub editors: Option<AgentProviderModelDraftEditors>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AgentProviderModelDraftEditors {
+    pub name: ViewHandle<EditorView>,
+    pub context: ViewHandle<EditorView>,
+    pub output: ViewHandle<EditorView>,
+    pub models_dev_provider: ViewHandle<EditorView>,
+    pub models_dev_model: ViewHandle<EditorView>,
+}
+
+impl AgentProviderModelDraft {
+    fn clear_unchanged_old_editors(
+        &self,
+        previous: &crate::settings::AgentProviderModel,
+        ctx: &mut ViewContext<AISettingsPageView>,
+    ) {
+        let Some(editors) = &self.editors else {
+            return;
+        };
+        if self.name == previous.name {
+            editors.name.update(ctx, |editor, ctx| {
+                editor.system_reset_buffer_text("", ctx);
+                editor.set_placeholder_text(
+                    crate::t!("settings-agent-providers-model-name-placeholder"),
+                    ctx,
+                );
+            });
+        }
+        if self.context_window == previous.context_window {
+            editors.context.update(ctx, |editor, ctx| {
+                editor.system_reset_buffer_text("", ctx);
+                editor.set_placeholder_text(
+                    crate::t!("settings-agent-providers-model-context-placeholder"),
+                    ctx,
+                );
+            });
+        }
+        if self.max_output_tokens == previous.max_output_tokens {
+            editors.output.update(ctx, |editor, ctx| {
+                editor.system_reset_buffer_text("", ctx);
+                editor.set_placeholder_text(
+                    crate::t!("settings-agent-providers-model-output-placeholder"),
+                    ctx,
+                );
+            });
+        }
+        if self.models_dev_provider_id == previous.models_dev_provider_id.as_deref().unwrap_or("") {
+            editors
+                .models_dev_provider
+                .update(ctx, |editor, ctx| editor.system_reset_buffer_text("", ctx));
+        }
+        if self.models_dev_model_id == previous.models_dev_model_id.as_deref().unwrap_or("") {
+            editors
+                .models_dev_model
+                .update(ctx, |editor, ctx| editor.system_reset_buffer_text("", ctx));
+        }
+    }
+}
+
+fn apply_agent_provider_model_draft(
+    model: &mut crate::settings::AgentProviderModel,
+    draft: &AgentProviderModelDraft,
+) -> (bool, bool) {
+    let id_changed = model.id != draft.id;
+    if id_changed {
+        let previous = model.clone();
+        model.reset_for_model_id(draft.id.clone());
+        // 仅本次明确改动的值可随新 ID 保存;未改动字段在编辑框中一并清空。
+        if draft.name != previous.name {
+            model.name = draft.name.clone();
+        }
+        if draft.context_window != previous.context_window {
+            model.context_window = draft.context_window;
+        }
+        if draft.max_output_tokens != previous.max_output_tokens {
+            model.max_output_tokens = draft.max_output_tokens;
+        }
+        let mut mapping_changed = false;
+        if draft.models_dev_provider_id != previous.models_dev_provider_id.as_deref().unwrap_or("")
+        {
+            let new_value = non_empty_string(draft.models_dev_provider_id.clone());
+            mapping_changed |= model.models_dev_provider_id != new_value;
+            model.models_dev_provider_id = new_value;
+        }
+        if draft.models_dev_model_id != previous.models_dev_model_id.as_deref().unwrap_or("") {
+            let new_value = non_empty_string(draft.models_dev_model_id.clone());
+            mapping_changed |= model.models_dev_model_id != new_value;
+            model.models_dev_model_id = new_value;
+        }
+        if mapping_changed {
+            model.catalog_metadata = None;
+        }
+        return (id_changed, mapping_changed);
+    }
+
+    let mapping_changed = model.models_dev_provider_id.as_deref()
+        != non_empty_str(&draft.models_dev_provider_id)
+        || model.models_dev_model_id.as_deref() != non_empty_str(&draft.models_dev_model_id);
+    model.name = draft.name.clone();
+    model.id = draft.id.clone();
+    model.context_window = draft.context_window;
+    model.max_output_tokens = draft.max_output_tokens;
+    model.models_dev_provider_id = non_empty_string(draft.models_dev_provider_id.clone());
+    model.models_dev_model_id = non_empty_string(draft.models_dev_model_id.clone());
+    if mapping_changed {
+        model.catalog_metadata = None;
+    }
+    (id_changed, mapping_changed)
 }
 
 /// model detail panel 三态 capability chip 的种类。
@@ -4161,14 +4237,21 @@ fn non_empty_string(value: String) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
-/// 用 API 返回的完整 ID 集合刷新模型列表。
+/// 用 API 返回的完整 ID 集合刷新 API 管理的模型。
 ///
-/// 上游仍存在的同 ID 模型保留用户已编辑的别名、token 上限和能力覆盖;
-/// 上游已移除的 ID 会被删除,新 ID 则用默认值创建。
+/// 同 ID 保留用户覆盖;消失的 API 管理模型移除。手工及旧配置模型来源不明,
+/// 即使被 API 命中也不能改判为 API 管理,否则将来可能被误删。
 fn refreshed_agent_provider_models(
     existing: &[crate::settings::AgentProviderModel],
     fetched_ids: impl IntoIterator<Item = String>,
 ) -> Vec<crate::settings::AgentProviderModel> {
+    let fetched_ids: Vec<_> = fetched_ids
+        .into_iter()
+        .filter(|id| !id.trim().is_empty())
+        .collect();
+    if fetched_ids.is_empty() {
+        return existing.to_vec();
+    }
     let mut existing_by_id = HashMap::with_capacity(existing.len());
     for model in existing {
         existing_by_id
@@ -4177,26 +4260,31 @@ fn refreshed_agent_provider_models(
     }
 
     let mut seen = HashSet::new();
-    fetched_ids
-        .into_iter()
-        .filter_map(|id| {
-            if !seen.insert(id.clone()) {
-                return None;
-            }
-            Some(
-                existing_by_id
-                    .remove(&id)
-                    .unwrap_or_else(|| crate::settings::AgentProviderModel::from_id(id)),
-            )
-        })
-        .collect()
+    let mut refreshed = Vec::new();
+    for id in fetched_ids {
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        let model = existing_by_id.remove(&id).unwrap_or_else(|| {
+            let mut model = crate::settings::AgentProviderModel::from_id(id);
+            model.api_discovered = true;
+            model
+        });
+        refreshed.push(model);
+    }
+    for model in existing {
+        if !model.api_discovered && seen.insert(model.id.clone()) {
+            refreshed.push(model.clone());
+        }
+    }
+    refreshed
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
 struct ModelsDevSyncSummary {
     matched: usize,
     changed: usize,
-    cleared: usize,
+    retained_unmatched: usize,
     preserved_overrides: usize,
 }
 
@@ -4304,7 +4392,7 @@ fn models_dev_updated_models(
     catalog: &crate::ai::agent_providers::models_dev::Catalog,
     target_model_ids: Option<&HashSet<String>>,
     updated_at_unix_seconds: u64,
-    clear_unmatched: bool,
+    mark_unmatched: bool,
 ) -> (
     Vec<crate::settings::AgentProviderModel>,
     ModelsDevSyncSummary,
@@ -4336,9 +4424,12 @@ fn models_dev_updated_models(
         }
         let before = model.clone();
         let Some(catalog_match) = find_catalog_model(model, catalog, preferred_provider) else {
-            if clear_unmatched && model.catalog_metadata.take().is_some() {
-                summary.changed += 1;
-                summary.cleared += 1;
+            if mark_unmatched && let Some(metadata) = model.catalog_metadata.as_mut() {
+                summary.retained_unmatched += 1;
+                if !metadata.unmatched_in_latest_catalog {
+                    metadata.unmatched_in_latest_catalog = true;
+                    summary.changed += 1;
+                }
             }
             continue;
         };
@@ -4430,11 +4521,11 @@ fn complete_models_dev_sync(
         }
     });
 
-    let (message, flavor) = if summary.matched == 0 && summary.cleared > 0 {
+    let (message, flavor) = if summary.matched == 0 && summary.retained_unmatched > 0 {
         (
             crate::t!(
-                "settings-agent-providers-models-dev-no-match-cleared",
-                count = summary.cleared
+                "settings-agent-providers-models-dev-no-match-retained",
+                count = summary.retained_unmatched
             ),
             ToastFlavor::Error,
         )
@@ -4443,11 +4534,21 @@ fn complete_models_dev_sync(
             crate::t!("settings-agent-providers-models-dev-no-match"),
             ToastFlavor::Error,
         )
+    } else if summary.retained_unmatched > 0 {
+        (
+            crate::t!(
+                "settings-agent-providers-models-dev-partial",
+                matched = summary.matched,
+                retained = summary.retained_unmatched,
+                overrides = summary.preserved_overrides
+            ),
+            ToastFlavor::Default,
+        )
     } else if summary.changed > 0 {
         (
             crate::t!(
                 "settings-agent-providers-models-dev-updated",
-                count = summary.changed,
+                count = summary.matched,
                 overrides = summary.preserved_overrides
             ),
             ToastFlavor::Success,
@@ -4460,7 +4561,7 @@ fn complete_models_dev_sync(
     };
     show_agent_provider_toast(message, flavor, ctx);
 
-    if summary.changed > 0 {
+    if summary.changed > 0 && summary.matched > 0 {
         view.rebuild_current_page(ctx);
     } else {
         ctx.notify();
@@ -5678,6 +5779,14 @@ impl TypedActionView for AISettingsPageView {
                 let api_key = crate::ai::agent_providers::AgentProviderSecrets::as_ref(ctx)
                     .get(&provider_id)
                     .map(str::to_owned);
+                let requested_base_url = provider.base_url.clone();
+                let requested_api_key = api_key.clone();
+                let revision = self
+                    .api_model_fetch_revision
+                    .entry(provider_id.clone())
+                    .or_default();
+                *revision = revision.wrapping_add(1);
+                let revision = *revision;
                 let client = http_client::Client::new();
                 let provider_id_for_handler = provider_id.clone();
                 ctx.spawn(
@@ -5691,13 +5800,38 @@ impl TypedActionView for AISettingsPageView {
                     },
                     move |view, result, ctx| match result {
                         Ok(fetched) => {
+                            if view.api_model_fetch_revision.get(&provider_id_for_handler)
+                                != Some(&revision)
+                                || crate::ai::agent_providers::AgentProviderSecrets::as_ref(ctx)
+                                    .get(&provider_id_for_handler)
+                                    != requested_api_key.as_deref()
+                                || AISettings::as_ref(ctx)
+                                    .agent_providers
+                                    .value()
+                                    .iter()
+                                    .find(|provider| provider.id == provider_id_for_handler)
+                                    .is_none_or(|provider| provider.base_url != requested_base_url)
+                            {
+                                return;
+                            }
+                            if fetched.iter().all(|model| model.id.trim().is_empty()) {
+                                show_agent_provider_toast(
+                                    crate::t!("settings-agent-providers-api-empty-retained"),
+                                    ToastFlavor::Error,
+                                    ctx,
+                                );
+                                return;
+                            }
                             let mut discovered_model_ids = Vec::new();
+                            let mut applied = false;
                             AISettings::handle(ctx).update(ctx, |settings, ctx| {
                                 let mut providers = settings.agent_providers.value().clone();
                                 if let Some(p) = providers
                                     .iter_mut()
                                     .find(|p| p.id == provider_id_for_handler)
+                                    .filter(|p| p.base_url == requested_base_url)
                                 {
+                                    applied = true;
                                     let existing_ids = p
                                         .models
                                         .iter()
@@ -5714,8 +5848,13 @@ impl TypedActionView for AISettingsPageView {
                                         .collect();
                                     p.models = models;
                                 }
-                                let _ = settings.agent_providers.set_value(providers, ctx);
+                                if applied {
+                                    let _ = settings.agent_providers.set_value(providers, ctx);
+                                }
                             });
+                            if !applied {
+                                return;
+                            }
                             // 模型行数可能变了,需要 rebuild widget rows。
                             view.rebuild_current_page(ctx);
                             view.queue_models_dev_enrichment(
