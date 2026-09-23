@@ -576,6 +576,7 @@ fn current_setup_accepts_independent_native_events_in_both_observed_orders() {
     assert!(display_before_response.early_skill_catalogs.is_empty());
 }
 
+#[cfg(unix)]
 #[test]
 fn current_command_catalog_reaches_the_selected_skill_observer_before_input() {
     let mut protocol = current_waiting_for_display_notifications();

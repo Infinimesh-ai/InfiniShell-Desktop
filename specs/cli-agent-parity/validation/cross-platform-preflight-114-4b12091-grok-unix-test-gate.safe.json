@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "scope": "focused_linux_windows_preflight_blocked_by_windows_grok_test_cfg",
+  "run": {
+    "id": 35821695492,
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "head_sha": "4b12091e788fb79f7bbf12c1fbf67d98c52aabe3",
+    "linux_x64": true,
+    "windows_x64": true,
+    "full_workspace_tests": false,
+    "run_atomic_windows_debug": true,
+    "conclusion": "failure"
+  },
+  "jobs": {
+    "linux_x64": {
+      "conclusion": "success",
+      "successful_steps": 34,
+      "skipped_steps": 2,
+      "failed_steps": 0
+    },
+    "windows_x64": {
+      "conclusion": "failure",
+      "successful_steps": 39,
+      "skipped_steps": 8,
+      "failed_steps": 1,
+      "first_failed_step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+    }
+  },
+  "first_failure": {
+    "phase": "cargo test --no-run --package warp --lib",
+    "error_codes": ["E0433", "E0609"],
+    "source_file": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+    "source_lines": [583, 586],
+    "cause": "A platform-neutral unit test referred to native_skill_live_tests and skill_catalog_for_live, both compiled only under all(test, unix).",
+    "windows_lifecycle_tests_executed_in_failed_step": false,
+    "windows_atomic_image_debug_step_skipped": true,
+    "windows_production_notification_installer_step_skipped": true,
+    "windows_atomic_exit_or_rejection_proven": false
+  },
+  "downloaded_artifacts": {
+    "artifact_count": 5,
+    "file_count": 25,
+    "symlink_count": 0,
+    "json_ndjson_parse_failures": 0,
+    "common_credential_or_email_pattern_hits": 0,
+    "relative_file_manifest_sha256": "163230d04a7853db182f37faa1109ebff2a8f06cc17e3010e9bd5a16f857b1fe",
+    "groups": {
+      "claude_windows_notifications": {"files": 1, "manifest_sha256": "2c61d4d12cbfe682dac4ba10000671f75e857d8aa350be303635424590362c99"},
+      "cli_linux_native_boundaries": {"files": 13, "manifest_sha256": "e2f6b9c2fabfd67f72af48ac326a84df77b411a8a98e980311169a8fe6dc6df6"},
+      "cli_windows_native_boundaries": {"files": 7, "manifest_sha256": "64d0266ab8fbc58aa5cd378646c26418d7a97c5aa969248bdc2ba77f947e536e"},
+      "codex_windows_conpty": {"files": 3, "manifest_sha256": "d43e36973e416ef95d21ec825350d1866858802d0a21095236eb2524008f5290"},
+      "codex_windows_native_hooks": {"files": 1, "manifest_sha256": "8651155571d65a4e9760d791b7058d164b331335ea1e696dd12a1d328ae51885"}
+    }
+  },
+  "repair_candidate": {
+    "file": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+    "change": "Apply cfg(unix) to the one test using the Unix-only probe and protocol field.",
+    "windows_rerun_verified": false
+  },
+  "boundaries": {
+    "same_commit_mac_verified": false,
+    "full_workspace_verified": false,
+    "gui_integration_verified": false,
+    "windows_atomic_product_upgrade_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}
