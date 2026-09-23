@@ -103,14 +103,54 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "固定完整包的入口"):
                     verify_candidate_01561_package(root / "bin/not-codex")
             output = Path(temporary) / "receipt.ndjson"
-            args = SimpleNamespace(test_case="candidate-01561-missing-session", codex=executable,
-                                   output=output)
-            with mock.patch("run_codex_adapter_live.verify_candidate_01561_package",
-                            side_effect=ValueError("fixed package rejected")), \
-                    mock.patch("run_codex_adapter_live.subprocess.run") as process:
-                with self.assertRaisesRegex(ValueError, "fixed package rejected"):
+            for case in ("candidate-01561-missing-session", "candidate-01561-lifecycle"):
+                with self.subTest(case=case):
+                    args = SimpleNamespace(test_case=case, codex=executable, output=output)
+                    with mock.patch("run_codex_adapter_live.verify_candidate_01561_package",
+                                    side_effect=ValueError("fixed package rejected")), \
+                            mock.patch("run_codex_adapter_live.subprocess.run") as process:
+                        with self.assertRaisesRegex(ValueError, "fixed package rejected"):
+                            run(args)
+                        process.assert_not_called()
+                    self.assertFalse(output.exists())
+
+    def test_candidate_01561_windows_package_entrypoint_supports_private_temp_path(self):
+        with tempfile.TemporaryDirectory(prefix="runner 临时 & ") as temporary:
+            root = Path(temporary) / "codex package"
+            (root / "bin").mkdir(parents=True)
+            executable = root / "bin/codex.exe"
+            executable.write_bytes(b"fixture")
+            package = {"entrypoint": "bin/codex.exe"}
+            for machine, target in (("AMD64", "windows-x64"), ("ARM64", "windows-arm64")):
+                with self.subTest(machine=machine), \
+                        mock.patch("run_codex_adapter_live.sys.platform", "win32"), \
+                        mock.patch("run_codex_adapter_live.platform.machine", return_value=machine), \
+                        mock.patch("run_codex_adapter_live.prepare.packages_for_version",
+                                   return_value={target: package}), \
+                        mock.patch("run_codex_adapter_live.prepare.verify_runtime_tree",
+                                   return_value=executable) as verified:
+                    self.assertEqual(verify_candidate_01561_package(executable), target)
+                    verified.assert_called_once_with(root, package, "0.156.1")
+
+    def test_candidate_01561_lifecycle_uses_runner_temp_before_credential_copy(self):
+        with tempfile.TemporaryDirectory(prefix="runner 临时 & ") as temporary:
+            root = Path(temporary)
+            output = root / "receipt.ndjson"
+            args = SimpleNamespace(test_case="candidate-01561-lifecycle",
+                                   codex=root / "package/bin/codex.exe",
+                                   test_binary=root / "warp-tests.exe",
+                                   supervisor=root / "warp.exe", output=output)
+            with mock.patch.dict(os.environ, {"RUNNER_TEMP": temporary}), \
+                    mock.patch("run_codex_adapter_live.sys.platform", "win32"), \
+                    mock.patch("run_codex_adapter_live.verify_candidate_01561_package"), \
+                    mock.patch("run_codex_adapter_live.digest", return_value="fixture"), \
+                    mock.patch("run_codex_adapter_live.subprocess.run",
+                               return_value=mock.Mock(stdout="fixture\n")), \
+                    mock.patch("run_codex_adapter_live.tempfile.TemporaryDirectory",
+                               side_effect=RuntimeError("stop before credential copy")) as directory:
+                with self.assertRaisesRegex(RuntimeError, "stop before credential copy"):
                     run(args)
-                process.assert_not_called()
+            directory.assert_called_once_with(prefix="infinishell-codex-adapter-", dir=temporary)
             self.assertFalse(output.exists())
 
     def test_each_case_requires_current_success_and_matching_test(self):
@@ -118,6 +158,10 @@ class AcceptanceEvidenceTests(unittest.TestCase):
         zero = "test result: ok. 0 passed; 0 failed; 0 ignored;"
         cases = {
             "lifecycle": {"event": "acceptance_passed"},
+            "candidate-01561-lifecycle": {
+                "event": "acceptance_passed", "scope": "rust_adapter_01561_test_only_process_restart",
+                "test_only_candidate_01561": True, "app_restart_and_ui_verified": False,
+            },
             "running-tool-cancel": {
                 "event": "running_tool_cancel_finished", "passed": True,
                 "native_item_started_before_interrupt": True, "interrupt_native_ack": True,
@@ -147,6 +191,14 @@ class AcceptanceEvidenceTests(unittest.TestCase):
                 self.assertFalse(verified_acceptance(case, 0, summary, []))
         self.assertFalse(verified_acceptance("candidate-01561-missing-session", 0, summary,
                                              [{"event": "missing_session_probe_finished", "passed": True}]))
+        for event in (
+            {"event": "acceptance_passed"},
+            {"event": "acceptance_passed", "scope": "rust_adapter_process_restart",
+             "test_only_candidate_01561": True, "app_restart_and_ui_verified": False},
+            {"event": "acceptance_passed", "scope": "rust_adapter_01561_test_only_process_restart",
+             "test_only_candidate_01561": False, "app_restart_and_ui_verified": False},
+        ):
+            self.assertFalse(verified_acceptance("candidate-01561-lifecycle", 0, summary, [event]))
 
     def test_running_tool_cancel_rejects_missing_cleanup_or_wrong_order(self):
         summary = "test result: ok. 1 passed; 0 failed; 0 ignored;"

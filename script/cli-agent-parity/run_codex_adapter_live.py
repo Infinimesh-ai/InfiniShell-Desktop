@@ -19,6 +19,7 @@ import prepare_codex_cli as prepare
 
 TEST_CASES = {
     "lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_managed_lifecycle",
+    "candidate-01561-lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_candidate_01561_managed_lifecycle",
     "running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_running_tool_cancel",
     "local-tools-restore": "ai::cli_agent_runtime::codex::live_tests::real_codex_local_tool_restore",
     "image-input": "ai::cli_agent_runtime::codex::live_tests::real_codex_image_input",
@@ -57,6 +58,12 @@ def verified_acceptance(test_case, exit_code, output, events):
         return False
     if test_case == "lifecycle":
         return any(event.get("event") == "acceptance_passed" for event in events)
+    if test_case == "candidate-01561-lifecycle":
+        return any(event.get("event") == "acceptance_passed"
+                   and event.get("scope") == "rust_adapter_01561_test_only_process_restart"
+                   and event.get("test_only_candidate_01561") is True
+                   and event.get("app_restart_and_ui_verified") is False
+                   for event in events)
     if test_case == "running-tool-cancel":
         expected_order = ["native_item_started", "interrupt_sent", "interrupt_accepted",
                           "turn_finished", "disconnected"]
@@ -348,7 +355,7 @@ def stopped_output(process, metadata):
 
 
 def run(args):
-    candidate_01561 = args.test_case == "candidate-01561-missing-session"
+    candidate_01561 = args.test_case in {"candidate-01561-missing-session", "candidate-01561-lifecycle"}
     if candidate_01561:
         verify_candidate_01561_package(args.codex)
     repository = Path(__file__).resolve().parents[2]
@@ -359,6 +366,7 @@ def run(args):
         "scope": {"running-tool-cancel": "rust_adapter_running_tool_cancel",
                   "image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
                   "candidate-01561-missing-session": "rust_adapter_01561_test_only_zero_input_missing_session",
+                  "candidate-01561-lifecycle": "rust_adapter_01561_test_only_process_restart",
                   "idle-crash": "rust_adapter_idle_crash_after_native_ready"}.get(
             args.test_case, "rust_adapter_process_restart"),
         "credentials_provided": args.test_case not in UNAUTHENTICATED_CASES,
@@ -377,7 +385,8 @@ def run(args):
                             text=True, capture_output=True, check=True)
     metadata["worktree_dirty"] = bool(status.stdout.strip())
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    temporary_parent = os.environ.get("RUNNER_TEMP") if args.test_case in UNAUTHENTICATED_CASES else None
+    temporary_parent = (os.environ.get("RUNNER_TEMP") if args.test_case in UNAUTHENTICATED_CASES
+                        or args.test_case == "candidate-01561-lifecycle" else None)
     with tempfile.TemporaryDirectory(prefix="infinishell-codex-adapter-", dir=temporary_parent) as temporary:
         root = Path(temporary).resolve()
         configuration = root / "codex"

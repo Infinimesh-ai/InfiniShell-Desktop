@@ -44,6 +44,7 @@ struct LiveSession {
     events: mpsc::Receiver<RuntimeEvent>,
     task: Option<JoinHandle<Result<(), RuntimeError>>>,
     native_id: Option<String>,
+    test_candidate_01561: bool,
 }
 
 impl Drop for LiveSession {
@@ -57,14 +58,29 @@ impl Drop for LiveSession {
 
 impl LiveSession {
     fn start(options: SessionOptions) -> Result<Self, String> {
+        Self::start_with_candidate(options, false)
+    }
+
+    fn start_with_candidate(
+        options: SessionOptions,
+        test_candidate_01561: bool,
+    ) -> Result<Self, String> {
         let generation = options.generation;
-        let connection = connect(options).map_err(|error| error.to_string())?;
+        let connection = if test_candidate_01561 {
+            let mut protocol = super::CodexProtocol::new(options);
+            protocol.test_only_01561_profile = true;
+            super::connect_protocol(protocol)
+        } else {
+            connect(options)
+        }
+        .map_err(|error| error.to_string())?;
         Ok(Self {
             generation,
             controller: connection.controller,
             events: connection.events,
             task: Some(tokio::spawn(connection.task)),
             native_id: None,
+            test_candidate_01561,
         })
     }
 
@@ -106,12 +122,16 @@ impl LiveSession {
     ) -> Result<String, String> {
         let event = self.next().await?;
         let RuntimeEventKind::SessionReady {
+            verified_cli_version,
             effective_permissions,
             ..
         } = event.kind
         else {
             return Err(format!("原生会话初始化失败：{:?}", event.kind));
         };
+        if self.test_candidate_01561 && verified_cli_version.as_deref() != Some("0.156.1") {
+            return Err("0.156.1 测试候选未返回精确 CLI 版本".into());
+        }
         let native_id = event
             .native_session_id
             .filter(|id| !id.is_empty())
@@ -586,7 +606,11 @@ fn approval_fixture_accepts_exact_shell_wrapper_and_rejects_other_commands() {
     ));
 }
 
-async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+async fn exercise(
+    root: &Path,
+    evidence: &mut Evidence,
+    test_candidate_01561: bool,
+) -> Result<(), String> {
     let cwd = root
         .join("project")
         .canonicalize()
@@ -610,7 +634,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options.clone())?;
+    let mut session = LiveSession::start_with_candidate(options.clone(), test_candidate_01561)?;
     let native_id = session.ready(evidence).await?;
     let first = run_turn(
         &mut session,
@@ -720,7 +744,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     options.target = SessionTarget::Resume {
         native_session_id: native_id.clone(),
     };
-    let mut resumed = LiveSession::start(options)?;
+    let mut resumed = LiveSession::start_with_candidate(options, test_candidate_01561)?;
     if resumed.ready(evidence).await? != native_id {
         return Err("恢复产生了新的原生会话 ID".into());
     }
@@ -728,7 +752,13 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     completed(&recovered, &steer_marker)?;
     resumed.shutdown(evidence).await?;
     evidence.record(json!({
-        "event": "acceptance_passed", "scope": "rust_adapter_process_restart",
+        "event": "acceptance_passed",
+        "scope": if test_candidate_01561 {
+            "rust_adapter_01561_test_only_process_restart"
+        } else {
+            "rust_adapter_process_restart"
+        },
+        "test_only_candidate_01561": test_candidate_01561,
         "native_session_id": native_id,
         "app_restart_and_ui_verified": false
     }))
@@ -737,6 +767,25 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "需要通过 run_codex_adapter_live.py 显式提供隔离登录和真实 Codex；会消耗模型额度"]
 async fn real_codex_managed_lifecycle() {
+    run_managed_lifecycle(false).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "需要通过 run_codex_adapter_live.py 显式提供隔离登录和固定 Codex 0.156.1；会消耗模型额度"]
+async fn real_codex_candidate_01561_managed_lifecycle() {
+    run_managed_lifecycle(true).await;
+}
+
+async fn run_managed_lifecycle(test_candidate_01561: bool) {
+    if test_candidate_01561 {
+        assert_eq!(
+            env::var("INFINISHELL_CODEX_TEST_CANDIDATE_01561")
+                .ok()
+                .as_deref(),
+            Some("1"),
+            "必须由固定完整包候选运行器显式启用"
+        );
+    }
     let root = PathBuf::from(
         env::var_os("INFINISHELL_CODEX_LIVE_ROOT").expect("必须由隔离运行脚本启动此测试"),
     );
@@ -756,9 +805,17 @@ async fn real_codex_managed_lifecycle() {
         root: root.clone(),
     };
     evidence
-        .record(json!({"event": "acceptance_started", "scope": "rust_adapter_process_restart"}))
+        .record(json!({
+            "event": "acceptance_started",
+            "scope": if test_candidate_01561 {
+                "rust_adapter_01561_test_only_process_restart"
+            } else {
+                "rust_adapter_process_restart"
+            },
+            "test_only_candidate_01561": test_candidate_01561
+        }))
         .unwrap();
-    let result = exercise(&root, &mut evidence).await;
+    let result = exercise(&root, &mut evidence, test_candidate_01561).await;
     if let Err(error) = &result {
         evidence
             .record(json!({"event": "acceptance_failed", "reason": error}))
