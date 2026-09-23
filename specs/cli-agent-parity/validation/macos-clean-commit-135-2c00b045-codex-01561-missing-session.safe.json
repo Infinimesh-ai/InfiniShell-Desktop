@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "scope": "codex_0_156_1_test_only_rust_adapter_missing_session_without_credentials",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "sha": "2c00b045fc7dd7dacad5bba660b509dac3a0331c",
+    "local_remote_sha_matched_before_execution": true,
+    "worktree_dirty_at_execution": false,
+    "platform": "macos-arm64"
+  },
+  "artifacts": {
+    "official_codex_version": "codex-cli 0.156.1",
+    "official_complete_package_tree_verified": true,
+    "official_binary_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+    "rust_libtest_sha256": "13b8195e87b85875230b2d5069e0050e879ed7439f732f2c601623cf88219d0f",
+    "release_supervisor_sha256": "194603ecafc515e0403a3d88df1143a2b819718e03d7e763ba24eea8035a2d9d",
+    "all_executed_from_internal_system_temp": true,
+    "libtest_and_supervisor_codesign_strict_verified": true
+  },
+  "supervisor_no_model_preflight": {
+    "passed": true,
+    "cases_passed": 2,
+    "cases_total": 2,
+    "models_requested": false,
+    "host_handshake_exit_code": 0,
+    "blocking_control_idle_exit_code": 0,
+    "private_receipt_sha256": "f65e7096b1643f8579d2b9e681a4a519263c46ef6f49a7b3e10063c2bd22a8a4"
+  },
+  "rust_adapter_probe": {
+    "test_only_candidate_enabled": true,
+    "production_version_gate_unchanged": true,
+    "runner_exit_code": 0,
+    "libtest_exit_code": 0,
+    "runner_acceptance_passed": true,
+    "credentials_provided": false,
+    "model_commands_sent": 0,
+    "expected_missing_rollout_error_observed": true,
+    "runtime_event_count": 1,
+    "supervisor_receipt_version": 1,
+    "supervisor_exit_reason": "stdio_closed",
+    "supervisor_exit_code": 0,
+    "supervisor_containment": "macos_resource_coalition",
+    "supervisor_cleanup_confirmed": true,
+    "native_exit_code_origin_verified": false,
+    "staged_native_and_supervisor_processes_after_probe": 0,
+    "private_runner_metadata_sha256": "329347e410de8860e500168361cd3a9bf62208f523e742dcb312f0b5cba31448",
+    "private_event_record_sha256": "6fadae7fc0d915aa276206487e8010ffb5118b9adae56ef4684e215b0ffdd250",
+    "private_test_output_sha256": "8a4bc1a04ef6f17a6671d87fd3800b559e43d5d7e810d6aa1f0fcb5d26c23e7e"
+  },
+  "boundaries": {
+    "authenticated_task_verified": false,
+    "tool_or_approval_verified": false,
+    "running_tool_cancel_verified": false,
+    "restore_or_app_restart_verified": false,
+    "gui_or_ssh_tmux_verified": false,
+    "linux_or_windows_verified": false,
+    "automatic_upgrade_verified": false,
+    "formal_0_156_1_runtime_gate_open": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}
