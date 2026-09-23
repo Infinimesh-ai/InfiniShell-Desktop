@@ -1780,7 +1780,14 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     cwd.verify_for_spawn()?;
                     let suspended = command.spawn_suspended()?;
                     let root_process_id = suspended.id();
-                    let mut child = suspended.resume()?;
+                    let mut child = match suspended.resume_with_child_on_error() {
+                        Ok(child) => child,
+                        Err((failure, mut child)) => {
+                            let _ = child.kill();
+                            // 调试事件尚未继续，不能在此等待；外层严格 Job 确认整树退出。
+                            return Err(failure);
+                        }
+                    };
                     let mut image_debug =
                         match executable.begin_image_debug_session(root_process_id) {
                             Ok(session) => session,

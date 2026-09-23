@@ -7,8 +7,9 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::{
-    Effects, GrokProtocol, REQUEST_TIMEOUT, flush_effects, supported_version, validate_options,
-    verified_version,
+    Effects, GrokProtocol, REQUEST_TIMEOUT, flush_effects, supported_version,
+    validate_current_settings_update, validate_options, verified_version,
+    verify_test_candidate_binary,
 };
 use crate::ai::cli_agent_runtime::grok_profile::GrokCreationPolicyV1;
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
@@ -158,6 +159,12 @@ fn current_display_notifications() -> Vec<Value> {
     messages
 }
 
+fn test_candidate_settings_update() -> Value {
+    let mut settings = current_display_notifications().remove(1);
+    settings["params"]["subagent_model_inheritance_enabled"] = json!(true);
+    settings
+}
+
 fn current_command_catalog(session_id: &str) -> Value {
     const COMMAND_HAS_META: [bool; 29] = [
         false, false, false, false, false, true, false, false, false, true, true, true, true, true,
@@ -256,6 +263,108 @@ fn only_exact_observed_cli_versions_are_accepted() {
     assert!(supported_version("1.0.34"));
     assert!(supported_version("1.0.40"));
     assert!(!supported_version("1.0.41"));
+}
+
+#[test]
+fn test_candidate_1041_requires_explicit_profile_and_exact_native_version_text() {
+    let version = "grok 1.0.41 (4220f3b224a6)";
+    assert_eq!(verified_version(version), None);
+    assert!(!supported_version("1.0.41"));
+
+    let mut ordinary = GrokProtocol::new(options());
+    assert!(ordinary.bind_cli_version(version).is_err());
+
+    let mut candidate = GrokProtocol::new(options());
+    candidate.test_only_1041_profile = true;
+    assert!(candidate.bind_cli_version("grok 1.0.41 (wrong)").is_err());
+    assert!(
+        candidate
+            .bind_cli_version("grok 1.0.40 (eb1a2256660d)")
+            .is_err()
+    );
+    candidate.bind_cli_version(version).unwrap();
+    assert_eq!(candidate.probed_version, Some("1.0.41"));
+    assert!(candidate.current_protocol());
+}
+
+#[test]
+fn test_candidate_1041_rejects_binary_without_fixed_size() {
+    let file = tempfile::NamedTempFile::new().unwrap();
+    assert!(verify_test_candidate_binary(file.path()).is_err());
+}
+
+#[test]
+fn test_candidate_1041_settings_requires_the_exact_added_boolean() {
+    let settings = test_candidate_settings_update();
+    assert!(validate_current_settings_update(&settings, true).is_ok());
+    assert!(validate_current_settings_update(&settings, false).is_err());
+}
+
+#[test]
+fn test_candidate_1041_settings_rejects_an_extra_field() {
+    let mut settings = test_candidate_settings_update();
+    settings["params"]["unexpected_flag"] = json!(true);
+    assert!(validate_current_settings_update(&settings, true).is_err());
+}
+
+#[test]
+fn test_candidate_1041_settings_rejects_a_missing_field() {
+    let mut settings = test_candidate_settings_update();
+    settings["params"]
+        .as_object_mut()
+        .unwrap()
+        .remove("subagent_model_inheritance_enabled");
+    assert!(validate_current_settings_update(&settings, true).is_err());
+}
+
+#[test]
+fn test_candidate_1041_settings_rejects_an_incorrect_type() {
+    let mut settings = test_candidate_settings_update();
+    settings["params"]["subagent_model_inheritance_enabled"] = json!("true");
+    assert!(validate_current_settings_update(&settings, true).is_err());
+}
+
+#[test]
+fn test_candidate_1041_bound_protocol_accepts_the_exact_settings_broadcast() {
+    let mut selected = options();
+    selected.selected_skills.push(SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: selected.cwd.join("SKILL.md"),
+    });
+    let mut protocol = GrokProtocol::new(selected);
+    protocol.test_only_1041_profile = true;
+    protocol.current_root_candidate_for_live = true;
+    protocol.current_selected_skill_candidate_for_live = true;
+    protocol
+        .bind_cli_version("grok 1.0.41 (4220f3b224a6)")
+        .unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = current_initialize();
+    initialize["result"]["_meta"]["agentVersion"] = json!("1.0.41");
+    protocol.receive(initialize).unwrap();
+    protocol
+        .receive(json!({
+            "jsonrpc": "2.0",
+            "method": "_x.ai/mcp/servers_updated",
+            "params": {"mcpServers": []}
+        }))
+        .unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for message in &setup[..5] {
+        protocol.receive(message.clone()).unwrap();
+    }
+    protocol.receive(fixture_response(3)).unwrap();
+    protocol.receive(setup[5].clone()).unwrap();
+    let display = current_display_notifications();
+    protocol.receive(display[0].clone()).unwrap();
+    protocol.receive(test_candidate_settings_update()).unwrap();
+    assert!(protocol.current_setup.as_ref().unwrap().settings_received);
+    assert!(protocol.session_id.is_some());
 }
 
 #[test]

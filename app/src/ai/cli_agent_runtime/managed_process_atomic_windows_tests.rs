@@ -53,8 +53,9 @@ const REAL_CLI_ENV_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_ENV";
 const DEBUG_DRIVER_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_DRIVER";
 const DEBUG_DRIVER_RECEIPT_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_RECEIPT";
 const DEBUG_DRIVER_TIMEOUT: Duration = Duration::from_secs(30);
+const DEBUG_LARGE_IMAGE_TIMEOUT: Duration = Duration::from_secs(120);
 
-fn run_debug_fixture_in_strict_job(test_name: &str) {
+fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
     let (_, test_module) = module_path!()
         .split_once("::")
         .expect("测试模块路径应包含 crate 名称");
@@ -86,7 +87,8 @@ fn run_debug_fixture_in_strict_job(test_name: &str) {
         panic!("调试夹具授权失败：{failure}；严格 Job 清理：{cleanup:?}");
     }
 
-    let deadline = Instant::now() + DEBUG_DRIVER_TIMEOUT;
+    let started = Instant::now();
+    let deadline = started + timeout;
     let outcome = loop {
         match tree.root_exited() {
             Ok(true) => break Ok(false),
@@ -101,9 +103,14 @@ fn run_debug_fixture_in_strict_job(test_name: &str) {
     // 即使调试事件链挂住，也须终止专属 Job、等待测试根进程并确认 ActiveProcesses=0。
     let status = tree.terminate_and_confirm(Duration::from_secs(5)).unwrap();
     let timed_out = outcome.unwrap();
+    eprintln!(
+        "Windows 调试夹具：测试={test_name}，外层耗时={}ms，超时={timed_out}，严格 Job 已清空",
+        started.elapsed().as_millis()
+    );
     assert!(
         !timed_out,
-        "调试链 {test_name} 在 30 秒内没有原生退出；严格 Job 已清空，测试根进程：{status}"
+        "调试链 {test_name} 在 {} 秒内没有原生退出；严格 Job 已清空，测试根进程：{status}",
+        timeout.as_secs()
     );
     assert!(
         status.success(),
@@ -116,6 +123,16 @@ fn await_debug_driver_authorization() {
     let mut authorization = [0];
     std::io::stdin().read_exact(&mut authorization).unwrap();
     assert_eq!(authorization, [b'1']);
+}
+
+fn resume_debuggee(suspended: command::windows::SuspendedChild) -> std::process::Child {
+    match suspended.resume_with_child_on_error() {
+        Ok(child) => child,
+        Err((failure, mut child)) => {
+            let _ = child.kill();
+            panic!("调试夹具恢复主线程失败，外层严格 Job 负责整树清理：{failure}");
+        }
+    }
 }
 
 fn record_debug_native_exit(test_name: &str) {
@@ -336,7 +353,10 @@ fn windows_program_with_bounded_imports_is_structurally_accepted() {
 #[ignore = "Windows 实机调试事件退出闭包尚未收敛，产品入口继续保持 ManualOnly"]
 fn debug_session_runs_system_only_process_to_native_exit() {
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
-        run_debug_fixture_in_strict_job("debug_session_runs_system_only_process_to_native_exit");
+        run_debug_fixture_in_strict_job(
+            "debug_session_runs_system_only_process_to_native_exit",
+            DEBUG_DRIVER_TIMEOUT,
+        );
         return;
     }
     await_debug_driver_authorization();
@@ -363,7 +383,7 @@ fn debug_session_runs_system_only_process_to_native_exit() {
         .unwrap();
     let suspended = command.spawn_suspended().unwrap();
     let root_process_id = suspended.id();
-    let mut child = suspended.resume().unwrap();
+    let mut child = resume_debuggee(suspended);
     eprintln!("Windows 调试夹具：系统命令主线程已恢复，等待根映像初始事件");
     let mut debug = executable
         .begin_image_debug_session(root_process_id)
@@ -385,7 +405,10 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         return;
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
-        run_debug_fixture_in_strict_job("debug_session_runs_fixed_real_cli_to_native_exit");
+        run_debug_fixture_in_strict_job(
+            "debug_session_runs_fixed_real_cli_to_native_exit",
+            DEBUG_DRIVER_TIMEOUT,
+        );
         return;
     }
     await_debug_driver_authorization();
@@ -436,7 +459,7 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         .unwrap();
     let suspended = command.spawn_suspended().unwrap();
     let root_process_id = suspended.id();
-    let mut child = suspended.resume().unwrap();
+    let mut child = resume_debuggee(suspended);
     eprintln!("Windows 调试夹具：真实 CLI 主线程已恢复，等待根映像初始事件");
     let mut debug = executable
         .begin_image_debug_session(root_process_id)
@@ -475,21 +498,39 @@ fn debug_session_rejects_non_system_dynamic_image_before_continue() {
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_fixture_in_strict_job(
             "debug_session_rejects_non_system_dynamic_image_before_continue",
+            DEBUG_LARGE_IMAGE_TIMEOUT,
         );
         return;
     }
     await_debug_driver_authorization();
     let executable_path = std::env::current_exe().unwrap();
+    let executable_bytes = fs::metadata(&executable_path).unwrap().len();
+    eprintln!("Windows DLL 拒绝诊断：测试二进制大小={executable_bytes} 字节，开始身份捕获");
+    let mut stage_started = Instant::now();
     let expected = ExpectedFileIdentity::capture(&executable_path).unwrap();
+    eprintln!(
+        "Windows DLL 拒绝诊断：身份捕获耗时={}ms，开始 PE 与租约准备",
+        stage_started.elapsed().as_millis()
+    );
+    stage_started = Instant::now();
     let mut executable = prepare(&expected).unwrap();
+    eprintln!(
+        "Windows DLL 拒绝诊断：PE 与租约准备耗时={}ms，开始夹具准备",
+        stage_started.elapsed().as_millis()
+    );
+    stage_started = Instant::now();
     let directory = tempfile::tempdir().unwrap();
     let system_directory = prepare_system_directory().unwrap();
     let system_path = final_path_from_handle(&system_directory.file).unwrap();
     let copied_dll = directory.path().join("copied-version.dll");
-    fs::copy(system_path.join("version.dll"), &copied_dll).unwrap();
+    let copied_dll_bytes = fs::copy(system_path.join("version.dll"), &copied_dll).unwrap();
     let marker = directory.path().join("loaded.txt");
     let cwd_identity = AtomicDirectoryIdentity::capture(directory.path()).unwrap();
     let cwd = prepare_directory(&cwd_identity).unwrap();
+    eprintln!(
+        "Windows DLL 拒绝诊断：夹具准备耗时={}ms，测试 DLL 大小={copied_dll_bytes} 字节，开始命令核验",
+        stage_started.elapsed().as_millis()
+    );
     let mut command = Command::new(executable.execution_path());
     command
         .arg("non_system_dynamic_image_fixture")
@@ -503,23 +544,49 @@ fn debug_session_rejects_non_system_dynamic_image_before_continue() {
         .stderr(Stdio::null())
         .inherit_managed_job()
         .creation_flags(DEBUG_PROCESS.0);
+    stage_started = Instant::now();
     executable
         .verify_command_for_suspended_spawn(&command)
         .unwrap();
+    eprintln!(
+        "Windows DLL 拒绝诊断：命令核验耗时={}ms，开始挂起派生",
+        stage_started.elapsed().as_millis()
+    );
+    stage_started = Instant::now();
     let suspended = command.spawn_suspended().unwrap();
+    eprintln!(
+        "Windows DLL 拒绝诊断：挂起派生耗时={}ms，开始恢复主线程",
+        stage_started.elapsed().as_millis()
+    );
     let root_process_id = suspended.id();
-    let mut child = suspended.resume().unwrap();
-    eprintln!("Windows 调试夹具：DLL 拒绝用例主线程已恢复，等待根映像初始事件");
+    stage_started = Instant::now();
+    let mut child = resume_debuggee(suspended);
+    eprintln!(
+        "Windows DLL 拒绝诊断：恢复主线程耗时={}ms，开始根映像初始事件接管",
+        stage_started.elapsed().as_millis()
+    );
+    stage_started = Instant::now();
     let mut debug = executable
         .begin_image_debug_session(root_process_id)
         .unwrap();
-    eprintln!("Windows 调试夹具：非系统 DLL 拒绝用例的根映像初始事件已确认");
+    eprintln!(
+        "Windows DLL 拒绝诊断：根映像初始事件接管耗时={}ms，开始非系统 DLL 拒绝等待",
+        stage_started.elapsed().as_millis()
+    );
     drop(cwd);
 
+    stage_started = Instant::now();
     let failure = debug.wait_for_exit(&mut child).unwrap_err();
-    eprintln!("Windows 调试夹具：非系统 DLL 已拒绝并返回：{failure}");
+    eprintln!(
+        "Windows DLL 拒绝诊断：非系统 DLL 拒绝等待耗时={}ms，已返回拒绝结果",
+        stage_started.elapsed().as_millis()
+    );
+    stage_started = Instant::now();
     let status = child.wait().unwrap();
-    eprintln!("Windows 调试夹具：拒绝路径根进程已退出，原生状态：{status}");
+    eprintln!(
+        "Windows DLL 拒绝诊断：根进程退出等待耗时={}ms，原生状态：{status}",
+        stage_started.elapsed().as_millis()
+    );
 
     assert_eq!(
         failure.to_string(),

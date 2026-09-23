@@ -37,7 +37,18 @@ impl SuspendedChild {
     }
 
     /// 恢复原生主线程，成功后返回普通子进程句柄。
-    pub fn resume(mut self) -> io::Result<Child> {
+    pub fn resume(self) -> io::Result<Child> {
+        match self.resume_with_child_on_error() {
+            Ok(child) => Ok(child),
+            Err((error, mut child)) => {
+                terminate_and_wait(&mut child);
+                Err(error)
+            }
+        }
+    }
+
+    /// 严格 Job 中使用：恢复失败时移交子进程，由调用方终止，避免在调试事件未继续时等待。
+    pub fn resume_with_child_on_error(mut self) -> std::result::Result<Child, (io::Error, Child)> {
         use windows::Win32::Foundation::HANDLE;
         use windows::Win32::System::Threading::ResumeThread;
 
@@ -47,12 +58,18 @@ impl SuspendedChild {
             .expect("冻结进程必须保留主线程句柄");
         let previous_count = unsafe { ResumeThread(HANDLE(primary_thread.as_raw_handle())) };
         if previous_count == u32::MAX {
-            return Err(io::Error::last_os_error());
+            return Err((
+                io::Error::last_os_error(),
+                self.child.take().expect("冻结进程必须存在"),
+            ));
         }
         if previous_count != 1 {
-            return Err(io::Error::other(format!(
-                "恢复冻结进程时的悬挂计数应为 1，实际为 {previous_count}"
-            )));
+            return Err((
+                io::Error::other(format!(
+                    "恢复冻结进程时的悬挂计数应为 1，实际为 {previous_count}"
+                )),
+                self.child.take().expect("冻结进程必须存在"),
+            ));
         }
 
         self.primary_thread.take();

@@ -299,14 +299,14 @@ impl WindowsImageDebugSession {
 
     fn handle_create_process(&mut self, event: &DEBUG_EVENT, root: bool) -> io::Result<()> {
         let information = unsafe { event.u.CreateProcessInfo };
-        let file = file_from_debug_handle(information.hFile)?;
         let process = owned_handle(information.hProcess)?;
-        close_owned_handle(information.hThread)?;
         if self.processes.insert(event.dwProcessId, process).is_some() {
             return Err(error(
                 "managed_process.atomic_windows_duplicate_process_event",
             ));
         }
+        let file = file_from_debug_handle(information.hFile)?;
+        close_owned_handle(information.hThread)?;
         if root {
             self.verify_root_image(&file)
         } else {
@@ -367,6 +367,10 @@ impl WindowsImageDebugSession {
     }
 
     fn reject_event_and_drain(&mut self, event: &DEBUG_EVENT) {
+        // 当前事件所属进程必须已有可终止句柄；否则不能继续未验证的事件。
+        if !self.processes.contains_key(&event.dwProcessId) {
+            return;
+        }
         for process in self.processes.values() {
             let handle = HANDLE(process.as_raw_handle());
             if unsafe { TerminateProcess(handle, 1) }.is_err() {

@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "tested_sha": "84a174f9ecf142c286fc97d3f17664d232dce1c9",
+    "working_tree_clean_at_execution": true
+  },
+  "run": {
+    "schema": 1,
+    "scope": "grok_1_0_41_zero_input_p0",
+    "platform": "macos-arm64",
+    "binary_version": "grok 1.0.41 (4220f3b224a6)",
+    "binary_bytes": 145657952,
+    "binary_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "zero_input_guard": true,
+    "model_inputs_sent": 0,
+    "passed": true,
+    "product_gate_open": false,
+    "full_goal_passed": false,
+    "http_model_call_count_measured": false,
+    "tls_decrypted": false,
+    "private_auth_copy_created": true,
+    "sandbox_network_canary": true,
+    "protocol_v1": true,
+    "native_version_matched": true,
+    "cached_auth_advertised": true,
+    "load_session_advertised": true,
+    "cached_auth_accepted": true,
+    "new_session_accepted": true,
+    "native_session_id_sha256": "e6f6f6c9a857d7a966db19696b02a5a50781d410c2a8b2162abfb8f9ccb671ac",
+    "native_exit_code": 0,
+    "native_eof_exit": true,
+    "protocol_request_methods": [
+      "initialize",
+      "authenticate",
+      "session/new"
+    ],
+    "business_tool_dispatches": 0,
+    "native_stdout_bytes": 16450,
+    "wrapper_launches_verified": true,
+    "private_settings_audit": {
+      "bytes_unchanged": false,
+      "permission_section_unchanged": true,
+      "native_marketplace_initialization_only": true,
+      "native_marketplace_purge_only": false,
+      "settings_scope_verified": true
+    },
+    "private_binary_unchanged": true,
+    "private_auth_copy_removed": true,
+    "original_auth_stat_unchanged": true,
+    "tunnel_closed": true,
+    "tls_connections_attempted": 5,
+    "tls_bytes": 87473,
+    "private_root_removed": true
+  },
+  "boundaries": {
+    "zero_input_p0_only": true,
+    "product_managed_runtime_verified": false,
+    "model_turns_or_permissions_verified": false,
+    "cancel_resume_tools_child_tasks_gui_verified": false,
+    "cross_platform_verified": false,
+    "full_goal_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}

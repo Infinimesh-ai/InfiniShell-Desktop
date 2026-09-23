@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "scope": "focused_linux_windows_preflight_with_windows_atomic_dll_rejection_failure",
+  "run": {
+    "id": 35837274454,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35837274454",
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "event": "workflow_dispatch",
+    "head_sha": "84a174f9ecf142c286fc97d3f17664d232dce1c9",
+    "linux_x64": true,
+    "windows_x64": true,
+    "full_workspace_tests": false,
+    "run_atomic_windows_debug": true,
+    "conclusion": "failure"
+  },
+  "jobs": {
+    "linux_x64": {
+      "conclusion": "success",
+      "successful_steps": 34,
+      "failed_steps": 0,
+      "skipped_steps": 2,
+      "installed_grok_hook_step": "success",
+      "installed_grok_hook_result": "17 tests: 15 passed, 2 skipped; test_failed_tmux_query_never_falls_back_to_outer_terminal and test_real_main_writes_version_to_controlling_terminal_and_keeps_stdout_empty both passed",
+      "installed_grok_hook_fixed_cli_version": "1.0.40",
+      "grok_1_0_41_product_hook_verified_by_this_step": false,
+      "host_crash_supervisor_step": "success",
+      "native_recovery_and_idle_crash_step": "success",
+      "gui_integration_step": "skipped",
+      "desktop_workspace_unit_test_step": "skipped"
+    },
+    "windows_x64": {
+      "conclusion": "failure",
+      "successful_steps": 44,
+      "failed_steps": 1,
+      "skipped_steps": 3,
+      "first_failed_step": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "atomic_debug_result": "2 tests run: 1 passed, 1 failed; the failed test failed on all 3 nextest attempts",
+      "system_only_native_exit_test": {
+        "name": "debug_session_runs_system_only_process_to_native_exit",
+        "conclusion": "passed",
+        "evidence": "The exact ignored test passed in 0.326 seconds; its source asserts native exit success and verifies its per-test receipt after strict Job cleanup."
+      },
+      "non_system_dynamic_image_rejection_test": {
+        "name": "debug_session_rejects_non_system_dynamic_image_before_continue",
+        "conclusion": "failed",
+        "attempts": 3,
+        "observed": "Each inner test logged that the DLL rejection fixture's main thread had resumed and it was waiting for the root image initial event. No confirmation of that event appeared before the outer 30-second deadline.",
+        "failure": "The outer test panicked at managed_process_atomic_windows_tests.rs:104: the debug chain did not exit natively within 30 seconds; the strict Job was cleared and the test root process exited with code 1.",
+        "strict_job_cleanup_confirmed_by_wrapper": true,
+        "independent_active_processes_count_logged": false,
+        "root_image_initial_event_confirmed": false,
+        "non_system_dll_rejected_before_continue_proven": false,
+        "underlying_reason_for_missing_event_confirmation_established": false
+      },
+      "host_crash_supervisor_step": "success",
+      "native_recovery_and_idle_crash_step": "success",
+      "production_notification_installer_step": "success",
+      "production_notification_installer_metadata": {
+        "accepted": true,
+        "exit_code": 0,
+        "codex_version": "codex-cli 0.147.0",
+        "credentials_provided": false,
+        "model_commands_sent": 0,
+        "native_hook_execution_verified": false,
+        "app_restart_and_ui_verified": false,
+        "supervised_process_tree_cleanup_verified": false
+      }
+    }
+  },
+  "runner_status_after_completion": {
+    "linux_x64": "online_idle",
+    "windows_x64": "online_idle"
+  },
+  "downloaded_artifacts": {
+    "artifact_count": 6,
+    "file_count": 37,
+    "symlink_count": 0,
+    "json_ndjson_parse_failures": 0,
+    "common_credential_or_email_pattern_hits": 0,
+    "relative_file_manifest_sha256": "c195a0a52fdd8347e4bbb21233f0f22b462f555dcf2700f7ae440e21cc817529",
+    "groups": {
+      "claude_windows_notifications": {"files": 1, "manifest_sha256": "fad30da2c7bd08bf26204a36767df172f63b80722793a71edd929a1eddab2307"},
+      "cli_linux_native_boundaries": {"files": 13, "manifest_sha256": "adf2845f2d8a9c32a84ec1512bcbbb3e4b84213e308282c99c0e497d3d645d7c"},
+      "cli_windows_native_boundaries": {"files": 16, "manifest_sha256": "82daf5e28fc80680c8f2ad5e49b333aed39454013b974860dcbbaf1820b282ba"},
+      "codex_windows_conpty": {"files": 3, "manifest_sha256": "f382d44f541985b590b67cdbe3b97725e7ff8e29f78134fc45ce8893e18568c8"},
+      "codex_windows_native_hooks": {"files": 1, "manifest_sha256": "abb54c089af1c91011305d1f61ef652c1ad397e2c0801d0751fbb88d23d06598"},
+      "codex_windows_production_installer": {"files": 3, "manifest_sha256": "e895a3b73dcc503ede16f460c2ddceefcc7f89e4a16797df659644c4ad1655a2"}
+    }
+  },
+  "boundaries": {
+    "same_commit_macos_verified": false,
+    "full_workspace_verified": false,
+    "gui_integration_verified": false,
+    "windows_atomic_product_upgrade_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "raw_logs_or_credentials_copied_to_repository": false
+}

@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_41_private_leader_settings_schema_only",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "tested_sha": "84a174f9ecf142c286fc97d3f17664d232dce1c9",
+    "working_tree_clean_at_execution": false,
+    "product_adapter_exercised": false
+  },
+  "binary": {
+    "version": "grok 1.0.41 (4220f3b224a6)",
+    "bytes": 145657952,
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "platform": "macos-arm64"
+  },
+  "method": "_x.ai/settings/update",
+  "comparison": {
+    "reviewed_1_0_40_field_count": 23,
+    "observed_1_0_41_field_count": 24,
+    "added_fields": [
+      {
+        "name": "subagent_model_inheritance_enabled",
+        "json_type": "boolean"
+      }
+    ],
+    "missing_fields": [],
+    "type_differences_against_12_explicit_1_0_40_type_constraints": [],
+    "remaining_1_0_40_fields_without_explicit_type_constraints": 11,
+    "outer_fields": ["jsonrpc", "method", "params"],
+    "params_json_type": "object"
+  },
+  "run": {
+    "passed": false,
+    "failure_code": "settings_schema_captured_zero_input",
+    "protocol_methods_sent": ["initialize", "authenticate", "session/new"],
+    "cached_auth_accepted": true,
+    "new_session_accepted": true,
+    "model_inputs_sent": 0,
+    "business_tool_dispatches": 0,
+    "private_leader_owned": true,
+    "sandbox_network_canary_passed": true,
+    "client_forced_cleanup": true,
+    "client_exited": true,
+    "leader_forced_cleanup": true,
+    "leader_exited": true,
+    "reader_closed": true,
+    "private_auth_copy_removed": true,
+    "source_auth_stat_unchanged": true,
+    "private_root_removed": true,
+    "tunnel_close_result_recorded_on_failure": false
+  },
+  "offline_checks": {
+    "private_probe_syntax": true,
+    "redacted_schema_positive_negative": true,
+    "json_receipt_valid": true
+  },
+  "assessment": {
+    "existing_adapter_treats_method_as_non_dispatching_settings_broadcast": true,
+    "exact_1_0_41_notification_validator_possible": true,
+    "proposed_validator": "For the isolated 1.0.41 profile only, require the reviewed 23 fields plus exactly subagent_model_inheritance_enabled of JSON boolean type; retain the prior 12 explicit type checks and setup position constraints.",
+    "validator_or_product_gate_changed": false,
+    "selected_skill_catalog_verified": false,
+    "single_model_turn_attempted": false,
+    "full_goal_passed": false
+  },
+  "boundaries": {
+    "receipt_118_negative_conclusion_preserved": true,
+    "raw_frame_or_values_copied_to_repository": false,
+    "paths_or_identity_copied_to_repository": false,
+    "one_notification_schema_only": true
+  }
+}

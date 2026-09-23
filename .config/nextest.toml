@@ -8,6 +8,13 @@ slow-timeout = { period = "30s", terminate-after = 2 }
 max-threads = 1
 
 [[profile.default.overrides]]
+# 大型测试二进制的调试拒绝诊断须先由用例内的严格 Job 完成有界清理。
+filter = 'package(warp) and test(debug_session_rejects_non_system_dynamic_image_before_continue)'
+platform = { host = 'cfg(target_os = "windows")' }
+slow-timeout = { period = "150s", terminate-after = 1 }
+retries = 0
+
+[[profile.default.overrides]]
 filter = 'package(warp)'
 platform = { host = 'cfg(target_os = "windows")' }
 test-group = 'windows-warp-tests'

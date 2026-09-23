@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_41_private_leader_selected_skill_catalog",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "tested_sha": "84a174f9ecf142c286fc97d3f17664d232dce1c9",
+    "working_tree_clean_at_execution": false,
+    "product_adapter_exercised": false
+  },
+  "binary": {
+    "version": "grok 1.0.41 (4220f3b224a6)",
+    "bytes": 145657952,
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "platform": "macos-arm64"
+  },
+  "candidate": {
+    "default_leader": true,
+    "single_explicit_selected_skill": "infinishell-native-skill",
+    "private_project_fixture": true,
+    "private_cached_auth_copy": true,
+    "system_private_tmp": true,
+    "bounded_official_tls_tunnel": true,
+    "connection_budget": 16,
+    "byte_budget": 8388608,
+    "read_only_approval_required_if_model_turn_reached": true
+  },
+  "attempts": [
+    {
+      "sequence": 1,
+      "phase": "zero_input_catalog",
+      "passed": false,
+      "failure_code": "unexpected_reverse_request_or_notification",
+      "unknown_method_recorded": false,
+      "protocol_methods_sent": ["initialize", "authenticate", "session/new"],
+      "native_version_matched": true,
+      "cached_auth_accepted": true,
+      "new_session_accepted": true,
+      "model_inputs_sent": 0,
+      "business_tool_dispatches": 0,
+      "client_forced_cleanup": true,
+      "client_exited": true,
+      "leader_forced_cleanup": true,
+      "leader_exited": true,
+      "reader_closed": true,
+      "private_auth_copy_removed": true,
+      "source_auth_stat_unchanged": true,
+      "private_root_removed": true
+    },
+    {
+      "sequence": 2,
+      "phase": "zero_input_catalog_method_classification",
+      "passed": false,
+      "failure_code": "unexpected_reverse_request_or_notification",
+      "first_unexpected_method": "_x.ai/settings/update",
+      "model_inputs_sent": 0,
+      "business_tool_dispatches": 0,
+      "client_forced_cleanup": true,
+      "client_exited": true,
+      "leader_forced_cleanup": true,
+      "leader_exited": true,
+      "reader_closed": true,
+      "private_auth_copy_removed": true,
+      "source_auth_stat_unchanged": true,
+      "private_root_removed": true
+    },
+    {
+      "sequence": 3,
+      "phase": "zero_input_catalog_strict_settings_validation",
+      "passed": false,
+      "failure_code": "invalid_settings_update",
+      "settings_validation_basis": "existing_1_0_40_exact_23_fields_and_types",
+      "model_inputs_sent": 0,
+      "business_tool_dispatches": 0,
+      "client_forced_cleanup": true,
+      "client_exited": true,
+      "leader_forced_cleanup": true,
+      "leader_exited": true,
+      "reader_closed": true,
+      "private_auth_copy_removed": true,
+      "source_auth_stat_unchanged": true,
+      "private_root_removed": true
+    }
+  ],
+  "offline_checks": {
+    "private_probe_syntax": true,
+    "settings_validator_positive_negative": true,
+    "git_diff_check": true
+  },
+  "boundaries": {
+    "selected_skill_catalog_verified": false,
+    "single_model_turn_attempted": false,
+    "exact_context_read_approval_verified": false,
+    "native_graceful_exit_verified_for_this_candidate": false,
+    "tunnel_close_result_recorded_on_failure": false,
+    "raw_logs_or_credentials_copied_to_repository": false,
+    "product_gate_open": false,
+    "full_goal_passed": false
+  },
+  "result": "Stopped before model input: official 1.0.41 emitted a settings update that did not satisfy the existing reviewed 1.0.40 exact envelope, field, and type validator. The candidate needs a separately reviewed 1.0.41 notification contract before the catalog or selected-skill model turn can be evaluated. All three attempts retained zero model input and recorded forced native process, reader, private auth copy, and private root cleanup."
+}

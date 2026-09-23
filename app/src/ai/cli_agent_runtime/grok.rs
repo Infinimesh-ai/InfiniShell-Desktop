@@ -2,6 +2,8 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
+#[cfg(test)]
+use std::io::Read;
 use std::path::Path;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
@@ -32,6 +34,15 @@ use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeL
 pub(super) const VERIFIED_VERSION: &str = "1.0.30";
 pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
 pub(super) const CURRENT_VERSION: &str = "1.0.40";
+#[cfg(test)]
+const TEST_CANDIDATE_VERSION: &str = "1.0.41";
+#[cfg(test)]
+const TEST_CANDIDATE_VERSION_OUTPUT: &str = "grok 1.0.41 (4220f3b224a6)";
+#[cfg(test)]
+const TEST_CANDIDATE_BYTES: u64 = 145_657_952;
+#[cfg(test)]
+const TEST_CANDIDATE_SHA256: &str =
+    "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d";
 const CURRENT_SETUP_METHOD: &str = "_x.ai/session/setup";
 const CURRENT_SETUP_PHASES: [&str; 6] = [
     "auth",
@@ -211,6 +222,15 @@ async fn run_process(
     commands: mpsc::Receiver<RuntimeCommand>,
     events: &mpsc::Sender<RuntimeEvent>,
 ) -> Result<(), RuntimeError> {
+    #[cfg(test)]
+    if protocol.test_only_1041_profile {
+        if !protocol.current_selected_skill_candidate_for_live() {
+            return Err(RuntimeError::InvalidConfiguration(crate::t!(
+                "cli-agent-grok-managed-unverified"
+            )));
+        }
+        verify_test_candidate_binary(&protocol.options.executable)?;
+    }
     let launch = if matches!(
         protocol.options.permission_policy,
         PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
@@ -368,6 +388,31 @@ async fn run_process(
     result?;
     finished?;
     drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    Ok(())
+}
+
+#[cfg(test)]
+fn verify_test_candidate_binary(path: &Path) -> Result<(), RuntimeError> {
+    if std::fs::metadata(path)?.len() != TEST_CANDIDATE_BYTES {
+        return Err(RuntimeError::UnsupportedVersion(
+            "Grok 1.0.41 test binary identity mismatch".into(),
+        ));
+    }
+    let mut file = std::fs::File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 65_536];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    if format!("{:x}", digest.finalize()) != TEST_CANDIDATE_SHA256 {
+        return Err(RuntimeError::UnsupportedVersion(
+            "Grok 1.0.41 test binary identity mismatch".into(),
+        ));
+    }
     Ok(())
 }
 
@@ -1019,9 +1064,41 @@ struct GrokProtocol {
     current_root_candidate_for_live: bool,
     #[cfg(test)]
     current_selected_skill_candidate_for_live: bool,
+    #[cfg(test)]
+    test_only_1041_profile: bool,
 }
 
 impl GrokProtocol {
+    fn current_version_candidate(&self, version: &str) -> bool {
+        if version == CURRENT_VERSION {
+            return true;
+        }
+        #[cfg(test)]
+        {
+            self.test_only_1041_profile && version == TEST_CANDIDATE_VERSION
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
+    }
+
+    fn current_protocol(&self) -> bool {
+        self.probed_version
+            .is_some_and(|version| self.current_version_candidate(version))
+    }
+
+    fn test_candidate_settings(&self) -> bool {
+        #[cfg(test)]
+        {
+            self.test_only_1041_profile && self.probed_version == Some(TEST_CANDIDATE_VERSION)
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
+    }
+
     fn baseline_lifecycle_verified(&self) -> bool {
         matches!(
             self.probed_version,
@@ -1035,14 +1112,12 @@ impl GrokProtocol {
 
     fn prompt_lifecycle_verified(&self) -> bool {
         self.baseline_lifecycle_verified()
-            && (self.probed_version != Some(CURRENT_VERSION)
-                || self.current_root_candidate_for_live())
+            && (!self.current_protocol() || self.current_root_candidate_for_live())
     }
 
     fn queued_submit_verified(&self) -> bool {
         self.extended_lifecycle_verified()
-            || (self.probed_version == Some(CURRENT_VERSION)
-                && self.current_root_candidate_for_live())
+            || (self.current_protocol() && self.current_root_candidate_for_live())
     }
 
     fn current_root_candidate_for_live(&self) -> bool {
@@ -1188,6 +1263,8 @@ impl GrokProtocol {
             current_root_candidate_for_live: false,
             #[cfg(test)]
             current_selected_skill_candidate_for_live: false,
+            #[cfg(test)]
+            test_only_1041_profile: false,
         }
     }
 
@@ -1207,8 +1284,16 @@ impl GrokProtocol {
         }
         self.probed_version = None;
         self.paired_version = None;
-        let version = verified_version(output)
-            .ok_or_else(|| RuntimeError::UnsupportedVersion(output.trim().to_owned()))?;
+        #[cfg(test)]
+        let version = if self.test_only_1041_profile {
+            (output.trim() == TEST_CANDIDATE_VERSION_OUTPUT).then_some(TEST_CANDIDATE_VERSION)
+        } else {
+            verified_version(output)
+        };
+        #[cfg(not(test))]
+        let version = verified_version(output);
+        let version =
+            version.ok_or_else(|| RuntimeError::UnsupportedVersion(output.trim().to_owned()))?;
         // 1.0.34 只开放已有原生收据覆盖的精确读取策略；写入、技能、SDK 租约和
         // 扩展生命周期仍使用各自门禁，不能把一次读取审批外推为整版兼容。
         let latest_scope_verified = self.options.selected_skills.is_empty()
@@ -1230,7 +1315,7 @@ impl GrokProtocol {
         if version != VERIFIED_VERSION
             && (self.options.local_tools.is_some()
                 || (!self.options.selected_skills.is_empty()
-                    && !(version == CURRENT_VERSION
+                    && !(self.current_version_candidate(version)
                         && self.current_selected_skill_candidate_for_live())))
         {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
@@ -1940,7 +2025,7 @@ impl GrokProtocol {
                         }
                         InputContent::Skill { name, path } => {
                             if self.probed_version != Some(VERIFIED_VERSION)
-                                && !(self.probed_version == Some(CURRENT_VERSION)
+                                && !(self.current_protocol()
                                     && self.current_selected_skill_candidate_for_live())
                             {
                                 return rejected_command(
@@ -2832,9 +2917,7 @@ impl GrokProtocol {
         let (method, requested_id) = match &self.options.target {
             SessionTarget::New => ("session/new", None),
             SessionTarget::Resume { native_session_id } => {
-                if self.probed_version == Some(CURRENT_VERSION)
-                    && !self.current_root_candidate_for_live()
-                {
+                if self.current_protocol() && !self.current_root_candidate_for_live() {
                     return Err(RuntimeError::Protocol(crate::t!(
                         "cli-agent-grok-managed-unverified"
                     )));
@@ -2873,9 +2956,8 @@ impl GrokProtocol {
         if let Some(probe) = &self.sdk_origin_probe {
             probe.decorate_open_session(&mut params);
         }
-        self.current_setup = (self.probed_version == Some(CURRENT_VERSION)
-            && requested_id.is_none())
-        .then(CurrentSetupProgress::default);
+        self.current_setup =
+            (self.current_protocol() && requested_id.is_none()).then(CurrentSetupProgress::default);
         Ok(self.request(PendingKind::OpenSession { requested_id }, method, params))
     }
 
@@ -3047,7 +3129,7 @@ impl GrokProtocol {
                 // 1.0.40 已登录 OAuth 的实测形状必须同时包含 cached_token 与 grok.com；
                 // 仅有交互式 grok.com 时继续关闭产品适配器，不能在后台弹出登录流程。
                 let methods = result["authMethods"].as_array();
-                let method = if self.probed_version == Some(CURRENT_VERSION) {
+                let method = if self.current_protocol() {
                     let ids = methods.map(|methods| {
                         methods
                             .iter()
@@ -3115,7 +3197,7 @@ impl GrokProtocol {
                         })?
                         .to_owned(),
                 };
-                if self.probed_version == Some(CURRENT_VERSION) && new_session {
+                if self.current_protocol() && new_session {
                     let direct_catalog = self.catalog_direct_for_live();
                     let setup = self.current_setup.as_mut().ok_or_else(|| {
                         RuntimeError::Protocol("missing Grok 1.0.40 setup sequence".into())
@@ -3188,7 +3270,7 @@ impl GrokProtocol {
                     &self.options.cwd,
                     &effective_permissions,
                 )?;
-                if (self.probed_version == Some(CURRENT_VERSION) && new_session)
+                if (self.current_protocol() && new_session)
                     || (self.options.grok_profile.is_some()
                         && self.creation_catalog_session != self.session_id)
                     || (self.options.target == SessionTarget::New
@@ -3201,10 +3283,7 @@ impl GrokProtocol {
                         .events
                         .push(self.ready_event(effective_permissions)?);
                 }
-                if self.probed_version == Some(CURRENT_VERSION)
-                    && new_session
-                    && self.catalog_direct_for_live()
-                {
+                if self.current_protocol() && new_session && self.catalog_direct_for_live() {
                     let ready = self.finish_current_setup()?;
                     effects.writes.extend(ready.writes);
                     effects.events.extend(ready.events);
@@ -3264,7 +3343,7 @@ impl GrokProtocol {
     }
 
     fn current_setup_notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
-        if self.probed_version != Some(CURRENT_VERSION) {
+        if !self.current_protocol() {
             return Err(RuntimeError::Protocol(
                 "unexpected Grok session setup notification".into(),
             ));
@@ -3408,7 +3487,7 @@ impl GrokProtocol {
             self.direct_mcp_initialized_received = true;
             return Ok(Effects::default());
         }
-        let current_resume_replay = self.probed_version == Some(CURRENT_VERSION)
+        let current_resume_replay = self.current_protocol()
             && self.session_id.is_none()
             && self.current_setup.is_none()
             && matches!(
@@ -3424,7 +3503,7 @@ impl GrokProtocol {
                     } if message["params"]["sessionId"].as_str() == Some(requested_id)
                 )
             });
-        if self.probed_version == Some(CURRENT_VERSION)
+        if self.current_protocol()
             && (self.session_id.is_none() || self.current_setup.is_some())
             && !current_resume_replay
         {
@@ -3464,7 +3543,7 @@ impl GrokProtocol {
                 return self.finish_current_setup();
             }
             if message["method"] == "_x.ai/settings/update" {
-                validate_current_settings_update(message)?;
+                validate_current_settings_update(message, self.test_candidate_settings())?;
                 let setup = self
                     .current_setup
                     .as_mut()
@@ -4092,7 +4171,10 @@ fn current_models_update(message: &Value) -> Result<ReportedModels, RuntimeError
     Ok(models)
 }
 
-fn validate_current_settings_update(message: &Value) -> Result<(), RuntimeError> {
+fn validate_current_settings_update(
+    message: &Value,
+    test_candidate_settings: bool,
+) -> Result<(), RuntimeError> {
     const KEYS: [&str; 23] = [
         "allow_access",
         "announcements",
@@ -4130,7 +4212,10 @@ fn validate_current_settings_update(message: &Value) -> Result<(), RuntimeError>
     let params = outer["params"]
         .as_object()
         .filter(|params| {
-            params.len() == KEYS.len() && KEYS.iter().all(|key| params.contains_key(*key))
+            params.len() == KEYS.len() + usize::from(test_candidate_settings)
+                && KEYS.iter().all(|key| params.contains_key(*key))
+                && (!test_candidate_settings
+                    || params.contains_key("subagent_model_inheritance_enabled"))
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok settings update fields".into()))?;
     let bool_fields = [
@@ -4150,6 +4235,7 @@ fn validate_current_settings_update(message: &Value) -> Result<(), RuntimeError>
         || !params["slash_command_tags"].is_object()
         || !params["permission_mode"].is_null()
         || !params["auto_permission_mode_enabled"].is_null()
+        || (test_candidate_settings && !params["subagent_model_inheritance_enabled"].is_boolean())
     {
         return Err(RuntimeError::Protocol(
             "invalid Grok settings update value types".into(),

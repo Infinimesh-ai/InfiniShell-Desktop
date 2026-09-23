@@ -2,11 +2,15 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## receipt115–116 后续增量（2026-09-23）
+## receipt115–122 后续增量（2026-09-23）
 
 - [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098 精确绑定 `645e8b4f…`，Linux／Windows 两 job 均失败。Linux 原生 Grok hook 测试 17 项中 13 通过、2 错误、2 跳过：一次 Node subprocess 超过夹具的 5 秒，一次真实 main 缺少通知；原始日志未证明共同原因。Windows 两个严格 Job 调试测试各重试三次，都在挂起根进程后等待首个调试事件时超过外层 30 秒，未取得根映像或完整原生退出结论。六个 artifact／31 文件已在仓库外做无符号链接、JSON／NDJSON 与常见敏感模式核验；两台 runner 结算后在线空闲。当前 Windows 顺序／有界等待修复尚未由本收据测试。
 - [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：固定 Grok `1.0.41 (4220f3b224a6)` 在 macOS arm64 的第一次原生零输入尝试因官方 marketplace 初始化改变私有配置而按严格字节审计失败；第二次使用既有精确例外后，通过 initialize、cached-token authenticate、session/new 与 EOF 退出，0 模型输入、0 业务工具，隔离认证副本、隧道及根目录清理完成。离线 runner 4／4。没有测量解密后的 HTTP 模型请求，也没有验证产品托管、审批、取消、恢复、GUI 或其他平台。
 - 本机安装版 Grok hook 诊断：复制后的 worker 首次协议启动约 6.9 秒，超出 hook 500 毫秒协议探测预算；显式冷启动预检后原生终端测试 15 通过／2 环境跳过。夹具只记录已就绪路径通过，不把预热当作产品冷启动投递成功。新增代码与夹具无用户可见文案变动，无需本地化资源变更。
+- [receipt117](validation/macos-clean-commit-117-grok-1041-zero-input-p0.safe.json)：固定官方 Grok `1.0.41` 在干净 `84a174f9…` 上复跑原生 ACP 零输入 P0，通过 initialize／authenticate／session/new、EOF 退出 0 和隔离清理；0 模型输入／业务工具，产品托管未验证。
+- [receipt118](validation/macos-working-tree-118-grok-1041-selected-skill-catalog.safe.json) 的三次零输入默认 leader 技能目录尝试在旧设置广播合同拒绝；[receipt119](validation/macos-working-tree-119-grok-1041-settings-schema.safe.json) 的脱敏 schema 投影显示新版仅多一个布尔字段。test-only 精确版本／SHA 与 24 字段候选通过 Rust 7／7、旧版 13／13 和隔离 `cargo check -p warp`；[receipt121](validation/macos-working-tree-121-grok-1041-selected-skill-catalog.safe.json) 的 raw ACP 零输入目录第二轮匹配唯一所选技能并正常退出，首次公告通知拒绝仍保留。正式版本／产品门禁未开放，Rust 适配器真实目录链未验。
+- [receipt122](validation/macos-working-tree-122-grok-1041-selected-skill-turn.safe.json)：先保留零输入构造器拒绝，再进行唯一一次真实输入。stdin 写入／flush 1 次后遇通知会话归属校验失败，ACK 未观察、审批 0、历史与技能结果未验证；已发输入不重试，原生进程、认证副本、隧道和私有目录清理确认。只读复核发现失败帧的方法／session 字段类别未留存，原始日志已删除；探针对无 session 的连接级模型广播存在误拒可能，真实失败原因仍未知。此轮无用户可见文案变化，无需本地化资源变更。
+- [receipt120](validation/cross-platform-preflight-120-84a174f9.safe.json)：聚焦 [run 35837274454](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35837274454) 精确绑定 `84a174f9…`。Linux 34 步成功／2 跳过，安装版 Grok `1.0.40` hook 15 通过／2 环境跳过；Windows 44 步成功／1 失败／3 跳过。系统命令严格 Job 原生退出测试 0.326 秒通过；非系统 DLL 拒绝测试三次均在根主线程恢复后到外层 30 秒超时，未取得根映像事件确认，也未定位耗时发生的阶段。严格 Job 包装器报告清理完成，无独立活动进程计数；6 个 artifact／37 文件在仓库外审计，结构、JSON／NDJSON 和常见敏感模式核验通过。原子 DLL 拒绝、三款产品升级、GUI、full workspace 与总 Goal 均未通过。
 
 ## receipt102–114 当前阶段增量（2026-09-23）
 
