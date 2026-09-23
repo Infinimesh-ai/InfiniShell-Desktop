@@ -2,7 +2,7 @@
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## receipt115–127 后续增量（2026-09-23）
+## receipt115–128 后续增量（2026-09-23）
 
 - [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098 精确绑定 `645e8b4f…`，Linux／Windows 两 job 均失败。Linux 原生 Grok hook 测试 17 项中 13 通过、2 错误、2 跳过：一次 Node subprocess 超过夹具的 5 秒，一次真实 main 缺少通知；原始日志未证明共同原因。Windows 两个严格 Job 调试测试各重试三次，都在挂起根进程后等待首个调试事件时超过外层 30 秒，未取得根映像或完整原生退出结论。六个 artifact／31 文件已在仓库外做无符号链接、JSON／NDJSON 与常见敏感模式核验；两台 runner 结算后在线空闲。当前 Windows 顺序／有界等待修复尚未由本收据测试。
 - [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：固定 Grok `1.0.41 (4220f3b224a6)` 在 macOS arm64 的第一次原生零输入尝试因官方 marketplace 初始化改变私有配置而按严格字节审计失败；第二次使用既有精确例外后，通过 initialize、cached-token authenticate、session/new 与 EOF 退出，0 模型输入、0 业务工具，隔离认证副本、隧道及根目录清理完成。离线 runner 4／4。没有测量解密后的 HTTP 模型请求，也没有验证产品托管、审批、取消、恢复、GUI 或其他平台。
@@ -17,6 +17,7 @@
 - [receipt125](validation/macos-clean-commit-125-cddafab7-zero-input-and-cancel-failed.safe.json)：干净提交 `cddafab7…` 的签名 supervisor 与固定 CLI 完成 Grok `1.0.41` 实际 Rust adapter 零输入默认 leader 目录，30 条中唯一选定技能路径匹配、原生清理确认；完整技能模型回合及正式版本门禁仍关闭。同一 SHA 的 Codex `0.155.1` 运行中工具取消真实尝试仅安全投影到 SessionReady／提交阶段，工具开始、取消和终态均未记录；原生输入是否接受与失败事件类别未知，尽管外层审计 0 残留且未兜底强杀，也必须计失败，receipt92 不被覆盖。无模型 supervisor 夹具在外置盘 libtest 上缺根心跳，内置 `/private/tmp` 同摘要副本 2／2 通过；不据此臆断 macOS 授权弹窗具体机制。
 - [receipt126](validation/macos-clean-commit-126-4ebd031c-codex-tool-start-failed.safe.json)：干净提交 `4ebd031c…` 的内置盘同源测试程序与签名 supervisor 无模型预检 2／2。Codex `0.155.1` 实链获得提交 ACK、回合开始、精确固定命令审批请求并回传允许，随后收到 Failed；夹具未识别工具开始、没有发送取消，外层没有兜底强杀且残留审计为 0。旧成功记录显示原生工具开始的命令可能带 `/bin/zsh -lc` 包装，而本次夹具只接受未包装字符串；原生失败原因与工具是否实际运行仍缺证据，取消验收继续失败。
 - [receipt127](validation/macos-clean-commit-127-99c04310-codex-tree-identity-failed.safe.json)：干净提交 `99c04310…` 的 Codex `0.155.1` 实链确认固定命令的原生进度为精确 shell 包装，审批精确匹配并允许；父子进程身份核对返回错误，未发送取消、未取得原生终态，外层无兜底强杀且零残留。签名 supervisor 的内置盘无模型预检 2／2；此失败不能替代产品取消成功。
+- [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json)：干净提交 `c2ed42fe…` 的官方 Codex `0.155.1` 真实 Rust adapter 运行中工具取消通过。固定命令原生开始、精确审批、父子 Python 存活及身份、原生取消 ACK、同代清理回执、零残留、Cancelled 终态先于断线均核对；runner 和 libtest 退出 0，外层无兜底强杀且零残留。receipt92 的原生 app-server 残留失败保留为历史；该成功仅覆盖当前 macOS 产品适配器的固定夹具，不替代同提交跨平台、GUI、SSH／tmux 或三款自动升级验收。
 - 后续测试候选在审批与原生进度间共用精确固定命令／shell 包装匹配，保留前后缀注入拒绝；终态前仅投影固定命令完成、标记文件是否出现及有限失败类别。离线匹配两项 2／2、Codex 运行器 Python 13／13、模拟 Windows 兜底分支通过；测试程序从内置 `/private/tmp` 执行，隔离 Cargo target 的 `cargo check -p warp` 通过。Windows 新清理单测已模拟 `taskkill`，不再对虚构 PID 执行真实命令。以上都未证明 Codex 运行中取消实链成功；无用户可见文案变化，无需本地化变更。
 - receipt127 之后的 macOS 无模型排查确认同一框架版 Python 的 `bin/python3.14` 启动后进程映像是 `Python.app/Contents/MacOS/Python`。仅对该固定 `Python.framework` 版本目录接受实际映像，并核对父子进程 argv 各自指向固定脚本。内置 `/private/tmp` 的真实 Python 父子进程身份夹具 1／1 通过，夹具自身自然退出；这个局部环境修正仍未重验产品取消终态。
 

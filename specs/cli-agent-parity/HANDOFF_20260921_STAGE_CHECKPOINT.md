@@ -14,6 +14,7 @@
 - [receipt125](validation/macos-clean-commit-125-cddafab7-zero-input-and-cancel-failed.safe.json) 绑定干净 `cddafab7…`：Grok `1.0.41` 实际 Rust adapter 零输入默认 leader 目录再次通过，30 条中唯一选定本地技能路径匹配、清理确认，正式版本门禁及完整技能回合仍关闭；Codex `0.155.1` 运行中工具取消实链失败，只有 SessionReady 和提交阶段写入安全投影，原生输入接受与失败事件类别未知，工具开始／取消均未记录，夹具最终残留审计为 0 且未用兜底强杀。不能把残留为 0 外推为产品取消通过。无模型 supervisor 夹具从外置盘执行缺根心跳，复制同摘要测试二进制到内置 `/private/tmp` 后 2／2 通过；精确 macOS 授权机制未证实。
 - [receipt126](validation/macos-clean-commit-126-4ebd031c-codex-tool-start-failed.safe.json) 绑定干净 `4ebd031c…`：内置盘同源测试程序的无模型 supervisor 预检 2／2；Codex `0.155.1` 实链收到原生提交 ACK、回合开始和精确固定命令审批请求，已允许该请求，随后在夹具认定工具运行前以 Failed 结束。未发送取消，外层无兜底强杀且残留审计为 0，产品取消验收仍失败。只读复核发现夹具只按未包装命令字符串识别工具开始，而旧成功记录的原生 `item/started` 使用 `/bin/zsh -lc` 包装；本次原生失败原因及工具是否实际启动仍未知，不能倒推为已通过。
 - [receipt127](validation/macos-clean-commit-127-99c04310-codex-tree-identity-failed.safe.json) 绑定干净 `99c04310…`：Codex `0.155.1` 的原生固定命令进度确认为精确 `/bin/zsh -lc` 包装，提交 ACK 和固定审批允许均通过；随后夹具在父子 Python 进程身份核对处失败，未发送取消。无模型签名 supervisor 预检 2／2，外层 0 残留且未兜底强杀。该失败不能充当产品取消回执。
+- [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json) 绑定干净 `c2ed42fe…`：官方 Codex `0.155.1`、同源签名 supervisor 与真实 Rust adapter 观察到精确固定命令原生开始、审批允许、Python 父子进程存活且身份匹配，然后发送取消并取得原生 ACK。同代进程树清理回执 `cleanup_confirmed=true`、父子零残留，Cancelled 终态先于断线；外层无兜底强杀且零残留，runner／libtest 均退出 0。receipt92 的原生 app-server 残留失败作为历史保留；本收据证明当前产品适配器在 macOS 该固定版本和夹具下补齐了运行中工具取消，不外推到 GUI、SSH／tmux 或其他平台。
 - receipt126 后的测试修正复用审批的精确 shell 包装解析来识别原生执行开始，只记录匹配类别、同命令完成事件、失败类别和标记文件存在性，不写原生命令或错误文本。Windows 的清理单测已把虚构 PID 的 `taskkill` 调用完全模拟；旧 `cddafab7…` CI 的 Windows Python 步骤失败仍须在 job 结束后看原日志，不从静态代码推断唯一根因。
 - receipt127 后的无模型核对发现本机框架版 Python 的 `sys.executable` 与实际 `Python.app` 进程映像不同；测试夹具现仅在同一 `Python.framework` 版本目录接受后者，并另查父子进程的固定脚本参数。内置盘的真实 Python 父子进程测试 1／1 通过且自然退出；该候选仍须在新干净提交上重做 Codex 取消实链。
 - Codex 后续测试诊断候选只增加安全里程碑类别，并允许工作区内固定命令无需审批时继续观察真实工具；仍要求若出现审批则精确匹配并回传。`cddafab7…` 的失败不可由代码推断补写原因，后续须在新干净 SHA、内置盘测试二进制和同源签名 supervisor 上另行实测。
@@ -97,7 +98,7 @@
 4. Grok：receipt106 已完成 `ac0fa70e…` 的固定 `1.0.40` 干净提交 root 候选链；receipt110 的原先负收据保留。receipt111 定位目录实际送达而旧 29 条验证器拒绝唯一技能增量；receipt113 又在干净 `4b12091e…` 上通过默认 leader 的单技能真实输入、唯一路径、精确只读审批、历史及最终标记。直连的不同目录仍失败。继续补本地工具、子任务／父权限上限、App 重启／GUI、产品网络隔离和当前默认 `1.0.41` 的独立版本评估；不得因 macOS 隔离候选通过就开放正式功能。
 5. Claude：receipt107 已完成 `45ba0d11…` 的 release supervisor 真实父子全链，不要重复消费相同模型链；下一步补真实 GUI 父子操作／重启、SSH／tmux、完整异常生命周期和同提交跨平台证据。运行 launchd 夹具时继续显式使用系统 `/private/tmp`，不得退回计划模式或放宽工具权限换取通过。
 6. Windows：补齐 cwd 身份绑定、调试进程树退出和完整 Job 残留清理收据；沿版本选择后的 `0.155.1` 清单复核官方资产，不再使用 legacy `0.147.0` 条目比较。在这些条件完成前继续保持 `ManualOnly`。
-7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测；receipt115／120 保留后续失败，receipt123 已在 `932167716…` 的 Windows 专项使严格 Job 两项测试首试通过。下一步在新 SHA 上复验挂起派生／恢复错误路径，并完成 Codex 当前版运行中工具取消实链；之后按下述分层门禁节奏处理剩余范围：Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
+7. receipt108／109 已完成 `c25221a22…` 的 Linux／Windows 聚焦预检及 Linux `execveat` 机制实测；receipt115／120 保留后续失败，receipt123 已在 `932167716…` 的 Windows 专项使严格 Job 两项测试首试通过。receipt128 已在 `c2ed42fe…` 完成 macOS Codex 当前版运行中工具取消的真实产品适配器链。下一步在新 SHA 上复验 Windows 挂起派生／恢复错误路径，随后按下述分层门禁节奏处理剩余范围：Linux 三款产品原子升级事务、SSH/tmux 产品接收、GUI IME 与双语布局、异常矩阵，以及功能冻结后的同提交 macOS 与 full workspace 验证。
 8. 只有“要求→实现→CLI 版本→源码提交→模式/平台→收据→结果”矩阵中所有必需项在同一当前提交上通过，才可把 Goal 标记为 complete。
 
 ### 5.1 新会话的省时验证节奏
