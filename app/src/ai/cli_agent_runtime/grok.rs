@@ -2379,6 +2379,13 @@ impl GrokProtocol {
                 verified_latest_read_tool(&params["toolCall"])
             }
             Some(CURRENT_VERSION) if self.current_root_candidate_for_live() => true,
+            #[cfg(test)]
+            Some(TEST_CANDIDATE_VERSION)
+                if self.test_candidate_settings()
+                    && self.current_selected_skill_candidate_for_live() =>
+            {
+                verified_latest_read_tool(&params["toolCall"])
+            }
             Some(_) | None => false,
         };
         if !permission_verified {

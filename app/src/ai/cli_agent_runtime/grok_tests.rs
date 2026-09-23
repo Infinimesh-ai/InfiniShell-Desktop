@@ -310,6 +310,46 @@ fn test_candidate_1041_selected_skill_only_opens_test_lifecycle() {
 }
 
 #[test]
+fn test_candidate_1041_only_forwards_correlated_exact_read_approval() {
+    let (mut candidate, mut request) = pending_native_approval();
+    candidate.probed_version = Some("1.0.41");
+    candidate.test_only_1041_profile = true;
+    candidate.current_root_candidate_for_live = true;
+    candidate.current_selected_skill_candidate_for_live = true;
+    candidate.options.selected_skills.push(SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: candidate.options.cwd.join("SKILL.md"),
+    });
+    let call_id = request["params"]["toolCall"]["toolCallId"].clone();
+    request["params"]["toolCall"] = json!({
+        "toolCallId": call_id,
+        "kind": "read",
+        "rawInput": {"variant": "ReadFile", "target_file": "verified.txt"},
+        "_meta": {"x.ai/tool": {
+            "version": 1, "name": "read_file", "namespace": "grok_build", "read_only": true
+        }}
+    });
+    let opened = candidate.receive(request.clone()).unwrap();
+    assert!(opened.writes.is_empty());
+    assert!(matches!(
+        opened.events.as_slice(),
+        [RuntimeEventKind::ApprovalRequested { .. }]
+    ));
+
+    let (mut without_skill, _) = pending_native_approval();
+    without_skill.probed_version = Some("1.0.41");
+    without_skill.test_only_1041_profile = true;
+    without_skill.current_root_candidate_for_live = true;
+    without_skill.current_selected_skill_candidate_for_live = true;
+    let rejected = without_skill.receive(request).unwrap();
+    assert!(rejected.events.is_empty());
+    assert_eq!(
+        rejected.writes[0]["result"]["outcome"]["outcome"],
+        "cancelled"
+    );
+}
+
+#[test]
 fn test_candidate_1041_rejects_binary_without_fixed_size() {
     let file = tempfile::NamedTempFile::new().unwrap();
     assert!(verify_test_candidate_binary(file.path()).is_err());
