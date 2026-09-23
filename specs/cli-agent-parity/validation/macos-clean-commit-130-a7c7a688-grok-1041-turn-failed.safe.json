@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_41_test_only_selected_skill_turn_failed",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "sha": "a7c7a6888b6b34185b5efc2f6fbac403d05191ae",
+    "working_tree_clean_at_execution": true,
+    "local_remote_sha_equal": true
+  },
+  "platform": "macos-arm64",
+  "binary": {
+    "version": "grok 1.0.41 (4220f3b224a6)",
+    "bytes": 145657952,
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "signed_internal_test_binary_sha256": "38b69f561b2287dab3d1e5ab2b59764e2716ed009708486bb57078739db971dc",
+    "signed_internal_supervisor_sha256": "f260dfbcf591138183cdce97859618533a59b82ec441f251125d3209b5ac86dd"
+  },
+  "zero_input_preflight": {
+    "passed": true,
+    "native_catalog_entries": 30,
+    "selected_skill_count": 1,
+    "selected_path_bound_before_input": true,
+    "native_inputs_sent": 0,
+    "native_exit_and_cleanup_confirmed": true,
+    "public_projection_sha256": "c2583e1e62a25dd1ade6bb996e4389201b35c9dc00d38cf682a1a4d9c867b9d4",
+    "public_metadata_sha256": "2326c914f4ea20b273718abfa7bcbea1d4baebc56f62038dd48e3c415ed7cecd"
+  },
+  "single_new_input_attempt": {
+    "passed": false,
+    "test_exit_code": 101,
+    "submitted_input_count": 1,
+    "native_accepted_input_count": 1,
+    "approval_requested_count": 0,
+    "verified_native_context_read_count": 0,
+    "final_history_verified": false,
+    "native_trace_categories": [
+      "tool_call",
+      "session/request_permission",
+      "tool_call_update_failed",
+      "turn_completed",
+      "session/prompt_complete"
+    ],
+    "native_prompt_stop_reason": "cancelled",
+    "rust_task_error_category": "protocol",
+    "rust_task_error_static_match": "unverified Grok prompt stop reason",
+    "supervisor_cleanup_confirmed": true,
+    "transport_closed_normally": false,
+    "sandbox_canary_passed": true,
+    "project_snapshot_unchanged": true,
+    "runner_private_auth_copy_removed": true,
+    "network_tunnel_stopped": true,
+    "tls_connections_attempted": 6,
+    "tls_bytes": 4382750,
+    "public_projection_sha256": "056d53961e1fcacd5fdc4b53a93c0866c4b50295bd5cef64a6360d148c5bca47",
+    "public_metadata_sha256": "ef2c4a26efcca0474729019bf98584120dc5ac361d552c7dd1b84633dd0db267"
+  },
+  "diagnosis": {
+    "source_permission_version_match_rejects_1041_candidate": true,
+    "causal_link_requires_offline_test_and_new_native_recheck": true,
+    "same_business_input_retried": false,
+    "product_1041_version_gate_open": false
+  },
+  "cleanup": {
+    "private_probe_roots_removed": true,
+    "staging_auth_clone_removed": true,
+    "original_auth_not_modified_by_runner": true,
+    "raw_frames_or_credentials_in_repository": false
+  },
+  "boundaries": {
+    "single_native_input_limit": 1,
+    "http_model_call_count_observable": false,
+    "full_cli_parity_acceptance_passed": false,
+    "user_facing_copy_changed": false
+  },
+  "result": "干净提交上的零输入目录通过；一次新业务输入获原生 ACK，但只读审批未交付测试端，原生取消。当前失败必须保留，不能计为 Grok 1.0.41 技能回合通过。"
+}
