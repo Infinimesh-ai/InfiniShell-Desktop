@@ -495,7 +495,8 @@ async fn authenticated_selected_skill_default_entry() {
     let test_candidate_1041 = env::var("INFINISHELL_GROK_TEST_CANDIDATE_1041").ok();
     assert!(
         test_candidate_1041.is_none()
-            || test_candidate_1041.as_deref() == Some("1") && mode == "leader_catalog"
+            || test_candidate_1041.as_deref() == Some("1")
+                && matches!(mode.as_str(), "leader" | "leader_catalog")
     );
     assert_eq!(
         fs::read_to_string(root.join(".infinishell-grok-live-probe")).unwrap(),

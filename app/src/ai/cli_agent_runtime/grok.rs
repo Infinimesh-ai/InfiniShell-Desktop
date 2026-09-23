@@ -1122,7 +1122,7 @@ impl GrokProtocol {
         matches!(
             self.probed_version,
             Some(VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION)
-        )
+        ) || (self.test_candidate_settings() && self.current_selected_skill_candidate_for_live())
     }
 
     fn extended_lifecycle_verified(&self) -> bool {

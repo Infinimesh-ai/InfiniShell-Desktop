@@ -285,6 +285,28 @@ fn test_candidate_1041_requires_explicit_profile_and_exact_native_version_text()
     candidate.bind_cli_version(version).unwrap();
     assert_eq!(candidate.probed_version, Some("1.0.41"));
     assert!(candidate.current_protocol());
+    assert!(!candidate.baseline_lifecycle_verified());
+}
+
+#[test]
+fn test_candidate_1041_selected_skill_only_opens_test_lifecycle() {
+    let mut selected = options();
+    selected.selected_skills.push(SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: selected.cwd.join("SKILL.md"),
+    });
+    let mut protocol = GrokProtocol::new(selected);
+    protocol.current_root_candidate_for_live = true;
+    protocol.current_selected_skill_candidate_for_live = true;
+    protocol.test_only_1041_profile = true;
+    protocol
+        .bind_cli_version("grok 1.0.41 (4220f3b224a6)")
+        .unwrap();
+    assert!(protocol.baseline_lifecycle_verified());
+    assert!(protocol.prompt_lifecycle_verified());
+    assert!(protocol.queued_submit_verified());
+    assert!(!protocol.extended_lifecycle_verified());
+    assert!(!supported_version("1.0.41"));
 }
 
 #[test]

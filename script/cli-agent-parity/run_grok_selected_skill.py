@@ -185,9 +185,14 @@ def boundary_passed(metadata, launches, tunnel, mode):
 
 def run(args):
     catalog_only = args.mode in CATALOG_MODES
-    test_candidate_1041 = getattr(args, "test_candidate_1041_catalog", False)
-    if test_candidate_1041 and (args.mode != "leader_catalog" or args.max_native_inputs != 0):
+    test_candidate_1041_catalog = getattr(args, "test_candidate_1041_catalog", False)
+    test_candidate_1041_turn = getattr(args, "test_candidate_1041_turn", False)
+    if test_candidate_1041_catalog and (args.mode != "leader_catalog" or args.max_native_inputs != 0):
         raise ValueError("1.0.41 候选仅允许零输入默认 leader 目录")
+    if test_candidate_1041_turn and (test_candidate_1041_catalog or args.mode != "leader"
+            or args.max_native_inputs != 1):
+        raise ValueError("1.0.41 回合候选仅允许一次输入默认 leader")
+    test_candidate_1041 = test_candidate_1041_catalog or test_candidate_1041_turn
     profile = CANDIDATE_1041 if test_candidate_1041 else CURRENT
     args.output.parent.mkdir(parents=True, exist_ok=True)
     isolation.reserve_artifacts(args.output)
@@ -303,6 +308,7 @@ def main():
     parser.add_argument("--mode", choices=("leader", "leader_catalog", "direct_catalog"), required=True)
     parser.add_argument("--max-native-inputs", type=int, default=1)
     parser.add_argument("--test-candidate-1041-catalog", action="store_true")
+    parser.add_argument("--test-candidate-1041-turn", action="store_true")
     parser.add_argument("--timeout", type=int, default=lease.MAX_DEADLINE)
     args = parser.parse_args()
     try:
@@ -310,7 +316,9 @@ def main():
             raise ValueError("模型输入预算与入口类型不匹配")
         if args.test_candidate_1041_catalog and args.mode != "leader_catalog":
             raise ValueError("1.0.41 候选仅允许零输入默认 leader 目录")
-        profile = CANDIDATE_1041 if args.test_candidate_1041_catalog else CURRENT
+        if args.test_candidate_1041_turn and (args.test_candidate_1041_catalog or args.mode != "leader"):
+            raise ValueError("1.0.41 回合候选仅允许一次输入默认 leader")
+        profile = CANDIDATE_1041 if args.test_candidate_1041_catalog or args.test_candidate_1041_turn else CURRENT
         isolation.validate_paths(args, profile["sha256"],
             expected_inputs=0 if args.mode in CATALOG_MODES else 1)
         return run(args)

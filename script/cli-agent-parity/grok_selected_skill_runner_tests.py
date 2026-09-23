@@ -49,6 +49,38 @@ class SelectedSkillRunnerTests(unittest.TestCase):
                 runner.run(args)
             self.assertFalse(output.exists())
 
+    def test_1041_turn_candidate_requires_one_default_leader_input(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "result.ndjson"
+            args = SimpleNamespace(output=output, mode="leader_catalog", max_native_inputs=0,
+                test_candidate_1041_catalog=False, test_candidate_1041_turn=True)
+            with self.assertRaisesRegex(ValueError, "一次输入"):
+                runner.run(args)
+            self.assertFalse(output.exists())
+            args.mode, args.max_native_inputs = "leader", 2
+            with self.assertRaisesRegex(ValueError, "一次输入"):
+                runner.run(args)
+            self.assertFalse(output.exists())
+            args.max_native_inputs = 1
+            args.test_candidate_1041_catalog = True
+            with self.assertRaisesRegex(ValueError, "零输入"):
+                runner.run(args)
+            self.assertFalse(output.exists())
+
+    def test_1041_turn_flag_binds_fixed_binary_and_one_input_budget(self):
+        argv = ["run_grok_selected_skill.py", "--test-binary", "/private/tmp/test-binary",
+            "--grok", "/private/tmp/grok", "--supervisor", "/private/tmp/supervisor",
+            "--official-grok-home", "/private/tmp/official-home",
+            "--output", "/private/tmp/result.ndjson", "--mode", "leader",
+            "--max-native-inputs", "1", "--test-candidate-1041-turn"]
+        with mock.patch.object(sys, "argv", argv), mock.patch.object(
+                runner.isolation, "validate_paths") as validate, mock.patch.object(
+                runner, "run", return_value=0) as run:
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual(validate.call_args.args[1], runner.CANDIDATE_1041["sha256"])
+        self.assertEqual(validate.call_args.kwargs["expected_inputs"], 1)
+        self.assertTrue(run.call_args.args[0].test_candidate_1041_turn)
+
     def test_complete_file_evidence_proves_only_one_default_entry_combination(self):
         raw = "\n".join(json.dumps(row) for row in evidence()).encode()
         with mock.patch.object(runner.isolation, "private_bytes", return_value=raw) as read:
