@@ -630,6 +630,33 @@ fn current_root_candidate_is_confined_to_the_ignored_live_harness() {
 }
 
 #[test]
+fn current_selected_skill_candidate_requires_separate_live_opt_in() {
+    let mut selected = options();
+    selected.selected_skills.push(SelectedLocalSkill {
+        name: "infinishell-native-skill".into(),
+        path: selected.cwd.join("SKILL.md"),
+    });
+    let mut root_only = GrokProtocol::new(selected.clone());
+    root_only.current_root_candidate_for_live = true;
+    assert!(root_only.bind_cli_version("grok 1.0.40").is_err());
+
+    let mut candidate = GrokProtocol::new(selected.clone());
+    candidate.current_root_candidate_for_live = true;
+    candidate.current_selected_skill_candidate_for_live = true;
+    candidate.bind_cli_version("grok 1.0.40").unwrap();
+    assert!(candidate.current_selected_skill_candidate_for_live());
+
+    selected.local_tools = Some(LocalToolPermissions {
+        allow_spawn: false,
+        allow_message: false,
+    });
+    let mut sdk_candidate = GrokProtocol::new(selected);
+    sdk_candidate.current_root_candidate_for_live = true;
+    sdk_candidate.current_selected_skill_candidate_for_live = true;
+    assert!(sdk_candidate.bind_cli_version("grok 1.0.40").is_err());
+}
+
+#[test]
 fn current_candidate_approval_is_open_only_inside_the_live_harness() {
     let (mut closed, request) = pending_native_approval();
     closed.probed_version = Some("1.0.40");

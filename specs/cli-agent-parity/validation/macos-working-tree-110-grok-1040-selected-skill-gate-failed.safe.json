@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "scope": "grok_1_0_40_default_entry_selected_skill_candidate",
+  "source": {
+    "branch": "codex/cli-agent-parity",
+    "base_commit": "334b6739a14d971847e2769429529d185015953f",
+    "working_tree_dirty": true,
+    "same_commit_verified_by_runner": false
+  },
+  "platform": "macos-arm64",
+  "binary": {
+    "version": "grok 1.0.40 (eb1a2256660d)",
+    "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+    "requested_model": "grok-4.7"
+  },
+  "harness": {
+    "test_binary_sha256": "ef8c442e427358d96f755d3b7143a43011ee0d3ac08605402d3f72bc94d969d2",
+    "supervisor_sha256": "731a63633711521a7cbfc91aa2d8b2ffcb33a1d809c62c9607be77478273b756",
+    "supervisor_codesign_verified": true,
+    "entry": "production_default_leader_with_test_only_root_and_selected_skill_candidate",
+    "permission_policy": "Inherit",
+    "selected_skill_limit": 1,
+    "project_trust": "synthetic_project_only",
+    "private_auth_copy_removed": true,
+    "project_snapshot_unchanged": true,
+    "tunnels_stopped": true
+  },
+  "before_user_relogin": {
+    "last_attempt_public_evidence_sha256": "279c6546ab056e893e8873a92d93fbf7c49d0cb54c06df03371403a1510e7686",
+    "native_error_kind": "invalid_configuration",
+    "native_error_contract": "login_required",
+    "submitted_input_count": 0,
+    "accepted_input_count": 0,
+    "case_passed": false
+  },
+  "after_user_relogin": {
+    "public_evidence_sha256": "4435dfdd13717758a4d9233c9d4e183107b28204ebd306f21775554ba7ebe1d6",
+    "public_network_sha256": "9910deed27503784032f73d6850edf7d0ccb6badb26ad65bf8412bb98dc65ac0",
+    "test_exit_code": 101,
+    "runner_timed_out": false,
+    "native_error_kind": "request_timed_out",
+    "native_initialize_response_observed": true,
+    "native_authenticate_response_observed": true,
+    "native_new_session_response_observed": true,
+    "native_setup_response_ready_observed": true,
+    "native_available_commands_update_observed": false,
+    "native_catalog_selected_path_seen_before_input": false,
+    "submitted_input_count": 0,
+    "accepted_input_count": 0,
+    "approval_count": 0,
+    "native_tool_event_count": 0,
+    "tls_connections_attempted": 7,
+    "tls_bytes": 1579042,
+    "http_model_calls_observable": false,
+    "private_settings_scope_verified": true,
+    "private_settings_marketplace_initialization_only": true,
+    "original_auth_copy_stat_unchanged": true,
+    "private_auth_copy_removed": true,
+    "project_snapshot_unchanged": true,
+    "tunnels_stopped": true,
+    "case_passed": false
+  },
+  "boundaries": {
+    "official_selected_skill_catalog_verified": false,
+    "one_model_input_exercised": false,
+    "default_entrypoint_skill_combination_verified": false,
+    "gui_composer_verified": false,
+    "public_product_gate_open": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "sensitive_values_or_raw_native_logs_copied_to_repository": false,
+  "result": "After a fresh user login the native session was created, but the required available_commands_update and selected skill path were not observed before the bounded setup timed out. No product model input was submitted. This is negative evidence, not skill acceptance."
+}

@@ -6,6 +6,8 @@
 
 2026-09-21 Windows 实机补验进一步证明当前挂起调试候选不能发布：cwd 句柄不能阻止叶目录改名，调试事件链不能可靠退出，Claude／Grok 在 debugger 被终止后曾保留根进程，三款真实 updater 参数均没有原生退出收据。因此 Windows 产品入口与三款来源继续在事务副作用前 `ManualOnly`，详见 [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)。[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 后续确认 receipt104 的 Codex `0.155.1` 资产漂移是误与 legacy `0.147.0` 清单比较；版本选择后的仓内清单与当前 GitHub API digest 一致，无需改产品摘要。这一纠正不改变 cwd 路径绑定、debug tree 终止、Job 清理和原生退出收据的实际缺口；这些条件完成前仍不能开放。
 
+2026-09-23 补核：[receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) 从已成功的 run 35746148046 Linux job 原始日志确认，密封 memfd `execveat` 的实际执行及失败不回退 pathname 均已通过。以下旧阶段“Linux 需要执行实际 `execveat` 用例”只适用于当时快照；现在仍缺的是 Codex／Claude／Grok 的 Linux 产品升级事务、退出回执和恢复。
+
 原固定 Codex 0.147.0、Claude 2.1.273、Grok 1.0.30 的验收文件保持原样。自动更新不能覆盖已冻结二进制或把历史通过追认为新版通过。最终验收要记录当时最新正式发行版本、平台、二进制摘要、实际源码提交和插件版本。
 
 ## 更新约定

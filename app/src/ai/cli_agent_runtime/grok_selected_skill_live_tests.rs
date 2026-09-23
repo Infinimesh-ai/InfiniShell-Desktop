@@ -149,6 +149,10 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
     };
     validate_options(&options).map_err(|_| "生产参数拒绝")?;
     let mut protocol = GrokProtocol::new(options);
+    if mode == "leader" {
+        protocol.current_root_candidate_for_live = true;
+        protocol.current_selected_skill_candidate_for_live = true;
+    }
     // 保留生产默认 argv；仅挂接无副作用的目录与最终历史观察器。
     let catalog = SkillCatalogProbe::new(skill_path.clone());
     protocol.skill_catalog_for_live = Some(catalog.clone());
@@ -371,13 +375,17 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
                     }
                 }
                 RuntimeEventKind::ApprovalCancelled { .. }
-                | RuntimeEventKind::InputJoined { .. }
-                | RuntimeEventKind::RequestFailed { .. }
-                | RuntimeEventKind::Disconnected { .. } => return Err("未允许的运行事件".into()),
+                | RuntimeEventKind::InputJoined { .. } => return Err("未允许的运行事件".into()),
+                RuntimeEventKind::RequestFailed { .. } => return Err("运行请求失败".into()),
+                RuntimeEventKind::Disconnected { .. } => return Err("原生连接断开".into()),
             }
         }
     }
     .await;
+    if submitted == 0 {
+        // 首次输入前的错误只含静态阶段描述，不包含技能文本或凭据。
+        eprintln!("Grok 技能候选输入前阶段：{result:?}");
+    }
     let _ = controller
         .send(RuntimeCommand {
             generation,
@@ -386,6 +394,12 @@ async fn exercise(root: &Path, mode: &str, file: &mut File) -> Result<(), String
         })
         .await;
     let joined = tokio::time::timeout(Duration::from_secs(30), &mut task).await;
+    if let Ok(Ok(Err(error))) = &joined {
+        eprintln!(
+            "GROK_SELECTED_SKILL_TASK_DIAGNOSTIC {}",
+            super::runtime_error_diagnostic(error)
+        );
+    }
     let transport_ok = matches!(&joined, Ok(Ok(Ok(()))));
     if joined.is_err() {
         task.abort();

@@ -21,6 +21,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_atomic_windows_debug:
+        description: Diagnose bounded native Windows image-debug exit and rejection
+        required: true
+        default: false
+        type: boolean
 # 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
 permissions:
   contents: read
@@ -808,6 +813,14 @@ jobs:
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
+
+      - name: Diagnose Windows atomic image-debug exit in a strict Job
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.test_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          cargo nextest run --no-fail-fast -p warp --lib --run-ignored only -E 'test(managed_process::atomic_windows::tests::debug_session_runs_system_only_process_to_native_exit) | test(managed_process::atomic_windows::tests::debug_session_rejects_non_system_dynamic_image_before_continue)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor

@@ -10,10 +10,12 @@ import secrets
 import subprocess
 import tempfile
 import time
+import tomllib
 
 import run_grok_native_skill as native
 
 lease, isolation, official, shared = native.lease, native.isolation, native.official, native.shared
+CURRENT = official.PROFILES[official.CURRENT_ROOT_PROFILE]
 SCOPE = "authenticated_selected_skill_default_entry"
 TEST_NAME = "ai::cli_agent_runtime::grok::selected_skill_live_tests::" + SCOPE
 SKILL_PATH = native.SKILL_PATH
@@ -80,7 +82,8 @@ def prepare_native(root, executable, source_home, port, mode):
     if mode == "sdk":
         wrapper, settings = isolation.prepare_probe_native(root, executable, source_home, port)
     elif mode == "leader":
-        wrapper, settings = official.prepare_native(root, executable, source_home, port)
+        wrapper, settings = official.prepare_native(root, executable, source_home, port,
+            binary_sha256=CURRENT["sha256"], model=CURRENT["model"])
         code = wrapper.read_text(encoding="utf-8")
         if code.count("if args==['--version']:") != 1:
             raise ValueError("默认入口包装器边界改变")
@@ -118,6 +121,20 @@ def stop_tunnel(tunnel, metadata):
     except Exception as error:
         metadata["tunnels_stopped"] = False
         metadata["tunnel_close_error_type"] = type(error).__name__
+
+
+def audit_current_settings(before, after):
+    audit = official.audit_private_settings(before, after)
+    purge_only = False
+    if audit["toml_parse_succeeded"]:
+        initial = tomllib.loads(before.decode("utf-8"))
+        current = tomllib.loads(after.decode("utf-8"))
+        expected = dict(initial, marketplace={"default_skills_installs_purged": True})
+        purge_only = ("marketplace" not in initial
+            and json.dumps(current, sort_keys=True) == json.dumps(expected, sort_keys=True))
+    audit["native_marketplace_purge_only"] = purge_only
+    audit["settings_scope_verified"] = audit["settings_scope_verified"] or purge_only
+    return audit
 
 
 def boundary_passed(metadata, launches, tunnel, mode):
@@ -161,6 +178,7 @@ def run(args):
         auth_copy_method="opaque_auth_json_only", allowed_https_hosts=sorted(official.OFFICIAL_HOSTS),
         http_model_calls_observable=False, http_model_call_budget_enforced=False, tls_decrypted=False,
         same_commit_verified_by_runner=False, grok_sha256=shared.digest(args.grok),
+        verified_cli_version=CURRENT["version"], requested_model=CURRENT["model"],
         test_binary_sha256=shared.digest(args.test_binary), supervisor_sha256=shared.digest(args.supervisor))
     events, launches, settings, before_settings = [], [], None, None
     with isolation.bounded_tunnel(args.timeout) as tunnel:
@@ -181,7 +199,7 @@ def run(args):
                 raise ValueError("输入前隔离边界失败")
             version = subprocess.run([str(wrapper), "--version"], env=environment, cwd=root / "project",
                 capture_output=True, text=True, timeout=min(10, remaining), check=True)
-            if version.stdout.strip() != shared.VERSION or tunnel.forwarded != 0:
+            if version.stdout.strip() != CURRENT["version"] or tunnel.forwarded != 0:
                 raise ValueError("固定 CLI 版本或网络预算不匹配")
             command = [str(args.test_binary), TEST_NAME, "--exact", "--ignored", "--nocapture", "--test-threads=1"]
             with os.fdopen(os.open(root / "private-test-output.txt", os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "wb") as output:
@@ -211,7 +229,7 @@ def run(args):
                 metadata["original_auth_stat_unchanged"] = lease.auth_identity(args.official_grok_home) == before_auth
                 metadata["project_snapshot_unchanged"] = project_unchanged(root, snapshot)
                 if settings is not None and before_settings is not None:
-                    metadata["private_settings_audit"] = official.audit_private_settings(before_settings, settings.read_bytes())
+                    metadata["private_settings_audit"] = audit_current_settings(before_settings, settings.read_bytes())
                 launches = isolation.private_events(root / "wrapper-audit.ndjson")
             except (OSError, ValueError) as error:
                 metadata["cleanup_error_type"] = type(error).__name__
@@ -235,12 +253,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("test-binary", "grok", "supervisor", "official-grok-home", "output"):
         parser.add_argument("--" + option, type=Path, required=True)
-    parser.add_argument("--mode", choices=("leader", "sdk"), required=True)
+    parser.add_argument("--mode", choices=("leader",), required=True)
     parser.add_argument("--max-native-inputs", type=int, default=1)
     parser.add_argument("--timeout", type=int, default=lease.MAX_DEADLINE)
     args = parser.parse_args()
     try:
-        isolation.validate_paths(args)
+        isolation.validate_paths(args, CURRENT["sha256"])
         return run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"默认技能运行器启动失败：{type(error).__name__}\n")

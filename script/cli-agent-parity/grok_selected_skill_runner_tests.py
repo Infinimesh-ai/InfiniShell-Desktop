@@ -127,6 +127,21 @@ class SelectedSkillRunnerTests(unittest.TestCase):
         tunnel.bytes = runner.lease.MAX_TLS_BYTES + 1
         self.assertFalse(runner.boundary_passed(metadata, launches, tunnel, "leader"))
 
+    def test_current_native_marketplace_purge_is_the_only_extra_settings_change(self):
+        before = b"[cli]\nuse_leader = true\n[permission]\nmode = 'ask'\n"
+        after = before + b"[marketplace]\ndefault_skills_installs_purged = true\n"
+        audit = runner.audit_current_settings(before, after)
+        self.assertTrue(audit["native_marketplace_purge_only"])
+        self.assertTrue(audit["settings_scope_verified"])
+        for changed in (
+            before + b"[marketplace]\ndefault_skills_installs_purged = false\n",
+            before + b"[marketplace]\ndefault_skills_installs_purged = true\nextra = true\n",
+            b"[cli]\nuse_leader = false\n[permission]\nmode = 'ask'\n[marketplace]\ndefault_skills_installs_purged = true\n",
+        ):
+            audit = runner.audit_current_settings(before, changed)
+            self.assertFalse(audit["native_marketplace_purge_only"])
+            self.assertFalse(audit["settings_scope_verified"])
+
     @unittest.skipUnless(os.name == "posix", "私有 HOME 与 leader socket 的原生目录权限为 POSIX 合同")
     def test_wrapper_accepts_only_default_mode_and_trusts_only_its_synthetic_project(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -138,7 +153,8 @@ class SelectedSkillRunnerTests(unittest.TestCase):
             environment = {"HOME": str(root / "home"), "GROK_HOME": str(root / "home/.grok")}
             for mode, argv in (("leader", ["agent", "stdio", "--leader-socket", str(root / "tmp/leader/leader.sock")]),
                                ("sdk", ["agent", "--no-leader", "stdio"])):
-                with mock.patch.object(runner.shared, "BINARY_SHA256", runner.shared.digest(native)):
+                with mock.patch.dict(runner.CURRENT, sha256=runner.shared.digest(native)), \
+                        mock.patch.object(runner.shared, "BINARY_SHA256", runner.shared.digest(native)):
                     wrapper, _ = runner.prepare_native(root, native, root / "source", 1, mode)
                 code = compile(wrapper.read_text(encoding="utf-8"), str(wrapper), "exec")
                 with mock.patch.object(sys, "argv", [str(wrapper), *argv]), mock.patch.dict(os.environ, environment, clear=True), \

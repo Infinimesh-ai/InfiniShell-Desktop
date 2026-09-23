@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "scope": "linux_atomic_execveat_primitive_actual_execution",
+  "source": {
+    "repository": "Infinimesh-ai/InfiniShell-Desktop",
+    "commit": "c25221a22b03c28ca8c8538bee9229ca1bb0ec87",
+    "branch": "codex/cli-agent-parity"
+  },
+  "workflow": {
+    "run_id": 35746148046,
+    "job_id": 106808181234,
+    "job_name": "Linux x64",
+    "conclusion": "success",
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35746148046/job/106808181234"
+  },
+  "log_verified_tests": [
+    {
+      "name": "ai::cli_agent_runtime::managed_process::atomic_linux::tests::sealed_memfd_execveat_forwards_argv_environment_and_cwd",
+      "result": "PASS",
+      "observed_at": "2026-09-22T15:40:07.7142376Z"
+    },
+    {
+      "name": "ai::cli_agent_runtime::managed_process::atomic_linux::tests::execveat_failure_does_not_fall_back_to_pathname",
+      "result": "PASS",
+      "observed_at": "2026-09-22T15:40:07.6357792Z"
+    }
+  ],
+  "boundaries": {
+    "actual_linux_memfd_execveat_primitive_verified": true,
+    "actual_linux_execveat_failure_without_path_fallback_verified": true,
+    "current_codex_linux_product_upgrade_transaction_verified": false,
+    "current_claude_linux_product_upgrade_transaction_verified": false,
+    "current_grok_linux_product_upgrade_transaction_verified": false,
+    "linux_atomic_update_exit_receipt_and_recovery_verified": false,
+    "full_goal_passed": false
+  },
+  "raw_job_log_copied_to_repository": false,
+  "result": "The c25221a22 Linux job actually executed the sealed memfd execveat fixture and its pathname-fallback rejection test. This corrects earlier documentation that said Linux execveat had not run. It does not prove any of the three CLI product upgrade transactions or the full Goal."
+}

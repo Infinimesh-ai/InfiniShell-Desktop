@@ -995,6 +995,8 @@ struct GrokProtocol {
     verified_final_histories_for_live: Option<live_tests::VerifiedFinalHistories>,
     #[cfg(test)]
     current_root_candidate_for_live: bool,
+    #[cfg(test)]
+    current_selected_skill_candidate_for_live: bool,
 }
 
 impl GrokProtocol {
@@ -1025,6 +1027,21 @@ impl GrokProtocol {
         #[cfg(test)]
         {
             self.current_root_candidate_for_live
+        }
+        #[cfg(not(test))]
+        {
+            false
+        }
+    }
+
+    fn current_selected_skill_candidate_for_live(&self) -> bool {
+        #[cfg(test)]
+        {
+            self.current_root_candidate_for_live
+                && self.current_selected_skill_candidate_for_live
+                && self.options.permission_policy == PermissionPolicy::Inherit
+                && self.options.local_tools.is_none()
+                && self.options.selected_skills.len() == 1
         }
         #[cfg(not(test))]
         {
@@ -1124,6 +1141,8 @@ impl GrokProtocol {
             verified_final_histories_for_live: None,
             #[cfg(test)]
             current_root_candidate_for_live: false,
+            #[cfg(test)]
+            current_selected_skill_candidate_for_live: false,
         }
     }
 
@@ -1164,7 +1183,10 @@ impl GrokProtocol {
             )));
         }
         if version != VERIFIED_VERSION
-            && (self.options.local_tools.is_some() || !self.options.selected_skills.is_empty())
+            && (self.options.local_tools.is_some()
+                || (!self.options.selected_skills.is_empty()
+                    && !(version == CURRENT_VERSION
+                        && self.current_selected_skill_candidate_for_live())))
         {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
                 "cli-agent-grok-managed-unverified"
@@ -1872,7 +1894,10 @@ impl GrokProtocol {
                             );
                         }
                         InputContent::Skill { name, path } => {
-                            if self.probed_version != Some(VERIFIED_VERSION) {
+                            if self.probed_version != Some(VERIFIED_VERSION)
+                                && !(self.probed_version == Some(CURRENT_VERSION)
+                                    && self.current_selected_skill_candidate_for_live())
+                            {
                                 return rejected_command(
                                     command.message_id,
                                     crate::t!("cli-agent-grok-managed-unverified"),

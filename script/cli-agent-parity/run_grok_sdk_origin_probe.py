@@ -652,7 +652,7 @@ def reserve_artifacts(output):
         raise
 
 
-def validate_paths(args):
+def validate_paths(args, expected_sha256=shared.BINARY_SHA256):
     if sys.platform != "darwin":
         raise ValueError("官方原生 SDK 隔离探针目前只验证 macOS")
     for name in ("test_binary", "grok", "supervisor"):
@@ -660,7 +660,7 @@ def validate_paths(args):
         if path.is_symlink() or not path.is_file():
             raise ValueError("可执行输入必须是现有非符号链接文件")
         setattr(args, name, path.resolve(strict=True))
-    if args.test_binary == args.supervisor or shared.digest(args.grok) != shared.BINARY_SHA256:
+    if args.test_binary == args.supervisor or shared.digest(args.grok) != expected_sha256:
         raise ValueError("需要独立监督入口与固定 Grok 二进制")
     home = args.official_grok_home
     if home.is_symlink() or not home.is_dir() or home.stat().st_uid != os.getuid() or home.stat().st_mode & 0o077:
