@@ -70,6 +70,7 @@ jobs:
 
       # 固定完整 action 提交和 Python 补丁版本，只更新当前作业的工具链环境。
       - name: Install Python for CLI parity verification
+        id: native_python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         timeout-minutes: 10
         with:
@@ -79,6 +80,7 @@ jobs:
           update-environment: true
 
       - name: Verify provisioned toolchain
+        id: linux_toolchain
         shell: bash
         run: |
           set -euo pipefail
@@ -91,11 +93,13 @@ jobs:
 
       # 复用 prepare_environment 中固定的 Node 引导，实际运行测试而非依赖 runner 的旧版本。
       - name: Install Node for CLI plugin verification
+        id: native_node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20.9.0
 
       - name: Test Grok notification plugin scripts
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -107,6 +111,7 @@ jobs:
           python3 -B script/cli-agent-parity/native_ssh_notifications_tests.py NativeSshNotificationTests.test_grok_bridge_main_uses_the_same_guarded_mapper_on_each_desktop -v
 
       - name: Test notification patch file transactions
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         env:
@@ -159,6 +164,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_codex
         shell: bash
         run: |
@@ -167,6 +173,7 @@ jobs:
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_claude
         shell: bash
         timeout-minutes: 10
@@ -176,6 +183,8 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        id: fixed_grok
         shell: bash
         timeout-minutes: 5
         run: |
@@ -184,6 +193,7 @@ jobs:
           printf 'INFINISHELL_TEST_GROK_EXE=%s\n' "$grok_executable" >> "$GITHUB_ENV"
 
       - name: Verify fixed Grok unauthenticated ACP boundaries
+        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -191,6 +201,7 @@ jobs:
           python3 -B script/cli-agent-parity/grok_fixed_acp_probe.py --version 1.0.41 --executable "$INFINISHELL_TEST_GROK_EXE" --output "$RUNNER_TEMP/grok-fixed-acp.json"
 
       - name: Verify native Claude initialization and idle EOF
+        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -206,6 +217,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.280 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
 
       - name: Verify native Codex plugin registry failure recovery
+        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: bash
         timeout-minutes: 5
         run: |
@@ -213,6 +225,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
 
       - name: Verify native Codex persistent plugin source
+        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: bash
         timeout-minutes: 10
         run: |
@@ -220,6 +233,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
 
       - name: Test Claude and Codex Bash notification payloads
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         env:
@@ -233,22 +247,26 @@ jobs:
           python3 script/cli-agent-parity/plugin_compatibility_tests.py -v
 
       - name: Test Unix PTY notification framing
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
 
       - name: Check InfiniShell-Desktop
+        if: ${{ !cancelled() && steps.linux_toolchain.outcome == 'success' }}
         id: check_app
         shell: bash
         run: cargo check -p warp --lib
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；Linux 同步执行同一合同。
       - name: Test IPC frame-limit recovery
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p ipc --lib
           -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
 
       - name: Test agent lifecycle, terminal cancellation, and Responses integration
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         id: test_app
         shell: bash
         run: >-
@@ -257,20 +275,24 @@ jobs:
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
 
       - name: Test CLI harness arguments
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
@@ -284,6 +306,7 @@ jobs:
         run: cargo build -p warp_tui --bin infinishell-tui
 
       - name: Test installed Grok hook through the native notification worker
+        if: ${{ !cancelled() && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -298,7 +321,7 @@ jobs:
       # 只验原生安装/inspect/升级/禁用/修复；没有凭据时不声称 SessionStart 已派发。
       - name: Verify fixed Linux Grok production notification installer without credentials
         id: grok_source_installer
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' }}
         shell: bash
         timeout-minutes: 6
         run: |
@@ -377,6 +400,7 @@ jobs:
           retention-days: 14
 
       - name: Test rust-genai
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 

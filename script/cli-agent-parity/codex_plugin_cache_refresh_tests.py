@@ -92,8 +92,8 @@ class CacheRefreshCleanupTests(unittest.TestCase):
         recorder = probe.CacheRefreshRecorder.__new__(probe.CacheRefreshRecorder)
         recorder.trace = {}
         recorder.process = Mock(returncode=0)
-        recorder.readers = [Mock(), Mock()]
-        for reader in recorder.readers:
+        recorder.readers = {name: Mock() for name in ('stdout', 'stderr')}
+        for reader in recorder.readers.values():
             reader.is_alive.return_value = False
         recorder.reader_errors = []
         recorder.job = Mock()
@@ -128,11 +128,33 @@ class CacheRefreshCleanupTests(unittest.TestCase):
             with self.subTest(active=active, reader_alive=reader_alive):
                 recorder = self.recorder()
                 recorder.job.wait_empty.return_value = active
-                recorder.readers[0].is_alive.return_value = reader_alive
+                recorder.readers['stdout'].is_alive.return_value = reader_alive
                 with self.assertRaises(ValueError):
                     recorder.close()
                 self.assertFalse(recorder.trace['cleanup_confirmed'])
                 recorder.job.close.assert_called_once()
+
+    def test_real_base_recorder_channel_map_closes_both_streams_after_eof(self):
+        # 使用另一个脚本的真实父类及合成 Python 子进程，防止 mock 掩盖线程容器变更。
+        with tempfile.TemporaryDirectory(prefix='cache-refresh-contract-') as temporary:
+            directory = Path(temporary)
+            env = {key: value for key, value in os.environ.items()
+                   if key.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TMP', 'TEMP')}
+            child = ('import json,sys;print(json.dumps({"channel":"stdout"}),flush=True);'
+                     'print(json.dumps({"channel":"stderr"}),file=sys.stderr,flush=True);sys.stdin.read()')
+            trace, events = {}, []
+            recorder = probe.CacheRefreshRecorder([sys.executable, '-c', child], env, directory, events, trace)
+            recorder.close()
+            self.assertEqual(set(recorder.readers), {'stdout', 'stderr'})
+            self.assertTrue(all(not reader.is_alive() for reader in recorder.readers.values()))
+            self.assertTrue(all(state['eof'] for state in recorder.reader_states.values()))
+            self.assertEqual({event['channel'] for event in events}, {'stdout', 'stderr'})
+            self.assertTrue(trace['root_exited_naturally'])
+            self.assertEqual(trace['root_exit_code'], 0)
+            self.assertTrue(trace['readers_eof'])
+            self.assertTrue(trace['cleanup_confirmed'])
+            self.assertTrue(recorder.process.stdout.closed)
+            self.assertTrue(recorder.process.stderr.closed)
 
     def test_protocol_failure_survives_close_failure(self):
         recorder = Mock()

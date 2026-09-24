@@ -278,7 +278,7 @@ class CacheRefreshRecorder(NativeRecorder):
     def __init__(self, command, env, directory, events, trace):
         self.trace = trace
         self.job = None
-        self.readers = []
+        self.readers = {}
         self.reader_errors = []
         if os.name == 'nt':
             import _winapi
@@ -331,10 +331,10 @@ class CacheRefreshRecorder(NativeRecorder):
                     active = self.job.wait_empty(5)
                 trace['job_active_after_cleanup'] = active
                 require(active == 0, '私有 Job 中仍有未确认退出的进程')
-            for reader in self.readers:
+            for reader in self.readers.values():
                 reader.join(timeout=2)
             trace['reader_errors'] = list(self.reader_errors)
-            trace['readers_eof'] = all(not reader.is_alive() for reader in self.readers)
+            trace['readers_eof'] = all(not reader.is_alive() for reader in self.readers.values())
             require(not self.reader_errors and trace['readers_eof'],
                     '原生输出读取失败或没有结束: ' + repr(self.reader_errors))
             trace['cleanup_confirmed'] = True
@@ -351,7 +351,7 @@ class CacheRefreshRecorder(NativeRecorder):
                     trace['cleanup_confirmed'] = False
                     close_error = error
             # 只有读取线程确已退出时才能关闭文本流，避免阻塞在其内部锁。
-            if all(not reader.is_alive() for reader in self.readers):
+            if all(not reader.is_alive() for reader in self.readers.values()):
                 for stream in (self.process.stdout, self.process.stderr):
                     try:
                         stream.close()

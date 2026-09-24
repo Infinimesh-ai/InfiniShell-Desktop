@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "source_commit": "cbdd0254e4f0439ff16ac06bb8e8712490c0f876",
+  "product_baseline_commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "v13_manifest_sha256": "4c73b842e80aeb741e240db843d7b9c335dd29ae67000b13e5bc0e14f1bc22e7",
+  "v13_manifest_file_count": 125,
+  "unchanged_manifest_files": 108,
+  "changed_manifest_files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "v13_sha256": "f76bc6a626aadd59eeae9194521e69ac822ef567364e666570d2c1f3b7821f4d",
+      "current_sha256": "c498268aa286a27d5c22fae647996c822bcdb153bbf808bfa0965363c0847db6"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+      "v13_sha256": "42229c7ddb76310332685aa210643f65a9c155afe55d0ae003458876ab27dd85",
+      "current_sha256": "f5281a4a770dd0bcb10bfaf45430eb9cc018e2317fb282be06e0e07907b5ccb8"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+      "v13_sha256": "2e4ef5d5085f222cb57afc83540483e915343afba6a11f9a0a2ab6503c71d696",
+      "current_sha256": "b4f0300e960a6b37cac55e909cb23ab64ea9e76eb7c1c4215c221afc05512b30"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "v13_sha256": "e10ed6adaa6da233edec52d934464ee7845ade9b2d39573c9c4af04b26886ecb",
+      "current_sha256": "854c804ac7db61b3409e17067096a0b019329d4eb55c00344ff359ceda9c8443"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+      "v13_sha256": "37c6a27abb3b585ca5212a88e5f56cb1f4135272e9d1eb15a23fc20395a718f8",
+      "current_sha256": "f804999718ee5121048032bf32d57f608ef1f26a9b1849efe3e92ad12d6e5187"
+    },
+    {
+      "path": "app/src/integration_testing/clipboard/mod.rs",
+      "v13_sha256": "0ccd63a2fb29c30c2880e3b2b17142795cebb2124b323c7717b536b593408914",
+      "current_sha256": "f8fe7e41a91ec275c21b92899694ae686ed73abd475ba3001954790b10080351"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "v13_sha256": "d743e7280327ebdfacb1ce9a30fb8f0d36a18317a1970d3747a104dd254634f8",
+      "current_sha256": "0ffcc041f09cdd4812fb862c922328baba4db8313f91d8b3d94aeb38472de9eb"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs",
+      "v13_sha256": "9a5289150c8a317569f50dd3261e1fafde7d7e112735f1908a40aa86bf928c33",
+      "current_sha256": "b2d3bd2b0c5b6f0ba72b2ab3366852c987dae5678245e72f89f1d7f83441b791"
+    },
+    {
+      "path": "crates/integration/src/test/cli_composer_system_clipboard.rs",
+      "v13_sha256": "7dd2565de671be8fd109cae8a4c083755f275305536a0e6cb30cef9c39fd6cd2",
+      "current_sha256": "fb7284ef52badd1cfaa4033ab50cae68acc0768a0e43027194c1e47b273209c3"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+      "v13_sha256": "123ac2c1744f2f76269e0b652389926eeb118fc15329c5c2828ccfab7610fb1e",
+      "current_sha256": "4daf6469fbf588140c5fb7e379a66405f331eabda90e9fb7ecad0694864bb450"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_plugin_live_runner_tests.py",
+      "v13_sha256": "30b452c26d688af37007eb12a65131ce70f5697397ec84b28a99b9909906e83e",
+      "current_sha256": "d9c3b97a6c79955f983999e34908cabe0e6d4c123202615822c88dedf6c45cc4"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_windows_hooks.py",
+      "v13_sha256": "430d145aa4b58e8224022b0a7e8a26a4d6a251b021afea6a481efdce71ac5096",
+      "current_sha256": "6c0c6083aad3d56b926def25a7e0e3e8edcdde5fc38c2e481239251a822f1a66"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+      "v13_sha256": "866cef4fc923348f1ff87854107f82f7fab0906aec1adda224d1d1f170721510",
+      "current_sha256": "4fadefd0bd3c4da9e6da40f610711b41315ff526b4de9aa152988aebe1a9271b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate.py",
+      "v13_sha256": "85e76598de7bb7fe185809164e40a53574bfb0644c689b49ea43e4b5d1440162",
+      "current_sha256": "318df3bc46ad2a11e922a06afb3fc5ca2d018ef094087ca9c75fd1d2f7d32cbe"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py",
+      "v13_sha256": "7c4793d864a06faeb93f62527ce40dafd515d7a77403faec53a030d8254d1633",
+      "current_sha256": "3be3f69e50a0bcad85d49774c3a84a127df7459ba9bc6860455389c2425789a9"
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate.py",
+      "v13_sha256": "68fe95586b1eedc15eaa49b94ec0931e84ca869b7605b9ddad4f5b9cea4dcc27",
+      "current_sha256": "5816fb58a820978e4fb9e3a1df4d258500d43599f24f7660ba3572ba12daee2c"
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate_tests.py",
+      "v13_sha256": "a6199d59e3f20501bca388f0b834ec112a187e17622147229d3dcd0de62a1f4b",
+      "current_sha256": "0e6cb5011612f978182cee1a4a596c16e81a76458859258bfad303e873eb3eaf"
+    }
+  ],
+  "release_behavior_change": {
+    "path": "app/src/terminal/local_tty/windows/mod.rs",
+    "scope": "仅 Windows ConPTY 标准句柄路由，Mac 不编译此模块",
+    "previous_failure": "真实 PowerShell InitShell 绕过 PTY 流入父 stdout；GUI bootstrap 超时",
+    "validation": "新一轮 Windows 真实 GUI 待验收"
+  },
+  "other_changes": "测试、诊断、脚本与 CI；Windows atomic生产模块只加 cfg(test) 诊断调用，信任策略未改",
+  "mac_release_behavior_unchanged": true,
+  "local_gate_source_hashes_match_commit": true,
+  "local_gate_record": {
+    "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-followup-frozen-local-gates.safe.json",
+    "sha256": "a8fe37739bbb5c3c264d002619c3eb0197a0c3e147c82d6d00343e2f31e47419"
+  },
+  "historical_receipts_not_relabelled": true,
+  "ci_run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35992533669",
+  "ci_head_sha_verified": true,
+  "ci_ref": "codex/cli-agent-parity-verify-cbdd0254e",
+  "ci_inputs": {
+    "run_linux": true,
+    "run_windows": true,
+    "run_macos_intel": false,
+    "full_workspace_tests": false,
+    "run_gui_clipboard": true,
+    "run_cli_atomic_updates": true,
+    "run_atomic_windows_debug": true
+  },
+  "prior_run_preserved": 35985989728,
+  "ci_result": "Linux 持久化探针回归失败；Windows 尚未开始即取消队列，改用修复后的提交重新集中验收",
+  "linux_job_id": 107609770643,
+  "windows_cancel_requested_while_queued": true
+}

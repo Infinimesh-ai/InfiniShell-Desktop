@@ -15,7 +15,7 @@
 | SSH／tmux；R3 | shell hook、通知 worker、终端可信输入绑定 | 固定三款真实 CLI 触发、真实本机隔离 OpenSSH、产品 PTY 接收、tmux 断连重接；各自收据见交付记录 | 对应 Mac→本机 SSH 场景通过；不是其他 OS 远端或所有组合；关闭透传复用公共解析器风险验证 |
 | CLI_AUTOUPDATE；R7 | `cli_agent_updates`、`managed_process_atomic_*` | [Mac 三款正式升级](validation/macos-fixed-versions-20260924/formal-updates-v4.safe.json)、[Claude Latest→Stable 降级](validation/macos-fixed-versions-20260924/claude-stable-downgrade-v10.safe.json)、Busy／回滚／恢复回归 | Mac 已识别原生来源通过；Linux／Windows 真正更新事务待集中 CI；未知来源降级保持 |
 | P5 双语和本地门禁 | `app/i18n/{en,zh-CN}`、Rust／Python／Node 回归 | [V11 本地索引](validation/macos-fixed-versions-20260924/mac-v11-local-index.safe.json)：check、libtest、i18n 11、定向 1645、原子 15；[双语布局](validation/macos-fixed-versions-20260924/gui-bilingual-final-v11.safe.json) | 上述通过；[完整桌面首次结果](validation/macos-fixed-versions-20260924/goal-v11-workspace-result.safe.json)为 10858 通过、3 前置超时、109 跳过，[3 项同二进制串行复验](validation/macos-fixed-versions-20260924/workspace-host-serial-v11.safe.json)通过，原失败保留 |
-| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；测试及 CI 修正 `faab52d8a41f9d47530f55c9bc73d13f1c115803` 的[集中复验 35985989728](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35985989728) 进行中 | 待平台结果和报告闭环；[源码对应](validation/macos-fixed-versions-20260924/source-binding-faab52d8a.safe.json)确认产品实现未变 |
+| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；测试及 CI 修正 `faab52d8a41f9d47530f55c9bc73d13f1c115803` 的集中复验已取得 Linux 全量通过；`cbdd0254e4f0439ff16ac06bb8e8712490c0f876` 的[剩余项集中复验 35992533669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35992533669)在持久化探针处失败，修复后重验 | 待剩余平台结果和报告闭环；[当前源码对应](validation/macos-fixed-versions-20260924/source-binding-cbdd0254e.safe.json)单列 Windows 终端修复，Mac 产品行为保持 |
 
 验证范围明确区分：真实 GUI 运行、GUI integration 编译、系统剪贴板、真实 IME、模拟协议、原生 CLI 执行和模型结果。跳过项不计通过，已记录失败不删除或追改。Grok 托管图片不支持，固定策略禁用原生 shell／hook／技能；这些限制应由界面与能力矩阵明确表达。
 
@@ -46,3 +46,5 @@ Windows Mesa 已实际创建 GL/llvmpipe 窗口，失败发生在终端引导、
 下一轮集中 CI 单独启用 GUI 剪贴板和原子升级，关闭完整工作区集合；新增 `run_gui_clipboard` 仅用于独立复验真实窗口，既有 `full_workspace_tests` 行为保留。当前修正无需本地化变更；原失败、跳过和不同提交来源继续分别保留。
 
 本轮冻结后的 [本地门禁](validation/macos-fixed-versions-20260924/ci-followup-frozen-local-gates.safe.json)为 35 个脚本 811 项通过、7 项平台跳过，cargo check、i18n 11 项、构建摘要边界 1 项及静态检查通过。[Windows 安全诊断回归](validation/macos-fixed-versions-20260924/ci-followup-windows-atomic-diagnostics.safe.json)单列阶段、系统数值、原生退出与 Job 清理，原生 Rust 分支仍待 CI。外置盘一度权限失败的原日志保留，后续检查已恢复通过。
+
+35992533669 的 Linux 在共享 `NativeRecorder.readers` 改为字典后，持久缓存探针仍按列表遍历，发生 `TypeError`／`AttributeError`；这是本次验收脚本回归，不是原生插件或产品能力失败。修复全部三处迭代并用真实父类和合成子进程验证双流 EOF；回归 25 项通过、5 项 Windows 条件跳过。本轮 Windows 尚在队列时取消，以修复后的提交替代，避免消费一次已知失败的运行；前一轮 Windows 全量继续。Linux 工作流也改为按各项真实前置执行独立检查，保留每项失败但不再让单一探针阻断编译、升级和 GUI。
