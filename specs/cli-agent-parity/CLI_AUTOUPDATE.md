@@ -1,6 +1,6 @@
 # 三方 CLI 自动升级与最新版对齐
 
-> **2026-09-25 固定版本收敛**：本轮固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。Mac 三款正式原生升级及 Claude Latest→Stable 降级通过；Linux 三款正常更新／来源变化／失败回滚／中断恢复通过；Windows Claude／Grok 正式事务通过，Codex 原生合同修正已通过本机门禁，待 Windows 实链。各项按实际源码与版本保留，当前范围与收据见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)。后文 ManualOnly 等结论仅属于原标注快照。
+> **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。Mac 三款正式原生升级及 Claude Latest→Stable 降级、Linux 三款正常／来源变化／失败回滚／中断恢复、Windows 三款正式升级均已通过。最后 Windows Codex 在 `b3acf2a69` 完成 inspect→execute→inspect、目标版本／摘要、13 项配置保全、严格 Job 与 journal 清理。[最终收据](validation/macos-fixed-versions-20260924/ci-36028161259-windows-codex-atomic.safe.json)及[完整验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)保留各源码域和历史失败，后文 ManualOnly 等状态只属于原标注快照。
 
 ## 2026-09-19 至 2026-09-23 范围与状态（历史）
 

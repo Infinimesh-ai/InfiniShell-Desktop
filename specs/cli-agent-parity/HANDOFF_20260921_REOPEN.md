@@ -1,6 +1,6 @@
 # CLI 对齐 Goal 复核与续接（2026-09-21）
 
-> **2026-09-25 当前验收状态**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，Mac 必要能力与实链已完成；Linux 三款正式原子更新、全量回归及 [真实 GUI 中文／图片](validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json)已通过。Windows 全量回归、Claude／Grok 正式升级、Codex hook／ConPTY 及真实 GUI 已通过；剩余 Codex 原子升级和 Grok 0.1.3→0.1.4 插件迁移。Goal 保持 active。各要求、源码域和收据以[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准，后文阶段记录保留原结论。
+> **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项已全部完成。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
 
 ## 2026-09-21 复核快照（历史）
 
