@@ -156,10 +156,10 @@ impl FontconfigLoader {
         // reduces the overall set of fallback fonts we need to load.
         let sort_fonts = sort_fonts(&pattern, true /* trim */);
 
-        // Skip the first font, since this is considered the primary "font" we're trying to match.
+        // 内置主字体不一定在 Fontconfig 中；首项可能是唯一覆盖某些字符的系统回退字体。
+        // trim 已省略覆盖重复的后续字体，必须保留首项；加载层按路径和 face index 去重。
         let fallback_fonts = sort_fonts
             .iter()
-            .skip(1)
             .filter_map(|pattern| {
                 // Fallback fonts we load aren't guaranteed to support english.
                 // Also, parse_font already has logging for parsing, so we log there.

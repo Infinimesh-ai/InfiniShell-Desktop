@@ -12,12 +12,20 @@ use image::{ImageFormat, Rgba, RgbaImage};
 use sha2::{Digest, Sha256};
 use warpui::clipboard::ClipboardContent;
 use warpui::elements::{ScrollTarget, ScrollToPositionMode, get_rich_content_position_id};
+#[cfg(target_os = "linux")]
+use warpui::fonts::Properties;
 use warpui::integration::{
     ARTIFACTS_DIR_ENV_VAR, AssertionCallback, AssertionOutcome, TestSetupUtils, TestStep,
 };
+#[cfg(target_os = "linux")]
+use warpui::platform::LineStyle;
+#[cfg(target_os = "linux")]
+use warpui::text_layout::{ClipConfig, DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont, TextStyle};
 use warpui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
 
 use super::LocalCLITaskManagerView;
+#[cfg(target_os = "linux")]
+use crate::appearance::Appearance;
 use crate::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use crate::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
 use crate::terminal::History;
@@ -268,6 +276,49 @@ pub fn assert_cli_clipboard_draft(image_count: usize) -> AssertionCallback {
     Box::new(move |app, window_id| {
         composer(app, window_id).read(app, |view, ctx| {
             let draft = view.prompt.as_ref(ctx).buffer_text(ctx);
+            #[cfg(target_os = "linux")]
+            {
+                // 系统字体已安装不等于实际编辑器能回退；用同一字体和排版路径拒绝缺字截图。
+                let appearance = Appearance::as_ref(ctx);
+                let editor = view.prompt.as_ref(ctx);
+                let font_cache = ctx.font_cache();
+                let line_style = LineStyle {
+                    font_size: editor.font_size(appearance),
+                    line_height_ratio: editor.line_height_ratio(appearance),
+                    baseline_ratio: DEFAULT_TOP_BOTTOM_RATIO,
+                    fixed_width_tab_size: None,
+                };
+                let style = StyleAndFont::new(
+                    editor.font_family(appearance),
+                    Properties::default().weight(appearance.monospace_font_weight()),
+                    TextStyle::new(),
+                );
+                for ch in ['中', '文', '第', '一', '行', '二'] {
+                    let line = font_cache.text_layout_system().layout_line(
+                        &ch.to_string(),
+                        line_style,
+                        &[(0..1, style)],
+                        f32::MAX,
+                        ClipConfig::default(),
+                    );
+                    let glyphs = line
+                        .runs
+                        .iter()
+                        .flat_map(|run| &run.glyphs)
+                        .collect::<Vec<_>>();
+                    if !line.chars_with_missing_glyphs.is_empty()
+                        || glyphs.is_empty()
+                        || glyphs.iter().any(|glyph| glyph.id == 0)
+                    {
+                        return AssertionOutcome::failure(format!(
+                            "真实编辑器字体缺少字符 U+{:04X}；glyph_count={}，missing_count={}",
+                            ch as u32,
+                            glyphs.len(),
+                            line.chars_with_missing_glyphs.len()
+                        ));
+                    }
+                }
+            }
             let focused = view.prompt.is_focused(ctx);
             let task_count = view.tasks(ctx).len();
             let selected = view.selected_task.is_some();

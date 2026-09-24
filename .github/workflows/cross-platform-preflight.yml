@@ -42,7 +42,7 @@ on:
         default: false
         type: boolean
       windows_grok_installer_only:
-        description: 仅补验 Windows Grok 生产通知安装器；全量模式优先
+        description: 默认仅补验 Windows Grok 安装器；开启原子更新时附加所选 CLI 更新；全量模式优先
         required: true
         default: false
         type: boolean
@@ -56,6 +56,16 @@ on:
         required: true
         default: false
         type: boolean
+      windows_atomic_agent:
+        description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - codex
+          - claude
+          - grok
       linux_atomic_agent:
         description: 原生补验模式的 Linux 升级对象；默认和全量模式始终验三款
         required: true
@@ -282,6 +292,12 @@ jobs:
         id: check_app
         shell: bash
         run: cargo check -p warp --lib
+
+      # GUI 专项包含字体行为修正，仍保留用户功能的双语资源门禁。
+      - name: Test bilingual resources for Linux GUI verification
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.linux_gui_only && !inputs.full_workspace_tests }}
+        shell: bash
+        run: cargo test -p warp --lib i18n::tests
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；Linux 同步执行同一合同。
       - name: Test IPC frame-limit recovery
@@ -1105,7 +1121,7 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && inputs.run_cli_atomic_updates && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
@@ -1192,12 +1208,12 @@ jobs:
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1207,7 +1223,7 @@ jobs:
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
         id: supervisor
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
@@ -1216,11 +1232,12 @@ jobs:
       # Windows 仍走已有严格 Job 调试候选，实际执行固定 update/install，并核对退出和新入口。
       - name: Verify fixed Windows CLI atomic update candidates without credentials
         id: fixed_cli_atomic_updates
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 40
         env:
           PYTHONUTF8: "1"
+          ATOMIC_AGENTS: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && inputs.windows_atomic_agent != 'all' && inputs.windows_atomic_agent || 'codex claude grok' }}
         run: |
           $ErrorActionPreference = 'Stop'
           $buildMessages = cargo test -p warp --lib --no-run --message-format=json
@@ -1232,11 +1249,12 @@ jobs:
           $worker = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
           $fixtureParent = Join-Path $env:RUNNER_TEMP ('infinishell-fixed-cli-updates-' + [guid]::NewGuid().ToString())
           New-Item -ItemType Directory -Path $fixtureParent | Out-Null
-          python -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary $executables[0] --supervisor $worker --fixture-parent $fixtureParent --cache "$env:RUNNER_TEMP\fixed-cli-atomic-inputs" --output "$env:RUNNER_TEMP\fixed-cli-atomic-evidence\summary.safe.json"
+          $atomicAgents = $env:ATOMIC_AGENTS.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)
+          python -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary $executables[0] --supervisor $worker --fixture-parent $fixtureParent --cache "$env:RUNNER_TEMP\fixed-cli-atomic-inputs" --output "$env:RUNNER_TEMP\fixed-cli-atomic-evidence\summary.safe.json" --agents @atomicAgents
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native update candidate failed; inspect safe receipts; production gates remain closed' }
 
       - name: Preserve Windows fixed CLI atomic update receipts
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-fixed-atomic-updates-${{ github.sha }}
@@ -1245,7 +1263,7 @@ jobs:
           retention-days: 14
 
       - name: Test supervisor cleanup after host crash
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
         run: |
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json

@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "run_id": 36018303373,
+  "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36018303373",
+  "source_commit": "9009af078456782031e135cf321ef21a53f31808",
+  "job_id": 107696421051,
+  "job_conclusion": "success",
+  "mode": "linux_gui_only",
+  "artifact_id": 10816750886,
+  "archive_sha256": "d0bdcc09faf6d6b37e91066702794baec143612d9f0c5d3754a7645de0681201",
+  "job_log_sha256": "8ef9e5a3ffe0c409948fa19f13191f0879fb257954ac3d635b4a966e7ab392b7",
+  "receipt_sha256": "3bbb0940950930c0863da1a68db9acf9f2f3858f59f21abd9e08d916641a21d2",
+  "system_cjk_coverage_sha256": "6288418f3bfb3161da43b2f9890b0c211aa2d191a1a51b28f184555babd700ce",
+  "original_receipt": {
+    "attachment_count": 1,
+    "binary_sha256": "33c18ae4b87d4915b4c5403dda6fac878e95ee8cd361dd3c7a5a17442a5ed7db",
+    "image_pixels_exact": true,
+    "managed_feature_enabled_for_test": true,
+    "managed_tasks_created": 0,
+    "model_inputs": 0,
+    "physical_ime_exercised": false,
+    "platform": "linux",
+    "schema": 1,
+    "screenshots": [
+      {
+        "file": "chinese-multiline.png",
+        "height": 800,
+        "sha256": "66c927e1c32c783e9b5980ea65891a9b12c3c1648d3f6feea9fb1b4a87717a16",
+        "width": 1280
+      },
+      {
+        "file": "pasted-image.png",
+        "height": 800,
+        "sha256": "5565b88d6d7e2cb099bd11aa2c609999577071ab0d1e486768b9ce22855de5d2",
+        "width": 1280
+      }
+    ],
+    "source_commit": "9009af078456782031e135cf321ef21a53f31808",
+    "system_clipboard": true,
+    "test": "test_cli_composer_system_clipboard_multiline_and_image",
+    "text_exact": true,
+    "visual_review_required": true
+  },
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install Python for CLI parity verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify provisioned toolchain",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check InfiniShell-Desktop",
+      "conclusion": "success"
+    },
+    {
+      "name": "Compile GUI integration tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Linux GUI system clipboard without model inputs",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Linux GUI system clipboard evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Install Python for CLI parity verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "actual_png_review": {
+    "reviewed_both_original_pngs": true,
+    "chinese_glyphs_rendered_as_tofu": true,
+    "english_and_image_attachment_visible": true,
+    "screenshots_identical_to_prior_f9_failure": true,
+    "passed": false
+  },
+  "acceptance_passed": false,
+  "next_required": "排查实际 FontDB 与字体 fallback 路径；系统安装 CJK 字体且 fc-list 覆盖并不足以证明应用可显示中文。",
+  "boundaries": [
+    "真实系统剪贴板文字和图片断言通过，但视觉中文验收失败。",
+    "没有物理 IME 测试；没有模型输入。",
+    "CI job success 不等于 GUI 验收通过。"
+  ]
+}

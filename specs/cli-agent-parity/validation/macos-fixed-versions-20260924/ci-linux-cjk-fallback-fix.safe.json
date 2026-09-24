@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "source_base_commit": "4880b6cf2d46ee9dd1b552e475a14405375b8d37",
+  "observed_failure": {
+    "run_id": 36018303373,
+    "gui_step_success": true,
+    "source_commit": "9009af078456782031e135cf321ef21a53f31808",
+    "binary_sha256": "33c18ae4b87d4915b4c5403dda6fac878e95ee8cd361dd3c7a5a17442a5ed7db",
+    "visual_review": "原生真实窗口内六个样本汉字显示方框；不能计中文目视通过",
+    "font_coverage_sha256": "6288418f3bfb3161da43b2f9890b0c211aa2d191a1a51b28f184555babd700ce",
+    "screenshots": [
+      {
+        "file": "chinese-multiline.png",
+        "sha256": "66c927e1c32c783e9b5980ea65891a9b12c3c1648d3f6feea9fb1b4a87717a16",
+        "previous_sha256": "66c927e1c32c783e9b5980ea65891a9b12c3c1648d3f6feea9fb1b4a87717a16",
+        "byte_identical": true
+      },
+      {
+        "file": "pasted-image.png",
+        "sha256": "5565b88d6d7e2cb099bd11aa2c609999577071ab0d1e486768b9ce22855de5d2",
+        "previous_sha256": "5565b88d6d7e2cb099bd11aa2c609999577071ab0d1e486768b9ce22855de5d2",
+        "byte_identical": true
+      }
+    ]
+  },
+  "confirmed_source_defect": {
+    "description": "Fontconfig trim=true 已按先前候选的 Unicode 覆盖裁剪后续候选，再无条件 skip(1) 会误删第一项的独有覆盖；内存加载的主字体未必在系统 Fontconfig 中，因此第一项不保证为主字体。",
+    "source_chain": [
+      {
+        "path": "app/src/appearance.rs",
+        "function": "load_default_monospace_font_family / load_default_ui_font_family",
+        "fact": "Hack / Roboto 内存字体由 load_family_from_bytes 加载"
+      },
+      {
+        "path": "crates/warpui/src/windowing/winit/app.rs",
+        "line": 268,
+        "function": "construct_ui_app",
+        "fact": "真实 integration 与生产窗口均创建真实 winit FontDB"
+      },
+      {
+        "path": "crates/warpui/src/windowing/winit/fonts.rs",
+        "function": "TextLayoutSystem::select_font → load_fallback_fonts",
+        "fact": "通过 loader::fallback_fonts 加载系统候选，insert_font 按 path/index 去重"
+      },
+      {
+        "path": "crates/warpui/src/windowing/winit/fonts/linux.rs",
+        "line": 159,
+        "function": "FontconfigLoader::fallback_fonts",
+        "fact": "删除 trim=true 之后无条件 skip(1)"
+      },
+      {
+        "path": "fontconfig-0.8.0/src/lib.rs",
+        "line": 531,
+        "function": "sort_fonts",
+        "fact": "锁定依赖直接调用 FcFontSort，trim 去掉已被先前候选覆盖的字体"
+      },
+      {
+        "path": "crates/warpui/src/windowing/winit/fonts.rs",
+        "function": "TextLayoutSystem::create_line",
+        "fact": "glyph_id == 0 记录到 chars_with_missing_glyphs"
+      },
+      {
+        "path": "app/src/lib.rs",
+        "line": 2781,
+        "fact": "应用网络字体 fallback_fn 仅 wasm 设置，native 依赖系统 fallback"
+      }
+    ],
+    "not_observed": "本次失败 runner 的 Fontconfig 首候选身份未记录；不声明具体 Noto 字体为已观测首候选",
+    "native_fix_result": "待下一次 Linux 真实 GUI 截图验收"
+  },
+  "changes": [
+    {
+      "path": "crates/warpui/src/windowing/winit/fonts/linux.rs",
+      "sha256": "82a9743dcb5b6c2e20f809f10374fc02b738ce73bc18178752f826a859ca23c6"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+      "sha256": "35b82e5b868ed10eebae1f64d1331a79066a29b1431819a2f3ba65f29eb04f6d"
+    }
+  ],
+  "scope": {
+    "production_linux_freebsd_fontconfig_only": true,
+    "macos_and_windows_font_behavior_unchanged": true,
+    "gui_new_assertion_linux_only": true,
+    "workflow_edited": false,
+    "receipt_schema_changed": false,
+    "new_dependencies": false,
+    "localization": "无需本地化变更；仅字体回退修复及测试诊断"
+  },
+  "verification": {
+    "rustfmt_check": true,
+    "git_diff_check": true,
+    "cargo_executed": false,
+    "ci_executed": false,
+    "test_entry": "test_cli_composer_system_clipboard_multiline_and_image",
+    "font_gate": "沿实际编辑器 family、size、line-height 与 settings weight 排版六汉字，必须存在非零 glyph 且无 missing glyph",
+    "existing_text_pixels_zero_submit_screenshots_preserved": true,
+    "next_required": "Linux GUI-only 运行同一真实系统剪贴板用例并逐张目视中文/附件；旧失败保留",
+    "cargo_note": "本地独立 cargo check 正在执行；结果另附，不将静态审计视为真实GUI通过"
+  },
+  "original_receipt_sha256": "cbc42cb96f6a37098f56789993815fabcb977180fd97fb322061437a0bd8d6df"
+}
