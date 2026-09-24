@@ -1,0 +1,22 @@
+{
+  "source_commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "run_id": 35973064369,
+  "job_id": 107547038799,
+  "platform": "linux-x64",
+  "step": 20,
+  "evidence_source": "GitHub Actions live job log rendered in the authenticated browser",
+  "job_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35973064369/job/107547038799",
+  "tests_run": 2847,
+  "passed": 2846,
+  "failed": 1,
+  "skipped": 4829,
+  "test_duration_seconds": 43.752,
+  "failed_test": "ai::cli_agent_runtime::permissions::tests::claude_21280_parent_requires_bound_test_candidate_proof",
+  "assertion_file": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+  "assertion_line": 311,
+  "assertion": "ceiling_from_parent(&task, \"claude\").is_err()",
+  "step_exit_code": 100,
+  "original_failure_preserved": true,
+  "remote_revalidation": "pending",
+  "dependent_skips_not_counted_as_passed": true
+}

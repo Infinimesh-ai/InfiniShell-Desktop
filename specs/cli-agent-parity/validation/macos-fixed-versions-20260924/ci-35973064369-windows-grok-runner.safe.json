@@ -1,0 +1,35 @@
+{
+  "run_id": 35973064369,
+  "job_id": 107547039141,
+  "head_sha": "2c483322f00d569bc126bfa96616e2920083f872",
+  "step": "Test Grok notification plugin scripts",
+  "evidence_source": "GitHub authenticated rendered live job log",
+  "failure_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35973064369/job/107547039141#step:8:123",
+  "node_tests": {
+    "passed": 15,
+    "failed": 0
+  },
+  "python_tests": {
+    "run": 5,
+    "failed": 1,
+    "failure": "test_private_environment_drops_auth_proxies_hook_overrides_and_injection",
+    "actual_path_separator": ";",
+    "expected_path_separator": ":"
+  },
+  "root_cause": "Linux平台模拟没有同步模拟os.pathsep，Windows宿主仍使用分号",
+  "fix": "同时mock runner.sys.platform=linux和runner.os.pathsep=:",
+  "production_source_changed": false,
+  "fixed_test_file": "script/cli-agent-parity/grok_plugin_live_runner_tests.py",
+  "fixed_test_sha256": "d9c3b97a6c79955f983999e34908cabe0e6d4c123202615822c88dedf6c45cc4",
+  "local_verification": {
+    "grok_plugin_live_runner_tests": {
+      "passed": 5,
+      "failed": 0
+    },
+    "same_guarded_mapper_on_each_desktop": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "windows_fixed_commit_rerun": "pending"
+}

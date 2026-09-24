@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "run_id": 35973064369,
+  "job_id": 107547038799,
+  "head_sha": "2c483322f00d569bc126bfa96616e2920083f872",
+  "artifact": {
+    "id": 10797876612,
+    "name": "cli-linux-native-boundaries-2c483322f00d569bc126bfa96616e2920083f872",
+    "size_in_bytes": 20508,
+    "digest": "sha256:c73991f09fac41b2535be91dd5a71dfa204413944cec15b73a28d79cccff18f4",
+    "expired": false
+  },
+  "downloaded_files": [
+    {
+      "path": "claude-21280-inputs/claude-fixed-inputs.json",
+      "bytes": 486,
+      "sha256": "36c1419c2044bbc9ddf68021a24797769b8d914324445c5ad64caed2201576c1",
+      "passed": null,
+      "native_version": "2.1.280 (Claude Code)",
+      "credentials_provided": false,
+      "model_commands_sent": null,
+      "model_input_submitted": null
+    },
+    {
+      "path": "claude-initialize-idle-eof.json",
+      "bytes": 3091,
+      "sha256": "0118ddf48543291e25708b1c899f53703a0466ac97928579c94e1ebb96e26e77",
+      "passed": true,
+      "native_version": "2.1.280",
+      "credentials_provided": false,
+      "model_commands_sent": 0,
+      "model_input_submitted": null
+    },
+    {
+      "path": "claude-permission-observation.json",
+      "bytes": 34753,
+      "sha256": "75b2e02272409ee937f71488fc97ce83bd3b1770fc2e47632d190e5a0d0728cc",
+      "passed": true,
+      "native_version": "2.1.280",
+      "credentials_provided": false,
+      "model_commands_sent": 0,
+      "model_input_submitted": null
+    },
+    {
+      "path": "codex-plugin-cache-refresh.json",
+      "bytes": 84051,
+      "sha256": "4b55eff26382897d8a5f8bdbce1ca002ba0498325916d070c8ad588b5225681f",
+      "passed": true,
+      "native_version": "0.156.1",
+      "credentials_provided": false,
+      "model_commands_sent": null,
+      "model_input_submitted": null
+    },
+    {
+      "path": "codex-plugin-lifecycle.json",
+      "bytes": 29417,
+      "sha256": "cc5190d9357bcd7a219c861c66d6b320a2034f5c770d6697d554bd0d089f8417",
+      "passed": true,
+      "native_version": "0.156.1",
+      "credentials_provided": false,
+      "model_commands_sent": null,
+      "model_input_submitted": null
+    },
+    {
+      "path": "grok-cli-fixed/grok-fixed-inputs.json",
+      "bytes": 553,
+      "sha256": "2b8db9cb4ec82840a4541fb1c08d9b6e03ae877900bc163b3fd486ab07c875f9",
+      "passed": null,
+      "native_version": "1.0.41",
+      "credentials_provided": false,
+      "model_commands_sent": null,
+      "model_input_submitted": false
+    },
+    {
+      "path": "grok-fixed-acp.json",
+      "bytes": 16719,
+      "sha256": "5b3495094015330d396ccaf2c0d8790da5de3aadf6fd103d0ac5b57db974fee5",
+      "passed": true,
+      "native_version": "1.0.41",
+      "credentials_provided": false,
+      "model_commands_sent": null,
+      "model_input_submitted": false
+    }
+  ],
+  "scope": "原始下载工件逐文件摘要，不扩大为产品运行或模型验收",
+  "native_binaries": [
+    {
+      "harness": "codex",
+      "version": "0.156.1",
+      "sha256": "0b2e9301d6100dddda3b9d5c80ebaeaa3a2f1962388f2f36f6b96a9f08b1f33f"
+    },
+    {
+      "harness": "claude",
+      "version": "2.1.280",
+      "sha256": "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b"
+    },
+    {
+      "harness": "grok",
+      "version": "1.0.41",
+      "sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"
+    }
+  ]
+}

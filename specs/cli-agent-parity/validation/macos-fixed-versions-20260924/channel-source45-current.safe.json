@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "audit_scope": "只读核对原必需验收及渠道源码演变；未执行 GUI、模型、构建或 CI。",
+  "current_product_commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "source45": {
+    "path": "/private/tmp/cli-parity-archive-34.OMYpHC/app/src/terminal/cli_agent_updates/sources.rs",
+    "manifest_path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/specs/cli-agent-parity/validation/macos-official-45-inputs.json",
+    "manifest_sha256": "8f19bb52ac6b019618dd3fa79be5c05108d8be9cec9b0b54483c6334b955e2f5",
+    "manifest_expected_source_sha256": "051af0c27846f82368675b9bab2912effcef4d1f36cb588bbd4e37eaa4ed085e",
+    "actual_source_sha256": "051af0c27846f82368675b9bab2912effcef4d1f36cb588bbd4e37eaa4ed085e",
+    "exact_source_match": true
+  },
+  "current": {
+    "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_updates/sources.rs",
+    "sha256": "38b1bf6e20d45ec625d169af31aaeaf78f7fb2cc391405bd2aba2c967a9a1757",
+    "matches_commit_blob": true
+  },
+  "comparison_method": "按顶层函数起点到下一顶层函数起点的原始 UTF-8 段逐字比较；段可能包含下一函数之前的属性或注释；不宣称整个文件相同。",
+  "identical_channel_related_segments": [
+    {
+      "function": "parse_version",
+      "source45_line": 210,
+      "current_line": 575,
+      "source45_segment_sha256": "a4f6ff5cf83824d2faf78b150455f9da56b13062d204dea6fcfdd4f070f2ffe0",
+      "current_segment_sha256": "a4f6ff5cf83824d2faf78b150455f9da56b13062d204dea6fcfdd4f070f2ffe0",
+      "byte_identical": true
+    },
+    {
+      "function": "version_number",
+      "source45_line": 241,
+      "current_line": 606,
+      "source45_segment_sha256": "28535e69157d99b80602f0034e5e8c279f4a88cc3db51a556f97181bede231f1",
+      "current_segment_sha256": "28535e69157d99b80602f0034e5e8c279f4a88cc3db51a556f97181bede231f1",
+      "byte_identical": true
+    },
+    {
+      "function": "compare_versions",
+      "source45_line": 251,
+      "current_line": 616,
+      "source45_segment_sha256": "02231fd3ca06416b05462638be25ff70936c84110b6039ac0e05717cc2ff2271",
+      "current_segment_sha256": "02231fd3ca06416b05462638be25ff70936c84110b6039ac0e05717cc2ff2271",
+      "byte_identical": true
+    },
+    {
+      "function": "channel_supported",
+      "source45_line": 500,
+      "current_line": 1000,
+      "source45_segment_sha256": "833f21270db3835967280622e9b501da92161ae6eee64e8caae1a2fe1b69ad2d",
+      "current_segment_sha256": "833f21270db3835967280622e9b501da92161ae6eee64e8caae1a2fe1b69ad2d",
+      "byte_identical": true
+    },
+    {
+      "function": "claude_channel",
+      "source45_line": 540,
+      "current_line": 1040,
+      "source45_segment_sha256": "16a35483c592ac994688c5ced27db1a7fe8543244ced21245ff856cea297cb92",
+      "current_segment_sha256": "16a35483c592ac994688c5ced27db1a7fe8543244ced21245ff856cea297cb92",
+      "byte_identical": true
+    },
+    {
+      "function": "channel_name",
+      "source45_line": 962,
+      "current_line": 2088,
+      "source45_segment_sha256": "79efe95dd7ccb7a8ae9e7e8f52895099264358eee6b51c40e1f989e0ef504c10",
+      "current_segment_sha256": "79efe95dd7ccb7a8ae9e7e8f52895099264358eee6b51c40e1f989e0ef504c10",
+      "byte_identical": true
+    },
+    {
+      "function": "snapshot_config",
+      "source45_line": 971,
+      "current_line": 2097,
+      "source45_segment_sha256": "3878f5c89ab8826c07c04acc7f454d66acaee2fe7c24c2e91545bba3e6a09b5c",
+      "current_segment_sha256": "3878f5c89ab8826c07c04acc7f454d66acaee2fe7c24c2e91545bba3e6a09b5c",
+      "byte_identical": true
+    },
+    {
+      "function": "selected_channel_config",
+      "source45_line": 1024,
+      "current_line": 2150,
+      "source45_segment_sha256": "ed29e428795fd58b8ca5e600544eac65dcd7e24bd23de817fb49595e3421355a",
+      "current_segment_sha256": "ed29e428795fd58b8ca5e600544eac65dcd7e24bd23de817fb49595e3421355a",
+      "byte_identical": true
+    },
+    {
+      "function": "codex_marker_config",
+      "source45_line": 1100,
+      "current_line": 2226,
+      "source45_segment_sha256": "0c22fdcf363fa0ec2fbc1868bba36dafb23f239156b41f98b539a0c4c1b2ebd7",
+      "current_segment_sha256": "0c22fdcf363fa0ec2fbc1868bba36dafb23f239156b41f98b539a0c4c1b2ebd7",
+      "byte_identical": true
+    },
+    {
+      "function": "validate_codex_publication",
+      "source45_line": 1149,
+      "current_line": 2275,
+      "source45_segment_sha256": "98f7814a3c43c31b73d0a1dc543345dae6df45895bd5b8b55c62ffda91203140",
+      "current_segment_sha256": "98f7814a3c43c31b73d0a1dc543345dae6df45895bd5b8b55c62ffda91203140",
+      "byte_identical": true
+    },
+    {
+      "function": "grok_config_delta_allowed",
+      "source45_line": 1779,
+      "current_line": 3131,
+      "source45_segment_sha256": "1cda130fe57f401644e2a10f568a1aa41b04272c8bb38587f613ba8f8e720dbc",
+      "current_segment_sha256": "1cda130fe57f401644e2a10f568a1aa41b04272c8bb38587f613ba8f8e720dbc",
+      "byte_identical": true
+    },
+    {
+      "function": "config_delta_allowed",
+      "source45_line": 1856,
+      "current_line": 3208,
+      "source45_segment_sha256": "0e278ddda3f20259d5e9bb8966bed3eaa1a219af7193ca7319f81f078ae1901f",
+      "current_segment_sha256": "0e278ddda3f20259d5e9bb8966bed3eaa1a219af7193ca7319f81f078ae1901f",
+      "byte_identical": true
+    },
+    {
+      "function": "config_restore_stage",
+      "source45_line": 1878,
+      "current_line": 3230,
+      "source45_segment_sha256": "990aefb3074e4d22a0a2fc71db2676d30a7c4928dc49f94c1ee9a8d4584c0805",
+      "current_segment_sha256": "990aefb3074e4d22a0a2fc71db2676d30a7c4928dc49f94c1ee9a8d4584c0805",
+      "byte_identical": true
+    },
+    {
+      "function": "plan_config_publish",
+      "source45_line": 1867,
+      "current_line": 3219,
+      "source45_segment_sha256": "c8d38b490c7bdc7bf6aeee386eaa2d16f79b7ced1b0d44b347e9306757b56920",
+      "current_segment_sha256": "c8d38b490c7bdc7bf6aeee386eaa2d16f79b7ced1b0d44b347e9306757b56920",
+      "byte_identical": true
+    },
+    {
+      "function": "sync_config_directory",
+      "source45_line": 1895,
+      "current_line": 3247,
+      "source45_segment_sha256": "b839abbc69d8960f0b2868c863ebf35b8a26a763e25ad8434a3640b66c41608e",
+      "current_segment_sha256": "b839abbc69d8960f0b2868c863ebf35b8a26a763e25ad8434a3640b66c41608e",
+      "byte_identical": true
+    },
+    {
+      "function": "restore_config",
+      "source45_line": 1914,
+      "current_line": 3266,
+      "source45_segment_sha256": "683924b0584a62c333578aaf92a696621963dd31bbea794489501057bcf03441",
+      "current_segment_sha256": "683924b0584a62c333578aaf92a696621963dd31bbea794489501057bcf03441",
+      "byte_identical": true
+    },
+    {
+      "function": "restore_config_with_hook",
+      "source45_line": 1919,
+      "current_line": 3271,
+      "source45_segment_sha256": "e8157e07d6728ca3e79e592592d7263f927e5f916ad4840f3d5d77e97f4db04d",
+      "current_segment_sha256": "e8157e07d6728ca3e79e592592d7263f927e5f916ad4840f3d5d77e97f4db04d",
+      "byte_identical": true
+    },
+    {
+      "function": "publish_config",
+      "source45_line": 1926,
+      "current_line": 3278,
+      "source45_segment_sha256": "46391e4371bd87b628b9d1cc5f5bf7dec0571a10e01988cf47c6d65c26c9425c",
+      "current_segment_sha256": "46391e4371bd87b628b9d1cc5f5bf7dec0571a10e01988cf47c6d65c26c9425c",
+      "byte_identical": true
+    },
+    {
+      "function": "publish_config_with_hook",
+      "source45_line": 1930,
+      "current_line": 3282,
+      "source45_segment_sha256": "2af39c7932c0c3609cb7947bc1d12f453a1f45f3adc0e1c203a88e81a6896010",
+      "current_segment_sha256": "2af39c7932c0c3609cb7947bc1d12f453a1f45f3adc0e1c203a88e81a6896010",
+      "byte_identical": true
+    },
+    {
+      "function": "cleanup_config_restore",
+      "source45_line": 2051,
+      "current_line": 3403,
+      "source45_segment_sha256": "a64bc1b9e44fd3595a5c3d8cb30c34c6fc31dc4550769c431c9b2228bd1d32d0",
+      "current_segment_sha256": "a64bc1b9e44fd3595a5c3d8cb30c34c6fc31dc4550769c431c9b2228bd1d32d0",
+      "byte_identical": true
+    },
+    {
+      "function": "read_optional_config",
+      "source45_line": 2071,
+      "current_line": 3423,
+      "source45_segment_sha256": "a4c9ef0551cd26ee5b487536732ec67e10931fbdc443e6410fb46a69a8177dcd",
+      "current_segment_sha256": "a4c9ef0551cd26ee5b487536732ec67e10931fbdc443e6410fb46a69a8177dcd",
+      "byte_identical": true
+    },
+    {
+      "function": "reconcile_journal",
+      "source45_line": 1281,
+      "current_line": 2492,
+      "source45_segment_sha256": "dfe9780546b1a39a83ba63842f5089f3bd8e1bde6d233b4ef34549eea74eb3fd",
+      "current_segment_sha256": "dfe9780546b1a39a83ba63842f5089f3bd8e1bde6d233b4ef34549eea74eb3fd",
+      "byte_identical": true
+    }
+  ],
+  "changed_domains": [
+    {
+      "domain": "latest",
+      "change": "仅 cfg(test) Unix/Windows 固定版本覆盖入口新增；生产渠道 endpoint/选择分支未变化。",
+      "coverage": "固定版本运行器 + 原 source45 渠道发现/往返收据；不冒充当前 Alpha 实装。"
+    },
+    {
+      "domain": "discover / BoundInvocation / execute / recovery",
+      "change": "结构化 artifact/参数/环境与 LaunchBinding；journal schema 2、binding、监督器身份与恢复收据检查。Codex 仍 update + CODEX_RELEASE=目标。",
+      "coverage": [
+        "formal-updates-v4.safe.json",
+        "Linux/Windows 本轮原子更新 workflow（结果仍待根代理汇总）",
+        "sources_tests.rs 中来源改变、绑定、失败恢复回归"
+      ]
+    },
+    {
+      "domain": "Claude native update invocation/config scope",
+      "change": "update 改为 install TARGET，并隔离原生更新私有配置；只成功发布指定渠道。",
+      "coverage": [
+        "claude-stable-downgrade-v10.safe.json",
+        "formal-updates-v4.safe.json",
+        "explicit_claude_channel_preserves_permission_and_unknown_settings",
+        "desired_channel_resumes_each_crash_boundary_without_reverting_to_before",
+        "desired_channel_cas_keeps_concurrent_user_save_at_both_claim_boundaries"
+      ]
+    },
+    {
+      "domain": "Grok native update invocation",
+      "change": "按 stable/alpha flag 选择改为解析渠道后 update --version TARGET；渠道配置发布函数逐字不变。",
+      "coverage": [
+        "formal-updates-v4.safe.json",
+        "source45 Grok stable-alpha / alpha-stable / channel-only 历史真实收据",
+        "explicit_grok_channel_preserves_comments_and_all_other_semantics",
+        "same_version_channel_sync_recovers_without_a_supervisor_or_updater"
+      ]
+    }
+  ],
+  "busy_requirement": {
+    "references": [
+      "CLI_AUTOUPDATE.md:30",
+      "CLI_AUTOUPDATE.md:50",
+      "CLI_AUTOUPDATE.md:53"
+    ],
+    "requires_behavior": true,
+    "explicit_requirement_for_real_model_or_gui_trigger": false,
+    "current_coverage": [
+      "pty_session_events_defer_update_until_last_local_session_exits（全部三款，真实会话模型事件接入 manager，最后会话 Ended 后仅派发一次）",
+      "launch_reservation_survives_root_idle_sync_and_blocks_until_real_release",
+      "manual_update_still_obeys_busy_and_single_operation_guards",
+      "native_channel_sync_at_same_version_waits_for_idle_and_obeys_auto_toggle"
+    ],
+    "additional_model_input_required": false
+  },
+  "acceptance_conclusion": {
+    "additional_mandatory_live_execution_outside_pending_workflow_identified": false,
+    "must_not_overclaim": [
+      "普通 Codex PTY 原生 Escape 只证明轮次中断；真实工具自然完成，不记工具取消或进程树清理。PLAN:100 已定义显式终止的降级路径，不要求更改或绕过原生 CLI。",
+      "V13 证明产品通知中心需要操作→Unknown 替换，系统通知未启用，不声称 OS 弹窗。",
+      "历史渠道往返与当前固定升级/函数一致性/回归组合支撑行为，不将 source45 改称最终提交实测。",
+      "跨平台 GUI 剪贴板必须等真实窗口和截图断言结果；编译或 Session0失败不能代替通过。"
+    ],
+    "documentation_minimum": [
+      "ACCEPTANCE 自动升级行追加历史渠道与本审计来源对应",
+      "生命周期行将普通 PTY 列为继续/恢复通过、Codex 取消按已记录降级，避免未限定“对应链通过”",
+      "CI 修复后的最终提交与 Mac 源码域及最终 workflow 结果重新关联；不要求机械重跑未变 Mac 实链"
+    ]
+  }
+}

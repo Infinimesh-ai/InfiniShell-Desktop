@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import sys
 import subprocess
 import tempfile
@@ -200,6 +201,86 @@ class FormalResourceTests(unittest.TestCase):
             native_probe.cleanup_private_cases(root, [case()], receipt)
             self.assertTrue(receipt['deleted'])
             self.assertFalse(root.exists())
+
+    def test_cleanup_removes_only_confirmed_private_windows_readonly_file(self):
+        case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
+                'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
+                                    'output_readers_eof': True} for _ in range(2)]}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'owned-private'
+            target = root / '.git/objects/pack/tmp_idx_test'
+            target.parent.mkdir(parents=True)
+            target.write_text('private Git object')
+            original_lstat, original_rmtree = Path.lstat, shutil.rmtree
+            target_info = original_lstat(target)
+
+            def metadata(path, *args, **kwargs):
+                if path == target:
+                    return SimpleNamespace(st_mode=target_info.st_mode, st_nlink=1,
+                                           st_file_attributes=stat.FILE_ATTRIBUTE_READONLY)
+                return original_lstat(path, *args, **kwargs)
+
+            def denied_once(directory, onerror):
+                error = PermissionError(13, 'read-only private file', str(target))
+                error.winerror = 5
+                onerror(os.unlink, str(target), (PermissionError, error, None))
+                original_rmtree(directory)
+
+            receipt = {}
+            with patch.object(native_probe.sys, 'platform', 'win32'), \
+                    patch.object(Path, 'lstat', metadata), \
+                    patch.object(native_probe.shutil, 'rmtree', side_effect=denied_once), \
+                    patch.object(native_probe.os, 'chmod') as chmod:
+                native_probe.cleanup_private_cases(root, [case], receipt)
+            chmod.assert_called_once_with(target, target_info.st_mode | stat.S_IWRITE, follow_symlinks=False)
+            self.assertTrue(receipt['deleted'])
+            self.assertEqual(receipt['readonly_files_removed'], 1)
+            self.assertFalse(root.exists())
+
+    def test_cleanup_readonly_retry_rejects_escape_reparse_hardlink_and_other_errors(self):
+        case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
+                'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
+                                    'output_readers_eof': True} for _ in range(2)]}
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'owned-private'
+            target = root / 'objects/private-file'
+            target.parent.mkdir(parents=True)
+            target.write_text('private')
+            original_lstat = Path.lstat
+            for boundary in ('outside', 'sharing_violation', 'no_readonly', 'file_reparse',
+                             'parent_reparse', 'hardlink', 'directory', 'symlink'):
+                with self.subTest(boundary=boundary):
+                    error = PermissionError(13, 'must remain rejected', str(target))
+                    error.winerror = 32 if boundary == 'sharing_violation' else 5
+
+                    def metadata(path, *args, **kwargs):
+                        if path == target:
+                            mode = stat.S_IFDIR if boundary == 'directory' else (
+                                stat.S_IFLNK if boundary == 'symlink' else stat.S_IFREG)
+                            return SimpleNamespace(st_mode=mode, st_nlink=2 if boundary == 'hardlink' else 1,
+                                st_file_attributes=(0 if boundary == 'no_readonly' else stat.FILE_ATTRIBUTE_READONLY)
+                                | (stat.FILE_ATTRIBUTE_REPARSE_POINT if boundary == 'file_reparse' else 0))
+                        if path == target.parent and boundary == 'parent_reparse':
+                            return SimpleNamespace(st_mode=stat.S_IFDIR,
+                                                   st_file_attributes=stat.FILE_ATTRIBUTE_REPARSE_POINT)
+                        return original_lstat(path, *args, **kwargs)
+
+                    def denied(directory, onerror):
+                        name = root.parent / 'outside' if boundary == 'outside' else target
+                        onerror(os.unlink, str(name), (PermissionError, error, None))
+
+                    receipt = {}
+                    with patch.object(native_probe.sys, 'platform', 'win32'), \
+                            patch.object(Path, 'lstat', metadata), \
+                            patch.object(native_probe.shutil, 'rmtree', side_effect=denied), \
+                            patch.object(native_probe.os, 'chmod') as chmod, \
+                            self.assertRaises(PermissionError) as caught:
+                        native_probe.cleanup_private_cases(root, [case], receipt)
+                    self.assertIs(caught.exception, error)
+                    chmod.assert_not_called()
+                    self.assertFalse(receipt['deleted'])
+                    self.assertEqual(receipt['readonly_files_removed'], 0)
+                    self.assertEqual(target.read_text(), 'private')
 
     def test_close_receipt_requires_actual_process_exit_and_both_output_readers(self):
         with tempfile.TemporaryDirectory() as temporary:

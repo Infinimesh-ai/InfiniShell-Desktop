@@ -1,0 +1,19 @@
+{
+  "commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "scope": "提交后最终本地强制门禁，缓存复用，不重跑模型或完整桌面集合",
+  "steps": [
+    {
+      "name": "check",
+      "exit_code": 0,
+      "seconds": 2.071,
+      "log": "/private/tmp/cli-parity-mac-commit-2c483322f-check.log"
+    },
+    {
+      "name": "i18n",
+      "exit_code": 0,
+      "seconds": 6.094,
+      "log": "/private/tmp/cli-parity-mac-commit-2c483322f-i18n.log"
+    }
+  ],
+  "head_unchanged": true
+}

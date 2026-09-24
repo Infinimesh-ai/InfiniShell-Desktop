@@ -1,0 +1,30 @@
+{
+  "base_commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "helper": {
+    "path": "script/cli-agent-parity/run_windows_gui_clipboard.ps1",
+    "sha256": "6f84412c440041cc3dfcc2630b180039d89d39e666f98ad7ef0aa0900ce50bce"
+  },
+  "powershell_ast": {
+    "exit_code": 0,
+    "log_sha256": "db9a0b8625262cfda34aa7b871c7e0619ebc16293186db93b45d8a05e83cf210"
+  },
+  "workflow_actionlint": "passed",
+  "mesa_version": "26.2.1",
+  "mesa_archive_sha256": "78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf",
+  "pe_machine": "AMD64",
+  "private_mesa_files": {
+    "opengl32.dll": {
+      "sha256": "7a8f7aa1b73099d24ddeca962a7e7360bccdfc234ff79cb557426e2a2ce3d4f6",
+      "bytes": 139264
+    },
+    "libgallium_wgl.dll": {
+      "sha256": "46ca4e92166f1389c8e9024dbeee0e24ccd5c46f9b6e2b048cc6bc476e6474d3",
+      "bytes": 61866496
+    }
+  },
+  "system_installation": false,
+  "cargo_products_modified": false,
+  "remote_revalidation": "pending",
+  "actual_window_clipboard_and_nonblank_screenshots_required": true,
+  "localization": "无需本地化变更"
+}

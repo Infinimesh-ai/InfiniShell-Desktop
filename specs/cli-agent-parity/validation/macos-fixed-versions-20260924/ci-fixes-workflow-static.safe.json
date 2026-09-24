@@ -1,0 +1,46 @@
+{
+  "workflow": ".github/workflows/cross-platform-preflight.yml",
+  "sha256": "f39cf37af587da7c56695a8b9605c5a0b715b124b050d2021b73450c9d47b1e0",
+  "actionlint_exit_code": 0,
+  "only_excluded_diagnostic": "已通过 GitHub runners API 核实的自托管 infinishell-ci 标签未在 actionlint 默认标签表中；保留首次两条诊断",
+  "other_diagnostics": 0,
+  "logs": [
+    {
+      "name": "ci-fixes-actionlint.log",
+      "sha256": "38f7b890ff8648964ba15a264939aeceb7227a9beb98c4b892fbac15177df08b"
+    },
+    {
+      "name": "ci-fixes-actionlint-known-runner.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "ci-fixes-actionlint-known-runner-v2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0
+    },
+    {
+      "name": "ci-fixes-actionlint-known-runner-v3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exit_code": 0
+    }
+  ],
+  "remote_revalidation": "pending",
+  "windows_cache_policy": {
+    "original_behavior": "always deleted Cargo target and sccache",
+    "original_cleanup_seconds": 267,
+    "free_bytes_after_original_cleanup": 255632842752,
+    "evidence": "GitHub Actions job 107547039141 step 3 lines 37-39, read from the live rendered job log",
+    "new_behavior": "retain both caches when free space is at least 100 GiB; otherwise run the existing bounded cache cleanup",
+    "minimum_free_bytes_to_retain": 107374182400,
+    "remote_revalidation": "pending"
+  },
+  "prior_workflow_sha256": "9381bd3fdb8ed9d13fad08a5ecbe31cc874aa3076fba82ce66d7972c377d7500",
+  "independent_native_validation": {
+    "reason": "首次 Linux/Windows 普通旧断言失败阻断原子更新，未产生事务证据",
+    "change": "监督、原子更新、严格 Job 和原生恢复只依赖编译、固定输入及监督器等实际前置；步骤内仍严格构建 libtest",
+    "previous_failure_preserved": true,
+    "job_failure_not_masked": true,
+    "remote_revalidation": "pending"
+  },
+  "workflow_sha256_before_mesa": "35694267527cc1e6614bf63cf5332d721f9f5d332c450df8966bb93a0c8a8cd4"
+}

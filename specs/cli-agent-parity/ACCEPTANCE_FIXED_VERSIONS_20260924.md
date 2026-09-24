@@ -15,6 +15,16 @@
 | SSH／tmux；R3 | shell hook、通知 worker、终端可信输入绑定 | 固定三款真实 CLI 触发、真实本机隔离 OpenSSH、产品 PTY 接收、tmux 断连重接；各自收据见交付记录 | 对应 Mac→本机 SSH 场景通过；不是其他 OS 远端或所有组合；关闭透传复用公共解析器风险验证 |
 | CLI_AUTOUPDATE；R7 | `cli_agent_updates`、`managed_process_atomic_*` | [Mac 三款正式升级](validation/macos-fixed-versions-20260924/formal-updates-v4.safe.json)、[Claude Latest→Stable 降级](validation/macos-fixed-versions-20260924/claude-stable-downgrade-v10.safe.json)、Busy／回滚／恢复回归 | Mac 已识别原生来源通过；Linux／Windows 真正更新事务待集中 CI；未知来源降级保持 |
 | P5 双语和本地门禁 | `app/i18n/{en,zh-CN}`、Rust／Python／Node 回归 | [V11 本地索引](validation/macos-fixed-versions-20260924/mac-v11-local-index.safe.json)：check、libtest、i18n 11、定向 1645、原子 15；[双语布局](validation/macos-fixed-versions-20260924/gui-bilingual-final-v11.safe.json) | 上述通过；[完整桌面首次结果](validation/macos-fixed-versions-20260924/goal-v11-workspace-result.safe.json)为 10858 通过、3 前置超时、109 跳过，[3 项同二进制串行复验](validation/macos-fixed-versions-20260924/workspace-host-serial-v11.safe.json)通过，原失败保留 |
-| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 最终源码提交与 Linux／Windows 集中验证尚未结算 | 待最终 SHA、平台结果和推送闭环 |
+| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；[统一 CI 35973064369](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35973064369) 正在验证同一提交 | 待平台结果和报告闭环；源码与 Mac 验证快照已逐文件核对 |
 
 验证范围明确区分：真实 GUI 运行、GUI integration 编译、系统剪贴板、真实 IME、模拟协议、原生 CLI 执行和模型结果。跳过项不计通过，已记录失败不删除或追改。Grok 托管图片不支持，固定策略禁用原生 shell／hook／技能；这些限制应由界面与能力矩阵明确表达。
+
+产品源码已冻结并推送为 `2c483322f00d569bc126bfa96616e2920083f872`。[来源对应记录](validation/macos-fixed-versions-20260924/final-source-binding-2c483322f.safe.json)确认 V13 的 125 个变更源文件和历史插件编译夹具均与提交一致，不重标旧构建收据；[提交后 Mac 门禁](validation/macos-fixed-versions-20260924/mac-commit-gates-2c483322f.safe.json)中的 check／i18n 亦通过。统一 CI 启用 Linux x64、Windows x64、完整桌面集合、固定原子更新与 Windows 调试监督器门禁；没有启动 Mac Intel 备用验证。
+
+渠道切换按实际变化域关联证据：[源码对应审计](validation/macos-fixed-versions-20260924/channel-source45-current.safe.json)核对了 source45 的精确源码，渠道解析、配置发布／恢复和 Codex 更新标记等 22 个函数段与当前逐字相同。历史 Codex latest↔alpha、Grok stable↔alpha 及同版本渠道同步保留原版本／源码范围；后续启动绑定、journal 和原子监督变更由 V4 三款正式升级及本轮平台事务验证覆盖，Claude 命令与私有配置变化另由 V10 真实降级覆盖。现行渠道、恢复和 CAS 回归补验变化，不把旧渠道收据重标为最终提交实测。
+
+运行中升级保护由三款真实会话模型事件→更新管理器延期→最后会话退出后单次派发的回归，以及启动保留期间禁止升级的回归覆盖。原计划要求该行为成立，没有额外要求通过模型输入或 GUI 点击触发。普通 Codex PTY 的 Escape 只计原生轮次中断；工具自然完成，不能计工具取消或进程树清理，继续保留 Unknown 与显式关闭终端的降级边界。
+
+首次统一 CI 的失败按原样保留：[Linux](validation/macos-fixed-versions-20260924/ci-35973064369-linux-final.safe.json)定向 2,846 项通过、1 项旧候选权限预期失败；真实 GUI 在创建窗口前缺少 `libXcursor`，没有进入剪贴板断言。Windows 的 [PATH 测试](validation/macos-fixed-versions-20260924/ci-35973064369-windows-grok-runner.safe.json)与 [Codex 临时目录清理](validation/macos-fixed-versions-20260924/ci-35973064369-windows-codex-hooks.safe.json)失败分别修复，原生通知 case 与 ConPTY 的通过保持各自边界。当前修正只涉及测试与 CI 环境，没有改变已验收的 Mac 产品行为；[本地权限 12 项、i18n 11 项和 check](validation/macos-fixed-versions-20260924/ci-fixes-local-gates.safe.json)、[清理脚本回归](validation/macos-fixed-versions-20260924/ci-fixes-codex-cleanup-local.safe.json)及 [workflow 静态检查](validation/macos-fixed-versions-20260924/ci-fixes-workflow-static.safe.json)通过。依赖步骤被跳过的结果不计通过，修正后的远端复验仍待执行。
+
+Windows 首次定向为 2,716 项通过、1 项同样的旧候选权限预期失败。真实 GUI 编译通过，运行在 DXGI swapchain 创建时报 `0x887A0022`，没有窗口、剪贴板断言或截图通过证据。[私有 Mesa WGL 环境脚本](validation/macos-fixed-versions-20260924/ci-fixes-windows-gui-mesa-static.safe.json)已通过本地语法及固定包摘要检查，远端验证仍待执行：它复制同一构建的 EXE 和运行库，使用固定 Mesa `26.2.1` 的两个 DLL，不改产品或系统安装；必须同时取得实际 GL/llvmpipe 窗口渲染日志、同二进制剪贴板收据和两张非空截图才计通过。

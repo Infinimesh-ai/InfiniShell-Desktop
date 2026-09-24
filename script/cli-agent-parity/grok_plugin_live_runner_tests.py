@@ -70,7 +70,7 @@ class GrokPluginLiveRunnerTests(unittest.TestCase):
             host = {'PATH': '/foreign/bin', 'HOME': '/real', 'GROK_API_KEY': 'secret',
                     'HTTPS_PROXY': 'private', 'NODE_OPTIONS': '--require bad', 'GROK_CONFIG_PATH': '/external',
                     'GROK_SHELL': 'foreign', 'LANG': 'C.UTF-8'}
-            with patch.object(runner.sys, 'platform', 'linux'):
+            with patch.object(runner.sys, 'platform', 'linux'), patch.object(runner.os, 'pathsep', ':'):
                 env = runner.isolated_environment(root, root / '程序 bin', host)
             self.assertEqual(env['PATH'], str(root / '程序 bin') + ':/usr/bin:/bin')
             for key in ('GROK_API_KEY', 'HTTPS_PROXY', 'NODE_OPTIONS', 'GROK_CONFIG_PATH', 'GROK_SHELL'):

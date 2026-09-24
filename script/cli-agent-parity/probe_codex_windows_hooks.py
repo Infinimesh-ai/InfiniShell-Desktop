@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import queue
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -363,7 +364,7 @@ def formal_registration(args, directory, evidence):
 
 
 def cleanup_private_cases(directory, cases, evidence):
-    evidence.update(attempted=False, deleted=False, descendants_job_verified=False)
+    evidence.update(attempted=False, deleted=False, descendants_job_verified=False, readonly_files_removed=0)
     require(cases and all(case['passed'] for case in cases), '失败现场不能自动清理')
     for case in cases:
         phases = [case, case['formal_registration']] if case.get('mode') == 'formal' else [case]
@@ -373,10 +374,43 @@ def cleanup_private_cases(directory, cases, evidence):
                     and close['output_readers_eof'] for close in closes) and not phase.get('close_failure')
                     and phase.get('config_rollback', {}).get('restored'), '缺少退出、EOF 或配置回滚证据，保留现场')
     require(directory.is_dir() and not directory.is_symlink(), '私有临时目录已被替换，拒绝清理')
+    root_identity = directory.lstat()
+    require(not getattr(root_identity, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,
+            '私有临时目录不能是重解析点')
+
+    def remove_readonly_file(function, name, failure):
+        error = failure[1]
+        target = Path(name)
+        if (sys.platform != 'win32' or not isinstance(error, PermissionError)
+                or getattr(error, 'winerror', None) != 5 or function not in (os.unlink, os.remove)):
+            raise error
+        try:
+            relative = target.relative_to(directory)
+        except ValueError:
+            raise error
+        if not relative.parts or '..' in relative.parts:
+            raise error
+        current_root = directory.lstat()
+        if (current_root.st_dev, current_root.st_ino) != (root_identity.st_dev, root_identity.st_ino):
+            raise error
+        for parent in (directory, *[directory.joinpath(*relative.parts[:i]) for i in range(1, len(relative.parts))]):
+            info = parent.lstat()
+            if not stat.S_ISDIR(info.st_mode) or getattr(info, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT:
+                raise error
+        info = target.lstat()
+        attributes = getattr(info, 'st_file_attributes', 0)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT
+                or not attributes & stat.FILE_ATTRIBUTE_READONLY):
+            raise error
+        # 原生 Git 会生成只读对象；只处理自建目录内的普通独占文件，不更改 ACL 或忽略占用。
+        os.chmod(target, info.st_mode | stat.S_IWRITE, follow_symlinks=False)
+        function(name)
+        evidence['readonly_files_removed'] += 1
+
     evidence['attempted'] = True
     try:
-        # 不更改未知只读属性；任何文件占用或权限错误都保留原始失败。
-        shutil.rmtree(directory)
+        shutil.rmtree(directory, onerror=remove_readonly_file)
         evidence['deleted'] = True
     except Exception as error:
         evidence['failure'] = {'type': type(error).__name__, 'message': str(error),

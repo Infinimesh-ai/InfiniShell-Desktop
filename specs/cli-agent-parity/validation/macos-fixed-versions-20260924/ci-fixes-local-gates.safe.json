@@ -1,0 +1,47 @@
+{
+  "base_commit": "2c483322f00d569bc126bfa96616e2920083f872",
+  "scope": "CI 测试脚本、正式权限测试与独立全量测试调度修正；没有产品实现变更",
+  "sources": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions_tests.rs",
+      "sha256": "854c804ac7db61b3409e17067096a0b019329d4eb55c00344ff359ceda9c8443"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_plugin_live_runner_tests.py",
+      "sha256": "d9c3b97a6c79955f983999e34908cabe0e6d4c123202615822c88dedf6c45cc4"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_windows_hooks.py",
+      "sha256": "974c5634dd5122e15eb6acae779c52cbbe372b1b06f04aeaef1e2f77d684b88d"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+      "sha256": "68fc112870ce0040b9fb880a3933ffe2b9afd2c16834472fe49714600dd5f148"
+    }
+  ],
+  "checks": [
+    {
+      "command": "cargo check -p warp",
+      "exit_code": 0,
+      "summary": "cargo check passed",
+      "log_sha256": "f3705343d75188eb3daa66b701ac3354781f6494ea395322b262a65fd5ee4276"
+    },
+    {
+      "command": "cargo test -p warp --lib ai::cli_agent_runtime::permissions::tests -- --test-threads=1",
+      "exit_code": 0,
+      "summary": "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 7678 filtered out; finished in 0.02s",
+      "log_sha256": "d7dc39572b15f5ec23ecfc17c7eee386358309ffe04120d7ee0c6d44d81154b5"
+    },
+    {
+      "command": "cargo test -p warp --lib i18n::tests",
+      "exit_code": 0,
+      "summary": "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7679 filtered out; finished in 5.08s",
+      "log_sha256": "cf3de51409e43b82ac0117d73022a162a6ae330a144c71ace585f3a016e48219"
+    }
+  ],
+  "localization": "无需本地化变更",
+  "remote_revalidation": "pending",
+  "workflow_validation_recorded_separately": true,
+  "format_and_diff_checks_passed": true,
+  "format_log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

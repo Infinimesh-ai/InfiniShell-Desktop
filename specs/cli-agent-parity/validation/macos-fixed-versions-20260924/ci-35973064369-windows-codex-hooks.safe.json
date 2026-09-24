@@ -1,0 +1,127 @@
+{
+  "head_sha": "2c483322f00d569bc126bfa96616e2920083f872",
+  "run_id": 35973064369,
+  "artifact_sha256": "fbe177d1fd8aa5273251828e78d06cec3bce940f70f13724935f54fe1161dfb5",
+  "hook_probe_passed": false,
+  "zero_model_requests": true,
+  "failure": {
+    "phase": "private_directory_cleanup",
+    "type": "PermissionError",
+    "winerror": 5,
+    "path_class": "isolated_codex_tmp_plugins_clone_git_pack_tmp_idx"
+  },
+  "cases": [
+    {
+      "index": 0,
+      "passed": true,
+      "formal_registration_passed": true,
+      "native_session_start": true,
+      "native_user_prompt_submit": true,
+      "native_prompt_blocked": true,
+      "hook_completion_complete": true,
+      "config_rollback_restored": true,
+      "process_closes": [
+        {
+          "root_exit_code": 0,
+          "root_exited_naturally": true,
+          "output_readers_eof": true,
+          "all_descendants_job_verified": false
+        },
+        {
+          "root_exit_code": 0,
+          "root_exited_naturally": true,
+          "output_readers_eof": true,
+          "all_descendants_job_verified": false
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "passed": true,
+      "formal_registration_passed": true,
+      "native_session_start": true,
+      "native_user_prompt_submit": true,
+      "native_prompt_blocked": true,
+      "hook_completion_complete": true,
+      "config_rollback_restored": true,
+      "process_closes": [
+        {
+          "root_exit_code": 0,
+          "root_exited_naturally": true,
+          "output_readers_eof": true,
+          "all_descendants_job_verified": false
+        },
+        {
+          "root_exit_code": 0,
+          "root_exited_naturally": true,
+          "output_readers_eof": true,
+          "all_descendants_job_verified": false
+        }
+      ]
+    }
+  ],
+  "codex-01561-windows-conpty.json": {
+    "sha256": "a591f5cb1351f33dcd9a3c43a05ac0cbf6603d7801a465cc48c00a095a6ce7c0",
+    "passed": true,
+    "top_keys": [
+      "schema_version",
+      "mode",
+      "codex_version",
+      "official_commit",
+      "passed",
+      "native_conpty_notifications_verified",
+      "scope",
+      "ordinary_codex_tui_verified",
+      "product_ui_notifications_verified",
+      "full_lifecycle_verified",
+      "model_generation_verified",
+      "credentials_provided",
+      "windows_product_enabled",
+      "private_dir",
+      "source_commit",
+      "source_sha256",
+      "candidate_lf_sha256",
+      "fixed_inputs",
+      "cli",
+      "conpty_assets",
+      "native_report",
+      "raw_output",
+      "driver",
+      "conout_canary_observed",
+      "matched_notifications",
+      "notification_events_verified",
+      "notification_events_not_verified",
+      "formal_five_hook_registration_verified",
+      "private_cases_cleanup",
+      "retained_host_directory"
+    ]
+  },
+  "codex-01561-windows-conpty.native.json": {
+    "sha256": "5fb8ea968d72522ad3f6e3467c218fc3d53c813c5a5af7b610a54f76e0fbf978",
+    "passed": true,
+    "top_keys": [
+      "passed",
+      "cases",
+      "model_http_requests",
+      "attachments",
+      "schema_version",
+      "mode",
+      "codex_version",
+      "cli",
+      "official_commit",
+      "native_codex_attachments",
+      "credentials_provided",
+      "shell_diagnostics_source_sha256",
+      "conout_diagnostic",
+      "bash_observer_enabled",
+      "jq_newline_boundary",
+      "attachment_observation_errors",
+      "attachment_snapshot_is_not_complete_process_history",
+      "shell_diagnostics"
+    ]
+  },
+  "job_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35973064369/job/107547039141",
+  "original_failure_preserved": true,
+  "cleanup_readonly_hypothesis_not_confirmed_by_original_receipt": true,
+  "remote_revalidation": "pending"
+}

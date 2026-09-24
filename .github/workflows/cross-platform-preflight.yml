@@ -154,6 +154,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
+        id: fixed_codex
         shell: bash
         run: |
           set -euo pipefail
@@ -271,6 +272,7 @@ jobs:
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
         id: supervisor
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         env:
           CARGO_BUILD_JOBS: "2"
@@ -311,7 +313,7 @@ jobs:
       # 固定发行输入仅在 ignored 验收作用域替代发现；消费者仍查询官方真实渠道。
       - name: Verify fixed Linux CLI atomic update transactions without credentials
         id: fixed_cli_atomic_updates
-        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 90
         run: |
@@ -332,6 +334,7 @@ jobs:
           retention-days: 14
 
       - name: Test supervisor cleanup after host crash
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -340,6 +343,7 @@ jobs:
           cargo nextest run --no-fail-fast -p warp --lib --run-ignored only -E 'test(managed_process::live_tests::supervised_)'
 
       - name: Verify native recovery and idle-crash boundaries without credentials
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 15
         run: |
@@ -388,9 +392,11 @@ jobs:
           WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-input-evidence/linux
         run: |
           set -euo pipefail
-          if ! command -v xvfb-run >/dev/null || ! command -v xclip >/dev/null; then
+          # winit 通过 dlopen 加载 X11 运行库；已安装 Xvfb 不代表窗口依赖齐全。
+          if ! command -v xvfb-run >/dev/null || ! command -v xclip >/dev/null ||
+            ! python3 -c 'import ctypes; [ctypes.CDLL(name) for name in ("libX11.so.6", "libXcursor.so.1", "libX11-xcb.so.1", "libXi.so.6", "libxkbcommon.so.0", "libxkbcommon-x11.so.0")]'; then
             sudo -n apt-get update -q
-            sudo -n apt-get install -y xvfb xauth xclip fonts-noto-cjk libgl1-mesa-dri mesa-vulkan-drivers
+            sudo -n apt-get install -y xvfb xauth xclip fonts-noto-cjk libgl1-mesa-dri mesa-vulkan-drivers libx11-6 libxcursor1 libx11-xcb1 libxi6 libxkbcommon0 libxkbcommon-x11-0
           fi
           cargo build -p integration --bin integration
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
@@ -406,7 +412,7 @@ jobs:
           retention-days: 14
 
       - name: Run desktop workspace unit tests
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
         # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
         # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
@@ -527,13 +533,18 @@ jobs:
           persist-credentials: false
           clean: true
 
-      # 自托管 runner 的目标目录与 sccache 可以完整重建。每次验收先清除旧产物，
-      # 避免历史提交累积占满系统盘并让后续平台门禁在编译中途失败。
+      # 空间充足时复用 Cargo/sccache；不足时才清理可重建产物，避免每轮从零编译。
       - name: Reclaim Windows build storage
         shell: pwsh
         timeout-minutes: 10
         run: |
           $ErrorActionPreference = 'Stop'
+          $drive = Get-PSDrive -Name C
+          $drive | Select-Object Name, Used, Free
+          if ($drive.Free -ge 100GB) {
+            Write-Output 'At least 100 GiB free; retaining Cargo and sccache build artifacts'
+            exit 0
+          }
           & $env:RUSTC_WRAPPER --stop-server
           if ($LASTEXITCODE -ne 0) {
             Write-Output 'No running sccache server needed to be stopped'
@@ -734,6 +745,7 @@ jobs:
           "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Prepare fixed native Grok without credentials
+        id: fixed_grok
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1044,7 +1056,7 @@ jobs:
       # 使用生产启动命令实测 cmd/PowerShell 的 Unicode argv；不伪造原生 hook 派发。
       - name: Verify fixed Windows Grok production notification installer without credentials
         id: grok_source_installer
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 6
         env:
@@ -1092,7 +1104,7 @@ jobs:
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1111,7 +1123,7 @@ jobs:
       # Windows 仍走已有严格 Job 调试候选，实际执行固定 update/install，并核对退出和新入口。
       - name: Verify fixed Windows CLI atomic update candidates without credentials
         id: fixed_cli_atomic_updates
-        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 40
         env:
@@ -1140,7 +1152,7 @@ jobs:
           retention-days: 14
 
       - name: Test supervisor cleanup after host crash
-        if: ${{ !cancelled() && steps.supervisor.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: pwsh
         run: |
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
@@ -1150,7 +1162,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify native recovery and idle-crash boundaries without credentials
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 15
         env:
@@ -1223,14 +1235,7 @@ jobs:
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'GUI integration binary discovery failed' }
           $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
-          # 服务会话必须实际创建窗口、读系统剪贴板并产出非空截图；不能降级为内存替身。
-          $process = Start-Process -FilePath $binary -ArgumentList 'test_cli_composer_system_clipboard_multiline_and_image' -NoNewWindow -PassThru
-          if (-not $process.WaitForExit(180000)) {
-            $process.Kill($true)
-            $process.WaitForExit()
-            throw 'Real Windows GUI initialization or clipboard test exceeded 180 seconds'
-          }
-          if ($process.ExitCode -ne 0) { throw 'Real Windows window or system clipboard verification failed' }
+          ./script/cli-agent-parity/run_windows_gui_clipboard.ps1 -Binary $binary
 
       - name: Preserve Windows GUI system clipboard evidence
         if: ${{ !cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure') }}
