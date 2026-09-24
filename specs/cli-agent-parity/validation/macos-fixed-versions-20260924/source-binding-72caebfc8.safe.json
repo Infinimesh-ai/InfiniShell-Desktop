@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "source_commit": "72caebfc80cd06a7c38e77ae47b29e8ed1f15075",
+  "base_commit": "175b8de4d1b90914cad37a55766add1cd1a07058",
+  "changed_files": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+      "sha256": "6e1182096823075d56f0585cc748956db8891266eba53939a3396d0f1a635e9a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+      "sha256": "440d299f4b962a27b70d3b82a6844dadbb01d659b8ab236f6c94bd12666972f1"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "sha256": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "sha256": "8b5decd8fc2554560672c3e32b54174bc462ffd9e2cfee33d0275bb01a20c136"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_tests.rs",
+      "sha256": "28d3735fbf8a3648da0eaaa5a17f5d095db22fc7db8911de07ecc23a1e29e564"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs",
+      "sha256": "c2ca6bc29bad109f60de0322f20a824e94ae89980fa6040c3826e1016d4641a5"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_plugin_live_runner_tests.py",
+      "sha256": "3a161e9543614aef707a95780b926d1f8f0fe61a022ddc69df037f85144cfb2f"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate.py",
+      "sha256": "817f4b4c9025d3de4781d3eb921ef1ca1d827228088d71cde15bae7d40a0752b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py",
+      "sha256": "ed3cd1eafc6037aa5d20b7b88ea503ae5ac10fe4f4e7e4133c7eb129a08e19ee"
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_plugin_live.py",
+      "sha256": "08cc1fa0fac964c6b258bb383c0dbde56731a0cc2cc4c3c7d6cb44e92671067a"
+    },
+    {
+      "path": "specs/cli-agent-parity/ACCEPTANCE_FIXED_VERSIONS_20260924.md",
+      "sha256": "7d24053b08c50c66699f46245d0ef3c42c0aa1cb9600aa03ecfa3ea596d87ada"
+    },
+    {
+      "path": "specs/cli-agent-parity/CAPABILITY_MATRIX.md",
+      "sha256": "ce8c0d2b7082b06f6a4a7c88cc6ba72acf90d2b2c7df480d04ddaf76bf617774"
+    },
+    {
+      "path": "specs/cli-agent-parity/CLI_AUTOUPDATE.md",
+      "sha256": "c3f58659809c7983ba0649fdb0989cbf53819b9042df0c0362deba3f3d034898"
+    },
+    {
+      "path": "specs/cli-agent-parity/HANDOFF_20260921_REOPEN.md",
+      "sha256": "c774095cb31f6bc71360c66d06e4411438fb11d1175a3bb92edb5f81adc01325"
+    },
+    {
+      "path": "specs/cli-agent-parity/HANDOFF_20260921_STAGE_CHECKPOINT.md",
+      "sha256": "865d5aec817fe28ba4466579044da8934e6e24ec878d16f88ea492a44ec4ab73"
+    },
+    {
+      "path": "specs/cli-agent-parity/PLAN.md",
+      "sha256": "c0924adbdfcb1e0ddd0891da98afaeb617c2de158cf2ab2fc22c878e050f269d"
+    },
+    {
+      "path": "specs/cli-agent-parity/VALIDATION_REPORT.md",
+      "sha256": "81c7588ffbcdae12ba869607db1ae8eedbd598b476d648d85c0c5c79ca122d40"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-windows-atomic.safe.json",
+      "sha256": "b991f93638a83bc9901dddeab90ecb5d9aa049b5be831ed405132170e3f7f943"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-windows-codex-hooks-conpty.safe.json",
+      "sha256": "5f4d564eaa23db409c55ebcfc88a1979349a89013668de3af1be6b2c5fb1cb03"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-windows-final.safe.json",
+      "sha256": "2d46051ac4e89ef86da1e4e49ab8c80f535d2add83548ed36920d93d293bb993"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-windows-gui.safe.json",
+      "sha256": "7f26c1d04979ca7a98ba530bbf47250319af8b01bb7ad86e59329a990c9f5803"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36021674501-windows-grok-migration-failure.safe.json",
+      "sha256": "c60cb8718ac96bf517d0648ee347c5863c65ff6c181d824425a8789c8ea056ee"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json",
+      "sha256": "8ef312e309ccb43930291e4822ef503e55f6290bc14826464acbc6a8dc33bc2f"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-981cfebc4-mac-source-reuse.safe.json",
+      "sha256": "a554164a4618b1bd2688e361d0db4dfb4115e60336b07da80fbc3c1f0b683a86"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-codex-contract-local-gates.safe.json",
+      "sha256": "853d7a63f747196e6e762e5cf4c9dce815b38d3e2bc01dde7d677b878e40e4bb"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-codex-native-contract-fix.safe.json",
+      "sha256": "288a1d41ed88b32926d6a834ddbefc8fb8f9ef5f0f71af046d4df618295d6dd3"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-combined-final-local-gates.safe.json",
+      "sha256": "1bfd4897c2d4bb21dfd3216b5d8c602dd5636f4c5e7f7d916492e5580133b9dd"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-grok-bridge-root-synthetic.safe.json",
+      "sha256": "ed2fa7ce24d56b1d95f47372edd6f8cf7b4210f164df219c8b6f0b0f1064d384"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-grok-migration-fixture-fix.safe.json",
+      "sha256": "45127401329cd1d8e28210a699b93fbbc4b8c06df0fd3dfb8e0212c7d3e983fb"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/source-binding-175b8de4d.safe.json",
+      "sha256": "97bdf43328f39683f0fe4fe49994e5054cf7d663414611a7c0b0e21f24d7a850"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/source-binding-4880b6cf2.safe.json",
+      "sha256": "bd969c5f7c4197ad1d2c9ded671e25f9423dff4fc352e43670a2618062668239"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/source-binding-9009af078.safe.json",
+      "sha256": "ae3bdf1ed3ca0797c13c306fe7e7dee0e4cdad3cf8041ef1b5d1628b3c27e605"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/source-binding-981cfebc4.safe.json",
+      "sha256": "61a8ea442b74e01785697adfc166efa938d5e197acd9c1c44e92e45753c8c0ff"
+    }
+  ],
+  "production_scope": "Windows 原生 Codex/Grok 更新子映像约束；sources 中新增目标元数据与选择分支仅 cfg(windows)，纯解析辅助仅 windows/test",
+  "grok_product_source_unchanged": true,
+  "linux_font_and_gui_sources_unchanged_from_175b8de4d": true,
+  "windows_gui_sources_unchanged_from_981cfebc4": true,
+  "local_gate_receipt": "ci-windows-combined-final-local-gates.safe.json",
+  "windows_native_result_pending": true,
+  "old_receipts_not_relabelled": true
+}

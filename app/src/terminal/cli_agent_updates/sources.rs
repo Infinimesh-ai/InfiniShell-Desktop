@@ -2769,7 +2769,24 @@ pub(super) async fn execute(
         let image = match plan.agent {
             CLIAgent::Codex => codex_windows_child_image(&plan.target_version).await?,
             CLIAgent::Grok => grok_windows_child_image(&plan.target_version).await?,
-            CLIAgent::Claude => return Err(Error::UnsupportedSource),
+            CLIAgent::Claude
+            | CLIAgent::Gemini
+            | CLIAgent::Amp
+            | CLIAgent::Droid
+            | CLIAgent::OpenCode
+            | CLIAgent::Copilot
+            | CLIAgent::Pi
+            | CLIAgent::OhMyPi
+            | CLIAgent::Auggie
+            | CLIAgent::CursorCli
+            | CLIAgent::Goose
+            | CLIAgent::DeepSeek
+            | CLIAgent::Hermes
+            | CLIAgent::Vibe
+            | CLIAgent::Antigravity
+            | CLIAgent::Omp
+            | CLIAgent::WarpTui
+            | CLIAgent::Unknown => return Err(Error::UnsupportedSource),
         };
         binding
             .with_child_image(image)

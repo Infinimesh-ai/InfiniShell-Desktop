@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "reviewed_commit": "72caebfc80cd06a7c38e77ae47b29e8ed1f15075",
+  "prior_mac_review_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "prior_mac_review_file": "ci-981cfebc4-mac-source-reuse.safe.json",
+  "prior_mac_review_sha256": "a554164a4618b1bd2688e361d0db4dfb4115e60336b07da80fbc3c1f0b683a86",
+  "unchanged_mac_domains": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "sha256": "c1006d79998e8d472da8307018801529ecd92a05ee3dbef2ae2848b1074d5144",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "sha256": "d612de9a6ef830a11fffc31bc3cd9092bd3ad87650768973b235bbf3a0c4011d",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "sha256": "cb2deec56ab46f14d7af0b88544bc512e0b5c2bd91a072c3ab8afc1150d5abf4",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "sha256": "2cb14496d9fd8c1fd1eb66a01990954e2549f814fd6b3e49254bfe462c3725a8",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "sha256": "29f452722ab87550890fa0807d9b8f2897e0036acfb59728e40017a8048db2c0",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/runtime_host.rs",
+      "sha256": "528655252f4994098a8b630e21d813c30397b2af2b32c283e044886649eca89d",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+      "sha256": "4a15b8f79c8510950a85148f42ab45baa95fe66ccd199ae2ae8f31e5d35da71e",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+      "sha256": "90a24fcad0977b60a1f4b9b5c546a6c711c79fd2ee6677e880f3154988aeaa24",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
+      "sha256": "851680295f3efb00653f2745cdbea7f07b763cc35e150647d7b79c7694159956",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/src/terminal/view/use_agent_footer/mod.rs",
+      "sha256": "d048c515dddda3ae6b1ee66ef464b9b02a325137bbfef2e2b3404d6b2292cdc2",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "sha256": "3f7fbd24bb928e5e9a587954405f30699e14b3efb4b13fa50be047e3ee1903ab",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "sha256": "9641addcae9bc735938c92b1aa0ee12ec565350605278b16a4dc38de51385727",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "crates/warpui/build.rs",
+      "sha256": "d43416104bcdc1231f6c1c99f6eb22171a10e408ec78d9ebe0eab391c3fc11ac",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "crates/warpui/src/platform/mac/rendering/renderer.rs",
+      "sha256": "e7b12d8af359377b9a86fb730d9d5c277d759f543f6291bb051729a8ce7a3e92",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "crates/warpui/src/platform/mac/rendering/metal/renderer.rs",
+      "sha256": "5acda69d01145b0b3d52d52717bd10476c4cdca05400e7700ea577e72da6b12f",
+      "equal_to_981cfebc4": true
+    },
+    {
+      "path": "crates/warpui/src/platform/mac/window.rs",
+      "sha256": "a7ca13a8060d65f6ca9d05dfc25fd4b625ea2348519fa40a6eb2c66550b57574",
+      "equal_to_981cfebc4": true
+    }
+  ],
+  "linux_gui_domains": [
+    {
+      "path": "crates/warpui/src/windowing/winit/fonts/linux.rs",
+      "sha256": "82a9743dcb5b6c2e20f809f10374fc02b738ce73bc18178752f826a859ca23c6",
+      "equal_to_175b8de4d": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+      "sha256": "35b82e5b868ed10eebae1f64d1331a79066a29b1431819a2f3ba65f29eb04f6d",
+      "equal_to_175b8de4d": true
+    }
+  ],
+  "remaining_production_change": "managed_process_atomic_windows.rs 仅 Windows；sources.rs 新目标解析/请求和子映像选择仅 Windows production，新纯辅助也可在 test 编译",
+  "grok_installer_changes": "grok.rs 未变；grok_tests.rs 修正原始根路径夹具与失败诊断；脚本白名单投影",
+  "mac_and_linux_runtime_behavior_changed_by_72caebfc8": false,
+  "local_check_i18n_and_regression_receipt": "ci-windows-combined-final-local-gates.safe.json",
+  "windows_native_reverification_run": 36026855842,
+  "windows_native_result_pending": true,
+  "no_old_receipt_relabelled_as_new_commit_execution": true,
+  "independent_acceptance_review": {
+    "mandatory_gaps_besides_two_windows_cases": 0,
+    "requirements_checked": [
+      "PLAN P0–P5",
+      "CLI_AUTOUPDATE",
+      "REOPEN R1–R8"
+    ],
+    "local_evidence_links_checked": 107,
+    "unique_evidence_files": 106,
+    "remaining": [
+      "Windows Codex 0.155.1→0.156.1 inspect/execute/inspect with exact target, config, journal and strict Job",
+      "Windows Grok 0.1.3→0.1.4 complete six-stage native installer"
+    ],
+    "retained_boundaries": [
+      "普通 Codex PTY Escape 不计工具取消或进程树清理",
+      "V13 只证明产品通知中心",
+      "Linux/Windows 只证明系统剪贴板，不是物理 IME"
+    ],
+    "requires_new_model_or_gui_chain_for_unchanged_domains": false
+  }
+}
