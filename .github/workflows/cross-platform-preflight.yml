@@ -445,17 +445,37 @@ jobs:
           WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-input-evidence/linux
         run: |
           set -euo pipefail
+          install_gui_dependencies() {
+            local attempt
+            local -a apt_options=(-o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30)
+            # 优先使用已有认证索引；安装仍由 APT 校验包摘要，避免无关镜像同步阻断。
+            if sudo -n apt-get "${apt_options[@]}" install -y "$@"; then
+              return 0
+            fi
+            # 刷新按摘要获取索引，任何索引失败均返回错误；重试耗尽不能继续 GUI。
+            for attempt in 1 2 3; do
+              if timeout 120s sudo -n apt-get "${apt_options[@]}" -o Acquire::By-Hash=force -o APT::Update::Error-Mode=any update -q; then
+                if sudo -n apt-get "${apt_options[@]}" install -y "$@"; then
+                  return 0
+                else
+                  return "$?"
+                fi
+              fi
+              if [[ "$attempt" -lt 3 ]]; then
+                sleep 5
+              fi
+            done
+            return 1
+          }
           # winit 通过 dlopen 加载 X11 运行库；已安装 Xvfb 不代表窗口依赖齐全。
           if ! command -v xvfb-run >/dev/null || ! command -v xclip >/dev/null ||
             ! python3 -c 'import ctypes; [ctypes.CDLL(name) for name in ("libX11.so.6", "libXcursor.so.1", "libX11-xcb.so.1", "libXi.so.6", "libxkbcommon.so.0", "libxkbcommon-x11.so.0")]'; then
-            sudo -n apt-get update -q
-            sudo -n apt-get install -y xvfb xauth xclip libgl1-mesa-dri mesa-vulkan-drivers libx11-6 libxcursor1 libx11-xcb1 libxi6 libxkbcommon0 libxkbcommon-x11-0
+            install_gui_dependencies xvfb xauth xclip libgl1-mesa-dri mesa-vulkan-drivers libx11-6 libxcursor1 libx11-xcb1 libxi6 libxkbcommon0 libxkbcommon-x11-0
           fi
           # 字体前置独立于 X11 依赖，已有窗口运行库不能证明中文可渲染。
           if ! command -v fc-list >/dev/null ||
             [[ "$(dpkg-query -W -f='${db:Status-Status}' fonts-noto-cjk 2>/dev/null || true)" != installed ]]; then
-            sudo -n apt-get update -q
-            sudo -n apt-get install -y fontconfig fonts-noto-cjk
+            install_gui_dependencies fontconfig fonts-noto-cjk
           fi
           fc-cache -f
           mkdir -p "$WARP_INTEGRATION_TEST_ARTIFACTS_DIR"

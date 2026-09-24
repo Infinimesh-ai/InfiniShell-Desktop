@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "job_id": 107687051187,
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "job_conclusion": "failure",
+  "log_sha256": "3b1947fcf25734ff5250e5f0fc2257cc47958bc737a683d3a9624652d9388d8a",
+  "log_bytes": 213804,
+  "passed_steps": [
+    "Set up job",
+    "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+    "Install Python for CLI parity verification",
+    "Verify provisioned toolchain",
+    "Check InfiniShell-Desktop",
+    "Compile GUI integration tests",
+    "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+    "Complete job"
+  ],
+  "failed_steps": [
+    "Verify Linux GUI system clipboard without model inputs",
+    "Preserve Linux GUI system clipboard evidence"
+  ],
+  "failure": {
+    "stage": "font_dependency_apt_update",
+    "exit_code": 100,
+    "repository": "Ubuntu jammy-security universe",
+    "index": "binary-amd64/Packages.xz",
+    "error": "File has unexpected size; mirror sync in progress",
+    "observed_size": 1049668,
+    "expected_size": 1051660,
+    "expected_sha256": "e468cddcf22f62fbf9de52ba992b96d00345c831c5d4dfafb9a6a77581328b66",
+    "release_created_at": "2026-09-24T13:40:23Z"
+  },
+  "gui_test_ran": false,
+  "font_coverage_verified": false,
+  "screenshots_created": false,
+  "upload_failure_is_secondary": true,
+  "product_failure_claimed": false,
+  "full_workspace_tests_executed": false
+}
