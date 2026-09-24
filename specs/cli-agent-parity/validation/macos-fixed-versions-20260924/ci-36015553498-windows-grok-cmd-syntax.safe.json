@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "job_id": 107687050910,
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "artifact": {
+    "artifact_id": 10815509193,
+    "name": "grok-windows-production-installer-981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "archive_sha256": "04f9581d2dac5d873c01d4375b383a766d4953df9189724cd309eb63b4c2d525",
+    "files": [
+      {
+        "path": "grok-production-installer.safe.json",
+        "bytes": 4740,
+        "sha256": "dc393ddb6a1ebad3c5ce456caf617dfe6a25cbd2cab8065dc8d28522427547d5"
+      }
+    ]
+  },
+  "original_safe_receipt": {
+    "schema_version": 1,
+    "passed": false,
+    "fixed_version": "1.0.41",
+    "platform": "win32",
+    "native_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    "test_binary_sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9",
+    "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+    "runner_sha256": "9af48a038cdf25c9bd2733e7bdc0364ea019172872c9031422c3915b9237c607",
+    "source_sha256": {
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "803c015c48a7a2c3289ef40db24cd6617ec7e828d3d0aa88025ea867d207b80a",
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+      "script/cli-agent-parity/codex_windows_hook_command.ps1": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25"
+    },
+    "credentials_provided": false,
+    "model_inputs": 0,
+    "native_hook_execution_verified": false,
+    "worker_conout_verified": false,
+    "gui_verified": false,
+    "private_root_removed": false,
+    "timed_out": false,
+    "exit_code": 101,
+    "output_bytes": 7051,
+    "output_sha256": "66351668876d62dbaa5de847488383f1fcc4d30405a9cad7c5195ea662641a69",
+    "failure_diagnostics": {
+      "panic_locations": [
+        {
+          "source": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+          "line": 2058,
+          "column": 29,
+          "kind": "unwrap_result",
+          "command_failure": null
+        }
+      ],
+      "raw_output_exported": false,
+      "private_paths_exported": false,
+      "recorded_command": {
+        "stage": "windows_bridge_cmd",
+        "error_kind": "native_nonzero",
+        "native_exit_code": 1,
+        "os_code": null,
+        "stdout_bytes": 0,
+        "stderr_bytes": 41,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderr_sha256": "6bf64187472dcd64b7055e5ee036702be3e6b457f7461defd9dc473d481b11ab",
+        "bridge": {
+          "node_exit_code": null,
+          "failure": null,
+          "node_module_not_found": false
+        }
+      }
+    },
+    "receipt": {
+      "credentials_provided": false,
+      "grok_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+      "grok_version": "1.0.41",
+      "model_input_submitted": false,
+      "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+      "node_version": "v20.9.0",
+      "passed": false,
+      "progress": [
+        "binary_bindings_verified",
+        "runtime_verification",
+        "runtime_verified",
+        "node_version_probe",
+        "node_version_verified",
+        "grok_version_probe",
+        "grok_version_verified",
+        "windows_bridge_prepare",
+        "windows_bridge_cmd",
+        "windows_bridge_cmd_returned"
+      ],
+      "stage": "windows_bridge_cmd_returned",
+      "steps": [],
+      "test_binary_sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9",
+      "windows_bridge_command": {
+        "actual_command_utf16_units": 5430,
+        "ascii_only": true,
+        "command_sha256": "9e86e932d9bd9b9d58168169dbb13d4c2e9065b0fbb275fff9aabc087eaee664",
+        "encoded_payload_characters": 5364,
+        "node_path_verbatim": false,
+        "path_contains_system_powershell": true,
+        "powershell_executable_exists": true,
+        "production_command_utf16_units": 4538,
+        "script_path_verbatim": true,
+        "serialization": "command_args",
+        "test_only_bridge_diagnostics": true
+      },
+      "windows_bridge_last_command": {
+        "bridge": {
+          "failure": null,
+          "node_exit_code": null,
+          "node_module_not_found": false
+        },
+        "error_kind": "native_nonzero",
+        "native_exit_code": 1,
+        "os_code": null,
+        "stage": "windows_bridge_cmd",
+        "stderr_bytes": 41,
+        "stderr_sha256": "6bf64187472dcd64b7055e5ee036702be3e6b457f7461defd9dc473d481b11ab",
+        "stdout_bytes": 0,
+        "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "windows_bridge_shell": {
+        "argument_count": 4,
+        "flags": [
+          "/d",
+          "/s",
+          "/c"
+        ],
+        "stage": "windows_bridge_cmd",
+        "timeout_seconds": 10
+      }
+    },
+    "source_unchanged": true
+  },
+  "stderr_fixed_text_proof": {
+    "bytes": 41,
+    "sha256": "6bf64187472dcd64b7055e5ee036702be3e6b457f7461defd9dc473d481b11ab",
+    "exact_fixed_ascii_message": "The syntax of the command is incorrect.\r\n",
+    "method": "compare known public fixed cmd diagnostic to same-call stderr byte length and SHA256",
+    "raw_private_body_recovered": false
+  },
+  "conclusion": "cmd rejects command syntax before any observed PowerShell bridge or Node marker; six installer stages did not begin",
+  "production_bridge_root_cause_resolved": false
+}

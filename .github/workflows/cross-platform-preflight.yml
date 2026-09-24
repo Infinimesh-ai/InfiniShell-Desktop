@@ -41,6 +41,11 @@ on:
         required: true
         default: false
         type: boolean
+      windows_grok_installer_only:
+        description: 仅补验 Windows Grok 生产通知安装器；全量模式优先
+        required: true
+        default: false
+        type: boolean
       run_cli_atomic_updates:
         description: 固定 0.156.1 / 2.1.280 / 1.0.41 的隔离真实原子更新候选
         required: true
@@ -722,7 +727,19 @@ jobs:
           python -B script/cli-agent-parity/native_ssh_notifications_tests.py NativeSshNotificationTests.test_grok_bridge_main_uses_the_same_guarded_mapper_on_each_desktop -v
           if ($LASTEXITCODE -ne 0) { throw 'Grok notification bridge contract tests failed' }
 
+      # 安装器补验跳过无关 CLI 的离线合集，仅保留固定 Grok 获取前置。
+      - name: Test fixed Grok preparation for installer-only verification
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok preparation runner tests failed' }
+
       - name: Test notification patch file transactions
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -784,7 +801,7 @@ jobs:
 
       - name: Prepare fixed native Codex without credentials
         id: fixed_codex
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -795,7 +812,7 @@ jobs:
       # 生产通知安装器的当前插件合同仍精确绑定 0.147.0；不要把最新版运行时冒充该合同。
       - name: Prepare fixed Codex production installer contract
         id: fixed_codex_installer
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -806,7 +823,7 @@ jobs:
 
       - name: Prepare fixed native Claude without credentials
         id: fixed_claude
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -827,7 +844,7 @@ jobs:
           "INFINISHELL_TEST_GROK_EXE=$grokExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Verify fixed Grok unauthenticated ACP boundaries
-        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_grok.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -837,7 +854,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok unauthenticated ACP boundaries failed' }
 
       - name: Verify native Claude initialization and idle EOF
-        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_claude.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -847,7 +864,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude initialize and idle EOF validation failed' }
 
       - name: Verify native Claude permission observations without credentials
-        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_claude.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -857,7 +874,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude permission observation validation failed' }
 
       - name: Verify native Codex plugin registry failure recovery
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_codex.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         env:
@@ -867,7 +884,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex plugin registry failure recovery failed' }
 
       - name: Verify native Codex persistent plugin source
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_codex.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -879,7 +896,7 @@ jobs:
       # 单独验证 Git Bash/jq，不将原生文件事务通过冒充 Windows hooks 已通过。
       # 即使前面的独立门禁失败，也保留这项验证的真实结果。
       - name: Test Windows Git Bash notification payloads
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -911,7 +928,7 @@ jobs:
 
       # 原生候选只在临时目录加载，必须在模型调用前由真实 hook 阻断，不开启产品安装门禁。
       - name: Verify Codex Windows native hooks without model requests
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -930,7 +947,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve Codex Windows native hook evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-native-hooks-${{ github.sha }}
@@ -940,7 +957,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify Codex Windows ConPTY notification transport
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -960,7 +977,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve Codex Windows ConPTY evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-conpty-${{ github.sha }}
@@ -973,7 +990,7 @@ jobs:
 
       # 当前固定版本独立验收；旧版 0.147 专项不能替代新版原生派发和 ConPTY。
       - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -992,7 +1009,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-native-hooks-${{ github.sha }}
@@ -1002,7 +1019,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify fixed Codex 0.156.1 Windows ConPTY notification transport
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1020,7 +1037,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows ConPTY evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-conpty-${{ github.sha }}
@@ -1037,7 +1054,7 @@ jobs:
       # 独立条件不因其他 CLI 门禁失败而跳过；没有自动重试，也不开放产品安装门控。
       - name: Verify Claude Windows native SessionStart notification without credentials
         id: claude_windows_notifications
-        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_claude.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 8
         env:
@@ -1047,7 +1064,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 原生 SessionStart 通知未通过，保留门控关闭' }
 
       - name: Preserve Claude Windows native notification evidence
-        if: ${{ !cancelled() && steps.claude_windows_notifications.outcome != 'skipped' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.claude_windows_notifications.outcome != 'skipped') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: claude-windows-notifications-${{ github.sha }}
@@ -1063,7 +1080,7 @@ jobs:
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；直接覆盖超大帧后的恢复路径。
       - name: Test IPC frame-limit recovery
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p ipc --lib
@@ -1071,12 +1088,12 @@ jobs:
 
       - name: Build InfiniShell SSH worker
         id: ssh_worker
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
         run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker"
 
       - name: Test Windows PowerShell SSH worker arguments
-        if: ${{ !cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: powershell
         run: >-
           .\script\windows\test_pwsh_ssh_worker.ps1
@@ -1088,12 +1105,12 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
         id: codex_source_installer
-        if: ${{ !cancelled() && steps.fixed_codex_installer.outcome == 'success' && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_codex_installer.outcome == 'success' && steps.check_app.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 8
         env:
@@ -1118,7 +1135,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Production Codex installer migration or idempotent verification failed; no automatic retry' }
 
       - name: Preserve Windows Codex production installer evidence
-        if: ${{ !cancelled() && steps.codex_source_installer.outcome != 'skipped' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.codex_source_installer.outcome != 'skipped') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-production-installer-${{ github.sha }}
@@ -1158,29 +1175,29 @@ jobs:
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
 
       - name: Test CLI harness arguments
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1190,7 +1207,7 @@ jobs:
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
         id: supervisor
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
@@ -1199,7 +1216,7 @@ jobs:
       # Windows 仍走已有严格 Job 调试候选，实际执行固定 update/install，并核对退出和新入口。
       - name: Verify fixed Windows CLI atomic update candidates without credentials
         id: fixed_cli_atomic_updates
-        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 40
         env:
@@ -1219,7 +1236,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native update candidate failed; inspect safe receipts; production gates remain closed' }
 
       - name: Preserve Windows fixed CLI atomic update receipts
-        if: ${{ !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped') }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-fixed-atomic-updates-${{ github.sha }}
@@ -1228,7 +1245,7 @@ jobs:
           retention-days: 14
 
       - name: Test supervisor cleanup after host crash
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
         run: |
           $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
@@ -1238,7 +1255,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify native recovery and idle-crash boundaries without credentials
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 15
         env:
@@ -1267,7 +1284,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native cmd shim missing-session recovery validation failed' }
 
       - name: Preserve Windows native CLI boundary evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-native-boundaries-${{ github.sha }}
@@ -1285,18 +1302,18 @@ jobs:
           retention-days: 14
 
       - name: Test rust-genai
-        if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard)) }}
         shell: pwsh
         run: cargo nextest run --no-run -p integration
 
       - name: Verify Windows GUI system clipboard without model inputs
         id: cli_gui_input
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard)) }}
         shell: pwsh
         timeout-minutes: 15
         env:
@@ -1314,7 +1331,7 @@ jobs:
           ./script/cli-agent-parity/run_windows_gui_clipboard.ps1 -Binary $binary
 
       - name: Preserve Windows GUI system clipboard evidence
-        if: ${{ !cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure')) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-gui-system-clipboard-${{ github.sha }}
@@ -1323,7 +1340,7 @@ jobs:
           retention-days: 14
 
       - name: Run desktop workspace unit tests
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests) }}
         shell: pwsh
         # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
         # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
@@ -1331,6 +1348,6 @@ jobs:
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
       - name: Report sccache statistics
-        if: ${{ always() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (always()) }}
         shell: pwsh
         run: '& $env:RUSTC_WRAPPER --show-stats'

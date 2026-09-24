@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "scope": "Windows Grok 安装器测试启动边界路径修复；不改变生产模板/参数序列化",
+  "baseline_head": "9009af078456782031e135cf321ef21a53f31808",
+  "changed_source": {
+    "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+    "sha256": "7954b22549367428487d220891923d2b451e1f6a331a159634a0801b96876f4d",
+    "lines": [
+      2021,
+      2051
+    ]
+  },
+  "production_source_unchanged": true,
+  "production_source_sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+  "template_sha256": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952",
+  "retained_failure": {
+    "sha256": "dc393ddb6a1ebad3c5ce456caf617dfe6a25cbd2cab8065dc8d28522427547d5",
+    "passed": false,
+    "stage": "windows_bridge_cmd_returned",
+    "native_exit_code": 1,
+    "stderr_bytes": 41,
+    "stderr_sha256": "6bf64187472dcd64b7055e5ee036702be3e6b457f7461defd9dc473d481b11ab",
+    "category": "cmd_syntax_error_before_powershell",
+    "receipt": "ci-36015553498-windows-grok-cmd-syntax.safe.json"
+  },
+  "root_cause": {
+    "category": "mixed_separator_shell_argv0",
+    "old_synthetic_program": "C:\\Windows\\System32/cmd.exe",
+    "new_synthetic_program": "C:\\Windows\\System32\\cmd.exe",
+    "synthetic_examples_not_observed_private_paths": true,
+    "pathbuf_relative_push_preserves_internal_slash": true,
+    "wrapper_delegates_args_unchanged": true,
+    "std_commandline_preserves_original_program_name": true,
+    "payload_is_ascii_fixed_flags_plus_base64": true,
+    "regular_args_add_only_outer_quote_pair": true,
+    "cmd_s_strips_that_quote_pair": true,
+    "raw_arg_required_for_this_payload": false,
+    "runtime_success_after_fix_verified": false
+  },
+  "source_chain": [
+    {
+      "path": "crates/command/src/async.rs",
+      "sha256": "7ce5a96de1cafff4b3406c5891a8c54ecbf2a5d0fb062fc532375298b4e30676",
+      "lines": [
+        39,
+        45,
+        144,
+        149
+      ]
+    },
+    {
+      "path": "async-process-2.5.0/src/lib.rs",
+      "sha256": "a7227fb9a395295754eecdc91fbae24c942833f71bac20132a526f98c3f99c0c",
+      "lines": [
+        810,
+        816
+      ]
+    }
+  ],
+  "official_fixed_rust_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/rust-lang/rust/1.92.0/library/std/src/path.rs",
+      "sha256": "169abd04e9176f1039522d990aa9eb003c63ce0e96eb3a1bb691c4695b68a936",
+      "relevant_lines": [
+        1304,
+        1383
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/rust-lang/rust/1.92.0/library/std/src/sys/process/windows.rs",
+      "sha256": "ac17cd2c5452d2c99f025df696c2823bc9ce9cf0075ab0898e5ecae45a2c206f",
+      "relevant_lines": [
+        791,
+        809
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/rust-lang/rust/1.92.0/library/std/src/sys/args/windows.rs",
+      "sha256": "69ffe5aedea4a6194365f11904329ebfa7c51d0f52960628f0a66fed05523d6d",
+      "relevant_lines": [
+        164,
+        204
+      ]
+    }
+  ],
+  "cmd_reference": {
+    "url": "https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/cmd",
+    "section": "Parameters /s and Remarks quotation handling"
+  },
+  "additional_primary_reports": [
+    "https://github.com/microsoft/WSL/issues/8259",
+    "https://github.com/rmyorston/busybox-w32/issues/322",
+    "https://github.com/ocaml/dune/pull/14278"
+  ],
+  "checks": {
+    "rustfmt_exit_code": 0,
+    "diff_check_exit_code": 0,
+    "python_runner_tests": 12,
+    "python_passed": 12,
+    "python_log_sha256": "4e9583fbd8b7dfd17b1b52f963bca5e078ab351e78d6c9726b2c05ff184c10db",
+    "cargo_run": false,
+    "windows_native_run": false,
+    "ci_dispatch": false
+  },
+  "acceptance_unchanged": [
+    "cmd and PowerShell 5.1 actual argv roundtrip",
+    "Unicode/space/quotes/shell metacharacters",
+    "official Grok production installer repair/disable",
+    "same original command result, no replay"
+  ],
+  "localization": "无需本地化变更；仅测试夹具路径",
+  "next_required": "由根代理安排 Windows installer-only 实际复验；当前不声明修复后实测通过",
+  "patch": {
+    "sha256": "43edaa1e0f0be1e33c5d7734b21a1720f3114158a8c6da330148012d3fae9c11"
+  },
+  "original_receipt_sha256": "711de207a1bda58b33f31811b79b6de8db9ec42bc30a3cc22e60aa5f8937462d",
+  "cargo_check_reuse": {
+    "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "receipt": "ci-native-followup-final-local-gates.safe.json",
+    "last_check_log_sha256": "ce6d7161839c53f3f6cbc2cc131ea06fc9f3b18621717aa1c934eeaf421b96fd",
+    "all_product_sources_and_build_inputs_unchanged": true,
+    "only_source_change": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+    "compile_gate": "cfg(test) module and cfg(windows) function",
+    "fresh_local_cargo_run": false,
+    "reason": "ACASIS 构建盘未挂载；不创建替代挂载目录。生产源码与已通过 cargo check 的提交完全相同，Windows 专项仍执行新的 cargo check 与真实测试。"
+  }
+}

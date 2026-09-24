@@ -2018,15 +2018,18 @@ async fn windows_startup_bridge_argv_probe(
     ])
     .unwrap();
     let system_root = PathBuf::from(env::var_os("SYSTEMROOT").unwrap());
+    // cmd 会自行解析原始 argv0；逐组件拼接，避免 System32/cmd.exe 中的正斜杠被当作开关。
+    let system = system_root.join("System32");
+    let powershell = system.join("WindowsPowerShell").join("v1.0");
     let shells = [
         (
             "windows_bridge_cmd",
-            system_root.join("System32/cmd.exe"),
+            system.join("cmd.exe"),
             vec!["/d", "/s", "/c"],
         ),
         (
             "windows_bridge_powershell",
-            system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe"),
+            powershell.join("powershell.exe"),
             vec!["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"],
         ),
     ];
@@ -2038,8 +2041,8 @@ async fn windows_startup_bridge_argv_probe(
         "encoded_payload_characters":command.split_whitespace().last().unwrap().len(),
         "node_path_verbatim":node.to_string_lossy().starts_with(r"\\?\"),
         "script_path_verbatim":script.to_string_lossy().starts_with(r"\\?\"),
-        "powershell_executable_exists":system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe").is_file(),
-        "path_contains_system_powershell":env::split_paths(&env::var_os("PATH").unwrap()).any(|path| path == system_root.join("System32/WindowsPowerShell/v1.0")),
+        "powershell_executable_exists":powershell.join("powershell.exe").is_file(),
+        "path_contains_system_powershell":env::split_paths(&env::var_os("PATH").unwrap()).any(|path| path == powershell),
         "serialization":"command_args", "test_only_bridge_diagnostics":instrumented,
     });
     for (stage, executable, flags) in shells {
