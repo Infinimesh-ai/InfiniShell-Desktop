@@ -716,7 +716,7 @@ async fn grok_windows_child_image(
         return Err(Error::InvalidRelease);
     }
     #[cfg(test)]
-    if let Some(image) = windows_live_tests::fixed_child_image(version) {
+    if let Some(image) = windows_live_tests::fixed_child_image(CLIAgent::Grok, version) {
         return Ok(image);
     }
     let url = format!("https://x.ai/cli/grok-{version}-windows-x86_64.exe");
@@ -751,6 +751,88 @@ async fn grok_windows_child_image(
         size,
         sha256: format!("{:x}", digest.finalize()),
     })
+}
+
+#[cfg(any(windows, test))]
+fn codex_windows_asset_identity(
+    release: &Value,
+    version: &str,
+    architecture: &str,
+) -> Result<(u64, String), Error> {
+    parse_version(version)?;
+    let target = match architecture {
+        "x86_64" => "x86_64-pc-windows-msvc",
+        "aarch64" => "aarch64-pc-windows-msvc",
+        _ => return Err(Error::UnsupportedPlatform),
+    };
+    let tag = format!("rust-v{version}");
+    if release["tag_name"].as_str() != Some(tag.as_str())
+        || release["draft"].as_bool() != Some(false)
+    {
+        return Err(Error::InvalidRelease);
+    }
+    let name = format!("codex-{target}.exe");
+    let url = format!("https://github.com/openai/codex/releases/download/{tag}/{name}");
+    let mut assets = release["assets"]
+        .as_array()
+        .ok_or(Error::InvalidRelease)?
+        .iter()
+        .filter(|asset| asset["name"].as_str() == Some(name.as_str()));
+    let asset = assets.next().ok_or(Error::InvalidRelease)?;
+    if assets.next().is_some() || asset["browser_download_url"].as_str() != Some(url.as_str()) {
+        return Err(Error::InvalidRelease);
+    }
+    let size = asset["size"].as_u64().ok_or(Error::InvalidRelease)?;
+    let digest = asset["digest"]
+        .as_str()
+        .and_then(|digest| digest.strip_prefix("sha256:"))
+        .filter(|digest| {
+            digest.len() == 64
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        })
+        .ok_or(Error::InvalidRelease)?;
+    if size == 0 || size > 1024 * 1024 * 1024 {
+        return Err(Error::InvalidRelease);
+    }
+    Ok((size, digest.to_owned()))
+}
+
+#[cfg(windows)]
+async fn codex_windows_child_image(
+    version: &str,
+) -> Result<managed_process::WindowsChildImage, Error> {
+    parse_version(version)?;
+    #[cfg(test)]
+    if let Some(image) = windows_live_tests::fixed_child_image(CLIAgent::Codex, version) {
+        return Ok(image);
+    }
+    // 只信任官方仓库精确 tag 的直接 EXE 摘要；不接受更新子进程或重定向来源。
+    let url = format!("https://api.github.com/repos/openai/codex/releases/tags/rust-v{version}");
+    let response = http_client::Client::new()
+        .get(&url)
+        .header("User-Agent", "InfiniShell-CLI-updater")
+        .timeout(PROBE_TIMEOUT)
+        .send()
+        .await
+        .map_err(|_| Error::Network)?;
+    if !response.status().is_success() || response.url().as_str() != url {
+        return Err(Error::Network);
+    }
+    let mut bytes = Vec::new();
+    let stream = response.bytes_stream();
+    futures::pin_mut!(stream);
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| Error::Network)?;
+        if bytes.len() + chunk.len() > MAX_OUTPUT as usize {
+            return Err(Error::InvalidRelease);
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    let release = serde_json::from_slice(&bytes).map_err(|_| Error::InvalidRelease)?;
+    let (size, sha256) = codex_windows_asset_identity(&release, version, std::env::consts::ARCH)?;
+    Ok(managed_process::WindowsChildImage { size, sha256 })
 }
 
 async fn discover(
@@ -2680,9 +2762,17 @@ pub(super) async fn execute(
     let mut invocation = prepared.invocation;
     let binding = prepared.binding;
     #[cfg(windows)]
-    let binding = if plan.agent == CLIAgent::Grok && plan.requires_native_update() {
+    let binding = if binding.is_native_file()
+        && plan.requires_native_update()
+        && matches!(plan.agent, CLIAgent::Codex | CLIAgent::Grok)
+    {
+        let image = match plan.agent {
+            CLIAgent::Codex => codex_windows_child_image(&plan.target_version).await?,
+            CLIAgent::Grok => grok_windows_child_image(&plan.target_version).await?,
+            CLIAgent::Claude => return Err(Error::UnsupportedSource),
+        };
         binding
-            .with_child_image(grok_windows_child_image(&plan.target_version).await?)
+            .with_child_image(image)
             .map_err(|_| Error::InvalidRelease)?
     } else {
         binding

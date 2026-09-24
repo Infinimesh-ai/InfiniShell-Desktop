@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36015553498",
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "artifact": {
+    "artifact_id": 10817891107,
+    "name": "cli-windows-gui-system-clipboard-981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "archive_sha256": "e5b7400eb2a0ceca0816c11fa8eb1aa80db128d470f69534f11df4e29ec7aad6",
+    "files": [
+      {
+        "path": "renderer.safe.json",
+        "bytes": 1402,
+        "sha256": "15b57240ef7f054699c71479f32a3fa2ab99f1641d1d3e1bce54b406cae51433"
+      },
+      {
+        "path": "run-23324/test_cli_composer_system_clipboard_multiline_and_image/2026-09-24T23-51-33/pasted-image.png",
+        "bytes": 2984023,
+        "sha256": "51e6f46deaf2c85e87945585c0362508da8d41c405bdaa512dd6de97da13527d"
+      },
+      {
+        "path": "run-23324/test_cli_composer_system_clipboard_multiline_and_image/2026-09-24T23-51-33/chinese-multiline.png",
+        "bytes": 2978406,
+        "sha256": "82e56162c2a6337e322bbfe7f61db92d1066bcc19517b0d57d8c3cc72fe20088"
+      },
+      {
+        "path": "run-23324/test_cli_composer_system_clipboard_multiline_and_image/2026-09-24T23-51-33/receipt.safe.json",
+        "bytes": 901,
+        "sha256": "8f4441aba518e809a4e62bedef2c25b412af0f0d5d1b6fba031433c090fc1769"
+      },
+      {
+        "path": "run-23324/test_cli_composer_system_clipboard_multiline_and_image/2026-09-24T23-51-33/recording.log",
+        "bytes": 2966,
+        "sha256": "7a969d23559b3cc84c6948842c0a5d2b771515c36dbb18c47b020199f974b647"
+      }
+    ]
+  },
+  "original_receipt": {
+    "attachment_count": 1,
+    "binary_sha256": "a63ae17094f901b73203dae78b4bd401a0c80bf823a9c18a2bb087d9cc93ed13",
+    "image_pixels_exact": true,
+    "managed_feature_enabled_for_test": true,
+    "managed_tasks_created": 0,
+    "model_inputs": 0,
+    "physical_ime_exercised": false,
+    "platform": "windows",
+    "schema": 1,
+    "screenshots": [
+      {
+        "file": "chinese-multiline.png",
+        "height": 800,
+        "sha256": "82e56162c2a6337e322bbfe7f61db92d1066bcc19517b0d57d8c3cc72fe20088",
+        "width": 1280
+      },
+      {
+        "file": "pasted-image.png",
+        "height": 800,
+        "sha256": "51e6f46deaf2c85e87945585c0362508da8d41c405bdaa512dd6de97da13527d",
+        "width": 1280
+      }
+    ],
+    "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "system_clipboard": true,
+    "test": "test_cli_composer_system_clipboard_multiline_and_image",
+    "text_exact": true,
+    "visual_review_required": true
+  },
+  "renderer": {
+    "schema": 1,
+    "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+    "outcome": "passed",
+    "renderer": [
+      "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+    ],
+    "exit_code": 0,
+    "mesa_version": "26.2.1",
+    "mesa_archive_url": "https://github.com/pal1000/mesa-dist-win/releases/download/26.2.1/mesa3d-26.2.1-release-msvc.7z",
+    "mesa_archive_sha256": "78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf",
+    "copied_runtime_files": [
+      {
+        "name": "integration.exe",
+        "sha256": "a63ae17094f901b73203dae78b4bd401a0c80bf823a9c18a2bb087d9cc93ed13"
+      },
+      {
+        "name": "conpty.dll",
+        "sha256": "1668fc38fef8d97f8e6002ca71d0e80d629c43b3c25f1f2417ec6bddb51405cd"
+      },
+      {
+        "name": "dxcompiler.dll",
+        "sha256": "75c019e3541980eea8ae661d81998d06f99627e3004c800532475a1c3551c6fb"
+      },
+      {
+        "name": "dxil.dll",
+        "sha256": "18fd73e06fc10e02a01885d8c282264c8f37bd2cf9a735d7700e231e94ea0376"
+      },
+      {
+        "name": "x64/OpenConsole.exe",
+        "sha256": "c41197578992211c3d457e1fb75ad2b474e6ee03a8dc8fda610ed8e7b46301ca"
+      }
+    ],
+    "model_inputs": 0,
+    "mesa_dll_sha256": {
+      "libgallium_wgl.dll": "46ca4e92166f1389c8e9024dbeee0e24ccd5c46f9b6e2b048cc6bc476e6474d3",
+      "opengl32.dll": "7a8f7aa1b73099d24ddeca962a7e7360bccdfc234ff79cb557426e2a2ce3d4f6"
+    }
+  },
+  "actual_png_review": {
+    "both_original_pngs_reviewed": true,
+    "chinese_multiline_legible": true,
+    "attachment_visible": true,
+    "composer_input_untruncated": true,
+    "passed": true
+  },
+  "acceptance_passed": true,
+  "boundary": "真实 Windows GL/llvmpipe 窗口和系统剪贴板；不冒充物理 IME、DXGI 或全部 GUI 功能通过"
+}

@@ -1,6 +1,10 @@
 # CLI 对齐 Goal 复核与续接（2026-09-21）
 
-> **当前结论：原 Goal 尚未满足全部验收，此前的 complete 结论撤回。**
+> **2026-09-25 当前验收状态**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，Mac 必要能力与实链已完成；Linux 三款正式原子更新、全量回归及 [真实 GUI 中文／图片](validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json)已通过。Windows 全量回归、Claude／Grok 正式升级、Codex hook／ConPTY 及真实 GUI 已通过；剩余 Codex 原子升级和 Grok 0.1.3→0.1.4 插件迁移。Goal 保持 active。各要求、源码域和收据以[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准，后文阶段记录保留原结论。
+
+## 2026-09-21 复核快照（历史）
+
+> **当时复核结论：原 Goal 尚未满足全部验收，此前的 complete 结论撤回。**
 > 本文件是新的续接入口，优先于 2026-09-19 交接和 `FINAL_20260921_CLI_PARITY.md` 中的“全部完成”声明。已经通过的构建、回归与真实运行证据继续有效，但只覆盖其实际源码、CLI 版本、模式与平台。本次只修正文档，不启动新的开发 Goal，不修改产品代码。
 
 ## 1. 先进入正确工作区（整理后已统一到根目录）

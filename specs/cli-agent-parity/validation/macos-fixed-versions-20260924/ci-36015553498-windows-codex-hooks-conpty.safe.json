@@ -1,0 +1,448 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "job_id": 107687050910,
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "codex_version": "0.156.1",
+  "artifacts": [
+    {
+      "artifact_id": 10815037807,
+      "name": "codex-01561-windows-native-hooks-981cfebc4e3c9acfde48140bddb5d67134c282ab",
+      "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+      "archive_sha256": "3c163ec8f5c4bb9fd93b6870fbeabf0cb4865fca11156ca997644ff599288b4f",
+      "files": [
+        {
+          "path": "codex-01561-windows-native-hooks.json",
+          "bytes": 842760,
+          "sha256": "1b64b7cfe8c99561b6b1b41eb0988f0c21c564262a4f18f2c86f116ec8ce385e"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10815152466,
+      "name": "codex-01561-windows-conpty-981cfebc4e3c9acfde48140bddb5d67134c282ab",
+      "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+      "archive_sha256": "2e11023067b3e503c821d9e1cb6ba8714c05cbccfb61232a6173699476eb7b6a",
+      "files": [
+        {
+          "path": "codex-01561-windows-conpty.json",
+          "bytes": 7416,
+          "sha256": "cdfe8b889441d94e17356c5611af86a557b9c56b4a0a969ff49d5c628af3999f"
+        },
+        {
+          "path": "codex-01561-windows-conpty.native.json",
+          "bytes": 874519,
+          "sha256": "8ed8a1a8c41c086d7fd5c3318d390d1273f98ca5c1f19eab9f2135e80ebeb6fc"
+        },
+        {
+          "path": "codex-01561-windows-conpty.pty.bin",
+          "bytes": 2508,
+          "sha256": "182049250e4405b04578651958844fad0578ea24bd96bbef02ee96ef549c55c1"
+        }
+      ]
+    }
+  ],
+  "hooks": {
+    "passed": true,
+    "scope": "formal_native_registration_and_two_blocked_hook_events",
+    "cases": [
+      {
+        "case_index": 0,
+        "passed": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        },
+        "native_session_start": true,
+        "native_user_prompt_submit": true,
+        "native_prompt_blocked": true,
+        "model_http_request_count": 0,
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": false,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 61,
+            "job_active_after_grace": 0,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 0,
+            "close_elapsed_ms": 1634,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 3,
+                "finished_elapsed_ms": 2031,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 2031,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          },
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": true,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 75,
+            "job_active_after_grace": 5,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 3,
+            "close_elapsed_ms": 5084,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 16,
+                "finished_elapsed_ms": 9814,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 9814,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          }
+        ]
+      },
+      {
+        "case_index": 1,
+        "passed": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        },
+        "native_session_start": true,
+        "native_user_prompt_submit": true,
+        "native_prompt_blocked": true,
+        "model_http_request_count": 0,
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": false,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 63,
+            "job_active_after_grace": 0,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 0,
+            "close_elapsed_ms": 1466,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 3,
+                "finished_elapsed_ms": 1862,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 1862,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          },
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": true,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 70,
+            "job_active_after_grace": 5,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 18,
+            "close_elapsed_ms": 5090,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 16,
+                "finished_elapsed_ms": 9785,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 9785,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          }
+        ]
+      }
+    ],
+    "model_http_request_count": 0,
+    "private_directory_cleanup": {
+      "attempted": true,
+      "deleted": true,
+      "descendants_job_verified": false,
+      "readonly_files_removed": 2
+    }
+  },
+  "conpty": {
+    "passed": true,
+    "native_conpty_notifications_verified": true,
+    "notification_events_verified": [
+      "session_start",
+      "prompt_submit"
+    ],
+    "notification_events_not_verified": [
+      "stop",
+      "permission_request",
+      "post_tool_use"
+    ],
+    "formal_five_hook_registration_verified": true,
+    "driver": {
+      "exit_code": 0,
+      "show_hresult": 0,
+      "release_hresult": 0,
+      "create_flags": 17302528,
+      "console_close_and_output_eof_confirmed": true,
+      "descendants_job_verified": false
+    },
+    "private_cases_cleanup": {
+      "attempted": true,
+      "deleted": true,
+      "descendants_job_verified": false,
+      "readonly_files_removed": 2
+    },
+    "cases": [
+      {
+        "case_index": 0,
+        "passed": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        },
+        "native_session_start": true,
+        "native_user_prompt_submit": true,
+        "native_prompt_blocked": true,
+        "model_http_request_count": 0,
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": false,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 62,
+            "job_active_after_grace": 0,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 0,
+            "close_elapsed_ms": 1362,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 3,
+                "finished_elapsed_ms": 1756,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 1756,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          },
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": true,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 52,
+            "job_active_after_grace": 5,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 2,
+            "close_elapsed_ms": 5072,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 16,
+                "finished_elapsed_ms": 13217,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 13217,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          }
+        ]
+      },
+      {
+        "case_index": 1,
+        "passed": true,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        },
+        "native_session_start": true,
+        "native_user_prompt_submit": true,
+        "native_prompt_blocked": true,
+        "model_http_request_count": 0,
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": false,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 64,
+            "job_active_after_grace": 0,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 0,
+            "close_elapsed_ms": 1470,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 3,
+                "finished_elapsed_ms": 1877,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 1877,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          },
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "all_descendants_job_verified": true,
+            "job_supervision_requested": true,
+            "job_assigned_before_resume": true,
+            "descendants_forced": true,
+            "job_close_confirmed": true,
+            "root_exit_code": 0,
+            "root_wait_elapsed_ms": 293,
+            "job_active_after_grace": 5,
+            "job_active_after_cleanup": 0,
+            "output_eof_timeout_seconds": 5,
+            "output_eof_wait_elapsed_ms": 2,
+            "close_elapsed_ms": 5299,
+            "output_readers": {
+              "stdout": {
+                "eof": true,
+                "lines": 16,
+                "finished_elapsed_ms": 13835,
+                "error_type": null,
+                "alive": false
+              },
+              "stderr": {
+                "eof": true,
+                "lines": 0,
+                "finished_elapsed_ms": 13835,
+                "error_type": null,
+                "alive": false
+              }
+            },
+            "pending_eof_channels": [],
+            "alive_reader_channels": [],
+            "reader_errors": []
+          }
+        ]
+      }
+    ],
+    "ordinary_codex_tui_verified": false,
+    "product_ui_notifications_verified": false,
+    "full_lifecycle_verified": false
+  },
+  "boundary": "Inner app-server roots exited naturally; owned descendants may be forced after grace, and genuine pipe EOF is required. Outer ConPTY driver Job ownership is not proven."
+}

@@ -103,6 +103,45 @@ class GrokPluginLiveRunnerTests(unittest.TestCase):
         value['bridge']['shell_error_kind'] = 'private-type'
         self.assertNotIn('shell_error_kind', runner.safe_recorded_command(value)['bridge'])
 
+    def test_production_failure_is_bound_to_its_stage_and_never_reuses_bridge_success(self):
+        stage = 'production_upgrade_known_013_to_014'
+        value = {'stage': stage, 'message_class': 'operation_failed', 'filesystem_error_observed': True,
+                 'filesystem_os_code': 5, 'filesystem_os_code_parsed_from_display': True,
+                 'commands': [{'operation': 'runtime_version', 'error_kind': None, 'native_exit_code': 0},
+                              {'operation': 'plugin_install', 'error_kind': 'native_nonzero', 'native_exit_code': 17,
+                               'private_payload': 'secret'}],
+                 'migration': {'record': 'regular', 'record_os_code': None, 'registered_version': 'legacy_013',
+                               'registered_cache_valid': True, 'legacy_source_valid': True, 'current_source_valid': True,
+                               'private_path': 'private-secret'}}
+        receipt = {'stage': stage, 'production_operation_failure': value,
+                   'windows_bridge_last_command': {'stage': 'windows_bridge_powershell', 'error_kind': None, 'native_exit_code': 0}}
+        result = runner.recorded_failure_diagnostics(receipt)
+        self.assertEqual(result['production_operation_failure']['commands'][-1]['native_exit_code'], 17)
+        self.assertEqual(result['production_operation_failure']['filesystem_os_code'], 5)
+        self.assertNotIn('private', json.dumps(result))
+        self.assertNotIn('secret', json.dumps(result))
+        self.assertNotIn('recorded_command', result)
+        for changed in ('production_install', 'finished'):
+            self.assertEqual(runner.recorded_failure_diagnostics(dict(receipt, stage=changed)), {})
+        self.assertEqual(runner.recorded_failure_diagnostics(dict(receipt, production_operation_failure=None)), {})
+        receipt['stage'] = 'windows_bridge_powershell_returned'
+        self.assertIn('recorded_command', runner.recorded_failure_diagnostics(receipt))
+        for mutation in ('category', 'code', 'boolean_code', 'too_many', 'state', 'operation'):
+            bad = copy.deepcopy(value)
+            if mutation == 'category': bad['message_class'] = 'private-secret'
+            elif mutation == 'code': bad['filesystem_os_code'] = 2 ** 31
+            elif mutation == 'boolean_code': bad['filesystem_os_code'] = True
+            elif mutation == 'too_many': bad['commands'] *= 9
+            elif mutation == 'state': bad['migration']['record'] = 'private-path'
+            else: bad['commands'][0]['operation'] = 'private-command'
+            self.assertIsNone(runner.safe_production_failure(bad, stage), mutation)
+
+    def test_original_upgrade_failure_keeps_bridge_success_out_of_failure_diagnostics(self):
+        receipt = {'stage': 'production_upgrade_known_013_to_014',
+                   'windows_bridge_last_command': {'stage': 'windows_bridge_powershell',
+                                                  'error_kind': None, 'native_exit_code': 0}}
+        self.assertEqual(runner.recorded_failure_diagnostics(receipt), {})
+
     def accept(self, receipt, host='linux', **kwargs):
         args = dict(exit_code=0, timed_out=False, output='test result: ok. 1 passed; 0 failed; 0 ignored;',
                     receipt=receipt, native_sha='g' * 64, node_sha='n' * 64, test_sha='t' * 64, host_platform=host)

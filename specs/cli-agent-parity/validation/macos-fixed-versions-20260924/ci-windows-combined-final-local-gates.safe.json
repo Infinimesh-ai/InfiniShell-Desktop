@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "source_sha256": {
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "6e1182096823075d56f0585cc748956db8891266eba53939a3396d0f1a635e9a",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs": "440d299f4b962a27b70d3b82a6844dadbb01d659b8ab236f6c94bd12666972f1",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+    "app/src/terminal/cli_agent_updates/sources.rs": "8b5decd8fc2554560672c3e32b54174bc462ffd9e2cfee33d0275bb01a20c136",
+    "app/src/terminal/cli_agent_updates/sources_tests.rs": "28d3735fbf8a3648da0eaaa5a17f5d095db22fc7db8911de07ecc23a1e29e564",
+    "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "c2ca6bc29bad109f60de0322f20a824e94ae89980fa6040c3826e1016d4641a5",
+    "script/cli-agent-parity/grok_plugin_live_runner_tests.py": "3a161e9543614aef707a95780b926d1f8f0fe61a022ddc69df037f85144cfb2f",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "817f4b4c9025d3de4781d3eb921ef1ca1d827228088d71cde15bae7d40a0752b",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py": "ed3cd1eafc6037aa5d20b7b88ea503ae5ac10fe4f4e7e4133c7eb129a08e19ee",
+    "script/cli-agent-parity/run_grok_plugin_live.py": "08cc1fa0fac964c6b258bb383c0dbde56731a0cc2cc4c3c7d6cb44e92671067a"
+  },
+  "source_unchanged": true,
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "+1.92.0",
+        "check",
+        "-p",
+        "warp",
+        "--lib"
+      ],
+      "exit_code": 0,
+      "seconds": 1.17,
+      "log_sha256": "d9b291e6d67d542c5b4d01dfed5daca6ea9237b9356fe46b8e2d702e618534ee",
+      "log_bytes": 60
+    },
+    {
+      "name": "grok",
+      "command": [
+        "cargo",
+        "+1.92.0",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "terminal::cli_agent_sessions::plugin_manager::grok::tests::"
+      ],
+      "exit_code": 0,
+      "seconds": 118.37,
+      "log_sha256": "366da69ab7e70fe3b78d6d253febc67d7aa59a2de3d98855d748a537c72402ad",
+      "log_bytes": 9173
+    },
+    {
+      "name": "i18n",
+      "command": [
+        "cargo",
+        "+1.92.0",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "seconds": 7.0,
+      "log_sha256": "be12a350e62ca75aef58a4236ba27486a356d41e852634c14bfa698710b0f8c9",
+      "log_bytes": 1099
+    }
+  ],
+  "original_target_symlink_restored": true,
+  "does_not_replace_actual_windows_verification": true,
+  "localization": "无需本地化变更；Windows 原子更新与 Grok 验收夹具修复未改变用户文案",
+  "grok_result": {
+    "passed": 62,
+    "failed": 0,
+    "ignored": 1,
+    "measured": 0,
+    "filtered": 7639
+  },
+  "i18n_result": {
+    "passed": 11,
+    "failed": 0,
+    "ignored": 0,
+    "measured": 0,
+    "filtered": 7691
+  }
+}

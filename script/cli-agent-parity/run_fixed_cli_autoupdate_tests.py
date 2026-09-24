@@ -131,7 +131,7 @@ class FixedUpdateTests(unittest.TestCase):
     def test_windows_environment_discards_credentials_and_overrides_all_cli_roots(self):
         with patch.dict(os.environ, {"SystemRoot": str(self.root / "Windows"), "SECRET_TOKEN": "synthetic",
                                     "ANTHROPIC_API_KEY": "synthetic", "CODEX_HOME": "/not-allowed",
-                                    "PATH": "/not-allowed"}, clear=True):
+                                    "PATH": "/not-allowed", "OS": "not-allowed"}, clear=True):
             environment = runner.windows_environment(self.root / "fixture")
         self.assertNotIn("ANTHROPIC_API_KEY", environment)
         self.assertNotIn("SECRET_TOKEN", environment)
@@ -139,6 +139,25 @@ class FixedUpdateTests(unittest.TestCase):
         for name in ("HOME", "USERPROFILE", "CODEX_HOME", "GROK_HOME", "CLAUDE_CONFIG_DIR", "APPDATA", "LOCALAPPDATA"):
             self.assertTrue(Path(environment[name]).is_relative_to(self.root / "fixture"))
         self.assertEqual(environment["CODEX_RELEASE"], "0.156.1")
+        self.assertEqual(environment["OS"], "Windows_NT")
+
+    def test_windows_codex_output_markers_keep_only_fixed_categories(self):
+        output = ("Updating Codex via `private command`...\n"
+                  "==> Detected platform: Windows (x64)\n==> Resolved version: 0.156.1\n"
+                  "==> Downloading Codex CLI\n"
+                  "Invoke-Expression : install.ps1 supports Windows only. Use install.sh on macOS or Linux.\n"
+                  "The remote server returned an error: (403) Forbidden.\nC:\\private\\payload\n")
+        markers = runner.windows_codex_output_markers(output)
+        self.assertEqual(markers, {"stages": ["updater_started", "platform_detected", "target_resolved", "downloading"],
+                                   "known_errors": ["windows_os_required"], "http_status_codes": [403]})
+        self.assertNotIn("private", json.dumps(markers))
+
+    def test_windows_codex_output_markers_ignore_unrecognized_payloads(self):
+        for output in ("C:\\private\\OS=Windows_NT secret-token exit1",
+                       "==> Resolved version: private\nThe remote server returned an error: (999) private",
+                       "{\"known_errors\":[\"C:\\\\private\"],\"http_status_codes\":[403]}"):
+            self.assertEqual(runner.windows_codex_output_markers(output),
+                             {"stages": [], "known_errors": [], "http_status_codes": []})
 
     def windows_case(self, *, native_code=0, target_installed=True, config_changed=False, version_correct=True, native_error=None, cleanup_confirmed=True):
         observed = {}
@@ -148,6 +167,8 @@ class FixedUpdateTests(unittest.TestCase):
             env = keywords["env"]
             observed["arguments"] = json.loads(env["INFINISHELL_WINDOWS_REAL_CLI_ARGS"])
             observed["environment"] = json.loads(env["INFINISHELL_WINDOWS_REAL_CLI_ENV"])
+            self.assertEqual(json.loads(env["INFINISHELL_WINDOWS_REAL_CLI_TARGET"]),
+                             {"size": self.target.stat().st_size, "sha256": runner.transaction.digest(self.target)})
             self.assertEqual(command[1], runner.WINDOWS_TEST)
             self.assertIn("--ignored", command)
             if target_installed:

@@ -374,7 +374,7 @@ impl WindowsImageDebugSession {
                         if dependencies.len() >= 256 {
                             return Err(error("managed_process.atomic_windows_component_limit"));
                         }
-                        let lease = prepare_component_image(&file, &self.system_directory)
+                        let lease = prepare_component_image(&file, &self.system_directory, true)
                             .inspect_err(|_| {
                                 #[cfg(test)]
                                 if let Ok(path) = final_path_from_handle(&file) {
@@ -407,7 +407,8 @@ impl WindowsImageDebugSession {
             ));
         }
         let file = file?;
-        if root {
+        // 原生安装器会再次执行当前 CLI 查询版本；必须仍是根映像的同一文件身份与摘要。
+        if root || inspect_handle(&file)?.id == self.expected_program_id {
             self.verify_root_image(&file)
         } else if let Some(helper) = &self.powershell
             && inspect_handle(&file)?.id == helper.identity.id
@@ -415,6 +416,9 @@ impl WindowsImageDebugSession {
             helper.verify_image(&file)?;
             Ok(())
         } else if self.verify_system_image(&file).is_ok() {
+            Ok(())
+        } else if let Ok(lease) = prepare_component_image(&file, &self.system_directory, false) {
+            self.child_images.insert(event.dwProcessId, lease);
             Ok(())
         } else if let Some(expected) = &self.child_image {
             let lease = prepare_child_image(&file, expected).inspect_err(|_| {
@@ -688,14 +692,19 @@ fn inspect_handle(file: &File) -> io::Result<LeasedIdentity> {
 fn prepare_child_image(file: &File, expected: &WindowsChildImage) -> io::Result<SystemHelperLease> {
     expected.validate()?;
     let path = final_path_from_handle(file)?;
-    let lease = lease_mapped_image(file, &path, false)?;
+    let lease = lease_mapped_image(file, &path, false, false)?;
     if lease.identity.size != expected.size || lease.sha256 != expected.sha256 {
         return Err(error("managed_process.atomic_windows_child_image_mismatch"));
     }
     Ok(lease)
 }
 
-fn lease_mapped_image(file: &File, path: &Path, dll: bool) -> io::Result<SystemHelperLease> {
+fn lease_mapped_image(
+    file: &File,
+    path: &Path,
+    dll: bool,
+    protected_component: bool,
+) -> io::Result<SystemHelperLease> {
     let parent = path
         .parent()
         .ok_or_else(|| error("managed_process.atomic_windows_loaded_image_parent_missing"))?;
@@ -721,7 +730,7 @@ fn lease_mapped_image(file: &File, path: &Path, dll: bool) -> io::Result<SystemH
             "managed_process.atomic_windows_loaded_image_not_plain",
         ));
     }
-    require_pe_kind(&mut program, identity.size, dll)?;
+    require_pe_image(&mut program, identity.size, dll, protected_component)?;
     let sha256 = sha256_file(&mut program)?;
     let lease = SystemHelperLease {
         program,
@@ -733,8 +742,12 @@ fn lease_mapped_image(file: &File, path: &Path, dll: bool) -> io::Result<SystemH
     Ok(lease)
 }
 
-/// 只接受系统 API 锚定、不可由普通用户写入的组件 DLL；这不是 Authenticode 校验。
-fn prepare_component_image(file: &File, system: &AncestorLease) -> io::Result<SystemHelperLease> {
+/// 只接受系统 API 锚定的组件 DLL 或精确编译器路径；这不是 Authenticode 校验。
+fn prepare_component_image(
+    file: &File,
+    system: &AncestorLease,
+    dll: bool,
+) -> io::Result<SystemHelperLease> {
     let official_system = prepare_system_directory()?;
     if official_system.identity.id != system.identity.id {
         return Err(error(
@@ -746,14 +759,18 @@ fn prepare_component_image(file: &File, system: &AncestorLease) -> io::Result<Sy
         .parent()
         .ok_or_else(|| error("managed_process.atomic_windows_system_directory_changed"))?;
     let path = final_path_from_handle(file)?;
-    if !is_component_path(&path, windows_path) {
+    if !(if dll {
+        is_component_path(&path, windows_path)
+    } else {
+        is_framework_compiler_path(&path, windows_path)
+    }) {
         return Err(error(
             "managed_process.atomic_windows_loaded_image_outside_system_directory",
         ));
     }
     let windows = open_ancestor(windows_path)?;
     let windows_identity = inspect_handle(&windows)?;
-    let lease = lease_mapped_image(file, &path, true)?;
+    let lease = lease_mapped_image(file, &path, dll, true)?;
     let mut found_windows = false;
     for ancestor in &lease.ancestors {
         if ancestor.identity.id == windows_identity.id {
@@ -771,6 +788,21 @@ fn prepare_component_image(file: &File, system: &AncestorLease) -> io::Result<Sy
     require_protected_security(&lease.program)?;
     lease.verify_image(file)?;
     Ok(lease)
+}
+
+fn is_framework_compiler_path(path: &Path, windows: &Path) -> bool {
+    // Windows PowerShell 的默认 CodeDOM 编译器来自系统 CLR 4 目录，不信任 PATH 或环境覆写。
+    ["Framework", "Framework64"].iter().any(|framework| {
+        let runtime = windows
+            .join("Microsoft.NET")
+            .join(framework)
+            .join("v4.0.30319");
+        ["csc.exe", "cvtres.exe"].iter().any(|name| {
+            path.as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&runtime.join(name).as_os_str().to_string_lossy())
+        })
+    })
 }
 
 fn is_component_path(path: &Path, windows: &Path) -> bool {
@@ -1090,6 +1122,15 @@ fn require_pe(file: &mut File, size: u64) -> io::Result<()> {
 }
 
 fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
+    require_pe_image(file, size, dll, dll)
+}
+
+fn require_pe_image(
+    file: &mut File,
+    size: u64,
+    dll: bool,
+    protected_component: bool,
+) -> io::Result<()> {
     if size < DOS_HEADER_PE_OFFSET + 4 {
         return Err(error("managed_process.atomic_windows_program_not_pe"));
     }
@@ -1238,7 +1279,7 @@ fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
         directory_count,
         BOUND_IMPORT_DIRECTORY_INDEX,
     )?;
-    if !dll && bound_import != PeDataDirectory::default() {
+    if !protected_component && bound_import != PeDataDirectory::default() {
         return Err(error(
             "managed_process.atomic_windows_bound_import_unsupported",
         ));
@@ -1251,7 +1292,7 @@ fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
         import,
         IMPORT_DESCRIPTOR_BYTES,
         false,
-        dll,
+        protected_component,
     )?;
     require_bounded_descriptor_table(
         file,

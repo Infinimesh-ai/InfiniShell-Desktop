@@ -1,17 +1,17 @@
 # CLI 能力矩阵
 
-> **2026-09-24 固定版本 Mac 验收（V13）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的正式入口、父子任务、GUI 恢复、普通通知、SSH/tmux、IME 和原子更新均已有按源码范围绑定的实链。Grok 无回合标识审批按会话级提醒处理，V13 真实提醒及清理通过；check、i18n 和受影响 378 项回归通过，完整桌面集合及三项串行复验按 V11 留证。现在准备冻结提交并统一验证 Linux／Windows，Goal 尚未完成。当前对应表见 [固定版本验收](ACCEPTANCE_FIXED_VERSIONS_20260924.md)，细节和边界见 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)。下文旧状态仅代表各自历史快照。
+> **2026-09-25 当前验收状态**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，Mac 必要能力与实链已完成；Linux 三款正式原子更新、全量回归及 [真实 GUI 中文／图片](validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json)已通过。Windows 全量回归、Claude／Grok 正式升级、Codex hook／ConPTY 及真实 GUI 已通过；剩余 Codex 原子升级和 Grok 0.1.3→0.1.4 插件迁移。Goal 保持 active。各要求、源码域和收据以[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准，后文阶段记录保留原结论。
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；Codex `0.155.1` 已在干净 `c2ed42fe…` 上通过 macOS 产品适配器运行中工具取消；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)、[receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) 和 [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
-## 2026-09-24 当前 dirty 增量
+## 2026-09-24 早期 dirty 增量（历史）
 
 | 要求 | 当前证据 | 结果与边界 |
 | --- | --- | --- |
 | Claude `2.1.280` 父子权限与结果交付 | [receipt145](validation/macos-working-tree-145-a25701d2-claude-21280-parent-child-owned.safe.json)：真实父子派发、受限权限继承、子任务文件效果、双向原生 ACK、自动结果及两代监督清理 | **dirty tree 的 test-only 候选通过**；receipt142 首次失败保留，正式门禁、GUI、SSH／tmux 和同 SHA 跨平台仍缺 |
 | Grok `1.0.41` 完整 P0 | [receipt146](validation/macos-working-tree-146-a25701d2-grok-1041-p0-external-failures.safe.json) 外置尝试；[receipt147](validation/macos-working-tree-147-a25701d2-grok-1041-p0-internal-missing-catalog.safe.json) 内置复测 | **失败／正式门禁关闭**：第一会话零输入握手通过；第二会话原生 leader 内部广播命令，但 ACP 未交付目录，初始化超时，0 次业务输入。模型回合、审批、取消及恢复未验收 |
 
-## 2026-09-23 当前提交的最新版候选
+## 2026-09-23 当时提交的最新版候选（历史）
 
 | 要求 | `a25701d2…` 的实测证据 | 结果与边界 |
 | --- | --- | --- |
@@ -51,7 +51,7 @@
 | Linux 原子执行机制 | `NativeFile` 冻结到 sealed memfd，调用 `execveat(AT_EMPTY_PATH)`；失败不回退 pathname | 静态 ELF 夹具，非三款 CLI 更新器 | clean `c25221a22b03c28ca8c8538bee9229ca1bb0ec87` | self-hosted Linux x64 原生执行 | [receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) | **机制实测通过／产品事务未验**：run 35746148046 日志中的 argv／env／cwd 转发与失败不回退两项 PASS；Codex／Claude／Grok 产品升级、退出回执和恢复仍为 false |
 | 阶段门禁与剩余总范围 | `c25221a22…` 已通过本地 feature check、Python 16＋48、workflow 静态门禁及 Linux／Windows 聚焦预检；Claude 117／协调器 63／Python 66／真实父子仍只属于 `45ba0d11…`，Grok 139／Python 37 仍只属于 `ac0fa70e…` | 三方 | preflight clean `c25221a22…`；Claude clean `45ba0d11…`；Grok clean `ac0fa70e…` | macOS 本地＋Linux／Windows CI | receipt102–109 | **跨平台聚焦边界通过，但 Goal 未完成**：SSH／tmux 当前产品接收、真实 GUI IME／双语布局、Linux 三款产品原子升级事务、Codex 当前产品完整生命周期、Grok 扩展／GUI、完整异常矩阵、同提交 macOS 与 full workspace 仍待完成 |
 
-## 2026-09-21 receipt100 当前矩阵
+## 2026-09-21 receipt100 矩阵（历史）
 
 当前分支仍为 `codex/cli-agent-parity`，`HEAD`／上游均为 `e6e9d619318e87d0bb889df344c8570f97977e90`，历史受测提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。下列实现尚未冻结或提交；[receipt100](validation/macos-working-tree-100-auth-autoupdate-live.safe.json) 绑定 macOS 扩展属性修复、Claude／Grok 当前源码产品更新成功及两款已认证独立 CLI 实测，[receipt99](validation/macos-working-tree-99-atomic-update-current.safe.json) 保留修复前的产品边界，[receipt98](validation/macos-working-tree-98-current-runtime-binding-gates.safe.json) 保留 Runtime Host／父子／协议门禁，[receipt97](validation/macos-working-tree-97-ssh-tmux-current-preflight.safe.json) 绑定当前远端只读前置核查。所有当前收据都明确 `full_goal_passed=false`。
 
@@ -151,7 +151,7 @@ source21 的87路径中间快照已通过 check、i18n11、定向1270、Python36
 | 已绑定 PTY 未确认结果 | 保存 Unconfirmed，占用原会话／代次，不能生成最终成功结果 | 共用约束，与托管 Completed 独立 | 共用存储约束不等于子任务已开放 |
 | 真正进程清理 | macOS 资源域的真实 Codex 工具／空闲崩溃有独立证据，最终提交复验待验 | source23 PNG3两代stdio／0与资源域清理有收据；Edit取消1stdio／1、清理true保留失败，真实异常工具崩溃待验 | source11／13 根任务正常 stdio／0 清理有证据；SDK7 exit=null、原始 wait=9、cleanup=true，不能记原生退出0 |
 
-## 产品开放边界与消息契约
+## 2026-09-23 产品开放边界与消息契约（历史）
 
 `LocalCLIManagedTasks` 同时控制入口与托管启动，默认关闭；开发验收使用显式开关。启动前重新探测受测版本，未验证版本只开放已经证明的模式。普通 PTY 不转换成协议任务，本机安装状态不证明 SSH 远端状态。
 
@@ -159,7 +159,7 @@ Grok官方根任务已有阶段GUI与生产coordinator证据；source34b生产SD
 
 消息保存明确的 `receipt_kind`：`native_protocol` 表示原生接收；`application_history` 只表示进入应用历史供正常后续请求读取。两者都不能独立证明模型执行完成。发送未确认记录、创建时父代、历史结果和分页查询保持关联；恢复不能自动重投已经执行的输入。完整实现边界见 [消息交付](OZ_LOCAL_MESSAGE_DELIVERY.md)、[Unconfirmed](UNCONFIRMED_TASK_STATE.md) 和原协调器报告。
 
-## 最终验收仍未满足
+## 2026-09-23 时尚未满足的验收（历史）
 
 | 要求 | 当前边界 |
 | --- | --- |

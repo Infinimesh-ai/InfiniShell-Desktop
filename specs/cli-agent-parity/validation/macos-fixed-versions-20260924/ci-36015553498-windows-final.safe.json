@@ -1,0 +1,276 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "job_id": 107687050910,
+  "conclusion": "failure",
+  "log_sha256": "31b1db4cbc01cfaa1edd036dee08a2aabdaddba914c46b54fca6ae3a03d82441",
+  "log_bytes": 573573,
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Reclaim Windows build storage",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare job-local Python for CLI parity verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Configure Windows build environment",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify provisioned toolchain",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install Node for CLI plugin verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Grok notification plugin scripts",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test notification patch file transactions",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Codex without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed Codex production installer contract",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Claude without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Grok without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude initialization and idle EOF",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude permission observations without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex plugin registry failure recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex persistent plugin source",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Windows Git Bash notification payloads",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Claude Windows native SessionStart notification without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Claude Windows native notification evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check InfiniShell-Desktop",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test IPC frame-limit recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build InfiniShell SSH worker",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test Windows PowerShell SSH worker arguments",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Windows Codex production notification installer without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows Codex production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows Grok production notification installer without credentials",
+      "conclusion": "failure"
+    },
+    {
+      "name": "Preserve Windows Grok production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test shared CLI action contracts and skills",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test CLI harness arguments",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test bilingual TUI task message states",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test managed command process ownership",
+      "conclusion": "success"
+    },
+    {
+      "name": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build CLI process supervisor",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows CLI atomic update candidates without credentials",
+      "conclusion": "failure"
+    },
+    {
+      "name": "Preserve Windows fixed CLI atomic update receipts",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test supervisor cleanup after host crash",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows native CLI boundary evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test rust-genai",
+      "conclusion": "success"
+    },
+    {
+      "name": "Compile GUI integration tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Windows GUI system clipboard without model inputs",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows GUI system clipboard evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run desktop workspace unit tests",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Report sccache statistics",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Install Node for CLI plugin verification",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "related_receipts": [
+    "ci-36015553498-windows-gui.safe.json",
+    "ci-36015553498-windows-atomic.safe.json",
+    "ci-36015553498-windows-codex-hooks-conpty.safe.json",
+    "ci-36015553498-windows-grok-cmd-syntax.safe.json"
+  ],
+  "all_acceptance_passed": false,
+  "test_counts": {
+    "affected_warp": {
+      "passed": 743,
+      "skipped": 6753
+    },
+    "ipc": {
+      "passed": 2,
+      "skipped": 9
+    },
+    "managed_command": {
+      "passed": 2,
+      "skipped": 12
+    },
+    "strict_job_debug": {
+      "passed": 2,
+      "skipped": 7494
+    },
+    "supervisor_cleanup": {
+      "passed": 4,
+      "skipped": 7492
+    },
+    "rust_genai": {
+      "passed": 81,
+      "failed": 0
+    }
+  }
+}

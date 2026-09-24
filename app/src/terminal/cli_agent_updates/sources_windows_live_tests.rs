@@ -96,10 +96,15 @@ pub(super) fn fixed_release(agent: CLIAgent, channel: Channel) -> Option<String>
         .flatten()
 }
 
-pub(super) fn fixed_child_image(version: &str) -> Option<managed_process::WindowsChildImage> {
+pub(super) fn fixed_child_image(
+    selected: CLIAgent,
+    version: &str,
+) -> Option<managed_process::WindowsChildImage> {
     FIXTURE
         .try_with(|(agent, target, _, image)| {
-            (*agent == CLIAgent::Grok && target == version)
+            (*agent == selected
+                && matches!(selected, CLIAgent::Codex | CLIAgent::Grok)
+                && target == version)
                 .then(|| image.clone())
                 .flatten()
         })
@@ -234,7 +239,8 @@ fn fixed_contract(manifest: &Manifest) -> Option<CLIAgent> {
 fn valid_native_isolation_switch(key: &str, value: &OsStr) -> bool {
     matches!(
         (key, value.to_str()),
-        ("GROK_DISABLE_AUTOUPDATER", Some("1"))
+        ("OS", Some("Windows_NT"))
+            | ("GROK_DISABLE_AUTOUPDATER", Some("1"))
             | (
                 "GROK_AUTO_UPDATE"
                     | "GROK_CLAUDE_HOOKS_ENABLED"
@@ -605,7 +611,7 @@ async fn real_native_update_without_model() {
 
 #[tokio::test]
 async fn fixed_windows_metadata_and_journal_do_not_escape_test_scope() {
-    assert!(fixed_child_image("1.0.41").is_none());
+    assert!(fixed_child_image(CLIAgent::Grok, "1.0.41").is_none());
     assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
     assert!(journal_root().is_none());
     FIXTURE
@@ -632,30 +638,34 @@ async fn fixed_windows_metadata_and_journal_do_not_escape_test_scope() {
         .await;
     assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
     assert!(journal_root().is_none());
-    let target = managed_process::WindowsChildImage {
-        size: 123,
-        sha256: "a".repeat(64),
-    };
-    FIXTURE
-        .scope(
-            (
-                CLIAgent::Grok,
-                "1.0.41".to_owned(),
-                PathBuf::from(r"C:\private-fixture"),
-                Some(target.clone()),
-            ),
-            async {
-                assert_eq!(fixed_child_image("1.0.41"), Some(target));
-                assert!(fixed_child_image("1.0.40").is_none());
-            },
-        )
-        .await;
-    assert!(fixed_child_image("1.0.41").is_none());
+    for (agent, version) in [(CLIAgent::Grok, "1.0.41"), (CLIAgent::Codex, "0.156.1")] {
+        let target = managed_process::WindowsChildImage {
+            size: 123,
+            sha256: "a".repeat(64),
+        };
+        FIXTURE
+            .scope(
+                (
+                    agent,
+                    version.to_owned(),
+                    PathBuf::from(r"C:\private-fixture"),
+                    Some(target.clone()),
+                ),
+                async {
+                    assert_eq!(fixed_child_image(agent, version), Some(target));
+                    assert!(fixed_child_image(agent, "0.0.0").is_none());
+                    assert!(fixed_child_image(CLIAgent::Claude, version).is_none());
+                },
+            )
+            .await;
+        assert!(fixed_child_image(agent, version).is_none());
+    }
 }
 
 #[test]
 fn fixed_windows_environment_accepts_only_disabled_native_switch_values() {
     let switches = [
+        ("OS", "Windows_NT"),
         ("GROK_AUTO_UPDATE", "0"),
         ("GROK_DISABLE_AUTOUPDATER", "1"),
         ("GROK_CLAUDE_HOOKS_ENABLED", "0"),
@@ -673,4 +683,7 @@ fn fixed_windows_environment_accepts_only_disabled_native_switch_values() {
         "XAI_API_KEY",
         OsStr::new("fixture")
     ));
+    for invalid in ["Linux", "windows_nt", "Windows_NT "] {
+        assert!(!valid_native_isolation_switch("OS", OsStr::new(invalid)));
+    }
 }

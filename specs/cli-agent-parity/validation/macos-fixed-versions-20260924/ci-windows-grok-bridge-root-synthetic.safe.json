@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "scope": "纯合成原生产 PowerShell 模板：相同 Windows 目录的 raw/canonical 路径拼写，非原失败 native 日志",
+  "production_source_sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+  "powershell_prefix_sha256": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952",
+  "synthetic_paths_only": true,
+  "canonical_prefix_added": true,
+  "raw_and_canonical_refer_to_same_windows_path": true,
+  "command_equal": false,
+  "json_command_bytes_equal": false,
+  "raw_command_length": 4494,
+  "canonical_command_length": 4506,
+  "both_below_command_length_limit": true,
+  "raw_command_sha256": "136dfba31836e796b715f536a5b17225ad81c2bbf908c2cc5701d47f3e0a6976",
+  "canonical_command_sha256": "96b2e18387925c822101a73c096ff09180690a878b179bd75e80e8a8c45048a5",
+  "raw_json_command_sha256": "245beeff810686bce484e25e9598a6821c0d8b3856895895ea139f7cad332a14",
+  "canonical_json_command_sha256": "a08c550f0e2741108c39d5d4efc5883dbe68c4e460bd3ba78fb96a8665652fa9",
+  "raw_capture_expectation_rejects_canonical_fixture_json": true,
+  "generated_command_executed": false,
+  "native_original_error_directly_observed": false,
+  "repository_modified": false,
+  "suggested_fix": "旧 bridge fixture 调用 startup_bridge_files 时 root 改为 grok_home_dir() 原值；已有 canonical 隔离断言保留。发布旧组后用同 raw root 调 capture_startup_bridge 断言可接受，无需更改产品路径或放宽字节验证。",
+  "source_chain": [
+    "run_grok_plugin_live.py isolated_environment: GROK_HOME=str(root/home/.grok)",
+    "grok_home_dir: env PathBuf without canonicalize",
+    "live fixture: grok_home=canonicalize; legacy bridge generated from it",
+    "apply: raw grok_home_dir; capture_startup_bridge exact bytes",
+    "startup_bridge_files_for_plugin: raw root/hooks path becomes encoded command"
+  ],
+  "original_receipt": {
+    "path": "grok-production-installer.safe.json",
+    "sha256": "38062d17cbc80fe984e077184e0b487edd44aae09333d17e0345eef839a13cbc"
+  },
+  "original_safe_summary_sha256": "e9690a5756f52b462625b7abd2fc8c6cb9524ced5545f33d45283cc6cc3ac7d7"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "source_commit": "9009af078456782031e135cf321ef21a53f31808",
+  "parent_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "changed_inputs_sha256": {
+    ".github/workflows/cross-platform-preflight.yml": "ff1f60be1909e442737451271cd602b430b8edf321ac3079ec20c608d1bfd533",
+    "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-linux-apt-index-failure.safe.json": "48803535f28536a0c5dd203fc2faaf13f865014acdae4859ae4f8bfa7e80cc68",
+    "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-linux-apt-fetch-fix.safe.json": "4c01c0473bce3e1c2a8402a04f41df77b8f4f2f489eed5aa6e46025f78b482a2"
+  },
+  "product_test_script_sources_identical_to_parent": true,
+  "remote_refs_verified": [
+    "codex/cli-agent-parity",
+    "codex/cli-agent-parity-verify-linux-9009af078"
+  ],
+  "ci_run_id": 36018303373,
+  "ci_scope": "Linux GUI only; Windows parent run remains active",
+  "ci_result_claimed": false
+}

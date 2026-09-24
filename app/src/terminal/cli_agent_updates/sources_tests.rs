@@ -2454,3 +2454,48 @@ fn windows_native_copy_is_rechecked_before_supervised_execution() {
         Err(Error::SourceChanged)
     );
 }
+
+#[test]
+fn codex_windows_target_requires_exact_official_release_asset() {
+    let valid = json!({
+        "tag_name": "rust-v0.156.1", "draft": false,
+        "assets": [{"name": "codex-x86_64-pc-windows-msvc.exe", "size": 323383088,
+            "digest": "sha256:70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+            "browser_download_url": "https://github.com/openai/codex/releases/download/rust-v0.156.1/codex-x86_64-pc-windows-msvc.exe"}]
+    });
+    assert_eq!(
+        codex_windows_asset_identity(&valid, "0.156.1", "x86_64").unwrap(),
+        (
+            323383088,
+            "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301".to_owned()
+        )
+    );
+    assert!(codex_windows_asset_identity(&valid, "0.155.1", "x86_64").is_err());
+    assert!(codex_windows_asset_identity(&valid, "0.156.1", "aarch64").is_err());
+    assert!(codex_windows_asset_identity(&valid, "0.156.1", "x86").is_err());
+    for (pointer, value) in [
+        ("/draft", json!(true)),
+        (
+            "/assets/0/browser_download_url",
+            json!("https://untrusted.invalid/codex.exe"),
+        ),
+        ("/assets/0/size", json!(0)),
+        ("/assets/0/size", json!(1024_u64 * 1024 * 1024 + 1)),
+        ("/assets/0/digest", json!("sha256:not-a-digest")),
+        ("/assets/0/digest", Value::Null),
+        (
+            "/assets/0/name",
+            json!("codex-x86_64-pc-windows-msvc.exe.zip"),
+        ),
+    ] {
+        let mut invalid = valid.clone();
+        *invalid.pointer_mut(pointer).unwrap() = value;
+        assert!(codex_windows_asset_identity(&invalid, "0.156.1", "x86_64").is_err());
+    }
+    let mut duplicate = valid.clone();
+    duplicate["assets"]
+        .as_array_mut()
+        .unwrap()
+        .push(valid["assets"][0].clone());
+    assert!(codex_windows_asset_identity(&duplicate, "0.156.1", "x86_64").is_err());
+}

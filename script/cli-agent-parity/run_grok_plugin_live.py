@@ -59,11 +59,11 @@ def safe_failure_diagnostics(output):
             'raw_output_exported': False, 'private_paths_exported': False}
 
 
-def safe_recorded_command(value):
+def safe_recorded_command(value, allowed_stages=('windows_bridge_cmd', 'windows_bridge_powershell')):
     """只投影原调用产生的固定诊断；不导出日志、路径或错误正文。"""
     if not isinstance(value, dict) or value.get('error_kind') not in (None, 'native_nonzero', 'timeout', 'spawn_io_error'):
         return None
-    if value.get('stage') not in ('windows_bridge_cmd', 'windows_bridge_powershell'):
+    if value.get('stage') not in allowed_stages:
         return None
     result = {'stage': value['stage'], 'error_kind': value.get('error_kind')}
     for key in ('native_exit_code', 'os_code'):
@@ -99,6 +99,66 @@ def safe_recorded_command(value):
                 safe['failure'] = {key: failure.get(key) for key in ('kind', 'hresult', 'os_code')}
         result['bridge'] = safe
     return result
+
+
+
+def safe_production_failure(value, stage):
+    """绑定当次生产操作；只保留固定类别、数值和迁移状态。"""
+    if (stage not in STEPS or stage == 'file_transaction_failure_rollback'
+            or not isinstance(value, dict) or value.get('stage') != stage
+            or value.get('message_class') not in ('operation_failed', 'invalid_state', 'restored_previous',
+                'restore_unverified', 'update_not_effective', 'incompatible', 'disabled', 'unknown')):
+        return None
+    result = {key: value[key] for key in ('stage', 'message_class')}
+    for key in ('filesystem_error_observed', 'filesystem_os_code_parsed_from_display'):
+        if type(value.get(key)) is not bool:
+            return None
+        result[key] = value[key]
+    code = value.get('filesystem_os_code')
+    if code is not None and (type(code) is not int or not -(2 ** 31) <= code < 2 ** 31):
+        return None
+    if value['filesystem_os_code_parsed_from_display'] != (code is not None):
+        return None
+    result['filesystem_os_code'] = code
+    commands = value.get('commands')
+    if not isinstance(commands, list) or len(commands) > 16:
+        return None
+    result['commands'] = []
+    for command in commands:
+        if (not isinstance(command, dict) or command.get('operation') not in
+                ('runtime_version', 'plugin_validate', 'plugin_install', 'plugin_uninstall', 'unknown')):
+            return None
+        safe = safe_recorded_command(dict(command, stage=stage), allowed_stages=(stage,))
+        if safe is None:
+            return None
+        safe.pop('stage'); safe.pop('bridge', None)
+        safe['operation'] = command['operation']
+        result['commands'].append(safe)
+    migration = value.get('migration')
+    if (not isinstance(migration, dict)
+            or migration.get('record') not in ('regular', 'not_regular', 'absent', 'io_error')
+            or migration.get('registered_version') not in ('legacy_013', 'current_014', 'other', 'absent', 'unreadable_or_invalid')
+            or (migration.get('registered_cache_valid') is not None and type(migration['registered_cache_valid']) is not bool)
+            or any(type(migration.get(key)) is not bool for key in ('legacy_source_valid', 'current_source_valid'))):
+        return None
+    code = migration.get('record_os_code')
+    if code is not None and (type(code) is not int or not -(2 ** 31) <= code < 2 ** 31):
+        return None
+    result['migration'] = {key: migration.get(key) for key in ('record', 'record_os_code', 'registered_version',
+        'registered_cache_valid', 'legacy_source_valid', 'current_source_valid')}
+    return result
+
+
+def recorded_failure_diagnostics(receipt):
+    """桥接诊断只属于桥接阶段，不能填入后续生产升级失败。"""
+    stage = receipt.get('stage')
+    failure = safe_production_failure(receipt.get('production_operation_failure'), stage)
+    if failure is not None:
+        return {'production_operation_failure': failure}
+    command = safe_recorded_command(receipt.get('windows_bridge_last_command'))
+    if command is not None and stage in (command['stage'], command['stage'] + '_returned'):
+        return {'recorded_command': command}
+    return {}
 
 
 def isolated_environment(root, programs, host_environment=None):
@@ -221,9 +281,7 @@ def run(args):
         receipt_path = root / 'grok-production-installer.json'
         receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
         report['receipt'] = receipt
-        recorded_command = safe_recorded_command(receipt.get('windows_bridge_last_command'))
-        if recorded_command is not None:
-            report['failure_diagnostics']['recorded_command'] = recorded_command
+        report['failure_diagnostics'].update(recorded_failure_diagnostics(receipt))
         report['passed'] = verified_receipt(process.returncode, report['timed_out'], output, receipt,
             report['native_sha256'], report['node_sha256'], report['test_binary_sha256'], sys.platform)
         report['source_unchanged'] = source_identity() == report['source_sha256']

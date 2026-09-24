@@ -1,8 +1,10 @@
-# CLI Agent Parity 阶段检查点交接（更新至 2026-09-24）
+# CLI Agent Parity 阶段检查点交接（更新至 2026-09-25）
 
-## 2026-09-24 集中 CI 后的剩余补验
+> **2026-09-25 当前验收状态**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，Mac 必要能力与实链已完成；Linux 三款正式原子更新、全量回归及 [真实 GUI 中文／图片](validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json)已通过。Windows 全量回归、Claude／Grok 正式升级、Codex hook／ConPTY 及真实 GUI 已通过；剩余 Codex 原子升级和 Grok 0.1.3→0.1.4 插件迁移。Goal 保持 active。各要求、源码域和收据以[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准，后文阶段记录保留原结论。
 
-- 当前受测提交为 `f9e3ece6aef8b65697d97a130cdd88476667f289`，run `36006825295`。Linux 定向 839 项和 Claude 四类正式原子事务通过；Grok 六阶段安装通过。GUI 字节／像素和两张截图断言通过，但目视发现中文方框，GUI 验收仍失败。Windows 结果与下一轮状态以[固定版本验收对应表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准。Goal 仍 active。
+## 2026-09-24 集中 CI 后的剩余补验（历史）
+
+- 当前产品受测提交为 `981cfebc4e3c9acfde48140bddb5d67134c282ab`，Windows run `36015553498`；固定 Codex hook／ConPTY 已通过。Linux 同 run 因 APT 索引镜像同步失败而未运行 GUI，workflow-only 修正 `9009af078` 的独立 run `36018303373` 已返回：系统字体覆盖与 GUI 断言通过，但真实截图中文仍为方框，验收仍失败；正在排查应用字体路径。此前 `f9e3ece6a` 的 run `36006825295` 中，Linux 定向 839 项和 Claude 四类正式原子事务通过；Grok 六阶段安装通过。GUI 字节／像素和两张截图断言通过，但目视发现中文方框，GUI 验收仍失败。Windows 结果与下一轮状态以[固定版本验收对应表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准。Goal 仍 active。
 - Mac 必要能力与实链已完成。版本固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`；分支仍为 `codex/cli-agent-parity`。Mac 按源码域复用原始收据，不把旧 GUI 二进制标为当前提交。
 - Linux／Windows 已有完整工作区 10,899／10,660 项通过，分别保留 98／110 项跳过及历史失败。Linux Codex／Grok 正式事务保留 `bf015492f` 的原始范围；本轮只补验受影响的 Claude，不重复全量。
 - Windows Claude 正式升级再次通过；Grok 原子执行已退出 0 且入口摘要匹配目标，但更新后复核失败；Codex 被系统 .NET 资源 DLL 的 PE 检查拒绝。新修正包含固定无扩展名 Grok 缓存布局、系统 DLL 有界导入目录尾部，以及 Codex 探针独占 Job 收尾；Grok 安装前 cmd 桥接仍需同次调用的明确错误诊断。Windows GUI 已确认 GL surface 不支持 COPY_SRC，补齐同帧渲染／呈现／读取路径，实际 wgpu 编译通过，真实截图待验。
@@ -160,7 +162,7 @@
 - 2026-09-23 14:42 UTC 检查时，ACASIS 与 ORICO 均不在 macOS 磁盘或 USB 设备列表，`/Volumes/ACASIS` 不存在；这是设备暂时断开，不是可点击的权限弹窗。内置盘当时约 93 GiB 可用；Python 验证显式指定 `/private/tmp` 后通过 16／16。临时将仓库 `target` 链接指向独立内置 target 后，`cargo check -p warp`、启用 `local_cli_managed_tasks` 的 `cargo test -p warp --lib --no-run`、同源签名 release supervisor 构建及无模型启动 2／2 均通过；构建退出后已恢复原 `target` 链接。15:28 UTC 检查时 ACASIS 重新挂载，ORICO 仍未出现；外置盘原缓存未清理或迁移。新版三款 macOS test-only 候选结果见 receipt137／139／140。
 - 详细记录见 `WORKSPACE_CLEANUP_20260921.md`。
 
-## 5. 新会话的严格入口
+## 5. 原阶段新会话入口（历史）
 
 1. `git fetch origin`，确认当前分支为 `codex/cli-agent-parity`、工作树干净，且本交接提交与远端 SHA 一致。
 2. 依次阅读 `AGENTS.md`、`HANDOFF_20260921_REOPEN.md`、本文、`PLAN.md`、`CAPABILITY_MATRIX.md`、`VALIDATION_REPORT.md`；收据先看本文引用的 106–114，按失败链再追溯 102–105，避免把历史快照当当前状态。

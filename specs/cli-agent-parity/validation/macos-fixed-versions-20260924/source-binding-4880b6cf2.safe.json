@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "commit": "4880b6cf2d46ee9dd1b552e475a14405375b8d37",
+  "base_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "changed_files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "blob": "8496dc3bc57c7eb15dbe6baf4a5c6226c51d8670",
+      "sha256": "b853a544d3020e8c132a1ff90bd1daafc6cb6214052d52ec1e1948d52fe00942"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "blob": "60b2cc1ef3bc225a894c3f0053bca506490aa2e3",
+      "sha256": "7954b22549367428487d220891923d2b451e1f6a331a159634a0801b96876f4d"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-linux-apt-index-failure.safe.json",
+      "blob": "e021d526529e9cb98fae3e4a2f2873e8e771a136",
+      "sha256": "48803535f28536a0c5dd203fc2faaf13f865014acdae4859ae4f8bfa7e80cc68"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36015553498-windows-grok-cmd-syntax.safe.json",
+      "blob": "eb6860c4c905e281ee97aa4070d1e26cfe4cb0cf",
+      "sha256": "a2bcf5c0c32ab772ce7b5f09b3eb94b4c895251c86bf9c3726f258f91d9c46f0"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-linux-apt-fetch-fix.safe.json",
+      "blob": "72d9f620e4667513c56226e6307f5d032faf213c",
+      "sha256": "4c01c0473bce3e1c2a8402a04f41df77b8f4f2f489eed5aa6e46025f78b482a2"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-grok-cmd-path-fix.safe.json",
+      "blob": "0db6b56fbe2964a64e1045289a5bca95b9801098",
+      "sha256": "5cc6292b5c6a07ea4e9d86e6b48a59129cfc5922cfabf761c98046a7a20709d4"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-windows-grok-installer-only-workflow.safe.json",
+      "blob": "1510718ddf4972043240264114eaf00f9c038f7c",
+      "sha256": "1638a3626a9259c62601c63f6c50a08064f8d56efb2f862b76c6183d0479f19a"
+    }
+  ],
+  "production_sources_unchanged": true,
+  "test_source_change": "Windows cfg(test) startup shell paths only",
+  "pending_windows_run": {
+    "id": 36021674501,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36021674501",
+    "mode": "windows_grok_installer_only",
+    "passed": false,
+    "status": "queued"
+  },
+  "mac_evidence_reused_by_source_scope": true,
+  "no_new_mac_gui_claim": true,
+  "localization": "无需本地化变更"
+}

@@ -55,6 +55,7 @@ const DYNAMIC_IMAGE_MARKER_ENV: &str = "INFINISHELL_WINDOWS_DYNAMIC_IMAGE_MARKER
 const REAL_CLI_FIXTURE_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_FIXTURE";
 const REAL_CLI_ARGS_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_ARGS";
 const REAL_CLI_ENV_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_ENV";
+const REAL_CLI_TARGET_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_TARGET";
 const DEBUG_DRIVER_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_DRIVER";
 const DEBUG_DRIVER_RECEIPT_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_RECEIPT";
 const DEBUG_DRIVER_TIMEOUT: Duration = Duration::from_secs(30);
@@ -490,6 +491,11 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         .unwrap_or_default();
     let expected = ExpectedFileIdentity::capture(&executable_path).unwrap();
     let mut executable = prepare(&expected).unwrap();
+    if let Some(target) = std::env::var(REAL_CLI_TARGET_ENV).ok() {
+        executable
+            .set_child_image(Some(serde_json::from_str(&target).unwrap()))
+            .unwrap();
+    }
     let directory = tempfile::tempdir().unwrap();
     for relative in [
         "home",
@@ -512,8 +518,9 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         .envs(super::super::isolated_environment(directory.path()))
         .envs(environment)
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        // 固定 CLI 运行器将此 ignored case 的输出写入私有日志，只导出安全标记。
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .inherit_managed_job()
         .creation_flags(DEBUG_PROCESS.0);
     executable
@@ -733,6 +740,10 @@ fn protected_component_pe_accepts_anycpu_import_directory_with_bounded_tail() {
     assert!(verify_pe_bytes(&bytes).is_err());
     let mut program = bytes;
     put_u16(&mut program, TEST_PE_OFFSET + 22, 0x0022);
+    // 系统 CodeDOM 编译器也可能是 PE32 AnyCPU；只有受保护组件路径可以复用该解析规则。
+    let mut file = tempfile::tempfile().unwrap();
+    file.write_all(&program).unwrap();
+    require_pe_image(&mut file, program.len() as u64, false, true).unwrap();
     assert_eq!(
         verify_pe_bytes(&program).unwrap_err().to_string(),
         "managed_process.atomic_windows_program_not_pe"
@@ -1071,11 +1082,44 @@ fn component_image_rejects_fake_system_anchor() {
         identity: inspect_handle(&fake).unwrap(),
         file: fake,
     };
-    assert!(prepare_component_image(&File::open(&fixture.program).unwrap(), &system).is_err());
+    for dll in [true, false] {
+        assert!(
+            prepare_component_image(&File::open(&fixture.program).unwrap(), &system, dll).is_err()
+        );
+    }
     assert!(!is_plain_kind(
         FILE_ATTRIBUTE_REPARSE_POINT.0 | FILE_ATTRIBUTE_DIRECTORY.0,
         true
     ));
+}
+
+#[test]
+fn framework_compilers_require_exact_system_runtime_paths() {
+    let windows = Path::new(r"C:\Windows");
+    for framework in ["Framework", "Framework64"] {
+        for name in ["csc.exe", "cvtres.exe", "CSC.EXE"] {
+            assert!(is_framework_compiler_path(
+                &windows
+                    .join("Microsoft.NET")
+                    .join(framework)
+                    .join("v4.0.30319")
+                    .join(name),
+                windows,
+            ));
+        }
+    }
+    for path in [
+        r"C:\private\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+        r"C:\Windows-other\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+        r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\unknown.exe",
+        r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.dll",
+        r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\nested\csc.exe",
+        r"C:\Windows\Microsoft.NET\Framework64\v2.0.50727\csc.exe",
+        r"C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe:payload",
+        r"C:\Windows\Temp\csc.exe",
+    ] {
+        assert!(!is_framework_compiler_path(Path::new(path), windows));
+    }
 }
 
 #[test]
@@ -1106,6 +1150,36 @@ fn child_image_requires_authoritative_digest_and_holds_identity_until_exit() {
     fs::rename(&fixture.bin, fixture.bin.with_file_name("changed")).unwrap();
 }
 
+#[test]
+fn repeated_root_image_requires_same_file_identity_and_contents() {
+    let fixture = Fixture::new();
+    let expected = fixture.expected();
+    let file = File::open(&fixture.program).unwrap();
+    let session = WindowsImageDebugSession {
+        root_process_id: 0,
+        expected_program_id: inspect_handle(&file).unwrap().id,
+        expected_program_size: expected.size,
+        expected_program_sha256: expected.sha256,
+        system_directory: prepare_system_directory().unwrap(),
+        powershell: None,
+        child_image: None,
+        child_images: HashMap::new(),
+        component_images: HashMap::new(),
+        processes: HashMap::new(),
+        initial_breakpoints: HashSet::new(),
+    };
+    assert!(session.verify_root_image(&file).is_ok());
+    let copy = fixture.bin.join("same-name-copy.exe");
+    fs::copy(&fixture.program, &copy).unwrap();
+    assert!(
+        session
+            .verify_root_image(&File::open(copy).unwrap())
+            .is_err()
+    );
+    fs::write(&fixture.program, vec![0; expected.size as usize]).unwrap();
+    assert!(session.verify_root_image(&file).is_err());
+}
+
 #[cfg(target_arch = "x86_64")]
 #[test]
 fn protected_component_accepts_system_powershell_dotnet_runtime() {
@@ -1116,8 +1190,21 @@ fn protected_component_accepts_system_powershell_dotnet_runtime() {
         .unwrap()
         .join(r"Microsoft.NET\Framework64\v4.0.30319\mscoreei.dll");
     let file = File::open(runtime).unwrap();
-    let lease = prepare_component_image(&file, &system).unwrap();
+    let lease = prepare_component_image(&file, &system, true).unwrap();
     lease.verify_image(&file).unwrap();
+    for name in ["csc.exe", "cvtres.exe"] {
+        let path = system_path
+            .parent()
+            .unwrap()
+            .join("Microsoft.NET")
+            .join("Framework64")
+            .join("v4.0.30319")
+            .join(name);
+        let compiler = File::open(path).unwrap();
+        let compiler_lease = prepare_component_image(&compiler, &system, false).unwrap();
+        compiler_lease.verify_image(&compiler).unwrap();
+        assert!(prepare_component_image(&compiler, &system, true).is_err());
+    }
 }
 
 #[test]

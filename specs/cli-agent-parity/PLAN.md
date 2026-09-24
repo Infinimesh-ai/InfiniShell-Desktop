@@ -1,6 +1,6 @@
 # Codex CLI、Grok Build、Claude Code 支持优化与能力对齐计划
 
-> **2026-09-24 固定版本 Mac 验收（V13）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的正式入口、父子任务、GUI 恢复、普通通知、SSH/tmux、IME 和原子更新均已有按源码范围绑定的实链。Grok 无回合标识审批按会话级提醒处理，V13 真实提醒及清理通过；check、i18n 和受影响 378 项回归通过，完整桌面集合及三项串行复验按 V11 留证。现在准备冻结提交并统一验证 Linux／Windows，Goal 尚未完成。当前对应表见 [固定版本验收](ACCEPTANCE_FIXED_VERSIONS_20260924.md)，细节和边界见 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)。下文旧状态仅代表各自历史快照。
+> **2026-09-25 当前验收状态**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，Mac 必要能力与实链已完成；Linux 三款正式原子更新、全量回归及 [真实 GUI 中文／图片](validation/macos-fixed-versions-20260924/ci-36023402924-linux-gui.safe.json)已通过。Windows 全量回归、Claude／Grok 正式升级、Codex hook／ConPTY 及真实 GUI 已通过；剩余 Codex 原子升级和 Grok 0.1.3→0.1.4 插件迁移。Goal 保持 active。各要求、源码域和收据以[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准，后文阶段记录保留原结论。
 
 > **当前状态更正（2026-09-21）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。已推送代码和同提交跨平台回归通过的事实保留，但 Grok 最新版托管能力、父子整链及真实远程产品验收仍有缺口。当前状态、证据与新 Goal 入口见 [复核与续接](HANDOFF_20260921_REOPEN.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
@@ -264,7 +264,7 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 
 **正式对齐发布：P5。** 必须提交能力矩阵和实际验证证据，区分默认可用、需插件、需升级、仅终端模式和尚不支持；不得以“存在 enum/按钮/接口”代替功能验收。
 
-实施阶段每个功能变更均须完成本地化审计与门禁。本轮新增状态未知、连接中断、插件禁用及原生审批终端提示，中英文已同步编写；已有中间构建的 i18n 与部分双语布局证据，bundle7 的授权/安装/更新六张说明布局通过。最终构建与全部变更的双语验收仍未完成。
+实施阶段每个功能变更均须完成本地化审计与门禁。固定版本的状态未知、连接中断、插件禁用和审批提示已完成中英文同步，V11 双语布局与 V13 i18n／受影响回归通过；本轮平台修正无需本地化变更，后续 i18n 与来源绑定见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)。
 
 ### 最终完成门槛
 
@@ -308,7 +308,7 @@ cargo nextest run --no-fail-fast -p warp --lib -E 'test(cli_agent) | test(local_
 - [Claude CLI 参考](https://code.claude.com/docs/en/cli-reference)、[程序化运行](https://code.claude.com/docs/en/headless)：结构化输出、会话恢复和权限选项；P0 固定受测版本。
 - [Claude hooks](https://code.claude.com/docs/en/hooks)：审批及失败事件；事件通知与审批决定回传是不同能力。
 
-## 10. 当前执行看板
+## 10. 原阶段执行看板（历史）
 
 > **2026-09-21 续接更新**：当前工作树在 `e6e9d619` 上仍未冻结。V2 runtime host 的 macOS 真实多进程夹具在 receipt80 对应字节上通过；其后当前实现继续修复 IPC 请求登记竞态、有界调用／序列化、幂等离线重放、journal 失败收敛和 claim 前后原生会话复核，并将子任务终态结果改为 ACK 前幂等落父信箱，将本地工具改为 ACK 前确定性租约、恢复时对“已开始但无结果”持久化不确定失败且禁止重放副作用。Full 队列现先取得容量再二次校验 owner，旧 epoch 命令不会越过 fencing；live reattach 以 claim 固定 tail，追平提交／ACK 后才恢复工具与开放连接，未 ACK 取消不能被副作用抢先。启动路径候选再以 manifest／代次绑定 `startup-exit` 收据，ready-handshake 失败只有在直接宿主已观察退出且真实 CLI 域已证明未启动或退出后才可恢复；启动 future 取消时 guard 终止直接宿主。独立 IPC 单测现为 11／11 并通过 `--no-deps` clippy，但新增 Runtime Host／Coordinator／Managed Process 测试尚未实际编译运行，因此 receipt80 只作前一工作树快照；两者都不替代三款真实 CLI。本机开发 Codex 已沿 Homebrew latest 从 `0.154.0` 升到 `0.155.1`，隔离 app-server initialize、空线程及负向 steer／resume 合同通过 receipt89–90；receipt92 进一步真实通过两轮、允许／拒绝、运行中 steer 与 app-server 重启恢复，但取消仅有 ACK／interrupted，固定工具 10 秒内未退出且无命令终态，整体仍失败。当前产品 adapter 的清理后终态候选正在修正，尚未编译或跑真实产品链，不改写 receipt92。Grok `1.0.34` 的 receipt94 绑定签名二进制、隔离帮助／inspect 与物化指南，确认追加、技能、MCP、子任务、进度、结果和恢复候选接口，也确认直接根子拓扑不能原生完成子→根消息；这些静态存在均不计扩展能力通过，现有保护继续保留。自动升级已把 program、entry、manager、helper、registration 身份冻结并交给最终 worker 在 exec 前复核，同 handle capture 已关闭自身双开竞态，pre-spawn 缺监督代次账本也会持久证明 `not_started` 后恢复；但真实产品升级仍在 `inspect` 前因 ORICO test worker 不可读而阻塞，身份复核后按 pathname 执行及脚本／helper 依赖未钉住的问题仍需来源层 `LaunchBinding` 与平台专用绑定执行。Codex SSH／tmux 探针安全修复后的 receipt82–84 已通过真实传输与断连重连生命周期，但实时产品 UI、当前产品解析器执行与重复／乱序仍缺，整体保持失败；正式消费者入口仍关闭；Claude／Grok 无认证，最终同提交三平台与门禁均未执行。Linux／Windows runner 已重新核对为在线空闲，只能在冻结候选后派发。精确矩阵见 [能力矩阵](CAPABILITY_MATRIX.md)，receipt80／81、SSH receipt71–84 均保留各自成功、失败和证据不足边界。
 

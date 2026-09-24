@@ -1,0 +1,218 @@
+{
+  "schema_version": 2,
+  "scope": "Windows Codex 固定原生更新 OS 夹具、同一旧映像、独立权威目标与受保护编译器依赖合同修复；Windows 实链尚待复验",
+  "old_version": "0.155.1",
+  "target_version": "0.156.1",
+  "previous_summary_preserved": {
+    "path": "summary.safe.json",
+    "bytes": 4745,
+    "sha256": "0b1ac9afc2cf35240afa708e9854697bc25b3fd4c44e090828f41409900abfcf"
+  },
+  "retained_original_receipts": [
+    {
+      "path": "codex-updated-product_receipt.safe.json",
+      "sha256": "41ffbcbd752d22a0447bc42f8ba527ce987799072cc8f48d986751e78f4ee311"
+    },
+    {
+      "path": "codex-updated-debug_receipt.safe.json",
+      "sha256": "ab13dbd65686babda34f4a58f09af5b6040388a957b85866a11a53d5c376b024"
+    },
+    {
+      "path": "codex-updated-receipt.safe.json",
+      "sha256": "2dea29b408689dd610191bf1db2cfa4c473dfa049cf6241b5b788de00601e0c3"
+    }
+  ],
+  "changed_sources": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+      "bytes": 56888,
+      "sha256": "6e1182096823075d56f0585cc748956db8891266eba53939a3396d0f1a635e9a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+      "bytes": 45135,
+      "sha256": "440d299f4b962a27b70d3b82a6844dadbb01d659b8ab236f6c94bd12666972f1"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "bytes": 130394,
+      "sha256": "8b5decd8fc2554560672c3e32b54174bc462ffd9e2cfee33d0275bb01a20c136"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_tests.rs",
+      "bytes": 89504,
+      "sha256": "28d3735fbf8a3648da0eaaa5a17f5d095db22fc7db8911de07ecc23a1e29e564"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs",
+      "bytes": 25261,
+      "sha256": "c2ca6bc29bad109f60de0322f20a824e94ae89980fa6040c3826e1016d4641a5"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate.py",
+      "bytes": 37711,
+      "sha256": "817f4b4c9025d3de4781d3eb921ef1ca1d827228088d71cde15bae7d40a0752b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py",
+      "bytes": 30863,
+      "sha256": "ed3cd1eafc6037aa5d20b7b88ea503ae5ac10fe4f4e7e4133c7eb129a08e19ee"
+    }
+  ],
+  "production_changed": true,
+  "production_scope": "Windows native update only; Mac/Linux unchanged",
+  "workflow_changed": false,
+  "cargo_run_by_subagent": false,
+  "ci_dispatched_by_subagent": false,
+  "fixed_public_sources": [
+    {
+      "path": "install-0.155.1.ps1",
+      "bytes": 40541,
+      "sha256": "ab832ca3fa3d2f4e0768cdd4253175d765da2df1034dda7f617d994d07e11f58",
+      "url": "https://raw.githubusercontent.com/openai/codex/rust-v0.155.1/scripts/install/install.ps1",
+      "relevant_lines": [
+        403,
+        416,
+        430,
+        514,
+        628,
+        748,
+        771,
+        864,
+        870,
+        873,
+        919
+      ]
+    },
+    {
+      "path": "AddType-netframework.cs",
+      "bytes": 204262,
+      "sha256": "7862e1fec4e8bc2efe8e35d0c73627fbdc62297bbff634fe6e094950eff6807f",
+      "url": "https://raw.githubusercontent.com/PowerShell/PowerShell/v6.0.0-alpha.9/src/Microsoft.PowerShell.Commands.Utility/commands/utility/AddType.cs",
+      "relevant_lines": [
+        1308,
+        1409,
+        1670,
+        1673,
+        1716
+      ]
+    },
+    {
+      "path": "csharpcodeprovider.cs",
+      "bytes": 157689,
+      "sha256": "d8e9b6b7c274b8979df081336a71b76278579ea5a83a95739a361830d2896246",
+      "url": "https://raw.githubusercontent.com/microsoft/referencesource/main/System/compmod/microsoft/csharp/csharpcodeprovider.cs",
+      "relevant_lines": [
+        285,
+        3426,
+        3463,
+        3498,
+        3622
+      ]
+    },
+    {
+      "path": "RedistVersionInfo.cs",
+      "bytes": 5634,
+      "sha256": "e82405fc031ba7e450977bb26d410c8feb112ce16f47ce00c40dec2a62ee6bb2",
+      "url": "https://raw.githubusercontent.com/microsoft/referencesource/main/System/compmod/system/codedom/compiler/RedistVersionInfo.cs",
+      "relevant_lines": [
+        35,
+        38,
+        53,
+        56
+      ]
+    },
+    {
+      "path": "codex-release-0.156.1.json",
+      "bytes": 311539,
+      "sha256": "3c23d8ce0a52411a74e488128398d85109a4b5a11bc9721e2ee5d19fccf3d69c",
+      "url": "https://api.github.com/repos/openai/codex/releases/tags/rust-v0.156.1",
+      "relevant_lines": []
+    }
+  ],
+  "findings": {
+    "isolated_environment_missing_OS_static_reproduced": true,
+    "production_environment_retains_OS": true,
+    "production_environment_audit": {
+      "source_call": "sources.rs:2891 spawn_bound_update",
+      "isolated_home_none": "managed_process.rs:832–845",
+      "preserves_inherited_os": "managed_process.rs:2164–2184 resolved_atomic_environment",
+      "production_fix_required_for_missing_os": false
+    },
+    "original_native_stdout_stderr_available": false,
+    "original_native_error_directly_observed": false,
+    "old_child_requires_same_file_id_size_sha256": true,
+    "copied_old_image_not_accepted_as_original": true,
+    "target_digest_source": "official exact-tag GitHub release asset metadata; exact EXE name/URL, size, lowercase SHA256; no redirect",
+    "official_target_sha256": "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+    "official_target_bytes": 323383088,
+    "release_json_bytes": 311539,
+    "release_json_limit_bytes": 1048576,
+    "test_target_override_from_independently_verified_manifest": true,
+    "target_override_does_not_claim_live_metadata_fetch": true,
+    "publisher_signature_claimed": false,
+    "compiler_candidates": [
+      "Microsoft.NET/Framework/v4.0.30319/csc.exe",
+      "Microsoft.NET/Framework64/v4.0.30319/csc.exe",
+      "Microsoft.NET/Framework/v4.0.30319/cvtres.exe",
+      "Microsoft.NET/Framework64/v4.0.30319/cvtres.exe"
+    ],
+    "compiler_anchors": "GetSystemDirectoryW actual handle identity; fixed relative path; protected DACL/owner; ordinary ancestor leases; actual PE kind/file identity/SHA; held until child exit",
+    "arbitrary_dotnet_executables_allowed": false,
+    "compiler_environment_path_override_allowed": false,
+    "main_and_target_PE_rules_unchanged": true,
+    "compiler_PE_uses_existing_protected_component_rules": true,
+    "new_machine_types_added": false,
+    "temporary_generated_DLLs_allowed": false,
+    "in_memory_assembly_source": "Add-Type default GenerateInMemory=true; CodeDOM reads byte[] and Assembly.Load(byte[],byte[],Evidence)",
+    "code_dom_chain_observed_in_current_native_run": false,
+    "cvtres_basis": {
+      "microsoft_tool_reference": "https://learn.microsoft.com/en-us/cpp/error-messages/tool-errors/cvtres-errors-cvt1100-through-cvt4001?view=msvc-170",
+      "vendor_first_hand_framework_csharp_failure": "https://knowledge.broadcom.com/external/article/171551/configuration-process-failing-during-ini.html",
+      "strength": "dependency-chain basis, not a claim of observation in this CI"
+    },
+    "unknown_images_DLL_ACL_Job_rules_unchanged": true
+  },
+  "diagnostics": {
+    "same_debug_invocation_stdio_to_existing_private_log": true,
+    "replay_added": false,
+    "product_failure_preserved": true,
+    "exported_only": [
+      "fixed_stage_markers",
+      "fixed_error_markers",
+      "HTTP_numeric_statuses",
+      "existing_log_SHA256"
+    ],
+    "raw_output_uploaded": false
+  },
+  "checks": {
+    "python_tests": 30,
+    "python_passed": 30,
+    "python_log": {
+      "path": "python-tests-v2.log",
+      "bytes": 245,
+      "sha256": "54b88e4cedd6f28c966f0aed46a01ca1b2390a4e9fd5b8133a7b4e0768ac7dde"
+    },
+    "rustfmt_exit_code": 0,
+    "synthetic_official_OS_guard": {
+      "path": "os-guard.safe.json",
+      "bytes": 620,
+      "sha256": "93ed4c9c668214c34a6d4a1f748cd4c849ea9413059e9363d81ae450078ecea8"
+    },
+    "independent_readonly_review": "mac_product_gaps: no definite new blocker; Windows loader execution still pending",
+    "rust_tests_executed_by_subagent": false,
+    "mac_test_filter": "codex_windows_target_requires_exact_official_release_asset",
+    "windows_test_filters": [
+      "managed_process::atomic_windows::tests",
+      "sources::windows_live_tests"
+    ]
+  },
+  "acceptance": {
+    "windows_native_updated_after_patch": false,
+    "old_failure_preserved": true,
+    "needs_real_windows_formal_update": true,
+    "no_full_platform_pass_claim": true
+  },
+  "localization": "无需本地化变更；没有新增用户文案",
+  "original_summary_sha256": "eb556362f43b1894e765169ad68e7d9e6992a563d50202575bb5c8b899a75692"
+}

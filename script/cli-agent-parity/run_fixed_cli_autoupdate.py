@@ -277,11 +277,33 @@ def windows_environment(root):
     # 所有显式 updater 安装根均位于本次隔离 HOME；只保留系统程序目录。
     system = Path(os.environ["SystemRoot"])
     environment["PATH"] = os.pathsep.join(str(path) for path in (system / "System32", system / "System32/WindowsPowerShell/v1.0", system))
-    environment.update(CODEX_HOME=str(root / "home/.codex"), CLAUDE_CONFIG_DIR=str(root / "home/.claude"),
+    environment.update(OS="Windows_NT", CODEX_HOME=str(root / "home/.codex"), CLAUDE_CONFIG_DIR=str(root / "home/.claude"),
                        GROK_HOME=str(root / "home/.grok"), CODEX_INSTALL_DIR=str(root / "home/AppData/Local/Programs/OpenAI/Codex/bin"),
                        CODEX_RELEASE=TARGET["codex"], CODEX_NON_INTERACTIVE="1", DISABLE_AUTOUPDATER="1",
                        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1")
     return environment
+
+
+def windows_codex_output_markers(log):
+    # 仅投影官方固定安装器的标记；不导出原文、路径、URL 或任意异常类型。
+    stages = {
+        "updater_started": "Updating Codex via `",
+        "platform_detected": "==> Detected platform: Windows (x64)",
+        "target_resolved": f"==> Resolved version: {TARGET['codex']}",
+        "downloading": "==> Downloading Codex CLI",
+        "installed": f"Codex CLI {TARGET['codex']} installed successfully.",
+    }
+    errors = {
+        "windows_os_required": "install.ps1 supports Windows only. Use install.sh on macOS or Linux.",
+        "metadata_fetch_failed": f"Could not fetch GitHub release metadata for Codex {TARGET['codex']}.",
+        "checksum_mismatch": "Downloaded Codex archive checksum did not match expected digest.",
+        "package_layout_invalid": "Downloaded Codex package archive did not contain the expected package layout.",
+        "installed_version_mismatch": f"Installed Codex command did not report expected version {TARGET['codex']}.",
+    }
+    return {"stages": [key for key, marker in stages.items() if marker in log],
+            "known_errors": [key for key, marker in errors.items() if marker in log],
+            "http_status_codes": sorted({int(code) for code in re.findall(
+                r"The remote server returned an error: \(([1-5][0-9]{2})\)", log)})[:8]}
 
 
 def windows_debug_case(args, agent, old, target):
@@ -292,7 +314,8 @@ def windows_debug_case(args, agent, old, target):
     configuration = {path: transaction.digest(path) for path in root.joinpath("home").rglob("*") if path.is_file() and path.suffix in (".json", ".toml")}
     old_sha, target_sha = transaction.digest(old), transaction.digest(target)
     environment.update(INFINISHELL_WINDOWS_REAL_CLI_FIXTURE=str(old), INFINISHELL_WINDOWS_REAL_CLI_ARGS=json.dumps(arguments),
-                       INFINISHELL_WINDOWS_REAL_CLI_ENV=json.dumps(environment))
+                       INFINISHELL_WINDOWS_REAL_CLI_ENV=json.dumps(environment),
+                       INFINISHELL_WINDOWS_REAL_CLI_TARGET=json.dumps({"size": target.stat().st_size, "sha256": target_sha}))
     log_path = root / "atomic-update.private.txt"
     timed_out = False
     with windows_codex_user_path(entry) if agent == "codex" else nullcontext():
@@ -367,6 +390,8 @@ def windows_debug_case(args, agent, old, target):
                 "target_native_version_matches": version_matches, "credentials_absent": transaction.auth_absent(root),
                 "stable_errors": errors, "rejected_images": rejected_images,
                 "private_log_sha256": transaction.digest(log_path)}
+    if agent == "codex":
+        evidence["native_output_markers"] = windows_codex_output_markers(log)
     evidence["passed"] = all(evidence[key] for key in ("native_exit_and_strict_job_confirmed", "strict_job_cleanup_confirmed", "updater_exit_success", "old_binary_unchanged", "target_reference_unchanged",
                                                       "configuration_unchanged", "entry_matches_target", "target_native_version_matches", "credentials_absent")) and not timed_out
     write(root / "receipt.safe.json", evidence)

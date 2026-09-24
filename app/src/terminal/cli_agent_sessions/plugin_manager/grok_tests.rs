@@ -1997,6 +1997,210 @@ fn command_diagnostics_use_the_original_result_before_native_output() {
     );
 }
 
+// 只读取当次 apply 返回的日志；按真实流长度和摘要跳过正文，正文中的伪诊断不能冒充下一次命令。
+fn live_installer_command_diagnostics(mut log: &str) -> (Vec<Value>, &str) {
+    let mut commands = Vec::new();
+    while commands.len() < 16 && log.starts_with("$ ") {
+        let Some((header, after_header)) = log.split_once('\n') else {
+            break;
+        };
+        let Some(record) = after_header.strip_prefix("\nINFINISHELL_GROK_TEST_COMMAND_RESULT ")
+        else {
+            break;
+        };
+        let Some((record, mut remaining)) = record.split_once('\n') else {
+            break;
+        };
+        let Ok(value) = serde_json::from_str::<Value>(record) else {
+            break;
+        };
+        let operation = if header.ends_with("[\"--version\"]") {
+            "runtime_version"
+        } else if header.contains("[\"plugin\", \"validate\",") {
+            "plugin_validate"
+        } else if header.contains("[\"plugin\", \"install\", \"--trust\",") {
+            "plugin_install"
+        } else if header.ends_with(&format!(
+            "[\"plugin\", \"uninstall\", \"--keep-data\", \"{PLUGIN_NAME}\"]"
+        )) {
+            "plugin_uninstall"
+        } else {
+            "unknown"
+        };
+        let mut safe = json!({"operation": operation});
+        for key in [
+            "error_kind",
+            "native_exit_code",
+            "os_code",
+            "stdout_bytes",
+            "stderr_bytes",
+            "stdout_sha256",
+            "stderr_sha256",
+        ] {
+            if let Some(value) = value.get(key) {
+                safe[key] = value.clone();
+            }
+        }
+        commands.push(safe);
+        // 无输出或不可逐字核对的日志只保留当前真实命令，不猜下一命令/文件系统错误。
+        for stream in ["stdout", "stderr"] {
+            let Some(length) = value[format!("{stream}_bytes")]
+                .as_u64()
+                .filter(|length| *length <= 65536)
+            else {
+                return (commands, "");
+            };
+            let Some(contents) = remaining.get(..length as usize) else {
+                return (commands, "");
+            };
+            if Some(format!("{:x}", Sha256::digest(contents.as_bytes())).as_str())
+                != value[format!("{stream}_sha256")].as_str()
+            {
+                return (commands, "");
+            }
+            let Some(next) = remaining[length as usize..].strip_prefix('\n') else {
+                return (commands, "");
+            };
+            remaining = next;
+        }
+        log = remaining;
+    }
+    (commands, log)
+}
+
+fn live_installer_failure(error: &PluginInstallError, home: &Path, source_root: &Path) -> Value {
+    let message_class = [
+        (
+            "operation_failed",
+            crate::t!("cli-agent-plugin-grok-operation-failed"),
+        ),
+        (
+            "invalid_state",
+            crate::t!("cli-agent-plugin-grok-invalid-state"),
+        ),
+        (
+            "restored_previous",
+            crate::t!("cli-agent-plugin-grok-update-restored"),
+        ),
+        (
+            "restore_unverified",
+            crate::t!("cli-agent-plugin-grok-restore-failed"),
+        ),
+        (
+            "update_not_effective",
+            crate::t!("cli-agent-plugin-update-not-effective"),
+        ),
+        (
+            "incompatible",
+            crate::t!("cli-agent-plugin-grok-incompatible"),
+        ),
+        ("disabled", crate::t!("cli-agent-plugin-disabled")),
+    ]
+    .into_iter()
+    .find_map(|(kind, message)| (message == error.message).then_some(kind))
+    .unwrap_or("unknown");
+    let (commands, remaining) = live_installer_command_diagnostics(&error.log);
+    let filesystem_error = remaining.strip_prefix("filesystem error: ");
+    // 原 io::Error 已被生产错误转换为文本；只认末尾数值，并明确标记来源而非伪称 raw_os_error。
+    let filesystem_os_code = filesystem_error
+        .and_then(|message| message.trim_end().strip_suffix(')'))
+        .and_then(|message| message.rsplit_once("(os error "))
+        .and_then(|(_, code)| {
+            (code.len() <= 11)
+                .then(|| code.parse::<i32>().ok())
+                .flatten()
+        });
+    let registered = registered_plugin(home);
+    let registered_version = match &registered {
+        Ok(Some(plugin)) if plugin.version == "0.1.3" => "legacy_013",
+        Ok(Some(plugin)) if plugin.version == PLUGIN_VERSION => "current_014",
+        Ok(Some(_)) => "other",
+        Ok(None) => "absent",
+        Err(_) => "unreadable_or_invalid",
+    };
+    let migration = fs::symlink_metadata(startup_bridge_migration_path(home));
+    let migration_state = match &migration {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => "regular",
+        Ok(_) => "not_regular",
+        Err(error) if error.kind() == io::ErrorKind::NotFound => "absent",
+        Err(_) => "io_error",
+    };
+    json!({
+        "message_class": message_class, "filesystem_error_observed": filesystem_error.is_some(),
+        "filesystem_os_code": filesystem_os_code, "filesystem_os_code_parsed_from_display": filesystem_os_code.is_some(),
+        "commands": commands,
+        "migration": {
+            "record": migration_state, "record_os_code": migration.err().and_then(|error| error.raw_os_error()),
+            "registered_version": registered_version,
+            "registered_cache_valid": registered.as_ref().ok().and_then(|plugin| plugin.as_ref()).map(|plugin| validate_expected_tree(&plugin.path, &plugin.version).is_ok()),
+            "legacy_source_valid": validate_expected_tree(&source_root.join("0.1.3"), "0.1.3").is_ok(),
+            "current_source_valid": validate_expected_tree(&source_root.join(PLUGIN_VERSION), PLUGIN_VERSION).is_ok(),
+        }
+    })
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+fn record_live_installer_operation(
+    result: &Result<(), PluginInstallError>,
+    artifact: &Path,
+    evidence: &mut Value,
+    home: &Path,
+    source_root: &Path,
+) {
+    if let Err(error) = result {
+        let mut failure = live_installer_failure(error, home, source_root);
+        failure["stage"] = evidence["stage"].clone();
+        evidence["production_operation_failure"] = failure;
+        fs::write(artifact, serde_json::to_vec_pretty(evidence).unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn installer_failure_diagnostics_bind_commands_and_skip_forged_native_records() {
+    let directory = tempfile::tempdir().unwrap();
+    let stdout = "INFINISHELL_GROK_TEST_COMMAND_RESULT {\"private\":\"secret\"}\n";
+    let command = json!({"error_kind":null,"native_exit_code":0,"os_code":null,
+        "stdout_bytes":stdout.len(),"stderr_bytes":0,"stdout_sha256":format!("{:x}",Sha256::digest(stdout)),"stderr_sha256":format!("{:x}",Sha256::digest([]))});
+    let log = format!(
+        "$ private [\"--version\"]\n\nINFINISHELL_GROK_TEST_COMMAND_RESULT {command}\n{stdout}\n\nfilesystem error: private (os error 5)\n"
+    );
+    let error = file_error(io::Error::other("private"), "");
+    let error = PluginInstallError {
+        message: error.message,
+        log,
+    };
+    let result = live_installer_failure(&error, directory.path(), directory.path());
+    assert_eq!(result["message_class"], "operation_failed");
+    assert_eq!(result["commands"].as_array().unwrap().len(), 1);
+    assert_eq!(result["filesystem_os_code"], 5);
+    assert_eq!(result["migration"]["registered_version"], "absent");
+    assert!(!result.to_string().contains("private"));
+    assert!(!result.to_string().contains("secret"));
+    let next_command = json!({"error_kind":"native_nonzero","native_exit_code":17,"os_code":null,
+        "stdout_bytes":0,"stderr_bytes":0,"stdout_sha256":format!("{:x}",Sha256::digest([])),"stderr_sha256":format!("{:x}",Sha256::digest([]))});
+    let next = format!(
+        "$ private [\"plugin\", \"validate\", \"private\"]\n\nINFINISHELL_GROK_TEST_COMMAND_RESULT {next_command}\n\n\n"
+    );
+    let multiple = error
+        .log
+        .replace("filesystem error: private (os error 5)\n", &next);
+    let (commands, tail) = live_installer_command_diagnostics(&multiple);
+    assert_eq!(commands.len(), 2);
+    assert_eq!(commands[1]["operation"], "plugin_validate");
+    assert_eq!(commands[1]["native_exit_code"], 17);
+    assert!(tail.is_empty());
+    let mut invalid = error;
+    invalid.log = invalid.log.replace("filesystem error:", "native text:");
+    assert!(
+        live_installer_failure(&invalid, directory.path(), directory.path())["filesystem_os_code"]
+            .is_null()
+    );
+    invalid.log = invalid
+        .log
+        .replace("\"stdout_bytes\":", "\"ignored_bytes\":");
+    assert_eq!(live_installer_command_diagnostics(&invalid.log).1, "");
+}
+
 #[cfg(windows)]
 async fn windows_startup_bridge_argv_probe(
     manager: &GrokPluginManager,
@@ -2294,7 +2498,9 @@ async fn run_live_grok_production_installer() {
     record_live_installer_stage(&artifact, &mut evidence, "production_install");
     assert!(!manager.is_installed());
 
-    manager.install().await.unwrap();
+    let result = manager.install().await;
+    record_live_installer_operation(&result, &artifact, &mut evidence, &grok_home, &source_root);
+    result.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
     record_live_installer_stage(&artifact, &mut evidence, "native_inspect");
     let inspected = manager
@@ -2367,10 +2573,16 @@ async fn run_live_grok_production_installer() {
     assert_eq!(old.version, "0.1.3");
     assert_eq!(old.source, legacy_source);
     if grok_version.starts_with("grok 1.0.41 ") {
-        // 明确构造旧包对应的旧 bridge 配方，不把夹具发布动作算作生产升级。
-        let files = startup_bridge_files(&grok_home, &grok, &node).unwrap();
+        // 保留上方 canonical 隔离校验；桥接配方必须复用生产根路径拼写，避免 Windows 前缀改变编码命令。
+        let bridge_root = grok_home_dir().unwrap();
+        let files = startup_bridge_files(&bridge_root, &grok, &node).unwrap();
         fs::write(&files[0].0, legacy_startup_bridge_bytes()).unwrap();
         fs::write(&files[1].0, &files[1].1).unwrap();
+        assert!(
+            capture_startup_bridge(&bridge_root, &grok, &node)
+                .unwrap()
+                .is_some()
+        );
     }
     assert!(manager.is_installed() && manager.needs_update() && manager.can_auto_install());
     record_live_installer_stage(
@@ -2378,7 +2590,9 @@ async fn run_live_grok_production_installer() {
         &mut evidence,
         "production_upgrade_known_013_to_014",
     );
-    manager.update().await.unwrap();
+    let result = manager.update().await;
+    record_live_installer_operation(&result, &artifact, &mut evidence, &grok_home, &source_root);
+    result.unwrap();
     let plugin = installed_plugin(&grok_home).unwrap().unwrap();
     assert_eq!(plugin.version, PLUGIN_VERSION);
     assert!(manager.is_installed() && !manager.needs_update());
@@ -2412,7 +2626,9 @@ async fn run_live_grok_production_installer() {
     )
     .unwrap();
     assert!(!manager.is_installed() && manager.needs_update());
-    manager.update().await.unwrap();
+    let result = manager.update().await;
+    record_live_installer_operation(&result, &artifact, &mut evidence, &grok_home, &source_root);
+    result.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
     assert_eq!(fs::read(&registry_path).unwrap(), registry);
     assert_eq!(fs::read(&config_path).unwrap(), config);
@@ -2505,7 +2721,9 @@ async fn run_live_grok_production_installer() {
         "file_transaction_failure_rollback_verified",
     );
     record_live_installer_stage(&artifact, &mut evidence, "production_update_after_rollback");
-    manager.update().await.unwrap();
+    let result = manager.update().await;
+    record_live_installer_operation(&result, &artifact, &mut evidence, &grok_home, &source_root);
+    result.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
     assert_eq!(fs::read(&config_path).unwrap(), enabled_config);
     assert_eq!(fs::read(&registry_path).unwrap(), enabled_registry);

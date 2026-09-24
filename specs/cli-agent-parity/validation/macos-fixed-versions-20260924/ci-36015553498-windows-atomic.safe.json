@@ -1,0 +1,363 @@
+{
+  "schema": 1,
+  "run_id": 36015553498,
+  "run_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36015553498",
+  "source_commit": "981cfebc4e3c9acfde48140bddb5d67134c282ab",
+  "artifact_id": 10817037186,
+  "archive_sha256": "e9cc1f6f8f19929efc64d7520c716ec34d570c0493790a92e21404cd6da6a098",
+  "original_files": [
+    {
+      "path": "build-inputs.safe.json",
+      "bytes": 611,
+      "sha256": "79a57be5a2b5d0bf27b43223cfde0678c959e5872f2320dea7d264b108957f2d"
+    },
+    {
+      "path": "claude-updated-receipt.safe.json",
+      "bytes": 2228,
+      "sha256": "330ea6ea7d0192a6b3bf5474e5d89af9a7b5d9ef13e4a43be8f74af621b410b0"
+    },
+    {
+      "path": "codex-updated-debug_receipt.safe.json",
+      "bytes": 1873,
+      "sha256": "ab13dbd65686babda34f4a58f09af5b6040388a957b85866a11a53d5c376b024"
+    },
+    {
+      "path": "claude-updated-product_receipt.safe.json",
+      "bytes": 1345,
+      "sha256": "5bd535de6227f314f682f1ec8b02d8f8fc9a2e69af0269f9ee83317eb6cbd8fe"
+    },
+    {
+      "path": "codex-updated-receipt.safe.json",
+      "bytes": 2227,
+      "sha256": "2dea29b408689dd610191bf1db2cfa4c473dfa049cf6241b5b788de00601e0c3"
+    },
+    {
+      "path": "grok-updated-receipt.safe.json",
+      "bytes": 2222,
+      "sha256": "a85e945c3958bacb5a31336b522fe952684d9dbc95c7186f213cb66a3bc675ca"
+    },
+    {
+      "path": "codex-updated-product_receipt.safe.json",
+      "bytes": 1372,
+      "sha256": "41ffbcbd752d22a0447bc42f8ba527ce987799072cc8f48d986751e78f4ee311"
+    },
+    {
+      "path": "grok-updated-product_receipt.safe.json",
+      "bytes": 1339,
+      "sha256": "39b2c41aec2d7b6fec51457231eee04199068293617d2dfc732e11c53ecede0d"
+    },
+    {
+      "path": "summary.safe.json",
+      "bytes": 2535,
+      "sha256": "1d699f8ffbeec1240e67368340f54fad9e488110e36b15cd61339ae4aa153804"
+    }
+  ],
+  "cases": [
+    {
+      "agent": "codex",
+      "original_product_receipt_sha256": "41ffbcbd752d22a0447bc42f8ba527ce987799072cc8f48d986751e78f4ee311",
+      "product_receipt": {
+        "schema": 1,
+        "scope": "cli_autoupdate_windows_native_product",
+        "agent": "codex",
+        "old_version": "0.155.1",
+        "target_version": "0.156.1",
+        "manifest_sha256": "4d4c08366585807fabc9a5e48f53982c39d4094589c297abfc31667f3aa148d8",
+        "worker_sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9",
+        "supervisor_sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e",
+        "old_sha256": "eba0f32c976667cb9298efafd98513e823eeda7b576a03ec658bb8be8d336316",
+        "target_sha256": "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+        "fixed_release_input": true,
+        "capability_or_source_gate_bypassed": false,
+        "isolated_journal_root_for_test": true,
+        "credentials_provided": false,
+        "model_inputs_sent": 0,
+        "product_inspect_calls": 2,
+        "product_execute_calls": 1,
+        "supervisor_exit_reason": "stdio_closed",
+        "supervisor_exit_code": 1,
+        "native_exit_confirmed": false,
+        "strict_job_cleanup_confirmed": true,
+        "entry_matches_target": false,
+        "target_version_matches": false,
+        "post_inspection_source": "Native",
+        "post_inspection_error": null,
+        "post_inspection_up_to_date": false,
+        "post_inspection_installed_version": "0.155.1",
+        "post_inspection_latest_version": "0.156.1",
+        "config_files_checked": 13,
+        "config_bytes_unchanged": true,
+        "journal_absent": true,
+        "old_binary_unchanged": true,
+        "target_reference_unchanged": true,
+        "credentials_absent": true,
+        "error": "CommandFailed",
+        "failure_code": "execute_failed",
+        "passed": false
+      },
+      "runner_receipt": {
+        "agent": "codex",
+        "candidate": false,
+        "configuration_unchanged": true,
+        "credentials_provided": false,
+        "entry_matches_target": false,
+        "live_latest_claimed": false,
+        "manifest_sha256": "4d4c08366585807fabc9a5e48f53982c39d4094589c297abfc31667f3aa148d8",
+        "model_inputs_sent": 0,
+        "old_version": "0.155.1",
+        "passed": false,
+        "private_log_sha256": "755efc2bc7628245c22ec3928ae21b56b7d479d4a8cbf8d273265acd4b0c8f0d",
+        "product_receipt": {
+          "path": "artifact:receipt.windows.safe.json",
+          "sha256": "41ffbcbd752d22a0447bc42f8ba527ce987799072cc8f48d986751e78f4ee311"
+        },
+        "product_receipt_binding_verified": true,
+        "scope": "Windows 固定官方 CLI 产品 inspect/execute/journal 事务；元数据输入和状态目录隔离，不绕过来源或执行门禁",
+        "source_files": {
+          "app/src/ai/cli_agent_runtime/managed_process.rs": "17edbb11dd2b0f03ea3d175f76ad5179bb85214c087f88972bf85dc272979ad0",
+          "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "9c3e34df822f7b532f787ce6b44b31fad1278056398dcd6a07ee8cd834c98fb0",
+          "app/src/terminal/cli_agent_updates.rs": "9f5eaf7042b712805b0fc9256b8113c5e8bf1318110b88d2b906c6cd48a8c4a3",
+          "app/src/terminal/cli_agent_updates/sources.rs": "bc357f982ef4cb7846fb00ed84d45801e3333f2e9f8288db923bea0353a87365",
+          "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "a0143df03bcae184a17aa0c704e954cef5eae41a40bc41e2db2c5fb1d6b3f121",
+          "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "988d4d53c322c373517360db505512e8889d9c937638d726d52f6f9356335812"
+        },
+        "stable_errors": [],
+        "supervisor": {
+          "path": "artifact:infinishell-tui.exe",
+          "sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e"
+        },
+        "target_version": "0.156.1",
+        "test_binary": {
+          "path": "artifact:warp-8e58c2045d83883a.exe",
+          "sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9"
+        },
+        "timed_out": false,
+        "user_path_restored": true,
+        "user_path_temporary_entry_used": true
+      }
+    },
+    {
+      "agent": "claude",
+      "original_product_receipt_sha256": "5bd535de6227f314f682f1ec8b02d8f8fc9a2e69af0269f9ee83317eb6cbd8fe",
+      "product_receipt": {
+        "schema": 1,
+        "scope": "cli_autoupdate_windows_native_product",
+        "agent": "claude",
+        "old_version": "2.1.278",
+        "target_version": "2.1.280",
+        "manifest_sha256": "73aca8217201ae9b9dc733dcd2794195f4c300166165be74fbc75ee51e099df0",
+        "worker_sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9",
+        "supervisor_sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e",
+        "old_sha256": "006ea5c8638f67f10a5ae66bb232fd267c9f6af294e3f03f4cfcf1fd3f2cced8",
+        "target_sha256": "0e4195524b73eb77efbdf3e2b36de5322a29f0ca575dfd2d9b4f946b1d425469",
+        "fixed_release_input": true,
+        "capability_or_source_gate_bypassed": false,
+        "isolated_journal_root_for_test": true,
+        "credentials_provided": false,
+        "model_inputs_sent": 0,
+        "product_inspect_calls": 2,
+        "product_execute_calls": 1,
+        "supervisor_exit_reason": "stdio_closed",
+        "supervisor_exit_code": 0,
+        "native_exit_confirmed": true,
+        "strict_job_cleanup_confirmed": true,
+        "entry_matches_target": true,
+        "target_version_matches": true,
+        "post_inspection_source": "Native",
+        "post_inspection_error": null,
+        "post_inspection_up_to_date": true,
+        "post_inspection_installed_version": "2.1.280",
+        "post_inspection_latest_version": "2.1.280",
+        "config_files_checked": 13,
+        "config_bytes_unchanged": true,
+        "journal_absent": true,
+        "old_binary_unchanged": true,
+        "target_reference_unchanged": true,
+        "credentials_absent": true,
+        "error": null,
+        "failure_code": null,
+        "passed": true
+      },
+      "runner_receipt": {
+        "agent": "claude",
+        "candidate": false,
+        "configuration_unchanged": true,
+        "credentials_provided": false,
+        "entry_matches_target": true,
+        "live_latest_claimed": false,
+        "manifest_sha256": "73aca8217201ae9b9dc733dcd2794195f4c300166165be74fbc75ee51e099df0",
+        "model_inputs_sent": 0,
+        "old_version": "2.1.278",
+        "passed": true,
+        "private_log_sha256": "b615ea006903b3f47d56cb07715d85b43f0156ffc2870a75bff78e45074a9154",
+        "product_receipt": {
+          "path": "artifact:receipt.windows.safe.json",
+          "sha256": "5bd535de6227f314f682f1ec8b02d8f8fc9a2e69af0269f9ee83317eb6cbd8fe"
+        },
+        "product_receipt_binding_verified": true,
+        "scope": "Windows 固定官方 CLI 产品 inspect/execute/journal 事务；元数据输入和状态目录隔离，不绕过来源或执行门禁",
+        "source_files": {
+          "app/src/ai/cli_agent_runtime/managed_process.rs": "17edbb11dd2b0f03ea3d175f76ad5179bb85214c087f88972bf85dc272979ad0",
+          "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "9c3e34df822f7b532f787ce6b44b31fad1278056398dcd6a07ee8cd834c98fb0",
+          "app/src/terminal/cli_agent_updates.rs": "9f5eaf7042b712805b0fc9256b8113c5e8bf1318110b88d2b906c6cd48a8c4a3",
+          "app/src/terminal/cli_agent_updates/sources.rs": "bc357f982ef4cb7846fb00ed84d45801e3333f2e9f8288db923bea0353a87365",
+          "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "a0143df03bcae184a17aa0c704e954cef5eae41a40bc41e2db2c5fb1d6b3f121",
+          "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "988d4d53c322c373517360db505512e8889d9c937638d726d52f6f9356335812"
+        },
+        "stable_errors": [],
+        "supervisor": {
+          "path": "artifact:infinishell-tui.exe",
+          "sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e"
+        },
+        "target_version": "2.1.280",
+        "test_binary": {
+          "path": "artifact:warp-8e58c2045d83883a.exe",
+          "sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9"
+        },
+        "timed_out": false,
+        "user_path_restored": true,
+        "user_path_temporary_entry_used": false
+      }
+    },
+    {
+      "agent": "grok",
+      "original_product_receipt_sha256": "39b2c41aec2d7b6fec51457231eee04199068293617d2dfc732e11c53ecede0d",
+      "product_receipt": {
+        "schema": 1,
+        "scope": "cli_autoupdate_windows_native_product",
+        "agent": "grok",
+        "old_version": "1.0.40",
+        "target_version": "1.0.41",
+        "manifest_sha256": "fdf39937e70f9f899816e29324344b04084b9fe08a42558b64ecc5770a6b2fa5",
+        "worker_sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9",
+        "supervisor_sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e",
+        "old_sha256": "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e",
+        "target_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+        "fixed_release_input": true,
+        "capability_or_source_gate_bypassed": false,
+        "isolated_journal_root_for_test": true,
+        "credentials_provided": false,
+        "model_inputs_sent": 0,
+        "product_inspect_calls": 2,
+        "product_execute_calls": 1,
+        "supervisor_exit_reason": "stdio_closed",
+        "supervisor_exit_code": 0,
+        "native_exit_confirmed": true,
+        "strict_job_cleanup_confirmed": true,
+        "entry_matches_target": true,
+        "target_version_matches": true,
+        "post_inspection_source": "Native",
+        "post_inspection_error": null,
+        "post_inspection_up_to_date": true,
+        "post_inspection_installed_version": "1.0.41",
+        "post_inspection_latest_version": "1.0.41",
+        "config_files_checked": 13,
+        "config_bytes_unchanged": true,
+        "journal_absent": true,
+        "old_binary_unchanged": true,
+        "target_reference_unchanged": true,
+        "credentials_absent": true,
+        "error": null,
+        "failure_code": null,
+        "passed": true
+      },
+      "runner_receipt": {
+        "agent": "grok",
+        "candidate": false,
+        "configuration_unchanged": true,
+        "credentials_provided": false,
+        "entry_matches_target": true,
+        "live_latest_claimed": false,
+        "manifest_sha256": "fdf39937e70f9f899816e29324344b04084b9fe08a42558b64ecc5770a6b2fa5",
+        "model_inputs_sent": 0,
+        "old_version": "1.0.40",
+        "passed": true,
+        "private_log_sha256": "644bee45504e6e0b2bad2da5a33f913cfd76ef068413fafd990ee257a76c4ab8",
+        "product_receipt": {
+          "path": "artifact:receipt.windows.safe.json",
+          "sha256": "39b2c41aec2d7b6fec51457231eee04199068293617d2dfc732e11c53ecede0d"
+        },
+        "product_receipt_binding_verified": true,
+        "scope": "Windows 固定官方 CLI 产品 inspect/execute/journal 事务；元数据输入和状态目录隔离，不绕过来源或执行门禁",
+        "source_files": {
+          "app/src/ai/cli_agent_runtime/managed_process.rs": "17edbb11dd2b0f03ea3d175f76ad5179bb85214c087f88972bf85dc272979ad0",
+          "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "9c3e34df822f7b532f787ce6b44b31fad1278056398dcd6a07ee8cd834c98fb0",
+          "app/src/terminal/cli_agent_updates.rs": "9f5eaf7042b712805b0fc9256b8113c5e8bf1318110b88d2b906c6cd48a8c4a3",
+          "app/src/terminal/cli_agent_updates/sources.rs": "bc357f982ef4cb7846fb00ed84d45801e3333f2e9f8288db923bea0353a87365",
+          "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "a0143df03bcae184a17aa0c704e954cef5eae41a40bc41e2db2c5fb1d6b3f121",
+          "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "988d4d53c322c373517360db505512e8889d9c937638d726d52f6f9356335812"
+        },
+        "stable_errors": [],
+        "supervisor": {
+          "path": "artifact:infinishell-tui.exe",
+          "sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e"
+        },
+        "target_version": "1.0.41",
+        "test_binary": {
+          "path": "artifact:warp-8e58c2045d83883a.exe",
+          "sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9"
+        },
+        "timed_out": false,
+        "user_path_restored": true,
+        "user_path_temporary_entry_used": false
+      }
+    }
+  ],
+  "codex_independent_diagnostic": {
+    "agent": "codex",
+    "candidate": true,
+    "configuration_unchanged": true,
+    "credentials_absent": true,
+    "credentials_provided": false,
+    "debug_failures": [],
+    "entry_matches_target": false,
+    "model_inputs_sent": 0,
+    "native_exit_and_strict_job_confirmed": true,
+    "native_exit_code": 1,
+    "native_update_attempted": true,
+    "old_binary_unchanged": true,
+    "old_sha256": "eba0f32c976667cb9298efafd98513e823eeda7b576a03ec658bb8be8d336316",
+    "old_version": "0.155.1",
+    "passed": false,
+    "private_log_sha256": "778b3eef4e0cc8d788e5c098d0171c75fdfaf66d0caf123cf4f817219bca229b",
+    "rejected_images": [],
+    "scope": "Windows 固定官方 CLI 严格 Job 原子执行诊断；不是产品事务或正式版本支持验收",
+    "source_files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+        "sha256": "9c3e34df822f7b532f787ce6b44b31fad1278056398dcd6a07ee8cd834c98fb0"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+        "sha256": "e863eefdf6a8f9f0486c50c681267fbe2b6e5165ac6f6631ba830409def142f0"
+      }
+    ],
+    "stable_errors": [],
+    "strict_job_cleanup_confirmed": true,
+    "supervisor": {
+      "path": "artifact:infinishell-tui.exe",
+      "sha256": "2af291985f3d189297e9eaad5dfbe6098eacde7b1b1e2c6f377c25341e723a7e"
+    },
+    "target_native_version_matches": false,
+    "target_reference_unchanged": true,
+    "target_sha256": "70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301",
+    "target_version": "0.156.1",
+    "test_binary": {
+      "path": "artifact:warp-8e58c2045d83883a.exe",
+      "sha256": "c2ca37003f387598c095b792234a1e3499b875b07ed34bd724da49bc24ab61c9"
+    },
+    "timed_out": false,
+    "updater_exit_success": false,
+    "user_path_restored": true,
+    "user_path_temporary_entry_used": true
+  },
+  "formal_passes": [
+    "claude",
+    "grok"
+  ],
+  "formal_failures": [
+    "codex"
+  ],
+  "summary": "Grok 与 Claude 正式更新通过；Codex 已无映像拒绝，但原生更新 exit 1，入口保持旧版。配置13项、严格Job清理与journal清除三款均通过。诊断不是正式事务通过。",
+  "next_required": "定位 Codex 同次原生退出 1；不放宽退出、摘要或清理门禁"
+}
