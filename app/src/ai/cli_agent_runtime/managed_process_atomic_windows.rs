@@ -18,7 +18,13 @@ use std::time::{Duration, Instant};
 
 use command::blocking::Command;
 use windows::Win32::Foundation::{
-    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, EXCEPTION_BREAKPOINT, GENERIC_READ, HANDLE,
+    DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
+    EXCEPTION_BREAKPOINT, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
+};
+use windows::Win32::Security::Authorization::{GetSecurityInfo, SE_FILE_OBJECT};
+use windows::Win32::Security::{
+    ACL, DACL_SECURITY_INFORMATION, GetLengthSid, IsValidAcl, IsValidSid,
+    OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID,
 };
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
@@ -32,9 +38,11 @@ use windows::Win32::System::Diagnostics::Debug::{
     OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
 };
 use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
-use windows::Win32::System::Threading::TerminateProcess;
+use windows::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
 
-use super::{AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, sha256_file};
+use super::{
+    AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, WindowsChildImage, sha256_file,
+};
 
 const MAX_NATIVE_EXECUTABLE_BYTES: u64 = 1024 * 1024 * 1024;
 const DOS_HEADER_PE_OFFSET: u64 = 0x3c;
@@ -78,6 +86,7 @@ pub(super) struct WindowsReplacementLease {
     ancestors: Vec<AncestorLease>,
     system_directory: AncestorLease,
     powershell: Option<SystemHelperLease>,
+    child_image: Option<WindowsChildImage>,
 }
 
 /// 固定系统 helper 的文件和祖先租约；不接受同目录其他程序或 DLL。
@@ -143,6 +152,9 @@ pub(super) struct WindowsImageDebugSession {
     expected_program_sha256: String,
     system_directory: AncestorLease,
     powershell: Option<SystemHelperLease>,
+    child_image: Option<WindowsChildImage>,
+    child_images: HashMap<u32, SystemHelperLease>,
+    component_images: HashMap<u32, Vec<SystemHelperLease>>,
     processes: HashMap<u32, OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
 }
@@ -179,6 +191,14 @@ impl WindowsDirectoryLease {
 }
 
 impl WindowsReplacementLease {
+    pub(super) fn set_child_image(&mut self, image: Option<WindowsChildImage>) -> io::Result<()> {
+        if let Some(image) = &image {
+            image.validate()?;
+        }
+        self.child_image = image;
+        Ok(())
+    }
+
     pub(super) fn execution_path(&self) -> &Path {
         &self.execution_path
     }
@@ -247,6 +267,9 @@ impl WindowsReplacementLease {
                 .as_ref()
                 .map(SystemHelperLease::try_clone)
                 .transpose()?,
+            child_image: self.child_image.clone(),
+            child_images: HashMap::new(),
+            component_images: HashMap::new(),
             processes: HashMap::new(),
             initial_breakpoints: HashSet::new(),
         };
@@ -314,11 +337,8 @@ impl WindowsImageDebugSession {
                 self.handle_create_process(event, event.dwProcessId == self.root_process_id)?;
                 Ok(DBG_CONTINUE)
             }
-            CREATE_THREAD_DEBUG_EVENT => {
-                let information = unsafe { event.u.CreateThread };
-                close_owned_handle(information.hThread)?;
-                Ok(DBG_CONTINUE)
-            }
+            // 原始线程句柄由 ContinueDebugEvent 在 EXIT_* 时关闭，不能提前释放。
+            CREATE_THREAD_DEBUG_EVENT => Ok(DBG_CONTINUE),
             EXCEPTION_DEBUG_EVENT => {
                 let information = unsafe { event.u.Exception };
                 if information.ExceptionRecord.ExceptionCode == EXCEPTION_BREAKPOINT
@@ -335,12 +355,38 @@ impl WindowsImageDebugSession {
             EXIT_PROCESS_DEBUG_EVENT => {
                 self.processes.remove(&event.dwProcessId);
                 self.initial_breakpoints.remove(&event.dwProcessId);
+                self.child_images.remove(&event.dwProcessId);
+                self.component_images.remove(&event.dwProcessId);
                 Ok(DBG_CONTINUE)
             }
             LOAD_DLL_DEBUG_EVENT => {
                 let information = unsafe { event.u.LoadDll };
                 let file = file_from_debug_handle(information.hFile)?;
-                self.verify_system_image(&file)?;
+                if self.verify_system_image(&file).is_err() {
+                    let dependencies = self.component_images.entry(event.dwProcessId).or_default();
+                    let identity = inspect_handle(&file)?;
+                    if let Some(held) = dependencies
+                        .iter()
+                        .find(|held| held.identity.id == identity.id)
+                    {
+                        held.verify_image(&file)?;
+                    } else {
+                        if dependencies.len() >= 256 {
+                            return Err(error("managed_process.atomic_windows_component_limit"));
+                        }
+                        let lease = prepare_component_image(&file, &self.system_directory)
+                            .inspect_err(|_| {
+                                #[cfg(test)]
+                                if let Ok(path) = final_path_from_handle(&file) {
+                                    tests::record_rejected_image(
+                                        &path,
+                                        &self.system_directory.file,
+                                    );
+                                }
+                            })?;
+                        dependencies.push(lease);
+                    }
+                }
                 Ok(DBG_CONTINUE)
             }
             RIP_EVENT => Err(error("managed_process.atomic_windows_loader_rip_event")),
@@ -352,22 +398,41 @@ impl WindowsImageDebugSession {
 
     fn handle_create_process(&mut self, event: &DEBUG_EVENT, root: bool) -> io::Result<()> {
         let information = unsafe { event.u.CreateProcessInfo };
-        let process = owned_handle(information.hProcess)?;
+        // hFile 属于调试器；即使复制进程句柄失败，也必须释放它。
+        let file = file_from_debug_handle(information.hFile);
+        let process = duplicate_process_handle(information.hProcess)?;
         if self.processes.insert(event.dwProcessId, process).is_some() {
             return Err(error(
                 "managed_process.atomic_windows_duplicate_process_event",
             ));
         }
-        let file = file_from_debug_handle(information.hFile)?;
-        close_owned_handle(information.hThread)?;
+        let file = file?;
         if root {
             self.verify_root_image(&file)
         } else if let Some(helper) = &self.powershell
             && inspect_handle(&file)?.id == helper.identity.id
         {
-            helper.verify_image(&file)
+            helper.verify_image(&file)?;
+            Ok(())
+        } else if self.verify_system_image(&file).is_ok() {
+            Ok(())
+        } else if let Some(expected) = &self.child_image {
+            let lease = prepare_child_image(&file, expected).inspect_err(|_| {
+                #[cfg(test)]
+                if let Ok(path) = final_path_from_handle(&file) {
+                    tests::record_rejected_image(&path, &self.system_directory.file);
+                }
+            })?;
+            self.child_images.insert(event.dwProcessId, lease);
+            Ok(())
         } else {
-            self.verify_system_image(&file)
+            #[cfg(test)]
+            if let Ok(path) = final_path_from_handle(&file) {
+                tests::record_rejected_image(&path, &self.system_directory.file);
+            }
+            Err(error(
+                "managed_process.atomic_windows_loaded_image_outside_system_directory",
+            ))
         }
     }
 
@@ -416,8 +481,6 @@ impl WindowsImageDebugSession {
         if parent_identity.id != self.system_directory.identity.id
             || !is_plain_kind(parent_identity.attributes, true)
         {
-            #[cfg(test)]
-            tests::record_rejected_image(&final_path, &self.system_directory.file);
             return Err(error(
                 "managed_process.atomic_windows_loaded_image_outside_system_directory",
             ));
@@ -448,7 +511,8 @@ impl WindowsImageDebugSession {
             };
             if next.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT {
                 let information = unsafe { next.u.CreateProcessInfo };
-                let Ok(process) = owned_handle(information.hProcess) else {
+                let _image = file_from_debug_handle(information.hFile);
+                let Ok(process) = duplicate_process_handle(information.hProcess) else {
                     return;
                 };
                 let handle = HANDLE(process.as_raw_handle());
@@ -456,13 +520,6 @@ impl WindowsImageDebugSession {
                     return;
                 }
                 self.processes.insert(next.dwProcessId, process);
-                let _ = close_owned_handle(information.hThread);
-                if !information.hFile.is_invalid() {
-                    let _ = file_from_debug_handle(information.hFile);
-                }
-            } else if next.dwDebugEventCode == CREATE_THREAD_DEBUG_EVENT {
-                let information = unsafe { next.u.CreateThread };
-                let _ = close_owned_handle(information.hThread);
             } else if next.dwDebugEventCode == LOAD_DLL_DEBUG_EVENT {
                 let information = unsafe { next.u.LoadDll };
                 if !information.hFile.is_invalid() {
@@ -532,6 +589,7 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<WindowsRepl
         ancestors,
         system_directory,
         powershell,
+        child_image: None,
     })
 }
 
@@ -626,6 +684,244 @@ fn inspect_handle(file: &File) -> io::Result<LeasedIdentity> {
     })
 }
 
+/// 子进程可以在更新器自己的下载目录中出现，但内容只能是来源层独立绑定的目标。
+fn prepare_child_image(file: &File, expected: &WindowsChildImage) -> io::Result<SystemHelperLease> {
+    expected.validate()?;
+    let path = final_path_from_handle(file)?;
+    let lease = lease_mapped_image(file, &path, false)?;
+    if lease.identity.size != expected.size || lease.sha256 != expected.sha256 {
+        return Err(error("managed_process.atomic_windows_child_image_mismatch"));
+    }
+    Ok(lease)
+}
+
+fn lease_mapped_image(file: &File, path: &Path, dll: bool) -> io::Result<SystemHelperLease> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| error("managed_process.atomic_windows_loaded_image_parent_missing"))?;
+    let mut paths: Vec<_> = parent.ancestors().collect();
+    paths.reverse();
+    let mut ancestors = Vec::new();
+    for path in paths {
+        let file = open_ancestor(path)?;
+        let identity = inspect_handle(&file)?;
+        if !is_plain_kind(identity.attributes, true) {
+            return Err(error("managed_process.atomic_windows_ancestor_not_plain"));
+        }
+        ancestors.push(AncestorLease { file, identity });
+    }
+    let mut program = open_program(path)?;
+    let identity = inspect_handle(&program)?;
+    if identity != inspect_handle(file)?
+        || !is_plain_kind(identity.attributes, false)
+        || identity.size == 0
+        || identity.size > MAX_NATIVE_EXECUTABLE_BYTES
+    {
+        return Err(error(
+            "managed_process.atomic_windows_loaded_image_not_plain",
+        ));
+    }
+    require_pe_kind(&mut program, identity.size, dll)?;
+    let sha256 = sha256_file(&mut program)?;
+    let lease = SystemHelperLease {
+        program,
+        identity,
+        sha256,
+        ancestors,
+    };
+    lease.verify_image(file)?;
+    Ok(lease)
+}
+
+/// 只接受系统 API 锚定、不可由普通用户写入的组件 DLL；这不是 Authenticode 校验。
+fn prepare_component_image(file: &File, system: &AncestorLease) -> io::Result<SystemHelperLease> {
+    let official_system = prepare_system_directory()?;
+    if official_system.identity.id != system.identity.id {
+        return Err(error(
+            "managed_process.atomic_windows_system_directory_changed",
+        ));
+    }
+    let system_path = final_path_from_handle(&system.file)?;
+    let windows_path = system_path
+        .parent()
+        .ok_or_else(|| error("managed_process.atomic_windows_system_directory_changed"))?;
+    let path = final_path_from_handle(file)?;
+    if !is_component_path(&path, windows_path) {
+        return Err(error(
+            "managed_process.atomic_windows_loaded_image_outside_system_directory",
+        ));
+    }
+    let windows = open_ancestor(windows_path)?;
+    let windows_identity = inspect_handle(&windows)?;
+    let lease = lease_mapped_image(file, &path, true)?;
+    let mut found_windows = false;
+    for ancestor in &lease.ancestors {
+        if ancestor.identity.id == windows_identity.id {
+            found_windows = true;
+        }
+        if found_windows {
+            require_protected_security(&ancestor.file)?;
+        }
+    }
+    if !found_windows {
+        return Err(error(
+            "managed_process.atomic_windows_system_directory_changed",
+        ));
+    }
+    require_protected_security(&lease.program)?;
+    lease.verify_image(file)?;
+    Ok(lease)
+}
+
+fn is_component_path(path: &Path, windows: &Path) -> bool {
+    let image: Vec<_> = path.components().collect();
+    let root: Vec<_> = windows.components().collect();
+    if image.len() <= root.len() + 1
+        || !image.iter().zip(&root).all(|(left, right)| {
+            left.as_os_str()
+                .to_string_lossy()
+                .eq_ignore_ascii_case(&right.as_os_str().to_string_lossy())
+        })
+    {
+        return false;
+    }
+    let component = image[root.len()].as_os_str().to_string_lossy();
+    let runtime_root = ["Microsoft.NET", "WinSxS", "System32"]
+        .iter()
+        .any(|name| component.eq_ignore_ascii_case(name));
+    // .NET 的原生映像缓存仍位于 Windows/assembly，限于 NativeImages_* 子目录。
+    let native_images = component.eq_ignore_ascii_case("assembly")
+        && image.get(root.len() + 1).is_some_and(|name| {
+            let name = name.as_os_str().to_string_lossy().to_ascii_lowercase();
+            name.starts_with("nativeimages_v")
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+        });
+    (runtime_root || native_images)
+        && path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("dll"))
+}
+
+struct SecurityDescriptor(HLOCAL);
+impl Drop for SecurityDescriptor {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = LocalFree(Some(self.0));
+        }
+    }
+}
+
+fn require_protected_security(file: &File) -> io::Result<()> {
+    let mut owner = PSID::default();
+    let mut dacl: *mut ACL = std::ptr::null_mut();
+    let mut descriptor = PSECURITY_DESCRIPTOR::default();
+    let result = unsafe {
+        GetSecurityInfo(
+            HANDLE(file.as_raw_handle()),
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            Some(&mut owner),
+            None,
+            Some(&mut dacl),
+            None,
+            Some(&mut descriptor),
+        )
+    };
+    if result.0 != 0 {
+        return Err(io::Error::from_raw_os_error(result.0 as i32));
+    }
+    let _descriptor = SecurityDescriptor(HLOCAL(descriptor.0));
+    if owner.0.is_null()
+        || dacl.is_null()
+        || !unsafe { IsValidSid(owner) }.as_bool()
+        || !unsafe { IsValidAcl(dacl) }.as_bool()
+    {
+        return Err(error(
+            "managed_process.atomic_windows_component_security_invalid",
+        ));
+    }
+    let owner_bytes =
+        unsafe { std::slice::from_raw_parts(owner.0.cast::<u8>(), GetLengthSid(owner) as usize) };
+    let acl_bytes =
+        unsafe { std::slice::from_raw_parts(dacl.cast::<u8>(), usize::from((*dacl).AclSize)) };
+    if !protected_security(owner_bytes, acl_bytes) {
+        return Err(error(
+            "managed_process.atomic_windows_component_security_untrusted",
+        ));
+    }
+    Ok(())
+}
+
+fn system_sid(subauthorities: &[u32]) -> Vec<u8> {
+    let mut sid = vec![1, subauthorities.len() as u8, 0, 0, 0, 0, 0, 5];
+    for value in subauthorities {
+        sid.extend_from_slice(&value.to_le_bytes());
+    }
+    sid
+}
+
+fn trusted_component_sid(sid: &[u8]) -> bool {
+    // SYSTEM、Administrators、TrustedInstaller；后者是 Windows Resource Protection 的服务 SID。
+    sid == system_sid(&[18])
+        || sid == system_sid(&[32, 544])
+        || sid
+            == system_sid(&[
+                80, 956008885, 3418522649, 1831038044, 1853292631, 2271478464,
+            ])
+}
+
+fn protected_security(owner: &[u8], acl: &[u8]) -> bool {
+    if !trusted_component_sid(owner)
+        || acl.len() < 8
+        || !matches!(acl[0], 2 | 4)
+        || usize::from(u16::from_le_bytes([acl[2], acl[3]])) != acl.len()
+    {
+        return false;
+    }
+    let count = u16::from_le_bytes([acl[4], acl[5]]);
+    let mut offset = 8;
+    // 具体文件写入、子项删除、删除、改 DACL/owner、通用写入及完全控制。
+    const WRITE_ACCESS: u32 = 0x0000_0156 | 0x000d_0000 | 0x5000_0000;
+    for _ in 0..count {
+        let Some(header) = acl.get(offset..offset + 4) else {
+            return false;
+        };
+        let size = usize::from(u16::from_le_bytes([header[2], header[3]]));
+        if size < 16 || size % 4 != 0 {
+            return false;
+        }
+        let Some(ace) = acl.get(offset..offset + size) else {
+            return false;
+        };
+        // 对 object/callback/未知 ACE 不推断其授权语义；普通 deny 只收紧权限。
+        if !matches!(ace[0], 0 | 1) || ace[1] & !0x1f != 0 {
+            return false;
+        }
+        let sid = &ace[8..];
+        if sid[0] != 1 || sid[1] > 15 || sid.len() != 8 + usize::from(sid[1]) * 4 {
+            return false;
+        }
+        let mask = u32::from_le_bytes(ace[4..8].try_into().expect("ACE 已验证长度"));
+        if mask & !0xf11f_01ff != 0 {
+            return false;
+        }
+        // INHERIT_ONLY 不授予当前对象权限；后续每个实际子对象仍独立检查。
+        if ace[0] == 0
+            && ace[1] & 0x08 == 0
+            && mask & WRITE_ACCESS != 0
+            && !trusted_component_sid(sid)
+        {
+            return false;
+        }
+        offset += size;
+    }
+    // AceCount 之外是未使用空间，不授予权限；不能要求系统分配的保留字节为零。
+    true
+}
+
 fn prepare_powershell(system_directory: &AncestorLease) -> io::Result<Option<SystemHelperLease>> {
     let system_path = final_path_from_handle(&system_directory.file)?;
     let mut ancestors = Vec::new();
@@ -710,18 +1006,28 @@ fn file_from_debug_handle(handle: HANDLE) -> io::Result<File> {
     Ok(unsafe { File::from_raw_handle(handle.0) })
 }
 
-fn owned_handle(handle: HANDLE) -> io::Result<OwnedHandle> {
+/// 调试事件中的原 process/thread 句柄由系统关闭；本模块只拥有独立副本。
+fn duplicate_process_handle(handle: HANDLE) -> io::Result<OwnedHandle> {
     if handle.is_invalid() {
         return Err(error(
             "managed_process.atomic_windows_debug_process_handle_missing",
         ));
     }
-    Ok(unsafe { OwnedHandle::from_raw_handle(handle.0) })
-}
-
-fn close_owned_handle(handle: HANDLE) -> io::Result<()> {
-    drop(owned_handle(handle)?);
-    Ok(())
+    let process = unsafe { GetCurrentProcess() };
+    let mut duplicate = HANDLE::default();
+    unsafe {
+        DuplicateHandle(
+            process,
+            handle,
+            process,
+            &mut duplicate,
+            0,
+            false,
+            DUPLICATE_SAME_ACCESS,
+        )
+    }
+    .map_err(io::Error::other)?;
+    Ok(unsafe { OwnedHandle::from_raw_handle(duplicate.0) })
 }
 
 fn wait_for_debug_event(timeout_ms: u32) -> io::Result<DEBUG_EVENT> {
@@ -780,6 +1086,10 @@ struct PeDataDirectory {
 
 /// 接受结构完整、导入名称有界的本机 PE；实际解析到的每个映像仍由调试事件句柄绑定。
 fn require_pe(file: &mut File, size: u64) -> io::Result<()> {
+    require_pe_kind(file, size, false)
+}
+
+fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
     if size < DOS_HEADER_PE_OFFSET + 4 {
         return Err(error("managed_process.atomic_windows_program_not_pe"));
     }
@@ -807,7 +1117,7 @@ fn require_pe(file: &mut File, size: u64) -> io::Result<()> {
         || section_count == 0
         || section_count > MAX_PE_SECTIONS
         || characteristics & 0x0002 == 0
-        || characteristics & 0x2000 != 0
+        || (characteristics & 0x2000 != 0) != dll
     {
         return Err(error("managed_process.atomic_windows_program_not_pe"));
     }
@@ -928,7 +1238,7 @@ fn require_pe(file: &mut File, size: u64) -> io::Result<()> {
         directory_count,
         BOUND_IMPORT_DIRECTORY_INDEX,
     )?;
-    if bound_import != PeDataDirectory::default() {
+    if !dll && bound_import != PeDataDirectory::default() {
         return Err(error(
             "managed_process.atomic_windows_bound_import_unsupported",
         ));

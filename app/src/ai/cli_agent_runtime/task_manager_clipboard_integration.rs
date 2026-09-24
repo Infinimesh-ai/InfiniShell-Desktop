@@ -11,6 +11,7 @@ use command::blocking::Command;
 use image::{ImageFormat, Rgba, RgbaImage};
 use sha2::{Digest, Sha256};
 use warpui::clipboard::ClipboardContent;
+use warpui::elements::{ScrollTarget, ScrollToPositionMode, get_rich_content_position_id};
 use warpui::integration::{
     ARTIFACTS_DIR_ENV_VAR, AssertionCallback, AssertionOutcome, TestSetupUtils, TestStep,
 };
@@ -188,6 +189,19 @@ pub fn write_cli_system_clipboard_text() -> TestStep {
                 )
             })
         })
+}
+
+pub fn reveal_cli_clipboard_draft() -> TestStep {
+    TestStep::new("将草稿和附件滚入真实截图视口").with_action(|app, window_id, _| {
+        composer(app, window_id).update(app, |view, ctx| {
+            // 使用编辑器实际布局位置，避免越界偏移被滚动容器重置到顶部。
+            view.body_scroll.scroll_to_position(ScrollTarget {
+                position_id: get_rich_content_position_id(&view.prompt.id()),
+                mode: ScrollToPositionMode::FullyIntoView,
+            });
+            ctx.notify();
+        });
+    })
 }
 
 fn red_blue_pixels(bytes: &[u8]) -> bool {

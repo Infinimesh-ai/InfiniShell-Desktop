@@ -1762,7 +1762,10 @@ async fn windows_startup_bridge_argv_probe(
     manager: &GrokPluginManager,
     node: &Path,
     root: &Path,
+    artifact: &Path,
+    evidence: &mut Value,
 ) -> Value {
+    record_live_installer_stage(artifact, evidence, "windows_bridge_prepare");
     // 只验证真实启动层的 argv；此节点脚本不冒充原生 hook 派发或通知 worker。
     let script = root.join("参数 ' 空格 & 目录.cjs");
     fs::write(&script, "process.stdout.write(JSON.stringify(process.argv.slice(2).map(x=>Buffer.from(x,'utf8').toString('base64'))));").unwrap();
@@ -1776,29 +1779,59 @@ async fn windows_startup_bridge_argv_probe(
     .unwrap();
     let system_root = PathBuf::from(env::var_os("SYSTEMROOT").unwrap());
     let shells = [
-        (system_root.join("System32/cmd.exe"), vec!["/d", "/s", "/c"]),
         (
+            "windows_bridge_cmd",
+            system_root.join("System32/cmd.exe"),
+            vec!["/d", "/s", "/c"],
+        ),
+        (
+            "windows_bridge_powershell",
             system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe"),
             vec!["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"],
         ),
     ];
-    for (executable, flags) in shells {
+    for (stage, executable, flags) in shells {
+        record_live_installer_stage(artifact, evidence, stage);
         let mut log = String::new();
         let mut args = flags.into_iter().map(OsStr::new).collect::<Vec<_>>();
         args.push(OsStr::new(&command));
-        let output = manager
+        let result = manager
             .run(&executable, &args, Duration::from_secs(10), &mut log)
-            .await
-            .unwrap();
+            .await;
+        evidence["windows_bridge_last_command"] = match &result {
+            Ok(output) => json!({
+                "stage":stage, "error_kind":null, "native_exit_code":output.status.code(),
+                "stdout_bytes":output.stdout.len(), "stderr_bytes":output.stderr.len(),
+                "stdout_sha256":format!("{:x}", Sha256::digest(&output.stdout)),
+                "stderr_sha256":format!("{:x}", Sha256::digest(&output.stderr)),
+            }),
+            // 生产 run 将原生失败封装为 PluginInstallError，不能据此虚构退出码或输出日志。
+            Err(_) => {
+                json!({"stage":stage, "error_kind":"plugin_install_error", "native_exit_code":null})
+            }
+        };
+        record_live_installer_stage(artifact, evidence, &format!("{stage}_returned"));
+        let output = result.unwrap();
         let actual: Vec<String> = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(
             actual,
             arguments.map(|value| base64::engine::general_purpose::STANDARD.encode(value))
         );
+        record_live_installer_stage(artifact, evidence, &format!("{stage}_verified"));
     }
     fs::remove_file(script).unwrap();
     json!({"kind":"windows_bridge_argv", "cmd_verified":true, "powershell_51_verified":true,
         "space_unicode_and_shell_metacharacters_preserved":true, "native_hook_execution_verified":false})
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
+fn record_live_installer_stage(artifact: &Path, evidence: &mut Value, stage: &str) {
+    evidence["stage"] = json!(stage);
+    evidence["progress"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!(stage));
+    fs::write(artifact, serde_json::to_vec_pretty(evidence).unwrap()).unwrap();
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
@@ -1944,6 +1977,7 @@ async fn run_live_grok_production_installer() {
         "passed": false, "credentials_provided": false, "model_input_submitted": false,
         "test_binary_sha256": format!("{:x}", Sha256::digest(fs::read(env::current_exe().unwrap()).unwrap())),
         "steps": [],
+        "progress": [],
     });
     for (program, variable) in [
         ("grok", "INFINISHELL_GROK_PLUGIN_LIVE_GROK_SHA256"),
@@ -1957,10 +1991,13 @@ async fn run_live_grok_production_installer() {
         );
         evidence[format!("{program}_sha256")] = json!(actual);
     }
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "binary_bindings_verified");
     let mut native_log = String::new();
+    record_live_installer_stage(&artifact, &mut evidence, "runtime_verification");
     let (grok, _) = manager.verify_runtime(&mut native_log).await.unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "runtime_verified");
     let node = manager.executable("node").unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "node_version_probe");
     let output = manager
         .run(
             &node,
@@ -1975,6 +2012,8 @@ async fn run_live_grok_production_installer() {
         node_version.trim(),
         env::var("INFINISHELL_GROK_PLUGIN_LIVE_NODE_VERSION").unwrap()
     );
+    record_live_installer_stage(&artifact, &mut evidence, "node_version_verified");
+    record_live_installer_stage(&artifact, &mut evidence, "grok_version_probe");
     let output = manager
         .run(
             &grok,
@@ -1996,16 +2035,21 @@ async fn run_live_grok_production_installer() {
             .unwrap()
     );
     evidence["node_version"] = json!(node_version.trim());
+    record_live_installer_stage(&artifact, &mut evidence, "grok_version_verified");
     #[cfg(windows)]
     {
-        evidence["windows_bridge_argv"] =
-            windows_startup_bridge_argv_probe(&manager, &node, &root).await;
-        fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+        let verified =
+            windows_startup_bridge_argv_probe(&manager, &node, &root, &artifact, &mut evidence)
+                .await;
+        evidence["windows_bridge_argv"] = verified;
+        record_live_installer_stage(&artifact, &mut evidence, "windows_bridge_verified");
     }
+    record_live_installer_stage(&artifact, &mut evidence, "production_install");
     assert!(!manager.is_installed());
 
     manager.install().await.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
+    record_live_installer_stage(&artifact, &mut evidence, "native_inspect");
     let inspected = manager
         .run(
             &grok,
@@ -2034,6 +2078,7 @@ async fn run_live_grok_production_installer() {
     evidence["native_hook_execution_verified"] = json!(false);
     let registry_path = grok_home.join("installed-plugins/registry.json");
     let config_path = grok_home.join("config.toml");
+    record_live_installer_stage(&artifact, &mut evidence, "installed_hook_export");
     let installed_hook_export = installed_hook_export_version_probe(
         &manager,
         &node,
@@ -2046,9 +2091,10 @@ async fn run_live_grok_production_installer() {
         .unwrap()
         .push(json!({"step": "production_install", "passed": true,
             "installed_hook_export":installed_hook_export, "installed_hook_main_verified":false}));
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "production_install_verified");
 
     // 用完整旧配方建立原生升级夹具；下面仍由生产 update 完成升级。
+    record_live_installer_stage(&artifact, &mut evidence, "legacy_fixture_install");
     let legacy_source = write_013_bundle(&source_root);
     validate_expected_tree(&legacy_source, "0.1.3").unwrap();
     let legacy_source_before = plugin_tree(&legacy_source, false).unwrap();
@@ -2080,6 +2126,11 @@ async fn run_live_grok_production_installer() {
         fs::write(&files[1].0, &files[1].1).unwrap();
     }
     assert!(manager.is_installed() && manager.needs_update() && manager.can_auto_install());
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "production_upgrade_known_013_to_014",
+    );
     manager.update().await.unwrap();
     let plugin = installed_plugin(&grok_home).unwrap().unwrap();
     assert_eq!(plugin.version, PLUGIN_VERSION);
@@ -2103,10 +2154,11 @@ async fn run_live_grok_production_installer() {
         "legacy_source_unchanged":true, "fixture_old_native_install":true,
         "production_update_call":true, "model_input_submitted":false
     }));
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "production_upgrade_verified");
     let registry = fs::read(&registry_path).unwrap();
     let config = fs::read(&config_path).unwrap();
 
+    record_live_installer_stage(&artifact, &mut evidence, "production_same_version_update");
     fs::write(
         plugin.path.join("hooks/notify.cjs"),
         "// 本次私有损坏夹具\n",
@@ -2118,8 +2170,17 @@ async fn run_live_grok_production_installer() {
     assert_eq!(fs::read(&registry_path).unwrap(), registry);
     assert_eq!(fs::read(&config_path).unwrap(), config);
     evidence["steps"].as_array_mut().unwrap().push(json!({"step": "production_same_version_update", "passed": true, "config_and_registry_unchanged": true}));
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "production_same_version_update_verified",
+    );
 
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "production_disabled_update_rejected",
+    );
     manager
         .run(
             &grok,
@@ -2146,9 +2207,18 @@ async fn run_live_grok_production_installer() {
     assert_eq!(fs::read(&registry_path).unwrap(), registry);
     assert_eq!(plugin_tree(&plugin.path, false).unwrap(), damaged);
     evidence["steps"].as_array_mut().unwrap().push(json!({"step": "production_disabled_update_rejected", "passed": true, "config_and_files_unchanged": true}));
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "production_disabled_update_rejected_verified",
+    );
 
     // 此段调用生产文件事务的故障注入点，不把它写成 apply 或 SIGKILL 验收。
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "file_transaction_failure_rollback",
+    );
     manager
         .run(
             &grok,
@@ -2182,7 +2252,12 @@ async fn run_live_grok_production_installer() {
     assert_eq!(fs::read(&registry_path).unwrap(), enabled_registry);
     evidence["steps"].as_array_mut().unwrap().push(json!({"step": "file_transaction_failure_rollback", "passed": true, "production_apply_call": false, "fault_after_first_replacement": true}));
     // 已通过的第五段立即落盘，后续恢复失败也不能丢失这段真实检查。
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(
+        &artifact,
+        &mut evidence,
+        "file_transaction_failure_rollback_verified",
+    );
+    record_live_installer_stage(&artifact, &mut evidence, "production_update_after_rollback");
     manager.update().await.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
     assert_eq!(fs::read(&config_path).unwrap(), enabled_config);
@@ -2192,5 +2267,5 @@ async fn run_live_grok_production_installer() {
         .unwrap()
         .push(json!({"step": "production_update_after_rollback", "passed": true}));
     evidence["passed"] = json!(true);
-    fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    record_live_installer_stage(&artifact, &mut evidence, "finished");
 }

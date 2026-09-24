@@ -26,6 +26,10 @@ pub enum CustomEvent {
         window_id: crate::WindowId,
         window_options: platform::WindowOptions,
     },
+    /// 截图必须驱动真实渲染，不依赖系统是否向窗口发送重绘消息。
+    CaptureFrame {
+        window_id: winit::window::WindowId,
+    },
     /// Run the wrapped task on the main thread.
     RunTask(ManuallyDrop<async_task::Runnable>),
     /// Exit the event loop, terminating the application.

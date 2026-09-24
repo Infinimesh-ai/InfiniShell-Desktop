@@ -1,0 +1,50 @@
+{
+  "observed_at": "2026-09-24T13:09:23.456185+00:00",
+  "scope": "Full fixed official Linux Claude input identity and offline ELF metadata only",
+  "version": "2.1.278",
+  "platform": "linux-x64",
+  "binary": {
+    "platform": "linux-x64",
+    "binary": "claude",
+    "bytes": 234119480,
+    "sha256": "5c4735937844e84f8a93306e841a5b0e12252909b07870f789b190468da147ab",
+    "url": "https://downloads.claude.ai/claude-code-releases/2.1.278/linux-x64/claude",
+    "path": "/private/tmp/isp-mac-1mej4h8z/claude-linux-21278-full/claude",
+    "full_hash_verified": true,
+    "reused_existing": false,
+    "executable_permission_added": false
+  },
+  "elf": {
+    "class": 64,
+    "endian": "little",
+    "machine": 62,
+    "type": 2,
+    "program_header_count": 10,
+    "program_headers_sha256": "d281f9c5ed2fc1272accf89fad7aeb618dbd99f559a0be629671725c1e7777ef",
+    "pt_interp": [
+      "/lib64/ld-linux-x86-64.so.2"
+    ],
+    "pt_dynamic": true,
+    "dt_needed": [
+      "librt.so.1",
+      "libc.so.6",
+      "ld-linux-x86-64.so.2",
+      "libpthread.so.0",
+      "libdl.so.2",
+      "libm.so.6"
+    ],
+    "dt_strtab_virtual_address": 2146140,
+    "dt_strtab_file_offset": 48988,
+    "dt_strsz": 24755,
+    "has_dt_rpath": false,
+    "has_dt_runpath": false
+  },
+  "repository_contract": {
+    "path": "script/cli-agent-parity/prepare_claude_cli.py",
+    "sha256": "63911daff29246db4f2d55ee6ae0b85a9ecaa8cbfdb714fbc399b55f9c286268"
+  },
+  "native_execution": false,
+  "credentials_provided": false,
+  "model_inputs": 0,
+  "upgrade_acceptance_claimed": false
+}

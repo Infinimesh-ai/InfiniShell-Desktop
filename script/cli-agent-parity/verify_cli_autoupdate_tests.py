@@ -243,6 +243,55 @@ class DriverTests(unittest.TestCase):
                 with self.subTest(key=key, bad=bad):
                     self.assertFalse(runner.valid_event(dict(event, **{key: bad})))
 
+    def test_supervised_exit_diagnostic_is_bounded_and_cannot_replace_failed_product_result(self):
+        observed = {"status": "confirmed", "exit_code": 17, "exit_reason": "native_exit",
+                    "containment": "linux_subtree", "cleanup_confirmed": True, "os_error": None}
+        event = dict(self.event(), supervised_exit=observed, passed=False, stage="execute",
+                     error="CommandFailed", failure_code="execute_failed")
+        self.assertTrue(runner.valid_event(event))
+        self.assertFalse(runner.acceptance(101, "test result: FAILED.", event, self.value, "a" * 64))
+        self.assertTrue(runner.valid_supervised_exit(dict(observed, exit_code=None, containment="not_started")))
+        rejected = {"status": "receipt_invalid", "exit_code": None, "exit_reason": None,
+                    "containment": None, "cleanup_confirmed": False, "os_error": 5}
+        self.assertTrue(runner.valid_supervised_exit(rejected))
+        for changes in ({"exit_code": True}, {"exit_code": 2 ** 31}, {"exit_code": -(2 ** 31) - 1},
+                        {"os_error": "private error"}, {"exit_reason": "/private/native-log"},
+                        {"containment": "/private/root"}, {"cleanup_confirmed": 1},
+                        {"status": "unknown"}, {"native_output": "private body"}):
+            with self.subTest(changes=changes):
+                self.assertFalse(runner.valid_event(dict(event, supervised_exit=dict(observed, **changes))))
+        self.assertFalse(runner.valid_supervised_exit(dict(rejected, cleanup_confirmed=True)))
+        self.assertFalse(runner.valid_supervised_exit(dict(rejected, exit_code=1)))
+
+    def test_supervised_stderr_diagnostic_rejects_raw_text_and_inconsistent_capture_sizes(self):
+        observed = {"status": "truncated", "file_bytes": 70000, "captured_bytes": 65536,
+                    "captured_sha256": "b" * 64, "categories": ["permission"], "error_codes": ["EACCES"]}
+        self.assertTrue(runner.valid_supervised_stderr(observed))
+        for changes in ({"file_bytes": True}, {"file_bytes": 2 ** 64}, {"captured_bytes": 65537},
+                        {"captured_bytes": 10}, {"captured_sha256": "private log"}, {"status": "complete"},
+                        {"categories": ["private log"]}, {"error_codes": ["EACCES", "EACCES"]},
+                        {"error_codes": ["/private/root"]}, {"raw": "private stderr"}):
+            with self.subTest(changes=changes):
+                self.assertFalse(runner.valid_supervised_stderr(dict(observed, **changes)))
+        missing = {"status": "missing", "file_bytes": None, "captured_bytes": 0,
+                   "captured_sha256": None, "categories": [], "error_codes": []}
+        self.assertTrue(runner.valid_supervised_stderr(missing))
+        self.assertFalse(runner.valid_supervised_stderr(dict(missing, categories=["unknown"])))
+
+    def test_supervised_stdout_accepts_only_fixed_internal_loader_codes(self):
+        output = {"status": "complete", "file_bytes": 100, "captured_bytes": 100,
+                  "captured_sha256": "c" * 64, "categories": ["loader_policy"],
+                  "error_codes": ["managed_process.linux_atomic_dependency_closure_unbound",
+                                  "managed_process.linux_glibc_cache_baseline_missing"]}
+        observed = {"status": "confirmed", "exit_code": 1, "exit_reason": "native_exit",
+                    "containment": "linux_subtree", "cleanup_confirmed": True, "os_error": None,
+                    "stdout": output, "stderr": None}
+        self.assertTrue(runner.valid_supervised_exit(observed))
+        self.assertFalse(runner.valid_supervised_exit(dict(observed, stdout=dict(output,
+            error_codes=["managed_process.unrecognized_private_error"])) ))
+        self.assertFalse(runner.valid_supervised_exit(dict(observed, stdout=dict(output, raw="private output"))))
+        self.assertFalse(runner.valid_supervised_exit(dict(observed, status="receipt_invalid")))
+
     def test_source_changed_case_requires_true_rejection_and_original_version_contract(self):
         value = dict(self.value, expected="source_changed_rejected")
         event = dict(self.event(), expected="source_changed_rejected", error="SourceChanged")
@@ -335,6 +384,7 @@ class DriverTests(unittest.TestCase):
 
     def test_source_binding_covers_adapter_versions_and_plugin_compatibility(self):
         required = {
+            "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
             "app/src/ai/cli_agent_runtime/codex.rs",
             "app/src/ai/cli_agent_runtime/claude.rs",
             "app/src/ai/cli_agent_runtime/grok.rs",

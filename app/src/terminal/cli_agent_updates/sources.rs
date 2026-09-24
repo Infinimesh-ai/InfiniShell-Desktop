@@ -33,11 +33,12 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 16] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 17] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
     include_bytes!("../../ai/cli_agent_runtime/codex.rs"),
@@ -699,6 +700,57 @@ async fn latest(
     };
     parse_version(&version)?;
     Ok(version)
+}
+
+// 官方 HTTPS 响应是此处的目标来源信任边界；这不是发布者签名校验。
+// 摘要由应用独立流式计算，不能接受原生更新子进程提供的摘要或任意 URL。
+#[cfg(windows)]
+async fn grok_windows_child_image(
+    version: &str,
+) -> Result<managed_process::WindowsChildImage, Error> {
+    parse_version(version)?;
+    if !version
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+'))
+    {
+        return Err(Error::InvalidRelease);
+    }
+    #[cfg(test)]
+    if let Some(image) = windows_live_tests::fixed_child_image(version) {
+        return Ok(image);
+    }
+    let url = format!("https://x.ai/cli/grok-{version}-windows-x86_64.exe");
+    let client = http_client::Client::new();
+    let response = client
+        .get(&url)
+        .timeout(UPDATE_TIMEOUT)
+        .send()
+        .await
+        .map_err(|_| Error::Network)?;
+    if !response.status().is_success() || response.url().as_str() != url {
+        return Err(Error::Network);
+    }
+    let mut size = 0_u64;
+    let mut digest = Sha256::new();
+    let stream = response.bytes_stream();
+    futures::pin_mut!(stream);
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| Error::Network)?;
+        size = size
+            .checked_add(chunk.len() as u64)
+            .ok_or(Error::InvalidRelease)?;
+        if size > 1024 * 1024 * 1024 {
+            return Err(Error::InvalidRelease);
+        }
+        digest.update(&chunk);
+    }
+    if size == 0 {
+        return Err(Error::InvalidRelease);
+    }
+    Ok(managed_process::WindowsChildImage {
+        size,
+        sha256: format!("{:x}", digest.finalize()),
+    })
 }
 
 async fn discover(
@@ -2614,6 +2666,14 @@ pub(super) async fn execute(
         .map_err(|_| Error::UnsupportedPlatform)?;
     let mut invocation = prepared.invocation;
     let binding = prepared.binding;
+    #[cfg(windows)]
+    let binding = if plan.agent == CLIAgent::Grok && plan.requires_native_update() {
+        binding
+            .with_child_image(grok_windows_child_image(&plan.target_version).await?)
+            .map_err(|_| Error::InvalidRelease)?
+    } else {
+        binding
+    };
     let config = plan.config.clone();
     if let Some(config) = &config {
         if read_optional_config(&config.path)? != config.before {
@@ -2857,11 +2917,13 @@ async fn run_supervised_update(
     let mut stdout = child.stdout.take().ok_or(Error::RecoveryRequired)?;
     let read = async {
         let mut bytes = Vec::new();
-        (&mut stdout)
+        let output_result = (&mut stdout)
             .take(MAX_OUTPUT + 1)
             .read_to_end(&mut bytes)
-            .await
-            .map_err(|_| Error::CommandFailed)?;
+            .await;
+        #[cfg(all(test, unix))]
+        live_tests::preserve_supervised_stdout(root, generation, &bytes);
+        output_result.map_err(|_| Error::CommandFailed)?;
         if bytes.len() as u64 > MAX_OUTPUT {
             return Err(Error::CommandFailed);
         }

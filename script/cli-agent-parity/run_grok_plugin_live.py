@@ -22,6 +22,43 @@ STEPS = ['production_install', 'production_upgrade_known_013_to_014',
          'file_transaction_failure_rollback', 'production_update_after_rollback']
 
 
+def safe_failure_diagnostics(output):
+    # 仅导出已知源码位置和固定错误类别；panic 正文可能含配置、命令和私有路径。
+    sources = ('app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs',
+               'app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs')
+    locations = []
+    for match in re.finditer(r"(?m)^thread [^\r\n]{1,512} panicked at ([^\r\n]+):(\d{1,9}):(\d{1,9}):\s*\n([^\r\n]*)", output):
+        path, line, column, message = match.groups()
+        path = path.replace('\\', '/')
+        source = next((name for name in sources if path == name or path.endswith('/' + name)), None)
+        if source is None:
+            continue
+        kind = 'panic'
+        if message.startswith('called `Result::unwrap()` on an `Err` value:'):
+            kind = 'unwrap_result'
+        elif message.startswith('called `Option::unwrap()` on a `None` value'):
+            kind = 'unwrap_option'
+        elif message.startswith('assertion ') and ' failed' in message:
+            kind = 'assertion_failed'
+        command_failure = None
+        if message.startswith('called `Result::unwrap()` on an `Err` value: PluginInstallError {'):
+            # 仅识别生产 run 自己追加的 Debug 结果；原生非零退出未记录 status，必须保持未知。
+            if re.search(r'\\ncommand failed or timed out: Err\(TimeoutError\)\\n" \}$', message):
+                command_failure = {'kind': 'timeout', 'os_code': None, 'native_exit_code': None}
+            else:
+                error = re.search(r'\\ncommand failed or timed out: Ok\(Err\(Os \{ code: (-?\d{1,10}), kind: '
+                                  r'(NotFound|PermissionDenied|InvalidInput|Interrupted|Other|Uncategorized), message:', message)
+                if error:
+                    command_failure = {'kind': 'spawn_io_error', 'os_code': int(error[1]),
+                                       'io_kind': error[2], 'native_exit_code': None}
+        locations.append({'source': source, 'line': int(line), 'column': int(column), 'kind': kind,
+                          'command_failure': command_failure})
+        if len(locations) == 8:
+            break
+    return {'panic_locations': locations,
+            'raw_output_exported': False, 'private_paths_exported': False}
+
+
 def isolated_environment(root, programs, host_environment=None):
     host = os.environ if host_environment is None else host_environment
     allowed = {'LANG', 'LC_ALL', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT'}
@@ -138,6 +175,7 @@ def run(args):
             stop_group(process, env); raise
         report.update(exit_code=process.returncode, output_bytes=len(output.encode()),
                       output_sha256=hashlib.sha256(output.encode()).hexdigest())
+        report['failure_diagnostics'] = safe_failure_diagnostics(output)
         receipt_path = root / 'grok-production-installer.json'
         receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
         report['receipt'] = receipt

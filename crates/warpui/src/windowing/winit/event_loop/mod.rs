@@ -642,6 +642,21 @@ impl EventLoop {
                 let task = ManuallyDrop::into_inner(task);
                 task.run();
             }
+            Event::UserEvent(CustomEvent::CaptureFrame { window_id }) => {
+                let pending = self.state.windows.get(&window_id).is_some_and(|state| {
+                    self.ui_app.read(|ctx| {
+                        ctx.windows()
+                            .platform_window(state.window_id)
+                            .is_some_and(|window| {
+                                downcast_window(window.as_ref()).has_pending_frame_capture()
+                            })
+                    })
+                });
+                // 普通重绘可能已经交付截图；窗口关闭或请求已完成时无需再画。
+                if pending {
+                    self.redraw_window(window_id, window_target);
+                }
+            }
             Event::UserEvent(CustomEvent::Terminate(termination_mode)) => {
                 if let ApproveTerminateResult::Terminate =
                     self.terminate_app_requested(termination_mode)

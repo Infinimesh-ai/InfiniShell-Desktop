@@ -1,0 +1,32 @@
+[
+  {
+    "name": "verify_cli_autoupdate_tests",
+    "exit_code": 0,
+    "seconds": 0.51,
+    "log_sha256": "c5ac6ba211eb8c91fa2f1050928f5018d1ea2494b2ea7110f6e2ff237247f273"
+  },
+  {
+    "name": "run_fixed_cli_autoupdate_tests",
+    "exit_code": 0,
+    "seconds": 0.28,
+    "log_sha256": "174d933f5f79823334a5ead0a372f79a898748c8d56c69853685b49bdd01f9e2"
+  },
+  {
+    "name": "grok_plugin_live_runner_tests",
+    "exit_code": 0,
+    "seconds": 0.1,
+    "log_sha256": "5f0635b83af38a6c5d516fcb60dc3fa63c9c6ca4854e51a6a29ca33c92ccef16"
+  },
+  {
+    "name": "codex_plugin_cache_refresh_tests",
+    "exit_code": 0,
+    "seconds": 0.19,
+    "log_sha256": "19043134e56d88426d5a781c84d35df4bb61d74c821c0d035b6d2f84412babcf"
+  },
+  {
+    "name": "codex_plugin_lifecycle_tests",
+    "exit_code": 0,
+    "seconds": 0.1,
+    "log_sha256": "56e03afda220e7ba78bbcecf9a2e53a0149cfc3e311fa10bbd01b25e8e5ba671"
+  }
+]

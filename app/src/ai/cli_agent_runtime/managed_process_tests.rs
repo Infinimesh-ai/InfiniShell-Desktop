@@ -313,6 +313,8 @@ fn legacy_manifest_without_expected_files_stays_compatible() {
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: None,
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: None,
     };
     let mut value = serde_json::to_value(manifest).unwrap();
@@ -344,6 +346,8 @@ fn atomic_manifest_never_downgrades_when_binding_record_is_missing() {
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: Some(AtomicLaunchKind::NativeFile),
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: Some(cwd),
     };
     let (directory, bytes) = create_launch_manifest(state.path(), &manifest).unwrap();
@@ -478,6 +482,8 @@ fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
         cwd: state.to_owned(),
         expected_files: Vec::new(),
         atomic_launch_kind: None,
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: None,
     };
     let bytes = serde_json::to_vec(&manifest).unwrap();
@@ -509,6 +515,8 @@ fn attempted_fixture(state: &Path, generation: Uuid) -> (PathBuf, Manifest, Vec<
         cwd: state.to_owned(),
         expected_files: Vec::new(),
         atomic_launch_kind: None,
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state, &manifest).unwrap();
@@ -591,6 +599,8 @@ fn spawn_rejection_removes_isolated_auth_before_becoming_recoverable() {
         cwd: state_path.clone(),
         expected_files: Vec::new(),
         atomic_launch_kind: None,
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(&state_path, &manifest).unwrap();
@@ -1153,6 +1163,20 @@ fn atomic_environment_removes_dynamic_loader_injection() {
     assert!(!unsafe_dynamic_loader_environment(std::ffi::OsStr::new(
         "PATH"
     )));
+    #[cfg(target_os = "linux")]
+    for name in [
+        "LD_ORIGIN_PATH",
+        "LD_HWCAP_MASK",
+        "LD_TRACE_LOADED_OBJECTS",
+        "LD_ASSUME_KERNEL",
+        "GLIBC_TUNABLES",
+        "GCONV_PATH",
+        "LOCPATH",
+    ] {
+        assert!(unsafe_dynamic_loader_environment(std::ffi::OsStr::new(
+            name
+        )));
+    }
 }
 
 #[test]
@@ -1357,4 +1381,36 @@ fn oversized_launch_record_never_claims_a_generation() {
     manifest.arguments.clear();
     assert!(create_launch_manifest(state.path(), &manifest).is_err());
     assert_eq!(fs::read(directory.join("manifest.json")).unwrap(), before);
+}
+
+#[cfg(windows)]
+#[test]
+fn authoritative_child_image_is_bound_to_transaction_and_rejects_invalid_identity() {
+    let original = PreparedLaunchBinding::native_file("a".repeat(64)).unwrap();
+    let image = WindowsChildImage {
+        size: 42,
+        sha256: "b".repeat(64),
+    };
+    let bound = original.clone().with_child_image(image.clone()).unwrap();
+    assert_ne!(bound.digest(), original.digest());
+    assert_eq!(bound.child_image.as_ref(), Some(&image));
+    assert!(bound.with_child_image(image.clone()).is_err());
+    assert!(
+        PreparedLaunchBinding::new("a".repeat(64))
+            .unwrap()
+            .with_child_image(image.clone())
+            .is_err()
+    );
+    for bad in [
+        WindowsChildImage {
+            size: 0,
+            ..image.clone()
+        },
+        WindowsChildImage {
+            sha256: "Z".repeat(64),
+            ..image
+        },
+    ] {
+        assert!(original.clone().with_child_image(bad).is_err());
+    }
 }

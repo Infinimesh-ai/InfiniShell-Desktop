@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "scope": "Actual Linux production modules compile-only for x86_64-unknown-linux-musl; no Linux execution",
+  "full_application_check": false,
+  "actual_linux_execution": false,
+  "parent_contracts": "Temporary compatible parent fields and open/hash helpers; compile-only, no behavioral test execution",
+  "source_files": {
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs": "811576baa9a27f25aa7b6467b79f897549b157ef55c1a17e9647bf44aef0d23c",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs": "cd0dd91830539a96ce284b7078cff19da6bb700892f231f4562466c5c4b33efd"
+  },
+  "exit_code": 0,
+  "log_sha256": "6f55803d23149cc56f0d09334280687693fea4f0bdd6337966ee81cded7be047",
+  "initial_harness_failures": "Missing target gating and serde dependency features corrected in temporary harness only; original logs retained privately"
+}

@@ -26,6 +26,11 @@ on:
         required: true
         default: false
         type: boolean
+      native_acceptance_only:
+        description: 仅补验原生 CLI 安装升级和 GUI；全量模式优先
+        required: true
+        default: false
+        type: boolean
       run_gui_clipboard:
         description: 单独复验真实 GUI 系统剪贴板，不重复完整工作区测试
         required: true
@@ -41,6 +46,16 @@ on:
         required: true
         default: false
         type: boolean
+      linux_atomic_agent:
+        description: 原生补验模式的 Linux 升级对象；默认和全量模式始终验三款
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - codex
+          - claude
+          - grok
 # 自托管 runner 只需要读取代码。这个 workflow 不接收部署密钥，也不向仓库写入内容。
 permissions:
   contents: read
@@ -271,23 +286,23 @@ jobs:
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
 
       - name: Test CLI harness arguments
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
@@ -321,7 +336,7 @@ jobs:
       # 只验原生安装/inspect/升级/禁用/修复；没有凭据时不声称 SessionStart 已派发。
       - name: Verify fixed Linux Grok production notification installer without credentials
         id: grok_source_installer
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' }}
         shell: bash
         timeout-minutes: 6
         run: |
@@ -344,13 +359,16 @@ jobs:
         if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 90
+        env:
+          ATOMIC_AGENTS: ${{ inputs.native_acceptance_only && !inputs.full_workspace_tests && inputs.linux_atomic_agent != 'all' && inputs.linux_atomic_agent || 'codex claude grok' }}
         run: |
           set -euo pipefail
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
           test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
           # Linux 原子目录不接受共享 /tmp 祖先；新建的任务根仍位于当前 runner 私有 HOME 内。
           fixture_parent="$(mktemp -d "$HOME/infinishell-fixed-cli-updates.XXXXXXXX")"
-          python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary "$test_binary" --supervisor "$target_dir/debug/infinishell-tui" --fixture-parent "$fixture_parent" --cache "$RUNNER_TEMP/fixed-cli-atomic-inputs" --output "$RUNNER_TEMP/fixed-cli-atomic-evidence/summary.safe.json"
+          read -r -a atomic_agents <<< "$ATOMIC_AGENTS"
+          python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary "$test_binary" --supervisor "$target_dir/debug/infinishell-tui" --fixture-parent "$fixture_parent" --cache "$RUNNER_TEMP/fixed-cli-atomic-inputs" --output "$RUNNER_TEMP/fixed-cli-atomic-evidence/summary.safe.json" --agents "${atomic_agents[@]}"
 
       - name: Preserve Linux fixed CLI atomic update receipts
         if: ${{ !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
@@ -1008,12 +1026,12 @@ jobs:
 
       - name: Build InfiniShell SSH worker
         id: ssh_worker
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
         run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker"
 
       - name: Test Windows PowerShell SSH worker arguments
-        if: ${{ !cancelled() && steps.ssh_worker.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: powershell
         run: >-
           .\script\windows\test_pwsh_ssh_worker.ps1
@@ -1025,12 +1043,12 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
         id: codex_source_installer
-        if: ${{ !cancelled() && steps.fixed_codex_installer.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.fixed_codex_installer.outcome == 'success' && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 8
         env:
@@ -1069,7 +1087,7 @@ jobs:
       # 使用生产启动命令实测 cmd/PowerShell 的 Unicode argv；不伪造原生 hook 派发。
       - name: Verify fixed Windows Grok production notification installer without credentials
         id: grok_source_installer
-        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 6
         env:
@@ -1095,19 +1113,19 @@ jobs:
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
 
       - name: Test CLI harness arguments
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 

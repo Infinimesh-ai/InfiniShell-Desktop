@@ -51,6 +51,7 @@ REQUIRED_SOURCE_FILES = ("app/src/terminal/cli_agent_updates.rs",
     "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
     "app/src/ai/cli_agent_runtime/managed_process.rs",
     "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
     "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
     "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
     "app/src/ai/cli_agent_runtime/codex.rs",
@@ -348,8 +349,84 @@ def prepare(args):
             "manifest_sha256": digest(root / "manifest.private.json")}
 
 
+def valid_supervised_stderr(value):
+    if value is None:
+        return True
+    if type(value) is not dict or set(value) != {
+            "status", "file_bytes", "captured_bytes", "captured_sha256", "categories", "error_codes"}:
+        return False
+    if type(value["status"]) is not str or value["status"] not in {"complete", "truncated", "missing", "invalid"}:
+        return False
+    categories = {"permission", "path", "execution", "network", "network_tls", "storage",
+                  "target_integrity", "resource", "platform", "unknown", "loader_policy", "identity"}
+    codes = {"EACCES", "EPERM", "ENOENT", "ENOTDIR", "ENOEXEC", "ETXTBSY", "EINVAL",
+             "ECONNREFUSED", "ECONNRESET", "ECONNABORTED", "ENETUNREACH", "EHOSTUNREACH",
+             "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT", "CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT",
+             "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "ERR_TLS_CERT_ALTNAME_INVALID", "ENOSPC", "EDQUOT",
+             "EROFS", "EBADMSG", "EILSEQ", "ENOMEM",
+             "managed_process.linux_atomic_dependency_closure_unbound",
+             "managed_process.linux_atomic_dependency_closure_invalid",
+             "managed_process.linux_atomic_not_elf", "managed_process.linux_atomic_program_table_invalid",
+             "managed_process.linux_atomic_dynamic_table_invalid", "managed_process.linux_atomic_executable_stack",
+             "managed_process.linux_atomic_identity_invalid", "managed_process.linux_atomic_source_changed",
+             "managed_process.linux_atomic_source_too_large", "managed_process.linux_atomic_snapshot_changed",
+             "managed_process.linux_atomic_seal_incomplete", "managed_process.linux_atomic_argument_invalid",
+             "managed_process.linux_atomic_environment_invalid",
+             "managed_process.linux_glibc_binding_changed",
+             "managed_process.linux_glibc_cache_baseline_missing",
+             "managed_process.linux_glibc_cache_invalid",
+             "managed_process.linux_glibc_elf_invalid",
+             "managed_process.linux_glibc_format_invalid",
+             "managed_process.linux_glibc_preload_present",
+             "managed_process.linux_glibc_soname_mismatch",
+             "managed_process.linux_glibc_system_file_untrusted"}
+    for key, allowed in (("categories", categories), ("error_codes", codes)):
+        if (type(value[key]) is not list or len(value[key]) > len(allowed)
+                or any(type(item) is not str or item not in allowed for item in value[key])
+                or len(set(value[key])) != len(value[key])):
+            return False
+    if type(value["captured_bytes"]) is not int or not 0 <= value["captured_bytes"] <= 65536:
+        return False
+    if value["status"] in {"missing", "invalid"}:
+        return (value["file_bytes"] is None and value["captured_bytes"] == 0
+                and value["captured_sha256"] is None and not value["categories"] and not value["error_codes"])
+    return (type(value["file_bytes"]) is int and 0 <= value["file_bytes"] < 2 ** 64
+            and is_hash(value["captured_sha256"]) and value["captured_bytes"] == min(value["file_bytes"], 65536)
+            and (value["status"] == "truncated") == (value["file_bytes"] > 65536))
+
+
+def valid_supervised_exit(value):
+    if value is None:
+        return True
+    keys = {"status", "exit_code", "exit_reason", "containment", "cleanup_confirmed", "os_error"}
+    if type(value) is not dict or not keys <= set(value) <= keys | {"stderr", "stdout"}:
+        return False
+    if not all(valid_supervised_stderr(value.get(stream)) for stream in ("stderr", "stdout")):
+        return False
+    if type(value["status"]) is not str or value["status"] not in {
+            "confirmed", "receipt_missing", "receipt_invalid", "generation_unavailable",
+            "generation_missing", "generation_ambiguous", "generation_invalid"}:
+        return False
+    if any(value[key] is not None and (type(value[key]) is not int or not -(2 ** 31) <= value[key] < 2 ** 31)
+           for key in ("exit_code", "os_error")):
+        return False
+    if value["status"] == "confirmed":
+        return (value["cleanup_confirmed"] is True and value["os_error"] is None
+            and type(value["exit_reason"]) is str
+            and value["exit_reason"] in {"native_exit", "stop_requested", "host_disconnected", "stdio_closed"}
+            and type(value["containment"]) is str
+            and value["containment"] in {"not_started", "linux_subtree", "unix_process_group", "macos_resource_coalition"})
+    return (value["cleanup_confirmed"] is False
+        and all(value[key] is None for key in ("exit_code", "exit_reason", "containment"))
+        and value.get("stderr") is None
+        and value.get("stdout") is None
+        and (value["status"] == "receipt_invalid" or value["os_error"] is None))
+
+
 def valid_event(event):
-    if type(event) is not dict or set(event) != EVENT_KEYS:
+    if type(event) is not dict or set(event) not in (EVENT_KEYS, EVENT_KEYS | {"supervised_exit"}):
+        return False
+    if not valid_supervised_exit(event.get("supervised_exit")):
         return False
     if not all(type(event[key]) is bool for key in BOOLS) or not all(is_hash(event[key]) for key in HASHES):
         return False

@@ -1,6 +1,7 @@
 use std::fs::{self, OpenOptions};
 use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStrExt as _;
+use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _};
 use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -9,7 +10,10 @@ use command::blocking::Command as BlockingCommand;
 use command::managed::{Containment, ManagedTree};
 use command::windows::SuspendedChild;
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
-use windows::Win32::System::Threading::DEBUG_PROCESS;
+use windows::Win32::System::Threading::{
+    DEBUG_PROCESS, GetCurrentProcessId, GetProcessId, OpenProcess,
+    PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::core::{Error as WindowsError, PCWSTR};
 
 use super::*;
@@ -912,4 +916,153 @@ fn fixed_system_powershell_helper_does_not_search_other_locations() {
         file,
     };
     assert!(prepare_powershell(&system).unwrap().is_none());
+}
+
+fn component_acl(aces: &[(u8, u8, u32, Vec<u8>)]) -> Vec<u8> {
+    let mut acl = vec![2, 0, 0, 0, aces.len() as u8, 0, 0, 0];
+    for (kind, flags, mask, sid) in aces {
+        let size = (8 + sid.len()) as u16;
+        acl.extend_from_slice(&[*kind, *flags]);
+        acl.extend_from_slice(&size.to_le_bytes());
+        acl.extend_from_slice(&mask.to_le_bytes());
+        acl.extend_from_slice(sid);
+    }
+    let size = acl.len() as u16;
+    acl[2..4].copy_from_slice(&size.to_le_bytes());
+    acl
+}
+
+#[test]
+fn protected_components_require_trusted_owner_and_all_effective_write_grants() {
+    let system = system_sid(&[18]);
+    let users = system_sid(&[32, 545]);
+    let mut aces = vec![
+        (0, 0, 0x001f01ff, system.clone()),
+        (0, 0, 0x001200a9, users.clone()),
+    ];
+    assert!(protected_security(&system, &component_acl(&aces)));
+    let mut padded = component_acl(&aces);
+    padded.extend_from_slice(&[0xa5; 4]);
+    let size = padded.len() as u16;
+    padded[2..4].copy_from_slice(&size.to_le_bytes());
+    assert!(protected_security(&system, &padded));
+    assert!(!protected_security(&users, &component_acl(&aces)));
+    // 显式 deny 不能用来掩盖后面的未知主体写授权；宁可拒绝，不求解复杂访问令牌。
+    aces.push((1, 0, 0x001f01ff, users.clone()));
+    aces.push((0, 0x10, 2, users.clone()));
+    assert!(!protected_security(&system, &component_acl(&aces)));
+    aces.pop();
+    aces.push((0, 0x08, 0x10000000, users));
+    assert!(protected_security(&system, &component_acl(&aces)));
+    for kind in [5, 6, 9, 10, 0xff] {
+        aces[0].0 = kind;
+        assert!(!protected_security(&system, &component_acl(&aces)));
+    }
+    assert!(!protected_security(&system, &[]));
+    assert!(!protected_security(&system, &[0; 8]));
+}
+
+#[test]
+fn component_paths_are_limited_to_actual_windows_component_roots_and_dlls() {
+    let windows = Path::new(r"C:\Windows");
+    for relative in [
+        r"Microsoft.NET\Framework64\v4.0.30319\mscoreei.dll",
+        r"assembly\thing.dll",
+        r"assembly\NativeImages_v4.0.30319_64\System\hash\System.ni.dll",
+        r"WinSxS\component\runtime.DLL",
+        r"System32\WindowsPowerShell\v1.0\pwrshplugin.dll",
+    ] {
+        assert_eq!(
+            is_component_path(&windows.join(relative), windows),
+            relative != r"assembly\thing.dll"
+        );
+    }
+    for path in [
+        r"C:\Windows-other\Microsoft.NET\x.dll",
+        r"C:\private\Windows\Microsoft.NET\x.dll",
+        r"C:\Windows\Temp\x.dll",
+        r"C:\Windows\Microsoft.NET\x.exe",
+    ] {
+        assert!(!is_component_path(Path::new(path), windows));
+    }
+}
+
+#[test]
+fn component_image_rejects_fake_system_anchor() {
+    let fixture = Fixture::new();
+    let fake = open_ancestor(&fixture.bin).unwrap();
+    let system = AncestorLease {
+        identity: inspect_handle(&fake).unwrap(),
+        file: fake,
+    };
+    assert!(prepare_component_image(&File::open(&fixture.program).unwrap(), &system).is_err());
+    assert!(!is_plain_kind(
+        FILE_ATTRIBUTE_REPARSE_POINT.0 | FILE_ATTRIBUTE_DIRECTORY.0,
+        true
+    ));
+}
+
+#[test]
+fn child_image_requires_authoritative_digest_and_holds_identity_until_exit() {
+    let fixture = Fixture::new();
+    let expected = fixture.expected();
+    let file = File::open(&fixture.program).unwrap();
+    let target = WindowsChildImage {
+        size: expected.size,
+        sha256: expected.sha256.clone(),
+    };
+    let lease = prepare_child_image(&file, &target).unwrap();
+    assert!(
+        OpenOptions::new()
+            .write(true)
+            .open(&fixture.program)
+            .is_err()
+    );
+    assert!(fs::rename(&fixture.bin, fixture.bin.with_file_name("changed")).is_err());
+    let mut wrong = target.clone();
+    wrong.sha256 = "0".repeat(64);
+    assert!(prepare_child_image(&file, &wrong).is_err());
+    wrong = target;
+    wrong.size += 1;
+    assert!(prepare_child_image(&file, &wrong).is_err());
+    drop(lease);
+    drop(file);
+    fs::rename(&fixture.bin, fixture.bin.with_file_name("changed")).unwrap();
+}
+
+#[cfg(target_arch = "x86_64")]
+#[test]
+fn protected_component_accepts_system_powershell_dotnet_runtime() {
+    let system = prepare_system_directory().unwrap();
+    let system_path = final_path_from_handle(&system.file).unwrap();
+    let runtime = system_path
+        .parent()
+        .unwrap()
+        .join(r"Microsoft.NET\Framework64\v4.0.30319\mscoreei.dll");
+    let file = File::open(runtime).unwrap();
+    let lease = prepare_component_image(&file, &system).unwrap();
+    lease.verify_image(&file).unwrap();
+}
+
+#[test]
+fn debug_process_duplicate_does_not_own_or_close_the_original_handle() {
+    let process_id = unsafe { GetCurrentProcessId() };
+    let original =
+        unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) }.unwrap();
+    let original = unsafe { OwnedHandle::from_raw_handle(original.0) };
+    let original_raw = HANDLE(original.as_raw_handle());
+    let duplicate = duplicate_process_handle(original_raw).unwrap();
+    assert_ne!(duplicate.as_raw_handle(), original.as_raw_handle());
+    assert_eq!(
+        unsafe { GetProcessId(HANDLE(duplicate.as_raw_handle())) },
+        process_id
+    );
+    drop(duplicate);
+    assert_eq!(unsafe { GetProcessId(original_raw) }, process_id);
+    let duplicate = duplicate_process_handle(original_raw).unwrap();
+    drop(original);
+    assert_eq!(
+        unsafe { GetProcessId(HANDLE(duplicate.as_raw_handle())) },
+        process_id
+    );
 }

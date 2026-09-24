@@ -1,0 +1,184 @@
+{
+  "schema": 1,
+  "scope": "Linux原子补验对象过滤，仅显式原生补验模式启用；全量和默认仍三款",
+  "source_files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "sha256": "a94bea96c434ea1dd4376342af7d5f6daef75f93d22eb231bd0e273093ebd240"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate.py",
+      "sha256": "988d4d53c322c373517360db505512e8889d9c937638d726d52f6f9356335812"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py",
+      "sha256": "6aded7f0126603b4f032dddb942cbb644f59781e3a6f52f5de84f27faec3b68c"
+    }
+  ],
+  "python_tests": {
+    "passed": 28,
+    "failed": 0,
+    "log_sha256": "c7d97050ae3513768cc83a4b9406e98bfcbf9aff98a013394330b97e3c5aae4e"
+  },
+  "actionlint_passed": true,
+  "selection_truth_table": [
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "requested": "all",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "requested": "codex",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "requested": "claude",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "requested": "grok",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "requested": "all",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "requested": "codex",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "requested": "claude",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "requested": "grok",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "requested": "all",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "requested": "codex",
+      "effective": [
+        "codex"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "requested": "claude",
+      "effective": [
+        "claude"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "requested": "grok",
+      "effective": [
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "requested": "all",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "requested": "codex",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "requested": "claude",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    },
+    {
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "requested": "grok",
+      "effective": [
+        "codex",
+        "claude",
+        "grok"
+      ]
+    }
+  ],
+  "each_selected_agent_keeps_all_cases": true,
+  "windows_scope_unchanged": true,
+  "selected_targets_explicit_in_receipt": true,
+  "native_result_claimed": false
+}

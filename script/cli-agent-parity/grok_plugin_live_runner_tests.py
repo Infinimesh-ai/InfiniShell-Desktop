@@ -27,6 +27,51 @@ def valid_receipt():
 
 
 class GrokPluginLiveRunnerTests(unittest.TestCase):
+    def test_panic_diagnostics_only_export_bound_source_location_and_error_class(self):
+        source = 'app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs'
+        output = ("thread 'private-task' panicked at C:\\private\\checkout\\" + source.replace('/', '\\')
+                  + ':1792:14:\ncalled `Result::unwrap()` on an `Err` value: '
+                  + 'PluginInstallError { log: "token=private-secret C:\\private\\config" }\n')
+        diagnostics = runner.safe_failure_diagnostics(output)
+        self.assertEqual(diagnostics['panic_locations'],
+                         [{'source': source, 'line': 1792, 'column': 14, 'kind': 'unwrap_result',
+                           'command_failure': None}])
+        self.assertNotIn('private-secret', json.dumps(diagnostics))
+        self.assertNotIn('private-task', json.dumps(diagnostics))
+        self.assertNotIn('checkout', json.dumps(diagnostics))
+        self.assertFalse(diagnostics['raw_output_exported'])
+        self.assertFalse(diagnostics['private_paths_exported'])
+
+    def test_panic_diagnostics_reject_unbound_paths_and_never_export_assertion_payload(self):
+        output = ("thread 'worker' panicked at C:/private/config.rs:7:8:\nsecret payload\n"
+                  "thread 'worker' panicked at app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs:2000:5:\n"
+                  "assertion `left == right` failed: private-secret\n  left: private-left\n right: private-right\n")
+        diagnostics = runner.safe_failure_diagnostics(output)
+        self.assertEqual(len(diagnostics['panic_locations']), 1)
+        self.assertEqual(diagnostics['panic_locations'][0]['kind'], 'assertion_failed')
+        self.assertNotIn('private-', json.dumps(diagnostics))
+        self.assertEqual(runner.safe_failure_diagnostics('no panic\n')['panic_locations'], [])
+
+    def test_only_production_command_debug_result_identifies_timeout_or_spawn_error(self):
+        prefix = ("thread 'worker' panicked at app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs:1996:70:\n"
+                  'called `Result::unwrap()` on an `Err` value: PluginInstallError { message: "private", log: "')
+        timeout = prefix + '$ private-command\\ncommand failed or timed out: Err(TimeoutError)\\n" }\n'
+        error = runner.safe_failure_diagnostics(timeout)['panic_locations'][0]['command_failure']
+        self.assertEqual(error, {'kind': 'timeout', 'os_code': None, 'native_exit_code': None})
+        spawn = prefix + r'$ private-command\ncommand failed or timed out: Ok(Err(Os { code: 193, kind: Uncategorized, message: \"private-path\" }))\n" }' + '\n'
+        error = runner.safe_failure_diagnostics(spawn)['panic_locations'][0]['command_failure']
+        self.assertEqual(error, {'kind': 'spawn_io_error', 'os_code': 193, 'io_kind': 'Uncategorized',
+                                'native_exit_code': None})
+        self.assertNotIn('private', json.dumps(error))
+
+    def test_unrecorded_native_exit_and_arbitrary_timeout_text_remain_unknown(self):
+        prefix = ("thread 'worker' panicked at app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs:1996:70:\n"
+                  'called `Result::unwrap()` on an `Err` value: PluginInstallError { message: "private", log: "')
+        for payload in ('native process exited with code 1', 'Err(TimeoutError)', 'timeout',
+                        'command failed or timed out: Err(UnknownError)'):
+            output = prefix + payload + '" }\n'
+            self.assertIsNone(runner.safe_failure_diagnostics(output)['panic_locations'][0]['command_failure'])
+
     def accept(self, receipt, host='linux', **kwargs):
         args = dict(exit_code=0, timed_out=False, output='test result: ok. 1 passed; 0 failed; 0 ignored;',
                     receipt=receipt, native_sha='g' * 64, node_sha='n' * 64, test_sha='t' * 64, host_platform=host)

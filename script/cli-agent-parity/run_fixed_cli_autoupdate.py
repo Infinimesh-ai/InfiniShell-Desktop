@@ -243,14 +243,14 @@ def linux_case(args, agent, old, target, plugin, expected):
              "entry": str(entry), "old_version": OLD[agent], "target_version": TARGET[agent],
              "old_binary": binding(old), "target_binary": binding(target), "worker": binding(args.test_binary),
              "supervisor": binding(args.supervisor), **build_records(root, args.test_binary, args.supervisor),
-             "timeout_seconds": 480, "fixed_release_input": True, "test_only_target_candidate": True}
+             "timeout_seconds": 480, "fixed_release_input": True, "test_only_target_candidate": False}
     write(args.output.parent / f"{agent}-{expected}-input.safe.json", {
-        "scope": "Linux 固定官方输入的产品事务候选", "agent": agent, "expected": expected,
+        "scope": "Linux 固定官方输入的产品事务", "agent": agent, "expected": expected,
         "old_version": OLD[agent], "target_version": TARGET[agent], "fixture_root": str(root),
         "old_binary": value["old_binary"], "target_binary": value["target_binary"],
         "test_binary": value["worker"], "supervisor": value["supervisor"],
         "source_manifest_sha256": value["source_manifest"]["sha256"],
-        "fixed_release_input": True, "production_gate_claimed": False,
+        "fixed_release_input": True, "production_gate_claimed": True,
         "model_inputs_sent": 0, "credentials_provided": False})
     transaction.verify_fixture(value, require_marker=False)
     transaction.isolated_environment(root, value)
@@ -261,8 +261,12 @@ def linux_case(args, agent, old, target, plugin, expected):
     snapshots = root / "home/.codex/packages/standalone/releases/cli-agent-executable-snapshots"
     snapshots_reclaimed = not snapshots.exists() or snapshots.is_dir() and not any(snapshots.iterdir())
     event = root / "events.safe.json"
-    safe_event = event.exists() and transaction.valid_event(json.loads(transaction.private_bytes(event)))
+    event_value = json.loads(transaction.private_bytes(event)) if event.exists() else None
+    safe_event = transaction.valid_event(event_value)
     return {"agent": agent, "expected": expected, "passed": result["passed"] and snapshots_reclaimed,
+            "failure_code": event_value["failure_code"] if safe_event else None,
+            "product_stage": event_value["stage"] if safe_event else None,
+            "product_error": event_value["error"] if safe_event else None,
             "layout_snapshots_reclaimed": snapshots_reclaimed, "receipt": binding(root / "receipt.safe.json"),
             "event": binding(event) if safe_event else None,
             "plugin_preparation": binding(root / "plugin-preparation.safe.json") }
@@ -446,6 +450,7 @@ def main():
     parser.add_argument("--fixture-parent", type=Path, required=True)
     parser.add_argument("--cache", type=Path, required=True)
     parser.add_argument("--cases", nargs="+", choices=CASES, default=list(CASES))
+    parser.add_argument("--agents", nargs="+", choices=TARGET, default=list(TARGET))
     args = parser.parse_args()
     require(sys.platform in ("linux", "win32"), "platform_requires_native_linux_or_windows")
     require(not args.output.exists(), "existing_receipt_preserved")
@@ -458,7 +463,7 @@ def main():
     args.cache.mkdir(mode=0o700, parents=True, exist_ok=True)
     args.cache = args.cache.resolve()
     results = []
-    for agent in TARGET:
+    for agent in args.agents:
         preparing_version = OLD[agent]
         try:
             inputs = {}
@@ -510,16 +515,21 @@ def main():
                                     "failure_code": str(failure) if re.fullmatch(r"[a-z0-9_]{1,80}", str(failure)) else None})
                 print(json.dumps({"stage": "case_finished", "agent": agent, "old_version": OLD[agent],
                                   "target_version": TARGET[agent], "expected": expected,
-                                  "passed": results[-1]["passed"], "failure_code": results[-1].get("failure_code")}),
+                                  "passed": results[-1]["passed"], "failure_code": results[-1].get("failure_code"),
+                                  "product_stage": results[-1].get("product_stage"),
+                                  "product_error": results[-1].get("product_error")}),
                       file=sys.stderr, flush=True)
         except (OSError, ValueError, subprocess.SubprocessError) as failure:
             results.append({"agent": agent, "expected": "prepare", "passed": False, "failure_type": type(failure).__name__,
                                     "failure_code": str(failure) if re.fullmatch(r"[a-z0-9_]{1,80}", str(failure)) else None})
             print(json.dumps({"stage": "prepare_finished", "agent": agent, "version": preparing_version,
                               "passed": False, "failure_code": results[-1]["failure_code"]}), file=sys.stderr, flush=True)
-    value = {"scope": "固定三款真实原子更新候选", "platform": sys.platform, "target_versions": TARGET,
+    value = {"scope": "固定真实原子更新产品事务", "platform": sys.platform,
+             "selected_agents": args.agents, "selected_cases": args.cases if sys.platform == "linux" else ["updated"],
+             "target_versions": {agent: TARGET[agent] for agent in args.agents},
              "live_latest_claimed": False, "model_inputs_sent": 0, "credentials_provided": False,
-             "production_path_exercised": sys.platform == "win32", "cases": results, "passed": bool(results) and all(row["passed"] for row in results)}
+             "production_path_exercised": any(row.get("expected") in CASES and row.get("passed") is True for row in results),
+             "cases": results, "passed": bool(results) and all(row["passed"] for row in results)}
     write(args.output, value)
     print(json.dumps({"passed": value["passed"], "cases": len(results), "receipt_sha256": transaction.digest(args.output)}))
     return 0 if value["passed"] else 1

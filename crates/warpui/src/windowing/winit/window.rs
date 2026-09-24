@@ -176,6 +176,7 @@ impl platform::WindowManager for WindowManager {
             window_id,
             Rc::new(super::window::Window::new(
                 callbacks,
+                self.event_loop_proxy.clone(),
                 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
                 self.x11_manager.clone(),
             )),
@@ -739,6 +740,7 @@ type FrameCaptureCallback = Box<dyn FnOnce(platform::CapturedFrame) + Send + 'st
 
 pub(super) struct Window {
     pub(super) callbacks: WindowCallbacks,
+    event_loop_proxy: EventLoopProxy<CustomEvent>,
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     x11_manager: Option<Rc<x11::X11Manager>>,
     inner: RefCell<Option<Inner>>,
@@ -755,12 +757,14 @@ pub(super) struct Window {
 impl Window {
     fn new(
         callbacks: WindowCallbacks,
+        event_loop_proxy: EventLoopProxy<CustomEvent>,
         #[cfg(any(target_os = "linux", target_os = "freebsd"))] x11_manager: Option<
             Rc<x11::X11Manager>,
         >,
     ) -> Self {
         Self {
             callbacks,
+            event_loop_proxy,
             #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             x11_manager,
             inner: Default::default(),
@@ -772,6 +776,10 @@ impl Window {
 
     pub fn titlebar_height(&self) -> f32 {
         self.titlebar_height.get()
+    }
+
+    pub fn has_pending_frame_capture(&self) -> bool {
+        self.capture_callback.borrow().is_some()
     }
 
     pub fn open_window(
@@ -1868,7 +1876,11 @@ impl platform::WindowContext for Window {
     ) {
         *self.capture_callback.borrow_mut() = Some(callback);
         if let Some(inner) = self.inner.borrow_mut().as_mut() {
-            inner.window.request_redraw();
+            // 在事件循环中使用原有 GPU 渲染路径，避免同步重入借用栈。
+            // 服务会话不保证派发 WM_PAINT；截图不能只等待普通窗口重绘。
+            let _ = self.event_loop_proxy.send_event(CustomEvent::CaptureFrame {
+                window_id: inner.window.id(),
+            });
         }
     }
 }

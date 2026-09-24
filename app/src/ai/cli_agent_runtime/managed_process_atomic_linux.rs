@@ -24,6 +24,7 @@ pub(super) struct SealedExecutable {
     file: File,
     sha256: String,
     size: u64,
+    system_closure: Option<glibc::SystemClosure>,
 }
 
 impl SealedExecutable {
@@ -126,7 +127,7 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<SealedExecu
             "managed_process.linux_atomic_source_changed",
         ));
     }
-    verify_elf(&snapshot, copied)?;
+    let system_closure = verify_elf(&snapshot, copied)?;
     snapshot.sync_all()?;
     if unsafe { libc::fcntl(snapshot.as_raw_fd(), libc::F_ADD_SEALS, REQUIRED_SEALS) } != 0 {
         return Err(io::Error::last_os_error());
@@ -145,6 +146,7 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<SealedExecu
         file: snapshot,
         sha256,
         size: copied,
+        system_closure,
     })
 }
 
@@ -205,6 +207,11 @@ pub(super) fn prepare_layout_snapshot(
         ));
     }
     let mut sealed = prepare(expected)?;
+    if sealed.system_closure.is_some() {
+        return Err(io::Error::other(
+            "managed_process.linux_atomic_dependency_closure_unbound",
+        ));
+    }
     let releases_directory = open_secure_directory(releases)?;
     let root_name = c"cli-agent-executable-snapshots";
     if unsafe { libc::mkdirat(releases_directory.as_raw_fd(), root_name.as_ptr(), 0o700) } != 0 {
@@ -508,7 +515,7 @@ pub(super) fn execute_layout(
     execute_file(&executable.file, argv0, arguments, environment)
 }
 
-fn verify_elf(file: &File, size: u64) -> io::Result<()> {
+fn verify_elf(file: &File, size: u64) -> io::Result<Option<glibc::SystemClosure>> {
     if size < 64 {
         return Err(io::Error::other("managed_process.linux_atomic_not_elf"));
     }
@@ -562,6 +569,12 @@ fn verify_elf(file: &File, size: u64) -> io::Result<()> {
 
     let mut table = vec![0_u8; table_size as usize];
     file.read_exact_at(&mut table, program_offset)?;
+    if table
+        .chunks_exact(entry_size as usize)
+        .any(|entry| read_u32(&entry[..4], endian).is_ok_and(|segment| segment == 3))
+    {
+        return glibc::prepare(file, size).map(Some);
+    }
     for entry in table.chunks_exact(entry_size as usize) {
         let segment_type = read_u32(&entry[..4], endian)?;
         if segment_type == 3 {
@@ -585,7 +598,7 @@ fn verify_elf(file: &File, size: u64) -> io::Result<()> {
             }
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 fn verify_static_dynamic_segment(
@@ -690,6 +703,11 @@ pub(super) fn execute(
     arguments: &[OsString],
     environment: &[(OsString, OsString)],
 ) -> io::Error {
+    if let Some(closure) = &executable.system_closure {
+        if let Err(error) = closure.verify() {
+            return error;
+        }
+    }
     execute_file(&executable.file, argv0, arguments, environment)
 }
 
@@ -765,3 +783,6 @@ fn cstring_vector<'a>(
 #[cfg(test)]
 #[path = "managed_process_atomic_linux_tests.rs"]
 mod tests;
+
+#[path = "managed_process_atomic_linux_glibc.rs"]
+mod glibc;

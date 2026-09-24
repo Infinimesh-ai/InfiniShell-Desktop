@@ -1,0 +1,214 @@
+{
+  "schema_version": 1,
+  "scope": "原生验收补跑开关的静态条件审计；不声称执行过新CI",
+  "workflow_path": ".github/workflows/cross-platform-preflight.yml",
+  "workflow_sha256": "f600396fd922eb59fde78e55a1dcae1ab83faf074e607cd60412c03941cede84",
+  "base_commit": "bf015492f38685af0306fb04c2f18af13c81553e",
+  "input_default_false": true,
+  "full_workspace_mode_takes_precedence": true,
+  "truth_table": [
+    {
+      "event": "push",
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "push",
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "push",
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "push",
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "workflow_dispatch",
+      "native_acceptance_only": false,
+      "full_workspace_tests": false,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "workflow_dispatch",
+      "native_acceptance_only": false,
+      "full_workspace_tests": true,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    },
+    {
+      "event": "workflow_dispatch",
+      "native_acceptance_only": true,
+      "full_workspace_tests": false,
+      "narrow_app_filter": true,
+      "keep_unaffected_steps": false
+    },
+    {
+      "event": "workflow_dispatch",
+      "native_acceptance_only": true,
+      "full_workspace_tests": true,
+      "narrow_app_filter": false,
+      "keep_unaffected_steps": true
+    }
+  ],
+  "narrow_filter": "test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)",
+  "existing_executed_test_examples": {
+    "ai::cli_agent_runtime::grok::": "ai::cli_agent_runtime::grok::catalog_preflight_live_tests::catalog_pull_is_once_bound_to_initialized_session_served_names_and_actual_write",
+    "ai::cli_agent_runtime::managed_process::": "ai::cli_agent_runtime::managed_process::atomic_windows::tests::cwd_lease_blocks_leaf_rename_until_released",
+    "terminal::cli_agent_sessions::plugin_manager::": "terminal::cli_agent_sessions::plugin_manager::claude::tests::claude_concurrent_disable_is_preserved_and_blocks_recovery",
+    "terminal::cli_agent_updates::": "terminal::cli_agent_updates::sources::tests::alpha_versions_sort_below_same_core_release_and_compare_numeric_components",
+    "terminal::local_tty::": "terminal::local_tty::windows::environment::tests::wsl_env_allowlist_includes_cli_agent_protocol_when_notifications_flag_is_enabled"
+  },
+  "test_example_source": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/windows-job.log",
+  "test_example_source_sha256": "8c67255bd630ffdb89763e91e24621a1adb81aac758e3771e871814450d223ae",
+  "changed_steps": {
+    "linux": [
+      "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "Test shared CLI action contracts and skills",
+      "Test CLI harness arguments",
+      "Test bilingual TUI task message states"
+    ],
+    "windows": [
+      "Build InfiniShell SSH worker",
+      "Test Windows PowerShell SSH worker arguments",
+      "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "Test shared CLI action contracts and skills",
+      "Test CLI harness arguments",
+      "Test bilingual TUI task message states"
+    ]
+  },
+  "unchanged_steps": {
+    "linux": [
+      "Install Python for CLI parity verification",
+      "Verify provisioned toolchain",
+      "Install Node for CLI plugin verification",
+      "Test Grok notification plugin scripts",
+      "Test notification patch file transactions",
+      "Prepare fixed native Codex without credentials",
+      "Prepare fixed native Claude without credentials",
+      "Prepare fixed native Grok without credentials",
+      "Verify fixed Grok unauthenticated ACP boundaries",
+      "Verify native Claude initialization and idle EOF",
+      "Verify native Claude permission observations without credentials",
+      "Verify native Codex plugin registry failure recovery",
+      "Verify native Codex persistent plugin source",
+      "Test Claude and Codex Bash notification payloads",
+      "Test Unix PTY notification framing",
+      "Check InfiniShell-Desktop",
+      "Test IPC frame-limit recovery",
+      "Test managed command process ownership",
+      "Build CLI process supervisor",
+      "Test installed Grok hook through the native notification worker",
+      "Verify fixed Linux Grok production notification installer without credentials",
+      "Preserve Linux Grok production installer evidence",
+      "Verify fixed Linux CLI atomic update transactions without credentials",
+      "Preserve Linux fixed CLI atomic update receipts",
+      "Test supervisor cleanup after host crash",
+      "Verify native recovery and idle-crash boundaries without credentials",
+      "Preserve Linux native CLI boundary evidence",
+      "Test rust-genai",
+      "Compile GUI integration tests",
+      "Verify Linux GUI system clipboard without model inputs",
+      "Preserve Linux GUI system clipboard evidence",
+      "Run desktop workspace unit tests"
+    ],
+    "windows": [
+      "Reclaim Windows build storage",
+      "Prepare job-local Python for CLI parity verification",
+      "Configure Windows build environment",
+      "Verify provisioned toolchain",
+      "Install Node for CLI plugin verification",
+      "Test Grok notification plugin scripts",
+      "Test notification patch file transactions",
+      "Prepare fixed native Codex without credentials",
+      "Prepare fixed Codex production installer contract",
+      "Prepare fixed native Claude without credentials",
+      "Prepare fixed native Grok without credentials",
+      "Verify fixed Grok unauthenticated ACP boundaries",
+      "Verify native Claude initialization and idle EOF",
+      "Verify native Claude permission observations without credentials",
+      "Verify native Codex plugin registry failure recovery",
+      "Verify native Codex persistent plugin source",
+      "Test Windows Git Bash notification payloads",
+      "Verify Codex Windows native hooks without model requests",
+      "Preserve Codex Windows native hook evidence",
+      "Verify Codex Windows ConPTY notification transport",
+      "Preserve Codex Windows ConPTY evidence",
+      "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+      "Preserve fixed Codex 0.156.1 Windows native hook evidence",
+      "Verify fixed Codex 0.156.1 Windows ConPTY notification transport",
+      "Preserve fixed Codex 0.156.1 Windows ConPTY evidence",
+      "Verify Claude Windows native SessionStart notification without credentials",
+      "Preserve Claude Windows native notification evidence",
+      "Check InfiniShell-Desktop",
+      "Test IPC frame-limit recovery",
+      "Verify Windows Codex production notification installer without credentials",
+      "Preserve Windows Codex production installer evidence",
+      "Verify fixed Windows Grok production notification installer without credentials",
+      "Preserve Windows Grok production installer evidence",
+      "Test managed command process ownership",
+      "Diagnose Windows atomic image-debug exit in a strict Job",
+      "Build CLI process supervisor",
+      "Verify fixed Windows CLI atomic update candidates without credentials",
+      "Preserve Windows fixed CLI atomic update receipts",
+      "Test supervisor cleanup after host crash",
+      "Verify native recovery and idle-crash boundaries without credentials",
+      "Preserve Windows native CLI boundary evidence",
+      "Test rust-genai",
+      "Compile GUI integration tests",
+      "Verify Windows GUI system clipboard without model inputs",
+      "Preserve Windows GUI system clipboard evidence",
+      "Run desktop workspace unit tests",
+      "Report sccache statistics"
+    ]
+  },
+  "default_and_full_app_filter_byte_preserved": true,
+  "all_existing_step_ids_preserved": true,
+  "production_installers_still_depend_on_running_test_app": true,
+  "required_dispatch_inputs_for_requested_native_rerun": {
+    "native_acceptance_only": true,
+    "full_workspace_tests": false,
+    "run_cli_atomic_updates": true,
+    "run_atomic_windows_debug": true,
+    "run_gui_clipboard": true
+  },
+  "skip_scope": {
+    "linux": [
+      "Test CLI harness arguments",
+      "Test bilingual TUI task message states",
+      "Test shared CLI action contracts and skills"
+    ],
+    "windows": [
+      "Build InfiniShell SSH worker",
+      "Test CLI harness arguments",
+      "Test Windows PowerShell SSH worker arguments",
+      "Test bilingual TUI task message states",
+      "Test shared CLI action contracts and skills"
+    ]
+  },
+  "actionlint": {
+    "exit_code": 0,
+    "config": "/private/tmp/isp-mac-1mej4h8z/evidence/native-acceptance-only/actionlint.yaml",
+    "config_sha256": "b807824ba54eec31f8d747978c6fd727cd7afdf36d66447c4de18ce76438528c",
+    "log": "/private/tmp/isp-mac-1mej4h8z/evidence/native-acceptance-only/actionlint.log",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "initial_default_config_issue": "仅现有 infinishell-ci 自托管标签未声明；显式配置该精确标签后通过"
+  },
+  "git_diff_check_passed": true,
+  "ci_dispatched": false,
+  "cargo_run": false,
+  "localization": "仅工程CI输入及执行范围，无产品用户文案变更，无需本地化变更"
+}

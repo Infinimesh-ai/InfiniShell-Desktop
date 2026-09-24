@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "passed": false,
+  "fixed_version": "1.0.41",
+  "platform": "win32",
+  "native_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+  "test_binary_sha256": "bce2034ada5f9c966b3799ce05beb421ee3e42f4a10bfd61313ca4e504b0b23c",
+  "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+  "runner_sha256": "cbb04f47514cfcfa1204f137d30220669cc8d17fca34d1607a0a59e6d4d3e2d5",
+  "source_sha256": {
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "94a63c7646ab56db6091103448bd21f9f765ee3f538e4710f8c15e8a60e6b4e0",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "b65a29c0142bcfcd926342f9f8eac4fa07f0a5bc3a7fa9db25a1648f799e9349",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+    "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+    "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+    "script/cli-agent-parity/codex_windows_hook_command.ps1": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25"
+  },
+  "credentials_provided": false,
+  "model_inputs": 0,
+  "native_hook_execution_verified": false,
+  "worker_conout_verified": false,
+  "gui_verified": false,
+  "private_root_removed": false,
+  "timed_out": false,
+  "exit_code": 101,
+  "output_bytes": 5744,
+  "output_sha256": "0b6c41bfe94caf962416d7d680c774fac26cf0654aad3dc9e7648cc424831a86",
+  "receipt": {
+    "credentials_provided": false,
+    "grok_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    "model_input_submitted": false,
+    "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+    "passed": false,
+    "steps": [],
+    "test_binary_sha256": "bce2034ada5f9c966b3799ce05beb421ee3e42f4a10bfd61313ca4e504b0b23c"
+  },
+  "source_unchanged": true
+}

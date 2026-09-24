@@ -1,0 +1,59 @@
+{
+  "scope": "本次原生验收诊断及运行器修正的Mac本地门禁，不替代Windows/Linux实测",
+  "baseline_commit": "bf015492f38685af0306fb04c2f18af13c81553e",
+  "working_tree_dirty": true,
+  "source_files": {
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "27dff4c48cec53e87724cb2d2991e86dede60b1e9069e041e7fe6960d003608a",
+    "script/cli-agent-parity/codex_plugin_cache_refresh_tests.py": "8163930feab0a90979fe919b0cbd07841575d63d8e58947020f28655d9e4ac9f",
+    "script/cli-agent-parity/grok_plugin_live_runner_tests.py": "77afc69a3c3a867416db3da851fdf523f85f8d88608093bb7957485befb40486",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "519c10a0a6fa19814f3160383fc5822196b7e65dbf1d92ebc4f384f6b39b40a2",
+    "script/cli-agent-parity/run_grok_plugin_live.py": "b12aa8908b21b33492295b532de0110ae7680fd6107212c4b990efac6862d037",
+    ".github/workflows/cross-platform-preflight.yml": "f600396fd922eb59fde78e55a1dcae1ab83faf074e607cd60412c03941cede84"
+  },
+  "libtest_compile_passed": true,
+  "cargo_check_passed": true,
+  "grok_rust_tests": {
+    "passed": 56,
+    "failed": 0,
+    "ignored": 1
+  },
+  "fixed_atomic_runner_python": {
+    "passed": 27,
+    "failed": 0
+  },
+  "grok_diagnostics_python": {
+    "passed": 9,
+    "failed": 0,
+    "receipt": "ci-grok-installer-diagnostics-local.safe.json"
+  },
+  "logs": {
+    "ci-grok-installer-diagnostics-libtest.log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/ci-grok-installer-diagnostics-libtest.log",
+      "sha256": "4abc8318b3c38c0e83e2f39aae8da721acff7290dc1c595031c579da5f0c7636"
+    },
+    "ci-grok-installer-diagnostics-check.log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/ci-grok-installer-diagnostics-check.log",
+      "sha256": "0236510a8ca681cb75596562140590f6fddc8d20aeab2a949da0f1a19b2a7b06"
+    },
+    "ci-grok-installer-diagnostics-unit.log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/ci-grok-installer-diagnostics-unit.log",
+      "sha256": "f48beef93766449b58749f7028b7f16e73457340f91b418761143aa733e20984"
+    },
+    "ci-fixed-atomic-safe-progress-tests.log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/ci-fixed-atomic-safe-progress-tests.log",
+      "sha256": "be68edddf07114782f81069eadf9bbe676ce6b53e097b27cac4cfc23187533dd"
+    }
+  },
+  "safe_atomic_progress": {
+    "only_validated_event_fields_exported": [
+      "stage",
+      "error",
+      "failure_code"
+    ],
+    "valid_event_whitelist_unchanged": true,
+    "product_success_conditions_unchanged": true
+  },
+  "production_code_changed": false,
+  "model_inputs_sent": 0,
+  "localization": "无需本地化变更"
+}

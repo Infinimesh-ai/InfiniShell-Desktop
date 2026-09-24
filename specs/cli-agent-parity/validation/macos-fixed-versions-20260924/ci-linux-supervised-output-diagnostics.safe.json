@@ -1,0 +1,73 @@
+{
+  "scope": "Test-only stdout preservation plus fixed Linux loader error diagnostics; no execution-policy relaxation or second native invocation.",
+  "source_files": [
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_updates/sources.rs",
+      "bytes": 126396,
+      "sha256": "f2b28e8b8589de72412f47b618ec97d23cb82f20263900c7ee60839a0ea8cf1e"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "bytes": 86634,
+      "sha256": "e225c54a96d583a504de0450d4245a6c637a141e8f6c047fe9df08222ca910dc"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/ai/cli_agent_runtime/managed_process.rs",
+      "bytes": 81087,
+      "sha256": "acac5b67ffe813da3895ae18293a881c7cfe9f2dfa069a3da4c8597bb8ba733c"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/verify_cli_autoupdate.py",
+      "bytes": 35965,
+      "sha256": "7ad3ae322eb40361d16b0455559700b1d2d96fa8959eedfbc6c028ba8cf9c42b"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/verify_cli_autoupdate_tests.py",
+      "bytes": 35197,
+      "sha256": "3e05ee6db05c71dd83d45780291ce6e736da1f9391d8de41063b4e7b6dd482e7"
+    }
+  ],
+  "stdout_capture": {
+    "call_site": "sources::run_supervised_update existing bounded stdout consumption",
+    "compile_gate": "cfg(all(test, unix))",
+    "runtime_gate": "LIVE_DIAGNOSTIC_ROOT task-local entered only after strict existing live manifest/environment/build checks",
+    "destination": "same generation/supervisor.stdout",
+    "file_mode": "0600 create_new/no-follow",
+    "raw_limit_bytes": 1048577,
+    "raw_uploaded": false,
+    "diagnostic_prefix_limit_bytes": 65536,
+    "production_stdout_behavior_unchanged": true,
+    "product_acceptance_unchanged": true
+  },
+  "classification": {
+    "fixed_linux_internal_codes_added": 13,
+    "dependency_closure_unbound_supported": true,
+    "unknown_not_accepted_as_root_cause": true,
+    "stdout_and_stderr_use_same_bounded_classifier": true
+  },
+  "validation": {
+    "python_test_count": 36,
+    "python_passed": 36,
+    "python_log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/linux-ci-35993404190/linux-supervised-output-diagnostic-tests.log",
+      "bytes": 6893,
+      "sha256": "dcf267112180bbf47cf39ea83dc7221b2d360078cc4040a7dca4fc4301608f9c"
+    },
+    "rustfmt_passed": true,
+    "diff_check_passed": true,
+    "cargo_run": false,
+    "new_rust_filter": "terminal::cli_agent_updates::sources::live_tests::supervised_stdout_capture_requires_live_scope_and_classifies_loader_policy"
+  },
+  "previous_stderr_diagnostic": {
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/linux-ci-35993404190/linux-supervised-stderr-diagnostic-fix.safe.json",
+    "bytes": 3870,
+    "sha256": "5e089f09bad20140d947200e749ca95a7780c63f5c644c5e991f21ba400f8bdb"
+  },
+  "fixed_elf_range_evidence": {
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-linux-elf-headers/elf-headers.safe.json",
+    "bytes": 7059,
+    "sha256": "b4516de2849747e2273115e3f914a2fb0566a5154f59d84a5920a0d4b2b86e71"
+  },
+  "elf_boundary": "Manifest fully hash-verified; exact official URL Range bytes only, not full binary hash validation or upgrade acceptance.",
+  "localization_change_required": false
+}

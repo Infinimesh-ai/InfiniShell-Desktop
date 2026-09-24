@@ -139,12 +139,15 @@ class CacheRefreshCleanupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='cache-refresh-contract-') as temporary:
             directory = Path(temporary)
             env = {key: value for key, value in os.environ.items()
-                   if key.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TMP', 'TEMP')}
+                   if key.upper() in ('SYSTEMROOT', 'WINDIR', 'PATH', 'TMP', 'TEMP', 'LD_LIBRARY_PATH')}
             child = ('import json,sys;print(json.dumps({"channel":"stdout"}),flush=True);'
                      'print(json.dumps({"channel":"stderr"}),file=sys.stderr,flush=True);sys.stdin.read()')
             trace, events = {}, []
             recorder = probe.CacheRefreshRecorder([sys.executable, '-c', child], env, directory, events, trace)
-            recorder.close()
+            try:
+                recorder.close()
+            except ValueError:
+                self.fail(f"synthetic recorder close failed: root_exit_code={trace.get('root_exit_code')}")
             self.assertEqual(set(recorder.readers), {'stdout', 'stderr'})
             self.assertTrue(all(not reader.is_alive() for reader in recorder.readers.values()))
             self.assertTrue(all(state['eof'] for state in recorder.reader_states.values()))

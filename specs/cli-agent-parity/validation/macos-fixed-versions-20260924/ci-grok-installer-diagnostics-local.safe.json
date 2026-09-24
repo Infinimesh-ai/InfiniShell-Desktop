@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "scope": "Grok1.0.41 Windows安装器原失败静态定位与测试专用安全诊断补充",
+  "run_id": 35993404190,
+  "run_head_sha": "bf015492f38685af0306fb04c2f18af13c81553e",
+  "original_failure": {
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35993404190/artifacts/10806851498/grok-production-installer.safe.json",
+    "sha256": "ddbf016858b176eab92d03363bf2d8a81e6d46a5c2843c93fea31c058b71ed56",
+    "passed": false,
+    "worker_exit_code": 101,
+    "timed_out": false,
+    "output_bytes": 5744,
+    "output_sha256": "0b6c41bfe94caf962416d7d680c774fac26cf0654aad3dc9e7648cc424831a86",
+    "completed_step_count": 0,
+    "root_cause_uniquely_identified": false,
+    "scope": "原初始收据覆盖runtime验证、Node/Grok版本及Windows双shell argv，尚不能唯一归因桥接"
+  },
+  "source_bindings": [
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/run_grok_plugin_live.py",
+      "sha256": "b12aa8908b21b33492295b532de0110ae7680fd6107212c4b990efac6862d037"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/grok_plugin_live_runner_tests.py",
+      "sha256": "77afc69a3c3a867416db3da851fdf523f85f8d88608093bb7957485befb40486"
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "sha256": "27dff4c48cec53e87724cb2d2991e86dede60b1e9069e041e7fe6960d003608a"
+    }
+  ],
+  "changes": [
+    "每个关键阶段开始/通过即持久化安全收据",
+    "Windows argv结果保留错误固定类别或成功数值退出与输出长度/摘要",
+    "runner只投影已知源码相对位置和数字行列、固定panic类别",
+    "仅从对应 PluginInstallError panic 识别生产追加的 Err(TimeoutError) 或 Os 数值 code/固定 kind；无原生非零 status 时保持 null"
+  ],
+  "production_code_modified": false,
+  "product_calls_preserved": true,
+  "existing_assertions_preserved": true,
+  "timeouts_unchanged": true,
+  "retained_failure_mode_added": false,
+  "raw_logs_exported": false,
+  "private_payloads_or_paths_exported": false,
+  "old_receipt_modified": false,
+  "python_tests": {
+    "exit_code": 0,
+    "passed": 9,
+    "failed": 0,
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35993404190/grok-installer-diagnostics-python-tests.log",
+    "sha256": "7c758af7411e05fc2e6c4fb89045f7a03d9a5957d5305092903a23a66373d034"
+  },
+  "rustfmt_passed": true,
+  "git_diff_check_passed": true,
+  "ci_dispatched": false,
+  "model_inputs_sent": 0,
+  "localization": "仅测试收据和诊断，无需本地化变更",
+  "remaining_validation": "根代理统一编译后，在Windows重新运行既有固定安装器入口；当前原CI失败不改标通过",
+  "diagnostic_format_sources": [
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "line": 170,
+      "meaning": "失败或超时追加 result Debug；非零退出未追加 status"
+    },
+    {
+      "path": "crates/warpui_core/src/async/mod.rs",
+      "line": 112,
+      "meaning": "实际 with_timeout 错误是 TimeoutError"
+    }
+  ],
+  "rust_frozen_after_first_notice": true,
+  "cargo_run_by_this_agent": false
+}

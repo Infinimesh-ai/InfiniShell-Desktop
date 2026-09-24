@@ -98,6 +98,8 @@ try {
             # 长回溯可能挤掉实际原因，先显示有界错误行，再保留末尾上下文。
             Select-String -LiteralPath $log -Pattern '\[ERROR\]|panicked at|failed to bootstrap' |
                 Select-Object -First 30 | ForEach-Object { $_.Line }
+            Select-String -LiteralPath $log -Pattern 'VideoRecorder:|Frame capture|Failed to render frame|Test step.*succeeded|GUI 引导失败' |
+                Select-Object -Last 20 | ForEach-Object { $_.Line }
             Get-Content -LiteralPath $log -Tail 80
         }
     }

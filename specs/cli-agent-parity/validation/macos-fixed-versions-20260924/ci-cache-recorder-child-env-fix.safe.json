@@ -1,0 +1,28 @@
+{
+  "run_id": 35993404190,
+  "head_sha": "bf015492f38685af0306fb04c2f18af13c81553e",
+  "failed_step": 7,
+  "scope": "synthetic Python subprocess test environment only",
+  "change": "Inherit LD_LIBRARY_PATH required by setup-python Linux shared library; report root exit code when close rejects.",
+  "prior_failure_evidence": "Parent observed failed synthetic child close in live CI log; original completed job log will be retained.",
+  "diagnostic_limit": "Exit127 not yet independently observed; do not claim it as proven.",
+  "source": {
+    "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/script/cli-agent-parity/codex_plugin_cache_refresh_tests.py",
+    "bytes": 30797,
+    "sha256": "8163930feab0a90979fe919b0cbd07841575d63d8e58947020f28655d9e4ac9f"
+  },
+  "tests": {
+    "total": 30,
+    "passed": 25,
+    "skipped": 5,
+    "skip_reason": "Windows-only Job tests on macOS",
+    "diff_check": true,
+    "log": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/linux-ci-35993404190/cache-recorder-child-env-tests.log",
+      "bytes": 6069,
+      "sha256": "ffe7425c9360f43ebc75cd7cfef72d60df1b6eb1f7cea3f7af6dfbb33650e85c"
+    }
+  },
+  "product_source_changed": false,
+  "localization_change_required": false
+}

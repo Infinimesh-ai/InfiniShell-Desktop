@@ -15,7 +15,7 @@
 | SSH／tmux；R3 | shell hook、通知 worker、终端可信输入绑定 | 固定三款真实 CLI 触发、真实本机隔离 OpenSSH、产品 PTY 接收、tmux 断连重接；各自收据见交付记录 | 对应 Mac→本机 SSH 场景通过；不是其他 OS 远端或所有组合；关闭透传复用公共解析器风险验证 |
 | CLI_AUTOUPDATE；R7 | `cli_agent_updates`、`managed_process_atomic_*` | [Mac 三款正式升级](validation/macos-fixed-versions-20260924/formal-updates-v4.safe.json)、[Claude Latest→Stable 降级](validation/macos-fixed-versions-20260924/claude-stable-downgrade-v10.safe.json)、Busy／回滚／恢复回归 | Mac 已识别原生来源通过；Linux／Windows 真正更新事务待集中 CI；未知来源降级保持 |
 | P5 双语和本地门禁 | `app/i18n/{en,zh-CN}`、Rust／Python／Node 回归 | [V11 本地索引](validation/macos-fixed-versions-20260924/mac-v11-local-index.safe.json)：check、libtest、i18n 11、定向 1645、原子 15；[双语布局](validation/macos-fixed-versions-20260924/gui-bilingual-final-v11.safe.json) | 上述通过；[完整桌面首次结果](validation/macos-fixed-versions-20260924/goal-v11-workspace-result.safe.json)为 10858 通过、3 前置超时、109 跳过，[3 项同二进制串行复验](validation/macos-fixed-versions-20260924/workspace-host-serial-v11.safe.json)通过，原失败保留 |
-| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；测试及 CI 修正 `faab52d8a41f9d47530f55c9bc73d13f1c115803` 的集中复验已取得 Linux 全量通过；`cbdd0254e4f0439ff16ac06bb8e8712490c0f876` 的[剩余项集中复验 35992533669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35992533669)在持久化探针处失败，修复后重验 | 待剩余平台结果和报告闭环；[当前源码对应](validation/macos-fixed-versions-20260924/source-binding-cbdd0254e.safe.json)单列 Windows 终端修复，Mac 产品行为保持 |
+| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；测试及 CI 修正 `faab52d8a41f9d47530f55c9bc73d13f1c115803` 的集中复验已取得 Linux 和 Windows 全量通过；`cbdd0254e4f0439ff16ac06bb8e8712490c0f876` 的[剩余项集中复验 35992533669](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35992533669)在持久化探针处失败，修复后重验 | 待剩余平台结果和报告闭环；[当前源码对应](validation/macos-fixed-versions-20260924/source-binding-cbdd0254e.safe.json)单列 Windows 终端修复，Mac 产品行为保持 |
 
 验证范围明确区分：真实 GUI 运行、GUI integration 编译、系统剪贴板、真实 IME、模拟协议、原生 CLI 执行和模型结果。跳过项不计通过，已记录失败不删除或追改。Grok 托管图片不支持，固定策略禁用原生 shell／hook／技能；这些限制应由界面与能力矩阵明确表达。
 
@@ -47,4 +47,34 @@ Windows Mesa 已实际创建 GL/llvmpipe 窗口，失败发生在终端引导、
 
 本轮冻结后的 [本地门禁](validation/macos-fixed-versions-20260924/ci-followup-frozen-local-gates.safe.json)为 35 个脚本 811 项通过、7 项平台跳过，cargo check、i18n 11 项、构建摘要边界 1 项及静态检查通过。[Windows 安全诊断回归](validation/macos-fixed-versions-20260924/ci-followup-windows-atomic-diagnostics.safe.json)单列阶段、系统数值、原生退出与 Job 清理，原生 Rust 分支仍待 CI。外置盘一度权限失败的原日志保留，后续检查已恢复通过。
 
-35992533669 的 Linux 在共享 `NativeRecorder.readers` 改为字典后，持久缓存探针仍按列表遍历，发生 `TypeError`／`AttributeError`；这是本次验收脚本回归，不是原生插件或产品能力失败。修复全部三处迭代并用真实父类和合成子进程验证双流 EOF；回归 25 项通过、5 项 Windows 条件跳过。本轮 Windows 尚在队列时取消，以修复后的提交替代，避免消费一次已知失败的运行；前一轮 Windows 全量继续。Linux 工作流也改为按各项真实前置执行独立检查，保留每项失败但不再让单一探针阻断编译、升级和 GUI。
+[35992533669 的 Linux 原失败](validation/macos-fixed-versions-20260924/ci-35992533669-linux-final.safe.json)在共享 `NativeRecorder.readers` 改为字典后，持久缓存探针仍按列表遍历，发生 `TypeError`／`AttributeError`；这是本次验收脚本回归，不是原生插件或产品能力失败。[修复全部三处迭代并用真实父类和合成子进程验证双流 EOF](validation/macos-fixed-versions-20260924/ci-cache-recorder-fix.safe.json)；回归 25 项通过、5 项 Windows 条件跳过。本轮 Windows 尚在队列时取消，以修复后的提交替代，避免消费一次已知失败的运行；前一轮 Windows 全量继续。Linux 工作流也改为按各项真实前置执行独立检查，保留每项失败但不再让单一探针阻断编译、升级和 GUI。
+
+上述缓存探针与独立门禁修正已推送为 `bf015492f38685af0306fb04c2f18af13c81553e`，同提交 [35993404190](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35993404190) 集中复验进行中。[源码对应](validation/macos-fixed-versions-20260924/source-binding-bf015492f.safe.json)确认此提交没有产品源码变化，CLI 版本和本轮输入保持固定。
+
+同轮 [Windows 最终结果](validation/macos-fixed-versions-20260924/ci-35985989728-windows-final.safe.json)确认全量 10,660 项通过、0 项失败、110 项跳过，定向 2,717 项通过；其中 3 项 leaky 是通过子集，不代表进程树清理。原五个失败步骤仍保留，后续仅复验受影响的原生升级、通知、安装／恢复和 GUI，不重复全量工作区。
+
+[Linux 生产调用审计](validation/macos-fixed-versions-20260924/ci-linux-production-path-audit.safe.json)确认本轮运行器虽然保留旧候选标签，但 `fixed_target_candidate` 已无产品调用；实际仍执行正式 `inspect → execute → inspect`，测试作用域只固定发行版本发现，来源、身份、原子执行及 journal 门禁没有绕过。因此对应事务只有实际收据通过才可计验收，不因标签单独重跑。新生成元数据已清除候选标签，官方输入摘要校验保持；既有运行器回归 27 项通过。
+
+本轮 [Windows Grok 安装器失败](validation/macos-fixed-versions-20260924/ci-35993404190-windows-grok-installer-failure.safe.json)退出 101、未超时，原生文件与来源摘要未变，六个安装步骤均未开始；原收据未区分运行时版本检查与 Windows argv 桥接，不能由空 steps 推断根因。[诊断修正](validation/macos-fixed-versions-20260924/ci-grok-installer-diagnostics-local.safe.json)仅在测试中落盘具体阶段，导出已知源码 panic 位置和固定错误类别，原始日志与私有路径不上传，生产命令、超时和全部断言保持。Python 9 项通过；同批 Mac libtest 编译、Grok 单测 56 项（1 项原生实链按约定忽略）及 cargo check 通过，尚不能替代 Windows 原生复验。
+
+为减少剩余补验等待，[窄范围工作流](validation/macos-fixed-versions-20260924/ci-native-acceptance-workflow-static.safe.json)增加默认关闭的 `native_acceptance_only`：保留五个相关 Rust 域、真实 CLI 安装／升级／恢复、严格 Job 和 GUI，跳过源码未变的共享 CLI、CLI harness、TUI 及 Windows SSH 专项；`full_workspace_tests=true` 始终保持原全量行为。默认模式不变。当前 [本地门禁](validation/macos-fixed-versions-20260924/ci-native-followup-local.safe.json)通过；原子运行器同时把已经通过字段白名单的失败阶段、错误类别和失败码及时输出，避免必须等全部事务结束才能定位单例失败。
+
+[本轮 Windows 最终结果](validation/macos-fixed-versions-20260924/ci-35993404190-windows-final.safe.json)为定向 2,718 项通过，失败限于 Grok 安装器、两款原子更新及 GUI 截图。[正式原子事务与独立诊断](validation/macos-fixed-versions-20260924/ci-35993404190-windows-atomic.safe.json)分别记录：Claude 正式升级通过；Codex 拒绝系统 .NET 的 `mscoreei.dll`；Grok 拒绝新目标子进程；严格 Job 清理、13 项配置保全和 journal 清除均通过。[GUI 原失败](validation/macos-fixed-versions-20260924/ci-35993404190-windows-gui-failure.safe.json)已越过初始化、中文多行及 PNG 像素断言，在 GPU 截图回调超时后因缺少截图失败，不能计整项通过。截图补验通过事件循环直接请求现有真实渲染路径，仍保留 5 秒和非空 PNG 门禁；测试入口初始化英文，避免把未初始化的翻译键作为界面。上述测试调整无需本地化变更。
+
+[本轮 Linux 最终结果](validation/macos-fixed-versions-20260924/ci-35993404190-linux-final.safe.json)定向 2,848 项通过；原生通知、Grok 六阶段安装和恢复通过。[正式原子更新](validation/macos-fixed-versions-20260924/ci-35993404190-linux-atomic.safe.json)为 12 项中 11 项通过，仅 Claude 正常升级在 execute 返回 CommandFailed。该失败没有执行后置入口检查，不能把默认 false 字段解释成入口损坏；新增诊断只从同一生产监督事务导出真实退出状态及有界、脱敏 stderr 类别，不另启替代升级器。
+
+Linux 的 [GUI 内容断言](validation/macos-fixed-versions-20260924/ci-35993404190-linux-gui-assertions.safe.json)通过，但[原始截图目视审查](validation/macos-fixed-versions-20260924/ci-35993404190-linux-gui-visual-review.safe.json)未通过：界面显示未初始化的翻译键，草稿及附件位于视口下方。测试现初始化英文并在截图前滚动到草稿区、重复精确内容和零提交断言；新截图仍待原生复验，旧图与原收据保持不变。
+
+[Windows 原子执行修正](validation/macos-fixed-versions-20260924/ci-windows-atomic-component-implementation.safe.json)将 Grok 官方目标映像的独立摘要绑定到事务；系统组件 DLL 仅允许真实 Windows 根下受 SYSTEM／Administrators／TrustedInstaller 所有权和 ACL 保护的有限目录，并持续持有映像与祖先句柄。不是根据文件名开放任意目标，也不宣称 Authenticode 验签。Windows 实测仍待后续 CI。
+
+下一轮继续使用同一 workflow 的原生补验模式：Linux 只运行尚未闭环的 Claude 四类事务；Windows 因原子监督实现变化仍验三款。两端保留相关 Rust 回归、安装器、真实 GUI 与清理；独立安装器不再依赖无关单测成功，但失败结果仍保留。已经通过的全量工作区不重复执行。上述变化无需本地化变更。
+
+Claude Linux 失败已取得[完整官方旧版文件的离线证据](validation/macos-fixed-versions-20260924/ci-linux-claude-dynamic-elf-input.safe.json)：`2.1.278` 的 234,119,480 字节及完整 SHA 与固定合同一致，包含 `/lib64/ld-linux-x86-64.so.2` 解释器和六项系统依赖，而现有静态 ELF 检查必然拒绝该输入。仅范围读取的早期证据不替代这次完整摘要核对；没有执行该 Linux 文件，也没有因此签发升级通过。
+
+Windows 另补[调试句柄所有权修正](validation/macos-fixed-versions-20260924/ci-windows-atomic-handle-ownership.safe.json)：原进程／线程句柄由 ContinueDebugEvent 生命周期释放，本方仅持有复制后的进程句柄；原映像文件句柄仍自行释放。真实 Windows 回归待统一复验。截图定位使用编辑器真实布局位置，避免超大偏移被 NewScrollable 重置为顶部。
+
+Linux 已补[受限 glibc 启动依赖适配](validation/macos-fixed-versions-20260924/ci-linux-glibc-closure-implementation.safe.json)：主程序仍由 sealed memfd／execveat 执行；仅支持 x86_64、缓存具备可用基线的系统 loader 与递归依赖，绑定所有同名 x64 候选，并在执行前复核摘要、身份及 root 保护。拒绝预加载、额外搜索路径和未知缓存扩展；Codex 静态布局路径不变。系统文件以 root 管理的 OS 为信任边界，未宣称阻止 root 修改或拦截运行期 dlopen。Linux 环境同时过滤 LD_*、GLIBC_TUNABLES、GCONV_PATH、LOCPATH，Mac 过滤行为不变。
+
+[Linux 模块目标编译](validation/macos-fixed-versions-20260924/ci-linux-atomic-local-compile.safe.json)与 [Windows 模块及测试目标编译](validation/macos-fixed-versions-20260924/ci-windows-atomic-local-compile.safe.json)通过；两者使用临时父模块合同进行 compile-only 检查，不能替代完整应用或目标平台运行。[五组 Python 回归](validation/macos-fixed-versions-20260924/ci-native-python-final.safe.json)通过，原子真实升级及 GUI 仍待集中补验。本轮无需本地化变更。
+
+修正冻结后的[最终本地门禁](validation/macos-fixed-versions-20260924/ci-native-frozen-local-gates.safe.json)通过：`cargo check -p warp`、i18n 11 项、受影响 Rust 217 项；五组 Python、PowerShell 语法与 workflow 静态检查通过。源码摘要完整记录，Linux／Windows 实测状态继续由下一轮独立收据确定。

@@ -84,11 +84,11 @@ struct Manifest {
     configs: BTreeMap<String, Option<String>>,
 }
 
-tokio::task_local! { static FIXTURE: (CLIAgent, String, PathBuf); }
+tokio::task_local! { static FIXTURE: (CLIAgent, String, PathBuf, Option<managed_process::WindowsChildImage>); }
 
 pub(super) fn fixed_release(agent: CLIAgent, channel: Channel) -> Option<String> {
     FIXTURE
-        .try_with(|(selected, version, _)| {
+        .try_with(|(selected, version, _, _)| {
             (*selected == agent && matches!(channel, Channel::Latest | Channel::Stable))
                 .then(|| version.clone())
         })
@@ -96,9 +96,20 @@ pub(super) fn fixed_release(agent: CLIAgent, channel: Channel) -> Option<String>
         .flatten()
 }
 
+pub(super) fn fixed_child_image(version: &str) -> Option<managed_process::WindowsChildImage> {
+    FIXTURE
+        .try_with(|(agent, target, _, image)| {
+            (*agent == CLIAgent::Grok && target == version)
+                .then(|| image.clone())
+                .flatten()
+        })
+        .ok()
+        .flatten()
+}
+
 pub(super) fn journal_root() -> Option<PathBuf> {
     FIXTURE
-        .try_with(|(_, _, root)| root.join("state/cli-agent-updates"))
+        .try_with(|(_, _, root, _)| root.join("state/cli-agent-updates"))
         .ok()
 }
 
@@ -527,6 +538,10 @@ async fn real_native_update_without_model() {
                 agent,
                 manifest.target_version.clone(),
                 manifest.root.clone(),
+                Some(managed_process::WindowsChildImage {
+                    size: fs::metadata(&manifest.target_binary.path).unwrap().len(),
+                    sha256: manifest.target_binary.sha256.clone(),
+                }),
             ),
             async {
                 let result = exercise(&manifest, agent, &mut evidence).await;
@@ -574,6 +589,7 @@ async fn real_native_update_without_model() {
 
 #[tokio::test]
 async fn fixed_windows_metadata_and_journal_do_not_escape_test_scope() {
+    assert!(fixed_child_image("1.0.41").is_none());
     assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
     assert!(journal_root().is_none());
     FIXTURE
@@ -582,6 +598,7 @@ async fn fixed_windows_metadata_and_journal_do_not_escape_test_scope() {
                 CLIAgent::Claude,
                 "2.1.280".to_owned(),
                 PathBuf::from(r"C:\private-fixture"),
+                None,
             ),
             async {
                 assert_eq!(
@@ -599,6 +616,25 @@ async fn fixed_windows_metadata_and_journal_do_not_escape_test_scope() {
         .await;
     assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
     assert!(journal_root().is_none());
+    let target = managed_process::WindowsChildImage {
+        size: 123,
+        sha256: "a".repeat(64),
+    };
+    FIXTURE
+        .scope(
+            (
+                CLIAgent::Grok,
+                "1.0.41".to_owned(),
+                PathBuf::from(r"C:\private-fixture"),
+                Some(target.clone()),
+            ),
+            async {
+                assert_eq!(fixed_child_image("1.0.41"), Some(target));
+                assert!(fixed_child_image("1.0.40").is_none());
+            },
+        )
+        .await;
+    assert!(fixed_child_image("1.0.41").is_none());
 }
 
 #[test]

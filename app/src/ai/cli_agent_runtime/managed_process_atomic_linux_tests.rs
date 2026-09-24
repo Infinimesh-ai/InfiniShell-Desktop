@@ -267,14 +267,14 @@ fn script_is_rejected_before_it_can_be_executed() {
 }
 
 #[test]
-fn interpreter_dependency_closure_is_rejected() {
+fn unsupported_interpreter_dependency_closure_is_rejected() {
     let state = tempfile::tempdir().unwrap();
     let program = state.path().join("program");
     write_executable(&program, &elf_with_segment(3, 0));
 
     assert_eq!(
         prepare(&expected(&program)).unwrap_err().to_string(),
-        "managed_process.linux_atomic_dependency_closure_unbound"
+        "managed_process.linux_glibc_elf_invalid"
     );
 }
 
@@ -510,6 +510,18 @@ fn execveat_failure_does_not_fall_back_to_pathname() {
 }
 
 #[test]
+#[cfg(target_arch = "x86_64")]
+fn glibc_system_elf_executes_from_sealed_memfd_with_bound_cache_closure() {
+    let state = tempfile::tempdir().unwrap();
+    let output = execveat_helper("system-glibc", Path::new("/usr/bin/true"), state.path());
+    assert!(
+        output.status.success(),
+        "系统 ELF execveat 验证失败：{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
 #[ignore = "仅由 Linux execveat 多进程测试派生"]
 fn execveat_process_helper() {
     let executable = PathBuf::from(env::var_os(PROCESS_EXECUTABLE_ENV).unwrap())
@@ -537,6 +549,12 @@ fn execveat_process_helper() {
     }
     let snapshot = ManuallyDrop::new(prepare(&expected(&executable)).unwrap());
     match role.as_str() {
+        "system-glibc" => {
+            assert!(snapshot.system_closure.is_some());
+            assert_eq!(snapshot.seals().unwrap() & REQUIRED_SEALS, REQUIRED_SEALS);
+            let error = execute(&snapshot, &executable, &[], &[]);
+            panic!("系统 ELF execveat 没有替换辅助进程：{error}");
+        }
         "forward" => {
             let error = execute(
                 &snapshot,

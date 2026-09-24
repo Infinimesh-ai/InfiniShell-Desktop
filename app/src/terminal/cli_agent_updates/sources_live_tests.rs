@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
-use std::io::{Read as _, Write as _};
+use std::io::{self, Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _, symlink};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -23,14 +23,14 @@ use super::{
     Channel, Error, Journal, Source, execute, inspect, journal_root, parse_version,
     previous_failure_for_intent,
 };
-use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason};
+use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason, ExitReceipt};
 use crate::features::FeatureFlag;
 use crate::terminal::cli_agent::CLIAgent;
 
 const SCOPE: &str = "cli_autoupdate_native_product";
 const MARKER: &str = "InfiniShell private updater fixture; no credentials or model inputs\n";
 const MAX_MANIFEST: usize = 64 * 1024;
-const COMPILED_SOURCE_FILES: [(&str, &[u8]); 8] = [
+const COMPILED_SOURCE_FILES: [(&str, &[u8]); 9] = [
     (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),
@@ -52,6 +52,10 @@ const COMPILED_SOURCE_FILES: [(&str, &[u8]); 8] = [
         include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
     ),
     (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
+    ),
+    (
         "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
         include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
     ),
@@ -64,11 +68,12 @@ const COMPILED_SOURCE_FILES: [(&str, &[u8]); 8] = [
         include_bytes!("../../../../script/cli-agent-parity/verify_cli_autoupdate.py"),
     ),
 ];
-const SUPERVISOR_COMPILED_SOURCES: [&[u8]; 6] = [
+const SUPERVISOR_COMPILED_SOURCES: [&[u8]; 7] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows.rs"),
 ];
@@ -124,6 +129,33 @@ struct Manifest {
 
 tokio::task_local! {
     static FIXED_RELEASE: (CLIAgent, Channel, String, bool);
+    static LIVE_DIAGNOSTIC_ROOT: PathBuf;
+}
+
+pub(super) fn preserve_supervised_stdout(state: &Path, generation: uuid::Uuid, bytes: &[u8]) {
+    // 仅严格清单、环境与构建绑定全部通过后的 live test 才进入此 task-local 作用域。
+    let _ = LIVE_DIAGNOSTIC_ROOT.try_with(|root| {
+        let directory = state
+            .join("cli-agent-processes")
+            .join(generation.to_string());
+        if bytes.len() as u64 > super::MAX_OUTPUT + 1
+            || plain_path(root, &directory).is_err()
+            || !fs::symlink_metadata(&directory).is_ok_and(|metadata| {
+                metadata.is_dir() && metadata.uid() == unsafe { libc::geteuid() }
+            })
+        {
+            return;
+        }
+        if let Ok(mut file) = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(directory.join("supervisor.stdout"))
+        {
+            let _ = file.write_all(bytes).and_then(|()| file.sync_all());
+        }
+    });
 }
 
 pub(super) fn fixed_release(agent: CLIAgent, channel: Channel) -> Option<String> {
@@ -250,6 +282,266 @@ struct Evidence {
     same_source_build_verified: bool,
     same_commit_verified_by_runner: bool,
     failure_intent_persisted: bool,
+    supervised_exit: Option<SupervisedExitDiagnostic>,
+}
+
+#[derive(Debug, Serialize)]
+struct SupervisedExitDiagnostic {
+    status: &'static str,
+    exit_code: Option<i32>,
+    exit_reason: Option<ExitReason>,
+    containment: Option<&'static str>,
+    cleanup_confirmed: bool,
+    os_error: Option<i32>,
+    stderr: Option<SupervisedStderrDiagnostic>,
+    stdout: Option<SupervisedStderrDiagnostic>,
+}
+
+impl SupervisedExitDiagnostic {
+    fn status(status: &'static str) -> Self {
+        Self {
+            status,
+            exit_code: None,
+            exit_reason: None,
+            containment: None,
+            cleanup_confirmed: false,
+            os_error: None,
+            stderr: None,
+            stdout: None,
+        }
+    }
+
+    fn from_receipt(receipt: io::Result<Option<ExitReceipt>>) -> Self {
+        match receipt {
+            Ok(Some(receipt)) => {
+                let containment = match receipt.containment.as_str() {
+                    "not_started" => "not_started",
+                    "linux_subtree" => "linux_subtree",
+                    "unix_process_group" => "unix_process_group",
+                    "macos_resource_coalition" => "macos_resource_coalition",
+                    _ => return Self::status("receipt_invalid"),
+                };
+                if !receipt.cleanup_confirmed {
+                    return Self::status("receipt_invalid");
+                }
+                Self {
+                    status: "confirmed",
+                    exit_code: receipt.exit_code,
+                    exit_reason: Some(receipt.exit_reason),
+                    containment: Some(containment),
+                    cleanup_confirmed: true,
+                    os_error: None,
+                    stderr: None,
+                    stdout: None,
+                }
+            }
+            Ok(None) => Self::status("receipt_missing"),
+            Err(error) => Self {
+                os_error: error.raw_os_error(),
+                ..Self::status("receipt_invalid")
+            },
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SupervisedStderrDiagnostic {
+    status: &'static str,
+    file_bytes: Option<u64>,
+    captured_bytes: usize,
+    captured_sha256: Option<String>,
+    categories: BTreeSet<&'static str>,
+    error_codes: BTreeSet<&'static str>,
+}
+
+impl SupervisedStderrDiagnostic {
+    fn status(status: &'static str) -> Self {
+        Self {
+            status,
+            file_bytes: None,
+            captured_bytes: 0,
+            captured_sha256: None,
+            categories: BTreeSet::new(),
+            error_codes: BTreeSet::new(),
+        }
+    }
+}
+
+fn supervised_output_diagnostic(root: &Path, path: &Path) -> SupervisedStderrDiagnostic {
+    const LIMIT: u64 = 64 * 1024;
+    if plain_path(root, path).is_err() {
+        return SupervisedStderrDiagnostic::status("invalid");
+    }
+    let mut file = match OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(path)
+    {
+        Ok(file) => file,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return SupervisedStderrDiagnostic::status("missing");
+        }
+        Err(_) => return SupervisedStderrDiagnostic::status("invalid"),
+    };
+    let Ok(before) = file.metadata() else {
+        return SupervisedStderrDiagnostic::status("invalid");
+    };
+    if !before.is_file() || before.uid() != unsafe { libc::geteuid() } {
+        return SupervisedStderrDiagnostic::status("invalid");
+    }
+    let mut bytes = Vec::new();
+    if (&mut file).take(LIMIT).read_to_end(&mut bytes).is_err()
+        || bytes.len() as u64 != before.len().min(LIMIT)
+        || !file.metadata().is_ok_and(|after| {
+            after.len() == before.len()
+                && after.dev() == before.dev()
+                && after.ino() == before.ino()
+                && after.mtime() == before.mtime()
+                && after.mtime_nsec() == before.mtime_nsec()
+        })
+    {
+        return SupervisedStderrDiagnostic::status("invalid");
+    }
+    let mut result = SupervisedStderrDiagnostic {
+        status: if before.len() > LIMIT {
+            "truncated"
+        } else {
+            "complete"
+        },
+        file_bytes: Some(before.len()),
+        captured_bytes: bytes.len(),
+        captured_sha256: Some(sha(&bytes)),
+        categories: BTreeSet::new(),
+        error_codes: BTreeSet::new(),
+    };
+    // 仅导出固定技术错误类别和 errno 标记；原文、URL、路径及配置内容留在私有文件中。
+    let text = String::from_utf8_lossy(&bytes);
+    let tokens = text
+        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .collect::<BTreeSet<_>>();
+    for (code, category) in [
+        ("EACCES", "permission"),
+        ("EPERM", "permission"),
+        ("ENOENT", "path"),
+        ("ENOTDIR", "path"),
+        ("ENOEXEC", "execution"),
+        ("ETXTBSY", "execution"),
+        ("EINVAL", "execution"),
+        ("ECONNREFUSED", "network"),
+        ("ECONNRESET", "network"),
+        ("ECONNABORTED", "network"),
+        ("ENETUNREACH", "network"),
+        ("EHOSTUNREACH", "network"),
+        ("ENOTFOUND", "network"),
+        ("EAI_AGAIN", "network"),
+        ("ETIMEDOUT", "network"),
+        ("CERT_HAS_EXPIRED", "network_tls"),
+        ("DEPTH_ZERO_SELF_SIGNED_CERT", "network_tls"),
+        ("UNABLE_TO_VERIFY_LEAF_SIGNATURE", "network_tls"),
+        ("ERR_TLS_CERT_ALTNAME_INVALID", "network_tls"),
+        ("ENOSPC", "storage"),
+        ("EDQUOT", "storage"),
+        ("EROFS", "storage"),
+        ("EBADMSG", "target_integrity"),
+        ("EILSEQ", "target_integrity"),
+        ("ENOMEM", "resource"),
+    ] {
+        if tokens.contains(code) {
+            result.error_codes.insert(code);
+            result.categories.insert(category);
+        }
+    }
+    for (code, category) in [
+        (
+            "managed_process.linux_atomic_dependency_closure_unbound",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_atomic_dependency_closure_invalid",
+            "loader_policy",
+        ),
+        ("managed_process.linux_atomic_not_elf", "loader_policy"),
+        (
+            "managed_process.linux_glibc_binding_changed",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_glibc_cache_baseline_missing",
+            "loader_policy",
+        ),
+        ("managed_process.linux_glibc_cache_invalid", "loader_policy"),
+        ("managed_process.linux_glibc_elf_invalid", "loader_policy"),
+        (
+            "managed_process.linux_glibc_format_invalid",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_glibc_preload_present",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_glibc_soname_mismatch",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_glibc_system_file_untrusted",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_atomic_program_table_invalid",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_atomic_dynamic_table_invalid",
+            "loader_policy",
+        ),
+        (
+            "managed_process.linux_atomic_executable_stack",
+            "loader_policy",
+        ),
+        ("managed_process.linux_atomic_identity_invalid", "identity"),
+        ("managed_process.linux_atomic_source_changed", "identity"),
+        ("managed_process.linux_atomic_source_too_large", "identity"),
+        ("managed_process.linux_atomic_snapshot_changed", "identity"),
+        ("managed_process.linux_atomic_seal_incomplete", "execution"),
+        ("managed_process.linux_atomic_argument_invalid", "execution"),
+        (
+            "managed_process.linux_atomic_environment_invalid",
+            "execution",
+        ),
+    ] {
+        if text.contains(code) {
+            result.error_codes.insert(code);
+            result.categories.insert(category);
+        }
+    }
+    let lower = text.to_ascii_lowercase();
+    for (phrase, category) in [
+        ("failed to download", "network"),
+        ("download failed", "network"),
+        ("failed to fetch", "network"),
+        ("unable to fetch", "network"),
+        ("connection timed out", "network"),
+        ("certificate verify failed", "network_tls"),
+        ("permission denied", "permission"),
+        ("operation not permitted", "permission"),
+        ("checksum mismatch", "target_integrity"),
+        ("hash mismatch", "target_integrity"),
+        ("exec format error", "execution"),
+        ("cannot execute", "execution"),
+        ("failed to execute", "execution"),
+        ("no such file or directory", "path"),
+        ("unsupported platform", "platform"),
+        ("unsupported architecture", "platform"),
+    ] {
+        if lower.contains(phrase) {
+            result.categories.insert(category);
+        }
+    }
+    if !bytes.is_empty() && result.categories.is_empty() {
+        result.categories.insert("unknown");
+    }
+    result
 }
 
 fn sha(bytes: &[u8]) -> String {
@@ -868,6 +1160,164 @@ fn supervisor_generations(root: &Path) -> Result<BTreeSet<PathBuf>, &'static str
     Ok(result)
 }
 
+fn supervised_exit_diagnostic(root: &Path, before: &BTreeSet<PathBuf>) -> SupervisedExitDiagnostic {
+    let Ok(after) = supervisor_generations(root) else {
+        return SupervisedExitDiagnostic::status("generation_unavailable");
+    };
+    let mut created = after.difference(before);
+    let Some(directory) = created.next() else {
+        return SupervisedExitDiagnostic::status("generation_missing");
+    };
+    if created.next().is_some() {
+        return SupervisedExitDiagnostic::status("generation_ambiguous");
+    }
+    let Some(generation) = directory
+        .file_name()
+        .and_then(OsStr::to_str)
+        .and_then(|value| uuid::Uuid::parse_str(value).ok())
+    else {
+        return SupervisedExitDiagnostic::status("generation_invalid");
+    };
+    let Ok(state) = journal_root() else {
+        return SupervisedExitDiagnostic::status("generation_unavailable");
+    };
+    // 只读取本次唯一新代次且经 manifest/退出合同验证的字段，不输出原生日志或私有路径。
+    let mut result =
+        SupervisedExitDiagnostic::from_receipt(managed_process::confirmed_exit(&state, generation));
+    if result.status == "confirmed" {
+        result.stderr = Some(supervised_output_diagnostic(
+            root,
+            &directory.join("supervisor.stderr"),
+        ));
+        result.stdout = Some(supervised_output_diagnostic(
+            root,
+            &directory.join("supervisor.stdout"),
+        ));
+    }
+    result
+}
+
+#[test]
+fn supervised_stderr_diagnostic_is_bounded_and_redacts_private_text() {
+    let root = tempfile::tempdir().unwrap();
+    let directory = root.path().join("generation");
+    fs::create_dir(&directory).unwrap();
+    let path = directory.join("supervisor.stderr");
+    let mut bytes = b"EACCES: permission denied /private/fixture/token-content\n".to_vec();
+    bytes.resize(70 * 1024, b'x');
+    fs::write(&path, &bytes).unwrap();
+    let observed = supervised_output_diagnostic(root.path(), &path);
+    assert_eq!(observed.status, "truncated");
+    assert_eq!(observed.file_bytes, Some(70 * 1024));
+    assert_eq!(observed.captured_bytes, 64 * 1024);
+    assert_eq!(observed.captured_sha256, Some(sha(&bytes[..64 * 1024])));
+    assert_eq!(observed.categories, BTreeSet::from(["permission"]));
+    assert_eq!(observed.error_codes, BTreeSet::from(["EACCES"]));
+    let encoded = serde_json::to_string(&observed).unwrap();
+    assert!(!encoded.contains("/private/") && !encoded.contains("token-content"));
+    fs::write(&path, b"unclassified private text").unwrap();
+    assert_eq!(
+        supervised_output_diagnostic(root.path(), &path).categories,
+        BTreeSet::from(["unknown"])
+    );
+    fs::remove_file(&path).unwrap();
+    symlink(root.path().join("private-log"), &path).unwrap();
+    assert_eq!(
+        supervised_output_diagnostic(root.path(), &path).status,
+        "invalid"
+    );
+}
+
+#[tokio::test]
+async fn supervised_stdout_capture_requires_live_scope_and_classifies_loader_policy() {
+    let root = tempfile::tempdir().unwrap();
+    let state = root.path().join("state");
+    let generation = uuid::Uuid::new_v4();
+    let directory = state
+        .join("cli-agent-processes")
+        .join(generation.to_string());
+    fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("supervisor.stdout");
+    let text = b"managed_process.linux_atomic_dependency_closure_unbound managed_process.linux_glibc_cache_baseline_missing /private/fixture";
+    preserve_supervised_stdout(&state, generation, text);
+    assert!(!path.exists());
+    LIVE_DIAGNOSTIC_ROOT
+        .scope(root.path().to_owned(), async {
+            preserve_supervised_stdout(&state, generation, text);
+            preserve_supervised_stdout(&state, generation, b"must not overwrite");
+        })
+        .await;
+    assert_eq!(fs::read(&path).unwrap(), text);
+    assert_eq!(fs::metadata(&path).unwrap().mode() & 0o777, 0o600);
+    let observed = supervised_output_diagnostic(root.path(), &path);
+    assert_eq!(observed.categories, BTreeSet::from(["loader_policy"]));
+    assert_eq!(
+        observed.error_codes,
+        BTreeSet::from([
+            "managed_process.linux_atomic_dependency_closure_unbound",
+            "managed_process.linux_glibc_cache_baseline_missing",
+        ])
+    );
+    assert!(
+        !serde_json::to_string(&observed)
+            .unwrap()
+            .contains("/private/")
+    );
+    let foreign = tempfile::tempdir().unwrap();
+    fs::remove_file(&path).unwrap();
+    LIVE_DIAGNOSTIC_ROOT
+        .scope(foreign.path().to_owned(), async {
+            preserve_supervised_stdout(&state, generation, text);
+        })
+        .await;
+    assert!(!path.exists());
+}
+
+#[test]
+fn supervised_exit_diagnostic_preserves_native_status_without_private_text() {
+    let receipt: ExitReceipt = serde_json::from_value(serde_json::json!({
+        "version": 1,
+        "generation": uuid::Uuid::new_v4(),
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_reason": "native_exit",
+        "exit_code": 17,
+        "manifest_sha256": "a".repeat(64),
+    }))
+    .unwrap();
+    let observed = SupervisedExitDiagnostic::from_receipt(Ok(Some(receipt.clone())));
+    assert_eq!(observed.status, "confirmed");
+    assert_eq!(observed.exit_code, Some(17));
+    assert_eq!(observed.exit_reason, Some(ExitReason::NativeExit));
+    assert!(observed.cleanup_confirmed);
+    assert_eq!(
+        SupervisedExitDiagnostic::from_receipt(Ok(None)).status,
+        "receipt_missing"
+    );
+    let mut invalid_receipt = receipt;
+    invalid_receipt.containment = "/private/unknown-containment".to_owned();
+    let invalid = SupervisedExitDiagnostic::from_receipt(Ok(Some(invalid_receipt)));
+    assert_eq!(invalid.status, "receipt_invalid");
+    assert!(
+        !serde_json::to_string(&invalid)
+            .unwrap()
+            .contains("/private/")
+    );
+    let rejected = SupervisedExitDiagnostic::from_receipt(Err(io::Error::other(
+        "/private/fixture/native-error-body",
+    )));
+    assert_eq!(rejected.status, "receipt_invalid");
+    assert!(
+        !serde_json::to_string(&rejected)
+            .unwrap()
+            .contains("/private/")
+    );
+    assert_eq!(
+        SupervisedExitDiagnostic::from_receipt(Err(io::Error::from_raw_os_error(5))).os_error,
+        Some(5)
+    );
+}
+
 struct WriteBlock {
     path: PathBuf,
     mode: u32,
@@ -1043,6 +1493,7 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
     } else {
         execute(plan, None).await
     };
+    evidence.supervised_exit = Some(supervised_exit_diagnostic(root, &generations_before));
     if let Some(write_block) = write_block {
         write_block.restore()?;
     }
@@ -1342,24 +1793,29 @@ async fn real_native_update_without_model() {
         same_source_build_verified: true,
         same_commit_verified_by_runner: false,
         failure_intent_persisted: false,
+        supervised_exit: None,
     };
-    let result = if manifest.fixed_release_input {
-        let (agent, channel) = agent_channel(&manifest).unwrap();
-        // 固定发行输入只在本次验收作用域内替代版本发现，消费者仍查询官方渠道。
-        FIXED_RELEASE
-            .scope(
-                (
-                    agent,
-                    channel,
-                    manifest.target_version.clone(),
-                    manifest.test_only_target_candidate,
-                ),
-                exercise(&manifest, &mut evidence),
-            )
-            .await
-    } else {
-        exercise(&manifest, &mut evidence).await
-    };
+    let result = LIVE_DIAGNOSTIC_ROOT
+        .scope(manifest.root.clone(), async {
+            if manifest.fixed_release_input {
+                let (agent, channel) = agent_channel(&manifest).unwrap();
+                // 固定发行输入只在本次验收作用域内替代版本发现，消费者仍查询官方渠道。
+                FIXED_RELEASE
+                    .scope(
+                        (
+                            agent,
+                            channel,
+                            manifest.target_version.clone(),
+                            manifest.test_only_target_candidate,
+                        ),
+                        exercise(&manifest, &mut evidence),
+                    )
+                    .await
+            } else {
+                exercise(&manifest, &mut evidence).await
+            }
+        })
+        .await;
     evidence.failure_code = result.as_ref().err().copied();
     if let Ok(after) = config_snapshot(&manifest.root) {
         (

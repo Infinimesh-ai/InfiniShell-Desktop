@@ -87,6 +87,36 @@ enum AtomicLaunchKind {
 pub(crate) struct PreparedLaunchBinding {
     digest: String,
     kind: Option<AtomicLaunchKind>,
+    #[cfg(windows)]
+    child_image: Option<WindowsChildImage>,
+}
+
+/// 来源层独立获取的官方目标文件身份；不能由正在执行的更新器提供。
+#[cfg(windows)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WindowsChildImage {
+    pub(crate) size: u64,
+    pub(crate) sha256: String,
+}
+
+#[cfg(windows)]
+impl WindowsChildImage {
+    fn validate(&self) -> io::Result<()> {
+        if self.size == 0
+            || self.size > 1024 * 1024 * 1024
+            || self.sha256.len() != 64
+            || !self
+                .sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(io::Error::other(
+                "managed_process.child_image_identity_invalid",
+            ));
+        }
+        Ok(())
+    }
 }
 
 impl PreparedLaunchBinding {
@@ -121,7 +151,31 @@ impl PreparedLaunchBinding {
                 "managed_process.launch_binding_digest_invalid",
             ));
         }
-        Ok(Self { digest, kind })
+        Ok(Self {
+            digest,
+            kind,
+            #[cfg(windows)]
+            child_image: None,
+        })
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn with_child_image(mut self, image: WindowsChildImage) -> io::Result<Self> {
+        image.validate()?;
+        if !self.is_native_file() || self.child_image.is_some() {
+            return Err(io::Error::other(
+                "managed_process.child_image_binding_invalid",
+            ));
+        }
+        self.digest = sha256(
+            format!(
+                "windows-child-image-v1:{}:{}:{}",
+                self.digest, image.size, image.sha256
+            )
+            .as_bytes(),
+        );
+        self.child_image = Some(image);
+        Ok(self)
     }
 
     pub(crate) fn digest(&self) -> &str {
@@ -451,6 +505,9 @@ struct Manifest {
     expected_files: Vec<ExpectedFileIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     atomic_launch_kind: Option<AtomicLaunchKind>,
+    #[cfg(windows)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    child_image: Option<WindowsChildImage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     atomic_cwd: Option<AtomicDirectoryIdentity>,
 }
@@ -820,6 +877,8 @@ async fn spawn_configured(
         environment,
         expected_files,
         atomic_launch_kind,
+        #[cfg(windows)]
+        child_image: binding.and_then(|binding| binding.child_image.clone()),
         atomic_cwd,
     };
     let (directory, manifest_bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -895,6 +954,8 @@ pub(crate) fn record_not_started(
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: None,
+        #[cfg(windows)]
+        child_image: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -926,6 +987,8 @@ pub(crate) fn record_not_started_with_binding(
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: binding.kind,
+        #[cfg(windows)]
+        child_image: binding.child_image.clone(),
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -1266,6 +1329,15 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         return Err(io::Error::other("托管进程启动契约不匹配"));
     }
     validate_expected_files_contract(&manifest.executable, &manifest.expected_files)?;
+    #[cfg(windows)]
+    if let Some(image) = &manifest.child_image {
+        image.validate()?;
+        if manifest.atomic_launch_kind != Some(AtomicLaunchKind::NativeFile) {
+            return Err(io::Error::other(
+                "managed_process.child_image_binding_invalid",
+            ));
+        }
+    }
     if manifest.isolated_state_dir.is_some() && manifest.isolated_home.is_none() {
         return Err(io::Error::other("隔离持久状态域缺少隔离目录"));
     }
@@ -1593,7 +1665,7 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
         .env(EXEC_CONTROL_ENV, child_listener.local_addr()?.to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null());
+        .stderr(Stdio::inherit());
     let mut tree = ManagedTree::claim(command.spawn()?)?;
     // 严格 Job/进程组已经就绪后才发送授权，内部 worker 此前不能派生真实 CLI。
     let execution_control = accept_authorized(&child_listener, manifest)?;
@@ -1932,6 +2004,7 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                         ));
                     }
                     let mut executable = atomic_windows::prepare(&manifest.expected_files[0])?;
+                    executable.set_child_image(manifest.child_image.clone())?;
                     let cwd_identity = manifest.atomic_cwd.as_ref().ok_or_else(|| {
                         io::Error::other("managed_process.atomic_cwd_binding_missing")
                     })?;
@@ -2120,6 +2193,9 @@ fn unsafe_dynamic_loader_environment(name: &std::ffi::OsStr) -> bool {
             name,
             b"LD_AUDIT" | b"LD_DEBUG" | b"LD_LIBRARY_PATH" | b"LD_PRELOAD" | b"LD_PROFILE"
         )
+        || cfg!(target_os = "linux")
+            && (name.starts_with(b"LD_")
+                || matches!(name, b"GLIBC_TUNABLES" | b"GCONV_PATH" | b"LOCPATH"))
 }
 
 #[cfg(windows)]

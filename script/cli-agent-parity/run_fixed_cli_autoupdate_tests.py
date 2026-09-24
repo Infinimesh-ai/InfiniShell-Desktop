@@ -83,6 +83,26 @@ class FixedUpdateTests(unittest.TestCase):
         self.assertEqual(data["binaries"][0]["stat_error_type"], "FileNotFoundError")
         self.assertTrue(data["binaries"][1]["is_file"])
 
+    def test_selected_agent_runs_all_its_transactions_without_claiming_other_agents(self):
+        argv = ["run_fixed_cli_autoupdate.py", "--test-binary", str(self.worker),
+                "--supervisor", str(self.supervisor), "--fixture-parent", str(self.root),
+                "--cache", str(self.root / "cache"), "--output", str(self.args.output),
+                "--agents", "claude"]
+        with patch.object(runner.sys, "platform", "linux"), patch.object(runner.sys, "argv", argv), \
+                patch.object(runner.sys, "stderr", io.StringIO()), patch.object(runner.sys, "stdout", io.StringIO()), \
+                patch.object(runner, "prepared_input", return_value=self.old) as prepare, \
+                patch.object(runner, "verified_input"), \
+                patch.object(runner, "linux_case", side_effect=lambda args, agent, old, target, plugin, expected:
+                             {"agent": agent, "expected": expected, "passed": True}) as case:
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual({call.args[0] for call in prepare.call_args_list}, {"claude"})
+        self.assertEqual([call.args[-1] for call in case.call_args_list], list(runner.CASES))
+        summary = json.loads(self.args.output.read_text())
+        self.assertEqual(summary["selected_agents"], ["claude"])
+        self.assertEqual(summary["selected_cases"], list(runner.CASES))
+        self.assertEqual(summary["target_versions"], {"claude": runner.TARGET["claude"]})
+        self.assertEqual({row["agent"] for row in summary["cases"]}, {"claude"})
+
     def test_codex_copy_preserves_the_entire_package_and_refuses_overwrite(self):
         source = self.root / "input/bin/codex"
         source.parent.mkdir(parents=True)
