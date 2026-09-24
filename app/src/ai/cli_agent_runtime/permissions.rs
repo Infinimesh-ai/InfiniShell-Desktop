@@ -176,7 +176,11 @@ pub(crate) fn ceiling_from_parent(
         .filter(|id| !id.is_empty())
         .ok_or_else(reject)?;
     let permissions = match parent.harness.as_str() {
-        "codex" if config.get("cli_version").and_then(Value::as_str) == Some("0.147.0") => {
+        "codex"
+            if config.get("cli_version").and_then(Value::as_str) == Some("0.147.0")
+                || (cfg!(any(target_os = "macos", target_os = "linux", windows))
+                    && config.get("cli_version").and_then(Value::as_str) == Some("0.156.1")) =>
+        {
             NativePermissions::Codex(parse_permissions(&observed).ok_or_else(reject)?)
         }
         "claude"
@@ -198,12 +202,13 @@ pub(crate) fn ceiling_from_parent(
             })
         }
         "grok"
-            if matches!(config["cli_version"].as_str(), Some("1.0.30" | "1.0.34"))
-                && matches!(
-                    config["permission_policy"].as_str(),
-                    Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
-                )
-                && observed["appCreationPolicyApplied"] == true
+            if config["cli_version"].as_str().is_some_and(|version| {
+                matches!(version, "1.0.30" | "1.0.34")
+                    || super::grok::current_fixed_scope_supported_version(version)
+            }) && matches!(
+                config["permission_policy"].as_str(),
+                Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
+            ) && observed["appCreationPolicyApplied"] == true
                 && observed["permissionEnforcementVerified"] == false
                 && config["grok_profile"] == observed["grokCreationPolicyV1"] =>
         {

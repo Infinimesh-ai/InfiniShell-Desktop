@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { TextDecoder } = require("node:util");
 
-const PLUGIN_VERSION = "0.1.3";
+const PLUGIN_VERSION = "0.1.4";
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_FRAME_BYTES = 4096;
 const TOTAL_TIMEOUT_MS = 4000;
@@ -109,7 +109,8 @@ function makeNotification(input) {
       errorType = "permission_denied";
       break;
     case "notification":
-      event = "notification";
+      // 固定原生类别明确表示权限 UI 正在等待；标题和正文仅用于展示，不能推断审批。
+      event = input.notificationType === "permission_prompt" ? "permission_request" : "notification";
       if (input.notificationType === "idle_prompt") terminalUnverified = true;
       break;
     default: return null;

@@ -1,0 +1,690 @@
+{
+  "schema_version": 1,
+  "draft": true,
+  "scope": "macos_fixed_cli_native_runtime_and_notification_plugin_receipt_summary",
+  "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+  "worktree_dirty": true,
+  "final_source_equality_verified": false,
+  "binary_binding_policy": "each_case_bound_to_recorded_binary_sha256_not_final_source_snapshot",
+  "platform": "macos",
+  "fixed_cli_versions": {
+    "grok": "1.0.41",
+    "claude": "2.1.280",
+    "codex": "0.156.1"
+  },
+  "native_runtime_passed_case_count": 3,
+  "production_rust_plugin_passed_case_count": 5,
+  "native_runtime_cases": [
+    {
+      "id": "codex-parent-child-2",
+      "acceptance_passed": true,
+      "cli": {
+        "version": "0.156.1",
+        "entrypoint_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "scope": "codex_01561_production_parent_child_inspect",
+      "test": "ai::cli_agent_runtime::coordinator::codex_live_tests::real_codex_01561_parent_child",
+      "test_binary_sha256": "5d980c3e9387b2be33b8b5e0ef6c1141f6e6a11233b301d73fbb29efa75935a2",
+      "supervisor_binary_sha256": "c53c82ffe31e3dfd275ebeaa9d7e45cc1ade2fd40b9992038a5ee8f8242935db",
+      "test_exit_code": 0,
+      "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+      "worktree_dirty": true,
+      "final_source_equality_verified": false,
+      "sources": [
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-parent-child-2.metadata.json",
+          "sha256": "7c350e5c21dc10db3a793da8e385d733157e17b5831f2c95e2aa8ff4308a13d2"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-parent-child-2.ndjson",
+          "sha256": "1626d734c6a9d7cd6cd8755ec85d20c45594de40dab6a89e29e2693fcebda069"
+        }
+      ],
+      "production_gate": {
+        "test_only_candidate": false
+      },
+      "budget": {
+        "max_native_inputs": 4,
+        "max_native_tools": 2,
+        "max_seconds": 180
+      },
+      "metrics": {
+        "accepted_inputs": 3,
+        "native_tool_calls": 2,
+        "child_count": 1,
+        "automatic_result_enqueued_verified": true,
+        "automatic_result_native_ack_verified": false,
+        "explicit_continuation_native_ack_verified": true,
+        "native_inspect_result_verified": true,
+        "parent_permission_ceiling_verified": true,
+        "parent_result_verified": true,
+        "child_result_verified": true,
+        "cleanup_confirmed": true,
+        "cleanup_receipts": 2,
+        "child_file_effect_verified": false,
+        "bidirectional_messages_verified": false,
+        "explicit_parent_continuation_generation": 2
+      },
+      "result_delivery_mode": "queued_automatic_result_then_explicit_generation_2_continuation_and_inspect",
+      "automatic_result_native_ack_claimed": false
+    },
+    {
+      "id": "claude-parent-child-2",
+      "acceptance_passed": true,
+      "cli": {
+        "version": "2.1.280",
+        "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "scope": "real_claude_production_coordinator",
+      "test": "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child",
+      "test_binary_sha256": "750c88751bcb308d68828ac23b1aaddb1b688a38c45359bbbc1c8cee59d04948",
+      "supervisor_binary_sha256": "ddfe4e571bf9cac7d67aaef3268dc88ee6b00d465b0f27e01dd72fd00c6a4533",
+      "test_exit_code": 0,
+      "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+      "worktree_dirty": true,
+      "final_source_equality_verified": false,
+      "sources": [
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-parent-child-2.metadata.json",
+          "sha256": "3e3aef88a6681795109c8b9f595e9526dc05c4158613f542579d07d701649a7f"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-parent-child-2.ndjson",
+          "sha256": "3b691596b897d11d6af0840664f638ae36ca1310a10717c2756bd943ec0a2130"
+        }
+      ],
+      "production_gate": {
+        "test_only_candidate": false,
+        "production_version_gate_verified": true
+      },
+      "budget": {
+        "max_native_tools": 4,
+        "max_native_inputs": 6,
+        "max_native_executions": 6,
+        "max_test_seconds": 450
+      },
+      "metrics": {
+        "approvals_allowed": 5,
+        "native_tool_calls": 4,
+        "native_inputs": 5,
+        "native_executions": 3,
+        "joined_inputs": 2,
+        "child_edit_effect_verified": true,
+        "automatic_result_delivery_ack_verified": true,
+        "final_result_via_inspect": true,
+        "native_message_ack_both_directions": true,
+        "production_spawn_verified": true,
+        "saved_profile_equal": true,
+        "cleanup_receipts": 2,
+        "parent_generation_count": 2,
+        "child_generation_count": 1,
+        "native_success_result_count": 3,
+        "cli_binary_unchanged": true,
+        "supervisor_binary_unchanged": true,
+        "sensitive_value_scan_passed": true
+      }
+    },
+    {
+      "id": "grok-root",
+      "acceptance_passed": true,
+      "cli": {
+        "version": "1.0.41",
+        "entrypoint_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "scope": "production_process_transport_with_runtime_commands",
+      "test": "ai::cli_agent_runtime::grok::live_tests::real_grok_current_root_lifecycle",
+      "test_binary_sha256": "5d980c3e9387b2be33b8b5e0ef6c1141f6e6a11233b301d73fbb29efa75935a2",
+      "supervisor_binary_sha256": "ddfe4e571bf9cac7d67aaef3268dc88ee6b00d465b0f27e01dd72fd00c6a4533",
+      "test_exit_code": 0,
+      "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+      "worktree_dirty": true,
+      "final_source_equality_verified": false,
+      "sources": [
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-root.metadata.json",
+          "sha256": "21e69975fe3ee168fda650e9e184f7dc60807805c8313d5846bd58f8737ec80a"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-root.ndjson",
+          "sha256": "357a40031ef468bd40cb31d45f82ed6d4ac9079919a6a2baf87b1714ec88c1e2"
+        }
+      ],
+      "production_gate": {
+        "public_product_gate_open": true,
+        "production_runtime_commands": true,
+        "test_only_internal_command_switch": false,
+        "test_only_current_candidate_gate": false
+      },
+      "budget": {
+        "max_acp_inputs": 8,
+        "deadline_seconds": 600
+      },
+      "metrics": {
+        "accepted_inputs": 8,
+        "native_turns": 8,
+        "native_generation_count": 2,
+        "completed_turns": 6,
+        "cancelled_turns": 2,
+        "approval_allow_count": 1,
+        "approval_deny_count": 1,
+        "approval_resolution_native_receipt_verified": false,
+        "native_history_verified_all_turns": true,
+        "product_full_output_preserved_all_turns": true,
+        "output_truncated_any_turn": false,
+        "queued_input_native_ack_verified": true,
+        "queued_input_verified": true,
+        "same_turn_steering_supported": false,
+        "cleanup_receipts": 2,
+        "cleanup_confirmed": true,
+        "private_settings_unchanged": false,
+        "tunnels_stopped": true,
+        "private_auth_copy_removed": true,
+        "separate_internal_supervisor_state_removed": true
+      },
+      "phase_counts": {
+        "first_turn": 1,
+        "second_turn": 1,
+        "approval_allow": 1,
+        "approval_deny": 1,
+        "queued_input": 2,
+        "cancel": 1,
+        "resume_result": 1
+      },
+      "file_effect_checks": [
+        {
+          "phase": "approval_allow",
+          "allowed": true
+        },
+        {
+          "phase": "approval_deny",
+          "allowed": false
+        }
+      ],
+      "unverified": {
+        "child_tasks_verified": false,
+        "local_tools_verified": false,
+        "skills_verified": false,
+        "parent_permission_ceiling_verified": false
+      }
+    }
+  ],
+  "notification_contracts": {
+    "id": "notification-installation-contracts",
+    "scope": "macos_fixed_cli_notification_plugin_installation_contracts",
+    "cli": {
+      "grok": {
+        "version": "1.0.41",
+        "entrypoint_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "claude": {
+        "version": "2.1.280",
+        "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "codex": {
+        "version": "0.156.1",
+        "entrypoint_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      }
+    },
+    "test_binary_sha256": null,
+    "supervisor_binary_sha256": null,
+    "test_execution_kind": "python_node_native_cli_probes_without_rust_product_installer",
+    "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+    "worktree_dirty": true,
+    "final_source_equality_verified": false,
+    "model_inputs": 0,
+    "credentials_read_or_copied": false,
+    "test_counts": {
+      "notification_patch_python": 20,
+      "plugin_compatibility_python": 14,
+      "grok_node": 14
+    },
+    "metrics": {
+      "codex_registry_lifecycle": "passed",
+      "codex_hook_list_count": 5,
+      "codex_hook_trust_keys_and_hashes_unchanged": true,
+      "codex_native_hook_execution_verified": false,
+      "claude_instrumented_session_start_paths": {
+        "passed": 3
+      },
+      "claude_native_upgrade_and_disabled_update": "passed",
+      "claude_full_native_notification_lifecycle_verified": false,
+      "grok_native_validate_install_list_uninstall": "passed",
+      "grok_exact_cache_tree_and_registry_contract": "passed",
+      "grok_native_hook_execution_verified": false,
+      "production_rust_installer_exercised": false
+    },
+    "sources": [
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/notification-contracts.safe.json",
+        "sha256": "6db2703a345670cc73b7c6e5d8d535bec28c0d72bf6c52789c37cfaa4476f5f7"
+      }
+    ],
+    "passed_probe_sources": [
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/codex-lifecycle.json",
+        "sha256": "4b0bee5450975624c513ae5b6a484d7233a508ef579e27511cfae2556d0d6c18"
+      },
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/codex-trust.json",
+        "sha256": "f8cb220e7f4bc0ce1e22a6ebd463a9aad7414eb533702586c4147f3002e0aa20"
+      },
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/claude-paths.json",
+        "sha256": "a982f2f0c61eac9e0e893c20feefaa2da55eced9f1293e615ea5e386d135d041"
+      },
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/claude-upgrade-retry.json",
+        "sha256": "669bdc5b4e8cdbbf52e964351262bae307f07748dc86a039a9d1cec0f5bc2ec4"
+      },
+      {
+        "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/grok-plugin-retry.json",
+        "sha256": "141140612a131e2e54b0c965af534ef10c45c38c1bf327ff985229fe3a6e8832"
+      }
+    ],
+    "preserved_probe_failures": [
+      {
+        "source": {
+          "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/claude-upgrade.json",
+          "sha256": "05ead45c23187bbe8ac0a09e38bf7cab9a60640a25f10af8c5048e1f2640b630"
+        },
+        "reason_code": "probe_fault_injection_missing_staging_dir_keyword",
+        "corrected_probe_passed": true
+      },
+      {
+        "source": {
+          "path": "/private/tmp/infinishell-mac-plugin-contract-ga5lx3g0/grok-plugin.json",
+          "sha256": "3ef4a043de8f1759e2f6d7e54fed2ee61ed226192483ba526f3a632670d8df68"
+        },
+        "reason_code": "probe_read_cache_path_from_wrong_registry_record",
+        "corrected_probe_passed": true
+      }
+    ]
+  },
+  "production_rust_plugin_transactions": {
+    "scope": "production_rust_notification_plugin_transactions",
+    "passed": true,
+    "model_inputs": 0,
+    "credentials_read_or_copied": false,
+    "sources": [
+      {
+        "path": "/private/tmp/isp-plugin-rust-ursrpmtr/summary.safe.json",
+        "sha256": "22ff598cf68d62a704500bffcba692dd3a42e1fce9b1d5b313bfdf1011676b22"
+      },
+      {
+        "path": "/private/tmp/isp-plugin-rust-ursrpmtr/inputs.json",
+        "sha256": "d2dcd1aa4f7f47ac15854dfa33e79a16eb697c155fef93365032370216b385e0"
+      }
+    ],
+    "cases": [
+      {
+        "id": "codex",
+        "accepted": true,
+        "cli": {
+          "version": "0.156.1",
+          "entrypoint_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+          "entrypoint_hash_kind": "native_executable",
+          "native_executable_sha256_recorded": true
+        },
+        "scope": "production_rust_notification_plugin_transactions",
+        "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+        "supervisor_binary_sha256": null,
+        "supervisor_used": false,
+        "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+        "worktree_dirty": true,
+        "final_source_equality_verified": false,
+        "model_inputs": 0,
+        "test_exit_code": 0,
+        "elapsed_seconds": 7.654,
+        "sources": [
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/codex-events.jsonl",
+            "sha256": "ad37b7adcdd807e4b5f71bc676bc6a7c478d7724ed1e4b1f90f4cf14aea20148"
+          },
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/codex.log",
+            "sha256": "aa98e24f72df7d9e2ab8f6f9ff570250fbe395f9bb0ac7e6dfe600a815d5a94a"
+          }
+        ],
+        "metrics": {
+          "cli_files_unchanged": true,
+          "libtest_unchanged": true,
+          "disabled_orchestration_preserved": true,
+          "old_cache_and_transaction_preserved": true,
+          "old_source_and_metadata_preserved": true,
+          "rev4_source_and_cache_verified": true,
+          "user_configuration_and_trust_preserved": true,
+          "event_count": 12,
+          "repeat_install_preserves_previous_recovery_material": true,
+          "rejection_case_count": 4,
+          "all_rejections_leave_bytes_and_modes_unchanged": true,
+          "all_rejections_avoid_native_command": true
+        },
+        "test_kind": "production_rust_source_migration"
+      },
+      {
+        "id": "claude-upgrade",
+        "accepted": true,
+        "cli": {
+          "version": "2.1.280",
+          "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+          "entrypoint_hash_kind": "native_executable",
+          "native_executable_sha256_recorded": true
+        },
+        "scope": "production_rust_notification_plugin_transactions",
+        "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+        "supervisor_binary_sha256": null,
+        "supervisor_used": false,
+        "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+        "worktree_dirty": true,
+        "final_source_equality_verified": false,
+        "model_inputs": 0,
+        "test_exit_code": 0,
+        "elapsed_seconds": 11.109,
+        "sources": [
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-upgrade.json",
+            "sha256": "080239767602e2313088004c72ebaff2dde68597f4d91c0c5770c24c6761d4ba"
+          },
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-upgrade.log",
+            "sha256": "0d128275a20ee5ba329089a096bb1d198afd4bc288fa0032989263c45cb29bfe"
+          }
+        ],
+        "metrics": {
+          "cli_files_unchanged": true,
+          "libtest_unchanged": true,
+          "verified": true,
+          "model_requests": 0,
+          "old_cache_preserved": true
+        },
+        "test_kind": "production_rust_plugin_upgrade",
+        "active_plugin_version": "2.2.0",
+        "plugin_version_is_not_cli_version": true
+      },
+      {
+        "id": "claude-patch-failure",
+        "accepted": true,
+        "cli": {
+          "version": "2.1.280",
+          "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+          "entrypoint_hash_kind": "native_executable",
+          "native_executable_sha256_recorded": true
+        },
+        "scope": "production_rust_notification_plugin_transactions",
+        "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+        "supervisor_binary_sha256": null,
+        "supervisor_used": false,
+        "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+        "worktree_dirty": true,
+        "final_source_equality_verified": false,
+        "model_inputs": 0,
+        "test_exit_code": 0,
+        "elapsed_seconds": 10.635,
+        "sources": [
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-patch-failure.json",
+            "sha256": "77f6960831b4e7e60b17b464fa0735251f5c65ce9f8a19e0da6cf504916ec5b3"
+          },
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-patch-failure.log",
+            "sha256": "0292c931ca960b4afb58f3bce5b415a269a05929731a09e3a379951f97dd615b"
+          }
+        ],
+        "metrics": {
+          "cli_files_unchanged": true,
+          "libtest_unchanged": true,
+          "verified": true,
+          "model_requests": 0,
+          "old_cache_preserved": true
+        },
+        "test_kind": "production_rust_plugin_patch_failure_rollback",
+        "active_plugin_version": "2.1.0",
+        "plugin_version_is_not_cli_version": true
+      },
+      {
+        "id": "claude-crash-retry",
+        "accepted": true,
+        "cli": {
+          "version": "2.1.280",
+          "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+          "entrypoint_hash_kind": "native_executable",
+          "native_executable_sha256_recorded": true
+        },
+        "scope": "production_rust_notification_plugin_transactions",
+        "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+        "supervisor_binary_sha256": null,
+        "supervisor_used": false,
+        "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+        "worktree_dirty": true,
+        "final_source_equality_verified": false,
+        "model_inputs": 0,
+        "test_exit_code": 0,
+        "elapsed_seconds": 15.347,
+        "sources": [
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-crash-retry.json",
+            "sha256": "2bae8f3f78abfc533e19f4a390c8b5ee6eef3ef61820254f2c677a27715bb307"
+          },
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/claude-crash-retry.log",
+            "sha256": "cb9135b8a635479adc81abb73fd7c0c97c3c671d723f104d9b6ce058ae1046ad"
+          }
+        ],
+        "metrics": {
+          "cli_files_unchanged": true,
+          "libtest_unchanged": true,
+          "verified": true,
+          "model_requests": 0,
+          "old_cache_preserved": true,
+          "original_git_request_held_during_retry": true,
+          "old_native_process_liveness_verified": false,
+          "distinct_new_stage": true,
+          "old_stage_preserved": true,
+          "published_state_unchanged_after_release": true,
+          "observation_after_release_seconds": 3
+        },
+        "test_kind": "production_rust_plugin_interrupted_staging_retry",
+        "active_plugin_version": "2.2.0",
+        "plugin_version_is_not_cli_version": true,
+        "retry_scope": "staged_native_marketplace_clone_not_registry_publication"
+      },
+      {
+        "id": "grok",
+        "accepted": true,
+        "cli": {
+          "version": "1.0.41",
+          "entrypoint_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+          "entrypoint_hash_kind": "native_executable",
+          "native_executable_sha256_recorded": true
+        },
+        "scope": "production_rust_notification_plugin_transactions",
+        "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+        "supervisor_binary_sha256": null,
+        "supervisor_used": false,
+        "baseline_commit": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+        "worktree_dirty": true,
+        "final_source_equality_verified": false,
+        "model_inputs": 0,
+        "test_exit_code": 0,
+        "elapsed_seconds": 29.418,
+        "sources": [
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/grok-home/grok-production-installer.json",
+            "sha256": "6b73d45c3ecb8abeb74749650a7bc4d74172769d221584e345a481f54885fbdc"
+          },
+          {
+            "path": "/private/tmp/isp-plugin-rust-ursrpmtr/grok.log",
+            "sha256": "d2299d9652f7e04f64fe744541212f91ae477caf068d33feda222b13793234b8"
+          }
+        ],
+        "metrics": {
+          "cli_files_unchanged": true,
+          "libtest_unchanged": true,
+          "passed_step_count": 6
+        },
+        "test_kind": "production_rust_plugin_install_upgrade_disabled_preservation_rollback_retry",
+        "steps": [
+          {
+            "step": "production_install",
+            "passed": true
+          },
+          {
+            "step": "production_upgrade_known_010_to_011",
+            "passed": true
+          },
+          {
+            "step": "production_same_version_update",
+            "passed": true
+          },
+          {
+            "step": "production_disabled_update_rejected",
+            "passed": true
+          },
+          {
+            "step": "file_transaction_failure_rollback",
+            "passed": true
+          },
+          {
+            "step": "production_update_after_rollback",
+            "passed": true
+          }
+        ]
+      }
+    ]
+  },
+  "preserved_native_failures": [
+    {
+      "id": "codex-parent-child",
+      "acceptance_passed": false,
+      "cli": {
+        "version": "0.156.1",
+        "entrypoint_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "scope": "codex_01561_production_parent_child",
+      "test_binary_sha256": "d2b370cf9987755c8b7f68fabf976e756b1485efbde54a51296881be5158b30a",
+      "supervisor_binary_sha256": "c53c82ffe31e3dfd275ebeaa9d7e45cc1ade2fd40b9992038a5ee8f8242935db",
+      "test_exit_code": 101,
+      "source_preserved": true,
+      "sources": [
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-parent-child.metadata.json",
+          "sha256": "705a5a7bb5b01b9fc538dc2e58fd28a4c5540fce8d4c2b399ddcdffc06a77549"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-parent-child.ndjson",
+          "sha256": "c52759d1a0a82066647a076d6f497096058871dcebc42cf761f258b9653a51cf"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-parent-child.test-output.txt",
+          "sha256": "47938f7801fcbc5952030eeab8819c5ace581fb1848cc5ec8ad7b050a355248b"
+        }
+      ],
+      "reason_code": "fixture_assumed_automatic_result_enqueue_would_wake_completed_parent",
+      "reason_summary": "父任务已完成，自动结果入队未获 native ACK；旧夹具等待 180 秒失败。后续显式继续第 2 代再 inspect 通过。",
+      "diagnosis_origin": "preserved_timeout_output_and_parent_agent_diagnosis",
+      "max_seconds": 180,
+      "metrics": {
+        "chain_verified": false,
+        "cleanup_confirmed": true,
+        "cleanup_receipts": 2
+      },
+      "subsequent_fix_relaxed_result_or_permission_assertions": false,
+      "automatic_result_native_ack_claimed": false
+    },
+    {
+      "id": "claude-parent-child",
+      "acceptance_passed": false,
+      "cli": {
+        "version": "2.1.280",
+        "entrypoint_sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+        "entrypoint_hash_kind": "native_executable",
+        "native_executable_sha256_recorded": true
+      },
+      "scope": "real_claude_production_coordinator",
+      "test_binary_sha256": "5d980c3e9387b2be33b8b5e0ef6c1141f6e6a11233b301d73fbb29efa75935a2",
+      "supervisor_binary_sha256": "c53c82ffe31e3dfd275ebeaa9d7e45cc1ade2fd40b9992038a5ee8f8242935db",
+      "test_exit_code": 101,
+      "source_preserved": true,
+      "sources": [
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-parent-child.metadata.json",
+          "sha256": "bac9effba34206804d57fed841ac3f307a1730a469b7d1011a5b2824df22f138"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-parent-child.ndjson",
+          "sha256": "e71b63e8e23df77e8489af567ea08cefe0d6196928b45337e42acd9e806966a4"
+        },
+        {
+          "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-parent-child-diagnosis.safe.json",
+          "sha256": "cdde5a74069b7c7e0ae4f8a3d2563084b232f503c84fe0acff06453c839bb174"
+        }
+      ],
+      "reason_code": "model_declined_synthetic_test_prompt_before_tool_call",
+      "reason_summary": "模型在任何工具调用前拒绝合成测试提示；未观察到生产 local tool 门禁拒绝，原生回合正常完成。",
+      "diagnosis_origin": "preserved_safe_diagnosis",
+      "metrics": {
+        "production_version_gate_verified": true,
+        "child_created": false,
+        "local_tool_gate_rejection_observed": false,
+        "cleanup_receipt_count": 1
+      },
+      "native_runtime_event_counts": {
+        "SessionReady": 2,
+        "MessageAccepted": 1,
+        "TurnStarted": 1,
+        "TextDelta": 1,
+        "Progress": 1,
+        "TurnFinished": 1
+      },
+      "native_turn_outcome": "Completed",
+      "native_result_subtype": "success",
+      "product_protocol_failure_claimed": false
+    }
+  ],
+  "scope_limits": {
+    "full_cli_executable_atomic_update_verified": false,
+    "full_native_notification_hook_lifecycle_verified": false,
+    "gui_or_app_restart_acceptance_verified": false,
+    "cross_platform_acceptance_verified": false,
+    "full_cli_parity_acceptance_verified": false,
+    "final_source_equality_verified": false,
+    "codex_automatic_result_native_ack_verified": false,
+    "codex_bidirectional_messages_verified": false,
+    "codex_child_file_effect_verified": false,
+    "grok_parent_child_tasks_verified": false,
+    "grok_same_turn_steering_supported": false,
+    "native_input_counts_equal_http_model_request_counts_claimed": false,
+    "plugin_transaction_upgrade_equals_cli_executable_upgrade": false
+  },
+  "summary_generation": {
+    "model_requests": 0,
+    "cargo_runs": 0,
+    "ci_runs": 0,
+    "repository_files_modified": false,
+    "credential_values_copied": false,
+    "full_transcripts_copied": false,
+    "full_configurations_copied": false,
+    "model_response_bodies_copied": false,
+    "projection": "explicit_boolean_count_fixed_version_hash_path_and_reason_allowlist"
+  },
+  "input_sources": [
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/fixed-inputs.safe.json",
+      "sha256": "c653e18d3df28162d73a8e75f4eb8edda07522347b9658787f9bd0c7cd13a86d"
+    }
+  ]
+}

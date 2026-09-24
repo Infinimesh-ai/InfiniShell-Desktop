@@ -1,0 +1,16 @@
+{
+  "source_auth_stat_unchanged": true,
+  "private_auth_removed": true,
+  "temporary_skill_removed": true,
+  "gui_pids_exited": [
+    68112,
+    68122,
+    68118,
+    68123
+  ],
+  "additional_default_profile_launch": {
+    "pid": 68118,
+    "closed_before_prompt": true,
+    "model_inputs": 0
+  }
+}

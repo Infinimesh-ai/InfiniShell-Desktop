@@ -1104,28 +1104,36 @@ mod idle_crash;
 
 #[test]
 fn latest_version_probe_and_matching_handshake_preserve_requested_permissions() {
-    let mut protocol = CodexProtocol::new(options());
-    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
-    protocol.initialize();
-    // 新版握手是协议形状夹具，不是原生执行记录。
-    let effects = protocol
-        .receive(json!({"id":1,"result":{
-            "userAgent":"infinishell/0.155.1 (Linux; x86_64)"
-        }}))
-        .unwrap();
-    assert_eq!(effects.writes[1]["method"], "thread/start");
-    assert_eq!(effects.writes[1]["params"]["approvalPolicy"], "untrusted");
-    assert_eq!(effects.writes[1]["params"]["approvalsReviewer"], "user");
-    assert_eq!(effects.writes[1]["params"]["sandbox"], "workspace-write");
-    assert!(effects.events.is_empty());
-    let ready = protocol
-        .receive(captured_output(TWO_TURNS, |message| message["id"] == 2))
-        .unwrap();
-    assert!(
-        matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
-        verified_cli_version: Some(version), ..
-    }] if version == "0.155.1")
-    );
+    for version in SUPPORTED_VERSIONS
+        .iter()
+        .copied()
+        .filter(|version| *version != "0.147.0")
+    {
+        let mut protocol = CodexProtocol::new(options());
+        protocol
+            .record_version_probe(&format!("codex-cli {version}"))
+            .unwrap();
+        protocol.initialize();
+        // 新版握手是协议形状夹具，不是原生执行记录。
+        let effects = protocol
+            .receive(json!({"id":1,"result":{
+                "userAgent":format!("infinishell/{version} (macOS; arm64)")
+            }}))
+            .unwrap();
+        assert_eq!(effects.writes[1]["method"], "thread/start");
+        assert_eq!(effects.writes[1]["params"]["approvalPolicy"], "untrusted");
+        assert_eq!(effects.writes[1]["params"]["approvalsReviewer"], "user");
+        assert_eq!(effects.writes[1]["params"]["sandbox"], "workspace-write");
+        assert!(effects.events.is_empty());
+        let ready = protocol
+            .receive(captured_output(TWO_TURNS, |message| message["id"] == 2))
+            .unwrap();
+        assert!(
+            matches!(ready.events.as_slice(), [RuntimeEventKind::SessionReady {
+        verified_cli_version: Some(actual), ..
+    }] if actual == version)
+        );
+    }
 }
 
 #[test]
@@ -1150,18 +1158,23 @@ fn unknown_version_probe_does_not_retain_a_previous_supported_version() {
 fn updater_and_protocol_share_the_exact_supported_version_contract() {
     assert!(supported_version("0.147.0"));
     assert!(supported_version("0.155.1"));
-    assert!(!supported_version("0.156.1"));
+    assert_eq!(
+        supported_version("0.156.1"),
+        cfg!(any(target_os = "macos", target_os = "linux", windows))
+    );
+    assert!(!supported_version("0.156.2"));
+    assert!(!supported_version("0.156.1-alpha.1"));
     assert!(!supported_version("0.155.10"));
     assert!(!supported_version("0.155.1-alpha.1"));
 }
 
 #[test]
-fn test_only_01561_candidate_requires_opt_in_and_matching_handshake() {
+fn candidate_01561_and_production_keep_exact_version_pairing() {
     let mut normal = CodexProtocol::new(options());
-    assert!(matches!(
-        normal.record_version_probe("codex-cli 0.156.1"),
-        Err(RuntimeError::UnsupportedVersion(_))
-    ));
+    assert_eq!(
+        normal.record_version_probe("codex-cli 0.156.1").is_ok(),
+        cfg!(any(target_os = "macos", target_os = "linux", windows))
+    );
     let mut candidate = CodexProtocol::new(options());
     candidate.test_only_01561_profile = true;
     for output in ["codex-cli 0.155.1", "codex-cli 0.156.1-alpha.1"] {
@@ -1193,15 +1206,23 @@ fn test_only_01561_candidate_requires_opt_in_and_matching_handshake() {
 
 #[test]
 fn latest_probe_cannot_initialize_an_older_app_server() {
-    let mut protocol = CodexProtocol::new(options());
-    protocol.record_version_probe("codex-cli 0.155.1").unwrap();
-    protocol.initialize();
-    assert!(matches!(
-        protocol.receive(captured_output(HANDSHAKE, |message| message["id"] == 1)),
-        Err(RuntimeError::UnsupportedVersion(_))
-    ));
-    assert!(protocol.pending.is_empty());
-    assert!(protocol.session_id.is_none());
+    for version in SUPPORTED_VERSIONS
+        .iter()
+        .copied()
+        .filter(|version| *version != "0.147.0")
+    {
+        let mut protocol = CodexProtocol::new(options());
+        protocol
+            .record_version_probe(&format!("codex-cli {version}"))
+            .unwrap();
+        protocol.initialize();
+        assert!(matches!(
+            protocol.receive(captured_output(HANDSHAKE, |message| message["id"] == 1)),
+            Err(RuntimeError::UnsupportedVersion(_))
+        ));
+        assert!(protocol.pending.is_empty());
+        assert!(protocol.session_id.is_none());
+    }
 }
 
 #[test]

@@ -1,0 +1,181 @@
+{
+  "scope": "Mac Grok 1.0.41 V8 正式产品父子链、双向消息、自动结果、inspect 与冷继续的真实验收",
+  "passed": true,
+  "platform": "macOS",
+  "cli_version": "1.0.41",
+  "candidate": false,
+  "test_name": "ai::cli_agent_runtime::coordinator::grok_child_live_tests::real_grok_fixed_policy_parent_child",
+  "test_exit_code": 0,
+  "binaries": {
+    "test_binary": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/libtest-goal-v8",
+      "bytes": 876721664,
+      "sha256": "bc4d03b0afac23648010341179cf479e89814c0350339002cdd99ee8b4fb748e"
+    },
+    "supervisor": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/supervisor-goal-v8",
+      "bytes": 749880464,
+      "sha256": "41bbb282a635c01226383eeaae407ab7310f58b7a1fe7a35256b38c26095af05"
+    },
+    "grok": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/grok",
+      "bytes": 145657952,
+      "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
+    }
+  },
+  "build_binding": {
+    "base_head": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+    "dirty_snapshot": true,
+    "source_manifest": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v8-sources.safe.json",
+      "bytes": 11346,
+      "sha256": "3b8631f303b83cab108a0e545cec1300c8a5d5a92048f0c13bb9e9e93a1f0e90"
+    },
+    "build_receipt": {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v8-build.safe.json",
+      "bytes": 1014,
+      "sha256": "83cefc30a17405537abffa4ce3da484ffb8cdd0a8be5ed7be9331aa593a0ac88"
+    },
+    "default_build_without_managed_feature": true,
+    "all_four_build_steps_passed": true,
+    "current_source_files_match_v8_snapshot": true,
+    "source_files_verified": 88,
+    "binary_hashes_match_build_and_live_metadata": true,
+    "same_committed_revision_claimed": false
+  },
+  "verified": {
+    "parent_child_passed": true,
+    "cold_resume_ready_verified": true,
+    "native_ack_both_directions": true,
+    "automatic_result_ack_verified": true,
+    "final_result_via_inspect_verified": true,
+    "native_effective_policy_verified": false,
+    "filesystem_sandbox_verified": false,
+    "app_restart_verified": false,
+    "real_gui_verified": false,
+    "full_cli_parity_acceptance_passed": false
+  },
+  "counts": {
+    "tasks": 2,
+    "parent_generations": 4,
+    "child_generations": 2,
+    "native_inputs": 6,
+    "sdk_tool_calls": 4
+  },
+  "behavior": {
+    "approval_gated_message_queued_without_native_ack": true,
+    "parent_binding_verified": true,
+    "child_creation_policy_verified": true,
+    "cold_resume_same_native_session": true,
+    "cold_resume_no_new_input": true,
+    "cold_resume_messages_unchanged": true,
+    "production_prepare": true,
+    "test_argv_override": false
+  },
+  "native_and_result_digests": {
+    "child_native_sha256": "04de45c9b048bd46a6c26289a98f4e9689f9974ca3417fd1fea758201b946e95",
+    "child_result_sha256": "90763d5f5768e3c3a988a759fd20a6c66d01b230241592cef52a575a3ed77160",
+    "parent_native_sha256": "748245b8cd773f316dfb2b6c3f925dbf9016ed03f882a6fee21319df1032c37a",
+    "parent_result_sha256": "0208495678a4ac9b417cc906f5235af732dde6db1eb86d54c113e834babdddb1"
+  },
+  "runtime_cleanup_receipts": [
+    {
+      "version": 2,
+      "manifest_sha256": "891e4f74ca1bb8803a1c0818c9d171a5862ccb2b464471ad61652c44b73de9de",
+      "journal_sha256": "d33996aead828d145fbe53fe2b869853a78706989e12be1b9519e5bf69d23ee2",
+      "last_event_sequence": 251,
+      "acknowledged_sequence": 250,
+      "native_process": "exited",
+      "native_cleanup_sha256": "686020c425d742eb837d476e292ff9484bf52209355653daa2b4c04061b259b2",
+      "adapter_task_terminated": true,
+      "adapter_succeeded": true,
+      "event_journal_completed": true,
+      "runtime_generation_sha256": "c44793e4eafd68ff7a96498d943ab4ab83d78f43fd2c16efb478f7ce4de4206d",
+      "cleanup_confirmed": true
+    },
+    {
+      "version": 2,
+      "manifest_sha256": "cdbe538a334a8458af7dc3d7de1c7471823d3315e9e67aad463178d044c74b0b",
+      "journal_sha256": "dda64c2ccd623bed351f2895059600e1be7ed4fb1c96aea1299940cb0fdc39f8",
+      "last_event_sequence": 109,
+      "acknowledged_sequence": 108,
+      "native_process": "exited",
+      "native_cleanup_sha256": "9c108395109ab75a557f2beee52b2beb8f9e47688bcbff00a3e4f8fa00dd570c",
+      "adapter_task_terminated": true,
+      "adapter_succeeded": true,
+      "event_journal_completed": true,
+      "runtime_generation_sha256": "e93bda8973224748607aabd1c23e6424c501066012f40551d48adac599bec77f",
+      "cleanup_confirmed": true
+    },
+    {
+      "version": 2,
+      "manifest_sha256": "af33a56384fc62f47dca9449eabca3dd967fc15aaf02f7faaa2cf82a8930c7dc",
+      "journal_sha256": "bb897f157bd1a6280b04c15fb6344d99e858dec087aafe12fe97a9afd16a70a7",
+      "last_event_sequence": 3,
+      "acknowledged_sequence": 2,
+      "native_process": "exited",
+      "native_cleanup_sha256": "ccdc705b7a31b4aabc8136ada44a4d6e66e905b9635efcf9f7cecd327c37647e",
+      "adapter_task_terminated": true,
+      "adapter_succeeded": true,
+      "event_journal_completed": true,
+      "runtime_generation_sha256": "e7e04467ceddd5d7be2884ceb8cdfcc858915e248e07deea1f6f914b22f87bb4",
+      "cleanup_confirmed": true
+    }
+  ],
+  "cleanup": {
+    "tunnels_stopped": true,
+    "private_auth_copy_removed": true,
+    "original_auth_stat_unchanged": true,
+    "project_snapshot_unchanged": true,
+    "binary_unchanged": true,
+    "boundary_passed": true,
+    "source_private_copy_removed": true,
+    "source_original_auth_stat_unchanged": true,
+    "runner_auth_copy_absent_now": true
+  },
+  "network": {
+    "event_counts": {
+      "official_connect_attempt": 21,
+      "official_tunnel_opened": 21,
+      "rejected_nonofficial_origin": 164
+    },
+    "tls_connections_attempted": 21,
+    "tls_bytes": 9651591,
+    "tls_budget_scope": "observed_configured_proxy_connections",
+    "http_model_calls_observable": false,
+    "native_network_budget_enforced": false,
+    "tls_decrypted": false,
+    "cost_budget_enforced": false
+  },
+  "source_evidence": [
+    {
+      "path": "/private/tmp/cli-parity-grok-1041-child-goal-v8.ndjson",
+      "bytes": 4625,
+      "sha256": "ddfca9a0ef9f1ae86c78e53e3485032227b2c77ef3aea041494b8139e13f9e44"
+    },
+    {
+      "path": "/private/tmp/cli-parity-grok-1041-child-goal-v8.metadata.json",
+      "bytes": 2038,
+      "sha256": "0428b887e71ae4f96a6b7a05132ecc83164d2007760e6fff94dcdba5a7264f64"
+    },
+    {
+      "path": "/private/tmp/cli-parity-grok-1041-child-goal-v8.network.json",
+      "bytes": 34308,
+      "sha256": "0abf89f2301fe519c6169e5b35479efa80c09ea9ae20f6d026c4eee4bc8573e9"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-child-source-cleanup-v8.safe.json",
+      "bytes": 68,
+      "sha256": "c29fb66c6922516a93ebe78bfb04d88a21490a0890c270cc8d4f2cbb57b95308"
+    }
+  ],
+  "review": {
+    "existing_strict_runner_observation_recomputed": true,
+    "eleven_events_validated": true,
+    "three_runtime_cleanup_receipts_verified": true,
+    "model_rerun": false,
+    "credentials_copied_during_review": false,
+    "raw_transcript_or_configuration_included": false
+  },
+  "boundary": "仅覆盖本收据列出的真实父子与冷继续链；不代替 GUI、应用进程重启、OS 文件系统/网络沙箱、全部 CLI/跨平台/全 Goal 验收。保留原始 runner 的 same_commit_verified_by_runner=false；此处单独核验 V8 dirty 源快照与构建/运行二进制摘要。"
+}

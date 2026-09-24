@@ -855,7 +855,7 @@ fn authenticated_native_lease_bridge_replays_cached_reply_without_another_tool_e
     let responses = bridge
         .reply_with_lease(&tool, Ok(json!({"tasks":[]})), &ledger, &proof)
         .unwrap();
-    ledger.record_reply_written(&proof).unwrap();
+    ledger.record_reply_written(&proof, true).unwrap();
     let (retry, retry_proof) = bridge
         .receive_with_lease(&inspect_request(), &mut ledger, now)
         .unwrap();
@@ -1100,7 +1100,7 @@ fn production_lease_reply_rejects_changed_targets_and_keeps_modern_cached_result
     assert_eq!(replies[0]["result"]["result"]["isError"], true);
     assert_eq!(replies[0]["result"]["result"]["resultType"], "complete");
     assert!(replies[0].get("native_receipt").is_none());
-    ledger.record_reply_written(&proof).unwrap();
+    ledger.record_reply_written(&proof, true).unwrap();
     let mut retry = frame;
     retry["id"] = json!(3);
     let (cached, cached_proof) = bridge.receive_with_lease(&retry, &mut ledger, now).unwrap();

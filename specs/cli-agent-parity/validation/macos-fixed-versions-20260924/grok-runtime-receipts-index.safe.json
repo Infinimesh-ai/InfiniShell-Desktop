@@ -1,0 +1,76 @@
+{
+  "scope": "Grok Mac 1.0.41 fixed read/files V5 and selected skill V7 offline follow-up",
+  "same_final_commit_claim": false,
+  "full_cli_parity_acceptance_passed": false,
+  "files": [
+    {
+      "file": "grok-fixed-read-v5.safe.json",
+      "sha256": "a7cfbc98c1578a97a54280354491cdffec779d7f0776809aa92339a02c5d9828",
+      "bytes": 5461,
+      "mode": "safe_receipts_combined_private_workspace_omitted",
+      "sources": [
+        {
+          "file": "cli-parity-grok-fixed-1041-v5.ndjson",
+          "sha256": "ac2fa232942f3b05d41243d2c833c9c36bb36f4f07d009867b0a01a5b78647b3"
+        },
+        {
+          "file": "cli-parity-grok-fixed-1041-v5.metadata.json",
+          "sha256": "802a9149a1d724cd089a952613a958c2b1c401b3175b0bacf913460f35966254"
+        },
+        {
+          "file": "cli-parity-grok-fixed-1041-v5.network.json",
+          "sha256": "3ac00136b385c0c66a746b6e6e0d88d41f1b020d86c561b8e8978c712ed35419"
+        }
+      ]
+    },
+    {
+      "file": "grok-files-v5.safe.json",
+      "sha256": "ac60e05203147734e96150128c383910531a4831e645fb9281b87875aff80f67",
+      "bytes": 10684,
+      "mode": "safe_receipts_combined_private_workspace_omitted",
+      "sources": [
+        {
+          "file": "cli-parity-grok-files-1041-v5.ndjson",
+          "sha256": "84538886d516c86803b37538ff15bf536ad4b2c6c4c28ad8097ac1ce770c328b"
+        },
+        {
+          "file": "cli-parity-grok-files-1041-v5.metadata.json",
+          "sha256": "0cb9dcca1cdbe134380215982aa35cc82f5dab97c0751d9457d2ee6558360cbd"
+        },
+        {
+          "file": "cli-parity-grok-files-1041-v5.network.json",
+          "sha256": "2d89d8ecaf8857930b98f3f8e7c4abfbe0db204f9a05c950335907456cb5e5f5"
+        }
+      ]
+    },
+    {
+      "file": "grok-selected-skill-v7.safe.json",
+      "sha256": "4d976da6cdf51e9bbf23ac2d2d5c67d0bd767e9a485a3c7542bcbfd81b9d21f5",
+      "bytes": 13920,
+      "mode": "safe_receipts_combined_private_workspace_omitted",
+      "sources": [
+        {
+          "file": "cli-parity-grok-skill-resume-1041-v7.ndjson",
+          "sha256": "ba139652fb6fca58487c0438335050ee03fdacb60df027ba93596ad92fcbb773"
+        },
+        {
+          "file": "cli-parity-grok-skill-resume-1041-v7.metadata.json",
+          "sha256": "ce6dcbef0a69bc2a1df5257e4038db3023f39f9f4e9c0e36f25eaabed94b003d"
+        },
+        {
+          "file": "cli-parity-grok-skill-resume-1041-v7.network.json",
+          "sha256": "f9dfd850acaf65dfa1e6d27ced09a48a95a84981bf262aa953bfab7c27a656a7"
+        },
+        {
+          "file": "cli-parity-grok-skill-resume-1041-v7.offline-recheck.safe.json",
+          "sha256": "87f57970f973abbb0f1ad891be00d784a74c754d24ff43624bc941e8f107d6d4"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "V5 direct adapter read/files restore retains its profile store; it does not prove runtime_host cross-host storage recovery.",
+    "V7 selected skill original runner remains failed; the independent offline native-history recheck passed without new model inputs.",
+    "The selected skill fixture correction has not yet been rebuilt or run."
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "scope": "v8_v9_build_and_risk_selected_tmux_evidence",
+  "full_goal_passed": false,
+  "files": [
+    {
+      "file": "goal-v8-sources.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v8-sources.safe.json",
+      "sha256": "3b8631f303b83cab108a0e545cec1300c8a5d5a92048f0c13bb9e9e93a1f0e90",
+      "copy_exact": true
+    },
+    {
+      "file": "goal-v8-build.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v8-build.safe.json",
+      "sha256": "83cefc30a17405537abffa4ce3da484ffb8cdd0a8be5ed7be9331aa593a0ac88",
+      "copy_exact": true
+    },
+    {
+      "file": "goal-v8-focused.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v8-focused.safe.json",
+      "sha256": "f6bbc15a4b5aba85949d35ba87a693d4fd5e8a8be1f02193a2bb967366ff228d",
+      "copy_exact": true
+    },
+    {
+      "file": "build-default-goal-v8.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/gui-evidence/build-default-goal-v8.safe.json",
+      "sha256": "694d11f05e276e331a3e98a453746ee81199143126c2323fbcf3deaf42f89686",
+      "copy_exact": true
+    },
+    {
+      "file": "goal-v9-sources.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v9-sources.safe.json",
+      "sha256": "35538f27300b59da0e848d0b3ecad2ce222602cbcfd03bad445fec28354fbc99",
+      "copy_exact": true
+    },
+    {
+      "file": "goal-v9-build.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v9-build.safe.json",
+      "sha256": "2395fbdac9e0aa0bf665175e6079a3cee6473111a28af45793cddc2f0e74b3f0",
+      "copy_exact": true
+    },
+    {
+      "file": "tmux-off-risk-selected-scope.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/tmux-off-risk-selected-scope.safe.json",
+      "sha256": "7a6cd520f6517fdc0de9ca6a337ba16ac8106820ea73000a9300e9d42cb45a68",
+      "copy_exact": true
+    }
+  ]
+}

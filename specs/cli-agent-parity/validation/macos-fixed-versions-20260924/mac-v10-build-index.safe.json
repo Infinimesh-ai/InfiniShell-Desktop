@@ -1,0 +1,36 @@
+{
+  "scope": "V10构建与本地回归；不是GUI或最终全工作区/多平台通过",
+  "files": [
+    {
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v10-sources.safe.json",
+      "archive": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-v10-sources.safe.json",
+      "sha256": "7b3251da1976909b3d3820d59644725efab315b7054bc40ca95f1aa3ce4d27f5"
+    },
+    {
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v10-build.safe.json",
+      "archive": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-v10-build.safe.json",
+      "sha256": "10bbb005c370634236dac5963acfbaecf8318ae376353fae22c164afc045288c"
+    },
+    {
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v10-focused.safe.json",
+      "archive": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-v10-focused.safe.json",
+      "sha256": "e9875859291d7712c9d44a0f3c30f978b07b25df5ed746587f8d7de03e822d46"
+    }
+  ],
+  "changed_source_paths_since_v8": [
+    "app/i18n/en/warp.ftl",
+    "app/i18n/zh-CN/warp.ftl",
+    "app/src/ai/cli_agent_runtime/codex_coordinator_live_tests.rs",
+    "app/src/ai/cli_agent_runtime/coordinator.rs",
+    "app/src/ai/cli_agent_runtime/coordinator_cli_update_tests.rs",
+    "app/src/ai/cli_agent_runtime/coordinator_tests.rs",
+    "app/src/ai/cli_agent_runtime/runtime_host.rs",
+    "app/src/ai/cli_agent_runtime/runtime_host_tests.rs",
+    "app/src/terminal/cli_agent.rs",
+    "app/src/terminal/cli_agent_updates/sources.rs",
+    "app/src/terminal/cli_agent_updates/sources_tests.rs",
+    "app/src/terminal/cli_agent_updates_tests.rs",
+    "script/cli-agent-parity/codex_adapter_runner_tests.py",
+    "script/cli-agent-parity/run_codex_adapter_live.py"
+  ]
+}

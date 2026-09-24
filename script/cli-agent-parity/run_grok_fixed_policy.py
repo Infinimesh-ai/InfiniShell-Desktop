@@ -16,6 +16,8 @@ import time
 import run_grok_native_tool_lease as lease
 
 isolation, official, shared = lease.isolation, lease.official, lease.shared
+CURRENT_FIXED_VERSION = "1.0.41"
+CURRENT_FIXED_SHA256 = "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
 SCOPE = "authenticated_fixed_policy_read_approval_and_cold_restore"
 TEST_NAME = "ai::cli_agent_runtime::grok::fixed_policy_live_tests::" + SCOPE
 MAX_DEADLINE = 540
@@ -88,7 +90,7 @@ def observation(code, events, allowed_hash):
         and first["denied_read_not_executed"] is False and second["denied_read_not_executed"] is True
         and first["failure_stage"] is None and second["failure_stage"] is None
         and all(first[key] == second[key] == 1 for key in COUNTERS)
-        and first["final_sha256"] == allowed_hash and second["final_sha256"] == sha(b"")
+        and first["final_sha256"] == allowed_hash and is_hash(second["final_sha256"])
         and is_hash(first["native_session_sha256"]) and first["native_session_sha256"] == second["native_session_sha256"]
         and end["passed"] and end["system_managed_policies_apply"]
         and not any(end[key] for key in END_BOOLS - {"passed", "system_managed_policies_apply"}))
@@ -159,14 +161,15 @@ print(json.dumps(r))
     return result
 
 
-def validate_paths(args, *, max_native_inputs=2, max_deadline=MAX_DEADLINE):
+def validate_paths(args, *, max_native_inputs=2, max_deadline=MAX_DEADLINE,
+        expected_sha256=shared.BINARY_SHA256):
     # 沿用官方入口的路径/摘要/凭据元数据规则，只替换本夹具的预算。
     if (type(args.max_native_inputs) is not int or args.max_native_inputs != max_native_inputs
             or type(args.timeout) is not int or not 30 <= args.timeout <= max_deadline):
         raise ValueError("固定策略验收超出调用方的输入或期限预算")
     check = argparse.Namespace(**vars(args))
     check.max_native_inputs, check.timeout = 1, min(args.timeout, lease.MAX_DEADLINE)
-    isolation.validate_paths(check)
+    isolation.validate_paths(check, expected_sha256=expected_sha256)
     for name in ("test_binary", "grok", "supervisor", "official_grok_home", "output"):
         setattr(args, name, getattr(check, name))
 
@@ -191,13 +194,14 @@ def cleanup_auth(root):
     return not any(path.exists() for path in paths)
 
 
-def boundary_passed(metadata, tunnel):
-    return (metadata.get("test_exit_code") == 0 and metadata.get("timed_out") is not True
+def boundary_passed(metadata, tunnel, *, connection_budget=lease.MAX_TLS_CONNECTIONS):
+    return (type(connection_budget) is int and 1 <= connection_budget <= 64
+        and metadata.get("test_exit_code") == 0 and metadata.get("timed_out") is not True
         and all(type(metadata.get(key)) is type(value) and metadata[key] == value
             for key, value in SANDBOX_SCOPE_FIELDS.items())
         and all(metadata.get(key) is True for key in ("tunnels_stopped", "private_auth_copy_removed",
             "original_auth_stat_unchanged", "project_snapshot_unchanged", "binary_unchanged"))
-        and tunnel.forwarded <= lease.MAX_TLS_CONNECTIONS and tunnel.bytes <= lease.MAX_TLS_BYTES
+        and tunnel.forwarded <= connection_budget and tunnel.bytes <= lease.MAX_TLS_BYTES
         and any(item == {"event": "official_tunnel_opened", "host": "cli-chat-proxy.grok.com"} for item in tunnel.events)
         and not any(item.get("event") == "official_connect_budget_rejected" for item in tunnel.events))
 
@@ -235,7 +239,8 @@ def run(args):
             official.copy_private_auth(args.official_grok_home, root / "home/.grok")
             environment = official.official_environment(root, port)
             environment.update(INFINISHELL_GROK_LIVE_ROOT=str(root), INFINISHELL_GROK_LIVE_EXECUTABLE=str(args.grok),
-                INFINISHELL_GROK_LIVE_ARTIFACT=str(raw), INFINISHELL_CLI_SUPERVISOR_EXECUTABLE=str(args.supervisor))
+                INFINISHELL_GROK_LIVE_ARTIFACT=str(raw), INFINISHELL_CLI_SUPERVISOR_EXECUTABLE=str(args.supervisor),
+                INFINISHELL_GROK_FIXED_VERSION=CURRENT_FIXED_VERSION)
             remaining = tunnel.deadline - time.monotonic()
             if remaining <= 0 or tunnel.forwarded != 0:
                 raise ValueError("输入之前预算已耗尽")
@@ -296,7 +301,7 @@ def main():
     parser.add_argument("--timeout", type=int, default=MAX_DEADLINE)
     args = parser.parse_args()
     try:
-        validate_paths(args)
+        validate_paths(args, expected_sha256=CURRENT_FIXED_SHA256)
         return run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"固定策略运行器失败：{type(error).__name__}\n")

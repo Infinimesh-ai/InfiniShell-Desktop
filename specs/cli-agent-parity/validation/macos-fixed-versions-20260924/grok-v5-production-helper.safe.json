@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "test_binary_sha256": "c75c402b13cbb967ce5fb188e1be1c0f2b0dba0d8f4bed3293ab12d68103b771",
+  "production_steps": 6,
+  "credentials_provided": false,
+  "helper_sha256": "184464fc31202dc9215e41c4066aa1539ec58fb8f312a77bce87d6c013b63a07",
+  "matches_current_source": true,
+  "model_inputs": 0,
+  "auth_copy_exists": false
+}

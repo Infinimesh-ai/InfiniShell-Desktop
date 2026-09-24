@@ -185,10 +185,7 @@ fn version_init(version: Value) -> Value {
 
 #[test]
 fn supported_versions_require_matching_probe_and_init() {
-    for (output, version) in [
-        ("2.1.273 (Claude Code)", "2.1.273"),
-        ("2.1.278 (Claude Code)", "2.1.278"),
-    ] {
+    for &(output, version) in SUPPORTED_VERSIONS {
         let mut protocol = ready_protocol();
         protocol.bind_probed_version(true, output).unwrap();
         let effects = protocol.receive(version_init(json!(version))).unwrap();
@@ -205,13 +202,18 @@ fn supported_versions_require_matching_probe_and_init() {
 }
 
 #[test]
-fn test_candidate_21280_requires_explicit_binding_and_exact_init() {
-    assert!(!supported_version("2.1.280"));
+fn candidate_21280_and_production_keep_exact_version_pairing() {
+    assert_eq!(
+        supported_version("2.1.280"),
+        cfg!(any(target_os = "macos", target_os = "linux", windows))
+    );
     let mut protocol = ready_protocol();
-    assert!(matches!(
-        protocol.bind_probed_version(true, TEST_CANDIDATE_OUTPUT),
-        Err(RuntimeError::UnsupportedVersion(_))
-    ));
+    assert_eq!(
+        protocol
+            .bind_probed_version(true, TEST_CANDIDATE_OUTPUT)
+            .is_ok(),
+        cfg!(any(target_os = "macos", target_os = "linux", windows))
+    );
     protocol.test_candidate_21280 = true;
     for output in [
         "2.1.280",
@@ -330,16 +332,18 @@ fn test_candidate_coordinator_state_root_requires_exact_host_shape() {
 
 #[test]
 fn supported_versions_cannot_mix_probe_and_init() {
-    for (output, version) in [
-        ("2.1.273 (Claude Code)", "2.1.278"),
-        ("2.1.278 (Claude Code)", "2.1.273"),
-    ] {
-        let mut protocol = ready_protocol();
-        protocol.bind_probed_version(true, output).unwrap();
-        assert!(matches!(
-            protocol.receive(version_init(json!(version))),
-            Err(RuntimeError::UnsupportedVersion(_))
-        ));
+    for &(output, probed) in SUPPORTED_VERSIONS {
+        for &(_, version) in SUPPORTED_VERSIONS {
+            if version == probed {
+                continue;
+            }
+            let mut protocol = ready_protocol();
+            protocol.bind_probed_version(true, output).unwrap();
+            assert!(matches!(
+                protocol.receive(version_init(json!(version))),
+                Err(RuntimeError::UnsupportedVersion(_))
+            ));
+        }
     }
 }
 
@@ -349,10 +353,13 @@ fn unknown_or_failed_probe_clears_previous_version_binding() {
         (true, "2.1.279 (Claude Code)"),
         (true, "2.1.274 (Claude Code)"),
         (true, "2.1.278-beta (Claude Code)"),
+        (true, "2.1.280-beta (Claude Code)"),
+        (true, "2.1.281 (Claude Code)"),
         (true, "2.1.278"),
         (true, ""),
         (false, "2.1.273 (Claude Code)"),
         (false, "2.1.278 (Claude Code)"),
+        (false, "2.1.280 (Claude Code)"),
     ] {
         let mut protocol = ready_protocol();
         protocol
@@ -371,7 +378,7 @@ fn unknown_or_failed_probe_clears_previous_version_binding() {
 
 #[test]
 fn init_requires_successful_probe_even_for_known_version() {
-    for version in ["2.1.273", "2.1.278"] {
+    for &(_, version) in SUPPORTED_VERSIONS {
         let mut protocol = ready_protocol();
         // 清除旧夹具的默认绑定，复现生产进程尚未完成探测的状态。
         protocol.probed_version = None;

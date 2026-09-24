@@ -28,6 +28,7 @@ RUST_TEST = "terminal::cli_agent_sessions::plugin_manager::claude::tests::real_c
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--executable", type=Path, required=True)
+    parser.add_argument("--claude-version", choices=("2.1.273", "2.1.280"), default="2.1.273")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--test-binary", type=Path)
     parser.add_argument("--rust-case", choices=("upgrade", "patch-failure", "crash-retry"), default="upgrade")
@@ -71,7 +72,9 @@ def execute(args, directory, report):
                               check=True, timeout=120).stdout.strip()
 
     version = native(args.executable, ["--version"], env, project, report).strip()
-    require(version == "2.1.273 (Claude Code)", "必须使用受测 Claude 2.1.273")
+    require(version == f"{args.claude_version} (Claude Code)"
+            and (args.claude_version != "2.1.280" or sys.platform == "darwin"),
+            "CLI 版本或平台不符合显式选择的固定通知契约")
     report.update(cli_version=version, executable_sha256=hashlib.sha256(args.executable.read_bytes()).hexdigest())
     public = directory / "public"
     public.mkdir()
@@ -224,12 +227,12 @@ def execute(args, directory, report):
         atomic_write = patch.atomic_write
         writes = 0
 
-        def fail_third_write(path, contents, mode):
+        def fail_third_write(path, contents, mode, *, staging_dir=None):
             nonlocal writes
             writes += 1
             if writes == 3:
                 raise OSError("独立探针注入：第三次受控替换失败")
-            atomic_write(path, contents, mode)
+            atomic_write(path, contents, mode, staging_dir=staging_dir)
 
         patch.atomic_write = fail_third_write
         try:

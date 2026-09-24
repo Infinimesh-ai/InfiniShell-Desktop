@@ -1,5 +1,7 @@
 # Codex CLI、Grok Build、Claude Code 支持优化与能力对齐计划
 
+> **2026-09-24 固定版本 Mac 验收（V13）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的正式入口、父子任务、GUI 恢复、普通通知、SSH/tmux、IME 和原子更新均已有按源码范围绑定的实链。Grok 无回合标识审批按会话级提醒处理，V13 真实提醒及清理通过；check、i18n 和受影响 378 项回归通过，完整桌面集合及三项串行复验按 V11 留证。现在准备冻结提交并统一验证 Linux／Windows，Goal 尚未完成。当前对应表见 [固定版本验收](ACCEPTANCE_FIXED_VERSIONS_20260924.md)，细节和边界见 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)。下文旧状态仅代表各自历史快照。
+
 > **当前状态更正（2026-09-21）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。已推送代码和同提交跨平台回归通过的事实保留，但 Grok 最新版托管能力、父子整链及真实远程产品验收仍有缺口。当前状态、证据与新 Goal 入口见 [复核与续接](HANDOFF_20260921_REOPEN.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
 > **receipt102–105 阶段收敛**：Claude 官方订阅账户与固定 `2.1.278` 已改为隔离设置源、原生 manual/default 审批合同；定向测试通过，但最终父子实链在外置调试 supervisor 的 macOS launchd 接管阶段以 EAGAIN 中断，未产生 SessionReady、父子 ACK、进度、结果或恢复。Grok `1.0.40` 已补精确认证、setup 与目录形状门禁，但真实 fresh-home 多次运行出现握手通知跨运行竞态，最终仍在模型输入前 fail closed，生产 submit／审批／取消／恢复及扩展能力均未开放。Windows 三款官方 x64 CLI 的版本和 Authenticode 已实机核对；cwd 可重命名、调试树不退出、强杀后根进程残留证明当前原子更新必须继续 `ManualOnly`。边界分别见 [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json)、[receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json) 与 [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)。[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) 已撤回 receipt104 中因误用 legacy `0.147.0` 条目得出的 Codex `0.155.1` 资产漂移结论；其余 Windows 阻断不变。本阶段没有完成 SSH／tmux、GUI IME／双语布局、Linux 实际执行或同提交跨平台终验；Goal 不得标记 complete。

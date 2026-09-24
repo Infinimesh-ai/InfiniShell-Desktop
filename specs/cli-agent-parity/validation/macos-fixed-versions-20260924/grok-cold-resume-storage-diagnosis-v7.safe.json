@@ -1,0 +1,28 @@
+{
+  "scope": "V7 实际父子链之后的零输入冷恢复失败诊断",
+  "original_evidence_sha256": "5477073fb44d1f505b14fe55cbf8ca7c5fd70892ad19ca26fac007ddf72cb849",
+  "new_journal_sha256": "84bbeab45221470d999ca1a02548319042f531cf727ea6294a902158a1f18d3a",
+  "new_events": {
+    "Disconnected": 1
+  },
+  "new_native_id_present": false,
+  "new_host_exit": {
+    "adapter_succeeded": false,
+    "adapter_task_terminated": true,
+    "native_process": "not_started",
+    "event_journal_completed": true,
+    "last_event_sequence": 1,
+    "acknowledged_sequence": 0
+  },
+  "saved_profile_store_exists_under_old_host": true,
+  "saved_profile_store_exists_under_new_host": false,
+  "saved_profile_store_exists_under_application_root": false,
+  "saved_config_sha256_matches": true,
+  "saved_cli_sha256_matches": true,
+  "diagnosis": "cold_resume_persistent_store_scoped_to_new_process_generation",
+  "diagnosis_basis": "生产代码恢复前检查和实际旧/新存储布局；原生未启动，不是输入重投",
+  "native_cold_resume_passed": false,
+  "new_model_inputs": 0,
+  "original_failure_preserved": true,
+  "production_fix_requires_new_build_and_real_resume": true
+}

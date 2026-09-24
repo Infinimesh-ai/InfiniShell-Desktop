@@ -5781,7 +5781,7 @@ ambient-agent-local-harness-persistence-failed = Could not save the local task. 
 ambient-agent-local-harness-working-directory-unavailable = Could not determine the local task’s working directory.
 ambient-agent-local-harness-shell-required = A detected shell is required to launch a local task.
 cli-agent-plugin-grok-install-title = Set up Grok notifications
-cli-agent-plugin-grok-install-subtitle = The bundled plugin requires Grok 1.0.30 and Node.js 18 or newer in this terminal.
+cli-agent-plugin-grok-install-subtitle = The bundled plugin requires Grok 1.0.30 or 1.0.41 and Node.js 18 or newer in this terminal.
 cli-agent-plugin-grok-cli-version-step = Check the Grok version
 cli-agent-plugin-grok-node-version-step = Check the Node.js version
 cli-agent-plugin-grok-enable-step = Enable the installed InfiniShell plugin
@@ -5829,8 +5829,10 @@ cli-task-manager-installation = { $cli }: { $version }
 cli-task-manager-local-only = These tasks run on this computer. Closing this panel keeps connected tasks running. SSH and tmux terminal sessions are managed separately.
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 supports text tasks, approvals, cancellation, history continuation, and task messages. Fixed read or file policies use per-call approval and allow child tasks with the same tools and no broader task permissions. They disable hooks, skills, and shell commands; administrator policies still apply, and file access is not sandboxed. With Inherit, each turn can use one selected skill whose full path uniquely matches the current session's skill list. Project trust is not granted automatically. Managed images are unavailable.
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 is enabled only for the verified P0 path: new text tasks, exact native read requests with per-call allow or deny, cancellation after real output, and native-session resume. Queued input, session close, file writes, local task tools, skills, child tasks, and managed images remain unavailable. Shell commands, hooks, and CLI or administrator policies are outside this P0 guarantee; this is not a filesystem sandbox.
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 supports text tasks, approvals, queued instructions, cancellation, and history continuation. Inherit uses CLI settings and allows one skill selected when starting the task. Fixed read or file policies require approval for each call and support local task tools and child tasks with no broader permissions. Fixed policies disable hooks, skills, and shell commands; administrator policies still apply, and file access is not sandboxed. Managed images are unavailable.
+cli-task-manager-grok-root-tools-unavailable = Local task tools and child tasks are unavailable with this Grok version and permission policy.
 cli-task-manager-grok-spawn-unavailable = Choose a fixed read or file policy before allowing Grok child tasks.
-cli-task-manager-claude-verification = Claude Code 2.1.273 and 2.1.278 are available for verification behind this feature flag. Authentication, successful turns, approvals, and recovery still require version-specific acceptance evidence.
+cli-task-manager-claude-verification = Claude Code 2.1.273, 2.1.278, and 2.1.280 are available behind this feature flag. Authentication, successful turns, approvals, and recovery require version-specific verification.
 cli-task-manager-empty = No local CLI tasks have been saved yet.
 cli-task-manager-permission = Permissions for new tasks
 cli-task-manager-permission-inherit = Inherit CLI settings
@@ -5936,7 +5938,7 @@ cli-task-manager-attachments = Attachments and skills
 
 cli-agent-task-exit-unconfirmed = The previous CLI process has not been confirmed stopped. Your task is kept; wait for cleanup before resuming. Older records without an exit receipt cannot be resumed safely.
 
-cli-task-manager-skills-session-fixed = This Claude session can use only skills registered when it was started. Create a new task to choose different skills.
+cli-task-manager-skills-session-fixed = This session can use only skills registered when it was started. Create a new task to choose different skills.
 
 cli-task-manager-message-route = Subject: { $subject } · From { $sender } (run { $sender_generation }) to { $recipient } (run { $recipient_generation })
 
@@ -6009,7 +6011,7 @@ terminal-input-grok-manual-copy-hint = Draft for Grok; submit offers a copy acti
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-auto = Automatically update { $agent }
-settings-cli-updates-description = Updates run when no InfiniShell terminal sessions or managed tasks are using this CLI.
+settings-cli-updates-description = Updates run when no InfiniShell terminal sessions or managed tasks are using this CLI. Updating the CLI does not enable managed features that have not been verified.
 settings-cli-updates-channel = Release channel
 settings-cli-updates-channel-follow = Follow current installation
 settings-cli-updates-channel-latest = Latest

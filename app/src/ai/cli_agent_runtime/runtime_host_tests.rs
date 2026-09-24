@@ -216,6 +216,8 @@ fn manifest_failure_receipt_proves_host_and_adapter_were_not_started() {
         read_startup_exit_receipt(&state_dir, generation).unwrap(),
         Some(receipt)
     );
+    assert!(exit_confirmed_for_update(&state_dir, generation).unwrap());
+    assert!(!exit_confirmed_for_update(&state_dir, Uuid::new_v4()).unwrap());
     assert!(matches!(
         block_on(classify_startup(&state_dir, generation)).unwrap(),
         RuntimeHostStartupState::Unconfirmed(RuntimeHostUnconfirmed::AdapterNotStarted)
@@ -272,6 +274,7 @@ fn ready_failure_receipt_requires_observed_host_exit() {
 
     write_startup_exit_receipt(&record.directory, &receipt).unwrap();
 
+    assert!(exit_confirmed_for_update(&state_dir, generation).is_err());
     let error = read_startup_exit_receipt(&state_dir, generation).unwrap_err();
     assert!(error.to_string().contains("缺少进程退出证据"));
 }

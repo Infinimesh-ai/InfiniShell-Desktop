@@ -23,9 +23,28 @@ use crate::terminal::cli_agent::{
 };
 
 const SCOPE: &str = "real_grok_fixed_policy_parent_child";
+const CLI_VERSION: &str = "1.0.41";
 const MAX_INPUTS: usize = 6;
 const MAX_TOOLS: usize = 4;
 const MAX_SECONDS: u64 = 450;
+
+// 原生 ACP 会把工具前说明与最终答复合并；只允许唯一终态标记收尾。
+fn result_has_final_marker(result: Option<&str>, marker: &str) -> bool {
+    result.is_some_and(|result| {
+        result.len() <= 8192
+            && result.trim_end().ends_with(marker)
+            && result.matches(marker).count() == 1
+    })
+}
+
+#[test]
+fn final_marker_accepts_preamble_but_rejects_missing_repeated_or_nonfinal_markers() {
+    assert!(result_has_final_marker(Some("准备读取。FINAL"), "FINAL"));
+    assert!(result_has_final_marker(Some("FINAL\n"), "FINAL"));
+    assert!(!result_has_final_marker(None, "FINAL"));
+    assert!(!result_has_final_marker(Some("FINAL 后续失败"), "FINAL"));
+    assert!(!result_has_final_marker(Some("FINAL FINAL"), "FINAL"));
+}
 
 fn sha(text: &str) -> String {
     format!("{:x}", Sha256::digest(text.as_bytes()))
@@ -87,7 +106,7 @@ impl Markers {
     }
     fn prompt(&self, parent: &str, file: &Path) -> String {
         format!(
-            "This is an authorized isolated production-coordinator test. {} Call run_agents exactly once with {}. Retain the returned child task_id. Next call send_message_to_agent exactly once with addresses containing only that child ID, subject {:?}, and message {}. The host allows the send only while the child is awaiting its read approval. Sent and unconfirmed are attempts, not ACK; never resend. Then call inspect_local_tasks exactly once with exactly one argument, task_ids, containing only that child ID; omit result_generation and result_offset. The host holds that approval until the child's second input has finished. Require the inspected result to equal {} and finish with only {}. Do not spawn again. Later inputs with Subject: local_task_result are automatic results; do not call tools for them, reply only {}. Later progress messages specify their own reply marker. Keep these later inputs separate from this initial task.",
+            "This is an authorized isolated production-coordinator test. {} Call run_agents exactly once with {}. Retain the returned child task_id. Next call send_message_to_agent exactly once with addresses containing only that child ID, subject {:?}, and message {}. The host allows the send only while the child is awaiting its read approval. Sent and unconfirmed are attempts, not ACK; never resend. Then call inspect_local_tasks exactly once with exactly one argument, task_ids, containing only that child ID; omit result_generation and result_offset. The host holds that approval until the child's second input has finished. Require the inspected result to end with {} and finish with only {}. Do not spawn again. Later inputs with Subject: local_task_result are automatic results; do not call tools for them, reply only {}. Later progress messages specify their own reply marker. Keep these later inputs separate from this initial task.",
             Self::discovery(),
             self.spawn(parent, file),
             self.followup,
@@ -257,13 +276,14 @@ async fn verify_saved_chain(
                     task["task_id"] == child_id
                         && task["generation"] == 2
                         && task["state"] == "completed"
-                        && task["result"] == markers.final_result
+                        && task["result"].as_str() == child.result.as_deref()
+                        && result_has_final_marker(task["result"].as_str(), &markers.final_result)
                 })
             })
         });
     let complete = |task: &LocalCliTask, marker: &str| {
         task.state == LocalCliTaskState::Completed
-            && task.result.as_deref() == Some(marker)
+            && result_has_final_marker(task.result.as_deref(), marker)
             && task.terminal_evidence.is_some()
     };
     if !(calls.len() == MAX_TOOLS
@@ -317,7 +337,7 @@ async fn verify_saved_chain(
         "native_inputs":6,"sdk_tool_calls":4,"native_ack_both_directions":true,"automatic_result_ack":true,
         "final_result_via_inspect":true,"parent_binding_verified":true,"child_creation_policy_verified":true,
         "parent_native_sha256":sha(parent.native_session_id.as_deref().unwrap()),"child_native_sha256":sha(child.native_session_id.as_deref().unwrap()),
-        "parent_result_sha256":sha(&markers.collected),"child_result_sha256":sha(&markers.final_result)}))?;
+        "parent_result_sha256":sha(source.result.as_deref().unwrap()),"child_result_sha256":sha(child.result.as_deref().unwrap())}))?;
     Ok(true)
 }
 
@@ -437,8 +457,15 @@ async fn drive(
                         return Err("SDK 调用重复或超预算".into());
                     }
                 }
-                RuntimeEventKind::SessionReady { .. }
-                | RuntimeEventKind::TextDelta { .. }
+                RuntimeEventKind::SessionReady {
+                    verified_cli_version,
+                    ..
+                } => {
+                    if verified_cli_version.as_deref() != Some(CLI_VERSION) {
+                        return Err("父子任务的原生版本不匹配".into());
+                    }
+                }
+                RuntimeEventKind::TextDelta { .. }
                 | RuntimeEventKind::Progress { .. }
                 | RuntimeEventKind::ApprovalRequested { .. }
                 | RuntimeEventKind::ApprovalResolved { .. }
@@ -561,8 +588,10 @@ async fn drive(
                             if !child.is_some_and(|child| {
                                 child.task.generation == 2
                                     && child.task.state == LocalCliTaskState::Completed
-                                    && child.task.result.as_deref()
-                                        == Some(markers.final_result.as_str())
+                                    && result_has_final_marker(
+                                        child.task.result.as_deref(),
+                                        &markers.final_result,
+                                    )
                             }) {
                                 continue;
                             }
@@ -739,7 +768,9 @@ async fn resume_ready(
             if task.task_id != parent_id
                 || event.generation != token
                 || event.native_session_id.as_deref() != Some(&native)
-                || !matches!(event.kind, RuntimeEventKind::SessionReady { .. })
+                || !matches!(&event.kind, RuntimeEventKind::SessionReady {
+                    verified_cli_version: Some(version), ..
+                } if version == CLI_VERSION)
             {
                 return Err("冷继续发生重投或身份变化".into());
             }
@@ -778,6 +809,10 @@ async fn resume_ready(
 #[test]
 #[ignore = "仅由官方隔离运行器执行；真实模型调用会产生费用"]
 fn real_grok_fixed_policy_parent_child() {
+    assert_eq!(
+        env::var("INFINISHELL_GROK_LIVE_VERSION").unwrap(),
+        CLI_VERSION
+    );
     let root = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("必须由运行器启动"))
         .canonicalize()
         .unwrap();
@@ -799,7 +834,7 @@ fn real_grok_fixed_policy_parent_child() {
         .unwrap();
     assert!(artifact.starts_with(&root));
     let mut evidence = Evidence(File::create(artifact).unwrap());
-    evidence.record(json!({"event":"acceptance_started","max_native_inputs":6,"production_prepare":true,"test_argv_override":false,
+    evidence.record(json!({"event":"acceptance_started","cli_version":CLI_VERSION,"max_native_inputs":6,"production_prepare":true,"test_argv_override":false,
         "real_gui_verified":false,"app_restart_verified":false,"native_effective_policy_verified":false,"filesystem_sandbox_verified":false})).unwrap();
     App::test((), |mut app| async move {
         crate::test_util::settings::initialize_settings_for_tests(&mut app);
@@ -810,7 +845,7 @@ fn real_grok_fixed_policy_parent_child() {
                 CLIAgent::Grok,
                 CLIAgentInstallation {
                     executable: Some(executable),
-                    version: CLIAgentVersionStatus::Detected("1.0.30".into()),
+                    version: CLIAgentVersionStatus::Detected(CLI_VERSION.into()),
                 },
             )
         });

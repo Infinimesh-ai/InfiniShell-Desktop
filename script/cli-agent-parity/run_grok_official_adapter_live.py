@@ -31,7 +31,7 @@ MAX_TUNNELS = 32
 MAX_BYTES = 32 * 1024 * 1024
 P0_PROFILE = "p0-1.0.34"
 CANDIDATE_1041_P0_PROFILE = "p0-test-only-1.0.41"
-CURRENT_ROOT_PROFILE = "root-1.0.40"
+CURRENT_ROOT_PROFILE = "root-1.0.41"
 PROFILES = {
     "full-1.0.30": {
         "version": shared.VERSION,
@@ -61,13 +61,13 @@ PROFILES = {
         "public_product_gate_open": False,
     },
     CURRENT_ROOT_PROFILE: {
-        "version": "grok 1.0.40 (eb1a2256660d)",
-        "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+        "version": "grok 1.0.41 (4220f3b224a6)",
+        "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
         "model": "grok-4.7",
         "test_name": "ai::cli_agent_runtime::grok::live_tests::real_grok_current_root_lifecycle",
         "max_acp_inputs": ACP_INPUTS,
         "project_files": ["approval-allow.txt"],
-        "public_product_gate_open": False,
+        "public_product_gate_open": True,
     },
 }
 NATIVE_MARKETPLACE_INITIALIZATION = {
@@ -576,7 +576,8 @@ def run(args):
         passed = (verified_p0_acceptance(process.returncode, output, events,
                 candidate_1041=args.acceptance_profile == CANDIDATE_1041_P0_PROFILE)
             if args.acceptance_profile in (P0_PROFILE, CANDIDATE_1041_P0_PROFILE)
-            else shared.verified_acceptance(process.returncode, output, events, official=True))
+            else shared.verified_acceptance(process.returncode, output, events, official=True,
+                production_root=args.acceptance_profile == CURRENT_ROOT_PROFILE))
         expected_leaders = 3 if args.acceptance_profile == CANDIDATE_1041_P0_PROFILE else 2
         metadata["acceptance_passed"] = (passed and model_tunnel and not metadata.get("timed_out", False)
             and metadata["private_settings_audit"]["settings_scope_verified"]

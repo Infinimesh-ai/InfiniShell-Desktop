@@ -1,0 +1,18 @@
+{
+  "gui_sha256": "c21f4bc4edf9c08de58d32bdb06f7daeaa448eee66479340a02f19de476ee132",
+  "languages": [
+    "en",
+    "zh-CN"
+  ],
+  "verified_visible_changed_descriptions": true,
+  "clipping_or_overlap_observed": false,
+  "layout_model_inputs": 0,
+  "restarted_for_chinese": true,
+  "layout_pid_exited": 71635,
+  "screenshots": {
+    "cli-platform-description-en-v11.png": "07b9d7d9e1ef5d7e7cb505c1da94152150d198aedbf075bc8106a6d3f2f1eb73",
+    "cli-platform-description-zh-v11.png": "6da3ace1a491b694a8113c2e04d440135a5e5182d803c68ad580cf586e4eaf82",
+    "cli-update-description-en-v11.png": "bac442ed336f30dca5347e89d39dc34bb6e25d7db6741b902517303e8e11ff83",
+    "cli-update-description-zh-v11.png": "995f2b5b8b6b0411f4bae9a2cc81a34fa3dc2761a6aa92d3caf81939e781393a"
+  }
+}

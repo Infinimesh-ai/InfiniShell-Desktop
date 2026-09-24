@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn infinishell_desktop_entry_enables_ime_without_promoting_managed_tasks() {
+fn infinishell_desktop_entry_enables_ime_and_macos_managed_tasks() {
     let app_manifest: toml::Value =
         toml::from_str(include_str!("../Cargo.toml")).expect("app/Cargo.toml 应为有效 TOML");
     assert_eq!(
@@ -39,10 +39,15 @@ fn infinishell_desktop_entry_enables_ime_without_promoting_managed_tasks() {
             "InfiniShell 桌面入口应在 {target} 启用 IME marked-text"
         );
     }
-    assert!(
-        !source.contains("FeatureFlag::LocalCLIManagedTasks"),
-        "完整验收前，InfiniShell 正式 GUI 入口不应启用本地 CLI 托管任务"
-    );
+    let managed_enable_call =
+        "state.with_additional_features(&[FeatureFlag::LocalCLIManagedTasks])";
+    let managed_offset = source
+        .find(managed_enable_call)
+        .expect("macOS 正式 GUI 入口应启用本地 CLI 托管任务");
+    let managed_cfg_offset = source[..managed_offset]
+        .rfind("#[cfg(target_os = \"macos\")]")
+        .expect("托管任务正式入口应限制在完成适配的 macOS 桌面");
+    assert!(managed_cfg_offset > enable_offset);
 }
 
 #[test]

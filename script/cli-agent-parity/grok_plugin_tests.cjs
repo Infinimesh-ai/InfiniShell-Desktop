@@ -229,3 +229,23 @@ test("一次 worker 失败不在 Node 留状态，显式重投仍调用相同事
     ...env, WARP_CLI_AGENT_NOTIFY_EXECUTABLE: "relative-worker",
   }, 5000, () => assert.fail("相对路径不能启动"), () => 1000), false);
 });
+
+
+test("仅原生 permission_prompt 类别映射为等待审批，正文不影响语义", () => {
+  for (const field of ["notificationType", "notification_type"]) {
+    const notification = plugin.makeNotification(normalized("notification", {
+      [field]: "permission_prompt", message: "任意展示文本", promptId: "turn-approved",
+    }));
+    assert.equal(notification.event, "permission_request");
+    assert.equal(notification.prompt_id, "turn-approved");
+    assert.equal(notification.summary, "任意展示文本");
+    assert.equal(notification.terminal_unverified, undefined);
+  }
+  for (const category of [undefined, "permission_denied", "PERMISSION_PROMPT", "permission_prompt_extra", "idle_prompt"]) {
+    const notification = plugin.makeNotification(normalized("notification", {
+      notificationType: category, message: "Permission needed: approve this tool",
+    }));
+    assert.equal(notification.event, "notification");
+  }
+  assert.throws(() => normalized("notification", {notificationType:"permission_prompt", notification_type:"idle_prompt"}), /conflicting_alias/);
+});

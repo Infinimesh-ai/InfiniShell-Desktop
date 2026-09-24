@@ -5593,7 +5593,7 @@ ambient-agent-local-harness-persistence-failed = 无法保存本地任务，任�
 ambient-agent-local-harness-working-directory-unavailable = 无法确定本地任务的工作目录。
 ambient-agent-local-harness-shell-required = 启动本地任务前需要检测到终端 Shell。
 cli-agent-plugin-grok-install-title = 设置 Grok 通知
-cli-agent-plugin-grok-install-subtitle = 随附插件需要此终端可用的 Grok 1.0.30 和 Node.js 18 或更新版本。
+cli-agent-plugin-grok-install-subtitle = 随附插件需要此终端可用的 Grok 1.0.30 或 1.0.41 和 Node.js 18 或更新版本。
 cli-agent-plugin-grok-cli-version-step = 检查 Grok 版本
 cli-agent-plugin-grok-node-version-step = 检查 Node.js 版本
 cli-agent-plugin-grok-enable-step = 启用已安装的 InfiniShell 插件
@@ -5641,8 +5641,10 @@ cli-task-manager-installation = { $cli }：{ $version }
 cli-task-manager-local-only = 这些任务在本机运行。关闭面板后，已连接的任务仍会继续运行。SSH 和 tmux 终端会话单独管理。
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 支持文本任务、审批、取消、历史继续和任务消息。固定只读或文件工具策略要求逐次审批，子任务使用相同工具，任务权限不得扩大。这两种策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。“继承”策略每轮可使用一个显式选择的技能，其完整路径必须唯一匹配当前会话的技能目录。应用不会自动授予项目信任。托管模式不支持图片。
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 仅开放已验证的 P0 路径：新建文本任务、精确原生读取请求的逐次允许或拒绝、真实输出后的取消，以及原生会话继续。追加输入、关闭会话、文件写入、本地任务工具、技能、子任务和托管图片仍不可用。终端命令、钩子以及 CLI 或管理员策略不在该 P0 保证范围内；这不是文件系统沙箱。
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。“继承”策略使用 CLI 设置，启动时可选择一个技能。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。托管模式不支持图片。
+cli-task-manager-grok-root-tools-unavailable = 当前 Grok 版本与权限策略组合不支持本地任务工具和子任务。
 cli-task-manager-grok-spawn-unavailable = 选择固定只读或文件工具策略后，才能允许 Grok 子任务。
-cli-task-manager-claude-verification = Claude Code 2.1.273 和 2.1.278 可在此功能开关下用于验证；登录、成功回合、审批与恢复仍需按版本取得独立验收证据。
+cli-task-manager-claude-verification = 此功能开关支持 Claude Code 2.1.273、2.1.278 和 2.1.280。登录、成功回合、审批与恢复需按版本独立验证。
 cli-task-manager-empty = 尚未保存本地 CLI 任务。
 cli-task-manager-permission = 新任务权限
 cli-task-manager-permission-inherit = 继承 CLI 设置
@@ -5748,7 +5750,7 @@ cli-task-manager-attachments = 附件与技能
 
 cli-agent-task-exit-unconfirmed = 尚未确认上次 CLI 进程已停止。任务记录已保留，请等待清理完成后再继续；缺少退出回执的旧记录暂时无法安全恢复。
 
-cli-task-manager-skills-session-fixed = 此 Claude 会话只能使用启动时注册的技能。若要选择其他技能，请新建任务。
+cli-task-manager-skills-session-fixed = 此会话只能使用启动时注册的技能。若要选择其他技能，请新建任务。
 
 cli-task-manager-message-route = 主题：{ $subject } · 从 { $sender }（第 { $sender_generation } 次运行）发往 { $recipient }（第 { $recipient_generation } 次运行）
 
@@ -5821,7 +5823,7 @@ terminal-input-grok-manual-copy-hint = 为 Grok 编写草稿；提交后可复�
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-auto = 自动更新 { $agent }
-settings-cli-updates-description = InfiniShell 内没有终端会话或托管任务使用此 CLI 时执行更新。
+settings-cli-updates-description = InfiniShell 内没有终端会话或托管任务使用此 CLI 时执行更新。CLI 更新不会自动启用尚未验证的托管功能。
 settings-cli-updates-channel = 发布渠道
 settings-cli-updates-channel-follow = 跟随当前安装
 settings-cli-updates-channel-latest = Latest（最新正式版）

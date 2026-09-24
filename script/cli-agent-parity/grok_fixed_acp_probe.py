@@ -28,6 +28,8 @@ EXIT_TIMEOUT = 5
 MISSING_SESSION = "00000000-0000-4000-8000-000000000000"
 METHODS = ("initialize", "session/new", "session/cancel", "session/load", "session/resume")
 SETUP_METHOD = "_x.ai/session/setup"
+# 无凭据 new 在两个固定版本均完成这七个阶段；不能套用已认证的 6/9/11 阶段合同。
+SETUP_VERSIONS = ("1.0.40", "1.0.41")
 SETUP_PHASES = ("auth", "resolve_workspace", "folder_trust", "plugin_registry", "mcp_merge",
                 "persistence_init", "spawn_session_actor")
 MACOS_BINARY_BYTES = 141869568
@@ -75,7 +77,7 @@ def valid_session_id(value):
 
 def validate_notification(message, version=VERSION):
     if message.get("method") == SETUP_METHOD:
-        require(version == VERSION and set(message) == {"jsonrpc", "method", "params"}
+        require(version in SETUP_VERSIONS and set(message) == {"jsonrpc", "method", "params"}
                 and message["jsonrpc"] == "2.0", "setup 通知只允许当前固定版本的精确外层")
         params = message["params"]
         require(isinstance(params, dict) and set(params) == {"method", "phase", "sessionId"}
@@ -149,7 +151,7 @@ def validate_transcript(records, expected, version=VERSION):
         validate_response(by_id[identifier], message, version)
         observed.add(identifier)
     require(observed == set(by_id), "ACP 并非每个请求都有唯一响应")
-    if version == VERSION:
+    if version in SETUP_VERSIONS:
         require(tuple(item["phase"] for item in setup) == SETUP_PHASES,
                 "当前版本 setup 阶段缺失、重复或乱序")
         require(all(item["sessionId"] is None for item in setup[:5])

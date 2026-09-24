@@ -388,7 +388,7 @@ def verified_final_response(event, native_session_id, expected=None):
     return expected is None or reply.strip() == expected
 
 
-def verified_acceptance(exit_code, output, events, *, official=False):
+def verified_acceptance(exit_code, output, events, *, official=False, production_root=False):
     if exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output):
         return False
     endings = [event for event in events if event.get("event") == "acceptance_passed"]
@@ -398,9 +398,30 @@ def verified_acceptance(exit_code, output, events, *, official=False):
     if (not isinstance(native, str) or not native or ending.get("scope") != SCOPE
             or ending.get("official_grok_model_tested") is not official
             or ending.get("queued_input_verified") is not True
+            or ending.get("public_product_gate_open") is not production_root
             or any(ending.get(key) is not False for key in ("same_turn_steering_supported",
-                "public_product_gate_open", "app_restart_and_ui_verified", "parent_permission_ceiling_verified"))):
+                "app_restart_and_ui_verified", "parent_permission_ceiling_verified"))):
         return False
+    if production_root:
+        started = [event for event in events if event.get("event") == "acceptance_started"]
+        ready = [event for event in events if event.get("event") == "session_ready"]
+        if (not official or ending.get("production_root") is not True
+                or ending.get("test_only_current_candidate_gate") is not False
+                or len(started) != 1
+                or started[0].get("verified_scope") != "production_root-1.0.41"
+                or started[0].get("production_root") is not True
+                or started[0].get("production_connect_protocol") is not True
+                or started[0].get("test_only_current_candidate_gate") is not False
+                or started[0].get("public_product_gate_open") is not True
+                or len(ready) != 2
+                or any(event.get("verified_cli_version") != "1.0.41"
+                    or event.get("current_model_id") != "grok-4.7"
+                    or event.get("native_session_id") != native
+                    or event.get("production_root") is not True
+                    or event.get("public_product_gate_open") is not True
+                    or event.get("permission_policy") != "Inherit"
+                    or event.get("permission_enforcement_verified") is not False for event in ready)):
+            return False
     results = [event for event in events if event.get("event") == "turn_finished"]
     if len(results) != 8 or len({event.get("turn_id") for event in results}) != 8:
         return False

@@ -1,0 +1,32 @@
+{
+  "fixtures": {
+    "isnc3": {
+      "credential_copy_removed": true,
+      "credential_source_stat_unchanged": true,
+      "identified_private_native_processes_gone": true,
+      "ssh_private_keys_removed": true,
+      "process_tree_cleanup_verified": false,
+      "isolated_sshd_exited": true
+    },
+    "isnh3": {
+      "credential_copy_removed": null,
+      "credential_source_stat_unchanged": null,
+      "identified_private_native_processes_gone": true,
+      "ssh_private_keys_removed": true,
+      "process_tree_cleanup_verified": false,
+      "isolated_sshd_exited": true
+    },
+    "isng4": {
+      "credential_copy_removed": true,
+      "credential_source_stat_unchanged": true,
+      "identified_private_native_processes_gone": true,
+      "tunnel_drained": true,
+      "ssh_private_keys_removed": true,
+      "process_tree_cleanup_verified": false,
+      "isolated_sshd_exited": true
+    }
+  },
+  "logs_deleted": false,
+  "original_codex_no_input_tmux_case_retained": true,
+  "full_supervisor_receipts_claimed": false
+}

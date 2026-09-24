@@ -1,0 +1,22 @@
+{
+  "scope": "默认编译特性 GUI 入口与 Grok 权限策略中英文布局",
+  "build_receipt": "gui-evidence/build-default-goal-v4.safe.json",
+  "source_receipt": "evidence/goal-v4-sources.safe.json",
+  "observations": {
+    "default_managed_entry_visible": true,
+    "inherit_sdk_buttons_disabled": true,
+    "fixed_sdk_buttons_available": true,
+    "fixed_skill_selector_unavailable": true,
+    "both_languages_no_clipped_labels": true
+  },
+  "screenshots": {
+    "default-cli-entry-v4.png": "6da03325f87552176d24c482bdfd92fcd69b7d6fb38b7a4aea72fec835e68969",
+    "default-cli-entry-en-v4.png": "31b91c1ae7089185bcb43517b23491f67a4d64bec4e5d2ab5ee08af8275f9ea6",
+    "grok-inherit-policy-zh-v4.png": "0b06cdafe065a18a81890a061d72a1a660ace8d5bc521978fbe877ca8c3ca830",
+    "grok-fixed-policy-zh-v4.png": "e97ae332705047987345a141818c912871e91231b22400fd23ab0b6c887f2477",
+    "grok-overview-en-v4.png": "3bc7ab5be5cedcec57fd927224a7c717dfc295acd52e0ccee9be127494215a08",
+    "grok-inherit-policy-en-v4.png": "f5624ffe0f2c29f99dddf97a7a2613cf781917e06105f16aab05475396b94af6",
+    "grok-fixed-policy-en-v4.png": "06efd6730679f3685dd4e8f1d21fe1db60f1527da524b40ae284190cbd8bd00b"
+  },
+  "does_not_prove_live_managed_call": true
+}

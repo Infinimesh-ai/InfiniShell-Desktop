@@ -2,6 +2,7 @@
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,10 +16,22 @@ import run_grok_child_coordinator as runner
 def evidence():
     chain = dict(runner.CHAIN, parent_native_sha256="1" * 64, child_native_sha256="2" * 64,
         parent_result_sha256="3" * 64, child_result_sha256="4" * 64)
-    cleanup = lambda token: {"event": "cleanup_verified", "scope": runner.SCOPE,
-        "runtime_sha256": token * 64, "cleanup_confirmed": True}
-    return [dict(runner.START), dict(runner.GATE), chain, cleanup("5"), cleanup("6"),
-        dict(runner.RESUME), cleanup("7"), dict(runner.END)]
+    def cleanup_pair(token):
+        runtime = f"00000000-0000-4000-8000-{token:012d}"
+        receipt = {"event": "runtime_host_cleanup_receipt", "scope": runner.SCOPE,
+            "runtime_generation": runtime, "receipt": {"version": 2,
+                "runtime_generation": runtime, "host_instance_id": runtime,
+                "manifest_sha256": "5" * 64, "journal_sha256": "6" * 64,
+                "native_cleanup_sha256": "7" * 64, "last_event_sequence": 20,
+                "acknowledged_sequence": 20, "native_process": "exited",
+                "adapter_task_terminated": True, "adapter_succeeded": True,
+                "event_journal_completed": True}}
+        cleanup = {"event": "cleanup_verified", "scope": runner.SCOPE,
+            "runtime_sha256": hashlib.sha256(runtime.encode()).hexdigest(),
+            "cleanup_confirmed": True}
+        return [receipt, cleanup]
+    return [dict(runner.START), dict(runner.GATE), chain, *cleanup_pair(1),
+        *cleanup_pair(2), dict(runner.RESUME), *cleanup_pair(3), dict(runner.END)]
 
 
 class EvidenceTests(unittest.TestCase):
@@ -89,8 +102,34 @@ class EvidenceTests(unittest.TestCase):
 
     def test_cleanup_requires_three_distinct_runtime_receipts(self):
         events = evidence()
-        events[6] = copy.deepcopy(events[3])
+        events[8:10] = copy.deepcopy(events[3:5])
         self.assertFalse(runner.observation(0, events)["parent_child_passed"])
+
+    def test_exit_receipt_must_prove_native_cleanup_for_the_matching_generation(self):
+        for key, value in (("native_process", "unknown"), ("adapter_task_terminated", False),
+                ("adapter_succeeded", False), ("event_journal_completed", False),
+                ("runtime_generation", "00000000-0000-4000-8000-000000000009"),
+                ("acknowledged_sequence", 21), ("version", True), ("manifest_sha256", "private")):
+            with self.subTest(key=key):
+                events = evidence()
+                events[3]["receipt"][key] = value
+                self.assertFalse(runner.observation(0, events)["parent_child_passed"])
+        events = evidence()
+        events[3]["receipt"]["private_transcript"] = "DO_NOT_PUBLISH"
+        self.assertFalse(runner.validate_event(events[3]))
+
+    def test_fixed_cli_version_cannot_reuse_an_older_chain_receipt(self):
+        events = evidence()
+        events[0]["cli_version"] = "1.0.30"
+        self.assertFalse(runner.observation(0, events)["parent_child_passed"])
+
+    def test_failed_adapter_receipt_remains_publishable_without_passing_acceptance(self):
+        events = evidence()
+        events[3]["receipt"]["adapter_succeeded"] = False
+        self.assertTrue(all(runner.validate_event(event) for event in events))
+        self.assertFalse(runner.observation(0, events)["parent_child_passed"])
+        events[3]["receipt"]["adapter_succeeded"] = "false"
+        self.assertFalse(runner.validate_event(events[3]))
 
     def test_parent_child_must_have_distinct_native_sessions(self):
         events = evidence()
@@ -133,7 +172,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertTrue(runner.validate_event(event))
         self.assertFalse(runner.observation(0, evidence()[:-1] + [event])["parent_child_passed"])
 
-    def test_eight_event_json_budget_is_checked_on_every_platform(self):
+    def test_eleven_event_json_budget_is_checked_on_every_platform(self):
         payload = "".join(json.dumps(event) + "\n" for event in evidence()).encode()
         with mock.patch.object(runner.isolation, "private_bytes", return_value=payload):
             self.assertEqual(runner.read_events(Path("offline-events.ndjson")), evidence())
@@ -142,7 +181,7 @@ class EvidenceTests(unittest.TestCase):
                 runner.read_events(Path("offline-events.ndjson"))
 
     @unittest.skipUnless(os.name == "posix", "在线运行器私有文件读取限定 POSIX；不代表 Windows 原生验收")
-    def test_reader_accepts_eight_events_and_rejects_ninth(self):
+    def test_reader_accepts_eleven_events_and_rejects_twelfth(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "events.ndjson"
             path.write_text("".join(json.dumps(item) + "\n" for item in evidence()))

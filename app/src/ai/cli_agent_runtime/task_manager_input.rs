@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use crate::ui_components::blended_colors;
 use ai::skills::{ParsedSkill, SkillReference, SkillScope};
 use repo_metadata::RepoMetadataModel;
+use serde_json::Value;
 use uuid::Uuid;
 use warp_cli::agent::Harness;
 use warp_core::ui::theme::color::internal_colors;
@@ -185,7 +186,7 @@ impl LocalCLITaskManagerView {
                 manager
                     .active_skill_by_reference(&skill.reference, ctx)
                     .is_some()
-                    && self.claude_skill_was_registered(&skill.reference, ctx)
+                    && self.session_skill_was_registered(&skill.reference, ctx)
             })
             .map(|skill| {
                 DropdownItem::new(
@@ -283,17 +284,29 @@ impl LocalCLITaskManagerView {
         ctx.notify();
     }
 
-    fn claude_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
+    fn session_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
         if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
             return false;
         }
-        if self.harness != Harness::Claude || self.selected_task.is_none() {
+        if self.selected_task.is_none() || !matches!(self.harness, Harness::Claude | Harness::Grok)
+        {
             return true;
         }
-        self.selected_record(ctx)
-            .and_then(|task| {
-                serde_json::from_str::<super::SavedLaunchOptions>(&task.config_json).ok()
-            })
+        let Some(config) = self
+            .selected_record(ctx)
+            .and_then(|task| serde_json::from_str::<Value>(&task.config_json).ok())
+        else {
+            return false;
+        };
+        let bound_grok = self.harness == Harness::Grok
+            && config["cli_version"]
+                .as_str()
+                .is_some_and(super::super::grok::current_root_supported_version);
+        if self.harness != Harness::Claude && !bound_grok {
+            return true;
+        }
+        serde_json::from_value::<super::SavedLaunchOptions>(config)
+            .ok()
             .is_some_and(|options| {
                 options.selected_skills.iter().any(|skill| {
                     *reference == SkillReference::Path(LocalOrRemotePath::Local(skill.path.clone()))
@@ -327,8 +340,9 @@ impl LocalCLITaskManagerView {
                 manager
                     .active_skill_by_reference(reference, ctx)
                     .filter(|skill| {
-                        self.harness != Harness::Grok
-                            || is_user_invocable(&skill.user_invocable(), CLIAgent::Grok)
+                        self.session_skill_was_registered(reference, ctx)
+                            && (self.harness != Harness::Grok
+                                || is_user_invocable(&skill.user_invocable(), CLIAgent::Grok))
                     })
                     .cloned()
                     .ok_or_else(|| {
@@ -363,7 +377,7 @@ impl LocalCLITaskManagerView {
                 return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
             }
         }
-        if !self.claude_skill_was_registered(reference, ctx) {
+        if !self.session_skill_was_registered(reference, ctx) {
             return Err(crate::t!("cli-task-manager-skills-session-fixed"));
         }
         let skill = SkillManager::as_ref(ctx)

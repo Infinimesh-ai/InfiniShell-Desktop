@@ -1,0 +1,55 @@
+{
+  "scope": "macOS ordinary product PTY Grok 1.0.41 plugin 0.1.4 actual approval request, V11",
+  "acceptance_passed": false,
+  "failure_code": "notification_worker_rejects_permission_request",
+  "cli_version": "1.0.41",
+  "plugin_version": "0.1.4",
+  "worker_sha256": "c21f4bc4edf9c08de58d32bdb06f7daeaa448eee66479340a02f19de476ee132",
+  "native_model_inputs": 1,
+  "input_budget": 1,
+  "native_permission_prompt_observed": true,
+  "native_prompt_id_presence_observed": null,
+  "native_hook_event_environment_matches": true,
+  "product_permission_request_received": false,
+  "product_generic_notification_received": false,
+  "product_wants_to_run_observed": false,
+  "product_received_events": {
+    "session_start": 1,
+    "prompt_submit": 1,
+    "tool_complete": 1,
+    "stop": 1
+  },
+  "native_allow_once_selected_and_confirmed": true,
+  "always_approve_selected": false,
+  "approved_file_exact": true,
+  "native_final_marker_observed": true,
+  "native_cli_exit_code": 0,
+  "gui_cmd_q_exit_verified": true,
+  "gui_pid": 72272,
+  "production_installer_upgrade_013_to_014_verified": true,
+  "cleanup": {
+    "automatic_model_inputs": 0,
+    "process_tree_cleanup_verified": false,
+    "identified_private_native_processes_gone": true,
+    "tunnel_drained": true,
+    "network_budget_exhausted": false,
+    "credential_copy_removed": true,
+    "credential_source_stat_unchanged": true
+  },
+  "diagnosis": {
+    "exact_blocker": "app/src/terminal/cli_agent_hook_writer.rs:96 known_event omits permission_request",
+    "mapper": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs:113 emits permission_request",
+    "compiled_worker_synthetic_probe_rejected": "cli_agent_notify_invalid_payload",
+    "real_native_worker_stderr_captured": false,
+    "normalize_complete_payload_observed": false,
+    "event_cursor_delivery_not_reached": true,
+    "additional_prompt_binding_check_required_after_worker_fix": true
+  },
+  "evidence_notes": [
+    "原生分类采用独立只读 Notification hook 白名单观察器，未保存 message/命令/原始 payload。",
+    "已安装生产 notify 字节未修改；实际 SessionStart、Prompt、ToolComplete、Stop 到达产品。",
+    "独立编译 worker 解析探针是合成、零模型、无 TTY，不计为真实原生通知通过。",
+    "截图仅含本次合成项目、输入和输出，已逐张审查。"
+  ],
+  "raw_payloads_or_credentials_archived": false
+}

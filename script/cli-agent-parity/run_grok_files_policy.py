@@ -15,6 +15,8 @@ lease, isolation, official, shared = fixed.lease, fixed.isolation, fixed.officia
 SCOPE = "authenticated_files_policy_six_input_lifecycle"
 TEST_NAME = "ai::cli_agent_runtime::grok::files_policy_live_tests::" + SCOPE
 MAX_DEADLINE = 900
+# 六个冷进程共用预算；固定版本实测已耗尽单输入探针默认的 32 次连接。
+MAX_TLS_CONNECTIONS = 64
 PHASES = ("write_allow", "write_deny", "edit_allow", "edit_deny", "pending_cancel", "cold_read")
 PHASE_BOOLS = {"passed", "ready", "same_saved_profile", "same_native_session", "no_replay_before_input",
     "hook_absent_at_ready", "hook_absent_after_shutdown", "final_history_verified", "native_tool_terminal",
@@ -169,14 +171,14 @@ def run(args):
     before_auth = lease.auth_identity(args.official_grok_home)
     binary_hash = shared.digest(args.grok)
     metadata = dict(observation(None, [], receipts), scope=SCOPE, test_name=TEST_NAME, private_workspace=str(root),
-        max_native_inputs=6, max_tls_connections=lease.MAX_TLS_CONNECTIONS, max_tls_bytes=lease.MAX_TLS_BYTES,
+        max_native_inputs=6, max_tls_connections=MAX_TLS_CONNECTIONS, max_tls_bytes=lease.MAX_TLS_BYTES,
         deadline_seconds=args.timeout, http_model_calls_observable=False, cost_budget_enforced=False, tls_decrypted=False,
         system_managed_policies_apply=True, native_executable_is_wrapper=False, same_commit_verified_by_runner=False,
         public_credential_values_recorded=False, grok_sha256=binary_hash,
         test_binary_sha256=shared.digest(args.test_binary), supervisor_sha256=shared.digest(args.supervisor))
     metadata.update(fixed.SANDBOX_SCOPE_FIELDS)
     events = []
-    with isolation.bounded_tunnel(args.timeout) as tunnel:
+    with isolation.bounded_tunnel(args.timeout, connection_budget=MAX_TLS_CONNECTIONS) as tunnel:
         try:
             port = tunnel.start()
             official.copy_private_auth(args.official_grok_home, root / "home/.grok")
@@ -219,7 +221,7 @@ def run(args):
                 metadata["binary_unchanged"] = shared.digest(args.grok) == binary_hash
             except (OSError, ValueError) as error:
                 metadata["cleanup_error_type"] = type(error).__name__
-            metadata["boundary_passed"] = (fixed.boundary_passed(metadata, tunnel)
+            metadata["boundary_passed"] = (fixed.boundary_passed(metadata, tunnel, connection_budget=MAX_TLS_CONNECTIONS)
                 and metadata.get("fixture_contract_unchanged") is True and metadata.get("expected_file_bytes_verified") is True)
             metadata["files_policy_passed"] &= metadata["boundary_passed"]
             for key in ("cold_native_restore_verified", "project_hook_suppression_observed"):
@@ -244,7 +246,7 @@ def main():
     parser.add_argument("--timeout",type=int,default=MAX_DEADLINE)
     args = parser.parse_args()
     try:
-        fixed.validate_paths(args,max_native_inputs=6,max_deadline=MAX_DEADLINE)
+        fixed.validate_paths(args,max_native_inputs=6,max_deadline=MAX_DEADLINE,expected_sha256=fixed.CURRENT_FIXED_SHA256)
         return run(args)
     except (OSError,ValueError,subprocess.SubprocessError) as error:
         parser.exit(2,f"文件工具运行器失败：{type(error).__name__}\n")

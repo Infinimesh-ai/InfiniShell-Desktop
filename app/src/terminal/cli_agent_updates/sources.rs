@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::ai::cli_agent_runtime::managed_process;
 #[cfg(feature = "local_fs")]
 use crate::ai::cli_agent_runtime::managed_process::ManagedEnvironment;
-use crate::ai::cli_agent_runtime::{claude, codex, grok, managed_process};
 use command::Stdio;
 use command::r#async::Command;
 use futures::{AsyncReadExt as _, StreamExt as _};
@@ -25,6 +25,7 @@ use super::{
     CliAgentUpdateChannel as Channel, CliAgentUpdateError as Error, CliAgentUpdateSource as Source,
 };
 use crate::terminal::cli_agent::{CLIAgent, parse_cli_agent_version};
+#[cfg(test)]
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
@@ -427,6 +428,7 @@ pub(super) struct CheckReport {
     pub plan: Option<UpdatePlan>,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PluginCompatibility {
     installed: bool,
@@ -436,6 +438,7 @@ struct PluginCompatibility {
     platform_needs_update: bool,
 }
 
+#[cfg(test)]
 impl PluginCompatibility {
     fn verified(self) -> bool {
         self.installed
@@ -446,31 +449,7 @@ impl PluginCompatibility {
     }
 }
 
-fn adapter_supports_version(agent: CLIAgent, version: &str) -> bool {
-    match agent {
-        CLIAgent::Codex => codex::supported_version(version),
-        CLIAgent::Claude => claude::supported_version(version),
-        CLIAgent::Grok => grok::supported_version(version),
-        CLIAgent::Gemini
-        | CLIAgent::Amp
-        | CLIAgent::Droid
-        | CLIAgent::OpenCode
-        | CLIAgent::Copilot
-        | CLIAgent::Pi
-        | CLIAgent::OhMyPi
-        | CLIAgent::Auggie
-        | CLIAgent::CursorCli
-        | CLIAgent::Goose
-        | CLIAgent::DeepSeek
-        | CLIAgent::Hermes
-        | CLIAgent::Vibe
-        | CLIAgent::Antigravity
-        | CLIAgent::Omp
-        | CLIAgent::WarpTui
-        | CLIAgent::Unknown => false,
-    }
-}
-
+#[cfg(test)]
 fn plugin_compatibility(agent: CLIAgent) -> Option<PluginCompatibility> {
     let manager = plugin_manager_for(agent)?;
     Some(PluginCompatibility {
@@ -480,11 +459,6 @@ fn plugin_compatibility(agent: CLIAgent) -> Option<PluginCompatibility> {
         platform_installed: manager.is_platform_plugin_installed(),
         platform_needs_update: manager.platform_plugin_needs_update(),
     })
-}
-
-fn managed_compatibility_verified(agent: CLIAgent, version: &str) -> bool {
-    adapter_supports_version(agent, version)
-        && plugin_compatibility(agent).is_some_and(PluginCompatibility::verified)
 }
 
 pub(super) async fn inspect(
@@ -511,10 +485,6 @@ pub(super) async fn inspect(
     let target_version = latest(agent, installation.channel, client).await?;
     let version_matches = installed_version == target_version;
     let mut error = installation.error;
-    if error.is_none() && !managed_compatibility_verified(agent, &target_version) {
-        // 缺少适配器版本合同或完整插件证据时保持手动处理，不能让版本号相同冒充兼容。
-        error = Some(Error::UnsupportedSource);
-    }
     if installation
         .source_target
         .as_ref()
@@ -663,6 +633,14 @@ async fn latest(
     channel: Channel,
     client: &http_client::Client,
 ) -> Result<String, Error> {
+    #[cfg(all(test, unix))]
+    if let Some(version) = live_tests::fixed_release(agent, channel) {
+        return Ok(version);
+    }
+    #[cfg(all(test, windows))]
+    if let Some(version) = windows_live_tests::fixed_release(agent, channel) {
+        return Ok(version);
+    }
     let (url, package) = match agent {
         CLIAgent::Codex if channel == Channel::Alpha => (
             "https://registry.npmjs.org/@openai/codex/alpha",
@@ -838,24 +816,32 @@ async fn discover(
                         ),
                         ("CODEX_RELEASE".into(), ArgumentRef::TargetVersion),
                     ]);
-                    if cfg!(windows) {
-                        invocation.binding = LaunchBindingSpec::ManualOnly {
-                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
-                                .to_owned(),
-                        };
-                    }
                     installation.config = Some((
                         codex_home.join("packages/standalone/auto-update-version"),
                         ConfigKind::CodexUpdateMarker,
                     ));
                     installation.invocation = Some(invocation);
-                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
+                    installation.error = None;
                     return Ok(installation);
                 }
             }
             CLIAgent::Claude => {
                 let versions = home.join(".local/share/claude/versions");
-                if same_tree(&installation.stamp.canonical, &versions) {
+                #[cfg(windows)]
+                let copied = windows_native_copy(
+                    &installation,
+                    &home.join(".local/bin/claude.exe"),
+                    &versions.join(installed),
+                );
+                #[cfg(windows)]
+                let native_layout = copied.is_some();
+                #[cfg(not(windows))]
+                let native_layout = same_tree(&installation.stamp.canonical, &versions);
+                if native_layout {
+                    #[cfg(windows)]
+                    {
+                        installation.manager = copied;
+                    }
                     installation.source = Source::Native;
                     let config_dir =
                         absolute_env("CLAUDE_CONFIG_DIR").unwrap_or_else(|| home.join(".claude"));
@@ -871,9 +857,17 @@ async fn discover(
                         Channel::FollowInstallation | Channel::Latest | Channel::Alpha => "latest",
                     };
                     let settings = format!("{{\"autoUpdatesChannel\":\"{selected}\"}}");
-                    let mut invocation = BoundInvocation {
+                    let invocation = BoundInvocation {
                         artifacts: [
-                            (ArtifactRole::Program, installation.stamp.canonical.clone()),
+                            (
+                                ArtifactRole::Program,
+                                installation
+                                    .manager
+                                    .as_ref()
+                                    .unwrap_or(&installation.stamp)
+                                    .canonical
+                                    .clone(),
+                            ),
                             (ArtifactRole::Entry, installation.entry.clone()),
                             (ArtifactRole::ConfigRoot, config_dir),
                         ]
@@ -883,7 +877,8 @@ async fn discover(
                         arguments: vec![
                             ArgumentRef::Literal("--settings".into()),
                             ArgumentRef::Literal(settings.into()),
-                            ArgumentRef::Literal("update".into()),
+                            ArgumentRef::Literal("install".into()),
+                            ArgumentRef::TargetVersion,
                         ],
                         environment: Vec::new(),
                         env_remove: Vec::new(),
@@ -891,27 +886,37 @@ async fn discover(
                             program: ArtifactRole::Program,
                         },
                     };
-                    if cfg!(windows) {
-                        invocation.binding = LaunchBindingSpec::ManualOnly {
-                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
-                                .to_owned(),
-                        };
-                    }
                     installation.invocation = Some(invocation);
                     installation.config = Some((config_path, ConfigKind::Claude));
-                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
+                    installation.error = None;
                     return Ok(installation);
                 }
             }
             CLIAgent::Grok => {
                 let grok_home = absolute_env("GROK_HOME").unwrap_or_else(|| home.join(".grok"));
-                if same_tree(&installation.stamp.canonical, &grok_home.join("downloads"))
-                    && installation
-                        .entry
-                        .parent()
-                        .and_then(|parent| parent.canonicalize().ok())
-                        == grok_home.join("bin").canonicalize().ok()
-                {
+                #[cfg(windows)]
+                let copied = windows_native_copy(
+                    &installation,
+                    &grok_home.join("bin/grok.exe"),
+                    &grok_home
+                        .join("downloads")
+                        .join(format!("grok-{installed}-windows-x86_64.exe")),
+                );
+                #[cfg(windows)]
+                let native_layout = cfg!(target_arch = "x86_64") && copied.is_some();
+                #[cfg(not(windows))]
+                let native_layout =
+                    same_tree(&installation.stamp.canonical, &grok_home.join("downloads"))
+                        && installation
+                            .entry
+                            .parent()
+                            .and_then(|parent| parent.canonicalize().ok())
+                            == grok_home.join("bin").canonicalize().ok();
+                if native_layout {
+                    #[cfg(windows)]
+                    {
+                        installation.manager = copied;
+                    }
                     installation.source = Source::Native;
                     let check = run(
                         &Invocation::new(&installation.entry, ["update", "--check", "--json"]),
@@ -924,9 +929,17 @@ async fn discover(
                     } else {
                         requested
                     };
-                    let mut invocation = BoundInvocation {
+                    let invocation = BoundInvocation {
                         artifacts: [
-                            (ArtifactRole::Program, installation.stamp.canonical.clone()),
+                            (
+                                ArtifactRole::Program,
+                                installation
+                                    .manager
+                                    .as_ref()
+                                    .unwrap_or(&installation.stamp)
+                                    .canonical
+                                    .clone(),
+                            ),
                             (ArtifactRole::Entry, installation.entry.clone()),
                             (ArtifactRole::ConfigRoot, grok_home.clone()),
                         ]
@@ -944,15 +957,9 @@ async fn discover(
                             program: ArtifactRole::Program,
                         },
                     };
-                    if cfg!(windows) {
-                        invocation.binding = LaunchBindingSpec::ManualOnly {
-                            reason: "Windows 原生可执行文件的导入与运行时依赖闭包尚未绑定"
-                                .to_owned(),
-                        };
-                    }
                     installation.invocation = Some(invocation);
                     installation.config = Some((grok_home.join("config.toml"), ConfigKind::Grok));
-                    installation.error = cfg!(windows).then_some(Error::UnsupportedSource);
+                    installation.error = None;
                     return Ok(installation);
                 }
             }
@@ -969,6 +976,25 @@ async fn discover(
     }
     // WinGet 包记录与当前入口尚未形成可靠的一一对应，不能因 winget 在 PATH 中就更新别的安装。
     Ok(installation)
+}
+
+// Windows 原生安装器复制可见入口；只接受固定布局中与版本缓存逐字节一致的文件。
+// 执行缓存原件，使可见入口可由原生安装器替换；二者会在最终派生前再次核对。
+#[cfg(any(windows, test))]
+fn windows_native_copy(
+    installation: &Installation,
+    entry: &Path,
+    reference: &Path,
+) -> Option<Stamp> {
+    plain_ancestors(entry).ok()?;
+    plain_ancestors(reference).ok()?;
+    if installation.entry != entry || installation.stamp.canonical != entry.canonicalize().ok()? {
+        return None;
+    }
+    let reference = stamp(reference).ok()?;
+    (reference.digest == installation.stamp.digest
+        && reference.canonical != installation.stamp.canonical)
+        .then_some(reference)
 }
 
 fn channel_supported(agent: CLIAgent, channel: Channel) -> bool {
@@ -2283,6 +2309,10 @@ fn validate_codex_publication(journal: &Journal) -> Result<(), Error> {
 }
 
 fn journal_root() -> Result<PathBuf, Error> {
+    #[cfg(all(test, windows))]
+    if let Some(root) = windows_live_tests::journal_root() {
+        return Ok(root);
+    }
     let root = warp_core::paths::secure_state_dir().unwrap_or_else(warp_core::paths::state_dir);
     if !root.is_absolute() {
         return Err(Error::PersistenceFailed);
@@ -2651,10 +2681,6 @@ pub(super) async fn execute(
             &plan.installed_version,
             &root,
         )?;
-        if !managed_compatibility_verified(plan.agent, &plan.target_version) {
-            // 同版本渠道同步也会进入 UpToDate，返回前必须抵御插件在检查后的并发变化。
-            return Err(Error::ProbeFailed);
-        }
         return Ok(plan.target_version);
     }
     if journal.claude_update.is_some() {
@@ -2768,10 +2794,7 @@ pub(super) async fn execute(
     if version(plan.agent, &installation.entry).await? != plan.target_version {
         return Err(Error::VersionMismatch);
     }
-    if !managed_compatibility_verified(plan.agent, &plan.target_version) {
-        // 更新期间插件或配置可能被并发改变，完成前必须重新核验，失败时不得进入 UpToDate。
-        return Err(Error::ProbeFailed);
-    }
+    // 安装成功不授予托管或插件能力；各自入口继续按实际版本和协议核验。
     Ok(plan.target_version)
 }
 
@@ -3459,3 +3482,7 @@ mod tests;
 #[cfg(test)]
 #[path = "sources_live_tests.rs"]
 mod live_tests;
+
+#[cfg(all(test, windows))]
+#[path = "sources_windows_live_tests.rs"]
+mod windows_live_tests;

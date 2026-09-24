@@ -1,5 +1,11 @@
 //! 本机托管任务面板；视图关闭不关闭任务，输入只在原生确认后清除。
 
+#[cfg(all(
+    feature = "integration_tests",
+    any(target_os = "linux", target_os = "windows")
+))]
+#[path = "task_manager_clipboard_integration.rs"]
+pub(crate) mod clipboard_integration;
 #[path = "task_manager_history.rs"]
 mod history;
 #[path = "task_manager_input.rs"]
@@ -753,6 +759,8 @@ impl LocalCLITaskManagerView {
         ) {
             return Err(crate::t!("cli-agent-managed-version-unavailable"));
         }
+        let root_only_grok =
+            grok_root_only_mode(self.harness, self.permission, &installation.version);
         let executable = installation
             .executable
             .expect("已验证的 CLI 安装必须包含绝对路径");
@@ -798,12 +806,16 @@ impl LocalCLITaskManagerView {
                         InputContent::Text(_) | InputContent::LocalImage(_) => None,
                     })
                     .collect(),
-                local_tools: supported_local_tools(
-                    self.harness,
-                    self.permission,
-                    (self.local_tools.allow_spawn || self.local_tools.allow_message)
-                        .then_some(self.local_tools),
-                ),
+                local_tools: if root_only_grok {
+                    None
+                } else {
+                    supported_local_tools(
+                        self.harness,
+                        self.permission,
+                        (self.local_tools.allow_spawn || self.local_tools.allow_message)
+                            .then_some(self.local_tools),
+                    )
+                },
             };
             let task = LocalCliTask {
                 version: 1,
@@ -1249,9 +1261,12 @@ impl LocalCLITaskManagerView {
                 Some(&installation.version),
             )
         });
-        let p0_grok = installation
-            .as_ref()
-            .is_some_and(|installation| grok_p0_installation(self.harness, &installation.version));
+        let root_only_grok = installation.as_ref().is_some_and(|installation| {
+            grok_root_only_mode(self.harness, self.permission, &installation.version)
+        });
+        if root_only_grok && self.selected_task.is_none() {
+            self.local_tools = LocalToolPermissions::default();
+        }
         for (key, disabled) in [
             (
                 "start",
@@ -1323,7 +1338,7 @@ impl LocalCLITaskManagerView {
             (
                 "allow-spawn",
                 self.local_tools.allow_spawn,
-                p0_grok
+                root_only_grok
                     || (self.harness == Harness::Grok
                         && !matches!(
                             self.permission,
@@ -1331,13 +1346,23 @@ impl LocalCLITaskManagerView {
                                 | PermissionPolicy::GrokRestrictedFilesV1
                         )),
             ),
-            ("allow-messages", self.local_tools.allow_message, p0_grok),
+            (
+                "allow-messages",
+                self.local_tools.allow_message,
+                root_only_grok,
+            ),
         ] {
             self.buttons[key].update(ctx, |button, ctx| {
                 button.set_active(active, ctx);
                 button.set_disabled(self.selected_task.is_some() || unsupported, ctx);
                 button.set_tooltip(
-                    unsupported.then(|| crate::t!("cli-task-manager-grok-spawn-unavailable")),
+                    unsupported.then(|| {
+                        if root_only_grok {
+                            crate::t!("cli-task-manager-grok-root-tools-unavailable")
+                        } else {
+                            crate::t!("cli-task-manager-grok-spawn-unavailable")
+                        }
+                    }),
                     ctx,
                 );
             });
@@ -1535,6 +1560,13 @@ impl View for LocalCLITaskManagerView {
             .is_some_and(|installation| grok_p0_installation(Harness::Grok, &installation.version))
         {
             crate::t!("cli-task-manager-grok-p0-verification")
+        } else if self
+            .verified_installation(Harness::Grok, ctx)
+            .is_some_and(|installation| {
+                grok_current_installation(Harness::Grok, &installation.version)
+            })
+        {
+            crate::t!("cli-task-manager-grok-current-verification")
         } else {
             crate::t!("cli-task-manager-grok-unavailable")
         };
@@ -1857,13 +1889,17 @@ impl TypedActionView for LocalCLITaskManagerView {
             TaskManagerAction::SelectHarness(harness) => {
                 if self.selected_task.is_none() {
                     self.harness = *harness;
-                    let p0_grok =
+                    let root_only_grok =
                         self.verified_installation(*harness, ctx)
                             .is_some_and(|installation| {
-                                grok_p0_installation(*harness, &installation.version)
+                                grok_root_only_mode(
+                                    *harness,
+                                    PermissionPolicy::Inherit,
+                                    &installation.version,
+                                )
                             });
                     self.permission = PermissionPolicy::Inherit;
-                    self.local_tools = if p0_grok {
+                    self.local_tools = if root_only_grok {
                         LocalToolPermissions::default()
                     } else {
                         supported_local_tools(*harness, self.permission, Some(self.local_tools))
@@ -1896,13 +1932,17 @@ impl TypedActionView for LocalCLITaskManagerView {
                 Ok(())
             }
             TaskManagerAction::ToggleSpawn => {
-                let p0_grok =
+                let root_only_grok =
                     self.verified_installation(self.harness, ctx)
                         .is_some_and(|installation| {
-                            grok_p0_installation(self.harness, &installation.version)
+                            grok_root_only_mode(
+                                self.harness,
+                                self.permission,
+                                &installation.version,
+                            )
                         });
                 if self.selected_task.is_none()
-                    && !p0_grok
+                    && !root_only_grok
                     && (self.harness != Harness::Grok
                         || matches!(
                             self.permission,
@@ -1915,12 +1955,16 @@ impl TypedActionView for LocalCLITaskManagerView {
                 Ok(())
             }
             TaskManagerAction::ToggleMessages => {
-                let p0_grok =
+                let root_only_grok =
                     self.verified_installation(self.harness, ctx)
                         .is_some_and(|installation| {
-                            grok_p0_installation(self.harness, &installation.version)
+                            grok_root_only_mode(
+                                self.harness,
+                                self.permission,
+                                &installation.version,
+                            )
                         });
-                if self.selected_task.is_none() && !p0_grok {
+                if self.selected_task.is_none() && !root_only_grok {
                     self.local_tools.allow_message = !self.local_tools.allow_message;
                 }
                 Ok(())
@@ -2325,10 +2369,12 @@ fn verified_version(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
         (Harness::Claude, CLIAgentVersionStatus::Detected(version)) => {
             super::claude::supported_version(version)
         }
-        (Harness::Grok, CLIAgentVersionStatus::Detected(version)) => matches!(
-            version.as_str(),
-            super::grok::VERIFIED_VERSION | super::grok::P0_VERIFIED_VERSION
-        ),
+        (Harness::Grok, CLIAgentVersionStatus::Detected(version)) => {
+            matches!(
+                version.as_str(),
+                super::grok::VERIFIED_VERSION | super::grok::P0_VERIFIED_VERSION
+            ) || super::grok::current_root_supported_version(version)
+        }
         _ => false,
     }
 }
@@ -2341,6 +2387,26 @@ fn grok_p0_installation(harness: Harness, version: &CLIAgentVersionStatus) -> bo
             CLIAgentVersionStatus::Detected(version)
         ) if version == super::grok::P0_VERIFIED_VERSION
     )
+}
+
+fn grok_current_installation(harness: Harness, version: &CLIAgentVersionStatus) -> bool {
+    matches!(
+        (harness, version),
+        (Harness::Grok, CLIAgentVersionStatus::Detected(version))
+            if super::grok::current_root_supported_version(version)
+    )
+}
+
+fn grok_root_only_mode(
+    harness: Harness,
+    permission: PermissionPolicy,
+    version: &CLIAgentVersionStatus,
+) -> bool {
+    grok_p0_installation(harness, version)
+        || (grok_current_installation(harness, version)
+            && (permission == PermissionPolicy::Inherit
+                || !matches!(version, CLIAgentVersionStatus::Detected(version)
+                    if super::grok::current_fixed_scope_supported_version(version))))
 }
 
 fn harness_name(harness: Harness) -> String {
@@ -2434,7 +2500,7 @@ fn permission_supported_for_version(
     if !permission_supported(harness, permission) {
         return false;
     }
-    if version.is_some_and(|version| grok_p0_installation(harness, version)) {
+    if version.is_some_and(|version| grok_root_only_mode(harness, permission, version)) {
         return permission == PermissionPolicy::Inherit;
     }
     true

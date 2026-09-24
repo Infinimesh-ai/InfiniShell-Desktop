@@ -5,6 +5,8 @@ use std::process::{Child, Stdio};
 use command::blocking::Command;
 use serde_json::{Value, json};
 
+use crate::terminal::cli_agent_sessions::event::{CLIAgentEventType, parse_event};
+
 use super::*;
 
 fn payload() -> Value {
@@ -22,6 +24,7 @@ fn accepts_only_the_declared_grok_events_and_identity() {
     for event in [
         "session_start",
         "prompt_submit",
+        "permission_request",
         "tool_complete",
         "stop",
         "stop_failure",
@@ -138,6 +141,26 @@ fn parse_osc(bytes: &[u8]) -> ParsedOsc {
         parser.advance(&mut performer, *byte);
     }
     performer
+}
+
+#[test]
+fn grok_permission_notification_reaches_product_parser_with_native_identity() {
+    let mut value = payload();
+    value["event"] = json!("permission_request");
+    value["plugin_version"] = json!("0.1.4");
+    value["summary"] = json!("等待原生 CLI 审批");
+    let osc = parse_osc(&encode_frame(&parsed(&value), false).unwrap());
+    assert_eq!(osc.invalid, 0);
+    assert_eq!(osc.values.len(), 1);
+    let event = parse_event(
+        Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+        &serde_json::to_string(&osc.values[0]).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(event.event, CLIAgentEventType::PermissionRequest);
+    assert_eq!(event.session_id.as_deref(), Some("session-1"));
+    assert_eq!(event.payload.prompt_id.as_deref(), Some("prompt-1"));
+    assert_eq!(event.payload.plugin_version.as_deref(), Some("0.1.4"));
 }
 
 #[test]

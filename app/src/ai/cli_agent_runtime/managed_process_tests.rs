@@ -213,7 +213,7 @@ fn bound_update_rejects_pathname_execution_before_claiming_generation() {
     assert!(!generation_directory(state.path(), generation).exists());
 }
 
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 #[test]
 fn native_file_binding_is_distinct_from_digest_only_recovery_binding() {
     let digest_only = PreparedLaunchBinding::new("a".repeat(64)).unwrap();
@@ -309,6 +309,7 @@ fn legacy_manifest_without_expected_files_stays_compatible() {
         arguments: Vec::new(),
         cwd: state.path().to_owned(),
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: None,
@@ -339,6 +340,7 @@ fn atomic_manifest_never_downgrades_when_binding_record_is_missing() {
         arguments: Vec::new(),
         cwd: state.path().to_owned(),
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: Some(AtomicLaunchKind::NativeFile),
@@ -464,6 +466,7 @@ fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
     let directory = create_generation_directory(state, generation).unwrap();
     let manifest = Manifest {
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,
@@ -494,6 +497,7 @@ fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
 fn attempted_fixture(state: &Path, generation: Uuid) -> (PathBuf, Manifest, Vec<u8>, SpawnAttempt) {
     let manifest = Manifest {
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,
@@ -575,6 +579,7 @@ fn spawn_rejection_removes_isolated_auth_before_becoming_recoverable() {
     fs::write(&auth, b"private").unwrap();
     let manifest = Manifest {
         isolated_home: Some(home.canonicalize().unwrap()),
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,
@@ -969,6 +974,97 @@ fn confirmed_receipt_removes_isolated_auth_but_preserves_session_storage() {
 }
 
 #[test]
+fn host_bound_profile_receipts_preserve_storage_across_process_generations() {
+    let application = tempfile::tempdir().unwrap();
+    let state = application.path().canonicalize().unwrap();
+    let home = state.join("grok-managed").join(Uuid::new_v4().to_string());
+    fs::create_dir_all(home.join("grok")).unwrap();
+    fs::write(home.join("grok/session-test"), b"preserved history").unwrap();
+    for generation in [Uuid::new_v4(), Uuid::new_v4()] {
+        let process_state = state
+            .join("cli-agent-hosts")
+            .join(generation.to_string())
+            .join("native");
+        let (directory, mut receipt) = fixture(&process_state, generation);
+        let path = directory.join("manifest.json");
+        let (mut manifest, _) = read_manifest(&path).unwrap();
+        manifest.isolated_home = Some(home.clone());
+        manifest.isolated_state_dir = Some(state.clone());
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        receipt.manifest_sha256 = sha256(&bytes);
+        read_manifest(&path).unwrap();
+        fs::write(home.join("grok/auth.json"), b"offline opaque test cache").unwrap();
+        // 只验证受绑定路径的清理合同，不声称启动了原生进程。
+        write_receipt(&directory, &receipt).unwrap();
+        assert_eq!(
+            confirmed_exit(&process_state, generation).unwrap(),
+            Some(receipt)
+        );
+        assert!(!home.join("grok/auth.json").exists());
+        assert_eq!(
+            fs::read(home.join("grok/session-test")).unwrap(),
+            b"preserved history"
+        );
+    }
+}
+
+#[test]
+fn persistent_isolation_rejects_wrong_scope_host_generation_and_missing_home() {
+    let application = tempfile::tempdir().unwrap();
+    let state = application.path().canonicalize().unwrap();
+    let generation = Uuid::new_v4();
+    let process_state = state
+        .join("cli-agent-hosts")
+        .join(generation.to_string())
+        .join("native");
+    let (directory, mut receipt) = fixture(&process_state, generation);
+    let path = directory.join("manifest.json");
+    let (mut manifest, _) = read_manifest(&path).unwrap();
+    let home = state.join("grok-managed").join(Uuid::new_v4().to_string());
+    fs::create_dir_all(home.join("grok")).unwrap();
+    fs::write(home.join("grok/auth.json"), b"offline opaque test cache").unwrap();
+    manifest.isolated_home = Some(home.clone());
+    manifest.isolated_state_dir = Some(state.clone());
+    for invalid in [
+        Manifest {
+            isolated_state_dir: None,
+            ..manifest.clone()
+        },
+        Manifest {
+            isolated_state_dir: Some(state.parent().unwrap().to_owned()),
+            ..manifest.clone()
+        },
+        Manifest {
+            isolated_state_dir: Some(process_state.clone()),
+            ..manifest.clone()
+        },
+        Manifest {
+            isolated_home: None,
+            ..manifest.clone()
+        },
+    ] {
+        let bytes = serde_json::to_vec(&invalid).unwrap();
+        fs::write(&path, &bytes).unwrap();
+        receipt.manifest_sha256 = sha256(&bytes);
+        assert!(read_manifest(&path).is_err());
+        assert!(write_receipt(&directory, &receipt).is_err());
+        assert!(home.join("grok/auth.json").exists());
+    }
+    // 监督 manifest 自身代次正确，也不能借用另一个宿主的 native 目录。
+    let other = Uuid::new_v4();
+    let (other_directory, _) = fixture(&process_state, other);
+    manifest.generation = other;
+    fs::write(
+        other_directory.join("manifest.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    assert!(read_manifest(&other_directory.join("manifest.json")).is_err());
+    assert!(home.join("grok/auth.json").exists());
+}
+
+#[test]
 fn isolated_receipt_accepts_real_state_path_aliases_without_changing_ownership() {
     let state = tempfile::tempdir().unwrap();
     let generation = Uuid::new_v4();
@@ -1118,6 +1214,100 @@ fn claude_update_configuration_is_bound_to_generation_and_exact_update_command()
         outside
             .validate_for_generation(state.path(), generation, &arguments)
             .is_err()
+    );
+    let install = [
+        "--settings",
+        "{\"autoUpdatesChannel\":\"latest\"}",
+        "install",
+        "2.1.280",
+    ]
+    .map(OsString::from);
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &install)
+            .is_ok()
+    );
+    assert!(
+        environment
+            .validate_for_generation(state.path(), Uuid::new_v4(), &install)
+            .is_err()
+    );
+    for target in [
+        "latest",
+        "stable",
+        "",
+        "2.1",
+        "2.1.280.0",
+        "2.1.280-beta",
+        "02.1.280",
+        "--force",
+    ] {
+        let mut changed = install.clone();
+        changed[3] = target.into();
+        assert!(
+            environment
+                .validate_for_generation(state.path(), generation, &changed)
+                .is_err()
+        );
+    }
+    let mut extra = install.to_vec();
+    extra.push("--force".into());
+    assert!(
+        environment
+            .validate_for_generation(state.path(), generation, &extra)
+            .is_err()
+    );
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn codex_snapshot_layout_requires_the_bound_standalone_update() {
+    let root = tempfile::tempdir().unwrap();
+    let root = root.path().canonicalize().unwrap();
+    let home = root.join("codex");
+    let releases = home.join("packages/standalone/releases");
+    fs::create_dir_all(&releases).unwrap();
+    let executable = releases.join("0.155.1-aarch64-apple-darwin/bin/codex");
+    let state = root.join("state");
+    let arguments = [OsString::from("update")];
+    let mut environment = ManagedEnvironment {
+        values: vec![
+            ("CODEX_HOME".into(), home.into_os_string()),
+            (
+                "CODEX_INSTALL_DIR".into(),
+                root.join("bin").into_os_string(),
+            ),
+            ("CODEX_RELEASE".into(), "0.156.1".into()),
+        ],
+        remove: vec![],
+    };
+    assert_eq!(
+        environment
+            .update_snapshot_root(&state, &executable, &arguments)
+            .unwrap(),
+        releases
+    );
+    assert!(
+        environment
+            .update_snapshot_root(&state, &root.join("other"), &arguments)
+            .is_err()
+    );
+    assert!(
+        environment
+            .update_snapshot_root(&state, &executable, &["update".into(), "--force".into()])
+            .is_err()
+    );
+    environment.values.pop();
+    assert!(
+        environment
+            .update_snapshot_root(&state, &executable, &arguments)
+            .is_err()
+    );
+    assert_eq!(
+        ManagedEnvironment::default()
+            .update_snapshot_root(&state, &root.join("claude"), &[])
+            .unwrap(),
+        state
     );
 }
 

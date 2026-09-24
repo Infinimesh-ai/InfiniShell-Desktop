@@ -18,11 +18,12 @@ sys.dont_write_bytecode = True
 from codex_windows_hook_command import (SCRIPTS, encode, encode_source, verify_encoding,
                                         verify_windows_argv, verify_windows_bytes_and_boundary,
                                         verify_windows_syntax, windows_environment)
-from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, obtain_inputs,
+from codex_windows_hook_inputs import (CODEX_VERSION, HOOK_CODEX_VERSIONS, RELEASE_ASSETS, codex_contract, obtain_inputs,
                                        plugin_base, require, verify_plugin)
 from codex_windows_formal import (EVENTS, authorize_config, exact_plugin_tree, formal_transport_expectations,
                                   native_hooks, probe_bundle, restore_config, same_native_registration,
                                   split_trigger_hooks, tree, validate_native_hooks)
+from prepare_codex_cli import verified_version
 
 
 HOOK_COMPLETION_TIMEOUT = 45
@@ -533,6 +534,7 @@ def one_case(args, directory, requests, evidence, prompt=HOOK_PROMPTS[0]):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('formal', 'candidate'), default='formal')
+    parser.add_argument('--codex-version', choices=HOOK_CODEX_VERSIONS, default=CODEX_VERSION)
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument('--architecture', choices=RELEASE_ASSETS, default='x86_64')
     for name in ('codex-executable', 'upstream-plugin', 'download-dir'):
@@ -551,7 +553,8 @@ def main():
     for path in (args.output, args.download_dir, Path(tempfile.gettempdir()).resolve()):
         require(path is None or not path.is_relative_to(args.repo), '禁止将产物、下载或临时 HOME 写入源树')
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'official_commit': CODEX_COMMIT, 'cases': [], 'checks': {},
+    report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'codex_version': args.codex_version,
+              'official_commit': codex_contract(args.codex_version)['commit'], 'cases': [], 'checks': {},
               'scope': args.mode + '_native_registration_and_two_blocked_hook_events',
               'credentials_provided': False, 'windows_product_enabled': False, 'native_conpty_notifications_verified': False,
               'full_lifecycle_verified': False, 'model_generation_verified': False}
@@ -563,15 +566,14 @@ def main():
         require(os.name == 'nt', '本脚本必须在 Windows 原生执行；不能用 Bash 回放代替')
         phase = 'fixed_input_hashes'
         args.codex_executable, args.upstream_plugin, report['fixed_inputs'] = obtain_inputs(
-            args.repo, args.download_dir, args.architecture, args.codex_executable, args.upstream_plugin)
+            args.repo, args.download_dir, args.architecture, args.codex_executable, args.upstream_plugin,
+            version=args.codex_version)
         phase = 'encoding_roundtrip'
         report['checks']['encoding'] = verify_encoding()
         phase = 'native_prerequisites'
         args.native_environment = windows_environment(args.bash_executable, args.jq_executable)
-        version = subprocess.run([str(args.codex_executable), '--version'], env=args.native_environment,
-                                 capture_output=True, text=True, encoding='utf-8', check=True, timeout=10).stdout.strip()
-        require(version == 'codex-cli 0.147.0', '原生 Codex 版本不匹配')
-        report['cli'] = version
+        verified_version(args.codex_executable, Path(tempfile.gettempdir()), args.codex_version)
+        report['cli'] = codex_contract(args.codex_version)['cli']
         phase = 'powershell_51_syntax'
         verify_windows_syntax(args.native_environment)
         report['checks'][phase] = True

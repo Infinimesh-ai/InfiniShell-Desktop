@@ -1,0 +1,179 @@
+{
+  "native_version": "1.0.41",
+  "native_cli_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+  "platform": "macOS",
+  "transport": "real loopback SSH publickey PTY and private tmux 3.7c",
+  "different_os_remote_host_verified": false,
+  "same_final_commit_claim": false,
+  "scopes": {
+    "local": {
+      "build": "v4",
+      "root": "/private/tmp/isng5",
+      "product_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-v4-full-product-hooks.safe.json",
+      "product_events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2,
+        "notification": 3
+      },
+      "paired_turns": 2,
+      "native_session_count": 1,
+      "model_inputs": 2,
+      "manual_plugin_reload": false,
+      "native_model_text_verified_by_gui_screenshot": true,
+      "unicode_input_verified": false,
+      "same_final_commit_claim": false
+    },
+    "direct": {
+      "build": "v4",
+      "root": "/private/tmp/isng5",
+      "product_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-v4-full-product-hooks.safe.json",
+      "product_events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2,
+        "notification": 2
+      },
+      "paired_turns": 2,
+      "native_session_count": 1,
+      "model_inputs": 2,
+      "manual_plugin_reload": false,
+      "native_model_text_verified_by_gui_screenshot": true,
+      "unicode_input_verified": false,
+      "same_final_commit_claim": false
+    },
+    "tmux-on": {
+      "build": "v5",
+      "root": "/private/tmp/isng6",
+      "product_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-tmux-complete-hooks-v5.safe.json",
+      "product_events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2,
+        "notification": 3
+      },
+      "paired_turns": 2,
+      "native_session_count": 1,
+      "model_inputs": 2,
+      "manual_plugin_reload": false,
+      "native_model_text_verified_by_gui_screenshot": true,
+      "unicode_input_verified": false,
+      "same_final_commit_claim": false,
+      "native_pane": {
+        "events": {
+          "session_start": 1,
+          "prompt_submit": 2,
+          "stop": 2,
+          "notification": 3
+        },
+        "native_session_count": 1,
+        "native_session_sha256": [
+          "cec52f412edec4219948ade8fe4b0c4adfbd18059fad5ad4d939dbcdd6e3f4d9"
+        ],
+        "bytes": 22755,
+        "sha256": "2b8b5b1280db74ab85b1183fbb2326861f2d5de59ca2fbe131c0c7f182d22574",
+        "native_cli_hook_triggered": true,
+        "product_ssh_ui_verified": false,
+        "outer_tmux_passthrough_verified": false
+      },
+      "product_session_matches_native": true,
+      "passthrough_enabled": true,
+      "one_native_start": true,
+      "gui_detach_reattach_same_pane_observed": true
+    },
+    "tmux-off": {
+      "build": "v5",
+      "root": "/private/tmp/isng6",
+      "product_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-tmux-complete-hooks-v5.safe.json",
+      "product_events": {},
+      "paired_turns": 0,
+      "native_session_count": 0,
+      "model_inputs": 0,
+      "manual_plugin_reload": false,
+      "native_model_text_verified_by_gui_screenshot": false,
+      "unicode_input_verified": false,
+      "same_final_commit_claim": false,
+      "native_pane": {
+        "events": {
+          "session_start": 1,
+          "notification": 2
+        },
+        "native_session_count": 1,
+        "native_session_sha256": [
+          "8fd8248b3b95093ac06940cfeac4af23af08f133aecf72d9e3c59c25ca5a8291"
+        ],
+        "bytes": 7581,
+        "sha256": "60c63c7389ba907a941b39b9c35d75e65f9bc02b880bea42b99345076c2a8194",
+        "native_cli_hook_triggered": true,
+        "product_ssh_ui_verified": false,
+        "outer_tmux_passthrough_verified": false
+      },
+      "product_session_matches_native": null,
+      "passthrough_enabled": false,
+      "one_native_start": true,
+      "gui_detach_reattach_same_pane_observed": false
+    }
+  },
+  "production_installers": {
+    "v4": {
+      "passed": true,
+      "test_binary_sha256": "d444cd9f4c7b5b2e3f74662f721c0e65ca4d1aa4f74a308c0665f271649a3ba0",
+      "production_steps": 6,
+      "credentials_provided": false
+    },
+    "v5": {
+      "passed": true,
+      "test_binary_sha256": "c75c402b13cbb967ce5fb188e1be1c0f2b0dba0d8f4bed3293ab12d68103b771",
+      "production_steps": 6,
+      "credentials_provided": false
+    }
+  },
+  "gui_build_receipts": {
+    "v4": "/private/tmp/isp-mac-1mej4h8z/gui-evidence/build-default-goal-v4.safe.json",
+    "v5": "/private/tmp/isp-mac-1mej4h8z/gui-evidence/build-default-goal-v5.safe.json"
+  },
+  "helper_sha256": {
+    "v4": "8c81660398b81e137e48548d8b4b32aa32b1b882542e4ababe378c21f7c72ee9",
+    "v5": "184464fc31202dc9215e41c4066aa1539ec58fb8f312a77bce87d6c013b63a07"
+  },
+  "v5_helper_production_binding_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-v5-production-helper.safe.json",
+  "v5_disable_matrix_receipt": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-hook-disable-layers-final.safe.json",
+  "source_snapshots": {
+    "v4": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v4-sources.safe.json",
+    "v5": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v5-sources.safe.json"
+  },
+  "matching_notification_domains": {
+    "app/src/ai/blocklist/agent_view/agent_input_footer/mod.rs": "6f53f74b159766d6c6c485ed135e7270f6cedb3ad37488f128dc637345ff0b7e",
+    "app/src/ai/blocklist/agent_view/agent_input_footer/mod_tests.rs": "a67a6774e74efccf778a46bf180a7270edb280c5dafe20066c6fda9813329711",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "dea89e55447e908872d4fd1d8578e7ac592d68ecfb4f0a56935e3d8e93a0c369",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "bd7a6228d440f3c035fb026148cfe693679248869b8ea24377d09b3b63dbab4b",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch.rs": "fc9782afe5b18b89693d078f0d8ea8a6a9dcf303fb6387d827de2730eff7c44e",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch_tests.rs": "8d2c2ed1866af31d0e3566f4e1cb63e08be87f144409b20f7d2fef01113f769e",
+    "app/src/terminal/view.rs": "03c05aad6f5b858253c08e72fd89043a94e778bee1b67f666b4601f374cfb36d",
+    "app/src/terminal/view/use_agent_footer/mod.rs": "d048c515dddda3ae6b1ee66ef464b9b02a325137bbfef2e2b3404d6b2292cdc2",
+    "app/src/terminal/view/use_agent_footer/mod_tests.rs": "1c6e9d0e9da08fb18b90c4c33be009551efaaeaede1a1707c18ffb346a5579b6",
+    "app/src/terminal/cli_agent_hook_writer.rs": "99fd417391c7c4d63cc5efbbf40a140b4fc63d45eb21abaac52e40da0f338541"
+  },
+  "hook_writer_matches_shared_base": true,
+  "v5_worker": {
+    "worker": "/private/tmp/isp-mac-1mej4h8z/supervisor-goal-v5",
+    "sha256": "81735f464a8e0670949db70edbfb37f24329a38d04e5a6c828ade968f9eda489"
+  },
+  "v5_cleanup": {
+    "credential_copy_removed": true,
+    "credential_source_stat_unchanged": true,
+    "identified_private_native_processes_gone": true,
+    "tunnel_drained": true,
+    "ssh_private_keys_removed": true,
+    "process_tree_cleanup_verified": false,
+    "sshd_exited": true,
+    "native_pids_gone": true
+  },
+  "preserved_failures": [
+    "/private/tmp/isp-mac-1mej4h8z/evidence/grok-v4-cleanup-and-tmux-boundary.safe.json",
+    "/private/tmp/isp-mac-1mej4h8z/evidence/grok-v4-full-product-hooks.safe.json"
+  ],
+  "failure_scope_note": "原 v4 tmux 两轮模型成功但 sandbox 未许可 pane 查询；修复后第一轮代理连接预算耗尽并取消。二者均不计 tmux 通知通过。",
+  "localization": "无需本地化变更",
+  "runner_unit_tests_passed": 13
+}

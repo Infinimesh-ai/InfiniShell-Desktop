@@ -437,11 +437,19 @@ impl VerifiedRuntime {
 
 fn version_matches(kind: PatchKind, output: &str) -> bool {
     let tokens = output.split_whitespace().collect::<Vec<_>>();
-    let version = kind.metadata().cli_contract_version;
-    match kind {
-        PatchKind::Claude => tokens.as_slice() == [version.as_str(), "(Claude", "Code)"],
-        PatchKind::Codex => tokens.as_slice() == ["codex-cli", version.as_str()],
-    }
+    let version = match (kind, tokens.as_slice()) {
+        (PatchKind::Claude, [version, "(Claude", "Code)"])
+        | (PatchKind::Codex, ["codex-cli", version]) => *version,
+        // 其他输出形状不能证明实际 CLI 身份。
+        _ => return false,
+    };
+    version == kind.metadata().cli_contract_version
+        // 新版仅补 macOS 原生插件安装及 hook 合同，不扩大其他平台的验证范围。
+        || (cfg!(target_os = "macos")
+            && matches!(
+                (kind, version),
+                (PatchKind::Claude, "2.1.280") | (PatchKind::Codex, "0.156.1")
+            ))
 }
 
 fn installed(home: &Path, kind: PatchKind) -> io::Result<Option<Installation>> {

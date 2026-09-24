@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 
 from apply_notification_patch import apply_files, bundle_data, default_bundle, validate_tree
@@ -18,13 +19,14 @@ from probe_local_tools import environment
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--codex-executable", required=True)
+    parser.add_argument("--codex-version", choices=("0.147.0", "0.156.1"), default="0.147.0")
     parser.add_argument("--upstream-plugin", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     executable = str(Path(args.codex_executable).resolve())
     version = subprocess.run([executable, "--version"], capture_output=True, text=True, check=True, timeout=5).stdout.strip()
-    if version != "codex-cli 0.147.0":
-        raise SystemExit("只接受已核实的 Codex CLI 0.147.0")
+    if version != f"codex-cli {args.codex_version}" or (args.codex_version == "0.156.1" and sys.platform != "darwin"):
+        raise SystemExit("CLI 版本或平台不符合显式选择的固定通知契约")
     metadata, replacements = bundle_data(default_bundle(), "codex")
     with tempfile.TemporaryDirectory(prefix="infinishell-hook-trust-") as temporary:
         directory = Path(temporary).resolve()

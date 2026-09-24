@@ -120,6 +120,51 @@ fn incomplete_claude_modes_missing_evidence_and_cross_cli_inheritance_fail_close
 
 #[cfg(feature = "local_fs")]
 #[test]
+fn unverified_codex_parent_versions_do_not_inherit_permission_evidence() {
+    for version in ["0.155.1", "0.156.0", "0.156.2", "0.156.1-alpha.1"] {
+        let mut task = parent(captured_permissions(READ_ONLY));
+        let mut config: Value = serde_json::from_str(&task.config_json).unwrap();
+        config["cli_version"] = json!(version);
+        task.config_json = config.to_string();
+        assert!(ceiling_from_parent(&task, "codex").is_err());
+    }
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn codex_01561_native_permission_shapes_remain_exact_on_desktop_platforms() {
+    // 固定 0.156.1 无凭据 thread/start 的实际返回；没有发送 turn/start。
+    for sandbox in [
+        json!({"type":"readOnly","networkAccess":false}),
+        json!({"type":"workspaceWrite","writableRoots":[],"networkAccess":false,
+            "excludeTmpdirEnvVar":false,"excludeSlashTmp":false}),
+    ] {
+        let permissions = json!({"approvalPolicy":"untrusted","sandbox":sandbox,
+            "approvalsReviewer":"user"});
+        let mut task = parent(permissions.clone());
+        task.config_json =
+            json!({"cli_version":"0.156.1","effective_permissions":permissions}).to_string();
+        if !cfg!(any(target_os = "macos", target_os = "linux", windows)) {
+            assert!(ceiling_from_parent(&task, "codex").is_err());
+            continue;
+        }
+        let ceiling = ceiling_from_parent(&task, "codex").unwrap();
+        let cwd = Path::new(&task.working_directory);
+        verify_effective_permissions(Some(&ceiling), "codex", cwd, &permissions).unwrap();
+        let mut widened = permissions.clone();
+        widened["sandbox"]["networkAccess"] = json!(true);
+        assert!(verify_effective_permissions(Some(&ceiling), "codex", cwd, &widened).is_err());
+        let mut unknown = permissions.clone();
+        unknown["sandbox"]["futureOverride"] = json!(true);
+        assert!(verify_effective_permissions(Some(&ceiling), "codex", cwd, &unknown).is_err());
+        task.config_json =
+            json!({"cli_version":"0.156.1","effective_permissions":unknown}).to_string();
+        assert!(ceiling_from_parent(&task, "codex").is_err());
+    }
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
 fn restored_ceiling_keeps_original_parent_generation_and_directory() {
     let parent = parent(captured_permissions(READ_ONLY));
     let original = ceiling_from_parent(&parent, "codex").unwrap();
@@ -160,7 +205,12 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
         "claude_profile":profile,"effective_permissions":effective})
         .to_string()
     };
-    for version in ["2.1.273", "2.1.278"] {
+    for version in [
+        "2.1.273",
+        "2.1.278",
+        #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+        "2.1.280",
+    ] {
         task.config_json = saved_config(version);
         assert!(ceiling_from_parent(&task, "claude").is_ok());
     }
@@ -209,7 +259,7 @@ fn fixed_claude_profile_is_bound_to_the_saved_parent_generation_and_same_child_s
     assert!(ceiling_from_parent(&task, "codex").is_err());
 }
 
-#[cfg(all(feature = "local_fs", debug_assertions))]
+#[cfg(all(feature = "local_fs", debug_assertions, not(target_os = "macos")))]
 #[test]
 fn claude_21280_parent_requires_bound_test_candidate_proof() {
     let Some(executable_digest) = super::super::claude::test_candidate_executable_digest() else {
@@ -315,6 +365,11 @@ fn fixed_grok_creation_policy_binds_parent_without_claiming_native_verification(
         (
             "1.0.34",
             "9cd26b579840f0f5c9148a8059ad651904c08b41b7f2ef0b4ec04b9ba898844e",
+        ),
+        #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+        (
+            "1.0.41",
+            "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
         ),
     ] {
         let profile = GrokCreationPolicyV1::compile(

@@ -51,6 +51,7 @@ class DriverTests(unittest.TestCase):
     def event(self):
         event = {key: True for key in runner.BOOLS}
         event.update({key: False for key in ("credentials_provided", "same_commit_verified_by_runner")})
+        event.update({key: self.value.get(key, False) for key in ("fixed_release_input", "test_only_target_candidate")})
         event.update({key: self.value[key] for key in ("case_id", "agent", "channel", "expected", "old_version", "target_version")})
         event.update(schema=1, scope=runner.SCOPE, stage="finished", error=None, failure_code=None,
             manifest_sha256="a" * 64, worker_sha256=self.value["worker"]["sha256"],
@@ -61,6 +62,41 @@ class DriverTests(unittest.TestCase):
             config_transition=self.value.get("config_transition"),
             plan_requires_native_update=self.value["expected"] != "channel_only")
         return event
+
+    def test_fixed_candidate_requires_explicit_release_exact_hash_and_macos(self):
+        value = dict(self.value, fixed_release_input=True, test_only_target_candidate=True,
+                     target_version="2.1.280", target_binary=dict(self.value["target_binary"],
+                     sha256=runner.FIXED_CANDIDATES["claude"][1]))
+        with patch.object(runner.sys, "platform", "darwin"):
+            runner.validate_manifest(value)
+            for bad in (dict(value, fixed_release_input=False), dict(value, fixed_release_input=1),
+                        dict(value, target_version="2.1.281"),
+                        dict(value, target_binary=dict(value["target_binary"], sha256="b" * 64))):
+                with self.subTest(value=bad), self.assertRaises(ValueError):
+                    runner.validate_manifest(bad)
+        with patch.object(runner.sys, "platform", "linux"), self.assertRaises(ValueError):
+            runner.validate_manifest(value)
+
+    def test_linux_candidate_binds_platform_architecture_version_and_digest(self):
+        for agent, (version, checksum) in runner.LINUX_FIXED_CANDIDATES.items():
+            value = dict(self.value, agent=agent, channel="follow_installation", fixed_release_input=True,
+                         test_only_target_candidate=True, target_version=version,
+                         target_binary=dict(self.value["target_binary"], sha256=checksum))
+            with patch.object(runner.sys, "platform", "linux"), patch.object(runner.platform, "machine", return_value="x86_64"):
+                runner.validate_manifest(value)
+                with self.assertRaises(ValueError):
+                    runner.validate_manifest(dict(value, fixed_release_input=False))
+            for system, machine in (("darwin", "x86_64"), ("win32", "amd64"), ("linux", "aarch64")):
+                with self.subTest(agent=agent, platform=system, machine=machine), patch.object(runner.sys, "platform", system), patch.object(runner.platform, "machine", return_value=machine):
+                    with self.assertRaises(ValueError):
+                        runner.validate_manifest(value)
+
+    def test_fixed_release_receipt_cannot_be_claimed_as_live_discovery_or_production_gate(self):
+        event = self.event()
+        text = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        for key in ("fixed_release_input", "test_only_target_candidate"):
+            with self.subTest(key=key):
+                self.assertFalse(runner.acceptance(0, text, dict(event, **{key: True}), self.value, "a" * 64))
 
     def test_manifest_rejects_wrong_channels_boolean_deadlines_and_extra_commands(self):
         runner.validate_manifest(self.value)

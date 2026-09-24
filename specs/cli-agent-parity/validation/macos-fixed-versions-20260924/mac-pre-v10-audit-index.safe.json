@@ -1,0 +1,15 @@
+{
+  "scope": "V9主动取消与V10升级解耦实现记录；不是V10通过",
+  "files": [
+    {
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v9-full-workspace.safe.json",
+      "archive": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-v9-full-workspace.safe.json",
+      "sha256": "eeb363c0d67937afa240eb9be23c38934d941f162a1f12afbe468f6d9f8199c6"
+    },
+    {
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/update-managed-decoupling/implementation.safe.json",
+      "archive": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/update-managed-decoupling.safe.json",
+      "sha256": "7af8f78f81cda266276da9a88673c9bb8ce7ac37ec45d7be3ccc53f9b02b6ce4"
+    }
+  ]
+}

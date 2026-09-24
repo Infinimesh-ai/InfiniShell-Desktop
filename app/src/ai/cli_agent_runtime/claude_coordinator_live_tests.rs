@@ -67,50 +67,50 @@ impl Markers {
 
     fn prompt(&self, parent: &str, file: &Path, model: &str) -> String {
         let child_prompt = format!(
-            "This is an authorized isolated integration test. Your parent task ID is {parent}. \
-             In this first turn use Read to read {}, then Edit exactly once with old_string \
-             CHILD_BEFORE and \
-             new_string exactly {}, replace_all=false. Do not use Write or any other file. Wait normally for host approval. \
-             After the Edit result, finish with {} unless a follow-up is folded into this execution; \
-             in that case complete its parent message and include its final marker. \
-             Do not spawn any agents.",
+            "Please update one file in this temporary project. The coordinating task's ID is {parent}. \
+             Use Read to read {}, then Edit exactly once with old_string CHILD_BEFORE, \
+             new_string exactly {}, and replace_all=false. Keep the work within this file, \
+             use Edit rather than Write, and follow the normal approval flow. \
+             After the edit succeeds, reply with the completion label {}. If a follow-up message \
+             arrives during this work, also complete its requested parent message and include \
+             its completion label. Please carry out this small edit yourself without spawning agents.",
             file.display(),
             self.initial,
             self.initial,
         );
-        let spawn = json!({"summary":"isolated parent-child verification", "base_prompt":"",
+        let spawn = json!({"summary":"temporary project file update", "base_prompt":"",
             "harness":"claude", "model_id":model, "skills":[],
-            "agent_run_configs":[{"name":"verified-child","prompt":child_prompt}]});
+            "agent_run_configs":[{"name":"file-update","prompt":child_prompt}]});
         let followup = format!(
-            "This is the queued follow-up, which the native runtime may fold into your running execution. \
-             Complete the previously authorized file operation before proceeding. \
-             Call send_message_to_agent exactly once to parent \
-             {parent}, subject {}, message: 'Receipt acknowledgement task: finish your queued \
-             input with {}; if this input joins your running execution, retain all prior instructions \
-             including inspect and include both its collection marker and this progress marker. \
-             Do not send another message.' \
-             After the send tool reports native acknowledgement, finish with {}. \
-             Do not perform additional edits or spawn agents.",
+            "Please send a progress update after completing the file edit requested above. \
+             Call send_message_to_agent exactly once to the coordinating task \
+             {parent}, subject {}, message: 'The file update is complete. Please acknowledge \
+             this progress message with the label {}. If you are still collecting the saved \
+             result with inspect_local_tasks, complete that work and include both the collection \
+             label and this progress label in your reply. A reply to the user is sufficient; \
+             no return message is needed.' \
+             Once the send tool acknowledges delivery, reply with the completion label {}. \
+             This follow-up only needs the progress message, with no further edits or agents.",
             self.progress, self.parent_progress, self.final_result,
         );
         format!(
-            "This is an authorized isolated production-coordinator test. Call run_agents once \
-             with these exact arguments: {spawn}. Retain the returned child task_id. \
+            "Please coordinate a small file update in this temporary project using one child task. \
+             The labels below identify the edit, progress update, and collected result. \
+             Call run_agents once with these arguments: {spawn}. Keep the returned child task_id. \
              Next call send_message_to_agent once to that child with subject {} and message {}. \
-             The host will approve this send only when the child is awaiting its file approval. \
-             Require the send result to report acknowledged with native_protocol; never resend. \
-             Then call inspect_local_tasks exactly once for only that child. The host holds \
-             that tool approval until the child's follow-up input has truly completed. Require its \
-             actual saved result to contain {} and never create a second child. \
-             Do not finish before you retrieve that actual final result. Then finish with only {}. \
-             Do not edit files or call any other tools. If queued child progress joins this execution, \
-             retain the inspect requirement and include both the collection and progress markers; \
-             otherwise process progress in a later separate execution. \
-             You will also receive automatically delivered messages with Subject: local_task_result \
-             and a JSON body. For each such input verify the JSON belongs to this child and \
-             finish with {} without calling additional tools. If it joins a running execution, \
-             preserve its existing inspect requirement and include this automatic receipt marker \
-             alongside any required collection or progress markers.",
+             Wait for the send result to report acknowledged with native_protocol. \
+             Then call inspect_local_tasks exactly once for that child and collect its saved result. \
+             Check that the saved result contains the completion label {}. After collecting it, \
+             reply with the collection label {}. This coordination needs only these tools; \
+             leave the file edit to the child and use the same child throughout. \
+             If a child progress message arrives during this work, complete the result collection \
+             and include both the collection and progress labels in your reply; otherwise \
+             acknowledge the progress message in a separate reply. \
+             The runtime also delivers result messages with Subject: local_task_result and a JSON \
+             body. For each such message, check that the JSON identifies this child and acknowledge \
+             it with the label {}, without additional tools. If it arrives during result collection, \
+             finish collecting the saved result and include this acknowledgement label alongside \
+             the collection and any progress labels.",
             self.followup,
             json!(followup),
             self.final_result,
@@ -703,13 +703,15 @@ async fn shutdown(
 #[test]
 #[ignore = "仅由显式私有 API 或授权默认账户运行器执行，调用真实模型并产生费用"]
 fn real_claude_fixed_profile_parent_child() {
+    let candidate =
+        env::var("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").as_deref() == Ok("1");
     // 运行器预期值只用于安装快照；可信版本仍由真实探测与 system/init 配对后落库。
     let expected_version = match env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION") {
         Ok(version) if matches!(version.as_str(), "2.1.273" | "2.1.278") => version,
         Ok(version)
             if version == "2.1.280"
-                && env::var("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").as_deref()
-                    == Ok("1") =>
+                && cfg!(target_os = "macos")
+                && (candidate || super::super::claude::supported_version(&version)) =>
         {
             version
         }
@@ -764,15 +766,22 @@ fn real_claude_fixed_profile_parent_child() {
     }
     if expected_version == "2.1.280" {
         assert_eq!(auth_mode, "authorized_default_account");
-        assert_eq!(
-            fs::read_to_string(root.join(".infinishell-claude-21280-candidate")).unwrap(),
-            "isolated Claude Code 2.1.280 test candidate\n"
-        );
-        fs::write(
-            state.join(".infinishell-claude-21280-candidate"),
-            b"isolated Claude Code 2.1.280 coordinator candidate\n",
-        )
-        .unwrap();
+        if candidate {
+            assert_eq!(
+                fs::read_to_string(root.join(".infinishell-claude-21280-candidate")).unwrap(),
+                "isolated Claude Code 2.1.280 test candidate\n"
+            );
+            fs::write(
+                state.join(".infinishell-claude-21280-candidate"),
+                b"isolated Claude Code 2.1.280 coordinator candidate\n",
+            )
+            .unwrap();
+        } else {
+            assert!(super::super::claude::supported_version(&expected_version));
+            assert!(env::var_os("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").is_none());
+            assert!(!root.join(".infinishell-claude-21280-candidate").exists());
+            assert!(!state.join(".infinishell-claude-21280-candidate").exists());
+        }
     }
     let artifact =
         PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").expect("缺少私有证据路径"))
@@ -790,6 +799,7 @@ fn real_claude_fixed_profile_parent_child() {
         .record(
             json!({"event":"acceptance_started","scope":SCOPE,"real_gui_verified":false,
         "authentication_source":auth_mode,
+        "production_version_gate_verified":expected_version == "2.1.280" && !candidate,
         "max_native_tools":MAX_NATIVE_TOOLS,"max_native_inputs":MAX_NATIVE_INPUTS,
         "max_native_executions":MAX_NATIVE_INPUTS,"max_seconds":450,
         "http_request_count_verified":false,"automatic_result_delivery_ack_verified":false}),

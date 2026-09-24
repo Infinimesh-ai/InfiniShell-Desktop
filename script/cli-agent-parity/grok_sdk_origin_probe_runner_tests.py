@@ -540,6 +540,12 @@ class ProbeRunnerTests(unittest.TestCase):
         self.assertEqual(runner.official.MAX_TUNNELS, previous)
 
     def test_thirty_third_tls_connect_is_denied_before_upstream_connection(self):
+        self.assert_tls_connection_budget(None, 32)
+
+    def test_explicit_six_process_budget_denies_sixty_fifth_connect(self):
+        self.assert_tls_connection_budget(64, 64)
+
+    def assert_tls_connection_budget(self, budget, expected):
         upstream_peers = []
         relays = []
 
@@ -550,19 +556,20 @@ class ProbeRunnerTests(unittest.TestCase):
             return upstream
 
         with patch.object(runner.official.OfficialTunnel, "connect", side_effect=connect) as invocation:
-            with runner.bounded_tunnel(30) as tunnel:
+            options = {} if budget is None else {"connection_budget": budget}
+            with runner.bounded_tunnel(30, **options) as tunnel:
                 port = tunnel.start()
                 try:
-                    for index in range(runner.MAX_TLS_CONNECTIONS + 1):
+                    for index in range(expected + 1):
                         client = socket.create_connection(("127.0.0.1", port), timeout=3)
                         try:
                             client.sendall(b"CONNECT cli-chat-proxy.grok.com:443 HTTP/1.1\r\nHost: cli-chat-proxy.grok.com\r\n\r\n")
                             response = client.recv(4096)
-                            self.assertIn(b" 200 " if index < runner.MAX_TLS_CONNECTIONS else b" 403 ", response)
+                            self.assertIn(b" 200 " if index < expected else b" 403 ", response)
                         finally:
                             client.close()
-                    self.assertEqual(invocation.call_count, 32)
-                    self.assertEqual(tunnel.forwarded, 32)
+                    self.assertEqual(invocation.call_count, expected)
+                    self.assertEqual(tunnel.forwarded, expected)
                     self.assertIn({"event": "official_connect_budget_rejected", "host": "cli-chat-proxy.grok.com"}, tunnel.events)
                 finally:
                     for peer in upstream_peers:

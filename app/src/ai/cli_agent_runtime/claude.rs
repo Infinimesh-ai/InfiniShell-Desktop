@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::ffi::OsString;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -39,10 +39,12 @@ mod profile_preflight;
 use permission_snapshot::{Observation, Rejection};
 
 const PERMISSION_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(5);
-// 2.1.278 已核对原生 --version/--help；完整任务链仍需独立真实验收。
-const SUPPORTED_VERSIONS: [(&str, &str); 2] = [
+// 固定新版在三个桌面平台使用相同的精确版本配对，未知版本仍拒绝。
+const SUPPORTED_VERSIONS: &[(&str, &str)] = &[
     ("2.1.273 (Claude Code)", "2.1.273"),
     ("2.1.278 (Claude Code)", "2.1.278"),
+    #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+    ("2.1.280 (Claude Code)", "2.1.280"),
 ];
 #[cfg(any(test, feature = "claude_21280_test_candidate"))]
 const TEST_CANDIDATE_VERSION: &str = "2.1.280";
@@ -216,6 +218,14 @@ fn native_result_evidence_enabled(state_dir: &Path) -> bool {
 }
 
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
+    let attachment_store = options.state_dir.join("local-cli-attachments");
+    connect_with_attachment_store(options, attachment_store)
+}
+
+pub(super) fn connect_with_attachment_store(
+    options: SessionOptions,
+    attachment_store: PathBuf,
+) -> Result<RuntimeConnection, RuntimeError> {
     if !options.executable.is_absolute() || !options.cwd.is_absolute() {
         return Err(RuntimeError::InvalidConfiguration(
             "executable and cwd must be absolute".into(),
@@ -225,6 +235,7 @@ pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeErro
     let (controller, commands, sender, events) = channels(options.generation);
     let task = Box::pin(async move {
         let mut protocol = ClaudeProtocol::new(options);
+        protocol.attachment_store = attachment_store;
         let result = run_process(&mut protocol, commands, &sender).await;
         let reason = match &result {
             Ok(()) => "runtime connection closed".to_string(),
@@ -862,6 +873,7 @@ struct PendingLocalTool {
 
 struct ClaudeProtocol {
     options: SessionOptions,
+    attachment_store: PathBuf,
     probed_version: Option<&'static str>,
     paired_version: Option<&'static str>,
     initialized: bool,
@@ -902,6 +914,7 @@ impl ClaudeProtocol {
     fn new(options: SessionOptions) -> Self {
         let native_result_evidence = native_result_evidence_enabled(&options.state_dir);
         Self {
+            attachment_store: options.state_dir.join("local-cli-attachments"),
             options,
             // 旧离线协议夹具不派生进程；真实运行始终由 run_process 的本次探测重新绑定。
             #[cfg(test)]
@@ -1233,14 +1246,11 @@ impl ClaudeProtocol {
         }
         match action {
             RuntimeAction::Submit { input } => {
-                let projection = match encode_input(
-                    input,
-                    self.skill_plugin.as_ref(),
-                    &self.options.state_dir.join("local-cli-attachments"),
-                ) {
-                    Ok(projection) => projection,
-                    Err(error) => return failed(message_id, &error),
-                };
+                let projection =
+                    match encode_input(input, self.skill_plugin.as_ref(), &self.attachment_store) {
+                        Ok(projection) => projection,
+                        Err(error) => return failed(message_id, &error),
+                    };
                 let (content, expected_replay) = projection.into_parts();
                 let session_id =
                     self.session_id

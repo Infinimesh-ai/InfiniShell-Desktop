@@ -1,0 +1,6 @@
+{
+  "cargo_fmt_all_check": true,
+  "git_diff_check": true,
+  "new_visible_messages": false,
+  "localization_audit": "复用现有英中同键同变量通知文案，无需本地化变更"
+}

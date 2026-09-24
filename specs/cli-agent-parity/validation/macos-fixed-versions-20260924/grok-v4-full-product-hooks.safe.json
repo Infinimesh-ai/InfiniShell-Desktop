@@ -1,0 +1,207 @@
+{
+  "agent": "grok",
+  "source": "isolated_product_terminal_log",
+  "cases": {
+    "local": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2,
+        "notification": 3
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 2,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T04:23:13Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T04:24:43Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": "15e1cb5e211199a8a45f76267cd65da7143120d8f8af230eed8f52fbacba3efb"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T04:24:46Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": "15e1cb5e211199a8a45f76267cd65da7143120d8f8af230eed8f52fbacba3efb"
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T04:25:21Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": "7a6de04e6b28c042a05e94bc195f13db23602204c0daccfb6460bc4d26fc2e51"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T04:25:26Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": "7a6de04e6b28c042a05e94bc195f13db23602204c0daccfb6460bc4d26fc2e51"
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:26:26Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": null
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:26:30Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": null
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:26:30Z",
+          "native_session_sha256": "3e32722c19449f9862d53180dcf3d05799c00ef7107f5ccf28a836170f9602c6",
+          "turn_sha256": null
+        }
+      ]
+    },
+    "direct": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2,
+        "notification": 2
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 2,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T04:27:15Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T04:27:50Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": "c3004b6784bec6db003c10ed33363573370c0d366f2606b17f3a0d43bb992859"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T04:28:03Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": "c3004b6784bec6db003c10ed33363573370c0d366f2606b17f3a0d43bb992859"
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T04:28:56Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": "c0cd72866d1fbbca4b083b4ee60788a3e92707d7332ce6d0ea1be36659917535"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T04:29:00Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": "c0cd72866d1fbbca4b083b4ee60788a3e92707d7332ce6d0ea1be36659917535"
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:29:55Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": null
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:29:55Z",
+          "native_session_sha256": "5806b6bb78e0b08f53e4299a96e6c25ee5fbd47f4f23733acee7ee03ef293e22",
+          "turn_sha256": null
+        }
+      ]
+    },
+    "tmux-on": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 1,
+        "cancelled": 1,
+        "notification": 2
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 1,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T04:38:47Z",
+          "native_session_sha256": "2de76ceab6b80eea905536e7149c17ef257b061d87dd7b843ca88377a9ec3e3a",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T04:39:19Z",
+          "native_session_sha256": "2de76ceab6b80eea905536e7149c17ef257b061d87dd7b843ca88377a9ec3e3a",
+          "turn_sha256": "a4698044db075617e287ce2af816c01be440269bdfa44269000d605f28ea79f2"
+        },
+        {
+          "event": "cancelled",
+          "timestamp": "2026-09-24T04:41:19Z",
+          "native_session_sha256": "2de76ceab6b80eea905536e7149c17ef257b061d87dd7b843ca88377a9ec3e3a",
+          "turn_sha256": "a4698044db075617e287ce2af816c01be440269bdfa44269000d605f28ea79f2"
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:41:36Z",
+          "native_session_sha256": "2de76ceab6b80eea905536e7149c17ef257b061d87dd7b843ca88377a9ec3e3a",
+          "turn_sha256": null
+        },
+        {
+          "event": "notification",
+          "timestamp": "2026-09-24T04:41:36Z",
+          "native_session_sha256": "2de76ceab6b80eea905536e7149c17ef257b061d87dd7b843ca88377a9ec3e3a",
+          "turn_sha256": null
+        }
+      ]
+    },
+    "tmux-off": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    }
+  },
+  "log_bytes": 1061334,
+  "log_sha256": "94b629681b27362dd875bc7f12bf56acd31a46a322365f683d0b4aaa7efd9b9a",
+  "raw_payloads_included": false,
+  "different_os_host_verified": false,
+  "model_response_content_verified": false,
+  "app_log_sources": [
+    {
+      "name": "infinishell.log.old.0",
+      "sha256": "b31fb9b2f2f568174933ad7905dce4f3d5f6b5630f93c34484a1ea2862a87351"
+    },
+    {
+      "name": "infinishell.log.old.1",
+      "sha256": "48f4afd7201ee7d8f408debafc34915d5129b4ebf12d8ef3d6f891d1ae8c1963"
+    },
+    {
+      "name": "infinishell.log.old.3",
+      "sha256": "053c8ead55a63197f4719c618128f29056c6563aa63395de2c7ae8ef59d65d46"
+    },
+    {
+      "name": "infinishell.log.old.4",
+      "sha256": "b15ccc8da7abe861dfe809cdfec5c9a599ad8cf8f41e9835a201e35c5dc0f8bd"
+    },
+    {
+      "name": "infinishell.log.old.2",
+      "sha256": "aff1d2802b05caf08f5d88ef92c7e0f48f42ed1419c2e631d9afcffa83e23042"
+    },
+    {
+      "name": "infinishell.log",
+      "sha256": "5d3d3b9378d3b7644d99f30bd89123296911a4d8aa1d9771ab42149ad216f658"
+    }
+  ]
+}

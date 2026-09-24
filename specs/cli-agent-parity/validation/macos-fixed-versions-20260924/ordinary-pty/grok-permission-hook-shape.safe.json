@@ -1,0 +1,25 @@
+{
+  "fixed_cli_version": "1.0.41",
+  "fixed_cli_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+  "source": "official_fixed_binary_embedded_hook_documentation",
+  "statements": [
+    "`permission_prompt` fires only when a permission UI is actually waiting. The matcher tests the real tool name; MCP calls routed through the internal `use_tool` / Cursor `CallMcpTool` dispatchers appear as the qualified `server__tool` name (e.g. `linear__save_issue`), so match on that, not the dispatcher name.",
+    "Its `message` is display text and can change between releases, so match on `notificationType` instead."
+  ],
+  "observed_product_notification_top_keys": [
+    "v",
+    "agent",
+    "event",
+    "session_id",
+    "event_id",
+    "plugin_version",
+    "cwd",
+    "project",
+    "transcript_path",
+    "summary"
+  ],
+  "original_hook_input_captured": false,
+  "notificationType_value_directly_observed": false,
+  "current_mapper": "normalize reads notificationType; notification case emits generic notification except idle_prompt unknown state",
+  "permission_request_product_state_verified": false
+}

@@ -1,0 +1,27 @@
+{
+  "scope": "实际GUI偏好保存、进程退出及同配置重启",
+  "before_pid": 25714,
+  "after_pid": 26411,
+  "preferences": {
+    "auto_updates": {
+      "Claude": false,
+      "Codex": false,
+      "Grok": false
+    },
+    "update_channels": {
+      "Claude": "stable",
+      "Codex": "latest",
+      "Grok": "stable"
+    }
+  },
+  "gui_observed_restored": true,
+  "source_receipt": "evidence/goal-v5-sources.safe.json",
+  "build_receipt": "gui-evidence/build-default-goal-v5.safe.json",
+  "screenshots": {
+    "update-preferences-before-restart-v5.png": "f72c87ea3992ca460921ea97c6e3465d5ebcc35eb28f0eda6689b92aab76d9e9",
+    "update-preferences-restored-top-v5.png": "bfbd40383b3b292da1d56a1486dd143f2063e8de7a2c5f50252a130943c67696",
+    "update-preferences-restored-bottom-v5.png": "d2c4a0d1ab2d3607215a753498c6d09113b352f1f66381780e52ecbbbd5318b7"
+  },
+  "no_cli_installation_executed": true,
+  "does_not_prove_channel_upgrade_transaction": true
+}

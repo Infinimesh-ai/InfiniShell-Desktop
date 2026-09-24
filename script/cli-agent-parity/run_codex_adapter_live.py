@@ -22,6 +22,7 @@ TEST_CASES = {
     "candidate-01561-lifecycle": "ai::cli_agent_runtime::codex::live_tests::real_codex_candidate_01561_managed_lifecycle",
     "running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_running_tool_cancel",
     "candidate-01561-running-tool-cancel": "ai::cli_agent_runtime::codex::live_tests::real_codex_candidate_01561_running_tool_cancel",
+    "parent-child-01561": "ai::cli_agent_runtime::coordinator::codex_live_tests::real_codex_01561_parent_child",
     "local-tools-restore": "ai::cli_agent_runtime::codex::live_tests::real_codex_local_tool_restore",
     "image-input": "ai::cli_agent_runtime::codex::live_tests::real_codex_image_input",
     "missing-session": "ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced",
@@ -60,6 +61,50 @@ def verified_acceptance(test_case, exit_code, output, events):
         return False
     if test_case == "lifecycle":
         return any(event.get("event") == "acceptance_passed" for event in events)
+    if test_case == "parent-child-01561":
+        starts = [event for event in events if event.get("event") == "acceptance_started"]
+        continuations = [event for event in events if event.get("event") == "explicit_inspect_requested"]
+        chains = [event for event in events if event.get("event") == "parent_child_chain_verified"]
+        endings = [event for event in events if event.get("event") == "parent_child_finished"]
+        mailbox = [event for event in events if event.get("event") == "parent_mailbox_dispatched"]
+        gates = [event for event in events if event.get("event") == "readonly_gate_released"]
+        if len(starts) != 1 or len(continuations) != 1 or len(chains) != 1 or len(endings) != 1:
+            return False
+        if (len(mailbox) != 1 or mailbox[0].get("source") != "production_managed_mailbox"
+                or mailbox[0].get("native_ack_verified") is not False
+                or len(gates) != 2 or gates[0].get("parent") is not False
+                or gates[1].get("parent") is not True
+                or not all(gate.get("native_message_ack_verified") is True for gate in gates)):
+            return False
+        start, chain, ending = starts[0], chains[0], endings[0]
+        return (all(event.get("scope") == "codex_01561_production_parent_child_duplex_inspect"
+                    and event.get("cli_version") == "0.156.1"
+                    and event.get("test_only_candidate_01561") is False
+                    and event.get("gui_verified") is False
+                    and event.get("child_file_effect_verified") is False
+                    for event in (start, ending))
+                and start.get("bidirectional_messages_verified") is False
+                and ending.get("bidirectional_messages_verified") is True
+                and start.get("max_native_inputs") == 6 and start.get("max_native_tools") == 3
+                and start.get("max_readonly_approvals") == 2
+                and start.get("max_seconds") == 180
+                and type(continuations[0].get("parent_generation")) is int
+                and continuations[0]["parent_generation"] in (2, 3)
+                and continuations[0].get("automatic_result_enqueued_verified") is True
+                and chain.get("native_tool_calls") == 3 and chain.get("child_count") == 1
+                and chain.get("readonly_approvals") == 2
+                and chain.get("parent_message_source") == "production_managed_mailbox"
+                and chain.get("child_message_source") == "native_send_message_to_agent"
+                and type(chain.get("accepted_inputs")) is int and 5 <= chain["accepted_inputs"] <= 6
+                and type(chain.get("automatic_result_native_ack_verified")) is bool
+                and all(chain.get(key) is True for key in (
+                    "parent_permission_ceiling_verified", "automatic_result_enqueued_verified",
+                    "parent_to_child_native_ack_verified", "child_to_parent_native_ack_verified",
+                    "explicit_continuation_native_ack_verified", "native_inspect_result_verified",
+                    "child_result_verified", "parent_result_verified"))
+                and ending.get("passed") is True and ending.get("chain_verified") is True
+                and "failure_code" in ending and ending["failure_code"] is None
+                and ending.get("cleanup_confirmed") is True and ending.get("cleanup_receipts") == 2)
     if test_case == "candidate-01561-lifecycle":
         return any(event.get("event") == "acceptance_passed"
                    and event.get("scope") == "rust_adapter_01561_test_only_process_restart"
@@ -121,6 +166,25 @@ def missing_session_environment(root):
     (root / ".infinishell-missing-session-probe").write_text(
         "isolated unauthenticated missing-session verification\n", encoding="utf-8", newline="\n")
     environment["INFINISHELL_CODEX_MISSING_ROOT"] = str(root)
+    return environment
+
+
+def parent_child_environment(root, environment):
+    # 协调器从 HOME 计算应用数据目录；独立隔离它，不能只隔离 CODEX_HOME。
+    environment = environment.copy()
+    for key in list(environment):
+        if key.startswith("INFINISHELL_CODEX_") or key.startswith("WARP_DATA_"):
+            environment.pop(key)
+    paths = {"HOME": root / "home", "USERPROFILE": root / "home",
+             "XDG_CONFIG_HOME": root / "home/.config", "XDG_DATA_HOME": root / "home/.local/share",
+             "XDG_CACHE_HOME": root / "home/.cache", "TMPDIR": root / "tmp",
+             "TMP": root / "tmp", "TEMP": root / "tmp"}
+    for key, path in paths.items():
+        path.mkdir(mode=0o700, parents=True, exist_ok=True)
+        environment[key] = str(path)
+    environment["WARP_DATA_PROFILE"] = "codex-parent-child-01561"
+    environment["INFINISHELL_CODEX_PARENT_CHILD_01561"] = "1"
+    (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8")
     return environment
 
 
@@ -364,7 +428,10 @@ def run(args):
     candidate_01561 = args.test_case in {"candidate-01561-missing-session", "candidate-01561-lifecycle",
                                            "candidate-01561-running-tool-cancel"}
     running_tool_cancel = args.test_case in RUNNING_TOOL_CANCEL_CASES
-    if candidate_01561:
+    parent_child = args.test_case == "parent-child-01561"
+    if parent_child and sys.platform != "darwin":
+        raise ValueError("Codex 0.156.1 父子生产验收仅在 macOS 开放")
+    if candidate_01561 or parent_child:
         verify_candidate_01561_package(args.codex)
     repository = Path(__file__).resolve().parents[2]
     test_name = TEST_CASES[args.test_case]
@@ -376,6 +443,7 @@ def run(args):
                   "image-input": "rust_adapter_image_input", "missing-session": "rust_adapter_missing_session",
                   "candidate-01561-missing-session": "rust_adapter_01561_test_only_zero_input_missing_session",
                   "candidate-01561-lifecycle": "rust_adapter_01561_test_only_process_restart",
+                  "parent-child-01561": "codex_01561_production_parent_child_duplex_inspect",
                   "idle-crash": "rust_adapter_idle_crash_after_native_ready"}.get(
             args.test_case, "rust_adapter_process_restart"),
         "credentials_provided": args.test_case not in UNAUTHENTICATED_CASES,
@@ -395,7 +463,7 @@ def run(args):
     metadata["worktree_dirty"] = bool(status.stdout.strip())
     args.output.parent.mkdir(parents=True, exist_ok=True)
     temporary_parent = (os.environ.get("RUNNER_TEMP") if args.test_case in UNAUTHENTICATED_CASES
-                        or candidate_01561 else None)
+                        or candidate_01561 or parent_child else None)
     with tempfile.TemporaryDirectory(prefix="infinishell-codex-adapter-", dir=temporary_parent) as temporary:
         root = Path(temporary).resolve()
         configuration = root / "codex"
@@ -414,6 +482,8 @@ def run(args):
             for key in list(environment):
                 if any(part in key for part in ("TOKEN", "API_KEY", "AUTH", "SECRET")):
                     environment.pop(key)
+            if parent_child:
+                environment = parent_child_environment(root, environment)
         # 环境只传给单独的测试进程；Rust 测试和其他并行测试都不修改全局环境。
         environment.update({
             "CODEX_HOME": str(configuration),
@@ -431,7 +501,7 @@ def run(args):
         metadata["cli_version"] = version.stdout.strip()
         # 清空本次输出，避免筛选器未匹配或版本不符时采用上一次的成功记录。
         args.output.write_text("")
-        expected_version = ("codex-cli 0.156.1" if candidate_01561 else
+        expected_version = ("codex-cli 0.156.1" if candidate_01561 or parent_child else
                             "codex-cli 0.155.1" if running_tool_cancel else None)
         if expected_version is not None and metadata["cli_version"] != expected_version:
             metadata["acceptance_passed"] = False
@@ -444,14 +514,14 @@ def run(args):
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                    text=True, encoding="utf-8", **platform_options)
         try:
-            output, _ = process.communicate(timeout=120 if args.test_case in UNAUTHENTICATED_CASES else 900)
+            output, _ = process.communicate(timeout=120 if args.test_case in UNAUTHENTICATED_CASES else 300 if parent_child else 900)
         except subprocess.TimeoutExpired:
-            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel)
-            output = stopped_output(process, metadata) if running_tool_cancel else process.communicate()[0]
+            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel or parent_child)
+            output = stopped_output(process, metadata) if running_tool_cancel or parent_child else process.communicate()[0]
             metadata["timed_out"] = True
         except BaseException:
-            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel)
-            if not running_tool_cancel:
+            terminate(process, own_process_only=args.test_case == "idle-crash" or running_tool_cancel or parent_child)
+            if not running_tool_cancel and not parent_child:
                 raise
             output = stopped_output(process, metadata)
             metadata["runner_interrupted"] = True
@@ -487,7 +557,7 @@ def run(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--test-case", choices=TEST_CASES, default="lifecycle", help="选择生命周期、运行中工具取消、本地工具保存恢复、图片、无凭据缺失会话或原生空闲崩溃验收")
+    parser.add_argument("--test-case", choices=TEST_CASES, default="lifecycle", help="选择生命周期、父子派发、运行中工具取消、本地工具保存恢复、图片、无凭据缺失会话或原生空闲崩溃验收")
     parser.add_argument("--test-binary", type=Path, required=True, help="cargo test --no-run 生成的 warp libtest 可执行文件")
     parser.add_argument("--codex", type=Path, required=True)
     parser.add_argument("--supervisor", type=Path, required=True, help="与适配器代码同提交构建、支持隐藏 worker 的 InfiniShell 主程序或 TUI 二进制")

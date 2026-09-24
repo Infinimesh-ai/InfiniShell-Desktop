@@ -1,0 +1,9 @@
+{
+  "automatic_model_inputs": 0,
+  "process_tree_cleanup_verified": false,
+  "identified_private_native_processes_gone": true,
+  "tunnel_drained": true,
+  "network_budget_exhausted": false,
+  "credential_copy_removed": true,
+  "credential_source_stat_unchanged": true
+}

@@ -14,11 +14,11 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use super::{GrokProtocol, run_process, verified_final_snapshot};
+use super::{GrokProtocol, connect_protocol, validate_options, verified_final_snapshot};
 use crate::ai::cli_agent_runtime::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
     RuntimeController, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
-    TurnOutcome, channels, managed_process,
+    TurnOutcome, managed_process,
 };
 
 const SCOPE: &str = "production_process_transport_with_runtime_commands";
@@ -154,7 +154,7 @@ struct LiveSession {
 enum LiveCapabilityProfile {
     Extended,
     P0,
-    CurrentRootCandidate,
+    ProductionRoot,
 }
 
 impl Drop for LiveSession {
@@ -167,10 +167,9 @@ impl Drop for LiveSession {
 }
 
 impl LiveSession {
-    fn start(options: SessionOptions, current_root_candidate_for_live: bool) -> Self {
-        let mut protocol = GrokProtocol::new(options);
-        protocol.current_root_candidate_for_live = current_root_candidate_for_live;
-        Self::start_protocol(protocol, false)
+    fn start(options: SessionOptions) -> Self {
+        validate_options(&options).expect("验收使用生产允许的会话配置");
+        Self::start_protocol(GrokProtocol::new(options), false)
     }
 
     fn start_candidate_1041_p0(options: SessionOptions) -> Result<Self, String> {
@@ -192,17 +191,18 @@ impl LiveSession {
             SessionTarget::New => None,
             SessionTarget::Resume { native_session_id } => Some(native_session_id.clone()),
         };
-        let (controller, commands, sender, events) = channels(generation);
         let final_histories = Arc::new(Mutex::new(HashMap::new()));
         protocol.verified_final_histories_for_live = Some(final_histories.clone());
+        // 历史和排队计数均为被动观察；能力判断与进程生命周期完整复用生产连接。
+        let queued_submissions = protocol.queued_submissions.clone();
+        let connection = connect_protocol(protocol);
+        let controller = connection.controller;
+        let events = connection.events;
         let task = tokio::spawn(async move {
-            let result = run_process(&mut protocol, commands, &sender).await;
-            let reason = match &result {
-                Ok(()) => "验收连接关闭".to_owned(),
-                Err(error) => error.to_string(),
-            };
-            let _ = sender.try_send(protocol.event(RuntimeEventKind::Disconnected { reason }));
-            result.map(|()| protocol.queued_submissions)
+            connection
+                .task
+                .await
+                .map(|()| *queued_submissions.lock().expect("排队计数锁未损坏"))
         });
         Self {
             generation,
@@ -281,6 +281,10 @@ impl LiveSession {
             evidence.record(json!({"event":"initialization_failed","kind":event.kind}))?;
             return Err("Grok 未完成真实初始化".into());
         };
+        let production_root = matches!(profile, LiveCapabilityProfile::ProductionRoot);
+        if production_root && verified_cli_version.as_deref() != Some(super::ROOT_VERSION) {
+            return Err("正式根任务版本不匹配".into());
+        }
         if self.test_candidate_1041_p0 && verified_cli_version.as_deref() != Some("1.0.41") {
             return Err("Grok 1.0.41 P0 会话版本不匹配".into());
         }
@@ -309,7 +313,7 @@ impl LiveSession {
                     "childTasks",
                 ],
             ),
-            LiveCapabilityProfile::CurrentRootCandidate => (
+            LiveCapabilityProfile::ProductionRoot => (
                 &[
                     "newSession",
                     "submit",
@@ -338,7 +342,7 @@ impl LiveSession {
             }
         }
         let current_model_id = match profile {
-            LiveCapabilityProfile::CurrentRootCandidate if !self.test_candidate_1041_p0 => {
+            LiveCapabilityProfile::ProductionRoot if !self.test_candidate_1041_p0 => {
                 let expected = env::var("INFINISHELL_GROK_LIVE_MODEL")
                     .map_err(|_| "当前版根验收缺少固定模型".to_owned())?;
                 let models = &effective_permissions["reportedMetadata"]["models"];
@@ -366,14 +370,15 @@ impl LiveSession {
             }
             LiveCapabilityProfile::Extended
             | LiveCapabilityProfile::P0
-            | LiveCapabilityProfile::CurrentRootCandidate => None,
+            | LiveCapabilityProfile::ProductionRoot => None,
         };
         if self.native_id.is_none() {
             return Err("初始化缺少真实会话 ID".into());
         }
         evidence.record(
             json!({"event":"session_ready", "native_session_id":self.native_id,
-            "public_product_gate_open":false,"permission_policy":"Inherit",
+            "public_product_gate_open":production_root,"permission_policy":"Inherit",
+            "verified_cli_version":verified_cli_version,"production_root":production_root,
             "permission_enforcement_verified":false,"scope":SCOPE,
             "current_model_id":current_model_id}),
         )
@@ -771,7 +776,7 @@ fn completed(turn: &ObservedTurn, expected: &str) -> Result<(), String> {
 async fn exercise(
     root: &Path,
     evidence: &mut Evidence,
-    current_root_candidate: bool,
+    production_root: bool,
 ) -> Result<(), String> {
     let official = match env::var("INFINISHELL_GROK_LIVE_AUTH_MODE") {
         Ok(mode) if mode == "official-cached-token" => true,
@@ -803,12 +808,12 @@ async fn exercise(
         local_tools: None,
         selected_skills: Vec::new(),
     };
-    let mut session = LiveSession::start(options.clone(), current_root_candidate);
+    let mut session = LiveSession::start(options.clone());
     session
         .ready(
             evidence,
-            if current_root_candidate {
-                LiveCapabilityProfile::CurrentRootCandidate
+            if production_root {
+                LiveCapabilityProfile::ProductionRoot
             } else {
                 LiveCapabilityProfile::Extended
             },
@@ -904,12 +909,12 @@ async fn exercise(
     options.target = SessionTarget::Resume {
         native_session_id: native_id.clone(),
     };
-    let mut resumed = LiveSession::start(options, current_root_candidate);
+    let mut resumed = LiveSession::start(options);
     resumed
         .ready(
             evidence,
-            if current_root_candidate {
-                LiveCapabilityProfile::CurrentRootCandidate
+            if production_root {
+                LiveCapabilityProfile::ProductionRoot
             } else {
                 LiveCapabilityProfile::Extended
             },
@@ -924,7 +929,8 @@ async fn exercise(
         return Err("恢复阶段出现额外排队".into());
     }
     evidence.record(json!({"event":"acceptance_passed","scope":SCOPE,"native_session_id":native_id,
-        "queued_input_verified":true,"same_turn_steering_supported":false,"public_product_gate_open":false,
+        "queued_input_verified":true,"same_turn_steering_supported":false,"public_product_gate_open":production_root,
+        "production_root":production_root,"test_only_current_candidate_gate":false,
         "app_restart_and_ui_verified":false,"parent_permission_ceiling_verified":false,
         "official_grok_model_tested":official,
         "model_path":if official { "Grok Build + 官方缓存登录" } else { "Grok Build + 自定义 Claude 后端" }}))
@@ -937,7 +943,7 @@ fn start_p0_session(
     if test_candidate_1041 {
         LiveSession::start_candidate_1041_p0(options)
     } else {
-        Ok(LiveSession::start(options, false))
+        Ok(LiveSession::start(options))
     }
 }
 
@@ -1128,11 +1134,11 @@ async fn real_grok_managed_lifecycle() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "必须由 Grok 1.0.40 官方隔离运行器显式启动；会消耗用户授权模型额度"]
+#[ignore = "必须由固定 Mac Grok 1.0.41 官方隔离运行器显式启动；最多八次模型输入"]
 async fn real_grok_current_root_lifecycle() {
     assert_eq!(
         env::var("INFINISHELL_GROK_LIVE_PROFILE").as_deref(),
-        Ok("root-1.0.40")
+        Ok("root-1.0.41")
     );
     let root =
         PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").expect("必须由隔离运行器启动"))
@@ -1160,10 +1166,11 @@ async fn real_grok_current_root_lifecycle() {
     };
     evidence
         .record(json!({"event":"acceptance_started","scope":SCOPE,
-            "verified_scope":"current_root_candidate","credential_files_read_by_probe":false,
+            "verified_scope":"production_root-1.0.41","credential_files_read_by_probe":false,
             "production_run_process":true,"production_run_transport":true,
-            "production_runtime_commands":true,"test_only_current_candidate_gate":true,
-            "public_product_gate_open":false,"same_turn_steering_supported":false,
+            "production_runtime_commands":true,"production_connect_protocol":true,
+            "test_only_current_candidate_gate":false,"production_root":true,
+            "public_product_gate_open":true,"same_turn_steering_supported":false,
             "skills_verified":false,"local_tools_verified":false,"child_tasks_verified":false}))
         .unwrap();
     let result = exercise(&root, &mut evidence, true).await;
@@ -1174,7 +1181,7 @@ async fn real_grok_current_root_lifecycle() {
     }
     assert!(
         result.is_ok(),
-        "真实 Grok 1.0.40 根生命周期验收未通过；请检查脱敏证据"
+        "真实 Grok 1.0.41 正式根生命周期验收未通过；请检查脱敏证据"
     );
 }
 

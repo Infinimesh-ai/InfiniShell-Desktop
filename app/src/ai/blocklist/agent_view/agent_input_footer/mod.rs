@@ -920,8 +920,8 @@ impl AgentInputFooter {
             if session.received_rich_notification && manager.supports_update() {
                 let needs_update = (!session.is_remote() && manager.needs_update())
                     || match &session.plugin_version {
-                        // 未上报版本的是引入版本协议前的旧插件，需要更新。
-                        None => true,
+                        // tmux 重连可能先收到不带版本的回合事件；未知不能推断为旧版。
+                        None => false,
                         Some(v) => compare_versions(v, min_version).is_lt(),
                     };
                 if !needs_update {
@@ -2554,3 +2554,7 @@ impl ActionButtonTheme for NLDButtonTheme {
         true
     }
 }
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "mod_tests.rs"]
+mod tests;

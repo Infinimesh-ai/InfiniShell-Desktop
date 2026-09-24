@@ -328,6 +328,11 @@ impl CLIAgentSession {
 #[allow(dead_code)] // `agent` fields on Started/InputSessionChanged/Ended are used for logging and future subscribers.
 #[derive(Debug, Clone)]
 pub enum CLIAgentSessionsModelEvent {
+    /// 会话级原生审批提醒；不改变回合、取消等待或持久化任务状态。
+    AttentionRequested {
+        terminal_view_id: EntityId,
+        agent: CLIAgent,
+    },
     Started {
         terminal_view_id: EntityId,
         agent: CLIAgent,
@@ -363,6 +368,9 @@ impl CLIAgentSessionsModelEvent {
     pub fn terminal_view_id(&self) -> EntityId {
         match self {
             CLIAgentSessionsModelEvent::Started {
+                terminal_view_id, ..
+            }
+            | CLIAgentSessionsModelEvent::AttentionRequested {
                 terminal_view_id, ..
             }
             | CLIAgentSessionsModelEvent::StatusChanged {
@@ -632,6 +640,22 @@ impl CLIAgentSessionsModel {
             .accept(event);
         match disposition {
             EventDisposition::Drop => return,
+            EventDisposition::SessionAttention => {
+                // 只展示已知原生会话的提醒，不能把无关联通知当成当前回合的审批状态。
+                if event.session_id.as_deref().is_some_and(|incoming| {
+                    !incoming.is_empty()
+                        && Some(incoming) == session.session_context.session_id.as_deref()
+                }) && matches!(
+                    session.status,
+                    CLIAgentSessionStatus::InProgress | CLIAgentSessionStatus::Blocked { .. }
+                ) {
+                    ctx.emit(CLIAgentSessionsModelEvent::AttentionRequested {
+                        terminal_view_id,
+                        agent: session.agent,
+                    });
+                }
+                return;
+            }
             EventDisposition::UnverifiedTerminal => {
                 let session = self
                     .sessions

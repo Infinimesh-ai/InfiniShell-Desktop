@@ -1,0 +1,208 @@
+{
+  "version": "grok 1.0.41 (4220f3b224a6)",
+  "native_cli_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+  "native_session_sha256": "02128b81777ee53492cfc781256493a588e8ec8457a1787f7c7a1d054cfaa29c",
+  "native_input_count": 5,
+  "checks": {
+    "input_budget_met": true,
+    "same_native_session": true,
+    "allow_once_gui_verified": true,
+    "allow_file_exact": true,
+    "deny_gui_verified": true,
+    "denied_file_absent": true,
+    "native_turn_interruption_gui_verified": true,
+    "cancel_script_was_running": true,
+    "cancel_script_stopped_without_completion": true,
+    "continue_marker_gui_verified": true,
+    "resume_marker_gui_verified": true,
+    "app_process_changed": true,
+    "restart_no_new_input": true,
+    "resume_no_new_input": true,
+    "new_app_restart_segment_zero_prompts": true,
+    "new_app_resume_segment_zero_prompts": true,
+    "native_exit_before_resume": true,
+    "native_resume_exit": true
+  },
+  "cleanup": {
+    "automatic_model_inputs": 0,
+    "process_tree_cleanup_verified": false,
+    "identified_private_native_processes_gone": true,
+    "tunnel_drained": true,
+    "network_budget_exhausted": false,
+    "credential_copy_removed": true,
+    "credential_source_stat_unchanged": true
+  },
+  "events_before_app_restart": {
+    "session_start": 1,
+    "prompt_submit": 4,
+    "notification": 5,
+    "tool_complete": 2,
+    "stop": 2,
+    "cancelled": 2
+  },
+  "events_after_app_restart": {
+    "session_start": 1,
+    "prompt_submit": 1,
+    "stop": 1,
+    "notification": 1
+  },
+  "safe_checkpoint_files": [
+    {
+      "path": "grok/cancel-running.safe.json",
+      "sha256": "e779d89449771605c67402d26a0502388b92b808c5a4eb96be0cb2eb9d7bea81"
+    },
+    {
+      "path": "grok/cancelled.safe.json",
+      "sha256": "a5c0a64ae58402a9ae89e3c759f9e466ee778157f499d09d5c0b026d99801d70"
+    },
+    {
+      "path": "grok/before-exit.safe.json",
+      "sha256": "463e9195b4d767f3673813e4f1e95829fc976f15957b23e8862bae08f5846c23"
+    },
+    {
+      "path": "grok/after-app-restart.safe.json",
+      "sha256": "4636146698ac03e85c5433bcbbd5a6557e715bdecdfee9d64af678cc6aeaec50"
+    },
+    {
+      "path": "grok/resume-ready.safe.json",
+      "sha256": "ee6b258e8a07927c52472f875b9c06bc3e50d8c4d20f664e9915bd31a026df2a"
+    },
+    {
+      "path": "grok/final.safe.json",
+      "sha256": "ba186e970c99054e420a5763f30b73a598aab7e7e3d1e9354c6c2b2dd9a56efd"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "gui-evidence/grok-allow-once.png",
+      "sha256": "29ec24ce4b412621008452c65649cf391d6980b94161f68f9c7379530ff31b34"
+    },
+    {
+      "path": "gui-evidence/grok-allow-readback-once.png",
+      "sha256": "8b1e3744cc959d91cfdecfe396be7b5d6b44b41ae47d688b4025dd40c340c387"
+    },
+    {
+      "path": "gui-evidence/grok-allow-result.png",
+      "sha256": "a645383d43963b7890aea559b0a7f433098cdf7fba8d5c94a89aecea0683b411"
+    },
+    {
+      "path": "gui-evidence/grok-app-restarted-idle.png",
+      "sha256": "d6f6ca78f01d4fa4112c80b46f15554a9f23679df5b709350edba49dabed262f"
+    },
+    {
+      "path": "gui-evidence/grok-cancel-allow.png",
+      "sha256": "593ec759ca7de246c9c5eb385e2b8d45720d7ada10f78856f205b2b978874098"
+    },
+    {
+      "path": "gui-evidence/grok-cancelled.png",
+      "sha256": "a950f492a681840cee76c8cfb689d395e82482e2a0825a8802b2f2b5b112c5e8"
+    },
+    {
+      "path": "gui-evidence/grok-continue.png",
+      "sha256": "389417668699f982260f0af2072017f29e22ebaf5e1311adbd0697570310c4bf"
+    },
+    {
+      "path": "gui-evidence/grok-deny-result.png",
+      "sha256": "cbac6c75dc60994887bd873096c8fc0141e458f0505f1fd90c5550b03147b533"
+    },
+    {
+      "path": "gui-evidence/grok-deny.png",
+      "sha256": "29ba892790209375e681a0aab44ffc36c07f938842b2a1e9d0fd8208f28bdc8e"
+    },
+    {
+      "path": "gui-evidence/grok-native-exited.png",
+      "sha256": "d846aab8b44a7a2724d78aa9e5c31bffe11fdecd523a4fe367b73c43d13c66ce"
+    },
+    {
+      "path": "gui-evidence/grok-resume-ready-no-input.png",
+      "sha256": "d1d202098dc37e3b145a506b7ef3a6597da264fe8ac149a94904e0e1e45426e4"
+    },
+    {
+      "path": "gui-evidence/grok-resume-result.png",
+      "sha256": "4c9a7b6af0055f5bdaefa51b7695275bb25247af1d0ebc9b382a1ea59248a713"
+    }
+  ],
+  "production_installer": {
+    "credentials_provided": false,
+    "grok_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "grok_version": "1.0.41",
+    "model_input_submitted": false,
+    "node_sha256": "a46ed02589ca3af795237111ff854262064f8ff5c5b58d75c1509f37311eb15e",
+    "node_version": "v25.9.0",
+    "passed": true,
+    "steps": [
+      {
+        "installed_hook_export": {
+          "config_registry_and_cache_unchanged": true,
+          "installed_hook_export_version_verified": true,
+          "installed_manifest_version": "0.1.3",
+          "installed_notify_sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898",
+          "kind": "installed_module_export_probe",
+          "main_entry_verified": false,
+          "manager_minimum_plugin_version": "0.1.3",
+          "model_input_submitted": false,
+          "node_exit_code": 0,
+          "plugin_version": "0.1.3",
+          "stderr_bytes": 0,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_bytes": 217,
+          "stdout_sha256": "f6e3b7c8b756b56d90afd3582d7f187963541537a99f16b2e66a074e77e737e5",
+          "tty_main_validation_required": true
+        },
+        "installed_hook_main_verified": false,
+        "passed": true,
+        "step": "production_install"
+      },
+      {
+        "current_plugin_version": "0.1.3",
+        "fixture_old_native_install": true,
+        "installed_hook_export": {
+          "config_registry_and_cache_unchanged": true,
+          "installed_hook_export_version_verified": true,
+          "installed_manifest_version": "0.1.3",
+          "installed_notify_sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898",
+          "kind": "installed_module_export_probe",
+          "main_entry_verified": false,
+          "manager_minimum_plugin_version": "0.1.3",
+          "model_input_submitted": false,
+          "node_exit_code": 0,
+          "plugin_version": "0.1.3",
+          "stderr_bytes": 0,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_bytes": 217,
+          "stdout_sha256": "489c3cd3f19ea395f7d5a393d1426c9093b9ef289f07ecd8b9797e256f9d5513",
+          "tty_main_validation_required": true
+        },
+        "installed_hook_main_verified": false,
+        "legacy_source_unchanged": true,
+        "model_input_submitted": false,
+        "passed": true,
+        "previous_plugin_version": "0.1.0",
+        "production_update_call": true,
+        "step": "production_upgrade_known_010_to_011"
+      },
+      {
+        "config_and_registry_unchanged": true,
+        "passed": true,
+        "step": "production_same_version_update"
+      },
+      {
+        "config_and_files_unchanged": true,
+        "passed": true,
+        "step": "production_disabled_update_rejected"
+      },
+      {
+        "fault_after_first_replacement": true,
+        "passed": true,
+        "production_apply_call": false,
+        "step": "file_transaction_failure_rollback"
+      },
+      {
+        "passed": true,
+        "step": "production_update_after_rollback"
+      }
+    ],
+    "test_binary_sha256": "bc4d03b0afac23648010341179cf479e89814c0350339002cdd99ee8b4fb748e"
+  },
+  "approval_details": "Native Yes, proceed selected; no persistent always-approve selection; one additional synthetic readback was approved in turn 1."
+}

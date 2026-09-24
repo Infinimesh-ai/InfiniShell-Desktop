@@ -6,6 +6,9 @@ use std::sync::LazyLock;
 use std::{env, fs, io};
 
 use async_trait::async_trait;
+#[cfg(any(windows, test))]
+use base64::Engine as _;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 #[cfg(not(target_family = "wasm"))]
@@ -20,8 +23,13 @@ use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, Pl
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.3";
+const PLUGIN_VERSION: &str = "0.1.4";
 const TESTED_GROK_VERSION: &str = "1.0.30";
+const STARTUP_BRIDGE_NAME: &str = "infinishell-1.0.41";
+// 仅认可已发布 Mac 补桥的完整原字节，并要求原生 JSON 同时匹配本次安装。
+const LEGACY_STARTUP_BRIDGE_SHA256: &str =
+    "184464fc31202dc9215e41c4066aa1539ec58fb8f312a77bce87d6c013b63a07";
+const STARTUP_BRIDGE_SCRIPT: &[u8] = include_bytes!("grok_native_hook_bridge.cjs");
 // 只认可此次发布前的完整 0.1.0 配方，不能把任意旧版说明当作应用来源。
 const LEGACY_README_SHA256: &str =
     "2db65e9c54c35725ba1164edb39daf9645bfdf7f1d3cd2689b8e338853c2e8b7";
@@ -55,6 +63,25 @@ const LEGACY_012_SHA256: &[(&str, &str)] = &[
         "2c275ebe80cd620aad36563c0eeff4e38c302dcf9ca324f1962df9b4134b60ca",
     ),
 ];
+// 0.1.3 的完整已发布配方；审批类别映射升级不能把新字节套用到旧版本。
+const LEGACY_013_SHA256: &[(&str, &str)] = &[
+    (
+        ".grok-plugin/plugin.json",
+        "c357e633f907623ff322f88aff2442cded9eaa243d9c14b45cdd66234bd20aa5",
+    ),
+    (
+        "hooks/hooks.json",
+        "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+    ),
+    (
+        "hooks/notify.cjs",
+        "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898",
+    ),
+    (
+        "README.md",
+        "064707b15ef7a620c7e5eb8a2209f8e6922a05b7b73fb15374b24d3d31bcd3ae",
+    ),
+];
 const BUNDLED_FILES: &[(&str, &str)] = &[
     (
         ".grok-plugin/plugin.json",
@@ -76,6 +103,8 @@ const BUNDLED_FILES: &[(&str, &str)] = &[
 
 pub(super) struct GrokPluginManager {
     path_env_var: Option<String>,
+    #[cfg(test)]
+    test_source_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -87,7 +116,23 @@ struct InstalledPlugin {
 
 impl GrokPluginManager {
     pub(super) fn new(path_env_var: Option<String>) -> Self {
-        Self { path_env_var }
+        Self {
+            path_env_var,
+            #[cfg(test)]
+            test_source_root: None,
+        }
+    }
+
+    fn source_root(&self) -> io::Result<PathBuf> {
+        // Windows KnownFolder 不受私有 HOME 环境影响；仅测试可显式注入已验证的隔离目录。
+        #[cfg(test)]
+        if let Some(root) = &self.test_source_root {
+            if !root.is_absolute() {
+                return Err(invalid_tree());
+            }
+            return Ok(root.clone());
+        }
+        bundled_source_root()
     }
 
     fn executable(&self, program: &str) -> Option<PathBuf> {
@@ -137,7 +182,10 @@ impl GrokPluginManager {
     }
 
     #[cfg(not(target_family = "wasm"))]
-    async fn verify_runtime(&self, log: &mut String) -> Result<PathBuf, PluginInstallError> {
+    async fn verify_runtime(
+        &self,
+        log: &mut String,
+    ) -> Result<(PathBuf, bool), PluginInstallError> {
         let grok = self
             .executable("grok")
             .ok_or_else(|| incompatible_error(log))?;
@@ -166,7 +214,15 @@ impl GrokPluginManager {
         ) {
             return Err(incompatible_error(log));
         }
-        Ok(grok)
+        let startup_bridge = cfg!(any(
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        )) && String::from_utf8_lossy(&grok_version.stdout)
+            .split_whitespace()
+            .nth(1)
+            == Some("1.0.41");
+        Ok((grok, startup_bridge))
     }
 
     #[cfg(not(target_family = "wasm"))]
@@ -205,9 +261,24 @@ impl GrokPluginManager {
             });
         }
         // 在创建目录或修改注册表前确认真实 CLI 和 hook 运行时。
-        let executable = self.verify_runtime(&mut log).await?;
+        let (executable, startup_bridge) = self.verify_runtime(&mut log).await?;
         let previous = registered_plugin(&grok_home).map_err(|_| invalid_state_error(&log))?;
-        let source_root = bundled_source_root().map_err(|error| file_error(error, &log))?;
+        let previous_bridge = if startup_bridge
+            && previous
+                .as_ref()
+                .is_some_and(|plugin| plugin.version != PLUGIN_VERSION)
+        {
+            let node = self
+                .executable("node")
+                .ok_or_else(|| incompatible_error(&log))?;
+            capture_startup_bridge(&grok_home, &executable, &node)
+                .map_err(|error| file_error(error, &log))?
+        } else {
+            None
+        };
+        let source_root = self
+            .source_root()
+            .map_err(|error| file_error(error, &log))?;
         let source = write_bundle(&source_root).map_err(|error| file_error(error, &log))?;
         self.run(
             &executable,
@@ -230,16 +301,29 @@ impl GrokPluginManager {
 
         let Some(previous) = previous else {
             self.install_source(&executable, &source, &mut log).await?;
-            return verify_installed(&grok_home, PLUGIN_VERSION, &log);
+            return self.finish_install(&grok_home, &executable, startup_bridge, &log);
         };
         if previous.version == PLUGIN_VERSION {
             // 同版本修复不重装原生插件，避免安装命令重新启用用户禁用的配置。
             repair_current_plugin(&grok_home, &previous, &source_root, |_, _| Ok(()))
                 .map_err(|error| file_error(error, &log))?;
-            return verify_installed(&grok_home, PLUGIN_VERSION, &log);
+            return self.finish_install(&grok_home, &executable, startup_bridge, &log);
         }
         if !updating {
             return Err(invalid_state_error(&log));
+        }
+        if previous_bridge.is_some() {
+            let node = self
+                .executable("node")
+                .ok_or_else(|| incompatible_error(&log))?;
+            persist_startup_bridge_migration(
+                &grok_home,
+                &executable,
+                &node,
+                &previous,
+                &source_root,
+            )
+            .map_err(|error| file_error(error, &log))?;
         }
         upgrade_plugin(
             &grok_home,
@@ -249,7 +333,40 @@ impl GrokPluginManager {
             &(self, executable.as_path()),
             &mut log,
         )
-        .await
+        .await?;
+        self.finish_install(&grok_home, &executable, startup_bridge, &log)
+    }
+
+    fn finish_install(
+        &self,
+        home: &Path,
+        executable: &Path,
+        startup_bridge: bool,
+        log: &str,
+    ) -> Result<(), PluginInstallError> {
+        verify_installed(home, PLUGIN_VERSION, log)?;
+        if startup_bridge {
+            let node = self
+                .executable("node")
+                .ok_or_else(|| incompatible_error(log))?;
+            let source_root = self.source_root().map_err(|error| file_error(error, log))?;
+            if let Some((record, previous_json)) =
+                pending_startup_bridge_migration(home, executable, &node, &source_root)
+                    .map_err(|error| file_error(error, log))?
+            {
+                migrate_startup_bridge(home, executable, &node, &previous_json)
+                    .map_err(|error| file_error(error, log))?;
+                let path = startup_bridge_migration_path(home);
+                if !bridge_file_matches(&path, &record).map_err(|error| file_error(error, log))? {
+                    return Err(invalid_state_error(log));
+                }
+                fs::remove_file(path).map_err(|error| file_error(error, log))?;
+            } else {
+                install_startup_bridge(home, executable, &node)
+                    .map_err(|error| file_error(error, log))?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -267,7 +384,8 @@ impl CliAgentPluginManager for GrokPluginManager {
                 registered_plugin(&root).is_ok_and(|plugin| match plugin {
                     Some(plugin) => {
                         plugin_tree(&plugin.path, true).is_ok()
-                            && bundled_source_root()
+                            && self
+                                .source_root()
                                 .is_ok_and(|source| validate_owned_source(&plugin, &source).is_ok())
                     }
                     None => true,
@@ -298,6 +416,18 @@ impl CliAgentPluginManager for GrokPluginManager {
                 .is_some_and(|plugin| {
                     parse_version(&plugin.version) < parse_version(PLUGIN_VERSION)
                         || installed_plugin(&root).is_err()
+                        || (cfg!(any(
+                            target_os = "macos",
+                            target_os = "linux",
+                            target_os = "windows"
+                        )) && fs::read_to_string(root.join(".metadata_version"))
+                            .is_ok_and(|version| version.trim() == "1.0.41")
+                            && self
+                                .executable("grok")
+                                .zip(self.executable("node"))
+                                .is_none_or(|(grok, node)| {
+                                    !startup_bridge_current(&root, &grok, &node)
+                                }))
                 })
         })
     }
@@ -377,10 +507,13 @@ fn parse_version(version: &str) -> Option<[u64; 3]> {
 }
 
 fn runtime_is_compatible(grok: &str, node: &str) -> bool {
-    grok.trim()
+    let grok_version = grok
+        .trim()
         .strip_prefix("grok ")
-        .and_then(|value| value.split_whitespace().next())
-        == Some(TESTED_GROK_VERSION)
+        .and_then(|value| value.split_whitespace().next());
+    (grok_version == Some(TESTED_GROK_VERSION)
+        // 三桌面沿用固定原生注册合同；未知版本不能借通知补桥进入支持范围。
+        || (cfg!(any(target_os = "macos", target_os = "linux", target_os = "windows")) && grok_version == Some("1.0.41")))
         && node
             .trim()
             .strip_prefix('v')
@@ -517,6 +650,408 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
     Ok(plugin)
 }
 
+fn startup_bridge_files(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+) -> io::Result<[(PathBuf, Vec<u8>); 2]> {
+    let plugin = installed_plugin(root)?.ok_or_else(invalid_tree)?;
+    startup_bridge_files_for_plugin(root, executable, node, &plugin)
+}
+
+fn startup_bridge_files_for_plugin(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+    plugin: &InstalledPlugin,
+) -> io::Result<[(PathBuf, Vec<u8>); 2]> {
+    if !plugin_enabled(root)? {
+        return Err(invalid_tree());
+    }
+    let script = root
+        .join("hooks")
+        .join(format!("{STARTUP_BRIDGE_NAME}.cjs"));
+    let mut hooks: Value = serde_json::from_str(BUNDLED_FILES[1].1)?;
+    let paths = [node, script.as_path(), executable, plugin.path.as_path()];
+    if paths.iter().any(|path| !path.is_absolute()) {
+        return Err(invalid_tree());
+    }
+    let paths = paths.map(|path| path.to_str().ok_or_else(invalid_tree));
+    let paths = paths.into_iter().collect::<io::Result<Vec<_>>>()?;
+    #[cfg(windows)]
+    let command = windows_startup_bridge_command(&paths)?;
+    #[cfg(not(windows))]
+    let command = paths
+        .into_iter()
+        .map(|path| {
+            if path.contains('\0') {
+                return Err(invalid_tree());
+            }
+            Ok(shell_escape::unix::escape(path.into()).into_owned())
+        })
+        .collect::<io::Result<Vec<_>>>()?
+        .join(" ");
+    for groups in hooks["hooks"]
+        .as_object_mut()
+        .ok_or_else(invalid_tree)?
+        .values_mut()
+    {
+        for group in groups.as_array_mut().ok_or_else(invalid_tree)? {
+            for hook in group["hooks"].as_array_mut().ok_or_else(invalid_tree)? {
+                hook["command"] = Value::String(command.clone());
+            }
+        }
+    }
+    Ok([
+        (script, STARTUP_BRIDGE_SCRIPT.to_vec()),
+        (
+            root.join("hooks")
+                .join(format!("{STARTUP_BRIDGE_NAME}.json")),
+            serde_json::to_vec_pretty(&hooks)?,
+        ),
+    ])
+}
+
+#[cfg(any(windows, test))]
+fn windows_startup_bridge_command(paths: &[&str]) -> io::Result<String> {
+    if paths.len() != 4
+        || paths
+            .iter()
+            .any(|path| path.is_empty() || path.contains('\0'))
+    {
+        return Err(invalid_tree());
+    }
+    // 固定 41 可选择 cmd、PowerShell 或 Bash；外层仅 ASCII，不让这些 shell 解释路径。
+    // 内层复用已验收的 PS 5.1 CRT 参数编码，直接继承 stdin 和控制台句柄交给既有 worker。
+    let template =
+        include_str!("../../../../../script/cli-agent-parity/codex_windows_hook_command.ps1");
+    let prefix = template
+        .split_once("# BEGIN_NOTIFICATION_LAUNCH")
+        .ok_or_else(invalid_tree)?
+        .0;
+    let quoted = paths
+        .iter()
+        .map(|path| format!("'{}'", path.replace('\'', "''")))
+        .collect::<Vec<_>>();
+    let executable = &quoted[0];
+    let arguments = quoted[1..].join(",");
+    let source = format!(
+        r#"{prefix}
+try {{
+    $info = New-Object System.Diagnostics.ProcessStartInfo
+    $info.FileName = {executable}
+    $info.UseShellExecute = $false
+    $info.RedirectStandardInput = $false
+    $info.RedirectStandardOutput = $false
+    $info.RedirectStandardError = $false
+    $info.CreateNoWindow = $false
+    $info.Arguments = (@({arguments}) | ForEach-Object {{ ConvertTo-NativeArgument $_ }}) -join ' '
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $info
+    if (-not $process.Start()) {{ throw 'Notification runtime did not start' }}
+    try {{ $process.WaitForExit(); $code = $process.ExitCode }} finally {{ $process.Dispose() }}
+    exit $code
+}} catch {{ exit 1 }}
+"#
+    );
+    let encoded = base64::engine::general_purpose::STANDARD.encode(
+        source
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect::<Vec<_>>(),
+    );
+    let command =
+        format!("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}");
+    // cmd 的总命令长度有界；超长路径必须在发布 hook 前拒绝。
+    if command.len() > 8000 {
+        return Err(invalid_tree());
+    }
+    Ok(command)
+}
+
+fn legacy_startup_bridge_matches(files: &[(PathBuf, Vec<u8>); 2]) -> io::Result<bool> {
+    if !bridge_file_matches(&files[1].0, &files[1].1)? {
+        return Ok(false);
+    }
+    let metadata = match fs::symlink_metadata(&files[0].0) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error),
+    };
+    if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() > 1024 * 1024 {
+        return Err(invalid_tree());
+    }
+    Ok(format!("{:x}", Sha256::digest(fs::read(&files[0].0)?)) == LEGACY_STARTUP_BRIDGE_SHA256)
+}
+
+fn bridge_file_matches(path: &Path, expected: &[u8]) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            Ok(fs::read(path)? == expected)
+        }
+        Ok(_) => Err(invalid_tree()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+fn startup_bridge_current(root: &Path, executable: &Path, node: &Path) -> bool {
+    plain_directory(&root.join("hooks")).is_ok()
+        && startup_bridge_files(root, executable, node).is_ok_and(|files| {
+            files
+                .iter()
+                .all(|(path, expected)| bridge_file_matches(path, expected).unwrap_or(false))
+        })
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StartupBridgeMigration {
+    schema_version: u8,
+    target_version: String,
+    old_version: String,
+    old_path: PathBuf,
+    old_source: PathBuf,
+    old_json_sha256: String,
+    old_script_sha256: String,
+    executable: PathBuf,
+    node: PathBuf,
+}
+
+fn startup_bridge_migration_path(root: &Path) -> PathBuf {
+    // 不用 .json 扩展名，避免被原生 hook loader 当作新的一份 hook 配方。
+    root.join("hooks")
+        .join(format!("{STARTUP_BRIDGE_NAME}.migration"))
+}
+
+fn persist_startup_bridge_migration(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+    old: &InstalledPlugin,
+    source_root: &Path,
+) -> io::Result<()> {
+    validate_owned_source(old, source_root)?;
+    // 必须在原生卸载/注册之前核对旧组，再保留可跨进程恢复的绑定。
+    let old_json = capture_startup_bridge(root, executable, node)?.ok_or_else(invalid_tree)?;
+    let files = startup_bridge_files(root, executable, node)?;
+    let old_script_sha256 = format!("{:x}", Sha256::digest(fs::read(&files[0].0)?));
+    let record = serde_json::to_vec(&StartupBridgeMigration {
+        schema_version: 1,
+        target_version: PLUGIN_VERSION.to_owned(),
+        old_version: old.version.clone(),
+        old_path: old.path.clone(),
+        old_source: old.source.clone(),
+        old_json_sha256: format!("{:x}", Sha256::digest(old_json)),
+        old_script_sha256,
+        executable: executable.to_path_buf(),
+        node: node.to_path_buf(),
+    })?;
+    let path = startup_bridge_migration_path(root);
+    if bridge_file_matches(&path, &record)? {
+        return Ok(());
+    }
+    let mut temporary = tempfile::NamedTempFile::new_in(root.join("hooks"))?;
+    temporary.write_all(&record)?;
+    temporary.as_file().sync_all()?;
+    temporary
+        .persist_noclobber(path)
+        .map_err(|error| error.error)?;
+    // 原生注册变更前把目录项也落盘，避免只有新 registry 而迁移记录丢失。
+    #[cfg(unix)]
+    fs::File::open(root.join("hooks"))?.sync_all()?;
+    Ok(())
+}
+
+fn pending_startup_bridge_migration(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+    source_root: &Path,
+) -> io::Result<Option<(Vec<u8>, Vec<u8>)>> {
+    let path = startup_bridge_migration_path(root);
+    let metadata = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    plain_directory(&root.join("hooks"))?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() > 64 * 1024 {
+        return Err(invalid_tree());
+    }
+    let bytes = fs::read(&path)?;
+    let record: StartupBridgeMigration = serde_json::from_slice(&bytes)?;
+    if record.schema_version != 1
+        || record.target_version != PLUGIN_VERSION
+        || record.old_version == PLUGIN_VERSION
+        || record.executable != executable
+        || record.node != node
+        || record
+            .old_path
+            .parent()
+            .ok_or_else(invalid_tree)?
+            .canonicalize()?
+            != root.canonicalize()?.join("installed-plugins")
+    {
+        return Err(invalid_tree());
+    }
+    if ![
+        LEGACY_STARTUP_BRIDGE_SHA256,
+        &format!("{:x}", Sha256::digest(STARTUP_BRIDGE_SCRIPT)),
+    ]
+    .contains(&record.old_script_sha256.as_str())
+    {
+        return Err(invalid_tree());
+    }
+    let old = InstalledPlugin {
+        version: record.old_version,
+        path: record.old_path,
+        source: record.old_source,
+    };
+    // 恢复不能仅相信本地标记：旧来源仍须匹配完整历史配方，当前原生注册和来源须已是目标完整树。
+    validate_owned_source(&old, source_root)?;
+    let current = installed_plugin(root)?.ok_or_else(invalid_tree)?;
+    if current.version != PLUGIN_VERSION
+        || current.source.canonicalize()? != source_root.join(PLUGIN_VERSION).canonicalize()?
+    {
+        return Err(invalid_tree());
+    }
+    validate_expected_tree(&current.source, PLUGIN_VERSION)?;
+    let expected = startup_bridge_files_for_plugin(root, executable, node, &old)?;
+    if format!("{:x}", Sha256::digest(&expected[1].1)) != record.old_json_sha256 {
+        return Err(invalid_tree());
+    }
+    Ok(Some((bytes, expected[1].1.clone())))
+}
+
+fn capture_startup_bridge(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+) -> io::Result<Option<Vec<u8>>> {
+    let files = startup_bridge_files(root, executable, node)?;
+    if files.iter().all(|(path, _)| matches!(fs::symlink_metadata(path), Err(error) if error.kind() == io::ErrorKind::NotFound)) {
+        return Ok(None);
+    }
+    plain_directory(&root.join("hooks"))?;
+    if bridge_file_matches(&files[1].0, &files[1].1)?
+        && (bridge_file_matches(&files[0].0, &files[0].1)?
+            || legacy_startup_bridge_matches(&files)?)
+    {
+        return Ok(Some(files[1].1.clone()));
+    }
+    Err(invalid_tree())
+}
+
+fn migrate_startup_bridge(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+    previous_json: &[u8],
+) -> io::Result<()> {
+    let files = startup_bridge_files(root, executable, node)?;
+    let directory = root.join("hooks");
+    plain_directory(&directory)?;
+    if bridge_file_matches(&files[1].0, &files[1].1)? {
+        return install_startup_bridge(root, executable, node);
+    }
+    let old_files = [
+        (files[0].0.clone(), files[0].1.clone()),
+        (files[1].0.clone(), previous_json.to_vec()),
+    ];
+    if !bridge_file_matches(&files[1].0, previous_json)?
+        || !(bridge_file_matches(&files[0].0, &files[0].1)?
+            || legacy_startup_bridge_matches(&old_files)?)
+    {
+        return Err(invalid_tree());
+    }
+    if previous_json != files[1].1 {
+        let digest = format!("{:x}", Sha256::digest(previous_json));
+        let backup = files[1].0.with_extension(format!("json.{digest}.previous"));
+        if !bridge_file_matches(&backup, previous_json)? {
+            let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+            temporary.write_all(previous_json)?;
+            temporary.as_file().sync_all()?;
+            temporary
+                .persist_noclobber(&backup)
+                .map_err(|error| error.error)?;
+        }
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+        temporary.write_all(&files[1].1)?;
+        temporary.as_file().sync_all()?;
+        if !plugin_enabled(root)?
+            || !bridge_file_matches(&files[1].0, previous_json)?
+            || !(bridge_file_matches(&files[0].0, &files[0].1)?
+                || legacy_startup_bridge_matches(&old_files)?)
+        {
+            return Err(invalid_tree());
+        }
+        // 新 JSON 仍可由已知旧 Mac 脚本消费；中断后“新 JSON＋旧脚本”可由常规修复继续。
+        temporary
+            .persist(&files[1].0)
+            .map_err(|error| error.error)?;
+    }
+    install_startup_bridge(root, executable, node)
+}
+
+fn install_startup_bridge(root: &Path, executable: &Path, node: &Path) -> io::Result<()> {
+    let files = startup_bridge_files(root, executable, node)?;
+    let directory = root.join("hooks");
+    match fs::create_dir(&directory) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(error),
+    }
+    plain_directory(&directory)?;
+    // 整组先检查所有同名内容；用户文件和链接一律拒绝，不借安装替换未知内容。
+    let upgrade_legacy = legacy_startup_bridge_matches(&files)?;
+    for (index, (path, expected)) in files.iter().enumerate() {
+        if fs::symlink_metadata(path).is_ok()
+            && !bridge_file_matches(path, expected)?
+            && !(index == 0 && upgrade_legacy)
+        {
+            return Err(invalid_tree());
+        }
+    }
+    if upgrade_legacy {
+        // 先保留已核验原字节；同名备份存在未知内容时也不覆盖。
+        let original = fs::read(&files[0].0)?;
+        let backup = files[0].0.with_extension("cjs.previous");
+        if !bridge_file_matches(&backup, &original)? {
+            let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+            temporary.write_all(&original)?;
+            temporary.as_file().sync_all()?;
+            temporary
+                .persist_noclobber(&backup)
+                .map_err(|error| error.error)?;
+        }
+    }
+    // 先发布脚本，最后原子发布原生 JSON；并发创建不能覆盖对方内容。
+    for (index, (path, contents)) in files.iter().enumerate() {
+        if bridge_file_matches(&path, &contents)? {
+            continue;
+        }
+        if !plugin_enabled(root)? {
+            return Err(invalid_tree());
+        }
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+        temporary.write_all(&contents)?;
+        temporary.as_file().sync_all()?;
+        if index == 0 && upgrade_legacy {
+            // 写入前重新核对完整旧组，不能把并发用户修改当作已知版本升级。
+            if !legacy_startup_bridge_matches(&files)? || !plugin_enabled(root)? {
+                return Err(invalid_tree());
+            }
+            temporary.persist(path).map_err(|error| error.error)?;
+        } else {
+            temporary
+                .persist_noclobber(path)
+                .map_err(|error| error.error)?;
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PluginFile {
     contents: Vec<u8>,
@@ -599,7 +1134,7 @@ fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
 
 fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
     let tree = plugin_tree(root, false)?;
-    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2") && version != PLUGIN_VERSION {
+    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3") && version != PLUGIN_VERSION {
         return Err(invalid_tree());
     }
     for (name, expected) in BUNDLED_FILES {
@@ -627,6 +1162,11 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
             ("0.1.1", "hooks/notify.cjs") => digest == LEGACY_011_NOTIFY_SHA256,
             ("0.1.0" | "0.1.1", "hooks/hooks.json") => digest == LEGACY_HOOKS_SHA256,
             ("0.1.2", name) => LEGACY_012_SHA256
+                .iter()
+                .any(|(expected_name, expected_digest)| {
+                    name == *expected_name && digest == *expected_digest
+                }),
+            ("0.1.3", name) => LEGACY_013_SHA256
                 .iter()
                 .any(|(expected_name, expected_digest)| {
                     name == *expected_name && digest == *expected_digest

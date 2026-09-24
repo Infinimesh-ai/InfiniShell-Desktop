@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "scope": "V10 GUI Grok 继承模式首轮完成后断连，原始失败",
+  "passed": false,
+  "task": {
+    "task_id": "6f116a83-f94a-488e-a940-aab997ca7267",
+    "native_session_id": "01a0d21f-ca82-72f1-9dd9-88f543933813",
+    "generation": 1,
+    "revision": 6,
+    "state": "completed",
+    "result": "MAPLE72 FIRST_OK"
+  },
+  "gui_sha256": "2789316494e5bfd259be8196c21ec3f0757646db9060bcd6e64e05df8499441f",
+  "native_version": "1.0.41",
+  "native_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+  "model_inputs_sent": 1,
+  "successful_turns": 1,
+  "tools": 0,
+  "disconnect_reasons": [
+    "CLI protocol error: invalid Grok command catalog metadata"
+  ],
+  "host_exit": {
+    "version": 2,
+    "runtime_generation": "b874d8b6-53a3-465a-8580-900afd4ec826",
+    "host_instance_id": "08a14f2e-8f72-42fe-977a-ce274aae8cc8",
+    "manifest_sha256": "d66e866551a00b42bbca78117dc2fc6e8f7bafa0c1d15ffc289f683b76f52390",
+    "journal_sha256": "7ea403ef0a8b5197d9e198bec810a40c6a14bc21aabe0bf976e56d812ab22690",
+    "last_event_sequence": 13,
+    "acknowledged_sequence": 12,
+    "native_process": "exited",
+    "native_cleanup_sha256": "2075236b0bb6e5a100cac6de242b8b97604892fb17329a981f2929d5196b9bbc",
+    "adapter_task_terminated": true,
+    "adapter_succeeded": false,
+    "event_journal_completed": true
+  },
+  "journal_sha256": "adbf2445c6e549763b03f3262a04ba660f24224e5988d5d0dc38d186ff9d065c",
+  "raw_catalog_frame_recorded": false,
+  "diagnosis": "官方源码三个可选元数据字段分别产生；本次 skills_reload 发生在首轮完成后，字段组合根因为源码与时序推断，未声称读取原始目录帧",
+  "original_failure_preserved": true
+}

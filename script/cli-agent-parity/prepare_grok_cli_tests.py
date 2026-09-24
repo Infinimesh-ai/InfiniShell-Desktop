@@ -77,6 +77,16 @@ class FixedGrokInputsTests(unittest.TestCase):
             self.assertEqual(actual["native_version_verified"], target == "darwin-arm64")
             self.assertEqual(actual["target_executed"], target == "darwin-arm64")
 
+    def test_fixed_1041_is_explicit_and_keeps_the_1040_baseline(self):
+        self.assertEqual(grok.VERSION, "1.0.40")
+        self.assertEqual(grok.VERSION_OUTPUTS["1.0.41"], "grok 1.0.41 (4220f3b224a6)")
+        self.assertEqual(grok.releases_for("1.0.41")["linux-x64"],
+                         ("grok-1.0.41-linux-x86_64", "grok", 165967424,
+                          "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"))
+        self.assertEqual(grok.releases_for("1.0.41")["win32-x64"],
+                         ("grok-1.0.41-windows-x86_64.exe", "grok.exe", 154082120,
+                          "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25"))
+
     def test_binary_architecture_uses_actual_headers(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "binary"

@@ -1,0 +1,135 @@
+{
+  "agent": "codex",
+  "source": "isolated_product_terminal_log",
+  "cases": {
+    "local": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 2,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T03:19:58Z",
+          "native_session_sha256": "65ada4ebcf9f3f1c8e517e1ee3c1fb4f747cfa040e94c5f8dca8115eb18b053b",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:19:58Z",
+          "native_session_sha256": "65ada4ebcf9f3f1c8e517e1ee3c1fb4f747cfa040e94c5f8dca8115eb18b053b",
+          "turn_sha256": "f353124e5b3cb31eb8c2798f609c2f41f495f4fda2ee54dcca2f4a1b62e66342"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:19:59Z",
+          "native_session_sha256": "65ada4ebcf9f3f1c8e517e1ee3c1fb4f747cfa040e94c5f8dca8115eb18b053b",
+          "turn_sha256": "f353124e5b3cb31eb8c2798f609c2f41f495f4fda2ee54dcca2f4a1b62e66342"
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:21:48Z",
+          "native_session_sha256": "65ada4ebcf9f3f1c8e517e1ee3c1fb4f747cfa040e94c5f8dca8115eb18b053b",
+          "turn_sha256": "729cdffedb95273d659a55d05499860652e5dde96443c5f49471104eca5b784c"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:21:49Z",
+          "native_session_sha256": "65ada4ebcf9f3f1c8e517e1ee3c1fb4f747cfa040e94c5f8dca8115eb18b053b",
+          "turn_sha256": "729cdffedb95273d659a55d05499860652e5dde96443c5f49471104eca5b784c"
+        }
+      ]
+    },
+    "direct": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    },
+    "tmux-on": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 2,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T03:29:35Z",
+          "native_session_sha256": "292a6b3cd60bd4cdb4ff822e317ca0790c4bb74001f864447198d3ba34606029",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:29:35Z",
+          "native_session_sha256": "292a6b3cd60bd4cdb4ff822e317ca0790c4bb74001f864447198d3ba34606029",
+          "turn_sha256": "208db4105dcc87d0129b3d1e1addb7f4e85201f42956f15299354902dcceef70"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:29:37Z",
+          "native_session_sha256": "292a6b3cd60bd4cdb4ff822e317ca0790c4bb74001f864447198d3ba34606029",
+          "turn_sha256": "208db4105dcc87d0129b3d1e1addb7f4e85201f42956f15299354902dcceef70"
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:30:33Z",
+          "native_session_sha256": "292a6b3cd60bd4cdb4ff822e317ca0790c4bb74001f864447198d3ba34606029",
+          "turn_sha256": "0c80acd5f80d5f20fe70d92f41ffc81f8f4309e153e7b41ab7571a410d20b9b8"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:30:34Z",
+          "native_session_sha256": "292a6b3cd60bd4cdb4ff822e317ca0790c4bb74001f864447198d3ba34606029",
+          "turn_sha256": "0c80acd5f80d5f20fe70d92f41ffc81f8f4309e153e7b41ab7571a410d20b9b8"
+        }
+      ]
+    },
+    "tmux-off": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    }
+  },
+  "log_bytes": 367383,
+  "log_sha256": "364eb3b461066330bdc15dfbc088c832d5233851dec9153f651bc4724a56873c",
+  "raw_payloads_included": false,
+  "different_os_host_verified": false,
+  "model_response_content_verified": false,
+  "native_inner_recordings": {
+    "tmux-on": {
+      "events": {},
+      "native_session_count": 0,
+      "native_session_sha256": [],
+      "bytes": 51840,
+      "sha256": "f63bb9db52b453f90ca0cba051d357ec0dc52025359590436c982d17def3785c",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false
+    },
+    "tmux-off": {
+      "events": {},
+      "native_session_count": 0,
+      "native_session_sha256": [],
+      "bytes": 8170,
+      "sha256": "14acc9f2343b87fc9102f734c041b19059811b06d22725650da909327d358885",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false
+    }
+  }
+}

@@ -392,16 +392,46 @@ tool = "write"
                 12345, profile["sha256"])
             self.assertIn(profile["sha256"], wrapper.read_text())
 
+    def test_formal_root_acceptance_requires_exact_version_and_no_candidate_gates(self):
+        events = acceptance_fixture()
+        events[0].update({"official_grok_model_tested": True, "public_product_gate_open": True,
+            "production_root": True, "test_only_current_candidate_gate": False})
+        events.append({"event": "acceptance_started", "verified_scope": "production_root-1.0.41",
+            "production_root": True, "production_connect_protocol": True,
+            "public_product_gate_open": True, "test_only_current_candidate_gate": False})
+        ready = {"event": "session_ready", "verified_cli_version": "1.0.41",
+            "current_model_id": "grok-4.7", "native_session_id": "native-session",
+            "production_root": True, "public_product_gate_open": True,
+            "permission_policy": "Inherit", "permission_enforcement_verified": False}
+        events.extend([dict(ready), dict(ready)])
+        output = "test result: ok. 1 passed; 0 failed; 0 ignored;"
+        self.assertTrue(shared.verified_acceptance(0, output, events, official=True, production_root=True))
+        self.assertFalse(shared.verified_acceptance(0, output, events, official=True))
+        for offset, key, value in ((-1, "verified_cli_version", "1.0.40"),
+                (-1, "native_session_id", "another-session"),
+                (-1, "current_model_id", "unverified-model"),
+                (-1, "permission_enforcement_verified", True),
+                (-3, "test_only_current_candidate_gate", True),
+                (-3, "production_connect_protocol", False),
+                (0, "public_product_gate_open", False)):
+            with self.subTest(key=key):
+                changed = [dict(event) for event in events]
+                changed[offset][key] = value
+                self.assertFalse(shared.verified_acceptance(0, output, changed,
+                    official=True, production_root=True))
+        self.assertFalse(shared.verified_acceptance(0, output, events[:-1],
+            official=True, production_root=True))
+
     def test_current_root_profile_pins_exact_binary_model_and_full_root_lifecycle(self):
         profile = PROFILES[CURRENT_ROOT_PROFILE]
-        self.assertEqual(profile["version"], "grok 1.0.40 (eb1a2256660d)")
+        self.assertEqual(profile["version"], "grok 1.0.41 (4220f3b224a6)")
         self.assertEqual(
             profile["sha256"],
-            "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2",
+            "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
         )
         self.assertEqual(profile["model"], "grok-4.7")
         self.assertEqual(profile["max_acp_inputs"], 8)
-        self.assertFalse(profile["public_product_gate_open"])
+        self.assertTrue(profile["public_product_gate_open"])
         self.assertTrue(profile["test_name"].endswith("real_grok_current_root_lifecycle"))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -423,7 +453,7 @@ tool = "write"
             root = Path(directory)
             test_binary = root / "test-binary"
             supervisor = root / "supervisor"
-            target = root / "grok-1.0.40"
+            target = root / "grok-1.0.41"
             for path in (test_binary, supervisor, target):
                 path.write_bytes(b"fixture")
             formal = root / "grok"

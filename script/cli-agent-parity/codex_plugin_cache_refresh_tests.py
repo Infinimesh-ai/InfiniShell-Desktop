@@ -472,28 +472,36 @@ class BackgroundRefreshWaitTests(unittest.TestCase):
             self.assertFalse(observed['revision_matches_expected'])
             self.assertNotIn(secret, json.dumps(observed))
 
-    def test_current_release_uses_exact_installed_marketplace_metadata(self):
+    def test_current_releases_use_exact_installed_marketplace_metadata(self):
+        for version in ('0.155.1', '0.156.1'):
+            with tempfile.TemporaryDirectory() as temporary:
+                home = Path(temporary)
+                cache, expected = self.files(home, True, False)
+                marketplace = home / 'marketplace'
+                marketplace.mkdir()
+                metadata = {'source_type': 'git', 'source': probe.UPSTREAM_URL,
+                            'ref_name': probe.PLUGIN_COMMIT, 'sparse_paths': [],
+                            'revision': probe.PLUGIN_COMMIT}
+                (marketplace / '.codex-marketplace-install.json').write_text(
+                    json.dumps(metadata), encoding='utf-8')
+                self.assertTrue(probe.background_refresh_published(
+                    cache, expected, home, marketplace, version))
+                observed = probe.background_refresh_snapshot(
+                    cache, expected, home, marketplace, version)
+                self.assertEqual(observed['revision_provenance'], 'installed_marketplace_metadata')
+                self.assertTrue(observed['marketplace_contract_matches_expected'])
+                metadata['source'] = 'https://example.invalid/replaced.git'
+                (marketplace / '.codex-marketplace-install.json').write_text(
+                    json.dumps(metadata), encoding='utf-8')
+                self.assertFalse(probe.background_refresh_published(
+                    cache, expected, home, marketplace, version))
+
+    def test_unverified_version_cannot_infer_marketplace_metadata_contract(self):
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
-            cache, expected = self.files(home, True, False)
-            marketplace = home / 'marketplace'
-            marketplace.mkdir()
-            metadata = {'source_type': 'git', 'source': probe.UPSTREAM_URL,
-                        'ref_name': probe.PLUGIN_COMMIT, 'sparse_paths': [],
-                        'revision': probe.PLUGIN_COMMIT}
-            (marketplace / '.codex-marketplace-install.json').write_text(
-                json.dumps(metadata), encoding='utf-8')
-            self.assertTrue(probe.background_refresh_published(
-                cache, expected, home, marketplace, '0.155.1'))
-            observed = probe.background_refresh_snapshot(
-                cache, expected, home, marketplace, '0.155.1')
-            self.assertEqual(observed['revision_provenance'], 'installed_marketplace_metadata')
-            self.assertTrue(observed['marketplace_contract_matches_expected'])
-            metadata['source'] = 'https://example.invalid/replaced.git'
-            (marketplace / '.codex-marketplace-install.json').write_text(
-                json.dumps(metadata), encoding='utf-8')
-            self.assertFalse(probe.background_refresh_published(
-                cache, expected, home, marketplace, '0.155.1'))
+            for version in ('0.156.2', '0.156.1-alpha', ''):
+                with self.subTest(version=version), self.assertRaisesRegex(ValueError, '受控来源'):
+                    probe.marketplace_revision_evidence(home, home, version)
 
 
 if __name__ == '__main__':

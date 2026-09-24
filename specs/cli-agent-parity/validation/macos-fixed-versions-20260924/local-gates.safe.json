@@ -1,0 +1,240 @@
+{
+  "platform": "macOS arm64",
+  "source_snapshot_sha256": "c3c4b121577f0a04a1aad341ec905431defbcff9223512a476b22cf277f91471",
+  "recovery_source_gates": [
+    {
+      "step": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "--features",
+        "local_cli_managed_tasks",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "seconds": 147.72,
+      "log": "/private/tmp/cli-parity-mac-recovery-i18n-20260924.log",
+      "log_sha256": "286e1f24914856a19ec8e9fe353e3c7183e417e684899966c9fec49d994401ea"
+    },
+    {
+      "step": "runtime",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--features",
+        "local_cli_managed_tasks",
+        "-E",
+        "test(ai::cli_agent_runtime::grok::tests) | test(ai::cli_agent_runtime::coordinator::tests) | test(ai::cli_agent_runtime::runtime_host::tests)"
+      ],
+      "exit_code": 0,
+      "seconds": 64.35,
+      "log": "/private/tmp/cli-parity-mac-recovery-runtime-20260924.log",
+      "log_sha256": "c72356546509af930746e988b76df216c2cbfb3a90a6af379ab6f11cdb63c09d"
+    },
+    {
+      "step": "app",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "warp",
+        "--bin",
+        "infinishell",
+        "--features",
+        "local_cli_managed_tasks"
+      ],
+      "exit_code": 0,
+      "seconds": 106.68,
+      "log": "/private/tmp/cli-parity-mac-recovery-app-20260924.log",
+      "log_sha256": "8d313e6d9cdba0222ccf726229e4b319011c7cf862ef984474d04c714b05a084"
+    },
+    {
+      "step": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "seconds": 61.34,
+      "log": "/private/tmp/cli-parity-mac-recovery-check-20260924.log",
+      "log_sha256": "05179d8d6e9b519213aaec64effe266f3ddbd330764537937d77680c3aed1333"
+    },
+    {
+      "step": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 14.53,
+      "log": "/private/tmp/cli-parity-mac-recovery-fmt-20260924.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "step": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.09,
+      "log": "/private/tmp/cli-parity-mac-recovery-diff-20260924.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "recovery_test_counts": {
+    "i18n": 11,
+    "grok_coordinator_runtime_host": 272
+  },
+  "preceding_focused_gates": [
+    {
+      "step": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "--features",
+        "local_cli_managed_tasks",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "seconds": 143.02,
+      "log": "/private/tmp/cli-parity-mac-final-i18n-20260924.log",
+      "log_sha256": "f96536b207b7c43261ead6fbd33398b4badea35da772755e7de4d44f62a10df0"
+    },
+    {
+      "step": "focused",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--features",
+        "local_cli_managed_tasks",
+        "-E",
+        "test(ai::cli_agent_runtime::task_manager_view::tests) | test(ai::cli_agent_runtime::grok::tests) | test(ai::cli_agent_runtime::permissions::tests) | test(ai::cli_agent_runtime::codex::tests) | test(ai::cli_agent_runtime::claude::tests) | test(ai::cli_agent_runtime::claude::profile_preflight::tests) | test(terminal::cli_agent_sessions::plugin_manager::notification_patch::tests) | test(terminal::cli_agent_sessions::plugin_manager::grok::tests) | test(terminal::cli_agent_updates::sources::tests)"
+      ],
+      "exit_code": 0,
+      "seconds": 9.63,
+      "log": "/private/tmp/cli-parity-mac-final-focused-20260924.log",
+      "log_sha256": "c6a007a0e2d4c4443d490e7d39601711c9b1cf874efb1bcb7021677acf780ff5"
+    },
+    {
+      "step": "app",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "warp",
+        "--bin",
+        "infinishell",
+        "--features",
+        "local_cli_managed_tasks"
+      ],
+      "exit_code": 0,
+      "seconds": 107.43,
+      "log": "/private/tmp/cli-parity-mac-final-app-20260924.log",
+      "log_sha256": "dc722a04edef87e752e53e28db80b4425ee63f632832186d1efc3c9453d61437"
+    },
+    {
+      "step": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "seconds": 134.92,
+      "log": "/private/tmp/cli-parity-mac-final-check-20260924.log",
+      "log_sha256": "75a5bb0ec6c07980c10aa8dcb95a60da37d6a79322c81201b71b67cdada2d440"
+    },
+    {
+      "step": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 14.24,
+      "log": "/private/tmp/cli-parity-mac-final-fmt-20260924.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "step": "diff",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.07,
+      "log": "/private/tmp/cli-parity-mac-final-diff-20260924.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "preceding_focused_count": 541,
+  "preceding_focused_source_is_final": false,
+  "python_gates": [
+    {
+      "test": "codex_adapter_runner_tests.py",
+      "exit_code": 0,
+      "seconds": 0.18,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/final-codex_adapter_runner_tests.py.log",
+      "log_sha256": "084be0b897fc080ce8a21f517058490226856a5e50e6ac80365344d8d3872bf6"
+    },
+    {
+      "test": "claude_coordinator_runner_tests.py",
+      "exit_code": 0,
+      "seconds": 0.69,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/final-claude_coordinator_runner_tests.py.log",
+      "log_sha256": "c915c7d0bd9692ccd7c6f011e3ff23aaa8e7673ec727e1865113f66d3b1c35e3"
+    },
+    {
+      "test": "grok_official_adapter_runner_tests.py",
+      "exit_code": 0,
+      "seconds": 2.17,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/final-grok_official_adapter_runner_tests.py.log",
+      "log_sha256": "d85390ebec5c73618f664a04ca866bc59ec1793a5d69f3c4ccc7ddffa7dcde6b"
+    },
+    {
+      "test": "notification_patch_tests.py",
+      "exit_code": 0,
+      "seconds": 0.35,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/final-notification_patch_tests.py.log",
+      "log_sha256": "b9d7d75b3c1840b2c39049da04548f400a3333f0bbb919552d3a9909f84a1258"
+    }
+  ],
+  "python_counts": {
+    "codex_adapter_runner": 22,
+    "claude_coordinator_runner": 70,
+    "grok_official_adapter_runner": 26,
+    "notification_patch": 20
+  },
+  "counts_overlap_do_not_sum": true,
+  "full_workspace_tests": false,
+  "cross_platform_ci_dispatched": false,
+  "source_manifest_verified_after_gui": true
+}

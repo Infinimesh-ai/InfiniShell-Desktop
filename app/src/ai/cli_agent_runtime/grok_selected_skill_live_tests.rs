@@ -94,12 +94,69 @@ fn composed_prompt(context: &Path) -> String {
     )
 }
 
+// 完整历史已由生产终态校验；恢复后的本轮工具与输入仍须按原生回合边界核对。
+fn selected_skill_turn_history<'a>(
+    updates: &'a [Value],
+    session: &str,
+    turn: &str,
+) -> Result<&'a [Value], String> {
+    let mut completions = updates.iter().enumerate().filter(|(_, row)| {
+        row["method"] == "_x.ai/session/update"
+            && row["params"]["update"]["sessionUpdate"] == "turn_completed"
+            && row["params"]["update"]["prompt_id"] == turn
+    });
+    let (end, _) = completions.next().ok_or("技能回放缺少本轮终态")?;
+    if completions.next().is_some() {
+        return Err("技能回放重复本轮终态".into());
+    }
+    let first = updates[..end]
+        .iter()
+        .position(|row| row["params"]["_meta"]["promptId"] == turn)
+        .ok_or("技能回放缺少本轮事件")?;
+    let start = updates[..first]
+        .iter()
+        .rposition(|row| {
+            row["method"] == "session/update"
+                && row["params"]["update"]["sessionUpdate"] == "user_message_chunk"
+        })
+        .ok_or("技能回放缺少本轮原始输入")?;
+    for (index, row) in updates.iter().enumerate() {
+        let params = &row["params"];
+        let update = &params["update"];
+        let prompt = params["_meta"].get("promptId");
+        if !(start..=end).contains(&index) {
+            if prompt == Some(&json!(turn)) {
+                return Err("技能回放本轮事件跨越输入或终态边界".into());
+            }
+            continue;
+        }
+        if params["sessionId"] != session
+            || prompt.is_some_and(|id| id != turn)
+            || (update["sessionUpdate"] == "user_message_chunk" && index != start)
+            || (update["sessionUpdate"] == "turn_completed" && index != end)
+            || (matches!(
+                update["sessionUpdate"].as_str(),
+                Some(
+                    "agent_message_chunk"
+                        | "agent_thought_chunk"
+                        | "tool_call"
+                        | "tool_call_update"
+                )
+            ) && prompt != Some(&json!(turn)))
+        {
+            return Err("技能回放混入其它会话、回合或未绑定事件".into());
+        }
+    }
+    Ok(&updates[start..=end])
+}
+
 async fn exercise(
     root: &Path,
     mode: &str,
     test_candidate_1041: bool,
+    resumed_session: Option<String>,
     file: &mut File,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let before = fs::read_to_string(root.join(SKILL_PATH)).map_err(|_| "技能夹具不可读")?;
     let sentinel = sentinel_from_skill(&before)?;
     let context_before =
@@ -136,7 +193,11 @@ async fn exercise(
             .canonicalize()
             .map_err(|_| "缺少隔离项目")?,
         state_dir: state_dir.clone(),
-        target: SessionTarget::New,
+        target: resumed_session
+            .clone()
+            .map_or(SessionTarget::New, |native_session_id| {
+                SessionTarget::Resume { native_session_id }
+            }),
         generation,
         permission_policy: PermissionPolicy::Inherit,
         permission_ceiling: None,
@@ -167,6 +228,14 @@ async fn exercise(
         ));
     }
     protocol.catalog_direct_for_live = mode == "direct_catalog";
+    if mode == "leader_resume" {
+        assert!(
+            !protocol.current_root_candidate_for_live
+                && !protocol.current_selected_skill_candidate_for_live
+                && !protocol.test_only_1041_profile
+                && !protocol.catalog_direct_for_live
+        );
+    }
     // 完整组合保留生产 argv；目录直连对照仅在本测试标记下覆盖入口。
     let catalog = SkillCatalogProbe::new(skill_path.clone());
     protocol.skill_catalog_for_live = Some(catalog.clone());
@@ -203,13 +272,26 @@ async fn exercise(
                 return Err("收到旧连接事件".into());
             }
             if let Some(id) = event.native_session_id {
-                if Uuid::parse_str(&id).is_err() || session.as_ref().is_some_and(|old| old != &id) {
+                if Uuid::parse_str(&id).is_err()
+                    || session.as_ref().is_some_and(|old| old != &id)
+                    || resumed_session
+                        .as_ref()
+                        .is_some_and(|expected| expected != &id)
+                {
                     return Err("会话身份改变".into());
                 }
                 session = Some(id);
             }
             match event.kind {
-                RuntimeEventKind::SessionReady { .. } => {
+                RuntimeEventKind::SessionReady {
+                    verified_cli_version,
+                    ..
+                } => {
+                    if mode == "leader_resume"
+                        && verified_cli_version.as_deref() != Some(super::ROOT_VERSION)
+                    {
+                        return Err("正式技能恢复版本回执不匹配".into());
+                    }
                     if submitted != 0 || session.is_none() {
                         return Err("重复或无身份初始化".into());
                     }
@@ -351,6 +433,11 @@ async fn exercise(
                     let updates = snapshot.replay["updates"]
                         .as_array()
                         .ok_or("最终回放无事件")?;
+                    let updates = selected_skill_turn_history(
+                        updates,
+                        session.as_deref().ok_or("缺少会话")?,
+                        &turn_id,
+                    )?;
                     (tool_count, skill_read_count) = verify_skill_read_history(
                         updates,
                         &cwd,
@@ -475,9 +562,56 @@ async fn exercise(
         "project_snapshot_unchanged":skill_unchanged,"full_cli_parity_acceptance_passed":false}),
     )?;
     if passed || catalog_handshake_verified {
-        Ok(())
+        session.ok_or_else(|| "技能验收没有原生会话".into())
     } else {
         Err("默认入口技能组合验收未通过".into())
+    }
+}
+
+#[test]
+fn selected_skill_resume_history_requires_one_bound_turn() {
+    let history = json!([
+        {"method":"session/update","params":{"sessionId":"session","update":{"sessionUpdate":"user_message_chunk"}}},
+        {"method":"session/update","params":{"sessionId":"session","_meta":{"promptId":"old"},"update":{"sessionUpdate":"tool_call"}}},
+        {"method":"_x.ai/session/update","params":{"sessionId":"session","update":{"sessionUpdate":"turn_completed","prompt_id":"old"}}},
+        {"method":"session/update","params":{"sessionId":"session","update":{"sessionUpdate":"user_message_chunk"}}},
+        {"method":"session/update","params":{"sessionId":"session","_meta":{"promptId":"current"},"update":{"sessionUpdate":"tool_call"}}},
+        {"method":"session/update","params":{"sessionId":"session","_meta":{"promptId":"current"},"update":{"sessionUpdate":"tool_call_update"}}},
+        {"method":"_x.ai/session/update","params":{"sessionId":"session","update":{"sessionUpdate":"turn_completed","prompt_id":"current"}}}
+    ]);
+    let rows = history.as_array().unwrap();
+    assert_eq!(
+        selected_skill_turn_history(rows, "session", "current").unwrap(),
+        &rows[3..]
+    );
+    assert_eq!(
+        selected_skill_turn_history(rows, "session", "old").unwrap(),
+        &rows[..3]
+    );
+    for mutation in [
+        "session",
+        "turn",
+        "missing_turn",
+        "input",
+        "completion",
+        "late",
+    ] {
+        let mut changed = rows.clone();
+        match mutation {
+            "session" => changed[5]["params"]["sessionId"] = json!("other"),
+            "turn" => changed[5]["params"]["_meta"]["promptId"] = json!("old"),
+            "missing_turn" => changed[5]["params"]["_meta"] = json!({}),
+            "input" => {
+                changed.remove(3);
+            }
+            "completion" => changed.push(changed[6].clone()),
+            "late" => changed.push(changed[5].clone()),
+            value => panic!("未知测试变体：{value}"),
+        }
+        assert!(
+            selected_skill_turn_history(&changed, "session", "current").is_err(),
+            "{mutation}"
+        );
     }
 }
 
@@ -490,7 +624,7 @@ async fn authenticated_selected_skill_default_entry() {
     let mode = env::var("INFINISHELL_GROK_SELECTED_SKILL_MODE").expect("缺少入口类型");
     assert!(matches!(
         mode.as_str(),
-        "leader" | "sdk" | "leader_catalog" | "direct_catalog"
+        "leader" | "sdk" | "leader_catalog" | "direct_catalog" | "leader_resume"
     ));
     let test_candidate_1041 = env::var("INFINISHELL_GROK_TEST_CANDIDATE_1041").ok();
     assert!(
@@ -518,14 +652,27 @@ async fn authenticated_selected_skill_default_entry() {
     let artifact = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ARTIFACT").unwrap());
     assert_eq!(artifact, root.join("private-evidence.ndjson"));
     let mut file = File::create(artifact).unwrap();
-    let max_native_inputs = if mode.ends_with("_catalog") { 0 } else { 1 };
+    let max_native_inputs = if mode.ends_with("_catalog") {
+        0
+    } else if mode == "leader_resume" {
+        2
+    } else {
+        1
+    };
     record(&mut file, json!({"event":"selected_skill_started","scope":SCOPE,"case":mode,"max_native_inputs":max_native_inputs,
         "production_connect_path":true,"test_agent_profile_override":false,"fixture_project_trust":true,
         "typed_selected_skill":true,"secret_in_submitted_prompt":false,"credential_values_recorded":false})).unwrap();
-    assert!(
-        exercise(&root, &mode, test_candidate_1041.is_some(), &mut file)
+    let native_session = exercise(&root, &mode, test_candidate_1041.is_some(), None, &mut file)
+        .await
+        .expect("默认入口技能组合验收失败；请查安全投影");
+    if mode == "leader_resume" {
+        assert!(test_candidate_1041.is_none());
+        let restored = exercise(&root, &mode, false, Some(native_session.clone()), &mut file)
             .await
-            .is_ok(),
-        "默认入口技能组合验收失败；请查安全投影"
-    );
+            .expect("正式单技能冷恢复验收失败；请查安全投影");
+        assert_eq!(native_session, restored);
+        record(&mut file, json!({"event":"selected_skill_resume_confirmed", "scope":SCOPE,
+            "case":mode, "same_native_session":true, "native_session_sha256":hash(native_session.as_bytes()),
+            "verified_cli_version":super::ROOT_VERSION, "candidate_flags_used":false, "connections":2})).unwrap();
+    }
 }

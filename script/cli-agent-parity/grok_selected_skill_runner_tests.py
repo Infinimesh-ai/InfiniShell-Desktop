@@ -36,6 +36,43 @@ def evidence(mode="leader"):
 
 
 class SelectedSkillRunnerTests(unittest.TestCase):
+    def test_formal_resume_requires_both_real_skill_phases_and_exact_version(self):
+        first = evidence("leader_resume")
+        events = [*first, *copy.deepcopy(first[1:]), {
+            "event": "selected_skill_resume_confirmed", "scope": runner.SCOPE, "case": "leader_resume",
+            "same_native_session": True, "native_session_sha256": "c" * 64,
+            "verified_cli_version": "1.0.41", "candidate_flags_used": False, "connections": 2}]
+        result = runner.observation(0, events, "leader_resume", EXPECTED)
+        self.assertTrue(result["case_passed"])
+        self.assertTrue(result["cold_selected_skill_restore_verified"])
+        # 原生在输入后继续公布目录，不能把最后一帧误当作输入前唯一证据。
+        for index in (1, 3):
+            later = copy.deepcopy(events[index]["snapshots"][0])
+            later["before_first_submit"] = False
+            events[index]["snapshots"].append(later)
+        self.assertTrue(runner.observation(0, events, "leader_resume", EXPECTED)["case_passed"])
+        no_before = copy.deepcopy(events)
+        no_before[3]["snapshots"] = no_before[3]["snapshots"][1:]
+        self.assertFalse(runner.observation(0, no_before, "leader_resume", EXPECTED)["case_passed"])
+        for index, key, value in ((4, "cleanup_confirmed", False), (4, "native_context_read_count", 0),
+                (4, "final_response_sha256", "d" * 64), (5, "same_native_session", False),
+                (5, "candidate_flags_used", True), (5, "verified_cli_version", "1.0.40"),
+                (5, "connections", True)):
+            changed = copy.deepcopy(events); changed[index][key] = value
+            self.assertFalse(runner.observation(0, changed, "leader_resume", EXPECTED)["case_passed"])
+        self.assertFalse(runner.observation(0, events[:3], "leader_resume", EXPECTED)["case_passed"])
+
+    def test_formal_resume_cli_uses_two_input_budget_and_fixed_binary(self):
+        argv = ["run_grok_selected_skill.py", "--test-binary", "/private/tmp/test-binary",
+            "--grok", "/private/tmp/grok", "--supervisor", "/private/tmp/supervisor",
+            "--official-grok-home", "/private/tmp/official-home", "--output", "/private/tmp/result.ndjson",
+            "--mode", "leader_resume", "--max-native-inputs", "2"]
+        with mock.patch.object(sys, "argv", argv), mock.patch.object(runner.fixed, "validate_paths") as validate, \
+                mock.patch.object(runner, "run", return_value=0):
+            self.assertEqual(runner.main(), 0)
+        self.assertEqual(validate.call_args.kwargs["expected_sha256"], runner.CURRENT["sha256"])
+        self.assertEqual(validate.call_args.kwargs["max_native_inputs"], 2)
+
     def test_1041_candidate_refuses_any_model_input_before_creating_artifacts(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "result.ndjson"

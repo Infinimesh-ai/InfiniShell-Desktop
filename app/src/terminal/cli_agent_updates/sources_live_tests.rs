@@ -24,6 +24,7 @@ use super::{
     previous_failure_for_intent,
 };
 use crate::ai::cli_agent_runtime::managed_process::{self, ExitReason};
+use crate::features::FeatureFlag;
 use crate::terminal::cli_agent::CLIAgent;
 
 const SCOPE: &str = "cli_autoupdate_native_product";
@@ -115,6 +116,82 @@ struct Manifest {
     timeout_seconds: u64,
     #[serde(default)]
     config_transition: Option<ConfigTransition>,
+    #[serde(default)]
+    fixed_release_input: bool,
+    #[serde(default)]
+    test_only_target_candidate: bool,
+}
+
+tokio::task_local! {
+    static FIXED_RELEASE: (CLIAgent, Channel, String, bool);
+}
+
+pub(super) fn fixed_release(agent: CLIAgent, channel: Channel) -> Option<String> {
+    FIXED_RELEASE
+        .try_with(|(expected_agent, expected_channel, version, _)| {
+            (*expected_agent == agent
+                && (*expected_channel == Channel::FollowInstallation
+                    || *expected_channel == channel))
+                .then(|| version.clone())
+        })
+        .ok()
+        .flatten()
+}
+
+pub(super) fn fixed_target_candidate(agent: CLIAgent, version: &str) -> bool {
+    FIXED_RELEASE
+        .try_with(|(expected_agent, _, expected_version, candidate)| {
+            *candidate && *expected_agent == agent && expected_version == version
+        })
+        .unwrap_or(false)
+}
+
+fn fixed_candidate_allowed(manifest: &Manifest) -> bool {
+    if !manifest.test_only_target_candidate {
+        return true;
+    }
+    if !manifest.fixed_release_input {
+        return false;
+    }
+    let target = (
+        manifest.agent.as_str(),
+        manifest.target_version.as_str(),
+        manifest.target_binary.sha256.as_str(),
+    );
+    cfg!(target_os = "macos")
+        && matches!(
+            target,
+            (
+                "codex",
+                "0.156.1",
+                "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a"
+            ) | (
+                "claude",
+                "2.1.280",
+                "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d"
+            ) | (
+                "grok",
+                "1.0.41",
+                "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
+            )
+        )
+        || cfg!(all(target_os = "linux", target_arch = "x86_64"))
+            && matches!(
+                target,
+                (
+                    "codex",
+                    "0.156.1",
+                    "0b2e9301d6100dddda3b9d5c80ebaeaa3a2f1962388f2f36f6b96a9f08b1f33f"
+                ) | (
+                    "claude",
+                    "2.1.280",
+                    "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b"
+                ) | (
+                    "grok",
+                    "1.0.41",
+                    "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"
+                )
+            )
 }
 
 #[derive(Clone, Eq, PartialEq)]
@@ -146,6 +223,9 @@ struct Evidence {
     product_inspect_calls: u32,
     product_execute_calls: u32,
     model_inputs_sent: u32,
+    fixed_release_input: bool,
+    test_only_target_candidate: bool,
+    plugin_feature_flags_enabled_for_test: bool,
     credentials_provided: bool,
     private_environment_verified: bool,
     credential_files_absent_before: bool,
@@ -833,12 +913,23 @@ async fn wait_for_native_start(root: &Path, agent: CLIAgent) -> Result<uuid::Uui
     .map_err(|_| "native_start_timeout")?
 }
 
-async fn wait_for_confirmed_exit(root: &Path, generation: uuid::Uuid) -> Result<(), &'static str> {
+async fn wait_for_confirmed_exit(
+    root: &Path,
+    generation: uuid::Uuid,
+    agent: CLIAgent,
+) -> Result<(), &'static str> {
     let state = journal_root().map_err(|_| "state_unavailable")?;
     plain_path(root, &state)?;
+    let journal: Journal = serde_json::from_slice(
+        &fs::read(state.join(format!("{}.json", agent.command_prefix())))
+            .map_err(|_| "interrupted_journal_missing")?,
+    )
+    .map_err(|_| "interrupted_journal_invalid")?;
+    let binding = super::journal_binding(&journal).map_err(|_| "interrupted_binding_invalid")?;
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
-            match managed_process::confirmed_exit(&state, generation) {
+            // exit.json 先于摘要绑定回执落盘；等完整合同，不能把短暂缺失当作恢复失败。
+            match managed_process::confirmed_exit_with_binding(&state, generation, &binding) {
                 Ok(Some(receipt))
                     if receipt.containment != "not_started"
                         && matches!(
@@ -848,6 +939,7 @@ async fn wait_for_confirmed_exit(root: &Path, generation: uuid::Uuid) -> Result<
                 {
                     return Ok(());
                 }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Ok(Some(_)) | Err(_) => return Err("interrupted_exit_unconfirmed"),
                 Ok(None) => {
                     Timer::after(Duration::from_millis(10)).await;
@@ -913,7 +1005,7 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
         }
         task.abort();
         let _ = task.await;
-        wait_for_confirmed_exit(root, generation).await?;
+        wait_for_confirmed_exit(root, generation, agent).await?;
         Ok(manifest.old_version.clone())
     } else {
         execute(plan, None).await
@@ -1018,6 +1110,70 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "仅在已核验的私有原子升级夹具中准备真实插件；不接受凭据或模型输入"]
+async fn prepare_native_update_plugins_without_model() {
+    let path = PathBuf::from(
+        env::var_os("INFINISHELL_CLI_AUTOUPDATE_MANIFEST").expect("必须使用专用验收驱动"),
+    );
+    let bytes = private_file(&path, 0o600).expect("私有清单验证失败");
+    let manifest: Manifest = serde_json::from_slice(&bytes).expect("私有清单结构无效");
+    assert_eq!(manifest.schema, 1);
+    assert_eq!(manifest.scope, SCOPE);
+    assert!(fixed_candidate_allowed(&manifest));
+    let (agent, _) = agent_channel(&manifest).expect("渠道无效");
+    verify_environment(&manifest, &path).expect("隔离环境无效");
+    verify_build_binding(&manifest).expect("构建输入不符");
+    let _notifications = FeatureFlag::HOANotifications.override_enabled(true);
+    let _codex_notifications = FeatureFlag::CodexNotifications.override_enabled(true);
+    let _codex_plugin = FeatureFlag::CodexPlugin.override_enabled(true);
+    plain_path(&manifest.root, &manifest.old_binary.path).expect("原生文件越界");
+    assert_eq!(
+        manifest.entry.canonicalize().ok().as_ref(),
+        Some(&manifest.old_binary.path)
+    );
+    assert_eq!(
+        binary_sha(&manifest.entry).ok().as_deref(),
+        Some(manifest.old_binary.sha256.as_str())
+    );
+    let manager = super::plugin_manager_for(agent).expect("缺少插件安装器");
+    assert!(manager.install().await.is_ok(), "通知插件准备失败");
+    if !manager.is_platform_plugin_installed() || manager.platform_plugin_needs_update() {
+        assert!(
+            manager.install_platform_plugin().await.is_ok(),
+            "平台插件准备失败"
+        );
+    }
+    assert!(
+        super::plugin_compatibility(agent).is_some_and(super::PluginCompatibility::verified),
+        "真实插件完整性验证失败"
+    );
+    assert!(auth_absent(&manifest.root), "夹具出现认证文件");
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(manifest.root.join("plugin-preparation.safe.json"))
+        .expect("插件准备收据不可写");
+    serde_json::to_writer(
+        &mut file,
+        &serde_json::json!({
+            "scope": "real_plugin_preparation_for_atomic_update",
+            "agent": manifest.agent,
+            "manifest_sha256": sha(&bytes),
+            "worker_sha256": manifest.worker.sha256,
+            "passed": true,
+            "model_inputs_sent": 0,
+            "credentials_provided": false,
+            "plugin_compatibility_verified": true,
+            "plugin_feature_flags_enabled_for_test": true,
+            "cli_atomic_update_verified": false,
+        }),
+    )
+    .expect("插件准备收据写入失败");
+    file.sync_all().expect("插件准备收据持久化失败");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "仅由 verify_cli_autoupdate.py 显式授权私有原生升级；不接受凭据或模型输入"]
 async fn real_native_update_without_model() {
     // 所有失败只显示稳定阶段名；配置、环境值和原生命令输出均不写入测试日志。
@@ -1048,12 +1204,16 @@ async fn real_native_update_without_model() {
             && parse_version(&manifest.target_version).is_ok()
             && (manifest.old_version == manifest.target_version)
                 == (manifest.expected == "channel_only")
-            && transition_valid(&manifest),
+            && transition_valid(&manifest)
+            && fixed_candidate_allowed(&manifest),
         "清单取值无效"
     );
     agent_channel(&manifest).expect("渠道无效");
     verify_environment(&manifest, &path).expect("隔离环境无效");
     verify_build_binding(&manifest).expect("测试程序与监督程序必须来自同一已通过门禁的源码清单");
+    let _notifications = FeatureFlag::HOANotifications.override_enabled(true);
+    let _codex_notifications = FeatureFlag::CodexNotifications.override_enabled(true);
+    let _codex_plugin = FeatureFlag::CodexPlugin.override_enabled(true);
     assert!(under(&manifest.root, &manifest.entry), "入口越界");
     assert!(
         manifest.entry.is_symlink()
@@ -1122,6 +1282,9 @@ async fn real_native_update_without_model() {
         product_inspect_calls: 0,
         product_execute_calls: 0,
         model_inputs_sent: 0,
+        fixed_release_input: manifest.fixed_release_input,
+        test_only_target_candidate: manifest.test_only_target_candidate,
+        plugin_feature_flags_enabled_for_test: true,
         credentials_provided: false,
         private_environment_verified: true,
         credential_files_absent_before: true,
@@ -1147,7 +1310,23 @@ async fn real_native_update_without_model() {
         same_commit_verified_by_runner: false,
         failure_intent_persisted: false,
     };
-    let result = exercise(&manifest, &mut evidence).await;
+    let result = if manifest.fixed_release_input {
+        let (agent, channel) = agent_channel(&manifest).unwrap();
+        // 固定发行输入只在本次验收作用域内替代版本发现，消费者仍查询官方渠道。
+        FIXED_RELEASE
+            .scope(
+                (
+                    agent,
+                    channel,
+                    manifest.target_version.clone(),
+                    manifest.test_only_target_candidate,
+                ),
+                exercise(&manifest, &mut evidence),
+            )
+            .await
+    } else {
+        exercise(&manifest, &mut evidence).await
+    };
     evidence.failure_code = result.as_ref().err().copied();
     if let Ok(after) = config_snapshot(&manifest.root) {
         (
@@ -1239,6 +1418,8 @@ fn transition_fixture(
         bundle_report: binary(),
         timeout_seconds: 480,
         config_transition: transition,
+        fixed_release_input: false,
+        test_only_target_candidate: false,
     }
 }
 
@@ -1247,6 +1428,63 @@ fn snapshot(bytes: Option<&str>) -> ConfigSnapshot {
         bytes: bytes.map(|bytes| bytes.as_bytes().to_vec()),
         mode: bytes.map(|_| 0o600),
     }
+}
+
+#[tokio::test]
+async fn fixed_release_and_candidate_do_not_escape_the_authorized_test_scope() {
+    assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
+    assert!(!fixed_target_candidate(CLIAgent::Claude, "2.1.280"));
+    FIXED_RELEASE
+        .scope(
+            (
+                CLIAgent::Claude,
+                Channel::Latest,
+                "2.1.280".to_owned(),
+                true,
+            ),
+            async {
+                assert_eq!(
+                    fixed_release(CLIAgent::Claude, Channel::Latest).as_deref(),
+                    Some("2.1.280")
+                );
+                assert!(fixed_release(CLIAgent::Claude, Channel::Stable).is_none());
+                assert!(fixed_release(CLIAgent::Codex, Channel::Latest).is_none());
+                assert!(fixed_target_candidate(CLIAgent::Claude, "2.1.280"));
+                assert!(!fixed_target_candidate(CLIAgent::Claude, "2.1.281"));
+                assert!(!fixed_target_candidate(CLIAgent::Codex, "2.1.280"));
+            },
+        )
+        .await;
+    assert!(fixed_release(CLIAgent::Claude, Channel::Latest).is_none());
+    assert!(!fixed_target_candidate(CLIAgent::Claude, "2.1.280"));
+}
+
+#[test]
+fn fixed_candidate_rejects_unbound_version_digest_and_discovery_mode() {
+    let mut manifest = transition_fixture("claude", "latest", None);
+    manifest.target_version = "2.1.280".to_owned();
+    manifest.target_binary.sha256 =
+        "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d".to_owned();
+    manifest.fixed_release_input = true;
+    manifest.test_only_target_candidate = true;
+    assert_eq!(
+        fixed_candidate_allowed(&manifest),
+        cfg!(target_os = "macos")
+    );
+    manifest.target_binary.sha256 =
+        "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b".to_owned();
+    assert_eq!(
+        fixed_candidate_allowed(&manifest),
+        cfg!(all(target_os = "linux", target_arch = "x86_64"))
+    );
+    manifest.target_version = "2.1.281".to_owned();
+    assert!(!fixed_candidate_allowed(&manifest));
+    manifest.target_version = "2.1.280".to_owned();
+    manifest.fixed_release_input = false;
+    assert!(!fixed_candidate_allowed(&manifest));
+    manifest.fixed_release_input = true;
+    manifest.target_binary.sha256 = "b".repeat(64);
+    assert!(!fixed_candidate_allowed(&manifest));
 }
 
 #[test]

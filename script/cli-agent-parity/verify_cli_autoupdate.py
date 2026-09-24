@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import signal
@@ -32,6 +33,17 @@ AUTH_PATHS = ("home/.codex/auth.json", "home/.grok/auth.json", "home/.claude/.cr
 MANIFEST_KEYS = {"schema", "scope", "case_id", "root", "agent", "channel", "expected", "entry",
                  "old_version", "target_version", "old_binary", "target_binary", "worker",
                  "supervisor", "source_manifest", "gates_report", "bundle_report", "timeout_seconds"}
+FIXED_CANDIDATES = {
+    "codex": ("0.156.1", "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a"),
+    "claude": ("2.1.280", "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d"),
+    "grok": ("1.0.41", "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"),
+}
+LINUX_FIXED_CANDIDATES = {
+    "codex": ("0.156.1", "0b2e9301d6100dddda3b9d5c80ebaeaa3a2f1962388f2f36f6b96a9f08b1f33f"),
+    "claude": ("2.1.280", "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b"),
+    "grok": ("1.0.41", "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"),
+}
+
 BINDINGS = ("old_binary", "target_binary", "worker", "supervisor", "source_manifest", "gates_report", "bundle_report")
 REQUIRED_SOURCE_FILES = ("app/src/terminal/cli_agent_updates.rs",
     "app/src/terminal/cli_agent_updates/sources.rs",
@@ -58,7 +70,8 @@ BOOLS = {"passed", "credentials_provided", "private_environment_verified", "cred
          "entry_matches_expected", "post_version_matches", "journal_absent", "production_chain_verified",
          "same_source_build_verified", "same_commit_verified_by_runner", "config_transition_verified",
          "unrelated_config_bytes_unchanged", "config_permissions_preserved", "supervisor_generations_unchanged", "entry_unchanged",
-         "failure_intent_persisted"}
+         "failure_intent_persisted", "fixed_release_input", "test_only_target_candidate",
+         "plugin_feature_flags_enabled_for_test"}
 HASHES = {"manifest_sha256", "worker_sha256", "supervisor_sha256", "source_manifest_sha256", "old_sha256", "target_sha256"}
 COUNTERS = {"product_inspect_calls", "product_execute_calls", "model_inputs_sent", "config_files_checked"}
 EVENT_KEYS = BOOLS | HASHES | COUNTERS | {"schema", "scope", "case_id", "agent", "channel", "expected",
@@ -163,7 +176,10 @@ def valid_transition(transition, agent, channel, expected):
 
 
 def validate_manifest(value):
-    require(type(value) is dict and set(value) in (MANIFEST_KEYS, MANIFEST_KEYS | {"config_transition"}), "manifest_fields")
+    require(type(value) is dict and MANIFEST_KEYS <= set(value)
+            <= MANIFEST_KEYS | {"config_transition", "fixed_release_input", "test_only_target_candidate"}, "manifest_fields")
+    require(all(type(value.get(key, False)) is bool for key in ("fixed_release_input", "test_only_target_candidate")),
+            "fixed_release_flags")
     require(type(value["schema"]) is int and value["schema"] == 1 and value["scope"] == SCOPE, "manifest_schema")
     require(type(value["case_id"]) is str and re.fullmatch(r"[a-z0-9-]{1,64}", value["case_id"]) is not None, "case_id")
     require(type(value["agent"]) is str and value["agent"] in CHANNELS, "agent")
@@ -178,6 +194,12 @@ def validate_manifest(value):
         row = value[name]
         require(type(row) is dict and set(row) == {"path", "sha256"}
                 and type(row["path"]) is str and Path(row["path"]).is_absolute() and is_hash(row["sha256"]), "binary_binding")
+    if value.get("test_only_target_candidate", False):
+        candidates = FIXED_CANDIDATES if sys.platform == "darwin" else (
+            LINUX_FIXED_CANDIDATES if sys.platform == "linux" and platform.machine().lower() in ("x86_64", "amd64") else {})
+        require(value.get("fixed_release_input", False)
+                and (value["target_version"], value["target_binary"]["sha256"]) == candidates.get(value["agent"]),
+                "fixed_candidate_binding")
     if value["expected"] == "channel_only":
         require(value["old_binary"] == value["target_binary"], "channel_only_binary_binding")
     else:
@@ -310,6 +332,9 @@ def prepare(args):
         value[name] = {"path": str(getattr(args, name)), "sha256": getattr(args, name + "_sha256")}
     if getattr(args, "config_transition", None) is not None:
         value["config_transition"] = json.loads(args.config_transition)
+    for key in ("fixed_release_input", "test_only_target_candidate"):
+        if getattr(args, key, False):
+            value[key] = True
     root = verify_fixture(value, require_marker=False)
     isolated_environment(root, value)
     exclusive_bytes(root / ".infinishell-cli-autoupdate", MARKER)
@@ -349,7 +374,10 @@ def acceptance(exit_code, text, event, value, manifest_hash):
         return False
     false_flags = {"credentials_provided", "same_commit_verified_by_runner"}
     measured_flags = {"config_bytes_unchanged", "config_semantics_unchanged", "config_permissions_unchanged",
+                      "fixed_release_input", "test_only_target_candidate",
                       "supervisor_generations_unchanged", "entry_unchanged"}
+    if any(event[key] is not value.get(key, False) for key in ("fixed_release_input", "test_only_target_candidate")):
+        return False
     transition = value.get("config_transition")
     if event["config_transition"] != transition or event["plan_requires_native_update"] is not (value["expected"] != "channel_only"):
         return False
@@ -486,6 +514,8 @@ def main(argv=None):
     prepared.add_argument("--expected", choices=sorted(EXPECTED), default="updated")
     prepared.add_argument("--timeout", type=int, default=480)
     prepared.add_argument("--config-transition", help="明确允许的单字段/标记变更 JSON；缺省要求配置字节不变")
+    prepared.add_argument("--fixed-release-input", action="store_true", help="使用清单固定版本作为发行输入，不声称实时 latest")
+    prepared.add_argument("--test-only-target-candidate", action="store_true", help="仅 Mac 或 Linux x64 固定版本及官方摘要的原子升级候选，不开放生产门禁")
     executed = sub.add_parser("run", help="显式授权后仅运行该清单的一次生产测试")
     executed.add_argument("--manifest", type=Path, required=True)
     executed.add_argument("--case-id", required=True)

@@ -48,6 +48,7 @@ impl Fixture {
         let directory = create_generation_directory(state, generation).unwrap();
         let manifest = Manifest {
             isolated_home: None,
+            isolated_state_dir: None,
             environment: None,
             version: 1,
             launch_allowed: true,

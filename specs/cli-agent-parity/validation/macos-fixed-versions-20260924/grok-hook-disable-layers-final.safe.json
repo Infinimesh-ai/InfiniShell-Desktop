@@ -1,0 +1,68 @@
+{
+  "fixed_native_version": "1.0.41",
+  "helper_sha256": "184464fc31202dc9215e41c4066aa1539ec58fb8f312a77bce87d6c013b63a07",
+  "native_config_sources_probe_cases": 15,
+  "native_config_source_receipt": "/private/tmp/isng4/layer-audit/summary.safe.json",
+  "native_tui_zero_input_cases": {
+    "zero-enabled-final": {
+      "events": {
+        "session_start": 1,
+        "notification": 2
+      },
+      "native_session_count": 1,
+      "native_session_sha256": [
+        "1d360274f814b34280a43fa02fbd2a8c94b398519b402ec15c1ae52aa0df9f68"
+      ],
+      "bytes": 5223,
+      "sha256": "04955639c60b46239965702584d5893af6084ccec69c8a10ae44bb5303d4d4e6",
+      "native_cli_hook_triggered": true,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false,
+      "model_inputs": 0,
+      "native_exit_command": true
+    },
+    "zero-project-captured-final": {
+      "events": {},
+      "native_session_count": 0,
+      "native_session_sha256": [],
+      "bytes": 3792,
+      "sha256": "7b93b663c9f95e2cb5f0225b948371a4929b85d2c16fa89401c37900fb3d129c",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false,
+      "model_inputs": 0,
+      "native_exit_command": true
+    },
+    "zero-hook-disabled-final2": {
+      "events": {},
+      "native_session_count": 0,
+      "native_session_sha256": [],
+      "bytes": 3792,
+      "sha256": "adc9950e29eb36ea747304510a4100056fc476c3dece5c9e103a067f925734a6",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false,
+      "model_inputs": 0,
+      "native_exit_command": true
+    },
+    "zero-policy-final": {
+      "events": {},
+      "native_session_count": 0,
+      "native_session_sha256": [],
+      "bytes": 3722,
+      "sha256": "e3757af159a301e72b90a9a8fcbb20ea5048550d0f7767ea95cc1297587b8d8c",
+      "native_cli_hook_triggered": false,
+      "product_ssh_ui_verified": false,
+      "outer_tmux_passthrough_verified": false,
+      "model_inputs": 0,
+      "native_exit_command": true
+    }
+  },
+  "all_model_inputs": 0,
+  "production_installer_verified": false,
+  "credential_copy_removed": true,
+  "credential_source_stat_unchanged": true,
+  "failed_private_pty_batch_preserved": true,
+  "unknown_or_untrusted_regression": "unit guard plus real inspect false; not a TUI acceptance claim",
+  "identified_private_native_processes_gone": true
+}

@@ -31,6 +31,7 @@ fn image_scope(format: ImageFormat) -> (TempDir, PathBuf) {
 fn scoped_protocol(directory: &TempDir) -> ClaudeProtocol {
     let mut protocol = ready_protocol();
     protocol.options.state_dir = directory.path().to_owned();
+    protocol.attachment_store = directory.path().join("local-cli-attachments");
     protocol
         .receive(json!({"type":"system","subtype":"init","claude_code_version":"2.1.273","permissionMode":"default",
         "tools":[],"mcp_servers":[],"session_id":"3ddff71c-4062-4198-a130-502e4c15684e"}))
@@ -55,6 +56,42 @@ fn replay(sent: &Value) -> Value {
     replay["isReplay"] = json!(true);
     replay["session_id"] = json!("3ddff71c-4062-4198-a130-502e4c15684e");
     replay
+}
+
+#[test]
+fn host_process_scope_preserves_application_attachment_scope() {
+    let (directory, path) = image_scope(ImageFormat::Png);
+    let mut protocol = scoped_protocol(&directory);
+    protocol.options.state_dir = directory
+        .path()
+        .join("cli-agent-hosts")
+        .join(protocol.options.generation.to_string())
+        .join("native");
+    fs::create_dir_all(&protocol.options.state_dir).unwrap();
+
+    let sent = protocol.command(image_command(Uuid::from_u128(330), path.clone()));
+    assert_eq!(sent.writes.len(), 1);
+    assert_eq!(
+        sent.writes[0]["message"]["content"][1]["source"]["data"],
+        STANDARD.encode(fs::read(&path).unwrap())
+    );
+
+    // 相同图片放在进程目录也不能绕过应用附件目录的边界。
+    let foreign = protocol.options.state_dir.join("local-cli-attachments");
+    fs::create_dir(&foreign).unwrap();
+    let foreign_path = foreign.join(path.file_name().unwrap());
+    fs::copy(&path, &foreign_path).unwrap();
+    let mut other_protocol = scoped_protocol(&directory);
+    other_protocol
+        .options
+        .state_dir
+        .clone_from(&protocol.options.state_dir);
+    let rejected = other_protocol.command(image_command(Uuid::from_u128(331), foreign_path));
+    assert!(rejected.writes.is_empty());
+    assert!(rejected.events.iter().any(
+        |event| matches!(event, RuntimeEventKind::RequestFailed { message, .. }
+                if message == &crate::t!("cli-agent-input-attachment-invalid"))
+    ));
 }
 
 #[test]
@@ -223,7 +260,7 @@ fn missing_corrupt_and_cross_scope_durable_images_fail_without_partial_write() {
                 fs::remove_file(&path).unwrap();
             }
             1 => fs::write(&path, b"corrupt PNG bytes").unwrap(),
-            2 => protocol.options.state_dir = directory.path().join("another-scope"),
+            2 => protocol.attachment_store = directory.path().join("another-scope"),
             _ => unreachable!("有限测试范围"),
         }
         let id = Uuid::from_u128(306);

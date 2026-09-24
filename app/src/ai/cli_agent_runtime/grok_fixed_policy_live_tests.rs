@@ -86,15 +86,24 @@ fn native_tool_terminal(replay: &Value, turn: &str, call: &str, allow: bool) -> 
     calls.len() == 1 && calls.contains(call) && terminal
 }
 
-// 固定 1.0.30 会在拒绝后取消回合，不会再请求模型生成拒绝结束语。
+// 拒绝后取消回合；保留工具调用前的说明，但不允许工具输出或之后的新模型文本。
 fn denied_read_not_executed(replay: &Value, turn: &str, call: &str) -> bool {
     let Some(updates) = replay["updates"].as_array() else {
         return false;
     };
     let mut rejected = 0;
+    let mut requested = false;
     for record in updates {
         let params = &record["params"];
         let update = &params["update"];
+        if record["method"] == "session/update" && params["_meta"]["promptId"] == turn {
+            if update["sessionUpdate"] == "tool_call" && update["toolCallId"] == call {
+                requested = true;
+            }
+            if requested && update["sessionUpdate"] == "agent_message_chunk" {
+                return false;
+            }
+        }
         if record["method"] == "session/update"
             && params["_meta"]["promptId"] == turn
             && update["toolCallId"] == call
@@ -197,8 +206,15 @@ async fn phase(
             match event.kind {
                 RuntimeEventKind::SessionReady {
                     effective_permissions,
-                    ..
+                    verified_cli_version,
                 } => {
+                    if env::var("INFINISHELL_GROK_FIXED_VERSION")
+                        .ok()
+                        .as_deref()
+                        .is_some_and(|expected| verified_cli_version.as_deref() != Some(expected))
+                    {
+                        return Err("固定策略原生版本回执不匹配".into());
+                    }
                     if ready
                         || session.is_none()
                         || effective_permissions["appCreationPolicyApplied"] != true
@@ -346,9 +362,7 @@ async fn phase(
                         &turn_id,
                         &outcome,
                     )?;
-                    let expected = if allow { allowed_token.trim() } else { "" };
-                    if receipt.final_response.trim() != expected
-                        || (!allow && !receipt.full_output.is_empty())
+                    if (allow && receipt.final_response.trim() != allowed_token.trim())
                         || receipt.full_output != output
                         || snapshot.replay.to_string().contains(denied_token.trim())
                     {
@@ -576,6 +590,20 @@ fn native_deny_receipt_requires_permission_rejection_and_no_read_output() {
             "update":{"sessionUpdate":"turn_completed", "prompt_id":"turn", "stop_reason":"cancelled"}}}
     ]});
     assert!(denied_read_not_executed(&replay, "turn", "call"));
+    let narration = json!({"method":"session/update", "params":{"_meta":{"promptId":"turn"},"update":{
+        "sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"读取前说明"}}}});
+    let mut before = replay.clone();
+    before["updates"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, narration.clone());
+    assert!(denied_read_not_executed(&before, "turn", "call"));
+    let mut after = replay.clone();
+    after["updates"]
+        .as_array_mut()
+        .unwrap()
+        .insert(2, narration);
+    assert!(!denied_read_not_executed(&after, "turn", "call"));
     assert!(!denied_read_not_executed(&replay, "old-turn", "call"));
     assert!(!denied_read_not_executed(&replay, "turn", "other-call"));
     for category in ["MidTurnAbort", "unknown"] {

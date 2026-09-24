@@ -140,7 +140,7 @@ impl PreparedLaunchBinding {
     }
 
     pub(crate) fn validate_update_execution(&self) -> io::Result<()> {
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        #[cfg(any(target_os = "linux", target_os = "macos", windows))]
         if self.kind == Some(AtomicLaunchKind::NativeFile) {
             return Ok(());
         }
@@ -279,6 +279,43 @@ fn windows_file_attributes_are_plain(attributes: u32) -> bool {
 }
 
 impl ManagedEnvironment {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    fn update_snapshot_root(
+        &self,
+        state_dir: &Path,
+        executable: &Path,
+        arguments: &[OsString],
+    ) -> io::Result<PathBuf> {
+        let Some((_, codex_home)) = self.values.iter().find(|(name, _)| name == "CODEX_HOME")
+        else {
+            return Ok(state_dir.to_owned());
+        };
+        let releases = Path::new(codex_home).join("packages/standalone/releases");
+        if arguments.len() != 1
+            || arguments[0] != "update"
+            || !releases.is_absolute()
+            || releases.canonicalize()? != releases
+            || !executable.starts_with(&releases)
+            || !self
+                .values
+                .iter()
+                .any(|(name, value)| name == "CODEX_INSTALL_DIR" && Path::new(value).is_absolute())
+            || !self
+                .values
+                .iter()
+                .any(|(name, value)| name == "CODEX_RELEASE" && !value.is_empty())
+        {
+            return Err(io::Error::other(if cfg!(target_os = "linux") {
+                "managed_process.atomic_linux_codex_layout_invalid"
+            } else {
+                "managed_process.atomic_macos_codex_layout_invalid"
+            }));
+        }
+        // 官方 CLI 按 current_exe 所在 releases 树识别 standalone；仍使用原代次快照与身份校验。
+        // 原安装器仅清理临时目录及具体版本目录，不会清理 cli-agent-executable-snapshots。
+        Ok(releases)
+    }
+
     fn validate(&self) -> io::Result<()> {
         let mut names = std::collections::HashSet::new();
         for (name, value) in &self.values {
@@ -334,10 +371,27 @@ impl ManagedEnvironment {
                 .canonicalize()?
                 .join(format!("claude-update-{generation}"))
                 .join("config");
+            // 精确发行参数由更新计划展开，并随原有清单摘要绑定；不能接受渠道名或额外选项。
+            let update_command = match arguments {
+                [_, _, command] => command == "update",
+                [_, _, command, target] => {
+                    command == "install"
+                        && target.to_str().is_some_and(|target| {
+                            let parts = target.split('.').collect::<Vec<_>>();
+                            parts.len() == 3
+                                && parts.iter().all(|part| {
+                                    !part.is_empty()
+                                        && part.len() <= 10
+                                        && part.bytes().all(|byte| byte.is_ascii_digit())
+                                        && (part.len() == 1 || !part.starts_with('0'))
+                                })
+                        })
+                }
+                _ => false,
+            };
             if Path::new(value) != expected
-                || arguments.len() != 3
+                || !update_command
                 || arguments[0] != "--settings"
-                || arguments[2] != "update"
                 || !matches!(
                     arguments[1].to_str(),
                     Some(
@@ -389,6 +443,8 @@ struct Manifest {
     cwd: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     isolated_home: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    isolated_state_dir: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     environment: Option<ManagedEnvironment>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -621,7 +677,10 @@ pub(crate) async fn spawn(
     arguments: &[OsString],
     cwd: &Path,
 ) -> io::Result<ManagedChild> {
-    spawn_with_isolated_home(state_dir, generation, executable, arguments, cwd, None).await
+    spawn_with_isolated_home(
+        state_dir, generation, executable, arguments, cwd, None, None,
+    )
+    .await
 }
 
 pub(crate) async fn spawn_with_isolated_home(
@@ -631,6 +690,7 @@ pub(crate) async fn spawn_with_isolated_home(
     arguments: &[OsString],
     cwd: &Path,
     isolated_home: Option<&Path>,
+    isolated_state_dir: Option<&Path>,
 ) -> io::Result<ManagedChild> {
     spawn_configured(
         state_dir,
@@ -639,6 +699,7 @@ pub(crate) async fn spawn_with_isolated_home(
         arguments,
         cwd,
         isolated_home,
+        isolated_state_dir,
         None,
         Vec::new(),
         None,
@@ -687,6 +748,7 @@ pub(crate) async fn spawn_with_environment_and_expected_files(
         arguments,
         cwd,
         None,
+        None,
         Some(environment),
         expected_files,
         None,
@@ -718,6 +780,7 @@ pub(crate) async fn spawn_bound_update(
         arguments,
         cwd,
         None,
+        None,
         Some(environment),
         expected_files,
         Some(binding),
@@ -732,6 +795,7 @@ async fn spawn_configured(
     arguments: &[OsString],
     cwd: &Path,
     isolated_home: Option<&Path>,
+    isolated_state_dir: Option<&Path>,
     environment: Option<ManagedEnvironment>,
     expected_files: Vec<ExpectedFileIdentity>,
     binding: Option<&PreparedLaunchBinding>,
@@ -752,6 +816,7 @@ async fn spawn_configured(
         arguments: arguments.to_owned(),
         cwd: cwd.to_owned(),
         isolated_home: isolated_home.map(Path::to_owned),
+        isolated_state_dir: isolated_state_dir.map(Path::canonicalize).transpose()?,
         environment,
         expected_files,
         atomic_launch_kind,
@@ -826,6 +891,7 @@ pub(crate) fn record_not_started(
         arguments: arguments.to_owned(),
         cwd: cwd.to_owned(),
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: None,
@@ -856,6 +922,7 @@ pub(crate) fn record_not_started_with_binding(
         arguments: arguments.to_owned(),
         cwd: cwd.to_owned(),
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
         atomic_launch_kind: binding.kind,
@@ -1199,6 +1266,9 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         return Err(io::Error::other("托管进程启动契约不匹配"));
     }
     validate_expected_files_contract(&manifest.executable, &manifest.expected_files)?;
+    if manifest.isolated_state_dir.is_some() && manifest.isolated_home.is_none() {
+        return Err(io::Error::other("隔离持久状态域缺少隔离目录"));
+    }
     if let Some(environment) = &manifest.environment {
         if manifest.isolated_home.is_some() {
             return Err(io::Error::other("隔离任务不接受额外环境覆盖"));
@@ -1210,11 +1280,27 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         environment.validate_for_generation(state_dir, manifest.generation, &manifest.arguments)?;
     }
     if let Some(home) = &manifest.isolated_home {
-        let state = directory
+        let process_state = directory
             .parent()
             .and_then(Path::parent)
             .ok_or_else(|| io::Error::other("隔离启动缺少状态域"))?
             .canonicalize()?;
+        let state = if let Some(state) = &manifest.isolated_state_dir {
+            // 只允许已绑定宿主代次的应用根；不能通过搜索任意祖先放宽目录边界。
+            if !state.is_absolute()
+                || state.canonicalize()? != *state
+                || process_state
+                    != state
+                        .join("cli-agent-hosts")
+                        .join(manifest.generation.to_string())
+                        .join("native")
+            {
+                return Err(io::Error::other("隔离持久状态域与宿主代次不匹配"));
+            }
+            state
+        } else {
+            &process_state
+        };
         if home.parent() != Some(state.join("grok-managed").as_path())
             || home
                 .file_name()
@@ -1285,6 +1371,8 @@ pub(crate) fn confirmed_exit(
     if receipt.containment == macos::CONTAINMENT {
         macos::verify_cleanup(&directory, &manifest, &manifest_bytes, &receipt)?;
     }
+    #[cfg(target_os = "linux")]
+    cleanup_linux_update_snapshot(&directory, &manifest, &manifest_bytes, &receipt)?;
     Ok(Some(receipt))
 }
 
@@ -1619,7 +1707,62 @@ fn write_receipt(directory: &Path, receipt: &ExitReceipt) -> io::Result<()> {
     #[cfg(unix)]
     fs::File::open(directory)?.sync_all()?;
     write_exit_binding(directory, receipt, &bytes)?;
+    #[cfg(target_os = "linux")]
+    {
+        let (manifest, manifest_bytes) = read_manifest(&directory.join("manifest.json"))?;
+        cleanup_linux_update_snapshot(directory, &manifest, &manifest_bytes, receipt)?;
+    }
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn cleanup_linux_update_snapshot(
+    directory: &Path,
+    manifest: &Manifest,
+    manifest_bytes: &[u8],
+    receipt: &ExitReceipt,
+) -> io::Result<()> {
+    if !receipt.cleanup_confirmed
+        || receipt.containment != "linux_subtree"
+        || receipt.generation != manifest.generation
+        || receipt.manifest_sha256 != sha256(manifest_bytes)
+        || manifest.atomic_launch_kind != Some(AtomicLaunchKind::NativeFile)
+    {
+        return Ok(());
+    }
+    let Some(environment) = manifest.environment.as_ref().filter(|environment| {
+        environment
+            .values
+            .iter()
+            .any(|(name, _)| name == "CODEX_HOME")
+    }) else {
+        return Ok(());
+    };
+    let binding = read_worker_launch_binding(directory, manifest, manifest_bytes)?
+        .ok_or_else(|| io::Error::other("managed_process.required_launch_binding_missing"))?;
+    let exit: ExitBindingRecord =
+        serde_json::from_slice(&read_record(&directory.join(EXIT_BINDING_RECORD))?)
+            .map_err(io::Error::other)?;
+    if exit.version != 1
+        || exit.generation != manifest.generation
+        || exit.binding_digest != binding.digest()
+        || exit.manifest_sha256 != receipt.manifest_sha256
+        || exit.receipt_sha256 != sha256(&read_record(&directory.join("exit.json"))?)
+        || manifest.expected_files.len() != 1
+        || manifest.expected_files[0].path != manifest.executable
+    {
+        return Err(io::Error::other(
+            "managed_process.exit_binding_record_mismatch",
+        ));
+    }
+    let releases =
+        environment.update_snapshot_root(directory, &manifest.executable, &manifest.arguments)?;
+    atomic_linux::cleanup_layout_snapshot(
+        &releases,
+        manifest.generation,
+        binding.digest(),
+        &manifest.expected_files[0],
+    )
 }
 
 fn cleanup_isolated_auth(manifest: &Manifest) -> io::Result<()> {
@@ -1707,6 +1850,32 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                             "managed_process.linux_atomic_dependency_closure_invalid",
                         ));
                     }
+                    if let Some(environment) = manifest.environment.as_ref()
+                        && environment
+                            .values
+                            .iter()
+                            .any(|(name, _)| name == "CODEX_HOME")
+                    {
+                        let releases = environment.update_snapshot_root(
+                            directory,
+                            &manifest.executable,
+                            &manifest.arguments,
+                        )?;
+                        let executable = atomic_linux::prepare_layout_snapshot(
+                            &releases,
+                            manifest.generation,
+                            binding.digest(),
+                            &manifest.expected_files[0],
+                        )?;
+                        enter_atomic_cwd(manifest)?;
+                        let environment = resolved_atomic_environment(manifest)?;
+                        return Err(atomic_linux::execute_layout(
+                            &executable,
+                            &manifest.executable,
+                            &manifest.arguments,
+                            &environment,
+                        ));
+                    }
                     let executable = atomic_linux::prepare(&manifest.expected_files[0])?;
                     if executable.sha256() != manifest.expected_files[0].sha256
                         || executable.size() != manifest.expected_files[0].size
@@ -1736,8 +1905,16 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     let state_dir = directory.parent().and_then(Path::parent).ok_or_else(|| {
                         io::Error::other("managed_process.atomic_macos_state_dir_invalid")
                     })?;
+                    let snapshot_root = match manifest.environment.as_ref() {
+                        Some(environment) => environment.update_snapshot_root(
+                            state_dir,
+                            &manifest.executable,
+                            &manifest.arguments,
+                        )?,
+                        None => state_dir.to_owned(),
+                    };
                     let executable = atomic_macos::prepare_native_executable(
-                        state_dir,
+                        &snapshot_root,
                         manifest.generation,
                         binding.digest(),
                         &manifest.expected_files[0],

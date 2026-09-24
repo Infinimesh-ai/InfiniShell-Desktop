@@ -1,0 +1,23 @@
+{
+  "binary_sha256": "7950516a539cf94d9cdb7100841c4443dc6363f98d07ff782f5844a1719b8e48",
+  "runs": [
+    {
+      "name": "focused",
+      "exit_code": 0,
+      "seconds": 74.562,
+      "result": [
+        "test result: ok. 1625 passed; 0 failed; 54 ignored; 0 measured; 5984 filtered out; finished in 68.18s"
+      ],
+      "log": "/private/tmp/cli-parity-mac-goal-v7-focused-20260924.log"
+    },
+    {
+      "name": "atomic-private-temp",
+      "exit_code": 0,
+      "seconds": 1.568,
+      "result": [
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 7648 filtered out; finished in 1.50s"
+      ],
+      "log": "/private/tmp/cli-parity-mac-goal-v7-atomic-private-temp-20260924.log"
+    }
+  ]
+}

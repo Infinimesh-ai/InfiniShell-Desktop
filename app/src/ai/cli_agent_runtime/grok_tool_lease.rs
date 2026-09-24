@@ -30,6 +30,7 @@ struct ToolLease {
     final_fingerprint: Option<[u8; 32]>,
     approved: bool,
     native_completed: bool,
+    reply_success: Option<bool>,
     expires: Option<Instant>,
     state: GrokToolLeaseState,
 }
@@ -226,6 +227,7 @@ impl GrokToolLeaseLedger {
                             final_fingerprint: None,
                             approved: false,
                             native_completed: false,
+                            reply_success: None,
                             expires: None,
                             state: GrokToolLeaseState::Streaming,
                         },
@@ -274,8 +276,17 @@ impl GrokToolLeaseLedger {
                         GrokToolLeaseState::Bound | GrokToolLeaseState::Closed => {}
                     }
                 } else if update["status"] == "failed" {
-                    self.retire();
-                    return Err("原生工具失败，旧 SDK 进程能力已退休".into());
+                    let lease = self.leases.get_mut(call).ok_or("工具失败没有初始账本")?;
+                    // 已实际回写的业务错误只结束对应调用；未知原生失败仍退休整个能力。
+                    if lease.state == GrokToolLeaseState::ReplyWritten
+                        && lease.reply_success == Some(false)
+                    {
+                        lease.native_completed = true;
+                        lease.state = GrokToolLeaseState::Closed;
+                    } else {
+                        self.retire();
+                        return Err("原生工具失败，旧 SDK 进程能力已退休".into());
+                    }
                 }
             }
             Some(_) | None => return Err("不是原生工具生命周期帧".into()),
@@ -472,6 +483,7 @@ impl GrokToolLeaseLedger {
     pub(crate) fn record_reply_written(
         &mut self,
         proof: &VerifiedGrokToolLease,
+        success: bool,
     ) -> Result<(), String> {
         self.active()?;
         self.verify_bound(
@@ -483,6 +495,12 @@ impl GrokToolLeaseLedger {
             .leases
             .get_mut(&proof.native_call_id)
             .ok_or("回复缺少原生租约")?;
+        if lease
+            .reply_success
+            .is_some_and(|previous| previous != success)
+        {
+            return Err("重复回写改变了工具业务结果".into());
+        }
         match lease.state {
             GrokToolLeaseState::Bound => {
                 lease.state = if lease.native_completed {
@@ -496,6 +514,7 @@ impl GrokToolLeaseLedger {
                 return Err("工具回复尚未绑定业务事务".into());
             }
         }
+        lease.reply_success = Some(success);
         Ok(())
     }
 

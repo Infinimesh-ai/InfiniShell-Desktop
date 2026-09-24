@@ -1,4 +1,5 @@
 use super::*;
+use crate::ai::cli_agent_runtime::{claude, codex, grok};
 use serde_json::json;
 use tempfile::TempDir;
 
@@ -71,14 +72,19 @@ fn channels_are_agent_specific() {
 }
 
 #[test]
-fn updater_uses_each_adapter_exact_version_contract() {
-    assert!(adapter_supports_version(CLIAgent::Codex, "0.155.1"));
-    assert!(!adapter_supports_version(CLIAgent::Codex, "0.155.2"));
-    assert!(adapter_supports_version(CLIAgent::Claude, "2.1.278"));
-    assert!(!adapter_supports_version(CLIAgent::Claude, "2.1.279"));
-    assert!(adapter_supports_version(CLIAgent::Grok, "1.0.40"));
-    assert!(!adapter_supports_version(CLIAgent::Grok, "1.0.41"));
-    assert!(!adapter_supports_version(CLIAgent::Gemini, "1.0.40"));
+fn valid_release_targets_do_not_enable_unverified_managed_versions() {
+    // 渠道安装目标与托管合同分别判断；不能为切换发行渠道放宽运行时版本门禁。
+    for (version, managed_supported) in [
+        (
+            "0.156.0-alpha.7",
+            codex::supported_version("0.156.0-alpha.7"),
+        ),
+        ("2.1.267", claude::supported_version("2.1.267")),
+        ("1.0.42", grok::supported_version("1.0.42")),
+    ] {
+        assert!(parse_version(version).is_ok(), "{version}");
+        assert!(!managed_supported, "{version}");
+    }
 }
 
 fn compatible_plugins() -> PluginCompatibility {
@@ -2348,4 +2354,63 @@ fn claude_original_policy_rejects_links_before_reading_contents() {
     std::os::unix::fs::symlink(&target, &policy).unwrap();
     assert!(verify_claude_originals(scope).is_err());
     assert_eq!(fs::read(target).unwrap(), b"unrelated file");
+}
+
+#[test]
+fn windows_native_copy_requires_exact_entry_and_matching_version_cache() {
+    let (_directory, root) = private_root();
+    let entry = root.join("claude.exe");
+    let reference = root.join("2.1.278");
+    fs::write(&entry, b"bound-native").unwrap();
+    fs::write(&reference, b"bound-native").unwrap();
+    let installation = Installation {
+        source: Source::Unknown,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: None,
+        helper: None,
+        registration: None,
+        invocation: None,
+        channel: Channel::Latest,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    assert_eq!(
+        windows_native_copy(&installation, &entry, &reference),
+        Some(stamp(&reference).unwrap())
+    );
+    assert!(windows_native_copy(&installation, &root.join("other.exe"), &reference).is_none());
+    assert!(windows_native_copy(&installation, &entry, &entry).is_none());
+    fs::write(&reference, b"different-native").unwrap();
+    assert!(windows_native_copy(&installation, &entry, &reference).is_none());
+}
+
+#[test]
+fn windows_native_copy_is_rechecked_before_supervised_execution() {
+    let (_directory, root) = private_root();
+    let entry = root.join("grok.exe");
+    let reference = root.join("grok-1.0.40-windows-x86_64.exe");
+    fs::write(&entry, b"bound-native").unwrap();
+    fs::write(&reference, b"bound-native").unwrap();
+    let mut installation = Installation {
+        source: Source::Native,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: None,
+        helper: None,
+        registration: None,
+        invocation: None,
+        channel: Channel::Stable,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    installation.manager = windows_native_copy(&installation, &entry, &reference);
+    assert_eq!(verify_installation_identity(&installation), Ok(()));
+    fs::write(&reference, b"changed").unwrap();
+    assert_eq!(
+        verify_installation_identity(&installation),
+        Err(Error::SourceChanged)
+    );
 }

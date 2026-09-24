@@ -70,7 +70,7 @@ class InstalledGrokHookTests(unittest.TestCase):
         result = self.verify()
         self.assertTrue(result["main_entry_verified"])
         self.assertEqual(result["notification_channel"], "native_worker_to_unix_controlling_tty")
-        self.assertEqual(result["plugin_version"], "0.1.3")
+        self.assertEqual(result["plugin_version"], "0.1.4")
         self.assertEqual(result["worker_sha256"], self.worker_sha)
         self.assertEqual(result["stdout_bytes"], 0)
         self.assertEqual(result["stderr_bytes"], 0)
@@ -183,7 +183,7 @@ class DetachedGrokHookTests(unittest.TestCase):
         event = json.loads(output[len(prefix):-1])
         self.assertEqual(event["event"], "session_start")
         self.assertEqual(event["session_id"], "detached-terminal-test")
-        self.assertEqual(event["plugin_version"], "0.1.3")
+        self.assertEqual(event["plugin_version"], "0.1.4")
         self.assertEqual(event["agent"], "grok")
 
     def check_bootstrap_refresh(self, shell, filename, marker, tail):

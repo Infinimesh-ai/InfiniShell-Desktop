@@ -67,6 +67,21 @@ fn fixed_policy_binds_each_supported_version_to_its_exact_executable_digest() {
             "1.0.34",
             "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e",
         ),
+        (
+            "1.0.41",
+            "1.0.40",
+            "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+        ),
+        (
+            "1.0.41",
+            "1.0.40",
+            "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+        ),
+        (
+            "1.0.41",
+            "1.0.40",
+            "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+        ),
     ] {
         let mut profile = policy(None);
         profile.executable_sha256 = digest.into();
@@ -669,6 +684,87 @@ fn switching_saved_profile_mode_cannot_rewrite_immutable_launch_files() {
 }
 
 #[test]
+fn persistent_profile_storage_survives_host_generations_without_crossing_scope() {
+    let directory = tempfile::tempdir().unwrap();
+    let state = directory.path().canonicalize().unwrap();
+    let profile = policy(permissions(true, true));
+    let home = profile
+        .prepare_storage(&state, &SessionTarget::New)
+        .unwrap();
+    create_private_directory(&home.join("grok")).unwrap();
+    immutable_file(
+        &home.join("grok/config.toml"),
+        profile.fixed_configuration().as_bytes(),
+    )
+    .unwrap();
+    immutable_file(
+        &home.join("profile.md"),
+        profile.profile_document().unwrap().as_bytes(),
+    )
+    .unwrap();
+    let saved = home.join("saved-session");
+    std::fs::write(&saved, b"existing-session-state").unwrap();
+    let target = SessionTarget::Resume {
+        native_session_id: Uuid::new_v4().to_string(),
+    };
+
+    for generation in [Uuid::new_v4(), Uuid::new_v4()] {
+        let process_state = state
+            .join("cli-agent-hosts")
+            .join(generation.to_string())
+            .join("native");
+        create_private_directory(&process_state).unwrap();
+        assert_eq!(profile.prepare_storage(&state, &target).unwrap(), home);
+        profile.verify_files(&state).unwrap();
+        // 进程状态域缺少原存储时必须拒绝，不能搜索其他代次或创建空会话替代。
+        assert!(profile.prepare_storage(&process_state, &target).is_err());
+        assert!(
+            !process_state
+                .join("grok-managed")
+                .join(profile.storage_id.to_string())
+                .exists()
+        );
+    }
+    let mut other = profile.clone();
+    other.storage_id = Uuid::new_v4();
+    assert!(other.prepare_storage(&state, &target).is_err());
+    assert!(other.verify_files(&state).is_err());
+    other = profile.clone();
+    other.tool_set = GrokToolSet::Files;
+    assert!(other.verify_files(&state).is_err());
+    assert_eq!(std::fs::read(saved).unwrap(), b"existing-session-state");
+}
+
+#[cfg(unix)]
+#[test]
+fn resumed_profile_storage_rejects_symlink_to_another_scope() {
+    let directory = tempfile::tempdir().unwrap();
+    let state = directory.path().canonicalize().unwrap();
+    let profile = policy(None);
+    let other = state.join("other-scope");
+    create_private_directory(&other).unwrap();
+    let parent = state.join("grok-managed");
+    create_private_directory(&parent).unwrap();
+    std::os::unix::fs::symlink(&other, parent.join(profile.storage_id.to_string())).unwrap();
+    assert!(
+        profile
+            .prepare_storage(
+                &state,
+                &SessionTarget::Resume {
+                    native_session_id: Uuid::new_v4().to_string(),
+                }
+            )
+            .is_err()
+    );
+    assert!(std::fs::read_dir(other).unwrap().next().is_none());
+    assert!(
+        profile
+            .prepare_storage(Path::new("relative"), &SessionTarget::New)
+            .is_err()
+    );
+}
+
+#[test]
 fn rejected_catalog_reports_only_known_names_and_structure() {
     let profile = policy(permissions(true, true));
     let tools = json!([
@@ -789,4 +885,41 @@ fn catalog_requires_exact_builtin_or_complete_served_local_union() {
             .verify_catalog_with_mcp(Some(&json!(duplicate)), true, &names)
             .is_err()
     );
+}
+
+#[test]
+fn current_fixed_scope_preserves_exact_binary_configuration_and_child_subset() {
+    let directory = tempfile::tempdir().unwrap();
+    for selected in [
+        PermissionPolicy::GrokRestrictedReadV1,
+        PermissionPolicy::GrokRestrictedFilesV1,
+    ] {
+        let parent = GrokCreationPolicyV1::compile(
+            directory.path(),
+            FIXED_SCOPE_VERSION,
+            "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d".into(),
+            format!("{:x}", Sha256::digest(fixed_configuration(true).as_bytes())),
+            permissions(true, true),
+            selected,
+        )
+        .unwrap();
+        assert_eq!(
+            parent.runtime_scope_verified(FIXED_SCOPE_VERSION, permissions(true, true), selected),
+            cfg!(any(target_os = "macos", target_os = "linux", windows))
+        );
+        assert!(!parent.runtime_scope_verified(CURRENT_VERSION, permissions(true, true), selected));
+        assert!(!parent.runtime_scope_verified(
+            FIXED_SCOPE_VERSION,
+            permissions(false, true),
+            selected
+        ));
+        assert!(parent.fixed_configuration().contains("grok-4.7"));
+        assert!(!parent.fixed_configuration().contains("grok-4.6-build"));
+        let child = parent.derive_child(permissions(false, true)).unwrap();
+        assert!(parent.validate_child(&child).is_ok());
+        assert!(child.validate_child(&parent).is_err());
+        assert!(child.permits_sdk_target("infinishell-local-tasks__send_message_to_agent"));
+        assert!(!child.permits_sdk_target("infinishell-local-tasks__run_agents"));
+    }
+    assert!(fixed_configuration(false).contains("grok-4.6-build"));
 }

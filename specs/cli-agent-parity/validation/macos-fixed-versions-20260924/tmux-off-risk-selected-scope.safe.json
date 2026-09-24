@@ -1,0 +1,94 @@
+{
+  "scope": "R3 Mac 真实回环 SSH/tmux allow-passthrough=off 的风险选样证据边界",
+  "requirement": {
+    "source": {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/specs/cli-agent-parity/HANDOFF_20260921_REOPEN.md",
+      "sha256": "037f4396ddde0cb8acf9cdb1911e5e743f3dbaf036cffeeabd84bbf86d08c41d"
+    },
+    "line": 73,
+    "selection_rule": "按平台风险选择场景，不机械扩展所有组合"
+  },
+  "covered": "Claude 与 Grok 已观察官方原生 session_start 到达 tmux 内侧，同时产品同一 SSH 通知接收路径为 0；关闭透传的阻断边界已有真实覆盖。",
+  "cases": {
+    "codex": {
+      "version": "0.156.1",
+      "receipt": {
+        "path": "/private/tmp/isp-mac-1mej4h8z/evidence/codex-tmux-off-one-input-v2.safe.json",
+        "sha256": "801d4e0d6a3eee3bdcb04dbe1219a04f480791a79992ede9febc62d48cff5b4e"
+      },
+      "model_inputs_already_recorded": 1,
+      "inner_events_observed": 0,
+      "product_notifications_received": 0,
+      "native_send_proven": false,
+      "native_send_then_blocked_claimed": false,
+      "boundary": "内层 script 未录到原生 DCS，未保留 pane.raw；产品为 0 不能单独证明官方 CLI 已发送后被 tmux 阻断。"
+    },
+    "claude": {
+      "version": "2.1.280",
+      "receipt": {
+        "path": "/private/tmp/isp-mac-1mej4h8z/evidence/claude-tmux-complete-v2.safe.json",
+        "sha256": "47628b30cc2db75640cd4420c3d0205a230d0f2f371ef12625a7d79ed3949487"
+      },
+      "inner_session_start": 1,
+      "inner_recording_sha256": "f999e482e213dca75ae5f5ae805ba7b71a7a1048d3d0338e1cf0dd46ee515262",
+      "product_notifications_received": 0,
+      "native_send_then_no_product_receive_proven": true
+    },
+    "grok": {
+      "version": "1.0.41",
+      "receipt": {
+        "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-tmux-complete-hooks-v5.safe.json",
+        "sha256": "b0c758938ff4e228ea08651ec4e4c59e929f36789a2820f0fe355becd19ffaf8"
+      },
+      "inner_receipt": {
+        "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-notification-scope-index.safe.json",
+        "sha256": "ca972d89a84b19c123e242b70d3ab9f6ab1e3623920e1f3e7651466af1928789"
+      },
+      "inner_session_start": 1,
+      "inner_notifications": 2,
+      "inner_recording_sha256": "60c63c7389ba907a941b39b9c35d75e65f9bc02b880bea42b99345076c2a8194",
+      "product_notifications_received": 0,
+      "native_send_then_no_product_receive_proven": true
+    }
+  },
+  "shared_product_receive_path": [
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/model/ansi/mod.rs",
+      "sha256": "6c0511bcc97e98b667d07aa366fa19333e967c7c9e22e9ce7f32f8ac44891ff2",
+      "relative_path": "app/src/terminal/model/ansi/mod.rs",
+      "v8_snapshot_match": null
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/model/terminal_model.rs",
+      "sha256": "788ebd6f296feddfa8624ff621561c4c76c85aaa85d115bf5e870927a76262c8",
+      "relative_path": "app/src/terminal/model/terminal_model.rs",
+      "v8_snapshot_match": null
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_sessions/event/mod.rs",
+      "sha256": "30c191a2ad82608a12e9a06651c34d5aa950fc14aed566e99c509d5d03d6ac98",
+      "relative_path": "app/src/terminal/cli_agent_sessions/event/mod.rs",
+      "v8_snapshot_match": null
+    },
+    {
+      "path": "/Users/zhishi/Tools/github/InfiniShell-Desktop/app/src/terminal/cli_agent_sessions/listener/mod.rs",
+      "sha256": "f2baccbffadc72082027b4f4d762e3df847a87f048660ab5b9ffb8eed6c70e6a",
+      "relative_path": "app/src/terminal/cli_agent_sessions/listener/mod.rs",
+      "v8_snapshot_match": null
+    }
+  ],
+  "protocol_boundary": "tmux 关闭透传后不向 SSH 外层交付 DCS 内的 OSC777；产品统一从 ANSI OSC777 接收并交给 CLI event/listener。各 CLI 的发送实现不宣称完全相同。",
+  "code_hash_scope": "上列为当前冻结工作树公共接收路径摘要，用于关联代码；不把历史 v2/v5 收据改称同一最终二进制验收。",
+  "same_final_build_for_historical_receipts_claimed": false,
+  "all_cli_mode_platform_combinations_required": false,
+  "different_os_remote_host_verified": false,
+  "original_receipts_preserved": true,
+  "this_task": {
+    "new_model_inputs": 0,
+    "new_ssh_services": 0,
+    "credential_copies_created": 0,
+    "ssh_keys_created": 0,
+    "gui_automation_used": false,
+    "repository_files_modified": false
+  }
+}

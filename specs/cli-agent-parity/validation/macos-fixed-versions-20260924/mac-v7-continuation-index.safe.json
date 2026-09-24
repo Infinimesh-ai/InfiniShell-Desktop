@@ -1,0 +1,61 @@
+{
+  "scope": "V7本地门禁及Claude GUI，Grok V7冷恢复失败保留",
+  "artifacts": [
+    {
+      "file": "gui-claude-composer-recovery-v7.safe.json",
+      "bytes": 3390,
+      "sha256": "cfeb6034aa63a2b78e3f177dcc9bbf06e6e042fab1bd25618aa11c6d2c0723e5"
+    },
+    {
+      "file": "goal-v7-build.safe.json",
+      "bytes": 1014,
+      "sha256": "1bdd47a06e8b103800bc63f6bdd716dddb85c5068ca2986769bf12c4a613b8ad"
+    },
+    {
+      "file": "goal-v7-focused.safe.json",
+      "bytes": 717,
+      "sha256": "a2490dd0af7f85067131e5f0e120fa43e966c3b8d6189c49565fe5fed6ff97dd"
+    },
+    {
+      "file": "build-default-goal-v7.safe.json",
+      "bytes": 373,
+      "sha256": "d2122b25628409b17f8ad2b9965e23c9abb34ad10c28f1de85849b3ff3c57733"
+    },
+    {
+      "file": "gui-claude-image-scope-failure-v5.safe.json",
+      "bytes": 982,
+      "sha256": "3e52e712202c2e6710ff3429a13502dff96275d960a5e8bb93c5e98040468bf6"
+    },
+    {
+      "file": "claude-skill-first-v7.safe.json",
+      "bytes": 7552,
+      "sha256": "ef29eee0b4995be0bee67b77c6d8331edf2d6e3ceee99e2de66c8f9eb600af34"
+    },
+    {
+      "file": "grok-cold-resume-storage-diagnosis-v7.safe.json",
+      "bytes": 1179,
+      "sha256": "16f8f1f9ac257b87d3681a3f932cc5d51f7e93d132891708bb0a8964d0e3bbc4"
+    },
+    {
+      "file": "claude-skill-auth-r1-result-v7.png",
+      "bytes": 276307,
+      "sha256": "0c3892f4ba66afafa3283caba9542833f1c73d900a3150126f46f50031055e43"
+    },
+    {
+      "file": "claude-image-after-restart-result-v7.png",
+      "bytes": 268096,
+      "sha256": "547eb7cc1edcf582c8a2ec2ad0dd84c77a7274af6d247f7113b92b6dc4999eb6"
+    },
+    {
+      "file": "claude-cold-resume-result-v7.png",
+      "bytes": 263482,
+      "sha256": "4ecfff8c136b2106a16d32ac28a032534b11e9575cba495ff027fb27dba160c6"
+    },
+    {
+      "file": "claude-auth-environment-failure-v7.png",
+      "bytes": 310237,
+      "sha256": "5d1bd778ec7b6ae5c777bedf6e884ef80f8ee555d1c96e710868fe08c10c4ed1"
+    }
+  ],
+  "full_cli_parity_acceptance_passed": false
+}

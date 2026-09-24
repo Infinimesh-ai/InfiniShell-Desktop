@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "scope": "macos_default_gui_grok_fixed_read_app_restart_and_cold_resume",
+  "cli_version": "1.0.41",
+  "task_id": "4c974261-896b-4f63-8f1b-4a8b11cac447",
+  "native_session_id": "01a0d1f0-2e18-78c1-8576-2f77a7234dd1",
+  "default_gui_binary": {
+    "sha256": "732f33a85b68a13aebace91fe60c6d4e9dd3882a6447f62c542877e29a86cbef",
+    "bytes": 749880480
+  },
+  "v8_build_manifest": {
+    "sha256": "83cefc30a17405537abffa4ce3da484ffb8cdd0a8be5ed7be9331aa593a0ac88",
+    "bytes": 1014
+  },
+  "v8_gui_build": {
+    "sha256": "694d11f05e276e331a3e98a453746ee81199143126c2323fbcf3deaf42f89686",
+    "bytes": 373
+  },
+  "fixed_cli": {
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "bytes": 145657952
+  },
+  "native_history": {
+    "sha256": "1bec4aaaf55a3bd305f4f61cb0c5ce20e3ba2f0289db149195777b013a9df177",
+    "bytes": 24170
+  },
+  "fixed_read_permission": true,
+  "approval_allow_once": 1,
+  "exact_synthetic_context_read": true,
+  "app_restart_no_replay": true,
+  "cold_resume_no_replay": true,
+  "cold_resume_same_native_session": true,
+  "persistent_profile_storage_survived_host_generation": true,
+  "new_native_inputs": 3,
+  "successful_turns": 3,
+  "hosts": [
+    {
+      "runtime_generation": "9c4ca390-5a35-4daf-a2c2-f93f0b56090b",
+      "journal": {
+        "sha256": "7bdfa199be8b1db1ee4607847b0e9fe128687ea9e98339ca6fe5615f828dd4b3",
+        "bytes": 63678
+      },
+      "owner_epochs": [
+        1,
+        2
+      ],
+      "native_input_acknowledgements": 2,
+      "completed_turns": 2,
+      "exit_receipt": {
+        "sha256": "77c601fceb0d2f0a16ebaf0cfec4aba2fd12dfa6381b2b3b0e1fad0ddb4b36c0",
+        "bytes": 556
+      },
+      "native_process": "exited",
+      "adapter_succeeded": true,
+      "event_journal_completed": true
+    },
+    {
+      "runtime_generation": "a49f5493-c7be-4e78-a72f-864938959572",
+      "journal": {
+        "sha256": "896f585936a4bc41755ed823046bd224df3e949856050aed37d88108adfb58af",
+        "bytes": 31465
+      },
+      "owner_epochs": [
+        1
+      ],
+      "native_input_acknowledgements": 1,
+      "completed_turns": 1,
+      "exit_receipt": {
+        "sha256": "6669417125e7e1cda7a6c24a06f40deaee8ec0c1b57b7c31553781383fa6ff29",
+        "bytes": 556
+      },
+      "native_process": "exited",
+      "adapter_succeeded": true,
+      "event_journal_completed": true
+    }
+  ],
+  "private_auth_removed": true,
+  "original_auth_stat_unchanged": true,
+  "app_closed": true,
+  "full_cli_parity_acceptance_passed": false,
+  "screenshots": {
+    "grok-first-result-v8.png": {
+      "sha256": "eadd5af33bbad4f336be86848ead34212daf5f8639fc113f33b7f1f516f83d26",
+      "bytes": 267238
+    },
+    "grok-cold-resume-result-v8.png": {
+      "sha256": "be835b74abec6f4b5fd9531bfbaf6cc9af150d49667696568f8d3403d5155060",
+      "bytes": 254083
+    },
+    "grok-fixed-read-approval-v8.png": {
+      "sha256": "2c2de40fa41fe6503f312ca42561cefe4c72e7205374716883f7a53125c6bbca",
+      "bytes": 251131
+    },
+    "grok-app-restart-result-v8.png": {
+      "sha256": "f3afe39e609d3cdb393d10f26277cc00cdfa588ece613c691554503d328ec2f2",
+      "bytes": 254148
+    }
+  }
+}

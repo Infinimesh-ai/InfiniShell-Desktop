@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "scope": "V10 GUI Grok inherit首轮完成后动态命令目录metadata拒绝，只读诊断及未应用最小修复",
+  "task_id": "6f116a83-f94a-488e-a940-aab997ca7267",
+  "runtime_generation": "b874d8b6-53a3-465a-8580-900afd4ec826",
+  "native_session_id": "01a0d21f-ca82-72f1-9dd9-88f543933813",
+  "cli_version": "1.0.41",
+  "repository_modified": false,
+  "gui_or_model_executed": false,
+  "rust_compiled": false,
+  "observed": {
+    "adapter_succeeded": false,
+    "catalog_broadcasts": [
+      {
+        "timestamp": "2026-09-24T06:34:54.023Z",
+        "trigger": "session_start",
+        "count": 12
+      },
+      {
+        "timestamp": "2026-09-24T06:34:54.029Z",
+        "trigger": "session_start",
+        "count": 12
+      },
+      {
+        "timestamp": "2026-09-24T06:34:57.651Z",
+        "trigger": "skills_reload",
+        "count": 32
+      }
+    ],
+    "catalog_in_persisted_updates": false,
+    "runtime_error": "CLI protocol error: invalid Grok command catalog metadata"
+  },
+  "evidence_files": [
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/gui-home/Library/Application Support/dev.infinishell.InfiniShellParityMac20260924-parity-mac-20260924-recovery/cli-agent-hosts/b874d8b6-53a3-465a-8580-900afd4ec826/runtime.journal",
+      "sha256": "adbf2445c6e549763b03f3262a04ba660f24224e5988d5d0dc38d186ff9d065c"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/gui-home/Library/Application Support/dev.infinishell.InfiniShellParityMac20260924-parity-mac-20260924-recovery/cli-agent-hosts/b874d8b6-53a3-465a-8580-900afd4ec826/host-exit.json",
+      "sha256": "82d33e57d2d66cb07a9a5d82147c0a0e010d34f8636de7cfd87eb21a28da49f8"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/gui-home/.grok/logs/unified.jsonl",
+      "sha256": "a4c710e674f7d06d06d2fed45d8bc37fccf23b9c138b870729953cd2d8062a0a"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/gui-home/.grok/sessions/%2Fprivate%2Ftmp%2Fisp-mac-1mej4h8z%2Fgui-project/01a0d21f-ca82-72f1-9dd9-88f543933813/updates.jsonl",
+      "sha256": "f23a0d121d614fbc6aa795e7eaa1af4fc1d605339e430586fc8450f7daf3190a"
+    }
+  ],
+  "root_cause": {
+    "confirmed_code_defect": "dynamic_root把promptId、streamStartMs、turnStartMs绑定为必须全有；官方固定辅助源码各自if Some独立序列化，prompt单独收尾清空",
+    "exact_rejected_frame_persisted": false,
+    "specific_frame_shape_inference": "本次首轮完成后的skills_reload很可能保留streamStartMs/turnStartMs但promptId已清空；未读取到该catalog原帧，不宣称确切7-key实录",
+    "persistence_reason": "固定辅助源码明确不持久化AvailableCommandsUpdate，本次updates.jsonl也没有catalog",
+    "auxiliary_public_sources": [
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/updates.rs",
+        "sha256": "3f5d530ebdb2477750f1bcef483cc756c3f3d45f1a73447646a1b0f6d4e4e8d2",
+        "lines": [
+          "282-306",
+          "434-443"
+        ],
+        "same_build_as_1_0_41_proven": false
+      },
+      {
+        "url": "https://raw.githubusercontent.com/xai-org/grok-build/482711333c7195dc16a272777f86086d615e2afb/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn_task.rs",
+        "sha256": "480dcd5f871707c17da25bcc098fb5967247cd75f2588190af059c19761e296b",
+        "lines": [
+          "22-30",
+          "276-316"
+        ],
+        "same_build_as_1_0_41_proven": false
+      }
+    ]
+  },
+  "minimal_fix": {
+    "only_dynamic_root_optional_field_grouping_changed": true,
+    "fields_independently_optional": [
+      "promptId",
+      "streamStartMs",
+      "turnStartMs"
+    ],
+    "preserved": [
+      "固定5个基础字段",
+      "未知字段拒绝",
+      "isReplay值约束",
+      "promptId语法约束",
+      "整数时钟非负且JSON精确范围",
+      "存在promptId时必须绑定当前活动回合",
+      "session/event绑定",
+      "权限及能力白名单"
+    ],
+    "tests": [
+      "production_root_turn_catalog_requires_the_current_turn_and_bounded_integer_clocks",
+      "production_root_idle_catalog_clocks_do_not_require_or_resume_a_turn"
+    ],
+    "temporal_regression": "活动回合正常收到文本、原生end_turn及最终历史确认→TurnFinished Completed→仅含两个时钟的idle catalog不发事件不发请求不关连接→坏promptId、结束回合promptId、负时钟、未知键拒绝"
+  },
+  "zero_auth_probe": {
+    "path": "script/cli-agent-parity/grok_fixed_acp_probe.py",
+    "current_sha256": "ea01ccb5f10f30c990eae0142e07f7ac7f91c3363f2ad820d88644776b9d7dd1",
+    "catalog_metadata_schema_present": false,
+    "change_needed": false,
+    "coordinated_with": "grok_catalog_path"
+  },
+  "patch": {
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/grok-inherit-idle-catalog-v10/grok-idle-catalog-optional-fields.patch",
+    "sha256": "91ddabd05547c55bcf6c75327b4b1de39eb81e3b988a8a11db76262323513372",
+    "files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok.rs",
+        "base_sha256": "e28ed03ef3b085615d66d61d788660060f6e7216734c70e05cfbe74ec7f4bd55",
+        "candidate_sha256": "cb2deec56ab46f14d7af0b88544bc512e0b5c2bd91a072c3ab8afc1150d5abf4",
+        "repository_unchanged_since_base": true
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok_tests.rs",
+        "base_sha256": "b42e72a90c11d0b85cb8a8140986756203b08809a719f4540de3070f26824875",
+        "candidate_sha256": "a4ec2c6abd0edf8f4836f80b77f678670ddbbd6f4a6674841f6380db829f3e05",
+        "repository_unchanged_since_base": true
+      }
+    ]
+  },
+  "validation": {
+    "rustfmt": "passed",
+    "cargo": "not_run",
+    "real_gui_retest": "pending_root_inherit_one_turn_plus_idle_wait"
+  },
+  "localization": "内部协议兼容修复，无用户文案变化，无需本地化变更"
+}

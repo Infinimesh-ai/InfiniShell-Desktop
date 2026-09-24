@@ -1,0 +1,16 @@
+{
+  "scope": "managed_composer_actual_macos_ime",
+  "app_binary_sha256": "5885039e4054469df5c689ec630947f118a60f3270561b068715d490c212252d",
+  "input_source": "com.apple.inputmethod.SCIM.ITABC",
+  "physical_pinyin_key_events": true,
+  "marked_text_observed": true,
+  "numeric_candidate_selection_produced_chinese": true,
+  "space_candidate_selection_produced_chinese": true,
+  "multiline_and_mixed_ascii_preserved": true,
+  "task_submitted": false,
+  "os_candidate_popup_image_captured": false,
+  "screenshots": {
+    "ime-marked-text.png": "cd02c3421641981c2d074e6f3b2aaee906130fa372871db0f728e9d6f1125fbe",
+    "ime-mixed-multiline.png": "d6bdca97a62118e97039c9fda058292d11f42ea9262b9fd87b1df35445131e96"
+  }
+}

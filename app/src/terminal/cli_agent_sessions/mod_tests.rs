@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use warpui::r#async::Timer;
@@ -1041,6 +1042,77 @@ fn inherited_claude_hook_cannot_update_grok_session() {
             assert_eq!(session.status, CLIAgentSessionStatus::InProgress);
             assert!(!session.received_rich_notification);
         });
+    });
+}
+
+#[test]
+fn grok_session_reminder_does_not_change_turn_context_or_pending_cancel() {
+    App::test((), |mut app| async move {
+        let model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+        let view_id = EntityId::new();
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let events = received.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&model, move |_, event, _| {
+                events.lock().unwrap().push(event.clone());
+            });
+        });
+        let mut prompt = rich_event(CLIAgentEventType::PromptSubmit);
+        prompt.agent = CLIAgent::Grok;
+        prompt.session_id = Some("current-session".to_owned());
+        model.update(&mut app, |model, ctx| {
+            let mut session = cli_agent_session(CLIAgentSessionStatus::InProgress, true);
+            session.agent = CLIAgent::Grok;
+            session.session_context.session_id = prompt.session_id.clone();
+            model.set_session(view_id, session, ctx);
+            model.update_from_event(view_id, &prompt, ctx);
+            model.observe_ctrl_c_write_with_window(view_id, Duration::from_secs(30), ctx);
+        });
+        received.lock().unwrap().clear();
+        let mut permission = prompt.clone();
+        permission.event = CLIAgentEventType::PermissionRequest;
+        permission.payload.prompt_id = None;
+        permission.payload.summary = Some("不应写入回合上下文".to_owned());
+        permission.payload.event_id = Some("native-permission".to_owned());
+        model.update(&mut app, |model, ctx| {
+            model.update_from_event(view_id, &permission, ctx);
+            model.update_from_event(view_id, &permission, ctx);
+            let session = model.session(view_id).unwrap();
+            assert_eq!(session.status, CLIAgentSessionStatus::InProgress);
+            assert_eq!(session.session_context.summary, None);
+            assert!(model.has_pending_or_resolved_ctrl_c_cancel(view_id));
+        });
+        assert!(matches!(
+            received.lock().unwrap().as_slice(),
+            [super::CLIAgentSessionsModelEvent::AttentionRequested { .. }]
+        ));
+        received.lock().unwrap().clear();
+        model.update(&mut app, |model, ctx| {
+            for (id, session_id) in [("missing", None), ("foreign", Some("other-session"))] {
+                permission.payload.event_id = Some(id.to_owned());
+                permission.session_id = session_id.map(str::to_owned);
+                model.update_from_event(view_id, &permission, ctx);
+            }
+            permission.session_id = prompt.session_id.clone();
+            for status in [
+                CLIAgentSessionStatus::Unknown,
+                CLIAgentSessionStatus::Disconnected,
+                CLIAgentSessionStatus::Success,
+                CLIAgentSessionStatus::Cancelled,
+                CLIAgentSessionStatus::Failed {
+                    error_type: None,
+                    message: None,
+                },
+            ] {
+                permission.payload.event_id = Some(format!("terminal-{status:?}"));
+                model.sessions.get_mut(&view_id).unwrap().status = status.clone();
+                model.update_from_event(view_id, &permission, ctx);
+                assert_eq!(model.session(view_id).unwrap().status, status);
+            }
+            assert!(model.ctrl_c_cancel_state[&view_id].pending_cancel.is_some());
+            model.abort_pending_cancel(view_id);
+        });
+        assert!(received.lock().unwrap().is_empty());
     });
 }
 

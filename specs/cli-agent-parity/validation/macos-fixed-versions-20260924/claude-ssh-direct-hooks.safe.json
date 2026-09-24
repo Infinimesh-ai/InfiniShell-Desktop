@@ -1,0 +1,78 @@
+{
+  "agent": "claude",
+  "source": "isolated_product_terminal_log",
+  "cases": {
+    "local": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    },
+    "direct": {
+      "events": {
+        "session_start": 1,
+        "prompt_submit": 2,
+        "stop": 2
+      },
+      "native_session_count": 1,
+      "paired_prompt_stop_turns": 2,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": true,
+      "records": [
+        {
+          "event": "session_start",
+          "timestamp": "2026-09-24T03:10:40Z",
+          "native_session_sha256": "94ece7de017cc413760c77ffb0b8076d0da5937dc6af9243d672013b8423d3c1",
+          "turn_sha256": null
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:10:44Z",
+          "native_session_sha256": "94ece7de017cc413760c77ffb0b8076d0da5937dc6af9243d672013b8423d3c1",
+          "turn_sha256": "4d5566ed42063b4deb15991208784a4ae605fe8978fc28dd928dcb7c20ee5a6f"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:10:52Z",
+          "native_session_sha256": "94ece7de017cc413760c77ffb0b8076d0da5937dc6af9243d672013b8423d3c1",
+          "turn_sha256": "4d5566ed42063b4deb15991208784a4ae605fe8978fc28dd928dcb7c20ee5a6f"
+        },
+        {
+          "event": "prompt_submit",
+          "timestamp": "2026-09-24T03:11:04Z",
+          "native_session_sha256": "94ece7de017cc413760c77ffb0b8076d0da5937dc6af9243d672013b8423d3c1",
+          "turn_sha256": "c5efc8370b4fe87125b78d6689d6085fa9b38b4b5abdf398514ca527fd267d03"
+        },
+        {
+          "event": "stop",
+          "timestamp": "2026-09-24T03:11:06Z",
+          "native_session_sha256": "94ece7de017cc413760c77ffb0b8076d0da5937dc6af9243d672013b8423d3c1",
+          "turn_sha256": "c5efc8370b4fe87125b78d6689d6085fa9b38b4b5abdf398514ca527fd267d03"
+        }
+      ]
+    },
+    "tmux-on": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    },
+    "tmux-off": {
+      "events": {},
+      "native_session_count": 0,
+      "paired_prompt_stop_turns": 0,
+      "unpaired_prompt_turns": 0,
+      "product_received_notifications": false,
+      "records": []
+    }
+  },
+  "log_bytes": 190909,
+  "log_sha256": "b8fdaa7b4c97ac0c1ff88da0755c40ca5a51498c2127f87d6828c9049cd9d3ee",
+  "raw_payloads_included": false,
+  "different_os_host_verified": false,
+  "model_response_content_verified": false
+}

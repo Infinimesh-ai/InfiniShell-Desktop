@@ -26,6 +26,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_cli_atomic_updates:
+        description: 固定 0.156.1 / 2.1.280 / 1.0.41 的隔离真实原子更新候选
+        required: true
+        default: false
+        type: boolean
       run_atomic_windows_debug:
         description: Diagnose bounded native Windows image-debug exit and rejection
         required: true
@@ -93,6 +98,8 @@ jobs:
           node --version
           node -e "if (Number(process.versions.node.split('.')[0]) < 18) throw new Error('Node 18+ is required');"
           node --test script/cli-agent-parity/grok_plugin_tests.cjs
+          python3 -B script/cli-agent-parity/grok_plugin_live_runner_tests.py -v
+          python3 -B script/cli-agent-parity/native_ssh_notifications_tests.py NativeSshNotificationTests.test_grok_bridge_main_uses_the_same_guarded_mapper_on_each_desktop -v
 
       - name: Test notification patch file transactions
         shell: bash
@@ -136,6 +143,7 @@ jobs:
           python3 -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
           python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
           python3 -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
+          python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py -v
           # 原始 Grok P0 的 POSIX 离线夹具；不启动真实 CLI 或模型。
           python3 -B script/cli-agent-parity/grok_native_p0_probe_tests.py -v
           python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
@@ -149,7 +157,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --version 0.155.1 --download-dir "$RUNNER_TEMP/codex-01551-inputs")"
+          codex_executable="$(python3 -B script/cli-agent-parity/prepare_codex_cli.py --version 0.156.1 --download-dir "$RUNNER_TEMP/codex-01561-inputs")"
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
@@ -158,7 +166,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.278 --download-dir "$RUNNER_TEMP/claude-21278-inputs")"
+          claude_executable="$(python3 -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.280 --download-dir "$RUNNER_TEMP/claude-21280-inputs")"
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
@@ -166,7 +174,7 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
-          grok_executable="$(python3 -B script/cli-agent-parity/prepare_grok_cli.py --download-dir "$RUNNER_TEMP/grok-cli-fixed")"
+          grok_executable="$(python3 -B script/cli-agent-parity/prepare_grok_cli.py --version 1.0.41 --download-dir "$RUNNER_TEMP/grok-cli-fixed")"
           printf 'INFINISHELL_TEST_GROK_EXE=%s\n' "$grok_executable" >> "$GITHUB_ENV"
 
       - name: Verify fixed Grok unauthenticated ACP boundaries
@@ -174,14 +182,14 @@ jobs:
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/grok_fixed_acp_probe.py --executable "$INFINISHELL_TEST_GROK_EXE" --output "$RUNNER_TEMP/grok-fixed-acp.json"
+          python3 -B script/cli-agent-parity/grok_fixed_acp_probe.py --version 1.0.41 --executable "$INFINISHELL_TEST_GROK_EXE" --output "$RUNNER_TEMP/grok-fixed-acp.json"
 
       - name: Verify native Claude initialization and idle EOF
         shell: bash
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.278 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
+          python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.280 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
 
       - name: Verify native Claude permission observations without credentials
         if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
@@ -189,21 +197,21 @@ jobs:
         timeout-minutes: 3
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.278 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
+          python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.280 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
 
       - name: Verify native Codex plugin registry failure recovery
         shell: bash
         timeout-minutes: 5
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.155.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
+          python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
 
       - name: Verify native Codex persistent plugin source
         shell: bash
         timeout-minutes: 10
         run: |
           set -euo pipefail
-          python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.155.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
+          python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
 
       - name: Test Claude and Codex Bash notification payloads
         shell: bash
@@ -223,6 +231,7 @@ jobs:
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
 
       - name: Check InfiniShell-Desktop
+        id: check_app
         shell: bash
         run: cargo check -p warp --lib
 
@@ -234,6 +243,7 @@ jobs:
           -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
 
       - name: Test agent lifecycle, terminal cancellation, and Responses integration
+        id: test_app
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
@@ -260,6 +270,7 @@ jobs:
 
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
+        id: supervisor
         shell: bash
         env:
           CARGO_BUILD_JOBS: "2"
@@ -276,6 +287,49 @@ jobs:
           install -m 0755 "$target_dir/debug/infinishell-tui" "$RUNNER_TEMP/infinishell-test-notify-worker"
           export INFINISHELL_TEST_NOTIFY_WORKER="$RUNNER_TEMP/infinishell-test-notify-worker"
           python3 -B script/cli-agent-parity/installed_grok_hook_tests.py -v
+
+      # 只验原生安装/inspect/升级/禁用/修复；没有凭据时不声称 SessionStart 已派发。
+      - name: Verify fixed Linux Grok production notification installer without credentials
+        id: grok_source_installer
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
+          python3 -B script/cli-agent-parity/run_grok_plugin_live.py --test-binary "$test_binary" --grok "$INFINISHELL_TEST_GROK_EXE" --node "$(command -v node)" --fixture-parent "$RUNNER_TEMP" --output "$RUNNER_TEMP/grok-production-installer.safe.json"
+
+      - name: Preserve Linux Grok production installer evidence
+        if: ${{ !cancelled() && steps.grok_source_installer.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-linux-production-installer-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-production-installer.safe.json
+          if-no-files-found: error
+          retention-days: 14
+
+      # 固定发行输入仅在 ignored 验收作用域替代发现；消费者仍查询官方真实渠道。
+      - name: Verify fixed Linux CLI atomic update transactions without credentials
+        id: fixed_cli_atomic_updates
+        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 90
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
+          # Linux 原子目录不接受共享 /tmp 祖先；新建的任务根仍位于当前 runner 私有 HOME 内。
+          fixture_parent="$(mktemp -d "$HOME/infinishell-fixed-cli-updates.XXXXXXXX")"
+          python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary "$test_binary" --supervisor "$target_dir/debug/infinishell-tui" --fixture-parent "$fixture_parent" --cache "$RUNNER_TEMP/fixed-cli-atomic-inputs" --output "$RUNNER_TEMP/fixed-cli-atomic-evidence/summary.safe.json"
+
+      - name: Preserve Linux fixed CLI atomic update receipts
+        if: ${{ !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-fixed-atomic-updates-${{ github.sha }}
+          path: ${{ runner.temp }}/fixed-cli-atomic-evidence/*.safe.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test supervisor cleanup after host crash
         shell: bash
@@ -307,7 +361,7 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-permission-observation.json
-            ${{ runner.temp }}/claude-21278-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/claude-21280-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error
@@ -322,11 +376,40 @@ jobs:
         shell: bash
         run: cargo nextest run --no-run -p integration
 
+      - name: Verify Linux GUI system clipboard without model inputs
+        id: cli_gui_input
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: bash
+        timeout-minutes: 15
+        env:
+          WARP_INTEGRATION: "1"
+          WARPUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS: "1"
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-input-evidence/linux
+        run: |
+          set -euo pipefail
+          if ! command -v xvfb-run >/dev/null || ! command -v xclip >/dev/null; then
+            sudo -n apt-get update -q
+            sudo -n apt-get install -y xvfb xauth xclip fonts-noto-cjk libgl1-mesa-dri mesa-vulkan-drivers
+          fi
+          cargo build -p integration --bin integration
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          timeout 180s xvfb-run -a -s '-screen 0 1600x1000x24' "$target_dir/debug/integration" test_cli_composer_system_clipboard_multiline_and_image
+
+      - name: Preserve Linux GUI system clipboard evidence
+        if: ${{ !cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-gui-system-clipboard-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-input-evidence/linux
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run desktop workspace unit tests
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: bash
         # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
-        # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
+        # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
   macos_intel_ssh_extension_build:
@@ -530,6 +613,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Node test runtime is unavailable' }
           node --test script/cli-agent-parity/grok_plugin_tests.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Grok notification script tests failed' }
+          python -B script/cli-agent-parity/grok_plugin_live_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok production installer runner tests failed' }
+          python -B script/cli-agent-parity/native_ssh_notifications_tests.py NativeSshNotificationTests.test_grok_bridge_main_uses_the_same_guarded_mapper_on_each_desktop -v
+          if ($LASTEXITCODE -ne 0) { throw 'Grok notification bridge contract tests failed' }
 
       - name: Test notification patch file transactions
         shell: pwsh
@@ -600,6 +687,8 @@ jobs:
           python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Codex package preparation validation failed' }
           python -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI autoupdate validation failed' }
           python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
@@ -619,7 +708,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --version 0.155.1 --download-dir "$env:RUNNER_TEMP\codex-01551-inputs"
+          $codexExecutable = python -B script/cli-agent-parity/prepare_codex_cli.py --version 0.156.1 --download-dir "$env:RUNNER_TEMP\codex-01561-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Codex preparation failed' }
           "INFINISHELL_TEST_CODEX_EXE=$codexExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -640,7 +729,7 @@ jobs:
         timeout-minutes: 10
         run: |
           $ErrorActionPreference = 'Stop'
-          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.278 --download-dir "$env:RUNNER_TEMP\claude-21278-inputs"
+          $claudeExecutable = python -B script/cli-agent-parity/prepare_claude_cli.py --claude-version 2.1.280 --download-dir "$env:RUNNER_TEMP\claude-21280-inputs"
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Claude preparation failed' }
           "INFINISHELL_TEST_CLAUDE_EXE=$claudeExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -649,7 +738,7 @@ jobs:
         timeout-minutes: 5
         run: |
           $ErrorActionPreference = 'Stop'
-          $grokExecutable = python -B script/cli-agent-parity/prepare_grok_cli.py --download-dir (Join-Path $env:RUNNER_TEMP 'grok-cli-fixed')
+          $grokExecutable = python -B script/cli-agent-parity/prepare_grok_cli.py --version 1.0.41 --download-dir (Join-Path $env:RUNNER_TEMP 'grok-cli-fixed')
           if ($LASTEXITCODE -ne 0) { throw 'Fixed native Grok preparation failed' }
           "INFINISHELL_TEST_GROK_EXE=$grokExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -659,7 +748,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/grok_fixed_acp_probe.py --executable "$env:INFINISHELL_TEST_GROK_EXE" --output (Join-Path $env:RUNNER_TEMP 'grok-fixed-acp.json')
+          python -B script/cli-agent-parity/grok_fixed_acp_probe.py --version 1.0.41 --executable "$env:INFINISHELL_TEST_GROK_EXE" --output (Join-Path $env:RUNNER_TEMP 'grok-fixed-acp.json')
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok unauthenticated ACP boundaries failed' }
 
       - name: Verify native Claude initialization and idle EOF
@@ -668,7 +757,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
+          python -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.280 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-initialize-idle-eof.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude initialize and idle EOF validation failed' }
 
       - name: Verify native Claude permission observations without credentials
@@ -678,7 +767,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-permission-observation.json"
+          python -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.280 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output "$env:RUNNER_TEMP\claude-permission-observation.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude permission observation validation failed' }
 
       - name: Verify native Codex plugin registry failure recovery
@@ -687,7 +776,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.155.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-lifecycle.json"
+          python -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.156.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-lifecycle.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex plugin registry failure recovery failed' }
 
       - name: Verify native Codex persistent plugin source
@@ -696,7 +785,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.155.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-cache-refresh.json"
+          python -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.156.1 --codex-executable "$env:INFINISHELL_TEST_CODEX_EXE" --output "$env:RUNNER_TEMP\codex-plugin-cache-refresh.json"
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex persistent plugin source validation failed' }
 
       # 单独验证 Git Bash/jq，不将原生文件事务通过冒充 Windows hooks 已通过。
@@ -794,6 +883,66 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # 当前固定版本独立验收；旧版 0.147 专项不能替代新版原生派发和 ConPTY。
+      - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 20
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for Codex hooks' }
+          $env:INFINISHELL_GIT_BASH_EXE = (Resolve-Path $gitBash).Path
+          $env:INFINISHELL_JQ_EXE = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_hooks.py" --codex-version 0.156.1 --repo "$env:GITHUB_WORKSPACE" --architecture x86_64 --download-dir "$env:RUNNER_TEMP\codex-01561-hook-inputs" --bash-executable "$env:INFINISHELL_GIT_BASH_EXE" --jq-executable "$env:INFINISHELL_JQ_EXE" --output "$env:RUNNER_TEMP\codex-01561-windows-native-hooks.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
+
+      - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-01561-windows-native-hooks-${{ github.sha }}
+          path: ${{ runner.temp }}/codex-01561-windows-native-hooks.json
+          if-no-files-found: error
+          retention-days: 14
+
+      # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
+      - name: Verify fixed Codex 0.156.1 Windows ConPTY notification transport
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gitBashCandidates = @(
+            "$env:PROGRAMFILES\Git\usr\bin\bash.exe",
+            "$env:LOCALAPPDATA\Programs\Git\usr\bin\bash.exe"
+          )
+          $gitBash = $gitBashCandidates | Where-Object { Test-Path -PathType Leaf $_ } | Select-Object -First 1
+          if (-not $gitBash) { throw 'Native Git Bash with msys-2.0.dll is required for ConPTY verification' }
+          $jqExecutable = (Get-Command jq.exe -ErrorAction Stop).Source
+          python -B "$env:GITHUB_WORKSPACE\script\cli-agent-parity\probe_codex_windows_conpty.py" --codex-version 0.156.1 --repo "$env:GITHUB_WORKSPACE" --download-dir "$env:RUNNER_TEMP\codex-01561-hook-inputs" --bash-executable "$gitBash" --jq-executable "$jqExecutable" --output "$env:RUNNER_TEMP\codex-01561-windows-conpty.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
+
+      - name: Preserve fixed Codex 0.156.1 Windows ConPTY evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: codex-01561-windows-conpty-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/codex-01561-windows-conpty.json
+            ${{ runner.temp }}/codex-01561-windows-conpty.native.json
+            ${{ runner.temp }}/codex-01561-windows-conpty.pty.bin
+          if-no-files-found: error
+          retention-days: 14
+
       # 原生插件探针和离线 Rust 门禁互相独立；保留失败，同时继续具备前置条件的检查。
       # 通过显式步骤依赖阻止缺少工具链、测试二进制或监督 worker 时误跑后续验收。
       # 只验证私有、已完成引导但未登录的会话；路径初始化不能代替正式 OSC 传输。
@@ -806,7 +955,7 @@ jobs:
         env:
           PYTHONUTF8: "1"
         run: |
-          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --claude-version 2.1.278 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-windows-notifications.json')
+          python -B script/cli-agent-parity/probe_claude_windows_notifications.py --claude-version 2.1.280 --executable "$env:INFINISHELL_TEST_CLAUDE_EXE" --output (Join-Path $env:RUNNER_TEMP 'claude-windows-notifications.json')
           if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 原生 SessionStart 通知未通过，保留门控关闭' }
 
       - name: Preserve Claude Windows native notification evidence
@@ -892,6 +1041,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # 使用生产启动命令实测 cmd/PowerShell 的 Unicode argv；不伪造原生 hook 派发。
+      - name: Verify fixed Windows Grok production notification installer without credentials
+        id: grok_source_installer
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 6
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
+          python -B script/cli-agent-parity/run_grok_plugin_live.py --test-binary $executables[0] --grok "$env:INFINISHELL_TEST_GROK_EXE" --node $node --fixture-parent "$env:RUNNER_TEMP" --output "$env:RUNNER_TEMP/grok-production-installer.safe.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Grok production installer or shell argv contract failed; retain receipt without automatic retry' }
+
+      - name: Preserve Windows Grok production installer evidence
+        if: ${{ !cancelled() && steps.grok_source_installer.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-windows-production-installer-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-production-installer.safe.json
+          if-no-files-found: error
+          retention-days: 14
+
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
@@ -931,6 +1107,37 @@ jobs:
         env:
           CARGO_BUILD_JOBS: "2"
         run: cargo build -p warp_tui --bin infinishell-tui
+
+      # Windows 仍走已有严格 Job 调试候选，实际执行固定 update/install，并核对退出和新入口。
+      - name: Verify fixed Windows CLI atomic update candidates without credentials
+        id: fixed_cli_atomic_updates
+        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.test_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 40
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit supervisor lookup failed' }
+          $worker = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          $fixtureParent = Join-Path $env:RUNNER_TEMP ('infinishell-fixed-cli-updates-' + [guid]::NewGuid().ToString())
+          New-Item -ItemType Directory -Path $fixtureParent | Out-Null
+          python -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary $executables[0] --supervisor $worker --fixture-parent $fixtureParent --cache "$env:RUNNER_TEMP\fixed-cli-atomic-inputs" --output "$env:RUNNER_TEMP\fixed-cli-atomic-evidence\summary.safe.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed native update candidate failed; inspect safe receipts; production gates remain closed' }
+
+      - name: Preserve Windows fixed CLI atomic update receipts
+        if: ${{ !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-fixed-atomic-updates-${{ github.sha }}
+          path: ${{ runner.temp }}/fixed-cli-atomic-evidence/*.safe.json
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Test supervisor cleanup after host crash
         if: ${{ !cancelled() && steps.supervisor.outcome == 'success' && steps.test_app.outcome == 'success' }}
@@ -983,7 +1190,7 @@ jobs:
             ${{ runner.temp }}/codex-idle-crash.*
             ${{ runner.temp }}/claude-initialize-idle-eof.json
             ${{ runner.temp }}/claude-permission-observation.json
-            ${{ runner.temp }}/claude-21278-inputs/claude-fixed-inputs.json
+            ${{ runner.temp }}/claude-21280-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
           if-no-files-found: error
@@ -999,11 +1206,46 @@ jobs:
         shell: pwsh
         run: cargo nextest run --no-run -p integration
 
+      - name: Verify Windows GUI system clipboard without model inputs
+        id: cli_gui_input
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          WARP_INTEGRATION: "1"
+          WARPUI_USE_REAL_DISPLAY_IN_INTEGRATION_TESTS: "1"
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-input-evidence/windows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build -p integration --bin integration
+          if ($LASTEXITCODE -ne 0) { throw 'GUI integration binary compilation failed' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'GUI integration binary discovery failed' }
+          $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
+          # 服务会话必须实际创建窗口、读系统剪贴板并产出非空截图；不能降级为内存替身。
+          $process = Start-Process -FilePath $binary -ArgumentList 'test_cli_composer_system_clipboard_multiline_and_image' -NoNewWindow -PassThru
+          if (-not $process.WaitForExit(180000)) {
+            $process.Kill($true)
+            $process.WaitForExit()
+            throw 'Real Windows GUI initialization or clipboard test exceeded 180 seconds'
+          }
+          if ($process.ExitCode -ne 0) { throw 'Real Windows window or system clipboard verification failed' }
+
+      - name: Preserve Windows GUI system clipboard evidence
+        if: ${{ !cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-gui-system-clipboard-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-input-evidence/windows
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run desktop workspace unit tests
         if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
         shell: pwsh
         # 全量桌面测试不包含 TUI；本次变动的 TUI 消息状态已由上方定向步骤覆盖。
-        # integration 需要专用图形会话，此处完成跨平台编译后交由 GUI 测试流程执行。
+        # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
         # nextest 配置仅串行 Windows 的 warp 主应用测试，其他 crate 仍可并行执行。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 

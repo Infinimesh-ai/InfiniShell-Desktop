@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "goal-v12-build.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v12-build.safe.json",
+      "sha256": "e5a28c8fe33ed8fd379d0f2e620b2eb253336a709c82e135888d9019376c2ef8"
+    },
+    {
+      "file": "goal-v12-sources.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v12-sources.safe.json",
+      "sha256": "c1b5525a0633486d60991d1ac1b6204c87c3a342c779e76616be7cccf226fd87"
+    },
+    {
+      "file": "goal-v12-writer.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v12-writer.safe.json",
+      "sha256": "1c5d817984dd737229bbb5b7cf3e71eb59fa63136d566d914077e9888bca7eca"
+    },
+    {
+      "file": "goal-v12-format.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v12-format.safe.json",
+      "sha256": "73a8022b265beb8a3e2e9ea8b60e609f4b86f90b081299e5859064350610d777"
+    },
+    {
+      "file": "goal-v12-delta.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/evidence/goal-v12-delta.safe.json",
+      "sha256": "9cc14d48486a22676d444176fe8c72326601c85c8f9990bc9fd32234750de6e1"
+    },
+    {
+      "file": "build-default-goal-v12.safe.json",
+      "source": "/private/tmp/isp-mac-1mej4h8z/gui-evidence/build-default-goal-v12.safe.json",
+      "sha256": "804466b8d9b905af10bf71101667b1cbcaa277a1a70818cdfbbde6395646e86e"
+    }
+  ],
+  "scope": "V11 plus notification writer event and Linux preparation fixture correction",
+  "localization": "No visible text change; V11 bilingual layout applies",
+  "full_workspace_reused_by_unaffected_scope": true,
+  "real_permission_gui": "pending"
+}

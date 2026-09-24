@@ -1,0 +1,26 @@
+{
+  "case": "claude_gui_attachment_scope_failure",
+  "version": "2.1.280",
+  "task_id": "50f5d3b0-dd6e-49ba-93fb-3d8f96689e7a",
+  "native_session_id": "15a5cb1a-3a8a-4804-ad03-e0d4f934bb51",
+  "runtime_generation": "f0f51334-90ce-424d-9081-8309c1f27515",
+  "result": "failed_before_native_submit",
+  "reason": "host_native_state_dir_mismatches_application_attachment_store",
+  "events": {
+    "SessionReady": 1,
+    "RequestFailed": 1,
+    "MessageAccepted": 1,
+    "Disconnected": 1
+  },
+  "accepted_turn_count": 0,
+  "image_sha256": "12bdfde7f3c89e2135990a79f859455ed472e55e2a9696d1d532689702279421",
+  "gui_build_receipt_sha256": "b403e0784f84fd8902eccae0029640ba5b32c2d81ecfacfe792c1d253b774a99",
+  "cleanup": {
+    "native_process": "exited",
+    "adapter_task_terminated": true,
+    "adapter_succeeded": true,
+    "event_journal_completed": true
+  },
+  "journal_sha256": "f2f4b4cd1d9198f8b3c820b3f94822dc251b44888ed8199e74271ea3ebf606e9",
+  "same_final_commit_claim": false
+}

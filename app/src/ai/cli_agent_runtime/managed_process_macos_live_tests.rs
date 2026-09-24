@@ -241,6 +241,7 @@ async fn spawn_captured_output(
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
     let manifest = Manifest {
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,
@@ -468,6 +469,7 @@ fn supervised_macos_live_domain_zero_timeout_never_writes_success() {
     let state = create_generation_directory(&directory, generation).unwrap();
     let manifest = Manifest {
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,
@@ -512,6 +514,7 @@ fn supervised_macos_job_removal_failure_still_stops_its_claimed_wrapper() {
     let state = create_generation_directory(&directory, generation).unwrap();
     let manifest = Manifest {
         isolated_home: None,
+        isolated_state_dir: None,
         environment: None,
         version: 1,
         launch_allowed: true,

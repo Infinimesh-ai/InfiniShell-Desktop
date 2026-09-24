@@ -77,8 +77,72 @@ fn native_lease_requires_real_reply_before_out_of_order_completion_can_close_it(
         .observe_native_tool(&completed("native-call"), now)
         .unwrap();
     assert_eq!(ledger.state(&proof).unwrap(), GrokToolLeaseState::Bound);
-    ledger.record_reply_written(&proof).unwrap();
+    ledger.record_reply_written(&proof, true).unwrap();
     assert_eq!(ledger.state(&proof).unwrap(), GrokToolLeaseState::Closed);
+}
+
+#[test]
+fn written_business_error_closes_only_its_native_call_and_allows_the_next_turn() {
+    let now = Instant::now();
+    let mut ledger = ledger(Uuid::nil());
+    ready(&mut ledger, "native-call", "initial", "final", 1, now);
+    let proof = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
+    ledger.record_reply_written(&proof, false).unwrap();
+    let mut failed = completed("native-call");
+    failed["params"]["update"]["status"] = json!("failed");
+    ledger.observe_native_tool(&failed, now).unwrap();
+    ledger.observe_native_tool(&failed, now).unwrap();
+    assert_eq!(ledger.state(&proof).unwrap(), GrokToolLeaseState::Closed);
+    assert!(!ledger.is_retired());
+    ledger.record_reply_written(&proof, false).unwrap();
+    assert!(ledger.record_reply_written(&proof, true).is_err());
+    ledger.begin_turn(Uuid::nil(), "next-native-turn").unwrap();
+}
+
+#[test]
+fn native_failure_without_a_matching_written_business_error_retires_capability() {
+    let now = Instant::now();
+    for written in [None, Some(true)] {
+        let mut ledger = ledger(Uuid::nil());
+        ready(&mut ledger, "native-call", "initial", "final", 1, now);
+        let proof = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
+        if let Some(success) = written {
+            ledger.record_reply_written(&proof, success).unwrap();
+        }
+        let mut failed = completed("native-call");
+        failed["params"]["update"]["status"] = json!("failed");
+        assert!(ledger.observe_native_tool(&failed, now).is_err());
+        assert!(ledger.is_retired());
+    }
+}
+
+#[test]
+fn business_error_for_one_call_cannot_authorize_another_calls_failure() {
+    let now = Instant::now();
+    let mut ledger = ledger(Uuid::nil());
+    ready(
+        &mut ledger,
+        "native-first",
+        "initial-first",
+        "final-first",
+        1,
+        now,
+    );
+    let first = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
+    ledger.record_reply_written(&first, false).unwrap();
+    ready(
+        &mut ledger,
+        "native-second",
+        "initial-second",
+        "final-second",
+        3,
+        now,
+    );
+    ledger.bind_sdk(&sdk(Uuid::nil(), 5, 3), now).unwrap();
+    let mut failed = completed("native-second");
+    failed["params"]["update"]["status"] = json!("failed");
+    assert!(ledger.observe_native_tool(&failed, now).is_err());
+    assert!(ledger.is_retired());
 }
 
 #[test]
@@ -175,7 +239,7 @@ fn cancelled_epoch_rejects_first_late_callback_and_reply_from_old_lease() {
     let proof = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
     ledger.retire();
     assert!(ledger.bind_sdk(&sdk(Uuid::nil(), 5, 3), now).is_err());
-    assert!(ledger.record_reply_written(&proof).is_err());
+    assert!(ledger.record_reply_written(&proof, true).is_err());
     assert!(
         ledger
             .observe_native_tool(&completed("native-call"), now)
@@ -210,7 +274,7 @@ fn new_generation_supports_repeated_arguments_but_rejects_old_server_and_proof()
         .bind_sdk(&sdk(Uuid::from_u128(1), 4, 2), now)
         .unwrap();
     assert_eq!(new.native_call_id(), "native-new-call");
-    assert!(current.record_reply_written(&old).is_err());
+    assert!(current.record_reply_written(&old, true).is_err());
     assert!(
         current
             .begin_turn(Uuid::from_u128(1), "new-turn-on-old-process")
@@ -255,7 +319,7 @@ fn completed_turn_reuses_process_epoch_and_nonce_without_rebinding_old_transacti
         now,
     );
     let old = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
-    ledger.record_reply_written(&old).unwrap();
+    ledger.record_reply_written(&old, true).unwrap();
     ledger
         .observe_native_tool(&completed("native-old"), now)
         .unwrap();
@@ -300,7 +364,7 @@ fn fixed_runtime_generation_accepts_next_confirmed_native_turn_after_all_leases_
             .is_err()
     );
     let first = ledger.bind_sdk(&sdk(Uuid::nil(), 4, 2), now).unwrap();
-    ledger.record_reply_written(&first).unwrap();
+    ledger.record_reply_written(&first, true).unwrap();
     ledger
         .observe_native_tool(&completed("native-first"), now)
         .unwrap();

@@ -413,6 +413,7 @@ struct RecoveryBatch {
     records: Vec<LocalCliTask>,
     hosts: Vec<RecoveredHost>,
     results: Vec<(LocalCliTask, LocalCliMessage)>,
+    unconfirmed_hosts: HashMap<String, String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -459,6 +460,8 @@ pub(crate) struct LocalCLITaskCoordinator {
     restored: Vec<LocalCliTask>,
     recovery_error: Option<String>,
     recovery_owner: Option<Uuid>,
+    recovery_complete: bool,
+    unconfirmed_hosts: HashMap<String, String>,
 }
 
 impl Entity for LocalCLITaskCoordinator {
@@ -469,12 +472,15 @@ impl SingletonEntity for LocalCLITaskCoordinator {}
 
 impl LocalCLITaskCoordinator {
     pub(crate) fn new(sender: Option<SyncSender<ModelEvent>>) -> Self {
+        let recovery_complete = sender.is_none();
         Self {
             sender,
             entries: HashMap::new(),
             restored: Vec::new(),
             recovery_error: None,
             recovery_owner: None,
+            recovery_complete,
+            unconfirmed_hosts: HashMap::new(),
         }
     }
 
@@ -536,6 +542,24 @@ impl LocalCLITaskCoordinator {
         &self.restored
     }
 
+    /// 回合终态不能证明原生进程退出；恢复未完成或退出未确认时继续阻止同款 CLI 更新。
+    pub(crate) fn cli_update_busy(&self, harness: &str) -> bool {
+        !self.recovery_complete
+            || self.recovery_owner.is_some()
+            || self.recovery_error.is_some()
+            || self
+                .unconfirmed_hosts
+                .values()
+                .any(|value| value == harness)
+            || self.entries.values().any(|entry| {
+                let snapshot = &entry.snapshot;
+                snapshot.task.harness == harness
+                    && (snapshot.connected
+                        || snapshot.task.state.is_active()
+                        || snapshot.active_turn_id.is_some())
+            })
+    }
+
     pub(crate) fn recovery_error(&self) -> Option<&str> {
         self.recovery_error.as_deref()
     }
@@ -571,6 +595,8 @@ impl LocalCLITaskCoordinator {
                 match result {
                     Ok(batch) => {
                         model.restored = batch.records;
+                        model.unconfirmed_hosts = batch.unconfirmed_hosts;
+                        model.recovery_complete = true;
                         model.recovery_error = None;
                         for recovered in batch.hosts {
                             model.install_recovered_host(recovered, ctx);
@@ -586,6 +612,8 @@ impl LocalCLITaskCoordinator {
                 ctx.notify();
             },
         );
+        ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
+        ctx.notify();
     }
 
     fn install_recovered_host(&mut self, recovered: RecoveredHost, ctx: &mut ModelContext<Self>) {
@@ -594,6 +622,7 @@ impl LocalCLITaskCoordinator {
         };
         let token = recovered.options.generation;
         let task_id = recovered.snapshot.task.task_id.clone();
+        self.unconfirmed_hosts.remove(&task_id);
         if self
             .entries
             .get(&task_id)
@@ -1167,6 +1196,9 @@ impl LocalCLITaskCoordinator {
         };
         let task = snapshot.task.clone();
         let previous_turn = entry.snapshot.active_turn_id.clone();
+        if snapshot.connected && snapshot.ready {
+            self.unconfirmed_hosts.remove(&snapshot.task.task_id);
+        }
         entry.snapshot = snapshot;
         let retry_results = event.as_ref().is_some_and(|event| {
             matches!(
@@ -1396,7 +1428,7 @@ async fn recover_runtime_hosts_in_state_dir(
         {
             results.push((task.clone(), message));
         }
-        if !task.state.is_active() {
+        if !task.state.is_active() && !task.state.is_terminal() {
             continue;
         }
         let config: serde_json::Value = match serde_json::from_str(&task.config_json) {
@@ -1414,6 +1446,19 @@ async fn recover_runtime_hosts_in_state_dir(
         if runtime_host_is_owned(owned, &task.task_id) {
             continue;
         }
+        // 回合结束不代表宿主退出；重启后仅接回仍存活的终态宿主，不重启或改写旧记录。
+        let terminal_host = if task.state.is_terminal() {
+            match super::runtime_host::classify_startup(state_dir, generation).await {
+                Ok(host @ super::runtime_host::RuntimeHostStartupState::LiveReattachable(_)) => {
+                    Some(host)
+                }
+                Ok(super::runtime_host::RuntimeHostStartupState::ExitedResumable { .. })
+                | Ok(super::runtime_host::RuntimeHostStartupState::Unconfirmed(_))
+                | Err(_) => continue,
+            }
+        } else {
+            None
+        };
         match super::runtime_host::startup_evidence_matches_task(
             state_dir,
             generation,
@@ -1434,9 +1479,12 @@ async fn recover_runtime_hosts_in_state_dir(
             }
             Some(true) | None => {}
         }
-        let classification = super::runtime_host::classify_startup(state_dir, generation)
-            .await
-            .map_err(|_| crate::t!("cli-agent-status-disconnected"))?;
+        let classification = match terminal_host {
+            Some(host) => host,
+            None => super::runtime_host::classify_startup(state_dir, generation)
+                .await
+                .map_err(|_| crate::t!("cli-agent-status-disconnected"))?,
+        };
         let Some(record) = super::runtime_host::load_record(state_dir, generation)
             .map_err(|_| crate::t!("cli-agent-status-disconnected"))?
         else {
@@ -1462,7 +1510,17 @@ async fn recover_runtime_hosts_in_state_dir(
                 .await?;
             continue;
         };
-        if record.task_id() != task.task_id || record.task_generation() != task.generation {
+        let identity_matches = if record.task_id() != task.task_id {
+            false
+        } else if record.task_generation() == task.generation {
+            true
+        } else {
+            let history = load_task_generations(sender, task.task_id.clone())?
+                .await
+                .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+            runtime_host_history_matches(&record, task, &history)
+        };
+        if !identity_matches {
             transition_recovery_state(
                 sender,
                 task,
@@ -1799,10 +1857,99 @@ async fn recover_runtime_hosts_in_state_dir(
             }
         }
     }
+    let mut unconfirmed_hosts = HashMap::new();
+    for task in &records {
+        if owned.contains_key(&task.task_id)
+            || hosts
+                .iter()
+                .any(|host| host.snapshot.task.task_id == task.task_id)
+        {
+            continue;
+        }
+        let generation = serde_json::from_str::<serde_json::Value>(&task.config_json)
+            .ok()
+            .and_then(|config| {
+                config["runtime_generation"]
+                    .as_str()
+                    .and_then(|value| Uuid::parse_str(value).ok())
+            });
+        if let Some(generation) = generation
+            && !super::runtime_host::exit_confirmed_for_update(state_dir, generation)
+                .unwrap_or(false)
+        {
+            unconfirmed_hosts.insert(task.task_id.clone(), task.harness.clone());
+        }
+    }
     Ok(RecoveryBatch {
         records,
         hosts,
         results,
+        unconfirmed_hosts,
+    })
+}
+
+fn runtime_host_history_matches(
+    record: &super::runtime_host::RuntimeHostRecord,
+    current: &LocalCliTask,
+    history: &[LocalCliTask],
+) -> bool {
+    if record.task_id() != current.task_id
+        || record.task_generation() >= current.generation
+        || record.harness()
+            != Harness::parse_orchestration_harness(&current.harness).unwrap_or(Harness::Unknown)
+        || record.options().cwd != Path::new(&current.working_directory)
+        || current
+            .native_session_id
+            .as_deref()
+            .is_none_or(str::is_empty)
+    {
+        return false;
+    }
+    let Ok(config) = serde_json::from_str::<serde_json::Value>(&current.config_json) else {
+        return false;
+    };
+    let mut chain: Vec<_> = history
+        .iter()
+        .filter(|task| task.generation >= record.task_generation())
+        .collect();
+    chain.sort_by_key(|task| task.generation);
+    if chain
+        .first()
+        .is_none_or(|task| task.generation != record.task_generation())
+        || chain.last().copied() != Some(current)
+        || chain
+            .windows(2)
+            .any(|pair| pair[0].generation.checked_add(1) != Some(pair[1].generation))
+    {
+        return false;
+    }
+    // 启动代、每个中间代和当前代必须属于同一宿主及原生会话；权限与启动配置不能漂移。
+    chain.iter().all(|task| {
+        let Ok(previous) = serde_json::from_str::<serde_json::Value>(&task.config_json) else {
+            return false;
+        };
+        task.version == current.version
+            && task.task_id == current.task_id
+            && task.harness == current.harness
+            && task.working_directory == current.working_directory
+            && task.parent_task_id == current.parent_task_id
+            && task.parent_generation == current.parent_generation
+            && task.native_session_id == current.native_session_id
+            && previous["runtime_generation"] == json!(record.runtime_generation())
+            && [
+                "executable",
+                "model",
+                "permission_policy",
+                "permission_ceiling",
+                "local_tools",
+                "selected_skills",
+                "claude_profile",
+                "grok_profile",
+                "cli_version",
+                "effective_permissions",
+            ]
+            .iter()
+            .all(|key| previous[*key] == config[*key])
     })
 }
 
@@ -3974,6 +4121,10 @@ mod cli_update_launch_tests;
 #[cfg(test)]
 #[path = "claude_coordinator_live_tests.rs"]
 mod claude_live_tests;
+
+#[cfg(all(test, target_os = "macos"))]
+#[path = "codex_coordinator_live_tests.rs"]
+mod codex_live_tests;
 
 #[cfg(test)]
 #[path = "grok_coordinator_live_tests.rs"]

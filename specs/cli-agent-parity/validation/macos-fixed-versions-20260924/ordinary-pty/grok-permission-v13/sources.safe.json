@@ -1,0 +1,57 @@
+{
+  "manifest_sha256": "4c73b842e80aeb741e240db843d7b9c335dd29ae67000b13e5bc0e14f1bc22e7",
+  "base_head": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+  "dirty_build_not_same_final_commit": true,
+  "files": {
+    "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": {
+      "observed_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "v13_manifest_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "base_head_blob_sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898"
+    },
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": {
+      "observed_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "v13_manifest_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "base_head_blob_sha256": null
+    },
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": {
+      "observed_sha256": "94a63c7646ab56db6091103448bd21f9f765ee3f538e4710f8c15e8a60e6b4e0",
+      "v13_manifest_sha256": "94a63c7646ab56db6091103448bd21f9f765ee3f538e4710f8c15e8a60e6b4e0",
+      "base_head_blob_sha256": "8f56c0916e1e9f97225f5b442b5dba8454f7a96513197453fc61a6a498a19ec9"
+    },
+    "app/src/terminal/cli_agent_hook_writer.rs": {
+      "observed_sha256": "185a51774cd99dcae41bc241e61bc850152cba115f2be88b160f63b7d92eb9d5",
+      "v13_manifest_sha256": "185a51774cd99dcae41bc241e61bc850152cba115f2be88b160f63b7d92eb9d5",
+      "base_head_blob_sha256": "99fd417391c7c4d63cc5efbbf40a140b4fc63d45eb21abaac52e40da0f338541"
+    },
+    "app/src/terminal/cli_agent_sessions/event_cursor.rs": {
+      "observed_sha256": "a663f42adf4ce0e27c4270c67db83290a3f187eb5e83c09e8f63ecbc11e3ea2e",
+      "v13_manifest_sha256": "a663f42adf4ce0e27c4270c67db83290a3f187eb5e83c09e8f63ecbc11e3ea2e",
+      "base_head_blob_sha256": "3d1f8a79c198ff9a01c6ceb5f3b9e23e9c3ee7bddff55098f68b779e59ecf528"
+    },
+    "app/src/terminal/cli_agent_sessions/mod.rs": {
+      "observed_sha256": "dc85e4f2d4c32541280d586e275e85e26d23992da4df5c1eb6ded4d379d7902d",
+      "v13_manifest_sha256": "dc85e4f2d4c32541280d586e275e85e26d23992da4df5c1eb6ded4d379d7902d",
+      "base_head_blob_sha256": "6d3cc4b3fae518ccd4607e9fc44a17095f3e079c0b49b27229c32c8946e1f83b"
+    },
+    "app/src/notifications/model.rs": {
+      "observed_sha256": "adab8fa0cdfdf4e2911fe7b0e523e8bff8f63c9144e0fdc81ce0ea3ff63693ec",
+      "v13_manifest_sha256": "adab8fa0cdfdf4e2911fe7b0e523e8bff8f63c9144e0fdc81ce0ea3ff63693ec",
+      "base_head_blob_sha256": "ae6761f9cba641957a58307f05bc51e88a6df74f1115a6fc490f37806464d032"
+    },
+    "app/src/terminal/view.rs": {
+      "observed_sha256": "f285586abcc9ec3485533bc9ff6ac5d7dbf316fdbff756e01bf336f72341e99b",
+      "v13_manifest_sha256": "f285586abcc9ec3485533bc9ff6ac5d7dbf316fdbff756e01bf336f72341e99b",
+      "base_head_blob_sha256": "f88edbdb153c463888d6c60cfa4b8f975a8d4195520f8aa6f2b22b55fa7b9730"
+    },
+    "app/i18n/en/warp.ftl": {
+      "observed_sha256": "3f7fbd24bb928e5e9a587954405f30699e14b3efb4b13fa50be047e3ee1903ab",
+      "v13_manifest_sha256": "3f7fbd24bb928e5e9a587954405f30699e14b3efb4b13fa50be047e3ee1903ab",
+      "base_head_blob_sha256": "8bc4e77f66df42f9346a080c1d8a68ae2d2288558c271f55375e3c66d168f57d"
+    },
+    "app/i18n/zh-CN/warp.ftl": {
+      "observed_sha256": "9641addcae9bc735938c92b1aa0ee12ec565350605278b16a4dc38de51385727",
+      "v13_manifest_sha256": "9641addcae9bc735938c92b1aa0ee12ec565350605278b16a4dc38de51385727",
+      "base_head_blob_sha256": "8ca2149b33a8a178fa9be1138976ec8a5d8ce3410d847b84c197e4d94cd42c40"
+    }
+  }
+}

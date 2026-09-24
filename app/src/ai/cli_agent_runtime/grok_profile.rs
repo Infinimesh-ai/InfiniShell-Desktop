@@ -11,13 +11,32 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Value, json};
 
 use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME, tool_definitions};
-use super::{PermissionPolicy, RuntimeError};
+use super::{PermissionPolicy, RuntimeError, SessionTarget};
 
 const LEGACY_VERIFIED_VERSION: &str = "1.0.30";
 const P0_VERIFIED_VERSION: &str = "1.0.34";
 const CURRENT_VERSION: &str = "1.0.40";
-// 这里只绑定官方固定字节；Linux/Windows 最新版仍须由运行时能力门禁和实机收据独立放行。
+const FIXED_SCOPE_VERSION: &str = "1.0.41";
+// 这里只绑定各平台的固定官方文件摘要；权限仍需启动材料、目录和实际工具证据。
 const VERIFIED_EXECUTABLES: &[(&str, &str, &str, &str)] = &[
+    (
+        "linux",
+        "x86_64",
+        FIXED_SCOPE_VERSION,
+        "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+    ),
+    (
+        "windows",
+        "x86_64",
+        FIXED_SCOPE_VERSION,
+        "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    ),
+    (
+        "macos",
+        "aarch64",
+        FIXED_SCOPE_VERSION,
+        "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    ),
     (
         "macos",
         "aarch64",
@@ -159,7 +178,7 @@ impl GrokCreationPolicyV1 {
     ) -> Result<Self, RuntimeError> {
         if !matches!(
             cli_version,
-            LEGACY_VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION
+            LEGACY_VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION | FIXED_SCOPE_VERSION
         ) || !cwd.is_absolute()
         {
             return Err(reject("grok_creation_policy_version_or_directory"));
@@ -259,6 +278,7 @@ impl GrokCreationPolicyV1 {
             && self.local_tools == local_tools
             && self.permission_policy() == permission_policy
             && (cli_version == LEGACY_VERIFIED_VERSION
+                || super::grok::current_fixed_scope_supported_version(cli_version)
                 || (cli_version == P0_VERIFIED_VERSION
                     && local_tools.is_none()
                     && permission_policy == PermissionPolicy::GrokRestrictedReadV1))
@@ -399,6 +419,15 @@ official_marketplace_auto_installed = true
 name = "xAI Official"
 git = "https://github.com/xai-org/plugin-marketplace.git"
 "#;
+
+fn fixed_configuration(current: bool) -> String {
+    // 已保存旧任务保留原模型配置摘要；当前固定版本使用本轮实链固定的模型。
+    if current {
+        FIXED_CONFIGURATION.replace("grok-4.6-build", "grok-4.7")
+    } else {
+        FIXED_CONFIGURATION.to_owned()
+    }
+}
 
 pub(super) struct GrokLaunch {
     pub policy: GrokCreationPolicyV1,
@@ -563,7 +592,7 @@ impl GrokCreationPolicyV1 {
         if !config.is_file() || !profile.is_file() {
             return Err(reject("grok_creation_files_missing"));
         }
-        immutable_file(&config, FIXED_CONFIGURATION.as_bytes())?;
+        immutable_file(&config, self.fixed_configuration().as_bytes())?;
         immutable_file(&profile, self.profile_document()?.as_bytes())
     }
 
@@ -615,9 +644,36 @@ impl GrokCreationPolicyV1 {
         }
     }
 
-    pub(super) fn prepare(options: &super::SessionOptions) -> Result<GrokLaunch, RuntimeError> {
+    fn fixed_configuration(&self) -> String {
+        fixed_configuration(self.matches_cli_version(FIXED_SCOPE_VERSION))
+    }
+
+    fn prepare_storage(
+        &self,
+        state: &Path,
+        target: &SessionTarget,
+    ) -> Result<PathBuf, RuntimeError> {
+        if !state.is_absolute() {
+            return Err(reject("grok_managed_directory_invalid"));
+        }
+        std::fs::create_dir_all(state)?;
+        let parent = state.canonicalize()?.join("grok-managed");
+        create_private_directory(&parent)?;
+        let home = parent.join(self.storage_id.to_string());
+        if *target != SessionTarget::New && !home.is_dir() {
+            return Err(reject("grok_resume_creation_storage_missing"));
+        }
+        create_private_directory(&home)?;
+        Ok(home)
+    }
+
+    pub(super) fn prepare(
+        options: &super::SessionOptions,
+        profile_state_dir: &Path,
+    ) -> Result<GrokLaunch, RuntimeError> {
         let (cli_version, digest) = verified_executable_digest(&options.executable)?;
-        let config_digest = format!("{:x}", Sha256::digest(FIXED_CONFIGURATION.as_bytes()));
+        let configuration = fixed_configuration(cli_version == FIXED_SCOPE_VERSION);
+        let config_digest = format!("{:x}", Sha256::digest(configuration.as_bytes()));
         let mut policy = Self::compile(
             &options.cwd,
             cli_version,
@@ -655,15 +711,8 @@ impl GrokCreationPolicyV1 {
                 .ok_or_else(|| reject("grok_creation_parent_unknown"))?
                 .validate_child(&policy)?;
         }
-        std::fs::create_dir_all(&options.state_dir)?;
-        let state = options.state_dir.canonicalize()?;
-        let parent = state.join("grok-managed");
-        create_private_directory(&parent)?;
-        let home = parent.join(policy.storage_id.to_string());
-        if options.target != super::SessionTarget::New && !home.is_dir() {
-            return Err(reject("grok_resume_creation_storage_missing"));
-        }
-        create_private_directory(&home)?;
+        // 持久会话存储属于应用作用域，不能随监督宿主的进程代次更换。
+        let home = policy.prepare_storage(profile_state_dir, &options.target)?;
         for path in [
             "grok",
             "home",
@@ -694,7 +743,7 @@ impl GrokCreationPolicyV1 {
         };
         immutable_file(
             &launch.home.join("grok/config.toml"),
-            FIXED_CONFIGURATION.as_bytes(),
+            configuration.as_bytes(),
         )?;
         immutable_file(
             &launch.profile_path,

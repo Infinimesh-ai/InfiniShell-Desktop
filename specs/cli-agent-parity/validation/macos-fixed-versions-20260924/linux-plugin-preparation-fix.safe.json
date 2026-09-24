@@ -1,0 +1,18 @@
+{
+  "base_source_manifest_sha256": "b3e0cbd07bf031146dd199c2cfec5ebbf41d266051bc0bf255498e6ee624ca8f",
+  "changes": [
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate.py",
+      "before": "0ff625551812633507ea5196232576574be84cf00bea4aa9c3c4c20001cf1a75",
+      "after": "85e76598de7bb7fe185809164e40a53574bfb0644c689b49ea43e4b5d1440162"
+    }
+  ],
+  "reason": "Linux plugin preparation uses supported Grok 1.0.41 then restores old 1.0.40 entry for actual upgrade",
+  "rust_and_bundled_resources_unchanged": true,
+  "python_tests": {
+    "count": 18,
+    "exit_code": 0,
+    "log_sha256": "dd359fa40526893fad559ad847525fcce619b3bae28da79c059f80fa36f5cb01"
+  },
+  "native_linux_executed": false
+}

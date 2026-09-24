@@ -9,6 +9,7 @@ import secrets
 import subprocess
 import tempfile
 import time
+import uuid
 
 import run_grok_fixed_policy as fixed
 
@@ -17,7 +18,11 @@ isolation, official, shared = lease.isolation, lease.official, lease.shared
 SCOPE = "real_grok_fixed_policy_parent_child"
 TEST_NAME = "ai::cli_agent_runtime::coordinator::grok_child_live_tests::" + SCOPE
 MAX_DEADLINE = 600
+CLI_VERSION = "1.0.41"
+CLI_VERSION_OUTPUT = "grok 1.0.41 (4220f3b224a6)"
+CLI_SHA256 = "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
 START = {"event": "acceptance_started", "scope": SCOPE, "max_native_inputs": 6,
+    "cli_version": CLI_VERSION,
     "production_prepare": True, "test_argv_override": False, "real_gui_verified": False,
     "app_restart_verified": False, "native_effective_policy_verified": False, "filesystem_sandbox_verified": False}
 GATE = {"event": "queued_before_read_allow", "scope": SCOPE,
@@ -41,11 +46,38 @@ def typed_equal(left, right):
         and all(type(left[key]) is type(value) and left[key] == value for key, value in right.items()))
 
 
+def valid_cleanup_receipt(event):
+    if set(event) != {"event", "scope", "runtime_generation", "receipt"}:
+        return False
+    receipt = event["receipt"]
+    keys = {"version", "runtime_generation", "host_instance_id", "manifest_sha256",
+        "journal_sha256", "last_event_sequence", "acknowledged_sequence", "native_process",
+        "native_cleanup_sha256", "adapter_task_terminated", "adapter_succeeded", "event_journal_completed"}
+    if type(receipt) is not dict or set(receipt) != keys:
+        return False
+    try:
+        if (str(uuid.UUID(event["runtime_generation"])) != event["runtime_generation"]
+                or str(uuid.UUID(receipt["host_instance_id"])) != receipt["host_instance_id"]):
+            return False
+    except (TypeError, ValueError, AttributeError):
+        return False
+    return (type(receipt["version"]) is int and receipt["version"] == 2
+        and receipt["runtime_generation"] == event["runtime_generation"]
+        and receipt["native_process"] == "exited"
+        and all(type(receipt[key]) is bool for key in ("adapter_task_terminated", "adapter_succeeded", "event_journal_completed"))
+        and all(fixed.is_hash(receipt[key]) for key in ("manifest_sha256", "journal_sha256", "native_cleanup_sha256"))
+        and type(receipt["last_event_sequence"]) is int
+        and type(receipt["acknowledged_sequence"]) is int
+        and 0 <= receipt["acknowledged_sequence"] <= receipt["last_event_sequence"])
+
+
 def validate_event(event):
     if type(event) is not dict or event.get("scope") != SCOPE:
         return False
     if any(typed_equal(event, expected) for expected in (START, GATE, RESUME, END)):
         return True
+    if event.get("event") == "runtime_host_cleanup_receipt":
+        return valid_cleanup_receipt(event)
     if event.get("event") == "chain_verified":
         return (set(event) == set(CHAIN) | CHAIN_HASHES
             and typed_equal({key: event[key] for key in CHAIN}, CHAIN)
@@ -60,13 +92,13 @@ def validate_event(event):
 
 
 def read_events(path):
-    # 八条固定证据覆盖开始、排队闸门、持久化链、三次清理和一次冷继续。
+    # 八条业务证据与三条真实宿主退出回执必须成对保留。
     raw = isolation.private_bytes(path, 128 * 1024)
     events = [json.loads(line, object_pairs_hook=lease._pairs,
         parse_constant=lambda value: (_ for _ in ()).throw(ValueError("非有限 JSON")))
         for line in raw.decode("utf-8").splitlines() if line.strip()]
-    if len(events) > 8 or any(type(event) is not dict for event in events):
-        raise ValueError("父子协调器证据超过八条固定事件")
+    if len(events) > 11 or any(type(event) is not dict for event in events):
+        raise ValueError("父子协调器证据超过十一条固定事件")
     return events
 
 
@@ -76,15 +108,21 @@ def observation(code, events):
         "final_result_via_inspect_verified": False, "native_effective_policy_verified": False,
         "filesystem_sandbox_verified": False, "app_restart_verified": False,
         "real_gui_verified": False, "full_cli_parity_acceptance_passed": False}
-    if (type(code) is not int or code != 0 or len(events) != 8
+    if (type(code) is not int or code != 0 or len(events) != 11
             or not all(validate_event(event) for event in events)):
         return result
     if ([event["event"] for event in events] != ["acceptance_started", "queued_before_read_allow", "chain_verified",
-            "cleanup_verified", "cleanup_verified", "cold_resume_verified", "cleanup_verified", "acceptance_passed"]):
+            "runtime_host_cleanup_receipt", "cleanup_verified", "runtime_host_cleanup_receipt", "cleanup_verified",
+            "cold_resume_verified", "runtime_host_cleanup_receipt", "cleanup_verified", "acceptance_passed"]):
         return result
     chain = events[2]
     if (chain["parent_native_sha256"] == chain["child_native_sha256"]
-            or len({events[index]["runtime_sha256"] for index in (3, 4, 6)}) != 3):
+            or not all(events[index]["receipt"][key] is True
+                for index in (3, 5, 8)
+                for key in ("adapter_task_terminated", "adapter_succeeded", "event_journal_completed"))
+            or len({events[index]["runtime_generation"] for index in (3, 5, 8)}) != 3
+            or any(events[index + 1]["runtime_sha256"] != fixed.sha(events[index]["runtime_generation"].encode())
+                for index in (3, 5, 8))):
         return result
     result.update(parent_child_passed=True, cold_resume_ready_verified=True,
         native_ack_both_directions=True, automatic_result_ack_verified=True, final_result_via_inspect_verified=True)
@@ -109,6 +147,7 @@ def run(args):
     before_auth = lease.auth_identity(args.official_grok_home)
     binary_hash = shared.digest(args.grok)
     metadata = dict(observation(None, []), scope=SCOPE, test_name=TEST_NAME,
+        cli_version=CLI_VERSION, cli_version_verified=False,
         private_workspace=str(root), max_native_inputs=6, max_tls_connections=lease.MAX_TLS_CONNECTIONS,
         max_tls_bytes=lease.MAX_TLS_BYTES, deadline_seconds=args.timeout, http_model_calls_observable=False,
         cost_budget_enforced=False, tls_decrypted=False, system_managed_policies_apply=True,
@@ -120,10 +159,16 @@ def run(args):
     with isolation.bounded_tunnel(args.timeout) as tunnel:
         try:
             port = tunnel.start()
-            official.copy_private_auth(args.official_grok_home, root / "home/.grok")
             environment = official.official_environment(root, port)
+            version = subprocess.run([str(args.grok), "--version"], cwd=root / "project",
+                env=environment, capture_output=True, text=True, check=True, timeout=30)
+            if version.stdout.strip() != CLI_VERSION_OUTPUT or tunnel.forwarded != 0:
+                raise ValueError("固定 Grok 版本探测不匹配")
+            metadata["cli_version_verified"] = True
+            official.copy_private_auth(args.official_grok_home, root / "home/.grok")
             environment.update(INFINISHELL_GROK_LIVE_ROOT=str(root), INFINISHELL_GROK_LIVE_EXECUTABLE=str(args.grok),
-                INFINISHELL_GROK_LIVE_ARTIFACT=str(raw), INFINISHELL_CLI_SUPERVISOR_EXECUTABLE=str(args.supervisor))
+                INFINISHELL_GROK_LIVE_ARTIFACT=str(raw), INFINISHELL_CLI_SUPERVISOR_EXECUTABLE=str(args.supervisor),
+                INFINISHELL_GROK_LIVE_VERSION=CLI_VERSION)
             remaining = tunnel.deadline - time.monotonic()
             if remaining <= 0 or tunnel.forwarded != 0:
                 raise ValueError("输入之前预算已耗尽")
@@ -160,7 +205,7 @@ def run(args):
             except (OSError, ValueError) as error:
                 metadata["cleanup_error_type"] = type(error).__name__
             metadata["boundary_passed"] = fixed.boundary_passed(metadata, tunnel)
-            metadata["parent_child_passed"] &= metadata["boundary_passed"]
+            metadata["parent_child_passed"] &= metadata["boundary_passed"] and metadata["cli_version_verified"]
             for key in ("cold_resume_ready_verified", "native_ack_both_directions", "automatic_result_ack_verified", "final_result_via_inspect_verified"):
                 metadata[key] &= metadata["parent_child_passed"]
             safe = events if all(validate_event(event) for event in events) else []
@@ -184,7 +229,8 @@ def main():
     parser.add_argument("--timeout", type=int, default=MAX_DEADLINE)
     args = parser.parse_args()
     try:
-        fixed.validate_paths(args, max_native_inputs=6, max_deadline=MAX_DEADLINE)
+        fixed.validate_paths(args, max_native_inputs=6, max_deadline=MAX_DEADLINE,
+            expected_sha256=CLI_SHA256)
         return run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"父子协调器运行器失败：{type(error).__name__}\n")

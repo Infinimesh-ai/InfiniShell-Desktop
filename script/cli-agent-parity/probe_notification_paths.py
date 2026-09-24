@@ -19,11 +19,12 @@ ASSETS = Path(__file__).resolve().parents[2] / "app/assets/bundled/cli-agent-plu
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--claude-executable", required=True)
+    parser.add_argument("--claude-version", choices=("2.1.273", "2.1.280"), default="2.1.273")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     version = subprocess.run([args.claude_executable, "--version"], text=True, capture_output=True, check=True, timeout=5).stdout.strip()
-    if version != "2.1.273 (Claude Code)":
-        raise SystemExit("只接受已核实的 Claude Code 2.1.273")
+    if version != f"{args.claude_version} (Claude Code)" or (args.claude_version == "2.1.280" and sys.platform != "darwin"):
+        raise SystemExit("CLI 版本或平台不符合显式选择的固定通知契约")
     hooks_path = ASSETS / "claude/hooks/hooks.json"
     hooks = json.loads(hooks_path.read_text(encoding="utf-8"))
     names = ["插件 空 格", "插件 ' $(touch INJECTED) `touch INJECTED`"]

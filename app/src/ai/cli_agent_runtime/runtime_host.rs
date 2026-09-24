@@ -2087,6 +2087,21 @@ pub(crate) fn startup_evidence_matches_task(
         .map(|receipt| receipt.task_id == task_id && receipt.task_generation == task_generation))
 }
 
+/// 更新空闲判断只接受已核验的未启动或完整退出证据，IPC 不可达本身不是退出证明。
+pub(crate) fn exit_confirmed_for_update(state_dir: &Path, generation: Uuid) -> io::Result<bool> {
+    if read_startup_incomplete_marker(state_dir, generation)?.is_some() {
+        return Ok(false);
+    }
+    if read_startup_exit_receipt(state_dir, generation)?.is_some() {
+        return Ok(true);
+    }
+    if load_record(state_dir, generation)?.is_some() {
+        return Ok(confirmed_exit(state_dir, generation)?.is_some());
+    }
+    // 兼容独立宿主引入前的已确认原生进程收据；不存在任何证据时继续保持忙状态。
+    Ok(super::managed_process::confirmed_exit(state_dir, generation)?.is_some())
+}
+
 pub(crate) async fn classify_startup(
     state_dir: &Path,
     generation: Uuid,
@@ -2664,6 +2679,52 @@ fn start_runtime_host_ipc(
     Ok(server)
 }
 
+#[cfg(test)]
+pub(crate) async fn start_acknowledged_host_for_test(
+    task_id: String,
+    task_generation: i64,
+    options: SessionOptions,
+    events: Vec<RuntimeEvent>,
+) -> io::Result<(
+    ipc::Server,
+    tokio::sync::mpsc::Receiver<RuntimeCommand>,
+    RuntimeHostRecord,
+)> {
+    let record = create_record(task_id, task_generation, Harness::Codex, options)?;
+    let mut state = RuntimeHostState::new(
+        &record.directory,
+        record.manifest.clone(),
+        record.manifest_sha256.clone(),
+    )?;
+    let acknowledged_sequence = events.len() as u64;
+    for event in events {
+        state.record_event(event)?;
+    }
+    let (controller, commands, _, _) = super::channels(record.runtime_generation());
+    let executor = Arc::new(Background::new(2, |_| "cli-recovery-test-host".to_owned()));
+    let server =
+        start_runtime_host_ipc(&record, Arc::new(Mutex::new(state)), controller, executor)?;
+    let process_id = std::process::id();
+    let (process_start_time, executable) = process_identity(process_id)?;
+    let ready = RuntimeHostReady {
+        version: HOST_MANIFEST_VERSION,
+        runtime_generation: record.runtime_generation(),
+        host_instance_id: record.host_instance_id(),
+        manifest_sha256: record.manifest_sha256.clone(),
+        process_id,
+        process_start_time,
+        executable,
+    };
+    write_new_record(
+        &record.directory.join("ready.json"),
+        &serde_json::to_vec(&ready).map_err(io::Error::other)?,
+    )?;
+    let mut client = connect_verified(record.clone()).await?;
+    client.claim_owner(0).await?;
+    client.acknowledge_events(acknowledged_sequence).await?;
+    Ok((server, commands, record))
+}
+
 fn run_connection(
     record: &RuntimeHostRecord,
     state: Arc<Mutex<RuntimeHostState>>,
@@ -2773,8 +2834,19 @@ pub(crate) fn run_worker(path: &Path) -> io::Result<()> {
     options.state_dir.clone_from(&native_state_dir);
     let connection = match record.manifest.harness {
         Harness::Codex => super::codex::connect(options),
-        Harness::Claude => super::claude::connect(options),
-        Harness::Grok => super::grok::connect(options),
+        // 原生进程状态独立落盘，附件仍属于已核验 manifest 的应用数据目录。
+        Harness::Claude => super::claude::connect_with_attachment_store(
+            options,
+            record
+                .manifest
+                .options
+                .state_dir
+                .join("local-cli-attachments"),
+        ),
+        Harness::Grok => super::grok::connect_with_profile_state_dir(
+            options,
+            record.manifest.options.state_dir.clone(),
+        ),
         Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
             return Err(io::Error::other("运行时宿主不支持此 CLI"));
         }

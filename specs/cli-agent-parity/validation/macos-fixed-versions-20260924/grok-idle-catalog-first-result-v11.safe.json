@@ -1,0 +1,23 @@
+{
+  "phase": "first-result",
+  "task": {
+    "task_id": "7d8763bc-344c-4be1-bd0f-ad967f63709e",
+    "native_session_id": "01a0d240-9b70-7831-92fb-a0550bdeeb33",
+    "generation": 1,
+    "revision": 6,
+    "state": "completed"
+  },
+  "hosts": [],
+  "native_catalog_updates": [
+    {
+      "ts": "2026-09-24T07:10:44.676Z",
+      "trigger": "session_start",
+      "count": 32
+    },
+    {
+      "ts": "2026-09-24T07:10:44.683Z",
+      "trigger": "session_start",
+      "count": 32
+    }
+  ]
+}

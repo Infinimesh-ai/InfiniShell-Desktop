@@ -1280,14 +1280,7 @@ fn sync_cli_agent_update_conditions(ctx: &mut AppContext) {
         let mut busy = CLIAgentSessionsModel::as_ref(ctx).has_local_session(agent);
         #[cfg(feature = "local_fs")]
         {
-            busy |= LocalCLITaskCoordinator::as_ref(ctx)
-                .snapshots()
-                .any(|snapshot| {
-                    snapshot.task.harness == agent.command_prefix()
-                        && (snapshot.connected
-                            || snapshot.task.state.is_active()
-                            || snapshot.active_turn_id.is_some())
-                });
+            busy |= LocalCLITaskCoordinator::as_ref(ctx).cli_update_busy(agent.command_prefix());
         }
         let channel = match AISettings::as_ref(ctx).cli_agent_update_channel(agent) {
             CLIUpdateChannel::FollowInstallation => CliAgentUpdateChannel::FollowInstallation,

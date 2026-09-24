@@ -95,6 +95,7 @@ fn parse_notification(bytes: &[u8]) -> Result<Notification> {
         notification.event.as_str(),
         "session_start"
             | "prompt_submit"
+            | "permission_request"
             | "tool_complete"
             | "stop"
             | "stop_failure"

@@ -1,0 +1,33 @@
+{
+  "default_build_without_managed_feature": true,
+  "source_manifest_sha256": "7b3251da1976909b3d3820d59644725efab315b7054bc40ca95f1aa3ce4d27f5",
+  "steps": [
+    {
+      "name": "check",
+      "exit_code": 0,
+      "seconds": 101.724,
+      "log": "/private/tmp/cli-parity-mac-goal-v10-check-20260924.log"
+    },
+    {
+      "name": "libtest",
+      "exit_code": 0,
+      "seconds": 165.949,
+      "log": "/private/tmp/cli-parity-mac-goal-v10-libtest-20260924.log"
+    },
+    {
+      "name": "i18n",
+      "exit_code": 0,
+      "seconds": 16.848,
+      "log": "/private/tmp/cli-parity-mac-goal-v10-i18n-20260924.log"
+    },
+    {
+      "name": "supervisor",
+      "exit_code": 0,
+      "seconds": 208.161,
+      "log": "/private/tmp/cli-parity-mac-goal-v10-supervisor-20260924.log"
+    }
+  ],
+  "libtest-goal-v10_sha256": "4ef163b45c89ba0c8d39ce78c8023101ad23d607cf89ac977e58cbeccf6ac259",
+  "supervisor-goal-v10_sha256": "9328cd8a85fa100a5da3fa274fde075d0bbd7367b57d08846f70dc926ba6ff59",
+  "source_unchanged": true
+}

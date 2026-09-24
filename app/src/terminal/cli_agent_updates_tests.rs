@@ -1,6 +1,15 @@
 use super::*;
 use warpui::App;
 
+#[cfg(feature = "local_fs")]
+use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
+use crate::terminal::cli_agent::init_cli_agent_updates;
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputState, CLIAgentSession, CLIAgentSessionContext, CLIAgentSessionStatus,
+    CLIAgentSessionsModel,
+};
+use crate::test_util::settings::initialize_settings_for_tests;
+
 fn available_entry() -> Entry {
     let mut entry = Entry::new(Instant::now());
     entry.status.phase = CliAgentUpdatePhase::Available;
@@ -153,7 +162,36 @@ fn stale_verification_progress_cannot_replace_current_operation() {
 }
 
 #[test]
-fn failed_compatibility_verification_never_becomes_up_to_date() {
+fn successful_installation_keeps_unverified_managed_version_closed() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Claude).unwrap();
+                entry.operation = 7;
+                entry.active = true;
+                entry.status.phase = CliAgentUpdatePhase::Verifying;
+                entry.status.installed_version = Some("2.1.280".to_owned());
+                entry.status.latest_version = Some("2.1.267".to_owned());
+
+                model.updated(CLIAgent::Claude, 7, Ok("2.1.267".to_owned()), ctx);
+
+                let entry = &model.entries[&CLIAgent::Claude];
+                assert!(!entry.active);
+                assert_eq!(entry.status.phase, CliAgentUpdatePhase::UpToDate);
+                assert_eq!(entry.status.installed_version.as_deref(), Some("2.1.267"));
+                assert!(entry.status.error.is_none());
+                assert!(entry.failed_target.is_none());
+                assert!(!crate::ai::cli_agent_runtime::claude::supported_version(
+                    "2.1.267"
+                ));
+            });
+        });
+    });
+}
+
+#[test]
+fn failed_version_probe_never_becomes_up_to_date() {
     App::test((), |mut app| async move {
         app.add_singleton_model(CliAgentUpdatesModel::new);
         app.update(|ctx| {
@@ -354,4 +392,81 @@ fn native_channel_sync_at_same_version_waits_for_idle_and_obeys_auto_toggle() {
             });
         });
     });
+}
+
+#[test]
+fn pty_session_events_defer_update_until_last_local_session_exits() {
+    for agent in AGENTS {
+        App::test((), move |mut app| async move {
+            initialize_settings_for_tests(&mut app);
+            app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+            app.add_singleton_model(|_| CLIAgentInstallModel::empty_for_test());
+            #[cfg(feature = "local_fs")]
+            app.add_singleton_model(|_| LocalCLITaskCoordinator::new(None));
+            app.update(init_cli_agent_updates);
+            let views = [EntityId::new(), EntityId::new()];
+            for (view, status) in views.into_iter().zip([
+                CLIAgentSessionStatus::Blocked { message: None },
+                CLIAgentSessionStatus::Success,
+            ]) {
+                app.update(|ctx| {
+                    CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                        sessions.set_session(
+                            view,
+                            CLIAgentSession {
+                                agent,
+                                status,
+                                session_context: CLIAgentSessionContext::default(),
+                                input_state: CLIAgentInputState::Closed,
+                                should_auto_toggle_input: false,
+                                listener: None,
+                                plugin_version: None,
+                                remote_host: None,
+                                draft_text: None,
+                                custom_command_prefix: None,
+                                received_rich_notification: false,
+                            },
+                            ctx,
+                        );
+                    });
+                });
+            }
+            let dispatched = app.update(|ctx| {
+                CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+                    assert!(updates.status(agent).unwrap().busy);
+                    updates.stage_recorded_update_for_test(agent, ctx)
+                })
+            });
+            assert_eq!(dispatched.try_recv(), Err(mpsc::TryRecvError::Empty));
+            app.update(|ctx| {
+                assert_eq!(
+                    CliAgentUpdatesModel::as_ref(ctx)
+                        .status(agent)
+                        .unwrap()
+                        .phase,
+                    CliAgentUpdatePhase::WaitingForIdle
+                );
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                    sessions.remove_session(views[0], ctx);
+                });
+            });
+            app.update(|ctx| {
+                let status = CliAgentUpdatesModel::as_ref(ctx).status(agent).unwrap();
+                assert!(status.busy);
+                assert_eq!(status.phase, CliAgentUpdatePhase::WaitingForIdle);
+                assert_eq!(dispatched.try_recv(), Err(mpsc::TryRecvError::Empty));
+                // 回合已完成仍占用本地 CLI；最后一个真实 Ended 事件才释放更新。
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                    sessions.remove_session(views[1], ctx);
+                });
+            });
+            app.update(|ctx| {
+                let updates = CliAgentUpdatesModel::as_ref(ctx);
+                assert!(!updates.status(agent).unwrap().busy);
+                assert!(updates.is_updating(agent));
+                assert_eq!(dispatched.try_recv(), Ok(agent));
+                assert_eq!(dispatched.try_recv(), Err(mpsc::TryRecvError::Empty));
+            });
+        });
+    }
 }

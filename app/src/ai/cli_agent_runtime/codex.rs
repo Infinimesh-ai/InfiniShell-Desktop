@@ -23,7 +23,12 @@ use super::{
     TurnOutcome, channels, local_tools,
 };
 
-const SUPPORTED_VERSIONS: [&str; 2] = ["0.147.0", "0.155.1"];
+const SUPPORTED_VERSIONS: &[&str] = &[
+    "0.147.0",
+    "0.155.1",
+    #[cfg(any(target_os = "macos", target_os = "linux", windows))]
+    "0.156.1",
+];
 #[cfg(test)]
 const TEST_CANDIDATE_VERSION: &str = "0.156.1";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -421,7 +426,8 @@ impl CodexProtocol {
             supported_version(version)
                 .then(|| {
                     SUPPORTED_VERSIONS
-                        .into_iter()
+                        .iter()
+                        .copied()
                         .find(|supported| *supported == version)
                 })
                 .flatten()

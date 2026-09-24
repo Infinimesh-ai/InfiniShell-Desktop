@@ -4,9 +4,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
 #[cfg(test)]
 use std::io::Read;
-use std::path::Path;
-#[cfg(test)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -36,10 +34,12 @@ use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeL
 pub(super) const VERIFIED_VERSION: &str = "1.0.30";
 pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
 pub(super) const CURRENT_VERSION: &str = "1.0.40";
+const ROOT_VERSION: &str = "1.0.41";
+const ROOT_VERSION_OUTPUT: &str = "grok 1.0.41 (4220f3b224a6)";
 #[cfg(test)]
-const TEST_CANDIDATE_VERSION: &str = "1.0.41";
+const TEST_CANDIDATE_VERSION: &str = ROOT_VERSION;
 #[cfg(test)]
-const TEST_CANDIDATE_VERSION_OUTPUT: &str = "grok 1.0.41 (4220f3b224a6)";
+const TEST_CANDIDATE_VERSION_OUTPUT: &str = ROOT_VERSION_OUTPUT;
 #[cfg(test)]
 const TEST_CANDIDATE_BYTES: u64 = 145_657_952;
 #[cfg(test)]
@@ -54,7 +54,17 @@ const CURRENT_SETUP_PHASES: [&str; 6] = [
     "mcp_merge",
     "response_ready",
 ];
-#[cfg(all(test, unix))]
+const ROOT_EXTENDED_SETUP_PHASES: [&str; 9] = [
+    "auth",
+    "resolve_workspace",
+    "folder_trust",
+    "plugin_registry",
+    "mcp_merge",
+    "git_discovery",
+    "finalize_response",
+    "tool_overrides",
+    "response_ready",
+];
 const DIRECT_CATALOG_SETUP_PHASES: [&str; 11] = [
     "auth",
     "resolve_workspace",
@@ -77,8 +87,18 @@ const SNAPSHOT_RETRY_INTERVAL: Duration = Duration::from_millis(250);
 
 /// 验证固定版本、原生生命周期及独占 SDK 租约；产品能力另由协调器门禁控制。
 pub fn connect(options: SessionOptions) -> Result<RuntimeConnection, RuntimeError> {
+    let profile_state_dir = options.state_dir.clone();
+    connect_with_profile_state_dir(options, profile_state_dir)
+}
+
+pub(super) fn connect_with_profile_state_dir(
+    options: SessionOptions,
+    profile_state_dir: PathBuf,
+) -> Result<RuntimeConnection, RuntimeError> {
     validate_options(&options)?;
-    Ok(connect_protocol(GrokProtocol::new(options)))
+    let mut protocol = GrokProtocol::new(options);
+    protocol.profile_state_dir = profile_state_dir;
+    Ok(connect_protocol(protocol))
 }
 
 fn connect_protocol(mut protocol: GrokProtocol) -> RuntimeConnection {
@@ -203,7 +223,17 @@ pub(crate) fn supported_version(version: &str) -> bool {
     matches!(
         version,
         VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION
-    )
+    ) || current_root_supported_version(version)
+}
+
+/// 三个桌面平台仅接受固定根任务版本；固定权限和子任务仍须独立合同。
+pub(crate) fn current_root_supported_version(version: &str) -> bool {
+    cfg!(any(target_os = "macos", target_os = "linux", windows)) && version == ROOT_VERSION
+}
+
+/// 固定策略另以原生目录、启动材料和工具租约验证，版本判定本身不授予权限。
+pub(crate) fn current_fixed_scope_supported_version(version: &str) -> bool {
+    cfg!(any(target_os = "macos", target_os = "linux", windows)) && version == ROOT_VERSION
 }
 
 fn verified_version(output: &str) -> Option<&'static str> {
@@ -215,6 +245,12 @@ fn verified_version(output: &str) -> Option<&'static str> {
         Some(VERIFIED_VERSION) => Some(VERIFIED_VERSION),
         Some(P0_VERIFIED_VERSION) => Some(P0_VERIFIED_VERSION),
         Some(CURRENT_VERSION) => Some(CURRENT_VERSION),
+        Some(ROOT_VERSION)
+            if current_root_supported_version(ROOT_VERSION)
+                && output.trim() == ROOT_VERSION_OUTPUT =>
+        {
+            Some(ROOT_VERSION)
+        }
         Some(_) | None => None,
     }
 }
@@ -255,7 +291,10 @@ async fn run_process(
         protocol.options.permission_policy,
         PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
     ) {
-        let launch = super::grok_profile::GrokCreationPolicyV1::prepare(&protocol.options)?;
+        let launch = super::grok_profile::GrokCreationPolicyV1::prepare(
+            &protocol.options,
+            &protocol.profile_state_dir,
+        )?;
         protocol.options.grok_profile = Some(launch.policy.clone());
         if let Some(sdk) = &mut protocol.sdk {
             sdk.bridge = GrokMcpBridge::with_creation_policy(sdk.process_epoch, &launch.policy)
@@ -356,6 +395,10 @@ async fn run_process(
         &arguments,
         &process_cwd,
         launch.as_ref().map(|launch| launch.home.as_path()),
+        launch.as_ref().and_then(|_| {
+            (protocol.profile_state_dir != protocol.options.state_dir)
+                .then_some(protocol.profile_state_dir.as_path())
+        }),
     )
     .await?;
     if let Some(sdk) = protocol.sdk.as_mut() {
@@ -787,7 +830,13 @@ struct Effects {
 enum PendingKind {
     Initialize,
     Authenticate,
-    OpenSession { requested_id: Option<String> },
+    OpenSession {
+        requested_id: Option<String>,
+    },
+    CommandCatalog {
+        session_id: String,
+        version: &'static str,
+    },
     Prompt,
     FinalOutput,
     CloseSession,
@@ -843,6 +892,7 @@ struct PendingApproval {
 #[derive(Default)]
 struct CurrentSetupProgress {
     next_phase: usize,
+    extended_root_phases: bool,
     session_id: Option<String>,
     response_received: bool,
     models_received: bool,
@@ -850,6 +900,8 @@ struct CurrentSetupProgress {
     announcements_received: u8,
     announcement_generation: Option<u64>,
     commands_received: bool,
+    command_pull_requested: bool,
+    commands_pulled: bool,
 }
 
 // 仅反序列化展示所需的实际原生字段，不把账号、路径或扩展凭据元数据带入快照。
@@ -1017,7 +1069,7 @@ struct GrokSdkConnection {
     calls: HashMap<String, PendingGrokLocalTool>,
     permissions_to_write: HashMap<[u8; 32], (Value, bool)>,
     approved_until: HashMap<String, Instant>,
-    replies_to_write: HashMap<String, (VerifiedGrokToolLease, HashSet<[u8; 32]>)>,
+    replies_to_write: HashMap<String, (VerifiedGrokToolLease, bool, HashSet<[u8; 32]>)>,
     native_completion_deadlines: HashMap<String, (VerifiedGrokToolLease, Instant)>,
 }
 
@@ -1026,13 +1078,16 @@ impl GrokSdkConnection {
         &mut self,
         proof: VerifiedGrokToolLease,
         writes: &[Value],
+        success: bool,
     ) -> Result<(), RuntimeError> {
         let fingerprints = writes
             .iter()
             .map(message_fingerprint)
             .collect::<Result<HashSet<_>, _>>()?;
-        self.replies_to_write
-            .insert(proof.native_call_id().to_owned(), (proof, fingerprints));
+        self.replies_to_write.insert(
+            proof.native_call_id().to_owned(),
+            (proof, success, fingerprints),
+        );
         Ok(())
     }
 }
@@ -1053,6 +1108,7 @@ struct GrokProtocol {
     #[cfg(all(test, unix))]
     direct_mcp_initialized_received: bool,
     options: SessionOptions,
+    profile_state_dir: PathBuf,
     session_id: Option<String>,
     next_id: u64,
     pending: Option<PendingRequest>,
@@ -1079,7 +1135,7 @@ struct GrokProtocol {
     #[cfg(test)]
     catalog_probe_for_live: Option<catalog_preflight_live_tests::CatalogProbe>,
     #[cfg(test)]
-    queued_submissions: usize,
+    queued_submissions: Arc<Mutex<usize>>,
     #[cfg(test)]
     sdk_origin_probe: Option<sdk_origin_live_tests::SdkOriginProbe>,
     #[cfg(test)]
@@ -1098,7 +1154,7 @@ struct GrokProtocol {
 
 impl GrokProtocol {
     fn current_version_candidate(&self, version: &str) -> bool {
-        if version == CURRENT_VERSION {
+        if version == CURRENT_VERSION || current_root_supported_version(version) {
             return true;
         }
         #[cfg(test)]
@@ -1116,24 +1172,81 @@ impl GrokProtocol {
             .is_some_and(|version| self.current_version_candidate(version))
     }
 
-    fn test_candidate_settings(&self) -> bool {
+    fn current_settings_v1041(&self) -> bool {
+        self.probed_version == Some(ROOT_VERSION) && self.current_protocol()
+    }
+
+    fn production_root_scope(&self, version: &str) -> bool {
         #[cfg(test)]
-        {
-            self.test_only_1041_profile && self.probed_version == Some(TEST_CANDIDATE_VERSION)
+        if self.test_only_1041_profile {
+            return false;
         }
-        #[cfg(not(test))]
-        {
-            false
-        }
+        current_root_supported_version(version)
+            && self.options.permission_policy == PermissionPolicy::Inherit
+            && self.options.permission_ceiling.is_none()
+            && self.options.grok_profile.is_none()
+            && self.options.claude_profile.is_none()
+            && self.options.model.is_none()
+            && self.options.local_tools.is_none()
+            && self.sdk.is_none()
+            && self.options.selected_skills.len() <= 1
+    }
+
+    fn production_root_verified(&self) -> bool {
+        self.probed_version
+            .is_some_and(|version| self.production_root_scope(version))
+    }
+
+    fn production_fixed_scope(&self, version: &str) -> bool {
+        current_fixed_scope_supported_version(version)
+            && self.options.selected_skills.is_empty()
+            && self.options.model.is_none()
+            && self.options.claude_profile.is_none()
+            && self.options.grok_profile.as_ref().is_some_and(|profile| {
+                profile.runtime_scope_verified(
+                    version,
+                    self.options.local_tools,
+                    self.options.permission_policy,
+                )
+            })
+    }
+
+    fn production_fixed_verified(&self) -> bool {
+        self.probed_version
+            .is_some_and(|version| self.production_fixed_scope(version))
+    }
+
+    fn production_resume_catalog(&self) -> bool {
+        self.production_resume_skill_catalog()
+            || (self.production_fixed_verified()
+                && matches!(self.options.target, SessionTarget::Resume { .. }))
+    }
+
+    fn setup_display_complete(&self, setup: &CurrentSetupProgress) -> bool {
+        setup.models_received
+            && setup.settings_received
+            && if self.production_fixed_verified() || self.production_root_verified() {
+                setup.announcements_received >= 1
+            } else {
+                setup.announcements_received == 2
+            }
+    }
+
+    fn production_resume_skill_catalog(&self) -> bool {
+        self.production_root_verified()
+            && matches!(self.options.target, SessionTarget::Resume { .. })
+            && self.options.selected_skills.len() == 1
     }
 
     fn baseline_lifecycle_verified(&self) -> bool {
         matches!(
             self.probed_version,
             Some(VERIFIED_VERSION | P0_VERIFIED_VERSION | CURRENT_VERSION)
-        ) || (self.test_candidate_settings()
-            && (self.current_selected_skill_candidate_for_live()
-                || self.test_candidate_p0_for_live()))
+        ) || self.production_root_verified()
+            || self.production_fixed_verified()
+            || (self.current_settings_v1041()
+                && (self.current_selected_skill_candidate_for_live()
+                    || self.test_candidate_p0_for_live()))
     }
 
     fn extended_lifecycle_verified(&self) -> bool {
@@ -1143,12 +1256,16 @@ impl GrokProtocol {
     fn prompt_lifecycle_verified(&self) -> bool {
         self.baseline_lifecycle_verified()
             && (!self.current_protocol()
+                || self.production_root_verified()
+                || self.production_fixed_verified()
                 || self.current_root_candidate_for_live()
                 || self.test_candidate_p0_for_live())
     }
 
     fn queued_submit_verified(&self) -> bool {
         self.extended_lifecycle_verified()
+            || self.production_root_verified()
+            || self.production_fixed_verified()
             || (self.current_protocol() && self.current_root_candidate_for_live())
     }
 
@@ -1200,7 +1317,10 @@ impl GrokProtocol {
         }
     }
 
-    fn catalog_direct_for_live(&self) -> bool {
+    fn direct_setup_protocol(&self) -> bool {
+        if self.production_fixed_verified() {
+            return true;
+        }
         #[cfg(all(test, unix))]
         {
             self.catalog_direct_for_live
@@ -1212,9 +1332,15 @@ impl GrokProtocol {
     }
 
     fn current_setup_phases(&self) -> &'static [&'static str] {
-        #[cfg(all(test, unix))]
-        if self.catalog_direct_for_live {
+        if self.direct_setup_protocol() {
             return &DIRECT_CATALOG_SETUP_PHASES;
+        }
+        if self
+            .current_setup
+            .as_ref()
+            .is_some_and(|setup| setup.extended_root_phases)
+        {
+            return &ROOT_EXTENDED_SETUP_PHASES;
         }
         &CURRENT_SETUP_PHASES
     }
@@ -1240,6 +1366,7 @@ impl GrokProtocol {
             PendingKind::OpenSession {
                 requested_id: Some(_),
             } => "load_session",
+            PendingKind::CommandCatalog { .. } => "command_catalog",
             PendingKind::Prompt => "prompt",
             PendingKind::FinalOutput => "final_output",
             PendingKind::CloseSession => "close_session",
@@ -1281,6 +1408,7 @@ impl GrokProtocol {
             catalog_direct_for_live: false,
             #[cfg(all(test, unix))]
             direct_mcp_initialized_received: false,
+            profile_state_dir: options.state_dir.clone(),
             options,
             session_id: None,
             next_id: 0,
@@ -1308,7 +1436,7 @@ impl GrokProtocol {
             #[cfg(test)]
             catalog_probe_for_live: None,
             #[cfg(test)]
-            queued_submissions: 0,
+            queued_submissions: Arc::new(Mutex::new(0)),
             #[cfg(test)]
             sdk_origin_probe: None,
             #[cfg(test)]
@@ -1371,14 +1499,30 @@ impl GrokProtocol {
             )));
         }
         if version != VERIFIED_VERSION
-            && (self.options.local_tools.is_some()
+            && ((self.options.local_tools.is_some() && !self.production_fixed_scope(version))
                 || (!self.options.selected_skills.is_empty()
-                    && !(self.current_version_candidate(version)
-                        && self.current_selected_skill_candidate_for_live())))
+                    && !(self.production_root_scope(version)
+                        || (self.current_version_candidate(version)
+                            && self.current_selected_skill_candidate_for_live()))))
         {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
                 "cli-agent-grok-managed-unverified"
             )));
+        }
+        if current_root_supported_version(version) {
+            validate_options(&self.options)?;
+            #[cfg(test)]
+            let test_profile = self.test_only_1041_profile;
+            #[cfg(not(test))]
+            let test_profile = false;
+            if !test_profile
+                && !self.production_root_scope(version)
+                && !self.production_fixed_scope(version)
+            {
+                return Err(RuntimeError::InvalidConfiguration(crate::t!(
+                    "cli-agent-grok-managed-unverified"
+                )));
+            }
         }
         self.probed_version = Some(version);
         Ok(())
@@ -1471,9 +1615,7 @@ impl GrokProtocol {
                     RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
                 })?
                 .begin_turn(self.options.generation, turn_id)
-                .map_err(|_| {
-                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
-                })?;
+                .map_err(|error| sdk_protocol_rejection("confirm_turn", &error))?;
         }
         Ok(())
     }
@@ -1522,7 +1664,7 @@ impl GrokProtocol {
             .as_mut()
             .ok_or_else(|| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?
             .observe_native_tool(message, Instant::now())
-            .map_err(|_| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?;
+            .map_err(|error| sdk_protocol_rejection("observe_native_tool", &error))?;
         if update["status"] == "completed" {
             sdk.approved_until.remove(call_id);
         }
@@ -1620,7 +1762,7 @@ impl GrokProtocol {
         let (outcome, proof) = sdk
             .bridge
             .receive_with_lease(message, ledger, Instant::now())
-            .map_err(|_| RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified")))?;
+            .map_err(|error| sdk_protocol_rejection("receive_with_lease", &error))?;
         #[cfg(test)]
         update_lease_audit(&self.lease_audit_for_live, |audit| {
             let params = &message["params"];
@@ -1677,9 +1819,11 @@ impl GrokProtocol {
                 })
             }
             GrokMcpRequest::Immediate(reply) => {
+                // 缓存业务错误保留原结果；协议级错误不冒充已回写的业务失败。
+                let success = reply["result"]["result"]["isError"] != true;
                 let writes = vec![reply];
                 sdk.approved_until.remove(proof.native_call_id());
-                sdk.schedule_replies(proof, &writes)?;
+                sdk.schedule_replies(proof, &writes, success)?;
                 Ok(Effects {
                     writes,
                     events: Vec::new(),
@@ -1719,6 +1863,7 @@ impl GrokProtocol {
             return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
         }
         let proof = call.proof.clone();
+        let success = result.is_ok();
         let writes = match sdk.bridge.reply_with_lease(
             &call.request,
             result,
@@ -1726,14 +1871,15 @@ impl GrokProtocol {
             &proof,
         ) {
             Ok(writes) => writes,
-            Err(_) => {
+            Err(error) => {
+                sdk_protocol_rejection("reply_with_lease", &error);
                 return rejected_command(
                     message_id,
                     crate::t!("cli-agent-grok-managed-unverified"),
                 );
             }
         };
-        if sdk.schedule_replies(proof, &writes).is_err() {
+        if sdk.schedule_replies(proof, &writes, success).is_err() {
             return rejected_command(message_id, crate::t!("cli-agent-grok-managed-unverified"));
         }
         sdk.calls.get_mut(call_id).expect("已核对本地调用").replied = true;
@@ -1758,9 +1904,7 @@ impl GrokProtocol {
             })?;
             ledger
                 .record_permission(&permission, allowed, Instant::now())
-                .map_err(|_| {
-                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
-                })?;
+                .map_err(|error| sdk_protocol_rejection("permission_written", &error))?;
             #[cfg(test)]
             update_lease_audit(&self.lease_audit_for_live, |audit| {
                 audit.permission_writes_allow += u64::from(allowed);
@@ -1781,13 +1925,13 @@ impl GrokProtocol {
             }
         }
         let mut written = Vec::new();
-        for (call, (_, remaining)) in &mut sdk.replies_to_write {
+        for (call, (_, _, remaining)) in &mut sdk.replies_to_write {
             if remaining.remove(&hash) && remaining.is_empty() {
                 written.push(call.clone());
             }
         }
         for call in written {
-            let (proof, _) = sdk.replies_to_write.remove(&call).expect("待写回执存在");
+            let (proof, success, _) = sdk.replies_to_write.remove(&call).expect("待写回执存在");
             #[cfg(test)]
             let was_closed = sdk
                 .ledger
@@ -1797,10 +1941,8 @@ impl GrokProtocol {
             sdk.ledger
                 .as_mut()
                 .expect("已绑定回执已有账本")
-                .record_reply_written(&proof)
-                .map_err(|_| {
-                    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
-                })?;
+                .record_reply_written(&proof, success)
+                .map_err(|error| sdk_protocol_rejection("reply_written", &error))?;
             let native_closed = sdk
                 .ledger
                 .as_ref()
@@ -2021,7 +2163,7 @@ impl GrokProtocol {
                     );
                 }
                 if let Some(profile) = &self.options.grok_profile {
-                    if let Err(error) = profile.verify_files(&self.options.state_dir) {
+                    if let Err(error) = profile.verify_files(&self.profile_state_dir) {
                         return rejected_command(command.message_id, error.to_string());
                     }
                 }
@@ -2083,6 +2225,10 @@ impl GrokProtocol {
                         }
                         InputContent::Skill { name, path } => {
                             if self.probed_version != Some(VERIFIED_VERSION)
+                                && !(self.production_root_verified()
+                                    && self.options.selected_skills.iter().any(|selected| {
+                                        selected.name == *name && selected.path == *path
+                                    }))
                                 && !(self.current_protocol()
                                     && self.current_selected_skill_candidate_for_live())
                             {
@@ -2128,7 +2274,7 @@ impl GrokProtocol {
                     self.queued.push_back(prompt);
                     #[cfg(test)]
                     {
-                        self.queued_submissions += 1;
+                        *self.queued_submissions.lock().expect("排队计数锁未损坏") += 1;
                     }
                     Effects::default()
                 } else {
@@ -2180,7 +2326,7 @@ impl GrokProtocol {
             } => {
                 if decision == ApprovalDecision::AllowOnce {
                     if let Some(profile) = &self.options.grok_profile {
-                        if let Err(error) = profile.verify_files(&self.options.state_dir) {
+                        if let Err(error) = profile.verify_files(&self.profile_state_dir) {
                             return rejected_command(command.message_id, error.to_string());
                         }
                     }
@@ -2415,10 +2561,15 @@ impl GrokProtocol {
             {
                 verified_latest_read_tool(&params["toolCall"])
             }
+            Some(ROOT_VERSION)
+                if self.production_root_verified() || self.production_fixed_verified() =>
+            {
+                true
+            }
             Some(CURRENT_VERSION) if self.current_root_candidate_for_live() => true,
             #[cfg(test)]
             Some(TEST_CANDIDATE_VERSION)
-                if self.test_candidate_settings()
+                if self.current_settings_v1041()
                     && (self.current_selected_skill_candidate_for_live()
                         || self.test_candidate_p0_for_live()) =>
             {
@@ -2597,6 +2748,38 @@ impl GrokProtocol {
     }
 
     fn poll_final_output(&mut self) -> Effects {
+        if self.current_protocol()
+            && self.probed_version == self.paired_version
+            && self.pending.is_none()
+            && self.current_setup.as_ref().is_some_and(|setup| {
+                setup.next_phase == self.current_setup_phases().len()
+                    && setup.response_received
+                    && setup.session_id.is_some()
+                    && setup.session_id == self.session_id
+                    && self.setup_display_complete(setup)
+                    && !setup.commands_received
+                    && !setup.command_pull_requested
+            })
+        {
+            let session_id = self.session_id.clone().expect("目录拉取已关联会话");
+            let version = self.paired_version.expect("目录拉取已匹配原生版本");
+            self.current_setup
+                .as_mut()
+                .expect("目录拉取仍处于握手阶段")
+                .command_pull_requested = true;
+            // 目录广播可能早于 leader 客户端订阅；只读拉取直接关联已创建的原生会话。
+            return Effects {
+                writes: vec![self.request(
+                    PendingKind::CommandCatalog {
+                        session_id: session_id.clone(),
+                        version,
+                    },
+                    "_x.ai/commands/list",
+                    json!({"sessionId": session_id}),
+                )],
+                events: Vec::new(),
+            };
+        }
         #[cfg(test)]
         if let Some(probe) = &self.catalog_probe_for_live {
             if let Some(session) = self.session_id.as_deref() {
@@ -2984,6 +3167,8 @@ impl GrokProtocol {
             SessionTarget::New => ("session/new", None),
             SessionTarget::Resume { native_session_id } => {
                 if self.current_protocol()
+                    && !self.production_root_verified()
+                    && !self.production_fixed_verified()
                     && !self.current_root_candidate_for_live()
                     && !self.test_candidate_p0_for_live()
                 {
@@ -3267,7 +3452,7 @@ impl GrokProtocol {
                         .to_owned(),
                 };
                 if self.current_protocol() && new_session {
-                    let direct_catalog = self.catalog_direct_for_live();
+                    let direct_catalog = self.direct_setup_protocol();
                     let setup = self.current_setup.as_mut().ok_or_else(|| {
                         RuntimeError::Protocol("missing Grok 1.0.40 setup sequence".into())
                     })?;
@@ -3329,8 +3514,8 @@ impl GrokProtocol {
                         "newSession": baseline_lifecycle_verified, "emptyHistoryRecovery": extended_lifecycle_verified, "closeSession": extended_lifecycle_verified,
                         "submit": prompt_lifecycle_verified, "queuedSubmit": self.queued_submit_verified(), "steer": false, "approval": prompt_lifecycle_verified,
                         "cancel": prompt_lifecycle_verified, "resume": prompt_lifecycle_verified && self.reported_capabilities["loadSession"] == true,
-                        "localTools": extended_lifecycle_verified && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.sdk.is_some(),
-                        "childTasks": extended_lifecycle_verified && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.options.grok_profile.as_ref().and_then(|profile| profile.local_tools()).is_some_and(|tools| tools.allow_spawn)
+                        "localTools": (extended_lifecycle_verified || self.production_fixed_verified()) && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.sdk.is_some(),
+                        "childTasks": (extended_lifecycle_verified || self.production_fixed_verified()) && self.reported_initialize_extensions.local_mcp_sdk_advertised && self.options.grok_profile.as_ref().and_then(|profile| profile.local_tools()).is_some_and(|tools| tools.allow_spawn)
                     }
                 });
                 super::permissions::verify_effective_permissions(
@@ -3340,6 +3525,7 @@ impl GrokProtocol {
                     &effective_permissions,
                 )?;
                 if (self.current_protocol() && new_session)
+                    || self.production_resume_catalog()
                     || (self.options.grok_profile.is_some()
                         && self.creation_catalog_session != self.session_id)
                     || (self.options.target == SessionTarget::New
@@ -3352,10 +3538,107 @@ impl GrokProtocol {
                         .events
                         .push(self.ready_event(effective_permissions)?);
                 }
-                if self.current_protocol() && new_session && self.catalog_direct_for_live() {
+                if self.production_resume_catalog() {
+                    // 恢复广播与 load 响应可能乱序；只以本轮关联拉取确认启动时绑定的技能。
+                    effects.writes.push(self.request(
+                        PendingKind::CommandCatalog {
+                            session_id: self.session_id.clone().expect("恢复已关联会话"),
+                            version: ROOT_VERSION,
+                        },
+                        "_x.ai/commands/list",
+                        json!({"sessionId": self.session_id}),
+                    ));
+                }
+                if self.current_protocol() && new_session && self.direct_setup_protocol() {
                     let ready = self.finish_current_setup()?;
                     effects.writes.extend(ready.writes);
                     effects.events.extend(ready.events);
+                }
+            }
+            PendingKind::CommandCatalog {
+                session_id,
+                version,
+            } => {
+                let resume_skill_catalog = self.production_resume_catalog()
+                    && self.current_setup.is_none()
+                    && matches!(&self.options.target, SessionTarget::Resume { native_session_id }
+                        if native_session_id == &session_id);
+                if !self.current_protocol()
+                    || self.probed_version != Some(version)
+                    || self.paired_version != Some(version)
+                    || self.session_id.as_deref() != Some(session_id.as_str())
+                    || !(resume_skill_catalog
+                        || self.current_setup.as_ref().is_some_and(|setup| {
+                            setup.command_pull_requested
+                                && !setup.commands_pulled
+                                && setup.session_id.as_deref() == Some(session_id.as_str())
+                        }))
+                    || self
+                        .deferred_ready
+                        .as_ref()
+                        .is_none_or(|(_, began)| began.elapsed() >= REQUEST_TIMEOUT)
+                    || result.as_object().is_none_or(|result| {
+                        result.len() != 2
+                            || !result.contains_key("commands")
+                            || !result.contains_key("tools")
+                    })
+                {
+                    return Err(RuntimeError::Protocol(
+                        "Grok command catalog response changed its setup binding".into(),
+                    ));
+                }
+                if self.production_fixed_verified() {
+                    self.validate_fixed_catalog(
+                        &session_id,
+                        &result["commands"],
+                        &result["tools"],
+                        false,
+                    )?;
+                    self.creation_catalog_session = Some(session_id.clone());
+                } else if self.production_root_verified() {
+                    validate_root_command_catalog(
+                        &result["commands"],
+                        &result["tools"],
+                        self.options.selected_skills.first(),
+                    )?;
+                } else {
+                    // 当前 leader 的关联拉取会随缓存就绪返回完整界面目录；两种实测形状都保留技能路径约束。
+                    let leader_catalog = self.paired_version == Some(ROOT_VERSION)
+                        && result["commands"].as_array().is_some_and(|commands| {
+                            commands.len()
+                                == 29 + usize::from(!self.options.selected_skills.is_empty())
+                        });
+                    validate_current_command_catalog(
+                        &result["commands"],
+                        &result["tools"],
+                        self.options.selected_skills.first(),
+                        !leader_catalog,
+                    )?;
+                }
+                if self.options.permission_policy == PermissionPolicy::Inherit {
+                    self.skill_catalog = Some(
+                        skills::SkillCatalog::from_native(&result["commands"])
+                            .map_err(RuntimeError::Protocol)?,
+                    );
+                }
+                #[cfg(all(test, unix))]
+                if let Some(probe) = &self.skill_catalog_for_live {
+                    probe.observe_pull(
+                        &session_id,
+                        &result["commands"],
+                        self.submitted_messages.is_empty(),
+                    );
+                }
+                // 拉取响应不冒充 available_commands_update，也不合成事件 ID 或通知回执。
+                if resume_skill_catalog {
+                    let (permissions, _) = self.deferred_ready.take().expect("恢复目录期限已验证");
+                    effects.events.push(self.ready_event(permissions)?);
+                } else {
+                    self.current_setup
+                        .as_mut()
+                        .expect("目录拉取已验证握手关联")
+                        .commands_pulled = true;
+                    effects = self.finish_current_setup()?;
                 }
             }
             PendingKind::Prompt => {
@@ -3440,7 +3723,20 @@ impl GrokProtocol {
                 "unexpected Grok setup method".into(),
             ));
         }
-        let direct_catalog = self.catalog_direct_for_live();
+        let direct_catalog = self.direct_setup_protocol();
+        // 同一固定 leader 在隔离环境会报告三个额外阶段；仅在关联响应后选择完整的实测序列。
+        if self.production_root_verified()
+            && self.current_setup.as_ref().is_some_and(|setup| {
+                setup.next_phase == 5
+                    && setup.response_received
+                    && params["phase"] == "git_discovery"
+            })
+        {
+            self.current_setup
+                .as_mut()
+                .expect("根握手已存在")
+                .extended_root_phases = true;
+        }
         let setup_phases = self.current_setup_phases();
         let setup = self
             .current_setup
@@ -3454,7 +3750,7 @@ impl GrokProtocol {
             if !waiting_for_response
                 || setup.response_received
                 || setup.session_id.is_some()
-                || setup.next_phase == 0 && !self.current_mcp_refresh_received
+                || setup.next_phase == 0 && !direct_catalog && !self.current_mcp_refresh_received
             {
                 return Err(RuntimeError::Protocol(
                     "unexpected Grok pre-response setup phase".into(),
@@ -3509,12 +3805,14 @@ impl GrokProtocol {
         let setup_phase_count = self.current_setup_phases().len();
         let complete = self.current_setup.as_ref().is_some_and(|setup| {
             setup.next_phase == setup_phase_count
+                && self.current_mcp_refresh_received
                 && setup.response_received
                 && setup.session_id.is_some()
-                && setup.models_received
-                && setup.settings_received
-                && setup.announcements_received == 2
-                && setup.commands_received
+                && self.setup_display_complete(setup)
+                && (setup.commands_received || setup.commands_pulled)
+                && !self.pending.as_ref().is_some_and(|pending| {
+                    matches!(pending.kind, PendingKind::CommandCatalog { .. })
+                })
         });
         if !complete {
             return Ok(Effects::default());
@@ -3532,9 +3830,416 @@ impl GrokProtocol {
         })
     }
 
+    fn validate_fixed_catalog(
+        &self,
+        session: &str,
+        commands: &Value,
+        tools: &Value,
+        allow_display_refresh: bool,
+    ) -> Result<(), RuntimeError> {
+        const COMMANDS: [(&str, bool); 6] = [
+            ("compact", true),
+            ("always-approve", true),
+            ("context", false),
+            ("session-info", false),
+            ("feedback", true),
+            ("goal", true),
+        ];
+        let display_only =
+            allow_display_refresh && self.creation_catalog_session.as_deref() == Some(session);
+        let valid_commands = if display_only {
+            // 就绪后的命令是动态显示目录，不能授予执行权限；固定范围始终禁止 slash 和技能输入。
+            valid_display_commands(commands)
+        } else {
+            commands.as_array().is_some_and(|commands| {
+                commands.len() == COMMANDS.len()
+                    && commands
+                        .iter()
+                        .zip(COMMANDS)
+                        .all(|(command, (name, input))| {
+                            command.as_object().is_some_and(|fields| {
+                                fields.len() == 3
+                                    && command["name"] == name
+                                    && command["description"]
+                                        .as_str()
+                                        .is_some_and(|text| text.len() <= 4096)
+                                    && if input {
+                                        command["input"].as_object().is_some_and(|fields| {
+                                            fields.len() == 1
+                                                && fields
+                                                    .get("hint")
+                                                    .and_then(Value::as_str)
+                                                    .is_some_and(|text| text.len() <= 4096)
+                                        })
+                                    } else {
+                                        command["input"].is_null()
+                                    }
+                            })
+                        })
+            })
+        };
+        if !valid_commands {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok fixed command catalog".into(),
+            ));
+        }
+        self.options
+            .grok_profile
+            .as_ref()
+            .expect("固定范围已有创建策略")
+            .verify_catalog_with_mcp(
+                Some(tools),
+                self.task_input_written,
+                &self.served_catalog_names(session),
+            )
+    }
+
+    fn fixed_notification(&mut self, message: &Value) -> Result<Option<Effects>, RuntimeError> {
+        if !self.production_fixed_verified() || self.paired_version != self.probed_version {
+            return Ok(None);
+        }
+        let method = message["method"].as_str().unwrap_or_default();
+        let params = &message["params"];
+        if method == "_x.ai/models/update"
+            || method == "_x.ai/settings/update"
+            || method == "_x.ai/announcements/update"
+        {
+            if self
+                .current_setup
+                .as_ref()
+                .is_some_and(|setup| setup.next_phase < 5)
+            {
+                return Err(RuntimeError::Protocol(
+                    "Grok fixed display preceded session setup".into(),
+                ));
+            }
+            // 独占直连会重复公布显示元数据；逐帧验证形状，重复次数不作为权限证明。
+            match method {
+                "_x.ai/models/update" => {
+                    self.reported_metadata.models = Some(current_models_update(message)?);
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.models_received = true;
+                    }
+                }
+                "_x.ai/settings/update" => {
+                    validate_current_settings_update(message, true)?;
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.settings_received = true;
+                    }
+                }
+                "_x.ai/announcements/update" => {
+                    validate_current_announcements_update(message)?;
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.announcements_received = 1;
+                    }
+                }
+                _ => unreachable!("已限定显示通知"),
+            }
+            return self.finish_current_setup().map(Some);
+        }
+        if method == "_x.ai/session_notification" && self.session_id.is_none()
+            && self.pending.as_ref().is_some_and(|pending| matches!(&pending.kind,
+                PendingKind::OpenSession { requested_id: Some(id) } if params["sessionId"].as_str() == Some(id.as_str())))
+        {
+            let update = &params["update"];
+            let valid = params.as_object().is_some_and(|fields| fields.len() >= 2 && fields.len() <= 3
+                && fields.keys().all(|key| matches!(key.as_str(), "sessionId" | "update" | "_meta")))
+                && match update["sessionUpdate"].as_str() {
+                    Some("background_tasks") => update.as_object().is_some_and(|fields| fields.len() == 2)
+                        && update["tasks"] == json!([]),
+                    Some("model_changed") => update.as_object().is_some_and(|fields| fields.len() == 3)
+                        && update["model_id"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 128)
+                        && (update["reasoning_effort"].is_null() || update["reasoning_effort"].is_string()),
+                    Some(_) | None => false,
+                };
+            if !valid { return Err(RuntimeError::Protocol("invalid Grok fixed recovery snapshot".into())); }
+            // 冷恢复先公布只读快照；它不确认新回合、权限或就绪，仍等待 load 和本次目录拉取。
+            self.record_notification_id(message)?;
+            return Ok(Some(Effects::default()));
+        }
+        let catalog = method == "session/update"
+            && params["update"]["sessionUpdate"] == "available_commands_update";
+        let mcp = matches!(
+            method,
+            "_x.ai/mcp_initialized" | "_x.ai/mcp/init_progress" | "_x.ai/mcp/server_status"
+        );
+        if !catalog && !mcp {
+            return Ok(None);
+        }
+        let expected = self
+            .session_id
+            .as_deref()
+            .or_else(|| {
+                self.current_setup
+                    .as_ref()
+                    .and_then(|setup| setup.session_id.as_deref())
+            })
+            .or_else(|| match &self.options.target {
+                SessionTarget::Resume { native_session_id } => Some(native_session_id.as_str()),
+                SessionTarget::New => None,
+            });
+        if expected.is_none()
+            || params["sessionId"].as_str() != expected
+            || !message.as_object().is_some_and(|fields| fields.len() == 3)
+        {
+            return Err(RuntimeError::Protocol(
+                "Grok fixed notification changed its session binding".into(),
+            ));
+        }
+        let session = expected.expect("会话已关联").to_owned();
+        if mcp {
+            // MCP 进度仅为显示通知；实际目录来自本进程桥已写出的注册响应和关联拉取。
+            let keys: &[&str] = match method {
+                "_x.ai/mcp_initialized" => &["sessionId", "mcpToolCount", "elapsedMs"],
+                "_x.ai/mcp/init_progress" => &["sessionId", "connected", "total"],
+                "_x.ai/mcp/server_status" => {
+                    &["sessionId", "name", "reason", "source", "status", "tools"]
+                }
+                _ => unreachable!("已限定 MCP 通知"),
+            };
+            if !params.as_object().is_some_and(|fields| {
+                fields.len() == keys.len() && keys.iter().all(|key| fields.contains_key(*key))
+            }) || (method == "_x.ai/mcp_initialized"
+                && (!params["mcpToolCount"].is_u64() || !params["elapsedMs"].is_u64()))
+                || (method == "_x.ai/mcp/init_progress"
+                    && (!params["connected"].is_u64() || !params["total"].is_u64()))
+                || (method == "_x.ai/mcp/server_status" && params["name"] != MCP_SERVER_NAME)
+            {
+                return Err(RuntimeError::Protocol(
+                    "invalid Grok fixed MCP notification".into(),
+                ));
+            }
+            return Ok(Some(Effects::default()));
+        }
+        if params["_meta"]["isReplay"] == true {
+            return Ok(Some(Effects::default()));
+        }
+        let update = &params["update"];
+        if !params.as_object().is_some_and(|fields| fields.len() == 3)
+            || !update.as_object().is_some_and(|fields| fields.len() == 3)
+            || !update["_meta"]
+                .as_object()
+                .is_some_and(|fields| fields.len() == 1 && fields.contains_key("tools"))
+            || !params["_meta"]["eventId"].as_str().is_some_and(|event| {
+                event
+                    .strip_prefix(&format!("{session}-"))
+                    .and_then(|suffix| suffix.parse::<u64>().ok())
+                    .is_some()
+            })
+            || !params["_meta"]["agentTimestampMs"].is_number()
+            || !params["_meta"]["totalTokens"].is_number()
+            || !params["_meta"]["updateParams"].is_object()
+            || params["_meta"]["updateType"] != "AvailableCommandsUpdate"
+            || params["_meta"]
+                .get("isReplay")
+                .is_some_and(|value| value != false)
+        {
+            return Err(RuntimeError::Protocol(
+                "invalid Grok fixed catalog notification".into(),
+            ));
+        }
+        self.validate_fixed_catalog(
+            &session,
+            &update["availableCommands"],
+            &update["_meta"]["tools"],
+            true,
+        )?;
+        if !self.record_notification_id(message)? {
+            return Ok(Some(Effects::default()));
+        }
+        self.creation_catalog_session = Some(session);
+        if let Some(setup) = &mut self.current_setup {
+            setup.commands_received = true;
+        }
+        // 恢复始终等待本次 load 之后的关联拉取，历史广播不能提前放行。
+        self.finish_current_setup().map(Some)
+    }
+
+    fn root_notification(&mut self, message: &Value) -> Result<Option<Effects>, RuntimeError> {
+        if !self.production_root_verified() || self.paired_version != self.probed_version {
+            return Ok(None);
+        }
+        let method = message["method"].as_str().unwrap_or_default();
+        let params = &message["params"];
+        if matches!(
+            method,
+            "_x.ai/models/update" | "_x.ai/settings/update" | "_x.ai/announcements/update"
+        ) {
+            if self
+                .current_setup
+                .as_ref()
+                .is_some_and(|setup| setup.next_phase < 5)
+                || (self.session_id.is_none()
+                    && !self.pending.as_ref().is_some_and(|pending| {
+                        matches!(pending.kind, PendingKind::OpenSession { .. })
+                    }))
+            {
+                return Err(RuntimeError::Protocol(
+                    "Grok root display preceded session setup".into(),
+                ));
+            }
+            // 缓存刷新会重复广播显示快照；逐帧验证，次数不构成权限或原生回合证明。
+            match method {
+                "_x.ai/models/update" => {
+                    self.reported_metadata.models = Some(current_models_update(message)?);
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.models_received = true;
+                    }
+                }
+                "_x.ai/settings/update" => {
+                    validate_current_settings_update(message, true)?;
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.settings_received = true;
+                    }
+                }
+                "_x.ai/announcements/update" => {
+                    validate_current_announcements_update(message)?;
+                    if let Some(setup) = &mut self.current_setup {
+                        setup.announcements_received = 1;
+                    }
+                }
+                _ => unreachable!("已限定根任务显示通知"),
+            }
+            return self.finish_current_setup().map(Some);
+        }
+        let catalog = method == "session/update"
+            && params["update"]["sessionUpdate"] == "available_commands_update";
+        if !catalog && method != "_x.ai/mcp_initialized" {
+            return Ok(None);
+        }
+        let session = params["sessionId"]
+            .as_str()
+            .filter(|session| valid_native_id(session))
+            .ok_or_else(|| {
+                RuntimeError::Protocol("Grok root notification has no session".into())
+            })?;
+        let expected = self
+            .session_id
+            .as_deref()
+            .or_else(|| {
+                self.current_setup
+                    .as_ref()
+                    .and_then(|setup| setup.session_id.as_deref())
+            })
+            .or_else(|| match &self.options.target {
+                SessionTarget::Resume { native_session_id } => Some(native_session_id.as_str()),
+                SessionTarget::New => None,
+            });
+        let setup_waiting = self
+            .current_setup
+            .as_ref()
+            .is_some_and(|setup| setup.next_phase >= 5)
+            && self.pending.as_ref().is_some_and(|pending| {
+                matches!(
+                    pending.kind,
+                    PendingKind::OpenSession { requested_id: None }
+                )
+            });
+        if expected.is_some_and(|expected| expected != session)
+            || (expected.is_none() && !setup_waiting)
+        {
+            return Err(RuntimeError::Protocol(
+                "Grok root notification changed its session binding".into(),
+            ));
+        }
+        if method == "_x.ai/mcp_initialized" {
+            if !message.as_object().is_some_and(|fields| fields.len() == 3)
+                || !params.as_object().is_some_and(|fields| fields.len() == 3)
+                || params["mcpToolCount"] != 0
+                || !params["elapsedMs"].is_u64()
+            {
+                return Err(RuntimeError::Protocol(
+                    "invalid Grok root MCP display notification".into(),
+                ));
+            }
+            return Ok(Some(Effects::default()));
+        }
+        let resume_waiting = matches!(self.options.target, SessionTarget::Resume { .. })
+            && (self.session_id.is_none() || self.deferred_ready.is_some());
+        if resume_waiting
+            && !self
+                .pending
+                .as_ref()
+                .is_some_and(|pending| match &pending.kind {
+                    PendingKind::OpenSession {
+                        requested_id: Some(id),
+                    } => id == session && self.session_id.is_none(),
+                    PendingKind::CommandCatalog {
+                        session_id,
+                        version,
+                    } => {
+                        session_id == session
+                            && *version == ROOT_VERSION
+                            && self.deferred_ready.is_some()
+                    }
+                    PendingKind::Initialize
+                    | PendingKind::Authenticate
+                    | PendingKind::OpenSession { requested_id: None }
+                    | PendingKind::Prompt
+                    | PendingKind::FinalOutput
+                    | PendingKind::CloseSession => false,
+                })
+        {
+            return Err(RuntimeError::Protocol(
+                "Grok resumed catalog has no bound request".into(),
+            ));
+        }
+        if params["_meta"]["isReplay"] == true {
+            return Ok(Some(Effects::default()));
+        }
+        validate_current_available_commands_update(
+            message,
+            session,
+            self.options.selected_skills.first(),
+            true,
+        )?;
+        if let Some(turn) = params["_meta"].get("promptId") {
+            let current = self
+                .prompt
+                .as_ref()
+                .filter(|prompt| prompt.started)
+                .and_then(|prompt| prompt.native_id.as_deref());
+            if current.is_none() || turn.as_str() != current {
+                return Err(RuntimeError::Protocol(
+                    "Grok root catalog changed its turn binding".into(),
+                ));
+            }
+        }
+        if !self.record_notification_id(message)? {
+            return Ok(Some(Effects::default()));
+        }
+        #[cfg(all(test, unix))]
+        if let Some(probe) = &self.skill_catalog_for_live {
+            probe.observe(message, self.submitted_messages.is_empty());
+        }
+        // 恢复广播不能替代本次 load 后的实际拉取，也不创建技能绑定。
+        if resume_waiting {
+            return Ok(Some(Effects::default()));
+        }
+        let catalog = skills::SkillCatalog::from_native(&params["update"]["availableCommands"])
+            .map_err(RuntimeError::Protocol)?;
+        if self.session_id.as_deref() == Some(session) {
+            self.skill_catalog = Some(catalog);
+        } else {
+            self.early_skill_catalogs
+                .insert(session.to_owned(), catalog);
+        }
+        if let Some(setup) = &mut self.current_setup {
+            setup.session_id.get_or_insert_with(|| session.to_owned());
+            setup.commands_received = true;
+        }
+        self.finish_current_setup().map(Some)
+    }
+
     fn notification(&mut self, message: &Value) -> Result<Effects, RuntimeError> {
         if message["method"] == CURRENT_SETUP_METHOD {
             return self.current_setup_notification(message);
+        }
+        if let Some(effects) = self.fixed_notification(message)? {
+            return Ok(effects);
+        }
+        if let Some(effects) = self.root_notification(message)? {
+            return Ok(effects);
         }
         #[cfg(all(test, unix))]
         if self.catalog_direct_for_live && message["method"] == "_x.ai/mcp_initialized" {
@@ -3587,14 +4292,15 @@ impl GrokProtocol {
                     || self
                         .current_setup
                         .as_ref()
-                        .is_some_and(|setup| setup.next_phase != 0)
+                        .is_some_and(|setup| setup.next_phase != 0 && !self.direct_setup_protocol())
                 {
                     return Err(RuntimeError::Protocol(
                         "duplicate or late Grok MCP refresh".into(),
                     ));
                 }
                 self.current_mcp_refresh_received = true;
-                return Ok(Effects::default());
+                // 直连的空全局刷新可能晚于 setup；它必须到齐，但不是本地 SDK 的注册或权限证明。
+                return self.finish_current_setup();
             }
             if message["method"] == "_x.ai/models/update" {
                 let models = current_models_update(message)?;
@@ -3612,7 +4318,7 @@ impl GrokProtocol {
                 return self.finish_current_setup();
             }
             if message["method"] == "_x.ai/settings/update" {
-                validate_current_settings_update(message, self.test_candidate_settings())?;
+                validate_current_settings_update(message, self.current_settings_v1041())?;
                 let setup = self
                     .current_setup
                     .as_mut()
@@ -3679,6 +4385,7 @@ impl GrokProtocol {
                     message,
                     &session_id,
                     self.options.selected_skills.first(),
+                    false,
                 )?;
                 if self.options.permission_policy == PermissionPolicy::Inherit {
                     let catalog = skills::SkillCatalog::from_native(
@@ -4142,6 +4849,27 @@ fn cancelled_permission(id: &Value) -> Effects {
     }
 }
 
+fn sdk_protocol_rejection(stage: &'static str, error: &str) -> RuntimeError {
+    // 只记录有限内部分类；未知错误正文、原生帧、会话 ID 和参数都不得写日志。
+    let reason = match error {
+        "完整工具输入改变了原生租约" => "native_input_changed",
+        "原生工具失败，旧 SDK 进程能力已退休" => "native_tool_failed",
+        "SDK 调用没有唯一完整原生工具租约" => "lease_not_unique",
+        "上一原生回合仍有未闭合工具租约" => "previous_lease_open",
+        "审批未匹配完整原生工具输入与身份" => "permission_binding",
+        "工具帧不是当前进程的已确认原生回合" => "native_turn_binding",
+        "原生事件 ID 被不同内容复用" => "native_event_conflict",
+        "SDK 外层事务 ID 内容冲突" | "SDK 内层事务 ID 内容冲突" => {
+            "sdk_request_conflict"
+        }
+        _ => "other_rejection",
+    };
+    log::debug!("Grok SDK 拒绝 stage={stage} reason={reason}");
+    #[cfg(test)]
+    eprintln!("GROK_SDK_REJECTION stage={stage} reason={reason}");
+    RuntimeError::Protocol(crate::t!("cli-agent-grok-managed-unverified"))
+}
+
 fn rejected_command(message_id: Uuid, message: String) -> Effects {
     Effects {
         writes: Vec::new(),
@@ -4242,7 +4970,7 @@ fn current_models_update(message: &Value) -> Result<ReportedModels, RuntimeError
 
 fn validate_current_settings_update(
     message: &Value,
-    test_candidate_settings: bool,
+    settings_v1041: bool,
 ) -> Result<(), RuntimeError> {
     const KEYS: [&str; 23] = [
         "allow_access",
@@ -4281,10 +5009,10 @@ fn validate_current_settings_update(
     let params = outer["params"]
         .as_object()
         .filter(|params| {
-            params.len() == KEYS.len() + usize::from(test_candidate_settings)
+            let has_inheritance_display = params.contains_key("subagent_model_inheritance_enabled");
+            params.len() == KEYS.len() + usize::from(has_inheritance_display)
                 && KEYS.iter().all(|key| params.contains_key(*key))
-                && (!test_candidate_settings
-                    || params.contains_key("subagent_model_inheritance_enabled"))
+                && (settings_v1041 || !has_inheritance_display)
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok settings update fields".into()))?;
     let bool_fields = [
@@ -4304,7 +5032,8 @@ fn validate_current_settings_update(
         || !params["slash_command_tags"].is_object()
         || !params["permission_mode"].is_null()
         || !params["auto_permission_mode_enabled"].is_null()
-        || (test_candidate_settings && !params["subagent_model_inheritance_enabled"].is_boolean())
+        // 原生重试时会回落到未下发该远端显示项的设置；存在时仍只接受布尔值。
+        || params.get("subagent_model_inheritance_enabled").is_some_and(|value| !value.is_boolean())
     {
         return Err(RuntimeError::Protocol(
             "invalid Grok settings update value types".into(),
@@ -4370,16 +5099,8 @@ fn validate_current_available_commands_update(
     message: &Value,
     session_id: &str,
     selected_skill: Option<&SelectedLocalSkill>,
+    dynamic_root: bool,
 ) -> Result<(), RuntimeError> {
-    const COMMAND_HAS_META: [bool; 29] = [
-        false, false, false, false, false, true, false, false, false, true, true, true, true, true,
-        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-    ];
-    const COMMAND_HAS_INPUT: [bool; 29] = [
-        true, true, false, false, true, true, true, true, true, true, false, false, false, true,
-        true, false, false, true, true, false, true, true, true, true, true, false, false, false,
-        true,
-    ];
     let outer = message
         .as_object()
         .filter(|outer| {
@@ -4404,23 +5125,60 @@ fn validate_current_available_commands_update(
         ));
     }
     let expected_event_id = format!("{session_id}-2");
+    // 毫秒时间戳只接受 JSON 可精确表示的非负整数，不由时钟字段推导回合或权限。
+    let valid_clock = |value: &Value| {
+        value
+            .as_u64()
+            .is_some_and(|value| value <= 9_007_199_254_740_991)
+    };
     let params_meta = params["_meta"]
         .as_object()
         .filter(|meta| {
-            meta.len() == 5
-                && meta.contains_key("agentTimestampMs")
-                && meta.contains_key("eventId")
-                && meta.contains_key("totalTokens")
-                && meta.contains_key("updateParams")
-                && meta.contains_key("updateType")
+            let base_keys = [
+                "agentTimestampMs",
+                "eventId",
+                "totalTokens",
+                "updateParams",
+                "updateType",
+            ];
+            if !base_keys.iter().all(|key| meta.contains_key(*key)) {
+                return false;
+            }
+            if !dynamic_root {
+                return meta.len() == 5;
+            }
+            // 原生分别发布这三个可选字段；回合结束后可能只剩显示时钟。
+            let turn_fields = ["promptId", "streamStartMs", "turnStartMs"];
+            let optional_count = turn_fields
+                .iter()
+                .filter(|key| meta.contains_key(**key))
+                .count();
+            meta.len() == 5 + usize::from(meta.contains_key("isReplay")) + optional_count
+                && meta.get("isReplay").is_none_or(|value| value == false)
+                && meta
+                    .get("promptId")
+                    .is_none_or(|value| value.as_str().is_some_and(valid_native_id))
+                && meta.get("streamStartMs").is_none_or(valid_clock)
+                && meta.get("turnStartMs").is_none_or(valid_clock)
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog metadata".into()))?;
-    if !params_meta["agentTimestampMs"].is_number() {
+    if (dynamic_root && !valid_clock(&params_meta["agentTimestampMs"]))
+        || (!dynamic_root && !params_meta["agentTimestampMs"].is_number())
+    {
         return Err(RuntimeError::Protocol(
             "invalid Grok command catalog timestamp".into(),
         ));
     }
-    if params_meta["eventId"].as_str() != Some(expected_event_id.as_str()) {
+    let valid_event = if dynamic_root {
+        params_meta["eventId"]
+            .as_str()
+            .and_then(|event| event.strip_prefix(&format!("{session_id}-")))
+            .and_then(|suffix| suffix.parse::<u64>().ok())
+            .is_some()
+    } else {
+        params_meta["eventId"].as_str() == Some(expected_event_id.as_str())
+    };
+    if !valid_event {
         return Err(RuntimeError::Protocol(
             "invalid Grok command catalog event id".into(),
         ));
@@ -4456,10 +5214,154 @@ fn validate_current_available_commands_update(
                 && update.contains_key("_meta")
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog update".into()))?;
-    let commands = update["availableCommands"]
+    let update_meta = update["_meta"]
+        .as_object()
+        .filter(|meta| meta.len() == 1 && meta.contains_key("tools"))
+        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command tool metadata".into()))?;
+    if dynamic_root {
+        return validate_root_command_catalog(
+            &update["availableCommands"],
+            &update_meta["tools"],
+            selected_skill,
+        );
+    }
+    validate_current_command_catalog(
+        &update["availableCommands"],
+        &update_meta["tools"],
+        selected_skill,
+        false,
+    )
+}
+
+// 此目录仅描述当前原生界面；不会注册 SDK、改变固定策略或授予工具租约。
+fn valid_display_commands(commands: &Value) -> bool {
+    commands.as_array().is_some_and(|commands| {
+        let mut names = HashSet::new();
+        commands.len() <= 128
+            && commands.iter().all(|command| {
+                command.as_object().is_some_and(|fields| {
+                    (fields.len() == 3 || fields.len() == 4)
+                        && fields.keys().all(|key| {
+                            matches!(key.as_str(), "name" | "description" | "input" | "_meta")
+                        })
+                        && command["name"].as_str().is_some_and(|name| {
+                            !name.is_empty()
+                                && name.len() <= 128
+                                && name
+                                    .chars()
+                                    .all(|ch| !ch.is_whitespace() && !ch.is_control())
+                                && names.insert(name)
+                        })
+                        && command["description"]
+                            .as_str()
+                            .is_some_and(|text| text.len() <= 4096)
+                        && fields.get("input").is_some_and(|input| {
+                            input.is_null()
+                                || input.as_object().is_some_and(|input| {
+                                    input.len() == 1
+                                        && input
+                                            .get("hint")
+                                            .and_then(Value::as_str)
+                                            .is_some_and(|hint| hint.len() <= 4096)
+                                })
+                        })
+                        && fields.get("_meta").is_none_or(Value::is_object)
+                        && serde_json::to_vec(command).is_ok_and(|bytes| bytes.len() <= 16 * 1024)
+                })
+            })
+    })
+}
+
+fn validate_root_command_catalog(
+    commands: &Value,
+    tools: &Value,
+    selected_skill: Option<&SelectedLocalSkill>,
+) -> Result<(), RuntimeError> {
+    let mut names = HashSet::new();
+    if !valid_display_commands(commands)
+        || !tools.as_array().is_some_and(|tools| {
+            tools.len() <= 128
+                && tools.iter().all(|tool| {
+                    tool.as_str().is_some_and(|name| {
+                        !name.is_empty()
+                            && name.len() <= 128
+                            && !name.chars().any(|ch| ch.is_whitespace() || ch.is_control())
+                            && names.insert(name)
+                    })
+                })
+        })
+    {
+        return Err(RuntimeError::Protocol(
+            "invalid Grok root display catalog".into(),
+        ));
+    }
+    if let Some(selected) = selected_skill {
+        let path = selected
+            .path
+            .canonicalize()
+            .map_err(|_| RuntimeError::Protocol(skills::unavailable()))?;
+        let matches = commands
+            .as_array()
+            .expect("显示目录已验证")
+            .iter()
+            .filter(|command| {
+                command["_meta"]["path"]
+                    .as_str()
+                    .map(Path::new)
+                    .filter(|path| path.is_absolute())
+                    .and_then(|path| path.canonicalize().ok())
+                    .is_some_and(|candidate| candidate == path)
+            })
+            .collect::<Vec<_>>();
+        if matches.len() != 1
+            || matches[0]["_meta"]["bareName"] != selected.name
+            || matches[0]["_meta"]["scope"] != "local"
+            || !matches[0]["input"].is_null()
+        {
+            return Err(RuntimeError::Protocol(
+                "Grok selected skill catalog path or identity changed".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_current_command_catalog(
+    commands: &Value,
+    tools: &Value,
+    selected_skill: Option<&SelectedLocalSkill>,
+    pulled: bool,
+) -> Result<(), RuntimeError> {
+    // 固定原生拉取为九条基础命令；现有 leader 广播契约独立保留。
+    const PULLED_COMMAND_NAMES: [&str; 9] = [
+        "compact",
+        "always-approve",
+        "context",
+        "session-info",
+        "feedback",
+        "deep-research",
+        "workflow",
+        "goal",
+        "loop",
+    ];
+    const COMMAND_HAS_META: [bool; 29] = [
+        false, false, false, false, false, true, false, false, false, true, true, true, true, true,
+        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    ];
+    const COMMAND_HAS_INPUT: [bool; 29] = [
+        true, true, false, false, true, true, true, true, true, true, false, false, false, true,
+        true, false, false, true, true, false, true, true, true, true, true, false, false, false,
+        true,
+    ];
+    let commands = commands
         .as_array()
         .filter(|commands| {
-            commands.len() == COMMAND_HAS_META.len() + usize::from(selected_skill.is_some())
+            let base_count = if pulled {
+                PULLED_COMMAND_NAMES.len()
+            } else {
+                COMMAND_HAS_META.len()
+            };
+            commands.len() == base_count + usize::from(selected_skill.is_some())
         })
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command catalog entries".into()))?;
     for (index, command) in commands.iter().enumerate() {
@@ -4494,6 +5396,30 @@ fn validate_current_available_commands_update(
                 "invalid Grok command catalog entry values".into(),
             ));
         }
+        if pulled && !is_selected_skill {
+            let valid_input = !has_input
+                || command["input"].as_object().is_some_and(|input| {
+                    input.len() == 1
+                        && input
+                            .get("hint")
+                            .and_then(Value::as_str)
+                            .is_some_and(|hint| hint.len() <= 4 * 1024)
+                });
+            let valid_meta = !has_meta
+                || command["_meta"].as_object().is_some_and(|meta| {
+                    meta.len() == 2
+                        && meta.get("workflowPath").is_some_and(Value::is_string)
+                        && meta.get("workflowSource").is_some_and(Value::is_string)
+                });
+            if command["name"].as_str() != Some(PULLED_COMMAND_NAMES[base_index])
+                || !valid_input
+                || !valid_meta
+            {
+                return Err(RuntimeError::Protocol(
+                    "invalid Grok pulled command catalog entry".into(),
+                ));
+            }
+        }
         if let Some(selected_skill) = selected_skill.filter(|_| is_selected_skill) {
             let selected_path = selected_skill.path.canonicalize().ok();
             let command_path = command["_meta"]["path"]
@@ -4511,11 +5437,7 @@ fn validate_current_available_commands_update(
             }
         }
     }
-    let update_meta = update["_meta"]
-        .as_object()
-        .filter(|meta| meta.len() == 1 && meta.contains_key("tools"))
-        .ok_or_else(|| RuntimeError::Protocol("invalid Grok command tool metadata".into()))?;
-    let tools = update_meta["tools"]
+    let tools = tools
         .as_array()
         .filter(|tools| tools.len() == 27)
         .ok_or_else(|| RuntimeError::Protocol("invalid Grok command tool count".into()))?;

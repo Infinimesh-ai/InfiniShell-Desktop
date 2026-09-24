@@ -10,6 +10,7 @@ import urllib.request
 
 
 CODEX_VERSION = "0.147.0"
+HOOK_CODEX_VERSIONS = (CODEX_VERSION, "0.156.1")
 CODEX_COMMIT = "be6e8eac029b183056b7e4402879f15d2c85f61b"
 PLUGIN_COMMIT = "31ce59d9011cfb1d78f265649a228dac5de58d76"
 # 摘要来自固定 release 的官方 API digest；不查询 latest，也不接受调用方覆盖摘要。
@@ -67,7 +68,31 @@ def verify_plugin(root, base):
     return observed
 
 
-def verify_codex(path, architecture):
+def codex_contract(version):
+    # 准备器本身复用旧版下载器，因此仅在调用时导入，避免循环初始化。
+    from prepare_codex_cli import release_contract
+    require(version in HOOK_CODEX_VERSIONS, "通知探针只接受固定的旧版或 0.156.1")
+    return release_contract(version)
+
+
+def verify_codex(path, architecture, version=CODEX_VERSION):
+    contract = codex_contract(version)
+    require(architecture in RELEASE_ASSETS, "没有此架构的固定 Windows Codex")
+    if version != CODEX_VERSION:
+        from prepare_codex_cli import check_parent_chain, packages_for_version, verify_runtime_tree
+        target = "windows-x64" if architecture == "x86_64" else "windows-arm64"
+        package = packages_for_version(version)[target]
+        entry = Path(package["entrypoint"])
+        require(path.parts[-len(entry.parts):] == entry.parts, "新版 Codex 必须保留官方完整包布局")
+        root = path.parents[len(entry.parts) - 1]
+        check_parent_chain(root)
+        require(verify_runtime_tree(root, package, version) == path, "运行包入口与所选 Codex 不一致")
+        size, digest, _ = package["files"][package["entrypoint"]]
+        return {"asset": package["entrypoint"], "bytes": size, "sha256": digest,
+                "version": version, "commit": contract["commit"], "runtime_tree_verified": True,
+                "archive": {"asset": package["archive"], "bytes": package["bytes"],
+                            "sha256": package["sha256"],
+                            "url": f"https://github.com/openai/codex/releases/download/rust-v{version}/{package['archive']}"}}
     name, size, digest = RELEASE_ASSETS[architecture]
     require(regular_file(path).stat().st_size == size and sha256(path) == digest,
             "Codex 可执行文件不匹配固定官方 release 摘要")
@@ -101,15 +126,30 @@ def fetch_file(url, destination, digest, size=None):
         temporary.unlink(missing_ok=True)
 
 
-def obtain_inputs(repo, directory, architecture, executable=None, plugin=None):
+def obtain_inputs(repo, directory, architecture, executable=None, plugin=None, version=CODEX_VERSION):
+    codex_contract(version)
+    require(architecture in RELEASE_ASSETS, "没有此架构的固定 Windows Codex")
     base = plugin_base(repo)
+    if executable is None and version != CODEX_VERSION:
+        from prepare_codex_cli import (check_parent_chain, extract_runtime_package,
+                                       fetch_file as fetch_package, packages_for_version)
+        require(directory is not None, "没有提供 Codex 完整包或固定下载目录")
+        directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        check_parent_chain(directory)
+        target = "windows-x64" if architecture == "x86_64" else "windows-arm64"
+        package = packages_for_version(version)[target]
+        name = package["archive"]
+        archive = directory / f"{version}-{name}"
+        fetch_package(f"https://github.com/openai/codex/releases/download/rust-v{version}/{name}",
+                      archive, package["sha256"], package["bytes"])
+        executable = extract_runtime_package(archive, directory / f"runtime-{version}-{target}", target, version)
     if executable is None:
         require(directory is not None, "没有提供 Codex 文件或固定下载目录")
         name, size, digest = RELEASE_ASSETS[architecture]
         executable = directory / name
         fetch_file(f"https://github.com/openai/codex/releases/download/rust-v{CODEX_VERSION}/{name}",
                    executable, digest, size)
-    cli_evidence = verify_codex(executable, architecture)
+    cli_evidence = verify_codex(executable, architecture, version)
     if plugin is None:
         require(directory is not None, "没有提供原始插件或固定下载目录")
         plugin = directory / ("codex-warp-" + PLUGIN_COMMIT) / "plugins/warp"

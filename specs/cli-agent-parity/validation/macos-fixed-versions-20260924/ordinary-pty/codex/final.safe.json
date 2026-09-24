@@ -1,0 +1,54 @@
+{
+  "agent": "codex",
+  "checkpoint": "final",
+  "history": {
+    "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+    "native_input_count": 6,
+    "native_history_sha256": "d90e6b5150dea5e34aaaed1c0f7fe8737868bd0dd6f22d43c48e808412700606",
+    "native_history_bytes": 139487
+  },
+  "product": {
+    "events": {
+      "session_start": 1,
+      "prompt_submit": 1,
+      "stop": 1
+    },
+    "native_session_count": 1,
+    "paired_prompt_stop_turns": 1,
+    "unpaired_prompt_turns": 0,
+    "product_received_notifications": true,
+    "records": [
+      {
+        "event": "session_start",
+        "timestamp": "2026-09-24T06:13:35Z",
+        "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+        "turn_sha256": null
+      },
+      {
+        "event": "prompt_submit",
+        "timestamp": "2026-09-24T06:13:35Z",
+        "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+        "turn_sha256": "334d0d55c7676c35e3ab05e07b26be4e3a1ca6bdea7934b5bd0309ec290f43a5"
+      },
+      {
+        "event": "stop",
+        "timestamp": "2026-09-24T06:13:38Z",
+        "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+        "turn_sha256": "334d0d55c7676c35e3ab05e07b26be4e3a1ca6bdea7934b5bd0309ec290f43a5"
+      }
+    ]
+  },
+  "app_process": {
+    "pid": 51992,
+    "pgid": 51992,
+    "started": "Thu Sep 24 14:12:38 2026"
+  },
+  "allowed_file_exact": true,
+  "denied_file_absent": true,
+  "cancel_started": true,
+  "cancel_completed": true,
+  "cancel_script_pid_alive": false,
+  "gui_approval_decision_verified": false,
+  "gui_response_content_verified": false,
+  "automatic_model_inputs": 0
+}

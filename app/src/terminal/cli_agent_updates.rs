@@ -2,6 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+#[cfg(test)]
+use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::time::{Duration, Instant};
 
 use warpui::r#async::Timer;
@@ -184,6 +186,8 @@ pub struct CliAgentUpdatesModel {
     entries: HashMap<CLIAgent, Entry>,
     client: Arc<http_client::Client>,
     operations_enabled: bool,
+    #[cfg(test)]
+    recorded_updates: Option<SyncSender<CLIAgent>>,
 }
 
 impl CliAgentUpdatesModel {
@@ -203,6 +207,8 @@ impl CliAgentUpdatesModel {
                 .collect(),
             client: Arc::new(http_client::Client::new()),
             operations_enabled: !cfg!(test),
+            #[cfg(test)]
+            recorded_updates: None,
         };
         if model.operations_enabled {
             model.schedule_tick(ctx);
@@ -215,6 +221,23 @@ impl CliAgentUpdatesModel {
         if let Some(entry) = self.entries.get_mut(&agent) {
             entry.status.phase = phase;
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn stage_recorded_update_for_test(
+        &mut self,
+        agent: CLIAgent,
+        ctx: &mut ModelContext<Self>,
+    ) -> Receiver<CLIAgent> {
+        let (sender, receiver) = mpsc::sync_channel(1);
+        self.recorded_updates = Some(sender);
+        self.operations_enabled = true;
+        let entry = self.entries.get_mut(&agent).unwrap();
+        entry.status.phase = CliAgentUpdatePhase::Available;
+        entry.status.latest_version = Some("synthetic-target".to_owned());
+        entry.plan = Some(sources::plan_for_test());
+        self.try_update(agent, ctx);
+        receiver
     }
 
     pub fn status(&self, agent: CLIAgent) -> Option<&CliAgentUpdateStatus> {
@@ -523,6 +546,12 @@ impl CliAgentUpdatesModel {
         entry.manual_update = false;
         let operation = entry.operation;
         self.changed(agent, ctx);
+        #[cfg(test)]
+        if let Some(sender) = &self.recorded_updates {
+            // 接线测试走真实延期与派发状态机，但不触碰用户安装或事务目录。
+            sender.try_send(agent).expect("更新只能派发一次");
+            return;
+        }
         let (verification_started_tx, verification_started_rx) = async_channel::bounded(1);
         let (verification_continue_tx, verification_continue_rx) = async_channel::bounded(1);
         ctx.spawn(

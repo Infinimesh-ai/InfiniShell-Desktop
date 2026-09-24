@@ -515,8 +515,28 @@ fn execveat_process_helper() {
     let executable = PathBuf::from(env::var_os(PROCESS_EXECUTABLE_ENV).unwrap())
         .canonicalize()
         .unwrap();
+    let role = env::var(PROCESS_ROLE_ENV).unwrap();
+    if role == "layout" {
+        let snapshot = prepare_layout_snapshot(
+            executable.parent().unwrap(),
+            uuid::Uuid::new_v4(),
+            &"a".repeat(64),
+            &expected(&executable),
+        )
+        .unwrap();
+        let error = execute_layout(
+            &snapshot,
+            Path::new("atomic-argv0"),
+            &[OsString::from("argument-value")],
+            &[(
+                OsString::from("ATOMIC_EXEC_ENV"),
+                OsString::from("environment-value"),
+            )],
+        );
+        panic!("布局快照 execveat 没有替换辅助进程：{error}");
+    }
     let snapshot = ManuallyDrop::new(prepare(&expected(&executable)).unwrap());
-    match env::var(PROCESS_ROLE_ENV).unwrap().as_str() {
+    match role.as_str() {
         "forward" => {
             let error = execute(
                 &snapshot,
@@ -538,4 +558,245 @@ fn execveat_process_helper() {
         }
         role => panic!("未知 Linux execveat 测试角色：{role}"),
     }
+}
+
+struct LayoutFixture(tempfile::TempDir);
+
+impl LayoutFixture {
+    fn path(&self) -> &Path {
+        self.0.path()
+    }
+}
+
+impl Drop for LayoutFixture {
+    fn drop(&mut self) {
+        let snapshots = self.path().join("cli-agent-executable-snapshots");
+        if let Ok(generations) = fs::read_dir(snapshots) {
+            for entry in generations.flatten() {
+                if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                    let _ = fs::set_permissions(entry.path(), fs::Permissions::from_mode(0o700));
+                }
+            }
+        }
+    }
+}
+
+fn private_layout_fixture() -> LayoutFixture {
+    // 与发布合同一致，祖先不可由其他用户写入；不在共享 /tmp 中建立可执行快照。
+    LayoutFixture(
+        tempfile::tempdir_in(env::var_os("HOME").expect("Linux 验证需要私有 HOME")).unwrap(),
+    )
+}
+
+#[test]
+fn layout_snapshot_preserves_an_actual_file_path_and_binding_receipt() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let generation = uuid::Uuid::new_v4();
+    let binding = "a".repeat(64);
+    let snapshot =
+        prepare_layout_snapshot(&releases, generation, &binding, &expected(&program)).unwrap();
+
+    assert_eq!(
+        fs::read_link(format!("/proc/self/fd/{}", snapshot.file.as_raw_fd())).unwrap(),
+        snapshot.path
+    );
+    assert_eq!(snapshot.file.metadata().unwrap().mode() & 0o7777, 0o500);
+    assert_ne!(
+        unsafe { libc::fcntl(snapshot.file.as_raw_fd(), libc::F_GETFD) } & libc::FD_CLOEXEC,
+        0
+    );
+    let receipt: serde_json::Value = serde_json::from_slice(
+        &fs::read(snapshot.path.parent().unwrap().join("snapshot.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(receipt["binding_digest"], binding);
+    assert_eq!(receipt["generation"], generation.to_string());
+    snapshot.verify_for_execution().unwrap();
+}
+
+#[test]
+fn layout_snapshot_does_not_overwrite_an_existing_generation() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let generation = uuid::Uuid::new_v4();
+    let snapshot =
+        prepare_layout_snapshot(&releases, generation, &"a".repeat(64), &expected(&program))
+            .unwrap();
+
+    assert!(
+        prepare_layout_snapshot(&releases, generation, &"b".repeat(64), &expected(&program))
+            .is_err()
+    );
+    snapshot.verify_for_execution().unwrap();
+}
+
+#[test]
+fn layout_snapshot_rejects_shared_ancestors_and_directory_links() {
+    let state = private_layout_fixture();
+    let root = state.path().canonicalize().unwrap();
+    let program = root.join("source");
+    write_executable(&program, &minimal_elf());
+    let releases = root.join("releases");
+    fs::create_dir(&releases).unwrap();
+    fs::set_permissions(&releases, fs::Permissions::from_mode(0o777)).unwrap();
+    assert!(
+        prepare_layout_snapshot(
+            &releases,
+            uuid::Uuid::new_v4(),
+            &"a".repeat(64),
+            &expected(&program)
+        )
+        .is_err()
+    );
+    fs::set_permissions(&releases, fs::Permissions::from_mode(0o700)).unwrap();
+    let redirected = root.join("redirected");
+    std::os::unix::fs::symlink(&releases, &redirected).unwrap();
+    assert!(
+        prepare_layout_snapshot(
+            &redirected,
+            uuid::Uuid::new_v4(),
+            &"a".repeat(64),
+            &expected(&program)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn layout_snapshot_rejects_replaced_program_before_exec() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let snapshot = prepare_layout_snapshot(
+        &releases,
+        uuid::Uuid::new_v4(),
+        &"a".repeat(64),
+        &expected(&program),
+    )
+    .unwrap();
+    fs::set_permissions(
+        snapshot.path.parent().unwrap(),
+        fs::Permissions::from_mode(0o700),
+    )
+    .unwrap();
+    fs::rename(&snapshot.path, snapshot.path.with_file_name("previous")).unwrap();
+    write_executable(&snapshot.path, &minimal_elf());
+    fs::set_permissions(&snapshot.path, fs::Permissions::from_mode(0o500)).unwrap();
+    fs::set_permissions(
+        snapshot.path.parent().unwrap(),
+        fs::Permissions::from_mode(0o500),
+    )
+    .unwrap();
+
+    assert_eq!(
+        execute_layout(&snapshot, &program, &[], &[]).to_string(),
+        "managed_process.linux_layout_snapshot_changed"
+    );
+}
+
+#[test]
+fn layout_snapshot_execveat_preserves_the_original_source() {
+    let state = private_layout_fixture();
+    let executable = state.path().join("static-probe");
+    write_executable(&executable, &native_static_probe());
+    let identity = expected(&executable);
+
+    let output = execveat_helper("layout", &executable, state.path());
+
+    assert!(
+        output.status.success(),
+        "布局快照 execveat 失败：{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("atomic-argv0\nargument-value\nATOMIC_EXEC_ENV=environment-value\n")
+    );
+    assert_eq!(expected(&executable).sha256, identity.sha256);
+}
+
+#[test]
+fn layout_snapshot_cleanup_is_bound_and_preserves_other_generations() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let identity = expected(&program);
+    let generation = uuid::Uuid::new_v4();
+    let binding = "a".repeat(64);
+    let snapshot = prepare_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+    let other =
+        prepare_layout_snapshot(&releases, uuid::Uuid::new_v4(), &binding, &identity).unwrap();
+
+    assert!(cleanup_layout_snapshot(&releases, generation, &"b".repeat(64), &identity).is_err());
+    assert!(snapshot.path.exists());
+    cleanup_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+    cleanup_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+    assert!(!snapshot.path.parent().unwrap().exists());
+    other.verify_for_execution().unwrap();
+    assert_eq!(expected(&program), identity);
+}
+
+#[test]
+fn layout_snapshot_cleanup_recovers_interrupted_copy_and_unlink() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let identity = expected(&program);
+    for removed_program in [false, true] {
+        let generation = uuid::Uuid::new_v4();
+        let binding = "a".repeat(64);
+        let snapshot = prepare_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+        fs::set_permissions(
+            snapshot.path.parent().unwrap(),
+            fs::Permissions::from_mode(0o700),
+        )
+        .unwrap();
+        if removed_program {
+            fs::remove_file(&snapshot.path).unwrap();
+        } else {
+            fs::set_permissions(&snapshot.path, fs::Permissions::from_mode(0o600)).unwrap();
+            fs::OpenOptions::new()
+                .write(true)
+                .open(&snapshot.path)
+                .unwrap()
+                .set_len(3)
+                .unwrap();
+        }
+        cleanup_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+        assert!(!snapshot.path.parent().unwrap().exists());
+    }
+}
+
+#[test]
+fn layout_snapshot_cleanup_rejects_unknown_files_and_replaced_identity() {
+    let state = private_layout_fixture();
+    let releases = state.path().canonicalize().unwrap();
+    let program = releases.join("source");
+    write_executable(&program, &minimal_elf());
+    let identity = expected(&program);
+    let generation = uuid::Uuid::new_v4();
+    let binding = "a".repeat(64);
+    let snapshot = prepare_layout_snapshot(&releases, generation, &binding, &identity).unwrap();
+    let directory = snapshot.path.parent().unwrap();
+    fs::set_permissions(directory, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::write(directory.join("unrelated"), b"preserve").unwrap();
+    assert!(cleanup_layout_snapshot(&releases, generation, &binding, &identity).is_err());
+    assert_eq!(fs::read(directory.join("unrelated")).unwrap(), b"preserve");
+    fs::remove_file(directory.join("unrelated")).unwrap();
+    // 旧 fd 仍持有旧 inode，保证替换文件不会巧合重用相同身份。
+    fs::remove_file(&snapshot.path).unwrap();
+    write_executable(&snapshot.path, &minimal_elf());
+    fs::set_permissions(&snapshot.path, fs::Permissions::from_mode(0o500)).unwrap();
+    assert!(cleanup_layout_snapshot(&releases, generation, &binding, &identity).is_err());
+    assert!(snapshot.path.exists());
+    assert!(directory.join("snapshot.json").exists());
 }

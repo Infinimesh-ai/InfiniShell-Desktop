@@ -70,6 +70,28 @@ fn runtime_version_requires_exact_probed_identity() {
 }
 
 #[test]
+fn current_notification_contracts_are_limited_to_exact_macos_versions() {
+    for (kind, version) in [
+        (PatchKind::Codex, "codex-cli 0.156.1\n"),
+        (PatchKind::Claude, "2.1.280 (Claude Code)\n"),
+    ] {
+        assert_eq!(version_matches(kind, version), cfg!(target_os = "macos"));
+    }
+    for (kind, output) in [
+        (PatchKind::Codex, "codex-cli 0.156.0"),
+        (PatchKind::Codex, "codex-cli 0.156.2"),
+        (PatchKind::Codex, "codex-cli 0.156.1-beta"),
+        (PatchKind::Codex, "codex-cli 0.156.1 extra"),
+        (PatchKind::Claude, "2.1.279 (Claude Code)"),
+        (PatchKind::Claude, "2.1.281 (Claude Code)"),
+        (PatchKind::Claude, "2.1.280-beta (Claude Code)"),
+        (PatchKind::Claude, "2.1.280 (Grok Build)"),
+    ] {
+        assert!(!version_matches(kind, output));
+    }
+}
+
+#[test]
 fn applies_exact_files_idempotently_without_changing_permissions() {
     let (directory, hashes) = synthetic_bundle();
     let original_permissions = fs::metadata(directory.path().join("scripts/a"))

@@ -27,13 +27,15 @@ TEST_CANDIDATE_STATE_MARKER_CONTENT = "isolated Claude Code 2.1.280 coordinator 
 def coordinator_candidate(args):
     version = getattr(args, "claude_version", VERSION)
     enabled = getattr(args, "allow_claude_21280_coordinator_candidate", False)
-    if (version == TEST_CANDIDATE_VERSION) != enabled:
-        raise ValueError("Claude 2.1.280 父子验收须显式选择专用测试构建")
-    if enabled and not getattr(args, "use_authorized_default_account", False):
-        raise ValueError("Claude 2.1.280 父子候选仅使用显式授权的默认账户")
-    if enabled and any(getattr(args, name, None) is not None for name in
+    if enabled and version != TEST_CANDIDATE_VERSION:
+        raise ValueError("Claude 父子候选标记仅允许精确 2.1.280")
+    if version == TEST_CANDIDATE_VERSION and sys.platform != "darwin":
+        raise ValueError("Claude 2.1.280 父子验收仅开放 macOS")
+    if version == TEST_CANDIDATE_VERSION and not getattr(args, "use_authorized_default_account", False):
+        raise ValueError("Claude 2.1.280 父子验收仅使用显式授权的默认账户")
+    if version == TEST_CANDIDATE_VERSION and any(getattr(args, name, None) is not None for name in
                        ("config_dir", "auth_home", "api_environment_file")):
-        raise ValueError("Claude 2.1.280 父子候选不能指定私有认证路径或 API 环境")
+        raise ValueError("Claude 2.1.280 父子验收不能指定私有认证路径或 API 环境")
     return enabled
 
 
@@ -131,14 +133,14 @@ def project_public_events(events, redact):
 
 
 def validate_auth_selection(args):
-    candidate = coordinator_candidate(args)
+    coordinator_candidate(args)
     default_account = getattr(args, "use_authorized_default_account", False)
     api_file = getattr(args, "api_environment_file", None)
     if default_account:
         if api_file is not None:
             raise ValueError("默认在线账户模式不能同时提供 API 环境")
-        if getattr(args, "claude_version", VERSION) != base.DEFAULT_ACCOUNT_VERSION and not candidate:
-            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278")
+        if getattr(args, "claude_version", VERSION) not in (base.DEFAULT_ACCOUNT_VERSION, TEST_CANDIDATE_VERSION):
+            raise ValueError("默认在线账户验收只接受固定官方 Claude 2.1.278 或 macOS 2.1.280")
     elif api_file is None:
         raise ValueError("私有 API 模式必须提供 api-environment-file")
     return default_account
@@ -572,15 +574,11 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
 def run(args):
     # 先按固定发行摘要校验；不向任意 PATH 命中的程序传入 API 环境执行 --version。
     candidate = coordinator_candidate(args)
-    if candidate:
-        # 共用基础路径校验，临时映射其同版本候选标记。
-        args.auth_home, args.config_dir = None, None
-        args.allow_claude_21280_candidate = True
-        try:
-            base.validate_paths(args)
-        finally:
-            del args.allow_claude_21280_candidate
     selected_version = getattr(args, "claude_version", VERSION)
+    formal_current = selected_version == TEST_CANDIDATE_VERSION and not candidate
+    if selected_version == TEST_CANDIDATE_VERSION:
+        # 父子运行器独立核对路径；正式版本不能借用基础运行器的候选标记。
+        validate_inputs(args)
     target = current_platform()
     verified_cli = verify_binary(args.claude, target, selected_version)
     root = Path(tempfile.mkdtemp(prefix="infinishell-claude-coordinator-")).resolve()
@@ -589,6 +587,11 @@ def run(args):
         raise ValueError("原生 Claude 在版本探测期间变化")
     if candidate:
         verify_candidate_supervisor(args.supervisor)
+    elif formal_current:
+        signature = subprocess.run(["/usr/bin/codesign", "--verify", "--strict", str(args.supervisor)],
+            env={"PATH": "/usr/bin:/bin"}, capture_output=True, timeout=10)
+        if signature.returncode != 0:
+            raise ValueError("Claude 正式 supervisor 签名核对失败")
     default_account = validate_auth_selection(args)
     api_environment = ({} if default_account else
                        base.load_api_environment(args.api_environment_file))
@@ -667,6 +670,7 @@ def run(args):
         "private_raw_evidence_filename": raw_artifact.name,
         "test_only_coordinator_candidate_21280": candidate,
         "candidate_supervisor_marker_verified": candidate,
+        "production_version_gate_expected": formal_current,
     }
     if account_status is not None:
         metadata["authorized_default_account"] = account_status
@@ -703,12 +707,17 @@ def run(args):
             process.wait(timeout=15)
             raise
         metadata["test_exit_code"] = process.returncode
+        if candidate or formal_current:
+            metadata["supervisor_binary_unchanged"] = (
+                base.digest(args.supervisor) == metadata["supervisor_binary_sha256"])
         if candidate:
             metadata["candidate_supervisor_binary_unchanged"] = (
-                base.digest(args.supervisor) == metadata["supervisor_binary_sha256"])
+                metadata["supervisor_binary_unchanged"])
         raw_text = redact(raw_artifact.read_text(encoding="utf-8"))
         raw_artifact.write_text(raw_text, encoding="utf-8")
         raw_events = [json.loads(line) for line in raw_text.splitlines() if line.strip()]
+        metadata["production_version_gate_verified"] = (formal_current
+            and _one(raw_events, "acceptance_started").get("production_version_gate_verified") is True)
         metadata["native_result_correlations"] = base.sanitize_event(
             _native_result_correlations(raw_events), redact)
         # 验收先审核私有全树，再审核公开摘要；删除字段不能把失败记录变成通过。
@@ -722,7 +731,8 @@ def run(args):
         metadata["denied_read_fixture_unchanged"] = base.digest(blocked) == blocked_digest
         metadata["cli_binary_unchanged"] = verify_binary(args.claude, target, selected_version) == verified_cli
         metadata["acceptance_passed"] = (not metadata.get("timed_out", False)
-            and (not candidate or metadata["candidate_supervisor_binary_unchanged"])
+            and (not (candidate or formal_current) or metadata["supervisor_binary_unchanged"])
+            and (not formal_current or metadata["production_version_gate_verified"])
             and metadata["project_settings_unchanged"] and metadata["denied_read_fixture_unchanged"]
             and metadata["cli_binary_unchanged"]
             and private_verified and verified_acceptance(process.returncode, output, events, selected_version))

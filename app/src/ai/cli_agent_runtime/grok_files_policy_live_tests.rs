@@ -639,8 +639,15 @@ async fn phase(
             match event.kind {
                 RuntimeEventKind::SessionReady {
                     effective_permissions,
-                    ..
+                    verified_cli_version,
                 } => {
+                    if env::var("INFINISHELL_GROK_FIXED_VERSION")
+                        .ok()
+                        .as_deref()
+                        .is_some_and(|expected| verified_cli_version.as_deref() != Some(expected))
+                    {
+                        return Err("固定策略原生版本回执不匹配".into());
+                    }
                     if ready
                         || session.is_none()
                         || effective_permissions["appCreationPolicyApplied"] != true

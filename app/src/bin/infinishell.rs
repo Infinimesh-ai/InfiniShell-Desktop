@@ -63,6 +63,11 @@ fn main() -> Result<()> {
     {
         use warp_core::features::FeatureFlag;
         state = state.with_additional_features(&[FeatureFlag::ImeMarkedText]);
+        // 托管任务先由 macOS 桌面入口交付，共用库及 TUI 保持独立开关。
+        #[cfg(target_os = "macos")]
+        {
+            state = state.with_additional_features(&[FeatureFlag::LocalCLIManagedTasks]);
+        }
     }
     ChannelState::set(state);
 

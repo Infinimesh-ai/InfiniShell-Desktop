@@ -1,0 +1,61 @@
+{
+  "scope": "macOS ordinary product PTY Grok 1.0.41 plugin 0.1.4 session attention request, V13",
+  "acceptance_passed": true,
+  "source_manifest_sha256": "4c73b842e80aeb741e240db843d7b9c335dd29ae67000b13e5bc0e14f1bc22e7",
+  "files": {
+    "allow-once-selected-v13.png": {
+      "sha256": "46fd68bf86188f02992dcb5ed89b3b3017fd7dd2f896d0ac99ee1439e46d2529",
+      "bytes": 690444
+    },
+    "attention-approval-v13.png": {
+      "sha256": "c6003614ff32a82e15726670839703cc86209c861336d94ffdf976b5bf1a85eb",
+      "bytes": 708445
+    },
+    "attention-replaced-unknown-v13.png": {
+      "sha256": "a8a7753bb49d6ebb45e0a5b715e3971a6b4decbd7e920afbb277b6bd4cc280af",
+      "bytes": 688652
+    },
+    "checkpoint-approval.safe.json": {
+      "sha256": "cc6310a6a872e5de1515513659f5e0643eab4dee9a394c3edc3935aace6a4d36",
+      "bytes": 4902
+    },
+    "checkpoint-completed.safe.json": {
+      "sha256": "74c69a808f9d7fe3f5d39d58cc2f0fe9b2340a223771e0bf7278eb462c44ab09",
+      "bytes": 5448
+    },
+    "checkpoint-ready.safe.json": {
+      "sha256": "fc59f996dc84a59ebb5783b75d92fac0adcacccccfe598a328c0882eaa2cb3f4",
+      "bytes": 960
+    },
+    "cleanup.safe.json": {
+      "sha256": "1662163e24fdf935cd2b11064e947b763237c1a184ecd2cf90b0d421bc8abc91",
+      "bytes": 269
+    },
+    "final.safe.json": {
+      "sha256": "c18afc403aaf74dd66a70df65a8b68cc2d7fa92759d41c42e8430d41059bc7f1",
+      "bytes": 4143
+    },
+    "installer-final.safe.json": {
+      "sha256": "524a4984ca94149798c8423765e371dc209e4640a074f2ed871ea10bfbf27254",
+      "bytes": 2944
+    },
+    "native-exit.safe.json": {
+      "sha256": "ecfa6476bee46797c82cf32d2fb40648120fddfdfb8915be2d6e545506173faa",
+      "bytes": 59
+    },
+    "native-exited-v13.png": {
+      "sha256": "ccbdd6e95027a7954639e40825d325609b9d51e84803ab4b8c21e701a16cae03",
+      "bytes": 656897
+    },
+    "native-notification-fields.safe.ndjson": {
+      "sha256": "ad607784a5daf44c925c46e0e1ec1e0cfa355ffa690fa2be291225b368e65981",
+      "bytes": 2595
+    },
+    "sources.safe.json": {
+      "sha256": "395a43d4517e24c10504b4d4324ea00800e5fd45b5480c9e9c773949799f446f",
+      "bytes": 3626
+    }
+  },
+  "screenshot_manual_reviewed": true,
+  "raw_transcripts_and_credentials_excluded": true
+}

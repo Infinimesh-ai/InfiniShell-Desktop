@@ -31,6 +31,7 @@ VERSION_OUTPUTS = {
     LEGACY_VERSION: "grok 1.0.30 (04b7ffed98c6)",
     P0_VERSION: "grok 1.0.34 (3736acbc8658)",
     VERSION: VERSION_OUTPUT,
+    "1.0.41": "grok 1.0.41 (4220f3b224a6)",
 }
 VERSION_RELEASES = {
     LEGACY_VERSION: {
@@ -54,6 +55,12 @@ VERSION_RELEASES = {
                       "034c883fa3962ab6ca409c2d3c7501c642166535dd39fa936ecffe1ac2cad92e"),
         "darwin-arm64": ("grok-1.0.40-macos-aarch64", "grok", 145308720,
                          "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2"),
+    },
+    "1.0.41": {
+        "linux-x64": ("grok-1.0.41-linux-x86_64", "grok", 165967424,
+                      "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"),
+        "win32-x64": ("grok-1.0.41-windows-x86_64.exe", "grok.exe", 154082120,
+                      "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25"),
     },
 }
 RELEASES = VERSION_RELEASES[VERSION]

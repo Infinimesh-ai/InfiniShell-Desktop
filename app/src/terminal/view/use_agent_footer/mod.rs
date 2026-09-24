@@ -51,7 +51,7 @@ use warpui::{
     ViewContext, ViewHandle,
 };
 
-use super::{RichContentInsertionPosition, TerminalAction, TerminalView};
+use super::{CLIAgentHookInputTarget, RichContentInsertionPosition, TerminalAction, TerminalView};
 use crate::ai::blocklist::block::cli_controller::CLISubagentEvent;
 use crate::cmd_or_ctrl_shift;
 use crate::code_review::diff_state::GitDeltaPreference;
@@ -1092,6 +1092,33 @@ impl TerminalView {
         CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id) == Some(generation)
     }
 
+    pub(super) fn bind_cli_agent_hook_input_target(&mut self, ctx: &AppContext) {
+        let sessions = CLIAgentSessionsModel::as_ref(ctx);
+        let Some(session) = sessions.session(self.view_id) else {
+            return;
+        };
+        let (Some(native_session_id), Some(listener)) = (
+            session.session_context.session_id.as_ref(),
+            session.listener.as_ref(),
+        ) else {
+            return;
+        };
+        if !session.received_rich_notification || native_session_id.is_empty() {
+            return;
+        }
+        let model = self.model.lock();
+        let block = model.block_list().active_block();
+        if !block.is_active_and_long_running() {
+            return;
+        }
+        self.cli_agent_hook_input_target = Some(CLIAgentHookInputTarget {
+            block_id: block.id().clone(),
+            native_session_id: native_session_id.clone(),
+            listener_id: listener.id(),
+            model_events_id: self.model_events_handle.id(),
+        });
+    }
+
     pub(super) fn cli_agent_input_target_matches(
         &self,
         generation: Uuid,
@@ -1104,19 +1131,27 @@ impl TerminalView {
             return false;
         };
         let model = self.model.lock();
+        let block = model.block_list().active_block();
+        // 包装命令名本身不能证明 CLI 身份；通知绑定必须仍属于同一 block、PTY 和原生会话。
+        let hook_target_matches = self
+            .cli_agent_hook_input_target
+            .as_ref()
+            .is_some_and(|target| {
+                &target.block_id == block.id()
+                    && target.model_events_id == self.model_events_handle.id()
+                    && session.received_rich_notification
+                    && session.session_context.session_id.as_ref()
+                        == Some(&target.native_session_id)
+                    && session.listener.as_ref().map(|listener| listener.id())
+                        == Some(target.listener_id)
+            });
         self.detect_cli_agent_from_model(&model, ctx)
             .is_some_and(|(agent, _)| agent == session.agent)
-            || (model
-                .block_list()
-                .active_block()
-                .is_active_and_long_running()
-                && session.agent.matches_command(
-                    &model
-                        .block_list()
-                        .active_block()
-                        .command_with_secrets_obfuscated(false),
-                    None,
-                ))
+            || (block.is_active_and_long_running()
+                && (session
+                    .agent
+                    .matches_command(&block.command_with_secrets_obfuscated(false), None)
+                    || hook_target_matches))
     }
 
     /// 普通 PTY 写入不是原生输入确认；审批界面里的 Enter 可能直接批准工具。

@@ -1,5 +1,7 @@
 # CLI 对齐验证记录
 
+> **2026-09-24 固定版本 Mac 验收（V13）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的正式入口、父子任务、GUI 恢复、普通通知、SSH/tmux、IME 和原子更新均已有按源码范围绑定的实链。Grok 无回合标识审批按会话级提醒处理，V13 真实提醒及清理通过；check、i18n 和受影响 378 项回归通过，完整桌面集合及三项串行复验按 V11 留证。现在准备冻结提交并统一验证 Linux／Windows，Goal 尚未完成。当前对应表见 [固定版本验收](ACCEPTANCE_FIXED_VERSIONS_20260924.md)，细节和边界见 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)。下文旧状态仅代表各自历史快照。
+
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
 ## 2026-09-24 续接

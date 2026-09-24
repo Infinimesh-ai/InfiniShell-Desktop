@@ -363,7 +363,7 @@ fn windows_program_with_bounded_imports_is_structurally_accepted() {
 }
 
 #[test]
-#[ignore = "Windows 实机调试事件退出闭包尚未收敛，产品入口继续保持 ManualOnly"]
+#[ignore = "Windows 实机退出闭包必须通过显式诊断入口验证"]
 fn debug_session_runs_system_only_process_to_native_exit() {
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_fixture_in_strict_job(
@@ -420,7 +420,7 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_fixture_in_strict_job(
             "debug_session_runs_fixed_real_cli_to_native_exit",
-            DEBUG_DRIVER_TIMEOUT,
+            Duration::from_secs(6 * 60),
         );
         return;
     }
@@ -506,7 +506,7 @@ fn non_system_dynamic_image_fixture() {
 }
 
 #[test]
-#[ignore = "Windows 实机调试事件拒绝路径尚未收敛，产品入口继续保持 ManualOnly"]
+#[ignore = "Windows 实机拒绝路径必须通过显式诊断入口验证"]
 fn debug_session_rejects_non_system_dynamic_image_before_continue() {
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_fixture_in_strict_job(
@@ -610,7 +610,7 @@ fn debug_session_rejects_non_system_dynamic_image_before_continue() {
 }
 
 #[test]
-fn cwd_lease_does_not_claim_atomic_replacement_protection() {
+fn cwd_lease_blocks_leaf_rename_until_released() {
     let directory = tempfile::tempdir().unwrap();
     let cwd_path = directory.path().join("cwd");
     let moved_cwd = directory.path().join("moved-cwd");
@@ -619,9 +619,12 @@ fn cwd_lease_does_not_claim_atomic_replacement_protection() {
     let cwd = prepare_directory(&cwd_identity).unwrap();
 
     cwd.verify_for_spawn().unwrap();
-    fs::rename(&cwd_path, &moved_cwd).unwrap();
-    assert!(cwd.verify_for_spawn().is_err());
+    assert!(fs::rename(&cwd_path, &moved_cwd).is_err());
+    assert!(fs::remove_dir(&cwd_path).is_err());
+    cwd.verify_for_spawn().unwrap();
     drop(cwd);
+    fs::rename(&cwd_path, &moved_cwd).unwrap();
+    fs::remove_dir(&moved_cwd).unwrap();
 }
 
 #[test]
@@ -787,4 +790,43 @@ fn pe_import_directory_has_a_fixed_oom_limit() {
         failure.to_string(),
         "managed_process.atomic_windows_program_not_pe"
     );
+}
+
+#[test]
+fn fixed_system_powershell_helper_is_leased_and_rejects_an_identical_copy() {
+    let directory = tempfile::tempdir().unwrap();
+    let system = directory.path().join("System32");
+    let parent = system.join("WindowsPowerShell/v1.0");
+    fs::create_dir_all(&parent).unwrap();
+    let program = parent.join("powershell.exe");
+    fs::write(&program, minimal_pe()).unwrap();
+    let file = open_ancestor(&system).unwrap();
+    let system = AncestorLease {
+        identity: inspect_handle(&file).unwrap(),
+        file,
+    };
+    let helper = prepare_powershell(&system).unwrap().unwrap();
+    helper.verify_image(&File::open(&program).unwrap()).unwrap();
+
+    let shadow = directory.path().join("powershell.exe");
+    fs::copy(&program, &shadow).unwrap();
+    assert!(helper.verify_image(&File::open(&shadow).unwrap()).is_err());
+    assert!(OpenOptions::new().write(true).open(&program).is_err());
+    assert!(fs::rename(&parent, parent.with_file_name("replaced")).is_err());
+    drop(helper);
+    fs::rename(&parent, parent.with_file_name("replaced")).unwrap();
+}
+
+#[test]
+fn fixed_system_powershell_helper_does_not_search_other_locations() {
+    let directory = tempfile::tempdir().unwrap();
+    let system = directory.path().join("System32");
+    fs::create_dir(&system).unwrap();
+    fs::write(system.join("powershell.exe"), minimal_pe()).unwrap();
+    let file = open_ancestor(&system).unwrap();
+    let system = AncestorLease {
+        identity: inspect_handle(&file).unwrap(),
+        file,
+    };
+    assert!(prepare_powershell(&system).unwrap().is_none());
 }

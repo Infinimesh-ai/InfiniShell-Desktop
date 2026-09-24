@@ -1,0 +1,18 @@
+{
+  "status": "applied; final build and native GUI verification pending",
+  "patches": {
+    "fixed_desktop_versions": "22b17f142aaf9030e8074df223c90ba608d70760b7e7eac173b90b2a370c85df",
+    "windows_product_update": "4c84bcd231a1b0c4ec3c2121ab697bbbc06690c699be15de27f989f6581cffb9",
+    "grok_idle_catalog": "91ddabd05547c55bcf6c75327b4b1de39eb81e3b988a8a11db76262323513372",
+    "codex_windows_1561": "1889a783ef3f291a5bca482dff428c4529035ec09f1406399cf8be95513e15c6",
+    "windows_installer_scope": "a4d12208d1b3b41d5fe2a20e79243c120ef2a103b1676b14c9e4111d4d4875d8",
+    "windows_native_switches": "ec93b29ee5e51b957f3f48395c3cffcdd7525297ffe8b63e263e8f928d9ed779"
+  },
+  "notification_applied_sha256": "f9beb1eb2897c6789453e4ca5b553e91abebc30b79b451c758c871f07cc4a891",
+  "notification_test_import_added_separately": "use base64::Engine as _;",
+  "gui_test_patch_sha256": "4e8bf53a20cbb34ccbffa05ba56446cd89e2ce849c7aabde208af7d9e2bf0260",
+  "source_manifest_sha256": "b3e0cbd07bf031146dd199c2cfec5ebbf41d266051bc0bf255498e6ee624ca8f",
+  "legacy_hook_ci_preserved": true,
+  "current_hook_ci_separate": true,
+  "ci_dispatched": false
+}

@@ -1,6 +1,43 @@
 use super::*;
 use crate::terminal::cli_agent_sessions::event::CLIAgentEventPayload;
 
+#[test]
+fn grok_unscoped_permission_is_only_a_deduplicated_session_reminder() {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+        let mut cursor = EventCursor::default();
+        let mut permission = event(agent, CLIAgentEventType::PermissionRequest, None);
+        permission.payload.event_id = Some("permission-notice".to_owned());
+        assert_eq!(cursor.accept(&permission), EventDisposition::Drop);
+        cursor.accept(&event(
+            agent,
+            CLIAgentEventType::PromptSubmit,
+            Some("current"),
+        ));
+        assert_eq!(
+            cursor.accept(&permission),
+            if agent == CLIAgent::Grok {
+                EventDisposition::SessionAttention
+            } else {
+                EventDisposition::Drop
+            }
+        );
+        assert_eq!(cursor.accept(&permission), EventDisposition::Drop);
+        assert_eq!(
+            cursor.accept(&event(
+                agent,
+                CLIAgentEventType::PermissionRequest,
+                Some("old")
+            )),
+            EventDisposition::Drop
+        );
+        let mut local = event(agent, CLIAgentEventType::PromptSubmit, None);
+        local.source = CLIAgentEventSource::LocalRichInput;
+        cursor.accept(&local);
+        permission.payload.event_id = Some("late-permission".to_owned());
+        assert_eq!(cursor.accept(&permission), EventDisposition::Drop);
+    }
+}
+
 fn event(agent: CLIAgent, kind: CLIAgentEventType, turn: Option<&str>) -> CLIAgentEvent {
     let payload = CLIAgentEventPayload {
         turn_id: (agent == CLIAgent::Codex)

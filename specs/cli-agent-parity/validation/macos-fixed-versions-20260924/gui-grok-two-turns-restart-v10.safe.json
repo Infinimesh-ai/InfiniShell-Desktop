@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "scope": "Mac 固定 Grok GUI 同宿主连续两轮后应用重启、零重投和第三轮真实记忆",
+  "passed": true,
+  "task_id": "d5e44cc2-4c24-4d59-87f8-40bb91675dfb",
+  "native_session_id": "01a0d221-2b18-75a2-b4fd-f99958e7ff70",
+  "model_inputs_sent": 3,
+  "tool_calls": 0,
+  "permission_mode": "fixed_read",
+  "app_pids": [
+    58091,
+    60157
+  ],
+  "source_manifest_sha256": "7b3251da1976909b3d3820d59644725efab315b7054bc40ca95f1aa3ce4d27f5",
+  "gui_sha256": "2789316494e5bfd259be8196c21ec3f0757646db9060bcd6e64e05df8499441f",
+  "native_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+  "phases": [
+    {
+      "phase": "v10-two-turns-before-restart",
+      "task": {
+        "task_id": "d5e44cc2-4c24-4d59-87f8-40bb91675dfb",
+        "native_session_id": "01a0d221-2b18-75a2-b4fd-f99958e7ff70",
+        "generation": 2,
+        "revision": 3,
+        "state": "completed",
+        "result": "CEDAR83 SECOND_OK"
+      },
+      "host": {
+        "runtime_generation": "18d7bdd9-6745-419c-b19f-5ba949337efa",
+        "journal_sha256": "6446a07f9b43eda5503173f37b46402cb81b54e9e59101b539bd48c480eee103",
+        "owner_epochs": [
+          1
+        ],
+        "recorded_commands": 2,
+        "accepted_commands_including_shutdown": 2,
+        "completed_turns": 2,
+        "event_kinds": [
+          "SessionReady",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished"
+        ],
+        "exit_receipt_present": false
+      },
+      "capture_sha256": "c459eba450340444ed691ae549309344c8199d35c4c2b783e0120a30371ef53b"
+    },
+    {
+      "phase": "v10-two-turns-restarted-zero-input",
+      "task": {
+        "task_id": "d5e44cc2-4c24-4d59-87f8-40bb91675dfb",
+        "native_session_id": "01a0d221-2b18-75a2-b4fd-f99958e7ff70",
+        "generation": 2,
+        "revision": 3,
+        "state": "completed",
+        "result": "CEDAR83 SECOND_OK"
+      },
+      "host": {
+        "runtime_generation": "18d7bdd9-6745-419c-b19f-5ba949337efa",
+        "journal_sha256": "f9a87a97a92e2d172f6679a5267a8065e42a2bd2c54afb8b586787feec9868a2",
+        "owner_epochs": [
+          1,
+          2
+        ],
+        "recorded_commands": 2,
+        "accepted_commands_including_shutdown": 2,
+        "completed_turns": 2,
+        "event_kinds": [
+          "SessionReady",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished"
+        ],
+        "exit_receipt_present": false
+      },
+      "capture_sha256": "da3dcfd4e8b1db84b39ae7573fbc4cf46e92eea311d35c63fcd3a5660644635b"
+    },
+    {
+      "phase": "v10-two-turns-cleanup",
+      "task": {
+        "task_id": "d5e44cc2-4c24-4d59-87f8-40bb91675dfb",
+        "native_session_id": "01a0d221-2b18-75a2-b4fd-f99958e7ff70",
+        "generation": 3,
+        "revision": 3,
+        "state": "completed",
+        "result": "CEDAR83 RESTART_OK"
+      },
+      "host": {
+        "runtime_generation": "18d7bdd9-6745-419c-b19f-5ba949337efa",
+        "journal_sha256": "d0b959931ede5045406579955088f750f3768f4e76529e15a98419d736b28111",
+        "owner_epochs": [
+          1,
+          2
+        ],
+        "recorded_commands": 4,
+        "accepted_commands_including_shutdown": 3,
+        "completed_turns": 3,
+        "event_kinds": [
+          "SessionReady",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished",
+          "MessageAccepted",
+          "Progress",
+          "TurnStarted",
+          "Progress",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TextDelta",
+          "TurnFinished",
+          "CommandDispatched",
+          "Disconnected"
+        ],
+        "exit_receipt_present": true
+      },
+      "capture_sha256": "0475aacdd78b382eeddc2f3a4069f39d3b4344b11d2f41b31a643da03eb1bd3c"
+    }
+  ],
+  "host_exit": {
+    "version": 2,
+    "runtime_generation": "18d7bdd9-6745-419c-b19f-5ba949337efa",
+    "host_instance_id": "5fe196e5-c1ef-4c2b-8275-d0dd9c86d55a",
+    "manifest_sha256": "6d371cc54c6010d2d745503375b9a890d8357d2a17617417a2ef1998b378fbf4",
+    "journal_sha256": "d281e119a15c738722194315ce04f75e49c0ad8b8aa90f4e3b7dc37df3b90456",
+    "last_event_sequence": 37,
+    "acknowledged_sequence": 36,
+    "native_process": "exited",
+    "native_cleanup_sha256": "f62257501928efbe23f47e3691542df53a7b5dc5de29d0ebe1ffd6e2633b61d4",
+    "adapter_task_terminated": true,
+    "adapter_succeeded": true,
+    "event_journal_completed": true
+  },
+  "screenshots": [
+    {
+      "path": "grok-two-turns-before-restart-v10.png",
+      "sha256": "7fdbe1817b17351b61fd5b867b231d7145ec115c3bcc8a66ee8e09fbd4258fc7"
+    },
+    {
+      "path": "grok-two-turns-restored-v10.png",
+      "sha256": "573646f93d2ae4a3686486eaa5f210ec67e19331b1eb6f12123cba6146545f59"
+    },
+    {
+      "path": "grok-two-turns-restart-result-v10.png",
+      "sha256": "532fa02ed0e7c487c5fe93c06ff06018a1f94e40d25d993f60dbf23ec5e09792"
+    }
+  ],
+  "credentials_copy_removed": true,
+  "credential_source_stat_before": {
+    "source": "/Users/zhishi/.grok/auth.json",
+    "stat": [
+      92334445,
+      1777,
+      1790188836056035972,
+      33152
+    ],
+    "copy": "/private/tmp/isp-mac-1mej4h8z/gui-home/.grok/auth.json"
+  },
+  "credential_source_stat_after": {
+    "inode": 92334445,
+    "size": 1777,
+    "mtime_ns": 1790188836056035972,
+    "mode": 33152
+  },
+  "same_commit_claimed": false,
+  "limitations": [
+    "继承模式另一个任务首轮后因命令目录元数据断连，独立保留失败，不计入此固定权限通过"
+  ],
+  "credential_source_stat_unchanged": true,
+  "app_pids_gone": true
+}

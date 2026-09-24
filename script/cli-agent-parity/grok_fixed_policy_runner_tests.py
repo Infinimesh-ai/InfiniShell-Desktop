@@ -89,14 +89,18 @@ class FixedPolicyEvidenceTests(unittest.TestCase):
                 events = evidence(); events[2][key] = value
                 self.assertFalse(passed(events))
 
-    def test_denial_requires_native_cancellation_and_no_read_or_model_result(self):
+    def test_denial_requires_native_cancellation_and_no_read_or_post_tool_text(self):
         for key, value in (("native_outcome", "Completed"), ("native_outcome", "Failed"),
                 ("denied_read_not_executed", False), ("failure_stage", "turn_finished"),
-                ("final_sha256", runner.sha(b"INFINISHELL_READ_DENIED"))):
+                ("final_sha256", None)):
             with self.subTest(key=key, value=value):
                 events = evidence(); events[2][key] = value
                 self.assertFalse(passed(events))
         events = evidence(); events[1]["native_outcome"] = "Cancelled"
+        self.assertFalse(passed(events))
+        events = evidence(); events[2]["final_sha256"] = runner.sha("工具调用前的说明".encode())
+        self.assertTrue(passed(events))
+        events[2]["denied_read_not_executed"] = False
         self.assertFalse(passed(events))
 
     def test_outcome_and_failure_stage_reject_private_or_malformed_values(self):
@@ -132,7 +136,7 @@ class FixedPolicyEvidenceTests(unittest.TestCase):
         for value in (True, 1.0, -1):
             events = evidence(); events[1]["approvals"] = value
             self.assertFalse(passed(events))
-        events = evidence(); events[2]["final_sha256"] = runner.sha(b"read-was-allowed")
+        events = evidence(); events[2]["final_sha256"] = None
         self.assertFalse(passed(events))
         events = evidence(); events[-1]["filesystem_sandbox_verified"] = True
         self.assertFalse(passed(events))
@@ -254,6 +258,14 @@ class FixedPolicyEvidenceTests(unittest.TestCase):
         tunnel = SimpleNamespace(forwarded=2, bytes=1024,
             events=[{"event": "official_tunnel_opened", "host": "cli-chat-proxy.grok.com"}])
         self.assertTrue(runner.boundary_passed(metadata, tunnel))
+        tunnel.forwarded = 33
+        self.assertFalse(runner.boundary_passed(metadata, tunnel))
+        self.assertTrue(runner.boundary_passed(metadata, tunnel, connection_budget=64))
+        tunnel.forwarded = 65
+        self.assertFalse(runner.boundary_passed(metadata, tunnel, connection_budget=64))
+        tunnel.forwarded = 2
+        for budget in (True, 0, 65, 64.0):
+            self.assertFalse(runner.boundary_passed(metadata, tunnel, connection_budget=budget))
         metadata["binary_unchanged"] = False
         self.assertFalse(runner.boundary_passed(metadata, tunnel))
         metadata["binary_unchanged"] = True; tunnel.bytes = runner.lease.MAX_TLS_BYTES + 1

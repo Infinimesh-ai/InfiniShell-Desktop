@@ -1,0 +1,31 @@
+{
+  "agent": "codex",
+  "checkpoint": "after-app-restart",
+  "history": {
+    "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+    "native_input_count": 5,
+    "native_history_sha256": "516f043bb7c659f16af96b4c0743225a07bcd39628112ba3b0fac579b12d2fb4",
+    "native_history_bytes": 128763
+  },
+  "product": {
+    "events": {},
+    "native_session_count": 0,
+    "paired_prompt_stop_turns": 0,
+    "unpaired_prompt_turns": 0,
+    "product_received_notifications": false,
+    "records": []
+  },
+  "app_process": {
+    "pid": 51992,
+    "pgid": 51992,
+    "started": "Thu Sep 24 14:12:38 2026"
+  },
+  "allowed_file_exact": true,
+  "denied_file_absent": true,
+  "cancel_started": true,
+  "cancel_completed": true,
+  "cancel_script_pid_alive": false,
+  "gui_approval_decision_verified": false,
+  "gui_response_content_verified": false,
+  "automatic_model_inputs": 0
+}

@@ -1,5 +1,7 @@
 # 三方 CLI 自动升级与最新版对齐
 
+> **2026-09-24 固定版本收敛**：本轮按用户要求固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，先完成 Mac、再统一跨平台。Mac 正式原生升级三款已通过；V10 另通过 Claude Latest→Stable 真实降级，更新与托管兼容门禁已解耦。Windows 产品事务补丁待实机验证。当前范围以 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md) 为准，下文为历史快照。
+
 ## 范围与当前状态
 
 2026-09-23 13:37 UTC 最新复核见 [receipt132](validation/version-discovery-132-20260923-latest-drift.safe.json)：Codex 官方稳定版已发布 `0.156.1`，Claude 官方 latest 为 `2.1.280`，Grok stable 隔离查询仍为 `1.0.41`。下文 `0.155.1`／`2.1.278` 版本与渠道表保留为 2026-09-21 历史快照；新版 Codex 已通过 [receipt135](validation/macos-clean-commit-135-2c00b045-codex-01561-missing-session.safe.json) 的无凭据缺失会话路径，以及干净 `a25701d2…` 的 [receipt137](validation/macos-clean-commit-137-a25701d2-codex-01561-lifecycle.safe.json) test-only 在线生命周期；新版 Claude 已通过 [receipt134](validation/macos-clean-commit-134-952c0ec0-claude-21280-no-credentials.safe.json) 的无凭据原生启动／退出、receipt136 的 dirty tree 候选和干净 `a25701d2…` 的 [receipt139](validation/macos-clean-commit-139-a25701d2-claude-21280-lifecycle.safe.json) 在线基本链。同提交 Grok `1.0.41` 所选技能候选见 [receipt140](validation/macos-clean-commit-140-a25701d2-grok-1041-selected-skill.safe.json)。三款正式产品版本门禁仍关闭；这些阶段性候选不证明三款自动升级事务，最终 P0–P5 不得沿用旧版结论。

@@ -1,0 +1,53 @@
+{
+  "phase": "after-idle-refresh",
+  "task": {
+    "task_id": "7d8763bc-344c-4be1-bd0f-ad967f63709e",
+    "native_session_id": "01a0d240-9b70-7831-92fb-a0550bdeeb33",
+    "generation": 1,
+    "revision": 6,
+    "state": "completed"
+  },
+  "hosts": [
+    {
+      "generation": "e68dfa63-86df-4257-8b0e-ff2e593637f1",
+      "journal_sha256": "7f72d1ea8b105ccd3cb6762c7ccf3e7fde30e85ce158eb036c2630c5a6ac3dfc",
+      "owner_epochs": [
+        1
+      ],
+      "event_counts": {
+        "SessionReady": 1,
+        "MessageAccepted": 1,
+        "Progress": 2,
+        "TurnStarted": 1,
+        "TextDelta": 8,
+        "TurnFinished": 1
+      },
+      "recorded_commands": 1,
+      "input_acknowledgements": 1,
+      "turns": [
+        {
+          "outcome": "Completed",
+          "expected_output": true
+        }
+      ],
+      "host_exit": null
+    }
+  ],
+  "native_catalog_updates": [
+    {
+      "ts": "2026-09-24T07:10:44.676Z",
+      "trigger": "session_start",
+      "count": 32
+    },
+    {
+      "ts": "2026-09-24T07:10:44.683Z",
+      "trigger": "session_start",
+      "count": 32
+    },
+    {
+      "ts": "2026-09-24T07:11:26.640Z",
+      "trigger": "skills_reload",
+      "count": 33
+    }
+  ]
+}

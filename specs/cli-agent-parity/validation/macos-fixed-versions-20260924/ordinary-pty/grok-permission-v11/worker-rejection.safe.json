@@ -1,0 +1,17 @@
+{
+  "scope": "compiled_worker_synthetic_parser_probe_no_model_no_tty",
+  "synthetic_payload": {
+    "v": 1,
+    "agent": "grok",
+    "event": "permission_request",
+    "session_id": "synthetic-permission-probe",
+    "prompt_id": "synthetic-prompt",
+    "event_id": "grok:1111111111111111111111111111111111111111111111111111111111111111",
+    "plugin_version": "0.1.4"
+  },
+  "worker_exit_code": 1,
+  "stderr": "Error: cli_agent_notify_invalid_payload",
+  "stdout_bytes": 0,
+  "expected_rejected_before_tty": true,
+  "not_a_real_native_notification": true
+}

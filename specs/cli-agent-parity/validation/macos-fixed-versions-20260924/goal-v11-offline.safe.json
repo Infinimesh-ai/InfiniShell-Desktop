@@ -1,0 +1,129 @@
+{
+  "source_manifest_sha256": "b3e0cbd07bf031146dd199c2cfec5ebbf41d266051bc0bf255498e6ee624ca8f",
+  "node_and_platform_python": [
+    {
+      "name": "grok_plugin_tests",
+      "exit_code": 0,
+      "seconds": 0.197,
+      "summary": [
+        "\u2139 fail 0",
+        "\u2139 cancelled 0",
+        "\u2139 skipped 0",
+        "\u2139 todo 0",
+        "\u2139 duration_ms 112.316916"
+      ],
+      "log_sha256": "bab033171f511c16ccf010f3bc87644a68d545196469d207ddb967f6b655b35c"
+    },
+    {
+      "name": "native_ssh_notifications_tests",
+      "exit_code": 0,
+      "seconds": 0.5,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 14 tests in 0.387s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "0cf45a9491082c36677b82c90c6c97de4ab9d4cdd579a2e4ae52d25959fec225"
+    },
+    {
+      "name": "grok_plugin_live_runner_tests",
+      "exit_code": 0,
+      "seconds": 0.106,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 5 tests in 0.003s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "31ccfa6f2330e6c200b243db1eebd351b6b5a324abe454fcfa7f1dfcfa963c17"
+    },
+    {
+      "name": "grok_fixed_acp_probe_tests",
+      "exit_code": 0,
+      "seconds": 0.38,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 22 tests in 0.268s",
+        "",
+        "OK (skipped=1)"
+      ],
+      "log_sha256": "84b543bd7b9b950d7c76ea18ee02a99c1e83f7242637e905162e04d364b74cb5"
+    },
+    {
+      "name": "prepare_grok_cli_tests",
+      "exit_code": 0,
+      "seconds": 0.161,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 21 tests in 0.060s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "3eeff5773004463a63f70f2cec24ebdb4ed26409eaa5a44bfd4f84c4e25e5e17"
+    },
+    {
+      "name": "codex_plugin_cache_refresh_tests",
+      "exit_code": 0,
+      "seconds": 0.134,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 25 tests in 0.017s",
+        "",
+        "OK (skipped=5)"
+      ],
+      "log_sha256": "0a227c450fc4d00e006de8dd82be3ba2dfed320fa8024089aa238b1e04e474e6"
+    },
+    {
+      "name": "run_fixed_cli_autoupdate_tests",
+      "exit_code": 0,
+      "seconds": 0.225,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 18 tests in 0.121s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "9a918f055d58cf1736bc47f00192268646ea9564904e68e3a98e9e1c2a5f9386"
+    },
+    {
+      "name": "verify_cli_autoupdate_tests",
+      "exit_code": 0,
+      "seconds": 0.354,
+      "summary": [
+        "",
+        "----------------------------------------------------------------------",
+        "Ran 31 tests in 0.262s",
+        "",
+        "OK"
+      ],
+      "log_sha256": "110692e58702b815c2e97eb20ec8b0f6b4c8b4be72c248ca6defb7586dad4e8b"
+    }
+  ],
+  "codex_hooks_initial": {
+    "log_sha256": "25fae107f8b7b1abf9b37850f2823386ed91d1c10f3064fe918bd4a8f535b6c0",
+    "tests": 37,
+    "skipped": 1,
+    "passed": false,
+    "reason": "External TMPDIR ancestors rejected; 2 errors, no native Windows execution"
+  },
+  "codex_hooks_private_temp": {
+    "log_sha256": "34510cdfa797eb072aee70287d7cfbbc54acba357a8603729d0f9613cfee2163",
+    "tests": 37,
+    "skipped": 1,
+    "passed": true
+  },
+  "codex_conpty_offline": {
+    "log_sha256": "c73c8d14a46cb81afa7044d9a17547630ac794ef09ce9f72b71a8e06d2736a32",
+    "tests": 17,
+    "skipped": 0,
+    "passed": true
+  },
+  "native_windows_verified": false
+}

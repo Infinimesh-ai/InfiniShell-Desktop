@@ -320,6 +320,36 @@ raise AssertionError("未到达注入的进程中断点")
             for agent in PATCH.CONTRACTS:
                 PATCH.bundle_data(destination, agent)
 
+    def test_current_cli_versions_are_macos_only_and_exact(self):
+        for host in ("darwin", "linux", "win32"):
+            for agent, output in PATCH.MACOS_CLI_VERSIONS.items():
+                with self.subTest(host=host, agent=agent), \
+                        mock.patch.object(PATCH.sys, "platform", host), \
+                        mock.patch.object(PATCH.subprocess, "run", return_value=mock.Mock(stdout=output)):
+                    if host == "darwin":
+                        self.assertEqual(PATCH.verify_runtime(agent, Path("isolated-home"), agent, True), output)
+                    else:
+                        with self.assertRaisesRegex(ValueError, "已验证版本"):
+                            PATCH.verify_runtime(agent, Path("isolated-home"), agent, True)
+        for agent, output in (("codex", "codex-cli 0.156.2"),
+                              ("codex", "codex-cli 0.156.1-beta"),
+                              ("claude", "2.1.281 (Claude Code)"),
+                              ("claude", "2.1.280-beta (Claude Code)"),
+                              ("claude", "2.1.280 (Grok Build)")):
+            with self.subTest(agent=agent, output=output), \
+                    mock.patch.object(PATCH.sys, "platform", "darwin"), \
+                    mock.patch.object(PATCH.subprocess, "run", return_value=mock.Mock(stdout=output)), \
+                    self.assertRaisesRegex(ValueError, "已验证版本"):
+                PATCH.verify_runtime(agent, Path("isolated-home"), agent, True)
+
+    def test_previous_cli_contracts_remain_accepted_on_every_platform(self):
+        for host in ("darwin", "linux", "win32"):
+            for agent, contract in PATCH.CONTRACTS.items():
+                with self.subTest(host=host, agent=agent), \
+                        mock.patch.object(PATCH.sys, "platform", host), \
+                        mock.patch.object(PATCH.subprocess, "run", return_value=mock.Mock(stdout=contract[0])):
+                    self.assertEqual(PATCH.verify_runtime(agent, Path("isolated-home"), agent, True), contract[0])
+
 
 if __name__ == "__main__":
     unittest.main()

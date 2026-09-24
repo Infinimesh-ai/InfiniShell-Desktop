@@ -1,0 +1,688 @@
+{
+  "binary": "/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop/debug/deps/warp-d027d9e31abb39a5",
+  "binary_sha256": "77ee82835c603695f991f2b57e40c7f90b81e07c5a2fdc8de4ef2cf8dec683b5",
+  "binary_bytes": 881724472,
+  "scope": "same workspace binary, three exact tests serial, no source edits or builds",
+  "per_test_seconds_limit": 60,
+  "runs": [
+    {
+      "name": "completed_host_is_recovered_offline_without_reexecuting_commands",
+      "seconds": 56.178,
+      "exit_code": 0,
+      "timed_out": false,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/workspace-host-serial-v11/completed_host_is_recovered_offline_without_reexecuting_commands.log",
+      "log_sha256": "8a7380d1470b312a7e6590ce3256cc2ad851308e0ae51cdbdfb6db73cf73532b",
+      "fixture_parent": "/private/tmp/ish-fz7e5eux",
+      "fixture_empty": true,
+      "observations": [
+        {
+          "seconds": 0.015,
+          "state": []
+        },
+        {
+          "seconds": 0.12,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 52305920,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.223,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 167542784,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.328,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 280371200,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.433,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 396967936,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.537,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 505790464,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.639,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 615800832,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.744,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 729997312,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.848,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 839237632,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.952,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 47.727,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "complete-after-second",
+                "fake-cli.sh",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 47.829,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "complete-after-second",
+                "fake-cli.sh",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 55.866,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "complete-after-second",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 55.969,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "commands.log",
+                "complete-after-second",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "handoff.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper",
+                "second-accepted-observed"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 56.073,
+          "state": [
+            {
+              "root": "/private/tmp/ish-fz7e5eux/.tmp1gPmpG",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "commands.log",
+                "complete-after-second",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "handoff.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "offline_gui.stderr",
+                "offline_gui.stdout",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper",
+                "second-accepted-observed"
+              ]
+            }
+          ]
+        }
+      ],
+      "copy_sync_chmod_observed_seconds": 0.952,
+      "hash_validation_finished_observed_seconds": 47.727
+    },
+    {
+      "name": "host_crash_is_unconfirmed_and_never_resumes_history",
+      "seconds": 56.19,
+      "exit_code": 0,
+      "timed_out": false,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/workspace-host-serial-v11/host_crash_is_unconfirmed_and_never_resumes_history.log",
+      "log_sha256": "f227dd704c5e18fd333c18207c8cc62b1203cd79feac7fa307bcb3b7532e0b78",
+      "fixture_parent": "/private/tmp/ish-659nvnhn",
+      "fixture_empty": true,
+      "observations": [
+        {
+          "seconds": 0.018,
+          "state": []
+        },
+        {
+          "seconds": 0.124,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 47308800,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.229,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 152969216,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.332,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 256786432,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.457,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 352321536,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.562,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 452206592,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.667,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 554729472,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.77,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 652607488,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.876,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 746143744,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.981,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 800186368,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 1.086,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 47.926,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "fake-cli.sh",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 48.031,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "fake-cli.sh",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 56.087,
+          "state": [
+            {
+              "root": "/private/tmp/ish-659nvnhn/.tmphkqciq",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "commands.log",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        }
+      ],
+      "copy_sync_chmod_observed_seconds": 1.086,
+      "hash_validation_finished_observed_seconds": 47.926
+    },
+    {
+      "name": "real_process_host_survives_gui_exit_and_reconnects_without_replay",
+      "seconds": 55.761,
+      "exit_code": 0,
+      "timed_out": false,
+      "log": "/private/tmp/isp-mac-1mej4h8z/evidence/workspace-host-serial-v11/real_process_host_survives_gui_exit_and_reconnects_without_replay.log",
+      "log_sha256": "eb69d7b2bb7e76a62d249db9d4d44adade3e6ce4b9268afbfea4db715d747005",
+      "fixture_parent": "/private/tmp/ish-2q6udqu8",
+      "fixture_empty": true,
+      "observations": [
+        {
+          "seconds": 0.019,
+          "state": []
+        },
+        {
+          "seconds": 0.124,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 47177728,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.226,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 155598848,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.331,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 264060928,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.434,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 372523008,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.539,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 479739904,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.64,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 584286208,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.742,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 691781632,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.848,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 800456704,
+              "helper_mode": "0o644",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 0.948,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 47.289,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "fake-cli.sh",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 47.393,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "fake-cli.sh",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 55.45,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "commands.log",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        },
+        {
+          "seconds": 55.552,
+          "state": [
+            {
+              "root": "/private/tmp/ish-2q6udqu8/.tmpCqnkcJ",
+              "helper_size": 881724472,
+              "helper_mode": "0o700",
+              "entries": [
+                "cli-agent-hosts",
+                "commands.log",
+                "fake-cli.sh",
+                "fake-ready.json",
+                "handoff.json",
+                "host.stderr",
+                "host.stdout",
+                "managed-supervisor.sh",
+                "new_gui.stderr",
+                "new_gui.stdout",
+                "old_gui.stderr",
+                "old_gui.stdout",
+                "process-helper"
+              ]
+            }
+          ]
+        }
+      ],
+      "copy_sync_chmod_observed_seconds": 0.948,
+      "hash_validation_finished_observed_seconds": 47.289
+    }
+  ],
+  "v11_source_manifest_sha256": "b3e0cbd07bf031146dd199c2cfec5ebbf41d266051bc0bf255498e6ee624ca8f",
+  "all_three_passed": true,
+  "original_timeout_result_preserved": true,
+  "aggregate_claim": "10858 workspace passes plus 3 same-workspace-binary serial passes; original full invocation retained 3 timeouts and 109 skips"
+}

@@ -119,11 +119,13 @@ def sha(value):
 
 
 @contextmanager
-def bounded_tunnel(timeout):
+def bounded_tunnel(timeout, *, connection_budget=MAX_TLS_CONNECTIONS):
+    if type(connection_budget) is not int or not 1 <= connection_budget <= 64:
+        raise ValueError("连接预算必须是 1 到 64 的整数")
     # 原模块在每个 CONNECT 前读取预算；本独立进程临时设置连接预算，退出时恢复。
     with _budget_lock:
         previous = official.MAX_TUNNELS
-        official.MAX_TUNNELS = MAX_TLS_CONNECTIONS
+        official.MAX_TUNNELS = connection_budget
         tunnel = None
         try:
             tunnel = official.OfficialTunnel(timeout)

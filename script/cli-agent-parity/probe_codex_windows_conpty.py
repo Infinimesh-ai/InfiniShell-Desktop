@@ -19,7 +19,9 @@ import uuid
 
 sys.dont_write_bytecode = True
 from codex_windows_hook_command import source_text, windows_environment
-from codex_windows_hook_inputs import obtain_inputs, require, sha256
+from codex_windows_hook_inputs import (CODEX_VERSION, HOOK_CODEX_VERSIONS, codex_contract,
+                                       obtain_inputs, require, sha256)
+from prepare_codex_cli import require_cli_version, verified_version
 
 
 MAX_OUTPUT = 16 * 1024 * 1024
@@ -252,9 +254,12 @@ def run_driver(configuration):
     import types
     import probe_codex_windows_hooks as native
     config = json.loads(configuration.read_text(encoding='utf-8'))
+    contract = codex_contract(config['codex_version'])
+    require_cli_version(config['cli'], contract['version'])
     api = WinApi()
     report = {'passed': False, 'cases': [], 'model_http_requests': [], 'attachments': [],
-              'schema_version': 2, 'mode': config['mode'],
+              'schema_version': 2, 'mode': config['mode'], 'codex_version': contract['version'],
+              'cli': contract['cli'], 'official_commit': contract['commit'],
               'native_codex_attachments': [], 'credentials_provided': False}
     stop = threading.Event()
     server = None
@@ -450,6 +455,7 @@ def run_conpty(dll_path, command, environment, cwd, output, timeout):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mode', choices=('formal', 'candidate'), default='formal')
+    parser.add_argument('--codex-version', choices=HOOK_CODEX_VERSIONS, default=CODEX_VERSION)
     parser.add_argument('--driver-config', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--repo', type=Path, default=Path(__file__).resolve().parents[2])
     for name in ('bash-executable', 'jq-executable', 'download-dir', 'output'):
@@ -467,7 +473,8 @@ def main():
         require(not path.is_relative_to(repo), '禁止在源码树中写探针产物、下载或 HOME')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     require(not args.output.exists(), '输出已经存在，不能覆盖先前证据')
-    report = {'schema_version': 2, 'mode': args.mode, 'passed': False, 'native_conpty_notifications_verified': False,
+    report = {'schema_version': 2, 'mode': args.mode, 'codex_version': args.codex_version,
+              'official_commit': codex_contract(args.codex_version)['commit'], 'passed': False, 'native_conpty_notifications_verified': False,
               'scope': args.mode + '_windows_hooks_actual_conpty_transport', 'ordinary_codex_tui_verified': False,
               'product_ui_notifications_verified': False, 'full_lifecycle_verified': False,
               'model_generation_verified': False, 'credentials_provided': False, 'windows_product_enabled': False}
@@ -480,10 +487,13 @@ def main():
                 'probe_codex_windows_hooks.py', 'codex_windows_hook_command.py',
                 'codex_windows_hook_command.ps1', 'codex_windows_hook_inputs.py',
                 'codex_windows_notify.py', 'codex_windows_notify.ps1', 'apply_notification_patch.py',
-                'codex_windows_formal.py', 'codex_persistent_source.py'))]
+                'codex_windows_formal.py', 'codex_persistent_source.py', 'prepare_codex_cli.py',
+                'codex_0156_package_manifest.json'))]
         report['source_sha256'] = {str(path.relative_to(repo)): sha256(path) for path in source_files}
         report['candidate_lf_sha256'] = require_candidate_contract()
-        codex, plugin, report['fixed_inputs'] = obtain_inputs(repo, args.download_dir, 'x86_64')
+        codex, plugin, report['fixed_inputs'] = obtain_inputs(repo, args.download_dir, 'x86_64', version=args.codex_version)
+        verified_version(codex, Path(tempfile.gettempdir()), args.codex_version)
+        report['cli'] = codex_contract(args.codex_version)['cli']
         environment = windows_environment(args.bash_executable, args.jq_executable)
         host = root / 'host'
         (host / 'x64').mkdir(parents=True)
@@ -499,7 +509,8 @@ def main():
         require(not native_report.exists() and not raw_output.exists(), '派生证据路径已存在')
         report['native_report'] = str(native_report)
         report['raw_output'] = {'path': str(raw_output)}
-        config = {'nonce': str(uuid.uuid4()), 'mode': args.mode, 'repo': str(repo), 'bash': str(args.bash_executable),
+        config = {'nonce': str(uuid.uuid4()), 'mode': args.mode,
+                  'codex_version': args.codex_version, 'cli': report['cli'], 'repo': str(repo), 'bash': str(args.bash_executable),
                   'jq': str(args.jq_executable), 'codex': str(codex), 'plugin': str(plugin),
                   'private_dir': str(root / 'cases'), 'native_report': str(native_report)}
         config_file = root / 'driver.json'
@@ -513,6 +524,8 @@ def main():
         native = json.loads(native_report.read_text(encoding='utf-8'))
         report['raw_output'] = {'path': str(raw_output), 'sha256': sha256(raw_output), 'bytes': raw_output.stat().st_size}
         require(report['driver']['exit_code'] == 0 and native['passed'], '附着原生 hook 场景失败')
+        require(native['codex_version'] == args.codex_version and native['cli'] == report['cli'] and
+                native['official_commit'] == report['official_commit'], 'ConPTY 子进程版本证据不匹配')
         raw = raw_output.read_bytes()
         report['conout_canary_observed'] = any(item.get('diagnostic_nonce') == config['nonce'] for item in notifications(raw))
         report['matched_notifications'] = verify_transport(raw, native['cases'])

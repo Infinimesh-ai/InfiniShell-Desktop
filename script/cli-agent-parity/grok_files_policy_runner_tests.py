@@ -219,6 +219,8 @@ exec(compile(ast.Module(body=entry,type_ignores=[]),str(path),"exec"),scope)
                 self.assertEqual(runner.run(args),1)
             self.assertFalse((root/"home/.grok/auth.json").exists())
             metadata=json.loads(args.output.with_suffix('.metadata.json').read_text())
+            self.assertEqual(metadata["max_tls_connections"], 64)
+            self.assertEqual(metadata["max_native_inputs"], 6)
             self.assertTrue(metadata["private_auth_copy_removed"])
             self.assertFalse(metadata["files_policy_passed"])
             if close_error:

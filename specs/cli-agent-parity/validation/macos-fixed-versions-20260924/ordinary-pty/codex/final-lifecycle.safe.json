@@ -1,0 +1,134 @@
+{
+  "version": "codex-cli 0.156.1",
+  "native_cli_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+  "native_session_sha256": "2b566d4216e885d145f2351287bc9e7dfc3bd6e670f266696cd8f30908487ca2",
+  "native_input_count": 6,
+  "checks": {
+    "input_budget_met": true,
+    "same_native_session": true,
+    "allow_once_gui_verified": true,
+    "allow_file_exact": true,
+    "deny_gui_verified": true,
+    "denied_file_absent": true,
+    "native_turn_interruption_gui_verified": true,
+    "cancel_script_was_running": true,
+    "cancel_script_stopped_without_completion": false,
+    "continue_marker_gui_verified": true,
+    "resume_marker_gui_verified": true,
+    "app_process_changed": true,
+    "restart_no_new_input": true,
+    "resume_no_new_input": true,
+    "new_app_restart_segment_zero_prompts": true,
+    "new_app_resume_segment_zero_prompts": true,
+    "native_exit_before_resume": true,
+    "native_resume_exit": true
+  },
+  "cleanup": {
+    "automatic_model_inputs": 0,
+    "process_tree_cleanup_verified": false,
+    "identified_private_native_processes_gone": true,
+    "credential_copy_removed": true,
+    "credential_source_stat_unchanged": true
+  },
+  "events_before_app_restart": {
+    "session_start": 1,
+    "prompt_submit": 5,
+    "permission_request": 4,
+    "tool_complete": 1,
+    "stop": 3
+  },
+  "events_after_app_restart": {
+    "session_start": 1,
+    "prompt_submit": 1,
+    "stop": 1
+  },
+  "safe_checkpoint_files": [
+    {
+      "path": "codex/cancel-running.safe.json",
+      "sha256": "68332cfaf189a9c28ad897b9a6440f601f51ab6817f8e9074c26e7b05ae7d72e"
+    },
+    {
+      "path": "codex/cancelled.safe.json",
+      "sha256": "19ce65eff443452c4cf637909bc6ecc30d14e63cb00e4b971916ce32e6d4780d"
+    },
+    {
+      "path": "codex/before-exit.safe.json",
+      "sha256": "bc783e76e165078e0de2d35b5e925bc65a48223d0a37d95aa59e034f9976fd4b"
+    },
+    {
+      "path": "codex/after-app-restart.safe.json",
+      "sha256": "ce6c7c71f5d849fb14272e6076c48f425393ee194b9d2dfa70c658344e7daa33"
+    },
+    {
+      "path": "codex/resume-ready.safe.json",
+      "sha256": "92b6f635fbd0e01aada4d55011164ab9621f1fea5db53531997b723d841966fc"
+    },
+    {
+      "path": "codex/final.safe.json",
+      "sha256": "b1434258362f5a084490a2f0efd752f63932d76a4e336a7271854efdde060119"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "gui-evidence/codex-after-deny-rich-draft.png",
+      "sha256": "43966c48c39adb2a501b37871e10bb9741d7a324c9ec74996878dd5a649fa3c2"
+    },
+    {
+      "path": "gui-evidence/codex-allow-result.png",
+      "sha256": "b868eda51917489c568db1e6b8184e02ce7b624a3ac5049b218992d5a1e177db"
+    },
+    {
+      "path": "gui-evidence/codex-allow.png",
+      "sha256": "0a5e0622b3f7855390632bb651b2de6ee1f37296a4e2c7d1aeac3c1d29c0d800"
+    },
+    {
+      "path": "gui-evidence/codex-cancel-allow.png",
+      "sha256": "b316b1ca85abd0d7e8f537e6a36fd6aeeb85b191b5c10e193a88b30226339bb0"
+    },
+    {
+      "path": "gui-evidence/codex-cancel-retry-allow.png",
+      "sha256": "c55f0314120c4e61bde0d1e23072119f47f3408b8001e2fee3aa700bee8a3314"
+    },
+    {
+      "path": "gui-evidence/codex-cancel-running.png",
+      "sha256": "e7902f313df94d1a10d75a92c0fa568989028758d8eb9ac83ab22eb20332b80e"
+    },
+    {
+      "path": "gui-evidence/codex-cancelled-native-but-process-alive.png",
+      "sha256": "0abff97e9e06bbc917c65d83808b8e7bfe2b6407a17419d01e5983e050c26633"
+    },
+    {
+      "path": "gui-evidence/codex-continue.png",
+      "sha256": "378eed6179c974d6b510dd380dbd42327498b8fe493e16cd6771eeb824b81581"
+    },
+    {
+      "path": "gui-evidence/codex-deny-result.png",
+      "sha256": "8d572bfd9b583c1c4d5dc63fa1d97341b7cb4869b242128c7857d8fa3daba840"
+    },
+    {
+      "path": "gui-evidence/codex-deny.png",
+      "sha256": "3af32df4aadaf22f5c1f46f06451ba288e72a5d873fff42daf040fdad11dd4a4"
+    },
+    {
+      "path": "gui-evidence/codex-native-exited.png",
+      "sha256": "72ef8d98411f1b45f74d8711fb876968b22fac67455341a2c90b352148ba5686"
+    },
+    {
+      "path": "gui-evidence/codex-pending-submit.png",
+      "sha256": "39968b07df5f39df78ae1cff7418679eb37153e9846d92f126a9f747d2a9d67d"
+    },
+    {
+      "path": "gui-evidence/codex-resume-ready-no-input.png",
+      "sha256": "352ae240e94500b53b5323d2855da32341cfa8fdbc657e3107f1ce03ef1a6f72"
+    },
+    {
+      "path": "gui-evidence/codex-resume-result.png",
+      "sha256": "ade8189d959f6b482ea86e8bfaf61c317dd7aad56185c424e364f5b969f0649a"
+    }
+  ],
+  "preserved_attempts": [
+    "first-not-exercised-cancel-running.safe.json",
+    "first-not-exercised-cancelled.safe.json"
+  ],
+  "cancel_probe_natural_completion_after_interrupt": true
+}

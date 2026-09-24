@@ -1,5 +1,7 @@
 use std::time::Duration;
 
+#[cfg(unix)]
+use command::blocking::Command;
 use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl, SqliteConnection};
 use futures::executor::block_on;
 use serde_json::{Value, json};
@@ -360,6 +362,322 @@ fn recovery_options(state_dir: &std::path::Path, generation: Uuid) -> SessionOpt
         local_tools: None,
         selected_skills: Vec::new(),
     }
+}
+
+#[cfg(unix)]
+#[test]
+fn restart_reattaches_completed_live_host_without_replaying_input() {
+    const CHILD_ENV: &str = "INFINISHELL_COMPLETED_HOST_RECOVERY_TEST";
+    if std::env::var_os(CHILD_ENV).is_none() {
+        // 子进程隔离宿主可执行文件设置，不修改并行测试共享的进程环境。
+        let executable = std::env::current_exe().unwrap().canonicalize().unwrap();
+        let output = Command::new(&executable)
+            .args([
+                "--exact",
+                "ai::cli_agent_runtime::coordinator::tests::restart_reattaches_completed_live_host_without_replaying_input",
+                "--nocapture",
+            ])
+            .env(CHILD_ENV, "1")
+            .env("INFINISHELL_CLI_SUPERVISOR_EXECUTABLE", &executable)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "宿主恢复子进程失败：{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("completed-live.sqlite")).unwrap();
+    block_on(async {
+        let generation = Uuid::new_v4();
+        let mut task = snapshot().task;
+        task.working_directory = state_dir.to_string_lossy().into_owned();
+        task.config_json = json!({"runtime_generation": generation}).to_string();
+        persist_running_task(&writer.sender, &mut task).await;
+        task.revision += 1;
+        task.state = LocalCliTaskState::Completed;
+        task.result = Some("已完成的结果".into());
+        task.terminal_evidence = Some("已确认的终态".into());
+        checkpoint_task(&writer.sender, task.clone(), Some(task.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let first_turn = task.clone();
+        task = next_task_generation(&task).unwrap();
+        checkpoint_task(&writer.sender, task.clone(), Some(first_turn.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        task.revision += 1;
+        task.state = LocalCliTaskState::Running;
+        checkpoint_task(&writer.sender, task.clone(), Some(task.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        task.revision += 1;
+        task.state = LocalCliTaskState::Completed;
+        task.result = Some("第二轮已完成的结果".into());
+        task.terminal_evidence = Some("第二轮已确认的终态".into());
+        checkpoint_task(&writer.sender, task.clone(), Some(task.generation))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let events = vec![
+            RuntimeEvent {
+                generation,
+                native_session_id: task.native_session_id.clone(),
+                kind: RuntimeEventKind::SessionReady {
+                    verified_cli_version: None,
+                    effective_permissions: Value::Null,
+                },
+            },
+            RuntimeEvent {
+                generation,
+                native_session_id: task.native_session_id.clone(),
+                kind: RuntimeEventKind::TurnFinished {
+                    turn_id: "completed-turn".into(),
+                    outcome: TurnOutcome::Completed,
+                    output: task.result.clone().unwrap(),
+                },
+            },
+        ];
+        let (server, mut commands, record) =
+            super::super::runtime_host::start_acknowledged_host_for_test(
+                task.task_id.clone(),
+                first_turn.generation,
+                recovery_options(&state_dir, generation),
+                events,
+            )
+            .await
+            .unwrap();
+        let mut batch = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task.clone()],
+            &HashMap::new(),
+            &state_dir,
+        )
+        .await
+        .unwrap();
+        assert_eq!(batch.records, vec![task.clone()]);
+        assert_eq!(batch.hosts.len(), 1);
+        assert!(batch.unconfirmed_hosts.is_empty());
+        assert_eq!(
+            load_task_generations(&writer.sender, task.task_id.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            vec![first_turn, task.clone()]
+        );
+        let recovered = batch.hosts.pop().unwrap();
+        assert_eq!(recovered.start_mode, ManagedStartMode::Reattached);
+        assert_eq!(recovered.snapshot.task, task);
+        assert!(recovered.snapshot.ready && recovered.snapshot.connected);
+        assert_eq!(recovered.snapshot.active_turn_id, None);
+        assert_eq!(recovered.snapshot.output, task.result.clone().unwrap());
+        assert!(recovered.initial_input.is_none());
+        assert!(recovered.pending_local_tools.is_empty());
+        assert!(
+            recovered
+                .protocol_state
+                .finished_turns
+                .contains("completed-turn")
+        );
+        assert_eq!(commands.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert!(
+            load_messages(&writer.sender, task.task_id.clone(), task.generation)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .is_empty()
+        );
+        let client = super::super::runtime_host::connect_existing(&state_dir, generation)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            client.inspect().await.unwrap(),
+            super::super::runtime_host::RuntimeHostResponse::Inspection {
+                owner_epoch: 2,
+                acknowledged_sequence: 2,
+                ..
+            }
+        ));
+        drop((recovered, client, server));
+        // IPC 服务不拥有端点文件；测试结束后移除其私有临时 socket。
+        #[cfg(target_os = "macos")]
+        let endpoint = std::path::Path::new("/tmp")
+            .join(format!("is-cli-host-{}.sock", record.host_instance_id()));
+        #[cfg(not(target_os = "macos"))]
+        let endpoint = std::env::temp_dir().join(format!(
+            "infinishell-cli-host-{}.sock",
+            record.host_instance_id()
+        ));
+        let _ = std::fs::remove_file(endpoint);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn advanced_host_generation_requires_contiguous_unchanged_session_history() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let generation = Uuid::new_v4();
+    let mut first = snapshot().task;
+    first.working_directory = state_dir.to_string_lossy().into_owned();
+    first.config_json = json!({
+        "runtime_generation": generation,
+        "permission_policy": "read_only",
+        "selected_skills": []
+    })
+    .to_string();
+    super::super::runtime_host::write_cancelled_startup_marker_for_test(
+        first.task_id.clone(),
+        first.generation,
+        Harness::Codex,
+        recovery_options(&state_dir, generation),
+    )
+    .unwrap();
+    let record = super::super::runtime_host::load_record(&state_dir, generation)
+        .unwrap()
+        .unwrap();
+    let second = next_task_generation(&first).unwrap();
+    let current = next_task_generation(&second).unwrap();
+    let history = vec![first, second, current.clone()];
+    assert!(runtime_host_history_matches(&record, &current, &history));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &current,
+        &history[1..]
+    ));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &current,
+        &[history[0].clone(), current.clone()]
+    ));
+    let mut duplicate = history.clone();
+    duplicate.insert(1, history[0].clone());
+    assert!(!runtime_host_history_matches(&record, &current, &duplicate));
+    for field in [
+        "native_session",
+        "runtime",
+        "permission",
+        "task",
+        "parent",
+        "cwd",
+        "skill",
+    ] {
+        let mut changed = history.clone();
+        match field {
+            "native_session" => changed[1].native_session_id = Some("another-session".into()),
+            "runtime" => changed[1].config_json = json!({"runtime_generation": Uuid::new_v4()}).to_string(),
+            "permission" => changed[1].config_json = json!({"runtime_generation": generation, "permission_policy": "full_access", "selected_skills": []}).to_string(),
+            "task" => changed[1].task_id = "another-task".into(),
+            "parent" => changed[1].parent_task_id = Some("another-parent".into()),
+            "cwd" => changed[1].working_directory = state_dir.join("another-directory").to_string_lossy().into_owned(),
+            "skill" => changed[1].config_json = json!({"runtime_generation": generation, "permission_policy": "read_only", "selected_skills": ["unexpected"]}).to_string(),
+            _ => unreachable!(),
+        }
+        assert!(
+            !runtime_host_history_matches(&record, &current, &changed),
+            "{field}"
+        );
+    }
+    let mut unpersisted = current.clone();
+    unpersisted.revision += 1;
+    assert!(!runtime_host_history_matches(
+        &record,
+        &unpersisted,
+        &history
+    ));
+}
+
+#[test]
+fn restart_preserves_terminal_records_without_a_confirmed_live_host() {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&state_dir.join("terminal-history.sqlite")).unwrap();
+    block_on(async {
+        for state in [
+            LocalCliTaskState::Completed,
+            LocalCliTaskState::Failed,
+            LocalCliTaskState::Cancelled,
+        ] {
+            for evidence in ["missing", "not_started", "unconfirmed"] {
+                let generation = Uuid::new_v4();
+                let mut task = snapshot().task;
+                task.config_json = json!({"runtime_generation": generation}).to_string();
+                persist_running_task(&writer.sender, &mut task).await;
+                task.revision += 1;
+                task.state = state;
+                task.result = Some("保留历史结果".into());
+                task.terminal_evidence = Some("保留历史终态".into());
+                checkpoint_task(&writer.sender, task.clone(), Some(task.generation))
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                if evidence == "not_started" {
+                    super::super::runtime_host::write_manifest_failure_receipt_for_test(
+                        task.task_id.clone(),
+                        task.generation,
+                        Harness::Codex,
+                        recovery_options(&state_dir, generation),
+                    )
+                    .unwrap();
+                } else if evidence == "unconfirmed" {
+                    super::super::runtime_host::write_cancelled_startup_marker_for_test(
+                        task.task_id.clone(),
+                        task.generation,
+                        Harness::Codex,
+                        recovery_options(&state_dir, generation),
+                    )
+                    .unwrap();
+                }
+                let batch = recover_runtime_hosts_in_state_dir(
+                    &writer.sender,
+                    vec![task.clone()],
+                    &HashMap::new(),
+                    &state_dir,
+                )
+                .await
+                .unwrap();
+                assert!(batch.hosts.is_empty());
+                assert_eq!(batch.records, vec![task.clone()]);
+                let mut coordinator = LocalCLITaskCoordinator::new(None);
+                coordinator.unconfirmed_hosts = batch.unconfirmed_hosts;
+                assert_eq!(
+                    coordinator.cli_update_busy("codex"),
+                    evidence != "not_started"
+                );
+                assert!(!coordinator.cli_update_busy("claude"));
+                assert_eq!(
+                    load_tasks(&writer.sender, false)
+                        .unwrap()
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .into_iter()
+                        .find(|stored| stored.task_id == task.task_id),
+                    Some(task)
+                );
+            }
+        }
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
 }
 
 #[test]

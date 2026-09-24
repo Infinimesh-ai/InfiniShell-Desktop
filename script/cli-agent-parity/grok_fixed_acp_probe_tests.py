@@ -34,7 +34,7 @@ def transcript(version=probe.VERSION):
         records.append({"direction": "stdin", "message": request})
         if "id" in request:
             native_id += 1
-            if version == probe.VERSION and request["method"] == "session/new":
+            if version in probe.SETUP_VERSIONS and request["method"] == "session/new":
                 session_id = "019d0000-0000-7000-8000-000000000040"
                 for phase in probe.SETUP_PHASES:
                     records.append({"direction": "stdout", "message": {"jsonrpc": "2.0",
@@ -129,6 +129,34 @@ class GrokFixedAcpTests(unittest.TestCase):
         changed[setup_indexes[-1]]["message"]["params"]["phase"] = "old_phase"
         with self.assertRaisesRegex(ValueError, "阶段"):
             probe.validate_transcript(changed, expected)
+
+    def test_1041_unauthenticated_setup_keeps_exact_phases_and_session_binding(self):
+        records, expected = transcript("1.0.41")
+        probe.validate_transcript(records, expected, "1.0.41")
+        indexes = [index for index, row in enumerate(records)
+                   if row["message"].get("method") == probe.SETUP_METHOD]
+        # 真实 1.0.41 的最后阶段可晚于 Authentication required；阶段顺序及 UUID 仍固定。
+        delayed = copy.deepcopy(records)
+        final = delayed.pop(indexes[-1])
+        delayed.insert(indexes[-1] + 1, final)
+        probe.validate_transcript(delayed, expected, "1.0.41")
+        for mutation in ("missing", "duplicate", "reordered", "wrong_session", "extra_phase"):
+            changed = copy.deepcopy(records)
+            if mutation == "missing":
+                changed.pop(indexes[-1])
+            elif mutation == "duplicate":
+                changed.insert(indexes[-1], copy.deepcopy(changed[indexes[-1]]))
+            elif mutation == "reordered":
+                changed[indexes[1]], changed[indexes[2]] = changed[indexes[2]], changed[indexes[1]]
+            elif mutation == "wrong_session":
+                changed[indexes[-1]]["message"]["params"]["sessionId"] = probe.MISSING_SESSION
+            else:
+                changed[indexes[-1]]["message"]["params"]["phase"] = "response_ready"
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                probe.validate_transcript(changed, expected, "1.0.41")
+        for version in (probe.LEGACY_VERSION, probe.P0_VERSION, "1.0.42"):
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                probe.validate_notification(records[indexes[0]]["message"], version)
 
     def test_historical_transcript_rejects_current_setup_notification(self):
         records, expected = transcript(probe.P0_VERSION)

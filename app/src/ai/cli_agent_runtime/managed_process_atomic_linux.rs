@@ -1,16 +1,16 @@
 //! Linux 更新程序的密封内存执行；只接受已冻结的原生 ELF 单文件。
 
-use std::ffi::{CString, OsStr, OsString};
-use std::fs::File;
+use std::ffi::{CStr, CString, OsStr, OsString};
+use std::fs::{self, File};
 use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::fd::{AsRawFd as _, FromRawFd as _, RawFd};
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::fs::{FileExt as _, MetadataExt as _};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use sha2::{Digest as _, Sha256};
 
-use super::{ExpectedFileId, ExpectedFileIdentity, open_expected_file};
+use super::{ExpectedFileId, ExpectedFileIdentity, open_expected_file, sha256_file};
 
 const MAX_NATIVE_EXECUTABLE_BYTES: u64 = 1024 * 1024 * 1024;
 const MAX_PROGRAM_HEADERS: u64 = 4_096;
@@ -146,6 +146,366 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<SealedExecu
         sha256,
         size: copied,
     })
+}
+
+/// 私有发布目录中的静态 ELF；保留 current_exe 的安装布局，并通过已打开 fd 执行。
+#[derive(Debug)]
+pub(super) struct LayoutExecutable {
+    file: File,
+    directory: File,
+    path: PathBuf,
+    identity: ExpectedFileId,
+    sha256: String,
+    size: u64,
+}
+
+impl LayoutExecutable {
+    pub(super) fn verify_for_execution(&self) -> io::Result<()> {
+        let directory = self.directory.metadata()?;
+        let before = self.file.metadata()?;
+        let path = fs::symlink_metadata(&self.path)?;
+        if directory.uid() != unsafe { libc::geteuid() }
+            || directory.mode() & 0o7777 != 0o500
+            || !before.is_file()
+            || before.uid() != unsafe { libc::geteuid() }
+            || before.mode() & 0o7777 != 0o500
+            || before.nlink() != 1
+            || before.len() != self.size
+            || before.dev() != self.identity.volume
+            || before.ino() != self.identity.index
+            || path.file_type().is_symlink()
+            || path.dev() != before.dev()
+            || path.ino() != before.ino()
+        {
+            return Err(io::Error::other(
+                "managed_process.linux_layout_snapshot_changed",
+            ));
+        }
+        let mut file = self.file.try_clone()?;
+        if sha256_file(&mut file)? != self.sha256 {
+            return Err(io::Error::other(
+                "managed_process.linux_layout_snapshot_changed",
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// 只有需要保留 standalone 安装布局的官方更新器使用此分支；普通 ELF 仍走 sealed memfd。
+/// 先密封并核验源字节，再发布到受控私有目录；新代次不能覆盖旧快照。
+pub(super) fn prepare_layout_snapshot(
+    releases: &Path,
+    generation: uuid::Uuid,
+    binding_digest: &str,
+    expected: &ExpectedFileIdentity,
+) -> io::Result<LayoutExecutable> {
+    if binding_digest.len() != 64 || !binding_digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_binding_invalid",
+        ));
+    }
+    let mut sealed = prepare(expected)?;
+    let releases_directory = open_secure_directory(releases)?;
+    let root_name = c"cli-agent-executable-snapshots";
+    if unsafe { libc::mkdirat(releases_directory.as_raw_fd(), root_name.as_ptr(), 0o700) } != 0 {
+        let error = io::Error::last_os_error();
+        if error.kind() != io::ErrorKind::AlreadyExists {
+            return Err(error);
+        }
+    }
+    let root = open_at(
+        releases_directory.as_raw_fd(),
+        root_name,
+        libc::O_RDONLY | libc::O_DIRECTORY,
+        0,
+    )?;
+    let metadata = root.metadata()?;
+    if metadata.uid() != unsafe { libc::geteuid() } || metadata.mode() & 0o7777 != 0o700 {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_root_not_private",
+        ));
+    }
+    let generation_name = CString::new(generation.to_string()).expect("UUID 不含 NUL");
+    if unsafe { libc::mkdirat(root.as_raw_fd(), generation_name.as_ptr(), 0o700) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let directory = open_at(
+        root.as_raw_fd(),
+        &generation_name,
+        libc::O_RDONLY | libc::O_DIRECTORY,
+        0,
+    )?;
+    let mut output = open_at(
+        directory.as_raw_fd(),
+        c"program",
+        libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL,
+        0o600,
+    )?;
+    let metadata = output.metadata()?;
+    let directory_metadata = directory.metadata()?;
+    let summary = serde_json::to_vec(&serde_json::json!({
+        "schema": 1,
+        "generation": generation,
+        "binding_digest": binding_digest,
+        "directory_file_id": {"volume": directory_metadata.dev(), "index": directory_metadata.ino()},
+        "source_file_id": expected.file_id,
+        "snapshot_file_id": {"volume": metadata.dev(), "index": metadata.ino()},
+        "size": expected.size,
+        "sha256": expected.sha256,
+        "program_relative_path": "program"
+    }))
+    .map_err(io::Error::other)?;
+    let mut receipt = open_at(
+        directory.as_raw_fd(),
+        c"snapshot.json",
+        libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL,
+        0o400,
+    )?;
+    receipt.write_all(&summary)?;
+    receipt.sync_all()?;
+    // 先持久化归属再复制大文件；中途失败仍可在整树退出后回收本代已绑定的部分副本。
+    directory.sync_all()?;
+    root.sync_all()?;
+    releases_directory.sync_all()?;
+    sealed.file.rewind()?;
+    if io::copy(&mut sealed.file, &mut output)? != expected.size {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_copy_incomplete",
+        ));
+    }
+    if unsafe { libc::fchmod(output.as_raw_fd(), 0o500) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    output.sync_all()?;
+    drop(output);
+    let file = open_at(directory.as_raw_fd(), c"program", libc::O_RDONLY, 0)?;
+    if unsafe { libc::fchmod(directory.as_raw_fd(), 0o500) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    directory.sync_all()?;
+    root.sync_all()?;
+    releases_directory.sync_all()?;
+    let snapshot = LayoutExecutable {
+        file,
+        directory,
+        path: releases
+            .join("cli-agent-executable-snapshots")
+            .join(generation.to_string())
+            .join("program"),
+        identity: ExpectedFileId {
+            volume: metadata.dev(),
+            index: metadata.ino(),
+        },
+        sha256: expected.sha256.clone(),
+        size: expected.size,
+    };
+    snapshot.verify_for_execution()?;
+    Ok(snapshot)
+}
+
+/// 调用者必须先验证本代整棵进程树退出；仅删除与 manifest 及启动摘要绑定的副本。
+/// 已删除的代次可幂等重试；不扫描或回收其他代次，更不删除整个快照根。
+pub(super) fn cleanup_layout_snapshot(
+    releases: &Path,
+    generation: uuid::Uuid,
+    binding_digest: &str,
+    expected: &ExpectedFileIdentity,
+) -> io::Result<()> {
+    let releases_directory = open_secure_directory(releases)?;
+    let root = match open_at(
+        releases_directory.as_raw_fd(),
+        c"cli-agent-executable-snapshots",
+        libc::O_RDONLY | libc::O_DIRECTORY,
+        0,
+    ) {
+        Ok(root) => root,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let root_metadata = root.metadata()?;
+    if root_metadata.uid() != unsafe { libc::geteuid() } || root_metadata.mode() & 0o7777 != 0o700 {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_root_not_private",
+        ));
+    }
+    let generation_name = CString::new(generation.to_string()).expect("UUID 不含 NUL");
+    let directory = match open_at(
+        root.as_raw_fd(),
+        &generation_name,
+        libc::O_RDONLY | libc::O_DIRECTORY,
+        0,
+    ) {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    let metadata = directory.metadata()?;
+    if metadata.uid() != unsafe { libc::geteuid() }
+        || !matches!(metadata.mode() & 0o7777, 0o500 | 0o700)
+    {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_cleanup_identity",
+        ));
+    }
+    // read_dir 绑定已打开目录；未知文件一律保留并拒绝清理。
+    let names = fs::read_dir(format!("/proc/self/fd/{}", directory.as_raw_fd()))?
+        .map(|entry| entry.map(|entry| entry.file_name()))
+        .collect::<io::Result<Vec<_>>>()?;
+    if names
+        .iter()
+        .any(|name| name != "program" && name != "snapshot.json")
+    {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_cleanup_unknown_file",
+        ));
+    }
+    if !names.is_empty() {
+        let receipt = open_at(
+            directory.as_raw_fd(),
+            c"snapshot.json",
+            libc::O_RDONLY | libc::O_NONBLOCK,
+            0,
+        )?;
+        let info = receipt.metadata()?;
+        if !info.is_file()
+            || info.uid() != unsafe { libc::geteuid() }
+            || info.nlink() != 1
+            || info.mode() & 0o7777 != 0o400
+            || info.len() > 16 * 1024
+        {
+            return Err(io::Error::other(
+                "managed_process.linux_layout_cleanup_identity",
+            ));
+        }
+        let summary: serde_json::Value =
+            serde_json::from_reader(receipt).map_err(io::Error::other)?;
+        if summary["schema"] != 1
+            || summary["generation"] != generation.to_string()
+            || summary["binding_digest"] != binding_digest
+            || summary["source_file_id"]
+                != serde_json::to_value(expected.file_id).map_err(io::Error::other)?
+            || summary["directory_file_id"]
+                != serde_json::json!({"volume": metadata.dev(), "index": metadata.ino()})
+            || summary["size"] != expected.size
+            || summary["sha256"] != expected.sha256
+            || summary["program_relative_path"] != "program"
+        {
+            return Err(io::Error::other(
+                "managed_process.linux_layout_cleanup_binding",
+            ));
+        }
+        match open_at(
+            directory.as_raw_fd(),
+            c"program",
+            libc::O_RDONLY | libc::O_NONBLOCK,
+            0,
+        ) {
+            Ok(program) => {
+                let info = program.metadata()?;
+                if !info.is_file()
+                    || info.uid() != unsafe { libc::geteuid() }
+                    || info.nlink() != 1
+                    || !matches!(info.mode() & 0o7777, 0o500 | 0o600)
+                    || info.len() > expected.size
+                    || summary["snapshot_file_id"]
+                        != serde_json::json!({"volume": info.dev(), "index": info.ino()})
+                {
+                    return Err(io::Error::other(
+                        "managed_process.linux_layout_cleanup_identity",
+                    ));
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    if unsafe { libc::fchmod(directory.as_raw_fd(), 0o700) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    // 先删程序，最后删归属记录；崩溃后仍可按相同代次恢复，空目录只执行 rmdir。
+    for name in [c"program", c"snapshot.json"] {
+        if unsafe { libc::unlinkat(directory.as_raw_fd(), name.as_ptr(), 0) } != 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::NotFound {
+                return Err(error);
+            }
+        }
+    }
+    directory.sync_all()?;
+    if unsafe {
+        libc::unlinkat(
+            root.as_raw_fd(),
+            generation_name.as_ptr(),
+            libc::AT_REMOVEDIR,
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    root.sync_all()
+}
+
+fn open_at(parent: RawFd, name: &CStr, flags: libc::c_int, mode: libc::mode_t) -> io::Result<File> {
+    let fd = unsafe {
+        libc::openat(
+            parent,
+            name.as_ptr(),
+            flags | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            mode,
+        )
+    };
+    if fd < 0 {
+        Err(io::Error::last_os_error())
+    } else {
+        Ok(unsafe { File::from_raw_fd(fd) })
+    }
+}
+
+fn open_secure_directory(path: &Path) -> io::Result<File> {
+    if !path.is_absolute() {
+        return Err(io::Error::other(
+            "managed_process.linux_layout_path_not_absolute",
+        ));
+    }
+    let mut directory = open_at(libc::AT_FDCWD, c"/", libc::O_RDONLY | libc::O_DIRECTORY, 0)?;
+    for component in path.components() {
+        let name = match component {
+            Component::RootDir => continue,
+            Component::Normal(name) => CString::new(name.as_bytes()).map_err(io::Error::other)?,
+            Component::CurDir | Component::ParentDir | Component::Prefix(_) => {
+                return Err(io::Error::other(
+                    "managed_process.linux_layout_path_not_normalized",
+                ));
+            }
+        };
+        directory = open_at(
+            directory.as_raw_fd(),
+            &name,
+            libc::O_RDONLY | libc::O_DIRECTORY,
+            0,
+        )?;
+        let metadata = directory.metadata()?;
+        if metadata.mode() & 0o022 != 0
+            || metadata.uid() != 0 && metadata.uid() != unsafe { libc::geteuid() }
+        {
+            return Err(io::Error::other(
+                "managed_process.linux_layout_ancestor_unsafe",
+            ));
+        }
+    }
+    Ok(directory)
+}
+
+pub(super) fn execute_layout(
+    executable: &LayoutExecutable,
+    argv0: &Path,
+    arguments: &[OsString],
+    environment: &[(OsString, OsString)],
+) -> io::Error {
+    if let Err(error) = executable.verify_for_execution() {
+        return error;
+    }
+    execute_file(&executable.file, argv0, arguments, environment)
 }
 
 fn verify_elf(file: &File, size: u64) -> io::Result<()> {
@@ -330,6 +690,15 @@ pub(super) fn execute(
     arguments: &[OsString],
     environment: &[(OsString, OsString)],
 ) -> io::Error {
+    execute_file(&executable.file, argv0, arguments, environment)
+}
+
+fn execute_file(
+    file: &File,
+    argv0: &Path,
+    arguments: &[OsString],
+    environment: &[(OsString, OsString)],
+) -> io::Error {
     let argv = match cstring_vector(
         std::iter::once(argv0.as_os_str()).chain(arguments.iter().map(OsString::as_os_str)),
         "managed_process.linux_atomic_argument_invalid",
@@ -373,7 +742,7 @@ pub(super) fn execute(
     let result = unsafe {
         libc::syscall(
             libc::SYS_execveat,
-            executable.file.as_raw_fd(),
+            file.as_raw_fd(),
             empty.as_ptr(),
             argv_ptrs.as_ptr(),
             env_ptrs.as_ptr(),

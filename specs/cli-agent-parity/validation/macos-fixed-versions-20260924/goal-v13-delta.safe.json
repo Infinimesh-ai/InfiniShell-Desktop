@@ -1,0 +1,44 @@
+{
+  "scope": "Grok会话级原生审批提醒，保持回合及取消校验；复用已有双语通知",
+  "source_delta": {
+    "app/src/ai/agent_sdk/driver.rs": {
+      "v12": null,
+      "v13": "38249dca4671d91a79298d3329b3cd86bec48de6ac960098907e9e81d1782d8f"
+    },
+    "app/src/ai/blocklist/local_agent_task_sync_model.rs": {
+      "v12": null,
+      "v13": "8f6536905f2f14dc0e5ea3077a2ced2b59423688c18048e284a9d3d420581f4c"
+    },
+    "app/src/notifications/model.rs": {
+      "v12": null,
+      "v13": "adab8fa0cdfdf4e2911fe7b0e523e8bff8f63c9144e0fdc81ce0ea3ff63693ec"
+    },
+    "app/src/notifications/model_tests.rs": {
+      "v12": null,
+      "v13": "69a41751e3afbef303f76de2d209795c36d5ef48da25c18176dcd178ddcaff60"
+    },
+    "app/src/terminal/cli_agent_sessions/event_cursor.rs": {
+      "v12": null,
+      "v13": "a663f42adf4ce0e27c4270c67db83290a3f187eb5e83c09e8f63ecbc11e3ea2e"
+    },
+    "app/src/terminal/cli_agent_sessions/event_cursor_tests.rs": {
+      "v12": null,
+      "v13": "7e255638d22995e12129d774cbc983b157cade159184b66d037c44f6b4ce78dd"
+    },
+    "app/src/terminal/cli_agent_sessions/mod.rs": {
+      "v12": null,
+      "v13": "dc85e4f2d4c32541280d586e275e85e26d23992da4df5c1eb6ded4d379d7902d"
+    },
+    "app/src/terminal/cli_agent_sessions/mod_tests.rs": {
+      "v12": null,
+      "v13": "99a410f19fba271758978561fa8923bb28abbcc377a1db67e62e378941c06b9d"
+    },
+    "app/src/terminal/view.rs": {
+      "v12": "03c05aad6f5b858253c08e72fd89043a94e778bee1b67f666b4601f374cfb36d",
+      "v13": "f285586abcc9ec3485533bc9ff6ac5d7dbf316fdbff756e01bf336f72341e99b"
+    }
+  },
+  "new_visible_messages": false,
+  "unaffected_v11_checks_reused": true,
+  "v13_affected_checks": "cargo check / libtest / i18n / sessions, writer, notifications and task sync regressions / signed GUI native permission notice"
+}

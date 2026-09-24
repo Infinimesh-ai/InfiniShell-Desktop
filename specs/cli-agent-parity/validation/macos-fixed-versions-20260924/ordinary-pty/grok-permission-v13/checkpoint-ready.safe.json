@@ -1,0 +1,31 @@
+{
+  "checkpoint": "ready",
+  "native_input_count": 0,
+  "native_history_count": 0,
+  "input_budget_respected": true,
+  "native_notification_fields": [],
+  "product_notifications": {
+    "events": {
+      "session_start": 1
+    },
+    "native_session_count": 1,
+    "paired_prompt_stop_turns": 0,
+    "unpaired_prompt_turns": 0,
+    "product_received_notifications": true,
+    "records": [
+      {
+        "event": "session_start",
+        "timestamp": "2026-09-24T07:54:22Z",
+        "native_session_sha256": "a4f0c37e70850216c3d9072a5c6362a3c8eb4c621da8560edad726ba413d2fdf",
+        "turn_sha256": null
+      }
+    ]
+  },
+  "approved_file_exact": false,
+  "worker_sha256": "32e8e8477eaa58c5e3db9377c8b9078e504737bab07e683affa895fd2eb0786f",
+  "gui_attention_reminder_appeared_verified": false,
+  "gui_attention_reminder_cleared_verified": false,
+  "gui_allow_once_verified": false,
+  "authoritative_blocked_claimed": false,
+  "raw_payloads_included": false
+}

@@ -596,14 +596,28 @@ impl platform::Delegate for AppDelegate {
 
 pub struct IntegrationTestDelegate {
     app_delegate: AppDelegate,
-    clipboard: InMemoryClipboard,
+    clipboard: Box<dyn crate::Clipboard>,
 }
 
 impl IntegrationTestDelegate {
     pub fn new(event_loop_proxy: EventLoopProxy<super::CustomEvent>) -> Result<Self> {
+        let clipboard: Box<dyn crate::Clipboard> = Box::new(InMemoryClipboard::default());
+        // 仅集成测试允许显式选择系统剪贴板；失败必须向上传播，不能回退到内存替身。
+        #[cfg(all(
+            feature = "integration_tests",
+            any(target_os = "linux", target_os = "windows")
+        ))]
+        let clipboard: Box<dyn crate::Clipboard> =
+            if std::env::var_os("WARPUI_INTEGRATION_SYSTEM_CLIPBOARD")
+                .is_some_and(|value| value == "1")
+            {
+                crate::platform::create_system_clipboard()?
+            } else {
+                clipboard
+            };
         Ok(IntegrationTestDelegate {
             app_delegate: AppDelegate::new(event_loop_proxy)?,
-            clipboard: InMemoryClipboard::default(),
+            clipboard,
         })
     }
 }
@@ -618,7 +632,7 @@ impl platform::Delegate for IntegrationTestDelegate {
     }
 
     fn clipboard(&mut self) -> &mut dyn crate::Clipboard {
-        &mut self.clipboard
+        self.clipboard.as_mut()
     }
 
     fn system_theme(&self) -> platform::SystemTheme {

@@ -199,12 +199,40 @@ impl SkillCatalogProbe {
             return;
         };
         let commands = &message["params"]["update"]["availableCommands"];
+        self.observe_commands(
+            session_id,
+            commands,
+            before_first_submit,
+            hash(message.to_string().as_bytes()),
+        );
+    }
+
+    /// 只观察已验证的关联 RPC 目录，不构造通知、事件 ID 或原生字段。
+    pub(super) fn observe_pull(
+        &self,
+        session_id: &str,
+        commands: &Value,
+        before_first_submit: bool,
+    ) {
+        let fingerprint = format!(
+            "pull:{}",
+            hash(json!([session_id, commands]).to_string().as_bytes())
+        );
+        self.observe_commands(session_id, commands, before_first_submit, fingerprint);
+    }
+
+    fn observe_commands(
+        &self,
+        session_id: &str,
+        commands: &Value,
+        before_first_submit: bool,
+        fingerprint: String,
+    ) {
         let Some(projection) =
             project_skill_catalog(commands, &self.skill_path, before_first_submit)
         else {
             return;
         };
-        let fingerprint = hash(message.to_string().as_bytes());
         let mut observations = self.observations.lock().expect("技能目录锁未损坏");
         if observations
             .snapshots

@@ -8,6 +8,8 @@ mod ai_assistant;
 mod ai_document;
 mod block_filtering;
 mod bootstrapping;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod cli_composer_system_clipboard;
 mod code_review;
 mod context_error_text_layout;
 mod copy_current_path;
@@ -58,6 +60,8 @@ pub use ai_document::*;
 use anyhow::{Result, anyhow};
 pub use block_filtering::*;
 pub use bootstrapping::*;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+pub use cli_composer_system_clipboard::*;
 pub use code_review::*;
 pub use context_error_text_layout::*;
 pub use copy_current_path::*;

@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "scope": "macos_default_gui_claude_skill_image_live_reattach_and_cold_resume",
+  "cli_version": "2.1.280",
+  "task_id": "6294a5e1-ff8f-4f29-bb54-3b27a2d00399",
+  "native_session_id": "0b092745-4669-4c73-b0ca-93c9fff631f6",
+  "default_gui_binary": {
+    "sha256": "89fb66dffd458b03615af16e36fa933094bf8dd393883d50a18bdc8dabefa3aa",
+    "bytes": 749937952
+  },
+  "v7_build_manifest": {
+    "sha256": "1bdd47a06e8b103800bc63f6bdd716dddb85c5068ca2986769bf12c4a613b8ad",
+    "bytes": 1014
+  },
+  "v7_gui_build": {
+    "sha256": "d2122b25628409b17f8ad2b9965e23c9abb34ad10c28f1de85849b3ff3c57733",
+    "bytes": 373
+  },
+  "fixed_cli": {
+    "sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+    "bytes": 217254576
+  },
+  "native_history": {
+    "sha256": "b8973e8d7d143d5b343f96d9b2d6620eac7ecca57cd0a1aa686efe62a92b88c4",
+    "bytes": 117661
+  },
+  "native_tool_names": [
+    "Read"
+  ],
+  "exact_synthetic_context_read": true,
+  "native_images": [
+    {
+      "media_type": "image/png",
+      "bytes": 272,
+      "sha256": "12bdfde7f3c89e2135990a79f859455ed472e55e2a9696d1d532689702279421"
+    }
+  ],
+  "skill_marker_received": true,
+  "image_answer_correct": true,
+  "app_restart_no_replay": true,
+  "cold_resume_no_replay": true,
+  "cold_resume_same_native_session": true,
+  "new_native_inputs": 3,
+  "successful_turns": 3,
+  "hosts": [
+    {
+      "runtime_generation": "3af69cc6-030b-4ba9-9670-a759f645c875",
+      "journal": {
+        "sha256": "e1442d7858d60c70b48d0077cd69931c4e058189a223fdb7fb546408e06c1f50",
+        "bytes": 12666
+      },
+      "owner_epochs": [
+        1,
+        2
+      ],
+      "commands": 3,
+      "native_input_acknowledgements": 2,
+      "completed_turns": 2,
+      "exit_receipt": {
+        "sha256": "f28104905cd9366e75596f7a86342f728da5e09a320a435036897a17c35f62c6",
+        "bytes": 556
+      },
+      "native_process": "exited",
+      "adapter_succeeded": true,
+      "event_journal_completed": true
+    },
+    {
+      "runtime_generation": "12f15f4f-9140-4517-98f7-7f4d9365e061",
+      "journal": {
+        "sha256": "8238a4f6f2b37a73f496e09cf835550ef64df2dc66b037c799534a3df4265ebf",
+        "bytes": 8166
+      },
+      "owner_epochs": [
+        1
+      ],
+      "commands": 2,
+      "native_input_acknowledgements": 1,
+      "completed_turns": 1,
+      "exit_receipt": {
+        "sha256": "e690ca162d0acff63721bcc6fcdea14511bbe58618dcd0ad9828612122f7fb23",
+        "bytes": 554
+      },
+      "native_process": "exited",
+      "adapter_succeeded": true,
+      "event_journal_completed": true
+    }
+  ],
+  "auth_access": "native_cli_uses_authorized_default_keychain; isolated config; no credential extraction",
+  "gui_profile_separate_from_user_default": true,
+  "failure_retained": "private HOME was not logged in; earlier V5 image scope rejection retained",
+  "full_cli_parity_acceptance_passed": false,
+  "screenshots": {
+    "claude-cold-resume-result-v7.png": {
+      "sha256": "4ecfff8c136b2106a16d32ac28a032534b11e9575cba495ff027fb27dba160c6",
+      "bytes": 263482
+    },
+    "claude-skill-auth-r1-result-v7.png": {
+      "sha256": "0c3892f4ba66afafa3283caba9542833f1c73d900a3150126f46f50031055e43",
+      "bytes": 276307
+    },
+    "claude-image-after-restart-result-v7.png": {
+      "sha256": "547eb7cc1edcf582c8a2ec2ad0dd84c77a7274af6d247f7113b92b6dc4999eb6",
+      "bytes": 268096
+    }
+  }
+}

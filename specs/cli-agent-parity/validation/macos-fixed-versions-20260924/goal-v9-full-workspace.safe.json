@@ -1,0 +1,43 @@
+{
+  "source_manifest_sha256": "35538f27300b59da0e848d0b3ecad2ce222602cbcfd03bad445fec28354fbc99",
+  "atomic_macos_separate_private_temp_required": true,
+  "steps": [
+    {
+      "name": "integration-compile",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-run",
+        "-p",
+        "integration"
+      ],
+      "exit_code": 0,
+      "seconds": 237.965,
+      "log_sha256": "0132651e2704f8e77f194d190b27f7b7303d83a578bae13644cf6c038bc33e6b",
+      "log": "/private/tmp/cli-parity-mac-goal-v9-integration-compile-20260924.log"
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "--workspace",
+        "--exclude",
+        "command-signatures-v2",
+        "--exclude",
+        "integration",
+        "--exclude",
+        "warp_tui",
+        "-E",
+        "not test(managed_process::atomic_macos::)"
+      ],
+      "exit_code": -2,
+      "seconds": 135.854,
+      "log_sha256": "b69ed2557138e6bf1e904baa082dc02a46aa304040d149fa63b9d454157f153f",
+      "log": "/private/tmp/cli-parity-mac-goal-v9-workspace-20260924.log"
+    }
+  ]
+}

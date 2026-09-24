@@ -16,9 +16,11 @@ from unittest.mock import Mock, patch
 sys.dont_write_bytecode = True
 from codex_windows_hook_command import (PREFIX, SCRIPTS, cmd_line, encode, source_text,
                                        verify_encoding, verify_windows_argv, require_original_bytes)
-from codex_windows_hook_inputs import (CODEX_COMMIT, RELEASE_ASSETS, fetch_file, plugin_base,
+from codex_windows_hook_inputs import (CODEX_COMMIT, CODEX_VERSION, HOOK_CODEX_VERSIONS, RELEASE_ASSETS,
+                                       codex_contract, fetch_file, obtain_inputs, plugin_base,
                                        regular_file, sha256, verify_codex, verify_plugin)
 import probe_codex_windows_hooks as native_probe
+import prepare_codex_cli as prepare
 from codex_windows_formal import (EVENTS, authorize_config, exact_plugin_tree, formal_transport_expectations,
                                   probe_bundle, restore_config, split_trigger_hooks, validate_native_hooks)
 
@@ -406,6 +408,102 @@ class CommandTests(unittest.TestCase):
 
 
 class FixedInputTests(unittest.TestCase):
+    def test_hook_versions_keep_legacy_default_and_bind_fixed_current_release(self):
+        self.assertEqual(CODEX_VERSION, '0.147.0')
+        self.assertEqual(HOOK_CODEX_VERSIONS, ('0.147.0', '0.156.1'))
+        self.assertEqual(codex_contract('0.147.0')['commit'], CODEX_COMMIT)
+        self.assertEqual(codex_contract('0.156.1')['commit'], 'b412ff32c417f855c2b2d1581b77058eed87c84b')
+        package = prepare.packages_for_version('0.156.1')['windows-x64']
+        self.assertEqual(package['files'][package['entrypoint']][1],
+                         '70bcb05f9bf1a4e7306edd0cd1b57d02af3267ad02a34b26f45c8c4bb20a3301')
+        for version in ('latest', '0.155.1', '0.156.2', ''):
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                codex_contract(version)
+
+    def test_current_executable_requires_complete_verified_package(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            (root / 'bin').mkdir(mode=0o700)
+            package = {'target': 'x86_64-pc-windows-msvc', 'entrypoint': 'bin/codex.exe',
+                       'directories': {'bin': 0o755}, 'archive': 'fixture.tar.gz',
+                       'bytes': 1, 'sha256': '0' * 64,
+                       'metadata': {'version': '0.156.1', 'target': 'x86_64-pc-windows-msvc',
+                                    'entrypoint': 'bin/codex.exe'}, 'files': {}}
+            bodies = {'bin/codex.exe': b'fixture-executable', 'bin/helper.dll': b'fixture-dll',
+                      'codex-package.json': json.dumps(package['metadata']).encode()}
+            for name, body in bodies.items():
+                member = root / name
+                member.write_bytes(body)
+                member.chmod(0o600)
+                package['files'][name] = (len(body), hashlib.sha256(body).hexdigest(), 0o644)
+            executable = root / 'bin/codex.exe'
+            with patch.object(prepare, 'packages_for_version', return_value={'windows-x64': package}):
+                evidence = verify_codex(executable, 'x86_64', '0.156.1')
+                self.assertTrue(evidence['runtime_tree_verified'])
+                self.assertEqual(evidence['version'], '0.156.1')
+                for invalid in ('missing', 'modified', 'extra'):
+                    with self.subTest(invalid=invalid):
+                        member = root / 'bin/helper.dll'
+                        if invalid == 'missing':
+                            member.unlink()
+                        elif invalid == 'modified':
+                            member.write_bytes(b'changed-dll')
+                        else:
+                            (root / 'bin/extra.dll').write_bytes(b'extra')
+                        with self.assertRaises(ValueError):
+                            verify_codex(executable, 'x86_64', '0.156.1')
+                        member.write_bytes(bodies['bin/helper.dll'])
+                        member.chmod(0o600)
+                        (root / 'bin/extra.dll').unlink(missing_ok=True)
+            with self.assertRaises(ValueError):
+                verify_codex(executable, 'x86_64', '0.147.0')
+
+    def test_current_download_uses_fixed_complete_package_preparer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary).resolve()
+            executable = directory / 'runtime-0.156.1-windows-x64/bin/codex.exe'
+            plugin = directory / 'plugin'
+            package = prepare.packages_for_version('0.156.1')['windows-x64']
+            with patch('codex_windows_hook_inputs.plugin_base', return_value={'tree_sha256': {}}), \
+                 patch('codex_windows_hook_inputs.verify_plugin', return_value={}), \
+                 patch('codex_windows_hook_inputs.verify_codex', return_value={'version': '0.156.1'}) as verify, \
+                 patch.object(prepare, 'fetch_file') as fetch, \
+                 patch.object(prepare, 'extract_runtime_package', return_value=executable) as extract:
+                actual, _, _ = obtain_inputs(directory, directory, 'x86_64', plugin=plugin, version='0.156.1')
+                archive = directory / ('0.156.1-' + package['archive'])
+                fetch.assert_called_once_with(
+                    'https://github.com/openai/codex/releases/download/rust-v0.156.1/' + package['archive'],
+                    archive, package['sha256'], package['bytes'])
+                extract.assert_called_once_with(archive, directory / 'runtime-0.156.1-windows-x64',
+                                                'windows-x64', '0.156.1')
+                verify.assert_called_once_with(executable, 'x86_64', '0.156.1')
+                self.assertEqual(actual, executable)
+
+    def test_fixed_native_version_mismatch_is_rejected_before_hook_execution(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            for version in HOOK_CODEX_VERSIONS:
+                wrong = '0.156.1' if version == CODEX_VERSION else CODEX_VERSION
+                with patch.object(prepare.subprocess, 'run', return_value=SimpleNamespace(stdout=f'codex-cli {wrong}')) as run:
+                    with self.assertRaises(ValueError):
+                        native_probe.verified_version(root / 'codex.exe', root, version)
+                    environment = run.call_args.kwargs['env']
+                    self.assertTrue(Path(environment['CODEX_HOME']).is_relative_to(root))
+                    self.assertTrue(Path(environment['HOME']).is_relative_to(root))
+
+    def test_probe_cli_exposes_only_explicit_fixed_hook_versions(self):
+        for name in ('probe_codex_windows_hooks.py', 'probe_codex_windows_conpty.py'):
+            script = Path(__file__).with_name(name)
+            environment = dict(os.environ, PYTHONIOENCODING='utf-8')
+            help_result = subprocess.run([sys.executable, '-B', str(script), '--help'],
+                                         env=environment, capture_output=True, text=True, encoding='utf-8', timeout=10)
+            self.assertEqual(help_result.returncode, 0)
+            self.assertIn('--codex-version {0.147.0,0.156.1}', help_result.stdout)
+            invalid = subprocess.run([sys.executable, '-B', str(script), '--codex-version', 'latest'],
+                                     env=environment, capture_output=True, text=True, encoding='utf-8', timeout=10)
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn('invalid choice', invalid.stderr)
+
     def test_official_pins_are_specific_release_assets(self):
         self.assertEqual(len(CODEX_COMMIT), 40)
         for architecture, (name, size, digest) in RELEASE_ASSETS.items():

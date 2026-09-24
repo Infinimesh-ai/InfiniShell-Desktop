@@ -159,6 +159,16 @@ fn installed_or_newer_versions_do_not_automatically_enable_managed_launch() {
         Harness::Grok,
         &CLIAgentVersionStatus::Detected("1.0.34".into())
     ));
+    for (harness, version) in [
+        (Harness::Codex, "0.156.1"),
+        (Harness::Claude, "2.1.280"),
+        (Harness::Grok, "1.0.41"),
+    ] {
+        assert_eq!(
+            verified_version(harness, &CLIAgentVersionStatus::Detected(version.into())),
+            cfg!(any(target_os = "macos", target_os = "linux", windows))
+        );
+    }
     // 1.0.40 目前只有固定字节、认证和 setup 形状证据；尚未完成产品内 P0 回合验收。
     assert!(!verified_version(
         Harness::Grok,
@@ -1366,6 +1376,180 @@ fn grok_composer_applies_native_visibility_single_skill_and_inherit_policy() {
             view.permission = PermissionPolicy::Inherit;
             view.managed_input.attachments.skills = vec![hidden];
             assert!(view.parsed_composer_skills(ctx).is_err());
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn current_grok_fixed_permissions_enable_tools_only_after_explicit_selection() {
+    warpui::App::test((), |mut app| async move {
+        let manager = manager_view(&mut app);
+        CLIAgentInstallModel::handle(&app).update(&mut app, |model, _| {
+            *model = CLIAgentInstallModel::with_installation_for_test(
+                CLIAgent::Grok,
+                CLIAgentInstallation {
+                    executable: Some(PathBuf::from("/fixture/grok")),
+                    version: CLIAgentVersionStatus::Detected("1.0.41".into()),
+                },
+            );
+        });
+        manager.update(&mut app, |view, ctx| {
+            view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert!(view.local_tools.allow_spawn && view.local_tools.allow_message);
+            view.handle_action(&TaskManagerAction::SelectHarness(Harness::Grok), ctx);
+            assert_eq!(view.local_tools, LocalToolPermissions::default());
+            for key in ["allow-spawn", "allow-messages"] {
+                assert!(view.buttons[key].as_ref(ctx).is_disabled());
+            }
+            view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert_eq!(view.local_tools, LocalToolPermissions::default());
+            for permission in [
+                PermissionPolicy::GrokRestrictedReadV1,
+                PermissionPolicy::GrokRestrictedFilesV1,
+            ] {
+                view.handle_action(&TaskManagerAction::SelectPermission(permission), ctx);
+                assert_eq!(view.permission, permission);
+                for key in ["allow-spawn", "allow-messages"] {
+                    assert!(!view.buttons[key].as_ref(ctx).is_disabled());
+                }
+                view.handle_action(&TaskManagerAction::ToggleSpawn, ctx);
+                view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+                assert!(view.local_tools.allow_spawn && view.local_tools.allow_message);
+                view.handle_action(
+                    &TaskManagerAction::SelectPermission(PermissionPolicy::Inherit),
+                    ctx,
+                );
+                assert_eq!(view.local_tools, LocalToolPermissions::default());
+                assert!(view.buttons["allow-spawn"].as_ref(ctx).is_disabled());
+                assert!(view.buttons["allow-messages"].as_ref(ctx).is_disabled());
+            }
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn current_grok_scan_clears_new_root_tools_without_rewriting_saved_permissions() {
+    warpui::App::test((), |mut app| async move {
+        let mut saved = task("saved-grok-permissions");
+        saved.harness = "grok".into();
+        saved.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,
+            "cli_version":"1.0.30","local_tools":{"allow_spawn":false,"allow_message":true}})
+        .to_string();
+        let manager = manager_view_with_records(&mut app, vec![saved.clone()]);
+        manager.update(&mut app, |view, ctx| {
+            view.handle_action(&TaskManagerAction::SelectHarness(Harness::Grok), ctx);
+            view.handle_action(&TaskManagerAction::ToggleMessages, ctx);
+            assert!(view.local_tools.allow_message);
+        });
+        CLIAgentInstallModel::handle(&app).update(&mut app, |model, _| {
+            *model = CLIAgentInstallModel::with_installation_for_test(
+                CLIAgent::Grok,
+                CLIAgentInstallation {
+                    executable: Some(PathBuf::from("/fixture/grok")),
+                    version: CLIAgentVersionStatus::Detected("1.0.41".into()),
+                },
+            );
+        });
+        manager.update(&mut app, |view, ctx| {
+            // 扫描完成使用同一刷新入口，必须同时收敛按钮及其实际配置。
+            view.refresh_buttons(ctx);
+            assert_eq!(view.local_tools, LocalToolPermissions::default());
+            assert!(view.buttons["allow-spawn"].as_ref(ctx).is_disabled());
+            assert!(view.buttons["allow-messages"].as_ref(ctx).is_disabled());
+            view.handle_action(&TaskManagerAction::SelectTask(saved.task_id.clone()), ctx);
+            view.refresh_buttons(ctx);
+            assert!(view.local_tools.allow_message);
+            assert_eq!(
+                view.selected_record(ctx).unwrap().config_json,
+                saved.config_json
+            );
+        });
+    });
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn current_grok_existing_task_skills_stay_bound_to_the_creation_selection() {
+    use crate::ai::skills::SkillManager;
+    use warp_util::local_or_remote_path::LocalOrRemotePath;
+
+    warpui::App::test((), |mut app| async move {
+        let project = tempfile::tempdir().unwrap();
+        let first_path = project.path().join(".grok/skills/first/SKILL.md");
+        let second_path = project.path().join(".grok/skills/second/SKILL.md");
+        std::fs::create_dir_all(first_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(second_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &first_path,
+            "---\nname: first\ndescription: First\n---\n第一技能\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &second_path,
+            "---\nname: second\ndescription: Second\n---\n第二技能\n",
+        )
+        .unwrap();
+        let mut empty = task("grok-without-skill");
+        empty.harness = "grok".into();
+        empty.working_directory = project.path().to_string_lossy().to_string();
+        empty.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,
+            "cli_version":"1.0.41","selected_skills":[]})
+        .to_string();
+        let mut bound = empty.clone();
+        bound.task_id = "grok-with-bound-skill".into();
+        bound.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,
+            "cli_version":"1.0.41","selected_skills":[{"name":"first","path":first_path}]})
+        .to_string();
+        let mut legacy = empty.clone();
+        legacy.task_id = "grok-legacy-skill-selection".into();
+        legacy.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,
+            "cli_version":"1.0.30","selected_skills":[]})
+        .to_string();
+        let manager =
+            manager_view_with_records(&mut app, vec![empty.clone(), bound.clone(), legacy.clone()]);
+        SkillManager::handle(&app).update(&mut app, |skills, _| {
+            skills.handle_skills_added(vec![
+                ai::skills::parse_skill(&first_path).unwrap(),
+                ai::skills::parse_skill(&second_path).unwrap(),
+            ]);
+        });
+        manager.update(&mut app, |view, ctx| {
+            let first = SkillReference::Path(LocalOrRemotePath::Local(first_path));
+            let second = SkillReference::Path(LocalOrRemotePath::Local(second_path));
+            view.handle_action(&TaskManagerAction::SelectTask(empty.task_id.clone()), ctx);
+            view.refresh_managed_input(ctx);
+            assert!(!view.managed_input.available_skills);
+            assert_eq!(
+                view.select_composer_skill(&first, view.input_generation, ctx)
+                    .unwrap_err(),
+                crate::t!("cli-task-manager-skills-session-fixed")
+            );
+            view.managed_input.attachments.skills = vec![first.clone()];
+            assert!(view.parsed_composer_skills(ctx).is_err());
+            view.managed_input.attachments.skills.clear();
+            view.handle_action(&TaskManagerAction::SelectTask(bound.task_id.clone()), ctx);
+            view.refresh_managed_input(ctx);
+            assert!(view.managed_input.available_skills);
+            assert!(
+                view.select_composer_skill(&first, view.input_generation, ctx)
+                    .is_ok()
+            );
+            assert_eq!(view.parsed_composer_skills(ctx).unwrap().len(), 1);
+            view.managed_input.attachments.skills.clear();
+            assert_eq!(
+                view.select_composer_skill(&second, view.input_generation, ctx)
+                    .unwrap_err(),
+                crate::t!("cli-task-manager-skills-session-fixed")
+            );
+            view.handle_action(&TaskManagerAction::SelectTask(legacy.task_id.clone()), ctx);
+            assert!(
+                view.select_composer_skill(&second, view.input_generation, ctx)
+                    .is_ok()
+            );
         });
     });
 }

@@ -18,6 +18,10 @@ CONTRACTS = {
     "claude": ("2.1.273 (Claude Code)", "2.2.0", "claude-code-warp", ".claude-plugin/plugin.json", "CLAUDE_CONFIG_DIR"),
     "codex": ("codex-cli 0.147.0", "0.4.0", "codex-warp", ".codex-plugin/plugin.json", "CODEX_HOME"),
 }
+MACOS_CLI_VERSIONS = {
+    "claude": "2.1.280 (Claude Code)",
+    "codex": "codex-cli 0.156.1",
+}
 FILES = {
     "claude": ("scripts/build-payload.sh", "scripts/on-session-start.sh", "scripts/on-stop.sh", "scripts/should-use-structured.sh", "hooks/hooks.json", "scripts/warp-notify.sh"),
     "codex": ("scripts/build-payload.sh", "scripts/on-stop.sh", "hooks/hooks.json", "scripts/warp-notify.sh", "scripts/on-prompt-submit.sh"),
@@ -197,7 +201,8 @@ def verify_runtime(agent, home, cli, files_only=False):
     for name, executable in executables:
         result = subprocess.run([executable, "--version"], env=environment, capture_output=True, text=True, timeout=5, check=True)
         versions[name] = result.stdout.strip()
-    if versions[agent] != CONTRACTS[agent][0]:
+    if versions[agent] != CONTRACTS[agent][0] and not (
+            sys.platform == "darwin" and versions[agent] == MACOS_CLI_VERSIONS[agent]):
         raise ValueError("CLI 版本不是此修补的已验证版本")
     return versions[agent]
 

@@ -397,6 +397,10 @@ integration_tests! {
     test_sftp_keyboard_escape_close_dialog,
 
     // Rich Input Ctrl+Enter submit toggle (issue #11588)
+    // 需要显式图形会话与系统剪贴板；由专用 GUI workflow 步骤直接运行。
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[ignore]
+    test_cli_composer_system_clipboard_multiline_and_image,
     test_rich_input_toggle_on_enter_inserts_newline_and_ctrl_enter_submits,
     // Regression: Enter must accept inline menus (not insert newline) when toggle=true
     test_rich_input_enter_accepts_menu_item_when_toggle_is_true,

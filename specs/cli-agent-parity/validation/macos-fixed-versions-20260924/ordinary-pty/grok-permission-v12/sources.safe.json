@@ -1,0 +1,32 @@
+{
+  "manifest_sha256": "c1b5525a0633486d60991d1ac1b6204c87c3a342c779e76616be7cccf226fd87",
+  "base_head": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+  "dirty_build_not_same_final_commit": true,
+  "files": {
+    "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": {
+      "observed_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "v12_manifest_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "base_head_blob_sha256": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898"
+    },
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": {
+      "observed_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "v12_manifest_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "base_head_blob_sha256": null
+    },
+    "app/src/terminal/cli_agent_hook_writer.rs": {
+      "observed_sha256": "185a51774cd99dcae41bc241e61bc850152cba115f2be88b160f63b7d92eb9d5",
+      "v12_manifest_sha256": "185a51774cd99dcae41bc241e61bc850152cba115f2be88b160f63b7d92eb9d5",
+      "base_head_blob_sha256": "99fd417391c7c4d63cc5efbbf40a140b4fc63d45eb21abaac52e40da0f338541"
+    },
+    "app/src/terminal/cli_agent_sessions/event_cursor.rs": {
+      "observed_sha256": "3d1f8a79c198ff9a01c6ceb5f3b9e23e9c3ee7bddff55098f68b779e59ecf528",
+      "v12_manifest_sha256": null,
+      "base_head_blob_sha256": "3d1f8a79c198ff9a01c6ceb5f3b9e23e9c3ee7bddff55098f68b779e59ecf528"
+    },
+    "app/src/terminal/cli_agent_sessions/mod.rs": {
+      "observed_sha256": "6d3cc4b3fae518ccd4607e9fc44a17095f3e079c0b49b27229c32c8946e1f83b",
+      "v12_manifest_sha256": null,
+      "base_head_blob_sha256": "6d3cc4b3fae518ccd4607e9fc44a17095f3e079c0b49b27229c32c8946e1f83b"
+    }
+  }
+}

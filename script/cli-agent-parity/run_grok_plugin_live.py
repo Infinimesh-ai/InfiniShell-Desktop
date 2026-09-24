@@ -1,0 +1,170 @@
+#!/usr/bin/env python3
+"""固定 Grok 1.0.41 生产通知安装窄验收；只用私有无凭据 HOME，不提交模型输入。"""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from prepare_grok_cli import verify_binary
+from run_codex_source_live import digest, stop_group
+
+TEST_NAME = ('terminal::cli_agent_sessions::plugin_manager::grok::tests::'
+             'live_grok_production_installer_repairs_and_preserves_disable')
+STEPS = ['production_install', 'production_upgrade_known_013_to_014',
+         'production_same_version_update', 'production_disabled_update_rejected',
+         'file_transaction_failure_rollback', 'production_update_after_rollback']
+
+
+def isolated_environment(root, programs, host_environment=None):
+    host = os.environ if host_environment is None else host_environment
+    allowed = {'LANG', 'LC_ALL', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT'}
+    environment = {key.upper(): value for key, value in host.items() if key.upper() in allowed}
+    system_paths = ['/usr/bin', '/bin']
+    if sys.platform == 'win32':
+        if not all(environment.get(key) for key in ('SYSTEMROOT', 'COMSPEC', 'PATHEXT')):
+            raise ValueError('Windows 安装验收缺少系统环境')
+        system = Path(environment['SYSTEMROOT']) / 'System32'
+        system_paths = [str(system / 'WindowsPowerShell/v1.0'), str(system)]
+    environment['PATH'] = os.pathsep.join([str(programs), *system_paths])
+    paths = {'HOME': 'home', 'USERPROFILE': 'home', 'GROK_HOME': 'home/.grok',
+             'APPDATA': 'home/AppData/Roaming', 'LOCALAPPDATA': 'home/AppData/Local',
+             'XDG_CONFIG_HOME': 'home/.config', 'XDG_DATA_HOME': 'home/.local/share',
+             'XDG_CACHE_HOME': 'home/.cache', 'TMPDIR': 'tmp', 'TMP': 'tmp', 'TEMP': 'tmp'}
+    for key, relative in paths.items():
+        path = root / relative
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+        environment[key] = str(path)
+    (root / 'home/Library/Application Support').mkdir(parents=True, exist_ok=True)
+    (root / 'work').mkdir()
+    (root / '.infinishell-grok-plugin-live').write_text(
+        'isolated unauthenticated Grok plugin verification\n', encoding='utf-8', newline='\n')
+    environment.update(INFINISHELL_GROK_PLUGIN_LIVE_ROOT=str(root),
+                       GROK_AUTO_UPDATE='0', GROK_DISABLE_AUTOUPDATER='1')
+    return environment
+
+
+def verified_receipt(exit_code, timed_out, output, receipt, native_sha, node_sha, test_sha, host_platform):
+    if (timed_out or exit_code != 0 or not re.search(r'test result: ok\. 1 passed; 0 failed; 0 ignored;', output)
+            or not isinstance(receipt, dict) or receipt.get('passed') is not True
+            or receipt.get('grok_version') != '1.0.41' or receipt.get('grok_sha256') != native_sha
+            or receipt.get('node_sha256') != node_sha or receipt.get('test_binary_sha256') != test_sha
+            or receipt.get('credentials_provided') is not False or receipt.get('model_input_submitted') is not False
+            or receipt.get('native_inspect_verified') is not True or receipt.get('native_hook_execution_verified') is not False):
+        return False
+    steps = receipt.get('steps')
+    if (not isinstance(steps, list) or any(not isinstance(item, dict) for item in steps)
+            or [item.get('step') for item in steps] != STEPS
+            or any(item.get('passed') is not True for item in steps)):
+        return False
+    if (steps[1].get('previous_plugin_version') != '0.1.3'
+            or steps[1].get('current_plugin_version') != '0.1.4'
+            or steps[1].get('legacy_source_unchanged') is not True
+            or steps[1].get('production_update_call') is not True
+            or steps[2].get('config_and_registry_unchanged') is not True
+            or steps[3].get('config_and_files_unchanged') is not True
+            or steps[4].get('production_apply_call') is not False
+            or steps[4].get('fault_after_first_replacement') is not True):
+        return False
+    for item in steps[:2]:
+        export = item.get('installed_hook_export', {})
+        if (export.get('installed_hook_export_version_verified') is not True
+                or export.get('plugin_version') != '0.1.4' or export.get('main_entry_verified') is not False):
+            return False
+    if host_platform == 'win32':
+        args = receipt.get('windows_bridge_argv', {})
+        if (args.get('cmd_verified') is not True or args.get('powershell_51_verified') is not True
+                or args.get('space_unicode_and_shell_metacharacters_preserved') is not True
+                or args.get('native_hook_execution_verified') is not False):
+            return False
+    return host_platform in ('linux', 'win32')
+
+
+def source_identity():
+    repo = Path(__file__).resolve().parents[2]
+    files = ['app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs',
+             'app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs',
+             'app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs',
+             'app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs',
+             'app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json',
+             'script/cli-agent-parity/codex_windows_hook_command.ps1']
+    return {name: digest(repo / name) for name in files}
+
+
+def run(args):
+    if sys.platform not in ('linux', 'win32') or platform.machine().lower() not in ('x86_64', 'amd64'):
+        raise ValueError('此窄入口只覆盖固定 Linux/Windows x64；Mac 沿既有验收')
+    native = verify_binary(args.grok, f'{sys.platform}-x64', '1.0.41')
+    for path in (args.test_binary, args.node):
+        if not path.is_file() or path.is_symlink():
+            raise ValueError('必须提供普通同提交 libtest 与 Node 可执行文件')
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.output.exists():
+        raise FileExistsError('不能覆盖此前失败或成功收据')
+    root = Path(tempfile.mkdtemp(prefix='grok 通知安装 ', dir=args.fixture_parent)).resolve()
+    report = {'schema_version': 1, 'passed': False, 'fixed_version': '1.0.41',
+              'platform': sys.platform, 'native_sha256': native['sha256'],
+              'test_binary_sha256': digest(args.test_binary), 'node_sha256': digest(args.node),
+              'runner_sha256': digest(Path(__file__)), 'source_sha256': source_identity(), 'credentials_provided': False,
+              'model_inputs': 0, 'native_hook_execution_verified': False,
+              'worker_conout_verified': False, 'gui_verified': False,
+              'private_root_removed': False, 'timed_out': False}
+    try:
+        programs = root / '程序 bin'; programs.mkdir()
+        suffix = '.exe' if sys.platform == 'win32' else ''
+        for source, name in [(args.grok, 'grok'), (args.node, 'node')]:
+            shutil.copy2(source, programs / (name + suffix))
+        env = isolated_environment(root, programs)
+        env.update(INFINISHELL_GROK_PLUGIN_LIVE_GROK_SHA256=report['native_sha256'],
+                   INFINISHELL_GROK_PLUGIN_LIVE_NODE_SHA256=report['node_sha256'])
+        node = subprocess.run([str(programs / ('node' + suffix)), '--version'], cwd=root / 'work',
+                              env=env, capture_output=True, timeout=5, check=True)
+        env['INFINISHELL_GROK_PLUGIN_LIVE_NODE_VERSION'] = node.stdout.decode().strip()
+        command = [str(args.test_binary), '--exact', TEST_NAME, '--ignored', '--test-threads=1', '--nocapture']
+        options = {'creationflags': 0x00000200} if sys.platform == 'win32' else {'start_new_session': True}
+        process = subprocess.Popen(command, cwd=root / 'work', env=env, **options,
+                                   text=True, encoding='utf-8', errors='replace', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        try:
+            output = process.communicate(timeout=220)[0]
+        except subprocess.TimeoutExpired:
+            output = stop_group(process, env)[0]; report['timed_out'] = True
+        except BaseException:
+            stop_group(process, env); raise
+        report.update(exit_code=process.returncode, output_bytes=len(output.encode()),
+                      output_sha256=hashlib.sha256(output.encode()).hexdigest())
+        receipt_path = root / 'grok-production-installer.json'
+        receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
+        report['receipt'] = receipt
+        report['passed'] = verified_receipt(process.returncode, report['timed_out'], output, receipt,
+            report['native_sha256'], report['node_sha256'], report['test_binary_sha256'], sys.platform)
+        report['source_unchanged'] = source_identity() == report['source_sha256']
+        report['passed'] = report['passed'] and report['source_unchanged']
+        if report['passed']:
+            shutil.rmtree(root); report['private_root_removed'] = True
+        else:
+            # 无凭据失败现场保留在 runner 私有目录；公开收据只记录摘要，不输出载荷或路径。
+            (root / 'test-output.private.txt').write_text(output, encoding='utf-8')
+    except Exception as error:
+        report['passed'] = False
+        report['error_kind'] = type(error).__name__
+    finally:
+        with args.output.open('x', encoding='utf-8') as target:
+            json.dump(report, target, ensure_ascii=False, indent=2); target.write('\n')
+    return 0 if report['passed'] and report['private_root_removed'] else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('test-binary', 'grok', 'node', 'fixture-parent', 'output'):
+        parser.add_argument('--' + name, required=True, type=lambda value: Path(value).resolve())
+    return run(parser.parse_args())
+
+
+if __name__ == '__main__':
+    sys.exit(main())

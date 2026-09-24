@@ -2369,6 +2369,14 @@ struct PendingSpecificCLIAgentLaunch {
     revision: crate::editor::EditorBufferRevision,
 }
 
+/// SSH 等包装命令只能使用当前 PTY 收到的原生通知绑定输入目标。
+struct CLIAgentHookInputTarget {
+    block_id: BlockId,
+    native_session_id: String,
+    listener_id: EntityId,
+    model_events_id: EntityId,
+}
+
 impl Default for TerminalViewStateChange {
     fn default() -> TerminalViewStateChange {
         TerminalViewStateChange {
@@ -2587,6 +2595,7 @@ pub struct TerminalView {
     pending_specific_cli_agent_launch: Option<PendingSpecificCLIAgentLaunch>,
     /// 只由同一命令块结束或真实 PTY 退出释放，旧回调不能释放后续启动。
     cli_agent_launch_reservation_block_id: Option<BlockId>,
+    cli_agent_hook_input_target: Option<CLIAgentHookInputTarget>,
     /// When true, enter agent view after pending setup commands complete
     /// (i.e. after `PendingCommandCompleted` is emitted). Set by
     /// `pane_tree_from_template_recursive` when a tab config has both
@@ -4299,6 +4308,7 @@ impl TerminalView {
             pending_command_queue: Default::default(),
             pending_specific_cli_agent_launch: None,
             cli_agent_launch_reservation_block_id: None,
+            cli_agent_hook_input_target: None,
             enter_agent_view_after_pending_commands: false,
             enter_agent_view_after_ssh_bootstrap: None,
             pending_ssh_route_launch: None,
@@ -11863,6 +11873,7 @@ impl TerminalView {
                 ctx.request_user_attention();
             }
             ModelEvent::Exit { reason } => {
+                self.cli_agent_hook_input_target = None;
                 CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                     sessions.remove_session(self.view_id, ctx);
                 });
@@ -11984,6 +11995,7 @@ impl TerminalView {
                 });
                 self.hide_use_agent_footer_in_blocklist(ctx);
                 if matches!(block_completed_event.block_type, BlockType::User(_)) {
+                    self.cli_agent_hook_input_target = None;
                     // Close the rich input editor if it was open (side effects
                     // like input config restore happen reactively).
                     // The auto-toggle flag is irrelevant here because the
@@ -13346,6 +13358,15 @@ impl TerminalView {
             sessions_model.update_from_event(self.view_id, &notification, ctx);
         });
 
+        if notification.source == CLIAgentEventSource::RichPlugin
+            && matches!(
+                notification.event,
+                CLIAgentEventType::SessionStart | CLIAgentEventType::PromptSubmit
+            )
+        {
+            self.bind_cli_agent_hook_input_target(ctx);
+        }
+
         if notification.event == CLIAgentEventType::SessionStart {
             send_telemetry_from_ctx!(
                 TelemetryEvent::CLIAgentPluginDetected {
@@ -13551,6 +13572,34 @@ impl TerminalView {
             )
         {
             self.update_git_status_subscription(ctx);
+        }
+
+        if let CLIAgentSessionsModelEvent::AttentionRequested {
+            terminal_view_id,
+            agent,
+        } = event
+        {
+            if *terminal_view_id == self.view_id {
+                // 会话提醒仅让原生审批 UI 可见，不更新对话或回合状态。
+                if *AISettings::as_ref(ctx).auto_toggle_rich_input
+                    && CLIAgentSessionsModel::as_ref(ctx)
+                        .session(self.view_id)
+                        .is_some_and(|session| session.should_auto_toggle_input)
+                {
+                    self.close_cli_agent_rich_input(CLIAgentRichInputCloseReason::AutoToggle, ctx);
+                }
+                self.send_agent_desktop_notification_or_show_banner(
+                    NotificationsTrigger::NeedsAttention,
+                    crate::t!(
+                        "notifications-agent-needs-attention-title",
+                        agent = agent.display_name()
+                    ),
+                    crate::t!("notifications-waiting-for-input"),
+                    Some(NotificationAgentVariant::CLIAgent((*agent).into())),
+                    ctx,
+                );
+            }
+            return;
         }
 
         let CLIAgentSessionsModelEvent::StatusChanged {

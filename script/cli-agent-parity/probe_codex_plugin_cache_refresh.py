@@ -458,7 +458,7 @@ def marketplace_revision_evidence(home, marketplace_root=None, codex_version=COD
         revision = configuration(home).get('marketplaces', {}).get('codex-warp', {}).get('last_revision')
         return {'provenance': 'config_last_revision', 'revision': revision,
                 'revision_matches_expected': revision == PLUGIN_COMMIT, 'contract_matches_expected': True}
-    require(codex_version == '0.155.1' and marketplace_root is not None,
+    require(codex_version in ('0.155.1', '0.156.1') and marketplace_root is not None,
             '新版固定 marketplace revision 缺少受控来源目录')
     metadata = json.loads((marketplace_root / '.codex-marketplace-install.json').read_text(encoding='utf-8'))
     expected = {'source_type': 'git', 'source': UPSTREAM_URL, 'ref_name': PLUGIN_COMMIT,

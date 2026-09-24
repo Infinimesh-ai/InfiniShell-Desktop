@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "scope": "codex_01561_production_parent_child_duplex_inspect",
+  "platform": "macos-aarch64",
+  "cli_version": "0.156.1",
+  "passed": true,
+  "same_final_commit_claim": false,
+  "full_cli_parity_acceptance_passed": false,
+  "credentials_included": false,
+  "credential_metadata_included": false,
+  "raw_logs_or_transcripts_included": false,
+  "base_head": "104f5b8a1e857c49c5bbb782c78ddbfd89eef628",
+  "worktree_dirty": true,
+  "source_binding": {
+    "fixture": {
+      "file": "app/src/ai/cli_agent_runtime/codex_coordinator_live_tests.rs",
+      "sha256": "a55b45afc7eab32d8a5c884b766718dd77b906051c5b9cc316bdf0b283e67e0c"
+    },
+    "runner": {
+      "file": "script/cli-agent-parity/run_codex_adapter_live.py",
+      "sha256": "866cef4fc923348f1ff87854107f82f7fab0906aec1adda224d1d1f170721510"
+    },
+    "v8_to_v9_changed_source_files": [
+      "app/src/ai/cli_agent_runtime/codex_coordinator_live_tests.rs",
+      "script/cli-agent-parity/codex_adapter_runner_tests.py",
+      "script/cli-agent-parity/run_codex_adapter_live.py"
+    ],
+    "product_source_unchanged_from_v8": true,
+    "builds": {
+      "v8": {
+        "source_manifest_sha256": "3b8631f303b83cab108a0e545cec1300c8a5d5a92048f0c13bb9e9e93a1f0e90",
+        "build_receipt_sha256": "83cefc30a17405537abffa4ce3da484ffb8cdd0a8be5ed7be9331aa593a0ac88",
+        "steps": [
+          {
+            "name": "check",
+            "exit_code": 0
+          },
+          {
+            "name": "libtest",
+            "exit_code": 0
+          },
+          {
+            "name": "i18n",
+            "exit_code": 0
+          },
+          {
+            "name": "supervisor",
+            "exit_code": 0
+          }
+        ],
+        "default_build_without_managed_feature": true
+      },
+      "v9": {
+        "source_manifest_sha256": "35538f27300b59da0e848d0b3ecad2ce222602cbcfd03bad445fec28354fbc99",
+        "build_receipt_sha256": "2395fbdac9e0aa0bf665175e6079a3cee6473111a28af45793cddc2f0e74b3f0",
+        "steps": [
+          {
+            "name": "check",
+            "exit_code": 0
+          },
+          {
+            "name": "libtest",
+            "exit_code": 0
+          },
+          {
+            "name": "i18n",
+            "exit_code": 0
+          },
+          {
+            "name": "supervisor",
+            "exit_code": 0
+          }
+        ],
+        "default_build_without_managed_feature": true
+      }
+    }
+  },
+  "binary_bindings": {
+    "libtest_version": "v9",
+    "supervisor_version": "v8",
+    "libtest-goal-v9": "8ed9628d241e186c4bbb461ed350ac8c91d610b59b4ddea3c68d07f0a5041d82",
+    "supervisor-goal-v8": "41bbb282a635c01226383eeaae407ab7310f58b7a1fe7a35256b38c26095af05",
+    "codex/bin/codex": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a"
+  },
+  "acceptance": {
+    "runner_exit_code": 0,
+    "runner_acceptance_passed": true,
+    "independent_runner_contract_recheck_passed": true,
+    "runtime_event_counts": {
+      "session_ready": 2,
+      "input_accepted": 6,
+      "turn_started": 3,
+      "text_delta": 124,
+      "local_tool_requested": 3,
+      "command_dispatched": 5,
+      "progress": 7,
+      "approval_requested": 2,
+      "approval_resolved": 2,
+      "turn_completed": 3
+    },
+    "source_auth_metadata_unchanged": true,
+    "runner_private_auth_copy_removed": true,
+    "supervised_cleanup_verified": true,
+    "cleanup_receipts": 2,
+    "elapsed_seconds": 57.274
+  },
+  "boundaries": {
+    "parent_to_child": "production_managed_mailbox_with_native_protocol_ack",
+    "child_to_parent": "native_send_message_to_agent_with_native_protocol_ack",
+    "gui_verified": false,
+    "child_file_effect_verified": false,
+    "completed_parent_automatic_wake_verified": false,
+    "explicit_parent_continuation_and_native_inspect_verified": true
+  },
+  "events": [
+    {
+      "bidirectional_messages_verified": false,
+      "child_file_effect_verified": false,
+      "cli_version": "0.156.1",
+      "event": "acceptance_started",
+      "gui_verified": false,
+      "max_native_inputs": 6,
+      "max_native_tools": 3,
+      "max_readonly_approvals": 2,
+      "max_seconds": 180,
+      "scope": "codex_01561_production_parent_child_duplex_inspect",
+      "test_only_candidate_01561": false
+    },
+    {
+      "event": "parent_mailbox_dispatched",
+      "native_ack_verified": false,
+      "source": "production_managed_mailbox"
+    },
+    {
+      "event": "readonly_gate_released",
+      "native_message_ack_verified": true,
+      "parent": false
+    },
+    {
+      "event": "readonly_gate_released",
+      "native_message_ack_verified": true,
+      "parent": true
+    },
+    {
+      "automatic_result_enqueued_verified": true,
+      "event": "explicit_inspect_requested",
+      "parent_generation": 2
+    },
+    {
+      "accepted_inputs": 6,
+      "automatic_result_enqueued_verified": true,
+      "automatic_result_native_ack_verified": true,
+      "child_count": 1,
+      "child_message_source": "native_send_message_to_agent",
+      "child_result_verified": true,
+      "child_to_parent_native_ack_verified": true,
+      "event": "parent_child_chain_verified",
+      "explicit_continuation_native_ack_verified": true,
+      "native_inspect_result_verified": true,
+      "native_tool_calls": 3,
+      "parent_message_source": "production_managed_mailbox",
+      "parent_permission_ceiling_verified": true,
+      "parent_result_verified": true,
+      "parent_to_child_native_ack_verified": true,
+      "readonly_approvals": 2
+    },
+    {
+      "bidirectional_messages_verified": true,
+      "chain_verified": true,
+      "child_file_effect_verified": false,
+      "cleanup_confirmed": true,
+      "cleanup_receipts": 2,
+      "cli_version": "0.156.1",
+      "event": "parent_child_finished",
+      "failure_code": null,
+      "gui_verified": false,
+      "passed": true,
+      "scope": "codex_01561_production_parent_child_duplex_inspect",
+      "test_only_candidate_01561": false
+    }
+  ],
+  "sources": [
+    {
+      "file": "codex-parent-duplex-v9.safe.json",
+      "sha256": "5a751e9445a97caccc834ad97005efb67152ce6389a0fffb36131abe47f4578a"
+    },
+    {
+      "file": "codex-parent-child-duplex-v9.ndjson",
+      "sha256": "f3b427f8c710b384bfa1876fe90210befe84daad6436a5dace3a06113ca2ea8b"
+    },
+    {
+      "file": "codex-parent-child-duplex-v9.metadata.json",
+      "sha256": "502e3c8337cf02f276553015ec658b2bbde87d7f99a51df4cf81dda9ab0762ba"
+    },
+    {
+      "file": "codex-parent-child-duplex-v9.test-output.txt",
+      "sha256": "fe7d940c656667d9b204b0d290d54e764bd8769e5ed63ce17962a7232f767089"
+    }
+  ]
+}

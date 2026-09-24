@@ -39,6 +39,8 @@ use crate::workspace::{Workspace, WorkspaceRegistry};
 ///   随通知一起 flush。
 pub struct NotificationsModel {
     notifications: NotificationItems,
+    /// 仅跟踪会话级审批提醒，避免后续会话更新清除已经替换它的终态通知。
+    session_attention_notifications: HashMap<EntityId, NotificationId>,
     /// 当前 turn 累积的 artifact;在终态(Success/Cancelled/Error)时 drain 进通知,
     /// InProgress 时清空。
     pub(crate) pending_artifacts: HashMap<AIConversationId, Vec<Artifact>>,
@@ -64,6 +66,7 @@ impl NotificationsModel {
 
         Self {
             notifications: NotificationItems::default(),
+            session_attention_notifications: HashMap::new(),
             pending_artifacts: HashMap::new(),
         }
     }
@@ -111,6 +114,31 @@ impl NotificationsModel {
         }
 
         match event {
+            CLIAgentSessionsModelEvent::AttentionRequested {
+                terminal_view_id,
+                agent,
+            } => {
+                let metadata = TerminalViewMetadata::lookup(*terminal_view_id, ctx);
+                let id = self.add_notification(
+                    crate::t!(
+                        "notifications-agent-needs-attention-title",
+                        agent = agent.display_name()
+                    ),
+                    crate::t!("notifications-waiting-for-input"),
+                    NotificationCategory::Request,
+                    NotificationSourceAgent::CLI {
+                        agent: *agent,
+                        is_ambient: metadata.is_ambient,
+                    },
+                    NotificationOrigin::CLISession(*terminal_view_id),
+                    *terminal_view_id,
+                    vec![],
+                    metadata.branch,
+                    ctx,
+                );
+                self.session_attention_notifications
+                    .insert(*terminal_view_id, id);
+            }
             CLIAgentSessionsModelEvent::Ended {
                 terminal_view_id, ..
             } => {
@@ -119,9 +147,22 @@ impl NotificationsModel {
                     ctx,
                 );
             }
+            CLIAgentSessionsModelEvent::SessionUpdated {
+                terminal_view_id, ..
+            } => {
+                if let Some(id) = self
+                    .session_attention_notifications
+                    .remove(terminal_view_id)
+                    && self.notifications.get_by_id(id).is_some()
+                {
+                    self.remove_notification_by_source(
+                        NotificationOrigin::CLISession(*terminal_view_id),
+                        ctx,
+                    );
+                }
+            }
             CLIAgentSessionsModelEvent::Started { .. }
-            | CLIAgentSessionsModelEvent::InputSessionChanged { .. }
-            | CLIAgentSessionsModelEvent::SessionUpdated { .. } => {}
+            | CLIAgentSessionsModelEvent::InputSessionChanged { .. } => {}
             CLIAgentSessionsModelEvent::StatusChanged {
                 terminal_view_id,
                 agent,
@@ -458,6 +499,10 @@ impl NotificationsModel {
         origin: NotificationOrigin,
         ctx: &mut ModelContext<Self>,
     ) {
+        if let NotificationOrigin::CLISession(terminal_view_id) = origin {
+            self.session_attention_notifications
+                .remove(&terminal_view_id);
+        }
         if self.notifications.remove_by_origin(origin) {
             ctx.emit(NotificationsEvent::NotificationUpdated);
         }
@@ -485,7 +530,7 @@ impl NotificationsModel {
         artifacts: Vec<Artifact>,
         branch: Option<String>,
         ctx: &mut ModelContext<Self>,
-    ) {
+    ) -> NotificationId {
         let is_visible = is_terminal_view_visible(terminal_view_id, ctx);
         let item = NotificationItem::new(
             title,
@@ -500,8 +545,13 @@ impl NotificationsModel {
         );
 
         let id = item.id;
+        if let NotificationOrigin::CLISession(terminal_view_id) = origin {
+            self.session_attention_notifications
+                .remove(&terminal_view_id);
+        }
         self.notifications.push(item);
         ctx.emit(NotificationsEvent::NotificationAdded { id });
+        id
     }
 }
 
@@ -575,3 +625,7 @@ fn active_focused_terminal_id(app: &AppContext) -> Option<EntityId> {
     let workspace = workspace.as_ref(app);
     workspace.active_terminal_id(app)
 }
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;

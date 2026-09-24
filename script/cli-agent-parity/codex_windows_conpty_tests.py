@@ -7,6 +7,9 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
+
+import probe_codex_windows_conpty as conpty_probe
 
 from probe_codex_windows_conpty import (WinApi, environment_block, notifications,
                                          read_shell_diagnostics, require_candidate_contract,
@@ -38,6 +41,25 @@ def osc(event, session='native-session-unique', turn='native-turn-unique', termi
 
 
 class ConptyProbeTests(unittest.TestCase):
+    def test_driver_rejects_parent_version_mismatch_before_creating_conpty(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / 'driver.json'
+            for version, cli in (('0.156.1', 'codex-cli 0.147.0'),
+                                 ('0.147.0', 'codex-cli 0.156.1'),
+                                 ('latest', 'codex-cli 0.156.1')):
+                with self.subTest(version=version, cli=cli):
+                    config.write_text(json.dumps({'codex_version': version, 'cli': cli}), encoding='utf-8')
+                    with patch.object(conpty_probe, 'WinApi') as api, self.assertRaises(ValueError):
+                        conpty_probe.run_driver(config)
+                    api.assert_not_called()
+            for version in ('0.147.0', '0.156.1'):
+                config.write_text(json.dumps({'codex_version': version, 'cli': f'codex-cli {version}'}),
+                                  encoding='utf-8')
+                with patch.object(conpty_probe, 'WinApi', side_effect=RuntimeError('offline-boundary')) as api:
+                    with self.assertRaisesRegex(RuntimeError, 'offline-boundary'):
+                        conpty_probe.run_driver(config)
+                    api.assert_called_once_with()
+
     def test_formal_transport_uses_rpc_text_without_wrapper_markers(self):
         for prompt in ('中文\nEnglish', '中文\r\nEnglish', 'literal \\r\\n'):
             case = formal_case(prompt)

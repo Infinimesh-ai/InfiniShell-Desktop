@@ -13,6 +13,7 @@ import time
 import tomllib
 
 import run_grok_native_skill as native
+import run_grok_fixed_policy as fixed
 
 lease, isolation, official, shared = native.lease, native.isolation, native.official, native.shared
 CURRENT = official.PROFILES[official.CURRENT_ROOT_PROFILE]
@@ -40,17 +41,23 @@ def skill_document(sentinel):
 
 def started(mode):
     return {"event": "selected_skill_started", "scope": SCOPE, "case": mode,
-        "max_native_inputs": 0 if mode in CATALOG_MODES else 1,
+        "max_native_inputs": 0 if mode in CATALOG_MODES else 2 if mode == "leader_resume" else 1,
         "production_connect_path": True, "test_agent_profile_override": False, "fixture_project_trust": True,
         "typed_selected_skill": True, "secret_in_submitted_prompt": False, "credential_values_recorded": False}
 
 
 def validate_event(event):
     if (type(event) is not dict or type(event.get("case")) is not str
-            or event["case"] not in {"leader", "sdk"} | CATALOG_MODES or event.get("scope") != SCOPE):
+            or event["case"] not in {"leader", "leader_resume", "sdk"} | CATALOG_MODES or event.get("scope") != SCOPE):
         return False
     if event.get("event") == "selected_skill_started":
         return event == started(event["case"]) and type(event.get("max_native_inputs")) is int
+    if event.get("event") == "selected_skill_resume_confirmed":
+        return (set(event) == {"event", "scope", "case", "same_native_session", "native_session_sha256",
+                "verified_cli_version", "candidate_flags_used", "connections"}
+            and event["case"] == "leader_resume" and event["same_native_session"] is True
+            and native.is_hash(event["native_session_sha256"]) and event["verified_cli_version"] == "1.0.41"
+            and event["candidate_flags_used"] is False and type(event["connections"]) is int and event["connections"] == 2)
     if event.get("event") == "skill_catalog_observed":
         return native.validate_event(dict(event, scope=native.SCOPE, case="visible"))
     return (set(event) == BOOLS | COUNTERS | {"event", "scope", "case", "expected_sha256", "final_response_sha256"}
@@ -65,6 +72,27 @@ def observation(exit_code, events, mode, expected_hash):
         "product_selected_skill_combination_verified": False, "native_catalog_selected_path_seen_before_input": False,
         "catalog_transport_handshake_verified": False,
         "gui_composer_verified": False, "full_cli_parity_acceptance_passed": False}
+    if mode == "leader_resume":
+        if (type(exit_code) is not int or exit_code != 0 or len(events) != 6
+                or not all(validate_event(event) for event in events) or events[0] != started(mode)
+                or any(event["case"] != mode for event in events)
+                or events[-1]["event"] != "selected_skill_resume_confirmed" or not native.is_hash(expected_hash)):
+            return result
+        for catalog, end in ((events[1], events[2]), (events[3], events[4])):
+            before = [row for row in catalog.get("snapshots", []) if row["before_first_submit"]]
+            if (catalog["event"] != "skill_catalog_observed" or end["event"] != "selected_skill_finished"
+                    or catalog["overflow"] or not before
+                    or not all(before[-1][key] is True for key in ("path_matches_selected", "bare_name_matches"))
+                    or not all(end[key] is True for key in BOOLS - {"test_agent_profile_override", "full_cli_parity_acceptance_passed"})
+                    or end["test_agent_profile_override"] is not False or end["full_cli_parity_acceptance_passed"] is not False
+                    or end["submitted_input_count"] != 1 or end["accepted_input_count"] != 1 or end["native_context_read_count"] != 1
+                    or end["approval_count"] not in (0, 1) or end["native_tool_event_count"] < 1
+                    or end["expected_sha256"] != expected_hash or end["final_response_sha256"] != expected_hash):
+                return result
+        result.update(case_passed=True, default_entrypoint_verified=True,
+            product_selected_skill_combination_verified=True, native_catalog_selected_path_seen_before_input=True,
+            cold_selected_skill_restore_verified=True)
+        return result
     if (len(events) != 3 or not all(validate_event(event) for event in events) or events[0] != started(mode)
             or events[1]["event"] != "skill_catalog_observed" or events[2]["event"] != "selected_skill_finished"
             or any(event["case"] != mode for event in events) or not native.is_hash(expected_hash)):
@@ -100,7 +128,7 @@ def observation(exit_code, events, mode, expected_hash):
 def prepare_native(root, executable, source_home, port, mode, profile=CURRENT):
     if mode == "sdk":
         wrapper, settings = isolation.prepare_probe_native(root, executable, source_home, port)
-    elif mode in {"leader", "leader_catalog", "direct_catalog"}:
+    elif mode in {"leader", "leader_resume", "leader_catalog", "direct_catalog"}:
         wrapper, settings = official.prepare_native(root, executable, source_home, port,
             binary_sha256=profile["sha256"], model=profile["model"])
         code = wrapper.read_text(encoding="utf-8")
@@ -170,12 +198,13 @@ def audit_current_settings(before, after):
 
 
 def boundary_passed(metadata, launches, tunnel, mode):
-    expected = "private_leader" if mode in {"leader", "leader_catalog"} else "direct_agent"
+    expected = "private_leader" if mode in {"leader", "leader_resume", "leader_catalog"} else "direct_agent"
+    expected_launches = ["version"] + [expected, "version"] * (2 if mode == "leader_resume" else 1)
     return (metadata.get("test_exit_code") == 0 and metadata.get("timed_out") is not True
         and all(metadata.get(key) is True for key in ("tunnels_stopped", "private_auth_copy_removed",
             "original_auth_stat_unchanged", "project_snapshot_unchanged"))
         and metadata.get("private_settings_audit", {}).get("settings_scope_verified") is True
-        and sorted(row.get("kind", "") for row in launches) == sorted([expected, "version", "version"])
+        and sorted(row.get("kind", "") for row in launches) == sorted(expected_launches)
         and all(row.get("arguments_unchanged") is (row.get("kind") == "version")
             and row.get("synthetic_project_trust_requested") is (row.get("kind") != "version") for row in launches)
         and tunnel.forwarded <= lease.MAX_TLS_CONNECTIONS and tunnel.bytes <= lease.MAX_TLS_BYTES
@@ -213,7 +242,7 @@ def run(args):
     (root / "wrapper-audit.ndjson").touch(mode=0o600)
     before_auth = lease.auth_identity(args.official_grok_home)
     metadata = dict(observation(None, [], args.mode, expected_hash), scope=SCOPE, case=args.mode,
-        private_workspace=str(root), test_name=TEST_NAME, max_native_inputs=0 if catalog_only else 1, expected_sha256=expected_hash,
+        private_workspace=str(root), test_name=TEST_NAME, max_native_inputs=0 if catalog_only else 2 if args.mode == "leader_resume" else 1, expected_sha256=expected_hash,
         max_tls_connections=lease.MAX_TLS_CONNECTIONS, max_tls_bytes=lease.MAX_TLS_BYTES, deadline_seconds=args.timeout,
         test_agent_profile_override=False, fixture_project_trust=True, project_trust_scope="synthetic_project_only",
         trust_store_scope="private_home_only", native_profile_override=False, runtime_permission_policy="Inherit",
@@ -262,7 +291,15 @@ def run(args):
                     process.wait(timeout=20)
                     raise
             metadata["test_exit_code"] = process.returncode
-            events = native.read_events(raw)
+            if args.mode == "leader_resume":
+                body = isolation.private_bytes(raw, 256 * 1024)
+                events = [json.loads(line, object_pairs_hook=lease._pairs,
+                    parse_constant=lambda value: (_ for _ in ()).throw(ValueError("非有限 JSON")))
+                    for line in body.decode("utf-8").splitlines() if line.strip()]
+                if len(events) > 6 or any(type(event) is not dict for event in events):
+                    raise ValueError("技能恢复证据超出固定事件合同")
+            else:
+                events = native.read_events(raw)
             metadata.update(observation(process.returncode, events, args.mode, expected_hash))
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             metadata["case_passed"] = False
@@ -305,22 +342,26 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("test-binary", "grok", "supervisor", "official-grok-home", "output"):
         parser.add_argument("--" + option, type=Path, required=True)
-    parser.add_argument("--mode", choices=("leader", "leader_catalog", "direct_catalog"), required=True)
+    parser.add_argument("--mode", choices=("leader", "leader_resume", "leader_catalog", "direct_catalog"), required=True)
     parser.add_argument("--max-native-inputs", type=int, default=1)
     parser.add_argument("--test-candidate-1041-catalog", action="store_true")
     parser.add_argument("--test-candidate-1041-turn", action="store_true")
     parser.add_argument("--timeout", type=int, default=lease.MAX_DEADLINE)
     args = parser.parse_args()
     try:
-        if args.max_native_inputs != (0 if args.mode in CATALOG_MODES else 1):
+        if args.max_native_inputs != (0 if args.mode in CATALOG_MODES else 2 if args.mode == "leader_resume" else 1):
             raise ValueError("模型输入预算与入口类型不匹配")
         if args.test_candidate_1041_catalog and args.mode != "leader_catalog":
             raise ValueError("1.0.41 候选仅允许零输入默认 leader 目录")
         if args.test_candidate_1041_turn and (args.test_candidate_1041_catalog or args.mode != "leader"):
             raise ValueError("1.0.41 回合候选仅允许一次输入默认 leader")
         profile = CANDIDATE_1041 if args.test_candidate_1041_catalog or args.test_candidate_1041_turn else CURRENT
-        isolation.validate_paths(args, profile["sha256"],
-            expected_inputs=0 if args.mode in CATALOG_MODES else 1)
+        if args.mode == "leader_resume":
+            fixed.validate_paths(args, max_native_inputs=2, max_deadline=2 * lease.MAX_DEADLINE,
+                expected_sha256=profile["sha256"])
+        else:
+            isolation.validate_paths(args, profile["sha256"],
+                expected_inputs=0 if args.mode in CATALOG_MODES else 1)
         return run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         parser.exit(2, f"默认技能运行器启动失败：{type(error).__name__}\n")

@@ -1,12 +1,15 @@
 use std::fs;
 
+use base64::Engine as _;
 use serde_json::json;
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 use sha2::{Digest as _, Sha256};
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 use warpui::r#async::FutureExt as _;
 
 use super::*;
+use crate::terminal::cli_agent_sessions::event::{CLI_AGENT_NOTIFICATION_SENTINEL, parse_event};
+use crate::terminal::cli_agent_sessions::event_cursor::{EventCursor, EventDisposition};
 
 fn install_fixture(root: &std::path::Path) -> std::path::PathBuf {
     let source = write_bundle(&root.join("source")).unwrap();
@@ -51,12 +54,246 @@ fn install_fixture(root: &std::path::Path) -> std::path::PathBuf {
 }
 
 #[test]
+fn private_installer_source_scope_is_explicit_without_changing_native_defaults() {
+    let mut manager = GrokPluginManager::new(None);
+    assert_eq!(
+        manager.source_root().unwrap(),
+        bundled_source_root().unwrap()
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory
+        .path()
+        .join("隔离 appdata/InfiniShell/cli-agent-plugins/grok");
+    manager.test_source_root = Some(source.clone());
+    assert_eq!(manager.source_root().unwrap(), source);
+    assert!(!source.exists());
+    manager.test_source_root = Some(PathBuf::from("relative-source"));
+    assert!(manager.source_root().is_err());
+}
+
+#[test]
 fn native_registry_reads_verified_installed_files() {
     let directory = tempfile::tempdir().unwrap();
     let installed = install_fixture(directory.path());
     let plugin = installed_plugin(directory.path()).unwrap().unwrap();
     assert_eq!(plugin.path, installed);
     assert_eq!(plugin.version, PLUGIN_VERSION);
+}
+
+#[test]
+fn startup_bridge_preserves_user_hooks_and_config_across_repeat_install() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    fs::create_dir(root.join("hooks")).unwrap();
+    fs::write(root.join("hooks/user.json"), "用户 hook 原件").unwrap();
+    let before = fs::read(root.join("config.toml")).unwrap();
+    let executable = &root.join("固定 cli/grok");
+    let node = &root.join("运行 时/node");
+    install_startup_bridge(root, executable, node).unwrap();
+    assert!(startup_bridge_current(root, executable, node));
+    let first = fs::read(root.join("hooks/infinishell-1.0.41.json")).unwrap();
+    install_startup_bridge(root, executable, node).unwrap();
+    assert_eq!(
+        fs::read(root.join("hooks/infinishell-1.0.41.json")).unwrap(),
+        first
+    );
+    assert_eq!(fs::read(root.join("config.toml")).unwrap(), before);
+    assert_eq!(
+        fs::read_to_string(root.join("hooks/user.json")).unwrap(),
+        "用户 hook 原件"
+    );
+}
+
+#[test]
+fn windows_startup_bridge_keeps_shell_metacharacters_inside_encoded_arguments() {
+    let paths = [
+        r"C:\固定 Node\node.exe",
+        r"C:\space ' & %PATH%\bridge.cjs",
+        r"C:\grok.exe",
+        r"C:\插件$(`x)\",
+    ];
+    let command = windows_startup_bridge_command(&paths).unwrap();
+    let encoded = command
+        .strip_prefix("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand ")
+        .unwrap();
+    assert!(
+        encoded
+            .bytes()
+            .all(|value| value.is_ascii_alphanumeric() || matches!(value, b'+' | b'/' | b'='))
+    );
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .unwrap();
+    let source = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    for path in paths {
+        assert!(source.contains(&format!("'{}'", path.replace('\'', "''"))));
+    }
+    assert!(source.contains("$info.RedirectStandardInput = $false"));
+    assert!(source.contains("$info.CreateNoWindow = $false"));
+    let template =
+        include_str!("../../../../../script/cli-agent-parity/codex_windows_hook_command.ps1");
+    assert!(
+        source.starts_with(
+            template
+                .split_once("# BEGIN_NOTIFICATION_LAUNCH")
+                .unwrap()
+                .0
+        )
+    );
+    assert!(windows_startup_bridge_command(&["one", "two", "three"]).is_err());
+    assert!(windows_startup_bridge_command(&["one", "two", "three", "bad\0path"]).is_err());
+    assert!(windows_startup_bridge_command(&[&"x".repeat(4000), "two", "three", "four"]).is_err());
+}
+
+fn legacy_startup_bridge_bytes() -> Vec<u8> {
+    // 反向还原唯一已发布补桥；完整摘要确保测试没有自行定义更宽的“旧版”。
+    let text = String::from_utf8(STARTUP_BRIDGE_SCRIPT.to_vec())
+        .unwrap()
+        .replace(
+            "全局源只补固定桌面版本的加载缺口",
+            "全局源只补固定 Mac 版本的加载缺口",
+        )
+        .replace(
+            "![\"darwin\", \"linux\", \"win32\"].includes(process.platform)",
+            "process.platform !== \"darwin\"",
+        )
+        .replace(
+            "maxBuffer: 1024 * 1024, windowsHide: true,",
+            "maxBuffer: 1024 * 1024,",
+        );
+    assert_eq!(
+        format!("{:x}", Sha256::digest(text.as_bytes())),
+        LEGACY_STARTUP_BRIDGE_SHA256
+    );
+    text.into_bytes()
+}
+
+#[test]
+fn startup_bridge_upgrades_only_the_known_old_script_with_its_exact_json_pair() {
+    for mutation in ["none", "script", "json", "backup", "disabled"] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        install_fixture(root);
+        let executable = root.join("固定 cli/grok");
+        let node = root.join("运行 时/node");
+        let files = startup_bridge_files(root, &executable, &node).unwrap();
+        fs::create_dir(root.join("hooks")).unwrap();
+        let old = legacy_startup_bridge_bytes();
+        fs::write(&files[0].0, &old).unwrap();
+        fs::write(&files[1].0, &files[1].1).unwrap();
+        match mutation {
+            "none" => {}
+            "script" => fs::write(&files[0].0, "用户修改").unwrap(),
+            "json" => fs::write(&files[1].0, "用户修改").unwrap(),
+            "backup" => fs::write(files[0].0.with_extension("cjs.previous"), "用户修改").unwrap(),
+            "disabled" => fs::write(
+                root.join("config.toml"),
+                "[plugins]\ndisabled=['infinishell-grok']\n",
+            )
+            .unwrap(),
+            other => panic!("未知夹具 {other}"),
+        }
+        let before = files
+            .iter()
+            .map(|(path, _)| fs::read(path).unwrap())
+            .collect::<Vec<_>>();
+        let result = install_startup_bridge(root, &executable, &node);
+        if mutation == "none" {
+            result.unwrap();
+            assert!(startup_bridge_current(root, &executable, &node));
+            assert_eq!(
+                fs::read(files[0].0.with_extension("cjs.previous")).unwrap(),
+                old
+            );
+            install_startup_bridge(root, &executable, &node).unwrap();
+        } else {
+            assert!(result.is_err(), "{mutation}");
+            assert_eq!(
+                files
+                    .iter()
+                    .map(|(path, _)| fs::read(path).unwrap())
+                    .collect::<Vec<_>>(),
+                before
+            );
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn startup_bridge_does_not_upgrade_a_symlinked_legacy_script() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let files = startup_bridge_files(root, &root.join("grok"), &root.join("node")).unwrap();
+    fs::create_dir(root.join("hooks")).unwrap();
+    let target = root.join("user-script");
+    let old = legacy_startup_bridge_bytes();
+    fs::write(&target, &old).unwrap();
+    std::os::unix::fs::symlink(&target, &files[0].0).unwrap();
+    fs::write(&files[1].0, &files[1].1).unwrap();
+    assert!(install_startup_bridge(root, &root.join("grok"), &root.join("node")).is_err());
+    assert_eq!(fs::read(target).unwrap(), old);
+}
+
+#[test]
+fn startup_bridge_refuses_conflicting_json_before_publishing_script() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    fs::create_dir(root.join("hooks")).unwrap();
+    let conflict = root.join("hooks/infinishell-1.0.41.json");
+    fs::write(&conflict, "用户同名文件").unwrap();
+    assert!(install_startup_bridge(root, &root.join("grok"), &root.join("node")).is_err());
+    assert_eq!(fs::read_to_string(conflict).unwrap(), "用户同名文件");
+    assert!(!root.join("hooks/infinishell-1.0.41.cjs").exists());
+}
+
+#[test]
+fn startup_bridge_refuses_disabled_plugin_without_creating_hooks() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    fs::write(
+        root.join("config.toml"),
+        "[plugins]\ndisabled=['infinishell-grok']\n",
+    )
+    .unwrap();
+    assert!(install_startup_bridge(root, &root.join("grok"), &root.join("node")).is_err());
+    assert!(!root.join("hooks").exists());
+    assert!(plugin_disabled(root).unwrap());
+}
+
+#[cfg(unix)]
+#[test]
+fn startup_bridge_does_not_follow_hook_directory_symlink() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let outside = tempfile::tempdir().unwrap();
+    std::os::unix::fs::symlink(outside.path(), root.join("hooks")).unwrap();
+    assert!(install_startup_bridge(root, &root.join("grok"), &root.join("node")).is_err());
+    assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn startup_bridge_and_reloaded_plugin_same_event_notifies_only_once() {
+    let mut cursor = EventCursor::default();
+    let prompt = parse_event(Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+        r#"{"v":1,"agent":"grok","event":"prompt_submit","session_id":"native","prompt_id":"turn","event_id":"same-prompt"}"#).unwrap();
+    let stop = parse_event(Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+        r#"{"v":1,"agent":"grok","event":"stop","session_id":"native","prompt_id":"turn","event_id":"same-stop"}"#).unwrap();
+    assert_eq!(cursor.accept(&prompt), EventDisposition::Accept);
+    assert_eq!(cursor.accept(&prompt), EventDisposition::Drop);
+    assert_eq!(cursor.accept(&stop), EventDisposition::Accept);
+    assert_eq!(cursor.accept(&stop), EventDisposition::Drop);
 }
 
 const LEGACY_HOOKS: &str =
@@ -235,6 +472,217 @@ fn modified_011_notification_or_readme_cannot_be_upgraded_as_owned_source() {
         fs::write(source.join(name), "用户修改").unwrap();
         assert!(validate_expected_tree(&source, "0.1.1").is_err());
         assert_eq!(fs::read_to_string(source.join(name)).unwrap(), "用户修改");
+    }
+}
+
+fn write_013_bundle(root: &Path) -> PathBuf {
+    let source = root.join("0.1.3");
+    for (name, contents) in [
+        (
+            ".grok-plugin/plugin.json",
+            include_str!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-plugin.json"
+            ),
+        ),
+        ("hooks/hooks.json", BUNDLED_FILES[1].1),
+        (
+            "hooks/notify.cjs",
+            include_str!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-notify.cjs"
+            ),
+        ),
+        (
+            "README.md",
+            include_str!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-README.md"
+            ),
+        ),
+    ] {
+        let destination = source.join(name);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::write(destination, contents).unwrap();
+    }
+    source
+}
+
+#[test]
+fn known_013_recipe_is_preserved_and_modified_files_cannot_acquire_ownership() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = write_013_bundle(directory.path());
+    let original = validate_expected_tree(&source, "0.1.3").unwrap();
+    let backup = backup_plugin(&source, directory.path()).unwrap();
+    write_bundle(directory.path()).unwrap();
+    assert_eq!(validate_expected_tree(&backup, "0.1.3").unwrap(), original);
+    assert!(validate_expected_tree(&source, PLUGIN_VERSION).is_err());
+    for (name, _) in LEGACY_013_SHA256 {
+        let path = source.join(name);
+        let bytes = fs::read(&path).unwrap();
+        let mut changed = bytes.clone();
+        changed.push(b' ');
+        fs::write(&path, &changed).unwrap();
+        assert!(validate_expected_tree(&source, "0.1.3").is_err());
+        assert_eq!(fs::read(&path).unwrap(), changed);
+        fs::write(&path, bytes).unwrap();
+    }
+    assert_eq!(validate_expected_tree(&source, "0.1.3").unwrap(), original);
+}
+
+#[test]
+fn bridge_migration_recovers_registry_commit_before_json_and_rejects_modified_bindings() {
+    for mutation in [
+        "none",
+        "json_digest",
+        "script_digest",
+        "target_version",
+        "source",
+        "json",
+        "script",
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let old_cache = install_fixture(root);
+        let source_root = root.join("source");
+        let old_source = write_013_bundle(&source_root);
+        for (name, _) in BUNDLED_FILES {
+            fs::copy(old_source.join(name), old_cache.join(name)).unwrap();
+        }
+        let registry_path = root.join("installed-plugins/registry.json");
+        let mut registry: Value =
+            serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+        registry["repos"]["source-one"]["kind"]["source_path"] = json!(old_source);
+        registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("0.1.3");
+        fs::write(&registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        let executable = root.join("grok");
+        let node = root.join("node");
+        let files = startup_bridge_files(root, &executable, &node).unwrap();
+        fs::create_dir(root.join("hooks")).unwrap();
+        fs::write(&files[0].0, legacy_startup_bridge_bytes()).unwrap();
+        fs::write(&files[1].0, &files[1].1).unwrap();
+        let old = installed_plugin(root).unwrap().unwrap();
+        persist_startup_bridge_migration(root, &executable, &node, &old, &source_root).unwrap();
+        let record_path = startup_bridge_migration_path(root);
+        let original_record = fs::read(&record_path).unwrap();
+        let new_source = write_bundle(&source_root).unwrap();
+        let new_cache = root.join("installed-plugins/source-two");
+        fs::create_dir(&new_cache).unwrap();
+        for (name, _) in BUNDLED_FILES {
+            let destination = new_cache.join(name);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::copy(new_source.join(name), destination).unwrap();
+        }
+        let mut entry = registry["repos"]
+            .as_object_mut()
+            .unwrap()
+            .remove("source-one")
+            .unwrap();
+        entry["path"] = json!(new_cache);
+        entry["kind"]["source_path"] = json!(new_source);
+        entry["plugins"][PLUGIN_NAME]["version"] = json!(PLUGIN_VERSION);
+        registry["repos"]["source-two"] = entry;
+        fs::write(&registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        fs::remove_dir_all(old_cache).unwrap();
+        // 模拟原生注册提交后立即崩溃；重进程没有前次内存中的旧 JSON。
+        let mut record: Value = serde_json::from_slice(&original_record).unwrap();
+        match mutation {
+            "none" => {}
+            "json_digest" => record["old_json_sha256"] = json!("0".repeat(64)),
+            "script_digest" => record["old_script_sha256"] = json!("0".repeat(64)),
+            "target_version" => record["target_version"] = json!("0.1.5"),
+            "source" => fs::write(old_source.join("hooks/notify.cjs"), "用户修改").unwrap(),
+            "json" => fs::write(&files[1].0, "用户修改").unwrap(),
+            "script" => fs::write(&files[0].0, "用户修改").unwrap(),
+            other => panic!("未知夹具 {other}"),
+        }
+        fs::write(&record_path, serde_json::to_vec(&record).unwrap()).unwrap();
+        let before = [
+            fs::read(&files[0].0).unwrap(),
+            fs::read(&files[1].0).unwrap(),
+        ];
+        let resumed = pending_startup_bridge_migration(root, &executable, &node, &source_root)
+            .and_then(|pending| {
+                let (_, previous_json) = pending.ok_or_else(invalid_tree)?;
+                migrate_startup_bridge(root, &executable, &node, &previous_json)
+            });
+        if mutation == "none" {
+            resumed.unwrap();
+            assert!(startup_bridge_current(root, &executable, &node));
+            assert!(record_path.is_file());
+            // JSON 和脚本已完成、标记尚未删除的中断同样可以幂等续修。
+            let (_, previous_json) =
+                pending_startup_bridge_migration(root, &executable, &node, &source_root)
+                    .unwrap()
+                    .unwrap();
+            migrate_startup_bridge(root, &executable, &node, &previous_json).unwrap();
+        } else {
+            assert!(resumed.is_err(), "{mutation}");
+            assert_eq!(
+                [
+                    fs::read(&files[0].0).unwrap(),
+                    fs::read(&files[1].0).unwrap()
+                ],
+                before
+            );
+        }
+    }
+}
+
+#[test]
+fn startup_bridge_migration_binds_the_prior_verified_cache_and_preserves_user_edits() {
+    for changed_json in [false, true] {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let installed = install_fixture(root);
+        let executable = root.join("grok");
+        let node = root.join("node");
+        let old_files = startup_bridge_files(root, &executable, &node).unwrap();
+        fs::create_dir(root.join("hooks")).unwrap();
+        fs::write(&old_files[0].0, legacy_startup_bridge_bytes()).unwrap();
+        fs::write(&old_files[1].0, &old_files[1].1).unwrap();
+        let previous = capture_startup_bridge(root, &executable, &node)
+            .unwrap()
+            .unwrap();
+        let registry_path = root.join("installed-plugins/registry.json");
+        let mut registry: Value =
+            serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+        let next = root.join("installed-plugins/source-two");
+        fs::rename(installed, &next).unwrap();
+        let mut entry = registry["repos"]
+            .as_object_mut()
+            .unwrap()
+            .remove("source-one")
+            .unwrap();
+        entry["path"] = json!(next);
+        registry["repos"]["source-two"] = entry;
+        fs::write(registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+        if changed_json {
+            fs::write(&old_files[1].0, "用户修改").unwrap();
+        }
+        let result = migrate_startup_bridge(root, &executable, &node, &previous);
+        if changed_json {
+            assert!(result.is_err());
+            assert_eq!(fs::read(&old_files[1].0).unwrap(), "用户修改".as_bytes());
+            assert_eq!(
+                fs::read(&old_files[0].0).unwrap(),
+                legacy_startup_bridge_bytes()
+            );
+        } else {
+            result.unwrap();
+            assert!(startup_bridge_current(root, &executable, &node));
+            let digest = format!("{:x}", Sha256::digest(&previous));
+            assert_eq!(
+                fs::read(
+                    old_files[1]
+                        .0
+                        .with_extension(format!("json.{digest}.previous"))
+                )
+                .unwrap(),
+                previous
+            );
+            // 模拟 JSON 已写、脚本未写即中断；不依赖旧 registry 搜索也可继续完成。
+            fs::write(&old_files[0].0, legacy_startup_bridge_bytes()).unwrap();
+            install_startup_bridge(root, &executable, &node).unwrap();
+            assert!(startup_bridge_current(root, &executable, &node));
+        }
     }
 }
 
@@ -973,6 +1421,26 @@ fn only_tested_grok_and_supported_node_versions_pass_runtime_probe() {
 }
 
 #[test]
+fn current_grok_notification_contract_is_limited_to_exact_desktop_version() {
+    assert_eq!(
+        runtime_is_compatible("grok 1.0.41 (4220f3b224a6)\n", "v22.18.0\n"),
+        cfg!(any(
+            target_os = "macos",
+            target_os = "linux",
+            target_os = "windows"
+        ))
+    );
+    for version in ["1.0.40", "1.0.42", "1.0.41-beta"] {
+        assert!(!runtime_is_compatible(
+            &format!("grok {version}\n"),
+            "v22.18.0\n"
+        ));
+    }
+    assert!(!runtime_is_compatible("grok 1.0.41\n", "v16.20.0\n"));
+    assert!(!runtime_is_compatible("other 1.0.41\n", "v22.18.0\n"));
+}
+
+#[test]
 fn remote_install_instructions_do_not_substitute_local_enable_only_instructions() {
     use super::{CliAgentPluginManager, GrokPluginManager};
     let instructions = GrokPluginManager::new(None).remote_install_instructions();
@@ -1277,7 +1745,7 @@ fn symlinks_and_hardlinks_cannot_redirect_plugin_repairs() {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 #[tokio::test]
 #[ignore = "仅供独立无凭据进程运行，必须显式提供私有目录及固定 Grok/Node 摘要"]
 async fn live_grok_production_installer_repairs_and_preserves_disable() {
@@ -1289,7 +1757,51 @@ async fn live_grok_production_installer_repairs_and_preserves_disable() {
     .expect("真实 Grok 插件验收超时");
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(windows)]
+async fn windows_startup_bridge_argv_probe(
+    manager: &GrokPluginManager,
+    node: &Path,
+    root: &Path,
+) -> Value {
+    // 只验证真实启动层的 argv；此节点脚本不冒充原生 hook 派发或通知 worker。
+    let script = root.join("参数 ' 空格 & 目录.cjs");
+    fs::write(&script, "process.stdout.write(JSON.stringify(process.argv.slice(2).map(x=>Buffer.from(x,'utf8').toString('base64'))));").unwrap();
+    let arguments = [r"C:\固定 grok\grok.exe", r"C:\插件 '$ %PATH% ! & 目录\"];
+    let command = windows_startup_bridge_command(&[
+        node.to_str().unwrap(),
+        script.to_str().unwrap(),
+        arguments[0],
+        arguments[1],
+    ])
+    .unwrap();
+    let system_root = PathBuf::from(env::var_os("SYSTEMROOT").unwrap());
+    let shells = [
+        (system_root.join("System32/cmd.exe"), vec!["/d", "/s", "/c"]),
+        (
+            system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe"),
+            vec!["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"],
+        ),
+    ];
+    for (executable, flags) in shells {
+        let mut log = String::new();
+        let mut args = flags.into_iter().map(OsStr::new).collect::<Vec<_>>();
+        args.push(OsStr::new(&command));
+        let output = manager
+            .run(&executable, &args, Duration::from_secs(10), &mut log)
+            .await
+            .unwrap();
+        let actual: Vec<String> = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(
+            actual,
+            arguments.map(|value| base64::engine::general_purpose::STANDARD.encode(value))
+        );
+    }
+    fs::remove_file(script).unwrap();
+    json!({"kind":"windows_bridge_argv", "cmd_verified":true, "powershell_51_verified":true,
+        "space_unicode_and_shell_metacharacters_preserved":true, "native_hook_execution_verified":false})
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 async fn installed_hook_export_version_probe(
     manager: &GrokPluginManager,
     node: &Path,
@@ -1359,7 +1871,7 @@ process.stdout.write(JSON.stringify(hook.makeNotification(input, {})));
     })
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 async fn run_live_grok_production_installer() {
     let test_name = "terminal::cli_agent_sessions::plugin_manager::grok::tests::live_grok_production_installer_repairs_and_preserves_disable";
     let arguments = env::args().collect::<Vec<_>>();
@@ -1402,20 +1914,32 @@ async fn run_live_grok_production_installer() {
         env::current_dir().unwrap().canonicalize().unwrap(),
         root.join("work")
     );
+    #[cfg(not(windows))]
     assert_eq!(
         dirs::home_dir().unwrap().canonicalize().unwrap(),
         root.join("home")
     );
+    #[cfg(not(windows))]
     let data_root = dirs::data_local_dir().unwrap().canonicalize().unwrap();
+    #[cfg(windows)]
+    let data_root = PathBuf::from(env::var_os("LOCALAPPDATA").unwrap())
+        .canonicalize()
+        .unwrap();
     assert!(data_root.starts_with(root.join("home")));
-    let source_root = bundled_source_root().unwrap();
+    let manager = GrokPluginManager::new(Some(env::var("PATH").unwrap()));
+    #[cfg(windows)]
+    let manager = {
+        let mut manager = manager;
+        manager.test_source_root = Some(data_root.join("InfiniShell/cli-agent-plugins/grok"));
+        manager
+    };
+    let source_root = manager.source_root().unwrap();
     assert!(source_root.starts_with(&data_root) && !source_root.exists());
     let grok_home = grok_home_dir().unwrap().canonicalize().unwrap();
     assert_eq!(grok_home, root.join("home/.grok"));
     assert_eq!(fs::read_dir(&grok_home).unwrap().count(), 0);
     let artifact = root.join("grok-production-installer.json");
     assert!(!artifact.exists());
-    let manager = GrokPluginManager::new(Some(env::var("PATH").unwrap()));
     let mut evidence = json!({
         "passed": false, "credentials_provided": false, "model_input_submitted": false,
         "test_binary_sha256": format!("{:x}", Sha256::digest(fs::read(env::current_exe().unwrap()).unwrap())),
@@ -1435,7 +1959,7 @@ async fn run_live_grok_production_installer() {
     }
     fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
     let mut native_log = String::new();
-    let grok = manager.verify_runtime(&mut native_log).await.unwrap();
+    let (grok, _) = manager.verify_runtime(&mut native_log).await.unwrap();
     let node = manager.executable("node").unwrap();
     let output = manager
         .run(
@@ -1451,12 +1975,63 @@ async fn run_live_grok_production_installer() {
         node_version.trim(),
         env::var("INFINISHELL_GROK_PLUGIN_LIVE_NODE_VERSION").unwrap()
     );
-    evidence["grok_version"] = json!(TESTED_GROK_VERSION);
+    let output = manager
+        .run(
+            &grok,
+            &[OsStr::new("--version")],
+            Duration::from_secs(3),
+            &mut native_log,
+        )
+        .await
+        .unwrap();
+    let grok_version = String::from_utf8(output.stdout).unwrap();
+    assert!(runtime_is_compatible(&grok_version, &node_version));
+    evidence["grok_version"] = json!(
+        grok_version
+            .trim()
+            .strip_prefix("grok ")
+            .unwrap()
+            .split_whitespace()
+            .next()
+            .unwrap()
+    );
     evidence["node_version"] = json!(node_version.trim());
+    #[cfg(windows)]
+    {
+        evidence["windows_bridge_argv"] =
+            windows_startup_bridge_argv_probe(&manager, &node, &root).await;
+        fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
+    }
     assert!(!manager.is_installed());
 
     manager.install().await.unwrap();
     assert!(manager.is_installed() && !manager.needs_update());
+    let inspected = manager
+        .run(
+            &grok,
+            &[OsStr::new("inspect"), OsStr::new("--json")],
+            Duration::from_secs(5),
+            &mut native_log,
+        )
+        .await
+        .unwrap();
+    let inspected: Value = serde_json::from_slice(&inspected.stdout).unwrap();
+    assert_eq!(inspected["grokVersion"], evidence["grok_version"]);
+    let observed = inspected["plugins"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|plugin| plugin["name"] == PLUGIN_NAME)
+        .collect::<Vec<_>>();
+    assert_eq!(observed.len(), 1);
+    assert_eq!(observed[0]["enabled"], true);
+    assert_eq!(observed[0]["provides"]["hooks"], true);
+    assert_eq!(
+        observed[0]["path"],
+        json!(installed_plugin(&grok_home).unwrap().unwrap().path)
+    );
+    evidence["native_inspect_verified"] = json!(true);
+    evidence["native_hook_execution_verified"] = json!(false);
     let registry_path = grok_home.join("installed-plugins/registry.json");
     let config_path = grok_home.join("config.toml");
     let installed_hook_export = installed_hook_export_version_probe(
@@ -1474,8 +2049,8 @@ async fn run_live_grok_production_installer() {
     fs::write(&artifact, serde_json::to_vec_pretty(&evidence).unwrap()).unwrap();
 
     // 用完整旧配方建立原生升级夹具；下面仍由生产 update 完成升级。
-    let legacy_source = write_legacy_bundle(&source_root);
-    validate_expected_tree(&legacy_source, "0.1.0").unwrap();
+    let legacy_source = write_013_bundle(&source_root);
+    validate_expected_tree(&legacy_source, "0.1.3").unwrap();
     let legacy_source_before = plugin_tree(&legacy_source, false).unwrap();
     manager
         .run(
@@ -1496,14 +2071,20 @@ async fn run_live_grok_production_installer() {
         .await
         .unwrap();
     let old = installed_plugin(&grok_home).unwrap().unwrap();
-    assert_eq!(old.version, "0.1.0");
+    assert_eq!(old.version, "0.1.3");
     assert_eq!(old.source, legacy_source);
+    if grok_version.starts_with("grok 1.0.41 ") {
+        // 明确构造旧包对应的旧 bridge 配方，不把夹具发布动作算作生产升级。
+        let files = startup_bridge_files(&grok_home, &grok, &node).unwrap();
+        fs::write(&files[0].0, legacy_startup_bridge_bytes()).unwrap();
+        fs::write(&files[1].0, &files[1].1).unwrap();
+    }
     assert!(manager.is_installed() && manager.needs_update() && manager.can_auto_install());
     manager.update().await.unwrap();
     let plugin = installed_plugin(&grok_home).unwrap().unwrap();
     assert_eq!(plugin.version, PLUGIN_VERSION);
     assert!(manager.is_installed() && !manager.needs_update());
-    validate_expected_tree(&legacy_source, "0.1.0").unwrap();
+    validate_expected_tree(&legacy_source, "0.1.3").unwrap();
     assert_eq!(
         plugin_tree(&legacy_source, false).unwrap(),
         legacy_source_before
@@ -1516,9 +2097,9 @@ async fn run_live_grok_production_installer() {
     )
     .await;
     evidence["steps"].as_array_mut().unwrap().push(json!({
-        "step":"production_upgrade_known_010_to_011", "passed":true,
+        "step":"production_upgrade_known_013_to_014", "passed":true,
         "installed_hook_export":upgraded_hook_export, "installed_hook_main_verified":false,
-        "previous_plugin_version":"0.1.0", "current_plugin_version":PLUGIN_VERSION,
+        "previous_plugin_version":"0.1.3", "current_plugin_version":PLUGIN_VERSION,
         "legacy_source_unchanged":true, "fixture_old_native_install":true,
         "production_update_call":true, "model_input_submitted":false
     }));

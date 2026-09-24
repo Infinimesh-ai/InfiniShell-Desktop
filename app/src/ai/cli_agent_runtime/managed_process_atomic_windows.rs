@@ -2,8 +2,8 @@
 //!
 //! 本模块只接受来源层已经冻结身份的单个原生 PE。程序句柄不共享写入或删除，
 //! 从卷根到程序父目录的每一层都不共享删除；因此在 `CreateProcessW` 成功创建 image
-//! 以前，程序和部分祖先不能被替换、重命名或删除。Windows 实机已证明 cwd 叶目录
-//! 仍可被重命名，且调试事件退出闭包尚未收敛；产品入口必须继续保持 ManualOnly。
+//! 以前保持对象身份。目录必须申请真实读取访问参与共享删除检查；固定官方更新器
+//! 由来源层绑定固定安装布局；未知 helper 或 DLL 在放行调试事件前拒绝。
 
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -77,9 +77,56 @@ pub(super) struct WindowsReplacementLease {
     expected_sha256: String,
     ancestors: Vec<AncestorLease>,
     system_directory: AncestorLease,
+    powershell: Option<SystemHelperLease>,
 }
 
-/// 从卷根到 cwd 本身的身份租约；它不能阻止 Windows 重命名 cwd 叶目录。
+/// 固定系统 helper 的文件和祖先租约；不接受同目录其他程序或 DLL。
+#[derive(Debug)]
+struct SystemHelperLease {
+    program: File,
+    identity: LeasedIdentity,
+    sha256: String,
+    ancestors: Vec<AncestorLease>,
+}
+
+impl SystemHelperLease {
+    fn try_clone(&self) -> io::Result<Self> {
+        Ok(Self {
+            program: self.program.try_clone()?,
+            identity: self.identity,
+            sha256: self.sha256.clone(),
+            ancestors: self
+                .ancestors
+                .iter()
+                .map(|ancestor| {
+                    Ok(AncestorLease {
+                        file: ancestor.file.try_clone()?,
+                        identity: ancestor.identity,
+                    })
+                })
+                .collect::<io::Result<Vec<_>>>()?,
+        })
+    }
+
+    fn verify_image(&self, file: &File) -> io::Result<()> {
+        for ancestor in &self.ancestors {
+            if inspect_handle(&ancestor.file)? != ancestor.identity {
+                return Err(error(
+                    "managed_process.atomic_windows_helper_ancestor_changed",
+                ));
+            }
+        }
+        if inspect_handle(&self.program)? != self.identity
+            || inspect_handle(file)? != self.identity
+            || sha256_file(&mut file.try_clone()?)? != self.sha256
+        {
+            return Err(error("managed_process.atomic_windows_helper_image_changed"));
+        }
+        Ok(())
+    }
+}
+
+/// 从卷根到 cwd 本身持有参与共享删除检查的目录读取租约。
 #[derive(Debug)]
 pub(super) struct WindowsDirectoryLease {
     execution_path: PathBuf,
@@ -95,6 +142,7 @@ pub(super) struct WindowsImageDebugSession {
     expected_program_size: u64,
     expected_program_sha256: String,
     system_directory: AncestorLease,
+    powershell: Option<SystemHelperLease>,
     processes: HashMap<u32, OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
 }
@@ -194,6 +242,11 @@ impl WindowsReplacementLease {
                 file: self.system_directory.file.try_clone()?,
                 identity: self.system_directory.identity,
             },
+            powershell: self
+                .powershell
+                .as_ref()
+                .map(SystemHelperLease::try_clone)
+                .transpose()?,
             processes: HashMap::new(),
             initial_breakpoints: HashSet::new(),
         };
@@ -309,6 +362,10 @@ impl WindowsImageDebugSession {
         close_owned_handle(information.hThread)?;
         if root {
             self.verify_root_image(&file)
+        } else if let Some(helper) = &self.powershell
+            && inspect_handle(&file)?.id == helper.identity.id
+        {
+            helper.verify_image(&file)
         } else {
             self.verify_system_image(&file)
         }
@@ -464,6 +521,7 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<WindowsRepl
         ));
     }
 
+    let powershell = prepare_powershell(&system_directory)?;
     Ok(WindowsReplacementLease {
         execution_path,
         program,
@@ -471,6 +529,7 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<WindowsRepl
         expected_sha256: expected.sha256.clone(),
         ancestors,
         system_directory,
+        powershell,
     })
 }
 
@@ -542,8 +601,9 @@ fn open_program(path: &Path) -> io::Result<File> {
 fn open_ancestor(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options
-        .access_mode(FILE_READ_ATTRIBUTES.0)
-        // 允许目录内容的普通读写，但不共享 DELETE，锁定该目录自身的 rename/delete。
+        .access_mode(GENERIC_READ.0 | FILE_READ_ATTRIBUTES.0)
+        // 单独 READ_ATTRIBUTES 不参与共享删除检查；真实目录读取访问才能阻止叶目录替换。
+        // 允许目录内容的普通读写，但不共享 DELETE。
         .share_mode((FILE_SHARE_READ | FILE_SHARE_WRITE).0)
         .custom_flags((FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT).0);
     options.open(path)
@@ -562,6 +622,48 @@ fn inspect_handle(file: &File) -> io::Result<LeasedIdentity> {
         size: (u64::from(information.nFileSizeHigh) << 32) | u64::from(information.nFileSizeLow),
         attributes: information.dwFileAttributes,
     })
+}
+
+fn prepare_powershell(system_directory: &AncestorLease) -> io::Result<Option<SystemHelperLease>> {
+    let system_path = final_path_from_handle(&system_directory.file)?;
+    let mut ancestors = Vec::new();
+    let mut path = system_path;
+    for name in ["WindowsPowerShell", "v1.0"] {
+        path.push(name);
+        let file = match open_ancestor(&path) {
+            Ok(file) => file,
+            Err(failure) if failure.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(failure) => return Err(failure),
+        };
+        let identity = inspect_handle(&file)?;
+        if !is_plain_kind(identity.attributes, true) {
+            return Err(error(
+                "managed_process.atomic_windows_helper_parent_not_plain",
+            ));
+        }
+        ancestors.push(AncestorLease { file, identity });
+    }
+    path.push("powershell.exe");
+    let mut program = match open_program(&path) {
+        Ok(file) => file,
+        Err(failure) if failure.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(failure) => return Err(failure),
+    };
+    let identity = inspect_handle(&program)?;
+    if !is_plain_kind(identity.attributes, false) || identity.size == 0 {
+        return Err(error("managed_process.atomic_windows_helper_not_plain"));
+    }
+    require_pe(&mut program, identity.size)?;
+    let sha256 = sha256_file(&mut program)?;
+    if inspect_handle(&program)? != identity {
+        return Err(error("managed_process.atomic_windows_helper_image_changed"));
+    }
+    Ok(Some(SystemHelperLease {
+        program,
+        identity,
+        sha256,
+        ancestors,
+    }))
 }
 
 fn prepare_system_directory() -> io::Result<AncestorLease> {

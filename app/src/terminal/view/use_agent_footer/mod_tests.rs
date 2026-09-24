@@ -545,6 +545,133 @@ fn collect_cli_test_writes(
     writes
 }
 
+fn prepare_hook_bound_ssh_input(app: &mut App) -> ViewHandle<TerminalView> {
+    initialize_app_for_terminal_view(app);
+    app.add_singleton_model(|_| crate::workspace::ToastStack);
+    FeatureFlag::CodexPlugin.set_enabled(true);
+    let terminal = add_window_with_terminal(app, None);
+    terminal.update(app, |view, ctx| {
+        view.model
+            .lock()
+            .simulate_long_running_block("ssh -F /private/tmp/isolated-config -tt host direct", "");
+        {
+            let model = view.model.lock();
+            assert!(view.detect_cli_agent_from_model(&model, ctx).is_none());
+        }
+        view.handle_cli_agent_notification(
+            Some("warp://cli-agent"),
+            r#"{"v":1,"agent":"codex","event":"session_start","session_id":"native-ssh-session","plugin_version":"0.4.0"}"#,
+            ctx,
+        );
+    });
+    terminal
+}
+
+#[test]
+fn ssh_native_hook_allows_utf8_paste_without_submitting() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_hook_bound_ssh_input(&mut app);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            let generation = CLIAgentSessionsModel::as_ref(ctx)
+                .input_generation(view.view_id)
+                .unwrap();
+            assert!(view.insert_text_into_cli_agent_pty("中文验收\n第二行", generation, ctx));
+        });
+        assert_eq!(
+            *writes.borrow(),
+            vec!["\u{1b}[200~中文验收\n第二行\u{1b}[201~".as_bytes().to_vec()]
+        );
+    });
+}
+
+#[test]
+fn ssh_native_hook_cannot_authorize_a_later_command_block() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_hook_bound_ssh_input(&mut app);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            let generation = CLIAgentSessionsModel::as_ref(ctx)
+                .input_generation(view.view_id)
+                .unwrap();
+            {
+                let mut model = view.model.lock();
+                model.finish_block();
+                model.simulate_long_running_block("ssh -tt different-host sh", "");
+            }
+            assert!(!view.insert_text_into_cli_agent_pty("不得写入后续命令", generation, ctx));
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn ssh_input_generation_rotation_rejects_stale_paste_but_accepts_fresh_input() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_hook_bound_ssh_input(&mut app);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            let stale_generation = CLIAgentSessionsModel::as_ref(ctx)
+                .input_generation(view.view_id)
+                .unwrap();
+            let generation = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                sessions.observe_ctrl_c_write(view.view_id, ctx);
+                sessions.input_generation(view.view_id).unwrap()
+            });
+            assert!(!view.insert_text_into_cli_agent_pty("过期输入", stale_generation, ctx));
+            assert!(view.insert_text_into_cli_agent_pty("新的输入", generation, ctx));
+        });
+        assert_eq!(
+            *writes.borrow(),
+            vec!["\u{1b}[200~新的输入\u{1b}[201~".as_bytes().to_vec()]
+        );
+    });
+}
+
+#[test]
+fn ssh_native_hook_cannot_authorize_a_replacement_native_session() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_hook_bound_ssh_input(&mut app);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            let mut replacement = CLIAgentSessionsModel::as_ref(ctx)
+                .session(view.view_id)
+                .unwrap()
+                .clone();
+            replacement.session_context.session_id = Some("replacement-native-session".to_owned());
+            let generation = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                sessions.set_session(view.view_id, replacement, ctx);
+                sessions.input_generation(view.view_id).unwrap()
+            });
+            assert!(!view.insert_text_into_cli_agent_pty("不得沿用旧会话绑定", generation, ctx));
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn ssh_session_label_without_native_hook_cannot_authorize_paste() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            {
+                let mut model = view.model.lock();
+                model.finish_block();
+                model.simulate_long_running_block(
+                    "ssh -F /private/tmp/isolated-config -tt host direct",
+                    "",
+                );
+            }
+            let generation = CLIAgentSessionsModel::as_ref(ctx)
+                .input_generation(view.view_id)
+                .unwrap();
+            assert!(!view.insert_text_into_cli_agent_pty("仅标签不可放行", generation, ctx));
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
 fn submit_cli_test_input(terminal: &ViewHandle<TerminalView>, app: &mut App, text: &str) {
     terminal.update(app, |view, ctx| {
         view.input.update(ctx, |input, ctx| {
