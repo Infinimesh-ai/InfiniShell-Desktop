@@ -110,14 +110,50 @@ impl Renderer {
         let surface_texture = resources.get_surface_texture()?;
 
         let mut encoder = device.create_command_encoder(&ENCODER_DESCRIPTOR);
-        let (_, error) = with_error_scope(device, || {
-            frame.draw(resources, &mut encoder, &surface_texture);
+        let (backing_texture, error) = with_error_scope(device, || {
+            // 部分 GL surface 只支持渲染；截图时先渲染到可读纹理，再把同一帧画到真实窗口。
+            let backing_texture = (capture_callback.is_some()
+                && !surface_texture
+                    .texture
+                    .usage()
+                    .contains(wgpu::TextureUsages::COPY_SRC))
+            .then(|| {
+                device.create_texture(&wgpu::TextureDescriptor {
+                    label: Some("Frame capture backing texture"),
+                    size: surface_texture.texture.size(),
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: surface_texture.texture.format(),
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                        | wgpu::TextureUsages::TEXTURE_BINDING
+                        | wgpu::TextureUsages::COPY_SRC,
+                    view_formats: &[],
+                })
+            });
+            let render_target = backing_texture.as_ref().unwrap_or(&surface_texture.texture);
+            frame.draw(resources, &mut encoder, render_target);
+            if let Some(texture) = &backing_texture {
+                // 默认最近邻且不混合，保留截图纹理的颜色与透明度；不要求 surface 支持 COPY_DST。
+                wgpu::util::TextureBlitter::new(device, surface_texture.texture.format()).copy(
+                    device,
+                    &mut encoder,
+                    &texture.create_view(&Default::default()),
+                    &surface_texture.texture.create_view(&Default::default()),
+                );
+            }
             queue.submit(Some(encoder.finish()));
+            backing_texture
         });
 
-        if let Some(callback) = capture_callback
-            && let Err(err) =
-                capture_surface_texture(device, queue, resources, &surface_texture, callback)
+        if error.is_none()
+            && let Some(callback) = capture_callback
+            && let Err(err) = capture_texture(
+                device,
+                queue,
+                backing_texture.as_ref().unwrap_or(&surface_texture.texture),
+                callback,
+            )
         {
             log::warn!("Frame capture failed: {err}");
         }
@@ -181,19 +217,13 @@ impl From<wgpu::Error> for Error {
     }
 }
 
-/// Copies the current surface texture into a `CapturedFrame` and delivers it via `callback`.
-///
-/// **`callback` is invoked synchronously on the render thread** once the GPU readback
-/// completes. It must be lightweight (e.g., move the frame into a shared buffer and return
-/// immediately) to avoid stalling frame presentation.
-fn capture_surface_texture(
+/// 读取真实渲染纹理并同步回调；回调应尽快返回，避免阻塞窗口呈现。
+fn capture_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
-    resources: &Resources,
-    surface_texture: &wgpu::SurfaceTexture,
+    texture: &wgpu::Texture,
     callback: Box<dyn FnOnce(CapturedFrame) + Send + 'static>,
 ) -> Result<(), String> {
-    let texture = &surface_texture.texture;
     let width = texture.width();
     let height = texture.height();
 
@@ -201,7 +231,7 @@ fn capture_surface_texture(
         return Err(format!("Invalid texture dimensions: {width}x{height}"));
     }
 
-    let format = resources.surface_config.borrow().format;
+    let format = texture.format();
     let bytes_per_pixel = 4u32;
     let unpadded_bytes_per_row = width * bytes_per_pixel;
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;

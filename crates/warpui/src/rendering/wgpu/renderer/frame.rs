@@ -1,6 +1,6 @@
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::Vector2F;
-use wgpu::{CommandEncoder, RenderPass, SurfaceTexture};
+use wgpu::{CommandEncoder, RenderPass, Texture};
 
 use crate::Scene;
 use crate::rendering::wgpu::Resources;
@@ -85,19 +85,14 @@ impl<'a> Frame<'a> {
         self,
         resources: &Resources,
         encoder: &mut CommandEncoder,
-        surface_texture: &SurfaceTexture,
+        texture: &Texture,
     ) {
-        let surface_size = Vector2F::new(
-            surface_texture.texture.width() as f32,
-            surface_texture.texture.height() as f32,
-        );
+        let surface_size = Vector2F::new(texture.width() as f32, texture.height() as f32);
 
-        let view = surface_texture
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor {
-                format: Some(surface_texture.texture.format()),
-                ..Default::default()
-            });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(texture.format()),
+            ..Default::default()
+        });
 
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {

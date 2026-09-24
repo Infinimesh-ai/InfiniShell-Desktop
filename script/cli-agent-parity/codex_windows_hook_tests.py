@@ -1,7 +1,9 @@
 """固定输入和编码的独立回归；原生 Windows 执行由 probe 单独验证，不用 mock 冒充。"""
 
 import base64
+from contextlib import contextmanager
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -495,6 +497,124 @@ class NativeRecorderCloseTests(unittest.TestCase):
             self.assertEqual(receipt['pending_eof_channels'], ['stderr'])
             self.assertEqual(receipt['alive_reader_channels'], [])
             self.assertEqual(receipt['reader_errors'], [{'channel': 'stderr', 'type': 'UnicodeDecodeError'}])
+
+    def test_owned_job_cleanup_drains_real_inherited_pipes_without_claiming_natural_descendants(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder, release = self.inherited_writer(Path(temporary), ['stdout', 'stderr'], 30)
+            job = Mock()
+            job.wait_empty.side_effect = [1, 0]
+            job.terminate.side_effect = lambda: release.write_text('release', encoding='utf-8')
+            recorder.probe_job = job
+            recorder.job_startup = {'assigned_before_resume': True}
+            evidence = {}
+            try:
+                native_probe.close_case(recorder, evidence)
+                receipt = evidence['process_closes'][0]
+                self.assertTrue(receipt['root_exited_naturally'])
+                self.assertEqual(receipt['root_exit_code'], 0)
+                self.assertTrue(receipt['descendants_forced'])
+                self.assertEqual(receipt['job_active_after_grace'], 1)
+                self.assertEqual(receipt['job_active_after_cleanup'], 0)
+                self.assertTrue(receipt['all_descendants_job_verified'])
+                self.assertTrue(receipt['job_close_confirmed'])
+                self.assertTrue(receipt['output_readers_eof'])
+                self.assertEqual(receipt['output_eof_timeout_seconds'], 5)
+                self.assertEqual({item['value']['child_done'] for item in recorder.events}, {'stdout', 'stderr'})
+                job.terminate.assert_called_once_with()
+                job.close.assert_called_once_with()
+            finally:
+                self.release_and_drain(recorder, release)
+
+    def test_job_still_active_cannot_pass_even_if_failure_cleanup_later_succeeds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder, release = self.inherited_writer(Path(temporary), ['stdout', 'stderr'], 30)
+            job = Mock()
+            job.wait_empty.side_effect = [1, 1, 0]
+            job.terminate.side_effect = lambda: release.write_text('release', encoding='utf-8')
+            recorder.probe_job = job
+            recorder.job_startup = {'assigned_before_resume': True}
+            evidence = {}
+            try:
+                with self.assertRaisesRegex(ValueError, '私有 Job 中仍有'):
+                    native_probe.close_case(recorder, evidence)
+                receipt = evidence['failed_close_receipt']
+                self.assertEqual(receipt['job_active_after_cleanup'], 1)
+                self.assertEqual(receipt['job_active_after_failure_cleanup'], 0)
+                self.assertFalse(receipt['all_descendants_job_verified'])
+                self.assertFalse(receipt['output_readers_eof'])
+                self.assertTrue(receipt['job_close_confirmed'])
+                self.assertNotIn('process_closes', evidence)
+            finally:
+                self.release_and_drain(recorder, release)
+
+    def test_forced_root_exit_is_rejected_after_confirmed_job_cleanup_and_eof(self):
+        process = Mock(stdin=io.StringIO(), stdout=io.StringIO(), stderr=io.StringIO(), returncode=1)
+        process.wait.side_effect = [subprocess.TimeoutExpired('fixture', 5), None]
+        with patch.object(native_probe.subprocess, 'Popen', return_value=process):
+            recorder = native_probe.NativeRecorder(['fixture'], {}, Path('.'), [])
+        recorder.probe_job = Mock()
+        recorder.probe_job.wait_empty.return_value = 0
+        recorder.job_startup = {'assigned_before_resume': True}
+        evidence = {}
+        with self.assertRaisesRegex(ValueError, '未正常退出'):
+            native_probe.close_case(recorder, evidence)
+        receipt = evidence['failed_close_receipt']
+        self.assertFalse(receipt['root_exited_naturally'])
+        self.assertTrue(receipt['termination_requested'])
+        self.assertTrue(receipt['all_descendants_job_verified'])
+        self.assertTrue(receipt['output_readers_eof'])
+
+    def test_startup_reuses_suspended_job_before_popen_and_does_not_double_wrap_cache_callers(self):
+        import probe_codex_plugin_cache_refresh as shared
+        job = Mock()
+        state = {'entered': False}
+        @contextmanager
+        def suspended(api, actual_job, command, env, directory, trace):
+            self.assertIs(actual_job, job)
+            state['entered'] = True
+            trace['assigned_before_resume'] = True
+            yield
+            state['entered'] = False
+        def popen(*args, **kwargs):
+            self.assertTrue(state['entered'])
+            return Mock(stdin=io.StringIO(), stdout=io.StringIO(), stderr=io.StringIO(), returncode=0)
+        with patch.dict(sys.modules, {'_winapi': Mock()}), \
+                patch.object(native_probe.os, 'name', 'nt'), \
+                patch.object(shared, 'WindowsProbeJob', return_value=job) as factory, \
+                patch.object(shared, 'suspended_creation', side_effect=suspended), \
+                patch.object(native_probe.subprocess, 'Popen', side_effect=popen):
+            recorder = native_probe.NativeRecorder(['fixture'], {}, '.', [], supervise_windows=True)
+        self.assertIs(recorder.probe_job, job)
+        factory.assert_called_once_with()
+        job.wait_empty.return_value = 0
+        recorder.close()
+        with patch.object(native_probe.os, 'name', 'nt'), \
+                patch.object(shared, 'WindowsProbeJob') as factory, \
+                patch.object(native_probe.subprocess, 'Popen', return_value=Mock(
+                    stdin=io.StringIO(), stdout=io.StringIO(), stderr=io.StringIO(), returncode=0)):
+            unowned = native_probe.NativeRecorder(['fixture'], {}, '.', [])
+        factory.assert_not_called()
+        unowned.close()
+
+    @unittest.skipUnless(os.name == 'nt', '需要 Windows Job 验证暂停创建及真实后代回收')
+    def test_windows_owned_job_reclaims_only_its_real_pipe_holding_descendant(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            child = 'import time; time.sleep(30)'
+            source = ('import subprocess, sys; sys.stdin.read(); '
+                      f'subprocess.Popen([sys.executable, "-c", {child!r}], stdin=subprocess.DEVNULL)')
+            recorder = native_probe.NativeRecorder([sys.executable, '-c', source],
+                os.environ.copy(), root, [], supervise_windows=True)
+            evidence = {}
+            native_probe.close_case(recorder, evidence)
+            receipt = evidence['process_closes'][0]
+            self.assertTrue(receipt['job_assigned_before_resume'])
+            self.assertTrue(receipt['root_exited_naturally'])
+            self.assertEqual(receipt['root_exit_code'], 0)
+            self.assertTrue(receipt['descendants_forced'])
+            self.assertEqual(receipt['job_active_after_cleanup'], 0)
+            self.assertTrue(receipt['output_readers_eof'])
+            self.assertTrue(receipt['job_close_confirmed'])
 
 
 class CommandTests(unittest.TestCase):

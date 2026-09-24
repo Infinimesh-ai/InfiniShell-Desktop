@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "scope": "test-only fixed stderr category projection from original call; no new process or bridge template change",
+  "source_sha256": {
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "803c015c48a7a2c3289ef40db24cd6617ec7e828d3d0aa88025ea867d207b80a",
+    "script/cli-agent-parity/run_grok_plugin_live.py": "9af48a038cdf25c9bd2733e7bdc0364ea019172872c9031422c3915b9237c607",
+    "script/cli-agent-parity/grok_plugin_live_runner_tests.py": "19247c9ae6d18447779be4a3edc17ec671bd92e48e2cbb7d01631c5403b5583c"
+  },
+  "python_tests_passed": 12,
+  "actual_rust_parser_tests": {
+    "passed": 2,
+    "source_extracted_verbatim": true,
+    "sha256": "86978d3fda7a08e112f6b2d62578b0c66ab6ba23569dd50bd4649168f5454a68",
+    "private_evidence_preserved": true
+  },
+  "accepted_shell_error_kinds": [
+    "cmd_command_not_found",
+    "powershell_command_not_found",
+    "powershell_parser_error",
+    "powershell_security_error",
+    "powershell_initialization_failure"
+  ],
+  "clixml_is_transport_only_not_a_failure_claim": true,
+  "unknown_text_kept_unclassified": true,
+  "raw_body_exported": false,
+  "native_windows_run": false,
+  "full_cargo_run": false,
+  "ci_dispatched": false,
+  "primary_source": "https://raw.githubusercontent.com/PowerShell/PowerShell/master/src/Microsoft.PowerShell.ConsoleHost/resources/ConsoleHostStrings.resx",
+  "original_receipt_sha256": "e8873046f87e9a0b0f0bdbc3613a495bc2ccc21025648e37b55b155a7998fc18"
+}

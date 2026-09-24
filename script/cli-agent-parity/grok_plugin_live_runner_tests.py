@@ -72,6 +72,37 @@ class GrokPluginLiveRunnerTests(unittest.TestCase):
             output = prefix + payload + '" }\n'
             self.assertIsNone(runner.safe_failure_diagnostics(output)['panic_locations'][0]['command_failure'])
 
+    def test_recorded_original_command_exports_exit_timeout_and_io_without_payload(self):
+        for kind, code, os_code in [('native_nonzero', 17, None), ('timeout', None, None), ('spawn_io_error', None, 193)]:
+            value = {'stage': 'windows_bridge_cmd', 'error_kind': kind, 'native_exit_code': code,
+                     'os_code': os_code, 'private_log': 'private-secret', 'private_path': 'C:/private/config'}
+            self.assertEqual(runner.safe_recorded_command(value), {
+                'stage': 'windows_bridge_cmd', 'error_kind': kind, 'native_exit_code': code, 'os_code': os_code})
+
+    def test_bridge_projection_keeps_known_exception_type_and_numeric_code_only(self):
+        value = {'stage': 'windows_bridge_cmd', 'error_kind': 'native_nonzero', 'native_exit_code': 1,
+                 'bridge': {'node_exit_code': None,
+                            'failure': {'kind': 'win32', 'hresult': -2147467259, 'os_code': 2, 'message': 'private-secret'}}}
+        result = runner.safe_recorded_command(value)
+        self.assertEqual(result['bridge']['failure'], {'kind': 'win32', 'hresult': -2147467259, 'os_code': 2})
+        self.assertNotIn('private-secret', json.dumps(result))
+        value['bridge']['failure']['kind'] = 'private-type'
+        self.assertIsNone(runner.safe_recorded_command(value)['bridge']['failure'])
+        value['native_exit_code'] = 'private-secret'
+        self.assertIsNone(runner.safe_recorded_command(value))
+        self.assertIsNone(runner.safe_recorded_command({'stage': 'private-path', 'error_kind': None}))
+
+    def test_shell_diagnostics_only_export_the_fixed_error_class_whitelist(self):
+        value = {'stage': 'windows_bridge_cmd', 'error_kind': 'native_nonzero', 'native_exit_code': 1,
+                 'bridge': {'powershell_clixml_observed': True, 'shell_error_kind': 'powershell_parser_error',
+                            'message': 'private-secret', 'path': 'C:/private/config'}}
+        safe = runner.safe_recorded_command(value)
+        self.assertEqual(safe['bridge']['shell_error_kind'], 'powershell_parser_error')
+        self.assertTrue(safe['bridge']['powershell_clixml_observed'])
+        self.assertNotIn('private', json.dumps(safe))
+        value['bridge']['shell_error_kind'] = 'private-type'
+        self.assertNotIn('shell_error_kind', runner.safe_recorded_command(value)['bridge'])
+
     def accept(self, receipt, host='linux', **kwargs):
         args = dict(exit_code=0, timed_out=False, output='test result: ok. 1 passed; 0 failed; 0 ignored;',
                     receipt=receipt, native_sha='g' * 64, node_sha='n' * 64, test_sha='t' * 64, host_platform=host)

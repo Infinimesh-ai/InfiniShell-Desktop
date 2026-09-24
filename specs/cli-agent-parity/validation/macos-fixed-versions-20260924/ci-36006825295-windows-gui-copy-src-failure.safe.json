@@ -1,0 +1,60 @@
+{
+  "run_id": 36006825295,
+  "source_commit": "f9e3ece6aef8b65697d97a130cdd88476667f289",
+  "artifact_id": 10814550066,
+  "archive_sha256": "5b4b2b5b5b486054195531e157dd35219465856c736bfdbe7c92a943c79969bf",
+  "original_files": [
+    {
+      "path": "renderer.safe.json",
+      "bytes": 1404,
+      "sha256": "98b64ffa403d73a88f6c9a014de03cf7a2a39efe89d21028c4141a2ff1845721"
+    }
+  ],
+  "renderer": {
+    "schema": 1,
+    "source_commit": "f9e3ece6aef8b65697d97a130cdd88476667f289",
+    "outcome": "failed",
+    "renderer": [
+      "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+    ],
+    "exit_code": 101,
+    "mesa_version": "26.2.1",
+    "mesa_archive_url": "https://github.com/pal1000/mesa-dist-win/releases/download/26.2.1/mesa3d-26.2.1-release-msvc.7z",
+    "mesa_archive_sha256": "78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf",
+    "copied_runtime_files": [
+      {
+        "name": "integration.exe",
+        "sha256": "74ca1b2e208279208bf1002eab24aa3ef4f4c5ace4c2b2ebbed23925814d8fa1"
+      },
+      {
+        "name": "conpty.dll",
+        "sha256": "1668fc38fef8d97f8e6002ca71d0e80d629c43b3c25f1f2417ec6bddb51405cd"
+      },
+      {
+        "name": "dxcompiler.dll",
+        "sha256": "75c019e3541980eea8ae661d81998d06f99627e3004c800532475a1c3551c6fb"
+      },
+      {
+        "name": "dxil.dll",
+        "sha256": "18fd73e06fc10e02a01885d8c282264c8f37bd2cf9a735d7700e231e94ea0376"
+      },
+      {
+        "name": "x64/OpenConsole.exe",
+        "sha256": "c41197578992211c3d457e1fb75ad2b474e6ee03a8dc8fda610ed8e7b46301ca"
+      }
+    ],
+    "model_inputs": 0,
+    "mesa_dll_sha256": {
+      "libgallium_wgl.dll": "46ca4e92166f1389c8e9024dbeee0e24ccd5c46f9b6e2b048cc6bc476e6474d3",
+      "opengl32.dll": "7a8f7aa1b73099d24ddeca962a7e7360bccdfc234ff79cb557426e2a2ce3d4f6"
+    }
+  },
+  "gui_window_and_bootstrap_passed": true,
+  "chinese_multiline_draft_exact_passed": true,
+  "scroll_into_view_passed": true,
+  "png_attachment_phase_reached": false,
+  "screenshot_count": 0,
+  "capture_failure": "wgpu Validation Error: surface texture has RENDER_ATTACHMENT usage but COPY_SRC is required by Frame capture encoder",
+  "passed": false,
+  "prior_image_pixel_success_not_relabelled_as_current": true
+}

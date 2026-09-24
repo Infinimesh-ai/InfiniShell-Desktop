@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "scope": "actual GPU capture for surfaces without COPY_SRC",
+  "source_sha256": {
+    "crates/warpui/src/rendering/wgpu/renderer.rs": "e3bd8938e5ceb138c443353a1aa3857bad2f70571c26775547c778ed56fabf59",
+    "crates/warpui/src/rendering/wgpu/renderer/frame.rs": "113a376b39f015f5ad678b4e500fc3a2de554e80d6f53565c12f164b9ddf330c"
+  },
+  "implementation": {
+    "scene_draws": 1,
+    "backing_only_when_capture_requested_and_surface_not_copyable": true,
+    "size_and_format_from_current_surface": true,
+    "samples": 1,
+    "blitter_filter": "nearest",
+    "blitter_blend": null,
+    "presented_frame_and_readback_share_backing": true,
+    "direct_readback_for_copyable_surface_unchanged": true,
+    "ordinary_render_without_capture_unchanged": true
+  },
+  "local_actual_wgpu_compile": {
+    "command": [
+      "cargo",
+      "check",
+      "-p",
+      "warpui",
+      "--lib",
+      "--features",
+      "experimental-wgpu-renderer,integration_tests"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 43.48,
+    "log_sha256": "00804d9b678c42ea8ed77232ce3bd274261aded52f72e3b72c122e9ad380a665",
+    "log_bytes": 5314
+  },
+  "native_linux_windows_gui_verified": false,
+  "localization": "无需本地化变更"
+}

@@ -166,6 +166,30 @@ impl GrokPluginManager {
             command.env("PATH", search_path);
         }
         let result = command.output().with_timeout(timeout).await;
+        #[cfg(test)]
+        {
+            // 仅记录同一次调用的数值/固定类别，原生正文留在原有私有日志内。
+            let diagnostic = match &result {
+                Ok(Ok(output)) => serde_json::json!({
+                    "error_kind": if output.status.success() { None } else { Some("native_nonzero") },
+                    "native_exit_code": output.status.code(), "os_code": null,
+                    "stdout_bytes": output.stdout.len(), "stderr_bytes": output.stderr.len(),
+                    "stdout_sha256": format!("{:x}", Sha256::digest(&output.stdout)),
+                    "stderr_sha256": format!("{:x}", Sha256::digest(&output.stderr)),
+                    "bridge": tests::windows_bridge_stderr_diagnostics(&output.stderr),
+                }),
+                Ok(Err(error)) => serde_json::json!({
+                    "error_kind": "spawn_io_error", "native_exit_code": null,
+                    "os_code": error.raw_os_error(),
+                }),
+                Err(_) => serde_json::json!({
+                    "error_kind": "timeout", "native_exit_code": null, "os_code": null,
+                }),
+            };
+            log.push_str(&format!(
+                "\nINFINISHELL_GROK_TEST_COMMAND_RESULT {diagnostic}\n"
+            ));
+        }
         let Ok(Ok(output)) = result else {
             log.push_str(&format!("command failed or timed out: {result:?}\n"));
             return Err(operation_error(log));
@@ -754,17 +778,26 @@ try {{
 }} catch {{ exit 1 }}
 "#
     );
-    let encoded = base64::engine::general_purpose::STANDARD.encode(
-        source
-            .encode_utf16()
-            .flat_map(u16::to_le_bytes)
-            .collect::<Vec<_>>(),
-    );
-    let command =
-        format!("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}");
-    // cmd 的总命令长度有界；超长路径必须在发布 hook 前拒绝。
+    let encode = |source: &str| {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(
+            source
+                .encode_utf16()
+                .flat_map(u16::to_le_bytes)
+                .collect::<Vec<_>>(),
+        );
+        format!("powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand {encoded}")
+    };
+    let command = encode(&source);
+    // 先按未插桩的生产模板执行长度门禁，诊断不能引入新的超长失败。
     if command.len() > 8000 {
         return Err(invalid_tree());
+    }
+    #[cfg(test)]
+    {
+        let diagnostic = encode(&tests::instrument_windows_bridge_script(&source));
+        if diagnostic.len() <= 8000 {
+            return Ok(diagnostic);
+        }
     }
     Ok(command)
 }

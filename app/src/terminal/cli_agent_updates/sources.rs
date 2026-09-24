@@ -947,13 +947,7 @@ async fn discover(
             CLIAgent::Grok => {
                 let grok_home = absolute_env("GROK_HOME").unwrap_or_else(|| home.join(".grok"));
                 #[cfg(windows)]
-                let copied = windows_native_copy(
-                    &installation,
-                    &grok_home.join("bin/grok.exe"),
-                    &grok_home
-                        .join("downloads")
-                        .join(format!("grok-{installed}-windows-x86_64.exe")),
-                );
+                let copied = windows_grok_native_copy(&installation, &grok_home, installed);
                 #[cfg(windows)]
                 let native_layout = cfg!(target_arch = "x86_64") && copied.is_some();
                 #[cfg(not(windows))]
@@ -1047,6 +1041,25 @@ fn windows_native_copy(
     (reference.digest == installation.stamp.digest
         && reference.canonical != installation.stamp.canonical)
         .then_some(reference)
+}
+
+#[cfg(any(windows, test))]
+fn windows_grok_native_copy(
+    installation: &Installation,
+    grok_home: &Path,
+    installed: &str,
+) -> Option<Stamp> {
+    // 官方 update 的缓存名没有 .exe；同时保留此前已识别的带扩展名安装布局。
+    // 两种布局均须位于固定目录，并与可见入口逐字节一致。
+    ["", ".exe"].into_iter().find_map(|suffix| {
+        windows_native_copy(
+            installation,
+            &grok_home.join("bin/grok.exe"),
+            &grok_home
+                .join("downloads")
+                .join(format!("grok-{installed}-windows-x86_64{suffix}")),
+        )
+    })
 }
 
 fn channel_supported(agent: CLIAgent, channel: Channel) -> bool {

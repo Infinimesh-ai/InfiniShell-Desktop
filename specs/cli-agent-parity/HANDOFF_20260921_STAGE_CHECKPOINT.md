@@ -2,12 +2,11 @@
 
 ## 2026-09-24 集中 CI 后的剩余补验
 
-- 最新补丁已覆盖 Linux Claude 官方动态 ELF 的系统启动依赖、Windows 官方目标子映像与系统组件、GUI 真实截图触发及草稿定位；目标模块编译检查与 Python 回归已通过。完整本地门禁和同源码原生补验仍在进行，不把静态审查计作最终通过。详见文末最新验收记录。
-
-- Mac 必要能力与实链已完成。固定版本保持 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`，当前工作分支仍为 `codex/cli-agent-parity`。后续平台状态以[固定版本验收对应表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和各原始收据为准，下文“准备统一 CI”属于前一快照。
-- 集中全量已取得 Linux 10,899、Windows 10,660 项通过，分别保留 98／110 项跳过及旧失败；不重复跑无变化的全量集合。
-- `bf015492f` 的 run `35993404190` 两端已结束：Linux 定向 2,848 项、Windows 定向 2,718 项通过；Windows 终端引导、中文多行与图片内容断言已通过。剩余是 Linux Claude 正常升级，Windows Codex／Grok 原子更新及 Grok 安装器，还有两端真正可见的草稿／附件截图。
-- 本地未提交修正已覆盖 Windows 官方目标映像和受保护系统 DLL、真实截图渲染请求与视口、实际事务失败诊断。必须先通过当前源码的 check／i18n／相关回归，再提交并在同一 workflow 的窄范围补验模式集中复验；不能将实现或诊断记录算作原生通过。Goal 仍 active。
+- 当前受测提交为 `f9e3ece6aef8b65697d97a130cdd88476667f289`，run `36006825295`。Linux 定向 839 项和 Claude 四类正式原子事务通过；Grok 六阶段安装通过。GUI 字节／像素和两张截图断言通过，但目视发现中文方框，GUI 验收仍失败。Windows 结果与下一轮状态以[固定版本验收对应表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)为准。Goal 仍 active。
+- Mac 必要能力与实链已完成。版本固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`；分支仍为 `codex/cli-agent-parity`。Mac 按源码域复用原始收据，不把旧 GUI 二进制标为当前提交。
+- Linux／Windows 已有完整工作区 10,899／10,660 项通过，分别保留 98／110 项跳过及历史失败。Linux Codex／Grok 正式事务保留 `bf015492f` 的原始范围；本轮只补验受影响的 Claude，不重复全量。
+- Windows Claude 正式升级再次通过；Grok 原子执行已退出 0 且入口摘要匹配目标，但更新后复核失败；Codex 被系统 .NET 资源 DLL 的 PE 检查拒绝。新修正包含固定无扩展名 Grok 缓存布局、系统 DLL 有界导入目录尾部，以及 Codex 探针独占 Job 收尾；Grok 安装前 cmd 桥接仍需同次调用的明确错误诊断。Windows GUI 已确认 GL surface 不支持 COPY_SRC，补齐同帧渲染／呈现／读取路径，实际 wgpu 编译通过，真实截图待验。
+- 下一轮使用现有 workflow 集中补验：Linux 仅 GUI（独立 CJK 字体覆盖前置），Windows 仅剩余原生项目和必要 GUI。默认／全量行为不变。每项必须有实际平台收据，当前实现、本地检查与诊断不得替代通过。
 
 ## 2026-09-24 Mac 固定版本收敛（V13）
 

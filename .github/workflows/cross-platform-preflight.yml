@@ -36,6 +36,11 @@ on:
         required: true
         default: false
         type: boolean
+      linux_gui_only:
+        description: 仅补验 Linux 真实 GUI 系统剪贴板；全量模式优先
+        required: true
+        default: false
+        type: boolean
       run_cli_atomic_updates:
         description: 固定 0.156.1 / 2.1.280 / 1.0.41 的隔离真实原子更新候选
         required: true
@@ -108,13 +113,14 @@ jobs:
 
       # 复用 prepare_environment 中固定的 Node 引导，实际运行测试而非依赖 runner 的旧版本。
       - name: Install Node for CLI plugin verification
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) }}
         id: native_node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20.9.0
 
       - name: Test Grok notification plugin scripts
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -126,7 +132,7 @@ jobs:
           python3 -B script/cli-agent-parity/native_ssh_notifications_tests.py NativeSshNotificationTests.test_grok_bridge_main_uses_the_same_guarded_mapper_on_each_desktop -v
 
       - name: Test notification patch file transactions
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         env:
@@ -179,7 +185,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_codex
         shell: bash
         run: |
@@ -188,7 +194,7 @@ jobs:
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_claude
         shell: bash
         timeout-minutes: 10
@@ -198,7 +204,7 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_grok
         shell: bash
         timeout-minutes: 5
@@ -208,7 +214,7 @@ jobs:
           printf 'INFINISHELL_TEST_GROK_EXE=%s\n' "$grok_executable" >> "$GITHUB_ENV"
 
       - name: Verify fixed Grok unauthenticated ACP boundaries
-        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_grok.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -216,7 +222,7 @@ jobs:
           python3 -B script/cli-agent-parity/grok_fixed_acp_probe.py --version 1.0.41 --executable "$INFINISHELL_TEST_GROK_EXE" --output "$RUNNER_TEMP/grok-fixed-acp.json"
 
       - name: Verify native Claude initialization and idle EOF
-        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_claude.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -224,7 +230,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_no_credentials.py --claude-version 2.1.280 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-initialize-idle-eof.json"
 
       - name: Verify native Claude permission observations without credentials
-        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_claude.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -232,7 +238,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot.py --claude-version 2.1.280 --executable "$INFINISHELL_TEST_CLAUDE_EXE" --output "$RUNNER_TEMP/claude-permission-observation.json"
 
       - name: Verify native Codex plugin registry failure recovery
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: bash
         timeout-minutes: 5
         run: |
@@ -240,7 +246,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_codex_plugin_lifecycle.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-lifecycle.json"
 
       - name: Verify native Codex persistent plugin source
-        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: bash
         timeout-minutes: 10
         run: |
@@ -248,7 +254,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_codex_plugin_cache_refresh.py --codex-version 0.156.1 --codex-executable "$INFINISHELL_TEST_CODEX_EXE" --output "$RUNNER_TEMP/codex-plugin-cache-refresh.json"
 
       - name: Test Claude and Codex Bash notification payloads
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         env:
@@ -262,7 +268,7 @@ jobs:
           python3 script/cli-agent-parity/plugin_compatibility_tests.py -v
 
       - name: Test Unix PTY notification framing
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' }}
         shell: bash
         run: python3 script/cli-agent-parity/tmux_notification_tests.py
 
@@ -274,14 +280,14 @@ jobs:
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；Linux 同步执行同一合同。
       - name: Test IPC frame-limit recovery
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p ipc --lib
           -E 'test(server_accepts_a_new_client_after_rejecting_an_oversized_frame) | test(client_disconnects_after_an_oversized_response_header)'
 
       - name: Test agent lifecycle, terminal cancellation, and Responses integration
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         id: test_app
         shell: bash
         run: >-
@@ -290,38 +296,38 @@ jobs:
 
       # 共享 CLI 状态转换和 TUI 消息渲染属于独立 crate，不能被 -p warp 的筛选覆盖。
       - name: Test shared CLI action contracts and skills
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p ai --lib
           -E 'test(agent::action_result::) | test(agent::action::) | test(skills::)'
 
       - name: Test CLI harness arguments
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_cli --lib
 
       - name: Test bilingual TUI task message states
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
         id: supervisor
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         env:
           CARGO_BUILD_JOBS: "2"
         run: cargo build -p warp_tui --bin infinishell-tui
 
       - name: Test installed Grok hook through the native notification worker
-        if: ${{ !cancelled() && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 3
         run: |
@@ -336,7 +342,7 @@ jobs:
       # 只验原生安装/inspect/升级/禁用/修复；没有凭据时不声称 SessionStart 已派发。
       - name: Verify fixed Linux Grok production notification installer without credentials
         id: grok_source_installer
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' }}
         shell: bash
         timeout-minutes: 6
         run: |
@@ -345,7 +351,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_grok_plugin_live.py --test-binary "$test_binary" --grok "$INFINISHELL_TEST_GROK_EXE" --node "$(command -v node)" --fixture-parent "$RUNNER_TEMP" --output "$RUNNER_TEMP/grok-production-installer.safe.json"
 
       - name: Preserve Linux Grok production installer evidence
-        if: ${{ !cancelled() && steps.grok_source_installer.outcome != 'skipped' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.grok_source_installer.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: grok-linux-production-installer-${{ github.sha }}
@@ -356,7 +362,7 @@ jobs:
       # 固定发行输入仅在 ignored 验收作用域替代发现；消费者仍查询官方真实渠道。
       - name: Verify fixed Linux CLI atomic update transactions without credentials
         id: fixed_cli_atomic_updates
-        if: ${{ !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && inputs.run_cli_atomic_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 90
         env:
@@ -371,7 +377,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate.py --test-binary "$test_binary" --supervisor "$target_dir/debug/infinishell-tui" --fixture-parent "$fixture_parent" --cache "$RUNNER_TEMP/fixed-cli-atomic-inputs" --output "$RUNNER_TEMP/fixed-cli-atomic-evidence/summary.safe.json" --agents "${atomic_agents[@]}"
 
       - name: Preserve Linux fixed CLI atomic update receipts
-        if: ${{ !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.fixed_cli_atomic_updates.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-linux-fixed-atomic-updates-${{ github.sha }}
@@ -380,7 +386,7 @@ jobs:
           retention-days: 14
 
       - name: Test supervisor cleanup after host crash
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -389,7 +395,7 @@ jobs:
           cargo nextest run --no-fail-fast -p warp --lib --run-ignored only -E 'test(managed_process::live_tests::supervised_)'
 
       - name: Verify native recovery and idle-crash boundaries without credentials
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_codex.outcome == 'success' && steps.supervisor.outcome == 'success' }}
         shell: bash
         timeout-minutes: 15
         run: |
@@ -400,7 +406,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_codex_adapter_live.py --test-case idle-crash --test-binary "$test_binary" --codex "$INFINISHELL_TEST_CODEX_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/codex-idle-crash.ndjson"
 
       - name: Preserve Linux native CLI boundary evidence
-        if: ${{ !cancelled() }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-linux-native-boundaries-${{ github.sha }}
@@ -418,18 +424,18 @@ jobs:
           retention-days: 14
 
       - name: Test rust-genai
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard || inputs.linux_gui_only) }}
         shell: bash
         run: cargo nextest run --no-run -p integration
 
       - name: Verify Linux GUI system clipboard without model inputs
         id: cli_gui_input
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard || inputs.linux_gui_only) }}
         shell: bash
         timeout-minutes: 15
         env:
@@ -443,8 +449,27 @@ jobs:
           if ! command -v xvfb-run >/dev/null || ! command -v xclip >/dev/null ||
             ! python3 -c 'import ctypes; [ctypes.CDLL(name) for name in ("libX11.so.6", "libXcursor.so.1", "libX11-xcb.so.1", "libXi.so.6", "libxkbcommon.so.0", "libxkbcommon-x11.so.0")]'; then
             sudo -n apt-get update -q
-            sudo -n apt-get install -y xvfb xauth xclip fonts-noto-cjk libgl1-mesa-dri mesa-vulkan-drivers libx11-6 libxcursor1 libx11-xcb1 libxi6 libxkbcommon0 libxkbcommon-x11-0
+            sudo -n apt-get install -y xvfb xauth xclip libgl1-mesa-dri mesa-vulkan-drivers libx11-6 libxcursor1 libx11-xcb1 libxi6 libxkbcommon0 libxkbcommon-x11-0
           fi
+          # 字体前置独立于 X11 依赖，已有窗口运行库不能证明中文可渲染。
+          if ! command -v fc-list >/dev/null ||
+            [[ "$(dpkg-query -W -f='${db:Status-Status}' fonts-noto-cjk 2>/dev/null || true)" != installed ]]; then
+            sudo -n apt-get update -q
+            sudo -n apt-get install -y fontconfig fonts-noto-cjk
+          fi
+          fc-cache -f
+          mkdir -p "$WARP_INTEGRATION_TEST_ARTIFACTS_DIR"
+          font_evidence="$WARP_INTEGRATION_TEST_ARTIFACTS_DIR/system-cjk-font-coverage.txt"
+          : > "$font_evidence"
+          # 对“中文第一行 / 第二行”的每个不同汉字检查真实字符覆盖；fc-match 允许替代字体，不能作为此门禁。
+          for codepoint in 4e2d 6587 7b2c 4e00 884c 4e8c; do
+            font_families="$(fc-list --format='%{family}\n' ":charset=$codepoint")"
+            if [[ -z "$font_families" ]]; then
+              printf '缺少中文样本字形 U+%s 的系统字体\n' "$codepoint" >&2
+              exit 1
+            fi
+            printf 'U+%s\n%s\n' "$codepoint" "$font_families" >> "$font_evidence"
+          done
           cargo build -p integration --bin integration
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
           timeout 180s xvfb-run -a -s '-screen 0 1600x1000x24' "$target_dir/debug/integration" test_cli_composer_system_clipboard_multiline_and_image

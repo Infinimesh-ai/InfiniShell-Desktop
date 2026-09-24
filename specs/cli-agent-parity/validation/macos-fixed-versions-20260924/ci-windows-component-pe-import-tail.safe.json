@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "scope": "Windows受保护系统组件DLL导入目录尾部解析修复",
+  "original_failure": {
+    "bytes": 2227,
+    "sha256": "6ae51ab8bb91ab32a9875c6b46de59bfbafe6d93f7e973092b31696947847df7",
+    "private_evidence_preserved": true
+  },
+  "original_failure_preserved": true,
+  "remote_rejected_image": "System.Management.Automation.Resources.dll",
+  "remote_image_bytes_not_available": true,
+  "remote_root_cause_same_subcondition_proved": false,
+  "confirmed_validator_bug": "要求整个普通导入目录长度为20B的整倍数会拒绝真实.NET PE中全零终止项后带名称数据的合法79B目录",
+  "sample_structure": {
+    "name": "System.Web.dll",
+    "bytes": 15144,
+    "sha256": "8e1c389481a815b1bc43f050dd37d0e55a6dbd1621653d1dddd0531d1ecb8d0c",
+    "machine": "0x14c",
+    "optional_magic": "0x10b",
+    "import_directory_size": 79,
+    "import_name": "mscoree.dll",
+    "complete_zero_terminator": true,
+    "remaining_directory_bytes": 39,
+    "private_evidence_preserved": true
+  },
+  "sample_is_original_windows_image": false,
+  "source_sha256": {
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "9c3e34df822f7b532f787ce6b44b31fad1278056398dcd6a07ee8cd834c98fb0",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs": "e863eefdf6a8f9f0486c50c681267fbe2b6e5165ac6f6631ba830409def142f0"
+  },
+  "change_scope": {
+    "protected_component_plain_import_directory_only": true,
+    "main_program_pe_rules_unchanged": true,
+    "delay_import_rules_unchanged": true,
+    "machine_rules_unchanged": true,
+    "path_acl_identity_sha_lease_unchanged": true,
+    "arbitrary_third_party_dll_not_allowed": true
+  },
+  "validation": {
+    "windows_compile_only": {
+      "exit_code": 0,
+      "target": "x86_64-pc-windows-msvc",
+      "tests_included": true,
+      "real_command_and_windows_dependencies": true,
+      "temporary_parent_capture_stubs_never_executed": true,
+      "log": {
+        "bytes": 3004,
+        "sha256": "de21ff6a110cec52264d3d42ef0cee18ba2f781e829a425c8210179d2a0a86cc",
+        "private_evidence_preserved": true
+      }
+    },
+    "exact_extracted_parser": {
+      "passed": 16,
+      "failed": 0,
+      "exit_code": 0,
+      "log": {
+        "bytes": 1115,
+        "sha256": "5e0ee2ad65195cb54ef3ed85226734205bf5b6f1b9e3eadf77ca70f58509f125",
+        "private_evidence_preserved": true
+      },
+      "structure_binding": {
+        "bytes": 1915,
+        "sha256": "d8fd44d6ea6aa7c9a9b8c93838e097790581335d2141c94efa2cd14abd6eb8a6",
+        "private_evidence_preserved": true
+      },
+      "harness": {
+        "bytes": 25037,
+        "sha256": "ffc573bbbad205ee6fb567462fa931ee9cbb3b8b9b4025cfa83b21099983ce9f",
+        "private_evidence_preserved": true
+      }
+    },
+    "old_parser_same_sample_rejection": {
+      "expected_rejection_observed": true,
+      "exit_code": 101,
+      "failure_code": "managed_process.atomic_windows_program_not_pe",
+      "log": {
+        "bytes": 747,
+        "sha256": "44da9ae43d1a09de06030b4fd495a0379cf2251883175c0daa5c38a4b64a857c",
+        "private_evidence_preserved": true
+      },
+      "source_binding": {
+        "bytes": 239,
+        "sha256": "0f33bc9533d9bbeb14717a87ba7228e537a07e076fa42e64973e52664d60314b",
+        "private_evidence_preserved": true
+      }
+    },
+    "rustfmt_passed": true,
+    "diff_check_passed": true
+  },
+  "remaining": "远端真实原子更新仍需根代理集中复验；不把本地结构样本/compile-only计作Windows事务通过",
+  "new_test_filters": [
+    "protected_component_pe_accepts_anycpu_import_directory_with_bounded_tail",
+    "protected_component_import_tail_cannot_hide_invalid_descriptors_or_image_headers"
+  ],
+  "main_repo_cargo_run": false,
+  "dll_executed": false,
+  "native_cli_executed": false,
+  "ci_dispatched": false,
+  "localization": "仅内部PE校验，无需本地化变更",
+  "rust_frozen": true,
+  "original_receipt_sha256": "a35a917a1fc3cc5587ed838a68da4fca1832b6a7627c64f1cfedb505909dd3bc"
+}

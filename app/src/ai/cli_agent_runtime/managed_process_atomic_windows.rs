@@ -1251,6 +1251,7 @@ fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
         import,
         IMPORT_DESCRIPTOR_BYTES,
         false,
+        dll,
     )?;
     require_bounded_descriptor_table(
         file,
@@ -1260,6 +1261,7 @@ fn require_pe_kind(file: &mut File, size: u64, dll: bool) -> io::Result<()> {
         delay_import,
         DELAY_IMPORT_DESCRIPTOR_BYTES,
         true,
+        false,
     )?;
     file.rewind()?;
     Ok(())
@@ -1295,6 +1297,7 @@ fn require_bounded_descriptor_table(
     directory: PeDataDirectory,
     descriptor_size: u64,
     delay: bool,
+    allow_trailing_data: bool,
 ) -> io::Result<()> {
     if directory == PeDataDirectory::default() {
         return Ok(());
@@ -1306,7 +1309,9 @@ fn require_bounded_descriptor_table(
         return Err(error("managed_process.atomic_windows_program_not_pe"));
     }
 
-    if directory.size % descriptor_size != 0 {
+    // 受保护系统组件中的 .NET PE 可把名称、thunk 等尾部包含在普通导入目录内。
+    // 仍须在完整映射的有界目录中找到全零终止项；主程序和延迟导入保持原严格合同。
+    if !allow_trailing_data && directory.size % descriptor_size != 0 {
         return Err(error("managed_process.atomic_windows_program_not_pe"));
     }
     let descriptor_offset = rva_to_file_offset(

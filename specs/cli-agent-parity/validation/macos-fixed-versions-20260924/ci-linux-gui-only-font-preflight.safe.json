@@ -1,0 +1,24 @@
+{
+  "workflow_sha256": "55a2cfaeefbe7076795d372fc66a841371894d569bca96c46cd4fe01fc5b329a",
+  "linux_named_steps": 36,
+  "boolean_step_comparisons": 1734,
+  "default_push_native_full_behavior_preserved": true,
+  "gui_only_named_steps": [
+    "Check InfiniShell-Desktop",
+    "Compile GUI integration tests",
+    "Install Python for CLI parity verification",
+    "Preserve Linux GUI system clipboard evidence",
+    "Verify Linux GUI system clipboard without model inputs",
+    "Verify provisioned toolchain"
+  ],
+  "checkout_retained": true,
+  "gui_only_triggers_gui_without_run_gui_clipboard": true,
+  "full_workspace_takes_precedence": true,
+  "gui_requires_check_success": true,
+  "windows_and_macos_jobs_byte_identical": true,
+  "actionlint": "pass; ignored only existing infinishell-ci label warning",
+  "diff_check": "pass",
+  "native_gui_visual_result": "pending",
+  "no_cargo_ci_or_ssh_executed": true,
+  "original_receipt_sha256": "9b101edb6ae799ab0e930cc7371ae3b4e517539b857c948a2e1e434b43c476a0"
+}

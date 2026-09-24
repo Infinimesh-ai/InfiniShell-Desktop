@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "scope": "Windows固定Codex hooks及ConPTY内层app-server探针Job所有权修复",
+  "run_id": 36006825295,
+  "original_failures": [
+    {
+      "relative_path": "artifacts/10811207450/files/codex-01561-windows-native-hooks.json",
+      "sha256": "921d91eac5f391248935212a5c143f0d38d2753ef906d746d576282d37ba46a8",
+      "original_passed": false,
+      "first_case_passed": true,
+      "second_hook_completion_complete": true,
+      "second_turn_completed": true,
+      "model_http_requests": 0,
+      "root_exit_code": 0,
+      "root_exited_naturally": true,
+      "output_eof_timeout_seconds": 5,
+      "alive_reader_channels": [
+        "stdout",
+        "stderr"
+      ],
+      "reader_errors": [],
+      "precise_inherited_handle_owner_identified": false
+    },
+    {
+      "relative_path": "artifacts/10810739361/files/codex-01561-windows-conpty.native.json",
+      "sha256": "ae531c865db0c682f8ee0909619a07dec80c0c65845a767101652af0b9320c6e",
+      "original_passed": false,
+      "first_case_passed": true,
+      "second_hook_completion_complete": true,
+      "second_turn_completed": true,
+      "model_http_requests": 0,
+      "root_exit_code": 0,
+      "root_exited_naturally": true,
+      "output_eof_timeout_seconds": 5,
+      "alive_reader_channels": [
+        "stdout",
+        "stderr"
+      ],
+      "reader_errors": [],
+      "precise_inherited_handle_owner_identified": false
+    }
+  ],
+  "source_sha256": {
+    "script/cli-agent-parity/probe_codex_windows_hooks.py": "514ae85711249f7a99263782a7a31a56c493f07dde1b24a2dcca227643b5bb6f",
+    "script/cli-agent-parity/codex_windows_hook_tests.py": "0d29cc5f9235a51929011d60a943ba533caf7eabdd4096c16b880dbd01e019aa"
+  },
+  "shared_helper_sha256": "e1445141063b801bee0aaafc189860271d2bf4aa0133176ac06abd9e3f7a1c07",
+  "changes": [
+    "仅start_codex显式开启从CREATE_SUSPENDED起归属的私有Windows Job",
+    "复用现有WindowsProbeJob及suspended_creation，默认构造和CacheRefreshRecorder.self.job保持独立",
+    "根自然exit0与真实hook/turn完成要求保留；残留后代监督回收单列descendants_forced、active0、Job关闭确认",
+    "双流共享5秒真实EOF预算不变；清理成功不能覆盖根强退、Job残留或读取错误",
+    "外层ConPTY descendants_job_verified=false未改，内层Codex Job退出事实单独报告"
+  ],
+  "validation": {
+    "command": "TMPDIR=/private/tmp TMP=/private/tmp TEMP=/private/tmp python3 -B -m unittest codex_windows_hook_tests codex_windows_conpty_tests codex_plugin_cache_refresh_tests",
+    "tests_run": 90,
+    "passed": 83,
+    "failed": 0,
+    "skipped": 7,
+    "exit_code": 0,
+    "real_local_synthetic_pipe_tests": true,
+    "windows_native_job_test_added_but_not_run_on_mac": true,
+    "initial_default_temp_attempt": {
+      "tests_run": 90,
+      "errors": 2,
+      "skipped": 7,
+      "cause": "既有固定输入测试父目录权限合同拒绝外置TMP，改用/private/tmp后通过"
+    },
+    "git_diff_check_passed": true
+  },
+  "native_cli_executed": false,
+  "model_inputs": 0,
+  "ci_dispatched": false,
+  "shared_source_modified": false,
+  "product_source_modified": false,
+  "product_lifecycle_claimed": false,
+  "old_evidence_modified": false,
+  "localization": "仅验收探针及收据，无需本地化变更",
+  "frozen": true,
+  "root_validation": {
+    "cargo_check_passed": true,
+    "log_sha256": "4f254574a8465d9944881d7172822f09dc6dc2fc0177f2b333578b2ad9221e21",
+    "root_diff_review_passed": true
+  }
+}

@@ -78,3 +78,19 @@ Linux 已补[受限 glibc 启动依赖适配](validation/macos-fixed-versions-20
 [Linux 模块目标编译](validation/macos-fixed-versions-20260924/ci-linux-atomic-local-compile.safe.json)与 [Windows 模块及测试目标编译](validation/macos-fixed-versions-20260924/ci-windows-atomic-local-compile.safe.json)通过；两者使用临时父模块合同进行 compile-only 检查，不能替代完整应用或目标平台运行。[五组 Python 回归](validation/macos-fixed-versions-20260924/ci-native-python-final.safe.json)通过，原子真实升级及 GUI 仍待集中补验。本轮无需本地化变更。
 
 修正冻结后的[最终本地门禁](validation/macos-fixed-versions-20260924/ci-native-frozen-local-gates.safe.json)通过：`cargo check -p warp`、i18n 11 项、受影响 Rust 217 项；五组 Python、PowerShell 语法与 workflow 静态检查通过。源码摘要完整记录，Linux／Windows 实测状态继续由下一轮独立收据确定。
+
+修正已推送为 `f9e3ece6aef8b65697d97a130cdd88476667f289`，集中补验 [36006825295](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36006825295) 进行中。[来源对应](validation/macos-fixed-versions-20260924/source-binding-f9e3ece6a.safe.json)确认 27 项变更输入与 Git 对象一致；[Mac 复用审计](validation/macos-fixed-versions-20260924/ci-f9e3ece6a-mac-source-reuse.safe.json)记录平台条件和 12 个核心域的逐字一致，不宣称旧 GUI 使用当前二进制。
+
+本轮新出现的 [Windows Codex 输出收尾失败](validation/macos-fixed-versions-20260924/ci-36006825295-windows-codex-eof-failure.safe.json)与 hook 执行分别记录：两份第二场景均取得完整 hook/turn、根自然退出 0 和配置恢复，但双管道 5 秒内没有 EOF，整体失败。[探针所有权修正](validation/macos-fixed-versions-20260924/ci-windows-codex-hooks-job-ownership-fix.safe.json)复用已有暂停创建及独占 Job；根自然退出仍强制，后代必要回收单列 `descendants_forced`、活动数归零和真实 EOF，不把强制回收写成自然退出或产品生命周期通过。本地 83 项通过／7 项平台跳过，cargo check 通过；实际 Windows 复验待执行，外层 ConPTY Job 未证明的边界不变。仅测试基础设施改动，无需本地化变更。
+
+本轮 [Linux 作业结果](validation/macos-fixed-versions-20260924/ci-36006825295-linux-final.safe.json)为定向 839 项通过，[Claude 四类正式事务](validation/macos-fixed-versions-20260924/ci-36006825295-linux-claude-atomic.safe.json)全部通过，包括正常升级、来源变化拒绝、失败回滚与中断恢复；[Grok 六阶段安装](validation/macos-fixed-versions-20260924/ci-36006825295-linux-grok-installer.safe.json)通过。两张真实 GUI 截图已取得，但[目视发现中文字形方框](validation/macos-fixed-versions-20260924/ci-36006825295-linux-gui-font-failure.safe.json)，不能因作业绿灯计完整 GUI 通过。[字体和 GUI 专项补验前置](validation/macos-fixed-versions-20260924/ci-linux-gui-only-font-preflight.safe.json)独立保证 CJK 字库与逐字覆盖，下一轮不重复已通过的 Linux 原生事务。
+
+本轮 [Windows 原子更新](validation/macos-fixed-versions-20260924/ci-36006825295-windows-atomic.safe.json)分别记录：Claude 通过；Grok 正式执行退出 0、入口达到目标摘要，但更新后来源／版本复核失败；Codex 拒绝系统 `System.Management.Automation.Resources.dll`。修正[固定 Grok 无扩展名缓存布局](validation/macos-fixed-versions-20260924/ci-windows-grok-native-cache-layout.safe.json)及[受保护 DLL 的合法导入目录尾部](validation/macos-fixed-versions-20260924/ci-windows-component-pe-import-tail.safe.json)；后者用真实本地 .NET 文件复现旧校验器拒绝并验证新解析器，明确不是远端原 DLL 字节取证。目标身份、摘要、系统路径及 ACL 门禁保持，实际 Windows 事务待补验。
+
+[Windows Grok 安装器](validation/macos-fixed-versions-20260924/ci-36006825295-windows-grok-installer.safe.json)失败已定位为安装前 cmd 桥接，固定 Grok／Node 版本检查通过，六阶段安装尚未开始。[同次调用诊断](validation/macos-fixed-versions-20260924/ci-windows-grok-bridge-command-diagnostics.safe.json)记录退出码、超时／IO 和固定桥接错误类别，保留原断言；测试插桩超长时使用原模板并明确记录，不能由本机 PowerShell 合成通过宣称 Windows PowerShell 5.1 已通过。上述变更无需本地化文案变更。
+
+Windows 本轮[真实 GUI 截图失败](validation/macos-fixed-versions-20260924/ci-36006825295-windows-gui-copy-src-failure.safe.json)发生在 GL surface 不支持 COPY_SRC：窗口、中文精确输入和零提交断言已通过，首次 GPU readback 失败，尚无截图。[截图修正](validation/macos-fixed-versions-20260924/ci-gui-surface-readback-fix.safe.json)仅在截图且 surface 不可读取时，将同一次真实 Scene 渲染到可读取纹理，再呈现同一帧并读取；普通渲染保持。实际 wgpu 路径已在 Mac 通过专项编译，Linux／Windows 截图仍待实测。
+
+Grok [诊断补充](validation/macos-fixed-versions-20260924/ci-windows-grok-bridge-command-diagnostics-v2.safe.json)只从同次调用提取固定 cmd／PowerShell 错误类别，CLIXML 仅作为传输格式，不导出原始内容；未知仍为未知。最终 Grok 与 i18n 回归 72 项通过，不把诊断实现记为安装器通过。
+
+本批[冻结本地门禁](validation/macos-fixed-versions-20260924/ci-native-followup-final-local-gates.safe.json)记录最终源码摘要：cargo check、真实 wgpu 编译、i18n 11 项、来源 113 项及 Grok／i18n 72 项通过。下一次集中补验仅执行 Linux GUI 与 Windows 剩余原生能力及 GUI；无需本地化变更。

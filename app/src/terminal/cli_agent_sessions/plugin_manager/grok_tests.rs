@@ -1757,6 +1757,246 @@ async fn live_grok_production_installer_repairs_and_preserves_disable() {
     .expect("真实 Grok 插件验收超时");
 }
 
+// 仅改变测试构建的诊断输出；不重复调用，也不改变生产脚本的句柄/执行/退出规则。
+const BRIDGE_DIAGNOSTIC_EXIT: &str =
+    "    [Console]::Error.WriteLine(\"INFINISHELL_GROK_BRIDGE_NATIVE_EXIT $code\")\n    exit $code";
+const BRIDGE_DIAGNOSTIC_CATCH: &str = r#"} catch {
+    $e=$_.Exception.GetBaseException(); $kind='other'; $native='-'
+    if($e -is [ComponentModel.Win32Exception]) { $kind='win32'; $native=$e.NativeErrorCode }
+    [Console]::Error.WriteLine("INFINISHELL_GROK_BRIDGE_FAILURE $kind $($e.HResult) $native")
+    exit 1
+}"#;
+
+pub(super) fn instrument_windows_bridge_script(source: &str) -> String {
+    source
+        .replace("    exit $code", BRIDGE_DIAGNOSTIC_EXIT)
+        .replace("} catch { exit 1 }", BRIDGE_DIAGNOSTIC_CATCH)
+}
+
+fn bridge_template_lengths(command: &str) -> (usize, usize, bool) {
+    let encoded = command.split_whitespace().last().unwrap();
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(encoded)
+        .unwrap();
+    let source = String::from_utf16(
+        &bytes
+            .chunks_exact(2)
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    let instrumented = source.contains(BRIDGE_DIAGNOSTIC_CATCH);
+    let original = source
+        .replace(BRIDGE_DIAGNOSTIC_EXIT, "    exit $code")
+        .replace(BRIDGE_DIAGNOSTIC_CATCH, "} catch { exit 1 }");
+    let prefix = command.len() - encoded.len();
+    let production = prefix + (original.encode_utf16().count() * 2).div_ceil(3) * 4;
+    (production, command.len(), instrumented)
+}
+
+fn windows_shell_failure(stderr: &str) -> (bool, Option<&'static str>) {
+    let clixml = stderr.trim_start().starts_with("#< CLIXML");
+    let text = if clixml {
+        // 只读 Error 字符串流，不反序列化对象，也不把转义的字面量再次当作换行。
+        stderr
+            .split("<S S=\"Error\">")
+            .skip(1)
+            .filter_map(|part| part.split_once("</S>").map(|(text, _)| text))
+            .map(|text| {
+                text.replace("_x005F_", "\0")
+                    .replace("_x000D_", "\r")
+                    .replace("_x000A_", "\n")
+                    .replace('\0', "_")
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        stderr.to_owned()
+    };
+    let lines = text.lines().map(str::trim).collect::<Vec<_>>();
+    for (index, line) in lines.iter().enumerate() {
+        if line.starts_with('\'')
+            && line.ends_with("' is not recognized as an internal or external command,")
+            && lines.get(index + 1) == Some(&"operable program or batch file.")
+        {
+            return (clixml, Some("cmd_command_not_found"));
+        }
+        if *line == "The shell cannot be started. A failure occurred during initialization:" {
+            return (clixml, Some("powershell_initialization_failure"));
+        }
+        let Some((field, value)) = line
+            .strip_prefix('+')
+            .and_then(|line| line.trim_start().split_once(':'))
+        else {
+            continue;
+        };
+        let (field, value) = (field.trim(), value.trim());
+        if field == "FullyQualifiedErrorId" && value == "CommandNotFoundException" {
+            return (clixml, Some("powershell_command_not_found"));
+        }
+        if field == "CategoryInfo" {
+            if value.starts_with("ParserError:")
+                && (value.ends_with(", ParseException")
+                    || value.ends_with(", ParentContainsErrorRecordException"))
+            {
+                return (clixml, Some("powershell_parser_error"));
+            }
+            if value.starts_with("SecurityError:") && value.ends_with(", PSSecurityException") {
+                return (clixml, Some("powershell_security_error"));
+            }
+        }
+    }
+    (clixml, None)
+}
+
+pub(super) fn windows_bridge_stderr_diagnostics(stderr: &[u8]) -> Value {
+    let mut result = json!({"node_exit_code":null, "failure":null, "node_module_not_found":false});
+    let (clixml, shell_failure) = windows_shell_failure(&String::from_utf8_lossy(stderr));
+    if clixml {
+        result["powershell_clixml_observed"] = json!(true);
+    }
+    if let Some(kind) = shell_failure {
+        result["shell_error_kind"] = json!(kind);
+    }
+    for line in String::from_utf8_lossy(stderr).lines() {
+        if matches!(
+            line.trim(),
+            "code: 'MODULE_NOT_FOUND'," | "code: 'MODULE_NOT_FOUND'"
+        ) {
+            result["node_module_not_found"] = json!(true);
+        }
+        let fields = line.split_whitespace().collect::<Vec<_>>();
+        match fields.as_slice() {
+            ["INFINISHELL_GROK_BRIDGE_NATIVE_EXIT", code] => {
+                if let Ok(code) = code.parse::<i32>() {
+                    result["node_exit_code"] = json!(code);
+                }
+            }
+            ["INFINISHELL_GROK_BRIDGE_FAILURE", kind, hresult, code]
+                if matches!(*kind, "win32" | "other") =>
+            {
+                let Ok(hresult) = hresult.parse::<i32>() else {
+                    continue;
+                };
+                let code = if *code == "-" {
+                    None
+                } else if let Ok(code) = code.parse::<i32>() {
+                    Some(code)
+                } else {
+                    continue;
+                };
+                result["failure"] = json!({"kind":kind, "hresult":hresult, "os_code":code});
+            }
+            // 原生错误正文不进入收据，未知格式保持未知。
+            _ => {}
+        }
+    }
+    result
+}
+
+fn test_command_diagnostic(log: &str) -> Value {
+    log.lines()
+        .find_map(|line| line.strip_prefix("INFINISHELL_GROK_TEST_COMMAND_RESULT "))
+        .and_then(|line| serde_json::from_str(line).ok())
+        .expect("同次调用必须提供固定命令诊断")
+}
+
+#[test]
+fn windows_bridge_diagnostics_export_only_fixed_categories_and_numbers() {
+    let safe = windows_bridge_stderr_diagnostics(
+        b"private-secret C:\\private\nINFINISHELL_GROK_BRIDGE_FAILURE win32 -2147467259 2\n",
+    );
+    assert_eq!(
+        safe,
+        json!({"node_exit_code":null, "node_module_not_found":false, "failure":{"kind":"win32", "hresult":-2147467259_i64, "os_code":2}})
+    );
+    let rejected = windows_bridge_stderr_diagnostics(b"INFINISHELL_GROK_BRIDGE_FAILURE private-path token secret\nINFINISHELL_GROK_BRIDGE_NATIVE_EXIT private-secret\n");
+    assert_eq!(
+        rejected,
+        json!({"node_exit_code":null, "node_module_not_found":false, "failure":null})
+    );
+    assert!(!safe.to_string().contains("private"));
+    assert!(!rejected.to_string().contains("secret"));
+    let node = windows_bridge_stderr_diagnostics(
+        b"  code: 'MODULE_NOT_FOUND',\nINFINISHELL_GROK_BRIDGE_NATIVE_EXIT 1\n",
+    );
+    assert_eq!(
+        node,
+        json!({"node_exit_code":1,"node_module_not_found":true,"failure":null})
+    );
+}
+
+#[test]
+fn shell_diagnostics_recognize_exact_classic_and_clixml_error_fields() {
+    assert_eq!(
+        windows_shell_failure("+ FullyQualifiedErrorId : CommandNotFoundException"),
+        (false, Some("powershell_command_not_found"))
+    );
+    assert_eq!(
+        windows_shell_failure(
+            "#< CLIXML\n<Objs><S S=\"Error\">+ CategoryInfo : ParserError: (:) [], ParentContainsErrorRecordException_x000D__x000A_</S></Objs>"
+        ),
+        (true, Some("powershell_parser_error"))
+    );
+    assert_eq!(
+        windows_shell_failure("+ CategoryInfo : SecurityError: (:) [], PSSecurityException"),
+        (false, Some("powershell_security_error"))
+    );
+    assert_eq!(
+        windows_shell_failure(
+            "'powershell.exe' is not recognized as an internal or external command,\noperable program or batch file."
+        ),
+        (false, Some("cmd_command_not_found"))
+    );
+    assert_eq!(
+        windows_shell_failure(
+            "The shell cannot be started. A failure occurred during initialization:"
+        ),
+        (false, Some("powershell_initialization_failure"))
+    );
+}
+
+#[test]
+fn shell_diagnostics_do_not_classify_private_body_or_unrecognized_error_types() {
+    assert_eq!(
+        windows_shell_failure(
+            "private-path/CommandNotFoundException ParserError PSSecurityException\n+ FullyQualifiedErrorId : private-secret\n+ CategoryInfo : ParserError: (:) [], PrivateException"
+        ),
+        (false, None)
+    );
+    assert_eq!(
+        windows_shell_failure(
+            "#< CLIXML\n<Objs><S S=\"Output\">+ FullyQualifiedErrorId : CommandNotFoundException</S></Objs>"
+        ),
+        (true, None)
+    );
+    assert_eq!(
+        windows_shell_failure(
+            "#< CLIXML\n<Objs><S S=\"Error\">private_x005F_x000A_+ FullyQualifiedErrorId : CommandNotFoundException</S></Objs>"
+        ),
+        (true, None)
+    );
+}
+
+#[test]
+fn bridge_diagnostics_do_not_push_a_valid_production_command_over_cmd_limit() {
+    let path = "x".repeat(1400);
+    let command = windows_startup_bridge_command(&[&path, "two", "three", "four"]).unwrap();
+    let (production, actual, instrumented) = bridge_template_lengths(&command);
+    assert!((7000..=8000).contains(&production));
+    assert_eq!(actual, production);
+    assert!(!instrumented);
+}
+
+#[test]
+fn command_diagnostics_use_the_original_result_before_native_output() {
+    let log = "private invocation\nINFINISHELL_GROK_TEST_COMMAND_RESULT {\"error_kind\":\"native_nonzero\",\"native_exit_code\":17,\"os_code\":null}\nINFINISHELL_GROK_TEST_COMMAND_RESULT {\"private\":\"payload\"}\n";
+    assert_eq!(
+        test_command_diagnostic(log),
+        json!({"error_kind":"native_nonzero", "native_exit_code":17, "os_code":null})
+    );
+}
+
 #[cfg(windows)]
 async fn windows_startup_bridge_argv_probe(
     manager: &GrokPluginManager,
@@ -1790,7 +2030,20 @@ async fn windows_startup_bridge_argv_probe(
             vec!["-NoLogo", "-NoProfile", "-NonInteractive", "-Command"],
         ),
     ];
+    let (production_length, actual_length, instrumented) = bridge_template_lengths(&command);
+    evidence["windows_bridge_command"] = json!({
+        "production_command_utf16_units":production_length, "actual_command_utf16_units":actual_length,
+        "ascii_only":command.is_ascii(),
+        "command_sha256":format!("{:x}", Sha256::digest(command.as_bytes())),
+        "encoded_payload_characters":command.split_whitespace().last().unwrap().len(),
+        "node_path_verbatim":node.to_string_lossy().starts_with(r"\\?\"),
+        "script_path_verbatim":script.to_string_lossy().starts_with(r"\\?\"),
+        "powershell_executable_exists":system_root.join("System32/WindowsPowerShell/v1.0/powershell.exe").is_file(),
+        "path_contains_system_powershell":env::split_paths(&env::var_os("PATH").unwrap()).any(|path| path == system_root.join("System32/WindowsPowerShell/v1.0")),
+        "serialization":"command_args", "test_only_bridge_diagnostics":instrumented,
+    });
     for (stage, executable, flags) in shells {
+        evidence["windows_bridge_shell"] = json!({"stage":stage,"flags":flags,"argument_count":flags.len()+1,"timeout_seconds":10});
         record_live_installer_stage(artifact, evidence, stage);
         let mut log = String::new();
         let mut args = flags.into_iter().map(OsStr::new).collect::<Vec<_>>();
@@ -1798,18 +2051,9 @@ async fn windows_startup_bridge_argv_probe(
         let result = manager
             .run(&executable, &args, Duration::from_secs(10), &mut log)
             .await;
-        evidence["windows_bridge_last_command"] = match &result {
-            Ok(output) => json!({
-                "stage":stage, "error_kind":null, "native_exit_code":output.status.code(),
-                "stdout_bytes":output.stdout.len(), "stderr_bytes":output.stderr.len(),
-                "stdout_sha256":format!("{:x}", Sha256::digest(&output.stdout)),
-                "stderr_sha256":format!("{:x}", Sha256::digest(&output.stderr)),
-            }),
-            // 生产 run 将原生失败封装为 PluginInstallError，不能据此虚构退出码或输出日志。
-            Err(_) => {
-                json!({"stage":stage, "error_kind":"plugin_install_error", "native_exit_code":null})
-            }
-        };
+        let mut diagnostic = test_command_diagnostic(&log);
+        diagnostic["stage"] = json!(stage);
+        evidence["windows_bridge_last_command"] = diagnostic;
         record_live_installer_stage(artifact, evidence, &format!("{stage}_returned"));
         let output = result.unwrap();
         let actual: Vec<String> = serde_json::from_slice(&output.stdout).unwrap();

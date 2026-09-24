@@ -59,6 +59,48 @@ def safe_failure_diagnostics(output):
             'raw_output_exported': False, 'private_paths_exported': False}
 
 
+def safe_recorded_command(value):
+    """只投影原调用产生的固定诊断；不导出日志、路径或错误正文。"""
+    if not isinstance(value, dict) or value.get('error_kind') not in (None, 'native_nonzero', 'timeout', 'spawn_io_error'):
+        return None
+    if value.get('stage') not in ('windows_bridge_cmd', 'windows_bridge_powershell'):
+        return None
+    result = {'stage': value['stage'], 'error_kind': value.get('error_kind')}
+    for key in ('native_exit_code', 'os_code'):
+        number = value.get(key)
+        if number is not None and (type(number) is not int or not -(2 ** 31) <= number < 2 ** 31):
+            return None
+        result[key] = number
+    for key in ('stdout_bytes', 'stderr_bytes'):
+        number = value.get(key)
+        if type(number) is int and 0 <= number < 2 ** 63:
+            result[key] = number
+    for key in ('stdout_sha256', 'stderr_sha256'):
+        digest = value.get(key)
+        if isinstance(digest, str) and re.fullmatch('[0-9a-f]{64}', digest):
+            result[key] = digest
+    bridge = value.get('bridge')
+    if isinstance(bridge, dict):
+        safe = {'node_exit_code': None, 'failure': None,
+                'node_module_not_found': bridge.get('node_module_not_found') is True}
+        if bridge.get('powershell_clixml_observed') is True:
+            safe['powershell_clixml_observed'] = True
+        if bridge.get('shell_error_kind') in ('cmd_command_not_found', 'powershell_command_not_found',
+                'powershell_parser_error', 'powershell_security_error', 'powershell_initialization_failure'):
+            safe['shell_error_kind'] = bridge['shell_error_kind']
+        code = bridge.get('node_exit_code')
+        if type(code) is int and -(2 ** 31) <= code < 2 ** 31:
+            safe['node_exit_code'] = code
+        failure = bridge.get('failure')
+        if (isinstance(failure, dict) and failure.get('kind') in ('win32', 'other')
+                and type(failure.get('hresult')) is int and -(2 ** 31) <= failure['hresult'] < 2 ** 31):
+            code = failure.get('os_code')
+            if code is None or (type(code) is int and -(2 ** 31) <= code < 2 ** 31):
+                safe['failure'] = {key: failure.get(key) for key in ('kind', 'hresult', 'os_code')}
+        result['bridge'] = safe
+    return result
+
+
 def isolated_environment(root, programs, host_environment=None):
     host = os.environ if host_environment is None else host_environment
     allowed = {'LANG', 'LC_ALL', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT'}
@@ -179,6 +221,9 @@ def run(args):
         receipt_path = root / 'grok-production-installer.json'
         receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else {}
         report['receipt'] = receipt
+        recorded_command = safe_recorded_command(receipt.get('windows_bridge_last_command'))
+        if recorded_command is not None:
+            report['failure_diagnostics']['recorded_command'] = recorded_command
         report['passed'] = verified_receipt(process.returncode, report['timed_out'], output, receipt,
             report['native_sha256'], report['node_sha256'], report['test_binary_sha256'], sys.platform)
         report['source_unchanged'] = source_identity() == report['source_sha256']

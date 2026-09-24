@@ -1,6 +1,7 @@
 """Windows 原生 Codex hook 验证；只改临时副本，不证明 ConPTY 通知与完整生命周期。"""
 
 import argparse
+from contextlib import ExitStack
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -152,15 +153,40 @@ def wait_for_hook_completion(recorder, thread_id, turn_id, native_hooks, blocker
 
 
 class NativeRecorder:
-    def __init__(self, command, env, directory, events):
+    def __init__(self, command, env, directory, events, *, supervise_windows=False):
         self.events = events
         self.reader_errors = []
         self.queue = queue.Queue()
         self.events_changed = threading.Event()
+        self.probe_job = None
+        self.job_startup = {}
         started = time.monotonic()
-        self.process = subprocess.Popen(command, env=env, cwd=directory, stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                        text=True, encoding='utf-8', errors='strict', bufsize=1)
+        try:
+            with ExitStack() as startup:
+                if supervise_windows and os.name == 'nt':
+                    # 延迟导入避免共享缓存探针继承本类时循环导入；缓存探针仍自行管理它的 Job。
+                    import _winapi
+                    from probe_codex_plugin_cache_refresh import WindowsProbeJob, suspended_creation
+                    require(sys.implementation.name == 'cpython', 'Windows 探针需要已核实的 CPython 创建接口')
+                    self.probe_job = WindowsProbeJob()
+                    startup.enter_context(suspended_creation(
+                        _winapi, self.probe_job, command, env, directory, self.job_startup))
+                self.process = subprocess.Popen(command, env=env, cwd=directory, stdin=subprocess.PIPE,
+                                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                                text=True, encoding='utf-8', errors='strict', bufsize=1)
+        except BaseException as error:
+            if self.probe_job is not None:
+                try:
+                    self.probe_job.terminate()
+                    require(self.probe_job.wait_empty(5) == 0, '创建失败后的私有 Job 没有清空')
+                except BaseException as cleanup_error:
+                    error.add_note('私有 Job 创建清理失败: ' + type(cleanup_error).__name__)
+                finally:
+                    try:
+                        self.probe_job.close()
+                    except BaseException as cleanup_error:
+                        error.add_note('私有 Job 句柄关闭失败: ' + type(cleanup_error).__name__)
+            raise
         self.readers = {}
         self.reader_finished = {name: threading.Event() for name in ('stdout', 'stderr')}
         self.reader_states = {name: {'eof': False, 'lines': 0, 'finished_elapsed_ms': None,
@@ -213,10 +239,40 @@ class NativeRecorder:
         raise RuntimeError(f'{method} 没有原生确认')
 
     def close(self):
-        started = time.monotonic()
         self.close_receipt = {'root_exited_naturally': False, 'termination_requested': False,
                               'kill_requested': False, 'output_readers_eof': False,
-                              'all_descendants_job_verified': False}
+                              'all_descendants_job_verified': False,
+                              'job_supervision_requested': self.probe_job is not None,
+                              'job_assigned_before_resume': self.job_startup.get('assigned_before_resume', False),
+                              'descendants_forced': False, 'job_close_confirmed': False}
+        try:
+            self._close_root_and_outputs()
+        finally:
+            primary = sys.exc_info()[1]
+            if self.probe_job is not None:
+                try:
+                    # 失败仍须收回本次创建即归属的后代；回收成功不能覆盖原始失败。
+                    if not self.close_receipt['all_descendants_job_verified']:
+                        self.close_receipt['descendants_forced'] = True
+                        self.probe_job.terminate()
+                        active = self.probe_job.wait_empty(5)
+                        self.close_receipt['job_active_after_failure_cleanup'] = active
+                        require(active == 0, '失败后的私有 Job 仍有活动进程')
+                except BaseException as error:
+                    self.close_receipt['job_failure_cleanup_error_type'] = type(error).__name__
+                    if primary is None:
+                        raise
+                finally:
+                    try:
+                        self.probe_job.close()
+                        self.close_receipt['job_close_confirmed'] = True
+                    except BaseException as error:
+                        self.close_receipt['job_close_error_type'] = type(error).__name__
+                        if primary is None:
+                            raise
+
+    def _close_root_and_outputs(self):
+        started = time.monotonic()
         try:
             self.process.stdin.close()
         except (BrokenPipeError, OSError):
@@ -235,6 +291,17 @@ class NativeRecorder:
         self.close_receipt.update(root_exit_code=self.process.returncode,
             root_exited_naturally=not self.close_receipt['termination_requested'],
             root_wait_elapsed_ms=round((time.monotonic() - started) * 1000))
+        if self.probe_job is not None:
+            require(self.close_receipt['job_assigned_before_resume'], '原生进程没有在运行前归属私有 Job')
+            active = self.probe_job.wait_empty(5)
+            self.close_receipt['job_active_after_grace'] = active
+            if active:
+                self.close_receipt['descendants_forced'] = True
+                self.probe_job.terminate()
+                active = self.probe_job.wait_empty(5)
+            self.close_receipt['job_active_after_cleanup'] = active
+            require(active == 0, '私有 Job 中仍有未确认退出的进程')
+            self.close_receipt['all_descendants_job_verified'] = True
         eof_started = time.monotonic()
         deadline = eof_started + OUTPUT_EOF_TIMEOUT
         # 两路共享一次有界 EOF 等待，不能把根退出或读取异常当成所有后代已退出。
@@ -262,7 +329,7 @@ def start_codex(executable, env, directory, traces):
     events = []
     traces.append(events)
     recorder = NativeRecorder([str(executable), 'app-server', '--stdio', '--disable', 'shell_snapshot'],
-                              env, directory, events)
+                              env, directory, events, supervise_windows=True)
     try:
         recorder.rpc('initialize', {'clientInfo': {'name': 'windows_hook_verification', 'version': '0.1.0'},
                                     'capabilities': {'experimentalApi': True}}, 1)
@@ -332,8 +399,7 @@ def close_case(recorder, evidence):
     primary = sys.exc_info()[1]
     try:
         recorder.close()
-        evidence.setdefault('process_closes', []).append(dict(recorder.close_receipt,
-            all_descendants_job_verified=False))
+        evidence.setdefault('process_closes', []).append(dict(recorder.close_receipt))
         require(recorder.close_receipt['root_exited_naturally'] and recorder.process.returncode == 0,
                 '原生 app-server 未正常退出，不能把监督终止计入通过')
     except BaseException as error:

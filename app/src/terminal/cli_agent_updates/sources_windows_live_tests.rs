@@ -393,6 +393,11 @@ struct Evidence {
     strict_job_cleanup_confirmed: bool,
     entry_matches_target: bool,
     target_version_matches: bool,
+    post_inspection_source: Option<String>,
+    post_inspection_error: Option<String>,
+    post_inspection_up_to_date: Option<bool>,
+    post_inspection_installed_version: Option<String>,
+    post_inspection_latest_version: Option<String>,
     config_files_checked: usize,
     config_bytes_unchanged: bool,
     journal_absent: bool,
@@ -491,6 +496,14 @@ async fn exercise(
             && report.installed_version == manifest.target_version
             && report.latest_version == manifest.target_version
     });
+    if let Ok(report) = &after {
+        // 来源枚举、固定错误与已解析版本均为安全字段；不导出路径或原生命令正文。
+        evidence.post_inspection_source = Some(format!("{:?}", report.source));
+        evidence.post_inspection_error = report.error.map(|error| format!("{error:?}"));
+        evidence.post_inspection_up_to_date = Some(report.up_to_date);
+        evidence.post_inspection_installed_version = Some(report.installed_version.clone());
+        evidence.post_inspection_latest_version = Some(report.latest_version.clone());
+    }
     if executed.as_ref().ok() != Some(&manifest.target_version) {
         evidence.error = executed.err().map(|error| format!("{error:?}"));
         return Err("execute_failed");
@@ -498,6 +511,9 @@ async fn exercise(
     if after.is_err() {
         evidence.error = after.err().map(|error| format!("{error:?}"));
         return Err("inspect_after_failed");
+    }
+    if !evidence.target_version_matches {
+        return Err("inspect_after_mismatch");
     }
     Ok(())
 }

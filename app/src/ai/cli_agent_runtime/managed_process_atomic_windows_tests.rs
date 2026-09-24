@@ -200,6 +200,15 @@ fn minimal_pe() -> Vec<u8> {
     } else {
         (0xaa64_u16, 0x020b_u16, 240_u16, 112_usize)
     };
+    minimal_pe_for(machine, magic, optional_size, directory_offset)
+}
+
+fn minimal_pe_for(
+    machine: u16,
+    magic: u16,
+    optional_size: u16,
+    directory_offset: usize,
+) -> Vec<u8> {
     let mut bytes = vec![0_u8; 0x400];
     bytes[..2].copy_from_slice(b"MZ");
     put_u32(
@@ -234,8 +243,9 @@ fn minimal_pe() -> Vec<u8> {
 }
 
 fn set_directory(bytes: &mut [u8], index: u32, rva: u32, size: u32) {
-    let directory_offset = if cfg!(target_arch = "x86") { 96 } else { 112 };
     let optional = TEST_PE_OFFSET + PE_SIGNATURE_AND_FILE_HEADER_BYTES as usize;
+    let magic = u16::from_le_bytes(bytes[optional..optional + 2].try_into().unwrap());
+    let directory_offset = if magic == 0x010b { 96 } else { 112 };
     let entry = optional + directory_offset + index as usize * 8;
     put_u32(bytes, entry, rva);
     put_u32(bytes, entry + 4, size);
@@ -712,6 +722,72 @@ fn cwd_lease_blocks_leaf_rename_until_released() {
     drop(cwd);
     fs::rename(&cwd_path, &moved_cwd).unwrap();
     fs::remove_dir(&moved_cwd).unwrap();
+}
+
+#[test]
+fn protected_component_pe_accepts_anycpu_import_directory_with_bounded_tail() {
+    let bytes = component_pe_with_import_tail();
+    verify_component_pe_bytes(&bytes).unwrap();
+
+    // 同一导入目录不能改变主程序的严格长度规则；DLL 也不能直接成为更新主程序。
+    assert!(verify_pe_bytes(&bytes).is_err());
+    let mut program = bytes;
+    put_u16(&mut program, TEST_PE_OFFSET + 22, 0x0022);
+    assert_eq!(
+        verify_pe_bytes(&program).unwrap_err().to_string(),
+        "managed_process.atomic_windows_program_not_pe"
+    );
+}
+
+fn component_pe_with_import_tail() -> Vec<u8> {
+    // 模拟 AnyCPU PE32 的一项普通导入、完整零终止项和目录内名称尾部（总长 79）。
+    let mut bytes = minimal_pe_for(0x014c, 0x010b, 224, 96);
+    put_u16(&mut bytes, TEST_PE_OFFSET + 22, 0x2022);
+    set_directory(&mut bytes, IMPORT_DIRECTORY_INDEX, TEST_SECTION_RVA, 79);
+    put_u32(&mut bytes, TEST_SECTION_OFFSET + 12, TEST_SECTION_RVA + 40);
+    bytes[TEST_SECTION_OFFSET + 40..TEST_SECTION_OFFSET + 52].copy_from_slice(b"mscoree.dll\0");
+    bytes
+}
+
+fn verify_component_pe_bytes(bytes: &[u8]) -> io::Result<()> {
+    let mut file = tempfile::tempfile().unwrap();
+    file.write_all(bytes).unwrap();
+    require_pe_kind(&mut file, bytes.len() as u64, true)
+}
+
+#[test]
+fn protected_component_import_tail_cannot_hide_invalid_descriptors_or_image_headers() {
+    for mutation in [
+        "partial_terminator",
+        "outside_section",
+        "path_import",
+        "unknown_machine",
+        "not_dll",
+        "partial_delay_import",
+    ] {
+        let mut bytes = component_pe_with_import_tail();
+        match mutation {
+            "partial_terminator" => {
+                set_directory(&mut bytes, IMPORT_DIRECTORY_INDEX, TEST_SECTION_RVA, 39);
+            }
+            "outside_section" => {
+                set_directory(&mut bytes, IMPORT_DIRECTORY_INDEX, TEST_SECTION_RVA, 0x201);
+            }
+            "path_import" => bytes[TEST_SECTION_OFFSET + 40] = b'/',
+            "unknown_machine" => put_u16(&mut bytes, TEST_PE_OFFSET + 4, 0),
+            "not_dll" => put_u16(&mut bytes, TEST_PE_OFFSET + 22, 0x0022),
+            "partial_delay_import" => {
+                set_directory(
+                    &mut bytes,
+                    DELAY_IMPORT_DIRECTORY_INDEX,
+                    TEST_SECTION_RVA + 0x80,
+                    33,
+                );
+            }
+            _ => unreachable!(),
+        }
+        assert!(verify_component_pe_bytes(&bytes).is_err(), "{mutation}");
+    }
 }
 
 #[test]

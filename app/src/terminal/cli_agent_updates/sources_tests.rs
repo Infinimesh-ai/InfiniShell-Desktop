@@ -2387,6 +2387,46 @@ fn windows_native_copy_requires_exact_entry_and_matching_version_cache() {
 }
 
 #[test]
+fn windows_grok_update_keeps_native_identity_with_extensionless_version_cache() {
+    let (_directory, root) = private_root();
+    let grok_home = root.join(".grok");
+    let entry = grok_home.join("bin/grok.exe");
+    let old = grok_home.join("downloads/grok-1.0.40-windows-x86_64.exe");
+    let target = grok_home.join("downloads/grok-1.0.41-windows-x86_64");
+    fs::create_dir_all(entry.parent().unwrap()).unwrap();
+    fs::create_dir_all(old.parent().unwrap()).unwrap();
+    fs::write(&entry, b"old-native").unwrap();
+    fs::write(&old, b"old-native").unwrap();
+    let mut installation = Installation {
+        source: Source::Native,
+        entry: entry.clone(),
+        stamp: stamp(&entry).unwrap(),
+        manager: None,
+        helper: None,
+        registration: None,
+        invocation: None,
+        channel: Channel::Stable,
+        config: None,
+        error: None,
+        source_target: None,
+    };
+    assert_eq!(
+        windows_grok_native_copy(&installation, &grok_home, "1.0.40"),
+        Some(stamp(&old).unwrap())
+    );
+    fs::write(&target, b"target-native").unwrap();
+    fs::write(&entry, b"target-native").unwrap();
+    installation.stamp = stamp(&entry).unwrap();
+    assert_eq!(
+        windows_grok_native_copy(&installation, &grok_home, "1.0.41"),
+        Some(stamp(&target).unwrap())
+    );
+    assert!(windows_grok_native_copy(&installation, &grok_home, "1.0.40").is_none());
+    fs::write(&target, b"tampered-native").unwrap();
+    assert!(windows_grok_native_copy(&installation, &grok_home, "1.0.41").is_none());
+}
+
+#[test]
 fn windows_native_copy_is_rechecked_before_supervised_execution() {
     let (_directory, root) = private_root();
     let entry = root.join("grok.exe");

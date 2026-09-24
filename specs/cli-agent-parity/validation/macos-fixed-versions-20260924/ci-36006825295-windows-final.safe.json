@@ -1,0 +1,484 @@
+{
+  "run_id": 36006825295,
+  "job_id": 107657011912,
+  "source_commit": "f9e3ece6aef8b65697d97a130cdd88476667f289",
+  "ci_conclusion": "failure",
+  "job_log_sha256": "85ce2e9ce857ef1db506719473c3e5f5eb59f596e5681e7517069028f9fdb89c",
+  "job_log_bytes": 592870,
+  "steps": [
+    {
+      "number": 1,
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:36:44Z",
+      "completed_at": "2026-09-24T13:36:54Z"
+    },
+    {
+      "number": 2,
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:36:54Z",
+      "completed_at": "2026-09-24T13:37:11Z"
+    },
+    {
+      "number": 3,
+      "name": "Reclaim Windows build storage",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:11Z",
+      "completed_at": "2026-09-24T13:37:12Z"
+    },
+    {
+      "number": 4,
+      "name": "Prepare job-local Python for CLI parity verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:12Z",
+      "completed_at": "2026-09-24T13:37:23Z"
+    },
+    {
+      "number": 5,
+      "name": "Configure Windows build environment",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:23Z",
+      "completed_at": "2026-09-24T13:37:24Z"
+    },
+    {
+      "number": 6,
+      "name": "Verify provisioned toolchain",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:24Z",
+      "completed_at": "2026-09-24T13:37:27Z"
+    },
+    {
+      "number": 7,
+      "name": "Install Node for CLI plugin verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:27Z",
+      "completed_at": "2026-09-24T13:37:34Z"
+    },
+    {
+      "number": 8,
+      "name": "Test Grok notification plugin scripts",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:34Z",
+      "completed_at": "2026-09-24T13:37:37Z"
+    },
+    {
+      "number": 9,
+      "name": "Test notification patch file transactions",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:37:37Z",
+      "completed_at": "2026-09-24T13:38:40Z"
+    },
+    {
+      "number": 10,
+      "name": "Prepare fixed native Codex without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:38:40Z",
+      "completed_at": "2026-09-24T13:39:14Z"
+    },
+    {
+      "number": 11,
+      "name": "Prepare fixed Codex production installer contract",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:39:14Z",
+      "completed_at": "2026-09-24T13:39:50Z"
+    },
+    {
+      "number": 12,
+      "name": "Prepare fixed native Claude without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:39:50Z",
+      "completed_at": "2026-09-24T13:40:09Z"
+    },
+    {
+      "number": 13,
+      "name": "Prepare fixed native Grok without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:40:09Z",
+      "completed_at": "2026-09-24T13:40:36Z"
+    },
+    {
+      "number": 14,
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:40:36Z",
+      "completed_at": "2026-09-24T13:40:45Z"
+    },
+    {
+      "number": 15,
+      "name": "Verify native Claude initialization and idle EOF",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:40:45Z",
+      "completed_at": "2026-09-24T13:40:48Z"
+    },
+    {
+      "number": 16,
+      "name": "Verify native Claude permission observations without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:40:48Z",
+      "completed_at": "2026-09-24T13:40:52Z"
+    },
+    {
+      "number": 17,
+      "name": "Verify native Codex plugin registry failure recovery",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:40:52Z",
+      "completed_at": "2026-09-24T13:41:10Z"
+    },
+    {
+      "number": 18,
+      "name": "Verify native Codex persistent plugin source",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:41:10Z",
+      "completed_at": "2026-09-24T13:41:46Z"
+    },
+    {
+      "number": 19,
+      "name": "Test Windows Git Bash notification payloads",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:41:46Z",
+      "completed_at": "2026-09-24T13:42:00Z"
+    },
+    {
+      "number": 20,
+      "name": "Verify Codex Windows native hooks without model requests",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:42:00Z",
+      "completed_at": "2026-09-24T13:43:44Z"
+    },
+    {
+      "number": 21,
+      "name": "Preserve Codex Windows native hook evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:43:44Z",
+      "completed_at": "2026-09-24T13:43:48Z"
+    },
+    {
+      "number": 22,
+      "name": "Verify Codex Windows ConPTY notification transport",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:43:48Z",
+      "completed_at": "2026-09-24T13:44:18Z"
+    },
+    {
+      "number": 23,
+      "name": "Preserve Codex Windows ConPTY evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:44:18Z",
+      "completed_at": "2026-09-24T13:44:22Z"
+    },
+    {
+      "number": 24,
+      "name": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-24T13:44:22Z",
+      "completed_at": "2026-09-24T13:46:14Z"
+    },
+    {
+      "number": 25,
+      "name": "Preserve fixed Codex 0.156.1 Windows native hook evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:46:14Z",
+      "completed_at": "2026-09-24T13:46:18Z"
+    },
+    {
+      "number": 26,
+      "name": "Verify fixed Codex 0.156.1 Windows ConPTY notification transport",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-24T13:46:18Z",
+      "completed_at": "2026-09-24T13:47:16Z"
+    },
+    {
+      "number": 27,
+      "name": "Preserve fixed Codex 0.156.1 Windows ConPTY evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:47:16Z",
+      "completed_at": "2026-09-24T13:47:20Z"
+    },
+    {
+      "number": 28,
+      "name": "Verify Claude Windows native SessionStart notification without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:47:20Z",
+      "completed_at": "2026-09-24T13:47:45Z"
+    },
+    {
+      "number": 29,
+      "name": "Preserve Claude Windows native notification evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:47:45Z",
+      "completed_at": "2026-09-24T13:47:49Z"
+    },
+    {
+      "number": 30,
+      "name": "Check InfiniShell-Desktop",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:47:49Z",
+      "completed_at": "2026-09-24T13:50:44Z"
+    },
+    {
+      "number": 31,
+      "name": "Test IPC frame-limit recovery",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:50:44Z",
+      "completed_at": "2026-09-24T13:50:53Z"
+    },
+    {
+      "number": 32,
+      "name": "Build InfiniShell SSH worker",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T13:50:53Z",
+      "completed_at": "2026-09-24T13:50:53Z"
+    },
+    {
+      "number": 33,
+      "name": "Test Windows PowerShell SSH worker arguments",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T13:50:53Z",
+      "completed_at": "2026-09-24T13:50:53Z"
+    },
+    {
+      "number": 34,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T13:50:53Z",
+      "completed_at": "2026-09-24T14:02:08Z"
+    },
+    {
+      "number": 35,
+      "name": "Verify Windows Codex production notification installer without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:02:08Z",
+      "completed_at": "2026-09-24T14:02:40Z"
+    },
+    {
+      "number": 36,
+      "name": "Preserve Windows Codex production installer evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:02:40Z",
+      "completed_at": "2026-09-24T14:02:44Z"
+    },
+    {
+      "number": 37,
+      "name": "Verify fixed Windows Grok production notification installer without credentials",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-24T14:02:44Z",
+      "completed_at": "2026-09-24T14:03:07Z"
+    },
+    {
+      "number": 38,
+      "name": "Preserve Windows Grok production installer evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:03:07Z",
+      "completed_at": "2026-09-24T14:03:12Z"
+    },
+    {
+      "number": 39,
+      "name": "Test shared CLI action contracts and skills",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T14:03:12Z",
+      "completed_at": "2026-09-24T14:03:12Z"
+    },
+    {
+      "number": 40,
+      "name": "Test CLI harness arguments",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T14:03:12Z",
+      "completed_at": "2026-09-24T14:03:12Z"
+    },
+    {
+      "number": 41,
+      "name": "Test bilingual TUI task message states",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T14:03:12Z",
+      "completed_at": "2026-09-24T14:03:12Z"
+    },
+    {
+      "number": 42,
+      "name": "Test managed command process ownership",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:03:12Z",
+      "completed_at": "2026-09-24T14:03:36Z"
+    },
+    {
+      "number": 43,
+      "name": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:03:36Z",
+      "completed_at": "2026-09-24T14:04:14Z"
+    },
+    {
+      "number": 44,
+      "name": "Build CLI process supervisor",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:04:14Z",
+      "completed_at": "2026-09-24T14:10:18Z"
+    },
+    {
+      "number": 45,
+      "name": "Verify fixed Windows CLI atomic update candidates without credentials",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-24T14:10:18Z",
+      "completed_at": "2026-09-24T14:23:23Z"
+    },
+    {
+      "number": 46,
+      "name": "Preserve Windows fixed CLI atomic update receipts",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:23:23Z",
+      "completed_at": "2026-09-24T14:23:42Z"
+    },
+    {
+      "number": 47,
+      "name": "Test supervisor cleanup after host crash",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:23:42Z",
+      "completed_at": "2026-09-24T14:23:58Z"
+    },
+    {
+      "number": 48,
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:23:58Z",
+      "completed_at": "2026-09-24T14:24:20Z"
+    },
+    {
+      "number": 49,
+      "name": "Preserve Windows native CLI boundary evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:24:20Z",
+      "completed_at": "2026-09-24T14:24:36Z"
+    },
+    {
+      "number": 50,
+      "name": "Test rust-genai",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:24:36Z",
+      "completed_at": "2026-09-24T14:24:50Z"
+    },
+    {
+      "number": 51,
+      "name": "Compile GUI integration tests",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:24:50Z",
+      "completed_at": "2026-09-24T14:31:14Z"
+    },
+    {
+      "number": 52,
+      "name": "Verify Windows GUI system clipboard without model inputs",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-09-24T14:31:14Z",
+      "completed_at": "2026-09-24T14:37:53Z"
+    },
+    {
+      "number": 53,
+      "name": "Preserve Windows GUI system clipboard evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:37:53Z",
+      "completed_at": "2026-09-24T14:37:57Z"
+    },
+    {
+      "number": 54,
+      "name": "Run desktop workspace unit tests",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T14:37:57Z",
+      "completed_at": "2026-09-24T14:37:57Z"
+    },
+    {
+      "number": 55,
+      "name": "Report sccache statistics",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:37:57Z",
+      "completed_at": "2026-09-24T14:37:57Z"
+    },
+    {
+      "number": 109,
+      "name": "Post Install Node for CLI plugin verification",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-24T14:37:57Z",
+      "completed_at": "2026-09-24T14:37:57Z"
+    },
+    {
+      "number": 110,
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:37:57Z",
+      "completed_at": "2026-09-24T14:38:01Z"
+    },
+    {
+      "number": 111,
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-24T14:38:01Z",
+      "completed_at": "2026-09-24T14:38:01Z"
+    }
+  ],
+  "test_summaries": [
+    "2026-09-24T13:50:53.7555549Z      Summary [   0.103s] 2 tests run: 2 passed, 9 skipped",
+    "2026-09-24T14:02:07.9779100Z      Summary [ 148.084s] 735 tests run: 735 passed, 6753 skipped",
+    "2026-09-24T14:03:35.8874414Z      Summary [   0.364s] 2 tests run: 2 passed, 12 skipped",
+    "2026-09-24T14:04:14.8448265Z      Summary [  33.549s] 2 tests run: 2 passed, 7486 skipped",
+    "2026-09-24T14:23:58.7583831Z      Summary [  10.437s] 4 tests run: 4 passed, 7484 skipped",
+    "2026-09-24T14:24:50.0834797Z test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+  ],
+  "failures_preserved": true,
+  "goal_complete": false
+}
