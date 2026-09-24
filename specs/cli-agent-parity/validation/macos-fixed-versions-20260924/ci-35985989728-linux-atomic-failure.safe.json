@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "run_id": 35985989728,
+  "job_id": 107588661860,
+  "head_sha": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "original_receipt": {
+    "path": "/private/tmp/isp-mac-1mej4h8z/evidence/linux-ci-35985989728/artifacts/cli-linux-fixed-atomic-updates/summary.safe.json",
+    "sha256": "9922f58dfac0f5ee11a51cfbc0a15e64e1fbaea52fddb9e9976ae86682665d74"
+  },
+  "cases_reported": 12,
+  "cases_passed": 0,
+  "failure_code": "binary_not_regular",
+  "failure_type": "ValueError",
+  "product_transactions_started": 0,
+  "input_receipts_exported": 0,
+  "verified_native_inputs_preparation_completed": true,
+  "failure_location_scope": "linux_case 在第一份 input.safe.json 写出前；每个场景均在产品 native 插件准备或事务开始前失败。",
+  "exact_failing_build_role": null,
+  "observed_build_bytes": null,
+  "hypothesis": "共同 worker/supervisor 构建产物超过旧1GiB摘要上限；现有工件只绑定SHA，无文件bytes，尚未实测确认。",
+  "not_a_symlink_diagnosis": true,
+  "private_cleanup_confirmed": false,
+  "private_fixture_boundary": "夹具复制可能已发生；本轮没有清理收据，不声称私有目录已删除。",
+  "credentials_provided": false,
+  "model_inputs_sent": 0,
+  "failure_preserved": true
+}

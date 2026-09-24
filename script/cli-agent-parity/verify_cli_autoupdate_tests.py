@@ -1,16 +1,48 @@
 #!/usr/bin/env python3
 """升级驱动离线边界；只用合成文件和 Python/mock，不执行原生 CLI。"""
 
+import hashlib
 import json
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import verify_cli_autoupdate as runner
+
+
+class DigestTests(unittest.TestCase):
+    def test_debug_binary_size_boundary_keeps_streaming_reads(self):
+        path = MagicMock()
+        path.is_file.return_value = True
+        path.stat.return_value = SimpleNamespace(st_size=8 * 1024 ** 3)
+        stream = path.open.return_value.__enter__.return_value
+        body = b"synthetic-debug-binary"
+        stream.read.side_effect = [body, b""]
+        self.assertEqual(runner.digest(path), hashlib.sha256(body).hexdigest())
+        self.assertTrue(all(call.args == (1024 * 1024,) for call in stream.read.call_args_list))
+        path.reset_mock()
+        path.stat.return_value = SimpleNamespace(st_size=8 * 1024 ** 3 + 1)
+        with self.assertRaisesRegex(ValueError, "^binary_too_large$"):
+            runner.digest(path)
+        path.open.assert_not_called()
+
+    def test_non_file_and_growth_beyond_limit_are_distinct(self):
+        path = MagicMock()
+        path.is_file.return_value = False
+        with self.assertRaisesRegex(ValueError, "^binary_not_regular$"):
+            runner.digest(path)
+        path.open.assert_not_called()
+        path.is_file.return_value = True
+        path.stat.return_value = SimpleNamespace(st_size=1)
+        path.open.return_value.__enter__.return_value.read.return_value = b"1234"
+        with patch.object(runner, "MAX_BINARY_BYTES", 3):
+            with self.assertRaisesRegex(ValueError, "^binary_too_large$"):
+                runner.digest(path)
 
 
 class DriverTests(unittest.TestCase):

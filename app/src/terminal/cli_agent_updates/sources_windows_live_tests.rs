@@ -376,6 +376,8 @@ struct Evidence {
     model_inputs_sent: u32,
     product_inspect_calls: u32,
     product_execute_calls: u32,
+    supervisor_exit_reason: Option<ExitReason>,
+    supervisor_exit_code: Option<i32>,
     native_exit_confirmed: bool,
     strict_job_cleanup_confirmed: bool,
     entry_matches_target: bool,
@@ -445,8 +447,18 @@ async fn exercise(
         receipt
     };
     let (executed, receipt) = futures::join!(execute(plan, Some(progress)), observe);
+    evidence.supervisor_exit_reason = receipt.as_ref().map(|receipt| receipt.exit_reason);
+    evidence.supervisor_exit_code = receipt.as_ref().and_then(|receipt| receipt.exit_code);
+    // 输出 EOF 可以先于根进程退出被观察到；监督回执保留最初的 StdioClosed 原因。
+    // Windows 执行 worker 仅在调试会话确认原生 exit 0 后成功返回，Job 强杀使用 exit 1。
+    // 因此仍要求真实 exit 0 和严格 Job 清空，且不接受显式停止或宿主断连。
     evidence.native_exit_confirmed = receipt.as_ref().is_some_and(|receipt| {
-        receipt.exit_reason == ExitReason::NativeExit && receipt.exit_code == Some(0)
+        matches!(
+            receipt.exit_reason,
+            ExitReason::NativeExit | ExitReason::StdioClosed
+        ) && receipt.exit_code == Some(0)
+            && receipt.cleanup_confirmed
+            && receipt.containment == "windows_job"
     });
     evidence.strict_job_cleanup_confirmed = receipt
         .as_ref()

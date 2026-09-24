@@ -15,7 +15,7 @@
 | SSH／tmux；R3 | shell hook、通知 worker、终端可信输入绑定 | 固定三款真实 CLI 触发、真实本机隔离 OpenSSH、产品 PTY 接收、tmux 断连重接；各自收据见交付记录 | 对应 Mac→本机 SSH 场景通过；不是其他 OS 远端或所有组合；关闭透传复用公共解析器风险验证 |
 | CLI_AUTOUPDATE；R7 | `cli_agent_updates`、`managed_process_atomic_*` | [Mac 三款正式升级](validation/macos-fixed-versions-20260924/formal-updates-v4.safe.json)、[Claude Latest→Stable 降级](validation/macos-fixed-versions-20260924/claude-stable-downgrade-v10.safe.json)、Busy／回滚／恢复回归 | Mac 已识别原生来源通过；Linux／Windows 真正更新事务待集中 CI；未知来源降级保持 |
 | P5 双语和本地门禁 | `app/i18n/{en,zh-CN}`、Rust／Python／Node 回归 | [V11 本地索引](validation/macos-fixed-versions-20260924/mac-v11-local-index.safe.json)：check、libtest、i18n 11、定向 1645、原子 15；[双语布局](validation/macos-fixed-versions-20260924/gui-bilingual-final-v11.safe.json) | 上述通过；[完整桌面首次结果](validation/macos-fixed-versions-20260924/goal-v11-workspace-result.safe.json)为 10858 通过、3 前置超时、109 跳过，[3 项同二进制串行复验](validation/macos-fixed-versions-20260924/workspace-host-serial-v11.safe.json)通过，原失败保留 |
-| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；[统一 CI 35973064369](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35973064369) 正在验证同一提交 | 待平台结果和报告闭环；源码与 Mac 验证快照已逐文件核对 |
+| P5 平台、提交和报告；R8 | `.github/workflows/cross-platform-preflight.yml`、本表和验证收据 | 产品提交 `2c483322f00d569bc126bfa96616e2920083f872` 已推送；测试及 CI 修正 `faab52d8a41f9d47530f55c9bc73d13f1c115803` 的[集中复验 35985989728](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35985989728) 进行中 | 待平台结果和报告闭环；[源码对应](validation/macos-fixed-versions-20260924/source-binding-faab52d8a.safe.json)确认产品实现未变 |
 
 验证范围明确区分：真实 GUI 运行、GUI integration 编译、系统剪贴板、真实 IME、模拟协议、原生 CLI 执行和模型结果。跳过项不计通过，已记录失败不删除或追改。Grok 托管图片不支持，固定策略禁用原生 shell／hook／技能；这些限制应由界面与能力矩阵明确表达。
 
@@ -28,3 +28,21 @@
 首次统一 CI 的失败按原样保留：[Linux](validation/macos-fixed-versions-20260924/ci-35973064369-linux-final.safe.json)定向 2,846 项通过、1 项旧候选权限预期失败；真实 GUI 在创建窗口前缺少 `libXcursor`，没有进入剪贴板断言。Windows 的 [PATH 测试](validation/macos-fixed-versions-20260924/ci-35973064369-windows-grok-runner.safe.json)与 [Codex 临时目录清理](validation/macos-fixed-versions-20260924/ci-35973064369-windows-codex-hooks.safe.json)失败分别修复，原生通知 case 与 ConPTY 的通过保持各自边界。当前修正只涉及测试与 CI 环境，没有改变已验收的 Mac 产品行为；[本地权限 12 项、i18n 11 项和 check](validation/macos-fixed-versions-20260924/ci-fixes-local-gates.safe.json)、[清理脚本回归](validation/macos-fixed-versions-20260924/ci-fixes-codex-cleanup-local.safe.json)及 [workflow 静态检查](validation/macos-fixed-versions-20260924/ci-fixes-workflow-static.safe.json)通过。依赖步骤被跳过的结果不计通过，修正后的远端复验仍待执行。
 
 Windows 首次定向为 2,716 项通过、1 项同样的旧候选权限预期失败。真实 GUI 编译通过，运行在 DXGI swapchain 创建时报 `0x887A0022`，没有窗口、剪贴板断言或截图通过证据。[私有 Mesa WGL 环境脚本](validation/macos-fixed-versions-20260924/ci-fixes-windows-gui-mesa-static.safe.json)已通过本地语法及固定包摘要检查，远端验证仍待执行：它复制同一构建的 EXE 和运行库，使用固定 Mesa `26.2.1` 的两个 DLL，不改产品或系统安装；必须同时取得实际 GL/llvmpipe 窗口渲染日志、同二进制剪贴板收据和两张非空截图才计通过。
+
+修正已推送为 `faab52d8a41f9d47530f55c9bc73d13f1c115803`。集中复验使用指向同一提交的 `codex/cli-agent-parity-verify-faab52d8a` 引用，Linux 利用空闲 runner 先执行，Windows 排队接续首轮全量；独立并发组保留首轮作业，不将其取消。两次 run 的失败和通过分别留证。
+
+首轮 Windows [最终回执](validation/macos-fixed-versions-20260924/ci-35973064369-windows-final.safe.json)为全量 10,659 项通过、1 项同样的旧候选权限断言失败、110 项跳过。5 项 nextest leaky 表示测试退出后的输出句柄迟闭，保留其名称及边界，不作为进程树清理通过证据。
+
+集中复验中 Windows 暴露两项脚本边界：[私有配置 LF／CRLF](validation/macos-fixed-versions-20260924/ci-35985989728-windows-offline-step9-original.safe.json)与 [Codex 主进程自然退出后输出 reader 未全结束](validation/macos-fixed-versions-20260924/ci-35985989728-windows-codex-01561-partial.safe.json)。前者显式写入 LF，并把 35 个独立离线脚本改为全部执行后统一报错；固定 CLI 准备和原生探针只依赖各自真实前置，失败状态仍保留。本机 PowerShell 批次 [797 项通过、7 项平台跳过及 cargo check](validation/macos-fixed-versions-20260924/ci-followup-offline-batch-local.safe.json)不能替代 Windows 实测。后者保留完整原生 hook 终态、配置恢复与 ConPTY 通过证据，EOF 超时仍按失败处理；没有依据将它认定为后代已清理。上述变化无需本地化变更。
+
+EOF 补验改用两路共享 5 秒事件截止时间，记录通道、真实 EOF、线程存活和耗时；读取或解码失败、超时仍严格失败，始终不宣称 Job 后代清理。[真实短命子进程回归](validation/macos-fixed-versions-20260924/ci-followup-codex-eof-local.safe.json)覆盖继承 stdout 延迟关闭、超时后的失败快照不变、非法 UTF-8 三个边界。改动后的 [最终 35 脚本批次](validation/macos-fixed-versions-20260924/ci-followup-final-local-gates.safe.json)为 800 项通过、7 项按平台跳过；当前源摘要已附，Windows 原生结果仍须后续复验。
+
+集中复验的 [Linux 最终结果](validation/macos-fixed-versions-20260924/ci-35985989728-linux-final.safe.json)已确认全量 10,899 项通过、98 项跳过，定向 2,847 项通过，Grok 0.1.4 六阶段正式安装／升级及 Codex 原生恢复通过。原子更新 12 项均在夹具准备时报 `binary_not_regular`，没有执行产品升级；[原失败分析](validation/macos-fixed-versions-20260924/ci-35985989728-linux-atomic-failure.safe.json)保留大小与普通文件合并报错的不确定性。[运行器修正](validation/macos-fixed-versions-20260924/ci-followup-linux-atomic-local.safe.json)将构建产物摘要上限与正式 CLI 的 1 GiB 限制分开，下一轮先记录构建文件类型和大小。真实 Linux GUI 已创建窗口，但中文草稿断言失败；测试补齐输入框焦点前置，仍要求真实 Ctrl-V、中文精确一致、PNG 像素和零提交。
+
+Windows 的 [三款正式更新原失败](validation/macos-fixed-versions-20260924/ci-35985989728-windows-atomic-failure.safe.json)保留不变：Codex／Grok 返回 `CommandFailed`，Claude 已达到目标摘要／版本但原生退出收据判定失败，三款配置保全、journal 清除和严格 Job 清理均通过。Claude 收据改为允许先观察到 `StdioClosed`，同时仍强制实际退出码 0、严格 Job 与清理确认；停止／宿主断开不接受。失败的产品执行另用独立私有副本诊断 loader 与原生退出，不把诊断成功替代产品失败，不放宽 DLL 信任检查。
+
+Windows Mesa 已实际创建 GL/llvmpipe 窗口，失败发生在终端引导、尚未开始剪贴板。测试补齐私有 profile 目录，并强制配置路径位于该目录；引导仍保留原 20 秒与全部断言，失败只增加四项状态诊断。原始 InitShell 直接进入父 stdout 的现象与 [Microsoft ConPTY 维护者说明](https://github.com/microsoft/terminal/discussions/15814)一致：恢复 `STARTF_USESTDHANDLES` 并保持三项标准句柄为 NULL，避免 shell 继承父进程重定向输出；该 Windows 产品修正仍须真实 GUI 复验，不能由 Mac check 代替。
+
+下一轮集中 CI 单独启用 GUI 剪贴板和原子升级，关闭完整工作区集合；新增 `run_gui_clipboard` 仅用于独立复验真实窗口，既有 `full_workspace_tests` 行为保留。当前修正无需本地化变更；原失败、跳过和不同提交来源继续分别保留。
+
+本轮冻结后的 [本地门禁](validation/macos-fixed-versions-20260924/ci-followup-frozen-local-gates.safe.json)为 35 个脚本 811 项通过、7 项平台跳过，cargo check、i18n 11 项、构建摘要边界 1 项及静态检查通过。[Windows 安全诊断回归](validation/macos-fixed-versions-20260924/ci-followup-windows-atomic-diagnostics.safe.json)单列阶段、系统数值、原生退出与 Job 清理，原生 Rust 分支仍待 CI。外置盘一度权限失败的原日志保留，后续检查已恢复通过。

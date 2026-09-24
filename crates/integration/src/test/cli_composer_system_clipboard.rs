@@ -3,9 +3,9 @@
 use warp::features::FeatureFlag;
 use warp::integration_testing::clipboard::{
     assert_cli_clipboard_draft, finish_cli_clipboard_evidence, open_cli_clipboard_composer,
-    setup_cli_system_clipboard, write_cli_system_clipboard_image, write_cli_system_clipboard_text,
+    setup_cli_system_clipboard, wait_until_cli_clipboard_bootstrapped,
+    write_cli_system_clipboard_image, write_cli_system_clipboard_text,
 };
-use warp::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use warpui_core::integration::TestStep;
 
 use crate::Builder;
@@ -16,7 +16,7 @@ pub fn test_cli_composer_system_clipboard_multiline_and_image() -> Builder {
     Builder::new()
         .with_real_display()
         .with_setup(setup_cli_system_clipboard)
-        .with_step(wait_until_bootstrapped_single_pane_for_tab(0))
+        .with_step(wait_until_cli_clipboard_bootstrapped())
         .with_step(open_cli_clipboard_composer())
         .with_step(write_cli_system_clipboard_text())
         .with_step(

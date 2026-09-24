@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "run_id": 35985989728,
+  "source_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "status": "partial_running",
+  "codex_version": "0.156.1",
+  "sources": [
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/codex-01561-hooks/codex-01561-windows-native-hooks.json",
+      "sha256": "632afed21208d18f2dcc2c022497a7c06af7b6592e4f0d26d633e4afb58037cf"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/codex-01561-conpty/codex-01561-windows-conpty.json",
+      "sha256": "651b3bb49329d75e166790547ab10ffb3e6a6326557ca7aa028255235cc2c8f2"
+    }
+  ],
+  "hooks": {
+    "passed": false,
+    "failure": {
+      "phase": "native_codex_hooks",
+      "type": "ValueError",
+      "message": "原生输出读取没有结束"
+    },
+    "cases": [
+      {
+        "index": 0,
+        "passed": true,
+        "formal_registration_passed": true,
+        "hook_completion": {
+          "complete": true,
+          "turn_completed": true,
+          "pending_display_orders": [],
+          "elapsed_ms": 5459,
+          "reader_errors": [],
+          "model_http_requests": 0
+        },
+        "verified_native_events": [
+          "sessionStart",
+          "userPromptSubmit"
+        ],
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "root_exit_code": 0,
+            "all_descendants_job_verified": false
+          },
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "root_exit_code": 0,
+            "all_descendants_job_verified": false
+          }
+        ],
+        "failed_close_receipt": null,
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        }
+      },
+      {
+        "index": 1,
+        "passed": false,
+        "formal_registration_passed": true,
+        "hook_completion": {
+          "complete": true,
+          "turn_completed": true,
+          "pending_display_orders": [],
+          "elapsed_ms": 4711,
+          "reader_errors": [],
+          "model_http_requests": 0
+        },
+        "verified_native_events": [
+          "sessionStart",
+          "userPromptSubmit"
+        ],
+        "process_closes": [
+          {
+            "root_exited_naturally": true,
+            "termination_requested": false,
+            "kill_requested": false,
+            "output_readers_eof": true,
+            "root_exit_code": 0,
+            "all_descendants_job_verified": false
+          }
+        ],
+        "failed_close_receipt": {
+          "root_exited_naturally": true,
+          "termination_requested": false,
+          "kill_requested": false,
+          "output_readers_eof": false,
+          "root_exit_code": 0
+        },
+        "config_rollback": {
+          "attempted": true,
+          "restored": true,
+          "concurrent_change_detected": false
+        }
+      }
+    ],
+    "cause_boundary": "第二案例 hook/turn 均完整完成且原生主进程自然exit0，但每reader join2秒后未全EOF；旧只读cleanup未到达，现有收据不能定位残留channel或PID。"
+  },
+  "conpty": {
+    "source_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+    "passed": true,
+    "codex_version": "0.156.1",
+    "native_conpty_notifications_verified": true,
+    "formal_five_hook_registration_verified": true,
+    "conout_canary_observed": true,
+    "notification_events_verified": [
+      "session_start",
+      "prompt_submit"
+    ],
+    "notification_events_not_verified": [
+      "stop",
+      "permission_request",
+      "post_tool_use"
+    ],
+    "ordinary_codex_tui_verified": false,
+    "product_ui_notifications_verified": false,
+    "full_lifecycle_verified": false,
+    "model_generation_verified": false,
+    "credentials_provided": false
+  },
+  "not_claimed": [
+    "hooks脚本完整通过",
+    "未知剩余进程身份",
+    "原生五事件全部实际触发",
+    "产品GUI或普通TUI通过"
+  ]
+}

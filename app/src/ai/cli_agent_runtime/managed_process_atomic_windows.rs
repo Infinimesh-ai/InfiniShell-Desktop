@@ -416,6 +416,8 @@ impl WindowsImageDebugSession {
         if parent_identity.id != self.system_directory.identity.id
             || !is_plain_kind(parent_identity.attributes, true)
         {
+            #[cfg(test)]
+            tests::record_rejected_image(&final_path, &self.system_directory.file);
             return Err(error(
                 "managed_process.atomic_windows_loaded_image_outside_system_directory",
             ));

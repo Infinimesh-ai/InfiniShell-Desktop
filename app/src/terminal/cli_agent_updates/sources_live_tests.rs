@@ -262,6 +262,39 @@ fn binary_sha(path: &Path) -> Result<String, &'static str> {
         .map_err(|_| "binary_unreadable")
 }
 
+fn build_binary_sha(path: &Path) -> Result<String, &'static str> {
+    // Cargo 调试产物可超过原生 CLI 的 1 GiB；此上限只用于验收构建身份。
+    build_binary_sha_with_limit(path, 8 * 1024 * 1024 * 1024)
+}
+
+fn build_binary_sha_with_limit(path: &Path, limit: u64) -> Result<String, &'static str> {
+    let mut file = fs::File::open(path).map_err(|_| "binary_unreadable")?;
+    let metadata = file.metadata().map_err(|_| "binary_unreadable")?;
+    if !metadata.is_file() || metadata.len() > limit {
+        return Err("binary_unreadable");
+    }
+    let mut digest = Sha256::new();
+    let mut consumed = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer).map_err(|_| "binary_unreadable")?;
+        if count == 0 {
+            break;
+        }
+        consumed += count as u64;
+        if consumed > limit {
+            return Err("binary_unreadable");
+        }
+        digest.update(&buffer[..count]);
+    }
+    if consumed != metadata.len()
+        || file.metadata().map_err(|_| "binary_unreadable")?.len() != metadata.len()
+    {
+        return Err("binary_unreadable");
+    }
+    Ok(hex::encode(digest.finalize()))
+}
+
 fn private_file(path: &Path, mode: u32) -> Result<Vec<u8>, &'static str> {
     let metadata = fs::symlink_metadata(path).map_err(|_| "private_file_missing")?;
     if !metadata.is_file()
@@ -477,7 +510,7 @@ fn verify_build_binding(manifest: &Manifest) -> Result<(), &'static str> {
         || !bundle
             .get("worker")
             .is_some_and(|value| matches_binary(value, &manifest.supervisor))
-        || binary_sha(&manifest.supervisor.path)? != manifest.supervisor.sha256
+        || build_binary_sha(&manifest.supervisor.path)? != manifest.supervisor.sha256
         || !binary_contains_all(&manifest.supervisor.path, &SUPERVISOR_COMPILED_SOURCES)?
         || !strict_signature_verified(&manifest.supervisor.path)
     {
@@ -1247,7 +1280,7 @@ async fn real_native_update_without_model() {
             .ok()
             .and_then(|path| path.canonicalize().ok())
             == manifest.worker.path.canonicalize().ok()
-            && binary_sha(&manifest.worker.path).ok().as_deref()
+            && build_binary_sha(&manifest.worker.path).ok().as_deref()
                 == Some(manifest.worker.sha256.as_str())
             && binary_sha(&manifest.source_manifest.path).ok().as_deref()
                 == Some(manifest.source_manifest.sha256.as_str()),
@@ -1504,6 +1537,24 @@ fn compiled_source_binding_rejects_a_forged_manifest_digest() {
 
     source["files"][0]["sha256"] = Value::String("0".repeat(64));
     assert!(!compiled_source_files_match(&source));
+}
+
+#[test]
+fn build_binary_digest_keeps_an_exact_size_limit_and_rejects_directories() {
+    let directory = tempfile::TempDir::new().unwrap();
+    let path = directory.path().join("worker");
+    // 用小上限验证同一流式分支，不创建 GiB 级夹具。
+    let bytes = vec![b'x'; 64 * 1024 + 1];
+    fs::write(&path, &bytes).unwrap();
+    assert_eq!(
+        build_binary_sha_with_limit(&path, bytes.len() as u64),
+        Ok(sha(&bytes))
+    );
+    assert_eq!(
+        build_binary_sha_with_limit(&path, bytes.len() as u64 - 1),
+        Err("binary_unreadable")
+    );
+    assert_eq!(build_binary_sha(directory.path()), Err("binary_unreadable"));
 }
 
 #[test]

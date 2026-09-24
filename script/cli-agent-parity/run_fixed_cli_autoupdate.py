@@ -41,6 +41,23 @@ def binding(path):
     return {"path": str(path), "sha256": transaction.digest(path)}
 
 
+def record_build_inputs(args):
+    # 复制任何原生夹具前保存构建文件形状，避免把超大调试产物误报为非普通文件。
+    binaries = []
+    for role, path in (("worker", args.test_binary), ("supervisor", args.supervisor)):
+        row = {"role": role, "path": str(path.absolute()), "is_file": path.is_file(),
+               "bytes": None, "stat_error_type": None}
+        try:
+            row["bytes"] = path.stat().st_size
+        except OSError as error:
+            row["stat_error_type"] = type(error).__name__
+        binaries.append(row)
+    write(args.output.with_name("build-inputs.safe.json"), {
+        "schema_version": 1, "scope": "固定升级夹具复制前的构建文件元数据",
+        "binary_limit_bytes": transaction.MAX_BINARY_BYTES, "binaries": binaries,
+        "credentials_provided": False, "model_inputs_sent": 0})
+
+
 def prepared_input(agent, version, cache):
     script, flag = {"codex": ("prepare_codex_cli.py", "--version"),
                     "claude": ("prepare_claude_cli.py", "--claude-version"),
@@ -287,8 +304,39 @@ def windows_debug_case(args, agent, old, target):
                 process.wait(timeout=15)
     log = log_path.read_text(encoding="utf-8", errors="replace")
     errors = sorted(set(re.findall(r"managed_process\.atomic_windows_[a-z_]+", log)))
+    rejected_images = []
+    debug_failures = []
+    for line in log.splitlines():
+        if line.startswith("atomic_windows_debug_failure=") and len(debug_failures) < 4:
+            try:
+                failure = json.loads(line.split("=", 1)[1])
+            except json.JSONDecodeError:
+                continue
+            if (isinstance(failure, dict) and set(failure) == {"stage", "os_error", "hresult", "failure_code"}
+                    and failure["stage"] in ("begin_session", "wait_for_exit")
+                    and all(failure[key] is None or type(failure[key]) is int and -2**31 <= failure[key] < 2**31
+                            for key in ("os_error", "hresult"))
+                    and (failure["failure_code"] is None or isinstance(failure["failure_code"], str)
+                         and re.fullmatch(r"managed_process\.atomic_windows_[a-z_]{1,98}", failure["failure_code"]))):
+                debug_failures.append(failure)
+            continue
+        if not line.startswith("atomic_windows_rejected_image=") or len(rejected_images) >= 8:
+            continue
+        try:
+            image = json.loads(line.split("=", 1)[1])
+        except json.JSONDecodeError:
+            continue
+        if (isinstance(image, dict) and set(image) == {"basename", "directory_category"}
+                and (image["basename"] is None or isinstance(image["basename"], str)
+                     and re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", image["basename"]))
+                and image["directory_category"] in ("windows_microsoft_net", "windows_winsxs",
+                    "windows_system32_subdirectory", "windows_other", "outside_windows_or_unresolved")):
+            rejected_images.append(image)
     native_exit = process.returncode == 0 and "1 passed; 0 failed" in log and "严格 Job 已清空" in log
-    updater_succeeded = re.search(r"真实更新参数的原生退出状态：exit code: (?:0|0x0+)(?:\r?\n|$)", log) is not None
+    strict_job_cleanup = not timed_out and "atomic_windows_strict_job_cleanup_confirmed=true" in log.splitlines()
+    native_status = re.search(r"真实更新参数的原生退出状态：exit code: (0x[0-9a-fA-F]+|[0-9]+)(?=\s|\(|$)", log)
+    native_exit_code = int(native_status[1], 16 if native_status[1].startswith("0x") else 10) if native_status else None
+    updater_succeeded = native_exit_code == 0
     config_unchanged = all(path.exists() and transaction.digest(path) == checksum for path, checksum in configuration.items())
     entry_matches = entry.is_file() and transaction.digest(entry) == target_sha
     version_matches = False
@@ -307,12 +355,15 @@ def windows_debug_case(args, agent, old, target):
                     "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
                     "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs")],
                 "old_sha256": old_sha, "target_sha256": target_sha,
-                "native_exit_and_strict_job_confirmed": native_exit, "updater_exit_success": updater_succeeded, "timed_out": timed_out,
+                "native_exit_and_strict_job_confirmed": native_exit, "native_exit_code": native_exit_code,
+                "strict_job_cleanup_confirmed": strict_job_cleanup, "debug_failures": debug_failures,
+                "updater_exit_success": updater_succeeded, "timed_out": timed_out,
                 "old_binary_unchanged": transaction.digest(old) == old_sha, "target_reference_unchanged": transaction.digest(target) == target_sha,
                 "configuration_unchanged": config_unchanged, "entry_matches_target": entry_matches,
                 "target_native_version_matches": version_matches, "credentials_absent": transaction.auth_absent(root),
-                "stable_errors": errors, "private_log_sha256": transaction.digest(log_path)}
-    evidence["passed"] = all(evidence[key] for key in ("native_exit_and_strict_job_confirmed", "updater_exit_success", "old_binary_unchanged", "target_reference_unchanged",
+                "stable_errors": errors, "rejected_images": rejected_images,
+                "private_log_sha256": transaction.digest(log_path)}
+    evidence["passed"] = all(evidence[key] for key in ("native_exit_and_strict_job_confirmed", "strict_job_cleanup_confirmed", "updater_exit_success", "old_binary_unchanged", "target_reference_unchanged",
                                                       "configuration_unchanged", "entry_matches_target", "target_native_version_matches", "credentials_absent")) and not timed_out
     write(root / "receipt.safe.json", evidence)
     return {"agent": agent, "expected": "updated", "passed": evidence["passed"], "receipt": binding(root / "receipt.safe.json")}
@@ -384,7 +435,7 @@ def windows_case(args, agent, old, target):
                     and target_matches and transaction.auth_absent(root)}
     write(root / "receipt.safe.json", evidence)
     return {"agent": agent, "expected": "updated", "passed": evidence["passed"], "receipt": binding(root / "receipt.safe.json"),
-            "product_receipt": binding(product_path) if product_path.is_file() else None}
+            "product_receipt": binding(product_path) if product_path.is_file() else None, "timed_out": timed_out}
 
 
 def main():
@@ -400,6 +451,7 @@ def main():
     require(not args.output.exists(), "existing_receipt_preserved")
     args.output.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     args.output = args.output.absolute()
+    record_build_inputs(args)
     args.test_binary = args.test_binary.resolve(strict=True)
     args.supervisor = args.supervisor.resolve(strict=True)
     args.fixture_parent = args.fixture_parent.resolve(strict=True)
@@ -407,15 +459,24 @@ def main():
     args.cache = args.cache.resolve()
     results = []
     for agent in TARGET:
+        preparing_version = OLD[agent]
         try:
-            old = prepared_input(agent, OLD[agent], args.cache)
-            target = prepared_input(agent, TARGET[agent], args.cache)
-            verified_input(agent, OLD[agent], old)
-            verified_input(agent, TARGET[agent], target)
-            plugin = prepared_input(agent, PLUGIN[agent], args.cache) if sys.platform == "linux" else None
-            if plugin is not None:
-                verified_input(agent, PLUGIN[agent], plugin)
+            inputs = {}
+            versions = [("old", OLD[agent]), ("target", TARGET[agent])]
+            if sys.platform == "linux":
+                versions.append(("plugin", PLUGIN[agent]))
+            for role, version in versions:
+                preparing_version = version
+                print(json.dumps({"stage": "prepare_started", "agent": agent, "version": version}),
+                      file=sys.stderr, flush=True)
+                inputs[role] = prepared_input(agent, version, args.cache)
+                verified_input(agent, version, inputs[role])
+                print(json.dumps({"stage": "prepare_finished", "agent": agent, "version": version,
+                                  "passed": True, "failure_code": None}), file=sys.stderr, flush=True)
+            old, target, plugin = inputs["old"], inputs["target"], inputs.get("plugin")
             for expected in args.cases if sys.platform == "linux" else ("updated",):
+                print(json.dumps({"stage": "case_started", "agent": agent, "old_version": OLD[agent],
+                                  "target_version": TARGET[agent], "expected": expected}), file=sys.stderr, flush=True)
                 try:
                     result = linux_case(args, agent, old, target, plugin, expected) if sys.platform == "linux" else windows_case(args, agent, old, target)
                     # 只汇出允许上传的结构化收据；原生日志和配置始终留在私有夹具内。
@@ -426,12 +487,36 @@ def main():
                             transaction.exclusive_bytes(exported, source.read_bytes())
                             result[name] = binding(exported)
                     results.append(result)
+                    if sys.platform == "win32" and result["passed"] is False and result.get("timed_out") is False:
+                        # 产品失败始终保留；仅用另一份隔离副本诊断原生 loader/退出合同。
+                        print(json.dumps({"stage": "diagnostic_started", "agent": agent,
+                                          "target_version": TARGET[agent]}), file=sys.stderr, flush=True)
+                        try:
+                            diagnostic = windows_debug_case(args, agent, old, target)
+                            source = Path(diagnostic["receipt"]["path"])
+                            exported = args.output.parent / f"{agent}-{expected}-debug_receipt.safe.json"
+                            transaction.exclusive_bytes(exported, source.read_bytes())
+                            diagnostic["receipt"] = binding(exported)
+                            result["diagnostic"] = diagnostic
+                        except (OSError, ValueError, subprocess.SubprocessError) as failure:
+                            result["diagnostic"] = {"passed": False, "failure_type": type(failure).__name__,
+                                "failure_code": str(failure) if re.fullmatch(r"[a-z0-9_]{1,80}", str(failure)) else None}
+                        print(json.dumps({"stage": "diagnostic_finished", "agent": agent,
+                                          "target_version": TARGET[agent], "passed": result["diagnostic"]["passed"],
+                                          "failure_code": result["diagnostic"].get("failure_code")}),
+                              file=sys.stderr, flush=True)
                 except (OSError, ValueError, subprocess.SubprocessError) as failure:
                     results.append({"agent": agent, "expected": expected, "passed": False, "failure_type": type(failure).__name__,
                                     "failure_code": str(failure) if re.fullmatch(r"[a-z0-9_]{1,80}", str(failure)) else None})
+                print(json.dumps({"stage": "case_finished", "agent": agent, "old_version": OLD[agent],
+                                  "target_version": TARGET[agent], "expected": expected,
+                                  "passed": results[-1]["passed"], "failure_code": results[-1].get("failure_code")}),
+                      file=sys.stderr, flush=True)
         except (OSError, ValueError, subprocess.SubprocessError) as failure:
             results.append({"agent": agent, "expected": "prepare", "passed": False, "failure_type": type(failure).__name__,
                                     "failure_code": str(failure) if re.fullmatch(r"[a-z0-9_]{1,80}", str(failure)) else None})
+            print(json.dumps({"stage": "prepare_finished", "agent": agent, "version": preparing_version,
+                              "passed": False, "failure_code": results[-1]["failure_code"]}), file=sys.stderr, flush=True)
     value = {"scope": "固定三款真实原子更新候选", "platform": sys.platform, "target_versions": TARGET,
              "live_latest_claimed": False, "model_inputs_sent": 0, "credentials_provided": False,
              "production_path_exercised": sys.platform == "win32", "cases": results, "passed": bool(results) and all(row["passed"] for row in results)}

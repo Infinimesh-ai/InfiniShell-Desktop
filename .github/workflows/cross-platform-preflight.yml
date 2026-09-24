@@ -26,6 +26,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_gui_clipboard:
+        description: 单独复验真实 GUI 系统剪贴板，不重复完整工作区测试
+        required: true
+        default: false
+        type: boolean
       run_cli_atomic_updates:
         description: 固定 0.156.1 / 2.1.280 / 1.0.41 的隔离真实原子更新候选
         required: true
@@ -376,13 +381,13 @@ jobs:
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
         shell: bash
         run: cargo nextest run --no-run -p integration
 
       - name: Verify Linux GUI system clipboard without model inputs
         id: cli_gui_input
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
         shell: bash
         timeout-minutes: 15
         env:
@@ -569,6 +574,7 @@ jobs:
 
       # 直接解压固定摘要的官方 CI 包，保持当前作业以外的 Python 安装配置。
       - name: Prepare job-local Python for CLI parity verification
+        id: native_python
         shell: pwsh
         timeout-minutes: 5
         run: ./script/cli-agent-parity/prepare_windows_python.ps1
@@ -641,81 +647,57 @@ jobs:
           }
           python -c "import os, sys; assert os.name == 'nt', 'Native Windows Python is required'; assert sys.version_info >= (3, 11), 'Python 3.11+ is required'; print(sys.version)"
           if ($LASTEXITCODE -ne 0) { throw 'Native Python version probe failed' }
-          python script/cli-agent-parity/notification_patch_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Windows notification file transaction tests failed' }
-          python -B script/cli-agent-parity/codex_persistent_source_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Persistent Codex source transaction tests failed' }
-          python script/cli-agent-parity/codex_adapter_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'CLI acceptance evidence validation failed' }
-          python -B script/cli-agent-parity/claude_adapter_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude acceptance evidence validation failed' }
-          python -B script/cli-agent-parity/claude_profile_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude fixed-profile evidence validation failed' }
-          python -B script/cli-agent-parity/claude_coordinator_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude coordinator evidence validation failed' }
-          python -B script/cli-agent-parity/claude_batch_cancel_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude 批次取消证据校验失败' }
-          python -B script/cli-agent-parity/claude_approval_cancel_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude 等待审批取消证据校验失败' }
-          python -B script/cli-agent-parity/claude_image_probe_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude image evidence validation failed' }
-          python -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude 托管 PNG 验收证据校验失败' }
-          python -B script/cli-agent-parity/codex_source_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Codex source migration evidence validation failed' }
-          python -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Codex journal recovery evidence validation failed' }
-          python -B script/cli-agent-parity/grok_adapter_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok adapter evidence validation failed' }
-          python -B script/cli-agent-parity/grok_coordinator_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok coordinator evidence validation failed' }
-          python -B script/cli-agent-parity/grok_official_pty_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok ordinary PTY preparation validation failed' }
-          python -B script/cli-agent-parity/grok_policy_preflight_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 只读权限接口预检证据校验失败' }
-          # 仅运行合成证据与准备边界回归，不启动真实 CLI 或模型。
-          python -B script/cli-agent-parity/grok_native_skill_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 原生技能离线证据校验失败' }
-          python -B script/cli-agent-parity/grok_fixed_policy_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 固定策略离线证据校验失败' }
-          python -B script/cli-agent-parity/grok_child_coordinator_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 父子任务离线证据校验失败' }
-          python -B script/cli-agent-parity/grok_files_policy_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 文件工具离线证据校验失败' }
-          python -B script/cli-agent-parity/grok_selected_skill_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok 所选技能离线证据校验失败' }
-          python -B script/cli-agent-parity/grok_catalog_preflight_runner_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Grok SDK 目录离线证据校验失败' }
-          # macOS 官方隔离运行器依赖 POSIX 文件权限；Windows 原生门禁由 Rust 与下方步骤验证。
-          python -B script/cli-agent-parity/codex_windows_hook_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Windows hook command and fixed-input validation failed' }
-          python -B script/cli-agent-parity/codex_plugin_lifecycle_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Native plugin lifecycle evidence validation failed' }
-          python -B script/cli-agent-parity/codex_windows_notify_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Windows notification transport candidate validation failed' }
-          python -B script/cli-agent-parity/codex_plugin_cache_refresh_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Native persistent source cleanup validation failed' }
-          python -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed Codex package preparation validation failed' }
-          python -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -B script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed CLI autoupdate validation failed' }
-          python -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed Claude preparation validation failed' }
-          python -B script/cli-agent-parity/claude_windows_notifications_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude Windows 通知离线判定失败' }
-          python -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok preparation validation failed' }
-          python -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok ACP evidence validation failed' }
-          python -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude initialize and idle EOF evidence validation failed' }
-          python -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Claude permission observation validation failed' }
+          # 收齐互相独立的离线失败，避免只修第一个用例就再次等待整轮 CI。
+          $PSNativeCommandUseErrorActionPreference = $false
+          $failedScripts = @()
+          $scripts = @(
+            'notification_patch_tests.py',
+            'codex_persistent_source_tests.py',
+            'codex_adapter_runner_tests.py',
+            'claude_adapter_runner_tests.py',
+            'claude_profile_runner_tests.py',
+            'claude_coordinator_runner_tests.py',
+            'claude_batch_cancel_runner_tests.py',
+            'claude_approval_cancel_runner_tests.py',
+            'claude_image_probe_runner_tests.py',
+            'claude_managed_image_runner_tests.py',
+            'codex_source_runner_tests.py',
+            'codex_journal_recovery_runner_tests.py',
+            'grok_adapter_runner_tests.py',
+            'grok_coordinator_runner_tests.py',
+            'grok_official_pty_runner_tests.py',
+            'grok_policy_preflight_runner_tests.py',
+            'grok_native_skill_runner_tests.py',
+            'grok_fixed_policy_runner_tests.py',
+            'grok_child_coordinator_runner_tests.py',
+            'grok_files_policy_runner_tests.py',
+            'grok_selected_skill_runner_tests.py',
+            'grok_catalog_preflight_runner_tests.py',
+            'codex_windows_hook_tests.py',
+            'codex_plugin_lifecycle_tests.py',
+            'codex_windows_notify_tests.py',
+            'codex_plugin_cache_refresh_tests.py',
+            'prepare_codex_cli_tests.py',
+            'verify_cli_autoupdate_tests.py',
+            'run_fixed_cli_autoupdate_tests.py',
+            'prepare_claude_cli_tests.py',
+            'claude_windows_notifications_tests.py',
+            'prepare_grok_cli_tests.py',
+            'grok_fixed_acp_probe_tests.py',
+            'probe_claude_no_credentials_tests.py',
+            'probe_claude_permission_snapshot_tests.py'
+          )
+          foreach ($testScript in $scripts) {
+            python -B "script/cli-agent-parity/$testScript" -v
+            if ($LASTEXITCODE -ne 0) { $failedScripts += $testScript }
+          }
+          if ($failedScripts.Count -gt 0) {
+            throw ('Windows offline verification failed: ' + ($failedScripts -join ', '))
+          }
 
       - name: Prepare fixed native Codex without credentials
         id: fixed_codex
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -726,6 +708,7 @@ jobs:
       # 生产通知安装器的当前插件合同仍精确绑定 0.147.0；不要把最新版运行时冒充该合同。
       - name: Prepare fixed Codex production installer contract
         id: fixed_codex_installer
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -736,6 +719,7 @@ jobs:
 
       - name: Prepare fixed native Claude without credentials
         id: fixed_claude
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -746,6 +730,7 @@ jobs:
 
       - name: Prepare fixed native Grok without credentials
         id: fixed_grok
+        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -755,6 +740,7 @@ jobs:
           "INFINISHELL_TEST_GROK_EXE=$grokExecutable" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Verify fixed Grok unauthenticated ACP boundaries
+        if: ${{ !cancelled() && steps.fixed_grok.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -764,6 +750,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok unauthenticated ACP boundaries failed' }
 
       - name: Verify native Claude initialization and idle EOF
+        if: ${{ !cancelled() && steps.fixed_claude.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 3
         env:
@@ -783,6 +770,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Claude permission observation validation failed' }
 
       - name: Verify native Codex plugin registry failure recovery
+        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         env:
@@ -792,6 +780,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex plugin registry failure recovery failed' }
 
       - name: Verify native Codex persistent plugin source
+        if: ${{ !cancelled() && steps.fixed_codex.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1214,13 +1203,13 @@ jobs:
         run: cargo test --manifest-path lib/rust-genai/Cargo.toml --lib
 
       - name: Compile GUI integration tests
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
         shell: pwsh
         run: cargo nextest run --no-run -p integration
 
       - name: Verify Windows GUI system clipboard without model inputs
         id: cli_gui_input
-        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.full_workspace_tests }}
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && github.event_name == 'workflow_dispatch' && (inputs.full_workspace_tests || inputs.run_gui_clipboard) }}
         shell: pwsh
         timeout-minutes: 15
         env:

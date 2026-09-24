@@ -16,6 +16,7 @@ import time
 
 
 SCOPE = "cli_autoupdate_native_product"
+MAX_BINARY_BYTES = 8 * 1024 ** 3
 TEST_NAME = "terminal::cli_agent_updates::sources::live_tests::real_native_update_without_model"
 MARKER = b"InfiniShell private updater fixture; no credentials or model inputs\n"
 CHANNELS = {"codex": {"follow_installation", "latest", "alpha"},
@@ -104,9 +105,13 @@ def is_version(value):
 
 def digest(path):
     result = hashlib.sha256()
-    require(path.is_file() and path.stat().st_size <= 1024 ** 3, "binary_not_regular")
+    require(path.is_file(), "binary_not_regular")
+    require(path.stat().st_size <= MAX_BINARY_BYTES, "binary_too_large")
+    consumed = 0
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            consumed += len(chunk)
+            require(consumed <= MAX_BINARY_BYTES, "binary_too_large")
             result.update(chunk)
     return result.hexdigest()
 
@@ -525,7 +530,7 @@ def main(argv=None):
         result = prepare(args) if args.command == "prepare" else run(args)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         known = {"manifest_fields", "manifest_schema", "case_id", "agent", "channel", "expectation", "versions", "deadline",
-            "absolute_path", "binary_binding", "old_and_target_must_differ", "binary_not_regular", "private_file_shape",
+            "absolute_path", "binary_binding", "old_and_target_must_differ", "binary_not_regular", "binary_too_large", "private_file_shape",
             "private_file_permissions", "path_outside_fixture", "fixture_symlink", "fixture_identity", "fixture_permissions",
             "fixture_marker", "binary_not_canonical", "old_entry_binding", "input_digest_mismatch", "credential_file_present",
             "environment_path", "native_fixture_requires_posix", "explicit_update_authorization_required", "case_binding",

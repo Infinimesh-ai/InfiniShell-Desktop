@@ -14,10 +14,12 @@ use warpui::clipboard::ClipboardContent;
 use warpui::integration::{
     ARTIFACTS_DIR_ENV_VAR, AssertionCallback, AssertionOutcome, TestSetupUtils, TestStep,
 };
-use warpui::{App, ViewHandle, WindowId, async_assert};
+use warpui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
 
 use super::LocalCLITaskManagerView;
-use crate::integration_testing::view_getters::workspace_view;
+use crate::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
+use crate::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
+use crate::terminal::History;
 use crate::workspace::WorkspaceAction;
 
 pub const CLI_CLIPBOARD_TEST_NAME: &str = "test_cli_composer_system_clipboard_multiline_and_image";
@@ -38,6 +40,43 @@ impl Drop for ClipboardProducer {
 }
 
 pub fn setup_cli_system_clipboard(utils: &mut TestSetupUtils) {
+    #[cfg(target_os = "windows")]
+    {
+        let profile = utils
+            .test_dir()
+            .canonicalize()
+            .expect("测试 profile 必须存在");
+        // 已知目录查询会检查目录存在；只补齐本次私有 profile，不修改系统注册表。
+        for relative in ["AppData/Local", "AppData/Roaming", "Documents"] {
+            fs::create_dir_all(profile.join(relative)).expect("创建私有 profile 子目录");
+        }
+        for (name, directory) in [
+            ("config_local_dir", warp_core::paths::config_local_dir()),
+            ("base_config_dir", warp_core::paths::base_config_dir()),
+        ] {
+            assert!(directory.is_absolute(), "{name} 必须解析为绝对路径");
+            // 配置末级目录可能尚未建立；创建前先验证已有祖先，拒绝落入真实用户目录。
+            let existing_parent = directory
+                .ancestors()
+                .find(|path| path.is_dir())
+                .expect("配置目录必须存在可验证的父目录")
+                .canonicalize()
+                .expect("解析配置目录父路径");
+            assert!(
+                existing_parent.starts_with(&profile),
+                "{name} 必须位于本次私有 profile 内"
+            );
+            fs::create_dir_all(&directory).expect("创建私有配置目录");
+            assert!(
+                directory
+                    .canonicalize()
+                    .expect("解析私有配置目录")
+                    .starts_with(&profile),
+                "{name} 创建后必须仍位于本次私有 profile 内"
+            );
+        }
+    }
+
     let source_commit = std::env::var("WARP_TEST_GUI_SOURCE_COMMIT")
         .expect("必须由正式 workflow 传入被验收的提交 SHA");
     assert!(
@@ -67,6 +106,29 @@ pub fn setup_cli_system_clipboard(utils: &mut TestSetupUtils) {
     utils.set_env(IMAGE_ENV, Some(&path));
 }
 
+pub fn wait_until_cli_clipboard_bootstrapped() -> TestStep {
+    // 复用原有全部断言与 20 秒期限，只为本用例补充失败状态，不输出终端原文。
+    wait_until_bootstrapped_single_pane_for_tab(0).set_on_failure_handler(
+        "记录真实 GUI 引导失败状态",
+        |app, window_id| {
+            single_terminal_view_for_tab(app, window_id, 0).read(app, |view, ctx| {
+                let model = view.model.lock();
+                let input_visible = view.is_input_box_visible(&model, ctx);
+                let history_initialized = model
+                    .block_list()
+                    .active_block()
+                    .session_id()
+                    .is_some_and(|id| History::as_ref(ctx).is_session_initialized(&id));
+                let bootstrapped = model.block_list().is_bootstrapped();
+                let precmd_done = model.block_list().is_bootstrapping_precmd_done();
+                AssertionOutcome::failure(format!(
+                    "GUI 引导失败：input_visible={input_visible}, history_initialized={history_initialized}, bootstrapped={bootstrapped}, precmd_done={precmd_done}"
+                ))
+            })
+        },
+    )
+}
+
 fn composer(app: &App, window_id: WindowId) -> ViewHandle<LocalCLITaskManagerView> {
     let mut views = app
         .views_of_type::<LocalCLITaskManagerView>(window_id)
@@ -85,8 +147,12 @@ pub fn open_cli_clipboard_composer() -> TestStep {
                 &WorkspaceAction::OpenLocalCLITaskManager,
             );
         })
+        .with_action(|app, window_id, _| {
+            // 弹窗打开后焦点属于内容容器；模拟用户选择输入框，再通过真实按键粘贴。
+            composer(app, window_id).update(app, |view, ctx| ctx.focus(&view.prompt));
+        })
         .add_named_assertion(
-            "托管输入框已显示且没有任务",
+            "托管输入框已聚焦且没有任务",
             |app, window_id| {
                 let views = app
                     .views_of_type::<LocalCLITaskManagerView>(window_id)
@@ -95,7 +161,12 @@ pub fn open_cli_clipboard_composer() -> TestStep {
                     return AssertionOutcome::failure("真实托管输入框尚未显示".into());
                 }
                 views[0].read(app, |view, ctx| {
-                    async_assert!(view.tasks(ctx).is_empty(), "测试 HOME 中不应存在托管任务")
+                    async_assert!(
+                        view.prompt.is_focused(ctx) && view.tasks(ctx).is_empty(),
+                        "真实输入框必须聚焦且没有任务；focused={}，task_count={}",
+                        view.prompt.is_focused(ctx),
+                        view.tasks(ctx).len()
+                    )
                 })
             },
         )
@@ -182,6 +253,13 @@ pub fn write_cli_system_clipboard_image() -> TestStep {
 pub fn assert_cli_clipboard_draft(image_count: usize) -> AssertionCallback {
     Box::new(move |app, window_id| {
         composer(app, window_id).read(app, |view, ctx| {
+            let draft = view.prompt.as_ref(ctx).buffer_text(ctx);
+            let focused = view.prompt.is_focused(ctx);
+            let task_count = view.tasks(ctx).len();
+            let selected = view.selected_task.is_some();
+            let pending_count = view.pending_inputs.len();
+            let preparing = view.managed_input.preparing.is_some();
+            let processing = view.managed_input.processing_images;
             let images = &view.managed_input.attachments.images;
             let pixels_match = images.iter().all(|image| {
                 image.mime_type == "image/png"
@@ -190,15 +268,27 @@ pub fn assert_cli_clipboard_draft(image_count: usize) -> AssertionCallback {
                         .is_ok_and(|bytes| red_blue_pixels(&bytes))
             });
             async_assert!(
-                view.prompt.as_ref(ctx).buffer_text(ctx) == CLI_CLIPBOARD_TEXT
+                draft == CLI_CLIPBOARD_TEXT
+                    && focused
                     && images.len() == image_count
                     && pixels_match
-                    && !view.managed_input.processing_images
-                    && view.tasks(ctx).is_empty()
-                    && view.selected_task.is_none()
-                    && view.pending_inputs.is_empty()
-                    && view.managed_input.preparing.is_none(),
-                "中文草稿、图片附件或零提交状态不符合预期；附件数={}，预期={image_count}",
+                    && !processing
+                    && task_count == 0
+                    && !selected
+                    && pending_count == 0
+                    && !preparing,
+                "中文草稿、图片附件或零提交状态不符合预期；focused={focused}，\
+                 草稿字节数={}，预期字节数={}，UTF8前64字节={:02x?}，LF字节位置={:?}，\
+                 task_count={task_count}，selected={selected}，pending_count={pending_count}，\
+                 preparing={preparing}，processing={processing}，pixels_match={pixels_match}，\
+                 附件数={}，预期={image_count}",
+                draft.len(),
+                CLI_CLIPBOARD_TEXT.len(),
+                &draft.as_bytes()[..draft.len().min(64)],
+                draft
+                    .match_indices('\n')
+                    .map(|(index, _)| index)
+                    .collect::<Vec<_>>(),
                 images.len()
             )
         })

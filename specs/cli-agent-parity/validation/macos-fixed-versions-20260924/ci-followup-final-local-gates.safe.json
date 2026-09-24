@@ -1,0 +1,394 @@
+{
+  "schema": 1,
+  "base_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "scope": "LF修正与EOF诊断修改后的Mac PowerShell最终35脚本批次；Windows实测待验",
+  "exit_code": 0,
+  "script_count": 35,
+  "tests_run": 807,
+  "tests_passed": 800,
+  "tests_skipped": 7,
+  "failed": 0,
+  "log_sha256": "9f92e75c7c4f6d09085b31a555d1dc25c105f79972cf48cef76b06ea942ca4b9",
+  "batch_sha256": "76fff6d8bf7fdc2c00ab199abd40f8d3e9a43a13e9999caf7d11ea414bff6769",
+  "sources": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "sha256": "5b319a895aa0f75c6c2b6aae9808f69ddaf3c85fb137030534dc0ff9e18d027b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+      "sha256": "4fadefd0bd3c4da9e6da40f610711b41315ff526b4de9aa152988aebe1a9271b"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_codex_windows_hooks.py",
+      "sha256": "6c0c6083aad3d56b926def25a7e0e3e8edcdde5fc38c2e481239251a822f1a66"
+    },
+    {
+      "path": "script/cli-agent-parity/notification_patch_tests.py",
+      "sha256": "1df14f7867c888c8ea86241bee65c356e707bf65506eeee72e937517dd7ac162"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_persistent_source_tests.py",
+      "sha256": "81ac59ab607050a7bcaac054517f4981ad95eff772d7f7c1e4266a1ce7583e82"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_adapter_runner_tests.py",
+      "sha256": "0d0841310bafa1128aaa79a986fbb7974b4df45a448e2ae5f6ab51b2a27fa5ab"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_adapter_runner_tests.py",
+      "sha256": "b595dc7c9fc250cc33caa903f4b39e78718710ef52d317523b0a8a621eb53193"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_profile_runner_tests.py",
+      "sha256": "264a135d2c5817e1d454267936d62da5f711f0ea5458f2d7b88f9d5c3a6ffc7d"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_coordinator_runner_tests.py",
+      "sha256": "eb39a615957b56521a76ea84542bb803bc3dfc43be82cf962cc1e5f033e73f0f"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_batch_cancel_runner_tests.py",
+      "sha256": "400a2c12603c9357c151417ba345ac3c4e87172917ab207fd2c2ddc306836173"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_approval_cancel_runner_tests.py",
+      "sha256": "c74964cc02b733d2fac9c4ccbb07a255858aa2e632fd7577be98bc4a854e8546"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_image_probe_runner_tests.py",
+      "sha256": "28b731f4143494187b05a93f2d2a1863c1c651223add91d241fd7a39d9f91df8"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_managed_image_runner_tests.py",
+      "sha256": "424869d5331c301f1d15da37feaaee240c6d1d005e7ae5e25381bba34c71fe61"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_source_runner_tests.py",
+      "sha256": "6c70ae8de93a7bbbb71608d7f08fdf854f17cc957d1dbe557e5d31a1105106c1"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_journal_recovery_runner_tests.py",
+      "sha256": "008a36cacee2ad97d2a5ee579b022d4ac0461401715ddabc68d8e627603cd0f8"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_adapter_runner_tests.py",
+      "sha256": "347e1ab5a499c6dcca5391e77a7f1b92254cbfee1b4888277a952d0b9d00c191"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_coordinator_runner_tests.py",
+      "sha256": "6cf1a8cbd073628505611b23540dfb57818d3e81f513c059d374d2fbb8242e23"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_official_pty_runner_tests.py",
+      "sha256": "86eead713462959ad8e57cd63f7de216baecffa8e458390f3cc7f30845b8b720"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_policy_preflight_runner_tests.py",
+      "sha256": "aec8612a3b2150b6de3978438cd68ba5d4547485b8a24bbd70e144128209b361"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_native_skill_runner_tests.py",
+      "sha256": "53b1051000d41f06ecf174658f94115d36ef8e507d31b3fb6c400566d5268f69"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_fixed_policy_runner_tests.py",
+      "sha256": "4bcaea7679824e563d4fb7798279cb85df533fd1944e4c04a43b1da6396a5784"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_child_coordinator_runner_tests.py",
+      "sha256": "b63f7ab86a6682662251cddef0d75586362bf2129489832288e87cf5274473da"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_files_policy_runner_tests.py",
+      "sha256": "c8f066598cc977512528dae5b7f5a2be956780e250b0e7ccd0f39cb1ebf59699"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_selected_skill_runner_tests.py",
+      "sha256": "741cf9118c1d796ddaed0b5bb81ebd5f200892d19094548ac2ce7d434b9d85ad"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_catalog_preflight_runner_tests.py",
+      "sha256": "d6bc984388e69e2aaba074b94652d78570507ca7cf5b34a75e4fa9eb9d9e8059"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_tests.py",
+      "sha256": "4daf6469fbf588140c5fb7e379a66405f331eabda90e9fb7ecad0694864bb450"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_plugin_lifecycle_tests.py",
+      "sha256": "c5046445944af4ddd027e2a3abfd2ec428a90bbfa9b9afd02b57e3e1122ebe9e"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_notify_tests.py",
+      "sha256": "34c724cb986fa1e69101e2588fdb8e35a54b3cd45529c19811ff2a606d3448c9"
+    },
+    {
+      "path": "script/cli-agent-parity/codex_plugin_cache_refresh_tests.py",
+      "sha256": "d96ecfe83350c94d188eb16836e0ec7da779337be096720f7f91eb15aed41a54"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_codex_cli_tests.py",
+      "sha256": "4583940ed2ecf41f3c0e6403d4f6f8fdaebdcc2ef481d9e0150f312c819a556a"
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate_tests.py",
+      "sha256": "a6199d59e3f20501bca388f0b834ec112a187e17622147229d3dcd0de62a1f4b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py",
+      "sha256": "7c4793d864a06faeb93f62527ce40dafd515d7a77403faec53a030d8254d1633"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_claude_cli_tests.py",
+      "sha256": "af3eef695bd74a6429d3bac5e3fc9c780c122dfdb2641469bd4a0a768a216c0a"
+    },
+    {
+      "path": "script/cli-agent-parity/claude_windows_notifications_tests.py",
+      "sha256": "d7f1ea984587fb545eda78040b8014a44c218792fc71061a594a9ee6c3b94586"
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli_tests.py",
+      "sha256": "c17b8af568e7ab68e823da8dc17fd86608671648838a622828ca13d60ade5ac2"
+    },
+    {
+      "path": "script/cli-agent-parity/grok_fixed_acp_probe_tests.py",
+      "sha256": "4a9acb4284da07d861d86892e5bc9c8b56bef68f27c378dbfabd6d7bdb0ebd05"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_no_credentials_tests.py",
+      "sha256": "b315979c28a7ca27c4e3530f2ddea17ce4a678c765e5e6b3f72e62677bd9d0bc"
+    },
+    {
+      "path": "script/cli-agent-parity/probe_claude_permission_snapshot_tests.py",
+      "sha256": "fb9eb0895a922823c52d854c8cea4f1ae8ffdc962a454111b4fa5c754bfdb6f7"
+    }
+  ],
+  "cargo_check": {
+    "command": "cargo check -p warp",
+    "exit_code": 0,
+    "summary": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.20s",
+    "log_sha256": "be39fb1269045488715d9cc2224ac25f9e05f1c677aba9bc7c4eb0e81d150a50"
+  },
+  "workflow_static": {
+    "actionlint_exit_code": 0,
+    "excluded_diagnostic": "仅已核实的自托管 infinishell-ci runner 标签",
+    "other_diagnostics": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "git_diff_check_exit_code": 0
+  },
+  "suite_results": [
+    {
+      "script": "notification_patch_tests.py",
+      "run": 20,
+      "passed": 20,
+      "skipped": 0
+    },
+    {
+      "script": "codex_persistent_source_tests.py",
+      "run": 13,
+      "passed": 13,
+      "skipped": 0
+    },
+    {
+      "script": "codex_adapter_runner_tests.py",
+      "run": 22,
+      "passed": 22,
+      "skipped": 0
+    },
+    {
+      "script": "claude_adapter_runner_tests.py",
+      "run": 22,
+      "passed": 22,
+      "skipped": 0
+    },
+    {
+      "script": "claude_profile_runner_tests.py",
+      "run": 10,
+      "passed": 10,
+      "skipped": 0
+    },
+    {
+      "script": "claude_coordinator_runner_tests.py",
+      "run": 70,
+      "passed": 70,
+      "skipped": 0
+    },
+    {
+      "script": "claude_batch_cancel_runner_tests.py",
+      "run": 28,
+      "passed": 28,
+      "skipped": 0
+    },
+    {
+      "script": "claude_approval_cancel_runner_tests.py",
+      "run": 36,
+      "passed": 36,
+      "skipped": 0
+    },
+    {
+      "script": "claude_image_probe_runner_tests.py",
+      "run": 25,
+      "passed": 25,
+      "skipped": 0
+    },
+    {
+      "script": "claude_managed_image_runner_tests.py",
+      "run": 20,
+      "passed": 20,
+      "skipped": 0
+    },
+    {
+      "script": "codex_source_runner_tests.py",
+      "run": 16,
+      "passed": 16,
+      "skipped": 0
+    },
+    {
+      "script": "codex_journal_recovery_runner_tests.py",
+      "run": 4,
+      "passed": 4,
+      "skipped": 0
+    },
+    {
+      "script": "grok_adapter_runner_tests.py",
+      "run": 13,
+      "passed": 13,
+      "skipped": 0
+    },
+    {
+      "script": "grok_coordinator_runner_tests.py",
+      "run": 27,
+      "passed": 27,
+      "skipped": 0
+    },
+    {
+      "script": "grok_official_pty_runner_tests.py",
+      "run": 20,
+      "passed": 20,
+      "skipped": 0
+    },
+    {
+      "script": "grok_policy_preflight_runner_tests.py",
+      "run": 75,
+      "passed": 75,
+      "skipped": 0
+    },
+    {
+      "script": "grok_native_skill_runner_tests.py",
+      "run": 22,
+      "passed": 22,
+      "skipped": 0
+    },
+    {
+      "script": "grok_fixed_policy_runner_tests.py",
+      "run": 20,
+      "passed": 20,
+      "skipped": 0
+    },
+    {
+      "script": "grok_child_coordinator_runner_tests.py",
+      "run": 22,
+      "passed": 22,
+      "skipped": 0
+    },
+    {
+      "script": "grok_files_policy_runner_tests.py",
+      "run": 15,
+      "passed": 15,
+      "skipped": 0
+    },
+    {
+      "script": "grok_selected_skill_runner_tests.py",
+      "run": 17,
+      "passed": 17,
+      "skipped": 0
+    },
+    {
+      "script": "grok_catalog_preflight_runner_tests.py",
+      "run": 8,
+      "passed": 8,
+      "skipped": 0
+    },
+    {
+      "script": "codex_windows_hook_tests.py",
+      "run": 42,
+      "passed": 41,
+      "skipped": 1
+    },
+    {
+      "script": "codex_plugin_lifecycle_tests.py",
+      "run": 4,
+      "passed": 4,
+      "skipped": 0
+    },
+    {
+      "script": "codex_windows_notify_tests.py",
+      "run": 6,
+      "passed": 6,
+      "skipped": 0
+    },
+    {
+      "script": "codex_plugin_cache_refresh_tests.py",
+      "run": 25,
+      "passed": 20,
+      "skipped": 5
+    },
+    {
+      "script": "prepare_codex_cli_tests.py",
+      "run": 51,
+      "passed": 51,
+      "skipped": 0
+    },
+    {
+      "script": "verify_cli_autoupdate_tests.py",
+      "run": 31,
+      "passed": 31,
+      "skipped": 0
+    },
+    {
+      "script": "run_fixed_cli_autoupdate_tests.py",
+      "run": 18,
+      "passed": 18,
+      "skipped": 0
+    },
+    {
+      "script": "prepare_claude_cli_tests.py",
+      "run": 12,
+      "passed": 12,
+      "skipped": 0
+    },
+    {
+      "script": "claude_windows_notifications_tests.py",
+      "run": 24,
+      "passed": 24,
+      "skipped": 0
+    },
+    {
+      "script": "prepare_grok_cli_tests.py",
+      "run": 21,
+      "passed": 21,
+      "skipped": 0
+    },
+    {
+      "script": "grok_fixed_acp_probe_tests.py",
+      "run": 22,
+      "passed": 21,
+      "skipped": 1
+    },
+    {
+      "script": "probe_claude_no_credentials_tests.py",
+      "run": 10,
+      "passed": 10,
+      "skipped": 0
+    },
+    {
+      "script": "probe_claude_permission_snapshot_tests.py",
+      "run": 16,
+      "passed": 16,
+      "skipped": 0
+    }
+  ],
+  "localization": "无需本地化变更",
+  "historical_failures_retained": true
+}

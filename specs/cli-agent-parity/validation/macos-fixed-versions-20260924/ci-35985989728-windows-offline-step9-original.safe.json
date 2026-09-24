@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "run_id": 35985989728,
+  "job_id": 107588661502,
+  "source_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "step": 9,
+  "name": "Test notification patch file transactions",
+  "conclusion": "failure",
+  "source_observation": {
+    "method": "根代理只读 GitHub Actions 实时日志 DOM",
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35985989728/job/107588661502#step:9"
+  },
+  "failed_suite": "codex_adapter_runner_tests.py",
+  "run": 22,
+  "failed": 1,
+  "skipped": 1,
+  "first_failure": {
+    "test_source": "script/cli-agent-parity/codex_adapter_runner_tests.py:134",
+    "production_runner_source": "script/cli-agent-parity/run_codex_adapter_live.py:187",
+    "category": "隔离 config.toml 写入使用平台默认换行；Windows CRLF 与夹具期望 LF 不同。"
+  },
+  "following_fixed_cli_preparations_skipped": true,
+  "followup_fix_reported_by_root": {
+    "change": "私有 config 写入显式 newline LF，保留原断言",
+    "local_powershell_script_suites": 35,
+    "local_passed": 797,
+    "local_skipped": 7,
+    "local_cargo_check_exit_code": 0,
+    "counts_source": "根代理消息；原始本地 gate 收据由根代理归档"
+  },
+  "original_ci_reclassified_as_passed": false,
+  "scope": "原 CI 失败保留；后续本地回归不能代替真实 Windows 原运行通过。"
+}

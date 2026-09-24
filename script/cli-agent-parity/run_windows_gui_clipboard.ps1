@@ -94,7 +94,12 @@ try {
     $record.outcome = 'failed'
     # 失败日志留在本次私有目录，CI 输出保留尾部诊断；不伪造截图或剪贴板收据。
     foreach ($log in @($stdout, $stderr)) {
-        if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 80 }
+        if (Test-Path -LiteralPath $log) {
+            # 长回溯可能挤掉实际原因，先显示有界错误行，再保留末尾上下文。
+            Select-String -LiteralPath $log -Pattern '\[ERROR\]|panicked at|failed to bootstrap' |
+                Select-Object -First 30 | ForEach-Object { $_.Line }
+            Get-Content -LiteralPath $log -Tail 80
+        }
     }
     throw
 } finally {

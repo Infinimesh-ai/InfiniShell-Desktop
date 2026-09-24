@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "run_id": 35985989728,
+  "job_id": 107588661502,
+  "source_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "step": 45,
+  "conclusion": "failure",
+  "completed_at": "2026-09-24T10:57:18Z",
+  "candidate": false,
+  "production_path_exercised": true,
+  "fixed_release_input": true,
+  "live_latest_claimed": false,
+  "credentials_provided": false,
+  "model_inputs_sent": 0,
+  "artifact_binding_verified": true,
+  "sources": [
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/claude-updated-product_receipt.safe.json",
+      "sha256": "8801efde896b7d87eba7802641957e951608bd4fcd203398ba70bd2e4f244f6a"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/claude-updated-receipt.safe.json",
+      "sha256": "8dec7a91c70fe39ae2b57e7dbd5a03ed4aa6c27a02cb11cf9f5698851fbe58ae"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/codex-updated-product_receipt.safe.json",
+      "sha256": "76e877361d3606cbd70671ece628f311f51dcce333a83e726b98065bc2870e3b"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/codex-updated-receipt.safe.json",
+      "sha256": "f544b155bd631897997dfa10c304d9b9d3a1c135efaa0ed9f710c862526e6d1b"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/grok-updated-product_receipt.safe.json",
+      "sha256": "3f709d9c93c0c238ba284f1aedaac38f06ecd48e1d024fc6aa54678fae3c6396"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/grok-updated-receipt.safe.json",
+      "sha256": "099eda7f0784085a8c557d1ae1e539978daf427a1fbbad306c036840bb438069"
+    },
+    {
+      "path": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-ci-35985989728/atomic/summary.safe.json",
+      "sha256": "201f1f1b6b81f29759501a4729caa4c868b952f6b5d9ed69e4e71645d6164af5"
+    }
+  ],
+  "cases": [
+    {
+      "agent": "codex",
+      "old_version": "0.155.1",
+      "target_version": "0.156.1",
+      "product_inspect_calls": 2,
+      "product_execute_calls": 1,
+      "native_exit_confirmed": false,
+      "strict_job_cleanup_confirmed": true,
+      "entry_matches_target": false,
+      "target_version_matches": false,
+      "config_files_checked": 13,
+      "config_bytes_unchanged": true,
+      "journal_absent": true,
+      "old_binary_unchanged": true,
+      "target_reference_unchanged": true,
+      "credentials_absent": true,
+      "error": "CommandFailed",
+      "failure_code": "execute_failed",
+      "passed": false
+    },
+    {
+      "agent": "claude",
+      "old_version": "2.1.278",
+      "target_version": "2.1.280",
+      "product_inspect_calls": 2,
+      "product_execute_calls": 1,
+      "native_exit_confirmed": false,
+      "strict_job_cleanup_confirmed": true,
+      "entry_matches_target": true,
+      "target_version_matches": true,
+      "config_files_checked": 13,
+      "config_bytes_unchanged": true,
+      "journal_absent": true,
+      "old_binary_unchanged": true,
+      "target_reference_unchanged": true,
+      "credentials_absent": true,
+      "error": null,
+      "failure_code": null,
+      "passed": false
+    },
+    {
+      "agent": "grok",
+      "old_version": "1.0.40",
+      "target_version": "1.0.41",
+      "product_inspect_calls": 2,
+      "product_execute_calls": 1,
+      "native_exit_confirmed": false,
+      "strict_job_cleanup_confirmed": true,
+      "entry_matches_target": false,
+      "target_version_matches": false,
+      "config_files_checked": 13,
+      "config_bytes_unchanged": true,
+      "journal_absent": true,
+      "old_binary_unchanged": true,
+      "target_reference_unchanged": true,
+      "credentials_absent": true,
+      "error": "CommandFailed",
+      "failure_code": "execute_failed",
+      "passed": false
+    }
+  ],
+  "diagnostic_boundaries": {
+    "claude": "当前原测试要求supervisor exit_reason NativeExit；产品执行成功且新入口hash/version均匹配，但native_exit_confirmed=false。原回执未导出reason/code，不能改标原CI pass；已定位输出EOF与根退出观察次序使StdioClosed也可对应真实exit0。后续仅修测试并保留严格Job、exit0和停止/宿主断连拒绝。",
+    "codex_grok": "当前回执只有CommandFailed/execute_failed且入口未到目标，stable_errors为空。内层执行worker stderr被产品监督层丢弃，现有安全工件不能判断拒绝的helper/DLL或原生非零原因。未知映像门禁不放宽。"
+  },
+  "not_claimed": [
+    "三款Windows真实自动更新全部通过",
+    "当前Claude原CI通过",
+    "Codex/Grok失败根因已经证实"
+  ]
+}

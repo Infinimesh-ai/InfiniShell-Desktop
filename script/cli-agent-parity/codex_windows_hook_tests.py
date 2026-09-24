@@ -406,6 +406,97 @@ class NativeCompletionTests(unittest.TestCase):
         self.assertFalse(evidence['normalization_used'])
 
 
+class NativeRecorderCloseTests(unittest.TestCase):
+    def inherited_writer(self, root, channels, delay):
+        release = root / 'release-child'
+        child_code = (
+            'import json, pathlib, sys, time\n'
+            'deadline = time.monotonic() + float(sys.argv[1])\n'
+            'while time.monotonic() < deadline and not pathlib.Path(sys.argv[2]).exists():\n'
+            '    time.sleep(0.01)\n'
+            'for channel in json.loads(sys.argv[3]):\n'
+            '    print(json.dumps({"child_done": channel}), file=getattr(sys, channel), flush=True)\n'
+        )
+        parent_code = (
+            'import subprocess, sys\n'
+            'sys.stdin.read()\n'
+            f'subprocess.Popen([sys.executable, "-c", {child_code!r}, {str(delay)!r}, '
+            f'{str(release)!r}, {json.dumps(channels)!r}], stdin=subprocess.DEVNULL, '
+            f'stdout={"None" if "stdout" in channels else "subprocess.DEVNULL"}, '
+            f'stderr={"None" if "stderr" in channels else "subprocess.DEVNULL"})\n'
+        )
+        recorder = native_probe.NativeRecorder([sys.executable, '-c', parent_code],
+                                               os.environ.copy(), root, [])
+        return recorder, release
+
+    def release_and_drain(self, recorder, release):
+        # 只释放夹具自己创建的短命后代；失败回执保持收尾超时时的原始快照。
+        release.write_text('release', encoding='utf-8')
+        for reader in recorder.readers.values():
+            reader.join(timeout=5)
+            self.assertFalse(reader.is_alive(), '测试后代未按释放信号退出')
+        for stream in (recorder.process.stdout, recorder.process.stderr):
+            stream.close()
+
+    def test_close_waits_for_delayed_inherited_stdout_and_drains_final_line(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder, release = self.inherited_writer(Path(temporary), ['stdout'], 2.2)
+            evidence = {}
+            try:
+                native_probe.close_case(recorder, evidence)
+                receipt = evidence['process_closes'][0]
+                self.assertTrue(receipt['root_exited_naturally'])
+                self.assertEqual(receipt['root_exit_code'], 0)
+                self.assertTrue(receipt['output_readers_eof'])
+                self.assertEqual(receipt['output_eof_timeout_seconds'], 5)
+                self.assertGreaterEqual(receipt['output_readers']['stdout']['finished_elapsed_ms'], 2000)
+                self.assertEqual(receipt['pending_eof_channels'], [])
+                self.assertEqual(receipt['alive_reader_channels'], [])
+                self.assertTrue(all(state['eof'] for state in receipt['output_readers'].values()))
+                self.assertTrue(any(event['value'] == {'child_done': 'stdout'} for event in recorder.events))
+                self.assertFalse(receipt['all_descendants_job_verified'])
+            finally:
+                self.release_and_drain(recorder, release)
+
+    def test_inherited_pipes_past_deadline_fail_with_both_channels_and_frozen_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder, release = self.inherited_writer(Path(temporary), ['stdout', 'stderr'], 5)
+            evidence = {}
+            try:
+                with patch.object(native_probe, 'OUTPUT_EOF_TIMEOUT', 0.15), self.assertRaisesRegex(
+                        ValueError, 'stdout, stderr'):
+                    native_probe.close_case(recorder, evidence)
+                receipt = evidence['failed_close_receipt']
+                self.assertTrue(receipt['root_exited_naturally'])
+                self.assertEqual(receipt['root_exit_code'], 0)
+                self.assertFalse(receipt['termination_requested'])
+                self.assertFalse(receipt['kill_requested'])
+                self.assertFalse(receipt['output_readers_eof'])
+                self.assertFalse(receipt['all_descendants_job_verified'])
+                self.assertEqual(receipt['pending_eof_channels'], ['stdout', 'stderr'])
+                self.assertEqual(receipt['alive_reader_channels'], ['stdout', 'stderr'])
+                self.assertEqual(receipt['output_eof_timeout_seconds'], 0.15)
+                self.assertNotIn('process_closes', evidence)
+            finally:
+                self.release_and_drain(recorder, release)
+            self.assertTrue(all(state['eof'] for state in recorder.reader_states.values()))
+            self.assertFalse(any(state['eof'] for state in receipt['output_readers'].values()))
+
+    def test_decoder_error_identifies_channel_without_counting_reader_exit_as_eof(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            recorder = native_probe.NativeRecorder([sys.executable, '-c',
+                'import os, sys; sys.stdin.read(); os.write(2, bytes([255]))'],
+                os.environ.copy(), Path(temporary), [])
+            evidence = {}
+            with self.assertRaisesRegex(ValueError, '原生输出读取失败'):
+                native_probe.close_case(recorder, evidence)
+            receipt = evidence['failed_close_receipt']
+            self.assertFalse(receipt['output_readers_eof'])
+            self.assertEqual(receipt['pending_eof_channels'], ['stderr'])
+            self.assertEqual(receipt['alive_reader_channels'], [])
+            self.assertEqual(receipt['reader_errors'], [{'channel': 'stderr', 'type': 'UnicodeDecodeError'}])
+
+
 class CommandTests(unittest.TestCase):
     def test_each_command_roundtrips_exact_fixed_source(self):
         for script in SCRIPTS:

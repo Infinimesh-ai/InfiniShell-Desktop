@@ -184,7 +184,7 @@ def parent_child_environment(root, environment):
         environment[key] = str(path)
     environment["WARP_DATA_PROFILE"] = "codex-parent-child-01561"
     environment["INFINISHELL_CODEX_PARENT_CHILD_01561"] = "1"
-    (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8")
+    (root / "codex/config.toml").write_text('cli_auth_credentials_store = "file"\n', encoding="utf-8", newline="\n")
     return environment
 
 

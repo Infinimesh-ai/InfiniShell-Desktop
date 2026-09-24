@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "base_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "scope": "Windows离线批次在Mac PowerShell执行，35个脚本均运行；不替代原生Windows验证",
+  "exit_code": 0,
+  "script_count": 35,
+  "tests_run": 804,
+  "tests_passed": 797,
+  "tests_skipped": 7,
+  "failed": 0,
+  "interpreter_alias": "python -> /opt/homebrew/bin/python3（仅本次PowerShell作用域）",
+  "log_sha256": "d217e55f2ac35cae7ea9718c4bf207661da5671f6d00b683ae2e6a60f30f8fe1",
+  "initial_missing_python_attempt_retained": "/private/tmp/isp-mac-1mej4h8z/evidence/windows-offline-batch-local.log",
+  "sources": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "sha256": "5b319a895aa0f75c6c2b6aae9808f69ddaf3c85fb137030534dc0ff9e18d027b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_codex_adapter_live.py",
+      "sha256": "4fadefd0bd3c4da9e6da40f610711b41315ff526b4de9aa152988aebe1a9271b"
+    }
+  ],
+  "windows_crlf_fix": "私有Codex配置显式LF写入；保留字节断言",
+  "localization": "无需本地化变更",
+  "cargo_check": {
+    "command": "cargo check -p warp",
+    "exit_code": 0,
+    "summary": "Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.20s",
+    "log_sha256": "be39fb1269045488715d9cc2224ac25f9e05f1c677aba9bc7c4eb0e81d150a50"
+  },
+  "workflow_static": {
+    "actionlint_exit_code": 0,
+    "excluded_diagnostic": "仅已核实的自托管 infinishell-ci runner 标签",
+    "other_diagnostics": 0,
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "git_diff_check_exit_code": 0
+  },
+  "windows_cache_runtime": {
+    "run_id": 35985989728,
+    "job_id": 107588661502,
+    "step": 3,
+    "observed_via": "GitHub Actions实时日志DOM",
+    "elapsed_seconds": 2,
+    "free_bytes": 154764763136,
+    "cache_retained": true,
+    "message": "At least 100 GiB free; retaining Cargo and sccache build artifacts."
+  }
+}

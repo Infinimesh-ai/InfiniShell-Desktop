@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """固定升级入口的离线边界；不下载、不执行 CLI、不访问账户配置。"""
+import io
 import json
 import os
 from pathlib import Path
@@ -27,6 +28,60 @@ class FixedUpdateTests(unittest.TestCase):
         self.target.write_bytes(b"new-official-placeholder")
         self.args = SimpleNamespace(test_binary=self.worker, supervisor=self.supervisor,
                                     fixture_parent=self.root, output=self.root / "summary.safe.json")
+
+    def test_build_metadata_is_saved_before_any_native_input_or_fixture_copy(self):
+        def prepare(*args):
+            data = json.loads((self.root / "build-inputs.safe.json").read_text())
+            self.assertEqual([(row["role"], row["is_file"], row["bytes"]) for row in data["binaries"]],
+                             [("worker", True, self.worker.stat().st_size),
+                              ("supervisor", True, self.supervisor.stat().st_size)])
+            self.assertEqual(data["binary_limit_bytes"], 8 * 1024 ** 3)
+            raise ValueError("fixed_input_preparation_failed")
+
+        argv = ["run_fixed_cli_autoupdate.py", "--test-binary", str(self.worker),
+                "--supervisor", str(self.supervisor), "--fixture-parent", str(self.root),
+                "--cache", str(self.root / "cache"), "--output", str(self.args.output)]
+        progress = io.StringIO()
+        with patch.object(runner.sys, "platform", "linux"), patch.object(runner.sys, "argv", argv), \
+                patch.object(runner.sys, "stderr", progress), \
+                patch.object(runner, "prepared_input", side_effect=prepare), \
+                patch.object(runner, "fixture") as fixture:
+            self.assertEqual(runner.main(), 1)
+        fixture.assert_not_called()
+        events = [json.loads(line) for line in progress.getvalue().splitlines()]
+        self.assertEqual(len(events), 6)
+        self.assertEqual([row["stage"] for row in events], ["prepare_started", "prepare_finished"] * 3)
+        self.assertTrue(all(row["failure_code"] == "fixed_input_preparation_failed" for row in events[1::2]))
+        self.assertNotIn(str(self.root), progress.getvalue())
+
+    def test_case_progress_uses_safe_fields_and_keeps_stdout_summary(self):
+        argv = ["run_fixed_cli_autoupdate.py", "--test-binary", str(self.worker),
+                "--supervisor", str(self.supervisor), "--fixture-parent", str(self.root),
+                "--cache", str(self.root / "cache"), "--output", str(self.args.output), "--cases", "updated"]
+        progress, output = io.StringIO(), io.StringIO()
+        with patch.object(runner.sys, "platform", "linux"), patch.object(runner.sys, "argv", argv), \
+                patch.object(runner.sys, "stderr", progress), patch.object(runner.sys, "stdout", output), \
+                patch.object(runner, "prepared_input", return_value=self.old), \
+                patch.object(runner, "verified_input"), \
+                patch.object(runner, "linux_case", side_effect=[{"passed": True}, ValueError("binary_too_large"), {"passed": True}]):
+            self.assertEqual(runner.main(), 1)
+        events = [json.loads(line) for line in progress.getvalue().splitlines()]
+        cases = [row for row in events if row["stage"] == "case_finished"]
+        self.assertEqual([row["passed"] for row in cases], [True, False, True])
+        self.assertEqual(cases[1]["failure_code"], "binary_too_large")
+        self.assertEqual({row["target_version"] for row in cases}, set(runner.TARGET.values()))
+        self.assertNotIn(str(self.root), progress.getvalue())
+        self.assertEqual(set(json.loads(output.getvalue())), {"passed", "cases", "receipt_sha256"})
+
+    def test_build_metadata_preserves_missing_file_diagnosis(self):
+        self.worker.unlink()
+        runner.record_build_inputs(self.args)
+        data = json.loads((self.root / "build-inputs.safe.json").read_text())
+        self.assertEqual(data["binaries"][0]["role"], "worker")
+        self.assertFalse(data["binaries"][0]["is_file"])
+        self.assertIsNone(data["binaries"][0]["bytes"])
+        self.assertEqual(data["binaries"][0]["stat_error_type"], "FileNotFoundError")
+        self.assertTrue(data["binaries"][1]["is_file"])
 
     def test_codex_copy_preserves_the_entire_package_and_refuses_overwrite(self):
         source = self.root / "input/bin/codex"
@@ -65,7 +120,7 @@ class FixedUpdateTests(unittest.TestCase):
             self.assertTrue(Path(environment[name]).is_relative_to(self.root / "fixture"))
         self.assertEqual(environment["CODEX_RELEASE"], "0.156.1")
 
-    def windows_case(self, *, native_code=0, target_installed=True, config_changed=False, version_correct=True):
+    def windows_case(self, *, native_code=0, target_installed=True, config_changed=False, version_correct=True, native_error=None, cleanup_confirmed=True):
         observed = {}
 
         def popen(command, **keywords):
@@ -79,9 +134,14 @@ class FixedUpdateTests(unittest.TestCase):
                 (root / "home/.local/bin/claude.exe").write_bytes(self.target.read_bytes())
             if config_changed:
                 (root / "home/.claude/settings.json").write_text("changed")
-            keywords["stdout"].write(("严格 Job 已清空\n1 passed; 0 failed\n"
-                                      f"真实更新参数的原生退出状态：exit code: {native_code}\n").encode())
-            return SimpleNamespace(wait=lambda **_: 0, returncode=0, pid=123)
+            output = f"原子调试器失败：{native_error}\n" if native_error else (
+                "严格 Job 已清空\n1 passed; 0 failed\n"
+                f"真实更新参数的原生退出状态：exit code: {native_code}\n")
+            if cleanup_confirmed:
+                output += "atomic_windows_strict_job_cleanup_confirmed=true\n"
+            keywords["stdout"].write(output.encode())
+            return SimpleNamespace(wait=lambda **_: 101 if native_error else 0,
+                                   returncode=101 if native_error else 0, pid=123)
 
         completed = subprocess.CompletedProcess([], 0, "2.1.280 (Claude Code)\n" if version_correct else "2.1.278 (Claude Code)\n", "")
         with patch.object(runner.sys, "platform", "win32"), patch.dict(os.environ, {"SystemRoot": str(self.root / "Windows")}):
@@ -105,6 +165,92 @@ class FixedUpdateTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertTrue(evidence["entry_matches_target"])
         self.assertFalse(evidence["updater_exit_success"])
+        self.assertEqual(evidence["native_exit_code"], 1)
+
+    def test_windows_debug_receipt_keeps_native_hex_exit_code(self):
+        result, evidence, _ = self.windows_case(native_code="0xC0000005")
+        self.assertFalse(result["passed"])
+        self.assertEqual(evidence["native_exit_code"], 0xC0000005)
+
+    def test_windows_debug_receipt_keeps_atomic_error_without_inventing_exit_code(self):
+        category = "managed_process.atomic_windows_loaded_image_outside_system_directory"
+        image = {"basename": "mscoree.dll", "directory_category": "windows_microsoft_net"}
+        unsafe = {"basename": "C:\\private\\full.dll", "directory_category": "windows_microsoft_net"}
+        diagnostic = category + "\n" + "\n".join(
+            "atomic_windows_rejected_image=" + json.dumps(row) for row in [image, unsafe])
+        result, evidence, _ = self.windows_case(native_error=diagnostic)
+        self.assertFalse(result["passed"])
+        self.assertEqual(evidence["stable_errors"], [category])
+        self.assertEqual(evidence["rejected_images"], [image])
+        self.assertIsNone(evidence["native_exit_code"])
+        self.assertFalse(evidence["native_exit_and_strict_job_confirmed"])
+        self.assertTrue(evidence["strict_job_cleanup_confirmed"])
+
+    def test_windows_debug_failure_stage_keeps_numeric_codes_and_rejects_unsafe_fields(self):
+        accepted = {"stage": "begin_session", "os_error": 5, "hresult": -2147024891, "failure_code": None}
+        invalid = [dict(accepted, stage="C:\\private\\file"), dict(accepted, os_error=True),
+                   dict(accepted, hresult=2**31), dict(accepted, failure_code="C:\\private\\file"),
+                   dict(accepted, raw_error="private")]
+        diagnostic = "synthetic\n" + "\n".join("atomic_windows_debug_failure=" + json.dumps(row)
+                                                for row in [accepted, *invalid])
+        result, evidence, _ = self.windows_case(native_error=diagnostic)
+        self.assertFalse(result["passed"])
+        self.assertEqual(evidence["debug_failures"], [accepted])
+        self.assertTrue(evidence["strict_job_cleanup_confirmed"])
+        self.assertIsNone(evidence["native_exit_code"])
+
+    def test_windows_debug_exit_success_does_not_invent_missing_cleanup_receipt(self):
+        result, evidence, _ = self.windows_case(cleanup_confirmed=False)
+        self.assertFalse(result["passed"])
+        self.assertFalse(evidence["strict_job_cleanup_confirmed"])
+        self.assertEqual(evidence["native_exit_code"], 0)
+
+    def test_windows_failed_product_gets_separate_diagnostic_without_becoming_success(self):
+        private_receipt = self.root / "diagnostic.safe.json"
+        runner.write(private_receipt, {"candidate": True, "passed": True, "native_exit_code": 0,
+                                       "stable_errors": [], "private_log_sha256": "synthetic"})
+        argv = ["run_fixed_cli_autoupdate.py", "--test-binary", str(self.worker),
+                "--supervisor", str(self.supervisor), "--fixture-parent", str(self.root),
+                "--cache", str(self.root / "cache"), "--output", str(self.args.output)]
+        progress, output = io.StringIO(), io.StringIO()
+        products = [{"passed": False, "timed_out": False}, {"passed": True, "timed_out": False},
+                    {"passed": False, "timed_out": True}]
+        with patch.object(runner.sys, "platform", "win32"), patch.object(runner.sys, "argv", argv), \
+                patch.object(runner.sys, "stderr", progress), patch.object(runner.sys, "stdout", output), \
+                patch.object(runner, "prepared_input", return_value=self.old), patch.object(runner, "verified_input"), \
+                patch.object(runner, "windows_case", side_effect=products), \
+                patch.object(runner, "windows_debug_case", return_value={"passed": True, "receipt": runner.binding(private_receipt)}) as debug:
+            self.assertEqual(runner.main(), 1)
+        debug.assert_called_once()
+        self.assertEqual(debug.call_args.args[1], "codex")
+        summary = json.loads(self.args.output.read_text())
+        self.assertFalse(summary["passed"])
+        self.assertFalse(summary["cases"][0]["passed"])
+        self.assertTrue(summary["cases"][0]["diagnostic"]["passed"])
+        exported = Path(summary["cases"][0]["diagnostic"]["receipt"]["path"])
+        self.assertEqual(exported.name, "codex-updated-debug_receipt.safe.json")
+        self.assertEqual(exported.read_bytes(), private_receipt.read_bytes())
+        self.assertNotIn("diagnostic", summary["cases"][1])
+        self.assertNotIn("diagnostic", summary["cases"][2])
+        self.assertNotIn(str(self.root), progress.getvalue())
+        self.assertEqual(set(json.loads(output.getvalue())), {"passed", "cases", "receipt_sha256"})
+
+    def test_windows_diagnostic_exception_preserves_original_product_result(self):
+        argv = ["run_fixed_cli_autoupdate.py", "--test-binary", str(self.worker),
+                "--supervisor", str(self.supervisor), "--fixture-parent", str(self.root),
+                "--cache", str(self.root / "cache"), "--output", str(self.args.output)]
+        products = [{"passed": False, "timed_out": False, "failure_code": "original_product_failed"},
+                    {"passed": True, "timed_out": False}, {"passed": True, "timed_out": False}]
+        with patch.object(runner.sys, "platform", "win32"), patch.object(runner.sys, "argv", argv), \
+                patch.object(runner.sys, "stderr", io.StringIO()), patch.object(runner.sys, "stdout", io.StringIO()), \
+                patch.object(runner, "prepared_input", return_value=self.old), patch.object(runner, "verified_input"), \
+                patch.object(runner, "windows_case", side_effect=products), \
+                patch.object(runner, "windows_debug_case", side_effect=ValueError("diagnostic_failed")):
+            self.assertEqual(runner.main(), 1)
+        first = json.loads(self.args.output.read_text())["cases"][0]
+        self.assertFalse(first["passed"])
+        self.assertEqual(first["failure_code"], "original_product_failed")
+        self.assertEqual(first["diagnostic"]["failure_code"], "diagnostic_failed")
 
     def test_windows_native_exit_without_update_is_failure(self):
         result, evidence, _ = self.windows_case(target_installed=False)

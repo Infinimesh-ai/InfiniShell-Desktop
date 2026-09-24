@@ -28,6 +28,7 @@ from prepare_codex_cli import verified_version
 
 
 HOOK_COMPLETION_TIMEOUT = 45
+OUTPUT_EOF_TIMEOUT = 5
 HOOK_PROMPTS = (
     "中文输入\nEnglish ' $() `literal` %PATH% !name! &",
     "中文输入\r\nEnglish 保留原始 CRLF 和字面 \\r\\n ' $() `literal` %PATH% !name! &",
@@ -160,9 +161,13 @@ class NativeRecorder:
         self.process = subprocess.Popen(command, env=env, cwd=directory, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                         text=True, encoding='utf-8', errors='strict', bufsize=1)
-        self.readers = []
+        self.readers = {}
+        self.reader_finished = {name: threading.Event() for name in ('stdout', 'stderr')}
+        self.reader_states = {name: {'eof': False, 'lines': 0, 'finished_elapsed_ms': None,
+                                    'error_type': None} for name in self.reader_finished}
         for name in ('stdout', 'stderr'):
             def read(channel=name):
+                state = self.reader_states[channel]
                 try:
                     for line in getattr(self.process, channel):
                         try:
@@ -171,16 +176,21 @@ class NativeRecorder:
                             value = line.rstrip()
                         self.events.append({'channel': channel, 'value': value,
                                             'observed_elapsed_ms': round((time.monotonic() - started) * 1000)})
+                        state['lines'] += 1
                         self.events_changed.set()
                         if channel == 'stdout':
                             self.queue.put(value)
+                    state['eof'] = True
                 except Exception as error:
-                    self.reader_errors.append(str(error))
+                    state['error_type'] = type(error).__name__
+                    self.reader_errors.append({'channel': channel, 'type': type(error).__name__})
                 finally:
+                    state['finished_elapsed_ms'] = round((time.monotonic() - started) * 1000)
+                    self.reader_finished[channel].set()
                     self.events_changed.set()
             reader = threading.Thread(target=read, daemon=True)
             reader.start()
-            self.readers.append(reader)
+            self.readers[name] = reader
 
     def send(self, value):
         self.process.stdin.write(json.dumps(value) + '\n')
@@ -203,8 +213,10 @@ class NativeRecorder:
         raise RuntimeError(f'{method} 没有原生确认')
 
     def close(self):
+        started = time.monotonic()
         self.close_receipt = {'root_exited_naturally': False, 'termination_requested': False,
-                              'kill_requested': False, 'output_readers_eof': False}
+                              'kill_requested': False, 'output_readers_eof': False,
+                              'all_descendants_job_verified': False}
         try:
             self.process.stdin.close()
         except (BrokenPipeError, OSError):
@@ -221,13 +233,28 @@ class NativeRecorder:
                 self.process.kill()
                 self.process.wait(timeout=3)
         self.close_receipt.update(root_exit_code=self.process.returncode,
-            root_exited_naturally=not self.close_receipt['termination_requested'])
-        for reader in self.readers:
-            reader.join(timeout=2)
-        require(all(not reader.is_alive() for reader in self.readers), '原生输出读取没有结束')
+            root_exited_naturally=not self.close_receipt['termination_requested'],
+            root_wait_elapsed_ms=round((time.monotonic() - started) * 1000))
+        eof_started = time.monotonic()
+        deadline = eof_started + OUTPUT_EOF_TIMEOUT
+        # 两路共享一次有界 EOF 等待，不能把根退出或读取异常当成所有后代已退出。
+        for channel, reader in self.readers.items():
+            self.reader_finished[channel].wait(max(0, deadline - time.monotonic()))
+            reader.join(timeout=max(0, deadline - time.monotonic()))
+        readers = {channel: dict(self.reader_states[channel], alive=reader.is_alive())
+                   for channel, reader in self.readers.items()}
+        pending = [channel for channel, state in readers.items() if not state['eof']]
+        alive = [channel for channel, state in readers.items() if state['alive']]
+        self.close_receipt.update(output_eof_timeout_seconds=OUTPUT_EOF_TIMEOUT,
+            output_eof_wait_elapsed_ms=round((time.monotonic() - eof_started) * 1000),
+            close_elapsed_ms=round((time.monotonic() - started) * 1000),
+            output_readers=readers, pending_eof_channels=pending, alive_reader_channels=alive,
+            reader_errors=list(self.reader_errors))
+        require(not alive, f'原生输出读取没有结束: {", ".join(alive)}')
         for stream in (self.process.stdout, self.process.stderr):
             stream.close()
         require(not self.reader_errors, '原生输出读取失败: ' + repr(self.reader_errors))
+        require(not pending, f'原生输出没有真实 EOF: {", ".join(pending)}')
         self.close_receipt['output_readers_eof'] = True
 
 

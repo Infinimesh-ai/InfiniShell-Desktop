@@ -1,5 +1,5 @@
 use std::fs::{self, OpenOptions};
-use std::io::{Read as _, Seek as _, Write as _};
+use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStrExt as _;
 use std::process::Stdio;
 use std::thread;
@@ -10,7 +10,7 @@ use command::managed::{Containment, ManagedTree};
 use command::windows::SuspendedChild;
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Threading::DEBUG_PROCESS;
-use windows::core::PCWSTR;
+use windows::core::{Error as WindowsError, PCWSTR};
 
 use super::*;
 
@@ -55,6 +55,40 @@ const DEBUG_DRIVER_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_DRIVER";
 const DEBUG_DRIVER_RECEIPT_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_RECEIPT";
 const DEBUG_DRIVER_TIMEOUT: Duration = Duration::from_secs(30);
 const DEBUG_LARGE_IMAGE_TIMEOUT: Duration = Duration::from_secs(120);
+
+pub(super) fn record_rejected_image(path: &Path, system_directory: &File) {
+    // 仅实机诊断测试输出文件名和位置类别；不输出完整路径，也不把类别作为信任依据。
+    let basename = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| {
+            name.len() <= 128
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        });
+    let system_path = final_path_from_handle(system_directory).ok();
+    let relative = system_path
+        .as_ref()
+        .and_then(|system| system.parent())
+        .and_then(|root| path.strip_prefix(root).ok());
+    let category = match relative
+        .and_then(|path| path.components().next())
+        .and_then(|part| part.as_os_str().to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("microsoft.net") => "windows_microsoft_net",
+        Some("winsxs") => "windows_winsxs",
+        Some("system32") => "windows_system32_subdirectory",
+        Some(_) => "windows_other",
+        None => "outside_windows_or_unresolved",
+    };
+    eprintln!(
+        "atomic_windows_rejected_image={}",
+        serde_json::json!({ "basename": basename, "directory_category": category })
+    );
+}
 
 fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
     let (_, test_module) = module_path!()
@@ -103,6 +137,7 @@ fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
     };
     // 即使调试事件链挂住，也须终止专属 Job、等待测试根进程并确认 ActiveProcesses=0。
     let status = tree.terminate_and_confirm(Duration::from_secs(5)).unwrap();
+    eprintln!("atomic_windows_strict_job_cleanup_confirmed=true");
     let timed_out = outcome.unwrap();
     eprintln!(
         "Windows 调试夹具：测试={test_name}，外层耗时={}ms，超时={timed_out}，严格 Job 已清空",
@@ -476,11 +511,23 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
     eprintln!("Windows 调试夹具：真实 CLI 主线程已恢复，等待根映像初始事件");
     let mut debug = executable
         .begin_image_debug_session(root_process_id)
-        .unwrap();
+        .unwrap_or_else(|failure| {
+            eprintln!(
+                "atomic_windows_debug_failure={}",
+                debug_failure_fields("begin_session", &failure)
+            );
+            panic!("Windows 原子调试失败：begin_session");
+        });
     eprintln!("Windows 调试夹具：真实 CLI 根映像初始事件已确认并继续");
     drop(cwd);
 
-    let status = debug.wait_for_exit(&mut child).unwrap();
+    let status = debug.wait_for_exit(&mut child).unwrap_or_else(|failure| {
+        eprintln!(
+            "atomic_windows_debug_failure={}",
+            debug_failure_fields("wait_for_exit", &failure)
+        );
+        panic!("Windows 原子调试失败：wait_for_exit");
+    });
     eprintln!("Windows 调试夹具：真实 CLI 根进程及调试子树已退出，原生状态：{status}");
 
     if requested_args.is_none() {
@@ -489,6 +536,42 @@ fn debug_session_runs_fixed_real_cli_to_native_exit() {
         eprintln!("真实更新参数的原生退出状态：{status}");
     }
     record_debug_native_exit("debug_session_runs_fixed_real_cli_to_native_exit");
+}
+
+fn debug_failure_fields(stage: &'static str, failure: &io::Error) -> serde_json::Value {
+    // 只保存固定错误标识及系统数值，不输出可能包含路径的错误正文。
+    let description = failure.to_string();
+    let code = description.split(':').next().filter(|code| {
+        code.starts_with("managed_process.atomic_windows_")
+            && code.len() <= 128
+            && code
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || matches!(byte, b'_' | b'.'))
+    });
+    let hresult = failure
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<WindowsError>())
+        .map(|error| error.code().0);
+    serde_json::json!({"stage": stage, "os_error": failure.raw_os_error(),
+        "hresult": hresult, "failure_code": code})
+}
+
+#[test]
+fn debug_failure_fields_keep_os_code_without_private_error_text() {
+    let native = debug_failure_fields("begin_session", &io::Error::from_raw_os_error(5));
+    assert_eq!(native["os_error"], 5);
+    let private = debug_failure_fields(
+        "wait_for_exit",
+        &io::Error::other("C:\\private\\config.json"),
+    );
+    assert!(private["os_error"].is_null());
+    assert!(private["failure_code"].is_null());
+    assert!(!private.to_string().contains("private"));
+    let code = "managed_process.atomic_windows_loaded_image_outside_system_directory";
+    assert_eq!(
+        debug_failure_fields("wait_for_exit", &io::Error::other(code))["failure_code"],
+        code
+    );
 }
 
 #[test]

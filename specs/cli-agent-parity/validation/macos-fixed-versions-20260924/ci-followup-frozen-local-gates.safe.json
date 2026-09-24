@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-09-24T11:21:00.292852+00:00",
+  "base_commit": "faab52d8a41f9d47530f55c9bc73d13f1c115803",
+  "platform": "macos-arm64",
+  "source_sha256": {
+    ".github/workflows/cross-platform-preflight.yml": "c498268aa286a27d5c22fae647996c822bcdb153bbf808bfa0965363c0847db6",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "f5281a4a770dd0bcb10bfaf45430eb9cc018e2317fb282be06e0e07907b5ccb8",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs": "b4f0300e960a6b37cac55e909cb23ab64ea9e76eb7c1c4215c221afc05512b30",
+    "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs": "f804999718ee5121048032bf32d57f608ef1f26a9b1849efe3e92ad12d6e5187",
+    "app/src/integration_testing/clipboard/mod.rs": "f8fe7e41a91ec275c21b92899694ae686ed73abd475ba3001954790b10080351",
+    "app/src/terminal/cli_agent_updates/sources_live_tests.rs": "0ffcc041f09cdd4812fb862c922328baba4db8313f91d8b3d94aeb38472de9eb",
+    "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "b2d3bd2b0c5b6f0ba72b2ab3366852c987dae5678245e72f89f1d7f83441b791",
+    "app/src/terminal/local_tty/windows/mod.rs": "ec2749c053dc5c16491ed45c39a80c26ebfacd572c68d3be721a9136a4f8bb9c",
+    "crates/integration/src/test/cli_composer_system_clipboard.rs": "fb7284ef52badd1cfaa4033ab50cae68acc0768a0e43027194c1e47b273209c3",
+    "script/cli-agent-parity/codex_windows_hook_tests.py": "4daf6469fbf588140c5fb7e379a66405f331eabda90e9fb7ecad0694864bb450",
+    "script/cli-agent-parity/probe_codex_windows_hooks.py": "6c0c6083aad3d56b926def25a7e0e3e8edcdde5fc38c2e481239251a822f1a66",
+    "script/cli-agent-parity/run_codex_adapter_live.py": "4fadefd0bd3c4da9e6da40f610711b41315ff526b4de9aa152988aebe1a9271b",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "318df3bc46ad2a11e922a06afb3fc5ca2d018ef094087ca9c75fd1d2f7d32cbe",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py": "3be3f69e50a0bcad85d49774c3a84a127df7459ba9bc6860455389c2425789a9",
+    "script/cli-agent-parity/run_windows_gui_clipboard.ps1": "2b3fa0b4ae88c2209f63d49f7cac8a823ad88b77fd8c5a9ed12f803af72c8acc",
+    "script/cli-agent-parity/verify_cli_autoupdate.py": "5816fb58a820978e4fb9e3a1df4d258500d43599f24f7660ba3572ba12daee2c",
+    "script/cli-agent-parity/verify_cli_autoupdate_tests.py": "0e6cb5011612f978182cee1a4a596c16e81a76458859258bfad303e873eb3eaf"
+  },
+  "offline_batch": {
+    "scripts": 35,
+    "run": 818,
+    "passed": 811,
+    "skipped": 7,
+    "failed": 0,
+    "log_sha256": "e508f8e2c493f3e109f0692357290a4bb8568df9aa687af68929acd6b957f78f",
+    "shell": "PowerShell; process-local python alias to /opt/homebrew/bin/python3"
+  },
+  "cargo_check": {
+    "passed": true,
+    "log_sha256": "cbad3e526dd89d5bff8a3fc4552fe58586db996b923a31cb8e637eef6e98bd9a"
+  },
+  "i18n": {
+    "passed": 11,
+    "failed": 0,
+    "log_sha256": "8cb4dc436fc88b1c815c2cd321cafebd9c6246aa6c61ee046366954883380742"
+  },
+  "build_digest_regression": {
+    "passed": 1,
+    "failed": 0,
+    "log_sha256": "0efb6f109b51fbfa65735b3b6dcd5796e903838dda9329b01744da85f4a2ddb2"
+  },
+  "static_checks": {
+    "actionlint": true,
+    "powershell_ast": true,
+    "rustfmt_changed_files": true,
+    "git_diff_check": true
+  },
+  "localization": "无需本地化变更",
+  "limits": [
+    "本地通过不代替 Windows/Linux 实机结果",
+    "仅 Windows 终端启动的生产行为变化；Mac 产品行为未变",
+    "Windows 调试诊断位于 cfg(test)，须原生 CI 编译及执行",
+    "Windows 新增错误字段 Rust 回归待远端验证"
+  ],
+  "prior_cargo_check_failure": {
+    "cause": "incremental compilation directory Permission denied",
+    "log_sha256": "bc4bcec827a3063792e63ac9d8faf7d4121f0a26ec26cf12da96d0b7e83a76d4",
+    "retry_passed": true
+  }
+}
