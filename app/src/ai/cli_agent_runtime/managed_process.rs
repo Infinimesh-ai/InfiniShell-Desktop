@@ -15,6 +15,7 @@ use std::time::{Duration, Instant};
 use command::r#async::{Child, ChildStdin, ChildStdout, Command};
 #[cfg(not(target_os = "macos"))]
 use command::managed::{Containment, ManagedTree, prepare_supervisor};
+use futures::channel::oneshot;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use tempfile::NamedTempFile;
@@ -911,25 +912,33 @@ async fn spawn_configured(
             return Err(error);
         }
     };
-    let expected = manifest.clone();
-    let control = blocking::unblock(move || {
-        let mut stream = accept_authorized(&listener, &expected)?;
-        let mut ready = [0];
-        stream.read_exact(&mut ready)?;
-        if ready != [1] {
-            return Err(io::Error::other("托管执行未获得进程所有权"));
-        }
-        Ok::<_, io::Error>(stream)
+    let state_dir = state_dir.to_owned();
+    let (started, startup) = oneshot::channel();
+    // OS 已经派生监督者，调用方取消也必须完成控制握手，不能随排队任务丢弃监听器。
+    blocking::unblock(move || {
+        let child = (|| {
+            let mut control = accept_authorized(&listener, &manifest)?;
+            let mut ready = [0];
+            control.read_exact(&mut ready)?;
+            if ready != [1] {
+                return Err(io::Error::other("托管执行未获得进程所有权"));
+            }
+            Ok(ManagedChild {
+                stdin: process.stdin.take(),
+                stdout: process.stdout.take(),
+                process: Some(process),
+                control: Some(control),
+                state_dir,
+                generation,
+            })
+        })();
+        // 接收方已取消时，销毁结果会通过 ManagedChild::drop 通知真实监督者清理。
+        let _ = started.send(child);
     })
-    .await?;
-    Ok(ManagedChild {
-        stdin: process.stdin.take(),
-        stdout: process.stdout.take(),
-        process: Some(process),
-        control: Some(control),
-        state_dir: state_dir.to_owned(),
-        generation,
-    })
+    .detach();
+    startup
+        .await
+        .map_err(|_| io::Error::other("托管启动任务未返回结果"))?
 }
 
 /// 独占并永久关闭尚未领取的代次；已有启动账本绝不被“未启动”结论覆盖。

@@ -1488,7 +1488,13 @@ async fn exercise(manifest: &Manifest, evidence: &mut Evidence) -> Result<(), &'
         }
         task.abort();
         let _ = task.await;
-        wait_for_confirmed_exit(root, generation, agent).await?;
+        wait_for_confirmed_exit(root, generation, agent)
+            .await
+            .map_err(|error| {
+                evidence.supervised_exit =
+                    Some(supervised_exit_diagnostic(root, &generations_before));
+                error
+            })?;
         Ok(manifest.old_version.clone())
     } else {
         execute(plan, None).await

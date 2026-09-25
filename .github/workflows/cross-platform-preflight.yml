@@ -513,7 +513,12 @@ jobs:
           done
           cargo build -p integration --bin integration
           target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
-          timeout 180s xvfb-run -a -s '-screen 0 1600x1000x24' "$target_dir/debug/integration" test_cli_composer_system_clipboard_multiline_and_image
+          # 同一真实用例按语言独立启动；窗口构造时即使用目标语言，产物分别保留。
+          for locale in en zh-CN; do
+            WARP_TEST_GUI_LOCALE="$locale" \
+              WARP_INTEGRATION_TEST_ARTIFACTS_DIR="$WARP_INTEGRATION_TEST_ARTIFACTS_DIR/$locale" \
+              timeout 180s xvfb-run -a -s '-screen 0 1600x1000x24' "$target_dir/debug/integration" test_cli_composer_system_clipboard_multiline_and_image
+          done
 
       - name: Preserve Linux GUI system clipboard evidence
         if: ${{ !cancelled() && (steps.cli_gui_input.outcome == 'success' || steps.cli_gui_input.outcome == 'failure') }}

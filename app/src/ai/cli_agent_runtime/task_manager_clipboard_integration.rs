@@ -375,6 +375,26 @@ pub fn finish_cli_clipboard_evidence() -> TestStep {
                 ),
                 "仅在真实草稿、附件与零提交断言全部通过后保存收据"
             );
+            let expected_locale =
+                std::env::var("WARP_TEST_GUI_LOCALE").unwrap_or_else(|_| "en".to_owned());
+            assert!(
+                matches!(expected_locale.as_str(), "en" | "zh-CN"),
+                "仅验收英文和简体中文界面"
+            );
+            let ui_locale = crate::i18n::loader()
+                .expect("界面语言必须已初始化")
+                .current_languages()
+                .first()
+                .expect("必须存在实际界面语言")
+                .to_string();
+            assert_eq!(
+                ui_locale, expected_locale,
+                "实际界面语言必须匹配本轮验收语言"
+            );
+            assert!(
+                FeatureFlag::LocalCLIManagedTasks.is_enabled(),
+                "保存收据时正式桌面默认配置必须仍启用托管任务"
+            );
             drop(data.remove::<_, ClipboardProducer>(PRODUCER_KEY));
             let root = PathBuf::from(std::env::var_os(ARTIFACTS_DIR_ENV_VAR).unwrap())
                 .join(CLI_CLIPBOARD_TEST_NAME);
@@ -422,6 +442,7 @@ pub fn finish_cli_clipboard_evidence() -> TestStep {
                 "schema": 1,
                 "test": CLI_CLIPBOARD_TEST_NAME,
                 "platform": std::env::consts::OS,
+                "ui_locale": ui_locale,
                 "source_commit": std::env::var("WARP_TEST_GUI_SOURCE_COMMIT").unwrap(),
                 "desktop_default_features_applied": true,
                 "managed_feature_test_override": false,

@@ -1,9 +1,11 @@
 //! 无模型的真实监督进程验收；夹具进程限时退出，不能替代三款 CLI 的生命周期验收。
 
 use std::process::Child as BlockingChild;
+use std::task::Context;
 
 use command::blocking::Command as BlockingCommand;
 use futures::executor::block_on;
+use futures::task::noop_waker_ref;
 
 use super::*;
 
@@ -11,6 +13,8 @@ const FIXTURE_ENV: &str = "INFINISHELL_MANAGED_PROCESS_FIXTURE";
 const GENERATION_ENV: &str = "INFINISHELL_MANAGED_PROCESS_GENERATION";
 const DETACH_ENV: &str = "INFINISHELL_MANAGED_PROCESS_DETACHED";
 const HOST_TEST: &str = "ai::cli_agent_runtime::managed_process::live_tests::fixture_host";
+const QUEUED_STARTUP_HOST_TEST: &str =
+    "ai::cli_agent_runtime::managed_process::live_tests::fixture_queued_startup_host";
 const NATIVE_TEST: &str = "ai::cli_agent_runtime::managed_process::live_tests::fixture_native";
 const NATIVE_EXIT_HOST_TEST: &str =
     "ai::cli_agent_runtime::managed_process::live_tests::fixture_native_exit_host";
@@ -111,6 +115,110 @@ fn assert_platform_containment(receipt: &ExitReceipt) {
     assert_eq!(receipt.containment, "macos_resource_coalition");
     #[cfg(windows)]
     assert_eq!(receipt.containment, "windows_job");
+}
+
+#[test]
+#[ignore = "需要已构建的真实监督 worker，不访问模型或用户配置"]
+fn supervised_cancel_before_control_handshake_confirms_process_tree_exit() {
+    supervisor_executable().expect("先构建主程序/TUI，并设置监督 worker 的绝对路径");
+    let directory = tempfile::tempdir().unwrap();
+    let generation = Uuid::new_v4();
+    let mut command = fixture_command(QUEUED_STARTUP_HOST_TEST, directory.path());
+    command
+        .env(GENERATION_ENV, generation.to_string())
+        // 独立夹具的唯一 blocking 线程由屏障占用，握手只能在取消后开始。
+        .env("BLOCKING_MAX_THREADS", "1");
+    let mut host = Host(command.spawn().unwrap());
+    let deadline = Instant::now() + Duration::from_secs(15);
+    while host.0.try_wait().unwrap().is_none() {
+        if Instant::now() >= deadline {
+            let errors =
+                fs::read_to_string(directory.path().join("fixture_queued_startup_host.stderr"))
+                    .unwrap_or_default();
+            let process_directory = generation_directory(directory.path(), generation);
+            let supervisor_errors =
+                fs::read_to_string(process_directory.join("supervisor.stderr")).unwrap_or_default();
+            let job_errors =
+                fs::read_to_string(process_directory.join("macos-job.stderr")).unwrap_or_default();
+            let job_state = fs::read_to_string(process_directory.join("launchctl-print.txt"))
+                .unwrap_or_default();
+            let receipt =
+                fs::read_to_string(process_directory.join("exit.json")).unwrap_or_default();
+            panic!(
+                "排队启动取消夹具未结束；generation={generation}; host={errors}; supervisor={supervisor_errors}; job={job_errors}; launchctl={job_state}; exit={receipt}"
+            );
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    let errors =
+        fs::read_to_string(directory.path().join("fixture_queued_startup_host.stderr")).unwrap();
+    assert!(
+        host.0.wait().unwrap().success(),
+        "排队启动取消失败: {errors}"
+    );
+    let receipt = wait_diagnostic_receipt(directory.path(), generation);
+    assert_abnormal_exit_receipt_boundary(directory.path(), generation, &receipt);
+    assert!(matches!(
+        receipt.exit_reason,
+        ExitReason::HostDisconnected | ExitReason::StdioClosed
+    ));
+    assert!(
+        confirmed_exit(directory.path(), Uuid::new_v4())
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+#[ignore = "内部排队启动取消夹具，只由 supervised 测试派生"]
+fn fixture_queued_startup_host() {
+    if std::env::var_os(FIXTURE_ENV).is_none() {
+        return;
+    }
+    assert_eq!(std::env::var("BLOCKING_MAX_THREADS").unwrap(), "1");
+    let directory = std::env::current_dir().unwrap();
+    let generation = std::env::var(GENERATION_ENV).unwrap().parse().unwrap();
+    let executable = std::env::current_exe().unwrap();
+    let arguments = ["--ignored", "--exact", NATIVE_TEST, "--nocapture"].map(OsString::from);
+    let (entered, waiting) = std::sync::mpsc::channel();
+    let (release, resume) = std::sync::mpsc::channel();
+    let blocker = blocking::unblock(move || {
+        entered.send(()).unwrap();
+        resume.recv_timeout(HANDSHAKE_TIMEOUT).unwrap();
+    });
+    waiting.recv_timeout(HANDSHAKE_TIMEOUT).unwrap();
+
+    let mut startup = Box::pin(spawn(
+        &directory,
+        generation,
+        &executable,
+        &arguments,
+        &directory,
+    ));
+    assert!(
+        startup
+            .as_mut()
+            .poll(&mut Context::from_waker(noop_waker_ref()))
+            .is_pending(),
+        "屏障未释放时不能完成启动"
+    );
+    assert!(
+        generation_directory(&directory, generation)
+            .join(SPAWN_ATTEMPT_RECORD)
+            .is_file()
+    );
+    assert!(confirmed_exit(&directory, generation).unwrap().is_none());
+    drop(startup);
+    release.send(()).unwrap();
+    block_on(blocker);
+
+    // 使用平台真实进程树退出证明，不能把取消 future 或账本存在视为清理完成。
+    let receipt = wait_diagnostic_receipt(&directory, generation);
+    assert_abnormal_exit_receipt_boundary(&directory, generation, &receipt);
+    assert!(matches!(
+        receipt.exit_reason,
+        ExitReason::HostDisconnected | ExitReason::StdioClosed
+    ));
 }
 
 #[test]

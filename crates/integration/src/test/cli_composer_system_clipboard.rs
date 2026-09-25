@@ -11,7 +11,14 @@ use warpui_core::integration::TestStep;
 use crate::Builder;
 
 pub fn test_cli_composer_system_clipboard_multiline_and_image() -> Builder {
-    i18n::init(Some("en"));
+    let locale = std::env::var("WARP_TEST_GUI_LOCALE").unwrap_or_else(|_| "en".to_owned());
+    assert!(
+        matches!(locale.as_str(), "en" | "zh-CN"),
+        "仅验收英文和简体中文界面"
+    );
+    // 在构建窗口之前选择语言，避免按钮和占位符保留另一种语言的缓存文案。
+    i18n::init(Some(&locale));
+    i18n::set_locale(&locale);
 
     Builder::new()
         .with_real_display()

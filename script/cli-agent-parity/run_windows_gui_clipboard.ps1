@@ -23,10 +23,14 @@ $record = [ordered]@{
     mesa_archive_url = 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.1/mesa3d-26.2.1-release-msvc.7z'
     mesa_archive_sha256 = '78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf'
     copied_runtime_files = @()
+    locale_results = @()
     model_inputs = 0
 }
 $savedBackend = $env:WGPU_BACKEND
 $savedDriver = $env:GALLIUM_DRIVER
+$savedLocale = $env:WARP_TEST_GUI_LOCALE
+$savedArtifacts = $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR
+$currentLocale = $null
 $stdout = Join-Path $directory 'stdout.log'
 $stderr = Join-Path $directory 'stderr.log'
 try {
@@ -66,32 +70,54 @@ try {
     }
     $env:WGPU_BACKEND = 'gl'
     $env:GALLIUM_DRIVER = 'llvmpipe'
-    $process = Start-Process -FilePath (Join-Path $executableDirectory 'integration.exe') `
-        -ArgumentList 'test_cli_composer_system_clipboard_multiline_and_image' `
-        -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
-        -NoNewWindow -PassThru
-    if (-not $process.WaitForExit(180000)) {
-        $process.Kill($true)
-        $process.WaitForExit()
-        throw 'Real Windows GUI initialization or clipboard test exceeded 180 seconds'
-    }
-    $record.exit_code = $process.ExitCode
-    $renderer = @(Select-String -LiteralPath $stdout, $stderr -Pattern 'Using Gl Cpu \(llvmpipe.*\) for rendering new window\.' | ForEach-Object { $_.Matches[0].Value })
-    $record.renderer = $renderer
-    if ($process.ExitCode -ne 0) { throw 'Real Windows window or system clipboard verification failed' }
-    if ($renderer.Count -eq 0) { throw 'Missing actual GL llvmpipe window renderer evidence' }
-    $receipts = @(Get-ChildItem -LiteralPath $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR -Recurse -Filter 'receipt.safe.json')
-    if ($receipts.Count -ne 1) { throw 'Expected exactly one real clipboard receipt' }
-    $receipt = Get-Content -LiteralPath $receipts[0].FullName -Raw | ConvertFrom-Json
     $binaryDigest = ($record.copied_runtime_files | Where-Object { $_.name -eq 'integration.exe' }).sha256
-    if ($receipt.source_commit -ne $record.source_commit -or $receipt.binary_sha256 -ne $binaryDigest -or
-        -not $receipt.system_clipboard -or -not $receipt.text_exact -or -not $receipt.image_pixels_exact -or
-        $receipt.model_inputs -ne 0 -or $receipt.managed_tasks_created -ne 0 -or $receipt.screenshots.Count -ne 2) {
-        throw 'Real clipboard receipt does not match this binary or required assertions'
+    # 共用一次 Mesa 和程序准备，每种语言都启动新窗口，避免缓存文案混用。
+    foreach ($locale in @('en', 'zh-CN')) {
+        $env:WARP_TEST_GUI_LOCALE = $locale
+        $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR = Join-Path $savedArtifacts $locale
+        New-Item -ItemType Directory -Path $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR | Out-Null
+        $stdout = Join-Path $directory "stdout-$locale.log"
+        $stderr = Join-Path $directory "stderr-$locale.log"
+        $currentLocale = [ordered]@{
+            ui_locale = $locale
+            outcome = 'pending'
+            exit_code = $null
+            renderer = @()
+        }
+        $record.locale_results += $currentLocale
+        $process = Start-Process -FilePath (Join-Path $executableDirectory 'integration.exe') `
+            -ArgumentList 'test_cli_composer_system_clipboard_multiline_and_image' `
+            -WorkingDirectory (Get-Location).Path -RedirectStandardOutput $stdout -RedirectStandardError $stderr `
+            -NoNewWindow -PassThru
+        if (-not $process.WaitForExit(180000)) {
+            $process.Kill($true)
+            $process.WaitForExit()
+            throw "Real Windows GUI initialization or clipboard test exceeded 180 seconds: $locale"
+        }
+        $currentLocale.exit_code = $process.ExitCode
+        $record.exit_code = $process.ExitCode
+        $renderer = @(Select-String -LiteralPath $stdout, $stderr -Pattern 'Using Gl Cpu \(llvmpipe.*\) for rendering new window\.' | ForEach-Object { $_.Matches[0].Value })
+        $currentLocale.renderer = $renderer
+        $record.renderer = $renderer
+        if ($process.ExitCode -ne 0) { throw "Real Windows window or system clipboard verification failed: $locale" }
+        if ($renderer.Count -eq 0) { throw "Missing actual GL llvmpipe window renderer evidence: $locale" }
+        $receipts = @(Get-ChildItem -LiteralPath $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR -Recurse -Filter 'receipt.safe.json')
+        if ($receipts.Count -ne 1) { throw "Expected exactly one real clipboard receipt: $locale" }
+        $receipt = Get-Content -LiteralPath $receipts[0].FullName -Raw | ConvertFrom-Json
+        if ($receipt.source_commit -ne $record.source_commit -or $receipt.binary_sha256 -ne $binaryDigest -or
+            $receipt.ui_locale -cne $locale -or
+            $receipt.desktop_default_features_applied -cne $true -or
+            $receipt.managed_feature_test_override -cne $false -or $receipt.managed_feature_enabled -cne $true -or
+            -not $receipt.system_clipboard -or -not $receipt.text_exact -or -not $receipt.image_pixels_exact -or
+            $receipt.model_inputs -ne 0 -or $receipt.managed_tasks_created -ne 0 -or $receipt.screenshots.Count -ne 2) {
+            throw "Real clipboard receipt does not match this binary, UI language, or required assertions: $locale"
+        }
+        $currentLocale.outcome = 'passed'
     }
     $record.outcome = 'passed'
 } catch {
     $record.outcome = 'failed'
+    if ($null -ne $currentLocale -and $currentLocale.outcome -ne 'passed') { $currentLocale.outcome = 'failed' }
     # 失败日志留在本次私有目录，CI 输出保留尾部诊断；不伪造截图或剪贴板收据。
     foreach ($log in @($stdout, $stderr)) {
         if (Test-Path -LiteralPath $log) {
@@ -108,4 +134,6 @@ try {
     $record | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $recordPath -Encoding utf8
     $env:WGPU_BACKEND = $savedBackend
     $env:GALLIUM_DRIVER = $savedDriver
+    $env:WARP_TEST_GUI_LOCALE = $savedLocale
+    $env:WARP_INTEGRATION_TEST_ARTIFACTS_DIR = $savedArtifacts
 }
