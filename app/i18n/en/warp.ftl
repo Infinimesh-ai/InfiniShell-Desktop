@@ -5841,6 +5841,8 @@ cli-task-manager-permission-workspace = Codex project writes
 cli-task-manager-permission-inherit-help = Inherited permissions may include access already allowed by your CLI configuration. This app does not change those settings or add approval bypass flags.
 cli-task-manager-permission-claude-files = Claude reviewed file tasks
 cli-task-manager-permission-claude-files-help = Limit Claude to reading project files and editing with your approval. This fixed policy preserves supported deny rules, disables shell commands and automatic hooks, and requires API authentication. Unsupported permission settings prevent the task from starting.
+cli-task-manager-permission-claude-files-v2 = Claude reviewed file creation (V2)
+cli-task-manager-permission-claude-files-v2-help = Claude Code 2.1.280 can read project files and request approval to edit or create files. Each write requires your approval. Commands, skills, and hooks remain blocked. File creation and replacement cannot target configuration paths or symbolic links. Earlier file task permissions do not gain this capability.
 cli-task-manager-permission-claude-files-skills = This file task policy does not run skills. Remove selected skills before starting.
 cli-task-manager-session-pending = Awaiting native session confirmation
 cli-task-manager-approval = Permission requested: { $method }
@@ -5899,10 +5901,10 @@ cli-agent-plugin-codex-patch-manual-note = Native installation alone does not ap
 cli-agent-message-unconfirmed-id = Delivery of message { $message_id } is unconfirmed. Check its saved status before retrying. { $error }
 
 cli-agent-task-skill-plugin-failed = Could not prepare the isolated skill plugin: { $error }
-cli-agent-task-skill-one-per-turn = Select one skill per turn in managed Claude or Grok tasks.
+cli-agent-task-skill-one-per-turn = Select one skill per turn in managed Grok tasks.
 cli-agent-task-parent-changed = The parent task has moved to another turn. Launch this child again from the current turn.
 cli-agent-input-images-unverified = Managed image input has not been verified for { $cli }. Your draft is unchanged.
-cli-agent-claude-image-formats = Verified Claude Code 2.1.280 supports PNG, JPEG, static GIF, and WebP images, including image-only inputs and images with one selected skill.
+cli-agent-claude-image-formats = Verified Claude Code 2.1.280 supports PNG, JPEG, static GIF, and WebP images, including image-only inputs. With inherited CLI settings, images can also be combined with one selected skill.
 cli-agent-claude-image-format-unsupported = Managed Claude Code tasks support PNG, JPEG, static GIF, and WebP images.
 cli-agent-claude-animated-gif-unverified = Claude Code managed tasks currently support static GIF images only. Your draft is unchanged.
 cli-agent-claude-rich-images-version = These image formats, image-only inputs, and image with skill combinations require verified Claude Code 2.1.280.
@@ -6061,3 +6063,13 @@ settings-cli-updates-persistence = The update record could not be saved. Check l
 settings-cli-updates-launch-blocked = The update for { $agent } has not finished. Check its update status in Settings before starting it.
 
 ai-command-launch-failed = Command did not start: { $reason }
+
+cli-agent-claude-skill-path-conflict = A skill with this name is already registered from a different path. Start a new task to replace it.
+cli-agent-claude-skill-limit = A Claude task can register up to 32 local skills.
+cli-agent-claude-skill-duplicate = The same skill was selected more than once. Remove the duplicate and try again.
+cli-agent-claude-skill-reload-failed = Claude did not confirm every selected skill. Your draft is retained. Reconnect this task before sending again.
+cli-agent-claude-skill-reload-pending = Claude is registering selected skills. Wait for registration to finish before sending again.
+cli-agent-claude-skill-reload-idle = Wait for the current Claude turn to finish before adding a new skill. Your draft is retained.
+cli-agent-claude-skill-version-required = Adding skills during a session or selecting multiple skills requires Claude Code 2.1.280 in Inherit mode.
+cli-agent-claude-image-multiple-skills-unverified = Select at most one skill when sending images to Claude. Multiple skills with images have not been verified.
+cli-agent-claude-skills-reload-help = You can select multiple skills. New skills are registered when this session is idle, and sending waits for Claude to confirm registration.

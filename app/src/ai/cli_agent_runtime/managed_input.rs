@@ -5,19 +5,19 @@ use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 use ai::skills::ParsedSkill;
-use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use image::codecs::gif::GifDecoder;
 use image::{AnimationDecoder, ImageDecoder, ImageFormat, ImageReader, Limits};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 use warp_cli::agent::Harness;
 
-use super::local_skills::prepare_local_cli_skill_inputs;
 use super::InputContent;
+use super::local_skills::prepare_local_cli_skill_inputs;
 use crate::ai::agent::ImageContext;
 use crate::util::image::{
-    is_supported_image_mime_type, MAX_IMAGE_COUNT_FOR_QUERY, MAX_IMAGE_PIXELS, MAX_IMAGE_SIZE_BYTES,
+    MAX_IMAGE_COUNT_FOR_QUERY, MAX_IMAGE_PIXELS, MAX_IMAGE_SIZE_BYTES, is_supported_image_mime_type,
 };
 
 /// 调用方传入已由现有文件、选区和评审 builder 生成的文本，不在这里重写上下文语法。
@@ -34,6 +34,11 @@ pub(crate) fn prepare_managed_input(
         Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => {
             return Err(crate::t!("cli-agent-managed-version-unavailable"));
         }
+    }
+    if harness == Harness::Claude && !images.is_empty() && skills.len() > 1 {
+        return Err(crate::t!(
+            "cli-agent-claude-image-multiple-skills-unverified"
+        ));
     }
     if harness == Harness::Grok && !images.is_empty() && !skills.is_empty() {
         return Err(crate::t!(

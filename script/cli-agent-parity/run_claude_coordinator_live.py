@@ -18,13 +18,32 @@ from prepare_claude_cli import RELEASE_CATALOG, VERSION, current_platform, verif
 
 TEST_NAME = "ai::cli_agent_runtime::coordinator::claude_live_tests::real_claude_fixed_profile_parent_child"
 SCOPE = "real_claude_production_coordinator"
+FILE_POLICY_SCOPES = {
+    "v1": SCOPE,
+    "v1-ceiling": "real_claude_production_coordinator_v1_ceiling",
+    "v2": "real_claude_production_coordinator_v2_write",
+}
+DENIED_WRITE = "DENIED_WRITE_MUST_NOT_APPLY"
 TEST_CANDIDATE_VERSION = "2.1.280"
 TEST_CANDIDATE_BUILD_ARGUMENT = "--infinishell-claude-21280-test-build"
 TEST_CANDIDATE_BUILD_MARKER = "infinishell-claude-21280-test-build-v1"
 TEST_CANDIDATE_STATE_MARKER_CONTENT = "isolated Claude Code 2.1.280 coordinator candidate\n"
 
 
+def file_policy_probe(args):
+    policy = getattr(args, "file_policy", "v1")
+    if policy not in FILE_POLICY_SCOPES:
+        raise ValueError("未知文件策略验收范围")
+    if policy != "v1" and (
+            getattr(args, "claude_version", VERSION) != TEST_CANDIDATE_VERSION
+            or not getattr(args, "use_authorized_default_account", False)
+            or getattr(args, "allow_claude_21280_coordinator_candidate", False)):
+        raise ValueError("V2 与 V1 父上限验收只允许正式 2.1.280 已授权默认账户")
+    return policy
+
+
 def coordinator_candidate(args):
+    file_policy_probe(args)
     version = getattr(args, "claude_version", VERSION)
     enabled = getattr(args, "allow_claude_21280_coordinator_candidate", False)
     if enabled and version != TEST_CANDIDATE_VERSION:
@@ -63,7 +82,7 @@ def _permission_summary(value):
     if not isinstance(value, dict):
         raise ValueError("原生权限记录必须为对象")
     summary = {key: project_public_value(value[key]) for key in (
-        "claudeRestrictedFilesV1", "fixedProfileSha256", "fixedProfileVerified",
+        "claudeRestrictedFilesV1", "claudeRestrictedFilesV2", "fixedProfileSha256", "fixedProfileVerified",
         "permissionMode", "sessionAssociationConfirmed") if key in value}
     summary["private_permissions_sha256"] = _value_sha256(value)
     observation = value.get("permissionObservation")
@@ -108,7 +127,14 @@ def project_public_value(value):
         elif key == "config_json":
             result[key] = json.dumps(_config_summary(json.loads(child)), ensure_ascii=False)
         elif key in ("body", "terminal_evidence") and isinstance(child, str) and child.lstrip().startswith(("{", "[")):
-            result[key] = json.dumps(project_public_value(json.loads(child)), ensure_ascii=False)
+            truncated_key = "body_truncated" if key == "body" else "evidence_truncated"
+            if value.get(truncated_key) is True:
+                # inspect 的有界正文可能止于 JSON 中间；原字节留在私有树，公开只保留摘要。
+                digest = hashlib.sha256(child.encode("utf-8")).hexdigest()
+                result[key] = f"<truncated-json sha256={digest}>"
+                result[f"private_{key}_sha256"] = digest
+            else:
+                result[key] = json.dumps(project_public_value(json.loads(child)), ensure_ascii=False)
         else:
             result[key] = project_public_value(child)
     return result
@@ -315,11 +341,13 @@ def _audit_inputs(runtime, histories, expected, metrics):
         # 初始化先验证固定权限，再由首条原生输入关联会话；这类 Ready 不是执行证据。
         kind = row["runtime"]["kind"]
         ready = kind.get("SessionReady", {}).get("effective_permissions", {})
+        profile_key = ("claudeRestrictedFilesV2" if config.get("permission_policy") == "ClaudeRestrictedFilesV2"
+                       else "claudeRestrictedFilesV1")
         if (native_id is not None or row["task"].get("native_session_id") is not None
                 or key[1] != 1 or key[0] in session_bound or set(kind) != {"SessionReady"}
                 or ready.get("fixedProfileVerified") is not True or ready.get("permissionMode") != "default"
                 or ready.get("sessionAssociationConfirmed") is not False
-                or ready.get("claudeRestrictedFilesV1") != config["claude_profile"]
+                or ready.get(profile_key) != config["claude_profile"]
                 or ready.get("fixedProfileSha256") != config["effective_permissions"].get("fixedProfileSha256")):
             return False
     native_results = _native_result_correlations(runtime)
@@ -363,20 +391,97 @@ def _runtime_host_cleanup_receipt(receipt, runtime_generation):
             and 0 <= acknowledged <= last)
 
 
-def verified_acceptance(exit_code, output, events, expected_version=VERSION):
+def _verify_file_probe(events, runtime, file_policy, parent, child, ceiling, profile, markers):
+    denied = [row for row in events if row.get("event") == "approval_denied"]
+    rejected = [row for row in events if row.get("event") == "v1_parent_v2_rejected"]
+    if file_policy == "v1-ceiling":
+        if len(rejected) != 1:
+            return False
+        row = rejected[0]
+        if (row.get("parent_task_id") != parent["task_id"] or row.get("parent_generation") != 1
+                or row.get("parent_native_session_id") != parent["native_session_id"]
+                or row.get("ceiling") != ceiling or row.get("requested_profile") != {
+                    "version": 2, "cliVersion": TEST_CANDIDATE_VERSION, "base": profile}
+                or row.get("error", {}).get("reason") != "claude_profile_parent_mismatch"
+                or row.get("native_connection_created") is not False
+                or row.get("native_input_sent") is not False
+                or row.get("parent_record_unchanged") is not True):
+            return False
+    elif rejected:
+        return False
+    if file_policy != "v2":
+        return not denied
+    if len(denied) != 1:
+        return False
+    allowed_path = child["working_directory"] + "/child-approved.txt"
+    denied_path = child["working_directory"] + "/child-denied.txt"
+    before = {key: value for key, value in _one(events, "write_fixtures_verified").items()
+              if key != "private_record_sha256"}
+    after = {key: value for key, value in _one(events, "write_effects_verified").items()
+             if key != "private_record_sha256"}
+    if (before != {
+            "event": "write_fixtures_verified", "allowed_path": allowed_path, "allowed_absent": True,
+            "denied_path": denied_path, "denied_before": "CHILD_BEFORE"}
+            or after != {
+                "event": "write_effects_verified", "allowed_path": allowed_path,
+                "allowed_content": markers["initial"], "denied_path": denied_path,
+                "denied_content": "CHILD_BEFORE"}):
+        return False
+    if (denied[0].get("task_id") != child["task_id"] or denied[0].get("generation") != 1
+            or denied[0].get("decision") != "DenyOnce"
+            or denied[0]["approval"]["details"].get("tool_name") != "Write"
+            or denied[0]["approval"]["details"].get("input") != {
+                "file_path": denied_path, "content": DENIED_WRITE}):
+        return False
+    approvals = [row for row in events if row.get("event") in ("approval_allowed", "approval_denied")]
+    identities = [(row["task_id"], row["approval"]["approval_id"]) for row in approvals]
+    if len(set(identities)) != len(identities):
+        return False
+    writes = [row for row in approvals if row["approval"]["details"].get("tool_name") == "Write"]
+    if len(writes) != 2 or writes[0] != denied[0] or writes[1].get("event") != "approval_allowed":
+        return False
+    process = json.loads(child["config_json"])["runtime_generation"]
+    # 宿主选择必须对应实际原生审批及其决策回执；单独写入 approval_allowed 不构成证据。
+    for chosen in writes:
+        request = chosen["approval"]
+        native = [(events.index(row), row["runtime"]["kind"]) for row in runtime
+                  if row["task"]["task_id"] == child["task_id"] and row["task"]["generation"] == 1
+                  and row["runtime"].get("native_session_id") == child["native_session_id"]
+                  and row["runtime"].get("generation") == process]
+        requested = [(index, kind["ApprovalRequested"]) for index, kind in native
+                     if kind.get("ApprovalRequested", {}).get("approval_id") == request["approval_id"]]
+        resolved = [(index, kind["ApprovalResolved"]) for index, kind in native
+                    if kind.get("ApprovalResolved", {}).get("approval_id") == request["approval_id"]]
+        starts = [index for index, kind in native if kind.get("TurnStarted", {}).get("turn_id") == request.get("turn_id")]
+        ends = [index for index, kind in native if kind.get("TurnFinished", {}).get("turn_id") == request.get("turn_id")]
+        if (len(requested) != 1 or len(resolved) != 1 or requested[0][1] != request
+                or request.get("method") != "can_use_tool" or len(starts) != 1 or len(ends) != 1
+                or resolved[0][1] != {"approval_id": request["approval_id"], "decision": chosen["decision"]}
+                or not starts[0] < requested[0][0] < events.index(chosen) < resolved[0][0] < ends[0]):
+            return False
+    return True
+
+
+def verified_acceptance(exit_code, output, events, expected_version=VERSION, file_policy="v1"):
     """校验实际持久记录及原生工具结果；结束行的布尔声明不能单独证明通过。"""
-    if (not isinstance(expected_version, str) or expected_version not in RELEASE_CATALOG
+    if (file_policy not in FILE_POLICY_SCOPES
+            or file_policy != "v1" and expected_version != TEST_CANDIDATE_VERSION
+            or not isinstance(expected_version, str) or expected_version not in RELEASE_CATALOG
             or exit_code != 0 or not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", output)
             or not isinstance(events, list) or any(not isinstance(row, dict) for row in events)
             or any(row.get("event") in ("acceptance_failed", "cleanup_failed") for row in events)):
         return False
     try:
+        write_probe = file_policy == "v2"
+        scope = FILE_POLICY_SCOPES[file_policy]
+        profile_key = "claudeRestrictedFilesV2" if write_probe else "claudeRestrictedFilesV1"
+        policy_name = "ClaudeRestrictedFilesV2" if write_probe else "ClaudeRestrictedFilesV1"
         started = _one(events, "acceptance_started")
         ending = _one(events, "acceptance_passed")
         chain = _one(events, "saved_chain_verified")
-        gate = _one(events, "native_ack_before_child_edit_allow")
+        gate = _one(events, "native_ack_before_child_write_allow" if write_probe else "native_ack_before_child_edit_allow")
         finished = _one(events, "coordinator_chain_finished")
-        if (started.get("scope") != SCOPE or ending.get("scope") != SCOPE
+        if (started.get("scope") != scope or ending.get("scope") != scope
                 or ending.get("real_gui_verified") is not False
                 or ending.get("automatic_result_delivery_ack_verified") is not True
                 or any(ending.get(key) is not True for key in (
@@ -384,7 +489,16 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
                     "native_message_ack_both_directions", "final_result_via_inspect"))
                 or finished.get("native_tool_calls") != 4 or finished.get("native_inputs") not in (5, 6)
                 or finished.get("approvals_allowed") != 5
-                or finished.get("child_edit_effect_verified") is not True):
+                or finished.get("child_write_effect_verified" if write_probe else "child_edit_effect_verified") is not True):
+            return False
+        if file_policy != "v1" and (
+                started.get("production_version_gate_verified") is not True
+                or any(ending.get(key) is not False for key in (
+                    "waiting_write_cancel_verified", "live_host_reattach_verified", "cold_history_resume_verified"))):
+            return False
+        if write_probe and (finished.get("approvals_denied") != 1
+                or finished.get("child_edit_effect_verified") is not False
+                or finished.get("denied_write_unchanged") is not True):
             return False
         parent, child = chain["parent"], chain["child"]
         parent_id, child_id = parent["task_id"], child["task_id"]
@@ -424,21 +538,26 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
             "parent_task_id": parent_id, "parent_generation": 1,
             "parent_native_session_id": source["native_session_id"],
             "working_directory": source["working_directory"],
-            "permissions": {"claudeRestrictedFilesV1": profile},
+            "permissions": {profile_key: profile},
         }
+        base_profile = profile.get("base") if write_probe else profile
+        if write_probe and (set(profile) != {"version", "cliVersion", "base"}
+                or profile.get("version") != 2 or profile.get("cliVersion") != TEST_CANDIDATE_VERSION
+                or not isinstance(base_profile, dict) or base_profile.get("version") != 1):
+            return False
         if (profile != child_config["claude_profile"]
-                or child_config["effective_permissions"]["claudeRestrictedFilesV1"] != profile
+                or child_config["effective_permissions"][profile_key] != profile
                 or child_config["effective_permissions"]["fixedProfileVerified"] is not True
                 or child_config["effective_permissions"]["permissionMode"] != "default"
-                or profile.get("localTools") != {"allow_spawn": True, "allow_message": True}
+                or base_profile.get("localTools") != {"allow_spawn": True, "allow_message": True}
                 or child_config["permission_ceiling"] != ceiling):
             return False
         for task in [parent, child, *chain["parent_generations"], *chain["child_generations"]]:
             config = json.loads(task["config_json"])
             if (config.get("cli_version") != expected_version
                     or config.get("claude_profile") != profile
-                    or config.get("permission_policy") != "ClaudeRestrictedFilesV1"
-                    or config.get("effective_permissions", {}).get("claudeRestrictedFilesV1") != profile
+                    or config.get("permission_policy") != policy_name
+                    or config.get("effective_permissions", {}).get(profile_key) != profile
                     or config.get("effective_permissions", {}).get("fixedProfileVerified") is not True
                     or config.get("effective_permissions", {}).get("permissionMode") != "default"):
                 return False
@@ -452,7 +571,7 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
                 or not _native_ack(followups[0], parent_id, child_id, 1, markers["followup"])
                 or not _native_ack(progresses[0], child_id, parent_id, child_generation, markers["progress"])
                 or gate.get("child_id") != child_id or gate.get("child_generation") != 1
-                or gate.get("child_edit_waiting") is not True
+                or gate.get("child_write_waiting" if write_probe else "child_edit_waiting") is not True
                 or gate.get("matching_messages") != followups):
             return False
         result_messages = [row for row in messages if row.get("subject") == "local_task_result"
@@ -534,7 +653,11 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
             if operation in approved_operations:
                 return False
             approved_operations.add(operation)
-            if tool == "Edit":
+            if tool == "Write" and write_probe:
+                if (operation != (child_id, 1, "Write") or details["input"] != {
+                        "file_path": child["working_directory"] + "/child-approved.txt", "content": markers["initial"]}):
+                    return False
+            elif tool == "Edit" and not write_probe:
                 edit = dict(details["input"])
                 replace_all = edit.pop("replace_all", False)
                 if (operation != (child_id, 1, "Edit")
@@ -546,6 +669,8 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
                     or operation not in arguments or details["input"] != arguments[operation]):
                 return False
         runtime = [row for row in events if row.get("event") == "runtime"]
+        if not _verify_file_probe(events, runtime, file_policy, source, child, ceiling, profile, markers):
+            return False
         all_histories = {(task["task_id"], task["generation"]): task
                          for name in ("parent_generations", "child_generations") for task in chain[name]}
         expected_inputs = {}
@@ -574,6 +699,8 @@ def verified_acceptance(exit_code, output, events, expected_version=VERSION):
 def run(args):
     # 先按固定发行摘要校验；不向任意 PATH 命中的程序传入 API 环境执行 --version。
     candidate = coordinator_candidate(args)
+    file_policy = file_policy_probe(args)
+    scope = FILE_POLICY_SCOPES[file_policy]
     selected_version = getattr(args, "claude_version", VERSION)
     formal_current = selected_version == TEST_CANDIDATE_VERSION and not candidate
     if selected_version == TEST_CANDIDATE_VERSION:
@@ -604,14 +731,17 @@ def run(args):
         args.config_dir.mkdir(mode=0o700)
         base.validate_paths(args)
     settings = base.prepare_project(root)
-    (root / ".infinishell-claude-coordinator-probe").write_text(SCOPE, encoding="utf-8")
+    (root / ".infinishell-claude-coordinator-probe").write_text(scope, encoding="utf-8")
     if candidate:
         with (root / base.TEST_CANDIDATE_MARKER).open("x", encoding="utf-8", newline="\n") as target_file:
             target_file.write(base.TEST_CANDIDATE_MARKER_CONTENT)
     blocked = root / "project/blocked.txt"
     blocked.write_text("This file is outside the allowed read policy.\n", encoding="utf-8")
     child_file = root / "project/child-approved.txt"
-    child_file.write_text("CHILD_BEFORE", encoding="utf-8")
+    if file_policy == "v2":
+        (root / "project/child-denied.txt").write_text("CHILD_BEFORE", encoding="utf-8")
+    else:
+        child_file.write_text("CHILD_BEFORE", encoding="utf-8")
     blocked_digest = base.digest(blocked)
     settings.write_text(json.dumps({"permissions": {
         "ask": ["Edit"], "deny": [f"Read(/{blocked.as_posix()})"]
@@ -638,6 +768,7 @@ def run(args):
         "INFINISHELL_CLAUDE_LIVE_AUTH_MODE": auth_mode,
         "INFINISHELL_CLAUDE_LIVE_EXECUTABLE": str(args.claude),
         "INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION": selected_version,
+        "INFINISHELL_CLAUDE_LIVE_FILE_POLICY": file_policy,
         "INFINISHELL_CLAUDE_LIVE_ARTIFACT": str(raw_artifact),
         "INFINISHELL_CLAUDE_LIVE_MODEL": args.model,
         "INFINISHELL_CLI_SUPERVISOR_EXECUTABLE": str(args.supervisor),
@@ -651,7 +782,7 @@ def run(args):
     redact = lambda value: base.sanitize(value, root, args.config_dir, args.auth_home, api_environment)
     repository = Path(__file__).resolve().parents[2]
     metadata = {
-        "test": TEST_NAME, "scope": SCOPE, "platform": sys.platform,
+        "test": TEST_NAME, "scope": scope, "file_policy": file_policy, "platform": sys.platform,
         "cli": verified_cli, "cli_version": detected, "requested_cli_version": selected_version,
         "model": args.model,
         "test_binary_sha256": base.digest(args.test_binary), "supervisor_binary_sha256": base.digest(args.supervisor),
@@ -671,6 +802,8 @@ def run(args):
         "test_only_coordinator_candidate_21280": candidate,
         "candidate_supervisor_marker_verified": candidate,
         "production_version_gate_expected": formal_current,
+        "waiting_write_cancel_verified": False, "live_host_reattach_verified": False,
+        "cold_history_resume_verified": False,
     }
     if account_status is not None:
         metadata["authorized_default_account"] = account_status
@@ -722,7 +855,7 @@ def run(args):
             _native_result_correlations(raw_events), redact)
         # 验收先审核私有全树，再审核公开摘要；删除字段不能把失败记录变成通过。
         private_verified = verified_acceptance(process.returncode, output,
-            [base.sanitize_event(row, redact) for row in raw_events], selected_version)
+            [base.sanitize_event(row, redact) for row in raw_events], selected_version, file_policy)
         events = project_public_events(raw_events, redact)
         metadata["private_raw_evidence_sha256"] = base.digest(raw_artifact)
         metadata["private_event_count"] = len(raw_events)
@@ -735,7 +868,13 @@ def run(args):
             and (not formal_current or metadata["production_version_gate_verified"])
             and metadata["project_settings_unchanged"] and metadata["denied_read_fixture_unchanged"]
             and metadata["cli_binary_unchanged"]
-            and private_verified and verified_acceptance(process.returncode, output, events, selected_version))
+            and private_verified and verified_acceptance(process.returncode, output, events, selected_version, file_policy))
+        if file_policy == "v2":
+            expected_content = _one(raw_events, "saved_chain_verified")["markers"]["initial"]
+            metadata["write_file_effects_independently_verified"] = (
+                child_file.read_text(encoding="utf-8") == expected_content
+                and (root / "project/child-denied.txt").read_text(encoding="utf-8") == "CHILD_BEFORE")
+            metadata["acceptance_passed"] &= metadata["write_file_effects_independently_verified"]
         metadata["automatic_result_delivery_ack_verified"] = metadata["acceptance_passed"]
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         metadata["runner_error"] = redact(f"{type(error).__name__}: {error}")
@@ -793,6 +932,8 @@ def main():
     parser.add_argument("--allow-claude-21280-coordinator-candidate", action="store_true",
                         help="仅专用测试构建；显式启用 Claude 2.1.280 父子候选")
     parser.add_argument("--supervisor", type=Path, required=True)
+    parser.add_argument("--file-policy", choices=tuple(FILE_POLICY_SCOPES), default="v1",
+                        help="v2 验证精确 Write 允许/拒绝；v1-ceiling 验证实际 V1 父上限拒绝 V2；均不包含恢复验收")
     parser.add_argument("--api-environment-file", type=Path)
     parser.add_argument("--use-authorized-default-account", action="store_true",
                         help="显式使用用户已授权的默认 Claude 在线订阅；与 API 环境互斥")

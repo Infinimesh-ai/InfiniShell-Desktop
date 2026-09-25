@@ -29,11 +29,63 @@ pub(crate) struct SelectedLocalSkill {
 pub(crate) struct PreparedClaudeSkillPlugin {
     directory: TempDir,
     selected: Vec<SelectedLocalSkill>,
+    budget: SkillCopyBudget,
 }
 
 impl PreparedClaudeSkillPlugin {
     pub(crate) fn plugin_directory(&self) -> &Path {
         self.directory.path()
+    }
+
+    pub(crate) fn selected(&self) -> &[SelectedLocalSkill] {
+        &self.selected
+    }
+
+    /// 只暂存尚未注册的目录；原生确认前不暴露为可调用技能。
+    pub(crate) fn stage_additions(
+        &self,
+        selected: &[SelectedLocalSkill],
+    ) -> Result<Option<PreparedClaudeSkillUpdate>, String> {
+        let mut additions = Vec::new();
+        for skill in selected {
+            if let Some(previous) = self.selected.iter().find(|item| item.name == skill.name) {
+                if previous != skill {
+                    return Err(crate::t!("cli-agent-claude-skill-path-conflict"));
+                }
+            } else if !additions.contains(skill) {
+                additions.push(skill.clone());
+            }
+        }
+        if additions.is_empty() {
+            return Ok(None);
+        }
+        if self.selected.len() + additions.len() > 32 {
+            return Err(crate::t!("cli-agent-claude-skill-limit"));
+        }
+        let staged = prepare_claude_skill_directory(&additions, self.budget.clone())?;
+        let mut update = PreparedClaudeSkillUpdate {
+            selected: additions,
+            paths: Vec::new(),
+            budget: staged.budget.clone(),
+        };
+        for skill in &update.selected {
+            let destination = self.directory.path().join("skills").join(&skill.name);
+            if destination.exists() {
+                return Err(crate::t!("cli-agent-claude-skill-path-conflict"));
+            }
+            std::fs::rename(
+                staged.directory.path().join("skills").join(&skill.name),
+                &destination,
+            )
+            .map_err(|error| {
+                crate::t!(
+                    "cli-agent-task-skill-plugin-failed",
+                    error = error.to_string()
+                )
+            })?;
+            update.paths.push(destination);
+        }
+        Ok(Some(update))
     }
 
     pub(crate) fn command_names(&self) -> Vec<String> {
@@ -59,6 +111,56 @@ pub(crate) fn prepare_claude_skill_plugin(
     if selected.is_empty() {
         return Ok(None);
     }
+    prepare_empty_or_selected_claude_skill_plugin(selected).map(Some)
+}
+
+pub(crate) fn prepare_empty_or_selected_claude_skill_plugin(
+    selected: &[SelectedLocalSkill],
+) -> Result<PreparedClaudeSkillPlugin, String> {
+    prepare_claude_skill_directory(
+        selected,
+        SkillCopyBudget {
+            bytes: 32 * 1024 * 1024,
+            entries: 1024,
+        },
+    )
+}
+
+/// 注册失败或连接丢弃时，仅删除本次新增且由本对象拥有的副本。
+pub(crate) struct PreparedClaudeSkillUpdate {
+    selected: Vec<SelectedLocalSkill>,
+    paths: Vec<PathBuf>,
+    budget: SkillCopyBudget,
+}
+
+impl PreparedClaudeSkillUpdate {
+    pub(crate) fn command_names(&self) -> Vec<String> {
+        self.selected
+            .iter()
+            .map(|skill| format!("{CLAUDE_SKILL_PLUGIN_NAME}:{}", skill.name))
+            .collect()
+    }
+
+    pub(crate) fn commit(mut self, plugin: &mut PreparedClaudeSkillPlugin) {
+        plugin.selected.append(&mut self.selected);
+        plugin.budget = self.budget.clone();
+        self.paths.clear();
+    }
+}
+
+impl Drop for PreparedClaudeSkillUpdate {
+    fn drop(&mut self) {
+        for path in &self.paths {
+            // 目标全部由 stage_additions 创建；不触碰原始技能或既有注册目录。
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+}
+
+fn prepare_claude_skill_directory(
+    selected: &[SelectedLocalSkill],
+    mut budget: SkillCopyBudget,
+) -> Result<PreparedClaudeSkillPlugin, String> {
     let prepare = || -> anyhow::Result<PreparedClaudeSkillPlugin> {
         if selected.len() > 32 {
             bail!("技能数量超过限制");
@@ -75,10 +177,6 @@ pub(crate) fn prepare_claude_skill_plugin(
             )?,
         )?;
         let mut names = HashSet::new();
-        let mut budget = SkillCopyBudget {
-            bytes: 32 * 1024 * 1024,
-            entries: 1024,
-        };
         for skill in selected {
             if !skill.path.is_absolute()
                 || skill.path.file_name().is_none_or(|name| name != "SKILL.md")
@@ -102,9 +200,10 @@ pub(crate) fn prepare_claude_skill_plugin(
         Ok(PreparedClaudeSkillPlugin {
             directory,
             selected: selected.to_vec(),
+            budget,
         })
     };
-    prepare().map(Some).map_err(|error| {
+    prepare().map_err(|error| {
         crate::t!(
             "cli-agent-task-skill-plugin-failed",
             error = error.to_string()
@@ -112,6 +211,7 @@ pub(crate) fn prepare_claude_skill_plugin(
     })
 }
 
+#[derive(Clone)]
 struct SkillCopyBudget {
     bytes: u64,
     entries: usize,
@@ -216,8 +316,14 @@ pub(crate) fn prepare_local_cli_skill_inputs(
     {
         return Err(crate::t!("cli-agent-task-skills-require-managed"));
     }
-    if matches!(harness, Harness::Claude | Harness::Grok) && skills.len() > 1 {
+    if harness == Harness::Grok && skills.len() > 1 {
         return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+    }
+    if harness == Harness::Claude {
+        let mut names = HashSet::new();
+        if skills.iter().any(|skill| !names.insert(&skill.name)) {
+            return Err(crate::t!("cli-agent-claude-skill-duplicate"));
+        }
     }
     skills
         .into_iter()

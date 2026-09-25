@@ -10,7 +10,7 @@ use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
 
 use super::super::local_tools::{LocalToolPermissions, NativeLocalToolRequest};
-use super::super::permissions::ceiling_from_parent;
+use super::super::permissions::{ClaudeFileProfile, ceiling_from_parent};
 use super::super::runtime_host::confirmed_exit;
 use super::super::{ApprovalDecision, current_state_dir};
 use super::*;
@@ -25,6 +25,51 @@ const SCOPE: &str = "real_claude_production_coordinator";
 const MAX_NATIVE_TOOLS: usize = 4;
 const MAX_NATIVE_INPUTS: usize = 6;
 const BEFORE: &str = "CHILD_BEFORE";
+const DENIED_WRITE: &str = "DENIED_WRITE_MUST_NOT_APPLY";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FilePolicyProbe {
+    V1,
+    V1Ceiling,
+    V2,
+}
+
+impl FilePolicyProbe {
+    fn selected() -> Self {
+        match env::var("INFINISHELL_CLAUDE_LIVE_FILE_POLICY") {
+            Ok(value) => match value.as_str() {
+                "v1" => Self::V1,
+                "v1-ceiling" => Self::V1Ceiling,
+                "v2" => Self::V2,
+                _ => panic!("未知文件策略验收范围"),
+            },
+            Err(env::VarError::NotPresent) => Self::V1,
+            Err(env::VarError::NotUnicode(_)) => panic!("文件策略验收范围编码无效"),
+        }
+    }
+
+    fn policy(self) -> PermissionPolicy {
+        match self {
+            Self::V1 | Self::V1Ceiling => PermissionPolicy::ClaudeRestrictedFilesV1,
+            Self::V2 => PermissionPolicy::ClaudeRestrictedFilesV2,
+        }
+    }
+
+    fn scope(self) -> &'static str {
+        match self {
+            Self::V1 => SCOPE,
+            Self::V1Ceiling => "real_claude_production_coordinator_v1_ceiling",
+            Self::V2 => "real_claude_production_coordinator_v2_write",
+        }
+    }
+
+    fn evidence_key(self) -> &'static str {
+        match self {
+            Self::V1 | Self::V1Ceiling => "claudeRestrictedFilesV1",
+            Self::V2 => "claudeRestrictedFilesV2",
+        }
+    }
+}
 
 struct Evidence {
     // 完整配置仅写隔离目录；运行器审核全树后生成带哈希的公开摘要。
@@ -65,7 +110,7 @@ impl Markers {
         }
     }
 
-    fn prompt(&self, parent: &str, file: &Path, model: &str) -> String {
+    fn prompt(&self, parent: &str, file: &Path, model: &str, probe: FilePolicyProbe) -> String {
         let child_prompt = format!(
             "Please update one file in this temporary project. The coordinating task's ID is {parent}. \
              Use Read to read {}, then Edit exactly once with old_string CHILD_BEFORE, \
@@ -78,6 +123,29 @@ impl Markers {
             self.initial,
             self.initial,
         );
+        let child_prompt = if probe == FilePolicyProbe::V2 {
+            let denied = file.with_file_name("child-denied.txt");
+            format!(
+                "Perform exactly two reviewed Write requests in this temporary project. \
+                 The coordinating task ID is {parent}. First Read {} and request Write once \
+                 with file_path {} and content exactly {DENIED_WRITE:?}. The host will deny this \
+                 request: accept that decision, do not retry it, and leave that file unchanged. \
+                 Then request Write exactly once to create {} with content exactly {:?}. \
+                 The host will separately review this creation. Each Write input must contain \
+                 only file_path and content. Do not use Edit, shell commands, other file paths, \
+                 or child agents. After the approved creation succeeds, reply with {}. \
+                 If a follow-up arrives, also send its requested parent progress message and \
+                 include its completion label. The denied write is expected, so continue to \
+                 the separately approved creation after the denial.",
+                denied.display(),
+                json!(denied),
+                file.display(),
+                self.initial,
+                self.initial,
+            )
+        } else {
+            child_prompt
+        };
         let spawn = json!({"summary":"temporary project file update", "base_prompt":"",
             "harness":"claude", "model_id":model, "skills":[],
             "agent_run_configs":[{"name":"file-update","prompt":child_prompt}]});
@@ -147,6 +215,7 @@ async fn approve(
     coordinator: &ModelHandle<LocalCLITaskCoordinator>,
     task: &LocalCliTask,
     approval: &ManagedApproval,
+    decision: ApprovalDecision,
 ) -> Result<(), String> {
     coordinator
         .update(app, |model, _| {
@@ -156,7 +225,7 @@ async fn approve(
                 Uuid::new_v4(),
                 RuntimeAction::RespondApproval {
                     approval_id: approval.approval_id.clone(),
-                    decision: ApprovalDecision::AllowOnce,
+                    decision,
                 },
             )
         })?
@@ -169,6 +238,7 @@ async fn verify_saved_chain(
     parent_id: &str,
     child_id: &str,
     markers: &Markers,
+    probe: FilePolicyProbe,
     evidence: &mut Evidence,
 ) -> Result<bool, String> {
     let saved = records(sender).await?;
@@ -197,7 +267,7 @@ async fn verify_saved_chain(
     if child.parent_task_id.as_deref() != Some(parent_id)
         || child.parent_generation != Some(1)
         || child_config["claude_profile"] != parent_config["claude_profile"]
-        || child_config["effective_permissions"]["claudeRestrictedFilesV1"]
+        || child_config["effective_permissions"][probe.evidence_key()]
             != parent_config["claude_profile"]
         || child_config["effective_permissions"]["fixedProfileVerified"] != true
     {
@@ -375,6 +445,7 @@ async fn drive(
     sender: &SyncSender<ModelEvent>,
     receiver: &mut mpsc::UnboundedReceiver<Wake>,
     root: &Path,
+    probe: FilePolicyProbe,
     evidence: &mut Evidence,
 ) -> Result<(), String> {
     let parent_id = Uuid::new_v4().to_string();
@@ -384,6 +455,18 @@ async fn drive(
         env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "父子验收必须显式固定模型")?;
     let cwd = fs::canonicalize(root.join("project")).map_err(|error| error.to_string())?;
     let output_file = cwd.join("child-approved.txt");
+    let denied_file = cwd.join("child-denied.txt");
+    if probe == FilePolicyProbe::V2 {
+        if output_file.exists()
+            || fs::read_to_string(&denied_file).map_err(|error| error.to_string())? != BEFORE
+        {
+            return Err("V2 Write 初始文件状态不符".into());
+        }
+        evidence.record(
+            json!({"event":"write_fixtures_verified","allowed_path":output_file,
+            "allowed_absent":true,"denied_path":denied_file,"denied_before":BEFORE}),
+        )?;
+    }
     let markers = Markers::new();
     let options = SessionOptions {
         executable,
@@ -391,7 +474,7 @@ async fn drive(
         state_dir: current_state_dir(),
         target: SessionTarget::New,
         generation: Uuid::new_v4(),
-        permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
+        permission_policy: probe.policy(),
         permission_ceiling: None,
         claude_profile: None,
         grok_profile: None,
@@ -409,8 +492,7 @@ async fn drive(
         parent_generation: None,
         harness: "claude".into(),
         working_directory: cwd.to_string_lossy().into(),
-        config_json: json!({"model":model,"permission_policy":"ClaudeRestrictedFilesV1"})
-            .to_string(),
+        config_json: json!({"model":model,"permission_policy":probe.policy()}).to_string(),
         native_session_id: None,
         generation: 1,
         revision: 0,
@@ -418,7 +500,7 @@ async fn drive(
         result: None,
         terminal_evidence: None,
     };
-    let prompt = markers.prompt(&parent_id, &output_file, &model);
+    let prompt = markers.prompt(&parent_id, &output_file, &model, probe);
     coordinator.update(app, |model, ctx| {
         model.start_with_input(
             task,
@@ -431,6 +513,9 @@ async fn drive(
     })?;
     let deadline = Instant::now() + Duration::from_secs(450);
     let mut approved = HashSet::new();
+    let mut native_approval_requests = HashSet::new();
+    let approval_budget = MAX_NATIVE_TOOLS + if probe == FilePolicyProbe::V2 { 2 } else { 1 };
+    let mut denied_write = false;
     let mut tool_calls = HashSet::new();
     let mut turns = HashSet::new();
     let mut joined_inputs = HashSet::new();
@@ -450,6 +535,9 @@ async fn drive(
         if let Some((task, event)) = wake {
             evidence.record(json!({"event":"runtime","task":task,"runtime":event}))?;
             match &event.kind {
+                RuntimeEventKind::ApprovalRequested { approval_id, .. } => {
+                    native_approval_requests.insert((task.task_id.clone(), approval_id.clone()));
+                }
                 RuntimeEventKind::LocalToolRequested { request } => {
                     tool_calls.insert((task.task_id.clone(), request.call_id.clone()));
                 }
@@ -497,10 +585,15 @@ async fn drive(
             child_id = Some(child.task.task_id.clone());
         }
         let child_edit_waiting = children.iter().any(|child| {
-            child
-                .approvals
-                .iter()
-                .any(|approval| approval.details["tool_name"] == "Edit")
+            child.approvals.iter().any(|approval| {
+                approval.details["tool_name"]
+                    == if probe == FilePolicyProbe::V2 {
+                        "Write"
+                    } else {
+                        "Edit"
+                    }
+                    && approval.details["input"]["file_path"] == json!(output_file)
+            })
         });
         let mut followup_ack = false;
         if let Some(child_id) = &child_id {
@@ -512,8 +605,8 @@ async fn drive(
                     && native_ack(row)
             });
             if followup_ack && child_edit_waiting && !gate_recorded {
-                evidence.record(json!({"event":"native_ack_before_child_edit_allow","child_id":child_id,
-                    "child_generation":1,"child_edit_waiting":true,
+                evidence.record(json!({"event":if probe == FilePolicyProbe::V2 {"native_ack_before_child_write_allow"} else {"native_ack_before_child_edit_allow"},"child_id":child_id,
+                    "child_generation":1,"child_edit_waiting":probe != FilePolicyProbe::V2,"child_write_waiting":probe == FilePolicyProbe::V2,
                     "matching_messages":rows.iter().filter(|row| row.subject == markers.followup).collect::<Vec<_>>() }))?;
                 gate_recorded = true;
             }
@@ -524,7 +617,11 @@ async fn drive(
                 if approved.contains(&identity) {
                     continue;
                 }
-                if approved.len() >= MAX_NATIVE_TOOLS + 1 {
+                // 先记录原生请求，再发出测试宿主决策，避免把异步快照当作收据顺序。
+                if probe == FilePolicyProbe::V2 && !native_approval_requests.contains(&identity) {
+                    continue;
+                }
+                if approved.len() >= approval_budget {
                     return Err("审批次数超过验收预算".into());
                 }
                 let tool = approval.details["tool_name"]
@@ -532,9 +629,32 @@ async fn drive(
                     .ok_or("审批缺少工具名")?;
                 let input = &approval.details["input"];
                 let is_parent = snapshot.task.task_id == parent_id;
+                let mut decision = ApprovalDecision::AllowOnce;
                 match tool {
+                    "Write"
+                        if probe == FilePolicyProbe::V2
+                            && !is_parent
+                            && input
+                                == &json!({"file_path":denied_file,"content":DENIED_WRITE})
+                            && !denied_write =>
+                    {
+                        decision = ApprovalDecision::DenyOnce;
+                        denied_write = true;
+                    }
+                    "Write"
+                        if probe == FilePolicyProbe::V2
+                            && !is_parent
+                            && denied_write
+                            && input
+                                == &json!({"file_path":output_file,"content":markers.initial}) =>
+                    {
+                        if !followup_ack {
+                            continue;
+                        }
+                    }
                     "Edit"
-                        if !is_parent
+                        if probe != FilePolicyProbe::V2
+                            && !is_parent
                             && input["file_path"].as_str().map(Path::new)
                                 == Some(output_file.as_path())
                             && input["old_string"] == BEFORE
@@ -598,35 +718,55 @@ async fn drive(
                     _ => return Err("模型请求了验收范围外的工具或参数".into()),
                 }
                 approved.insert(identity);
-                evidence.record(json!({"event":"approval_allowed","task_id":snapshot.task.task_id,
+                evidence.record(json!({"event":if decision == ApprovalDecision::AllowOnce {"approval_allowed"} else {"approval_denied"},"task_id":snapshot.task.task_id,
                     "generation":snapshot.task.generation,"approval":{"approval_id":approval.approval_id,
                         "turn_id":approval.turn_id,"method":approval.method,"details":approval.details},
-                    "decision":"AllowOnce"}))?;
-                approve(app, coordinator, &snapshot.task, approval).await?;
+                    "decision":decision}))?;
+                approve(app, coordinator, &snapshot.task, approval, decision).await?;
             }
         }
         if gate_recorded
             && tool_calls.len() == MAX_NATIVE_TOOLS
             && (5..=MAX_NATIVE_INPUTS).contains(&(turns.len() + joined_inputs.len()))
             && finished_turns.len() == turns.len() + joined_inputs.len()
-            && approved.len() == MAX_NATIVE_TOOLS + 1
+            && approved.len() == approval_budget
             && let Some(child_id) = &child_id
             && snapshots
                 .iter()
                 .all(|snapshot| snapshot.task.state == LocalCliTaskState::Completed)
-            && verify_saved_chain(sender, &parent_id, child_id, &markers, evidence).await?
+            && verify_saved_chain(sender, &parent_id, child_id, &markers, probe, evidence).await?
         {
             if fs::read_to_string(&output_file).map_err(|error| error.to_string())?
                 != markers.initial
             {
                 return Err("已批准子任务文件效果不符".into());
             }
+            if probe == FilePolicyProbe::V2
+                && (!denied_write
+                    || fs::read_to_string(&denied_file).map_err(|error| error.to_string())?
+                        != BEFORE)
+            {
+                return Err("被拒绝 Write 改变了文件或没有实际进入审批".into());
+            }
+            if probe == FilePolicyProbe::V2 {
+                evidence.record(json!({"event":"write_effects_verified","allowed_path":output_file,
+                    "allowed_content":fs::read_to_string(&output_file).map_err(|error| error.to_string())?,
+                    "denied_path":denied_file,
+                    "denied_content":fs::read_to_string(&denied_file).map_err(|error| error.to_string())?}))?;
+            }
+            if probe == FilePolicyProbe::V1Ceiling {
+                verify_v1_ceiling_rejection(sender, &parent_id, evidence).await?;
+            }
             evidence.record(
                 json!({"event":"coordinator_chain_finished","native_tool_calls":tool_calls.len(),
                     "native_inputs":turns.len() + joined_inputs.len(),
                     "native_executions":turns.len(),"joined_inputs":joined_inputs.len(),
-                    "approvals_allowed":approved.len(),
-                    "child_edit_effect_verified":true,"expected_child_file_content":markers.initial}),
+                    "approvals_allowed":approved.len() - usize::from(denied_write),
+                    "approvals_denied":usize::from(denied_write),
+                    "child_edit_effect_verified":probe != FilePolicyProbe::V2,
+                    "child_write_effect_verified":probe == FilePolicyProbe::V2,
+                    "denied_write_unchanged":denied_write,
+                    "expected_child_file_content":markers.initial}),
             )?;
             return Ok(());
         }
@@ -638,6 +778,65 @@ async fn drive(
             return Err("父任务在父子验收完成前提前结束".into());
         }
     }
+}
+
+async fn verify_v1_ceiling_rejection(
+    sender: &SyncSender<ModelEvent>,
+    parent_id: &str,
+    evidence: &mut Evidence,
+) -> Result<(), String> {
+    let history = load_task_generations(sender, parent_id.to_owned())?
+        .await
+        .map_err(|_| "父代读取确认已关闭")??;
+    let parent = history
+        .iter()
+        .find(|task| task.generation == 1)
+        .ok_or("缺少实际 V1 父代")?;
+    let ceiling = ceiling_from_parent(parent, "claude").map_err(|error| error.to_string())?;
+    let Some(ClaudeFileProfile::V1(base)) = ceiling.claude_profile() else {
+        return Err("父记录不是实际 V1 策略".into());
+    };
+    let expanded = ClaudeFileProfile::compile(PermissionPolicy::ClaudeRestrictedFilesV2, base)
+        .map_err(|error| error.to_string())?;
+    let requested = SessionOptions {
+        executable: PathBuf::from(
+            env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").ok_or("缺少固定 CLI")?,
+        ),
+        cwd: PathBuf::from(&parent.working_directory),
+        state_dir: current_state_dir(),
+        target: SessionTarget::New,
+        generation: Uuid::new_v4(),
+        permission_policy: PermissionPolicy::ClaudeRestrictedFilesV2,
+        permission_ceiling: Some(ceiling.clone()),
+        claude_profile: Some(expanded.clone()),
+        grok_profile: None,
+        model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "缺少固定模型")?),
+        local_tools: Some(LocalToolPermissions {
+            allow_spawn: true,
+            allow_message: true,
+        }),
+        selected_skills: Vec::new(),
+    };
+    let error = match super::super::claude::connect(requested) {
+        Err(error) => error,
+        Ok(_) => return Err("V1 父上限意外创建了 V2 运行连接".into()),
+    };
+    let details = error
+        .permission_ceiling_evidence()
+        .ok_or("缺少父上限拒绝证据")?;
+    if details["reason"] != "claude_profile_parent_mismatch" {
+        return Err("V1 父上限没有按预期拒绝 V2".into());
+    }
+    let after = load_task_generations(sender, parent_id.to_owned())?
+        .await
+        .map_err(|_| "父代复核确认已关闭")??;
+    if after.iter().find(|task| task.generation == 1) != Some(parent) {
+        return Err("拒绝 V2 后原始父记录变化".into());
+    }
+    evidence.record(json!({"event":"v1_parent_v2_rejected","parent_task_id":parent_id,
+        "parent_generation":1,"parent_native_session_id":parent.native_session_id,
+        "ceiling":ceiling,"requested_profile":expanded,"error":details,
+        "native_connection_created":false,"native_input_sent":false,"parent_record_unchanged":true}))
 }
 
 async fn shutdown(
@@ -703,6 +902,7 @@ async fn shutdown(
 #[test]
 #[ignore = "仅由显式私有 API 或授权默认账户运行器执行，调用真实模型并产生费用"]
 fn real_claude_fixed_profile_parent_child() {
+    let probe = FilePolicyProbe::selected();
     let candidate =
         env::var("INFINISHELL_CLAUDE_COORDINATOR_CANDIDATE_21280").as_deref() == Ok("1");
     // 运行器预期值只用于安装快照；可信版本仍由真实探测与 system/init 配对后落库。
@@ -724,8 +924,12 @@ fn real_claude_fixed_profile_parent_child() {
             .unwrap();
     assert_eq!(
         fs::read_to_string(root.join(".infinishell-claude-coordinator-probe")).unwrap(),
-        SCOPE
+        probe.scope()
     );
+    if probe != FilePolicyProbe::V1 {
+        assert_eq!(expected_version, "2.1.280");
+        assert!(!candidate, "V2 与父 V1 上限验收只能走正式版本门禁");
+    }
     let auth_home = PathBuf::from(env::var_os("HOME").expect("缺少认证 HOME"))
         .canonicalize()
         .unwrap();
@@ -797,7 +1001,7 @@ fn real_claude_fixed_profile_parent_child() {
     };
     evidence
         .record(
-            json!({"event":"acceptance_started","scope":SCOPE,"real_gui_verified":false,
+            json!({"event":"acceptance_started","scope":probe.scope(),"real_gui_verified":false,
         "authentication_source":auth_mode,
         "production_version_gate_verified":expected_version == "2.1.280" && !candidate,
         "max_native_tools":MAX_NATIVE_TOOLS,"max_native_inputs":MAX_NATIVE_INPUTS,
@@ -840,6 +1044,7 @@ fn real_claude_fixed_profile_parent_child() {
             &writer.sender,
             &mut receiver,
             &root,
+            probe,
             &mut evidence,
         )
         .await;
@@ -853,7 +1058,9 @@ fn real_claude_fixed_profile_parent_child() {
         writer.handle.join().unwrap();
         match result.and(cleanup) {
             Ok(()) => evidence
-                .record(json!({"event":"acceptance_passed","scope":SCOPE,
+                .record(json!({"event":"acceptance_passed","scope":probe.scope(),
+                "waiting_write_cancel_verified":false,"live_host_reattach_verified":false,
+                "cold_history_resume_verified":false,
                 "production_spawn_verified":true,"saved_profile_equal":true,
                 "native_message_ack_both_directions":true,"final_result_via_inspect":true,
                 "real_gui_verified":false,"automatic_result_delivery_ack_verified":true}))

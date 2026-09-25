@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -7,9 +8,9 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 use super::{
-    Effects, GrokProtocol, PendingKind, REQUEST_TIMEOUT, flush_effects, run_process,
-    supported_version, validate_current_settings_update, validate_options, verified_version,
-    verify_test_candidate_binary,
+    Effects, GrokProtocol, PendingKind, REQUEST_TIMEOUT, flush_effects, native_stdio_arguments,
+    run_process, supported_version, validate_current_settings_update, validate_options,
+    verified_version, verify_test_candidate_binary,
 };
 use crate::ai::cli_agent_runtime::grok_profile::GrokCreationPolicyV1;
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
@@ -18,6 +19,47 @@ use crate::ai::cli_agent_runtime::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeError,
     RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
 };
+
+#[test]
+fn fixed_root_explicitly_selects_leader_and_preserves_private_socket_path() {
+    let socket = PathBuf::from("私有 目录").join("leader.sock");
+    assert_eq!(
+        native_stdio_arguments(false, Some("1.0.41"), &socket),
+        vec![
+            OsString::from("agent"),
+            OsString::from("--leader"),
+            OsString::from("stdio"),
+            OsString::from("--leader-socket"),
+            socket.into_os_string(),
+        ]
+    );
+}
+
+#[test]
+fn direct_sdk_never_inherits_root_leader_or_socket_arguments() {
+    assert_eq!(
+        native_stdio_arguments(true, Some("1.0.41"), &PathBuf::from("unused.sock")),
+        vec![
+            OsString::from("agent"),
+            OsString::from("--no-leader"),
+            OsString::from("stdio"),
+        ]
+    );
+}
+
+#[test]
+fn older_fixed_version_keeps_its_previously_verified_launch_arguments() {
+    let socket = PathBuf::from("legacy.sock");
+    assert_eq!(
+        native_stdio_arguments(false, Some("1.0.30"), &socket),
+        vec![
+            OsString::from("agent"),
+            OsString::from("stdio"),
+            OsString::from("--leader-socket"),
+            socket.into_os_string(),
+        ]
+    );
+}
 
 pub(super) fn options() -> SessionOptions {
     SessionOptions {

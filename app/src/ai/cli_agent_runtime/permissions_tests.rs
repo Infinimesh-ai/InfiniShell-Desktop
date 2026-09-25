@@ -1,3 +1,4 @@
+use super::super::PermissionPolicy;
 use super::*;
 
 #[cfg(feature = "local_fs")]
@@ -450,4 +451,73 @@ fn fixed_file_parent_and_child_require_the_saved_and_reported_tool_set_to_match(
     mismatched["effective_permissions"]["requestedPolicy"] = json!("GrokRestrictedReadV1");
     task.config_json = mismatched.to_string();
     assert!(ceiling_from_parent(&task, "grok").is_err());
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn claude_v2_parent_proof_cannot_be_synthesized_from_a_v1_record() {
+    let mut task = parent(json!({}));
+    task.harness = "claude".into();
+    let base = json!({"version":1,"workingDirectory":task.working_directory,
+        "canonicalWorkingDirectory":std::fs::canonicalize(&task.working_directory).unwrap(),
+        "executableSha256":super::super::claude::test_candidate_executable_digest().unwrap(),
+        "denyRules":[],"sourceRules":[],"localTools":{"allow_spawn":true,"allow_message":true}});
+    let v2 = json!({"version":2,"cliVersion":"2.1.280","base":base});
+    let v1_effective = json!({"permissionMode":"default","fixedProfileVerified":true,"claudeRestrictedFilesV1":base});
+    let v2_effective = json!({"permissionMode":"default","fixedProfileVerified":true,"claudeRestrictedFilesV2":v2});
+    let v1_config = json!({"cli_version":"2.1.280","permission_policy":"ClaudeRestrictedFilesV1",
+        "claude_profile":base,"effective_permissions":v1_effective});
+    task.config_json = v1_config.to_string();
+    let v1_ceiling = ceiling_from_parent(&task, "claude").unwrap();
+    assert_eq!(
+        json!(v1_ceiling)["permissions"],
+        json!({"claudeRestrictedFilesV1":base})
+    );
+    let mut ambiguous = json!(v1_ceiling);
+    ambiguous["permissions"]["claudeRestrictedFilesV2"] = v2.clone();
+    assert!(serde_json::from_value::<ParentPermissionCeiling>(ambiguous).is_err());
+    assert!(
+        verify_effective_permissions(
+            Some(&v1_ceiling),
+            "claude",
+            Path::new(&task.working_directory),
+            &v2_effective
+        )
+        .is_err()
+    );
+    let v2_config = json!({"cli_version":"2.1.280","permission_policy":"ClaudeRestrictedFilesV2",
+        "claude_profile":v2,"effective_permissions":v2_effective});
+    task.config_json = v2_config.to_string();
+    let v2_ceiling = ceiling_from_parent(&task, "claude").unwrap();
+    verify_effective_permissions(
+        Some(&v2_ceiling),
+        "claude",
+        Path::new(&task.working_directory),
+        &v2_effective,
+    )
+    .unwrap();
+    assert!(
+        verify_effective_permissions(
+            Some(&v2_ceiling),
+            "claude",
+            Path::new(&task.working_directory),
+            &v1_effective
+        )
+        .is_err()
+    );
+    let restored: ParentPermissionCeiling = serde_json::from_value(json!(v1_ceiling)).unwrap();
+    assert_eq!(
+        restored.claude_profile().unwrap().policy(),
+        PermissionPolicy::ClaudeRestrictedFilesV1
+    );
+    for (key, value) in [
+        ("permission_policy", json!("ClaudeRestrictedFilesV1")),
+        ("cli_version", json!("2.1.278")),
+        ("claude_profile", base),
+    ] {
+        let mut changed = v2_config.clone();
+        changed[key] = value;
+        task.config_json = changed.to_string();
+        assert!(ceiling_from_parent(&task, "claude").is_err());
+    }
 }

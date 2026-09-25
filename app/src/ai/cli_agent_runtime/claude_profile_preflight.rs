@@ -14,13 +14,12 @@ use warpui::r#async::FutureExt as _;
 
 use super::{MAX_LINE_BYTES, write_message};
 use crate::ai::cli_agent_runtime::claude_profile::{
-    ClaudeRestrictedFilesV1, FIXED_PERMISSION_MODE_ARGUMENT, ISOLATED_SETTINGS_ARGUMENTS, reject,
+    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2,
+    FIXED_PERMISSION_MODE_ARGUMENT, ISOLATED_SETTINGS_ARGUMENTS, reject,
 };
-use crate::ai::cli_agent_runtime::{RuntimeError, SessionOptions, SessionTarget};
+use crate::ai::cli_agent_runtime::{PermissionPolicy, RuntimeError, SessionOptions, SessionTarget};
 
-pub(super) async fn prepare(
-    options: &SessionOptions,
-) -> Result<ClaudeRestrictedFilesV1, RuntimeError> {
+pub(super) async fn prepare(options: &SessionOptions) -> Result<ClaudeFileProfile, RuntimeError> {
     if !options.selected_skills.is_empty() {
         return Err(reject("claude_profile_skills_unsupported"));
     }
@@ -31,7 +30,8 @@ pub(super) async fn prepare(
     let candidate = super::test_candidate_enabled(options);
     #[cfg(not(any(test, feature = "claude_21280_test_candidate")))]
     let candidate = false;
-    let digest = executable_digest(&options.executable, candidate)?;
+    let digest =
+        executable_digest_for_policy(&options.executable, candidate, options.permission_policy)?;
     let arguments = [
         "--print",
         "--input-format=stream-json",
@@ -93,6 +93,7 @@ pub(super) async fn prepare(
             &rules,
             &hooks,
         )?;
+        let profile = ClaudeFileProfile::compile(options.permission_policy, profile)?;
         if let Some(saved) = &options.claude_profile {
             saved.verify_source(&profile)?;
         }
@@ -155,7 +156,16 @@ async fn query(
     .map_err(|_| reject("claude_profile_preflight_timeout"))?
 }
 
+#[cfg(test)]
 fn executable_digest(path: &Path, candidate: bool) -> Result<String, RuntimeError> {
+    executable_digest_for_policy(path, candidate, PermissionPolicy::ClaudeRestrictedFilesV1)
+}
+
+fn executable_digest_for_policy(
+    path: &Path,
+    candidate: bool,
+    policy: PermissionPolicy,
+) -> Result<String, RuntimeError> {
     let expected = expected_executable_digests(std::env::consts::OS, std::env::consts::ARCH)?;
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha256::new();
@@ -168,6 +178,13 @@ fn executable_digest(path: &Path, candidate: bool) -> Result<String, RuntimeErro
         digest.update(&bytes[..count]);
     }
     let actual = format!("{:x}", digest.finalize());
+    if policy == PermissionPolicy::ClaudeRestrictedFilesV2 {
+        return if ClaudeRestrictedFilesV2::executable_verified(&actual) {
+            Ok(actual)
+        } else {
+            Err(reject("claude_files_v2_executable_unverified"))
+        };
+    }
     #[cfg(any(test, feature = "claude_21280_test_candidate"))]
     let candidate_matches = candidate
         && test_candidate_executable_digest(std::env::consts::OS, std::env::consts::ARCH)

@@ -52,10 +52,21 @@ pub enum PermissionPolicy {
     WorkspaceWrite,
     /// 固定 Claude 文件工具及逐次审批，不等价于操作系统沙箱。
     ClaudeRestrictedFilesV1,
+    /// 固定 2.1.280 的文件审批策略，额外允许经审批创建文件。
+    ClaudeRestrictedFilesV2,
     /// 固定 Grok 只读工具与应用 SDK 子集，逐次审批；不等价于操作系统沙箱。
     GrokRestrictedReadV1,
     /// 应用固定 Grok 文件工具及逐次审批，不声明原生文件系统沙箱。
     GrokRestrictedFilesV1,
+}
+
+impl PermissionPolicy {
+    pub(crate) fn is_claude_file_profile(self) -> bool {
+        matches!(
+            self,
+            Self::ClaudeRestrictedFilesV1 | Self::ClaudeRestrictedFilesV2
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -68,7 +79,7 @@ pub struct SessionOptions {
     pub generation: Uuid,
     pub permission_policy: PermissionPolicy,
     pub permission_ceiling: Option<permissions::ParentPermissionCeiling>,
-    pub claude_profile: Option<permissions::ClaudeRestrictedFilesV1>,
+    pub claude_profile: Option<permissions::ClaudeFileProfile>,
     pub grok_profile: Option<permissions::GrokCreationPolicyV1>,
     pub model: Option<String>,
     pub local_tools: Option<local_tools::LocalToolPermissions>,

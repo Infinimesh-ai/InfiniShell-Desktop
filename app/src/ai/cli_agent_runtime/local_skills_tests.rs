@@ -114,7 +114,7 @@ fn claude_skill_plugin_copies_relative_resources_and_cleans_up_after_each_connec
 }
 
 #[test]
-fn claude_skill_plugin_rejects_duplicate_names_and_multiple_native_commands_in_one_turn() {
+fn claude_skill_plugin_rejects_duplicate_names_in_one_turn() {
     let (_directory, skill) = skill();
     let LocalOrRemotePath::Local(path) = &skill.path else {
         panic!("夹具路径类型错误");
@@ -190,4 +190,76 @@ fn grok_selection_preserves_native_reference_and_rejects_hidden_or_renamed_files
     )
     .unwrap();
     assert!(prepare_local_cli_skill_inputs(vec![skill], Harness::Grok, true).is_err());
+}
+
+#[test]
+fn claude_multiple_distinct_skills_preserve_original_paths() {
+    let (_directory, first) = skill();
+    let second_root = TempDir::new().unwrap();
+    let second_path = second_root.path().join("SKILL.md");
+    fs::write(
+        &second_path,
+        "---\nname: second\ndescription: 第二技能\n---\n独立正文\n",
+    )
+    .unwrap();
+    let second = parse_skill(&second_path).unwrap();
+    let prepared =
+        prepare_local_cli_skill_inputs(vec![first.clone(), second], Harness::Claude, true).unwrap();
+    assert_eq!(prepared.len(), 2);
+    assert_eq!(
+        prepared[1],
+        InputContent::Skill {
+            name: "second".into(),
+            path: second_path
+        }
+    );
+    assert!(!format!("{prepared:?}").contains("独立正文"));
+}
+
+#[test]
+fn claude_failed_addition_does_not_mutate_existing_registration_or_source_files() {
+    let (_directory, first) = skill();
+    let LocalOrRemotePath::Local(path) = first.path else {
+        panic!("应为本地路径");
+    };
+    let selected = SelectedLocalSkill {
+        name: first.name,
+        path: path.clone(),
+    };
+    let plugin = prepare_empty_or_selected_claude_skill_plugin(&[selected.clone()]).unwrap();
+    let source_bytes = fs::read(&path).unwrap();
+    let missing = SelectedLocalSkill {
+        name: "missing".into(),
+        path: path.parent().unwrap().join("missing/SKILL.md"),
+    };
+    assert!(plugin.stage_additions(&[missing]).is_err());
+    assert_eq!(plugin.selected(), &[selected]);
+    assert_eq!(fs::read(&path).unwrap(), source_bytes);
+    assert!(!plugin.plugin_directory().join("skills/missing").exists());
+}
+
+#[test]
+fn claude_same_name_from_a_different_source_cannot_replace_a_registered_skill() {
+    let (_directory, first) = skill();
+    let (_second_directory, second) = skill();
+    let LocalOrRemotePath::Local(first_path) = first.path else {
+        panic!("应为本地路径");
+    };
+    let LocalOrRemotePath::Local(second_path) = second.path else {
+        panic!("应为本地路径");
+    };
+    let plugin = prepare_empty_or_selected_claude_skill_plugin(&[SelectedLocalSkill {
+        name: "review-local".into(),
+        path: first_path.clone(),
+    }])
+    .unwrap();
+    assert!(
+        plugin
+            .stage_additions(&[SelectedLocalSkill {
+                name: "review-local".into(),
+                path: second_path
+            }])
+            .is_err()
+    );
+    assert!(plugin.command_for("review-local", &first_path).is_some());
 }

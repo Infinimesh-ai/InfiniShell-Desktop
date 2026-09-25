@@ -189,7 +189,8 @@ impl GrokCreationPolicyV1 {
             PermissionPolicy::Inherit
             | PermissionPolicy::ReadOnly
             | PermissionPolicy::WorkspaceWrite
-            | PermissionPolicy::ClaudeRestrictedFilesV1 => {
+            | PermissionPolicy::ClaudeRestrictedFilesV1
+            | PermissionPolicy::ClaudeRestrictedFilesV2 => {
                 return Err(reject("grok_creation_policy_not_selected"));
             }
         };

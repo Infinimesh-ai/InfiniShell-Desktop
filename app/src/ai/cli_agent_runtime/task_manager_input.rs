@@ -137,7 +137,7 @@ impl LocalCLITaskManagerView {
 
     pub(super) fn refresh_managed_input(&mut self, ctx: &mut ViewContext<Self>) {
         let options = ImageContextOptions::Enabled {
-            unsupported_model: !matches!(self.harness, Harness::Codex | Harness::Claude),
+            unsupported_model: !self.managed_image_entry_supported(ctx),
             is_processing_attached_images: self.managed_input.processing_images,
             num_images_attached: self.managed_input.attachments.images.len(),
             num_images_in_conversation: 0,
@@ -202,6 +202,47 @@ impl LocalCLITaskManagerView {
         self.managed_input.skills.update(ctx, |dropdown, ctx| {
             dropdown.set_items(items, ctx);
         });
+    }
+
+    fn managed_image_entry_supported(&self, ctx: &AppContext) -> bool {
+        match self.harness {
+            Harness::Codex | Harness::Claude => true,
+            Harness::Grok => {
+                if self.permission != PermissionPolicy::Inherit
+                    || !self.managed_input.attachments.skills.is_empty()
+                    || !self.verified_installation(Harness::Grok, ctx).is_some_and(
+                        |installation| {
+                            super::grok_current_installation(
+                                Harness::Grok,
+                                &installation.version,
+                            )
+                        },
+                    )
+                {
+                    return false;
+                }
+                if self.selected_task.is_none() {
+                    return true;
+                }
+                // 历史会话的技能绑定独立于当前草稿；实际模型仍由原生握手再次核验。
+                self.selected_record(ctx)
+                    .and_then(|task| serde_json::from_str::<Value>(&task.config_json).ok())
+                    .filter(|config| {
+                        config["cli_version"]
+                            .as_str()
+                            .is_some_and(super::super::grok::current_root_supported_version)
+                    })
+                    .and_then(|config| {
+                        serde_json::from_value::<super::SavedLaunchOptions>(config).ok()
+                    })
+                    .is_some_and(|options| {
+                        options.permission_policy == PermissionPolicy::Inherit
+                            && options.selected_skills.is_empty()
+                            && options.model.as_deref().is_none_or(|model| model == "grok-4.7")
+                    })
+            }
+            Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => false,
+        }
     }
 
     pub(super) fn restore_attachment_draft(
@@ -285,7 +326,7 @@ impl LocalCLITaskManagerView {
     }
 
     fn session_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
-        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+        if self.permission.is_claude_file_profile() {
             return false;
         }
         if self.selected_task.is_none() || !matches!(self.harness, Harness::Claude | Harness::Grok)
@@ -298,6 +339,10 @@ impl LocalCLITaskManagerView {
         else {
             return false;
         };
+        if self.harness == Harness::Claude && config["cli_version"] == "2.1.280" {
+            // 只开放原生已验证的热注册版本；实际发送仍等待注册 ACK。
+            return self.permission == PermissionPolicy::Inherit;
+        }
         let bound_grok = self.harness == Harness::Grok
             && config["cli_version"]
                 .as_str()
@@ -318,7 +363,7 @@ impl LocalCLITaskManagerView {
         &self,
         ctx: &AppContext,
     ) -> Result<Vec<ParsedSkill>, String> {
-        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1
+        if self.permission.is_claude_file_profile()
             && !self.managed_input.attachments.skills.is_empty()
         {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
@@ -364,7 +409,7 @@ impl LocalCLITaskManagerView {
         if generation != self.input_generation {
             return Err(crate::t!("cli-agent-input-target-changed"));
         }
-        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+        if self.permission.is_claude_file_profile() {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if self.harness == Harness::Grok {
@@ -458,7 +503,7 @@ impl LocalCLITaskManagerView {
         let mut body = Flex::column();
         body.add_child(self.row(&["attach-files", "import-review"]));
         body.add_child(self.text(crate::t!("cli-task-manager-skills"), appearance));
-        if self.permission == PermissionPolicy::ClaudeRestrictedFilesV1 {
+        if self.permission.is_claude_file_profile() {
             body.add_child(self.text(
                 crate::t!("cli-task-manager-permission-claude-files-skills"),
                 appearance,
@@ -503,10 +548,21 @@ impl LocalCLITaskManagerView {
         }
         body.add_child(chips.finish());
         if self.harness == Harness::Claude && self.selected_task.is_some() {
-            body.add_child(self.text(
-                crate::t!("cli-task-manager-skills-session-fixed"),
-                appearance,
-            ));
+            body.add_child(
+                self.text(
+                    if self
+                        .selected_record(ctx)
+                        .and_then(|task| serde_json::from_str::<Value>(&task.config_json).ok())
+                        .is_some_and(|config| config["cli_version"] == "2.1.280")
+                        && self.permission == PermissionPolicy::Inherit
+                    {
+                        crate::t!("cli-agent-claude-skills-reload-help")
+                    } else {
+                        crate::t!("cli-task-manager-skills-session-fixed")
+                    },
+                    appearance,
+                ),
+            );
         }
         if self.harness == Harness::Claude {
             body.add_child(self.text(crate::t!("cli-agent-claude-image-formats"), appearance));

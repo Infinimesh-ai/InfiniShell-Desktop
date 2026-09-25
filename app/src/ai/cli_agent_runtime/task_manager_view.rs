@@ -35,7 +35,7 @@ use warpui::{
 
 use super::coordinator::{
     LocalCLITaskCoordinator, LocalCLITaskCoordinatorEvent, ManagedTaskSnapshot,
-    claude_input_pending,
+    claude_input_pending, verify_recovery_identity,
 };
 use super::local_skills::SelectedLocalSkill;
 use super::local_tools::LocalToolPermissions;
@@ -150,7 +150,7 @@ struct SavedLaunchOptions {
     #[serde(default)]
     permission_ceiling: Option<super::permissions::ParentPermissionCeiling>,
     #[serde(default)]
-    claude_profile: Option<super::permissions::ClaudeRestrictedFilesV1>,
+    claude_profile: Option<super::permissions::ClaudeFileProfile>,
     #[serde(default)]
     grok_profile: Option<super::permissions::GrokCreationPolicyV1>,
     model: Option<String>,
@@ -380,6 +380,7 @@ impl LocalCLITaskManagerView {
             PermissionPolicy::ReadOnly,
             PermissionPolicy::WorkspaceWrite,
             PermissionPolicy::ClaudeRestrictedFilesV1,
+            PermissionPolicy::ClaudeRestrictedFilesV2,
             PermissionPolicy::GrokRestrictedReadV1,
             PermissionPolicy::GrokRestrictedFilesV1,
         ]
@@ -1289,6 +1290,7 @@ impl LocalCLITaskManagerView {
                         task.native_session_id.is_none()
                             || task.state.is_active()
                             || task.state == LocalCliTaskState::Unknown
+                            || verify_recovery_identity(&task).is_err()
                     }),
             ),
             ("cancel", !connected || !running),
@@ -1602,8 +1604,8 @@ impl View for LocalCLITaskManagerView {
                 .finish(),
         );
         body.add_child(self.text(crate::t!("cli-task-manager-permission"), appearance));
-        // 固定策略名称较长，Grok 纵向排列，避免两种语言的新选项挤出面板。
-        let mut permissions = if self.harness == Harness::Grok {
+        // 固定策略名称较长，Claude 与 Grok 纵向排列，避免两种语言的新选项挤出面板。
+        let mut permissions = if matches!(self.harness, Harness::Claude | Harness::Grok) {
             Flex::column()
         } else {
             Flex::row()
@@ -2293,6 +2295,7 @@ fn supported_local_tools(
 }
 
 fn resumed_task(previous: &LocalCliTask) -> Result<(LocalCliTask, SessionTarget), String> {
+    verify_recovery_identity(previous)?;
     // 没有已连接的协调器不代表旧 PTY 已结束；未确认的运行仍占用当前代。
     match previous.state {
         LocalCliTaskState::Unconfirmed => {
@@ -2428,6 +2431,9 @@ fn permission_name(permission: PermissionPolicy) -> String {
         PermissionPolicy::ClaudeRestrictedFilesV1 => {
             crate::t!("cli-task-manager-permission-claude-files")
         }
+        PermissionPolicy::ClaudeRestrictedFilesV2 => {
+            crate::t!("cli-task-manager-permission-claude-files-v2")
+        }
         PermissionPolicy::GrokRestrictedReadV1 => {
             crate::t!("cli-task-manager-permission-grok-read")
         }
@@ -2457,6 +2463,9 @@ fn permission_help(permission: PermissionPolicy) -> Option<String> {
         PermissionPolicy::ClaudeRestrictedFilesV1 => {
             Some(crate::t!("cli-task-manager-permission-claude-files-help"))
         }
+        PermissionPolicy::ClaudeRestrictedFilesV2 => Some(crate::t!(
+            "cli-task-manager-permission-claude-files-v2-help"
+        )),
         PermissionPolicy::GrokRestrictedReadV1 => {
             Some(crate::t!("cli-task-manager-permission-grok-read-help"))
         }
@@ -2485,7 +2494,9 @@ fn permission_supported(harness: Harness, permission: PermissionPolicy) -> bool 
     match permission {
         PermissionPolicy::Inherit => true,
         PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => harness == Harness::Codex,
-        PermissionPolicy::ClaudeRestrictedFilesV1 => harness == Harness::Claude,
+        PermissionPolicy::ClaudeRestrictedFilesV1 | PermissionPolicy::ClaudeRestrictedFilesV2 => {
+            harness == Harness::Claude
+        }
         PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1 => {
             harness == Harness::Grok
         }
@@ -2499,6 +2510,9 @@ fn permission_supported_for_version(
 ) -> bool {
     if !permission_supported(harness, permission) {
         return false;
+    }
+    if permission == PermissionPolicy::ClaudeRestrictedFilesV2 {
+        return matches!(version, Some(CLIAgentVersionStatus::Detected(version)) if version == "2.1.280");
     }
     if version.is_some_and(|version| grok_root_only_mode(harness, permission, version)) {
         return permission == PermissionPolicy::Inherit;

@@ -20,7 +20,8 @@ use uuid::Uuid;
 use warpui::r#async::{FutureExt as _, Timer};
 
 use super::local_skills::{
-    CLAUDE_SKILL_PLUGIN_NAME, PreparedClaudeSkillPlugin, prepare_claude_skill_plugin,
+    CLAUDE_SKILL_PLUGIN_NAME, PreparedClaudeSkillPlugin, PreparedClaudeSkillUpdate,
+    prepare_claude_skill_plugin, prepare_empty_or_selected_claude_skill_plugin,
 };
 use super::local_tools::{ClaudeMcpRequest, NativeLocalToolRequest};
 use super::managed_input::restore_claude_managed_images;
@@ -32,6 +33,9 @@ use super::{
 };
 use crate::ai::agent::ImageContext;
 use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
+
+#[path = "claude_skills.rs"]
+mod skills;
 
 #[path = "claude_permission_snapshot.rs"]
 mod permission_snapshot;
@@ -263,7 +267,7 @@ async fn run_process(
     {
         protocol.test_candidate_21280 = test_candidate_enabled(&protocol.options);
     }
-    if protocol.options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV1 {
+    if protocol.options.permission_policy.is_claude_file_profile() {
         let profile = profile_preflight::prepare(&protocol.options).await?;
         protocol.options.claude_profile = Some(profile);
     }
@@ -282,8 +286,18 @@ async fn run_process(
     let detected = String::from_utf8_lossy(&output.stdout).trim().to_string();
     protocol.bind_probed_version(output.status.success(), &detected)?;
 
-    protocol.skill_plugin = prepare_claude_skill_plugin(&protocol.options.selected_skills)
-        .map_err(RuntimeError::InvalidConfiguration)?;
+    protocol.skill_plugin = if protocol.probed_version == Some("2.1.280")
+        && protocol.options.permission_policy == PermissionPolicy::Inherit
+    {
+        // 空槽也在启动时注册，后续新增技能无需修改全局配置或重启会话。
+        Some(
+            prepare_empty_or_selected_claude_skill_plugin(&protocol.options.selected_skills)
+                .map_err(RuntimeError::InvalidConfiguration)?,
+        )
+    } else {
+        prepare_claude_skill_plugin(&protocol.options.selected_skills)
+            .map_err(RuntimeError::InvalidConfiguration)?
+    };
     let mut arguments: Vec<OsString> = launch_arguments(&protocol.options)
         .into_iter()
         .map(OsString::from)
@@ -362,6 +376,8 @@ async fn run_transport(
         }
         flush_effects(protocol, stdin, events, effects).await?;
         let effects = protocol.expire_cancellations();
+        flush_effects(protocol, stdin, events, effects).await?;
+        let effects = protocol.expire_skill_registrations();
         flush_effects(protocol, stdin, events, effects).await?;
         if protocol.request_timed_out() {
             return Err(RuntimeError::RequestTimedOut);
@@ -456,7 +472,37 @@ fn trace_live_protocol_ids(message: &Value, generation: Uuid) {
     if std::env::var_os("INFINISHELL_CLAUDE_RICH_IMAGE_CASE").is_some() {
         identifiers["rich_image_content_projection"] = live_native_rich_image_projection(message);
     }
+    if std::env::var_os("INFINISHELL_CLAUDE_IMAGE_SKILL_TRACE").as_deref()
+        == Some(std::ffi::OsStr::new("1"))
+    {
+        // 仅专用在线夹具启用；保留实际工具身份与输入摘要，不记录技能正文或任意参数。
+        identifiers["runtime_generation"] = json!(generation);
+        identifiers["image_skill_projection"] = live_native_image_skill_projection(message);
+    }
     eprintln!("CLAUDE_NATIVE_PROTOCOL_IDS {identifiers}");
+}
+
+#[cfg(test)]
+fn live_native_image_skill_projection(message: &Value) -> Value {
+    let command = "infinishell-local-skills:inspect-managed-image";
+    let tools = message["message"]["content"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|block| block["type"] == "tool_use")
+        .map(|block| {
+            json!({"tool_use_id":live_native_id(&block["id"]),
+                "selected_skill":block["name"] == "Skill" && block["input"] == json!({"skill":command}),
+                "input_sha256":format!("{:x}", Sha256::digest(serde_json::to_vec(&block["input"]).expect("原生 JSON 可编码")))})
+        })
+        .collect::<Vec<_>>();
+    let registered = message["response"]["response"]["commands"]
+        .as_array()
+        .map(|commands| commands.iter().any(|entry| entry["name"] == command));
+    let model_verified = (message["type"] == "system" && message["subtype"] == "init")
+        .then(|| message["model"] == "claude-opus-5-5");
+    json!({"tools":tools,"selected_command_registered":registered,
+        "native_model_matches_fixture":model_verified})
 }
 
 #[cfg(test)]
@@ -768,14 +814,16 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
     if options.grok_profile.is_some()
         || !matches!(
             options.permission_policy,
-            PermissionPolicy::Inherit | PermissionPolicy::ClaudeRestrictedFilesV1
+            PermissionPolicy::Inherit
+                | PermissionPolicy::ClaudeRestrictedFilesV1
+                | PermissionPolicy::ClaudeRestrictedFilesV2
         )
     {
         return Err(RuntimeError::InvalidConfiguration(
             "Claude permission modes are not equivalent to the requested filesystem sandbox".into(),
         ));
     }
-    if options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV1 {
+    if options.permission_policy.is_claude_file_profile() {
         if !options.selected_skills.is_empty() {
             return Err(super::claude_profile::reject(
                 "claude_profile_skills_unsupported",
@@ -783,12 +831,15 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         }
         if let Some(profile) = &options.claude_profile {
             profile.validate(&options.cwd)?;
+            if profile.policy() != options.permission_policy {
+                return Err(super::claude_profile::reject("claude_profile_wrong_policy"));
+            }
         }
         if let Some(ceiling) = &options.permission_ceiling {
             let expected = ceiling
                 .claude_profile()
                 .ok_or_else(|| super::claude_profile::reject("claude_profile_wrong_parent"))?;
-            if options.claude_profile.as_ref() != Some(expected) {
+            if options.claude_profile.as_ref() != Some(&expected) {
                 return Err(super::claude_profile::reject(
                     "claude_profile_parent_mismatch",
                 ));
@@ -856,8 +907,17 @@ enum PermissionStage {
 
 enum PendingKind {
     Initialize,
+    ReloadSkills {
+        message_id: Uuid,
+        input: Vec<InputContent>,
+        session_id: Option<String>,
+        update: PreparedClaudeSkillUpdate,
+    },
     PermissionObservation(PermissionStage),
-    Interrupt { message_id: Uuid, turn_id: Uuid },
+    Interrupt {
+        message_id: Uuid,
+        turn_id: Uuid,
+    },
 }
 
 struct PendingRequest {
@@ -939,6 +999,7 @@ struct ClaudeProtocol {
     local_tools: HashMap<String, PendingLocalTool>,
     mcp_replies: HashMap<String, ([u8; 32], Value)>,
     skill_plugin: Option<PreparedClaudeSkillPlugin>,
+    skill_reload_failed: bool,
     permission_observation: Option<Observation>,
     permission_observation_started: Option<Instant>,
     ready_permissions: Value,
@@ -985,6 +1046,7 @@ impl ClaudeProtocol {
             local_tools: HashMap::new(),
             mcp_replies: HashMap::new(),
             skill_plugin: None,
+            skill_reload_failed: false,
             permission_observation: None,
             permission_observation_started: None,
             ready_permissions: Value::Null,
@@ -1011,6 +1073,11 @@ impl ClaudeProtocol {
     fn bind_probed_version(&mut self, succeeded: bool, detected: &str) -> Result<(), RuntimeError> {
         self.probed_version = None;
         self.paired_version = None;
+        if self.options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV2
+            && detected != "2.1.280 (Claude Code)"
+        {
+            return Err(RuntimeError::UnsupportedVersion(detected.to_owned()));
+        }
         #[cfg(any(test, feature = "claude_21280_test_candidate"))]
         if succeeded && self.test_candidate_21280 && detected == TEST_CANDIDATE_OUTPUT {
             self.probed_version = Some(TEST_CANDIDATE_VERSION);
@@ -1104,7 +1171,7 @@ impl ClaudeProtocol {
                 return Effects::default();
             }
             let mut effective = self.ready_permissions.clone();
-            effective["claudeRestrictedFilesV1"] = json!(profile);
+            effective[profile.evidence_key()] = json!(profile);
             effective["fixedProfileVerified"] = json!(true);
             if let Err(error) = verify_effective_permissions(
                 self.options.permission_ceiling.as_ref(),
@@ -1132,7 +1199,7 @@ impl ClaudeProtocol {
     fn ready_event(&self) -> RuntimeEventKind {
         let mut effective_permissions = self.ready_permissions.clone();
         if let Some(profile) = &self.options.claude_profile {
-            effective_permissions["claudeRestrictedFilesV1"] = json!(profile);
+            effective_permissions[profile.evidence_key()] = json!(profile);
             effective_permissions["fixedProfileVerified"] = json!(self.profile_error.is_none());
             effective_permissions["fixedProfileSha256"] = json!(profile.digest());
             #[cfg(any(test, feature = "claude_21280_test_candidate"))]
@@ -1297,6 +1364,11 @@ impl ClaudeProtocol {
         }
         match action {
             RuntimeAction::Submit { input } => {
+                match self.begin_skill_registration(message_id, &input) {
+                    Ok(Some(effects)) => return effects,
+                    Ok(None) => {}
+                    Err(error) => return failed(message_id, &error),
+                }
                 let image_with_skill = input
                     .iter()
                     .any(|part| matches!(part, InputContent::LocalImage(_)))
@@ -1949,6 +2021,16 @@ impl ClaudeProtocol {
         };
         let mut effects = Effects::default();
         match pending.kind {
+            PendingKind::ReloadSkills {
+                message_id,
+                input,
+                session_id,
+                update,
+            } => {
+                effects = self.finish_skill_registration(
+                    message_id, input, session_id, update, response, success,
+                );
+            }
             PendingKind::Initialize => {
                 if self.probed_version.is_none() {
                     return Err(RuntimeError::Protocol(
@@ -2744,26 +2826,30 @@ fn encode_input(
 ) -> Result<InputProjection, String> {
     let mut texts = Vec::new();
     let mut images = Vec::new();
-    let mut skill_command = None;
+    let mut skill_commands = Vec::new();
     for part in input {
         match part {
             InputContent::Text(text) => texts.push(text),
             InputContent::Skill { name, path } => {
-                if skill_command.is_some() {
-                    return Err("Claude supports only one selected skill per turn".into());
+                let command = plugin
+                    .and_then(|plugin| plugin.command_for(&name, &path))
+                    .ok_or("skill was not selected and registered for this connection")?;
+                if skill_commands.contains(&command) {
+                    return Err(crate::t!("cli-agent-claude-skill-duplicate"));
                 }
-                skill_command = Some(
-                    plugin
-                        .and_then(|plugin| plugin.command_for(&name, &path))
-                        .ok_or("skill was not selected and registered for this connection")?,
-                );
+                skill_commands.push(command);
             }
             InputContent::LocalImage(path) => images.push(path),
         }
     }
     let text = texts.join("\n\n");
     if !images.is_empty() {
-        let text = image_prompt(&text, skill_command.as_deref());
+        if skill_commands.len() > 1 {
+            return Err(crate::t!(
+                "cli-agent-claude-image-multiple-skills-unverified"
+            ));
+        }
+        let text = image_prompt(&text, skill_commands.first().map(String::as_str));
         if text.len() > MAX_INPUT_BYTES {
             return Err(crate::t!("cli-agent-input-text-too-large"));
         }
@@ -2799,8 +2885,9 @@ fn encode_input(
             expected_replay,
         });
     }
-    let (content, expected_replay) = match skill_command {
-        Some(name) => {
+    let (content, expected_replay) = match skill_commands.as_slice() {
+        [] => (text.clone(), text),
+        [name] => {
             let mut content = format!("/{name}");
             let mut replay = format!(
                 "<command-message>{name}</command-message>\n<command-name>/{name}</command-name>"
@@ -2812,7 +2899,17 @@ fn encode_input(
             }
             (content, replay)
         }
-        None => (text.clone(), text),
+        names => {
+            // 多个 slash 不构成多次调用；仅引用已注册名称，让原生 Skill 工具逐个加载。
+            let commands = serde_json::to_string(names).expect("技能名称可序列化");
+            let mut content =
+                format!("Invoke the Skill tool for each registered skill in order: {commands}.");
+            if !text.is_empty() {
+                content.push_str("\n\n");
+                content.push_str(&text);
+            }
+            (content.clone(), content)
+        }
     };
     if content.is_empty()
         || content.len() > MAX_INPUT_BYTES

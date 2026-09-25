@@ -1,6 +1,6 @@
 # CLI 能力缺项与验收缺口
 
-更新日期：2026-09-25。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；本次输入增量（提交绑定待补）已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。新的在线收据为工作区源码摘要绑定，不是最终 SHA 验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
+更新日期：2026-09-26。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。新的在线收据为工作区源码摘要绑定，不是最终 SHA 验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
 
 当前交付具有阶段性合并基础，但完整体验对齐仍有下列缺项。**安全拒绝、明确降级、原生安装成功或入口可见均不等于对应功能完成。** 原先“P0–P5 全部完成、剩余项为空”的汇总结论不能作为完整 Goal 的验收结论；具体通过记录仍按其实际范围有效。
 
@@ -29,7 +29,7 @@
 ### G02 — Grok 托管图片输入
 
 - **状态／优先级／范围**：功能缺项，高；P0 真实能力判断、P1 附件、P4 托管输入。
-- **实际情况与影响**：本次输入增量已接通固定 `1.0.41/grok-4.7`、Inherit、无已选技能根会话的 PNG ACP 内容，保持未知版本、模型及固定策略拒绝。macOS 生产适配器取得新建图片、关闭后同原生 ID 冷恢复并提交独立图片的正例，真实历史图片字节与持久引用一致，重复消息未重复执行。原生仍声明 `image:false`，已认证正例否定此前未登录探针的能力外推。尚缺最终提交、GUI、跨平台及其余要求，条目不关闭。
+- **实际情况与影响**：本次输入增量已接通固定 `1.0.41/grok-4.7`、Inherit、无已选技能根会话的 PNG ACP 内容，保持未知版本、模型及固定策略拒绝。macOS 生产适配器取得新建图片、关闭后同原生 ID 冷恢复并提交独立图片的正例，真实历史图片字节与持久引用一致，重复消息未重复执行。原生仍声明 `image:false`，已认证正例否定此前未登录探针的能力外推。84102 GUI 图片选择器遗漏及缺省 direct 握手失败均已保留；工作区显式选择 `--leader`，保留协议阶段校验，后续 macOS 真实 GUI 已取得两张独立 PNG 字节/识色正例、同原生 ID 新进程冷恢复、应用重启后同宿主重关联且未重投，两代自然退出并清理。两轮各自绑定源码与签名后应用摘要；最终提交、跨平台及其余要求仍待验，条目不关闭。
 - **当前替代方式**：满足固定版本、模型与 Inherit 无技能条件时可走新 PNG 路径；其他组合保留草稿或选用另一个已验入口。文字替代不计本功能完成。
 - **源码／证据**：[输入准备](../../app/src/ai/cli_agent_runtime/managed_input.rs#L35)、[ACP 图片适配](../../app/src/ai/cli_agent_runtime/grok.rs#L2217)、[明确未登录的固定版本收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/run-36116931025/windows/grok-fixed-acp.json)。
 - **关闭条件**：先在已授权账号及明确模型下验证原生图片合同；若具备接口，完成类型化输入、持久引用、继续／恢复及失败保留，证明原生接收字节与实际图片回答。若接口确实缺失，保留具体证据并由用户决定范围，不能仅凭未登录声明关闭。
@@ -45,7 +45,7 @@
 ### G04 — Claude 托管图片格式扩展及验收
 
 - **状态／优先级／范围**：模式限制，中；P1 附件、P5 验收。
-- **实际情况与影响**：本次输入增量已扩展固定 `2.1.280` 的 PNG、JPEG（含 jpg MIME 归一化）、静态 GIF、WebP，校验真实格式、字节、像素、整批原生帧预算及持久文件。macOS、`claude-opus-5-5` 的生产适配器 JPEG/WebP/静态 GIF 识图与冷恢复回忆已通过。随后补严 Claude 单帧 GIF 首次/恢复校验，保留 Codex 原行为；该后续修正的最终门禁与同提交验收待补，不能把已有 WIP 收据改记为最终验证。
+- **实际情况与影响**：本次输入增量已扩展固定 `2.1.280` 的 PNG、JPEG（含 jpg MIME 归一化）、静态 GIF、WebP，校验真实格式、字节、像素、整批原生帧预算及持久文件。macOS、`claude-opus-5-5` 的生产适配器 JPEG/WebP/静态 GIF 识图与冷恢复回忆已通过。随后补严 Claude 单帧 GIF 首次/恢复校验，保留 Codex 原行为；该后续修正在 `84102bb1c` 的本地门禁及静态 GIF 在线窄复验通过，另有此提交 GUI JPEG 原字节与识色正例；Linux／Windows 对应在线链仍待补，旧 WIP 收据不重标。
 - **当前替代方式**：使用本次已接通的明确格式；其他格式仍须先转换，跨平台通过范围不外推。
 - **源码／证据**：[格式门禁](../../app/src/ai/cli_agent_runtime/managed_input.rs#L42)、[已通过的 PNG GUI 收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/gui-claude-composer-recovery-v7.safe.json)。
 - **关闭条件**：对计划支持的其他格式逐项验证原生合同、声明 MIME 与真实格式、大小限制、字节投递、图片回答及恢复；能力矩阵列明已通过格式，不使用笼统“所有图片”。
@@ -53,23 +53,23 @@
 ### G05 — Claude 托管纯图片及图片与技能混用
 
 - **状态／优先级／范围**：模式限制，中；P1 组合输入、P4 继续与恢复。
-- **实际情况与影响**：本次输入增量已接通纯图片，以及精确注册单技能加图片的原生 Skill 工具指令，不注入任意技能正文或绕审批。macOS `2.1.280/claude-opus-5-5` 生产适配器纯 PNG（零文字图片块）识图与冷恢复回忆通过；同轮图加技能仅有原生 stream-json 调用、逐次审批与冷恢复正例，完整生产适配器/GUI链尚未验收。原先裸 slash 数组未执行技能的失败及探针指令冲突失败仍保留。
-- **当前替代方式**：纯图片已有生产适配器正例；图片加单技能的完整产品链待补验，分轮操作仍不能代替组合验收。
+- **实际情况与影响**：本次输入增量已接通纯图片，以及精确注册单技能加图片的原生 Skill 工具指令，不注入任意技能正文或绕审批。macOS `2.1.280/claude-opus-5-5` 生产适配器纯 PNG（零文字图片块）识图与冷恢复回忆通过；同轮图片加单技能已有本次整合工作区生产适配器新建与同会话冷恢复正例，两次精确 Skill AllowOnce、图片原始字节、独立识色及自然退出清理分别计证；后续 Mac GUI 已有 PNG加单技能及修复后应用重启重关联正例，三条消息和原生历史未重投；不同构建分别绑定，跨平台仍待补。更早原生 stream-json 正例的审批次数未单独计证，不被新收据回填。原先裸 slash 数组未执行技能的失败及探针指令冲突失败仍保留。
+- **当前替代方式**：纯图片已有 84102 GUI 和生产适配器正例；图片加单技能已有 Mac 生产适配器和实际 GUI 正例，其他平台仍待补验。
 - **源码／证据**：[托管组合输入](../../app/src/ai/cli_agent_runtime/managed_input.rs#L46)、[分轮 GUI 收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/gui-claude-composer-recovery-v7.safe.json)。
 - **关闭条件**：分别完成纯图片和图片＋单技能的原生编码、接收、执行和恢复验收；多技能组合另受 G06 约束。拒绝时不得丢弃输入或部分派发。
 
 ### G06 — Claude／Grok 每轮单技能及会话启动登记限制
 
 - **状态／优先级／范围**：模式限制，中；P1 技能、P4 会话继续。
-- **实际情况与影响**：当前产品仍保留 Claude／Grok 每轮单技能及启动登记限制；Grok 还要求继承模式，固定策略禁用技能见 G10。新增 macOS Claude `2.1.280/Opus 5.5` 原生 PTY/stream-json 证据已证明同轮顺序调用两技能、会话中新增及 reload_plugins 注册、冷恢复读取新标记；每次 Skill 单独审批。仅为原生无副作用技能合同，产品注册事务、并发与父权限上限尚未接通验收，不能记作 G06 实现完成；Grok 多技能未验。
-- **当前替代方式**：一轮使用一个已登记技能；需要其他技能时新建并绑定该技能的任务，不伪装为原会话继续。
+- **实际情况与影响**：当前工作区已接通固定 Claude `2.1.280` 的无图多技能与会话内新增，整合后本地门禁通过；Grok 仍保留每轮单技能及启动登记限制；Grok 还要求继承模式，固定策略禁用技能见 G10。新增 macOS Claude `2.1.280/Opus 5.5` 原生 PTY/stream-json 证据已证明同轮顺序调用两技能、会话中新增及 reload_plugins 注册、冷恢复读取新标记；每次 Skill 单独审批。另有实现来源 `3b4d8e8a3` 的生产适配器三轮正例：多技能、新增技能、同会话冷恢复，6 次真实 Skill 单次审批，重复消息未重复执行。实现采用准确 reload_plugins 确认、失败回滚、旧回调隔离及接收后持久化；固定文件策略仍禁技能。Claude macOS GUI 首轮 alpha/beta、同会话新增后 alpha/gamma 均逐次 AllowOnce 并返回独立标记；同原生会话和 runtime、逻辑代次 1→2，SQLite 累积三项 selected_skills。第三轮 PNG加alpha 已有原生字节/识色/Skill正例；热技能导致的重启身份误判已修，GUI重关联同宿主/原生进程、同代3和三条输入，未重投，正常断开清理通过。中文说明/技能列表/历史可读；真正身份冲突另保留终态并禁恢复，技能回执先于清单落盘，ACK或清单写入失败后的幂等重放已通过真实SQLite回归，零重复发送。跨平台未完成。Grok 默认 profile、显式 leader 的原生校准已证明同轮首技能正文展开、后技能由 read_file 完整读取，以及新增后显式 reload 才可见；同 leader 两个已信任目录均被刷新，sessionId 不提供局部作用域。该探针零审批请求，不是产品多技能／热新增接通、严格串行调用或父权限上限证明。
+- **当前替代方式**：Grok 产品仍一轮使用一个启动登记技能；需要其他技能时新建并绑定，不伪装为原会话继续。Claude 新增能力按已验证的无图、继承模式范围使用。
 - **源码／证据**：[每轮数量限制](../../app/src/ai/cli_agent_runtime/local_skills.rs#L209)、[启动登记检查](../../app/src/ai/cli_agent_runtime/task_manager_input.rs#L287)、[Grok 单技能与恢复收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/grok-selected-skill-v7.safe.json)。
 - **关闭条件**：验证多技能与会话中新增技能的真实接口及调用顺序；补齐路径与权限边界、准确注册确认、历史恢复和失败原子性。若原生不支持，按具体 CLI／模式记录证据，不从文件出现在目录推断技能已可调用。
 
 ### G07 — 三款普通终端的文件附件卡片
 
 - **状态／优先级／范围**：功能缺项，高；P1 附件和文件上下文。
-- **实际情况与影响**：本次输入增量把本地文件卡片转为明确路径引用：整批校验绝对路径、普通文件及当前账号可读性，以 JSON 保留中文/空格/引号边界，交由 CLI 原生读取与审批，失败保留草稿；不发送任意二进制内容，远程文件卡仍拒绝。三款 macOS 原生 PTY 手动路径投递均有读取独立标记正例，Claude 另有原生拒绝；尚非修改后的 GUI 链，且 Grok 产品发送仍受 G01 阻止。
+- **实际情况与影响**：本次输入增量把本地文件卡片转为明确路径引用：整批校验绝对路径、普通文件及当前账号可读性，以 JSON 保留中文/空格/引号边界，交由 CLI 原生读取与审批，失败保留草稿；不发送任意二进制内容，远程文件卡仍拒绝。三款 macOS 原生 PTY 手动路径投递均有读取独立标记正例，Claude 另有原生拒绝；尚非修改后的 GUI 链；随后 macOS Codex 实测确认“附加文件”选择成功仅插入路径正文，没有生成文件卡片，入口接线待补。原点击未选中的类型过滤误判已通过键盘复核撤回，两次均零模型输入。Grok 产品发送仍受 G01 阻止。
 - **当前替代方式**：使用 CLI 可访问的文件路径或现有文件上下文入口，明确确认引用的文件；不承诺二进制文件由模型直接理解。
 - **源码／证据**：[文件附件投递](../../app/src/terminal/view/use_agent_footer/mod.rs#L694)。
 - **关闭条件**：界定支持的文件种类和投递语义，完成三款普通 PTY 的附件转换、正确路径／字节接收、空格与中文路径、失效文件和权限拒绝验收；不能只删除拒绝分支。
@@ -93,7 +93,7 @@
 ### G10 — Claude／Grok 子任务限固定权限策略
 
 - **状态／优先级／范围**：模式限制，高；P3 权限、P4 子任务与双向消息。
-- **实际情况与影响**：Claude 子任务要求 `ClaudeRestrictedFilesV1`；Grok 子任务仅在相应固定读取／文件策略和已核验 SDK 合同下开放，继承设置不能证明完整父权限上限。固定策略禁用原生 shell、hooks 和技能；Claude 原生文件工具限制为 `Read`／`Edit`，`Bash`、`Skill`、`Write` 等被拒绝。现有父子消息、结果回收真实通过，不等于已提供可任意运行命令和技能的通用编码子任务。**固定策略不是操作系统文件或网络沙箱。**
+- **实际情况与影响**：Claude 原有子任务要求 `ClaudeRestrictedFilesV1`；当前工作区新增独立 `ClaudeRestrictedFilesV2`，仅固定 `2.1.280` 开放受审 `Write` 创建或覆盖项目内文件，V1 父任务不可扩为 V2；macOS `claude-opus-5-5` 的真实生产父子链已证明精确 Write 允许生效、拒绝不改文件、双向 ACK／结果回收及两代正常清理，另有真实 V1 父扩为 V2 在发送原生输入前拒绝的独立链；Grok 子任务仅在相应固定读取／文件策略和已核验 SDK 合同下开放，继承设置不能证明完整父权限上限。固定策略禁用原生 shell、hooks 和技能；Claude V1 工具限 `Read`／`Edit`，V2 仅增加 `Write`；V1 的 `Write` 及两策略的 `Bash`、`Skill` 等仍被拒绝。新 V2 的待审批取消、活跃重关联、冷恢复、GUI 和跨平台尚未在线验证。现有父子消息、结果回收真实通过，不等于已提供可任意运行命令和技能的通用编码子任务。**固定策略不是操作系统文件或网络沙箱。**
 - **当前替代方式**：在固定策略内拆分允许的文件任务；需要原生 shell 或技能时使用用户明确启动的继承设置根任务，不把它称为具有同等父权限保证的受控子任务。
 - **源码／证据**：[子任务派发限制](../../app/src/ai/cli_agent_runtime/coordinator_tools.rs#L590)、[Claude 固定工具与参数](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L13)、[Claude 空 hooks 验证](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L612)、[Grok 固定工具与空技能／hooks](../../app/src/ai/cli_agent_runtime/grok_profile.rs#L316)、[Grok 父子实链](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/grok-parent-child-v8.safe.json)。
 - **关闭条件**：先明确允许扩展的子任务工具范围，验证真实可约束的父权限上限，再逐项接入命令／技能等能力；审批允许／拒绝、越界拒绝、取消后进程清理、双向 ACK、冷恢复及结果必须有真实链。不得以固定绕过审批或修改用户全局配置换取可用性。
@@ -153,7 +153,7 @@
 ### V04 — 图片投递与模型理解分别验收
 
 - **状态／优先级／范围**：验收缺口，高；P1 附件、P5 实际结果。
-- **实际情况与影响**：Codex GUI 已证明类型化图片进入原生请求，但该轮颜色回答错误，不能计作图片理解成功；这也不足以单独断言投递代码出错。Claude 本次增加 JPEG/WebP/静态 GIF/纯 PNG 的 macOS 生产适配器正确识色与字节回放；Grok 固定模型 PNG 的生产适配器投递与两张独立识色均有正例。收据为 WIP 源码摘要绑定；GUI、最终提交、其他平台及组合仍分别欠验，原 Codex 错误回答保留；独立原生 exec 的 gpt-6-sol 同图回答经目视语义核对正确（LIME 对应亮绿），原 strict_match=false 保留，不计 GUI/产品适配器已复验。
+- **实际情况与影响**：Codex GUI 已证明类型化图片进入原生请求，但该轮颜色回答错误，不能计作图片理解成功；这也不足以单独断言投递代码出错。Claude 本次增加 JPEG/WebP/静态 GIF/纯 PNG 的 macOS 生产适配器正确识色与字节回放；Grok 固定模型 PNG 的生产适配器及后续 GUI 均有原生字节与两张独立识色正例，GUI 冷恢复和活跃重关联分别计证。后续收据为 WIP 源码摘要绑定；最终提交、其他平台及其余格式/组合仍分别欠验，原 Codex 错误回答保留；独立原生 exec 的 gpt-6-sol 同图回答经目视语义核对正确（LIME 对应亮绿），原 strict_match=false 保留，不计 GUI/产品适配器已复验。
 - **当前替代方式**：分别呈现投递通过和理解未通过，保留原回答，不以重试成功覆盖原失败。
 - **源码／证据**：[Codex 原收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/gui-codex-composer-v2.safe.json)、[Claude PNG 原收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/gui-claude-composer-recovery-v7.safe.json)、[图片结果说明](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md)。
 - **关闭条件**：使用明确可判定的图片夹具，逐次核对原生请求字节、实际模型与回答，记录原失败的排查结果及仍未确定的原因，并取得独立正例；格式、组合和平台分别列证，不能把标签可见或接收 ACK 当作读图正确，也不要求或承诺模型在任意图片上的回答百分之百正确。
@@ -161,7 +161,7 @@
 ### V05 — Linux／Windows Grok 专属双语视口
 
 - **状态／优先级／范围**：验收缺口，中；P1 入口、P3 权限、P5 本地化布局。
-- **实际情况与影响**：两平台现有英文／简体中文截图主要选择 Codex，证明所见按钮、输入与附件标签；未完整覆盖 Grok 固定权限说明、技能禁用提示、滚动后区域及相应交互状态。macOS 已验 Grok 权限按钮不能替代两平台布局。
+- **实际情况与影响**：两平台现有英文／简体中文截图主要选择 Codex，证明所见按钮、输入与附件标签；未完整覆盖 Grok 固定权限说明、技能禁用提示、滚动后区域及相应交互状态。本轮 macOS 已检查 Grok 英中权限、附件、技能限制、消息与历史结果完整滚动区，无截断遮挡；不能替代两平台布局或未执行的审批交互。
 - **当前替代方式**：保留现有可见范围通过，同时明确未检查视口，不能用 Fluent 键一致性代替实际布局。
 - **源码／证据**：[Grok／Claude 排队与模式提示视图](../../app/src/ai/cli_agent_runtime/task_manager_view.rs#L1790)、[Linux GUI 原记录](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/run-36103244022/linux/linux-gui.safe.json)、[Windows GUI 原记录](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/run-36103244022/windows/gui-review.safe.json)。
 - **关闭条件**：两平台分别启动实际英文和简体中文界面，选择 Grok 并覆盖继承、固定读取／文件策略、技能禁用、审批及完整滚动区域；按支持窗口尺寸检查截断、换行、控件与焦点，并保留原图和构建来源。
@@ -170,4 +170,4 @@
 
 本表不要求为了文档整理再次运行全部测试，也不将阶段性合并等同于发布或 Goal 完成。合并说明应公开这些条目、已实现范围与现有证据；原始失败被保留是可追溯性要求，不表示修复后独立通过记录无效。完整 Goal 的后续关闭应逐项解决功能缺项与验收缺口，并明确处理真实原生差异，不能再以“已可靠拒绝／已记录不支持”代替实现与验收。
 
-本次输入增量包含用户功能变化，英文与简体中文图片/文件说明已同步；macOS 当前 WIP 布局范围见验证结论。最终源码门禁与平台验收未完成，不能沿用此前“仅文档、无需本地化变更”的描述。
+本次输入增量包含用户功能变化，英文与简体中文图片/文件说明已同步；macOS 当前 WIP 布局范围见验证结论。整合工作区本地门禁已通过，最终提交绑定与相关平台验收仍待补；本段所述产品增量不能沿用此前“仅文档、无需本地化变更”的描述。本次仅更新五份状态文档，无需本地化变更。

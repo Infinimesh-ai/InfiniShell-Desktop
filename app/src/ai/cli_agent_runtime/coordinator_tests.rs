@@ -513,6 +513,48 @@ fn restart_reattaches_completed_live_host_without_replaying_input() {
                 ..
             }
         ));
+        // 同一存活宿主若出现权限历史漂移，只隔离该连接，不能让整批任务加载失败。
+        let previous = task.clone();
+        let mut config: Value = serde_json::from_str(&task.config_json).unwrap();
+        config["permission_policy"] = json!("changed-policy");
+        task.config_json = config.to_string();
+        commit_transition(&writer.sender, &mut task, &previous)
+            .await
+            .unwrap();
+        let other = snapshot().task;
+        checkpoint_task(&writer.sender, other.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let quarantined = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task.clone(), other.clone()],
+            &HashMap::new(),
+            &state_dir,
+        )
+        .await
+        .unwrap();
+        assert!(quarantined.hosts.is_empty());
+        assert_eq!(quarantined.records.len(), 2);
+        assert!(quarantined.records.contains(&other));
+        let retained = quarantined
+            .records
+            .iter()
+            .find(|record| record.task_id == task.task_id)
+            .unwrap();
+        assert_eq!(retained.state, LocalCliTaskState::Completed);
+        assert_eq!(retained.result, task.result);
+        assert_eq!(retained.terminal_evidence, task.terminal_evidence);
+        assert_eq!(
+            quarantined.unconfirmed_hosts.get(&task.task_id),
+            Some(&task.harness)
+        );
+        assert_eq!(commands.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert!(matches!(
+            client.inspect().await.unwrap(),
+            super::super::runtime_host::RuntimeHostResponse::Inspection { owner_epoch: 2, .. }
+        ));
         drop((recovered, client, server));
         // IPC 服务不拥有端点文件；测试结束后移除其私有临时 socket。
         #[cfg(target_os = "macos")]
@@ -555,20 +597,32 @@ fn advanced_host_generation_requires_contiguous_unchanged_session_history() {
     let second = next_task_generation(&first).unwrap();
     let current = next_task_generation(&second).unwrap();
     let history = vec![first, second, current.clone()];
-    assert!(runtime_host_history_matches(&record, &current, &history));
-    assert!(!runtime_host_history_matches(
+    assert!(runtime_host_history_matches(
         &record,
         &current,
-        &history[1..]
+        &history,
+        &[]
     ));
     assert!(!runtime_host_history_matches(
         &record,
         &current,
-        &[history[0].clone(), current.clone()]
+        &history[1..],
+        &[]
+    ));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &current,
+        &[history[0].clone(), current.clone()],
+        &[]
     ));
     let mut duplicate = history.clone();
     duplicate.insert(1, history[0].clone());
-    assert!(!runtime_host_history_matches(&record, &current, &duplicate));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &current,
+        &duplicate,
+        &[]
+    ));
     for field in [
         "native_session",
         "runtime",
@@ -590,7 +644,7 @@ fn advanced_host_generation_requires_contiguous_unchanged_session_history() {
             _ => unreachable!(),
         }
         assert!(
-            !runtime_host_history_matches(&record, &current, &changed),
+            !runtime_host_history_matches(&record, &current, &changed, &[]),
             "{field}"
         );
     }
@@ -599,7 +653,8 @@ fn advanced_host_generation_requires_contiguous_unchanged_session_history() {
     assert!(!runtime_host_history_matches(
         &record,
         &unpersisted,
-        &history
+        &history,
+        &[]
     ));
 }
 
@@ -1987,6 +2042,11 @@ fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_aft
         crate::persistence::start_test_writer(&directory.path().join("result.sqlite")).unwrap();
     block_on(async {
         let mut state = persisted_running_claude(&writer.sender).await;
+        let previous = state.task.clone();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        commit_transition(&writer.sender, &mut state.task, &previous)
+            .await
+            .unwrap();
         let mut child = snapshot().task;
         child.parent_task_id = Some(state.task.task_id.clone());
         child.parent_generation = Some(1);
@@ -2108,6 +2168,14 @@ fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_aft
                 .await
                 .unwrap();
             }
+            assert_claude_joined_replay_requires_native_receipt(
+                &writer.sender,
+                &directory.path().join("result.sqlite"),
+                &mut state,
+                id,
+                &Uuid::from_u128(10).to_string(),
+            )
+            .await;
         }
         send_mailbox_request(
             &writer.sender,
@@ -2122,6 +2190,29 @@ fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_aft
         .unwrap();
         assert!(commands.try_recv().is_err(), "已领取的结果不能再次写入协议");
         assert!(!claude_input_pending(&state.task));
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([])
+        );
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let acknowledged_result = stored
+            .iter()
+            .find(|message| message.message_id == result.message_id)
+            .unwrap();
+        assert_eq!(acknowledged_result.body, result.body);
+        assert_eq!(acknowledged_result.sender_task_id, child.task_id);
+        assert_eq!(
+            acknowledged_result.state,
+            LocalCliMessageState::Acknowledged
+        );
+        assert_eq!(
+            acknowledged_result.receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();
@@ -6573,6 +6664,1313 @@ fn resumed_claude_keeps_historical_version_until_the_new_runtime_pairs() {
             json!(new_runtime)
         );
         assert_eq!(history[0].native_session_id, history[1].native_session_id);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_hot_skill_recovery_paths_are_committed_only_after_native_input_ack() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("skills.sqlite")).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        checkpoint_task(&writer.sender, state.task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let first = Uuid::from_u128(7001);
+        let path = directory.path().join("中文 技能/SKILL.md");
+        let action = RuntimeAction::Submit {
+            input: vec![InputContent::Skill {
+                name: "first".into(),
+                path: path.clone(),
+            }],
+        };
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            first,
+            action.clone(),
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().action, action);
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([])
+        );
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let failure = event(
+            &state,
+            RuntimeEventKind::RequestFailed {
+                message_id: first,
+                message: "原生注册失败".into(),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &failure,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([])
+        );
+
+        let second = Uuid::from_u128(7002);
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            second,
+            action,
+            false,
+        )
+        .await
+        .unwrap();
+        commands.try_recv().unwrap();
+        let ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: second,
+                turn_id: Some(second.to_string()),
+            },
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([{"name":"first","path":path}])
+        );
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        let saved = load_messages(
+            &writer.sender,
+            state.task.task_id.clone(),
+            state.task.generation,
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            saved
+                .iter()
+                .find(|message| message.message_id == second.to_string())
+                .unwrap()
+                .state,
+            LocalCliMessageState::Acknowledged
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_hot_skill_ack_write_failure_preserves_manifest_and_host_watermark() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("skills.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        persist_running_task(&writer.sender, &mut state.task).await;
+        let token = Uuid::new_v4();
+        let (mut controller, mut commands, _sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let message_id = Uuid::new_v4();
+        let path = directory.path().join("中文 新技能/SKILL.md");
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            message_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Skill {
+                    name: "new-skill".into(),
+                    path: path.clone(),
+                }],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, message_id);
+        let before = state.task.clone();
+        let ack = RuntimeEvent {
+            generation: token,
+            native_session_id: before.native_session_id.clone(),
+            kind: RuntimeEventKind::MessageAccepted {
+                message_id,
+                turn_id: Some(message_id.to_string()),
+            },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let mut connection = SqliteConnection::establish(database.to_str().unwrap()).unwrap();
+        diesel::sql_query("CREATE TRIGGER reject_skill_ack BEFORE UPDATE OF state ON local_cli_messages WHEN NEW.state = 'acknowledged' BEGIN SELECT RAISE(ABORT, 'injected ack failure'); END")
+            .execute(&mut connection).unwrap();
+        assert!(
+            commit_and_ack_runtime_event(
+                &writer.sender,
+                &mut state,
+                &controller,
+                &ack,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        let stored = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, [before.clone()]);
+        assert_eq!(
+            committed_events.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].state, LocalCliMessageState::Sent);
+        assert_eq!(messages[0].receipt_kind, None);
+        diesel::sql_query("DROP TRIGGER reject_skill_ack")
+            .execute(&mut connection)
+            .unwrap();
+        commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([{"name":"new-skill","path":path}])
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            messages[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_hot_skill_checkpoint_failure_replays_persisted_ack_without_resending() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("skills.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        persist_running_task(&writer.sender, &mut state.task).await;
+        let token = Uuid::new_v4();
+        let (mut controller, mut commands, _sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let message_id = Uuid::new_v4();
+        let path = directory.path().join("中文 新技能/SKILL.md");
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            message_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Skill {
+                    name: "new-skill".into(),
+                    path: path.clone(),
+                }],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, message_id);
+        let before = state.task.clone();
+        let ack = RuntimeEvent {
+            generation: token,
+            native_session_id: before.native_session_id.clone(),
+            kind: RuntimeEventKind::MessageAccepted {
+                message_id,
+                turn_id: Some(message_id.to_string()),
+            },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let mut connection = SqliteConnection::establish(database.to_str().unwrap()).unwrap();
+        diesel::sql_query("CREATE TRIGGER reject_skill_checkpoint BEFORE UPDATE OF data ON local_cli_tasks BEGIN SELECT RAISE(ABORT, 'injected checkpoint failure'); END")
+            .execute(&mut connection).unwrap();
+        assert!(
+            commit_and_ack_runtime_event(
+                &writer.sender,
+                &mut state,
+                &controller,
+                &ack,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        let stored = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, [before.clone()]);
+        assert_eq!(
+            committed_events.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            messages[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+        let persisted_message = messages[0].clone();
+        diesel::sql_query("DROP TRIGGER reject_skill_checkpoint")
+            .execute(&mut connection)
+            .unwrap();
+        // 仅从 SQLite 恢复任务并清空协议内存，模拟 ACK 已提交、清单未写入时重启。
+        state.task = stored.into_iter().next().unwrap();
+        accepted.clear();
+        finished.clear();
+        commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([{"name":"new-skill","path":path}])
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            messages[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+        assert_eq!(messages[0], persisted_message);
+        let repaired = state.task.clone();
+        commit_and_ack_runtime_event(
+            &writer.sender,
+            &mut state,
+            &controller,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(committed_events.try_recv(), Ok(()));
+        assert_eq!(state.task, repaired);
+        assert_eq!(
+            load_tasks(&writer.sender, false)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            [repaired]
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages, [persisted_message]);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_hot_skill_invalid_native_session_cannot_persist_early_ack() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("skills.sqlite");
+    let writer = crate::persistence::start_test_writer(&database).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        persist_running_task(&writer.sender, &mut state.task).await;
+        let token = Uuid::new_v4();
+        let (mut controller, mut commands, _sender, _events) = channels(token);
+        let (host_acks, mut committed_events) = tokio::sync::mpsc::channel(2);
+        controller.host_event_acks = Some(host_acks);
+        let message_id = Uuid::new_v4();
+        let path = directory.path().join("中文 新技能/SKILL.md");
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            message_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Skill {
+                    name: "new-skill".into(),
+                    path: path.clone(),
+                }],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(commands.try_recv().unwrap().message_id, message_id);
+        let before = state.task.clone();
+        let ack = RuntimeEvent {
+            generation: token,
+            native_session_id: before.native_session_id.clone(),
+            kind: RuntimeEventKind::MessageAccepted {
+                message_id,
+                turn_id: Some(message_id.to_string()),
+            },
+        };
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let ack = RuntimeEvent {
+            native_session_id: Some(Uuid::new_v4().to_string()),
+            ..ack
+        };
+        assert!(
+            commit_and_ack_runtime_event(
+                &writer.sender,
+                &mut state,
+                &controller,
+                &ack,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        let stored = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored, [before.clone()]);
+        assert_eq!(
+            committed_events.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        assert_eq!(
+            commands.try_recv(),
+            Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+        );
+        let messages = load_messages(&writer.sender, before.task_id.clone(), before.generation)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].state, LocalCliMessageState::Sent);
+        assert_eq!(messages[0].receipt_kind, None);
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_fixed_version_parent_child_mailbox_ack_keeps_plain_body_and_skills_unchanged() {
+    for recipient_is_child in [true, false] {
+        let directory = tempfile::tempdir().unwrap();
+        let writer =
+            crate::persistence::start_test_writer(&directory.path().join("mailbox.sqlite"))
+                .unwrap();
+        block_on(async {
+            let mut state = snapshot();
+            state.task.harness = "claude".into();
+            state.task.config_json =
+                json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+            let mut source = snapshot().task;
+            if recipient_is_child {
+                state.task.parent_task_id = Some(source.task_id.clone());
+                state.task.parent_generation = Some(1);
+            } else {
+                source.parent_task_id = Some(state.task.task_id.clone());
+                source.parent_generation = Some(1);
+            }
+            let tasks = if recipient_is_child {
+                [source.clone(), state.task.clone()]
+            } else {
+                [state.task.clone(), source.clone()]
+            };
+            for task in tasks {
+                checkpoint_task(&writer.sender, task, None)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+            }
+            let previous = state.task.clone();
+            state.task.state = LocalCliTaskState::Running;
+            state.active_turn_id = Some(Uuid::from_u128(10).to_string());
+            commit_transition(&writer.sender, &mut state.task, &previous)
+                .await
+                .unwrap();
+            let token = Uuid::new_v4();
+            let (controller, mut commands, _sender, _events) = channels(token);
+            let message_id = Uuid::new_v4();
+            let message = LocalCliMessage {
+                version: 1,
+                message_id: message_id.to_string(),
+                sender_task_id: source.task_id.clone(),
+                recipient_task_id: state.task.task_id.clone(),
+                sender_generation: 1,
+                recipient_generation: 1,
+                subject: "followup".into(),
+                body: "追加中文任务；此正文不是 RuntimeAction JSON。".into(),
+                state: LocalCliMessageState::Queued,
+                receipt_kind: None,
+            };
+            enqueue_message(&writer.sender, message.clone())
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            acknowledge_message(
+                &writer.sender,
+                message.message_id.clone(),
+                state.task.task_id.clone(),
+                1,
+                LocalCliMessageState::Sent,
+            )
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+            send_mailbox_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                message_id,
+                RuntimeAction::Submit {
+                    input: vec![InputContent::Text(format!(
+                        "Subject: {}\n\n{}",
+                        message.subject, message.body
+                    ))],
+                },
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(commands.try_recv().unwrap().message_id, message_id);
+            let pending = claude_pending_input(&state.task).unwrap();
+            let ack = event(
+                &state,
+                RuntimeEventKind::MessageAccepted {
+                    message_id,
+                    turn_id: Some(message_id.to_string()),
+                },
+            );
+            let mut accepted = HashSet::new();
+            let mut finished = HashSet::new();
+            for _ in 0..2 {
+                commit_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &ack,
+                    &mut accepted,
+                    &mut finished,
+                )
+                .await
+                .unwrap();
+            }
+            assert_eq!(claude_pending_input(&state.task).unwrap(), pending);
+            assert_eq!(accepted, HashSet::from([message_id.to_string()]));
+            assert_eq!(
+                serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+                json!([])
+            );
+            let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            let mut expected = message;
+            expected.state = LocalCliMessageState::Acknowledged;
+            expected.receipt_kind = Some(LocalCliReceiptKind::NativeProtocol);
+            assert_eq!(stored, vec![expected]);
+            let joined = event(
+                &state,
+                RuntimeEventKind::InputJoined {
+                    message_id,
+                    turn_id: Uuid::from_u128(10).to_string(),
+                },
+            );
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &joined,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+            assert_claude_joined_replay_requires_native_receipt(
+                &writer.sender,
+                &directory.path().join("mailbox.sqlite"),
+                &mut state,
+                message_id,
+                &Uuid::from_u128(10).to_string(),
+            )
+            .await;
+            assert!(commands.try_recv().is_err(), "重复回执不能重新派发邮箱正文");
+        });
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    }
+}
+
+#[test]
+fn claude_fixed_version_ack_rejects_invalid_self_input_and_missing_message() {
+    for body in [Some("损坏的用户输入"), Some(r#""Shutdown""#), None] {
+        let directory = tempfile::tempdir().unwrap();
+        let writer =
+            crate::persistence::start_test_writer(&directory.path().join("invalid-input.sqlite"))
+                .unwrap();
+        block_on(async {
+            let mut state = snapshot();
+            state.task.harness = "claude".into();
+            state.task.config_json =
+                json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+            let message_id = Uuid::new_v4();
+            set_claude_pending_input(
+                &mut state.task,
+                Some(ClaudePendingInput {
+                    message_id,
+                    submission_generation: 1,
+                }),
+            )
+            .unwrap();
+            checkpoint_task(&writer.sender, state.task.clone(), None)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            if let Some(body) = body {
+                let mut message = input_message(
+                    &state.task,
+                    message_id,
+                    &RuntimeAction::Submit {
+                        input: vec![InputContent::Text("原始输入".into())],
+                    },
+                )
+                .unwrap();
+                message.body = body.into();
+                enqueue_message(&writer.sender, message)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                acknowledge_message(
+                    &writer.sender,
+                    message_id.to_string(),
+                    state.task.task_id.clone(),
+                    1,
+                    LocalCliMessageState::Sent,
+                )
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            }
+            let before = state.task.clone();
+            let before_messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            let ack = event(
+                &state,
+                RuntimeEventKind::MessageAccepted {
+                    message_id,
+                    turn_id: Some(message_id.to_string()),
+                },
+            );
+            assert!(
+                commit_runtime_event(
+                    &writer.sender,
+                    &mut state,
+                    &ack,
+                    &mut HashSet::new(),
+                    &mut HashSet::new(),
+                )
+                .await
+                .is_err()
+            );
+            assert_eq!(state.task, before);
+            let after_messages = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                after_messages, before_messages,
+                "坏输入不能补写原生接收回执"
+            );
+        });
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    }
+}
+
+#[test]
+fn claude_fixed_version_old_ack_cannot_confirm_new_generation_skills() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("old-ack.sqlite")).unwrap();
+    block_on(async {
+        let mut state = snapshot();
+        state.task.harness = "claude".into();
+        state.task.config_json = json!({"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        checkpoint_task(&writer.sender, state.task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let token = Uuid::new_v4();
+        let (controller, mut commands, _sender, _events) = channels(token);
+        let old_id = Uuid::new_v4();
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            old_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("第一代输入".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        commands.try_recv().unwrap();
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        for kind in [
+            RuntimeEventKind::MessageAccepted {
+                message_id: old_id,
+                turn_id: Some(old_id.to_string()),
+            },
+            RuntimeEventKind::TurnStarted {
+                turn_id: old_id.to_string(),
+            },
+            RuntimeEventKind::TurnFinished {
+                turn_id: old_id.to_string(),
+                outcome: TurnOutcome::Completed,
+                output: "第一代结果".into(),
+            },
+        ] {
+            let native = event(&state, kind);
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &native,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .unwrap();
+        }
+        let next_id = Uuid::new_v4();
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            next_id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Skill {
+                    name: "new-skill".into(),
+                    path: directory.path().join("新技能/SKILL.md"),
+                }],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        commands.try_recv().unwrap();
+        assert_eq!(state.task.generation, 2);
+        let before = state.task.clone();
+        let stale_ack = event(
+            &state,
+            RuntimeEventKind::MessageAccepted {
+                message_id: old_id,
+                turn_id: Some(old_id.to_string()),
+            },
+        );
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &stale_ack,
+                &mut accepted,
+                &mut finished,
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(state.task, before);
+        let current = load_messages(&writer.sender, state.task.task_id.clone(), 2)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(current.len(), 1);
+        assert_eq!(current[0].message_id, next_id.to_string());
+        assert_eq!(current[0].state, LocalCliMessageState::Sent);
+        assert_eq!(current[0].receipt_kind, None);
+        let previous = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(previous[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            serde_json::from_str::<Value>(&state.task.config_json).unwrap()["selected_skills"],
+            json!([])
+        );
+        assert!(commands.try_recv().is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+// 模拟 SQLite 已提交 joined、宿主水位尚未推进时重放；只接受相同消息的原生 ACK。
+async fn assert_claude_joined_replay_requires_native_receipt(
+    sender: &SyncSender<ModelEvent>,
+    database: &Path,
+    state: &mut ManagedTaskSnapshot,
+    message_id: Uuid,
+    turn_id: &str,
+) {
+    assert!(!claude_input_pending(&state.task));
+    assert!(claude_joined_event_is_persisted(state, message_id, turn_id).unwrap());
+    let before = state.task.clone();
+    let mut connection = SqliteConnection::establish(database.to_str().unwrap()).unwrap();
+    let original: String = local_cli_messages::table
+        .filter(local_cli_messages::message_id.eq(message_id.to_string()))
+        .select(local_cli_messages::data)
+        .first(&mut connection)
+        .unwrap();
+    let original_message: LocalCliMessage = serde_json::from_str(&original).unwrap();
+    assert_eq!(original_message.state, LocalCliMessageState::Acknowledged);
+    assert_eq!(
+        original_message.receipt_kind,
+        Some(LocalCliReceiptKind::NativeProtocol)
+    );
+    let joined = event(
+        state,
+        RuntimeEventKind::InputJoined {
+            message_id,
+            turn_id: turn_id.into(),
+        },
+    );
+    for receipt in [None, Some(LocalCliReceiptKind::ApplicationHistory)] {
+        let mut damaged = original_message.clone();
+        damaged.receipt_kind = receipt;
+        let damaged_json = serde_json::to_string(&damaged).unwrap();
+        diesel::update(
+            local_cli_messages::table
+                .filter(local_cli_messages::message_id.eq(message_id.to_string())),
+        )
+        .set(local_cli_messages::data.eq(&damaged_json))
+        .execute(&mut connection)
+        .unwrap();
+        let mut accepted = HashSet::from([message_id.to_string()]);
+        assert!(
+            commit_runtime_event(sender, state, &joined, &mut accepted, &mut HashSet::new())
+                .await
+                .is_err()
+        );
+        assert_eq!(state.task, before);
+        assert!(
+            accepted.contains(&message_id.to_string()),
+            "非原生回执不能推进恢复协议状态"
+        );
+        let unchanged: String = local_cli_messages::table
+            .filter(local_cli_messages::message_id.eq(message_id.to_string()))
+            .select(local_cli_messages::data)
+            .first(&mut connection)
+            .unwrap();
+        assert_eq!(unchanged, damaged_json, "恢复拒绝不得改写损坏收据");
+    }
+    diesel::update(
+        local_cli_messages::table.filter(local_cli_messages::message_id.eq(message_id.to_string())),
+    )
+    .set(local_cli_messages::data.eq(&original))
+    .execute(&mut connection)
+    .unwrap();
+    let mut accepted = HashSet::from([message_id.to_string()]);
+    assert!(
+        !commit_runtime_event(sender, state, &joined, &mut accepted, &mut HashSet::new())
+            .await
+            .unwrap()
+    );
+    assert!(accepted.is_empty());
+    assert_eq!(
+        state.task, before,
+        "重复 joined 只推进协议水位，不能增加任务 revision"
+    );
+    let unchanged: String = local_cli_messages::table
+        .filter(local_cli_messages::message_id.eq(message_id.to_string()))
+        .select(local_cli_messages::data)
+        .first(&mut connection)
+        .unwrap();
+    assert_eq!(unchanged, original, "重复 joined 不得重写已提交的原生回执");
+}
+
+fn claude_hot_skill_history_fixture() -> (
+    tempfile::TempDir,
+    super::super::runtime_host::RuntimeHostRecord,
+    Vec<LocalCliTask>,
+    Vec<LocalCliMessage>,
+) {
+    let directory = tempfile::tempdir().unwrap();
+    let state_dir = directory.path().canonicalize().unwrap();
+    let runtime = Uuid::new_v4();
+    let alpha = json!({"name":"alpha","path":state_dir.join("alpha/SKILL.md")});
+    let beta = json!({"name":"beta","path":state_dir.join("beta/SKILL.md")});
+    let gamma = json!({"name":"gamma","path":state_dir.join("gamma/SKILL.md")});
+    let mut first = snapshot().task;
+    first.harness = "claude".into();
+    first.working_directory = state_dir.to_string_lossy().into_owned();
+    first.config_json = json!({
+        "runtime_generation":runtime,
+        "cli_version":"2.1.280",
+        "permission_policy":"Inherit",
+        "selected_skills":[alpha]
+    })
+    .to_string();
+    super::super::runtime_host::write_cancelled_startup_marker_for_test(
+        first.task_id.clone(),
+        1,
+        Harness::Claude,
+        recovery_options(&state_dir, runtime),
+    )
+    .unwrap();
+    let record = super::super::runtime_host::load_record(&state_dir, runtime)
+        .unwrap()
+        .unwrap();
+    let mut second = next_task_generation(&first).unwrap();
+    let mut config: Value = serde_json::from_str(&second.config_json).unwrap();
+    config["selected_skills"] = json!([alpha, beta]);
+    second.config_json = config.to_string();
+    let mut third = next_task_generation(&second).unwrap();
+    config["selected_skills"] = json!([alpha, beta, gamma]);
+    third.config_json = config.to_string();
+    let receipt = |generation, name: &str| LocalCliMessage {
+        version: 1,
+        message_id: Uuid::new_v4().to_string(),
+        sender_task_id: first.task_id.clone(),
+        recipient_task_id: first.task_id.clone(),
+        sender_generation: generation,
+        recipient_generation: generation,
+        subject: "user_input".into(),
+        body: serde_json::to_string(&RuntimeAction::Submit {
+            input: vec![InputContent::Skill {
+                name: name.into(),
+                path: state_dir.join(name).join("SKILL.md"),
+            }],
+        })
+        .unwrap(),
+        state: LocalCliMessageState::Acknowledged,
+        receipt_kind: Some(LocalCliReceiptKind::NativeProtocol),
+    };
+    let messages = vec![receipt(2, "beta"), receipt(3, "gamma")];
+    (directory, record, vec![first, second, third], messages)
+}
+
+#[test]
+fn claude_three_generation_hot_skills_recover_only_with_native_receipts() {
+    let (_directory, record, history, messages) = claude_hot_skill_history_fixture();
+    assert!(runtime_host_history_matches(
+        &record,
+        &history[2],
+        &history,
+        &messages
+    ));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &history[2],
+        &history,
+        &[]
+    ));
+    assert!(!runtime_host_history_matches(
+        &record,
+        &history[2],
+        &history,
+        &messages[1..]
+    ));
+}
+
+#[test]
+fn claude_hot_skill_history_rejects_wrong_receipt_source_and_generation() {
+    let (_directory, record, history, messages) = claude_hot_skill_history_fixture();
+    for scenario in [
+        "sent",
+        "history",
+        "missing_kind",
+        "old_generation",
+        "other_sender",
+        "other_recipient",
+        "wrong_body",
+    ] {
+        let mut changed = messages.clone();
+        match scenario {
+            "sent" => changed[0].state = LocalCliMessageState::Sent,
+            "history" => changed[0].receipt_kind = Some(LocalCliReceiptKind::ApplicationHistory),
+            "missing_kind" => changed[0].receipt_kind = None,
+            "old_generation" => {
+                changed[0].sender_generation = 1;
+                changed[0].recipient_generation = 1;
+            }
+            "other_sender" => changed[0].sender_task_id = "other-task".into(),
+            "other_recipient" => changed[0].recipient_task_id = "other-task".into(),
+            "wrong_body" => {
+                changed[0].body = serde_json::to_string(&RuntimeAction::Shutdown).unwrap()
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            !runtime_host_history_matches(&record, &history[2], &history, &changed),
+            "{scenario}"
+        );
+    }
+}
+
+#[test]
+fn claude_hot_skill_history_rejects_removal_reorder_path_changes_and_duplicates() {
+    let (directory, record, history, messages) = claude_hot_skill_history_fixture();
+    for scenario in ["remove", "reorder", "path", "duplicate", "relative"] {
+        let mut changed = history.clone();
+        let mut config: Value = serde_json::from_str(&changed[1].config_json).unwrap();
+        match scenario {
+            "remove" => config["selected_skills"] = json!([]),
+            "reorder" => config["selected_skills"].as_array_mut().unwrap().swap(0, 1),
+            "path" => {
+                config["selected_skills"][0]["path"] =
+                    json!(directory.path().join("replaced/SKILL.md"))
+            }
+            "duplicate" => config["selected_skills"][1]["name"] = json!("alpha"),
+            "relative" => config["selected_skills"][1]["path"] = json!("relative/SKILL.md"),
+            _ => unreachable!(),
+        }
+        changed[1].config_json = config.to_string();
+        assert!(
+            !runtime_host_history_matches(&record, &changed[2], &changed, &messages),
+            "{scenario}"
+        );
+    }
+}
+
+#[test]
+fn claude_hot_skill_history_rejects_old_versions_and_permission_changes() {
+    let (_directory, record, history, messages) = claude_hot_skill_history_fixture();
+    for scenario in [
+        "old_version",
+        "unknown_version",
+        "permission",
+        "file_profile",
+    ] {
+        let mut changed = history.clone();
+        for task in &mut changed {
+            let mut config: Value = serde_json::from_str(&task.config_json).unwrap();
+            match scenario {
+                "old_version" => config["cli_version"] = json!("2.1.279"),
+                "unknown_version" => config["cli_version"] = json!("2.1.281"),
+                "file_profile" => config["permission_policy"] = json!("ClaudeRestrictedFilesV2"),
+                "permission" => {
+                    if task.generation == 2 {
+                        config["permission_policy"] = json!("FullAccess");
+                    }
+                }
+                _ => unreachable!(),
+            }
+            task.config_json = config.to_string();
+        }
+        assert!(
+            !runtime_host_history_matches(&record, &changed[2], &changed, &messages),
+            "{scenario}"
+        );
+    }
+}
+
+#[test]
+fn terminal_recovery_identity_failure_preserves_results_and_other_records() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("recovery.sqlite")).unwrap();
+    block_on(async {
+        let mut completed = snapshot().task;
+        persist_running_task(&writer.sender, &mut completed).await;
+        completed.revision += 1;
+        completed.state = LocalCliTaskState::Completed;
+        completed.result = Some("原生已完成的第三轮结果".into());
+        completed.terminal_evidence = Some("第三轮真实完成证据".into());
+        checkpoint_task(
+            &writer.sender,
+            completed.clone(),
+            Some(completed.generation),
+        )
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+        let before = completed.clone();
+        let mut other = snapshot().task;
+        persist_running_task(&writer.sender, &mut other).await;
+        transition_recovery_state(
+            &writer.sender,
+            &mut completed,
+            LocalCliTaskState::Unconfirmed,
+            "identity_mismatch",
+        )
+        .await
+        .unwrap();
+        assert_eq!(completed.state, LocalCliTaskState::Completed);
+        assert_eq!(completed.result, before.result);
+        assert_eq!(completed.terminal_evidence, before.terminal_evidence);
+        assert_eq!(completed.native_session_id, before.native_session_id);
+        let once = completed.clone();
+        transition_recovery_state(
+            &writer.sender,
+            &mut completed,
+            LocalCliTaskState::Unconfirmed,
+            "identity_mismatch",
+        )
+        .await
+        .unwrap();
+        assert_eq!(completed, once, "重复刷新不能反复改写同一异常证据");
+        let loaded = load_tasks(&writer.sender, false)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.len(), 2);
+        assert!(loaded.contains(&completed));
+        assert!(loaded.contains(&other));
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn identity_quarantine_rejects_resume_before_creating_an_entry_or_dispatching_input() {
+    let _flag = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let coordinator = app.add_model(|_| LocalCLITaskCoordinator::new(None));
+        let directory = tempfile::tempdir().unwrap();
+        for reason in [
+            "identity_mismatch",
+            "native_session_mismatch",
+            "startup_evidence_identity_mismatch",
+        ] {
+            let mut task = snapshot().task;
+            task.working_directory = directory.path().to_string_lossy().into_owned();
+            task.config_json = json!({"runtime_host_start_state":reason}).to_string();
+            task.generation = 2;
+            let mut options = recovery_options(directory.path(), Uuid::new_v4());
+            options.target = SessionTarget::Resume {
+                native_session_id: task.native_session_id.clone().unwrap(),
+            };
+            coordinator.update(&mut app, |coordinator, ctx| {
+                assert_eq!(
+                    coordinator.start(task.clone(), options.clone(), Some(1), ctx),
+                    Err(crate::t!("cli-agent-task-outcome-unconfirmed"))
+                );
+                assert_eq!(
+                    coordinator.start_with_input(
+                        task,
+                        options,
+                        Some(1),
+                        Uuid::new_v4(),
+                        vec![InputContent::Text("不能派发的第四轮".into())],
+                        ctx
+                    ),
+                    Err(crate::t!("cli-agent-task-outcome-unconfirmed"))
+                );
+                assert!(coordinator.entries.is_empty());
+                assert!(coordinator.restored.is_empty());
+            });
+        }
+    });
+}
+
+#[test]
+fn durable_identity_quarantine_blocks_resume_even_when_process_exit_is_confirmed() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("quarantine.sqlite")).unwrap();
+    block_on(async {
+        let runtime = Uuid::new_v4();
+        let mut previous = snapshot().task;
+        previous.config_json = json!({"runtime_generation":runtime}).to_string();
+        persist_running_task(&writer.sender, &mut previous).await;
+        let running = previous.clone();
+        previous.state = LocalCliTaskState::Completed;
+        previous.result = Some("保留真实结果".into());
+        previous.terminal_evidence = Some("保留真实终态证据".into());
+        commit_transition(&writer.sender, &mut previous, &running)
+            .await
+            .unwrap();
+        let mut options = recovery_options(directory.path(), Uuid::new_v4());
+        options.target = SessionTarget::Resume {
+            native_session_id: previous.native_session_id.clone().unwrap(),
+        };
+        // 使用正式未启动封存 API 取得可通过原退出门禁的收据；不伪造 JSON 或启动 CLI。
+        super::super::managed_process::record_not_started(
+            directory.path(),
+            runtime,
+            &options.executable,
+            &[],
+            directory.path(),
+        )
+        .unwrap();
+        assert!(
+            super::super::managed_process::confirmed_exit(directory.path(), runtime)
+                .unwrap()
+                .is_some()
+        );
+        let next = next_task_generation(&previous).unwrap();
+        verify_previous_process_exit(&writer.sender, &next, Some(1), &options)
+            .await
+            .unwrap();
+        for reason in [
+            "identity_mismatch",
+            "native_session_mismatch",
+            "startup_evidence_identity_mismatch",
+        ] {
+            let before = previous.clone();
+            previous.config_json =
+                json!({"runtime_generation":runtime,"runtime_host_start_state":reason}).to_string();
+            commit_transition(&writer.sender, &mut previous, &before)
+                .await
+                .unwrap();
+            // 调用方沿用隔离前的快照；必须以重新读取的数据库记录拒绝恢复。
+            assert_eq!(
+                verify_previous_process_exit(&writer.sender, &next, Some(1), &options).await,
+                Err(crate::t!("cli-agent-task-outcome-unconfirmed"))
+            );
+            assert_eq!(
+                load_tasks(&writer.sender, false)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                [previous.clone()]
+            );
+            assert!(
+                load_messages(&writer.sender, previous.task_id.clone(), 1)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .is_empty()
+            );
+        }
     });
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();

@@ -5653,6 +5653,8 @@ cli-task-manager-permission-workspace = Codex 项目写入
 cli-task-manager-permission-inherit-help = 继承权限可能包含 CLI 配置中已允许的访问。应用不会更改这些设置，也不会添加绕过审批的启动参数。
 cli-task-manager-permission-claude-files = Claude 文件审批任务
 cli-task-manager-permission-claude-files-help = 将 Claude 限制为读取项目文件，以及经你审批后编辑文件。固定策略保留受支持的拒绝规则，禁用终端命令和自动钩子，并要求 API 认证。遇到不支持的权限设置时，任务不会启动。
+cli-task-manager-permission-claude-files-v2 = Claude 文件创建审批（V2）
+cli-task-manager-permission-claude-files-v2-help = Claude Code 2.1.280 可读取项目文件，并请求审批后编辑或创建文件。每次写入均需你审批。终端命令、技能和钩子仍被禁用。创建与覆盖文件不能指向配置路径或符号链接。旧文件任务的权限不会自动增加此能力。
 cli-task-manager-permission-claude-files-skills = 此文件任务策略不运行技能。请移除已选技能后再启动。
 cli-task-manager-session-pending = 等待原生会话确认
 cli-task-manager-approval = 请求审批：{ $method }
@@ -5711,10 +5713,10 @@ cli-agent-plugin-codex-patch-manual-note = 仅执行原生安装不会应用 Inf
 cli-agent-message-unconfirmed-id = 消息 { $message_id } 的接收尚未确认。请查询原记录，勿自动重投。{ $error }
 
 cli-agent-task-skill-plugin-failed = 无法准备隔离技能插件：{ $error }
-cli-agent-task-skill-one-per-turn = 托管 Claude 或 Grok 任务中，每轮请选择一个技能。
+cli-agent-task-skill-one-per-turn = 托管 Grok 任务中，每轮请选择一个技能。
 cli-agent-task-parent-changed = 父任务已进入另一轮。请从当前轮重新派发此子任务。
 cli-agent-input-images-unverified = 尚未验证 { $cli } 的托管图片输入。草稿已保留。
-cli-agent-claude-image-formats = 已验证的 Claude Code 2.1.280 支持 PNG、JPEG、静态 GIF 和 WebP 图片，也支持纯图片输入及图片与单个已选技能组合。
+cli-agent-claude-image-formats = 已验证的 Claude Code 2.1.280 支持 PNG、JPEG、静态 GIF 和 WebP 图片，也支持纯图片输入。继承 CLI 设置时，还可将图片与单个已选技能组合。
 cli-agent-claude-image-format-unsupported = Claude Code 托管任务支持 PNG、JPEG、静态 GIF 和 WebP 图片。
 cli-agent-claude-animated-gif-unverified = Claude Code 托管任务目前仅支持静态 GIF 图片。草稿已保留。
 cli-agent-claude-rich-images-version = 这些图片格式、纯图片输入及图片与技能组合需要已验证的 Claude Code 2.1.280。
@@ -5873,3 +5875,13 @@ settings-cli-updates-persistence = 无法保存更新记录。请检查本地存
 settings-cli-updates-launch-blocked = { $agent } 的更新尚未结束。请在设置中检查更新状态后再启动。
 
 ai-command-launch-failed = 命令未启动：{ $reason }
+
+cli-agent-claude-skill-path-conflict = 同名技能已从其他路径注册。如需替换，请新建任务。
+cli-agent-claude-skill-limit = 每个 Claude 任务最多可注册 32 个本地技能。
+cli-agent-claude-skill-duplicate = 同一技能被重复选择。请移除重复项后重试。
+cli-agent-claude-skill-reload-failed = Claude 未确认所有所选技能，草稿已保留。请重新连接此任务后再发送。
+cli-agent-claude-skill-reload-pending = Claude 正在注册所选技能。请等待注册结束后再发送。
+cli-agent-claude-skill-reload-idle = 请等待当前 Claude 回合结束后再新增技能。草稿已保留。
+cli-agent-claude-skill-version-required = 会话中新增技能或选择多个技能需要 Claude Code 2.1.280，并使用继承权限模式。
+cli-agent-claude-image-multiple-skills-unverified = 向 Claude 发送图片时最多选择一个技能。图片与多个技能组合尚未验证。
+cli-agent-claude-skills-reload-help = 可以选择多个技能。新增技能会在会话空闲时注册，并在 Claude 确认注册后发送。

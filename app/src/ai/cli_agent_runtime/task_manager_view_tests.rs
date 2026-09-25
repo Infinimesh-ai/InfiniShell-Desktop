@@ -358,6 +358,110 @@ fn managed_image_entry_uses_verified_harnesses_and_retains_processing_limits() {
 }
 
 #[test]
+fn grok_image_picker_tracks_fixed_version_permission_and_draft_skills() {
+    warpui::App::test((), |mut app| async move {
+        let manager = manager_view(&mut app);
+        for (version, enabled) in [("1.0.30", false), ("1.0.41", true), ("1.0.42", false)] {
+            CLIAgentInstallModel::handle(&app).update(&mut app, |model, _| {
+                *model = CLIAgentInstallModel::with_installation_for_test(
+                    CLIAgent::Grok,
+                    CLIAgentInstallation {
+                        executable: Some(std::env::temp_dir().join("grok")),
+                        version: CLIAgentVersionStatus::Detected(version.into()),
+                    },
+                );
+            });
+            manager.update(&mut app, |view, ctx| {
+                view.harness = Harness::Grok;
+                for permission in [
+                    PermissionPolicy::Inherit,
+                    PermissionPolicy::GrokRestrictedReadV1,
+                    PermissionPolicy::GrokRestrictedFilesV1,
+                ] {
+                    view.permission = permission;
+                    view.refresh_managed_input(ctx);
+                    assert_eq!(
+                        view.prompt.as_ref(ctx).image_context_options.is_enabled(),
+                        enabled && permission == PermissionPolicy::Inherit,
+                    );
+                }
+                view.permission = PermissionPolicy::Inherit;
+                view.managed_input.attachments.skills = vec![SkillReference::Path(
+                    warp_util::local_or_remote_path::LocalOrRemotePath::Local(
+                        std::env::temp_dir().join("SKILL.md"),
+                    ),
+                )];
+                view.refresh_managed_input(ctx);
+                assert!(!view.prompt.as_ref(ctx).image_context_options.is_enabled());
+                view.managed_input.attachments.skills.clear();
+                view.managed_input.processing_images = true;
+                view.refresh_managed_input(ctx);
+                assert!(!view.prompt.as_ref(ctx).image_context_options.is_enabled());
+                view.managed_input.processing_images = false;
+            });
+        }
+    });
+}
+
+#[test]
+fn grok_image_picker_keeps_saved_session_skill_and_model_boundaries() {
+    warpui::App::test((), |mut app| async move {
+        let configs = [
+            (
+                "current",
+                serde_json::json!({"permission_policy":"Inherit", "cli_version":"1.0.41", "model":null, "selected_skills":[]}),
+                true,
+            ),
+            (
+                "bound-skill",
+                serde_json::json!({"permission_policy":"Inherit", "cli_version":"1.0.41", "model":null, "selected_skills":[{"name":"bound", "path":std::env::temp_dir().join("SKILL.md") }]}),
+                false,
+            ),
+            (
+                "other-model",
+                serde_json::json!({"permission_policy":"Inherit", "cli_version":"1.0.41", "model":"other-model", "selected_skills":[]}),
+                false,
+            ),
+            (
+                "legacy",
+                serde_json::json!({"permission_policy":"Inherit", "cli_version":"1.0.30", "model":null, "selected_skills":[]}),
+                false,
+            ),
+        ];
+        let records = configs
+            .iter()
+            .map(|(id, config, _)| {
+                let mut record = task(id);
+                record.harness = "grok".into();
+                record.config_json = config.to_string();
+                record
+            })
+            .collect();
+        let manager = manager_view_with_records(&mut app, records);
+        CLIAgentInstallModel::handle(&app).update(&mut app, |model, _| {
+            *model = CLIAgentInstallModel::with_installation_for_test(
+                CLIAgent::Grok,
+                CLIAgentInstallation {
+                    executable: Some(std::env::temp_dir().join("grok")),
+                    version: CLIAgentVersionStatus::Detected("1.0.41".into()),
+                },
+            );
+        });
+        manager.update(&mut app, |view, ctx| {
+            for (id, _, enabled) in configs {
+                view.handle_action(&TaskManagerAction::SelectTask(id.into()), ctx);
+                assert!(view.managed_input.attachments.skills.is_empty());
+                view.refresh_managed_input(ctx);
+                assert_eq!(
+                    view.prompt.as_ref(ctx).image_context_options.is_enabled(),
+                    enabled
+                );
+            }
+        });
+    });
+}
+
+#[test]
 fn managed_composer_ack_does_not_clear_a_reedited_identical_draft_or_new_attachments() {
     warpui::App::test((), |mut app| async move {
         let manager = manager_view(&mut app);
@@ -1550,6 +1654,164 @@ fn current_grok_existing_task_skills_stay_bound_to_the_creation_selection() {
                 view.select_composer_skill(&second, view.input_generation, ctx)
                     .is_ok()
             );
+        });
+    });
+}
+
+#[test]
+fn fixed_claude_session_can_select_new_and_multiple_skills_without_changing_legacy_or_restricted_policy()
+ {
+    use crate::ai::skills::SkillManager;
+    use warp_util::local_or_remote_path::LocalOrRemotePath;
+
+    warpui::App::test((), |mut app| async move {
+        let project = tempfile::tempdir().unwrap();
+        let first_path = project.path().join(".claude/skills/first/SKILL.md");
+        let second_path = project.path().join(".claude/skills/second/SKILL.md");
+        std::fs::create_dir_all(first_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(second_path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &first_path,
+            "---\nname: first\ndescription: 第一技能\n---\n正文一\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &second_path,
+            "---\nname: second\ndescription: 第二技能\n---\n正文二\n",
+        )
+        .unwrap();
+        let mut current = task("claude-current");
+        current.harness = "claude".into();
+        current.working_directory = project.path().to_string_lossy().to_string();
+        current.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,"cli_version":"2.1.280","selected_skills":[]}).to_string();
+        let mut legacy = current.clone();
+        legacy.task_id = "claude-legacy".into();
+        legacy.config_json = serde_json::json!({"permission_policy":"Inherit","model":null,"cli_version":"2.1.278","selected_skills":[]}).to_string();
+        let manager = manager_view_with_records(&mut app, vec![current.clone(), legacy.clone()]);
+        SkillManager::handle(&app).update(&mut app, |skills, _| {
+            skills.handle_skills_added(vec![
+                ai::skills::parse_skill(&first_path).unwrap(),
+                ai::skills::parse_skill(&second_path).unwrap(),
+            ]);
+        });
+        manager.update(&mut app, |view, ctx| {
+            let first = SkillReference::Path(LocalOrRemotePath::Local(first_path));
+            let second = SkillReference::Path(LocalOrRemotePath::Local(second_path));
+            view.handle_action(&TaskManagerAction::SelectTask(current.task_id.clone()), ctx);
+            view.select_composer_skill(&first, view.input_generation, ctx)
+                .unwrap();
+            view.select_composer_skill(&second, view.input_generation, ctx)
+                .unwrap();
+            assert_eq!(view.parsed_composer_skills(ctx).unwrap().len(), 2);
+            for policy in [
+                PermissionPolicy::ClaudeRestrictedFilesV1,
+                PermissionPolicy::ClaudeRestrictedFilesV2,
+            ] {
+                view.permission = policy;
+                assert!(view.parsed_composer_skills(ctx).is_err());
+                assert!(
+                    view.select_composer_skill(&first, view.input_generation, ctx)
+                        .is_err()
+                );
+            }
+            view.handle_action(&TaskManagerAction::SelectTask(legacy.task_id.clone()), ctx);
+            assert_eq!(
+                view.select_composer_skill(&first, view.input_generation, ctx)
+                    .unwrap_err(),
+                crate::t!("cli-task-manager-skills-session-fixed")
+            );
+        });
+    });
+}
+
+#[test]
+fn claude_v2_file_creation_is_a_separate_exact_version_choice() {
+    for version in ["2.1.278", "2.1.279", "2.1.281"] {
+        assert!(!permission_supported_for_version(
+            Harness::Claude,
+            PermissionPolicy::ClaudeRestrictedFilesV2,
+            Some(&CLIAgentVersionStatus::Detected(version.into()))
+        ));
+    }
+    assert!(!permission_supported_for_version(
+        Harness::Claude,
+        PermissionPolicy::ClaudeRestrictedFilesV2,
+        None
+    ));
+    assert!(permission_supported_for_version(
+        Harness::Claude,
+        PermissionPolicy::ClaudeRestrictedFilesV2,
+        Some(&CLIAgentVersionStatus::Detected("2.1.280".into()))
+    ));
+    assert!(!permission_supported(
+        Harness::Grok,
+        PermissionPolicy::ClaudeRestrictedFilesV2
+    ));
+    assert!(!permission_supported(
+        Harness::Codex,
+        PermissionPolicy::ClaudeRestrictedFilesV2
+    ));
+}
+
+#[test]
+fn resume_rejects_identity_quarantine_without_changing_terminal_results() {
+    for reason in [
+        "identity_mismatch",
+        "native_session_mismatch",
+        "startup_evidence_identity_mismatch",
+    ] {
+        let mut original = task("isolated");
+        original.config_json = serde_json::json!({"runtime_host_start_state":reason}).to_string();
+        let before = original.clone();
+        assert_eq!(
+            resumed_task(&original),
+            Err(crate::t!("cli-agent-task-outcome-unconfirmed"))
+        );
+        assert_eq!(original, before);
+    }
+}
+
+#[test]
+fn ordinary_startup_status_keeps_existing_cold_resume_behavior() {
+    for status in [
+        None,
+        Some("host_unavailable"),
+        Some("native_exit_unconfirmed"),
+        Some("exited_pending_recovery"),
+        Some("future_nonidentity_status"),
+    ] {
+        let mut original = task("ordinary");
+        original.config_json = serde_json::json!({"runtime_host_start_state":status}).to_string();
+        let (resumed, target) = resumed_task(&original).unwrap();
+        assert_eq!(resumed.generation, 5);
+        assert_eq!(
+            target,
+            SessionTarget::Resume {
+                native_session_id: "native-session".into()
+            }
+        );
+        assert_eq!(original.state, LocalCliTaskState::Completed);
+        assert_eq!(original.result.as_deref(), Some("previous result"));
+    }
+}
+
+#[test]
+fn identity_quarantine_disables_resume_button_but_keeps_other_history_resumable() {
+    let _flag = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+    warpui::App::test((), |mut app| async move {
+        let mut isolated = task("isolated");
+        isolated.config_json =
+            serde_json::json!({"runtime_host_start_state":"identity_mismatch"}).to_string();
+        let ordinary = task("ordinary");
+        let manager = manager_view_with_records(&mut app, vec![isolated, ordinary]);
+        manager.update(&mut app, |view, ctx| {
+            view.selected_task = Some("isolated".into());
+            view.refresh_buttons(ctx);
+            assert!(view.buttons["resume"].as_ref(ctx).is_disabled());
+            assert!(view.buttons["send"].as_ref(ctx).is_disabled());
+            view.selected_task = Some("ordinary".into());
+            view.refresh_buttons(ctx);
+            assert!(!view.buttons["resume"].as_ref(ctx).is_disabled());
         });
     });
 }

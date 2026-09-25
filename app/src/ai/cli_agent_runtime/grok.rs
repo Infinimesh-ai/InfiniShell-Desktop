@@ -215,7 +215,8 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         }
         PermissionPolicy::ReadOnly
         | PermissionPolicy::WorkspaceWrite
-        | PermissionPolicy::ClaudeRestrictedFilesV1 => unreachable!("已拒绝其他 CLI 策略"),
+        | PermissionPolicy::ClaudeRestrictedFilesV1
+        | PermissionPolicy::ClaudeRestrictedFilesV2 => unreachable!("已拒绝其他 CLI 策略"),
     }
     Ok(())
 }
@@ -255,6 +256,27 @@ fn verified_version(output: &str) -> Option<&'static str> {
         }
         Some(_) | None => None,
     }
+}
+
+fn native_stdio_arguments(
+    direct_sdk: bool,
+    version: Option<&str>,
+    leader_socket: &Path,
+) -> Vec<OsString> {
+    let mut arguments = vec![OsString::from("agent")];
+    if direct_sdk {
+        arguments.push(OsString::from("--no-leader"));
+    } else if version == Some(ROOT_VERSION) {
+        // 1.0.41 的 --leader-socket 不选择 leader 模式；缺省配置会进入另一套直连握手。
+        // 固定传输模式以匹配已校准阶段，不修改用户配置，也不放宽阶段或权限检查。
+        arguments.push(OsString::from("--leader"));
+    }
+    arguments.push(OsString::from("stdio"));
+    if !direct_sdk {
+        arguments.push(OsString::from("--leader-socket"));
+        arguments.push(leader_socket.as_os_str().to_owned());
+    }
+    arguments
 }
 
 async fn run_process(
@@ -353,19 +375,12 @@ async fn run_process(
             launch.profile_path.clone().into_os_string(),
             OsString::from("stdio"),
         ]
-    } else if direct_sdk {
-        vec![
-            OsString::from("agent"),
-            OsString::from("--no-leader"),
-            OsString::from("stdio"),
-        ]
     } else {
-        vec![
-            OsString::from("agent"),
-            OsString::from("stdio"),
-            OsString::from("--leader-socket"),
-            directory.path().join("leader.sock").into_os_string(),
-        ]
+        native_stdio_arguments(
+            direct_sdk,
+            protocol.probed_version,
+            &directory.path().join("leader.sock"),
+        )
     };
     #[cfg(all(test, unix))]
     let arguments = if let Some(profile) = &protocol.skill_profile_for_live {

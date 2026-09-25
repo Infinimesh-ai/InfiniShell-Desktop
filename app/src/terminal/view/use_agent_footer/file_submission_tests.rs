@@ -82,7 +82,9 @@ fn file_only_submission_delivers_exact_path_once_and_clears_accepted_cards() {
             await_submission_event(submitted).await;
 
             let delivered = String::from_utf8(writes.borrow().concat()).unwrap();
-            assert!(delivered.contains(path.to_str().unwrap()));
+            // 原生输入约定为 JSON 路径数组，Windows 反斜杠必须保留转义边界。
+            let expected_paths = serde_json::to_string(&[path.to_str().unwrap()]).unwrap();
+            assert!(delivered.contains(&expected_paths));
             assert!(!delivered.contains("private file bytes"));
             assert_eq!(writes.borrow().len(), 2);
             terminal.read(&app, |view, ctx| {
@@ -95,7 +97,7 @@ fn file_only_submission_delivers_exact_path_once_and_clears_accepted_cards() {
                         .query
                         .as_ref()
                         .unwrap()
-                        .contains(path.to_str().unwrap())
+                        .contains(&expected_paths)
                 );
             });
         });
@@ -148,8 +150,10 @@ fn newly_added_file_and_reedited_draft_survive_an_earlier_submission() {
         await_submission_event(submitted).await;
 
         let delivered = String::from_utf8(writes.borrow().concat()).unwrap();
-        assert!(delivered.contains(first.to_str().unwrap()));
-        assert!(!delivered.contains(second.to_str().unwrap()));
+        let first_paths = serde_json::to_string(&[first.to_str().unwrap()]).unwrap();
+        let second_path = serde_json::to_string(second.to_str().unwrap()).unwrap();
+        assert!(delivered.contains(&first_paths));
+        assert!(!delivered.contains(&second_path));
         terminal.read(&app, |view, ctx| {
             assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "新草稿");
             assert_eq!(view.ai_context_model.as_ref(ctx).pending_files().len(), 2);

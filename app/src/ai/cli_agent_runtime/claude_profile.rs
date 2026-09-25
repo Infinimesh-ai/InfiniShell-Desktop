@@ -271,20 +271,24 @@ impl ClaudeRestrictedFilesV1 {
     }
 
     pub(super) fn arguments(&self) -> Vec<String> {
+        self.arguments_for("Read,Edit", &BLOCKED_TOOLS, self.fixed_settings())
+    }
+
+    fn arguments_for(&self, tools: &str, blocked: &[&str], settings: Value) -> Vec<String> {
         let mut arguments = ISOLATED_SETTINGS_ARGUMENTS
             .into_iter()
             .map(str::to_owned)
             .chain([
                 FIXED_PERMISSION_MODE_ARGUMENT.into(),
-                "--tools=Read,Edit".into(),
+                format!("--tools={tools}"),
                 "--strict-mcp-config".into(),
                 "--disable-slash-commands".into(),
-                format!("--settings={}", self.fixed_settings()),
+                format!("--settings={settings}"),
             ])
             .collect::<Vec<_>>();
         // 该变长参数只出现一次，避免后一个选项覆盖前一个拒绝列表。
         arguments.push("--disallowedTools".into());
-        arguments.extend(BLOCKED_TOOLS.into_iter().map(str::to_owned));
+        arguments.extend(blocked.iter().map(|tool| (*tool).to_owned()));
         arguments.extend(self.deny_rules.iter().cloned());
         if self.local_tools.is_none() {
             arguments.push("mcp__*".into());
@@ -300,8 +304,27 @@ impl ClaudeRestrictedFilesV1 {
         hooks: &Value,
         mcp: &Value,
     ) -> Result<(), RuntimeError> {
+        self.verify_live_for(
+            settings,
+            rules,
+            hooks,
+            mcp,
+            &self.fixed_settings(),
+            &BLOCKED_TOOLS,
+        )
+    }
+
+    fn verify_live_for(
+        &self,
+        settings: &Value,
+        rules: &Value,
+        hooks: &Value,
+        mcp: &Value,
+        expected_settings: &Value,
+        blocked: &[&str],
+    ) -> Result<(), RuntimeError> {
         validate_settings(settings, true)?;
-        if settings["effective"] != self.fixed_settings() {
+        if settings["effective"] != *expected_settings {
             return Err(reject("claude_profile_fixed_settings_changed"));
         }
         validate_hooks(hooks)?;
@@ -313,8 +336,9 @@ impl ClaudeRestrictedFilesV1 {
         let rows = rules["state"]["rules"]
             .as_array()
             .ok_or_else(|| reject("claude_profile_rules_shape"))?;
-        for expected in BLOCKED_TOOLS
-            .into_iter()
+        for expected in blocked
+            .iter()
+            .copied()
             .chain(self.deny_rules.iter().map(String::as_str))
             .chain(self.local_tools.is_none().then_some("mcp__*"))
         {
@@ -440,14 +464,17 @@ impl ClaudeRestrictedFilesV1 {
     }
 
     pub(super) fn verify_system_init(&self, message: &Value) -> Result<(), RuntimeError> {
+        self.verify_system_init_for(message, &["Read", "Edit", "EndConversation"])
+    }
+
+    fn verify_system_init_for(&self, message: &Value, tools: &[&str]) -> Result<(), RuntimeError> {
         if message["permissionMode"] != FIXED_PROTOCOL_PERMISSION_MODE {
             return Err(reject("claude_profile_mode_changed"));
         }
-        let mut allowed = BTreeSet::from([
-            "Read".to_owned(),
-            "Edit".to_owned(),
-            "EndConversation".to_owned(),
-        ]);
+        let mut allowed = tools
+            .iter()
+            .map(|tool| (*tool).to_owned())
+            .collect::<BTreeSet<_>>();
         if let Some(permissions) = self.local_tools {
             for tool in tool_definitions(permissions.allow_spawn, permissions.allow_message) {
                 let name = tool["name"]
@@ -476,6 +503,10 @@ impl ClaudeRestrictedFilesV1 {
         )
     }
 }
+
+#[path = "claude_profile_v2.rs"]
+mod v2;
+pub use v2::{ClaudeFileProfile, ClaudeRestrictedFilesV2};
 
 fn mcp_denied(rule: &str, tool: &str) -> bool {
     rule == "mcp__*" || rule == tool

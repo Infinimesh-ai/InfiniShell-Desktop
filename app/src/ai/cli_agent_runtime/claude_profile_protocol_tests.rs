@@ -1,11 +1,12 @@
 use super::*;
 
 fn protocol(cwd: &std::path::Path) -> ClaudeProtocol {
-    let profile = serde_json::from_value(json!({"version":1,"workingDirectory":cwd,
+    let profile: super::super::claude_profile::ClaudeRestrictedFilesV1 =
+        serde_json::from_value(json!({"version":1,"workingDirectory":cwd,
         "canonicalWorkingDirectory":std::fs::canonicalize(cwd).unwrap(),
         "executableSha256":"953e9880dbcb0b70f31c1f508de6a3fd389753d131688557fd992da9184693fb",
         "denyRules":[],"sourceRules":[],"localTools":null}))
-    .unwrap();
+        .unwrap();
     ClaudeProtocol::new(SessionOptions {
         executable: cwd.join("claude"),
         cwd: cwd.to_owned(),
@@ -14,7 +15,7 @@ fn protocol(cwd: &std::path::Path) -> ClaudeProtocol {
         generation: Uuid::from_u128(1),
         permission_policy: PermissionPolicy::ClaudeRestrictedFilesV1,
         permission_ceiling: None,
-        claude_profile: Some(profile),
+        claude_profile: Some(profile.into()),
         grok_profile: None,
         model: None,
         local_tools: None,
@@ -31,7 +32,19 @@ fn initialize() -> Value {
 }
 
 fn finish_check(protocol: &mut ClaudeProtocol, request: &Value) -> Effects {
-    let fixed = json!({"permissions":{"ask":["Edit"]},"sandbox":{"enabled":false}});
+    let arguments = protocol
+        .options
+        .claude_profile
+        .as_ref()
+        .unwrap()
+        .arguments();
+    let fixed: Value = serde_json::from_str(
+        arguments
+            .iter()
+            .find_map(|argument| argument.strip_prefix("--settings="))
+            .unwrap(),
+    )
+    .unwrap();
     let settings = reply(
         protocol,
         request,
@@ -43,6 +56,12 @@ fn finish_check(protocol: &mut ClaudeProtocol, request: &Value) -> Effects {
     .unwrap();
     let mut scope = captured["rules"].clone();
     scope["state"]["originalCwd"] = json!(protocol.options.cwd);
+    if protocol.options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV2 {
+        scope["state"]["rules"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|rule| rule["rule"] != "Write");
+    }
     let rules = reply(protocol, &settings.writes[0], scope);
     let hooks = reply(
         protocol,
@@ -478,4 +497,172 @@ fn tool_approval_cannot_replace_the_correlated_invocation_input() {
     assert!(rejected.events.is_empty());
     assert_eq!(rejected.writes[0]["response"]["subtype"], "error");
     assert!(protocol.approvals.is_empty());
+}
+
+fn protocol_v2(cwd: &std::path::Path) -> ClaudeProtocol {
+    let mut protocol = protocol(cwd);
+    let base = protocol.options.claude_profile.take().unwrap();
+    let mut base = json!(base);
+    base["executableSha256"] = json!(test_candidate_executable_digest().unwrap());
+    protocol.options.claude_profile = Some(
+        serde_json::from_value(json!({
+            "version":2,"cliVersion":"2.1.280","base":base
+        }))
+        .unwrap(),
+    );
+    protocol.options.permission_policy = PermissionPolicy::ClaudeRestrictedFilesV2;
+    protocol
+}
+
+#[test]
+fn v2_write_requires_matching_input_and_consumes_each_approval_once() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let mut protocol = protocol_v2(&cwd);
+    assert!(validate_options(&protocol.options).is_ok());
+    ready(&mut protocol);
+    start_turn(&mut protocol, 2);
+    let input = json!({"file_path":cwd.join("new.txt"),"content":"approved bytes"});
+    protocol
+        .receive(assistant(
+            10,
+            "write-message",
+            Some(2),
+            json!([
+                {"type":"tool_use","id":"write-tool","name":"Write","input":input}
+            ]),
+        ))
+        .unwrap();
+    let request = json!({"type":"control_request","request_id":"write-once","request":{
+        "subtype":"can_use_tool","tool_name":"Write","tool_use_id":"write-tool","input":input}});
+    let mut altered = request.clone();
+    altered["request_id"] = json!("altered-input");
+    altered["request"]["input"]["content"] = json!("different bytes");
+    let rejected = protocol.receive(altered).unwrap();
+    assert!(rejected.events.is_empty());
+    assert_eq!(rejected.writes[0]["response"]["subtype"], "error");
+    let requested = protocol.receive(request.clone()).unwrap();
+    assert!(matches!(
+        &requested.events[0],
+        RuntimeEventKind::ApprovalRequested { .. }
+    ));
+    let pending = protocol.command(action(
+        3,
+        RuntimeAction::RespondApproval {
+            approval_id: "write-once".into(),
+            decision: ApprovalDecision::AllowOnce,
+        },
+    ));
+    let allowed = finish_check(&mut protocol, &pending.writes[0]);
+    assert_eq!(
+        allowed.writes[0]["response"]["response"],
+        json!({"behavior":"allow","updatedInput":input})
+    );
+    assert_eq!(
+        protocol.receive(request).unwrap().writes[0]["response"]["subtype"],
+        "error"
+    );
+}
+
+#[test]
+fn v2_interrupt_invalidates_pending_write_and_saved_v1_never_upgrades() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let mut protocol = protocol_v2(&cwd);
+    assert!(
+        protocol
+            .bind_probed_version(true, "2.1.278 (Claude Code)")
+            .is_err()
+    );
+    assert!(
+        protocol
+            .bind_probed_version(true, "2.1.280 (Claude Code)")
+            .is_ok()
+    );
+    ready(&mut protocol);
+    start_turn(&mut protocol, 2);
+    let input = json!({"file_path":cwd.join("cancelled.txt"),"content":"unsent"});
+    protocol
+        .receive(assistant(
+            10,
+            "pending-message",
+            Some(2),
+            json!([
+                {"type":"tool_use","id":"pending-tool","name":"Write","input":input}
+            ]),
+        ))
+        .unwrap();
+    protocol
+        .receive(
+            json!({"type":"control_request","request_id":"cancelled-write","request":{
+        "subtype":"can_use_tool","tool_name":"Write","tool_use_id":"pending-tool","input":input}}),
+        )
+        .unwrap();
+    let interrupted = protocol.command(action(
+        3,
+        RuntimeAction::Interrupt {
+            turn_id: Uuid::from_u128(2).to_string(),
+        },
+    ));
+    assert_eq!(interrupted.writes[0]["request"]["subtype"], "interrupt");
+    let pending = protocol.command(action(
+        4,
+        RuntimeAction::RespondApproval {
+            approval_id: "cancelled-write".into(),
+            decision: ApprovalDecision::AllowOnce,
+        },
+    ));
+    let response = finish_check(&mut protocol, &pending.writes[0]);
+    assert!(response.writes.is_empty());
+    let mut restored: SessionOptions = serde_json::from_value(json!(protocol.options)).unwrap();
+    restored.permission_policy = PermissionPolicy::ClaudeRestrictedFilesV1;
+    assert!(validate_options(&restored).is_err());
+    let mut v1 = self::protocol(&cwd).options;
+    v1.permission_policy = PermissionPolicy::ClaudeRestrictedFilesV2;
+    assert!(validate_options(&v1).is_err());
+}
+
+#[test]
+fn v2_write_target_replaced_while_approval_waits_is_denied_before_sending() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let mut protocol = protocol_v2(&cwd);
+    ready(&mut protocol);
+    start_turn(&mut protocol, 2);
+    let input = json!({"file_path":cwd.join("pending.txt"),"content":"approved bytes"});
+    protocol
+        .receive(assistant(
+            10,
+            "replace-message",
+            Some(2),
+            json!([
+                {"type":"tool_use","id":"replace-tool","name":"Write","input":input}
+            ]),
+        ))
+        .unwrap();
+    let requested = protocol
+        .receive(
+            json!({"type":"control_request","request_id":"replace-once","request":{
+        "subtype":"can_use_tool","tool_name":"Write","tool_use_id":"replace-tool","input":input}}),
+        )
+        .unwrap();
+    assert!(matches!(
+        &requested.events[0],
+        RuntimeEventKind::ApprovalRequested { .. }
+    ));
+    std::fs::write(cwd.join("target.txt"), "unchanged").unwrap();
+    std::fs::hard_link(cwd.join("target.txt"), cwd.join("pending.txt")).unwrap();
+    let pending = protocol.command(action(
+        3,
+        RuntimeAction::RespondApproval {
+            approval_id: "replace-once".into(),
+            decision: ApprovalDecision::AllowOnce,
+        },
+    ));
+    let denied = finish_check(&mut protocol, &pending.writes[0]);
+    assert_eq!(denied.writes[0]["response"]["response"]["behavior"], "deny");
+    assert_eq!(
+        std::fs::read_to_string(cwd.join("target.txt")).unwrap(),
+        "unchanged"
+    );
 }

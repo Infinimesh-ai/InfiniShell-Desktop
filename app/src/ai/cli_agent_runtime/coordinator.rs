@@ -770,6 +770,9 @@ impl LocalCLITaskCoordinator {
         if self.recovery_owner.is_some() {
             return Err(crate::t!("cli-agent-task-already-running"));
         }
+        if matches!(options.target, SessionTarget::Resume { .. }) {
+            verify_recovery_identity(&task)?;
+        }
         if self
             .entries
             .get(&task.task_id)
@@ -846,7 +849,7 @@ impl LocalCLITaskCoordinator {
                 options.grok_profile =
                     serde_json::from_value(config.get("grok_profile").cloned().unwrap_or_default())
                         .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
-                if options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV1
+                if options.permission_policy.is_claude_file_profile()
                     && options.claude_profile.is_none()
                 {
                     return Err(crate::t!("cli-agent-task-invalid-launch"));
@@ -1385,6 +1388,21 @@ async fn persist_recovery_checkpoint(
     commit_transition(sender, task, &previous).await
 }
 
+/// 真实身份冲突独立于回合终态和进程退出；不得借冷恢复清除隔离证据。
+pub(crate) fn verify_recovery_identity(task: &LocalCliTask) -> Result<(), String> {
+    let config: serde_json::Value = serde_json::from_str(&task.config_json)
+        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    if matches!(
+        config["runtime_host_start_state"].as_str(),
+        Some(
+            "identity_mismatch" | "native_session_mismatch" | "startup_evidence_identity_mismatch"
+        )
+    ) {
+        return Err(crate::t!("cli-agent-task-outcome-unconfirmed"));
+    }
+    Ok(())
+}
+
 async fn transition_recovery_state(
     sender: &SyncSender<ModelEvent>,
     task: &mut LocalCliTask,
@@ -1396,7 +1414,13 @@ async fn transition_recovery_state(
         .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
     config["runtime_host_start_state"] = json!(start_state);
     task.config_json = config.to_string();
-    task.state = state;
+    // 宿主身份异常只能隔离连接，不能撤销已经持久化的真实回合终态。
+    if !task.state.is_terminal() {
+        task.state = state;
+    }
+    if *task == previous {
+        return Ok(());
+    }
     commit_transition(sender, task, &previous).await
 }
 
@@ -1518,7 +1542,14 @@ async fn recover_runtime_hosts_in_state_dir(
             let history = load_task_generations(sender, task.task_id.clone())?
                 .await
                 .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
-            runtime_host_history_matches(&record, task, &history)
+            let messages = if task.harness == "claude" && config["cli_version"] == "2.1.280" {
+                load_task_messages(sender, task.task_id.clone())?
+                    .await
+                    .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
+            } else {
+                Vec::new()
+            };
+            runtime_host_history_matches(&record, task, &history, &messages)
         };
         if !identity_matches {
             transition_recovery_state(
@@ -1892,6 +1923,7 @@ fn runtime_host_history_matches(
     record: &super::runtime_host::RuntimeHostRecord,
     current: &LocalCliTask,
     history: &[LocalCliTask],
+    messages: &[LocalCliMessage],
 ) -> bool {
     if record.task_id() != current.task_id
         || record.task_generation() >= current.generation
@@ -1923,6 +1955,12 @@ fn runtime_host_history_matches(
     {
         return false;
     }
+    if !chain
+        .windows(2)
+        .all(|pair| runtime_host_skill_history_matches(pair[0], pair[1], messages))
+    {
+        return false;
+    }
     // 启动代、每个中间代和当前代必须属于同一宿主及原生会话；权限与启动配置不能漂移。
     chain.iter().all(|task| {
         let Ok(previous) = serde_json::from_str::<serde_json::Value>(&task.config_json) else {
@@ -1942,7 +1980,6 @@ fn runtime_host_history_matches(
                 "permission_policy",
                 "permission_ceiling",
                 "local_tools",
-                "selected_skills",
                 "claude_profile",
                 "grok_profile",
                 "cli_version",
@@ -1950,6 +1987,70 @@ fn runtime_host_history_matches(
             ]
             .iter()
             .all(|key| previous[*key] == config[*key])
+    })
+}
+
+// 只有固定 Claude 原生确认过的热注册可以扩展清单；旧技能顺序和真实路径不能改变。
+fn runtime_host_skill_history_matches(
+    previous: &LocalCliTask,
+    current: &LocalCliTask,
+    messages: &[LocalCliMessage],
+) -> bool {
+    let (Ok(before), Ok(after)) = (
+        serde_json::from_str::<serde_json::Value>(&previous.config_json),
+        serde_json::from_str::<serde_json::Value>(&current.config_json),
+    ) else {
+        return false;
+    };
+    if before["selected_skills"] == after["selected_skills"] {
+        return true;
+    }
+    if previous.harness != "claude"
+        || current.harness != "claude"
+        || before["cli_version"] != "2.1.280"
+        || after["cli_version"] != "2.1.280"
+        || before["permission_policy"] != "Inherit"
+        || after["permission_policy"] != "Inherit"
+    {
+        return false;
+    }
+    let (Ok(before), Ok(after)) = (
+        serde_json::from_value::<Vec<super::local_skills::SelectedLocalSkill>>(
+            before["selected_skills"].clone(),
+        ),
+        serde_json::from_value::<Vec<super::local_skills::SelectedLocalSkill>>(
+            after["selected_skills"].clone(),
+        ),
+    ) else {
+        return false;
+    };
+    let mut names = HashSet::new();
+    if !after.starts_with(&before)
+        || after.len() > 32
+        || after.iter().any(|skill| {
+            skill.name.trim().is_empty() || !skill.path.is_absolute() || !names.insert(&skill.name)
+        })
+    {
+        return false;
+    }
+    after[before.len()..].iter().all(|skill| {
+        messages.iter().any(|message| {
+            message.version == 1
+                && message.sender_task_id == current.task_id
+                && message.recipient_task_id == current.task_id
+                && message.sender_generation == current.generation
+                && message.recipient_generation == current.generation
+                && message.subject == "user_input"
+                && message.state == LocalCliMessageState::Acknowledged
+                && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol)
+                && matches!(
+                    serde_json::from_str::<RuntimeAction>(&message.body),
+                    Ok(RuntimeAction::Submit { input }) if input.iter().any(|part| {
+                        matches!(part, InputContent::Skill { name, path }
+                            if name == &skill.name && path == &skill.path)
+                    })
+                )
+        })
     })
 }
 
@@ -2817,6 +2918,8 @@ async fn verify_previous_process_exit(
             previous.task_id == task.task_id && Some(previous.generation) == expected_generation
         })
         .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+    // 重新读取的持久记录才是恢复授权依据，调用方不能删去隔离字段后绕过检查。
+    verify_recovery_identity(&previous)?;
     let configuration: serde_json::Value = serde_json::from_str(&previous.config_json)
         .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
     let generation = configuration
@@ -3619,8 +3722,10 @@ async fn commit_runtime_event(
             .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
             let persisted_receipt = messages.iter().any(|message| {
                 message.message_id == message_id.to_string()
-                    && message.subject == "user_input"
+                    && message.recipient_task_id == snapshot.task.task_id
+                    && message.recipient_generation == snapshot.task.generation
                     && message.state == LocalCliMessageState::Acknowledged
+                    && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol)
             });
             if !persisted_receipt {
                 return Err(crate::t!("cli-agent-claude-queue-uncertain"));
@@ -3645,9 +3750,51 @@ async fn commit_runtime_event(
     }
     let previous = snapshot.task.clone();
     let mut updated = snapshot.clone();
+    let mut claude_skills_added = false;
     if snapshot.task.harness == "grok" {
         set_grok_input_links(&mut updated.task, &grok_links)?;
     } else if snapshot.task.harness == "claude" {
+        if let RuntimeEventKind::MessageAccepted {
+            message_id,
+            turn_id: Some(turn_id),
+        } = &event.kind
+            && *turn_id == message_id.to_string()
+            && serde_json::from_str::<serde_json::Value>(&snapshot.task.config_json)
+                .is_ok_and(|config| config["cli_version"] == "2.1.280")
+        {
+            let messages = load_messages(
+                sender,
+                snapshot.task.task_id.clone(),
+                snapshot.task.generation,
+            )?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+            let message = messages
+                .iter()
+                .find(|message| {
+                    message.message_id == message_id.to_string()
+                        && matches!(
+                            message.state,
+                            LocalCliMessageState::Sent | LocalCliMessageState::Acknowledged
+                        )
+                })
+                .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+            // 父子邮箱和自动结果的正文不是 RuntimeAction；只有自身用户输入登记技能。
+            // 消息仍须已派发，并由后续原生回执事务核对接收代与发送来源。
+            if message.sender_task_id == snapshot.task.task_id {
+                if message.subject != "user_input"
+                    || message.sender_generation != snapshot.task.generation
+                {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+                let action = serde_json::from_str::<RuntimeAction>(&message.body)
+                    .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+                if !matches!(action, RuntimeAction::Submit { .. }) {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+                claude_skills_added = remember_accepted_claude_skills(&mut updated.task, &action)?;
+            }
+        }
         if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
             set_claude_pending_input(&mut updated.task, None)?;
             let mut config: serde_json::Value = serde_json::from_str(&updated.task.config_json)
@@ -3678,17 +3825,38 @@ async fn commit_runtime_event(
     } else {
         apply_runtime_event(&mut updated, event)?;
     }
+    let skill_receipt = if claude_skills_added {
+        // 清单只能引用已持久的原生回执；全部事件校验成功后先确认自身技能输入。
+        // 两次写入之间崩溃时宿主水位尚未推进，重放同一 ACK 可幂等补齐清单。
+        let receipt = acknowledge_runtime_message(
+            sender,
+            &previous.task_id,
+            previous.generation,
+            &event.kind,
+        )
+        .await?;
+        if receipt != Some(LocalCliMessageState::Acknowledged) {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
+        receipt
+    } else {
+        None
+    };
     if updated.task != previous {
         commit_transition(sender, &mut updated.task, &previous).await?;
     }
     *snapshot = updated;
-    let receipt = acknowledge_runtime_message(
-        sender,
-        &snapshot.task.task_id,
-        grok_receipt_generation.unwrap_or(snapshot.task.generation),
-        &event.kind,
-    )
-    .await?;
+    let receipt = if skill_receipt.is_some() {
+        skill_receipt
+    } else {
+        acknowledge_runtime_message(
+            sender,
+            &snapshot.task.task_id,
+            grok_receipt_generation.unwrap_or(snapshot.task.generation),
+            &event.kind,
+        )
+        .await?
+    };
     if grok_receipt_generation.is_some() && receipt.is_none() {
         return Err(crate::t!("cli-agent-task-invalid-launch"));
     }
@@ -3798,7 +3966,7 @@ fn verified_claude_profile(
     task: &LocalCliTask,
     config: &serde_json::Value,
     effective_permissions: &serde_json::Value,
-) -> Result<super::permissions::ClaudeRestrictedFilesV1, String> {
+) -> Result<super::permissions::ClaudeFileProfile, String> {
     let reject = || crate::t!("cli-agent-task-invalid-launch");
     if task.harness != "claude"
         || effective_permissions.get("fixedProfileVerified") != Some(&json!(true))
@@ -3809,17 +3977,21 @@ fn verified_claude_profile(
     {
         return Err(reject());
     }
-    let profile: super::permissions::ClaudeRestrictedFilesV1 = serde_json::from_value(
-        effective_permissions
-            .get("claudeRestrictedFilesV1")
-            .cloned()
-            .ok_or_else(reject)?,
-    )
-    .map_err(|_| reject())?;
+    let key = match config["permission_policy"].as_str() {
+        Some("ClaudeRestrictedFilesV1") => "claudeRestrictedFilesV1",
+        Some("ClaudeRestrictedFilesV2") => "claudeRestrictedFilesV2",
+        _ => return Err(reject()),
+    };
+    let profile: super::permissions::ClaudeFileProfile =
+        serde_json::from_value(effective_permissions.get(key).cloned().ok_or_else(reject)?)
+            .map_err(|_| reject())?;
+    if config["permission_policy"] != json!(profile.policy()) {
+        return Err(reject());
+    }
     profile
         .validate(&PathBuf::from(&task.working_directory))
         .map_err(|_| crate::t!("cli-agent-task-permission-ceiling-unavailable"))?;
-    let previous: Option<super::permissions::ClaudeRestrictedFilesV1> =
+    let previous: Option<super::permissions::ClaudeFileProfile> =
         serde_json::from_value(config.get("claude_profile").cloned().unwrap_or_default())
             .map_err(|_| reject())?;
     if previous
@@ -3829,6 +4001,58 @@ fn verified_claude_profile(
         return Err(reject());
     }
     Ok(profile)
+}
+
+/// 仅在原生输入确认后扩展恢复清单；注册失败、旧事件或未派发输入不改变清单。
+fn remember_accepted_claude_skills(
+    task: &mut LocalCliTask,
+    action: &RuntimeAction,
+) -> Result<bool, String> {
+    let RuntimeAction::Submit { input } = action else {
+        return Ok(false);
+    };
+    if !input
+        .iter()
+        .any(|part| matches!(part, InputContent::Skill { .. }))
+    {
+        return Ok(false);
+    }
+    let mut config: serde_json::Value = serde_json::from_str(&task.config_json)
+        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    if task.harness != "claude" || config["cli_version"] != "2.1.280" {
+        return Ok(false);
+    }
+    let mut selected: Vec<super::local_skills::SelectedLocalSkill> = serde_json::from_value(
+        config
+            .get("selected_skills")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+    )
+    .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    let previous_len = selected.len();
+    for part in input {
+        if let InputContent::Skill { name, path } = part {
+            let skill = super::local_skills::SelectedLocalSkill {
+                name: name.clone(),
+                path: path.clone(),
+            };
+            if let Some(previous) = selected.iter().find(|previous| previous.name == *name) {
+                if previous != &skill {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+            } else if path.is_absolute() && selected.len() < 32 {
+                selected.push(skill);
+            } else {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            }
+        }
+    }
+    if selected.len() == previous_len {
+        return Ok(false);
+    }
+    config["selected_skills"] = json!(selected);
+    task.config_json = config.to_string();
+    Ok(true)
 }
 
 fn apply_runtime_event(
@@ -3882,9 +4106,10 @@ fn apply_runtime_event(
                     }
                 }
             }
-            if config.get("permission_policy")
-                == Some(&json!(PermissionPolicy::ClaudeRestrictedFilesV1))
-            {
+            if matches!(
+                config["permission_policy"].as_str(),
+                Some("ClaudeRestrictedFilesV1" | "ClaudeRestrictedFilesV2")
+            ) {
                 let profile =
                     verified_claude_profile(&snapshot.task, &config, effective_permissions)?;
                 config["claude_profile"] = serde_json::to_value(profile)

@@ -262,7 +262,7 @@ fn test_candidate_21280_parent_proof_requires_gate_and_version_pair() {
         }))
         .unwrap();
     let digest = profile.digest();
-    protocol.options.claude_profile = Some(profile);
+    protocol.options.claude_profile = Some(profile.into());
     protocol.test_candidate_21280 = true;
     protocol.session_id = Some("3ddff71c-4062-4198-a130-502e4c15684e".into());
     protocol.paired_version = Some(TEST_CANDIDATE_VERSION);

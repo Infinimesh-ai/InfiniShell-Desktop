@@ -11,7 +11,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use super::RuntimeError;
-pub use super::claude_profile::ClaudeRestrictedFilesV1;
+pub use super::claude_profile::{
+    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2,
+};
 pub use super::grok_profile::GrokCreationPolicyV1;
 #[cfg(feature = "local_fs")]
 use crate::persistence::model::LocalCliTask;
@@ -35,9 +37,34 @@ enum NativePermissions {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct ClaudePermissionProof {
-    claude_restricted_files_v1: ClaudeRestrictedFilesV1,
+#[serde(untagged, deny_unknown_fields)]
+enum ClaudePermissionProof {
+    V1 {
+        #[serde(rename = "claudeRestrictedFilesV1")]
+        profile: ClaudeRestrictedFilesV1,
+    },
+    V2 {
+        #[serde(rename = "claudeRestrictedFilesV2")]
+        profile: ClaudeRestrictedFilesV2,
+    },
+}
+
+impl ClaudePermissionProof {
+    fn profile(&self) -> ClaudeFileProfile {
+        match self {
+            Self::V1 { profile } => ClaudeFileProfile::V1(profile.clone()),
+            Self::V2 { profile } => ClaudeFileProfile::V2(profile.clone()),
+        }
+    }
+}
+
+impl From<ClaudeFileProfile> for ClaudePermissionProof {
+    fn from(profile: ClaudeFileProfile) -> Self {
+        match profile {
+            ClaudeFileProfile::V1(profile) => Self::V1 { profile },
+            ClaudeFileProfile::V2(profile) => Self::V2 { profile },
+        }
+    }
 }
 
 #[cfg(all(
@@ -66,9 +93,9 @@ impl ParentPermissionCeiling {
         }
     }
 
-    pub(crate) fn claude_profile(&self) -> Option<&ClaudeRestrictedFilesV1> {
+    pub(crate) fn claude_profile(&self) -> Option<ClaudeFileProfile> {
         match &self.permissions {
-            NativePermissions::Claude(proof) => Some(&proof.claude_restricted_files_v1),
+            NativePermissions::Claude(proof) => Some(proof.profile()),
             NativePermissions::Codex(_) | NativePermissions::Grok(_) => None,
         }
     }
@@ -120,11 +147,14 @@ fn claude_parent_version_verified(
     parent: &LocalCliTask,
     config: &Value,
     observed: &Value,
-    profile: &ClaudeRestrictedFilesV1,
+    profile: &ClaudeFileProfile,
 ) -> bool {
     let Some(version) = config.get("cli_version").and_then(Value::as_str) else {
         return false;
     };
+    if profile.policy() == super::PermissionPolicy::ClaudeRestrictedFilesV2 {
+        return version == "2.1.280";
+    }
     if super::claude::supported_version(version) {
         return true;
     }
@@ -184,22 +214,25 @@ pub(crate) fn ceiling_from_parent(
             NativePermissions::Codex(parse_permissions(&observed).ok_or_else(reject)?)
         }
         "claude"
-            if config["permission_policy"] == "ClaudeRestrictedFilesV1"
-                && observed["fixedProfileVerified"] == true
+            if matches!(
+                config["permission_policy"].as_str(),
+                Some("ClaudeRestrictedFilesV1" | "ClaudeRestrictedFilesV2")
+            ) && observed["fixedProfileVerified"] == true
                 && observed["permissionMode"]
-                    == super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
-                && config["claude_profile"] == observed["claudeRestrictedFilesV1"] =>
+                    == super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE =>
         {
-            let profile: ClaudeRestrictedFilesV1 =
-                serde_json::from_value(observed["claudeRestrictedFilesV1"].clone())
-                    .map_err(|_| reject())?;
+            let profile: ClaudeFileProfile =
+                serde_json::from_value(config["claude_profile"].clone()).map_err(|_| reject())?;
+            if config["permission_policy"] != json!(profile.policy())
+                || config["claude_profile"] != observed[profile.evidence_key()]
+            {
+                return Err(reject());
+            }
             profile.validate(Path::new(&parent.working_directory))?;
             if !claude_parent_version_verified(parent, &config, &observed, &profile) {
                 return Err(reject());
             }
-            NativePermissions::Claude(ClaudePermissionProof {
-                claude_restricted_files_v1: profile,
-            })
+            NativePermissions::Claude(profile.into())
         }
         "grok"
             if config["cli_version"].as_str().is_some_and(|version| {
@@ -301,8 +334,9 @@ pub(crate) fn verify_effective_permissions(
             }
         }
         NativePermissions::Claude(expected) if harness == "claude" => {
-            let profile: ClaudeRestrictedFilesV1 = serde_json::from_value(
-                actual["claudeRestrictedFilesV1"].clone(),
+            let expected_profile = expected.profile();
+            let profile: ClaudeFileProfile = serde_json::from_value(
+                actual[expected_profile.evidence_key()].clone(),
             )
             .map_err(|_| {
                 rejected(
@@ -314,7 +348,7 @@ pub(crate) fn verify_effective_permissions(
             })?;
             if actual["fixedProfileVerified"] != true
                 || actual["permissionMode"] != super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
-                || !expected.claude_restricted_files_v1.same_scope(&profile)
+                || !expected_profile.same_scope(&profile)
             {
                 return Err(rejected(
                     Some(ceiling),

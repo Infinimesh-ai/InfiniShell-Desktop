@@ -759,6 +759,7 @@ impl CodexProtocol {
                 }
                 match self.options.permission_policy {
                     PermissionPolicy::ClaudeRestrictedFilesV1
+                    | PermissionPolicy::ClaudeRestrictedFilesV2
                     | PermissionPolicy::GrokRestrictedReadV1
                     | PermissionPolicy::GrokRestrictedFilesV1 => {
                         return Err(RuntimeError::InvalidConfiguration(
@@ -825,6 +826,7 @@ impl CodexProtocol {
                 }
                 let expected_sandbox = match self.options.permission_policy {
                     PermissionPolicy::ClaudeRestrictedFilesV1
+                    | PermissionPolicy::ClaudeRestrictedFilesV2
                     | PermissionPolicy::GrokRestrictedReadV1
                     | PermissionPolicy::GrokRestrictedFilesV1 => {
                         return Err(RuntimeError::InvalidConfiguration(

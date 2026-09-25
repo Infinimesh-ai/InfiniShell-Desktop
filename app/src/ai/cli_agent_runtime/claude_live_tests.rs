@@ -1,5 +1,8 @@
 //! 真实 Claude 适配器验收；只通过显式认证运行器启动，不属于默认单元测试。
 
+#[path = "claude_skills_live_tests.rs"]
+mod skills_live_tests;
+
 #[path = "claude_profile_live_tests.rs"]
 mod profile_live_tests;
 
@@ -8,6 +11,9 @@ mod batch_cancel_live_tests;
 
 #[path = "claude_managed_image_live_tests.rs"]
 mod managed_image_live_tests;
+
+#[path = "claude_image_skill_live_tests.rs"]
+mod image_skill_live_tests;
 
 use std::collections::{HashMap, HashSet};
 use std::env;

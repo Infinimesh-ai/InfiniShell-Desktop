@@ -590,8 +590,7 @@ async fn spawn_children(
     if harness != source.harness && options.permission_policy == PermissionPolicy::Inherit {
         return Err("不同 CLI 的继承权限不等价，不能自动扩大子任务权限".into());
     }
-    if harness == "claude" && options.permission_policy != PermissionPolicy::ClaudeRestrictedFilesV1
-    {
+    if harness == "claude" && !options.permission_policy.is_claude_file_profile() {
         return Err(crate::t!("cli-agent-task-permission-ceiling-unavailable"));
     }
     validate_spawn_scope(source, records, run.agent_run_configs.len())?;
@@ -678,7 +677,7 @@ async fn spawn_children(
             .map_err(|_| "子任务提交确认已关闭")??;
         let mut child_options = options.clone();
         child_options.permission_ceiling = Some(permission_ceiling.clone());
-        child_options.claude_profile = permission_ceiling.claude_profile().cloned();
+        child_options.claude_profile = permission_ceiling.claude_profile();
         child_options.grok_profile = grok_profile;
         child_options.executable = executable;
         child_options.target = SessionTarget::New;

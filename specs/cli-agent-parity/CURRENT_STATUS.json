@@ -67,16 +67,16 @@
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 36116931025,
-  "localization": "本次输入增量已同步英文与简体中文图片/文件说明；macOS WIP 重启后 Claude/Grok 相应说明布局可读，非最终 SHA 产品链；最终 cargo check、应用构建、i18n 11 项与受影响模块 624 项通过，相关平台门禁待补。",
+  "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。",
   "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。 本次图片仓外证据已逐字节复制到持久归档并生成 SHA-256 索引，保留 /private/tmp 原件，不含认证文件。",
-  "internal_execution_policy": "后续需启动的验收二进制/应用从内置盘同字节副本运行；外置盘只保留构建缓存。",
+  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，保留至少 12 GiB。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
   "documentation_updated_at": "2026-09-26",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
-    "implementation_commit": "本次输入增量（提交绑定待补）",
+    "implementation_commit": "84102bb1c687f87a2425bc1937784e77250c416c",
     "npm_source_binding_commit": "b6f93f6627738fb83b6be776dd225666a900ac90",
     "changed_gap_scopes": [
       "G02",
@@ -88,15 +88,53 @@
     "closed_gaps": [],
     "verification_scope": "macOS arm64 固定 CLI/模型的 WIP 生产适配器图片、原生 PTY/技能合同及局部双语布局；详情见 VALIDATION_REPORT.md。",
     "source_binding": "在线收据含基线 HEAD、source_worktree_dirty、关键源码和二进制 SHA-256；不能记作最终提交通过。",
-    "final_same_commit_gates": "本地最终源码已通过，提交绑定及 Linux/Windows 待补",
-    "claude_late_static_gif_guard": "首次与专用恢复仅单帧；最终 libtest 已通过静态、动画与损坏后帧回归，在线静态 GIF 窄复验待补；旧 WIP 收据不回填。",
+    "final_same_commit_gates": "84102bb1c 本地门禁通过，20个构建源文件与 Git blob 一致；run36158594977 Linux通过，Windows附件路径JSON断言2项失败，整体失败。工作区修复后本地footer45项通过，待同提交Windows复验。",
+    "claude_late_static_gif_guard": "84102bb1c 关键源码摘要绑定的静态 GIF 在线窄复验通过；旧 WIP 收据不回填。",
     "grok_late_selected_skill_image_guard": "无已选技能门禁已通过最终模块回归；原 WIP 在线结果仍按当时源码计证。",
     "raw_image_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/",
     "raw_image_archive_index_sha256": "ad4bb6a4da73f41b44c25c08844a259386a63bbcacda304fd1bd02bd0d288308",
     "npm_source_binding_scope": [
       "codex",
       "claude"
-    ]
+    ],
+    "gui_scope": "84102bb1c macOS Claude JPEG及纯PNG真实GUI、活跃重关联与冷恢复分别确认；后续摘要绑定工作区 Grok 双图 GUI、同nativeID冷恢复、同宿主重关联及双语滚动区已通过，旧选择器/握手失败保留。"
   },
-  "selected_related_gates_scope": "仅沿用历史对应提交的通过；不代表本次输入增量门禁全绿，当前结果与待补见 current_increment 和 VALIDATION_REPORT.md。"
+  "selected_related_gates_scope": "仅沿用历史对应提交的通过；不代表本次输入增量门禁全绿，当前结果与待补见 current_increment 和 VALIDATION_REPORT.md。",
+  "pending_integration": {
+    "implementation_sources": [
+      "3b4d8e8a3f937d9a6c7d20570f082399c8538df7",
+      "9f5967f6244bb7f41ea21755e12fd38e15ed3702"
+    ],
+    "test_sources": [
+      "de135f92c40af6edb22baded45278cf5404ea07e",
+      "156bda72826122ecae9523460763128d1f0a551c"
+    ],
+    "scopes": [
+      "G06 Claude多技能及新增",
+      "G10 Claude V2受审创建文件",
+      "G02 Grok图片入口遗漏修复"
+    ],
+    "status": "工作区整合后内置门禁与限定在线链通过；待提交后同源码绑定及相关平台验证，原 Goal 未完成",
+    "closed_gaps": [],
+    "local_gate_scope": "内置首轮 runtime1038/53跳过；修正邮箱ACK后 fixed轮 runtime1044/53跳过，i18n11、check和build通过。随后 joined重放修正的 replay-fixed轮 coordinator91/4跳过、i18n11、check和build通过；各轮来源分别绑定，未把跳过在线项计为通过。Windows附件断言已修且本地footer45通过，同提交Windows复验仍待补。 恢复清单/隔离与ACK顺序后续定向复验：coordinator101/4跳过、i18n11、check/build通过；此前task-manager46通过。",
+    "claude_image_skill_scope": "固定2.1.280/Opus5.5 macOS arm64生产适配器Inherit单技能：两独立PNG、两次精确Skill AllowOnce、同nativeID冷恢复及两代自然退出清理通过；libtest ec718473…、supervisor48018a00…，source摘要绑定工作区。",
+    "source_snapshot_sha256": "05e7fcbb8d4e8ef98e924ccf1b17426564239b3b2313639ab34a4fc100306461",
+    "source_binding": "baseline84102bb1c的36个工作区源码摘要，最终恢复写入顺序构建；测试与监督者各自摘要见claude-recovery-local-gates-20260926。原在线结果仍绑定此前各自构建，未回填为新程序通过。提交后须核对Git blob并完成相关平台验证。",
+    "grok_gui_scope": "macOS arm64、1.0.41/grok-4.7、Inherit无技能：两张独立PNG实际识色；新进程同nativeID冷恢复前消息仍1条；第二轮完成后重启精确重关联同host/native进程、代次2、消息2条且未重发。两代自然exit0并有清理回执；两轮分别绑定源码/签名后应用摘要。",
+    "grok_skill_native_scope": "仅默认profile显式leader原生校准：同轮双技能首项原生展开、后项read_file读完整正文；热新增须显式reload，刷新覆盖同leader两会话而非单session。零审批请求，不计产品adapter、父权限上限、GUI或跨平台。",
+    "claude_skill_gui_scope": "三轮真实 GUI（双技能、热新增、PNG加单技能）共5次精确Skill AllowOnce，原生历史模型为claude-opus-5-5且图片字节摘要匹配；恢复修复前错误及原始记录保留。修复构建重关联同宿主/原生进程、同会话和代次3，仍3条输入，原生历史字节不变；正常断开exit0并确认清理。英文和简体中文相关说明、技能列表、消息与历史结果可读。模型轮次与重关联程序分别绑定各自源码/二进制，不宣称新构建重跑模型。跨平台仍待补，不关闭G05/G06。",
+    "claude_v2_coordinator_scope": "固定2.1.280/claude-opus-5-5、macOS arm64：V2精确Write允许/拒绝及V1父不可扩V2两条真实生产协调器链通过；每链4次MCP、5次输入、3次执行、2次joined。四代完整清理且进程/launchd项均消失。待审批Write取消、活跃重关联、冷恢复、GUI与跨平台未验；命令/技能范围仍未扩展，G10不关闭。",
+    "archive_indices": {
+      "internal-integrated-gates-20260926/index.safe.json": "785f001b60cbb04bbf243261b6981c436e3be6f91809d19d3f7654e1f733933a",
+      "gui-grok-two-images-20260926/index.safe.json": "64726f010ae77e59c480df88efc704fb5597b984832807c94c5bc755135bd735",
+      "grok-g06-leader-default-20260926/index.safe.json": "c9f7a13d0ca0c63fe4b22d4f78254c390b2dbcce494641b82b11390871bc6413",
+      "g10-coordinator-post-fix/index.safe.json": "8d30cf54cc0fa3d6c39a0037a020787229364200950aea3d28dd7408f718b42c",
+      "gui-claude-hot-skills-20260926/index.safe.json": "a13e13a571adec83aae6361398313dda3e7cf47342301c091f1840d70079d737",
+      "g07-picker-negative-20260926/index.safe.json": "f41dad825484fc447a7fe03a534808011341eaa97b1143d591da4e2475ae5ea1",
+      "g07-picker-recheck-20260926/index.safe.json": "653e648cd37a62a1fa1b74d19f726d3edde34af6a20788c0e097b70cbc926b7e",
+      "claude-recovery-local-gates-20260926/index.safe.json": "c446536dc2eb113f75941666bc562963619aabc48ec975799ba4064e0a9baa0a"
+    },
+    "claude_recovery_fix": "固定2.1.280/Inherit只有同代NativeProtocol确认的技能前缀追加可恢复；真正身份冲突保留终态结果并阻止冷恢复。固定Claude新增技能先保存原生ACK再更新清单，宿主水位最后推进；ACK或清单写入失败与重复重放的真实SQLite回归通过且零重发。最终来源05e7fcbb…：i18n11、coordinator101/4跳过、check/build通过；上轮未再修改的task-manager46通过。",
+    "g07_gui_scope": "macOS Codex 0.156.1普通终端真实附加文件入口能选择txt，但仅插入路径正文，没有文件卡片。两会话零模型输入并正常退出；原点击未选中的类型过滤误判已撤回，原截图及复核均保留。入口接线待补，不关闭G07。"
+  }
 }
