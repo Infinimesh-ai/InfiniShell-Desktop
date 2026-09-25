@@ -509,7 +509,7 @@ impl LocalCLITaskManagerView {
             ));
         }
         if self.harness == Harness::Claude {
-            body.add_child(self.text(crate::t!("cli-agent-claude-png-only"), appearance));
+            body.add_child(self.text(crate::t!("cli-agent-claude-image-formats"), appearance));
         }
         if self.managed_input.preparing.is_some() || self.managed_input.processing_images {
             body.add_child(self.text(crate::t!("cli-task-manager-preparing-input"), appearance));

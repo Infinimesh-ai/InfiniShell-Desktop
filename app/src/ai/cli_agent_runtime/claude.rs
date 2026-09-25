@@ -19,9 +19,11 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 use warpui::r#async::{FutureExt as _, Timer};
 
-use super::local_skills::{PreparedClaudeSkillPlugin, prepare_claude_skill_plugin};
+use super::local_skills::{
+    CLAUDE_SKILL_PLUGIN_NAME, PreparedClaudeSkillPlugin, prepare_claude_skill_plugin,
+};
 use super::local_tools::{ClaudeMcpRequest, NativeLocalToolRequest};
-use super::managed_input::restore_managed_images;
+use super::managed_input::restore_claude_managed_images;
 use super::permissions::verify_effective_permissions;
 use super::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
@@ -451,6 +453,9 @@ fn trace_live_protocol_ids(message: &Value, generation: Uuid) {
                 .map(|text| format!("{:x}", Sha256::digest(text.as_bytes())))
         );
     }
+    if std::env::var_os("INFINISHELL_CLAUDE_RICH_IMAGE_CASE").is_some() {
+        identifiers["rich_image_content_projection"] = live_native_rich_image_projection(message);
+    }
     eprintln!("CLAUDE_NATIVE_PROTOCOL_IDS {identifiers}");
 }
 
@@ -463,7 +468,10 @@ fn live_native_image_projection(message: &Value) -> Value {
     let Some(blocks) = content.as_array().filter(|blocks| blocks.len() == 2) else {
         return Value::Null;
     };
-    if summarize_blocks(content).is_err() {
+    if blocks[0]["type"] != "text"
+        || blocks[1]["type"] != "image"
+        || summarize_blocks(content).is_err()
+    {
         return Value::Null;
     }
     let text = blocks[0]["text"].as_str().expect("已验证文本块");
@@ -475,7 +483,31 @@ fn live_native_image_projection(message: &Value) -> Value {
     json!({"array_sha256":format!("{:x}", Sha256::digest(&encoded)),
         "text_sha256":format!("{:x}", Sha256::digest(text.as_bytes())), "text_bytes":text.len(),
         "image_sha256":format!("{:x}", Sha256::digest(&image)), "image_bytes":image.len(),
-        "block_types":["text", "image"], "media_type":"image/png"})
+        "block_types":["text", "image"], "media_type":blocks[1]["source"]["media_type"]})
+}
+
+#[cfg(test)]
+fn live_native_rich_image_projection(message: &Value) -> Value {
+    if message["type"] != "user" || message["message"]["role"] != "user" {
+        return Value::Null;
+    }
+    let content = &message["message"]["content"];
+    let Ok(summary) = summarize_blocks(content) else {
+        return Value::Null;
+    };
+    let images = content.as_array().expect("已验证数组").iter()
+        .filter(|block| block["type"] == "image")
+        .map(|block| {
+            let data = block["source"]["data"].as_str().expect("已验证图片块");
+            let decoded = STANDARD.decode(data).ok()?;
+            Some(json!({"media_type":block["source"]["media_type"],
+                "image_sha256":format!("{:x}", Sha256::digest(&decoded)),"image_bytes":decoded.len()}))
+        }).collect::<Option<Vec<_>>>();
+    let Some(images) = images else {
+        return Value::Null;
+    };
+    json!({"array_sha256":format!("{:x}", Sha256::digest(serde_json::to_vec(content).expect("数组可编码"))),
+        "array_bytes":summary.bytes,"images":images})
 }
 
 #[cfg(test)]
@@ -645,10 +677,16 @@ fn user_message(content: Value, id: Uuid, session_id: &str) -> Value {
 }
 
 /// 已逐张验证的 base64 无 JSON 转义；在保存附件和创建任务前核对整批原生帧预算。
-pub(super) fn verify_prepared_png_budget(
+pub(super) fn verify_prepared_image_budget(
     text: &str,
     images: &[ImageContext],
+    skills: &[InputContent],
 ) -> Result<(), String> {
+    let command = skills.iter().find_map(|part| match part {
+        InputContent::Skill { name, .. } => Some(format!("{CLAUDE_SKILL_PLUGIN_NAME}:{name}")),
+        InputContent::Text(_) | InputContent::LocalImage(_) => None,
+    });
+    let text = image_prompt(text, command.as_deref());
     if text.len() > MAX_INPUT_BYTES {
         return Err(crate::t!("cli-agent-input-text-too-large"));
     }
@@ -658,9 +696,22 @@ pub(super) fn verify_prepared_png_budget(
     if payload_bytes > MAX_IMAGE_MESSAGE_BYTES {
         return Err(crate::t!("editor-image-too-large"));
     }
-    let mut blocks = vec![json!({"type":"text", "text":text})];
-    for _ in 0..images.len() {
-        blocks.push(json!({"type":"image", "source":{"type":"base64", "media_type":"image/png", "data":""}}));
+    let mut blocks = Vec::new();
+    if !text.is_empty() {
+        blocks.push(json!({"type":"text", "text":text}));
+    }
+    for image in images {
+        let mime_type = if image.mime_type == "image/jpg" {
+            "image/jpeg"
+        } else {
+            image.mime_type.as_str()
+        };
+        if !supported_image_mime_type(mime_type) {
+            return Err(crate::t!("cli-agent-claude-image-format-unsupported"));
+        }
+        blocks.push(
+            json!({"type":"image", "source":{"type":"base64", "media_type":mime_type, "data":""}}),
+        );
     }
     // 固定已验证版本的原生会话和消息 ID 均为 UUID；预算包含完整信封与换行。
     let placeholder = user_message(json!(blocks), Uuid::nil(), &Uuid::nil().to_string());
@@ -1246,12 +1297,37 @@ impl ClaudeProtocol {
         }
         match action {
             RuntimeAction::Submit { input } => {
+                let image_with_skill = input
+                    .iter()
+                    .any(|part| matches!(part, InputContent::LocalImage(_)))
+                    && input
+                        .iter()
+                        .any(|part| matches!(part, InputContent::Skill { .. }));
                 let projection =
                     match encode_input(input, self.skill_plugin.as_ref(), &self.attachment_store) {
                         Ok(projection) => projection,
                         Err(error) => return failed(message_id, &error),
                     };
                 let (content, expected_replay) = projection.into_parts();
+                if self.probed_version != Some("2.1.280")
+                    && (image_with_skill
+                        || content.as_array().is_some_and(|blocks| {
+                            blocks.first().is_none_or(|block| {
+                                block["type"] != "text"
+                                    || block["text"]
+                                        .as_str()
+                                        .is_none_or(|text| text.trim().is_empty())
+                            }) || blocks.iter().any(|block| {
+                                block["type"] == "image"
+                                    && block["source"]["media_type"] != "image/png"
+                            })
+                        }))
+                {
+                    return failed(
+                        message_id,
+                        &crate::t!("cli-agent-claude-rich-images-version"),
+                    );
+                }
                 let session_id =
                     self.session_id
                         .as_deref()
@@ -2558,7 +2634,7 @@ struct BlockReplay {
 #[derive(Debug, PartialEq, Eq)]
 enum InputBlockKind {
     Text,
-    PngImage,
+    Image,
 }
 
 /// 长期账本只保留有界摘要；严格形状后重新构造规范 JSON，字段顺序不影响关联。
@@ -2566,12 +2642,13 @@ fn summarize_blocks(content: &Value) -> Result<BlockReplay, String> {
     let blocks = content
         .as_array()
         .ok_or_else(|| crate::t!("cli-agent-claude-image-replay-invalid"))?;
-    if blocks.len() < 2 || blocks.len() > MAX_IMAGE_COUNT_FOR_QUERY + 1 {
+    if blocks.is_empty() || blocks.len() > MAX_IMAGE_COUNT_FOR_QUERY + 1 {
         return Err(crate::t!("cli-agent-claude-image-replay-invalid"));
     }
     let mut canonical = Vec::with_capacity(blocks.len());
     let mut kinds = Vec::with_capacity(blocks.len());
     let mut payload_bytes = 0usize;
+    let mut image_count = 0usize;
     for (index, block) in blocks.iter().enumerate() {
         let fields = block
             .as_object()
@@ -2594,11 +2671,13 @@ fn summarize_blocks(content: &Value) -> Result<BlockReplay, String> {
                 canonical.push(json!({"type":"text","text":text}));
                 kinds.push(InputBlockKind::Text);
             }
-            Some("image") if index > 0 => {
+            Some("image") => {
                 let source = &block["source"];
                 if source.as_object().is_none_or(|fields| fields.len() != 3)
                     || source["type"] != "base64"
-                    || source["media_type"] != "image/png"
+                    || source["media_type"]
+                        .as_str()
+                        .is_none_or(|mime| !supported_image_mime_type(mime))
                     || source["data"]
                         .as_str()
                         .is_none_or(|data| data.is_empty() || data.len() > MAX_LINE_BYTES)
@@ -2610,11 +2689,18 @@ fn summarize_blocks(content: &Value) -> Result<BlockReplay, String> {
                 if payload_bytes > MAX_LINE_BYTES {
                     return Err(crate::t!("editor-image-too-large"));
                 }
-                canonical.push(json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":source["data"]}}));
-                kinds.push(InputBlockKind::PngImage);
+                image_count += 1;
+                if image_count > MAX_IMAGE_COUNT_FOR_QUERY {
+                    return Err(crate::t!("cli-agent-claude-image-replay-invalid"));
+                }
+                canonical.push(json!({"type":"image","source":{"type":"base64","media_type":source["media_type"],"data":source["data"]}}));
+                kinds.push(InputBlockKind::Image);
             }
             Some(_) | None => return Err(crate::t!("cli-agent-claude-image-replay-invalid")),
         }
+    }
+    if image_count == 0 {
+        return Err(crate::t!("cli-agent-claude-image-replay-invalid"));
     }
     let encoded = serde_json::to_vec(&canonical)
         .map_err(|_| crate::t!("cli-agent-claude-image-replay-invalid"))?;
@@ -2628,20 +2714,34 @@ fn summarize_blocks(content: &Value) -> Result<BlockReplay, String> {
     })
 }
 
+// 固定 2.1.280 的原生字节回放和模型识别已分别覆盖这些格式。
+fn supported_image_mime_type(mime_type: &str) -> bool {
+    matches!(
+        mime_type,
+        "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+    )
+}
+
+// 数组文本不会触发原生 slash 展开；显式调用已注册 Skill，保留原有权限审批。
+fn image_prompt(text: &str, skill_command: Option<&str>) -> String {
+    let Some(command) = skill_command else {
+        return text.to_owned();
+    };
+    let mut prompt = format!(
+        "Invoke the Skill tool with skill={command}, then apply that skill to the attached images."
+    );
+    if !text.is_empty() {
+        prompt.push_str("\n\n");
+        prompt.push_str(text);
+    }
+    prompt
+}
+
 fn encode_input(
     input: Vec<InputContent>,
     plugin: Option<&PreparedClaudeSkillPlugin>,
     attachment_store: &Path,
 ) -> Result<InputProjection, String> {
-    if input
-        .iter()
-        .any(|part| matches!(part, InputContent::LocalImage(_)))
-        && input
-            .iter()
-            .any(|part| matches!(part, InputContent::Skill { .. }))
-    {
-        return Err(crate::t!("cli-agent-claude-image-skill-unverified"));
-    }
     let mut texts = Vec::new();
     let mut images = Vec::new();
     let mut skill_command = None;
@@ -2663,11 +2763,9 @@ fn encode_input(
     }
     let text = texts.join("\n\n");
     if !images.is_empty() {
+        let text = image_prompt(&text, skill_command.as_deref());
         if text.len() > MAX_INPUT_BYTES {
             return Err(crate::t!("cli-agent-input-text-too-large"));
-        }
-        if text.trim().is_empty() {
-            return Err(crate::t!("cli-task-manager-empty-prompt"));
         }
         if images.len() > MAX_IMAGE_COUNT_FOR_QUERY {
             return Err(crate::t!(
@@ -2676,20 +2774,23 @@ fn encode_input(
             ));
         }
         let mut payload_bytes = text.len();
-        let mut blocks = vec![json!({"type":"text","text":text})];
+        let mut blocks = Vec::new();
+        if !text.is_empty() {
+            blocks.push(json!({"type":"text","text":text}));
+        }
         for path in images {
             // 逐张验证并检查总预算，失败不派发，避免同时加载二十张大图。
-            let image = restore_managed_images(vec![path], attachment_store)?
+            let image = restore_claude_managed_images(vec![path], attachment_store)?
                 .pop()
                 .expect("单张图片还原完整返回");
-            if image.mime_type != "image/png" {
-                return Err(crate::t!("cli-agent-claude-png-only"));
+            if !supported_image_mime_type(&image.mime_type) {
+                return Err(crate::t!("cli-agent-claude-image-format-unsupported"));
             }
             payload_bytes = payload_bytes.saturating_add(image.data.len());
             if payload_bytes > MAX_LINE_BYTES {
                 return Err(crate::t!("editor-image-too-large"));
             }
-            blocks.push(json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":image.data}}));
+            blocks.push(json!({"type":"image","source":{"type":"base64","media_type":image.mime_type,"data":image.data}}));
         }
         let content = json!(blocks);
         let expected_replay = summarize_blocks(&content)?;

@@ -462,3 +462,188 @@ async fn real_claude_managed_png_lifecycle() {
         "生产Claude图片验收未通过；检查安全证据"
     );
 }
+
+async fn exercise_rich_image(
+    root: &Path,
+    format: image::ImageFormat,
+    pure: bool,
+    evidence: &mut Evidence,
+) -> Result<(), String> {
+    let (png, expected) = quadrant_png(Uuid::new_v4());
+    let decoded = image::load_from_memory(&png).map_err(|_| "fixture_decode_failed")?;
+    let mut encoded = std::io::Cursor::new(Vec::new());
+    decoded
+        .write_to(&mut encoded, format)
+        .map_err(|_| "fixture_encode_failed")?;
+    let bytes = encoded.into_inner();
+    let image_sha = sha(&bytes);
+    let store = root.join("local-cli-attachments");
+    let image = ImageContext {
+        data: STANDARD.encode(&bytes),
+        mime_type: format.to_mime_type().to_owned(),
+        file_name: "不使用标签作为路径.png".into(),
+        is_figma: false,
+    };
+    let text = if pure { "" } else { IMAGE_PROMPT };
+    let input = prepare_managed_input(Harness::Claude, text.into(), &[image], Vec::new(), &store)?;
+    let saved_path = input
+        .iter()
+        .find_map(|part| match part {
+            InputContent::LocalImage(path) => Some(path.clone()),
+            InputContent::Text(_) | InputContent::Skill { .. } => None,
+        })
+        .ok_or("image_reference_missing")?;
+    let InputProjection::Blocks { content, .. } = encode_input(input.clone(), None, &store)? else {
+        return Err("production_array_missing".into());
+    };
+    let checkpoint = root.join("rich-image-input.json");
+    fs::write(
+        &checkpoint,
+        serde_json::to_vec(&input).map_err(|_| "checkpoint_encode_failed")?,
+    )
+    .map_err(|_| "checkpoint_write_failed")?;
+    evidence.record(json!({"event":"rich_attachment_prepared","media_type":format.to_mime_type(),
+        "pure_image":pure,"image_sha256":image_sha,"image_bytes":bytes.len(),
+        "native_array_sha256":sha(&serde_json::to_vec(&content).map_err(|_| "array_encode_failed")?),
+        "expected_reply_sha256":sha(expected.as_bytes())}))?;
+    let mut options = SessionOptions {
+        executable: PathBuf::from(
+            env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").ok_or("cli_path_missing")?,
+        ),
+        cwd: root
+            .join("project")
+            .canonicalize()
+            .map_err(|_| "project_missing")?,
+        state_dir: root.to_owned(),
+        target: SessionTarget::New,
+        generation: Uuid::new_v4(),
+        permission_policy: PermissionPolicy::Inherit,
+        permission_ceiling: None,
+        claude_profile: None,
+        grok_profile: None,
+        model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "fixed_model_missing")?),
+        local_tools: None,
+        selected_skills: Vec::new(),
+    };
+    let mut session = LiveSession::start(options.clone())?;
+    session.ready(evidence).await?;
+    let mut cached_ack = None;
+    if pure {
+        turn(
+            &mut session,
+            "pure_image_instructions",
+            vec![InputContent::Text(format!(
+                "For the next image only: {IMAGE_PROMPT} For this text turn, reply exactly READY."
+            ))],
+            "READY",
+            false,
+            &mut cached_ack,
+            evidence,
+        )
+        .await?;
+    }
+    turn(
+        &mut session,
+        "image",
+        input,
+        &expected,
+        false,
+        &mut cached_ack,
+        evidence,
+    )
+    .await?;
+    let native_id = session.native_id.clone().ok_or("native_session_missing")?;
+    close(&mut session, root, evidence).await?;
+    let recovered: Vec<InputContent> =
+        serde_json::from_slice(&fs::read(&checkpoint).map_err(|_| "checkpoint_missing")?)
+            .map_err(|_| "checkpoint_invalid")?;
+    let restored = restore_managed_images(vec![saved_path.clone()], &store)?;
+    let rebuilt =
+        prepare_managed_input(Harness::Claude, text.into(), &restored, Vec::new(), &store)?;
+    if recovered != rebuilt
+        || sha(&fs::read(saved_path).map_err(|_| "attachment_missing")?) != image_sha
+    {
+        return Err("restored_image_changed".into());
+    }
+    evidence.record(
+        json!({"event":"rich_attachment_restored","media_type":format.to_mime_type(),
+        "image_sha256":image_sha,"typed_reference_matches":true,"image_replayed_to_native":false}),
+    )?;
+    options.generation = Uuid::new_v4();
+    options.target = SessionTarget::Resume {
+        native_session_id: native_id.clone(),
+    };
+    let mut resumed = LiveSession::start(options)?;
+    resumed.ready(evidence).await?;
+    if resumed.expected_native_id.as_ref() != Some(&native_id) {
+        return Err("resume_target_changed".into());
+    }
+    turn(
+        &mut resumed,
+        "recall",
+        vec![InputContent::Text(RECALL_PROMPT.into())],
+        &expected,
+        false,
+        &mut cached_ack,
+        evidence,
+    )
+    .await?;
+    if resumed.native_id.as_ref() != Some(&native_id) {
+        return Err("resume_session_changed".into());
+    }
+    close(&mut resumed, root, evidence).await?;
+    evidence.record(
+        json!({"event":"acceptance_passed","scope":"claude_managed_rich_image_process_resume",
+        "native_session_id":native_id,"media_type":format.to_mime_type(),"pure_image":pure,
+        "native_inputs":if pure {3} else {2},"runtime_generations":2,
+        "durable_attachment_restore_verified":true,"production_adapter_verified":true,
+        "app_restart_and_ui_verified":false,"sqlite_verified":false}),
+    )
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "需要固定已认证 CLI 与监督者；单格式最多 3 次原生输入，会消耗模型额度"]
+async fn real_claude_managed_rich_image_lifecycle() {
+    let case = env::var("INFINISHELL_CLAUDE_RICH_IMAGE_CASE").unwrap();
+    let (format, pure) = match case.as_str() {
+        "jpeg" => (image::ImageFormat::Jpeg, false),
+        "webp" => (image::ImageFormat::WebP, false),
+        "gif" => (image::ImageFormat::Gif, false),
+        "pure-png" => (image::ImageFormat::Png, true),
+        _ => panic!("仅允许已明确验证的图片格式用例"),
+    };
+    assert_eq!(
+        env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION").unwrap(),
+        "2.1.280"
+    );
+    let root = PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_ROOT").unwrap())
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-claude-live-probe")).unwrap(),
+        "isolated Claude Rust adapter verification\n"
+    );
+    let mut evidence = Evidence {
+        file: File::create(PathBuf::from(
+            env::var_os("INFINISHELL_CLAUDE_LIVE_ARTIFACT").unwrap(),
+        ))
+        .unwrap(),
+        root: root.clone(),
+    };
+    evidence.record(json!({"event":"acceptance_started","scope":"claude_managed_rich_image_process_resume",
+        "case":case,"max_native_inputs":3,"production_adapter":true,"credential_files_read_by_probe":false})).unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(650),
+        exercise_rich_image(&root, format, pure, &mut evidence),
+    )
+    .await;
+    if let Ok(Err(reason)) = &result {
+        evidence
+            .record(json!({"event":"acceptance_failed","reason":reason}))
+            .unwrap();
+    }
+    assert!(
+        matches!(result, Ok(Ok(()))),
+        "生产 Claude 富图片验收未通过；检查安全证据"
+    );
+}

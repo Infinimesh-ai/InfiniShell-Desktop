@@ -1,4 +1,4 @@
-//! 持久 PNG 输入与原生数组回放的离线安全回归，不执行真实 CLI。
+//! 持久图片输入与原生数组回放的离线安全回归，不执行真实 CLI。
 
 use std::fs;
 use std::io::Cursor as ImageCursor;
@@ -33,7 +33,10 @@ fn scoped_protocol(directory: &TempDir) -> ClaudeProtocol {
     protocol.options.state_dir = directory.path().to_owned();
     protocol.attachment_store = directory.path().join("local-cli-attachments");
     protocol
-        .receive(json!({"type":"system","subtype":"init","claude_code_version":"2.1.273","permissionMode":"default",
+        .bind_probed_version(true, "2.1.280 (Claude Code)")
+        .unwrap();
+    protocol
+        .receive(json!({"type":"system","subtype":"init","claude_code_version":"2.1.280","permissionMode":"default",
         "tools":[],"mcp_servers":[],"session_id":"3ddff71c-4062-4198-a130-502e4c15684e"}))
         .unwrap();
     protocol
@@ -115,7 +118,7 @@ fn durable_png_input_is_native_text_image_array_and_ledger_retains_only_summary(
     };
     assert_eq!(
         summary.kinds,
-        vec![InputBlockKind::Text, InputBlockKind::PngImage]
+        vec![InputBlockKind::Text, InputBlockKind::Image]
     );
     assert_eq!(summary.bytes, serde_json::to_vec(content).unwrap().len());
     assert_eq!(summary.sha256, fingerprint(content));
@@ -274,23 +277,81 @@ fn missing_corrupt_and_cross_scope_durable_images_fail_without_partial_write() {
     }
 }
 
-#[test]
-fn only_png_is_accepted_even_when_other_image_format_has_valid_hash_and_dimensions() {
-    let (directory, path) = image_scope(ImageFormat::Jpeg);
+fn assert_native_image_format(format: ImageFormat, mime_type: &str) {
+    let (directory, path) = image_scope(format);
     let mut protocol = scoped_protocol(&directory);
     let id = Uuid::from_u128(307);
-    let failure = protocol.command(image_command(id, path.clone()));
-    assert!(failure.writes.is_empty());
-    assert!(
-        matches!(&failure.events[0],RuntimeEventKind::RequestFailed {message,..}
-        if message == &crate::t!("cli-agent-claude-png-only"))
+    let sent = protocol.command(image_command(id, path.clone()));
+    assert_eq!(sent.writes.len(), 1);
+    assert!(sent.events.is_empty());
+    assert_eq!(
+        sent.writes[0]["message"]["content"][1]["source"]["media_type"],
+        mime_type
     );
-    assert_eq!(protocol.turns.contains_key(&id), false);
-    assert_eq!(path.exists(), true);
+    assert_eq!(
+        sent.writes[0]["message"]["content"][1]["source"]["data"],
+        STANDARD.encode(fs::read(path).unwrap())
+    );
+    let accepted = protocol.receive(replay(&sent.writes[0])).unwrap();
+    assert_eq!(
+        accepted.events,
+        vec![RuntimeEventKind::MessageAccepted {
+            message_id: id,
+            turn_id: Some(id.to_string())
+        }]
+    );
 }
 
 #[test]
-fn image_and_skill_combination_is_rejected_before_reading_any_attachment() {
+fn durable_jpeg_preserves_native_mime_and_exact_replay() {
+    assert_native_image_format(ImageFormat::Jpeg, "image/jpeg");
+}
+
+#[test]
+fn durable_webp_preserves_native_mime_and_exact_replay() {
+    assert_native_image_format(ImageFormat::WebP, "image/webp");
+}
+
+#[test]
+fn durable_gif_preserves_native_mime_and_exact_replay() {
+    assert_native_image_format(ImageFormat::Gif, "image/gif");
+}
+
+#[test]
+fn newly_verified_formats_require_the_fixed_native_version() {
+    let (directory, path) = image_scope(ImageFormat::Jpeg);
+    let mut protocol = scoped_protocol(&directory);
+    protocol.probed_version = Some("2.1.278");
+    let rejected = protocol.command(image_command(Uuid::from_u128(337), path));
+    assert!(rejected.writes.is_empty());
+    assert!(
+        matches!(&rejected.events[0], RuntimeEventKind::RequestFailed { message, .. }
+        if message == &crate::t!("cli-agent-claude-rich-images-version"))
+    );
+    assert!(protocol.turns.is_empty());
+}
+
+#[test]
+fn pure_images_require_the_fixed_native_version() {
+    let (directory, path) = image_scope(ImageFormat::Png);
+    let mut protocol = scoped_protocol(&directory);
+    protocol.probed_version = Some("2.1.278");
+    let rejected = protocol.command(command(
+        Uuid::from_u128(338),
+        RuntimeAction::Submit {
+            input: vec![InputContent::LocalImage(path)],
+        },
+    ));
+    assert!(rejected.writes.is_empty());
+    assert!(
+        matches!(&rejected.events[0], RuntimeEventKind::RequestFailed { message, .. }
+        if message == &crate::t!("cli-agent-claude-rich-images-version"))
+    );
+    assert!(protocol.turns.is_empty());
+}
+
+#[test]
+fn unregistered_image_skill_is_rejected_before_reading_any_attachment() {
     let (directory, path) = image_scope(ImageFormat::Png);
     let mut protocol = scoped_protocol(&directory);
     fs::remove_file(&path).unwrap();
@@ -311,21 +372,88 @@ fn image_and_skill_combination_is_rejected_before_reading_any_attachment() {
     assert!(failure.writes.is_empty());
     assert!(
         matches!(&failure.events[0],RuntimeEventKind::RequestFailed {message,..}
-        if message == &crate::t!("cli-agent-claude-image-skill-unverified"))
+        if message == "skill was not selected and registered for this connection")
     );
 }
 
 #[test]
-fn image_only_and_oversized_text_do_not_enter_native_turn_ledger() {
+fn image_skill_uses_registered_native_tool_and_preserves_user_input_and_replay() {
     let (directory, path) = image_scope(ImageFormat::Png);
     let mut protocol = scoped_protocol(&directory);
-    let empty = protocol.command(command(
-        Uuid::from_u128(309),
+    let selected_directory = directory.path().join("selected-skill");
+    fs::create_dir(&selected_directory).unwrap();
+    let skill_path = selected_directory.join("SKILL.md");
+    fs::write(&skill_path, "---\nname: inspect-picture\ndescription: Inspect attached pictures\n---\nInspect only the attached picture.\n").unwrap();
+    protocol.skill_plugin =
+        prepare_claude_skill_plugin(&[super::super::super::local_skills::SelectedLocalSkill {
+            name: "inspect-picture".into(),
+            path: skill_path.clone(),
+        }])
+        .unwrap();
+    let id = Uuid::from_u128(339);
+    let sent = protocol.command(command(
+        id,
         RuntimeAction::Submit {
-            input: vec![InputContent::LocalImage(path.clone())],
+            input: vec![
+                InputContent::Text("中文问题\n保留 `$()`".into()),
+                InputContent::LocalImage(path),
+                InputContent::Skill {
+                    name: "inspect-picture".into(),
+                    path: skill_path,
+                },
+            ],
         },
     ));
-    assert!(empty.writes.is_empty());
+    assert_eq!(sent.writes.len(), 1);
+    assert_eq!(
+        sent.writes[0]["message"]["content"][0]["text"],
+        "Invoke the Skill tool with skill=infinishell-local-skills:inspect-picture, then apply that skill to the attached images.\n\n中文问题\n保留 `$()`"
+    );
+    assert_eq!(sent.writes[0]["message"]["content"][1]["type"], "image");
+    let accepted = protocol.receive(replay(&sent.writes[0])).unwrap();
+    assert_eq!(
+        accepted.events,
+        vec![RuntimeEventKind::MessageAccepted {
+            message_id: id,
+            turn_id: Some(id.to_string())
+        }]
+    );
+}
+
+#[test]
+fn pure_image_has_no_synthetic_text_and_requires_matching_native_replay() {
+    let (directory, path) = image_scope(ImageFormat::Png);
+    let mut protocol = scoped_protocol(&directory);
+    let id = Uuid::from_u128(309);
+    let sent = protocol.command(command(
+        id,
+        RuntimeAction::Submit {
+            input: vec![InputContent::LocalImage(path)],
+        },
+    ));
+    assert_eq!(sent.writes.len(), 1);
+    assert_eq!(
+        sent.writes[0]["message"]["content"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(sent.writes[0]["message"]["content"][0]["type"], "image");
+    let accepted = protocol.receive(replay(&sent.writes[0])).unwrap();
+    assert_eq!(
+        accepted.events,
+        vec![RuntimeEventKind::MessageAccepted {
+            message_id: id,
+            turn_id: Some(id.to_string())
+        }]
+    );
+}
+
+#[test]
+fn oversized_image_text_does_not_enter_native_turn_ledger() {
+    let (directory, path) = image_scope(ImageFormat::Png);
+    let mut protocol = scoped_protocol(&directory);
     let oversized = protocol.command(command(
         Uuid::from_u128(310),
         RuntimeAction::Submit {
@@ -337,6 +465,16 @@ fn image_only_and_oversized_text_do_not_enter_native_turn_ledger() {
     ));
     assert!(oversized.writes.is_empty());
     assert_eq!(protocol.turns.len(), 0);
+}
+
+#[test]
+fn replay_rejects_text_only_arrays_and_too_many_pure_images() {
+    assert!(summarize_blocks(&json!([{ "type": "text", "text": "缺失图片" }])).is_err());
+    let images = vec![
+        json!({"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}});
+        21
+    ];
+    assert!(summarize_blocks(&json!(images)).is_err());
 }
 
 #[test]

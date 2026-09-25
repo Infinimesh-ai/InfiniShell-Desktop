@@ -43,7 +43,7 @@
   "tracked_items_total": 18,
   "gap_register": "KNOWN_GAPS.md",
   "partial_merge_is_goal_waiver": false,
-  "source_behavior_changed_in_this_revision": false,
+  "source_behavior_changed_in_this_revision": true,
   "supersedes_overall_completion_conclusions": [
     {
       "sha256": "1abf5f02fb6e9d751f0824b717cd175ad751d05de7358a335bdd557b6fac16ba",
@@ -67,12 +67,36 @@
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 36116931025,
-  "localization": "仅整理规格与验证结论，无产品或可见界面变化，无需本地化变更。",
-  "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。",
+  "localization": "本次输入增量已同步英文与简体中文图片/文件说明；macOS WIP 重启后 Claude/Grok 相应说明布局可读，非最终 SHA 产品链；最终 cargo check、应用构建、i18n 11 项与受影响模块 624 项通过，相关平台门禁待补。",
+  "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。 本次图片仓外证据已逐字节复制到持久归档并生成 SHA-256 索引，保留 /private/tmp 原件，不含认证文件。",
   "internal_execution_policy": "后续需启动的验收二进制/应用从内置盘同字节副本运行；外置盘只保留构建缓存。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
-  "documentation_updated_at": "2026-09-25",
+  "documentation_updated_at": "2026-09-26",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
   "validation_report": "VALIDATION_REPORT.md",
-  "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/"
+  "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
+  "current_increment": {
+    "implementation_commit": "本次输入增量（提交绑定待补）",
+    "npm_source_binding_commit": "b6f93f6627738fb83b6be776dd225666a900ac90",
+    "changed_gap_scopes": [
+      "G02",
+      "G04",
+      "G05",
+      "G07",
+      "G09"
+    ],
+    "closed_gaps": [],
+    "verification_scope": "macOS arm64 固定 CLI/模型的 WIP 生产适配器图片、原生 PTY/技能合同及局部双语布局；详情见 VALIDATION_REPORT.md。",
+    "source_binding": "在线收据含基线 HEAD、source_worktree_dirty、关键源码和二进制 SHA-256；不能记作最终提交通过。",
+    "final_same_commit_gates": "本地最终源码已通过，提交绑定及 Linux/Windows 待补",
+    "claude_late_static_gif_guard": "首次与专用恢复仅单帧；最终 libtest 已通过静态、动画与损坏后帧回归，在线静态 GIF 窄复验待补；旧 WIP 收据不回填。",
+    "grok_late_selected_skill_image_guard": "无已选技能门禁已通过最终模块回归；原 WIP 在线结果仍按当时源码计证。",
+    "raw_image_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/",
+    "raw_image_archive_index_sha256": "ad4bb6a4da73f41b44c25c08844a259386a63bbcacda304fd1bd02bd0d288308",
+    "npm_source_binding_scope": [
+      "codex",
+      "claude"
+    ]
+  },
+  "selected_related_gates_scope": "仅沿用历史对应提交的通过；不代表本次输入增量门禁全绿，当前结果与待补见 current_increment 和 VALIDATION_REPORT.md。"
 }

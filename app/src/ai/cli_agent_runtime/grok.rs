@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
 use command::Stdio;
 use command::r#async::Command;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -30,6 +31,7 @@ use super::{
 use super::grok_tool_lease::{GrokToolLeaseLedger, GrokToolLeaseState, VerifiedGrokToolLease};
 use super::local_skills::SelectedLocalSkill;
 use super::local_tools::{GrokMcpBridge, GrokMcpRequest, MCP_SERVER_NAME, NativeLocalToolRequest};
+use super::managed_input::restore_managed_images;
 
 pub(super) const VERIFIED_VERSION: &str = "1.0.30";
 pub(super) const P0_VERIFIED_VERSION: &str = "1.0.34";
@@ -1197,6 +1199,19 @@ impl GrokProtocol {
             .is_some_and(|version| self.production_root_scope(version))
     }
 
+    fn image_input_verified(&self) -> bool {
+        // 1.0.41 的已认证 ACP 实测接收图片，但仍声明 image=false；此校准仅绑定该版本和模型。
+        self.probed_version == Some(ROOT_VERSION)
+            && self.paired_version == Some(ROOT_VERSION)
+            && self.production_root_verified()
+            && self.options.selected_skills.is_empty()
+            && self
+                .reported_metadata
+                .models
+                .as_ref()
+                .is_some_and(|models| models.current_model_id == "grok-4.7")
+    }
+
     fn production_fixed_scope(&self, version: &str) -> bool {
         current_fixed_scope_supported_version(version)
             && self.options.selected_skills.is_empty()
@@ -2215,13 +2230,15 @@ impl GrokProtocol {
                     match item {
                         InputContent::Text(_) => {}
                         InputContent::LocalImage(_) => {
-                            return rejected_command(
-                                command.message_id,
-                                crate::t!(
-                                    "cli-agent-input-images-unverified",
-                                    cli = Harness::Grok.display_name()
-                                ),
-                            );
+                            if !self.image_input_verified() {
+                                return rejected_command(
+                                    command.message_id,
+                                    crate::t!(
+                                        "cli-agent-input-images-unverified",
+                                        cli = Harness::Grok.display_name()
+                                    ),
+                                );
+                            }
                         }
                         InputContent::Skill { name, path } => {
                             if self.probed_version != Some(VERIFIED_VERSION)
@@ -2426,14 +2443,28 @@ impl GrokProtocol {
                 Err(error) => return rejected_command(queued.message_id, error),
             }
         } else {
-            queued
+            // 排队期间模型可能改变、附件可能失效；发出前再次核对，失败不发送部分内容。
+            if queued
                 .input
-                .into_iter()
-                .filter_map(|part| match part {
-                    InputContent::Text(text) => Some(json!({"type":"text", "text":text})),
-                    InputContent::LocalImage(_) | InputContent::Skill { .. } => None,
-                })
-                .collect()
+                .iter()
+                .any(|part| matches!(part, InputContent::LocalImage(_)))
+                && !self.image_input_verified()
+            {
+                return rejected_command(
+                    queued.message_id,
+                    crate::t!(
+                        "cli-agent-input-images-unverified",
+                        cli = Harness::Grok.display_name()
+                    ),
+                );
+            }
+            match encode_prompt_content(
+                queued.input,
+                &self.profile_state_dir.join("local-cli-attachments"),
+            ) {
+                Ok(content) => content,
+                Err(error) => return rejected_command(queued.message_id, error),
+            }
         };
         self.prompt = Some(PendingPrompt {
             message_id: queued.message_id,
@@ -2965,6 +2996,13 @@ impl GrokProtocol {
                     "full_output_sha256":format!("{:x}",Sha256::digest(&output))})
             );
         }
+        #[cfg(test)]
+        managed_image_live_tests::trace_verified_image_history(
+            result,
+            self.options.generation,
+            self.session_id.as_deref().expect("最终历史已关联原生会话"),
+            &turn_id,
+        );
         #[cfg(test)]
         if let Some(histories) = &self.verified_final_histories_for_live {
             histories.lock().expect("原生最终回放锁未被破坏").insert(
@@ -4729,6 +4767,50 @@ impl GrokProtocol {
     }
 }
 
+/// 图片只从当前应用数据目录的持久附件还原，路径本身不作为图片发送。
+fn encode_prompt_content(
+    input: Vec<InputContent>,
+    attachment_store: &Path,
+) -> Result<Vec<Value>, String> {
+    let mut content = Vec::new();
+    let mut image_count = 0;
+    let mut bytes = 0usize;
+    for part in input {
+        let block = match part {
+            InputContent::Text(text) => json!({"type":"text", "text":text}),
+            InputContent::LocalImage(path) => {
+                image_count += 1;
+                if image_count > MAX_IMAGE_COUNT_FOR_QUERY {
+                    return Err(crate::t!(
+                        "editor-images-disabled-query-limit",
+                        limit = MAX_IMAGE_COUNT_FOR_QUERY
+                    ));
+                }
+                let image = restore_managed_images(vec![path], attachment_store)?
+                    .pop()
+                    .expect("单张图片还原完整返回");
+                if image.mime_type != "image/png" {
+                    return Err(crate::t!("cli-agent-grok-image-format-unverified"));
+                }
+                json!({"type":"image", "mimeType":image.mime_type, "data":image.data})
+            }
+            InputContent::Skill { .. } => return Err(skills::unavailable()),
+        };
+        bytes = bytes.saturating_add(
+            serde_json::to_vec(&block)
+                .map_err(|_| crate::t!("cli-agent-runtime-data-too-large"))?
+                .len()
+                + 1,
+        );
+        // 为 JSON-RPC 外层及身份保留空间，避免多附件突破原生单帧上限。
+        if bytes > MAX_LINE_BYTES - 64 * 1024 {
+            return Err(crate::t!("cli-agent-runtime-data-too-large"));
+        }
+        content.push(block);
+    }
+    Ok(content)
+}
+
 /// 持久化文本会合并并复用最后一个分片 ID，因此以完整回放和同回合终态核对，不重放增量分片。
 fn verified_final_snapshot(
     result: &Value,
@@ -5458,6 +5540,10 @@ fn validate_current_command_catalog(
 mod tests;
 
 #[cfg(test)]
+#[path = "grok_image_tests.rs"]
+mod image_tests;
+
+#[cfg(test)]
 #[path = "grok_live_tests.rs"]
 mod live_tests;
 
@@ -5499,3 +5585,7 @@ mod catalog_preflight_live_tests;
 #[cfg(all(test, any(target_os = "macos", target_os = "linux", windows)))]
 #[path = "grok_supervised_exit_live_tests.rs"]
 mod supervised_exit_live_tests;
+
+#[cfg(test)]
+#[path = "grok_managed_image_live_tests.rs"]
+mod managed_image_live_tests;

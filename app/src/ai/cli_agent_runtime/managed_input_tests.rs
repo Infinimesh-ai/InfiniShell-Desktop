@@ -115,16 +115,14 @@ fn corrupt_existing_attachment_is_reported_without_overwrite_or_partial_input() 
     let mut damaged = fs::read(path).unwrap();
     damaged[0] ^= 0xff;
     fs::write(path, &damaged).unwrap();
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            "保留草稿".to_owned(),
-            &[image],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        "保留草稿".to_owned(),
+        &[image],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     assert_eq!(fs::read(path).unwrap(), damaged);
     assert_eq!(fs::read_dir(store).unwrap().count(), 1);
 }
@@ -136,43 +134,37 @@ fn invalid_image_batch_fails_before_creating_assets() {
     let valid = image_context();
     let mut invalid = valid.clone();
     invalid.data = "无效 base64".to_owned();
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            "全部保留".to_owned(),
-            &[valid.clone(), invalid],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        "全部保留".to_owned(),
+        &[valid.clone(), invalid],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
     let mut wrong_mime = valid.clone();
     wrong_mime.mime_type = "image/jpeg".to_owned();
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            String::new(),
-            &[wrong_mime],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[wrong_mime],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     let mut truncated = valid;
     let mut bytes = STANDARD.decode(&truncated.data).unwrap();
     bytes.truncate(30);
     truncated.data = STANDARD.encode(bytes);
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            String::new(),
-            &[truncated],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[truncated],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
 }
 
@@ -181,38 +173,32 @@ fn unsupported_cli_and_missing_skills_do_not_silently_remove_content() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let image = image_context();
-    assert!(
-        prepare_managed_input(
-            Harness::Grok,
-            "Grok gate".to_owned(),
-            &[image.clone()],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
     let skill = skill(directory.path());
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "多个技能".to_owned(),
-            &[],
-            vec![skill.clone(), skill.clone()],
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Grok,
+        "图片与技能".to_owned(),
+        &[image.clone()],
+        vec![skill.clone()],
+        &store
+    )
+    .is_err());
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        "多个技能".to_owned(),
+        &[],
+        vec![skill.clone(), skill.clone()],
+        &store
+    )
+    .is_err());
     fs::remove_file(directory.path().join("SKILL.md")).unwrap();
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            "缺失技能".to_owned(),
-            &[image],
-            vec![skill],
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        "缺失技能".to_owned(),
+        &[image],
+        vec![skill],
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
 }
 
@@ -245,69 +231,238 @@ fn claude_png_preparation_preserves_multiline_context_and_durable_asset() {
     );
 }
 
+fn claude_image_format_round_trip(format: ImageFormat, declared_mime: &str, expected_mime: &str) {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let mut encoded = Cursor::new(Vec::new());
+    image::DynamicImage::new_rgb8(2, 2)
+        .write_to(&mut encoded, format)
+        .unwrap();
+    let original = ImageContext {
+        data: STANDARD.encode(encoded.into_inner()),
+        mime_type: declared_mime.to_owned(),
+        file_name: "忽略用户文件名.png".to_owned(),
+        is_figma: false,
+    };
+    let input = prepare_managed_input(
+        Harness::Claude,
+        String::new(),
+        &[original.clone()],
+        Vec::new(),
+        &store,
+    )
+    .unwrap();
+    assert_eq!(input.len(), 1);
+    let path = local_image(&input).to_owned();
+    let persisted = serde_json::to_string(&super::super::RuntimeAction::Submit { input }).unwrap();
+    let restored_action = serde_json::from_str::<super::super::RuntimeAction>(&persisted).unwrap();
+    let super::super::RuntimeAction::Submit { input } = restored_action else {
+        panic!("恢复的输入必须仍为提交操作");
+    };
+    assert_eq!(local_image(&input), path);
+    let restored = restore_claude_managed_images(vec![path], &store).unwrap();
+    assert_eq!(restored[0].data, original.data);
+    assert_eq!(restored[0].mime_type, expected_mime);
+    assert_eq!(fs::read_dir(store).unwrap().count(), 1);
+}
+
 #[test]
-fn claude_unsupported_image_batches_fail_before_creating_assets() {
+fn claude_pure_png_survives_persistent_input_restore() {
+    claude_image_format_round_trip(ImageFormat::Png, "image/png", "image/png");
+}
+
+#[test]
+fn claude_jpeg_survives_persistent_input_restore() {
+    claude_image_format_round_trip(ImageFormat::Jpeg, "image/jpeg", "image/jpeg");
+}
+
+#[test]
+fn claude_jpg_alias_is_restored_as_canonical_jpeg() {
+    claude_image_format_round_trip(ImageFormat::Jpeg, "image/jpg", "image/jpeg");
+}
+
+#[test]
+fn claude_webp_survives_persistent_input_restore() {
+    claude_image_format_round_trip(ImageFormat::WebP, "image/webp", "image/webp");
+}
+
+#[test]
+fn claude_gif_survives_persistent_input_restore() {
+    claude_image_format_round_trip(ImageFormat::Gif, "image/gif", "image/gif");
+}
+
+fn gif_bytes(frame_count: usize) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    {
+        let mut encoder = image::codecs::gif::GifEncoder::new(&mut bytes);
+        for index in 0..frame_count {
+            let color = if index == 0 {
+                image::Rgba([255, 0, 0, 255])
+            } else {
+                image::Rgba([0, 0, 255, 255])
+            };
+            encoder
+                .encode_frame(image::Frame::new(image::RgbaImage::from_pixel(2, 2, color)))
+                .unwrap();
+        }
+    }
+    bytes
+}
+
+fn rejected_gif_cannot_be_prepared_or_restored(bytes: &[u8], expected_error: &str) {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let image = ImageContext {
+        data: STANDARD.encode(bytes),
+        mime_type: "image/gif".into(),
+        file_name: "图片.gif".into(),
+        is_figma: false,
+    };
+    assert_eq!(
+        prepare_managed_input(Harness::Claude, String::new(), &[image], Vec::new(), &store)
+            .unwrap_err(),
+        expected_error
+    );
+    assert!(!store.exists());
+    fs::create_dir(&store).unwrap();
+    let digest = Sha256::digest(bytes);
+    let path = store.join(format!("{digest:x}.gif"));
+    // 模拟升级前已经持久化的引用；恢复不能凭正确 hash 跳过静态帧验证。
+    fs::write(&path, bytes).unwrap();
+    assert_eq!(
+        restore_claude_managed_images(vec![path], &store)
+            .err()
+            .as_deref(),
+        Some(expected_error)
+    );
+}
+
+#[test]
+fn static_gif_checks_the_complete_single_frame_without_changing_bytes() {
+    let bytes = gif_bytes(1);
+    let image = ImageContext {
+        data: STANDARD.encode(&bytes),
+        mime_type: "image/gif".into(),
+        file_name: "静态.gif".into(),
+        is_figma: false,
+    };
+    assert_eq!(validate_image(&image).unwrap().bytes, bytes);
+    validate_static_gif(&bytes).unwrap();
+}
+
+#[test]
+fn animated_gif_is_rejected_before_persistence_and_during_restore() {
+    rejected_gif_cannot_be_prepared_or_restored(
+        &gif_bytes(2),
+        &crate::t!("cli-agent-claude-animated-gif-unverified"),
+    );
+}
+
+#[test]
+fn claude_static_gif_boundary_does_not_change_codex_managed_input() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let bytes = gif_bytes(2);
+    let image = ImageContext {
+        data: STANDARD.encode(&bytes),
+        mime_type: "image/gif".into(),
+        file_name: "动画.gif".into(),
+        is_figma: false,
+    };
+    let input = prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[image.clone()],
+        Vec::new(),
+        &store,
+    )
+    .unwrap();
+    let restored = restore_managed_images(vec![local_image(&input).to_owned()], &store).unwrap();
+    assert_eq!(restored[0].data, image.data);
+}
+
+#[test]
+fn damaged_second_gif_frame_is_rejected_even_when_first_frame_decodes() {
+    let single = gif_bytes(1);
+    let mut broken = gif_bytes(2);
+    assert_eq!(&broken[..single.len() - 1], &single[..single.len() - 1]);
+    // 保留完整首帧并截断第二帧扩展；首帧解码成功不能掩盖后续损坏。
+    broken.truncate(single.len() - 1 + 5);
+    ImageReader::with_format(Cursor::new(&broken), ImageFormat::Gif)
+        .decode()
+        .unwrap();
+    let mut frames = GifDecoder::new(Cursor::new(&broken)).unwrap().into_frames();
+    assert!(frames.next().unwrap().is_ok());
+    assert!(frames.next().unwrap().is_err());
+    rejected_gif_cannot_be_prepared_or_restored(&broken, &invalid_image());
+}
+
+#[test]
+fn claude_invalid_image_batches_fail_before_creating_assets() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let original = image_context();
-    let mut jpeg_bytes = Cursor::new(Vec::new());
-    image::DynamicImage::new_rgb8(2, 2)
-        .write_to(&mut jpeg_bytes, ImageFormat::Jpeg)
-        .unwrap();
-    let mut jpeg = original.clone();
-    jpeg.data = STANDARD.encode(jpeg_bytes.into_inner());
-    jpeg.mime_type = "image/jpeg".into();
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "保留全部图片".into(),
-            &[original.clone(), jpeg],
-            Vec::new(),
-            &store,
-        )
-        .is_err()
-    );
-    assert!(!store.exists());
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "说明".into(),
-            &[original.clone()],
-            vec![skill(directory.path())],
-            &store,
-        )
-        .is_err()
-    );
-    assert!(!store.exists());
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            " \n\t".into(),
-            &[original.clone()],
-            Vec::new(),
-            &store,
-        )
-        .is_err()
-    );
+    let mut mismatched = original.clone();
+    mismatched.mime_type = "image/jpeg".into();
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        String::new(),
+        &[original.clone(), mismatched],
+        Vec::new(),
+        &store,
+    )
+    .is_err());
     assert!(!store.exists());
     let mut damaged = original.clone();
     damaged.data = "破损base64".into();
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "保留全部图片".into(),
-            &[original, damaged],
-            Vec::new(),
-            &store,
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        "保留全部图片".into(),
+        &[original, damaged],
+        Vec::new(),
+        &store,
+    )
+    .is_err());
+    assert!(!store.exists());
+}
+
+#[test]
+fn claude_picture_and_single_skill_keep_both_typed_parts() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let selected = skill(directory.path());
+    let input = prepare_managed_input(
+        Harness::Claude,
+        String::new(),
+        &[image_context()],
+        vec![selected],
+        &store,
+    )
+    .unwrap();
+    assert_eq!(input.len(), 2);
+    assert!(matches!(&input[0], InputContent::LocalImage(_)));
+    assert!(matches!(&input[1], InputContent::Skill { name, .. } if name == "local-review"));
+}
+
+#[test]
+fn claude_image_skill_instruction_is_counted_before_persisting_assets() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let selected = skill(directory.path());
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        "x".repeat(1024 * 1024),
+        &[image_context()],
+        vec![selected],
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
 }
 
 #[test]
 fn claude_total_frame_and_text_limits_fail_before_persisting_assets() {
-    use rand::{RngCore, SeedableRng, rngs::StdRng};
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
@@ -326,27 +481,23 @@ fn claude_total_frame_and_text_limits_fail_before_persisting_assets() {
         file_name: "两张合格图片.png".into(),
         is_figma: false,
     };
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "总帧预算".into(),
-            &[image.clone(), image],
-            Vec::new(),
-            &store,
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        "总帧预算".into(),
+        &[image.clone(), image],
+        Vec::new(),
+        &store,
+    )
+    .is_err());
     assert!(!store.exists());
-    assert!(
-        prepare_managed_input(
-            Harness::Claude,
-            "中".repeat(1024 * 1024 / 3 + 1),
-            &[image_context()],
-            Vec::new(),
-            &store,
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Claude,
+        "中".repeat(1024 * 1024 / 3 + 1),
+        &[image_context()],
+        Vec::new(),
+        &store,
+    )
+    .is_err());
     assert!(!store.exists());
     let prepared = prepare_managed_input(
         Harness::Claude,
@@ -365,16 +516,14 @@ fn managed_images_reuse_editor_size_count_and_pixel_limits() {
     let store = directory.path().join("local-cli-attachments");
     let mut oversized = image_context();
     oversized.data = "A".repeat(MAX_IMAGE_SIZE_BYTES.div_ceil(3) * 4 + 1);
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            String::new(),
-            &[oversized],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[oversized],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     let too_many = vec![image_context(); MAX_IMAGE_COUNT_FOR_QUERY + 1];
     assert!(
         prepare_managed_input(Harness::Codex, String::new(), &too_many, Vec::new(), &store)
@@ -386,16 +535,14 @@ fn managed_images_reuse_editor_size_count_and_pixel_limits() {
         .unwrap();
     let mut too_many_pixels = image_context();
     too_many_pixels.data = STANDARD.encode(bytes.into_inner());
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            String::new(),
-            &[too_many_pixels],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[too_many_pixels],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
 }
 
@@ -452,16 +599,14 @@ fn managed_attachment_symlink_cannot_redirect_or_modify_existing_assets() {
     fs::write(&target, &original).unwrap();
     fs::remove_file(path).unwrap();
     std::os::unix::fs::symlink(&target, path).unwrap();
-    assert!(
-        prepare_managed_input(
-            Harness::Codex,
-            String::new(),
-            &[image_context()],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Codex,
+        String::new(),
+        &[image_context()],
+        Vec::new(),
+        &store
+    )
+    .is_err());
     assert_eq!(fs::read(target).unwrap(), original);
 }
 
@@ -562,17 +707,15 @@ fn restoring_images_rejects_symlink_assets_and_store() {
     fs::rename(&saved, &path).unwrap();
     let store_link = directory.path().join("store-link");
     std::os::unix::fs::symlink(&store, &store_link).unwrap();
-    assert!(
-        restore_managed_images(
-            vec![store_link.join(path.file_name().unwrap())],
-            &store_link
-        )
-        .is_err()
-    );
+    assert!(restore_managed_images(
+        vec![store_link.join(path.file_name().unwrap())],
+        &store_link
+    )
+    .is_err());
 }
 
 #[test]
-fn grok_preserves_text_and_selected_skill_but_rejects_images_before_writing() {
+fn grok_preserves_text_and_selected_skill_but_rejects_image_skill_mix_before_writing() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let text = "中文与 English\n文件上下文：note.txt\n评审意见：保留末尾换行";
@@ -598,15 +741,13 @@ fn grok_preserves_text_and_selected_skill_but_rejects_images_before_writing() {
         ]
     );
     assert!(!store.exists());
-    assert!(
-        prepare_managed_input(
-            Harness::Grok,
-            text.into(),
-            &[image_context()],
-            Vec::new(),
-            &store
-        )
-        .is_err()
-    );
+    assert!(prepare_managed_input(
+        Harness::Grok,
+        text.into(),
+        &[image_context()],
+        vec![skill(directory.path())],
+        &store
+    )
+    .is_err());
     assert!(!store.exists());
 }

@@ -1147,3 +1147,6 @@ fn native_notification_authorization_opens_manual_steps_without_writing_to_cli()
 
 #[path = "input_approval_guard_tests.rs"]
 mod input_approval_guard_tests;
+
+#[path = "file_submission_tests.rs"]
+mod file_submission_tests;

@@ -5,18 +5,19 @@ use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 
 use ai::skills::ParsedSkill;
-use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use image::{ImageFormat, ImageReader, Limits};
+use base64::Engine;
+use image::codecs::gif::GifDecoder;
+use image::{AnimationDecoder, ImageDecoder, ImageFormat, ImageReader, Limits};
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 use warp_cli::agent::Harness;
 
-use super::InputContent;
 use super::local_skills::prepare_local_cli_skill_inputs;
+use super::InputContent;
 use crate::ai::agent::ImageContext;
 use crate::util::image::{
-    MAX_IMAGE_COUNT_FOR_QUERY, MAX_IMAGE_PIXELS, MAX_IMAGE_SIZE_BYTES, is_supported_image_mime_type,
+    is_supported_image_mime_type, MAX_IMAGE_COUNT_FOR_QUERY, MAX_IMAGE_PIXELS, MAX_IMAGE_SIZE_BYTES,
 };
 
 /// 调用方传入已由现有文件、选区和评审 builder 生成的文本，不在这里重写上下文语法。
@@ -34,23 +35,14 @@ pub(crate) fn prepare_managed_input(
             return Err(crate::t!("cli-agent-managed-version-unavailable"));
         }
     }
-    if harness == Harness::Grok && !images.is_empty() {
+    if harness == Harness::Grok && !images.is_empty() && !skills.is_empty() {
         return Err(crate::t!(
             "cli-agent-input-images-unverified",
             cli = harness.display_name()
         ));
     }
-    if harness == Harness::Claude && !images.is_empty() {
-        // 当前原生校准仅覆盖 PNG 与文本，不把其他格式或技能混用计作可用能力。
-        if images.iter().any(|image| image.mime_type != "image/png") {
-            return Err(crate::t!("cli-agent-claude-png-only"));
-        }
-        if !skills.is_empty() {
-            return Err(crate::t!("cli-agent-claude-image-skill-unverified"));
-        }
-        if text.trim().is_empty() {
-            return Err(crate::t!("cli-task-manager-empty-prompt"));
-        }
+    if harness == Harness::Grok && images.iter().any(|image| image.mime_type != "image/png") {
+        return Err(crate::t!("cli-agent-grok-image-format-unverified"));
     }
     if images.len() > MAX_IMAGE_COUNT_FOR_QUERY {
         return Err(crate::t!(
@@ -64,7 +56,12 @@ pub(crate) fn prepare_managed_input(
         .map(validate_image)
         .collect::<Result<Vec<_>, _>>()?;
     if harness == Harness::Claude && !images.is_empty() {
-        super::claude::verify_prepared_png_budget(&text, images)?;
+        for image in &validated_images {
+            if image.format == ImageFormat::Gif {
+                validate_static_gif(&image.bytes)?;
+            }
+        }
+        super::claude::verify_prepared_image_budget(&text, images, &skill_inputs)?;
     }
     if text.is_empty() && images.is_empty() && skill_inputs.is_empty() {
         return Err(crate::t!("cli-task-manager-empty-prompt"));
@@ -176,14 +173,47 @@ fn validate_image(image: &ImageContext) -> Result<ValidatedImage, String> {
     if width == 0 || height == 0 || pixels > MAX_IMAGE_PIXELS as u64 {
         return Err(crate::t!("editor-image-too-large"));
     }
-    let mut reader = ImageReader::with_format(Cursor::new(&bytes), format);
     let mut limits = Limits::default();
     limits.max_image_width = Some(width);
     limits.max_image_height = Some(height);
     limits.max_alloc = Some(MAX_IMAGE_PIXELS as u64 * 16);
+    let mut reader = ImageReader::with_format(Cursor::new(&bytes), format);
     reader.limits(limits);
     reader.decode().map_err(|_| invalid_image())?;
     Ok(ValidatedImage { bytes, format })
+}
+
+/// Claude 的静态 GIF 范围也约束历史引用；不改变其他 CLI 的既有格式校验。
+pub(super) fn restore_claude_managed_images(
+    paths: Vec<PathBuf>,
+    attachment_store: &Path,
+) -> Result<Vec<ImageContext>, String> {
+    let images = restore_managed_images(paths, attachment_store)?;
+    for image in &images {
+        if image.mime_type == "image/gif" {
+            let bytes = STANDARD.decode(&image.data).map_err(|_| invalid_image())?;
+            validate_static_gif(&bytes)?;
+        }
+    }
+    Ok(images)
+}
+
+fn validate_static_gif(bytes: &[u8]) -> Result<(), String> {
+    let mut decoder = GifDecoder::new(Cursor::new(bytes)).map_err(|_| invalid_image())?;
+    let mut limits = Limits::default();
+    limits.max_alloc = Some(MAX_IMAGE_PIXELS as u64 * 16);
+    decoder.set_limits(limits).map_err(|_| invalid_image())?;
+    let mut frames = decoder.into_frames();
+    // 通用校验已限制字节和像素；这里只检查两帧，不能把仅解码首帧当作静态 GIF 校验。
+    frames
+        .next()
+        .ok_or_else(invalid_image)?
+        .map_err(|_| invalid_image())?;
+    match frames.next() {
+        None => Ok(()),
+        Some(Ok(_)) => Err(crate::t!("cli-agent-claude-animated-gif-unverified")),
+        Some(Err(_)) => Err(invalid_image()),
+    }
 }
 
 fn prepare_attachment_store(directory: &Path) -> std::io::Result<()> {

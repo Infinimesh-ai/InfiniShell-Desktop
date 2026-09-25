@@ -19,6 +19,7 @@ use crate::terminal::cli_agent_sessions::{
     CLIAgentInputEntrypoint, CLIAgentSessionStatus, CLIAgentSessionsModel,
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
+mod file_attachments;
 mod warpify_footer;
 
 use crate::editor::EditorBufferRevision;
@@ -684,18 +685,18 @@ impl TerminalView {
             .into_iter()
             .cloned()
             .collect();
-        if text.trim().is_empty() && images.is_empty() {
+        let files: Vec<_> = self
+            .ai_context_model
+            .as_ref(ctx)
+            .pending_files()
+            .into_iter()
+            .cloned()
+            .collect();
+        if text.trim().is_empty() && images.is_empty() && files.is_empty() {
             return;
         }
         if self.input.as_ref(ctx).cli_input_is_processing_images() {
             self.show_error_toast(crate::t!("cli-agent-input-images-processing"), ctx);
-            return;
-        }
-        if !self.ai_context_model.as_ref(ctx).pending_files().is_empty() {
-            self.show_error_toast(
-                crate::t!("cli-agent-input-file-attachment-unavailable"),
-                ctx,
-            );
             return;
         }
         let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
@@ -710,6 +711,22 @@ impl TerminalView {
         };
         if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
             return;
+        }
+        if !files.is_empty() {
+            let session = CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .expect("输入代际属于当前 CLI 会话");
+            if session.remote_host.is_some() {
+                self.show_error_toast(crate::t!("cli-agent-input-remote-file-unavailable"), ctx);
+                return;
+            }
+            if !matches!(agent, CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok) {
+                self.show_error_toast(
+                    crate::t!("cli-agent-input-file-attachment-unavailable"),
+                    ctx,
+                );
+                return;
+            }
         }
         if !images.is_empty() && self.cli_agent_image_paste_bytes(ctx).is_none() {
             return;
@@ -731,14 +748,39 @@ impl TerminalView {
                 .as_ref(ctx)
                 .pending_attachments_revision(),
         });
-        self.paste_images_then_submit_text(
-            images,
-            text.into_bytes(),
-            rich_input_submit_strategy(agent),
-            generation,
-            Some(snapshot),
-            ctx,
-        );
+        if files.is_empty() {
+            self.paste_images_then_submit_text(
+                images,
+                text.into_bytes(),
+                rich_input_submit_strategy(agent),
+                generation,
+                Some(snapshot),
+                ctx,
+            );
+        } else {
+            ctx.spawn(
+                file_attachments::prepare_file_attachments(text, files),
+                move |me, result, ctx| match result {
+                    Ok(text) => {
+                        let snapshot = Rc::new(CliInputSubmission {
+                            agent,
+                            query: text.clone(),
+                            editor_revision: snapshot.editor_revision.clone(),
+                            attachments_revision: snapshot.attachments_revision,
+                        });
+                        me.paste_images_then_submit_text(
+                            images,
+                            text.into_bytes(),
+                            rich_input_submit_strategy(agent),
+                            generation,
+                            Some(snapshot),
+                            ctx,
+                        );
+                    }
+                    Err(message) => me.fail_cli_agent_text_submit(generation, message, ctx),
+                },
+            );
+        }
     }
 
     /// Submits `text` as a prompt to the active CLI agent on this terminal by
@@ -1170,7 +1212,8 @@ impl TerminalView {
         let message = if matches!(session.status, CLIAgentSessionStatus::Blocked { .. }) {
             crate::t!("cli-agent-input-waiting-for-native-response")
         } else if session.agent == CLIAgent::Grok {
-            // Grok 1.0.30 hooks 没有可靠的审批开始或输入就绪事件，不能猜测可排队。
+            // Grok 1.0.41 可通知审批开始，但尚无已验证的输入就绪确认。
+            // 其审批界面的默认选项可能永久放行工具，不能据 Stop 猜测 Enter 安全。
             crate::t!("cli-agent-grok-input-manual-copy-required")
         } else {
             return false;
@@ -1262,7 +1305,7 @@ impl TerminalView {
         });
         if attachments_unchanged {
             self.ai_context_model.update(ctx, |model, ctx| {
-                model.clear_pending_images(ctx);
+                model.clear_pending_attachments(ctx);
             });
         }
         let draft = self.input.as_ref(ctx).buffer_text(ctx);
