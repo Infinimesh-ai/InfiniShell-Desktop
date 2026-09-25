@@ -185,10 +185,15 @@ def verify_case_files(root, case, inputs):
     require(digest(receipt_path) == case["exit_receipt_sha256"] and digest(manifest_path) == case["manifest_sha256"], "persisted_receipt_digest_changed")
     require(json.loads(receipt_path.read_bytes()) == case["exit_receipt"], "persisted_receipt_changed")
     manifest = json.loads(manifest_path.read_bytes())
+    # Windows 普通路径与扩展路径可能同指一个对象；目录和二进制必须实际存在且身份相同。
+    try:
+        executable_matches = Path(manifest["executable"]).samefile(inputs["grok"]["path"])
+        home_matches = Path(manifest["isolated_home"]).samefile(
+            root / case["scenario"] / "state/grok-managed" / case["generation"])
+    except OSError as error:
+        raise ValueError("persisted_manifest_binding_changed") from error
     require(manifest["generation"] == case["generation"] and manifest["launch_allowed"] is True
-            and Path(manifest["executable"]).resolve() == Path(inputs["grok"]["path"]).resolve()
-            and Path(manifest["isolated_home"]).resolve()
-            == (root / case["scenario"] / "state/grok-managed" / case["generation"]).resolve(), "persisted_manifest_binding_changed")
+            and executable_matches and home_matches, "persisted_manifest_binding_changed")
 
 
 def read_events(path, allow_partial=False):
@@ -232,6 +237,15 @@ def panic_locations(output):
             if item not in result:
                 result.append(item)
     return result[:4]
+
+
+def pidfd_open_os_errors(output):
+    # 仅导出已知身份夹具的数值错误码，不发布原始错误文本、路径或进程信息。
+    if not any(item["path"] == "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs"
+               for item in panic_locations(output)):
+        return []
+    codes = re.findall(r"(?m)^pidfd_open 失败：[^\r\n]{0,256}\(os error ([0-9]{1,5})\)\r?$", output)
+    return sorted({int(code) for code in codes if 0 < int(code) <= 4095})[:4]
 
 
 def safe_progress(events, target, manifest_digest):
@@ -330,7 +344,9 @@ def run(args):
     report.update(test_exit_code=exit_code, timed_out=timed_out)
     if log_path.exists():
         if log_path.stat().st_size <= MAX_LOG_BYTES:
-            report["panic_locations"] = panic_locations(log_path.read_text(encoding="utf-8", errors="replace"))
+            output = log_path.read_text(encoding="utf-8", errors="replace")
+            report["panic_locations"] = panic_locations(output)
+            report["pidfd_open_os_errors"] = pidfd_open_os_errors(output)
         log_path.chmod(0o600)
         report["raw_log"] = {"sha256": digest(log_path), "bytes": log_path.stat().st_size, "content_published": False}
     events = private / "events.private.ndjson"

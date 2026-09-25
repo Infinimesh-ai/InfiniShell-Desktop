@@ -120,6 +120,7 @@ fn own_child(system: &mut System, parent: u32, executable: &Path, arguments: &[O
         ProcessesToUpdate::Some(&candidates),
         true,
         ProcessRefreshKind::nothing()
+            .without_tasks()
             .with_exe(UpdateKind::Always)
             .with_cmd(UpdateKind::Always),
     );
@@ -147,7 +148,12 @@ fn native_processes(
     leader: bool,
 ) -> Vec<identity::BoundProcess> {
     let mut system = System::new();
-    system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+    // Linux 默认也枚举线程；pidfd 绑定真实进程，不把同映像的线程当作后代进程。
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::All,
+        true,
+        ProcessRefreshKind::nothing().without_tasks(),
+    );
     let worker_args = [
         OsString::from("cli-agent-supervisor"),
         manifest.as_os_str().to_owned(),
@@ -209,7 +215,9 @@ fn native_processes(
     system.refresh_processes_specifics(
         ProcessesToUpdate::Some(&[Pid::from_u32(native_root)]),
         true,
-        ProcessRefreshKind::nothing().with_cmd(UpdateKind::Always),
+        ProcessRefreshKind::nothing()
+            .without_tasks()
+            .with_cmd(UpdateKind::Always),
     );
     assert_eq!(
         &system.process(Pid::from_u32(native_root)).unwrap().cmd()[1..],
@@ -250,13 +258,16 @@ fn native_processes(
     system.refresh_processes_specifics(
         ProcessesToUpdate::Some(&candidates),
         true,
-        ProcessRefreshKind::nothing().with_exe(UpdateKind::Always),
+        ProcessRefreshKind::nothing()
+            .without_tasks()
+            .with_exe(UpdateKind::Always),
     );
     let native: Vec<_> = candidates
         .iter()
         .filter(|pid| {
             system
                 .process(**pid)
+                .filter(|process| process.thread_kind().is_none())
                 .and_then(|process| process.exe())
                 .and_then(|path| path.canonicalize().ok())
                 .is_some_and(|path| path == executable)
@@ -591,23 +602,26 @@ fn real_grok_1041_supervised_exit_without_credentials() {
     let path = PathBuf::from(std::env::var_os(MANIFEST_ENV).expect("请通过专用运行器提供隔离输入"));
     assert!(path.is_absolute());
     let bytes = fs::read(&path).unwrap();
-    let inputs: Inputs = serde_json::from_slice(&bytes).unwrap();
+    let mut inputs: Inputs = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(inputs.schema, 1);
     assert_eq!(inputs.cli_version, "1.0.41");
     assert_eq!(inputs.source_commit.len(), 40);
     assert_eq!(inputs.source_tree.len(), 40);
     assert_eq!(fs::read(inputs.root.join(MARKER)).unwrap(), MARKER_BYTES);
-    assert_eq!(inputs.grok.path, verify_binary(&inputs.grok));
+    // 先核验输入文件，再统一路径表示；Windows 原路径与规范化路径可以指向同一文件。
+    inputs.grok.path = verify_binary(&inputs.grok);
+    inputs.test_binary.path = verify_binary(&inputs.test_binary);
+    inputs.supervisor.path = verify_binary(&inputs.supervisor);
     assert_eq!(
         std::env::current_exe().unwrap().canonicalize().unwrap(),
-        verify_binary(&inputs.test_binary)
+        inputs.test_binary.path
     );
     assert_eq!(
         managed_process::supervisor_executable()
             .unwrap()
             .canonicalize()
             .unwrap(),
-        verify_binary(&inputs.supervisor)
+        inputs.supervisor.path
     );
     let mut events = OpenOptions::new()
         .write(true)

@@ -45,6 +45,21 @@ def transcript(target="win32-x64"):
 
 
 class ReceiptTests(unittest.TestCase):
+    def test_pidfd_failure_exports_only_bounded_numeric_diagnostic(self):
+        output = ("thread 'test' panicked at app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs:31:13:\n"
+                  "pidfd_open 失败：PRIVATE_CANARY (os error 3)\n"
+                  "pidfd_open 失败：duplicate (os error 3)\n"
+                  "pidfd_open 失败：invalid (os error 99999)\n")
+        self.assertEqual(runner.pidfd_open_os_errors(output), [3])
+        self.assertNotIn("PRIVATE_CANARY", json.dumps(runner.pidfd_open_os_errors(output)))
+
+    def test_unrelated_output_does_not_claim_pidfd_failure(self):
+        for output in ("pidfd_open 失败：unknown (os error 3)\n",
+                       "thread 'test' panicked at /private/unknown.rs:31:13:\npidfd_open 失败：unknown (os error 3)\n",
+                       "thread 'test' panicked at app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs:31:13:\nother (os error 3)\n"):
+            with self.subTest(output=output):
+                self.assertEqual(runner.pidfd_open_os_errors(output), [])
+
     def test_four_shapes_use_platform_native_cleanup(self):
         for target in runner.CONTAINMENT:
             with self.subTest(target=target):
@@ -155,6 +170,7 @@ class ReceiptTests(unittest.TestCase):
             executable.write_bytes(b"offline fixture")
             manifest = {"generation": value["generation"], "launch_allowed": True, "executable": str(executable),
                         "isolated_home": str(root / value["scenario"] / "state/grok-managed" / value["generation"])}
+            Path(manifest["isolated_home"]).mkdir(parents=True)
             runner.write_private(directory / "manifest.json", manifest)
             value["manifest_sha256"] = runner.digest(directory / "manifest.json")
             value["exit_receipt"]["manifest_sha256"] = value["manifest_sha256"]
@@ -164,12 +180,41 @@ class ReceiptTests(unittest.TestCase):
             runner.verify_case_files(root, value, inputs)
             # 摘要有效也不能接受旧的状态域外隔离布局。
             manifest["isolated_home"] = str(root / value["scenario"] / "isolated")
+            Path(manifest["isolated_home"]).mkdir()
             (directory / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
             value["manifest_sha256"] = runner.digest(directory / "manifest.json")
             with self.assertRaisesRegex(ValueError, "persisted_manifest_binding_changed"):
                 runner.verify_case_files(root, value, inputs)
             (directory / "manifest.json").write_bytes(b"{}")
             with self.assertRaises(ValueError):
+                runner.verify_case_files(root, value, inputs)
+
+    def test_manifest_accepts_same_file_alias_but_rejects_identical_copy_and_missing_object(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            value = case(runner.SCENARIOS[0])
+            directory = root / value["scenario"] / "state/cli-agent-processes" / value["generation"]
+            directory.mkdir(parents=True)
+            home = root / value["scenario"] / "state/grok-managed" / value["generation"]
+            home.mkdir(parents=True)
+            executable, alias = root / "grok.exe", root / "grok-alias.exe"
+            executable.write_bytes(b"offline same identity")
+            alias.hardlink_to(executable)
+            manifest = {"generation": value["generation"], "launch_allowed": True,
+                        "executable": str(alias), "isolated_home": str(home)}
+            runner.write_private(directory / "manifest.json", manifest)
+            value["manifest_sha256"] = runner.digest(directory / "manifest.json")
+            value["exit_receipt"]["manifest_sha256"] = value["manifest_sha256"]
+            runner.write_private(directory / "exit.json", value["exit_receipt"])
+            value["exit_receipt_sha256"] = runner.digest(directory / "exit.json")
+            inputs = {"grok": {"path": str(executable)}}
+            runner.verify_case_files(root, value, inputs)
+            alias.unlink()
+            alias.write_bytes(executable.read_bytes())
+            with self.assertRaisesRegex(ValueError, "persisted_manifest_binding_changed"):
+                runner.verify_case_files(root, value, inputs)
+            alias.unlink()
+            with self.assertRaisesRegex(ValueError, "persisted_manifest_binding_changed"):
                 runner.verify_case_files(root, value, inputs)
 
     def test_minimal_environment_drops_credentials_and_proxy(self):
@@ -201,6 +246,7 @@ class ReceiptTests(unittest.TestCase):
                 manifest = {"generation": value["generation"], "launch_allowed": True,
                             "executable": inputs["grok"]["path"],
                             "isolated_home": str(private / value["scenario"] / "state/grok-managed" / value["generation"])}
+                Path(manifest["isolated_home"]).mkdir(parents=True)
                 runner.write_private(directory / "manifest.json", manifest)
                 value["manifest_sha256"] = runner.digest(directory / "manifest.json")
                 value["exit_receipt"]["manifest_sha256"] = value["manifest_sha256"]
