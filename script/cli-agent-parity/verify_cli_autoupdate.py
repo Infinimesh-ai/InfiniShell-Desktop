@@ -49,6 +49,7 @@ BINDINGS = ("old_binary", "target_binary", "worker", "supervisor", "source_manif
 REQUIRED_SOURCE_FILES = ("app/src/terminal/cli_agent_updates.rs",
     "app/src/terminal/cli_agent_updates/sources.rs",
     "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+    "app/src/terminal/cli_agent_updates/sources_npm.rs",
     "app/src/ai/cli_agent_runtime/managed_process.rs",
     "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
     "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",

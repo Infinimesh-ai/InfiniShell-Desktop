@@ -28,14 +28,18 @@ use crate::terminal::cli_agent::{CLIAgent, parse_cli_agent_version};
 #[cfg(test)]
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 
+#[path = "sources_npm.rs"]
+mod npm;
+
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 17] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 18] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
+    include_bytes!("sources_npm.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
@@ -1094,7 +1098,7 @@ async fn discover(
             _ => return Err(Error::UnsupportedSource),
         }
     }
-    if let Some(npm) = discover_npm(agent, &installation, requested).await? {
+    if let Some(npm) = discover_npm(agent, &installation, installed, requested).await? {
         return Ok(npm);
     }
     if cfg!(target_os = "macos")
@@ -1225,12 +1229,11 @@ fn validate_grok_check(bytes: &[u8], installed: &str) -> Result<Channel, Error> 
 async fn discover_npm(
     agent: CLIAgent,
     installation: &Installation,
+    installed: &str,
     requested: Channel,
 ) -> Result<Option<Installation>, Error> {
-    let package = match agent {
-        CLIAgent::Codex => "@openai/codex",
-        CLIAgent::Claude => "@anthropic-ai/claude-code",
-        _ => return Ok(None),
+    let Some(package) = npm::package_name(agent) else {
+        return Ok(None);
     };
     let Some(node) = path_program(if cfg!(windows) { "node.exe" } else { "node" }) else {
         return Ok(None);
@@ -1244,6 +1247,10 @@ async fn discover_npm(
     let Some(npm_cli) = npm_cli.filter(|path| path.is_file()) else {
         return Ok(None);
     };
+    // 包清单必须声明当前 npm 入口；同名脚本不能充当管理器注册证明。
+    if !npm::registered_manager(&npm_cli)? {
+        return Ok(None);
+    }
     let prefix_bytes = match run(
         &Invocation::new(
             &node,
@@ -1268,52 +1275,21 @@ async fn discover_npm(
     if !prefix.is_absolute() {
         return Ok(None);
     }
-    let package_root = if cfg!(windows) {
-        prefix.join("node_modules")
-    } else {
-        prefix.join("lib/node_modules")
-    }
-    .join(package);
-    let manifest = package_root.join("package.json");
-    if !manifest.is_file() {
-        return Ok(None);
-    }
-    let manifest_bytes = read_limited(&manifest, MAX_CONFIG)?;
-    let value: Value = serde_json::from_slice(&manifest_bytes).map_err(|_| Error::ProbeFailed)?;
-    if value.get("name").and_then(Value::as_str) != Some(package) {
-        return Ok(None);
-    }
-    let bin = value.get("bin").and_then(|bin| {
-        bin.as_str()
-            .or_else(|| bin.get(agent.command_prefix()).and_then(Value::as_str))
-    });
-    let Some(bin) = bin else {
+    let Some(registration) = npm::registered_installation(
+        agent,
+        installation,
+        installed,
+        &prefix,
+        cfg!(windows),
+    )? else {
         return Ok(None);
     };
-    let bin_path = package_root.join(bin);
-    if !same_tree(
-        &bin_path
-            .canonicalize()
-            .map_err(|_| Error::UnsupportedSource)?,
-        &package_root,
-    ) {
-        return Ok(None);
-    }
-    // 不把名称相同的自定义 shim 或另一个 Node 前缀误判成此 npm 安装。
-    if bin_path.canonicalize().ok().as_ref() != Some(&installation.stamp.canonical) {
-        return Ok(None);
-    }
     let mut found = installation.clone();
     found.source = Source::Npm;
     found.channel = match requested {
         Channel::Stable | Channel::Alpha | Channel::Latest => requested,
         Channel::FollowInstallation => {
-            if agent == CLIAgent::Codex
-                && value
-                    .get("version")
-                    .and_then(Value::as_str)
-                    .is_some_and(|version| version.contains("-alpha"))
-            {
+            if agent == CLIAgent::Codex && installed.contains("-alpha") {
                 Channel::Alpha
             } else {
                 Channel::Latest
@@ -1326,16 +1302,16 @@ async fn discover_npm(
     let npm_cli = npm_identity.canonical.clone();
     found.manager = Some(node_identity);
     found.helper = Some(npm_identity);
-    found.registration = Some((manifest.clone(), stamp(&manifest)?));
+    found.registration = Some((registration.manifest.clone(), registration.stamp));
     found.invocation = Some(BoundInvocation::manual_only(
         [
             (ArtifactRole::Program, node.clone()),
             (ArtifactRole::Entry, installation.entry.clone()),
             (ArtifactRole::Manager, node),
             (ArtifactRole::Helper, npm_cli),
-            (ArtifactRole::Registration, manifest.clone()),
-            (ArtifactRole::InstallRoot, prefix),
-            (ArtifactRole::DependencyRoot, package_root),
+            (ArtifactRole::Registration, registration.manifest),
+            (ArtifactRole::InstallRoot, registration.prefix),
+            (ArtifactRole::DependencyRoot, registration.package_root),
         ],
         ArtifactRole::Program,
         vec![

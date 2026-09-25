@@ -30,7 +30,7 @@ use crate::terminal::cli_agent::CLIAgent;
 const SCOPE: &str = "cli_autoupdate_native_product";
 const MARKER: &str = "InfiniShell private updater fixture; no credentials or model inputs\n";
 const MAX_MANIFEST: usize = 64 * 1024;
-const COMPILED_SOURCE_FILES: [(&str, &[u8]); 9] = [
+const COMPILED_SOURCE_FILES: [(&str, &[u8]); 10] = [
     (
         "app/src/terminal/cli_agent_updates.rs",
         include_bytes!("../cli_agent_updates.rs"),
@@ -42,6 +42,10 @@ const COMPILED_SOURCE_FILES: [(&str, &[u8]); 9] = [
     (
         "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
         include_bytes!("sources_live_tests.rs"),
+    ),
+    (
+        "app/src/terminal/cli_agent_updates/sources_npm.rs",
+        include_bytes!("sources_npm.rs"),
     ),
     (
         "app/src/ai/cli_agent_runtime/managed_process.rs",
