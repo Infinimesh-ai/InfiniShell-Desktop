@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn infinishell_desktop_entry_enables_ime_and_macos_managed_tasks() {
+fn infinishell_desktop_entry_enables_ime_and_managed_tasks_on_all_desktop_platforms() {
     let app_manifest: toml::Value =
         toml::from_str(include_str!("../Cargo.toml")).expect("app/Cargo.toml 应为有效 TOML");
     assert_eq!(
@@ -24,10 +24,10 @@ fn infinishell_desktop_entry_enables_ime_and_macos_managed_tasks() {
     );
 
     let source = include_str!("bin/infinishell.rs");
-    let enable_call = "state.with_additional_features(&[FeatureFlag::ImeMarkedText])";
+    let enable_call = "state.with_additional_features(warp::features::INFINISHELL_DESKTOP_FLAGS)";
     let enable_offset = source
         .find(enable_call)
-        .expect("InfiniShell 桌面入口应显式启用 IME marked-text");
+        .expect("InfiniShell 桌面入口应使用共用桌面默认配置");
     let cfg_offset = source[..enable_offset]
         .rfind("#[cfg(any(")
         .expect("IME marked-text 应由桌面平台 cfg 约束");
@@ -39,15 +39,8 @@ fn infinishell_desktop_entry_enables_ime_and_macos_managed_tasks() {
             "InfiniShell 桌面入口应在 {target} 启用 IME marked-text"
         );
     }
-    let managed_enable_call =
-        "state.with_additional_features(&[FeatureFlag::LocalCLIManagedTasks])";
-    let managed_offset = source
-        .find(managed_enable_call)
-        .expect("macOS 正式 GUI 入口应启用本地 CLI 托管任务");
-    let managed_cfg_offset = source[..managed_offset]
-        .rfind("#[cfg(target_os = \"macos\")]")
-        .expect("托管任务正式入口应限制在完成适配的 macOS 桌面");
-    assert!(managed_cfg_offset > enable_offset);
+    assert!(INFINISHELL_DESKTOP_FLAGS.contains(&FeatureFlag::ImeMarkedText));
+    assert!(INFINISHELL_DESKTOP_FLAGS.contains(&FeatureFlag::LocalCLIManagedTasks));
 }
 
 #[test]

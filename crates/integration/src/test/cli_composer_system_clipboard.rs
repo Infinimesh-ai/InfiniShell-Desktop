@@ -1,6 +1,5 @@
 //! Linux/Windows 真实窗口与系统剪贴板的零模型验收。
 
-use warp::features::FeatureFlag;
 use warp::i18n;
 use warp::integration_testing::clipboard::{
     assert_cli_clipboard_draft, finish_cli_clipboard_evidence, open_cli_clipboard_composer,
@@ -12,7 +11,6 @@ use warpui_core::integration::TestStep;
 use crate::Builder;
 
 pub fn test_cli_composer_system_clipboard_multiline_and_image() -> Builder {
-    FeatureFlag::LocalCLIManagedTasks.set_enabled(true);
     i18n::init(Some("en"));
 
     Builder::new()

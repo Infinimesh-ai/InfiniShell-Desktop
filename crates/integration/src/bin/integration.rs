@@ -24,7 +24,8 @@ pub struct Args {
 }
 
 pub fn main() -> Result<()> {
-    ChannelState::set(ChannelState::new(
+    let args = Args::parse();
+    let mut state = ChannelState::new(
         Channel::Integration,
         ChannelConfig {
             app_id: AppId::new(
@@ -40,9 +41,14 @@ pub fn main() -> Result<()> {
             autoupdate_config: None,
             mcp_static_config: None,
         },
-    ));
-
-    let args = Args::parse();
+    );
+    if args.integration_test_name.as_deref()
+        == Some("test_cli_composer_system_clipboard_multiline_and_image")
+    {
+        // 使用正式桌面入口的默认配置，不能由用例单独强开托管功能。
+        state = state.with_additional_features(warp::features::INFINISHELL_DESKTOP_FLAGS);
+    }
+    ChannelState::set(state);
 
     if let Some(command) = &args.command {
         match command {

@@ -26,6 +26,7 @@ use warpui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
 use super::LocalCLITaskManagerView;
 #[cfg(target_os = "linux")]
 use crate::appearance::Appearance;
+use crate::features::FeatureFlag;
 use crate::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use crate::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
 use crate::terminal::History;
@@ -149,6 +150,10 @@ fn composer(app: &App, window_id: WindowId) -> ViewHandle<LocalCLITaskManagerVie
 pub fn open_cli_clipboard_composer() -> TestStep {
     TestStep::new("打开真实托管输入框，不启动任务")
         .with_action(|app, window_id, _| {
+            assert!(
+                FeatureFlag::LocalCLIManagedTasks.is_enabled(),
+                "正式桌面默认配置必须已启用托管任务"
+            );
             let workspace = workspace_view(app, window_id);
             app.dispatch_typed_action(
                 window_id,
@@ -418,7 +423,9 @@ pub fn finish_cli_clipboard_evidence() -> TestStep {
                 "test": CLI_CLIPBOARD_TEST_NAME,
                 "platform": std::env::consts::OS,
                 "source_commit": std::env::var("WARP_TEST_GUI_SOURCE_COMMIT").unwrap(),
-                "managed_feature_enabled_for_test": true,
+                "desktop_default_features_applied": true,
+                "managed_feature_test_override": false,
+                "managed_feature_enabled": FeatureFlag::LocalCLIManagedTasks.is_enabled(),
                 "binary_sha256": format!("{:x}", executable_hash.finalize()),
                 "system_clipboard": true,
                 "text_exact": true,

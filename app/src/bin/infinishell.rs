@@ -61,13 +61,8 @@ fn main() -> Result<()> {
     // 可见 —— 对日文 / 中文 / 韩文输入都属于实质性损坏。
     #[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
     {
-        use warp_core::features::FeatureFlag;
-        state = state.with_additional_features(&[FeatureFlag::ImeMarkedText]);
-        // 托管任务先由 macOS 桌面入口交付，共用库及 TUI 保持独立开关。
-        #[cfg(target_os = "macos")]
-        {
-            state = state.with_additional_features(&[FeatureFlag::LocalCLIManagedTasks]);
-        }
+        // 三款 CLI 共用托管入口，具体操作仍由各版本、协议与权限策略决定。
+        state = state.with_additional_features(warp::features::INFINISHELL_DESKTOP_FLAGS);
     }
     ChannelState::set(state);
 

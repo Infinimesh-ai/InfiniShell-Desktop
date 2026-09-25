@@ -3,6 +3,12 @@ use std::collections::HashSet;
 use warp_core::channel::ChannelState;
 pub use warp_core::features::*;
 
+/// InfiniShell 三平台桌面的默认功能；共用库与 TUI 不自动使用此配置。
+pub const INFINISHELL_DESKTOP_FLAGS: &[FeatureFlag] = &[
+    FeatureFlag::ImeMarkedText,
+    FeatureFlag::LocalCLIManagedTasks,
+];
+
 /// Mark all features which should be enabled on the current channel as enabled.
 /// This sets global feature flag state and should never be called in a unit test.
 pub fn init_feature_flags() {
