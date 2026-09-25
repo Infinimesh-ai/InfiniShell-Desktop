@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""无凭据验证固定 Grok 的 ACP 边界；不提交模型输入，不自动认证或修改已有配置。"""
+"""无凭据验证固定 Grok ACP 与自持清理；五秒 EOF 单独记录，不冒充产品监督退出。"""
 
 import argparse
 import json
@@ -19,7 +19,7 @@ sys.dont_write_bytecode = True
 from prepare_grok_cli import (LEGACY_VERSION, P0_VERSION, VERSION, VERSION_RELEASES, digest,
                               isolated_environment, regular_file, require,
                               verify_binary, verify_version)
-from probe_claude_no_credentials import Recorder, repository_identity
+from probe_claude_no_credentials import EOF_TIMEOUT, Recorder, repository_identity
 
 
 REQUEST_TIMEOUT = 20
@@ -263,6 +263,24 @@ def wait_idle_exit(recorder):
             "elapsed_ms": round((time.monotonic() - started) * 1000)}
 
 
+def validate_stdio_completion(eof, cleanup):
+    # 原生五秒 EOF 是观测能力，不是应用的监督清理合同；迟到的自然退出不能改记为五秒通过。
+    require(eof.get("alive_before_stdin_eof") is True
+            and type(eof.get("stdin_eof_exited_within_5s")) is bool,
+            "stdio 缺少真实 EOF 观测")
+    timely = eof["stdin_eof_exited_within_5s"]
+    initial_exit = eof.get("exit_code_before_cleanup")
+    require((timely and type(initial_exit) is int and initial_exit == 0)
+            or (not timely and initial_exit is None), "stdio EOF 快照与原生退出状态不一致")
+    require(cleanup.get("forced_termination") is False
+            and cleanup.get("owned_process_exited") is True
+            and type(cleanup.get("exit_code")) is int and cleanup["exit_code"] == 0
+            and "error" not in cleanup, "stdio 没有在自持清理前自然正常退出")
+    return {"observation_timeout_seconds": EOF_TIMEOUT,
+            "exited_within_observation": timely, "delayed_natural_exit": not timely,
+            "natural_exit_before_owned_cleanup": True, "product_supervisor_verified": False}
+
+
 def run(executable, root, report, version=VERSION):
     env = isolated_environment(root)
     report.update(repository_identity(env))
@@ -323,9 +341,8 @@ def run(executable, root, report, version=VERSION):
     validate_transcript(client.records, expected, version)
     require(all(item.get("owned_process_exited") and "error" not in item for item in cleanup.values()),
             "自持原生进程或输出读取线程未完整清理")
-    require(report["stdio_eof"]["stdin_eof_exited_within_5s"] and
-            report["stdio_eof"]["exit_code_before_cleanup"] == 0 and not cleanup["stdio"]["forced_termination"],
-            "stdio 未在 EOF 后自行正常退出")
+    # 保持既有两次观察的时限，不新增等待；产品退出另由真实监督器四场景门禁核对。
+    report["native_stdio_eof_observation"] = validate_stdio_completion(report["stdio_eof"], cleanup["stdio"])
     require(not report["leader_after_stdio_eof"]["exited_within_5s"] or
             report["leader_after_stdio_eof"]["exit_code_before_cleanup"] == 0,
             "leader 在收尾前异常退出")
@@ -350,6 +367,7 @@ def main():
     require(not output.is_relative_to(Path(__file__).resolve().parents[2]), "证据必须位于源树外")
     output.parent.mkdir(parents=True, exist_ok=True)
     report = {"passed": False, "scope": "unauthenticated_fixed_acp_boundaries", "cases": [],
+              "acceptance_contract": "fixed_acp_owned_cleanup_with_native_eof_observation",
               "credentials_provided": False, "authenticate_sent": False, "model_input_submitted": False,
               "running_approval_verified": False, "running_cancel_verified": False, "history_recovery_verified": False,
               "model_http_traffic_measured": False, "requested_cli_version": args.version}

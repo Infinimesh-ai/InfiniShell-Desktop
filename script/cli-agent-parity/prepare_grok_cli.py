@@ -61,6 +61,8 @@ VERSION_RELEASES = {
                       "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"),
         "win32-x64": ("grok-1.0.41-windows-x86_64.exe", "grok.exe", 154082120,
                       "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25"),
+        "darwin-arm64": ("grok-1.0.41-macos-aarch64", "grok", 145657952,
+                         "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"),
     },
 }
 RELEASES = VERSION_RELEASES[VERSION]

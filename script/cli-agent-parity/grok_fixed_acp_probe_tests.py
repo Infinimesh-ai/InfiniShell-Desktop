@@ -47,6 +47,52 @@ def transcript(version=probe.VERSION):
 
 
 class GrokFixedAcpTests(unittest.TestCase):
+    def test_delayed_natural_stdio_exit_preserves_failed_five_second_observation(self):
+        eof = {"alive_before_stdin_eof": True, "stdin_eof_exited_within_5s": False,
+               "exit_code_before_cleanup": None, "eof_elapsed_ms": 5005}
+        cleanup = {"forced_termination": False, "owned_process_exited": True, "exit_code": 0}
+        original = copy.deepcopy(eof)
+        result = probe.validate_stdio_completion(eof, cleanup)
+        self.assertEqual(eof, original)
+        self.assertFalse(result["exited_within_observation"])
+        self.assertTrue(result["delayed_natural_exit"])
+        self.assertTrue(result["natural_exit_before_owned_cleanup"])
+        self.assertFalse(result["product_supervisor_verified"])
+        self.assertEqual(result["observation_timeout_seconds"], 5)
+
+    def test_timely_stdio_exit_is_separate_from_delayed_observation(self):
+        eof = {"alive_before_stdin_eof": True, "stdin_eof_exited_within_5s": True,
+               "exit_code_before_cleanup": 0}
+        result = probe.validate_stdio_completion(eof, {
+            "forced_termination": False, "owned_process_exited": True, "exit_code": 0})
+        self.assertTrue(result["exited_within_observation"])
+        self.assertFalse(result["delayed_natural_exit"])
+
+    def test_forced_failed_or_unconfirmed_stdio_cleanup_cannot_pass_as_natural_exit(self):
+        eof = {"alive_before_stdin_eof": True, "stdin_eof_exited_within_5s": False,
+               "exit_code_before_cleanup": None}
+        valid = {"forced_termination": False, "owned_process_exited": True, "exit_code": 0}
+        for patch in ({"forced_termination": True}, {"owned_process_exited": False},
+                      {"exit_code": None}, {"exit_code": 1}, {"exit_code": False},
+                      {"error": "输出读取线程未退出"}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                probe.validate_stdio_completion(eof, valid | patch)
+        for key in valid:
+            missing = valid.copy()
+            del missing[key]
+            with self.subTest(missing=key), self.assertRaises(ValueError):
+                probe.validate_stdio_completion(eof, missing)
+
+    def test_inconsistent_eof_snapshot_is_rejected(self):
+        valid = {"alive_before_stdin_eof": True, "stdin_eof_exited_within_5s": False,
+                 "exit_code_before_cleanup": None}
+        cleanup = {"forced_termination": False, "owned_process_exited": True, "exit_code": 0}
+        for patch in ({"alive_before_stdin_eof": False}, {"stdin_eof_exited_within_5s": None},
+                      {"stdin_eof_exited_within_5s": True}, {"exit_code_before_cleanup": 0},
+                      {"stdin_eof_exited_within_5s": True, "exit_code_before_cleanup": 1}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                probe.validate_stdio_completion(valid | patch, cleanup)
+
     def test_requests_have_distinct_ids_and_no_authentication_or_model_input(self):
         first = probe.requests(Path("中文 project"), "first")
         second = probe.requests(Path("中文 project"), "second")

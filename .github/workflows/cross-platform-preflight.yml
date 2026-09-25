@@ -196,6 +196,7 @@ jobs:
           python3 -B script/cli-agent-parity/claude_windows_notifications_tests.py -v
           python3 -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
           python3 -B script/cli-agent-parity/grok_fixed_acp_probe_tests.py -v
+          python3 -B script/cli-agent-parity/run_grok_supervised_exit_tests.py -v
           python3 -B script/cli-agent-parity/probe_claude_no_credentials_tests.py -v
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
@@ -426,6 +427,16 @@ jobs:
           python3 -B script/cli-agent-parity/run_codex_adapter_live.py --test-case missing-session --test-binary "$test_binary" --codex "$INFINISHELL_TEST_CODEX_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/codex-missing-session.ndjson"
           python3 -B script/cli-agent-parity/run_codex_adapter_live.py --test-case idle-crash --test-binary "$test_binary" --codex "$INFINISHELL_TEST_CODEX_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/codex-idle-crash.ndjson"
 
+      - name: Verify fixed Grok production supervised cleanup without credentials
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
+          python3 -B script/cli-agent-parity/run_grok_supervised_exit.py --test-binary "$test_binary" --grok "$INFINISHELL_TEST_GROK_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/grok-supervised-exit.json"
+
       - name: Preserve Linux native CLI boundary evidence
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -441,6 +452,7 @@ jobs:
             ${{ runner.temp }}/claude-21280-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
+            ${{ runner.temp }}/grok-supervised-exit.json
           if-no-files-found: error
           retention-days: 14
 
@@ -809,6 +821,7 @@ jobs:
             'claude_windows_notifications_tests.py',
             'prepare_grok_cli_tests.py',
             'grok_fixed_acp_probe_tests.py',
+            'run_grok_supervised_exit_tests.py',
             'probe_claude_no_credentials_tests.py',
             'probe_claude_permission_snapshot_tests.py'
           )
@@ -1306,6 +1319,24 @@ jobs:
           python -B script/cli-agent-parity/run_codex_adapter_live.py --test-case missing-session --test-binary $executables[0] --codex $shim --supervisor $worker --output "$env:RUNNER_TEMP\codex-missing-session-cmd.ndjson"
           if ($LASTEXITCODE -ne 0) { throw 'Native cmd shim missing-session recovery validation failed' }
 
+      - name: Verify fixed Grok production supervised cleanup without credentials
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 15
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cargo metadata failed' }
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp test build failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one warp libtest executable' }
+          $worker = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          python -B script/cli-agent-parity/run_grok_supervised_exit.py --test-binary $executables[0] --grok "$env:INFINISHELL_TEST_GROK_EXE" --supervisor $worker --output "$env:RUNNER_TEMP\grok-supervised-exit.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok production supervised cleanup failed' }
+
       - name: Preserve Windows native CLI boundary evidence
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -1321,6 +1352,7 @@ jobs:
             ${{ runner.temp }}/claude-21280-inputs/claude-fixed-inputs.json
             ${{ runner.temp }}/grok-cli-fixed/grok-fixed-inputs.json
             ${{ runner.temp }}/grok-fixed-acp.json
+            ${{ runner.temp }}/grok-supervised-exit.json
           if-no-files-found: error
           retention-days: 14
 

@@ -5495,3 +5495,7 @@ mod selected_skill_live_tests;
 #[cfg(test)]
 #[path = "grok_catalog_preflight_live_tests.rs"]
 mod catalog_preflight_live_tests;
+
+#[cfg(all(test, any(target_os = "macos", target_os = "linux", windows)))]
+#[path = "grok_supervised_exit_live_tests.rs"]
+mod supervised_exit_live_tests;
