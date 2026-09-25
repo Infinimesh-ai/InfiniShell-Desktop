@@ -1,0 +1,7 @@
+{
+  "timestamp": "2026-09-25T06:54:43.240923+00:00",
+  "bundle_processes": [],
+  "all_exited": true,
+  "method": "native_quit_menu_after_shortcut_did_not_exit",
+  "forced_termination": false
+}

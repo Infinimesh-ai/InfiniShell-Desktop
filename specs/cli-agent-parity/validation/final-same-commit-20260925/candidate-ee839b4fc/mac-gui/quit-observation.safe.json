@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "checked_at": "2026-09-25T07:11:10.832761+00:00",
+  "accepted_english_launch_pid": 15207,
+  "pids_seen_after_quit_shortcut_and_followup_ui_observation": [
+    15578,
+    15582
+  ],
+  "pids_after_native_quit_menu": [],
+  "current_bundle_pids": [],
+  "all_test_bundle_processes_exited": true,
+  "forced_termination": false,
+  "clarification": "退出快捷键与后续 CUA 状态读取后观察到的 PID 已不同于受测启动 PID；CUA 可自动启动选中的应用，不能据此断言产品快捷键退出失败。quit.safe.json 的 method 字段仅记录当时操作顺序，此记录澄清其归因边界。最终使用原生退出菜单后，两次只读进程检查确认测试 bundle 无存活进程。",
+  "screenshots_taken_before_quit": true
+}

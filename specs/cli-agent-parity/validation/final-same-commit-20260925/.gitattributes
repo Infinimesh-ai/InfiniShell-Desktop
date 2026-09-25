@@ -1,0 +1,2 @@
+# 验收产物保留原字节，并将 Windows CRLF 识别为合法行尾。
+* -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

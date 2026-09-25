@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "source_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "run_id": 36113156742,
+  "job_id": 108001010372,
+  "job_conclusion": "failure",
+  "files": [
+    {
+      "file": "artifact-index.safe.json",
+      "sha256": "a3fe8ac252f023e10627532b345087fef5a69da6975d1b8ab8d3aaa24f28b9e8",
+      "bytes": 3601
+    },
+    {
+      "file": "failure-diagnosis.safe.json",
+      "sha256": "4b535478238a49a29f03122511ddff5f61cb8ac58669f594d7e264041ca1c873",
+      "bytes": 2441
+    },
+    {
+      "file": "grok-supervised-exit.json",
+      "sha256": "f3a86ea248da13ad4f8f1eb5dcf10fe3fe661fc28fb02a193573b09b1c03123c",
+      "bytes": 5661
+    },
+    {
+      "file": "grok-supervised-verification.safe.json",
+      "sha256": "38de8783400f2b4582cc17275d7944e8eb4b4efd9f7331426b2cbc97fb4a02e1",
+      "bytes": 3492
+    },
+    {
+      "file": "job-summary.safe.json",
+      "sha256": "fae8c7af12c105370a6c12f45531a8e255ee32e7cd04f549ddf4455b3b0476d8",
+      "bytes": 14423
+    },
+    {
+      "file": "native-boundaries.safe.json",
+      "sha256": "0ab2d6105f970f982493c65c5433e137987264d252aab7f7253e2161bb666336",
+      "bytes": 8183
+    },
+    {
+      "file": "source-comparison.safe.json",
+      "sha256": "01b556b849d0c379d77712db5db319315c65097d15a6172391213a98d1883257",
+      "bytes": 2184
+    }
+  ],
+  "original_four_case_report_preserved": true,
+  "raw_logs_and_private_manifests_copied": false,
+  "credentials_accessed": false,
+  "ci_rerun_triggered": false,
+  "scope": "原生专项；历史失败证据不改写，原 ee839 完整门禁继续使用原提交身份。",
+  "completed_grok_cases": 0,
+  "requested_grok_cases": 4,
+  "failure_diagnosis_preserves_uncertain_errno": true
+}

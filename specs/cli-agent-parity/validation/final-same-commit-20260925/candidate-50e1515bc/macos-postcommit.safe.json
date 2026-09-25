@@ -1,0 +1,27 @@
+{
+  "commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "passed": true,
+  "seconds": 62.15,
+  "exit_code": 0,
+  "precommit_binaries_reused": true,
+  "compiled_rust_source_matches_commit": true,
+  "source_dirty": false,
+  "precommit_check_receipt_sha256": "600b1fe61bb2694ecc39df242b054d00f9646a23b5245271840c2d0269591ce6",
+  "cargo_check_rerun_postcommit": false,
+  "external_build_volume_unavailable_at_postcommit": true,
+  "raw_log_sha256": "5d2bf7d5bf2dddd4238dba83c2f9adb4ae3d960dad6bd59b49922175ed0087b4",
+  "internal_inputs": {
+    "test_binary": {
+      "source": "/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop/debug/deps/warp-dc3b923e2a89fdeb",
+      "copy": "/Users/zhishi/.isp-final-w5gpyd6w/grok-platform-fixtures-z0c0pqwr/warp-tests",
+      "sha256": "bd49c322507825f74486a237812f015adce08aed7c99e6fad6017bc8481ebfb6",
+      "bytes": 884247624
+    },
+    "supervisor": {
+      "source": "/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop/debug/infinishell-tui",
+      "copy": "/Users/zhishi/.isp-final-w5gpyd6w/grok-platform-fixtures-z0c0pqwr/infinishell-tui",
+      "sha256": "670c91e9d11aaf5bbba7faf43e66bd830b4ff611cc7f2af6222ef24910935827",
+      "bytes": 804780032
+    }
+  }
+}

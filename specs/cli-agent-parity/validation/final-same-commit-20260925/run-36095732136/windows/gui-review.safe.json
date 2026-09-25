@@ -1,0 +1,92 @@
+{
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "run_id": 36095732136,
+  "platform": "windows-x64",
+  "receipt_sha256": "b96a0ca8d6177eb1a2527664dc76d87fceac44d5da41a876400f6ef7f9518aa7",
+  "renderer_receipt_sha256": "4d14ef0744cf4acef2dd96d02a566d047cfcb1768804f353102767bb4735886a",
+  "receipt": {
+    "attachment_count": 1,
+    "binary_sha256": "3a95aaae614d7265f741f456daebbae6a9f29576b3e99dc2adff68bd882d836a",
+    "desktop_default_features_applied": true,
+    "image_pixels_exact": true,
+    "managed_feature_enabled": true,
+    "managed_feature_test_override": false,
+    "managed_tasks_created": 0,
+    "model_inputs": 0,
+    "physical_ime_exercised": false,
+    "platform": "windows",
+    "schema": 1,
+    "screenshots": [
+      {
+        "file": "chinese-multiline.png",
+        "height": 800,
+        "sha256": "1093178a387174cc5fea8b93121261bb805510c06bcffd7348c107a223f9bf11",
+        "width": 1280
+      },
+      {
+        "file": "pasted-image.png",
+        "height": 800,
+        "sha256": "e595fc19ba1ae8baf1a015f34166edecf34b8c9e8f53c8bc7445bdee92597025",
+        "width": 1280
+      }
+    ],
+    "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "system_clipboard": true,
+    "test": "test_cli_composer_system_clipboard_multiline_and_image",
+    "text_exact": true,
+    "visual_review_required": true
+  },
+  "renderer": {
+    "schema": 1,
+    "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "outcome": "passed",
+    "renderer": [
+      "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+    ],
+    "exit_code": 0,
+    "mesa_version": "26.2.1",
+    "mesa_archive_url": "https://github.com/pal1000/mesa-dist-win/releases/download/26.2.1/mesa3d-26.2.1-release-msvc.7z",
+    "mesa_archive_sha256": "78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf",
+    "copied_runtime_files": [
+      {
+        "sha256": "3a95aaae614d7265f741f456daebbae6a9f29576b3e99dc2adff68bd882d836a",
+        "name": "integration.exe"
+      },
+      {
+        "sha256": "1668fc38fef8d97f8e6002ca71d0e80d629c43b3c25f1f2417ec6bddb51405cd",
+        "name": "conpty.dll"
+      },
+      {
+        "sha256": "75c019e3541980eea8ae661d81998d06f99627e3004c800532475a1c3551c6fb",
+        "name": "dxcompiler.dll"
+      },
+      {
+        "sha256": "18fd73e06fc10e02a01885d8c282264c8f37bd2cf9a735d7700e231e94ea0376",
+        "name": "dxil.dll"
+      },
+      {
+        "sha256": "c41197578992211c3d457e1fb75ad2b474e6ee03a8dc8fda610ed8e7b46301ca",
+        "name": "x64/OpenConsole.exe"
+      }
+    ],
+    "model_inputs": 0,
+    "mesa_dll_sha256": {
+      "libgallium_wgl.dll": "46ca4e92166f1389c8e9024dbeee0e24ccd5c46f9b6e2b048cc6bc476e6474d3",
+      "opengl32.dll": "7a8f7aa1b73099d24ddeca962a7e7360bccdfc234ff79cb557426e2a2ce3d4f6"
+    }
+  },
+  "visual_review": {
+    "original_pngs_opened": true,
+    "ui_language": "en",
+    "chinese_mixed_multiline_text_readable": true,
+    "chinese_glyphs_not_tofu": true,
+    "attachment_chip_visible": true,
+    "grok_selector_visible": true,
+    "reviewed_scroll_position_only": true,
+    "full_dialog_layout_claimed": false,
+    "zh_CN_interface_layout_claimed": false,
+    "physical_ime_verified": false,
+    "all_hardware_gpus_verified": false,
+    "notes": "两张原图分别为中英混合多行剪贴板输入和图片附件标签；界面正文已按测试流程滚动，未作为首屏完整布局或简体中文界面验收。"
+  }
+}

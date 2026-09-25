@@ -1,0 +1,32 @@
+{
+  "attachment_count": 1,
+  "binary_sha256": "3a95aaae614d7265f741f456daebbae6a9f29576b3e99dc2adff68bd882d836a",
+  "desktop_default_features_applied": true,
+  "image_pixels_exact": true,
+  "managed_feature_enabled": true,
+  "managed_feature_test_override": false,
+  "managed_tasks_created": 0,
+  "model_inputs": 0,
+  "physical_ime_exercised": false,
+  "platform": "windows",
+  "schema": 1,
+  "screenshots": [
+    {
+      "file": "chinese-multiline.png",
+      "height": 800,
+      "sha256": "1093178a387174cc5fea8b93121261bb805510c06bcffd7348c107a223f9bf11",
+      "width": 1280
+    },
+    {
+      "file": "pasted-image.png",
+      "height": 800,
+      "sha256": "e595fc19ba1ae8baf1a015f34166edecf34b8c9e8f53c8bc7445bdee92597025",
+      "width": 1280
+    }
+  ],
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "system_clipboard": true,
+  "test": "test_cli_composer_system_clipboard_multiline_and_image",
+  "text_exact": true,
+  "visual_review_required": true
+}

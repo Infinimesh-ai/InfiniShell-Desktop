@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "source_manifest_sha256": "7af85c69964f01e2e5fb91a453865dcb68bb1af909fe4f0b743fa27da7a24dc4",
+  "reconstructed_from_exact_git_objects": true,
+  "matches_all_atomic_receipts": true,
+  "source_files": [
+    {
+      "path": "app/src/terminal/cli_agent_updates.rs",
+      "bytes": 22456,
+      "sha256": "9f5eaf7042b712805b0fc9256b8113c5e8bf1318110b88d2b906c6cd48a8c4a3"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "bytes": 130922,
+      "sha256": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "bytes": 88058,
+      "sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "bytes": 81761,
+      "sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
+      "bytes": 27407,
+      "sha256": "811576baa9a27f25aa7b6467b79f897549b157ef55c1a17e9647bf44aef0d23c"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
+      "bytes": 26682,
+      "sha256": "cd0dd91830539a96ce284b7078cff19da6bb700892f231f4562466c5c4b33efd"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
+      "bytes": 30541,
+      "sha256": "851680295f3efb00653f2745cdbea7f07b763cc35e150647d7b79c7694159956"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+      "bytes": 56888,
+      "sha256": "6e1182096823075d56f0585cc748956db8891266eba53939a3396d0f1a635e9a"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "bytes": 56146,
+      "sha256": "c1006d79998e8d472da8307018801529ecd92a05ee3dbef2ae2848b1074d5144"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "bytes": 113137,
+      "sha256": "d612de9a6ef830a11fffc31bc3cd9092bd3ad87650768973b235bbf3a0c4011d"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "bytes": 226923,
+      "sha256": "cb2deec56ab46f14d7af0b88544bc512e0b5c2bd91a072c3ab8afc1150d5abf4"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/mod.rs",
+      "bytes": 12495,
+      "sha256": "55e99adbe538cfffecf4f8df8939a0177e550b622cd7dfb60e4b0643d5392a75"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex.rs",
+      "bytes": 16888,
+      "sha256": "2df03a050c17e4a208084652bfcbcaad9715e6f564f24baa5293a22dcaefe2c4"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/claude.rs",
+      "bytes": 31383,
+      "sha256": "657e8f03956d277148b84d4a1c50acf4428d3f1dbc6d3bd62cfa5fd380e19a07"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "bytes": 68279,
+      "sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_source.rs",
+      "bytes": 47584,
+      "sha256": "5842b90b359d10f1d10d97d51cf0d126786f0aa06bc8957abca6a06d9b3db7c9"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/codex_hook_trust.rs",
+      "bytes": 5763,
+      "sha256": "db168ba04f009bf42e1bf5445919ab6999e5901e9c2b235dfaec5c309ed6bac7"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/notification_patch.rs",
+      "bytes": 31992,
+      "sha256": "fc9782afe5b18b89693d078f0d8ea8a6a9dcf303fb6387d827de2730eff7c44e"
+    },
+    {
+      "path": "script/cli-agent-parity/verify_cli_autoupdate.py",
+      "bytes": 36525,
+      "sha256": "2a0a3bd97a002b51a3b37eb965f051490c5439def3292e41a13341c498618e6d"
+    }
+  ],
+  "scope": "依据 ee839 的 REQUIRED_SOURCE_FILES 与 encoded 序列化方式，独立重建源清单摘要；不改变原 event 的 same_commit_verified_by_runner=false。"
+}

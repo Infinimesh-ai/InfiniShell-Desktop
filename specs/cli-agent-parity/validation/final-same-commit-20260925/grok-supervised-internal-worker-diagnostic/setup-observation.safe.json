@@ -1,0 +1,124 @@
+{
+  "scope": "grok_1041_setup_sequence_only",
+  "binary": {
+    "platform": "darwin-arm64",
+    "artifact": "grok-1.0.41-macos-aarch64",
+    "binary": "grok",
+    "bytes": 145657952,
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "url": "https://x.ai/cli/grok-1.0.41-macos-aarch64",
+    "format": "mach-o64-arm64"
+  },
+  "credentials_provided": false,
+  "model_commands_sent": 0,
+  "product_supervisor_verified": false,
+  "cases": [
+    {
+      "scenario": "automatic_private_leader",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "setup_session_identity": [
+        "null",
+        "null",
+        "null",
+        "null",
+        "null"
+      ],
+      "responses": [
+        {
+          "method": "initialize",
+          "status": "passed"
+        },
+        {
+          "method": "session/new",
+          "status": "blocked_by_auth"
+        },
+        {
+          "method": "session/load",
+          "status": "missing_session_rejected"
+        },
+        {
+          "method": "session/resume",
+          "status": "missing_session_rejected"
+        }
+      ],
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "messages_sent": 5,
+      "passed": true,
+      "stdin_eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 5
+      },
+      "private_leader_cleanup_command_exit": 0,
+      "stdio_owned_forced_cleanup": false,
+      "stdio_exit_code": 0,
+      "auth_file_absent": true,
+      "private_socket_absent_after_cleanup": false,
+      "private_endpoint_processes_remaining": 0
+    },
+    {
+      "scenario": "no_leader",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "setup_session_identity": [
+        "null",
+        "null",
+        "null",
+        "null",
+        "null",
+        "uuid",
+        "uuid"
+      ],
+      "responses": [
+        {
+          "method": "initialize",
+          "status": "passed"
+        },
+        {
+          "method": "session/new",
+          "status": "blocked_by_auth"
+        },
+        {
+          "method": "session/load",
+          "status": "missing_session_rejected"
+        },
+        {
+          "method": "session/resume",
+          "status": "missing_session_rejected"
+        }
+      ],
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "messages_sent": 5,
+      "passed": true,
+      "stdin_eof": {
+        "alive_before_stdin_eof": true,
+        "stdin_eof_exited_within_5s": true,
+        "exit_code_before_cleanup": 0,
+        "eof_elapsed_ms": 2156
+      },
+      "stdio_owned_forced_cleanup": false,
+      "stdio_exit_code": 0,
+      "auth_file_absent": true,
+      "private_socket_absent_after_cleanup": true,
+      "private_endpoint_processes_remaining": 0
+    }
+  ],
+  "binary_unchanged": true,
+  "passed": true
+}

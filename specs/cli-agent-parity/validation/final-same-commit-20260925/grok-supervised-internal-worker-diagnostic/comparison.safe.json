@@ -1,0 +1,32 @@
+{
+  "purpose": "byte_identical_worker_location_comparison_not_acceptance",
+  "worker_sha256": "670c91e9d11aaf5bbba7faf43e66bd830b4ff611cc7f2af6222ef24910935827",
+  "startup_completed": true,
+  "acp_responses_completed": true,
+  "setup_phases_observed": [
+    "auth",
+    "resolve_workspace",
+    "folder_trust",
+    "plugin_registry",
+    "mcp_merge"
+  ],
+  "failed_assertion": "新测试假设 setup 必定包含预先启动 relay-on-demand leader 时观测到的七阶段。",
+  "failed_assertion_raw_log_sha256": "bfb2b1063fa77b063cd9265a05274b335195fd1819fc971f2a8628fa73f1d349",
+  "four_scenario_acceptance_passed": false,
+  "product_timeout_changed": false,
+  "system_permissions_changed": false,
+  "exit_receipts_after_test_failure": [
+    {
+      "sha256": "976db9af3e505078e0f667d851b5955548158a84c54c0c900de2ad93d1b95a75",
+      "receipt": {
+        "version": 1,
+        "generation": "5dd7decd-0b46-4909-b6ca-8ef4e776d2f7",
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_reason": "stdio_closed",
+        "exit_code": 0,
+        "manifest_sha256": "33e3deced08f0684b0ab03e1207cdf5fc1663d0c059216767b1b613f368e8edd"
+      }
+    }
+  ]
+}

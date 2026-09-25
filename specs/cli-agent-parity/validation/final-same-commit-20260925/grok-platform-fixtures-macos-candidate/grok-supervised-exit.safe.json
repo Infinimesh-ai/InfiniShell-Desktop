@@ -1,0 +1,376 @@
+{
+  "schema": 1,
+  "scope": "grok_1041_production_supervised_exit_zero_model",
+  "source": {
+    "commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+    "tree": "629ebe5b65616fc7436c649e82c630cbe8ea9236",
+    "files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+        "base_git_object": "52a5cf134c3595571620502a36b36b3360123c31",
+        "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok.rs",
+        "base_git_object": "1bbf74b1952085b7ede1ca831c2674cde6c2cd97",
+        "sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+        "base_git_object": "c5ed6f6e3c30ed3a1d903b2ec3a34f1afc13103f",
+        "sha256": "67304b9225d8774059dd9b91625c1615251766083877963f696fea2a6a2865a6"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+        "base_git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470",
+        "sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+        "base_git_object": "cc53272b8632848a6e3cf2c6de85712775ea9a09",
+        "sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0"
+      },
+      {
+        "path": "crates/command/src/managed.rs",
+        "base_git_object": "e8f4632dc80fb49ec53621226d09373e17d0e195",
+        "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+      },
+      {
+        "path": "crates/command/src/managed_macos.rs",
+        "base_git_object": "e7ce0df18c1864e19e7f61115d23c68445c9f398",
+        "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+      },
+      {
+        "path": "script/cli-agent-parity/prepare_grok_cli.py",
+        "base_git_object": "976d0cb32c7e928060c95a46e289ead383fe4db1",
+        "sha256": "0ac553512f9d99f187cb5225a9eb7d72acf308e4f4f78abc938dc0812feab111"
+      },
+      {
+        "path": "script/cli-agent-parity/run_grok_supervised_exit.py",
+        "base_git_object": "f601dff7144cbf796fc5864afaf8751fcbb26fe7",
+        "sha256": "ea72ac83347aa4e48877b3bd52608cee45421e30809470d725762cc180f0ce81"
+      },
+      {
+        "path": "script/cli-agent-parity/run_grok_supervised_exit_tests.py",
+        "base_git_object": "79ce932972a9e3b9744c1ff1b10afd7db5cdf511",
+        "sha256": "f34cd5b66a88bef1a2522066e8772e9744ccf51b4037da1e19b5b69fc5280b2b"
+      }
+    ],
+    "source_dirty": true,
+    "candidate_changed_paths": [
+      "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+      "script/cli-agent-parity/run_grok_supervised_exit.py",
+      "script/cli-agent-parity/run_grok_supervised_exit_tests.py"
+    ],
+    "execution_source_kind": "precommit_candidate",
+    "compiled_source_identity_independently_verified": false,
+    "build_provenance_requirement": "测试二进制和 worker 的同提交或同候选构建须结合本次构建日志；本运行器绑定源码和输入摘要，不从文件路径推断编译来源。"
+  },
+  "cli_version": "1.0.41",
+  "platform": "darwin-arm64",
+  "native_binary": {
+    "platform": "darwin-arm64",
+    "artifact": "grok-1.0.41-macos-aarch64",
+    "binary": "grok",
+    "bytes": 145657952,
+    "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+    "url": "https://x.ai/cli/grok-1.0.41-macos-aarch64",
+    "format": "mach-o64-arm64"
+  },
+  "inputs": {
+    "test_binary": {
+      "sha256": "bd49c322507825f74486a237812f015adce08aed7c99e6fad6017bc8481ebfb6",
+      "bytes": 884247624
+    },
+    "grok": {
+      "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+      "bytes": 145657952
+    },
+    "supervisor": {
+      "sha256": "670c91e9d11aaf5bbba7faf43e66bd830b4ff611cc7f2af6222ef24910935827",
+      "bytes": 804780032
+    }
+  },
+  "inputs_manifest_sha256": "31cc0f6e6b618703a2b9acd48921c04c8076d30cc846587182673b3da141e9ab",
+  "credentials_provided": false,
+  "model_commands_sent": 0,
+  "authentication_commands_sent": 0,
+  "model_http_count_measured": false,
+  "test_name": "ai::cli_agent_runtime::grok::supervised_exit_live_tests::real_grok_1041_supervised_exit_without_credentials",
+  "timeout_seconds": 300,
+  "cases": [
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_code": 0,
+        "exit_reason": "stdio_closed",
+        "generation": "af450fc9-c3fe-499d-9e1b-e501a4010dde",
+        "manifest_sha256": "5ba43d998a3406a4fbd8cbe88d4eee1b0852b5a520c91b87cf14a77ac3b4cc2b",
+        "version": 1
+      },
+      "exit_receipt_sha256": "905a62ae932cf644a501278429ee5fbbbcea5052a1c4a47fb4714f255110790b",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "af450fc9-c3fe-499d-9e1b-e501a4010dde",
+      "inputs_manifest_sha256": "31cc0f6e6b618703a2b9acd48921c04c8076d30cc846587182673b3da141e9ab",
+      "isolated_home": true,
+      "manifest_sha256": "5ba43d998a3406a4fbd8cbe88d4eee1b0852b5a520c91b87cf14a77ac3b4cc2b",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "darwin_audit_token_pidversion",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "private_leader_finish",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_code": 0,
+        "exit_reason": "stdio_closed",
+        "generation": "6f09768f-b335-4745-ae86-3e46f28c407d",
+        "manifest_sha256": "336d9cce787dc79d01280f1ba31df6f0e8ff93f59c48e9c9852467af066c51d4",
+        "version": 1
+      },
+      "exit_receipt_sha256": "ee9af7186c7dbb03272ce7ec26522dfcae88104719138e01a67e22c7a2b3303f",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "6f09768f-b335-4745-ae86-3e46f28c407d",
+      "inputs_manifest_sha256": "31cc0f6e6b618703a2b9acd48921c04c8076d30cc846587182673b3da141e9ab",
+      "isolated_home": true,
+      "manifest_sha256": "336d9cce787dc79d01280f1ba31df6f0e8ff93f59c48e9c9852467af066c51d4",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "darwin_audit_token_pidversion",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "private_leader_stdin_eof",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_code": null,
+        "exit_reason": "stdio_closed",
+        "generation": "0b61a062-488d-4fb6-b6c9-3ea70e93d191",
+        "manifest_sha256": "5b12546d535d3494328c7352181b434a8c61edfa61e18ce0389354cc973d80b2",
+        "version": 1
+      },
+      "exit_receipt_sha256": "fa77171e5fe884308b77a2237983507bf853a78c26579ec2da23a2d912ee35f7",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "0b61a062-488d-4fb6-b6c9-3ea70e93d191",
+      "inputs_manifest_sha256": "31cc0f6e6b618703a2b9acd48921c04c8076d30cc846587182673b3da141e9ab",
+      "isolated_home": true,
+      "manifest_sha256": "5b12546d535d3494328c7352181b434a8c61edfa61e18ce0389354cc973d80b2",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "darwin_audit_token_pidversion",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "no_leader_finish",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "macos_resource_coalition",
+        "exit_code": null,
+        "exit_reason": "stdio_closed",
+        "generation": "3dd74c44-e312-4a62-8e6a-4d1737a22678",
+        "manifest_sha256": "c8f392b5b6d9c851e0f56f1a1fe04e4f4d4f2d5ed149d8aa128086aa5293239f",
+        "version": 1
+      },
+      "exit_receipt_sha256": "8fa892eff4fd49b989a2ecbc009fd419087a0f11ec1049aa8688173d89ed2232",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "3dd74c44-e312-4a62-8e6a-4d1737a22678",
+      "inputs_manifest_sha256": "31cc0f6e6b618703a2b9acd48921c04c8076d30cc846587182673b3da141e9ab",
+      "isolated_home": true,
+      "manifest_sha256": "c8f392b5b6d9c851e0f56f1a1fe04e4f4d4f2d5ed149d8aa128086aa5293239f",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "darwin_audit_token_pidversion",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "no_leader_stdin_eof",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "stdout_eof_confirmed": true
+    }
+  ],
+  "started_scenarios": [
+    "private_leader_finish",
+    "private_leader_stdin_eof",
+    "no_leader_finish",
+    "no_leader_stdin_eof"
+  ],
+  "passed": true,
+  "limitations": [
+    "只证明真实 Grok ACP 进程经生产监督器的显式结束及 EOF 清理；不宣称完整 GrokAdapter 生命周期或用户 Stop 操作。",
+    "--no-leader 只覆盖进程/stdio 拓扑，不代表固定权限 profile 的完整验收。",
+    "session/cancel 指向不存在的会话且无响应确认；不宣称取消了运行中回合。",
+    "零模型结论来自发送消息集合和无凭据配置，不是 HTTP 流量计量。"
+  ],
+  "inputs_unchanged": true,
+  "source_unchanged": true,
+  "cleanup_confirmed": true,
+  "all_observed_native_processes_exited": true,
+  "test_exit_code": 0,
+  "timed_out": false,
+  "panic_locations": [],
+  "pidfd_open_os_errors": [],
+  "raw_log": {
+    "sha256": "ae4e3159765d4a481191fc75f9cf2cb7580462f784b5231f138f9150ddec5a5a",
+    "bytes": 494,
+    "content_published": false
+  },
+  "case_progress": [
+    {
+      "scenario": "private_leader_finish",
+      "stage": "startup"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "acp"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "finish"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "startup"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "acp"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "finish"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "startup"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "acp"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "finish"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "startup"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "acp"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "finish"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "receipt"
+    }
+  ],
+  "raw_events": {
+    "sha256": "93a4576b46e34ec3457870268bf7b7f081db7d62d9a78fef1c6e147bb2b38c32",
+    "bytes": 6712,
+    "content_published": false
+  }
+}

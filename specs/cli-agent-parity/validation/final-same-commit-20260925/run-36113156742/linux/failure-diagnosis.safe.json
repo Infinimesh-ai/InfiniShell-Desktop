@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "source_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "run_id": 36113156742,
+  "job_id": 108001010372,
+  "failure_observed": {
+    "scenario": "private_leader_finish",
+    "completed_cases": 0,
+    "last_stage": "native_identity",
+    "libtest_exit_code": 101,
+    "outer_timeout": false,
+    "panic_file": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+    "panic_line": 31,
+    "assertion": "pidfd_open returned a negative descriptor",
+    "actual_errno_recorded_in_public_report": false,
+    "actual_target_pid_recorded_in_public_report": false,
+    "private_log_sha256": "ae26321e7939274f963a27ad5ec62acbc8fe3d59a9422e3b3eb743a6a95f4c14"
+  },
+  "source_findings": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+      "lines": [
+        150,
+        221,
+        255,
+        273
+      ],
+      "finding": "以 ProcessRefreshKind::nothing() 枚举并按父链收集候选，仅按 executable 过滤，随后对每个候选使用进程 pidfd helper；没有排除用户线程。"
+    },
+    {
+      "dependency": "sysinfo 0.37.0",
+      "path": "src/common/system.rs",
+      "lines": [
+        2374,
+        2390,
+        2396,
+        2408
+      ],
+      "finding": "nothing()/Default 仍默认 tasks=true；Linux 将任务作为独立 process 条目。"
+    },
+    {
+      "dependency": "sysinfo 0.37.0",
+      "path": "src/unix/linux/process.rs",
+      "lines": [
+        548,
+        550,
+        848,
+        849,
+        858,
+        862
+      ],
+      "finding": "get_proc_tasks 向 System 追加 task；非 TGID 被标识为 Userland thread，父字段指向 TGID。"
+    }
+  ],
+  "conclusion": "已证明新夹具的进程候选集合可混入 TID，属于需要修复的测试身份枚举缺陷；本轮安全报告未导出具体 PID 与 errno，尚不能把该次 syscall 失败的精确因果标为证实。",
+  "same_run_counterevidence": {
+    "codex_idle_crash_acceptance_passed": true,
+    "codex_idle_crash_test_exit_code": 0,
+    "same_pidfd_helper": true,
+    "rules_out": "不能将本次归因于该 Linux 主机整体不支持 pidfd。"
+  },
+  "repair_direction": "在该新夹具的刷新中禁用 tasks，并在接受候选时排除 thread_kind；保留 pidfd 身份绑定和退出断言，不添加裸 PID kill 回退，不放宽生产清理成功门槛。",
+  "repository_source_modified": false,
+  "tests_rerun": false
+}

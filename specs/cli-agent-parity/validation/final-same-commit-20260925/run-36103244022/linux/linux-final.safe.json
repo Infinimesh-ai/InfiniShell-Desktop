@@ -1,0 +1,1012 @@
+{
+  "schema": 1,
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "run_id": 36103244022,
+  "run_attempt": 1,
+  "job": {
+    "id": 107970099361,
+    "name": "Linux x64",
+    "head_sha": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-09-25T06:31:32Z",
+    "completed_at": "2026-09-25T08:00:14Z",
+    "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36103244022/job/107970099361"
+  },
+  "job_api_sha256": "d59a93fcee9395de864e4a694a82c86f998050026b00059171a92f6919229593",
+  "raw_log": {
+    "file": "job.raw.private.log",
+    "bytes": 3726592,
+    "sha256": "c2b8896216b97049fc5f0a687dfe18b8bb4d0cbfd86c54b08cdf69b7102e34ae",
+    "retained_privately": true
+  },
+  "step_counts": {
+    "success": 42,
+    "skipped": 1
+  },
+  "steps": [
+    {
+      "number": 1,
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:31:34Z",
+      "completed_at": "2026-09-25T06:31:45Z"
+    },
+    {
+      "number": 2,
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:31:45Z",
+      "completed_at": "2026-09-25T06:32:26Z"
+    },
+    {
+      "number": 3,
+      "name": "Install Python for CLI parity verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:26Z",
+      "completed_at": "2026-09-25T06:32:26Z"
+    },
+    {
+      "number": 4,
+      "name": "Verify provisioned toolchain",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:26Z",
+      "completed_at": "2026-09-25T06:32:26Z"
+    },
+    {
+      "number": 5,
+      "name": "Install Node for CLI plugin verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:26Z",
+      "completed_at": "2026-09-25T06:32:27Z"
+    },
+    {
+      "number": 6,
+      "name": "Test Grok notification plugin scripts",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:27Z",
+      "completed_at": "2026-09-25T06:32:28Z"
+    },
+    {
+      "number": 7,
+      "name": "Test notification patch file transactions",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:28Z",
+      "completed_at": "2026-09-25T06:32:46Z"
+    },
+    {
+      "number": 8,
+      "name": "Prepare fixed native Codex without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:32:46Z",
+      "completed_at": "2026-09-25T06:33:27Z"
+    },
+    {
+      "number": 9,
+      "name": "Prepare fixed native Claude without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:33:27Z",
+      "completed_at": "2026-09-25T06:34:02Z"
+    },
+    {
+      "number": 10,
+      "name": "Prepare fixed native Grok without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:02Z",
+      "completed_at": "2026-09-25T06:34:31Z"
+    },
+    {
+      "number": 11,
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:31Z",
+      "completed_at": "2026-09-25T06:34:39Z"
+    },
+    {
+      "number": 12,
+      "name": "Verify native Claude initialization and idle EOF",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:39Z",
+      "completed_at": "2026-09-25T06:34:40Z"
+    },
+    {
+      "number": 13,
+      "name": "Verify native Claude permission observations without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:40Z",
+      "completed_at": "2026-09-25T06:34:42Z"
+    },
+    {
+      "number": 14,
+      "name": "Verify native Codex plugin registry failure recovery",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:42Z",
+      "completed_at": "2026-09-25T06:34:53Z"
+    },
+    {
+      "number": 15,
+      "name": "Verify native Codex persistent plugin source",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:34:53Z",
+      "completed_at": "2026-09-25T06:35:02Z"
+    },
+    {
+      "number": 16,
+      "name": "Test Claude and Codex Bash notification payloads",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:35:02Z",
+      "completed_at": "2026-09-25T06:35:07Z"
+    },
+    {
+      "number": 17,
+      "name": "Test Unix PTY notification framing",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:35:07Z",
+      "completed_at": "2026-09-25T06:35:07Z"
+    },
+    {
+      "number": 18,
+      "name": "Check InfiniShell-Desktop",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:35:07Z",
+      "completed_at": "2026-09-25T06:39:18Z"
+    },
+    {
+      "number": 19,
+      "name": "Test bilingual resources for Linux GUI verification",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-09-25T06:39:18Z",
+      "completed_at": "2026-09-25T06:39:18Z"
+    },
+    {
+      "number": 20,
+      "name": "Test IPC frame-limit recovery",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:39:18Z",
+      "completed_at": "2026-09-25T06:39:43Z"
+    },
+    {
+      "number": 21,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:39:43Z",
+      "completed_at": "2026-09-25T06:48:57Z"
+    },
+    {
+      "number": 22,
+      "name": "Test shared CLI action contracts and skills",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:48:57Z",
+      "completed_at": "2026-09-25T06:49:36Z"
+    },
+    {
+      "number": 23,
+      "name": "Test CLI harness arguments",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:49:36Z",
+      "completed_at": "2026-09-25T06:49:59Z"
+    },
+    {
+      "number": 24,
+      "name": "Test bilingual TUI task message states",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:49:59Z",
+      "completed_at": "2026-09-25T06:55:59Z"
+    },
+    {
+      "number": 25,
+      "name": "Test managed command process ownership",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:55:59Z",
+      "completed_at": "2026-09-25T06:56:06Z"
+    },
+    {
+      "number": 26,
+      "name": "Build CLI process supervisor",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:56:06Z",
+      "completed_at": "2026-09-25T07:03:31Z"
+    },
+    {
+      "number": 27,
+      "name": "Test installed Grok hook through the native notification worker",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:03:31Z",
+      "completed_at": "2026-09-25T07:04:09Z"
+    },
+    {
+      "number": 28,
+      "name": "Verify fixed Linux Grok production notification installer without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:04:09Z",
+      "completed_at": "2026-09-25T07:04:46Z"
+    },
+    {
+      "number": 29,
+      "name": "Preserve Linux Grok production installer evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:04:46Z",
+      "completed_at": "2026-09-25T07:04:49Z"
+    },
+    {
+      "number": 30,
+      "name": "Verify fixed Linux CLI atomic update transactions without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:04:49Z",
+      "completed_at": "2026-09-25T07:36:32Z"
+    },
+    {
+      "number": 31,
+      "name": "Preserve Linux fixed CLI atomic update receipts",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:36:32Z",
+      "completed_at": "2026-09-25T07:36:36Z"
+    },
+    {
+      "number": 32,
+      "name": "Test supervisor cleanup after host crash",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:36:36Z",
+      "completed_at": "2026-09-25T07:36:42Z"
+    },
+    {
+      "number": 33,
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:36:42Z",
+      "completed_at": "2026-09-25T07:36:50Z"
+    },
+    {
+      "number": 34,
+      "name": "Preserve Linux native CLI boundary evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:36:50Z",
+      "completed_at": "2026-09-25T07:36:53Z"
+    },
+    {
+      "number": 35,
+      "name": "Test rust-genai",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:36:53Z",
+      "completed_at": "2026-09-25T07:37:37Z"
+    },
+    {
+      "number": 36,
+      "name": "Compile GUI integration tests",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:37:37Z",
+      "completed_at": "2026-09-25T07:43:17Z"
+    },
+    {
+      "number": 37,
+      "name": "Verify Linux GUI system clipboard without model inputs",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:43:17Z",
+      "completed_at": "2026-09-25T07:49:20Z"
+    },
+    {
+      "number": 38,
+      "name": "Preserve Linux GUI system clipboard evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:49:20Z",
+      "completed_at": "2026-09-25T07:49:25Z"
+    },
+    {
+      "number": 39,
+      "name": "Run desktop workspace unit tests",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T07:49:25Z",
+      "completed_at": "2026-09-25T08:00:04Z"
+    },
+    {
+      "number": 76,
+      "name": "Post Install Node for CLI plugin verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T08:00:04Z",
+      "completed_at": "2026-09-25T08:00:04Z"
+    },
+    {
+      "number": 77,
+      "name": "Post Install Python for CLI parity verification",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T08:00:04Z",
+      "completed_at": "2026-09-25T08:00:04Z"
+    },
+    {
+      "number": 78,
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T08:00:04Z",
+      "completed_at": "2026-09-25T08:00:04Z"
+    },
+    {
+      "number": 79,
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-09-25T08:00:04Z",
+      "completed_at": "2026-09-25T08:00:04Z"
+    }
+  ],
+  "nextest_summaries": [
+    {
+      "source_log_line": 3266,
+      "step": "Test IPC frame-limit recovery",
+      "elapsed_seconds": 0.062,
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 9
+    },
+    {
+      "source_log_line": 7165,
+      "step": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "elapsed_seconds": 66.404,
+      "run": 2871,
+      "passed": 2871,
+      "failed": 0,
+      "skipped": 4831
+    },
+    {
+      "source_log_line": 7469,
+      "step": "Test shared CLI action contracts and skills",
+      "elapsed_seconds": 0.066,
+      "run": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 220
+    },
+    {
+      "source_log_line": 7676,
+      "step": "Test CLI harness arguments",
+      "elapsed_seconds": 0.156,
+      "run": 129,
+      "passed": 129,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "source_log_line": 8023,
+      "step": "Test bilingual TUI task message states",
+      "elapsed_seconds": 0.322,
+      "run": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 928
+    },
+    {
+      "source_log_line": 8067,
+      "step": "Test managed command process ownership",
+      "elapsed_seconds": 0.212,
+      "run": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 14
+    },
+    {
+      "source_log_line": 8625,
+      "step": "Test supervisor cleanup after host crash",
+      "elapsed_seconds": 3.109,
+      "run": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 7697
+    },
+    {
+      "source_log_line": 20946,
+      "step": "Run desktop workspace unit tests",
+      "elapsed_seconds": 77.381,
+      "run": 10923,
+      "passed": 10923,
+      "failed": 0,
+      "skipped": 100
+    }
+  ],
+  "supervised_tests": [
+    {
+      "source_log_line": 8619,
+      "elapsed_seconds": 0.475,
+      "package": "warp",
+      "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+      "step": "Test supervisor cleanup after host crash"
+    },
+    {
+      "source_log_line": 8620,
+      "elapsed_seconds": 2.415,
+      "package": "warp",
+      "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_cancel_before_control_handshake_confirms_process_tree_exit",
+      "step": "Test supervisor cleanup after host crash"
+    },
+    {
+      "source_log_line": 8621,
+      "elapsed_seconds": 3.076,
+      "package": "warp",
+      "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+      "step": "Test supervisor cleanup after host crash"
+    },
+    {
+      "source_log_line": 8622,
+      "elapsed_seconds": 3.085,
+      "package": "warp",
+      "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+      "step": "Test supervisor cleanup after host crash"
+    },
+    {
+      "source_log_line": 8623,
+      "elapsed_seconds": 3.094,
+      "package": "warp",
+      "test": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+      "step": "Test supervisor cleanup after host crash"
+    }
+  ],
+  "i18n": {
+    "focused_passed": 11,
+    "workspace_passed": 11,
+    "focused_tests": [
+      {
+        "source_log_line": 6337,
+        "elapsed_seconds": 0.071,
+        "package": "warp",
+        "test": "i18n::tests::init_is_idempotent",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6338,
+        "elapsed_seconds": 0.122,
+        "package": "warp",
+        "test": "i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6340,
+        "elapsed_seconds": 0.122,
+        "package": "warp",
+        "test": "i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6341,
+        "elapsed_seconds": 0.086,
+        "package": "warp",
+        "test": "i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6342,
+        "elapsed_seconds": 0.068,
+        "package": "warp",
+        "test": "i18n::tests::requested_languages_fall_back_to_english_when_empty",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6343,
+        "elapsed_seconds": 0.148,
+        "package": "warp",
+        "test": "i18n::tests::fallback_chain_works",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6345,
+        "elapsed_seconds": 0.097,
+        "package": "warp",
+        "test": "i18n::tests::requested_languages_keep_preferred_order",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6350,
+        "elapsed_seconds": 0.13,
+        "package": "warp",
+        "test": "i18n::tests::shared_runtime_loader_includes_tui_resources",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6362,
+        "elapsed_seconds": 0.203,
+        "package": "warp",
+        "test": "i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 6386,
+        "elapsed_seconds": 0.595,
+        "package": "warp",
+        "test": "i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      },
+      {
+        "source_log_line": 7082,
+        "elapsed_seconds": 6.416,
+        "package": "warp",
+        "test": "i18n::tests::production_literal_translation_keys_exist_in_english_resources",
+        "step": "Test agent lifecycle, terminal cancellation, and Responses integration"
+      }
+    ],
+    "workspace_tests": [
+      {
+        "source_log_line": 15227,
+        "elapsed_seconds": 0.066,
+        "package": "warp",
+        "test": "i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15228,
+        "elapsed_seconds": 0.067,
+        "package": "warp",
+        "test": "i18n::tests::init_is_idempotent",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15229,
+        "elapsed_seconds": 0.119,
+        "package": "warp",
+        "test": "i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15230,
+        "elapsed_seconds": 0.076,
+        "package": "warp",
+        "test": "i18n::tests::requested_languages_keep_preferred_order",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15233,
+        "elapsed_seconds": 0.086,
+        "package": "warp",
+        "test": "i18n::tests::requested_languages_fall_back_to_english_when_empty",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15234,
+        "elapsed_seconds": 0.087,
+        "package": "warp",
+        "test": "i18n::tests::shared_runtime_loader_includes_tui_resources",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15238,
+        "elapsed_seconds": 0.146,
+        "package": "warp",
+        "test": "i18n::tests::fallback_chain_works",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15239,
+        "elapsed_seconds": 0.163,
+        "package": "warp",
+        "test": "i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15250,
+        "elapsed_seconds": 0.184,
+        "package": "warp",
+        "test": "i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15302,
+        "elapsed_seconds": 0.567,
+        "package": "warp",
+        "test": "i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+        "step": "Run desktop workspace unit tests"
+      },
+      {
+        "source_log_line": 15764,
+        "elapsed_seconds": 5.531,
+        "package": "warp",
+        "test": "i18n::tests::production_literal_translation_keys_exist_in_english_resources",
+        "step": "Run desktop workspace unit tests"
+      }
+    ],
+    "dedicated_bilingual_step": "skipped",
+    "note": "本次 full 模式的 i18n 测试已在 focused 和 workspace 两次执行；独立 GUI bilingual step 仍明确记为 skipped。"
+  },
+  "default_feature_tests": [
+    {
+      "source_log_line": 15222,
+      "elapsed_seconds": 0.07,
+      "package": "warp",
+      "test": "features::tests::desktop_source_keeps_all_three_cli_update_consumer_entries",
+      "step": "Run desktop workspace unit tests"
+    },
+    {
+      "source_log_line": 15225,
+      "elapsed_seconds": 0.076,
+      "package": "warp",
+      "test": "features::tests::infinishell_desktop_entry_enables_ime_and_managed_tasks_on_all_desktop_platforms",
+      "step": "Run desktop workspace unit tests"
+    },
+    {
+      "source_log_line": 15226,
+      "elapsed_seconds": 0.075,
+      "package": "warp",
+      "test": "features::tests::shared_non_gui_defaults_do_not_enable_local_cli_managed_tasks",
+      "step": "Run desktop workspace unit tests"
+    }
+  ],
+  "workspace_scope": {
+    "command": "cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui",
+    "excluded": [
+      "command-signatures-v2",
+      "integration",
+      "warp_tui"
+    ],
+    "separate_tui_tests": 9,
+    "separate_gui_system_clipboard_locales": [
+      "en",
+      "zh-CN"
+    ]
+  },
+  "script_unittest_results": [
+    {
+      "source_log_line": 328,
+      "step": "Install Node for CLI plugin verification",
+      "reported_run": 14,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 334,
+      "step": "Test Grok notification plugin scripts",
+      "reported_run": 1,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 419,
+      "step": "Test Grok notification plugin scripts",
+      "reported_run": 20,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 437,
+      "step": "Test notification patch file transactions",
+      "reported_run": 13,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 464,
+      "step": "Test notification patch file transactions",
+      "reported_run": 22,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 491,
+      "step": "Test notification patch file transactions",
+      "reported_run": 22,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 506,
+      "step": "Test notification patch file transactions",
+      "reported_run": 10,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 581,
+      "step": "Test notification patch file transactions",
+      "reported_run": 70,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 614,
+      "step": "Test notification patch file transactions",
+      "reported_run": 28,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 655,
+      "step": "Test notification patch file transactions",
+      "reported_run": 36,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 685,
+      "step": "Test notification patch file transactions",
+      "reported_run": 25,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 710,
+      "step": "Test notification patch file transactions",
+      "reported_run": 20,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 731,
+      "step": "Test notification patch file transactions",
+      "reported_run": 16,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 740,
+      "step": "Test notification patch file transactions",
+      "reported_run": 4,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 758,
+      "step": "Test notification patch file transactions",
+      "reported_run": 13,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 790,
+      "step": "Test notification patch file transactions",
+      "reported_run": 27,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 815,
+      "step": "Test notification patch file transactions",
+      "reported_run": 20,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 846,
+      "step": "Test notification patch file transactions",
+      "reported_run": 26,
+      "skipped": 1,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 960,
+      "step": "Test notification patch file transactions",
+      "reported_run": 109,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 978,
+      "step": "Test notification patch file transactions",
+      "reported_run": 13,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1058,
+      "step": "Test notification patch file transactions",
+      "reported_run": 75,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1085,
+      "step": "Test notification patch file transactions",
+      "reported_run": 22,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1110,
+      "step": "Test notification patch file transactions",
+      "reported_run": 20,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1137,
+      "step": "Test notification patch file transactions",
+      "reported_run": 22,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1157,
+      "step": "Test notification patch file transactions",
+      "reported_run": 15,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1183,
+      "step": "Test notification patch file transactions",
+      "reported_run": 17,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1198,
+      "step": "Test notification patch file transactions",
+      "reported_run": 8,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1254,
+      "step": "Test notification patch file transactions",
+      "reported_run": 47,
+      "skipped": 2,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1263,
+      "step": "Test notification patch file transactions",
+      "reported_run": 4,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1274,
+      "step": "Test notification patch file transactions",
+      "reported_run": 6,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1305,
+      "step": "Test notification patch file transactions",
+      "reported_run": 26,
+      "skipped": 5,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1362,
+      "step": "Test notification patch file transactions",
+      "reported_run": 51,
+      "skipped": 1,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1403,
+      "step": "Test notification patch file transactions",
+      "reported_run": 36,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1438,
+      "step": "Test notification patch file transactions",
+      "reported_run": 30,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1491,
+      "step": "Test notification patch file transactions",
+      "reported_run": 47,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1509,
+      "step": "Test notification patch file transactions",
+      "reported_run": 12,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1538,
+      "step": "Test notification patch file transactions",
+      "reported_run": 24,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1565,
+      "step": "Test notification patch file transactions",
+      "reported_run": 21,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1592,
+      "step": "Test notification patch file transactions",
+      "reported_run": 22,
+      "skipped": 1,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1607,
+      "step": "Test notification patch file transactions",
+      "reported_run": 10,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1628,
+      "step": "Test notification patch file transactions",
+      "reported_run": 16,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1814,
+      "step": "Test Claude and Codex Bash notification payloads",
+      "reported_run": 14,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 1835,
+      "step": "Test Claude and Codex Bash notification payloads",
+      "reported_run": 5,
+      "skipped": 0,
+      "result": "ok"
+    },
+    {
+      "source_log_line": 8425,
+      "step": "Test installed Grok hook through the native notification worker",
+      "reported_run": 17,
+      "skipped": 2,
+      "result": "ok"
+    }
+  ],
+  "rust_genai": {
+    "passed": 81,
+    "failed": 0,
+    "ignored": 0,
+    "source_log_line": 9003
+  },
+  "nextest_retry_slow_leak_events": [],
+  "collection": {
+    "ci_rerun_triggered": false,
+    "credentials_accessed": false,
+    "initial_log_download_refused_terminal_escapes": true,
+    "log_download_retried_with_allow_escape_sequences": true,
+    "note": "仅重试读取已经完成的日志；没有重跑测试。"
+  },
+  "acceptance_limits": [
+    "全 workspace 的 100 个跳过用例不计为通过。",
+    "本 run 的无凭据原生探针不证明真实模型审批、运行中取消或历史恢复；既有 9af6de393 失败证据保持独立。"
+  ]
+}

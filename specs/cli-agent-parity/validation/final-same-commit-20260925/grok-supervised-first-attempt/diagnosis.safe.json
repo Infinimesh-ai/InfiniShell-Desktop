@@ -1,0 +1,12 @@
+{
+  "passed": false,
+  "phase": "private_leader_finish.startup",
+  "cause": "测试夹具把隔离 HOME 放在 root/isolated；生产校验要求 state/grok-managed/<UUID>，worker 在执行 Grok 前拒绝。",
+  "error": "Error: 隔离启动目录不属于托管状态域",
+  "stderr_sha256": "debef9165df793871162c547589677ac8a34f1378693ce3e582d38bed3a8e14a",
+  "native_acp_started": false,
+  "product_boundary_weakened": false,
+  "product_timeout_changed": false,
+  "classification": "fixture_layout_error",
+  "raw_failure_preserved": true
+}

@@ -1,0 +1,306 @@
+{
+  "run_id": 36095732136,
+  "head_sha": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "artifacts": [
+    {
+      "id": 10849475654,
+      "name": "cli-windows-gui-system-clipboard-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "d8d231602e53397a0a4e050dc745aa3038381ae2012ed0a83d88b5d78da5da5f",
+      "github_digest": "sha256:d8d231602e53397a0a4e050dc745aa3038381ae2012ed0a83d88b5d78da5da5f",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "run-8600/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T13-51-36/chinese-multiline.png",
+          "sha256": "1093178a387174cc5fea8b93121261bb805510c06bcffd7348c107a223f9bf11",
+          "size": 2987689
+        },
+        {
+          "path": "run-8600/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T13-51-36/pasted-image.png",
+          "sha256": "e595fc19ba1ae8baf1a015f34166edecf34b8c9e8f53c8bc7445bdee92597025",
+          "size": 2984023
+        },
+        {
+          "path": "renderer.safe.json",
+          "sha256": "4d14ef0744cf4acef2dd96d02a566d047cfcb1768804f353102767bb4735886a",
+          "size": 1402
+        },
+        {
+          "path": "run-8600/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T13-51-36/receipt.safe.json",
+          "sha256": "b96a0ca8d6177eb1a2527664dc76d87fceac44d5da41a876400f6ef7f9518aa7",
+          "size": 978
+        },
+        {
+          "path": "run-8600/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T13-51-36/recording.log",
+          "sha256": "ee33cd8d3211ac19c2181ed943aab3529a45eb73bd5dec9dc34245b624a2304f",
+          "size": 2966
+        }
+      ]
+    },
+    {
+      "id": 10849255167,
+      "name": "cli-windows-native-boundaries-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "dd5302aeb44b5b7a6563354beccdcc0206f56cee7e73c78d3bdb656beced7928",
+      "github_digest": "sha256:dd5302aeb44b5b7a6563354beccdcc0206f56cee7e73c78d3bdb656beced7928",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "claude-21280-inputs/claude-fixed-inputs.json",
+          "sha256": "1a5af0c8fd64623d4991c6f38edf1565c53624fab724aba701b69b5ed047090f",
+          "size": 494
+        },
+        {
+          "path": "claude-permission-observation.json",
+          "sha256": "b8ad148043d2f4d7e77a760f4ec32c3e8f3fa1d1f5144e7fa602dd298977157e",
+          "size": 34759
+        },
+        {
+          "path": "codex-idle-crash.metadata.json",
+          "sha256": "2da23246bd4262e7a6beb1757951cc44b4632aec9d3ad84aa086f2bf41d8e175",
+          "size": 793
+        },
+        {
+          "path": "claude-initialize-idle-eof.json",
+          "sha256": "3078ed82bd47dfdda4be68e922a2f42c08052c583a037d5897332b1e04ed274f",
+          "size": 3097
+        },
+        {
+          "path": "codex-idle-crash.test-output.txt",
+          "sha256": "50fa845c72686c31fd1e523ca0b89147e75a5c394184f080ce7e6ad8f2e980a0",
+          "size": 493
+        },
+        {
+          "path": "codex-missing-session-cmd.metadata.json",
+          "sha256": "8777cf084e53bab2d22364c4c92b312ef542ccf33b4b5851b9aa5ce945bc58b3",
+          "size": 764
+        },
+        {
+          "path": "codex-idle-crash.ndjson",
+          "sha256": "fc4db82b41c5f9ea97f95a7e36bed2b738a4cc87c3f6fcc37341a011dfe7cf7d",
+          "size": 2671
+        },
+        {
+          "path": "codex-missing-session-cmd.ndjson",
+          "sha256": "1ae0c2968ae15814e8b739b8ce97c41ca8f6f00b654d1c0dcc8532f7a402550d",
+          "size": 1608
+        },
+        {
+          "path": "codex-missing-session-cmd.test-output.txt",
+          "sha256": "a43b9b3195140344eb80a29fa4cf519ed7dfd499a0195dc0fd9a417d09b2dd56",
+          "size": 473
+        },
+        {
+          "path": "codex-missing-session.metadata.json",
+          "sha256": "8777cf084e53bab2d22364c4c92b312ef542ccf33b4b5851b9aa5ce945bc58b3",
+          "size": 764
+        },
+        {
+          "path": "codex-missing-session.test-output.txt",
+          "sha256": "6c30b8dbc0ced21c81584955ac141df2bf49354da12583759475426ae391f0b6",
+          "size": 473
+        },
+        {
+          "path": "codex-missing-session.ndjson",
+          "sha256": "c9e49329972b7d59d930e918d138fa6b81d85178b3e583a0cbe542276f5de5d9",
+          "size": 1608
+        },
+        {
+          "path": "codex-plugin-cache-refresh.json",
+          "sha256": "b82da3aec7afabbb481ea0f999a23e881de628d1871d97892790c48fffb6af0a",
+          "size": 299962
+        },
+        {
+          "path": "codex-plugin-lifecycle.json",
+          "sha256": "ef5be8a96e7b732dc333bb7a30b797fc9684d4b983318b0a73e088696829f2bf",
+          "size": 26113
+        },
+        {
+          "path": "grok-cli-fixed/grok-fixed-inputs.json",
+          "sha256": "e056ad7b0b93a0def6b426c32fbf71fb1aba254de5cc2aeed654aaa97a776cc5",
+          "size": 569
+        },
+        {
+          "path": "grok-fixed-acp.json",
+          "sha256": "538cad64bca913f31bc69ec4e389b61710f885651d6457e3f22259ac7d72e1fb",
+          "size": 16915
+        }
+      ]
+    },
+    {
+      "id": 10848538113,
+      "name": "cli-windows-fixed-atomic-updates-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "f6f093f85e22abde2ea6a3e98f6db39074c744e31e1c7a3c81c48b0fe32f2f07",
+      "github_digest": "sha256:f6f093f85e22abde2ea6a3e98f6db39074c744e31e1c7a3c81c48b0fe32f2f07",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "claude-updated-receipt.safe.json",
+          "sha256": "8c673e9bdce6ef8a081eb8ae84c922640e7b028784279d7e57f2850626b05853",
+          "size": 2228
+        },
+        {
+          "path": "build-inputs.safe.json",
+          "sha256": "c57294238ff34a80c29e13d6079aca2c5d883eb6626a0dacce70095e19894d53",
+          "size": 611
+        },
+        {
+          "path": "claude-updated-product_receipt.safe.json",
+          "sha256": "afbdcac1aa80dd693ee58a1e80799c882f286bd7fd9cb059365e8d009a57e52f",
+          "size": 1345
+        },
+        {
+          "path": "codex-updated-product_receipt.safe.json",
+          "sha256": "0d63949f32dfc924d27eab82b4ac685705239308630d8cff5aba83e231885bc8",
+          "size": 1344
+        },
+        {
+          "path": "grok-updated-receipt.safe.json",
+          "sha256": "23657713e2ecf0fd41974d117ff7f1582dfbfacbf5622b7e785c723135372949",
+          "size": 2222
+        },
+        {
+          "path": "summary.safe.json",
+          "sha256": "6da3027dae1934191bb7c8f57adc07deb413ed7e866513e389593030db8ddacb",
+          "size": 2182
+        },
+        {
+          "path": "grok-updated-product_receipt.safe.json",
+          "sha256": "d06601bab028396aecec3139f15abbeb37b4e2a661a9478720904c371cd824cb",
+          "size": 1339
+        },
+        {
+          "path": "codex-updated-receipt.safe.json",
+          "sha256": "43a89d919b4c69fe2f08fbb1ca9e5f335a64126f99e86e7b1af4cf3d3eb32a4c",
+          "size": 2225
+        }
+      ]
+    },
+    {
+      "id": 10848047570,
+      "name": "codex-windows-production-installer-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "b74a9b1a7c52a280c567259521406bfabc0135223e27ec7064d1f45c4b0002b6",
+      "github_digest": "sha256:b74a9b1a7c52a280c567259521406bfabc0135223e27ec7064d1f45c4b0002b6",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-rust-source-installer.ndjson",
+          "sha256": "f8984c267b8303008b2289f529ec8a2ea536fc0c4c8d5d68391c811a428818f6",
+          "size": 4465
+        },
+        {
+          "path": "codex-rust-source-installer.test-output.txt",
+          "sha256": "e18f1e17bfcff79420ea12f822f1f727357ce2c56857b87df7f13097fb128723",
+          "size": 553
+        },
+        {
+          "path": "codex-rust-source-installer.metadata.json",
+          "sha256": "8147035304feb74ebfc45bd64395f20934cc2967f80dcd96e94417334f2e48ff",
+          "size": 1166
+        }
+      ]
+    },
+    {
+      "id": 10847886516,
+      "name": "claude-windows-notifications-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "68b868ab4ff52938f86c605a6070cde5fcaf463b32d50df4f1ac417b8f90693d",
+      "github_digest": "sha256:68b868ab4ff52938f86c605a6070cde5fcaf463b32d50df4f1ac417b8f90693d",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "claude-windows-notifications.json",
+          "sha256": "87c8306a116bc6a634b764b322672be15f933a6d5a2ac574d8878f0ccfcee658",
+          "size": 33679
+        }
+      ]
+    },
+    {
+      "id": 10847799901,
+      "name": "grok-windows-production-installer-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "d54f53d90ce6f5cbdd66139ba1c69a05f67ef90d0a1bc86bd7497429df9546c3",
+      "github_digest": "sha256:d54f53d90ce6f5cbdd66139ba1c69a05f67ef90d0a1bc86bd7497429df9546c3",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "grok-production-installer.safe.json",
+          "sha256": "d20834637f3862062d904f6d2b534829fb1e23f25cb2e1a212ef7e4e0407e0e5",
+          "size": 8054
+        }
+      ]
+    },
+    {
+      "id": 10847736831,
+      "name": "codex-windows-native-hooks-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "a201f517c2bcda7026c891a99604b3a353cd0c263536a6dadb3613353f2d3c3b",
+      "github_digest": "sha256:a201f517c2bcda7026c891a99604b3a353cd0c263536a6dadb3613353f2d3c3b",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-windows-native-hooks.json",
+          "sha256": "0a61da876b3b6a3820d044fb73ea41b196cf1f4111bd9ac40890d5b0f6c9a4f5",
+          "size": 835787
+        }
+      ]
+    },
+    {
+      "id": 10847632712,
+      "name": "codex-01561-windows-conpty-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "6ea407d932ab746f47085e6a22454b4e520d4affaa705cc5a43b55be23e17aab",
+      "github_digest": "sha256:6ea407d932ab746f47085e6a22454b4e520d4affaa705cc5a43b55be23e17aab",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-01561-windows-conpty.json",
+          "sha256": "c114f05141c83badf1083b5e996e40afea5f5425e3c27e63836bb94e96a034f9",
+          "size": 7416
+        },
+        {
+          "path": "codex-01561-windows-conpty.native.json",
+          "sha256": "095c213fdfe115d686da9c1d023c38ee42a10162e7810d94773ee0f16a9294a7",
+          "size": 875748
+        },
+        {
+          "path": "codex-01561-windows-conpty.pty.bin",
+          "sha256": "d6bd586ec52805d4c6f3508b8cc796620ba949b1228077ce91d075508e3dfcb7",
+          "size": 2508
+        }
+      ]
+    },
+    {
+      "id": 10847407575,
+      "name": "codex-01561-windows-native-hooks-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "cf79babd390e3f83d3e1268d1f839744162eefcd69b1171eaf319ef0bcd3a87b",
+      "github_digest": "sha256:cf79babd390e3f83d3e1268d1f839744162eefcd69b1171eaf319ef0bcd3a87b",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-01561-windows-native-hooks.json",
+          "sha256": "a64e2b101c74a65653ec28016137cb7f2f344920c94d7996f19554ea0889436b",
+          "size": 842759
+        }
+      ]
+    },
+    {
+      "id": 10846984062,
+      "name": "codex-windows-conpty-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "8071e7fb6847126b733de5ad2de90e329d23dbed1d9debb2f6b4822ce1fc9f94",
+      "github_digest": "sha256:8071e7fb6847126b733de5ad2de90e329d23dbed1d9debb2f6b4822ce1fc9f94",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-windows-conpty.json",
+          "sha256": "d258145a43a122198db20ebd0461af76552ff0118d4d76cdc7d9d08c2248ea1a",
+          "size": 7072
+        },
+        {
+          "path": "codex-windows-conpty.pty.bin",
+          "sha256": "83b7e4859ac7f359300464e5cf00aa1bff831e3a550306be3e887d3b683e9a0b",
+          "size": 2508
+        },
+        {
+          "path": "codex-windows-conpty.native.json",
+          "sha256": "e61f037f1b8e7a0b3cd4943803c60c4fabc4f72c60f95ee7bebffe0ac1bb207b",
+          "size": 860146
+        }
+      ]
+    }
+  ]
+}

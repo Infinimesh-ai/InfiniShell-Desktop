@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "run_id": 36095732136,
+  "job_id": 107947496822,
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "job_conclusion": "failure",
+  "only_failed_step": 30,
+  "safe_summaries": [
+    {
+      "file": "linux-final.safe.json",
+      "bytes": 32398,
+      "sha256": "d3d75c1bade8ab11ce38f789b3031f56335889d8601c264818a4699805908b6d"
+    },
+    {
+      "file": "linux-gui.safe.json",
+      "bytes": 3919,
+      "sha256": "6cdc7535ee38aa4903ee4eea9478c629cb6436ab666f93d1d594f37761c1632e"
+    },
+    {
+      "file": "linux-atomic.safe.json",
+      "bytes": 20979,
+      "sha256": "6e2b16cb34e307a7f66ea0ec197c6ad99be3f3b42942f002b8e2c90978c50a9c"
+    },
+    {
+      "file": "linux-grok.safe.json",
+      "bytes": 2218,
+      "sha256": "cf280424ae27760814cbdeba9538720c773427bcd382b62eca390c1da66acd3a"
+    },
+    {
+      "file": "linux-native-boundaries.safe.json",
+      "bytes": 4240,
+      "sha256": "3d9b38ca30f5b2b772ea58db9c65b8f61b5f45cb0a9dc7dd0227718d22fca24f"
+    }
+  ],
+  "raw_artifacts_downloaded": 4,
+  "raw_log_saved": true,
+  "raw_job_api_saved": true,
+  "both_gui_original_pngs_reviewed": true,
+  "changed_repository_files": false,
+  "ci_rerun_triggered": false,
+  "credentials_accessed": false
+}

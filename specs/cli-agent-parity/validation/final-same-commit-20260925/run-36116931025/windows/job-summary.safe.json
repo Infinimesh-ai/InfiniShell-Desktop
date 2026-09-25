@@ -1,0 +1,743 @@
+{
+  "schema": 1,
+  "source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "run_id": 36116931025,
+  "job_id": 108013126732,
+  "job_name": "Windows x64",
+  "conclusion": "success",
+  "started_at": "2026-09-25T09:10:19Z",
+  "completed_at": "2026-09-25T09:32:20Z",
+  "raw_log_sha256": "067716875101fb5802d52a6ebf968e01a881cac02c3bd57e8d04146a95fb2d85",
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Reclaim Windows build storage",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare job-local Python for CLI parity verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Configure Windows build environment",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify provisioned toolchain",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install Node for CLI plugin verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Grok notification plugin scripts",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test fixed Grok preparation for installer-only verification",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test notification patch file transactions",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Codex without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed Codex production installer contract",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Claude without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Grok without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude initialization and idle EOF",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude permission observations without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex plugin registry failure recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex persistent plugin source",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Windows Git Bash notification payloads",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Claude Windows native SessionStart notification without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Claude Windows native notification evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check InfiniShell-Desktop",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test IPC frame-limit recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build InfiniShell SSH worker",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test Windows PowerShell SSH worker arguments",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Windows Codex production notification installer without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows Codex production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows Grok production notification installer without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows Grok production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test shared CLI action contracts and skills",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test CLI harness arguments",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test bilingual TUI task message states",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test managed command process ownership",
+      "conclusion": "success"
+    },
+    {
+      "name": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Build CLI process supervisor",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows CLI atomic update candidates without credentials",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Preserve Windows fixed CLI atomic update receipts",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test supervisor cleanup after host crash",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Grok production supervised cleanup without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows native CLI boundary evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test rust-genai",
+      "conclusion": "success"
+    },
+    {
+      "name": "Compile GUI integration tests",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Verify Windows GUI system clipboard without model inputs",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Preserve Windows GUI system clipboard evidence",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Run desktop workspace unit tests",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Report sccache statistics",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Install Node for CLI plugin verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "test_summaries": [
+    {
+      "line": 2197,
+      "step_candidates": [
+        "Test IPC frame-limit recovery"
+      ],
+      "summary": "Summary [   0.090s] 2 tests run: 2 passed, 9 skipped",
+      "step_number": 32
+    },
+    {
+      "line": 3003,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "summary": "Summary [ 150.459s] 747 tests run: 747 passed, 6756 skipped",
+      "step_number": 35
+    },
+    {
+      "line": 3169,
+      "step_candidates": [
+        "Test managed command process ownership"
+      ],
+      "summary": "Summary [   0.345s] 2 tests run: 2 passed, 12 skipped",
+      "step_number": 43
+    },
+    {
+      "line": 3496,
+      "step_candidates": [
+        "Test supervisor cleanup after host crash"
+      ],
+      "summary": "Summary [  12.845s] 5 tests run: 5 passed, 7498 skipped",
+      "step_number": 48
+    },
+    {
+      "line": 3725,
+      "step_candidates": [
+        "Test rust-genai"
+      ],
+      "summary": "test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "step_number": 52
+    }
+  ],
+  "diagnostic_lines": [],
+  "i18n_passes": [],
+  "exact_test_counts": [
+    {
+      "step": 32,
+      "name": "Test IPC frame-limit recovery",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 9,
+      "leaky_passed_subset": 0,
+      "source_log_line": 2197
+    },
+    {
+      "step": 35,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "run": 747,
+      "passed": 747,
+      "failed": 0,
+      "skipped": 6756,
+      "leaky_passed_subset": 0,
+      "source_log_line": 3003
+    },
+    {
+      "step": 43,
+      "name": "Test managed command process ownership",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 12,
+      "leaky_passed_subset": 0,
+      "source_log_line": 3169
+    },
+    {
+      "step": 48,
+      "name": "Test supervisor cleanup after host crash",
+      "run": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 7498,
+      "leaky_passed_subset": 0,
+      "source_log_line": 3496
+    },
+    {
+      "step": 52,
+      "name": "Test rust-genai",
+      "passed": 81,
+      "failed": 0,
+      "ignored": 0,
+      "source_log_line": 3725
+    }
+  ],
+  "step_counts": {
+    "success": 47,
+    "skipped": 13
+  },
+  "all_failed_steps": [],
+  "retry_or_flaky_count": 0,
+  "final_test_failure_or_timeout_markers": 0,
+  "leaky_tests": [],
+  "i18n_pass_count_by_step": {},
+  "feature_default_entry_tests": [],
+  "log_step_binding_method": "按原始Run组与实际执行步骤顺序对应，消除API秒级时间导致的相邻步骤歧义。",
+  "raw_log_bytes": 548895,
+  "job_api_sha256": "695462f85ac1e548243e741a562ca4c15c34cb66dde3857e87a90d634da3cc19",
+  "run_attempt": 1,
+  "boundaries": [
+    "测试组可能重复覆盖用例，不可相加为不重复测试总数。",
+    "leaky为已通过用例的子集，不是独立失败，也不能证明托管进程树清理。",
+    "定向组skipped包含过滤项；跨平台能力仍按各自原生与GUI收据记录。"
+  ],
+  "python_test_groups": [
+    {
+      "source_log_line": 414,
+      "step": 8,
+      "run": 14,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 420,
+      "step": 8,
+      "run": 1,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 513,
+      "step": 10,
+      "run": 20,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 531,
+      "step": 10,
+      "run": 13,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 558,
+      "step": 10,
+      "run": 22,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 585,
+      "step": 10,
+      "run": 22,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 600,
+      "step": 10,
+      "run": 10,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 675,
+      "step": 10,
+      "run": 70,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 708,
+      "step": 10,
+      "run": 28,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 749,
+      "step": 10,
+      "run": 36,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 779,
+      "step": 10,
+      "run": 25,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 804,
+      "step": 10,
+      "run": 20,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 825,
+      "step": 10,
+      "run": 16,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 834,
+      "step": 10,
+      "run": 4,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 852,
+      "step": 10,
+      "run": 13,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 884,
+      "step": 10,
+      "run": 27,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 909,
+      "step": 10,
+      "run": 20,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 989,
+      "step": 10,
+      "run": 75,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1017,
+      "step": 10,
+      "run": 22,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 1042,
+      "step": 10,
+      "run": 20,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 1069,
+      "step": 10,
+      "run": 22,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 1089,
+      "step": 10,
+      "run": 15,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 1115,
+      "step": 10,
+      "run": 17,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    },
+    {
+      "source_log_line": 1130,
+      "step": 10,
+      "run": 8,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1186,
+      "step": 10,
+      "run": 47,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1195,
+      "step": 10,
+      "run": 4,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1206,
+      "step": 10,
+      "run": 6,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 1237,
+      "step": 10,
+      "run": 26,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1294,
+      "step": 10,
+      "run": 51,
+      "skipped": 7,
+      "failed": 0,
+      "summary": "OK (skipped=7)"
+    },
+    {
+      "source_log_line": 1335,
+      "step": 10,
+      "run": 36,
+      "skipped": 2,
+      "failed": 0,
+      "summary": "OK (skipped=2)"
+    },
+    {
+      "source_log_line": 1370,
+      "step": 10,
+      "run": 30,
+      "skipped": 3,
+      "failed": 0,
+      "summary": "OK (skipped=3)"
+    },
+    {
+      "source_log_line": 1389,
+      "step": 10,
+      "run": 12,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1418,
+      "step": 10,
+      "run": 24,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1445,
+      "step": 10,
+      "run": 21,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1476,
+      "step": 10,
+      "run": 26,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1500,
+      "step": 10,
+      "run": 19,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1515,
+      "step": 10,
+      "run": 10,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1536,
+      "step": 10,
+      "run": 16,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1771,
+      "step": 20,
+      "run": 14,
+      "skipped": 0,
+      "failed": 0,
+      "summary": "OK"
+    },
+    {
+      "source_log_line": 1887,
+      "step": 23,
+      "run": 17,
+      "skipped": 1,
+      "failed": 0,
+      "summary": "OK (skipped=1)"
+    }
+  ],
+  "python_group_count": 40,
+  "python_test_counts": {
+    "run": 899,
+    "passed": 870,
+    "skipped": 29,
+    "failed": 0
+  },
+  "node_test_summaries": [
+    {
+      "source_log_line": 390,
+      "step": 8,
+      "summary": "# tests 15"
+    },
+    {
+      "source_log_line": 391,
+      "step": 8,
+      "summary": "# suites 0"
+    },
+    {
+      "source_log_line": 392,
+      "step": 8,
+      "summary": "# pass 15"
+    },
+    {
+      "source_log_line": 393,
+      "step": 8,
+      "summary": "# fail 0"
+    },
+    {
+      "source_log_line": 394,
+      "step": 8,
+      "summary": "# cancelled 0"
+    },
+    {
+      "source_log_line": 395,
+      "step": 8,
+      "summary": "# skipped 0"
+    },
+    {
+      "source_log_line": 396,
+      "step": 8,
+      "summary": "# todo 0"
+    }
+  ],
+  "run_scope": {
+    "native_acceptance_only": true,
+    "full_workspace_tests": false,
+    "run_gui_clipboard": false,
+    "run_cli_atomic_updates": false,
+    "i18n_or_feature_entry_tests_repeated": false
+  },
+  "limitations": [
+    "本轮为原生验收补验；未重跑 GUI、原子升级、全工作区、i18n 或默认入口专项，相关历史证据单独绑定。",
+    "五项生产监督测试使用合成测试子进程；真实 Grok 四场景另以原生收据核对。"
+  ]
+}

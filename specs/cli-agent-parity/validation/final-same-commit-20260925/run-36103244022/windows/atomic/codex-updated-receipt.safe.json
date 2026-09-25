@@ -1,0 +1,40 @@
+{
+  "agent": "codex",
+  "candidate": false,
+  "configuration_unchanged": true,
+  "credentials_provided": false,
+  "entry_matches_target": true,
+  "live_latest_claimed": false,
+  "manifest_sha256": "404bb605f72199a68bf38dbe73cdd1ed71c89b2c04950403a9c71ee8e712bd95",
+  "model_inputs_sent": 0,
+  "old_version": "0.155.1",
+  "passed": true,
+  "private_log_sha256": "0d1db8457c22ce19adc53c7c271fdc897d5f4059e4845105d46bfbf73c5e7816",
+  "product_receipt": {
+    "path": "C:\\actions-runner\\_work\\_temp\\infinishell-fixed-cli-updates-9b8028aa-16a8-456a-afa5-c131392351fb\\infinishell-cli-autoupdate-codex-vggicu28\\receipt.windows.safe.json",
+    "sha256": "495d0e9a9731c20bfcdd202cacb43d6c6dddb1387167c511ed953a0ee5419949"
+  },
+  "product_receipt_binding_verified": true,
+  "scope": "Windows 固定官方 CLI 产品 inspect/execute/journal 事务；元数据输入和状态目录隔离，不绕过来源或执行门禁",
+  "source_files": {
+    "app/src/ai/cli_agent_runtime/managed_process.rs": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+    "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs": "6e1182096823075d56f0585cc748956db8891266eba53939a3396d0f1a635e9a",
+    "app/src/terminal/cli_agent_updates.rs": "9f5eaf7042b712805b0fc9256b8113c5e8bf1318110b88d2b906c6cd48a8c4a3",
+    "app/src/terminal/cli_agent_updates/sources.rs": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f",
+    "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs": "c2ca6bc29bad109f60de0322f20a824e94ae89980fa6040c3826e1016d4641a5",
+    "script/cli-agent-parity/run_fixed_cli_autoupdate.py": "817f4b4c9025d3de4781d3eb921ef1ca1d827228088d71cde15bae7d40a0752b"
+  },
+  "stable_errors": [],
+  "supervisor": {
+    "path": "C:\\infinishell-ci\\cargo-target\\debug\\infinishell-tui.exe",
+    "sha256": "3d6f1c54bb09de9eb069d5623642400906901473082b04f5a082bcce819be737"
+  },
+  "target_version": "0.156.1",
+  "test_binary": {
+    "path": "C:\\infinishell-ci\\cargo-target\\debug\\deps\\warp-8e58c2045d83883a.exe",
+    "sha256": "7a46a457b20000d5dea1aed9c66e1a63aeb207750e85c662e2e0d5c27310a005"
+  },
+  "timed_out": false,
+  "user_path_restored": true,
+  "user_path_temporary_entry_used": true
+}

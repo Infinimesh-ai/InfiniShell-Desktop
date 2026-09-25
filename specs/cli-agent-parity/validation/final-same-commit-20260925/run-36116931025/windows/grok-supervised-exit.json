@@ -1,0 +1,372 @@
+{
+  "schema": 1,
+  "scope": "grok_1041_production_supervised_exit_zero_model",
+  "source": {
+    "commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+    "tree": "8be444cebdbd1e3196ca7719481540ce89636361",
+    "files": [
+      {
+        "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+        "base_git_object": "52a5cf134c3595571620502a36b36b3360123c31",
+        "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok.rs",
+        "base_git_object": "1bbf74b1952085b7ede1ca831c2674cde6c2cd97",
+        "sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+        "base_git_object": "e65979e854a35070e35150394b874085660a6c19",
+        "sha256": "67304b9225d8774059dd9b91625c1615251766083877963f696fea2a6a2865a6"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+        "base_git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470",
+        "sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66"
+      },
+      {
+        "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+        "base_git_object": "cc53272b8632848a6e3cf2c6de85712775ea9a09",
+        "sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0"
+      },
+      {
+        "path": "crates/command/src/managed.rs",
+        "base_git_object": "e8f4632dc80fb49ec53621226d09373e17d0e195",
+        "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072"
+      },
+      {
+        "path": "crates/command/src/managed_macos.rs",
+        "base_git_object": "e7ce0df18c1864e19e7f61115d23c68445c9f398",
+        "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b"
+      },
+      {
+        "path": "script/cli-agent-parity/prepare_grok_cli.py",
+        "base_git_object": "976d0cb32c7e928060c95a46e289ead383fe4db1",
+        "sha256": "0ac553512f9d99f187cb5225a9eb7d72acf308e4f4f78abc938dc0812feab111"
+      },
+      {
+        "path": "script/cli-agent-parity/run_grok_supervised_exit.py",
+        "base_git_object": "be44aced2118634b147cb3ab7cadb88e79713cb2",
+        "sha256": "8e7e3f98dddb51921200937c63d09fd8e3365b9e811fbe0073f99d1fbc35fd24"
+      },
+      {
+        "path": "script/cli-agent-parity/run_grok_supervised_exit_tests.py",
+        "base_git_object": "612ada36049f4ff8a88b02701c83557f28d26c84",
+        "sha256": "eafb4b713695d4c0d860e88370073a417a286cf90566df1d5edff82eed20b6e6"
+      }
+    ],
+    "source_dirty": false,
+    "candidate_changed_paths": [],
+    "execution_source_kind": "clean_commit",
+    "compiled_source_identity_independently_verified": false,
+    "build_provenance_requirement": "测试二进制和 worker 的同提交或同候选构建须结合本次构建日志；本运行器绑定源码和输入摘要，不从文件路径推断编译来源。"
+  },
+  "cli_version": "1.0.41",
+  "platform": "win32-x64",
+  "native_binary": {
+    "platform": "win32-x64",
+    "artifact": "grok-1.0.41-windows-x86_64.exe",
+    "binary": "grok.exe",
+    "bytes": 154082120,
+    "sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    "url": "https://x.ai/cli/grok-1.0.41-windows-x86_64.exe",
+    "format": "pe32+-x86-64"
+  },
+  "inputs": {
+    "test_binary": {
+      "sha256": "565b6184b56e9e212b77f807a2aea1b4484ca635a95c9bc5806c8c2e8a746824",
+      "bytes": 462523904
+    },
+    "grok": {
+      "sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+      "bytes": 154082120
+    },
+    "supervisor": {
+      "sha256": "d49aa90483013c5416cc564beb97fda87355f221150ff75a9fbb342f9ae51dc3",
+      "bytes": 414372864
+    }
+  },
+  "inputs_manifest_sha256": "bebd303c0a1caa28b0338c8921ab06d0e909552c0d3fbf1f0fe224577763c098",
+  "credentials_provided": false,
+  "model_commands_sent": 0,
+  "authentication_commands_sent": 0,
+  "model_http_count_measured": false,
+  "test_name": "ai::cli_agent_runtime::grok::supervised_exit_live_tests::real_grok_1041_supervised_exit_without_credentials",
+  "timeout_seconds": 300,
+  "cases": [
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "windows_job",
+        "exit_code": 0,
+        "exit_reason": "stop_requested",
+        "generation": "74ac90c2-2c85-45b8-abb2-c7dd88047d99",
+        "manifest_sha256": "01ea90532a9cd62bac370e0bb229205ccbf0572fd3ff661f32748087222364d1",
+        "version": 1
+      },
+      "exit_receipt_sha256": "979321341b290cfe2aa3765b99c41d3f16d988a0918c8fe4755906ae23daad67",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "74ac90c2-2c85-45b8-abb2-c7dd88047d99",
+      "inputs_manifest_sha256": "bebd303c0a1caa28b0338c8921ab06d0e909552c0d3fbf1f0fe224577763c098",
+      "isolated_home": true,
+      "manifest_sha256": "01ea90532a9cd62bac370e0bb229205ccbf0572fd3ff661f32748087222364d1",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "windows_owned_process_handle",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "private_leader_finish",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "windows_job",
+        "exit_code": 0,
+        "exit_reason": "stdio_closed",
+        "generation": "761c6138-59ae-4f45-a966-0070356c3eaa",
+        "manifest_sha256": "0f13490661e96e6a1565f9761d4a88359e38a07ec14691c57e2332fb30a599bf",
+        "version": 1
+      },
+      "exit_receipt_sha256": "7a4b4d2c514a524b836392f93db7dab1bff9588a5c61385e188c33c56e3ef04a",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "761c6138-59ae-4f45-a966-0070356c3eaa",
+      "inputs_manifest_sha256": "bebd303c0a1caa28b0338c8921ab06d0e909552c0d3fbf1f0fe224577763c098",
+      "isolated_home": true,
+      "manifest_sha256": "0f13490661e96e6a1565f9761d4a88359e38a07ec14691c57e2332fb30a599bf",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "windows_owned_process_handle",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "private_leader_stdin_eof",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "windows_job",
+        "exit_code": 1,
+        "exit_reason": "stdio_closed",
+        "generation": "39539597-72db-4b43-aced-617a4b0c9393",
+        "manifest_sha256": "4c1893953e50aeeb55056dc87135d43e0ff62c2a275472c06d7a749cc90927c3",
+        "version": 1
+      },
+      "exit_receipt_sha256": "ff1307682b39fdd2ecf6f0689e838ef5c2b4493a7d9cd6ff5a2f8c90694f3b61",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "39539597-72db-4b43-aced-617a4b0c9393",
+      "inputs_manifest_sha256": "bebd303c0a1caa28b0338c8921ab06d0e909552c0d3fbf1f0fe224577763c098",
+      "isolated_home": true,
+      "manifest_sha256": "4c1893953e50aeeb55056dc87135d43e0ff62c2a275472c06d7a749cc90927c3",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "windows_owned_process_handle",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "no_leader_finish",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "stdout_eof_confirmed": true
+    },
+    {
+      "acp_messages_sent": 5,
+      "authentication_commands_sent": 0,
+      "cli_version": "1.0.41",
+      "credentials_provided": false,
+      "drained_tail_bytes": 0,
+      "event": "case_passed",
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "windows_job",
+        "exit_code": 1,
+        "exit_reason": "stdio_closed",
+        "generation": "d2e3f4c5-f4f9-4e6c-a948-f81e8bff241f",
+        "manifest_sha256": "b7d989da6e0aecba043e39af45f95c3f960c467b94bdd191c912eb13833adf2a",
+        "version": 1
+      },
+      "exit_receipt_sha256": "2f51505ab9751d7eab5165896af4901d0274671ccaf681ddc178462c9627130c",
+      "fixed_policy_permissions_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "generation": "d2e3f4c5-f4f9-4e6c-a948-f81e8bff241f",
+      "inputs_manifest_sha256": "bebd303c0a1caa28b0338c8921ab06d0e909552c0d3fbf1f0fe224577763c098",
+      "isolated_home": true,
+      "manifest_sha256": "b7d989da6e0aecba043e39af45f95c3f960c467b94bdd191c912eb13833adf2a",
+      "missing_cancel_ack_claimed": false,
+      "model_commands_sent": 0,
+      "native_identity_mechanism": "windows_owned_process_handle",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "old_generation_rejected": true,
+      "scenario": "no_leader_stdin_eof",
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "stdout_eof_confirmed": true
+    }
+  ],
+  "started_scenarios": [
+    "private_leader_finish",
+    "private_leader_stdin_eof",
+    "no_leader_finish",
+    "no_leader_stdin_eof"
+  ],
+  "passed": true,
+  "limitations": [
+    "只证明真实 Grok ACP 进程经生产监督器的显式结束及 EOF 清理；不宣称完整 GrokAdapter 生命周期或用户 Stop 操作。",
+    "--no-leader 只覆盖进程/stdio 拓扑，不代表固定权限 profile 的完整验收。",
+    "session/cancel 指向不存在的会话且无响应确认；不宣称取消了运行中回合。",
+    "零模型结论来自发送消息集合和无凭据配置，不是 HTTP 流量计量。"
+  ],
+  "inputs_unchanged": true,
+  "source_unchanged": true,
+  "cleanup_confirmed": true,
+  "all_observed_native_processes_exited": true,
+  "test_exit_code": 0,
+  "timed_out": false,
+  "panic_locations": [],
+  "pidfd_open_os_errors": [],
+  "raw_log": {
+    "sha256": "0dd4c7ba42c5ca758f0c6ae6551f34cdc0a5d99f8d7dd58dc653d25fd0019a26",
+    "bytes": 494,
+    "content_published": false
+  },
+  "case_progress": [
+    {
+      "scenario": "private_leader_finish",
+      "stage": "startup"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "acp"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "finish"
+    },
+    {
+      "scenario": "private_leader_finish",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "startup"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "acp"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "finish"
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "startup"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "acp"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "finish"
+    },
+    {
+      "scenario": "no_leader_finish",
+      "stage": "receipt"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "startup"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "acp"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "native_identity"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "finish"
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "stage": "receipt"
+    }
+  ],
+  "raw_events": {
+    "sha256": "70db16cf2a23872f368cb64518c9aaaf7dca9858fa144dfd69d38da5ba5ee8e2",
+    "bytes": 6652,
+    "content_published": false
+  }
+}

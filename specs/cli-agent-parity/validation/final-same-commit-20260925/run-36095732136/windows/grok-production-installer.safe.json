@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "fixed_version": "1.0.41",
+  "platform": "win32",
+  "native_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+  "test_binary_sha256": "c78e20bb3525ffdcacac599b616c059536af4e8688277346a32b76850c726fec",
+  "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+  "runner_sha256": "08cc1fa0fac964c6b258bb383c0dbde56731a0cc2cc4c3c7d6cb44e92671067a",
+  "source_sha256": {
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+    "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+    "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+    "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+    "script/cli-agent-parity/codex_windows_hook_command.ps1": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25"
+  },
+  "credentials_provided": false,
+  "model_inputs": 0,
+  "native_hook_execution_verified": false,
+  "worker_conout_verified": false,
+  "gui_verified": false,
+  "private_root_removed": true,
+  "timed_out": false,
+  "exit_code": 0,
+  "output_bytes": 506,
+  "output_sha256": "753e1c00d26d75308c5d845865d7f77ad47341e845e761ad3604e1ce842e61ec",
+  "failure_diagnostics": {
+    "panic_locations": [],
+    "raw_output_exported": false,
+    "private_paths_exported": false
+  },
+  "receipt": {
+    "credentials_provided": false,
+    "grok_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    "grok_version": "1.0.41",
+    "model_input_submitted": false,
+    "native_hook_execution_verified": false,
+    "native_inspect_verified": true,
+    "node_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+    "node_version": "v20.9.0",
+    "passed": true,
+    "progress": [
+      "binary_bindings_verified",
+      "runtime_verification",
+      "runtime_verified",
+      "node_version_probe",
+      "node_version_verified",
+      "grok_version_probe",
+      "grok_version_verified",
+      "windows_bridge_prepare",
+      "windows_bridge_cmd",
+      "windows_bridge_cmd_returned",
+      "windows_bridge_cmd_verified",
+      "windows_bridge_powershell",
+      "windows_bridge_powershell_returned",
+      "windows_bridge_powershell_verified",
+      "windows_bridge_verified",
+      "production_install",
+      "native_inspect",
+      "installed_hook_export",
+      "production_install_verified",
+      "legacy_fixture_install",
+      "production_upgrade_known_013_to_014",
+      "production_upgrade_verified",
+      "production_same_version_update",
+      "production_same_version_update_verified",
+      "production_disabled_update_rejected",
+      "production_disabled_update_rejected_verified",
+      "file_transaction_failure_rollback",
+      "file_transaction_failure_rollback_verified",
+      "production_update_after_rollback",
+      "finished"
+    ],
+    "stage": "finished",
+    "steps": [
+      {
+        "installed_hook_export": {
+          "config_registry_and_cache_unchanged": true,
+          "installed_hook_export_version_verified": true,
+          "installed_manifest_version": "0.1.4",
+          "installed_notify_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+          "kind": "installed_module_export_probe",
+          "main_entry_verified": false,
+          "manager_minimum_plugin_version": "0.1.4",
+          "model_input_submitted": false,
+          "node_exit_code": 0,
+          "plugin_version": "0.1.4",
+          "stderr_bytes": 0,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_bytes": 217,
+          "stdout_sha256": "f95c0290528e1e48f1a593e19adc986a730eabd08c8d6c8e903cc85e96f6404f",
+          "tty_main_validation_required": true
+        },
+        "installed_hook_main_verified": false,
+        "passed": true,
+        "step": "production_install"
+      },
+      {
+        "current_plugin_version": "0.1.4",
+        "fixture_old_native_install": true,
+        "installed_hook_export": {
+          "config_registry_and_cache_unchanged": true,
+          "installed_hook_export_version_verified": true,
+          "installed_manifest_version": "0.1.4",
+          "installed_notify_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+          "kind": "installed_module_export_probe",
+          "main_entry_verified": false,
+          "manager_minimum_plugin_version": "0.1.4",
+          "model_input_submitted": false,
+          "node_exit_code": 0,
+          "plugin_version": "0.1.4",
+          "stderr_bytes": 0,
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stdout_bytes": 217,
+          "stdout_sha256": "4ffcf056289daef7fc10ae90ea4314be3defad3a1afbc3bc80a4d2b92054d802",
+          "tty_main_validation_required": true
+        },
+        "installed_hook_main_verified": false,
+        "legacy_source_unchanged": true,
+        "model_input_submitted": false,
+        "passed": true,
+        "previous_plugin_version": "0.1.3",
+        "production_update_call": true,
+        "step": "production_upgrade_known_013_to_014"
+      },
+      {
+        "config_and_registry_unchanged": true,
+        "passed": true,
+        "step": "production_same_version_update"
+      },
+      {
+        "config_and_files_unchanged": true,
+        "passed": true,
+        "step": "production_disabled_update_rejected"
+      },
+      {
+        "fault_after_first_replacement": true,
+        "passed": true,
+        "production_apply_call": false,
+        "step": "file_transaction_failure_rollback"
+      },
+      {
+        "passed": true,
+        "step": "production_update_after_rollback"
+      }
+    ],
+    "test_binary_sha256": "c78e20bb3525ffdcacac599b616c059536af4e8688277346a32b76850c726fec",
+    "windows_bridge_argv": {
+      "cmd_verified": true,
+      "kind": "windows_bridge_argv",
+      "native_hook_execution_verified": false,
+      "powershell_51_verified": true,
+      "space_unicode_and_shell_metacharacters_preserved": true
+    },
+    "windows_bridge_command": {
+      "actual_command_utf16_units": 5430,
+      "ascii_only": true,
+      "command_sha256": "34c956f0509d7bb272054de5ebc6e43fce139cba11b6a4ecc0c7beaef5df69ae",
+      "encoded_payload_characters": 5364,
+      "node_path_verbatim": false,
+      "path_contains_system_powershell": true,
+      "powershell_executable_exists": true,
+      "production_command_utf16_units": 4538,
+      "script_path_verbatim": true,
+      "serialization": "command_args",
+      "test_only_bridge_diagnostics": true
+    },
+    "windows_bridge_last_command": {
+      "bridge": {
+        "failure": null,
+        "node_exit_code": 0,
+        "node_module_not_found": false,
+        "powershell_clixml_observed": true
+      },
+      "error_kind": null,
+      "native_exit_code": 0,
+      "os_code": null,
+      "stage": "windows_bridge_powershell",
+      "stderr_bytes": 431,
+      "stderr_sha256": "4a018caa3aeea983ca85a2a3c3a65b93bdfc1712f17c17ba53d54507b297653f",
+      "stdout_bytes": 83,
+      "stdout_sha256": "8e48a7b11a47fa60fa173ca3889d98a420bec08bf03cb790e750bf8b57074815"
+    },
+    "windows_bridge_shell": {
+      "argument_count": 5,
+      "flags": [
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command"
+      ],
+      "stage": "windows_bridge_powershell",
+      "timeout_seconds": 10
+    }
+  },
+  "source_unchanged": true
+}

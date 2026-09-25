@@ -1,0 +1,228 @@
+{
+  "run_id": 36116931025,
+  "head_sha": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "artifacts": [
+    {
+      "id": 10856746514,
+      "name": "codex-windows-production-installer-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "1002d06891601348447292d901e6df6c04cb8ef59b1f236e9bab9c71a8eba905",
+      "github_digest": "sha256:1002d06891601348447292d901e6df6c04cb8ef59b1f236e9bab9c71a8eba905",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-rust-source-installer.ndjson",
+          "sha256": "ef7518b0be4bb27dfad3f6f6ff0ef695462e36e16272af6468c5ff879f7b85e8",
+          "size": 4465
+        },
+        {
+          "path": "codex-rust-source-installer.test-output.txt",
+          "sha256": "0ec1a3dd1f5dcfdd4faab51def56244ff1b048eb2cfc018a8ba873a9d0e0067b",
+          "size": 553
+        },
+        {
+          "path": "codex-rust-source-installer.metadata.json",
+          "sha256": "cc12d6ae4ccbd9a43cef0790c2a3bfbfdfe1dbc0ba0767850498f304efcf90fd",
+          "size": 1166
+        }
+      ]
+    },
+    {
+      "id": 10856501964,
+      "name": "cli-windows-native-boundaries-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "e0cd39cb1251d3eed3de9ece262c021056d3ac5fd778f1754c93be9d6eb30b09",
+      "github_digest": "sha256:e0cd39cb1251d3eed3de9ece262c021056d3ac5fd778f1754c93be9d6eb30b09",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "claude-21280-inputs/claude-fixed-inputs.json",
+          "sha256": "1a5af0c8fd64623d4991c6f38edf1565c53624fab724aba701b69b5ed047090f",
+          "size": 494
+        },
+        {
+          "path": "codex-idle-crash.metadata.json",
+          "sha256": "cd7edc8c94f78205f715f75d660cf48c0b46c71ecc5e38e4aabe6d554ad861af",
+          "size": 793
+        },
+        {
+          "path": "claude-initialize-idle-eof.json",
+          "sha256": "baa10e18a85f78f8aa5d084e2d5b3ee97cf82e084768d8af6610a007d094a5ef",
+          "size": 3095
+        },
+        {
+          "path": "claude-permission-observation.json",
+          "sha256": "e36ae227680a5b726478090492ecb746050c8bb477e48957bf4d66078720314a",
+          "size": 34763
+        },
+        {
+          "path": "codex-idle-crash.ndjson",
+          "sha256": "727ec0256f9b5713eb1772cc709c51ac983d1dd55a7fe6ff0b61a32744cd4d0d",
+          "size": 2677
+        },
+        {
+          "path": "codex-idle-crash.test-output.txt",
+          "sha256": "ef51d51a6af11e9067c0e61198979d75e8a1caaf9965a88b8e36993ae05c39e4",
+          "size": 493
+        },
+        {
+          "path": "codex-missing-session-cmd.ndjson",
+          "sha256": "fc328cf7dc16a1c68445a63442cece3fff0f14aad6b7bbf600e16a8949114643",
+          "size": 1608
+        },
+        {
+          "path": "codex-missing-session-cmd.metadata.json",
+          "sha256": "b4b1b7a56aae9ca96bff9c44865dd6a3099e73b3e36adf7fb61e5a549e4c9e75",
+          "size": 764
+        },
+        {
+          "path": "codex-missing-session-cmd.test-output.txt",
+          "sha256": "0719848dd1f892de7ddc1d7289401a60f77cf66ffbffd92b7c82e94ca0af0e82",
+          "size": 473
+        },
+        {
+          "path": "codex-missing-session.metadata.json",
+          "sha256": "b4b1b7a56aae9ca96bff9c44865dd6a3099e73b3e36adf7fb61e5a549e4c9e75",
+          "size": 764
+        },
+        {
+          "path": "codex-missing-session.test-output.txt",
+          "sha256": "4265d05ecafc179ecbfc673c1056c38f38bef1a494056d84f05d35f12fa17328",
+          "size": 473
+        },
+        {
+          "path": "codex-plugin-cache-refresh.json",
+          "sha256": "d6b19a4a572871dfd433ca65205708da4c3bf07f9edfff095fe1a257968fa9dd",
+          "size": 299961
+        },
+        {
+          "path": "codex-missing-session.ndjson",
+          "sha256": "5d4cc65b50b4c45a0dbb94a6eacc6e621a6621a7d8d91a02d32acb7965e73b77",
+          "size": 1608
+        },
+        {
+          "path": "codex-plugin-lifecycle.json",
+          "sha256": "359a7e0f0102457cda699ede2d5e09719fcd171d158853c81adeaf8aaa5b8669",
+          "size": 26113
+        },
+        {
+          "path": "grok-cli-fixed/grok-fixed-inputs.json",
+          "sha256": "e056ad7b0b93a0def6b426c32fbf71fb1aba254de5cc2aeed654aaa97a776cc5",
+          "size": 569
+        },
+        {
+          "path": "grok-fixed-acp.json",
+          "sha256": "a9eac6d46022d5a17e12026ae222e3a5d25045d53bbc11b7e30cddb1b13caf23",
+          "size": 17235
+        },
+        {
+          "path": "grok-supervised-exit.json",
+          "sha256": "9c4824e305dae5de1ac32acea8bc4d55f95346a9adbc4010de84deb2be39bd42",
+          "size": 13261
+        }
+      ]
+    },
+    {
+      "id": 10855757102,
+      "name": "claude-windows-notifications-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "13124fa71fa9cc96614c90f145e982dd42409885ef5cf9096732cffb1037a91c",
+      "github_digest": "sha256:13124fa71fa9cc96614c90f145e982dd42409885ef5cf9096732cffb1037a91c",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "claude-windows-notifications.json",
+          "sha256": "654e41a9441316c0b731e4b2244de26bae67ce56a8159436ded5d18b41c06c22",
+          "size": 33679
+        }
+      ]
+    },
+    {
+      "id": 10855712161,
+      "name": "codex-01561-windows-conpty-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "998bc159ed0b174515a7fbaad5bf22c39dc93f1ac157717cbfecec05662d1d3f",
+      "github_digest": "sha256:998bc159ed0b174515a7fbaad5bf22c39dc93f1ac157717cbfecec05662d1d3f",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-01561-windows-conpty.json",
+          "sha256": "3590659b72d3ad9ddcdadd8304edd25e64bb36dc23a2feab4e946e193e1954d8",
+          "size": 7416
+        },
+        {
+          "path": "codex-01561-windows-conpty.pty.bin",
+          "sha256": "0967d9d36be21b1ead40cd0d0b745a33f5a0f8325c9c7e99761c2faa25150c11",
+          "size": 2508
+        },
+        {
+          "path": "codex-01561-windows-conpty.native.json",
+          "sha256": "3820485e8eddf3c50edc172375ccf5b98bd43d2dd4e49583837d58cb80142ef6",
+          "size": 874440
+        }
+      ]
+    },
+    {
+      "id": 10855684047,
+      "name": "grok-windows-production-installer-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "2b78cbe620a8c1d1a836751c6cfa2cbe08c21e94d94fced16ecff91b474adb59",
+      "github_digest": "sha256:2b78cbe620a8c1d1a836751c6cfa2cbe08c21e94d94fced16ecff91b474adb59",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "grok-production-installer.safe.json",
+          "sha256": "0c4c91ea9a8be353da54381a239cb2b5389ac6fc3b7c66fd232becdf587b2f96",
+          "size": 8054
+        }
+      ]
+    },
+    {
+      "id": 10855513728,
+      "name": "codex-01561-windows-native-hooks-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "18e63a6dbcc5d9c13d95f81d0ecb7d0a9417ddefee15d9b0e34b406f516df0ad",
+      "github_digest": "sha256:18e63a6dbcc5d9c13d95f81d0ecb7d0a9417ddefee15d9b0e34b406f516df0ad",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-01561-windows-native-hooks.json",
+          "sha256": "70156fadbcb5b44ea6d6b247923b3745647291f15659db8650ce8fd34e74dea6",
+          "size": 842767
+        }
+      ]
+    },
+    {
+      "id": 10854529896,
+      "name": "codex-windows-native-hooks-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "b42897030efc8c6643c08b2c246c73c35fef1ff7091c4c37dac14802973cf033",
+      "github_digest": "sha256:b42897030efc8c6643c08b2c246c73c35fef1ff7091c4c37dac14802973cf033",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-windows-native-hooks.json",
+          "sha256": "248b60b784d92d28d10e5fff1e2cf257a9e58670376ca3db216fe0330f521d03",
+          "size": 835782
+        }
+      ]
+    },
+    {
+      "id": 10854484932,
+      "name": "codex-windows-conpty-50e1515bcd3f20cf120edf5565766975b6a68d5d",
+      "archive_sha256": "f7f918cafff18ed9768624c24bab5811842bc9bcaf2021784aa561adadd3c96d",
+      "github_digest": "sha256:f7f918cafff18ed9768624c24bab5811842bc9bcaf2021784aa561adadd3c96d",
+      "github_digest_matches": true,
+      "files": [
+        {
+          "path": "codex-windows-conpty.json",
+          "sha256": "78014e68bdd7b3fc553400d823aacfbf6358215e7441deb366344c548aeea830",
+          "size": 7072
+        },
+        {
+          "path": "codex-windows-conpty.pty.bin",
+          "sha256": "658e7033e6c215d72d3d4f466d5e31781ea1364bc90afb4e5e43f9744f6e650b",
+          "size": 2508
+        },
+        {
+          "path": "codex-windows-conpty.native.json",
+          "sha256": "6c739e2ed27fe07677921588b75468c11affa42deaa5d5b33f5201ffceccbe37",
+          "size": 860637
+        }
+      ]
+    }
+  ]
+}

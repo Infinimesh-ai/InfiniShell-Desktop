@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "base_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "changed_files": [
+    "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+    "script/cli-agent-parity/run_grok_supervised_exit.py",
+    "script/cli-agent-parity/run_grok_supervised_exit_tests.py"
+  ],
+  "source_comparisons": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "base_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "candidate_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+      "base_sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0",
+      "candidate_sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+      "base_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+      "candidate_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "base_sha256": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f",
+      "candidate_sha256": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "base_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+      "candidate_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "base_sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14",
+      "candidate_sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+      "base_sha256": "dc8a9b9d362cd8b8e33fa3170438c19b8134848819bb1b7627bb703518d2f2d6",
+      "candidate_sha256": "67304b9225d8774059dd9b91625c1615251766083877963f696fea2a6a2865a6",
+      "bytes_unchanged": false
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_supervised_exit.py",
+      "base_sha256": "f4093c567141bb1e5aed04b3a6070d0a65732b92ca888fb5771e3add51ccbc23",
+      "candidate_sha256": "8e7e3f98dddb51921200937c63d09fd8e3365b9e811fbe0073f99d1fbc35fd24",
+      "bytes_unchanged": false
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_supervised_exit_tests.py",
+      "base_sha256": "87f41f58373f387c2c48292f86387773e62b1c1aadc322d747a4671abde7330d",
+      "candidate_sha256": "eafb4b713695d4c0d860e88370073a417a286cf90566df1d5edff82eed20b6e6",
+      "bytes_unchanged": false
+    }
+  ],
+  "change_scope": "仅新 Grok 真实监督测试的线程筛选、输入路径规范化，以及运行器 samefile 身份验证与有界 errno 诊断和相应测试。生产监督代码未改动。",
+  "limits": [
+    "本次 run 专项执行不算重新完成 ee839 的 GUI、workspace 或原子升级；各份历史证据继续标注原 SHA。",
+    "14e 四场景失败仍保留，后续结果不会覆盖其原始报告。"
+  ]
+}

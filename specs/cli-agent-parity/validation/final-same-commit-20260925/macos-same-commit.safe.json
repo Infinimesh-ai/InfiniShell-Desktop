@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "product_sources_unchanged": true,
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "seconds": 1.22,
+      "log_sha256": "a113781de65540b4cd3aa2a4cc5d6f77f4bed35e9ab0e988cc44a7a412373342",
+      "log_bytes": 72,
+      "summary": [],
+      "failures": []
+    },
+    {
+      "name": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "seconds": 5.71,
+      "log_sha256": "0dd14c1f97fd8b13d6bdf779b80d32ef4bfe438b30f95fce968a81d1a80f53f2",
+      "log_bytes": 1115,
+      "summary": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7691 filtered out; finished in 4.77s"
+      ],
+      "failures": []
+    },
+    {
+      "name": "workspace",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "--workspace",
+        "--exclude",
+        "command-signatures-v2",
+        "--exclude",
+        "integration",
+        "--exclude",
+        "warp_tui",
+        "--test-threads",
+        "4"
+      ],
+      "exit_code": 0,
+      "seconds": 692.29,
+      "log_sha256": "7c392626942ae37f9e075e73186eeffb3db5988aa8f654de1f55144b68fb7504",
+      "log_bytes": 1394861,
+      "summary": [
+        "     Summary [ 339.256s] 10895 tests run: 10895 passed (3 slow, 1 leaky), 94 skipped"
+      ],
+      "failures": []
+    },
+    {
+      "name": "tui",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp_tui",
+        "--lib",
+        "-E",
+        "test(tool_call_labels::tests::)"
+      ],
+      "exit_code": 0,
+      "seconds": 243.77,
+      "log_sha256": "3e65e0ff37d24288a133c35e9a3352bd67c2aa8ad08c0828c82aa52616448b43",
+      "log_bytes": 9677,
+      "summary": [
+        "     Summary [   0.259s] 9 tests run: 9 passed, 928 skipped"
+      ],
+      "failures": []
+    }
+  ],
+  "passed": true,
+  "platform": {
+    "os": "Darwin",
+    "version": "27.0",
+    "architecture": "arm64"
+  },
+  "workspace_notes": {
+    "passed": 10895,
+    "skipped": 94,
+    "failed": 0,
+    "leaky": 1,
+    "leaky_test": "warp ai::agent_providers::request_budget::tests::multimodal_attachment_remains_intact_when_tool_results_are_trimmed",
+    "leaky_is_subset_of_passed": true,
+    "does_not_prove_process_tree_cleanup": true,
+    "slow_but_passed_host_tests": 3
+  },
+  "product_git_objects": {
+    "app": "6d3f42916d649f8d6b3f2d53cd2318e4278034fb",
+    "crates": "240fdb972ba1b5ea049091aafabbfdad189a3af9",
+    "resources": "5f2be323c52963a7f3996aca857cdff74253b5f4",
+    "script": "4b21e7a54a4851b3029d9e3d567f8c4e9c66bbe4",
+    ".github": "9f3a69cb2aba8856fd69299943f3554712a4063d",
+    ".cargo": "fb9b38741febd22fa9875dc71d6ba86df2a8319a",
+    "lib": "b00fd139197c23de34e5ee3b58260cac3645214d",
+    "Cargo.toml": "47fa3e7472d201f2787ba17d85ba78fcb34fcf9c",
+    "Cargo.lock": "c954fa1ce1dfa7c34878660222265a82c5223f16",
+    "rust-toolchain.toml": "904bafaeebe08df76ba094fb4b069c33bd9ad877"
+  }
+}

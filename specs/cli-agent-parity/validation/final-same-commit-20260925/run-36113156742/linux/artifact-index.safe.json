@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "run_id": 36113156742,
+  "source_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "artifacts": [
+    {
+      "artifact_id": 10854762186,
+      "artifact_name": "cli-linux-native-boundaries-14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+      "original_zip_sha256": "e450b4dcf6f4563d7c89b236b3c3d47408e0a278430659b303a3c05984fed989",
+      "original_zip_bytes": 27022,
+      "files": [
+        {
+          "name": "claude-21280-inputs/claude-fixed-inputs.json",
+          "bytes": 486,
+          "sha256": "36c1419c2044bbc9ddf68021a24797769b8d914324445c5ad64caed2201576c1"
+        },
+        {
+          "name": "claude-permission-observation.json",
+          "bytes": 34753,
+          "sha256": "8f186babda591f819897a338f9cb309dc1e63ee688b789b168f4f3aa691757ca"
+        },
+        {
+          "name": "codex-idle-crash.metadata.json",
+          "bytes": 775,
+          "sha256": "3206af160e1b51c70bbc009d9d2a70c10c0cdd1ba5a4ffa0101f64ff9905cb3a"
+        },
+        {
+          "name": "claude-initialize-idle-eof.json",
+          "bytes": 3091,
+          "sha256": "303ad1416317e5caefd5fefce1c79fd749c9b4b84737a2405af1e98f2e7f6ae8"
+        },
+        {
+          "name": "codex-idle-crash.ndjson",
+          "bytes": 2604,
+          "sha256": "8b9fbd6207066f8d639afa8dc699c7405e29979ab70f88a9f6e607cf861f9b17"
+        },
+        {
+          "name": "codex-idle-crash.test-output.txt",
+          "bytes": 485,
+          "sha256": "172c363706a71a9d924be7b2d4ebb5477abb24a932e8d4c42c9ee13712cddab6"
+        },
+        {
+          "name": "codex-missing-session.metadata.json",
+          "bytes": 746,
+          "sha256": "bf60e2612d1308c6b901a2ae26bcbd69c3d22f23b5979d63da750627be270197"
+        },
+        {
+          "name": "codex-missing-session.ndjson",
+          "bytes": 1616,
+          "sha256": "5d6eb9dd4d30b777d9601a22fbe066197637b03f7e10d1da382d1b699766d6f9"
+        },
+        {
+          "name": "codex-missing-session.test-output.txt",
+          "bytes": 465,
+          "sha256": "3f3a79fdbedb9dc4a6fc7db06bc4be683aaef728851b9b64881a5b0fa55897c9"
+        },
+        {
+          "name": "codex-plugin-cache-refresh.json",
+          "bytes": 84059,
+          "sha256": "e3474d075ba18df364386c90f91f042c084a8c6e8b4a5a25fd7ef09569311471"
+        },
+        {
+          "name": "codex-plugin-lifecycle.json",
+          "bytes": 29414,
+          "sha256": "5cbdbd921719577badf724cc4adeb21239d611a5339f964603b8b10fc6c646bf"
+        },
+        {
+          "name": "grok-cli-fixed/grok-fixed-inputs.json",
+          "bytes": 553,
+          "sha256": "2b8db9cb4ec82840a4541fb1c08d9b6e03ae877900bc163b3fd486ab07c875f9"
+        },
+        {
+          "name": "grok-fixed-acp.json",
+          "bytes": 17040,
+          "sha256": "ff5afd126d340fa9a8387bd7f9378072e339b476545d02617cad3b1cbbffcc55"
+        },
+        {
+          "name": "grok-supervised-exit.json",
+          "bytes": 5661,
+          "sha256": "f3a86ea248da13ad4f8f1eb5dcf10fe3fe661fc28fb02a193573b09b1c03123c"
+        }
+      ],
+      "raw_zip_retained_privately": true
+    },
+    {
+      "artifact_id": 10855122555,
+      "artifact_name": "grok-linux-production-installer-14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+      "original_zip_sha256": "f2582aa9fdb563c1ac81585c81f9021aeb356fd47a3788bb8f078cf406b8e3ec",
+      "original_zip_bytes": 1832,
+      "files": [
+        {
+          "name": "grok-production-installer.safe.json",
+          "bytes": 5973,
+          "sha256": "00109edf20e2402818b3eb4b2bbe2b7a0b20e1c60f3a7ceb20cf48de8bcec9b0"
+        }
+      ],
+      "raw_zip_retained_privately": true
+    }
+  ]
+}

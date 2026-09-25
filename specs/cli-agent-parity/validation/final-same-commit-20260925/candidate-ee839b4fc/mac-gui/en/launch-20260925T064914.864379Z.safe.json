@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "signed_binary_sha256": "a587b200eefb594bc002e7cd8e101f6dd49327a18b22a432b6895688f2479351",
+  "pid": 15207,
+  "ui_locale_requested": "en",
+  "profile": "cli-parity-final-ee839-en",
+  "private_home": "/private/tmp/isp-final-20260925-un_fih0i/mac-gui-final/en/home",
+  "credentials_copied": false,
+  "managed_feature_override": false,
+  "existing_apps_closed": false,
+  "actual_ui_locale_verified": false,
+  "visual_verification_passed": false,
+  "private_log": "/private/tmp/isp-final-20260925-un_fih0i/mac-gui-final/en/gui-20260925T064914.864379Z.private.log"
+}

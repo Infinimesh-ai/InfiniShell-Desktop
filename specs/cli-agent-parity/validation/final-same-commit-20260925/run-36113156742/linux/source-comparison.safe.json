@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "base_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "source_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "source_comparisons": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "ee839_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "14e0_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+      "ee839_sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0",
+      "14e0_sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+      "ee839_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+      "14e0_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "ee839_sha256": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f",
+      "14e0_sha256": "9b964077767eadce89f708f242ccd0d7dd74124cf349a8ff36a730ece80d0f0f",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "ee839_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+      "14e0_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+      "bytes_unchanged": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "ee839_sha256": "cb2deec56ab46f14d7af0b88544bc512e0b5c2bd91a072c3ab8afc1150d5abf4",
+      "14e0_sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14",
+      "bytes_unchanged": false
+    }
+  ],
+  "grok_module_change": "仅追加 #[cfg(test)] 的 supervised_exit_live_tests 模块引用；其余产品代码字节保持。",
+  "limits": [
+    "本次 run 专项执行不算重新完成 ee839 的 GUI、workspace 或原子升级；这些证据始终标注原 SHA。"
+  ]
+}

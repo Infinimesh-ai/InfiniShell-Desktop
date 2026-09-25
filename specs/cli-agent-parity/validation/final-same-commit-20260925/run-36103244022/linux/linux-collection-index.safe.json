@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "run_id": 36103244022,
+  "job_id": 107970099361,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "job_conclusion": "success",
+  "created_at_utc": "2026-09-25T08:05:30.349243+00:00",
+  "files": [
+    {
+      "file": "artifact-index.safe.json",
+      "bytes": 16441,
+      "sha256": "f4b0ab0b2d014fc78087ee4c77929ff5c5ab84b17fa5d44ba27a9cd51fbe8ece"
+    },
+    {
+      "file": "gui/en/chinese-multiline.png",
+      "bytes": 2990231,
+      "sha256": "34bb8728d3db8ba9e08a9e2078f370d6b5ccc734f814f9fa73eac24c013a3531"
+    },
+    {
+      "file": "gui/en/pasted-image.png",
+      "bytes": 2987533,
+      "sha256": "a779930f30ffc06a1aabd0cfa6d80811cdacfa4ef8b37eee80420ffa6f1d200e"
+    },
+    {
+      "file": "gui/en/receipt.safe.json",
+      "bytes": 997,
+      "sha256": "3ee01aa46409124f0d0002f5c83de9b8b2c5e07a4b083e921d5122e4d781279e"
+    },
+    {
+      "file": "gui/zh-CN/chinese-multiline.png",
+      "bytes": 2987037,
+      "sha256": "f2ebdf77e1a2201af5261f5be3abd872cd0e97a045671377830c8e04198a6643"
+    },
+    {
+      "file": "gui/zh-CN/pasted-image.png",
+      "bytes": 2983035,
+      "sha256": "9827e84a4cf22ab90e8983f66e02b771c47bcf33e740b04f5880e13286449027"
+    },
+    {
+      "file": "gui/zh-CN/receipt.safe.json",
+      "bytes": 1000,
+      "sha256": "b9b3f3978cc418434a8cb48d772a8623619975f0e9a935b4ccb91e2a23cc8f28"
+    },
+    {
+      "file": "linux-atomic.safe.json",
+      "bytes": 48579,
+      "sha256": "aed5ba27c456d98b9d566b5d39f6c69263dc0d574f5102fa727b61291cf0f13b"
+    },
+    {
+      "file": "linux-final.safe.json",
+      "bytes": 29947,
+      "sha256": "f6cb337c2af9b17963087a6cd0e680a1d5bf005bbfdf8bb575ebf33735d12ceb"
+    },
+    {
+      "file": "linux-grok.safe.json",
+      "bytes": 9431,
+      "sha256": "45deaf439c22846eb62586c972d61a286eacb53038099b0985058da3a841c676"
+    },
+    {
+      "file": "linux-gui.safe.json",
+      "bytes": 5024,
+      "sha256": "6eb45f41c0e0e99e86a1432c8a31f2f950c02c486c51a768f537489ec03084fa"
+    },
+    {
+      "file": "linux-native-boundaries.safe.json",
+      "bytes": 8238,
+      "sha256": "a347ad0e572612e324575843e1caef6425cba2ef4b4d85481cbfc9d02bfe6895"
+    },
+    {
+      "file": "source-binding-verification.safe.json",
+      "bytes": 4084,
+      "sha256": "4b6912466b6d01a454e6ee82156384eff7c712ca428aa4d692d2d71d6d923643"
+    }
+  ],
+  "four_original_pngs_preserved_and_visually_reviewed": true,
+  "raw_artifacts_downloaded": 4,
+  "raw_logs_and_private_manifests_copied": false,
+  "ci_rerun_triggered": false,
+  "credentials_accessed": false,
+  "prior_failed_run": {
+    "run_id": 36095732136,
+    "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "unchanged_and_not_superseded_as_success": true
+  },
+  "scope": "仅白名单安全摘要、两份原始安全 GUI 收据与四张原始 PNG；无凭据、原始系统日志、原始事件 transcript、私有 manifest 或 raw CI 日志。"
+}

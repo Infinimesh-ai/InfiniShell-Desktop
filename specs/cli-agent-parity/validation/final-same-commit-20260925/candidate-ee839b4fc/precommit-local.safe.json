@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "base_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "candidate_source_sha256": {
+    ".github/workflows/cross-platform-preflight.yml": "ed6265b45705f37051c625449c3476646ee8b4c8414068198d908ade3b319d00",
+    "app/i18n/en/warp.ftl": "e0f15b5c25992100c8038594c140c9774f5375eaabd83485a6b515db5f3c7a9d",
+    "app/i18n/zh-CN/warp.ftl": "9ada26a16baa9b13bb6f22be384fe583c4486b678875cfd1f50235d7d4df5fe8",
+    "app/src/ai/cli_agent_runtime/managed_process.rs": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+    "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+    "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs": "253990bc6738e989d38c4414707c0e36ddbfde688b82158339363b60e4aec072",
+    "app/src/terminal/cli_agent_updates/sources_live_tests.rs": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+    "crates/integration/src/test/cli_composer_system_clipboard.rs": "681e2cd1279601871f721b25ba5403493f116483ee01ec5b865b9353d9f90fe8",
+    "script/cli-agent-parity/run_windows_gui_clipboard.ps1": "d1fd44f090c9aef03dd5cb5e8966ffcf295ea299cf2a3bef772f32a1561c243f"
+  },
+  "source_unchanged": true,
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.82,
+      "log_sha256": "a52787ab42561629ef803a736767cb6c32c68488cc00694fb04e55ce85b38c24",
+      "summary": [],
+      "diagnostics": []
+    },
+    {
+      "name": "integration-check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "integration"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 62.54,
+      "log_sha256": "368827d0f01866a9a1cb8d82c170e80208373921da2a0cc872282c807bcbc5b4",
+      "summary": [],
+      "diagnostics": []
+    },
+    {
+      "name": "supervisor-build",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "warp_tui",
+        "--bin",
+        "infinishell-tui"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.59,
+      "log_sha256": "686d2c86452077eb1b5f60a2298a3eb08643812ce030515f9376dea0afd9f915",
+      "summary": [],
+      "diagnostics": []
+    },
+    {
+      "name": "live-supervised",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--run-ignored",
+        "only",
+        "--test-threads",
+        "1",
+        "-E",
+        "test(managed_process::live_tests::supervised_)"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 142.87,
+      "log_sha256": "7dee9a19b6a7e4da4d78c6b66767c02a35ce5d7d91b305f085b007b88351d40c",
+      "summary": [
+        "     Summary [  23.281s] 5 tests run: 5 passed, 7699 skipped"
+      ],
+      "diagnostics": []
+    },
+    {
+      "name": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.94,
+      "log_sha256": "f205bdc578b49160a4f090712e3b6b0c8f13f9a9eae030327663c99d2bae2258",
+      "summary": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7693 filtered out; finished in 4.98s"
+      ],
+      "diagnostics": []
+    },
+    {
+      "name": "cli-focused",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--test-threads",
+        "4",
+        "-E",
+        "test(features::tests::) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(local_cli_tasks) | test(local_cli_mailbox) | test(local_harness) | test(harness_availability) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(terminal::model::ansi::dcs_hooks::tests::) | test(terminal::model::session::test::)"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 96.12,
+      "log_sha256": "f08e32e8f4919fb398e7f65ff2707e2884597dbdc2c49737335bbc7f4f479bb5",
+      "summary": [
+        "     Summary [  94.349s] 1786 tests run: 1786 passed (3 slow), 5918 skipped"
+      ],
+      "diagnostics": []
+    }
+  ],
+  "passed": true
+}

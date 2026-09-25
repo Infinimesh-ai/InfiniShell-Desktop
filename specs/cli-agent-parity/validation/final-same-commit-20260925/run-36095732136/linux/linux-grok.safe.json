@@ -1,0 +1,77 @@
+{
+  "run_id": 36095732136,
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "grok_fixed_version": "1.0.41",
+  "passed": true,
+  "steps": [
+    {
+      "step": "production_install",
+      "passed": true
+    },
+    {
+      "step": "production_upgrade_known_013_to_014",
+      "passed": true
+    },
+    {
+      "step": "production_same_version_update",
+      "passed": true
+    },
+    {
+      "step": "production_disabled_update_rejected",
+      "passed": true
+    },
+    {
+      "step": "file_transaction_failure_rollback",
+      "passed": true
+    },
+    {
+      "step": "production_update_after_rollback",
+      "passed": true
+    }
+  ],
+  "native_inspect_verified": true,
+  "native_hook_execution_verified": false,
+  "gui_verified": false,
+  "credentials_provided": false,
+  "model_inputs": 0,
+  "private_root_removed": true,
+  "source_binding": [
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "exact_git_blob_match": true,
+      "git_declared_crlf_checkout_match": false,
+      "matches_checkout": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "exact_git_blob_match": true,
+      "git_declared_crlf_checkout_match": false,
+      "matches_checkout": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs",
+      "exact_git_blob_match": true,
+      "git_declared_crlf_checkout_match": false,
+      "matches_checkout": true
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs",
+      "exact_git_blob_match": true,
+      "git_declared_crlf_checkout_match": false,
+      "matches_checkout": true
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json",
+      "exact_git_blob_match": true,
+      "git_declared_crlf_checkout_match": false,
+      "matches_checkout": true
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_command.ps1",
+      "exact_git_blob_match": false,
+      "git_declared_crlf_checkout_match": true,
+      "matches_checkout": true
+    }
+  ],
+  "receipt_sha256": "6f558a88a04e2cd263ce8f49e8f500806ae7f84921b1bb65bd75988401f14639"
+}

@@ -1,0 +1,17 @@
+{
+  "passed": false,
+  "supervised_passed": 2,
+  "supervised_failed": 3,
+  "failure_stage": "fixture_host_and_root_readiness",
+  "failed_cases": [
+    "supervised_detachment_obeys_platform_containment_boundary",
+    "supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+    "supervised_host_sigkill_stops_root_and_descendants_before_receipt"
+  ],
+  "ready_deadline_seconds": 15,
+  "worker_location": "byte_identical_internal_copy",
+  "libtest_location": "external_ACASIS_volume",
+  "cause_confirmed": false,
+  "four_real_grok_cases_executed": false,
+  "next_comparison": "将同一 libtest 字节也复制到内置盘，保持当前 worker、时限、用例和源码不变。"
+}

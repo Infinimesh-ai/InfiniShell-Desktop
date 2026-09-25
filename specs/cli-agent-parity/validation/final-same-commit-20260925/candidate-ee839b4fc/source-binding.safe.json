@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "parent_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "precommit_gates_bound_to_committed_files": true,
+  "source_files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "worktree_sha256": "ed6265b45705f37051c625449c3476646ee8b4c8414068198d908ade3b319d00",
+      "git_object": "2f7f5bf6640c05e29d9874deb1c30741707532d3"
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "worktree_sha256": "e0f15b5c25992100c8038594c140c9774f5375eaabd83485a6b515db5f3c7a9d",
+      "git_object": "67a30fbeaa90ed4ce2432dd3f633ba520c3bbfc9"
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "worktree_sha256": "9ada26a16baa9b13bb6f22be384fe583c4486b678875cfd1f50235d7d4df5fe8",
+      "git_object": "b620586ab73b8ad3026ae160b28b306371827b71"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "worktree_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+      "worktree_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+      "git_object": "01d091da3aa7c0c24c74234ed607ef42a104012c"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+      "worktree_sha256": "253990bc6738e989d38c4414707c0e36ddbfde688b82158339363b60e4aec072",
+      "git_object": "8762b7c93961d0218dbd266c25294f18fa9fd96c"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "worktree_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+      "git_object": "9491f880936ee5b62f59ddd376165a656eb582f0"
+    },
+    {
+      "path": "crates/integration/src/test/cli_composer_system_clipboard.rs",
+      "worktree_sha256": "681e2cd1279601871f721b25ba5403493f116483ee01ec5b865b9353d9f90fe8",
+      "git_object": "f0970a06f704c0fca539685b482622207cbdabb2"
+    },
+    {
+      "path": "script/cli-agent-parity/run_windows_gui_clipboard.ps1",
+      "worktree_sha256": "d1fd44f090c9aef03dd5cb5e8966ffcf295ea299cf2a3bef772f32a1561c243f",
+      "git_object": "f8348e2adb84ff9c8f8cbe1dd1af47496a5a4b67"
+    }
+  ],
+  "changes": [
+    "三平台桌面默认入口继承9af6de3",
+    "取消启动的监听器和监督进程生命周期转交给独立完成握手的任务",
+    "真实单线程排队取消回归与失败诊断",
+    "英/简中Claude支持版本文案及分进程双语GUI验收"
+  ],
+  "historical_native_receipts_relabelled": false,
+  "initial_macos_failure_preserved": "../startup-cancel-initial-failure.safe.json",
+  "original_linux_interruption_failure_preserved": "../run-36095732136/linux/linux-atomic.safe.json",
+  "platform_gates": "pending",
+  "model_inputs_in_this_iteration": 0
+}

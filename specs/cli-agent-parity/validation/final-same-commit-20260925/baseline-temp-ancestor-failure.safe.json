@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "source_commit": "d8759fbe1f8c763a82732c984aa2d20980f8d1b0",
+  "product_git_objects": {
+    "app": "a111a8eaabd32c5f438e7402bd22d207def1bacc",
+    "crates": "b65876e37386a4de0e3d3468d3453a00e2dcb589",
+    "resources": "5f2be323c52963a7f3996aca857cdff74253b5f4",
+    "script": "4b21e7a54a4851b3029d9e3d567f8c4e9c66bbe4",
+    ".github": "9f3a69cb2aba8856fd69299943f3554712a4063d",
+    ".cargo": "fb9b38741febd22fa9875dc71d6ba86df2a8319a",
+    "lib": "b00fd139197c23de34e5ee3b58260cac3645214d",
+    "Cargo.toml": "47fa3e7472d201f2787ba17d85ba78fcb34fcf9c",
+    "Cargo.lock": "c954fa1ce1dfa7c34878660222265a82c5223f16",
+    "rust-toolchain.toml": "904bafaeebe08df76ba094fb4b069c33bd9ad877"
+  },
+  "product_sources_unchanged": true,
+  "gates": [
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "seconds": 125.87,
+      "log_sha256": "09fc9744ea0a19089ef98cff69cbe68505b72a0a141f4f44547757eecabb2b08",
+      "log_bytes": 151,
+      "summary": []
+    },
+    {
+      "name": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "seconds": 187.99,
+      "log_sha256": "bb6ec7c01bf33a1fd5e09bb263b2cbcd128738e62859654675b8e794b4b68321",
+      "log_bytes": 1194,
+      "summary": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7691 filtered out; finished in 5.06s"
+      ]
+    },
+    {
+      "name": "cli-focused",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--test-threads",
+        "4",
+        "-E",
+        "test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(local_cli_tasks) | test(local_cli_mailbox) | test(local_harness) | test(harness_availability) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::tests) | test(terminal::model::ansi::dcs_hooks::tests::) | test(terminal::model::session::test::)"
+      ],
+      "exit_code": 100,
+      "seconds": 96.8,
+      "log_sha256": "46e9272bbe7a0cf3be505f025097ad8264d2e445c906ddae99bf58ba06832b6d",
+      "log_bytes": 282906,
+      "summary": [
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.11s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.11s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.12s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.10s",
+        "    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7701 filtered out; finished in 0.11s",
+        "     Summary [  93.663s] 1783 tests run: 1771 passed (3 slow), 12 failed, 5919 skipped"
+      ]
+    }
+  ],
+  "passed": false
+}

@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "run_id": 36116931025,
+  "source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "receipt": {
+    "file": "grok-supervised-exit.json",
+    "sha256": "0bc25d82aea2c101a825fb939b35c566bbe2e951a30d133d28ecca763b0c2f83",
+    "bytes": 13241
+  },
+  "passed": true,
+  "case_count": 4,
+  "test_exit_code": 0,
+  "timed_out": false,
+  "pidfd_open_os_errors": [],
+  "panic_locations": [],
+  "source_files_match_exact_git_objects": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex_idle_crash_identity_tests.rs",
+      "sha256": "89618cc72bc001ca3edb1d92ee44ca929429dcc04203fd958a86306a8ad23d68",
+      "git_object": "52a5cf134c3595571620502a36b36b3360123c31",
+      "matches": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "sha256": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14",
+      "git_object": "1bbf74b1952085b7ede1ca831c2674cde6c2cd97",
+      "matches": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+      "sha256": "67304b9225d8774059dd9b91625c1615251766083877963f696fea2a6a2865a6",
+      "git_object": "e65979e854a35070e35150394b874085660a6c19",
+      "matches": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+      "git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470",
+      "matches": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+      "sha256": "337c5d18521725e00fcc72fc261610e6a41e65be59328a9385bd3ae9d64a6bd0",
+      "git_object": "cc53272b8632848a6e3cf2c6de85712775ea9a09",
+      "matches": true
+    },
+    {
+      "path": "crates/command/src/managed.rs",
+      "sha256": "a8ffe4a2b3afa17b966bd99f458b391adddf5a08d0cd7272bc09e6efb1e19072",
+      "git_object": "e8f4632dc80fb49ec53621226d09373e17d0e195",
+      "matches": true
+    },
+    {
+      "path": "crates/command/src/managed_macos.rs",
+      "sha256": "e3d7e7f5d185bfb451486db73c919614065cadb34dccb606b8fe7858e875282b",
+      "git_object": "e7ce0df18c1864e19e7f61115d23c68445c9f398",
+      "matches": true
+    },
+    {
+      "path": "script/cli-agent-parity/prepare_grok_cli.py",
+      "sha256": "0ac553512f9d99f187cb5225a9eb7d72acf308e4f4f78abc938dc0812feab111",
+      "git_object": "976d0cb32c7e928060c95a46e289ead383fe4db1",
+      "matches": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_supervised_exit.py",
+      "sha256": "8e7e3f98dddb51921200937c63d09fd8e3365b9e811fbe0073f99d1fbc35fd24",
+      "git_object": "be44aced2118634b147cb3ab7cadb88e79713cb2",
+      "matches": true
+    },
+    {
+      "path": "script/cli-agent-parity/run_grok_supervised_exit_tests.py",
+      "sha256": "eafb4b713695d4c0d860e88370073a417a286cf90566df1d5edff82eed20b6e6",
+      "git_object": "612ada36049f4ff8a88b02701c83557f28d26c84",
+      "matches": true
+    }
+  ],
+  "source_dirty": false,
+  "source_claim_preserved": {
+    "compiled_source_identity_independently_verified": false
+  },
+  "limits": [
+    "只证明真实 Grok ACP 进程经生产监督器的显式结束及 EOF 清理；不宣称完整 GrokAdapter 生命周期或用户 Stop 操作。",
+    "--no-leader 只覆盖进程/stdio 拓扑，不代表固定权限 profile 的完整验收。",
+    "session/cancel 指向不存在的会话且无响应确认；不宣称取消了运行中回合。",
+    "零模型结论来自发送消息集合和无凭据配置，不是 HTTP 流量计量。"
+  ],
+  "cases": [
+    {
+      "scenario": "private_leader_finish",
+      "generation": "13abbe64-bbc7-4181-9605-9f56a2b7e7a9",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "native_identity_mechanism": "linux_pidfd_send_signal",
+      "stdout_eof_confirmed": true,
+      "drained_tail_bytes": 0,
+      "old_generation_rejected": true,
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "acp_messages_sent": 5,
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "missing_cancel_ack_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "fixed_policy_permissions_claimed": false,
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_code": 0,
+        "exit_reason": "stdio_closed",
+        "generation": "13abbe64-bbc7-4181-9605-9f56a2b7e7a9",
+        "manifest_sha256": "7d7ff08481b811a435f2f85a93dc5a632247a1056b790072d5b28feb9941d05c",
+        "version": 1
+      }
+    },
+    {
+      "scenario": "private_leader_stdin_eof",
+      "generation": "7964956f-6162-4dda-bc38-19fe1a94807f",
+      "observed_native_processes": 2,
+      "observed_native_processes_exited": true,
+      "native_identity_mechanism": "linux_pidfd_send_signal",
+      "stdout_eof_confirmed": true,
+      "drained_tail_bytes": 0,
+      "old_generation_rejected": true,
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "acp_messages_sent": 5,
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge"
+      ],
+      "missing_cancel_ack_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "fixed_policy_permissions_claimed": false,
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_code": 0,
+        "exit_reason": "stdio_closed",
+        "generation": "7964956f-6162-4dda-bc38-19fe1a94807f",
+        "manifest_sha256": "ef4b93589dbd0a2e2d532885ac69a1bedc1635bf6528e2aee9eed8c34b836f7a",
+        "version": 1
+      }
+    },
+    {
+      "scenario": "no_leader_finish",
+      "generation": "01dbaebb-775e-47ec-8992-c88892903a1b",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "native_identity_mechanism": "linux_pidfd_send_signal",
+      "stdout_eof_confirmed": true,
+      "drained_tail_bytes": 0,
+      "old_generation_rejected": true,
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "acp_messages_sent": 5,
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "missing_cancel_ack_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "fixed_policy_permissions_claimed": false,
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_code": null,
+        "exit_reason": "stop_requested",
+        "generation": "01dbaebb-775e-47ec-8992-c88892903a1b",
+        "manifest_sha256": "c490b6c34cea2ed0e91d2dd8feface911c00b45db55a532affa60b7a02d7d25a",
+        "version": 1
+      }
+    },
+    {
+      "scenario": "no_leader_stdin_eof",
+      "generation": "44552711-ed2a-4961-b62c-8d9efb33618b",
+      "observed_native_processes": 1,
+      "observed_native_processes_exited": true,
+      "native_identity_mechanism": "linux_pidfd_send_signal",
+      "stdout_eof_confirmed": true,
+      "drained_tail_bytes": 0,
+      "old_generation_rejected": true,
+      "model_commands_sent": 0,
+      "authentication_commands_sent": 0,
+      "acp_messages_sent": 5,
+      "setup_phases": [
+        "auth",
+        "resolve_workspace",
+        "folder_trust",
+        "plugin_registry",
+        "mcp_merge",
+        "persistence_init",
+        "spawn_session_actor"
+      ],
+      "missing_cancel_ack_claimed": false,
+      "full_adapter_lifecycle_claimed": false,
+      "fixed_policy_permissions_claimed": false,
+      "exit_receipt": {
+        "cleanup_confirmed": true,
+        "containment": "linux_subtree",
+        "exit_code": null,
+        "exit_reason": "stdio_closed",
+        "generation": "44552711-ed2a-4961-b62c-8d9efb33618b",
+        "manifest_sha256": "ca440af45a99770dffdbf2218b3eadb673819b270148df39e1e1766b913b4c6b",
+        "version": 1
+      }
+    }
+  ]
+}

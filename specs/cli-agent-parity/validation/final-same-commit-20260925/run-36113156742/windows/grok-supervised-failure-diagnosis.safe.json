@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "source_commit": "14e0d7d4218e53cfc73cad9d2f8ece6751af0104",
+  "run_id": 36113156742,
+  "job_id": 108001010627,
+  "report": "grok-supervised-exit.json",
+  "report_sha256": "f6b7aa5c56a56e6026df6d81a115500e18aedc3ba53c4249aca8540896b53d30",
+  "passed": false,
+  "failure_stage": "verify_receipts",
+  "failure_code": "test_did_not_complete_four_cases",
+  "test_exit_code": 101,
+  "timed_out": false,
+  "panic_locations": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs",
+      "line": 600,
+      "column": 5
+    }
+  ],
+  "required_native_cases": 4,
+  "started_native_cases": 0,
+  "completed_native_cases": 0,
+  "failure_class": "test_input_path_equality_assertion_before_scenarios",
+  "assertion_verified_by_bound_source_and_panic_location": true,
+  "assertion_values_available": false,
+  "windows_path_prefix_difference_hypothesis_confirmed": false,
+  "raw_private_libtest_log": {
+    "sha256": "55e248734671d50a749429e93ed37d350535039c63ac4243d7a5afc7630c892c",
+    "bytes": 1100,
+    "content_published": false
+  },
+  "raw_private_libtest_log_retrieved": false,
+  "github_job_log_retrieved_privately": true,
+  "github_job_log_sha256": "14d12f929b4c4250c6787c2dc881f01d8954bcb58b2aa2f2909db7a9c2195136",
+  "observations": [
+    "panic 行直接比较 Python 提供的原生 Grok 路径和 Rust 规范化路径；事件文件在后续才创建。",
+    "当前 CI 工件只包含私有 libtest 日志摘要，不含断言左右值；具体路径前缀差异仍是待确认解释。",
+    "四场景没有开始，不能归为真实 Grok 清理通过或产品监督清理失败。",
+    "保留原始失败，不重跑、不覆盖此前五秒 EOF 失败。"
+  ]
+}

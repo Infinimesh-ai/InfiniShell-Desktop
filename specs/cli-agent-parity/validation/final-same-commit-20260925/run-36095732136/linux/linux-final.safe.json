@@ -1,0 +1,937 @@
+{
+  "schema": 1,
+  "repository": "Infinimesh-ai/InfiniShell-Desktop",
+  "run_id": 36095732136,
+  "job": {
+    "id": 107947496822,
+    "name": "Linux x64",
+    "head_sha": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "status": "completed",
+    "conclusion": "failure",
+    "started_at": "2026-09-25T04:45:35Z",
+    "completed_at": "2026-09-25T06:14:24Z",
+    "html_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36095732136/job/107947496822"
+  },
+  "job_api_sha256": "7dbe5bfeaf2d4eff8c452751cc7a227b58932644118b51d997a2aee6f45a3968",
+  "raw_log": {
+    "file": "linux-job.raw.private.log",
+    "bytes": 3696193,
+    "sha256": "43f4217b9c58dfbd4c8f483735777c141543f7a36491a9948ecfc79633c2a880"
+  },
+  "step_counts": {
+    "success": 39,
+    "skipped": 3,
+    "failure": 1
+  },
+  "steps": [
+    {
+      "number": 1,
+      "name": "Set up job",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:45:38Z",
+      "completed_at": "2026-09-25T04:45:48Z"
+    },
+    {
+      "number": 2,
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:45:48Z",
+      "completed_at": "2026-09-25T04:46:09Z"
+    },
+    {
+      "number": 3,
+      "name": "Install Python for CLI parity verification",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:09Z",
+      "completed_at": "2026-09-25T04:46:09Z"
+    },
+    {
+      "number": 4,
+      "name": "Verify provisioned toolchain",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:09Z",
+      "completed_at": "2026-09-25T04:46:09Z"
+    },
+    {
+      "number": 5,
+      "name": "Install Node for CLI plugin verification",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:09Z",
+      "completed_at": "2026-09-25T04:46:10Z"
+    },
+    {
+      "number": 6,
+      "name": "Test Grok notification plugin scripts",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:10Z",
+      "completed_at": "2026-09-25T04:46:11Z"
+    },
+    {
+      "number": 7,
+      "name": "Test notification patch file transactions",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:11Z",
+      "completed_at": "2026-09-25T04:46:33Z"
+    },
+    {
+      "number": 8,
+      "name": "Prepare fixed native Codex without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:33Z",
+      "completed_at": "2026-09-25T04:46:47Z"
+    },
+    {
+      "number": 9,
+      "name": "Prepare fixed native Claude without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:46:47Z",
+      "completed_at": "2026-09-25T04:47:05Z"
+    },
+    {
+      "number": 10,
+      "name": "Prepare fixed native Grok without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:05Z",
+      "completed_at": "2026-09-25T04:47:19Z"
+    },
+    {
+      "number": 11,
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:19Z",
+      "completed_at": "2026-09-25T04:47:27Z"
+    },
+    {
+      "number": 12,
+      "name": "Verify native Claude initialization and idle EOF",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:27Z",
+      "completed_at": "2026-09-25T04:47:28Z"
+    },
+    {
+      "number": 13,
+      "name": "Verify native Claude permission observations without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:28Z",
+      "completed_at": "2026-09-25T04:47:30Z"
+    },
+    {
+      "number": 14,
+      "name": "Verify native Codex plugin registry failure recovery",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:30Z",
+      "completed_at": "2026-09-25T04:47:40Z"
+    },
+    {
+      "number": 15,
+      "name": "Verify native Codex persistent plugin source",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:40Z",
+      "completed_at": "2026-09-25T04:47:55Z"
+    },
+    {
+      "number": 16,
+      "name": "Test Claude and Codex Bash notification payloads",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:55Z",
+      "completed_at": "2026-09-25T04:47:59Z"
+    },
+    {
+      "number": 17,
+      "name": "Test Unix PTY notification framing",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:47:59Z",
+      "completed_at": "2026-09-25T04:48:00Z"
+    },
+    {
+      "number": 18,
+      "name": "Check InfiniShell-Desktop",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:48:00Z",
+      "completed_at": "2026-09-25T04:52:14Z"
+    },
+    {
+      "number": 19,
+      "name": "Test bilingual resources for Linux GUI verification",
+      "conclusion": "skipped",
+      "started_at": "2026-09-25T04:52:14Z",
+      "completed_at": "2026-09-25T04:52:14Z"
+    },
+    {
+      "number": 20,
+      "name": "Test IPC frame-limit recovery",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:52:14Z",
+      "completed_at": "2026-09-25T04:52:36Z"
+    },
+    {
+      "number": 21,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "conclusion": "success",
+      "started_at": "2026-09-25T04:52:36Z",
+      "completed_at": "2026-09-25T05:01:01Z"
+    },
+    {
+      "number": 22,
+      "name": "Test shared CLI action contracts and skills",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:01:01Z",
+      "completed_at": "2026-09-25T05:01:37Z"
+    },
+    {
+      "number": 23,
+      "name": "Test CLI harness arguments",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:01:37Z",
+      "completed_at": "2026-09-25T05:02:03Z"
+    },
+    {
+      "number": 24,
+      "name": "Test bilingual TUI task message states",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:02:03Z",
+      "completed_at": "2026-09-25T05:07:46Z"
+    },
+    {
+      "number": 25,
+      "name": "Test managed command process ownership",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:07:46Z",
+      "completed_at": "2026-09-25T05:07:53Z"
+    },
+    {
+      "number": 26,
+      "name": "Build CLI process supervisor",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:07:53Z",
+      "completed_at": "2026-09-25T05:15:15Z"
+    },
+    {
+      "number": 27,
+      "name": "Test installed Grok hook through the native notification worker",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:15:15Z",
+      "completed_at": "2026-09-25T05:16:07Z"
+    },
+    {
+      "number": 28,
+      "name": "Verify fixed Linux Grok production notification installer without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:16:07Z",
+      "completed_at": "2026-09-25T05:16:38Z"
+    },
+    {
+      "number": 29,
+      "name": "Preserve Linux Grok production installer evidence",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:16:38Z",
+      "completed_at": "2026-09-25T05:16:42Z"
+    },
+    {
+      "number": 30,
+      "name": "Verify fixed Linux CLI atomic update transactions without credentials",
+      "conclusion": "failure",
+      "started_at": "2026-09-25T05:16:42Z",
+      "completed_at": "2026-09-25T05:50:37Z"
+    },
+    {
+      "number": 31,
+      "name": "Preserve Linux fixed CLI atomic update receipts",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:50:37Z",
+      "completed_at": "2026-09-25T05:50:41Z"
+    },
+    {
+      "number": 32,
+      "name": "Test supervisor cleanup after host crash",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:50:41Z",
+      "completed_at": "2026-09-25T05:50:47Z"
+    },
+    {
+      "number": 33,
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:50:47Z",
+      "completed_at": "2026-09-25T05:50:55Z"
+    },
+    {
+      "number": 34,
+      "name": "Preserve Linux native CLI boundary evidence",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:50:55Z",
+      "completed_at": "2026-09-25T05:50:59Z"
+    },
+    {
+      "number": 35,
+      "name": "Test rust-genai",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:50:59Z",
+      "completed_at": "2026-09-25T05:51:46Z"
+    },
+    {
+      "number": 36,
+      "name": "Compile GUI integration tests",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:51:46Z",
+      "completed_at": "2026-09-25T05:57:29Z"
+    },
+    {
+      "number": 37,
+      "name": "Verify Linux GUI system clipboard without model inputs",
+      "conclusion": "success",
+      "started_at": "2026-09-25T05:57:29Z",
+      "completed_at": "2026-09-25T06:03:21Z"
+    },
+    {
+      "number": 38,
+      "name": "Preserve Linux GUI system clipboard evidence",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:03:21Z",
+      "completed_at": "2026-09-25T06:03:27Z"
+    },
+    {
+      "number": 39,
+      "name": "Run desktop workspace unit tests",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:03:27Z",
+      "completed_at": "2026-09-25T06:14:17Z"
+    },
+    {
+      "number": 76,
+      "name": "Post Install Node for CLI plugin verification",
+      "conclusion": "skipped",
+      "started_at": "2026-09-25T06:14:17Z",
+      "completed_at": "2026-09-25T06:14:17Z"
+    },
+    {
+      "number": 77,
+      "name": "Post Install Python for CLI parity verification",
+      "conclusion": "skipped",
+      "started_at": "2026-09-25T06:14:17Z",
+      "completed_at": "2026-09-25T06:14:17Z"
+    },
+    {
+      "number": 78,
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:14:17Z",
+      "completed_at": "2026-09-25T06:14:17Z"
+    },
+    {
+      "number": 79,
+      "name": "Complete job",
+      "conclusion": "success",
+      "started_at": "2026-09-25T06:14:17Z",
+      "completed_at": "2026-09-25T06:14:17Z"
+    }
+  ],
+  "nextest_summaries": [
+    {
+      "step": 20,
+      "name": "Test IPC frame-limit recovery",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 9,
+      "source_log_line": 3262,
+      "summary": "Summary [   0.035s] 2 tests run: 2 passed, 9 skipped"
+    },
+    {
+      "step": 21,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "run": 2871,
+      "passed": 2871,
+      "failed": 0,
+      "skipped": 4829,
+      "source_log_line": 7161,
+      "summary": "Summary [  39.756s] 2871 tests run: 2871 passed, 4829 skipped"
+    },
+    {
+      "step": 22,
+      "name": "Test shared CLI action contracts and skills",
+      "run": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 220,
+      "source_log_line": 7465,
+      "summary": "Summary [   0.063s] 75 tests run: 75 passed, 220 skipped"
+    },
+    {
+      "step": 23,
+      "name": "Test CLI harness arguments",
+      "run": 129,
+      "passed": 129,
+      "failed": 0,
+      "skipped": 0,
+      "source_log_line": 7672,
+      "summary": "Summary [   0.158s] 129 tests run: 129 passed, 0 skipped"
+    },
+    {
+      "step": 24,
+      "name": "Test bilingual TUI task message states",
+      "run": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 928,
+      "source_log_line": 8019,
+      "summary": "Summary [   0.271s] 9 tests run: 9 passed, 928 skipped"
+    },
+    {
+      "step": 25,
+      "name": "Test managed command process ownership",
+      "run": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 14,
+      "source_log_line": 8063,
+      "summary": "Summary [   0.215s] 1 test run: 1 passed, 14 skipped"
+    },
+    {
+      "step": 32,
+      "name": "Test supervisor cleanup after host crash",
+      "run": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 7696,
+      "source_log_line": 8621,
+      "summary": "Summary [   3.103s] 4 tests run: 4 passed, 7696 skipped"
+    },
+    {
+      "step": 39,
+      "name": "Run desktop workspace unit tests",
+      "run": 10923,
+      "passed": 10923,
+      "failed": 0,
+      "skipped": 98,
+      "source_log_line": 20759,
+      "summary": "Summary [  88.313s] 10923 tests run: 10923 passed, 98 skipped"
+    }
+  ],
+  "rust_libtest_summaries": [
+    {
+      "step": 35,
+      "passed": 81,
+      "failed": 0,
+      "ignored": 0,
+      "source_log_line": 9001
+    }
+  ],
+  "python_groups": [
+    {
+      "step": 6,
+      "name": "Test Grok notification plugin scripts",
+      "invocations": 2,
+      "run": 15,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "step": 7,
+      "name": "Test notification patch file transactions",
+      "invocations": 39,
+      "run": 1025,
+      "passed": 1015,
+      "failed": 0,
+      "skipped": 10
+    },
+    {
+      "step": 16,
+      "name": "Test Claude and Codex Bash notification payloads",
+      "invocations": 1,
+      "run": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "step": 17,
+      "name": "Test Unix PTY notification framing",
+      "invocations": 1,
+      "run": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "step": 27,
+      "name": "Test installed Grok hook through the native notification worker",
+      "invocations": 1,
+      "run": 17,
+      "passed": 15,
+      "failed": 0,
+      "skipped": 2
+    }
+  ],
+  "node_groups": [
+    {
+      "step": 6,
+      "run": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "source_log_line": 300
+    }
+  ],
+  "i18n_actual_passed_by_step": {
+    "21": 11,
+    "39": 11
+  },
+  "i18n_tests": {
+    "21": [
+      "i18n::tests::init_is_idempotent",
+      "i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+      "i18n::tests::requested_languages_keep_preferred_order",
+      "i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+      "i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+      "i18n::tests::requested_languages_fall_back_to_english_when_empty",
+      "i18n::tests::fallback_chain_works",
+      "i18n::tests::shared_runtime_loader_includes_tui_resources",
+      "i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+      "i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+      "i18n::tests::production_literal_translation_keys_exist_in_english_resources"
+    ],
+    "39": [
+      "i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+      "i18n::tests::init_is_idempotent",
+      "i18n::tests::requested_languages_keep_preferred_order",
+      "i18n::tests::requested_languages_fall_back_to_english_when_empty",
+      "i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+      "i18n::tests::shared_runtime_loader_includes_tui_resources",
+      "i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+      "i18n::tests::fallback_chain_works",
+      "i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+      "i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+      "i18n::tests::production_literal_translation_keys_exist_in_english_resources"
+    ]
+  },
+  "feature_tests": [
+    {
+      "step": 39,
+      "name": "features::tests::desktop_source_keeps_all_three_cli_update_consumer_entries",
+      "source_log_line": 15035
+    },
+    {
+      "step": 39,
+      "name": "features::tests::shared_non_gui_defaults_do_not_enable_local_cli_managed_tasks",
+      "source_log_line": 15038
+    },
+    {
+      "step": 39,
+      "name": "features::tests::infinishell_desktop_entry_enables_ime_and_managed_tasks_on_all_desktop_platforms",
+      "source_log_line": 15041
+    }
+  ],
+  "retry_or_flaky_markers": [],
+  "artifacts": [
+    {
+      "artifact_id": 10849455501,
+      "name": "cli-linux-fixed-atomic-updates-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "51f153f4f476a8ce7f7442050012411caa9e2f9fdb417dc1d73a75437d216f52",
+      "api_digest": "sha256:51f153f4f476a8ce7f7442050012411caa9e2f9fdb417dc1d73a75437d216f52",
+      "digest_matches": true,
+      "files": [
+        {
+          "path": "build-inputs.safe.json",
+          "bytes": 704,
+          "sha256": "2753e3901750d97c72b16ae3651457da0d1fa75f180bc7d6473d626aec846d52"
+        },
+        {
+          "path": "claude-command_failed_rolled_back-event.safe.json",
+          "bytes": 2341,
+          "sha256": "2c9c95310de78def0272a2e84ecab64f87e04b6133e99a654124614a269f85c3"
+        },
+        {
+          "path": "claude-command_failed_rolled_back-input.safe.json",
+          "bytes": 1506,
+          "sha256": "d633feb0c50653d8daae64ae241a68be07724b6f98af0c0fe7fd0873e5a57feb"
+        },
+        {
+          "path": "claude-command_failed_rolled_back-plugin_preparation.safe.json",
+          "bytes": 420,
+          "sha256": "080ab277fe67791646588ee46f826198ba456ae64c16f2c0f2ba81830272f944"
+        },
+        {
+          "path": "claude-command_failed_rolled_back-receipt.safe.json",
+          "bytes": 3866,
+          "sha256": "f05081ef30e89e5e7840b4751945924b4a8070ce4103c3b71c8e3973c8b5bcb4"
+        },
+        {
+          "path": "claude-interrupted_recovered-event.safe.json",
+          "bytes": 2239,
+          "sha256": "7b575f5534eb9b2b900b1588abb7e066767e93f9f51d8036ae17a105a439ff30"
+        },
+        {
+          "path": "claude-interrupted_recovered-input.safe.json",
+          "bytes": 1501,
+          "sha256": "2c43cc802a35bd4b9d231f836d801135e636669246a3976c887a7f8a10449e5c"
+        },
+        {
+          "path": "claude-interrupted_recovered-plugin_preparation.safe.json",
+          "bytes": 420,
+          "sha256": "e0f185e5578331787976a067aef62238f1008b800cc4e70ef11e1f5e5fb67635"
+        },
+        {
+          "path": "claude-interrupted_recovered-receipt.safe.json",
+          "bytes": 3720,
+          "sha256": "f3ae9e6485aa5ea64bc6d50db9cd938566ea48437fed7d25307379234ec9f863"
+        },
+        {
+          "path": "claude-source_changed_rejected-event.safe.json",
+          "bytes": 1964,
+          "sha256": "9cf6d200e45b5eafc5d9d25911536cca7bd7c466db3c2aa056063c14b221b46c"
+        },
+        {
+          "path": "claude-source_changed_rejected-input.safe.json",
+          "bytes": 1503,
+          "sha256": "555e38ef344d0dbcc35af4ad48c7db149a95459836b8371dbd1ebd6fb658fdb1"
+        },
+        {
+          "path": "claude-source_changed_rejected-plugin_preparation.safe.json",
+          "bytes": 420,
+          "sha256": "35987a1ddb57cf2d4b2d401f63dc384130417af010ab60c5f0096eba714b0ed9"
+        },
+        {
+          "path": "claude-source_changed_rejected-receipt.safe.json",
+          "bytes": 3313,
+          "sha256": "0e51b7df27541e6722c9dcf286b29053eff7c0b9ba893c219c2d5939246b557d"
+        },
+        {
+          "path": "claude-updated-event.safe.json",
+          "bytes": 2282,
+          "sha256": "0b681e5b6a5b0dad140396b8b39b5840729ad0100c093552a81b12f8d700bb25"
+        },
+        {
+          "path": "claude-updated-input.safe.json",
+          "bytes": 1487,
+          "sha256": "14f5705c2f28efff3036e02d9352521bf04a0de8da9ea0493bd4f349c9b95e6b"
+        },
+        {
+          "path": "claude-updated-receipt.safe.json",
+          "bytes": 3768,
+          "sha256": "aa84bc56c1fb543d04fe442cc3fa3bca63219bc53825190f679297980fb3de83"
+        },
+        {
+          "path": "claude-updated-plugin_preparation.safe.json",
+          "bytes": 420,
+          "sha256": "d6d8f666b7a6a9a5544e8cd8d6f780abd0eabb33a72d4645bca50ef5fbb3cc3d"
+        },
+        {
+          "path": "codex-command_failed_rolled_back-event.safe.json",
+          "bytes": 2329,
+          "sha256": "f3deba435bedf1c52aca21c216ce229fbdff78162813ea34c79494c8542e69a5"
+        },
+        {
+          "path": "codex-command_failed_rolled_back-input.safe.json",
+          "bytes": 1555,
+          "sha256": "3c4674052b27c593a4f8ae4b9f232915732e50090a5e9cd0d6f49a4ce1a53ad3"
+        },
+        {
+          "path": "codex-command_failed_rolled_back-receipt.safe.json",
+          "bytes": 3834,
+          "sha256": "288de49519a8cf37ac6073488a9b4e4d5928a6233e519175a1b6087bf0f38de8"
+        },
+        {
+          "path": "codex-interrupted_recovered-event.safe.json",
+          "bytes": 2237,
+          "sha256": "361565837cd61292726561946e01960ed1e484354a6e9cbdb4a1edef4fa7d596"
+        },
+        {
+          "path": "codex-interrupted_recovered-input.safe.json",
+          "bytes": 1550,
+          "sha256": "eea4bde2e6430081e3b17e380f1ce56577e11b5528400186c42319c7be81e61c"
+        },
+        {
+          "path": "codex-command_failed_rolled_back-plugin_preparation.safe.json",
+          "bytes": 419,
+          "sha256": "16869e4c1f420f86cbfcd496274ce5d268561c18d5d707b06725ce51c9b5357b"
+        },
+        {
+          "path": "codex-interrupted_recovered-plugin_preparation.safe.json",
+          "bytes": 419,
+          "sha256": "ff6c8b42e87b18193abcf69ea76aac426fd8354e46eb49d7e4a8bbcd8d88d011"
+        },
+        {
+          "path": "codex-interrupted_recovered-receipt.safe.json",
+          "bytes": 3717,
+          "sha256": "bf01bb1703f35e83ef339af8f02e346b975793721c98d79ac3c4fa28606ca745"
+        },
+        {
+          "path": "codex-source_changed_rejected-event.safe.json",
+          "bytes": 1962,
+          "sha256": "9e9f351c03d3eb9db9ce6461353b3786ad7e6f536696a28e2af40e4ebaa93fae"
+        },
+        {
+          "path": "codex-source_changed_rejected-input.safe.json",
+          "bytes": 1552,
+          "sha256": "07c6ae66323ad480d8155081ce9f2212bd65b89473dd67093bab33457ff8bad5"
+        },
+        {
+          "path": "codex-source_changed_rejected-plugin_preparation.safe.json",
+          "bytes": 419,
+          "sha256": "aa0eec1ea9275b3c2f57e5d376fe598a8cf1209cf26673eca59a2baebe6c4814"
+        },
+        {
+          "path": "codex-source_changed_rejected-receipt.safe.json",
+          "bytes": 3310,
+          "sha256": "51c5b758a69138fd9efa00954bfa3bcb182ffbb26891071570f41859f3f80246"
+        },
+        {
+          "path": "codex-updated-event.safe.json",
+          "bytes": 2280,
+          "sha256": "08144b1e52abbfa749f25ac2e97e256c497aaccc1b1233ddbeba66c55cd2a7dc"
+        },
+        {
+          "path": "codex-updated-input.safe.json",
+          "bytes": 1536,
+          "sha256": "3961a0f2ec4c4a66ed247fe4f28aff8a8e9a7258beb5d9e8aa8a35d85d307f8e"
+        },
+        {
+          "path": "codex-updated-plugin_preparation.safe.json",
+          "bytes": 419,
+          "sha256": "ec1d73fa90ed7abfb1ca7909610a8bbc8c945acdc37e2ea6d48e3f256f45e307"
+        },
+        {
+          "path": "codex-updated-receipt.safe.json",
+          "bytes": 3766,
+          "sha256": "3a54038fab9b09737ccab5ed3351060405d2f902c7698604bc49166df9345217"
+        },
+        {
+          "path": "grok-command_failed_rolled_back-event.safe.json",
+          "bytes": 2327,
+          "sha256": "993134636f5f4e35f62ebb57c29029877d0ace348768fac146647becd5fd4ac6"
+        },
+        {
+          "path": "grok-command_failed_rolled_back-input.safe.json",
+          "bytes": 1518,
+          "sha256": "961ee88883aeadc50f89dbb0419bf84e1ec16b6dbf1f3fa5da86bf55254dc6d3"
+        },
+        {
+          "path": "grok-command_failed_rolled_back-plugin_preparation.safe.json",
+          "bytes": 418,
+          "sha256": "bad2337905193171304da76601ac25d8f1cf9ec5c379659668ca0fc63445e676"
+        },
+        {
+          "path": "grok-command_failed_rolled_back-receipt.safe.json",
+          "bytes": 3831,
+          "sha256": "8ff1c429cd753203ce10eec03dae4543b942154cf883ae2e07c04152242907a3"
+        },
+        {
+          "path": "grok-interrupted_recovered-event.safe.json",
+          "bytes": 1820,
+          "sha256": "c1abdceddbe6dc197d56ed1b22565e5426a3301a24ce1a69ae0a8fca1aa86ab9"
+        },
+        {
+          "path": "grok-interrupted_recovered-input.safe.json",
+          "bytes": 1513,
+          "sha256": "caacbf70d39591b5748c97f3678a7bd1af2b4866484dc0ddfd1ed49ce52c2830"
+        },
+        {
+          "path": "grok-interrupted_recovered-plugin_preparation.safe.json",
+          "bytes": 418,
+          "sha256": "121ba27f71810c758f67d8ac52e4f1ead1411963f01d10cfa3dcaf07be998fa4"
+        },
+        {
+          "path": "grok-interrupted_recovered-receipt.safe.json",
+          "bytes": 3098,
+          "sha256": "fd26e224490f8b8d5fa11cf64b34d61e49ee995863fdd629e466f70eb8481f9b"
+        },
+        {
+          "path": "grok-source_changed_rejected-event.safe.json",
+          "bytes": 1958,
+          "sha256": "62a4071a9383e8ababbb7a3d7252b91e92731257e382bf940ff0c55c0cabad3f"
+        },
+        {
+          "path": "grok-source_changed_rejected-input.safe.json",
+          "bytes": 1515,
+          "sha256": "41c58077cbf8cc897ca33fbbe8c97b277922d5e78060185542a89186831c6535"
+        },
+        {
+          "path": "grok-source_changed_rejected-plugin_preparation.safe.json",
+          "bytes": 418,
+          "sha256": "c048b1dffed5c723c6792ad09405fa8cb1913396583fb85c9db134259cd90072"
+        },
+        {
+          "path": "grok-source_changed_rejected-receipt.safe.json",
+          "bytes": 3305,
+          "sha256": "5f29bd14f1c481d51732cb909b9a5de7fdf919ac4cf2450405981e754d95c6f2"
+        },
+        {
+          "path": "grok-updated-event.safe.json",
+          "bytes": 2276,
+          "sha256": "28502f71f3cc4d3b65446014bf419fabe172dcd54eb15e8b00cd0e8dc09defda"
+        },
+        {
+          "path": "grok-updated-input.safe.json",
+          "bytes": 1499,
+          "sha256": "368ca292e829130999332662d3f5bf763cd5da76e7fda0bf8a737733aef2c848"
+        },
+        {
+          "path": "grok-updated-plugin_preparation.safe.json",
+          "bytes": 418,
+          "sha256": "6fb03197e4611701bd0d81f1cc56dd34903a54808985b024a02bd093a3ecf6af"
+        },
+        {
+          "path": "grok-updated-receipt.safe.json",
+          "bytes": 3760,
+          "sha256": "772dd711f2cde7739079d5d394c73b04f7bf4be1e791b6169c9d83f3661cd152"
+        },
+        {
+          "path": "summary.safe.json",
+          "bytes": 12508,
+          "sha256": "b12c5ffe9b7134a2df52ac11e84e5802e0d34c40bbcdfbcc41f2d464aa5e09a2"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10848358942,
+      "name": "cli-linux-gui-system-clipboard-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "953ab6d581211baf52e6daf039a2eabeb0c2bc3d0e5bdc593d81a0ba1fc3fe12",
+      "api_digest": "sha256:953ab6d581211baf52e6daf039a2eabeb0c2bc3d0e5bdc593d81a0ba1fc3fe12",
+      "digest_matches": true,
+      "files": [
+        {
+          "path": "run-987306/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T06-03-00/chinese-multiline.png",
+          "bytes": 2986988,
+          "sha256": "b8a81b9fbfcb6e4c0f30a2fca18fc0e809584f8e223c6a1211aeb2095f48a851"
+        },
+        {
+          "path": "run-987306/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T06-03-00/receipt.safe.json",
+          "bytes": 976,
+          "sha256": "c4eeda99288b3c281da407ad0d32cee9d1b2add27104da2d8526300052dadb3c"
+        },
+        {
+          "path": "run-987306/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T06-03-00/recording.log",
+          "bytes": 2966,
+          "sha256": "c9d3d45cbd27529eea8e504a487775655a3c3a048b98cacb72bb1e1bbd9e6de0"
+        },
+        {
+          "path": "run-987306/test_cli_composer_system_clipboard_multiline_and_image/2026-09-25T06-03-00/pasted-image.png",
+          "bytes": 2984389,
+          "sha256": "616de1b433ab52f1613fc165b2701f4d6163241d5ea974c7b0151d25c06d6b7a"
+        },
+        {
+          "path": "system-cjk-font-coverage.txt",
+          "bytes": 3462,
+          "sha256": "6288418f3bfb3161da43b2f9890b0c211aa2d191a1a51b28f184555babd700ce"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10849330948,
+      "name": "cli-linux-native-boundaries-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "d71aeb2767f4f2fa7927feaf30ef9d81281f544e3c72b9ec04d2e4d7d8846421",
+      "api_digest": "sha256:d71aeb2767f4f2fa7927feaf30ef9d81281f544e3c72b9ec04d2e4d7d8846421",
+      "digest_matches": true,
+      "files": [
+        {
+          "path": "claude-21280-inputs/claude-fixed-inputs.json",
+          "bytes": 486,
+          "sha256": "36c1419c2044bbc9ddf68021a24797769b8d914324445c5ad64caed2201576c1"
+        },
+        {
+          "path": "claude-initialize-idle-eof.json",
+          "bytes": 3089,
+          "sha256": "e6be3891ff0092cbc28b2ff8fa93185fafa248eec4433b3fa1063f05039436cd"
+        },
+        {
+          "path": "claude-permission-observation.json",
+          "bytes": 34742,
+          "sha256": "1192c571931657db4d2f6fb5677a405ed96135c64d8f810f0092293a5290a6ad"
+        },
+        {
+          "path": "codex-idle-crash.metadata.json",
+          "bytes": 775,
+          "sha256": "b0aa071cf265b168e944e87d61dcb4873af1acc1dc24146c3cf116ce8a480a51"
+        },
+        {
+          "path": "codex-idle-crash.ndjson",
+          "bytes": 2596,
+          "sha256": "e76a93140f63da2e2fe274695ef73915d27b347966a56d31b10f5fed771a3db9"
+        },
+        {
+          "path": "codex-idle-crash.test-output.txt",
+          "bytes": 485,
+          "sha256": "5ee4ec5cf491611744f3087752b2f3bd7376e903f2b15ec457962bfa5ca0bb3f"
+        },
+        {
+          "path": "codex-missing-session.metadata.json",
+          "bytes": 746,
+          "sha256": "c6827682f9d05d3201a56fee1fd02327d42a75e60680c0f6c2e00352507ed535"
+        },
+        {
+          "path": "codex-missing-session.ndjson",
+          "bytes": 1616,
+          "sha256": "076dc89cd4c127eb85a385b5dc7fed71ab113aea4a07afc4f6dccdee58cc9fbf"
+        },
+        {
+          "path": "codex-missing-session.test-output.txt",
+          "bytes": 465,
+          "sha256": "08ab5a40fdb6aa0c23139d8c966270dbd38faacaaaf7bee2aae7b8f4cee1fb09"
+        },
+        {
+          "path": "codex-plugin-cache-refresh.json",
+          "bytes": 84052,
+          "sha256": "0d0b2b178860a2d521627a6479fc73d188033af1bab5d293d05e7c8bda644d19"
+        },
+        {
+          "path": "codex-plugin-lifecycle.json",
+          "bytes": 29410,
+          "sha256": "3869d78a1283e6e7f34eacefb81419312ccb1e9a361dcc46f888175bf6aac270"
+        },
+        {
+          "path": "grok-cli-fixed/grok-fixed-inputs.json",
+          "bytes": 553,
+          "sha256": "2b8db9cb4ec82840a4541fb1c08d9b6e03ae877900bc163b3fd486ab07c875f9"
+        },
+        {
+          "path": "grok-fixed-acp.json",
+          "bytes": 16717,
+          "sha256": "e7f2eb2f233232bbfefb7859a47151cd4a63210fe0c2def6948556b871c6b8b5"
+        }
+      ]
+    },
+    {
+      "artifact_id": 10848146628,
+      "name": "grok-linux-production-installer-9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+      "archive_sha256": "2d3b19841093a418828848e8009b7f9beb86f1f8f78b223d90b93c269106b51e",
+      "api_digest": "sha256:2d3b19841093a418828848e8009b7f9beb86f1f8f78b223d90b93c269106b51e",
+      "digest_matches": true,
+      "files": [
+        {
+          "path": "grok-production-installer.safe.json",
+          "bytes": 5973,
+          "sha256": "6f558a88a04e2cd263ce8f49e8f500806ae7f84921b1bb65bd75988401f14639"
+        }
+      ]
+    }
+  ],
+  "overall_acceptance_passed": false,
+  "failure": {
+    "agent": "grok",
+    "case": "interrupted_recovered",
+    "failure_code": "interrupted_exit_timeout",
+    "stage": "execute",
+    "test_exit_code": 101,
+    "runner_timed_out": false,
+    "atomic_cases_total": 12,
+    "atomic_cases_passed": 11,
+    "atomic_cases_failed": 1,
+    "atomic_cases_skipped": 0,
+    "atomic_retries": 0
+  },
+  "boundaries": [
+    "各测试组可能重复覆盖相同用例，禁止相加为不重复测试总数。",
+    "定向nextest的skipped含过滤项，不等于全部未实现或失败。",
+    "独立i18n步骤跳过；11项i18n在定向和全量日志确实通过。",
+    "GUI是英文界面中文多行输入和图片附件chip，不是简中界面布局或物理IME。",
+    "原子失败与所有历史原始收据保留，不能由其他11项通过抵消。"
+  ],
+  "step_log_binding_method": "按37个原始Run组与实际执行的步骤顺序对应，避免GitHub API秒级时间将步骤末尾摘要误归到下一步骤。"
+}

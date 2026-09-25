@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "run_id": 36095732136,
+  "status": "completed",
+  "conclusion": "failure",
+  "linux": "failure: Grok interrupted_exit_timeout; other selected gates passed",
+  "windows": "success; 3 leaky tests preserved, no retries",
+  "historical_failure_preserved": true,
+  "files": [
+    {
+      "path": "linux/atomic-failure/grok-interrupted_recovered-event.safe.json",
+      "bytes": 1820,
+      "sha256": "c1abdceddbe6dc197d56ed1b22565e5426a3301a24ce1a69ae0a8fca1aa86ab9"
+    },
+    {
+      "path": "linux/atomic-failure/grok-interrupted_recovered-receipt.safe.json",
+      "bytes": 3098,
+      "sha256": "fd26e224490f8b8d5fa11cf64b34d61e49ee995863fdd629e466f70eb8481f9b"
+    },
+    {
+      "path": "linux/gui/chinese-multiline.png",
+      "bytes": 2986988,
+      "sha256": "b8a81b9fbfcb6e4c0f30a2fca18fc0e809584f8e223c6a1211aeb2095f48a851"
+    },
+    {
+      "path": "linux/gui/pasted-image.png",
+      "bytes": 2984389,
+      "sha256": "616de1b433ab52f1613fc165b2701f4d6163241d5ea974c7b0151d25c06d6b7a"
+    },
+    {
+      "path": "linux/gui/receipt.safe.json",
+      "bytes": 976,
+      "sha256": "c4eeda99288b3c281da407ad0d32cee9d1b2add27104da2d8526300052dadb3c"
+    },
+    {
+      "path": "linux/gui/system-cjk-font-coverage.txt",
+      "bytes": 3462,
+      "sha256": "6288418f3bfb3161da43b2f9890b0c211aa2d191a1a51b28f184555babd700ce"
+    },
+    {
+      "path": "linux/linux-atomic.safe.json",
+      "bytes": 20979,
+      "sha256": "6e2b16cb34e307a7f66ea0ec197c6ad99be3f3b42942f002b8e2c90978c50a9c"
+    },
+    {
+      "path": "linux/linux-collection-index.safe.json",
+      "bytes": 1238,
+      "sha256": "852f7694f9d81246f98575e9833e933696cbd3b833646e94ca8a4711ac6ad9d5"
+    },
+    {
+      "path": "linux/linux-final.safe.json",
+      "bytes": 32398,
+      "sha256": "d3d75c1bade8ab11ce38f789b3031f56335889d8601c264818a4699805908b6d"
+    },
+    {
+      "path": "linux/linux-grok.safe.json",
+      "bytes": 2218,
+      "sha256": "cf280424ae27760814cbdeba9538720c773427bcd382b62eca390c1da66acd3a"
+    },
+    {
+      "path": "linux/linux-gui.safe.json",
+      "bytes": 3919,
+      "sha256": "6cdc7535ee38aa4903ee4eea9478c629cb6436ab666f93d1d594f37761c1632e"
+    },
+    {
+      "path": "linux/linux-native-boundaries.safe.json",
+      "bytes": 4240,
+      "sha256": "3d9b38ca30f5b2b772ea58db9c65b8f61b5f45cb0a9dc7dd0227718d22fca24f"
+    },
+    {
+      "path": "partial-archive.safe.json",
+      "bytes": 3211,
+      "sha256": "d892af68a120a736bbe242c6646495bc53d73ecbfbc4bbc35295252f1d676007"
+    },
+    {
+      "path": "windows/artifact-index.safe.json",
+      "bytes": 11988,
+      "sha256": "1edbdfa0cb9ec68ddb254fa4a2e06f681326be3a1b5462d895b10703a1aa00e4"
+    },
+    {
+      "path": "windows/atomic/claude-updated-product_receipt.safe.json",
+      "bytes": 1345,
+      "sha256": "afbdcac1aa80dd693ee58a1e80799c882f286bd7fd9cb059365e8d009a57e52f"
+    },
+    {
+      "path": "windows/atomic/codex-updated-product_receipt.safe.json",
+      "bytes": 1344,
+      "sha256": "0d63949f32dfc924d27eab82b4ac685705239308630d8cff5aba83e231885bc8"
+    },
+    {
+      "path": "windows/atomic/grok-updated-product_receipt.safe.json",
+      "bytes": 1339,
+      "sha256": "d06601bab028396aecec3139f15abbeb37b4e2a661a9478720904c371cd824cb"
+    },
+    {
+      "path": "windows/atomic-updates.safe.json",
+      "bytes": 10038,
+      "sha256": "5bd99bef19772a140fa1eac29ffaf8ead2835a029b76f3956a059e9e5ce3a795"
+    },
+    {
+      "path": "windows/grok-production-installer.safe.json",
+      "bytes": 8054,
+      "sha256": "d20834637f3862062d904f6d2b534829fb1e23f25cb2e1a212ef7e4e0407e0e5"
+    },
+    {
+      "path": "windows/gui/chinese-multiline.png",
+      "bytes": 2987689,
+      "sha256": "1093178a387174cc5fea8b93121261bb805510c06bcffd7348c107a223f9bf11"
+    },
+    {
+      "path": "windows/gui/pasted-image.png",
+      "bytes": 2984023,
+      "sha256": "e595fc19ba1ae8baf1a015f34166edecf34b8c9e8f53c8bc7445bdee92597025"
+    },
+    {
+      "path": "windows/gui/receipt.safe.json",
+      "bytes": 978,
+      "sha256": "b96a0ca8d6177eb1a2527664dc76d87fceac44d5da41a876400f6ef7f9518aa7"
+    },
+    {
+      "path": "windows/gui/renderer.safe.json",
+      "bytes": 1402,
+      "sha256": "4d14ef0744cf4acef2dd96d02a566d047cfcb1768804f353102767bb4735886a"
+    },
+    {
+      "path": "windows/gui-review.safe.json",
+      "bytes": 3455,
+      "sha256": "77a09a746c1dbc5e62fcb5fa5e35679dfbcd8161a0658ea04bfddefafca30e0b"
+    },
+    {
+      "path": "windows/job-summary.safe.json",
+      "bytes": 20193,
+      "sha256": "0099efb38c9bdd3e15cee6cb71d1015ddadc6071af112ed0e8a202577008e8df"
+    },
+    {
+      "path": "windows/native-boundaries.safe.json",
+      "bytes": 6321,
+      "sha256": "850fc344cdd129405447e28847e3d0b299114c5d046fe7d6ed4e049813ae3652"
+    },
+    {
+      "path": "windows/native-installers.safe.json",
+      "bytes": 9248,
+      "sha256": "78f8caf47a11ac953407af15e02b4f4a8ae37bc74f694ddf013dabe5109e3c99"
+    },
+    {
+      "path": "windows/native-notifications.safe.json",
+      "bytes": 6921,
+      "sha256": "161a5ee1f478495d9f6c170d052547e8ce1e28dd646be20fd35776acb4cb38e7"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # 固定版本验收对应表（2026-09-24）
 
+> **2026-09-25 最终收尾验证通过**：三平台桌面已默认开放 Grok 等本地托管入口；产品实现冻结于 `ee839b4fc`，最新验证提交为 `50e1515bc`。三平台必要门禁、所列双语布局及新增真实 Grok 四场景清理均已通过。原生五秒 EOF 负例和各阶段失败保留，清理通过不等于模型任务成功。完整来源与限制见[最终同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)；下方历史结论保留各自版本、构建和验收范围，不重标为本轮实测。
+
 本表把原 PLAN P0–P5、REOPEN R1–R8 与本轮实际证据对应。版本固定为 Codex `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不因上游发布新版本重新开始本轮。全部必需验收项已完成；最后受测产品提交为 `b3acf2a69010f9bd776558ce4f2fae9fbaa3e511`。[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)绑定实际源码、版本与平台，后文历史失败保留。
 
 代码沿用 `codex/cli-agent-parity`，开发基线 `104f5b8a1e857c49c5bbb782c78ddbfd89eef628`。Mac 实链按各自二进制和源码域留证；后续改动通过相应回归补验，不把旧收据改写成最终提交实测。详细来源、失败和平台边界见 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)。

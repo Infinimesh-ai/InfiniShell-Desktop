@@ -1,0 +1,18 @@
+{
+  "purpose": "startup_stack_diagnosis_not_acceptance",
+  "exit_code": 1,
+  "elapsed_seconds": 81.35,
+  "observations": [
+    {
+      "elapsed_seconds": 71.22,
+      "wrapper_discovered": "dev.infinishell.cli-agent.1b0d98c1-3a99-449f-a14e-67952fd646f3",
+      "pid": 25667
+    },
+    {
+      "elapsed_seconds": 72.34,
+      "sample": "dev.infinishell.cli-agent.1b0d98c1-3a99-449f-a14e-67952fd646f3",
+      "pid": 25667,
+      "exit_code": 0
+    }
+  ]
+}

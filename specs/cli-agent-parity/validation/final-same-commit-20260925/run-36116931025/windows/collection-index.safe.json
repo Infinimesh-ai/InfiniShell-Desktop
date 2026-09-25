@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "run_id": 36116931025,
+  "run_attempt": 1,
+  "source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "platform": "windows-x64",
+  "job_id": 108013126732,
+  "job_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36116931025/job/108013126732",
+  "conclusion": "success",
+  "collection_complete": true,
+  "scope": {
+    "native_acceptance_only": true,
+    "full_workspace_tests": false,
+    "run_gui_clipboard": false,
+    "run_cli_atomic_updates": false
+  },
+  "files": [
+    {
+      "path": "job-summary.safe.json",
+      "sha256": "cb6b635fdf4721a4447e19b6f62e2dbed53b9a9fa8c11a33b7ea818d63d8d0a0",
+      "bytes": 17019,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "artifact-index.safe.json",
+      "sha256": "c92e5ab9bbd768a0ef2d460ec26c75b542a77feed807fec08a1caacde2706f6b",
+      "bytes": 8732,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "native-notifications.safe.json",
+      "sha256": "0e5339e88b695ec7b16a661b76a7eeb2dac1af3d8c0322109209cd5ca05f7201",
+      "bytes": 6921,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "native-installers.safe.json",
+      "sha256": "335e1cca9d0858fefd6f4d8e13edb24d4246e1f64490f92cb35b2cd7b0e228c7",
+      "bytes": 9248,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "native-boundaries.safe.json",
+      "sha256": "59a2369cdc24062c640a83c56a1d90aa6f1c03a1ef3e002132489a165acbe49a",
+      "bytes": 8165,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "grok-supervised.safe.json",
+      "sha256": "77110fe362121042382138e16d66d8c3435ce24bd2d37cfa914ad68b5ef27e64",
+      "bytes": 10614,
+      "original_bytes_preserved": true,
+      "kind": "safe_projection"
+    },
+    {
+      "path": "grok-supervised-exit.json",
+      "sha256": "9c4824e305dae5de1ac32acea8bc4d55f95346a9adbc4010de84deb2be39bd42",
+      "bytes": 13261,
+      "original_bytes_preserved": true,
+      "kind": "original_native_receipt"
+    },
+    {
+      "path": "grok-fixed-acp.json",
+      "sha256": "a9eac6d46022d5a17e12026ae222e3a5d25045d53bbc11b7e30cddb1b13caf23",
+      "bytes": 17235,
+      "original_bytes_preserved": true,
+      "kind": "original_native_receipt"
+    },
+    {
+      "path": "grok-production-installer.safe.json",
+      "sha256": "0c4c91ea9a8be353da54381a239cb2b5389ac6fc3b7c66fd232becdf587b2f96",
+      "bytes": 8054,
+      "original_bytes_preserved": true,
+      "kind": "original_native_receipt"
+    }
+  ],
+  "private_evidence": [
+    {
+      "file": "run.latest.json",
+      "sha256": "f163d718a86c49ff561eea9440d8c93b19651dd9d4c0a461d8c33d6778fd4539",
+      "bytes": 13551,
+      "content_published": false
+    },
+    {
+      "file": "jobs.latest.json",
+      "sha256": "7306aa282331ba5620db0a748978763870af2dd0add186540ce104da0490460e",
+      "bytes": 22560,
+      "content_published": false
+    },
+    {
+      "file": "job.final.json",
+      "sha256": "695462f85ac1e548243e741a562ca4c15c34cb66dde3857e87a90d634da3cc19",
+      "bytes": 15898,
+      "content_published": false
+    },
+    {
+      "file": "job.log",
+      "sha256": "067716875101fb5802d52a6ebf968e01a881cac02c3bd57e8d04146a95fb2d85",
+      "bytes": 548895,
+      "content_published": false
+    },
+    {
+      "file": "artifacts.json",
+      "sha256": "57cb2f5cfc57b174df906543bd71f5dffedd4e35c04b6d8311c556b8209f4f54",
+      "bytes": 6416,
+      "content_published": false
+    }
+  ],
+  "remote_only_evidence": [
+    {
+      "description": "真实 Grok libtest 私有日志；原工件只有摘要，未上传日志正文或输入 manifest。",
+      "sha256": "0dd4c7ba42c5ca758f0c6ae6551f34cdc0a5d99f8d7dd58dc653d25fd0019a26",
+      "bytes": 494,
+      "content_published": false,
+      "retrieved_locally": false
+    }
+  ],
+  "sensitive_audit": {
+    "json_parse_passed": true,
+    "credential_pattern_hits": 0,
+    "known_sensitive_string_fields_redacted": 3,
+    "raw_manifest_or_log_copied": false
+  },
+  "grok_supervised": {
+    "passed": true,
+    "started_native_cases": 4,
+    "completed_native_cases": 4,
+    "exit_observations": [
+      {
+        "scenario": "private_leader_finish",
+        "exit_reason": "stop_requested",
+        "exit_code": 0
+      },
+      {
+        "scenario": "private_leader_stdin_eof",
+        "exit_reason": "stdio_closed",
+        "exit_code": 0
+      },
+      {
+        "scenario": "no_leader_finish",
+        "exit_reason": "stdio_closed",
+        "exit_code": 1
+      },
+      {
+        "scenario": "no_leader_stdin_eof",
+        "exit_reason": "stdio_closed",
+        "exit_code": 1
+      }
+    ]
+  },
+  "native_eof_observation": {
+    "observation_timeout_seconds": 5,
+    "exited_within_observation": true,
+    "delayed_natural_exit": false,
+    "natural_exit_before_owned_cleanup": true,
+    "product_supervisor_verified": false
+  },
+  "limitations": [
+    "本轮仅补验原生边界，未产生新的 GUI 截图、原子升级或全工作区/i18n 结果。",
+    "五项监督测试使用合成夹具；真实 Grok 四场景另以原生收据核对，两者不可互相替代。",
+    "原生 ACP 五秒 EOF 仅记录本次观察，不推翻旧轮保留的五秒 EOF 失败，不保证所有运行都可在五秒内退出。",
+    "真实 Grok 收据不证明模型回合、用户 Stop 操作、完整 GrokAdapter 生命周期或固定权限策略验收。",
+    "本次两个 no_leader 场景均记录 stdio_closed / exit_code=1，清理验收通过不代表自然 exit0 或模型任务成功。",
+    "私有或远端证据列表不要求在本公开归档中存在同名文件。"
+  ]
+}

@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "reviewed_at_utc": "2026-09-25T06:58:49.079037+00:00",
+  "scope": "macOS 默认桌面入口、Claude 支持版本说明及 Grok 权限按钮的英文和简体中文局部布局验收",
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "source_tree": "e69e859ec45588f9ab3f81cd08c609babdbe4399",
+  "platform": {
+    "os": "macos",
+    "version": "27.0",
+    "architecture": "arm64"
+  },
+  "signed_binary_sha256": "a587b200eefb594bc002e7cd8e101f6dd49327a18b22a432b6895688f2479351",
+  "bundle_receipt": {
+    "file": "bundle.safe.json",
+    "sha256": "f115d73a7c54468f1429d25e8fa5d3f118840778f8d3926c2b54b8c0332c05da",
+    "bytes": 3656
+  },
+  "resources_receipt": {
+    "file": "resources.safe.json",
+    "sha256": "a6be3bae8c84372c67d183cbed293377f27f13aa2c3dc283c60ba019891882f9",
+    "bytes": 22769
+  },
+  "quit_receipt": {
+    "file": "quit.safe.json",
+    "sha256": "69dc33086ea29d45e9b8e11eb9e8e136b749dba29936706812954aff265d8406",
+    "bytes": 193
+  },
+  "historical_bundle_receipt_flags_note": "bundle.safe.json 的 gui_started=false、visual_verification_passed=false 和 profiles.started=false 是打包时状态；启动回执中的 actual_ui_locale_verified=false、visual_verification_passed=false 是启动时状态。原始收据保持不改写，本文件记录后续实际观察。",
+  "default_entry_visible_without_feature_override": true,
+  "actual_localized_interface_observed": [
+    "en",
+    "zh-CN"
+  ],
+  "claude_support_description_visible_and_complete": true,
+  "claude_support_versions": [
+    "2.1.273",
+    "2.1.278",
+    "2.1.280"
+  ],
+  "grok_selector_and_inherit_fixed_read_fixed_file_buttons_visible": true,
+  "reviewed_labels_no_truncation_or_overlap": true,
+  "local_layout_review_passed": true,
+  "profiles": [
+    {
+      "ui_locale": "en",
+      "locale_observation": "已逐张检查实际原图中的标题、按钮和说明语言；不是仅根据启动参数推断",
+      "launch": {
+        "file": "en/launch-20260925T064914.864379Z.safe.json",
+        "sha256": "1c4bbdb29ca7bd426794f1875670cee11fc6a998fda5e3c5b127ab7791cd2ffd",
+        "bytes": 644
+      },
+      "profile": "cli-parity-final-ee839-en",
+      "isolated_home_visible_in_final_modal": true,
+      "fixed_cli_versions_visible": {
+        "Codex": "0.156.1",
+        "Claude": "2.1.280",
+        "Grok": "1.0.41"
+      },
+      "fixed_cli_path_prefix_visible": "/private/tmp/isp-mac-1mej4h8z/gui-bin/",
+      "managed_feature_override": false,
+      "credentials_copied": false,
+      "database_read_mode": "原数据库及现有 WAL/SHM 复制到私有审计目录，再用 mode=ro/query_only 查询；原文件摘要未变",
+      "database_bindings": {
+        "warp.sqlite": {
+          "sha256": "f9c36360b3fd6d6b605345eab870fbbe2896a0aba5ca55632590a372f1cabeba",
+          "bytes": 503808
+        },
+        "warp.sqlite-wal": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "warp.sqlite-shm": {
+          "sha256": "d30d8e63e50090ae1698d38af277355921fc2c856588699e4723cf8a9fa80866",
+          "bytes": 32768
+        }
+      },
+      "local_cli_row_counts": {
+        "local_cli_tasks": 0,
+        "local_cli_task_generations": 0,
+        "local_cli_messages": 0
+      },
+      "runtime_journal_count": 0,
+      "settings_sha256_at_review": "c214b2bdf876125a2dde1baec14cb88f5d0022e11052f355bcc207d4cf48d7d0"
+    },
+    {
+      "ui_locale": "zh-CN",
+      "locale_observation": "已逐张检查实际原图中的标题、按钮和说明语言；不是仅根据启动参数推断",
+      "launch": {
+        "file": "zh-CN/launch-20260925T064736.671412Z.safe.json",
+        "sha256": "778cc8b72f6e51041cedace1e9e9be0c3e80a56f32f3973104ebfaf746d409dd",
+        "bytes": 656
+      },
+      "profile": "cli-parity-final-ee839-zh-cn",
+      "isolated_home_visible_in_final_modal": true,
+      "fixed_cli_versions_visible": {
+        "Codex": "0.156.1",
+        "Claude": "2.1.280",
+        "Grok": "1.0.41"
+      },
+      "fixed_cli_path_prefix_visible": "/private/tmp/isp-mac-1mej4h8z/gui-bin/",
+      "managed_feature_override": false,
+      "credentials_copied": false,
+      "database_read_mode": "原数据库及现有 WAL/SHM 复制到私有审计目录，再用 mode=ro/query_only 查询；原文件摘要未变",
+      "database_bindings": {
+        "warp.sqlite": {
+          "sha256": "36a13428a6a4be4a255cbd2b97528c2216d8bd59e37097656c69e06959380d29",
+          "bytes": 503808
+        },
+        "warp.sqlite-wal": {
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0
+        },
+        "warp.sqlite-shm": {
+          "sha256": "a700f8c6e2efedf653b47186d24f254d4be90c767b40cc1f3825795a3deaf343",
+          "bytes": 32768
+        }
+      },
+      "local_cli_row_counts": {
+        "local_cli_tasks": 0,
+        "local_cli_task_generations": 0,
+        "local_cli_messages": 0
+      },
+      "runtime_journal_count": 0,
+      "settings_sha256_at_review": "28d3e7f5d037779e32da909653d8a484ae232af52ef42b31be934848c32f5284"
+    }
+  ],
+  "valid_screenshots": [
+    {
+      "file": "en/screenshots/default-entry-verified.png",
+      "sha256": "82d451e1bf27962efb5a1e99d07ff9760a5e3d256e3fad7756944249cbb5b374",
+      "bytes": 234477,
+      "ui_locale": "en",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "default-entry"
+    },
+    {
+      "file": "en/screenshots/claude-support-verified.png",
+      "sha256": "a96b8a1c24c94ee87890ecc8bac97e7e45e334dccf8143b625387fd2192f2bc7",
+      "bytes": 359993,
+      "ui_locale": "en",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "claude-support"
+    },
+    {
+      "file": "en/screenshots/grok-default-policy-verified.png",
+      "sha256": "0ffdf7de530956be2a3670eab43186d6c36ed0a537e4fcce34d27110ef7490c2",
+      "bytes": 358653,
+      "ui_locale": "en",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "grok-default-policy"
+    },
+    {
+      "file": "zh-CN/screenshots/default-entry.png",
+      "sha256": "bc99d9c7511fb6600187de675fcd7e8ef4af908f6542305ec7dd7df74ff25ce4",
+      "bytes": 172348,
+      "ui_locale": "zh-CN",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "default-entry"
+    },
+    {
+      "file": "zh-CN/screenshots/claude-support.png",
+      "sha256": "ede9ab4331f8fd58fe66a07ac7a53a06bfede70476edfe7499eb74aff7fe9348",
+      "bytes": 356359,
+      "ui_locale": "zh-CN",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "claude-support"
+    },
+    {
+      "file": "zh-CN/screenshots/grok-default-policy.png",
+      "sha256": "3e63fff04dbafe95ca37ce43eb3b24f1abd386c83f8d7da84b3b35d9d2d16fb2",
+      "bytes": 334353,
+      "ui_locale": "zh-CN",
+      "width": 2560,
+      "height": 1600,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "visual_review": "原始截图已用 view_image(original) 独立检查",
+      "accepted": true,
+      "scope": "grok-default-policy"
+    }
+  ],
+  "excluded_screenshots": [
+    {
+      "file": "en/screenshots/default-entry.png",
+      "sha256": "9914c1f5a8d4125e53eb2e1a6feb6b7cc8d509db67a82b53188af8e4107ff4ac",
+      "bytes": 224543,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "accepted": false,
+      "exclusion_reason": "初次英文运行的同组模态截图显示 Codex 0.155.1、Claude 2.1.267，来源为系统安装路径，项目目录为真实用户 HOME；不符合本轮固定 CLI 与隔离目录要求。三个原始截图均保留，不能计入最终隔离验收。",
+      "superseded_by": "en/screenshots/default-entry-verified.png"
+    },
+    {
+      "file": "en/screenshots/claude-support.png",
+      "sha256": "4aba752c0108814a9589590afdfa4c2119d044534ae81707790a4b3073c3b1b9",
+      "bytes": 340009,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "accepted": false,
+      "exclusion_reason": "初次英文运行的同组模态截图显示 Codex 0.155.1、Claude 2.1.267，来源为系统安装路径，项目目录为真实用户 HOME；不符合本轮固定 CLI 与隔离目录要求。三个原始截图均保留，不能计入最终隔离验收。",
+      "superseded_by": "en/screenshots/claude-support-verified.png"
+    },
+    {
+      "file": "en/screenshots/grok-default-policy.png",
+      "sha256": "f097250ea33568c868ea49753ee4ddd3aaea5b0ca107962b4d4d7b7314c211a2",
+      "bytes": 338538,
+      "actual_mime": "image/jpeg",
+      "filename_extension": ".png",
+      "extension_matches_encoding": false,
+      "original_bytes_preserved": true,
+      "accepted": false,
+      "exclusion_reason": "初次英文运行的同组模态截图显示 Codex 0.155.1、Claude 2.1.267，来源为系统安装路径，项目目录为真实用户 HOME；不符合本轮固定 CLI 与隔离目录要求。三个原始截图均保留，不能计入最终隔离验收。",
+      "superseded_by": "en/screenshots/grok-default-policy-verified.png"
+    }
+  ],
+  "zero_model_workflow": {
+    "submitted_model_inputs": 0,
+    "created_local_cli_tasks": 0,
+    "basis": [
+      "操作者执行的零模型布局流程",
+      "两个独立 profile 的本地 CLI 表只读计数均为零",
+      "两个 profile 均无托管宿主 runtime.journal"
+    ],
+    "http_monitoring_performed": false,
+    "all_network_requests_absent_claimed": false
+  },
+  "boundaries": [
+    "只覆盖命令面板入口、模态顶部安装版本/路径、Claude 新说明以及可见的 Grok 权限按钮。",
+    "长说明的完整静态布局以 claude-support 原图为准；Grok 选中帧显示覆盖式滚动条。",
+    "模态下方未滚动，视口外输入框、附件、提交区及部分本地工具控件不属于本次布局通过范围。",
+    "固定策略按钮存在不证明审批或任务执行；本轮没有提交模型或创建本地 CLI 任务。",
+    "不宣称本轮验证物理 IME、剪贴板输入、附件、全部窗口尺寸或所有 UI 区域。",
+    "数据库和操作流程的零输入证据不等于 HTTP 监控。"
+  ],
+  "physical_ime_exercised": false,
+  "all_test_bundle_processes_exited": true,
+  "forced_termination": false
+}

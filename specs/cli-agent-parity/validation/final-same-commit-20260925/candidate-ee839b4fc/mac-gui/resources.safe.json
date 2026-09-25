@@ -1,0 +1,526 @@
+{
+  "AppIcon.icns": {
+    "sha256": "f99097302e595b254e4f967bd27562da5014dc4a3c943c5d1d228b2339177517",
+    "mode": "0o644"
+  },
+  "Assets.car": {
+    "sha256": "88f8baf7342a8c54444bb8a876ff9f1dca03996e603891f4d5285d84cd0d885e",
+    "mode": "0o644"
+  },
+  "InfiniShell.icns": {
+    "sha256": "c42b192f67f364b34c7dd22e6db825a3ba2e35fa72ced63157a4ac701340c578",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/edit-figma-design/SKILL.md": {
+    "sha256": "e9d433cbd9eedd600a5f4765a14fd893a273141bd6a69fe5383b290a1e896d1f",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-code-connect-components/SKILL.md": {
+    "sha256": "9c76f117502fc9ac43151f52cf1fda917790650a3cb266065164eb21e0b4601e",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-create-design-system-rules/SKILL.md": {
+    "sha256": "401da565f9882e74fef37e9f08b7afc7530d8f4740734b5b476949d5013a086c",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-create-new-file/SKILL.md": {
+    "sha256": "b3a45dfd8af628262311cfd0bac8dcbc19affc6b873a9c8421a58707b725e349",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-design/SKILL.md": {
+    "sha256": "45d2b97103bdeb31cb2744fca2c79bcefb659c88faca626bea30ec2f9342dcc9",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/SKILL.md": {
+    "sha256": "e0dd320f58bde79f4cf7dd1269f5330a55b744f8d5e038425a0b17f90c0ac21e",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/code-connect-setup.md": {
+    "sha256": "5a02dedec8797710da32bdf6ce312ea1ada6455760b624c66736497441126664",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/component-creation.md": {
+    "sha256": "a4af302d054c5c31821f93085988819535ab431e491f6b7c16a9ff2039233f1b",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/discovery-phase.md": {
+    "sha256": "ef7416a697417f3d54551d0ba41bc52ec4a33f032e4998b2cfba696053fa2fec",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/documentation-creation.md": {
+    "sha256": "b26fbca3a3a8c9cfd7244b5c7a843cac3fe3f73e8baed163d87ee681bea70fc5",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/error-recovery.md": {
+    "sha256": "890773b8758f7957d29a1ce77557806f6f71d9e80762d002d9babdb4baef2622",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/naming-conventions.md": {
+    "sha256": "16810f87eab00ea93644035dca95e2d927b266b9fcbf5460c1712dab30638442",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/references/token-creation.md": {
+    "sha256": "55bf202077b7ee3d1a6a3973c261d572d1a62827338c8dec40904136bb6bd975",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/bindVariablesToComponent.js": {
+    "sha256": "333f5cdda0f75b9d52a8fa2d50369677e6247532bd74580a9fe611fe270e092a",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/cleanupOrphans.js": {
+    "sha256": "fe61c1320ab7cba6e34a565901d8bb0fe691a2cb940f42fc98d348817916aa11",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/createComponentWithVariants.js": {
+    "sha256": "bb49ab8921f239e4c0a188c83bf382f00dcfa877afb340a8d0ff473fed764777",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/createDocumentationPage.js": {
+    "sha256": "19d531c9619cacd124fee59486369f9e95d25a420fc2e796fd1e5ce263016b2e",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/createSemanticTokens.js": {
+    "sha256": "15682762708cbfcca1b2734c72fce8b981528c4b1131c8f1645b411edbc94b46",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/createVariableCollection.js": {
+    "sha256": "27de8086b7e9cc2ed475d7ba5014d91e62527982a5216a8cfcda1c8bef14f117",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/inspectFileStructure.js": {
+    "sha256": "3b72f89e6bd3db81bc68b18afb2bac3a337b9c0538d0b889802c2c995ae7eba8",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/rehydrateState.js": {
+    "sha256": "4daf5e653699fd720b43bd3eec3715887a92039a8646301fc4534028fd3d1f93",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-generate-library/scripts/validateCreation.js": {
+    "sha256": "dae970b4d80c4d0994f14c89ad01c04115604444b916a0b8fc342ed262fdfa97",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-implement-design/SKILL.md": {
+    "sha256": "0ff1a899d0814857733b5dc6734810a872b6a5ef115dc644857ef0536a33b0b7",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/SKILL.md": {
+    "sha256": "e49d4a0126c41710640501273da56e5435ba718bfc4b3e824d577a7fd5b99ded",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/api-reference.md": {
+    "sha256": "64b7ee2c07b1644e775a0123ce2d0c190a99c0366dd134b5c147a8a7403fc01c",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/common-patterns.md": {
+    "sha256": "b7569f8a69be0ad9f7eaf1351dc97125e8651efe67c3040bd64c1fdee056a174",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/component-patterns.md": {
+    "sha256": "fbece7096eebfbfd571c8b28aefcc20ead5989561ee23ba403c1578a216cbe2a",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/effect-style-patterns.md": {
+    "sha256": "9f960df3fcec1c0601e57db2f6506dde0ab524baeb462b01fb4f745972ffb2e7",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/gotchas.md": {
+    "sha256": "0ce39f6ca488e68059df1addb6509f438a2a212cb92fd412ebe9931d12545e08",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/plugin-api-patterns.md": {
+    "sha256": "2d324871b0e02e2216efc690d20e8ac7abab03d56ac25f24dce2b77f6e7c050d",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/plugin-api-standalone.d.ts": {
+    "sha256": "353ad119339f199370281da2cee051466b0a9e46c81c880459d69d12ee31d86a",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/plugin-api-standalone.index.md": {
+    "sha256": "414c05643770a9e26a5c0f8e639dcb97d13d82b19b14c25fac2f86c7002daa2a",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/text-style-patterns.md": {
+    "sha256": "42568a4d17f74c6f4ce75d93982aba47b405c2bfbfaf46e5d2b1bb65d2458cff",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/validation-and-recovery.md": {
+    "sha256": "c917194630d37e62a2946c8a041765f7066654a7a50c907f293de7d1dec7399e",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/variable-patterns.md": {
+    "sha256": "1c394e6344cea9677b1ece96cc977d2c82dac457ee482435bdacd7b8d0871f73",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-components--creating.md": {
+    "sha256": "f383ea109e48c335c5855a8c7be15402e0ba72d5313c34cde6cebf550a6443ff",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-components--using.md": {
+    "sha256": "e4e82a8492ec830f18a3120cae9755f389da92aabb2693ef87c396fd281af576",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-components.md": {
+    "sha256": "90c99d03e849b127b4144725d38b37ad5e456dd6e29c2e9c28690646dcc97b96",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-effect-styles.md": {
+    "sha256": "d0b9b409fda5e22a9095420c606224a2c9b166abbeda6e8b284a820b6d9d7907",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-text-styles.md": {
+    "sha256": "cc6ffcb39b0be488f01a0706001198e914c47bee83ad6a04a50cfc40f9bf6370",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-variables--creating.md": {
+    "sha256": "3a2f9796aac9d419705ca02b9fab29a46282f0921c4c0a01704cec7e43d8ccf2",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-variables--using.md": {
+    "sha256": "3a328d9f2a176a4086ee7c3e14ca83ee730f4d44b5c1b2276247481fdab6a5e7",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds-variables.md": {
+    "sha256": "df1fdb26683111bc4a16fa2bb4260a904073b884f1cd69cd778d4fa1ce24f611",
+    "mode": "0o644"
+  },
+  "bundled/mcp_skills/figma/figma-use/references/working-with-design-systems/wwds.md": {
+    "sha256": "e514da78a7eed6a55c95d6b52a600bd38252bb28ad1dde689a7c72f30c99a9f8",
+    "mode": "0o644"
+  },
+  "bundled/skills/add-mcp-server/SKILL.md": {
+    "sha256": "6f450e66c4b5f9ef94263d350a61df8a13a8a528c246b4b742c0a90aee18afca",
+    "mode": "0o644"
+  },
+  "bundled/skills/change-keybinding/SKILL.md": {
+    "sha256": "42ba205ee04efeed0c92286d695653913febef3dd57ee5404d51edb805f648e5",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/LICENSE.txt": {
+    "sha256": "14099b9c79d031b9d4b32c736a4e20f2b941f52dd79500532d62d26dd716110c",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/SKILL.md": {
+    "sha256": "93b2fcf35ef3fc3926632aa9d3b09780c527d21dc0304f59b1baf8e887726b7d",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/csharp/claude-api.md": {
+    "sha256": "c17ddeb20330f54d8fbf9af3e1225ab0370396b86d211cf71b1f8a5008c39e5f",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/curl/examples.md": {
+    "sha256": "fa77288bc86b055868d8934d2b81a8fb4da783241bc7dd0c15a5b55e3d0570cb",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/curl/managed-agents.md": {
+    "sha256": "cfe59ca89b57892fbb6ad110effab269ee1e72eaef45e08698d51f3c96b51fde",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/go/claude-api.md": {
+    "sha256": "79730feb26fde385d351e269ff5dec022e9d2f88f1b94230c48b18db1b3e1a9b",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/go/managed-agents/README.md": {
+    "sha256": "127a472f2d97a34edd096cbaa864ce49912f6cef0477b892b819ea5467457a9d",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/java/claude-api.md": {
+    "sha256": "631e1014b2e5994c74994b6e5f9694c4e059375d1692eca233af49134fb613cc",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/java/managed-agents/README.md": {
+    "sha256": "a58bf7306937bd17cc1d344043235d5004ef4524bf14a063027c7c395784efc5",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/php/claude-api.md": {
+    "sha256": "bfe37758d6ad0edaf0e3328347742e88990646cb11d8cf22e74dcbd9b82db020",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/php/managed-agents/README.md": {
+    "sha256": "e9cf486cd1ecb738b34c3c720392e9d8448c7f520932875314a3395a4c781c87",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/claude-api/README.md": {
+    "sha256": "0791f8bcdd080d1aea992620a477006d5e722ebb5649f31841a8e6a9e6b51dd4",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/claude-api/batches.md": {
+    "sha256": "b7c22eade4ffbbb92cf1dca1760904d6bd35c1b26e3c2e512c8d5f0ab895c728",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/claude-api/files-api.md": {
+    "sha256": "76d5f216111559a386bb1257cef82d147a9182a3559e143d7b00004dbdc60469",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/claude-api/streaming.md": {
+    "sha256": "0293136bfee6cf09d9eca79c15f48aad3a3075bc0cab5c9d72f81582ec3d7232",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/claude-api/tool-use.md": {
+    "sha256": "ea3ce9e218176fa78790cd37b8a6ff01d7f6b2bd3cb282bd5d2d0b91a44822c6",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/python/managed-agents/README.md": {
+    "sha256": "008a5c11226dc071c110b84b75177540d9bb9a58ef15994b3a784d3db1722200",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/ruby/claude-api.md": {
+    "sha256": "91819394c0c6929a2612ea9ba28d3843d31b9938be6f6eba08ffe5169740d0c1",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/ruby/managed-agents/README.md": {
+    "sha256": "0ecda024060a4d229a98843566144a7b8bca3ad665423f9b17989fc669f17946",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/agent-design.md": {
+    "sha256": "4801b81580e1251c0df809da9647b05b6e30513014f439f814caccfb7750e8a4",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/error-codes.md": {
+    "sha256": "fbfefc37fe4a89bc4af3ffc6bf204c4163297f115827a937e8ce2ad093ff0988",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/live-sources.md": {
+    "sha256": "5eb45a811f7cf543eba5899e38ddfde8992abb505b42f4cae101d7b63d729d76",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-api-reference.md": {
+    "sha256": "54cd8b052b8b15c96027016892bf06a46a0c7b3ecc84ce9835615d30b09df748",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-client-patterns.md": {
+    "sha256": "8af9636b5e39e5583f8eb8a2986a6155ca606e0032a00db8a5d8e11a13d41e8e",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-core.md": {
+    "sha256": "ba32f10cab1af6daf4b718944073af30e8d0f7940ebb1737e22108325c790e7a",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-environments.md": {
+    "sha256": "c4b479a4f7dbd79753ca05e2fab96a9b4d26132e72090071d8d496c3d0c2b22e",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-events.md": {
+    "sha256": "23d23a7bc0f77d37acf53b306d8dfd1eb2f0693d30bfb09167b3388289c4a11f",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-onboarding.md": {
+    "sha256": "509d262490e74b7854b1c7c004d9153be23da8f87b8419003c6a61af7707dbb1",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-overview.md": {
+    "sha256": "1dfb80e1c71d8b1ed2ddee3c8301b3790f455262004628b42c545daeb73a603a",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/managed-agents-tools.md": {
+    "sha256": "e8ad747677cbf904a1185c70466e2a7c3054a7d776bfeb87aa3a9268c572e851",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/model-migration.md": {
+    "sha256": "769f3c4bf7debc03ca349e858d1e0652c28d51dbb956bd2d56c14eaa6a69acaa",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/models.md": {
+    "sha256": "0d08f60e064e104d537d66181e50c692343fbd3a4a19cd9946ff0bb557709dcc",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/prompt-caching.md": {
+    "sha256": "1ed4b531b10dfb65b85e967045c7ed704dd36b2113a8c5b4f94d2ed0631891e3",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/shared/tool-use-concepts.md": {
+    "sha256": "1f4f1c4e0a87d911139ebf01b4d5f97839df327e22abd0e8d0854acadeff77fd",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/claude-api/README.md": {
+    "sha256": "b6a7db2c213419a4bba7217642b51ecd4655a1b59d2aa29a36dd861ac1611bb9",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/claude-api/batches.md": {
+    "sha256": "706af0ee8c62f45cc9696bbe7cc81a35f6df636c3a877215864b32c418a3e136",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/claude-api/files-api.md": {
+    "sha256": "8b43d5583490d5bf340e48acee0c4fb5fb43b7da00fe3c41c93e2048eab595fb",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/claude-api/streaming.md": {
+    "sha256": "92813bdc545b87599c04853cbd4a2f5204693f8cc07996be9b6570e2a662cad5",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/claude-api/tool-use.md": {
+    "sha256": "636e5ad9826aef67fea9e2aea86ae48cfa54532eedaa37171dc1f9d401469f11",
+    "mode": "0o644"
+  },
+  "bundled/skills/claude-api/typescript/managed-agents/README.md": {
+    "sha256": "bf7184e496d84d166ef2ba205a5e29ad6cc673ae03b0893219d125ab2c52ce23",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/LICENSE.txt": {
+    "sha256": "58d1e17ffe5109a7ae296caafcadfdbe6a7d176f0bc4ab01e12a689b0499d8bd",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/SKILL.md": {
+    "sha256": "8d7be19f8c6c6d812f89e07bc1649d4cb08e282d5726303050a8c06553287183",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/agents/analyzer.md": {
+    "sha256": "bf68f4cac5a56c673a928c2e6d619586c5b93ea364026ab37547772cb45a663a",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/agents/comparator.md": {
+    "sha256": "fe1fc9787c495d864c5d6eada47396478572325fde1b33a96d78bf4b849b7a3e",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/agents/grader.md": {
+    "sha256": "57134da0c1a4eea33fbd74a1c9c44aa814f07d6bc64de303edb586f941e5d21a",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/assets/eval_review.html": {
+    "sha256": "ce477dcc74dc1c0d1d3352646a79167b5a63634e936b1019160025065974e452",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/eval-viewer/generate_review.py": {
+    "sha256": "fc9d1b9243fe5ab6012ebd579bd76d0035de1b79fd3b969de114defab26478fb",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/eval-viewer/viewer.html": {
+    "sha256": "ea4f8ac712f74beedee69c6e21eb4019a0e5cfc231acfba728d2d296d1a532d9",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/references/schemas.md": {
+    "sha256": "8e8876180a8989b406a4d3edddf875b04cdfd5805cc8616686d552b11ce4455f",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/__init__.py": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/aggregate_benchmark.py": {
+    "sha256": "123ef128ea5ccc01a4b1ac212ef5567f21e9c13d3d240609780beeb3200c49aa",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/generate_report.py": {
+    "sha256": "52d67aae70a1fbbbd30d9f2934c90caee93d80b83022c8084609b5a9b62c02b2",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/improve_description.py": {
+    "sha256": "fd25ddf885f60fef65378a32d3ad043fb23b9967fca3f99b406a32f21a606e58",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/package_skill.py": {
+    "sha256": "1a33059b0db1ef73375d46d513e5ea81369d2e8838c970597b0d52ddef8d1c0f",
+    "mode": "0o755"
+  },
+  "bundled/skills/create-skill/scripts/quick_validate.py": {
+    "sha256": "67cf5703402013936c8fb75ad6a1afecd8841d45cc5e606b634eb05825fde365",
+    "mode": "0o755"
+  },
+  "bundled/skills/create-skill/scripts/run_eval.py": {
+    "sha256": "26cc55d7c307a455bee218d7c53515c2c4e75cfc7838b6e73a3bfb0a669ec0aa",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/run_loop.py": {
+    "sha256": "7bd6f674203168520517eec94c55f493c0d154339b061b4d7c0f0dad187d0f21",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-skill/scripts/utils.py": {
+    "sha256": "3af8ae62c40c73ab712207436a0d9a981e845f25c5a7040229eb189cc8e45bb1",
+    "mode": "0o644"
+  },
+  "bundled/skills/create-tab-config/SKILL.md": {
+    "sha256": "0973564af2e7448b341a29b3339d8c7b048d1c54e374ea02bfd05ecbfc0b64a4",
+    "mode": "0o644"
+  },
+  "bundled/skills/factory-mcp/SKILL.md": {
+    "sha256": "a83ee609b38ea5c59ea3909ad64880a96a9ce25a9ff6d5573e17dd6ab427bf80",
+    "mode": "0o644"
+  },
+  "bundled/skills/factory-mcp/references/factory-mcp-tools.md": {
+    "sha256": "7f962e16bf728877120f682c8b81103ff7f2e8863ce44003045ddf728c5fdd9a",
+    "mode": "0o644"
+  },
+  "bundled/skills/modify-settings/SKILL.md": {
+    "sha256": "a5316ac530aaa4930db001e7460f67f0954f02cae88f4c95c543f9e9e0aa6673",
+    "mode": "0o644"
+  },
+  "bundled/skills/modify-settings/scripts/find_setting.py": {
+    "sha256": "bf8c0db2ebad66a4e3c96f3d3620ee4777a91ac99779c4260ec55e6d009979a2",
+    "mode": "0o644"
+  },
+  "bundled/skills/pr-comments/SKILL.md": {
+    "sha256": "de34e1a908114d99ceb97e4ad5cf77f6b1a66678eb727c616335d1467381b8e4",
+    "mode": "0o644"
+  },
+  "bundled/skills/pr-comments/scripts/fetch_github_review_comments.py": {
+    "sha256": "4af79cf3a7c067c861ada682069448fd8afa2a6b702bf4e09cbd330c497c1a99",
+    "mode": "0o644"
+  },
+  "bundled/skills/pr-comments/scripts/test_fetch_comments.py": {
+    "sha256": "3f281fba3ffc002eb686aa4a5eaf2455e3f453ee9188fa741f78838df15f5869",
+    "mode": "0o644"
+  },
+  "bundled/skills/pr-comments/scripts/test_trim_diff_hunk.py": {
+    "sha256": "b15d3a4e2b70eddb467538d718123595abea4aec623d90b8fd90db452b6b24fd",
+    "mode": "0o644"
+  },
+  "bundled/skills/pr-comments/scripts/trim_diff_hunk.py": {
+    "sha256": "5ee80414281cbd2746536e96a6b79a3a38cf4bd427a33eedf169eff317f12468",
+    "mode": "0o644"
+  },
+  "bundled/skills/tab-configs/SKILL.md": {
+    "sha256": "70d9b0c1c1809ed246263f8e2109bc7a3e7797be0191027d8bc36035fe789672",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/SKILL.md": {
+    "sha256": "c6536192f72f7dd8729993e1bb81877a4df5e1319e261371f12f5cbced983836",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/references/migration-matrix.md": {
+    "sha256": "dc607fda87c2ceb38a41851f1ec3e0314aa08c5193984afb282c4147125d5141",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/scripts/inspect_shared_settings.py": {
+    "sha256": "f66c20fa84749602c2ed6cab82e7ac35b6f9a7b46d11f76d590980029ae89558",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/scripts/merge_mcp_config.py": {
+    "sha256": "cec25fb4ecc8d0ab204e20b7301651b648aef85a027c6dd7d02e229af798081c",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/fixtures/destination_mcp.json": {
+    "sha256": "0e51d1bf88f3084bea57b0dbf895a7f6d99e6b29213c6a28508730aea306718e",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/fixtures/gui_settings.toml": {
+    "sha256": "3445ab33d97dd1f3c034635e57a8ab9fad7dab6b2c834e82a98b1b5d78a9bbf7",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/fixtures/settings_schema.json": {
+    "sha256": "17bc75b0de9a5ce9d17d904ea2ee61b396dbbf64ca5847451cbd06576913b530",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/fixtures/source_mcp.json": {
+    "sha256": "86c79cf22017a1319d54009d2f37a8e4b07eb5f3dae4bdd480a78db8e03ae763",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/fixtures/tui_settings.toml": {
+    "sha256": "b77bf778781c6a79b9b408b7557b785848556c4ebf9f3bce3accc5fc380b8a15",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/test_inspect_shared_settings.py": {
+    "sha256": "433d89c326a3de00966f3d4fb302c7c9def8fd2d8153ee945b5868ca9d1d954a",
+    "mode": "0o644"
+  },
+  "bundled/skills/tui-migrate-setup/tests/test_merge_mcp_config.py": {
+    "sha256": "1b9adc15891f29a5ddced7fc1c16e843b39277c68ab8db8ca5b8b1268c349242",
+    "mode": "0o644"
+  },
+  "bundled/skills/update-tab-config/SKILL.md": {
+    "sha256": "3347aa45386d34483c32de669e61209e5406e2455abfce7b2187ef6a43c297f9",
+    "mode": "0o644"
+  },
+  "bundled/skills/warpctrl/SKILL.md": {
+    "sha256": "3dd589213bd435a0466442991f39b231a2463280f495566c6f5ad27e6fd366ce",
+    "mode": "0o644"
+  }
+}

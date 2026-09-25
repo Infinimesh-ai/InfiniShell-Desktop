@@ -1,5 +1,7 @@
 # CLI 对齐验证记录
 
+> **2026-09-25 最终收尾验证通过**：三平台桌面已默认开放 Grok 等本地托管入口；产品实现冻结于 `ee839b4fc`，最新验证提交为 `50e1515bc`。三平台必要门禁、所列双语布局及新增真实 Grok 四场景清理均已通过。原生五秒 EOF 负例和各阶段失败保留，清理通过不等于模型任务成功。完整来源与限制见[最终同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)；下方历史结论保留各自版本、构建和验收范围，不重标为本轮实测。
+
 > **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项已全部完成。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已在干净提交 `ac0fa70e…` 上补齐 macOS 生产进程／传输 root 候选链，并在 `4b12091e…` 上通过默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上补齐 macOS production runtime-host 父子链；`c25221a22…` 又完成 Linux／Windows 聚焦预检。GUI、SSH／tmux、完整异常矩阵、同提交全范围 macOS 和 full workspace 等仍有缺口。当前状态、证据与新 Goal 入口见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。

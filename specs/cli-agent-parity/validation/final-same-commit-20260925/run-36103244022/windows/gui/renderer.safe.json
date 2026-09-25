@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "outcome": "passed",
+  "renderer": [
+    "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+  ],
+  "exit_code": 0,
+  "mesa_version": "26.2.1",
+  "mesa_archive_url": "https://github.com/pal1000/mesa-dist-win/releases/download/26.2.1/mesa3d-26.2.1-release-msvc.7z",
+  "mesa_archive_sha256": "78a0305844074535e73dfb6dcb5eb2a65f1d9dc445102e1f4c3c3e97dace19bf",
+  "copied_runtime_files": [
+    {
+      "sha256": "a025bc0cbf939792404f4ba0d02f2e8209a16e7947bd1221217418c72cd3b2cb",
+      "name": "integration.exe"
+    },
+    {
+      "sha256": "1668fc38fef8d97f8e6002ca71d0e80d629c43b3c25f1f2417ec6bddb51405cd",
+      "name": "conpty.dll"
+    },
+    {
+      "sha256": "75c019e3541980eea8ae661d81998d06f99627e3004c800532475a1c3551c6fb",
+      "name": "dxcompiler.dll"
+    },
+    {
+      "sha256": "18fd73e06fc10e02a01885d8c282264c8f37bd2cf9a735d7700e231e94ea0376",
+      "name": "dxil.dll"
+    },
+    {
+      "sha256": "c41197578992211c3d457e1fb75ad2b474e6ee03a8dc8fda610ed8e7b46301ca",
+      "name": "x64/OpenConsole.exe"
+    }
+  ],
+  "locale_results": [
+    {
+      "ui_locale": "en",
+      "outcome": "passed",
+      "exit_code": 0,
+      "renderer": [
+        "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+      ]
+    },
+    {
+      "ui_locale": "zh-CN",
+      "outcome": "passed",
+      "exit_code": 0,
+      "renderer": [
+        "Using Gl Cpu (llvmpipe (LLVM 23.1.1, 256 bits)) for rendering new window."
+      ]
+    }
+  ],
+  "model_inputs": 0,
+  "mesa_dll_sha256": {
+    "opengl32.dll": "7a8f7aa1b73099d24ddeca962a7e7360bccdfc234ff79cb557426e2a2ce3d4f6",
+    "libgallium_wgl.dll": "46ca4e92166f1389c8e9024dbeee0e24ccd5c46f9b6e2b048cc6bc476e6474d3"
+  }
+}

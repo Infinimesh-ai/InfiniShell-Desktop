@@ -1,0 +1,33 @@
+{
+  "attachment_count": 1,
+  "binary_sha256": "ea4207e81ea8c20fec8818ae390e1b4bbd35304c5b910ddbda804fe857922685",
+  "desktop_default_features_applied": true,
+  "image_pixels_exact": true,
+  "managed_feature_enabled": true,
+  "managed_feature_test_override": false,
+  "managed_tasks_created": 0,
+  "model_inputs": 0,
+  "physical_ime_exercised": false,
+  "platform": "linux",
+  "schema": 1,
+  "screenshots": [
+    {
+      "file": "chinese-multiline.png",
+      "height": 800,
+      "sha256": "f2ebdf77e1a2201af5261f5be3abd872cd0e97a045671377830c8e04198a6643",
+      "width": 1280
+    },
+    {
+      "file": "pasted-image.png",
+      "height": 800,
+      "sha256": "9827e84a4cf22ab90e8983f66e02b771c47bcf33e740b04f5880e13286449027",
+      "width": 1280
+    }
+  ],
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "system_clipboard": true,
+  "test": "test_cli_composer_system_clipboard_multiline_and_image",
+  "text_exact": true,
+  "ui_locale": "zh-CN",
+  "visual_review_required": true
+}

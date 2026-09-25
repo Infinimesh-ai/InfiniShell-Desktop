@@ -1,0 +1,698 @@
+{
+  "schema": 1,
+  "source_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+  "run_id": 36095732136,
+  "job_id": 107947497003,
+  "job_name": "Windows x64",
+  "conclusion": "success",
+  "started_at": "2026-09-25T04:45:35Z",
+  "completed_at": "2026-09-25T06:31:46Z",
+  "raw_log_sha256": "92a908e97ed461b46fb6ff6bb6ebe541e38857bf9bfed705b39bf77aec0d28d8",
+  "steps": [
+    {
+      "name": "Set up job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Reclaim Windows build storage",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare job-local Python for CLI parity verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Configure Windows build environment",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify provisioned toolchain",
+      "conclusion": "success"
+    },
+    {
+      "name": "Install Node for CLI plugin verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Grok notification plugin scripts",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test fixed Grok preparation for installer-only verification",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test notification patch file transactions",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Codex without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed Codex production installer contract",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Claude without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Prepare fixed native Grok without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Grok unauthenticated ACP boundaries",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude initialization and idle EOF",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Claude permission observations without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex plugin registry failure recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native Codex persistent plugin source",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Windows Git Bash notification payloads",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Codex Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Codex Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows native hook evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Codex 0.156.1 Windows ConPTY notification transport",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve fixed Codex 0.156.1 Windows ConPTY evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Claude Windows native SessionStart notification without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Claude Windows native notification evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Check InfiniShell-Desktop",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test IPC frame-limit recovery",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build InfiniShell SSH worker",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test Windows PowerShell SSH worker arguments",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Windows Codex production notification installer without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows Codex production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows Grok production notification installer without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows Grok production installer evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test shared CLI action contracts and skills",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test CLI harness arguments",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test bilingual TUI task message states",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test managed command process ownership",
+      "conclusion": "success"
+    },
+    {
+      "name": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "conclusion": "success"
+    },
+    {
+      "name": "Build CLI process supervisor",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify fixed Windows CLI atomic update candidates without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows fixed CLI atomic update receipts",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test supervisor cleanup after host crash",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify native recovery and idle-crash boundaries without credentials",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows native CLI boundary evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Test rust-genai",
+      "conclusion": "success"
+    },
+    {
+      "name": "Compile GUI integration tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Verify Windows GUI system clipboard without model inputs",
+      "conclusion": "success"
+    },
+    {
+      "name": "Preserve Windows GUI system clipboard evidence",
+      "conclusion": "success"
+    },
+    {
+      "name": "Run desktop workspace unit tests",
+      "conclusion": "success"
+    },
+    {
+      "name": "Report sccache statistics",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Install Node for CLI plugin verification",
+      "conclusion": "success"
+    },
+    {
+      "name": "Post Run actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd",
+      "conclusion": "success"
+    },
+    {
+      "name": "Complete job",
+      "conclusion": "success"
+    }
+  ],
+  "test_summaries": [
+    {
+      "line": 2166,
+      "step_candidates": [
+        "Test IPC frame-limit recovery"
+      ],
+      "summary": "Summary [   0.093s] 2 tests run: 2 passed, 9 skipped",
+      "step_number": 32
+    },
+    {
+      "line": 5030,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "summary": "Summary [ 597.438s] 2737 tests run: 2737 passed, 4763 skipped",
+      "step_number": 35
+    },
+    {
+      "line": 5269,
+      "step_candidates": [
+        "Test shared CLI action contracts and skills"
+      ],
+      "summary": "Summary [   0.464s] 75 tests run: 75 passed, 224 skipped",
+      "step_number": 40
+    },
+    {
+      "line": 5421,
+      "step_candidates": [
+        "Test CLI harness arguments"
+      ],
+      "summary": "Summary [   0.919s] 129 tests run: 129 passed, 0 skipped",
+      "step_number": 41
+    },
+    {
+      "line": 5587,
+      "step_candidates": [
+        "Test bilingual TUI task message states"
+      ],
+      "summary": "Summary [   0.423s] 9 tests run: 9 passed, 926 skipped",
+      "step_number": 42
+    },
+    {
+      "line": 5612,
+      "step_candidates": [
+        "Test managed command process ownership"
+      ],
+      "summary": "Summary [   0.328s] 2 tests run: 2 passed, 12 skipped",
+      "step_number": 43
+    },
+    {
+      "line": 5673,
+      "step_candidates": [
+        "Diagnose Windows atomic image-debug exit in a strict Job"
+      ],
+      "summary": "Summary [  37.234s] 2 tests run: 2 passed, 7498 skipped",
+      "step_number": 44
+    },
+    {
+      "line": 6089,
+      "step_candidates": [
+        "Test supervisor cleanup after host crash"
+      ],
+      "summary": "Summary [  10.507s] 4 tests run: 4 passed, 7496 skipped",
+      "step_number": 48
+    },
+    {
+      "line": 6297,
+      "step_candidates": [
+        "Test rust-genai"
+      ],
+      "summary": "test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "step_number": 51
+    },
+    {
+      "line": 17244,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "summary": "Summary [1700.379s] 10680 tests run: 10680 passed (3 leaky), 110 skipped",
+      "step_number": 55
+    }
+  ],
+  "diagnostic_lines": [
+    {
+      "line": 15565,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.693s] ( 9003/10680) warp terminal::input::tests::test_changelog_slash_command_clears_buffer_on_success",
+      "step_number": 55
+    },
+    {
+      "line": 15607,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.689s] ( 9045/10680) warp terminal::input::tests::test_open_slash_command_triggers_completions_on_space",
+      "step_number": 55
+    },
+    {
+      "line": 15638,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.656s] ( 9076/10680) warp terminal::input::tests::test_tab_completion_with_leading_space",
+      "step_number": 55
+    }
+  ],
+  "i18n_passes": [
+    {
+      "line": 4279,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.190s] (1988/2737) warp i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+      "step_number": 35
+    },
+    {
+      "line": 4280,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.193s] (1989/2737) warp i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+      "step_number": 35
+    },
+    {
+      "line": 4281,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.216s] (1990/2737) warp i18n::tests::fallback_chain_works",
+      "step_number": 35
+    },
+    {
+      "line": 4282,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.096s] (1991/2737) warp i18n::tests::init_is_idempotent",
+      "step_number": 35
+    },
+    {
+      "line": 4283,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.100s] (1992/2737) warp i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+      "step_number": 35
+    },
+    {
+      "line": 4284,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [  11.778s] (1993/2737) warp i18n::tests::production_literal_translation_keys_exist_in_english_resources",
+      "step_number": 35
+    },
+    {
+      "line": 4285,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.111s] (1994/2737) warp i18n::tests::requested_languages_fall_back_to_english_when_empty",
+      "step_number": 35
+    },
+    {
+      "line": 4286,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.102s] (1995/2737) warp i18n::tests::requested_languages_keep_preferred_order",
+      "step_number": 35
+    },
+    {
+      "line": 4287,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.885s] (1996/2737) warp i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+      "step_number": 35
+    },
+    {
+      "line": 4288,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.141s] (1997/2737) warp i18n::tests::shared_runtime_loader_includes_tui_resources",
+      "step_number": 35
+    },
+    {
+      "line": 4289,
+      "step_candidates": [
+        "Test agent lifecycle, terminal cancellation, and Responses integration"
+      ],
+      "message": "PASS [   0.269s] (1998/2737) warp i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+      "step_number": 35
+    },
+    {
+      "line": 13494,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.199s] ( 6932/10680) warp i18n::tests::english_and_simplified_chinese_have_the_same_message_ids",
+      "step_number": 55
+    },
+    {
+      "line": 13495,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.198s] ( 6933/10680) warp i18n::tests::english_and_simplified_chinese_use_the_same_variables",
+      "step_number": 55
+    },
+    {
+      "line": 13496,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.204s] ( 6934/10680) warp i18n::tests::fallback_chain_works",
+      "step_number": 55
+    },
+    {
+      "line": 13497,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.106s] ( 6935/10680) warp i18n::tests::init_is_idempotent",
+      "step_number": 55
+    },
+    {
+      "line": 13498,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.100s] ( 6936/10680) warp i18n::tests::literal_translation_key_scanner_ignores_docs_and_finds_calls",
+      "step_number": 55
+    },
+    {
+      "line": 13499,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [  10.422s] ( 6937/10680) warp i18n::tests::production_literal_translation_keys_exist_in_english_resources",
+      "step_number": 55
+    },
+    {
+      "line": 13500,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.089s] ( 6938/10680) warp i18n::tests::requested_languages_fall_back_to_english_when_empty",
+      "step_number": 55
+    },
+    {
+      "line": 13501,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.093s] ( 6939/10680) warp i18n::tests::requested_languages_keep_preferred_order",
+      "step_number": 55
+    },
+    {
+      "line": 13502,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.866s] ( 6940/10680) warp i18n::tests::settings_ui_helpers_do_not_receive_hardcoded_visible_text",
+      "step_number": 55
+    },
+    {
+      "line": 13503,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.133s] ( 6941/10680) warp i18n::tests::shared_runtime_loader_includes_tui_resources",
+      "step_number": 55
+    },
+    {
+      "line": 13504,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "PASS [   0.259s] ( 6942/10680) warp i18n::tests::workflow_command_placeholder_renders_literal_template_braces",
+      "step_number": 55
+    }
+  ],
+  "exact_test_counts": [
+    {
+      "step": 32,
+      "name": "Test IPC frame-limit recovery",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 9,
+      "leaky_passed_subset": 0,
+      "source_log_line": 2166
+    },
+    {
+      "step": 35,
+      "name": "Test agent lifecycle, terminal cancellation, and Responses integration",
+      "run": 2737,
+      "passed": 2737,
+      "failed": 0,
+      "skipped": 4763,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5030
+    },
+    {
+      "step": 40,
+      "name": "Test shared CLI action contracts and skills",
+      "run": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 224,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5269
+    },
+    {
+      "step": 41,
+      "name": "Test CLI harness arguments",
+      "run": 129,
+      "passed": 129,
+      "failed": 0,
+      "skipped": 0,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5421
+    },
+    {
+      "step": 42,
+      "name": "Test bilingual TUI task message states",
+      "run": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 926,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5587
+    },
+    {
+      "step": 43,
+      "name": "Test managed command process ownership",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 12,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5612
+    },
+    {
+      "step": 44,
+      "name": "Diagnose Windows atomic image-debug exit in a strict Job",
+      "run": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 7498,
+      "leaky_passed_subset": 0,
+      "source_log_line": 5673
+    },
+    {
+      "step": 48,
+      "name": "Test supervisor cleanup after host crash",
+      "run": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 7496,
+      "leaky_passed_subset": 0,
+      "source_log_line": 6089
+    },
+    {
+      "step": 51,
+      "name": "Test rust-genai",
+      "passed": 81,
+      "failed": 0,
+      "ignored": 0,
+      "source_log_line": 6297
+    },
+    {
+      "step": 55,
+      "name": "Run desktop workspace unit tests",
+      "run": 10680,
+      "passed": 10680,
+      "failed": 0,
+      "skipped": 110,
+      "leaky_passed_subset": 3,
+      "source_log_line": 17244
+    }
+  ],
+  "step_counts": {
+    "success": 58,
+    "skipped": 1
+  },
+  "all_failed_steps": [],
+  "retry_or_flaky_count": 0,
+  "final_test_failure_or_timeout_markers": 0,
+  "leaky_tests": [
+    {
+      "line": 15565,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.693s] ( 9003/10680) warp terminal::input::tests::test_changelog_slash_command_clears_buffer_on_success",
+      "step_number": 55
+    },
+    {
+      "line": 15607,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.689s] ( 9045/10680) warp terminal::input::tests::test_open_slash_command_triggers_completions_on_space",
+      "step_number": 55
+    },
+    {
+      "line": 15638,
+      "step_candidates": [
+        "Run desktop workspace unit tests"
+      ],
+      "message": "LEAK [   0.656s] ( 9076/10680) warp terminal::input::tests::test_tab_completion_with_leading_space",
+      "step_number": 55
+    }
+  ],
+  "i18n_pass_count_by_step": {
+    "35": 11,
+    "55": 11
+  },
+  "feature_default_entry_tests": [
+    {
+      "step": 55,
+      "test": "features::tests::desktop_source_keeps_all_three_cli_update_consumer_entries",
+      "source_log_line": 13491
+    },
+    {
+      "step": 55,
+      "test": "features::tests::infinishell_desktop_entry_enables_ime_and_managed_tasks_on_all_desktop_platforms",
+      "source_log_line": 13492
+    },
+    {
+      "step": 55,
+      "test": "features::tests::shared_non_gui_defaults_do_not_enable_local_cli_managed_tasks",
+      "source_log_line": 13493
+    }
+  ],
+  "log_step_binding_method": "按原始Run组与实际执行步骤顺序对应，消除API秒级时间导致的相邻步骤歧义。",
+  "raw_log_bytes": 3323882,
+  "job_api_sha256": "90cd410da6c6c0c1c791dc50e70f3ed295927faf71583e46ce4dc8b34c66e821",
+  "run_attempt": 1,
+  "boundaries": [
+    "测试组可能重复覆盖用例，不可相加为不重复测试总数。",
+    "leaky为已通过用例的子集，不是独立失败，也不能证明托管进程树清理。",
+    "定向组skipped包含过滤项；跨平台能力仍按各自原生与GUI收据记录。"
+  ]
+}

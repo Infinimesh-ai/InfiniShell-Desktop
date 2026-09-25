@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "run_id": 36116931025,
+  "job_id": 108013126999,
+  "job_conclusion": "success",
+  "files": [
+    {
+      "file": "artifact-index.safe.json",
+      "sha256": "7814d33b50bf35e6ce7d5136adc2d464cc043266bad5f7e8397eb9cdaec31dbd",
+      "bytes": 3602
+    },
+    {
+      "file": "grok-supervised-exit.json",
+      "sha256": "0bc25d82aea2c101a825fb939b35c566bbe2e951a30d133d28ecca763b0c2f83",
+      "bytes": 13241
+    },
+    {
+      "file": "grok-supervised-verification.safe.json",
+      "sha256": "238272a69030d475c972155014ec9d8e08593625193f54392937783ddf2ed74d",
+      "bytes": 8105
+    },
+    {
+      "file": "job-summary.safe.json",
+      "sha256": "c0734e1edd430103458328b73aaef6352dcf6c7fbf112d7a4557816ea87a0b77",
+      "bytes": 14407
+    },
+    {
+      "file": "native-boundaries.safe.json",
+      "sha256": "53bce36fa56b856c5549826130d0b91e02dc5dbe6306b734040578b2c4116a1b",
+      "bytes": 8183
+    },
+    {
+      "file": "source-comparison.safe.json",
+      "sha256": "c2532e7691233365dbca36b292ee9c3584b7031b82408937233ecdda9dab5a4a",
+      "bytes": 3491
+    }
+  ],
+  "original_four_case_report_preserved": true,
+  "raw_logs_and_private_manifests_copied": false,
+  "credentials_accessed": false,
+  "ci_rerun_triggered": false,
+  "scope": "原生专项；历史失败证据不改写，原 ee839 完整门禁继续使用原提交身份。"
+}

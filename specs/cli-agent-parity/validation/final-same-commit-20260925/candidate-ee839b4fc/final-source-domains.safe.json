@@ -1,0 +1,900 @@
+{
+  "schema": 1,
+  "audit_kind": "只读 Git 对象比较与既有安全收据来源校验；本审计未构建、未运行 CLI、未操作 GUI。",
+  "generated_at_utc": "2026-09-25T07:29:14.161771+00:00",
+  "base_commit": "b3acf2a69010f9bd776558ce4f2fae9fbaa3e511",
+  "final_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "base_tree": "284716ef6fa16afe61eb42fe78200514ff30ba05",
+  "final_tree": "e69e859ec45588f9ab3f81cd08c609babdbe4399",
+  "method": [
+    "改动清单来自 git diff --name-status/--numstat 的两提交比较。",
+    "文件以 git rev-parse <commit>:<path> 比较 blob 对象；目录比较完整 tree 对象，包含隐藏文件。",
+    "测试候选的 SHA-256 与 git show ee839:<path> 原始 blob bytes 比较；PowerShell 按 ee839 的 .gitattributes CRLF 检出规则另外校验，不依赖当前工作区文件。",
+    "仅输出固定源码路径、哈希、受限测试摘要与验收边界；不读取认证配置或输出原始私有日志。"
+  ],
+  "old_binding_reference": {
+    "path": "specs/cli-agent-parity/validation/final-same-commit-20260925/source-binding.safe.json",
+    "sha256": "04edff2e022981f930209db2bc329b1175dea7d7a30a71f9173362a4059a4166",
+    "recorded_final_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "original_scope": "其中九项 native_domains_unchanged 的比较仅止于 b3→9af6；本文件重新比较 b3→ee839，不沿用其全部源码未变结论。"
+  },
+  "changed_files": [
+    {
+      "path": ".github/workflows/cross-platform-preflight.yml",
+      "status": "M",
+      "category": "workflow",
+      "description": "Linux GUI 剪贴板用例分别运行 en 与 zh-CN 独立进程并分目录保留收据。",
+      "added": 6,
+      "deleted": 1,
+      "final_git_object": "2f7f5bf6640c05e29d9874deb1c30741707532d3",
+      "base_git_object": "f3568bd7c03baf0961cf49599186a7fdd2b8c2bb"
+    },
+    {
+      "path": "app/i18n/en/warp.ftl",
+      "status": "M",
+      "category": "localization",
+      "description": "仅 cli-task-manager-claude-verification：移除过时功能开关及待验证提示，明确三个受支持的 Claude 版本。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "67a30fbeaa90ed4ce2432dd3f633ba520c3bbfc9",
+      "base_git_object": "c97b338de964316602a2238b5e597ad3b75277c9"
+    },
+    {
+      "path": "app/i18n/zh-CN/warp.ftl",
+      "status": "M",
+      "category": "localization",
+      "description": "同步 cli-task-manager-claude-verification 的简体中文语义；变量集合未改变。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "b620586ab73b8ad3026ae160b28b306371827b71",
+      "base_git_object": "bc68d185221729e8af51c150992e5edd748d9480"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "status": "M",
+      "category": "product",
+      "description": "OS 监督者派生后，握手在独立 blocking 任务继续；接收方取消时由 ManagedChild 析构通知监督者清理，避免取消排队 future 丢失监听器及清理所有权。",
+      "added": 27,
+      "deleted": 18,
+      "final_git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470",
+      "base_git_object": "65e7557dc1e13b05d0344aa60b2fa5ae6f090bb3"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+      "status": "M",
+      "category": "test",
+      "description": "增加监督握手排队期间取消的真实进程树退出用例及内部限时夹具；五项 supervised 用例是本轮新增验证证据。",
+      "added": 108,
+      "deleted": 0,
+      "final_git_object": "01d091da3aa7c0c24c74234ed607ef42a104012c",
+      "base_git_object": "bfcff365f8373b4e26d96b73f16789136d0ea6ed"
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+      "status": "M",
+      "category": "test",
+      "description": "GUI 测试限定语言、读取实际 i18n loader 语言并写入收据，验证产品默认配置和无单旗标覆盖。",
+      "added": 29,
+      "deleted": 1,
+      "final_git_object": "8762b7c93961d0218dbd266c25294f18fa9fd96c",
+      "base_git_object": "8c794acfa0f3aa0a4865462a0d2b77c3647597af"
+    },
+    {
+      "path": "app/src/bin/infinishell.rs",
+      "status": "M",
+      "category": "product",
+      "description": "macOS、Linux、Windows 桌面主入口共用默认功能集合，默认开放本地 CLI 托管任务；版本及权限策略不变。",
+      "added": 2,
+      "deleted": 7,
+      "final_git_object": "74c15590b518ee579fba16e45930f4151d6b77f7",
+      "base_git_object": "1474f763d7a2e1df1735581b860dd558344bf54f"
+    },
+    {
+      "path": "app/src/features.rs",
+      "status": "M",
+      "category": "product",
+      "description": "新增三平台桌面共用 INFINISHELL_DESKTOP_FLAGS，含 ImeMarkedText 与 LocalCLIManagedTasks；不自动用于共用库或 TUI。",
+      "added": 6,
+      "deleted": 0,
+      "final_git_object": "55b5a193d049065d72e0515e983066afc326c4b7",
+      "base_git_object": "8937001029d2975a2b0f7c4937ec7626b5ffe5ed"
+    },
+    {
+      "path": "app/src/features_tests.rs",
+      "status": "M",
+      "category": "test",
+      "description": "验证三平台桌面共用默认集合及共用库/TUI 独立边界。",
+      "added": 5,
+      "deleted": 12,
+      "final_git_object": "805ce741c901644d541a316814177726601dbff8",
+      "base_git_object": "63e210b960e7c9d5af8d17610f147a9ccd197718"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "status": "M",
+      "category": "test",
+      "description": "真实升级夹具等待监督退出失败时补存诊断；未修改升级生产实现。",
+      "added": 7,
+      "deleted": 1,
+      "final_git_object": "9491f880936ee5b62f59ddd376165a656eb582f0",
+      "base_git_object": "903876d3fa630c0d246ca68977b66b5acbff8654"
+    },
+    {
+      "path": "crates/integration/src/bin/integration.rs",
+      "status": "M",
+      "category": "test",
+      "description": "真实 GUI 测试入口使用桌面默认功能集合并在构建 UI 前初始化指定语言。",
+      "added": 10,
+      "deleted": 4,
+      "final_git_object": "e96c67a59268b4f55333815aebbeada317694f22",
+      "base_git_object": "76024eec7e6a3cfa59b5c8f719908aca138de4d8"
+    },
+    {
+      "path": "crates/integration/src/test/cli_composer_system_clipboard.rs",
+      "status": "M",
+      "category": "test",
+      "description": "剪贴板用例校验真实界面语言及默认能力收据，并保持零模型输入断言。",
+      "added": 8,
+      "deleted": 3,
+      "final_git_object": "f0970a06f704c0fca539685b482622207cbdabb2",
+      "base_git_object": "5ca8d97f14f6d1ad0aa4c0f2a4038c0b17f0517b"
+    },
+    {
+      "path": "script/cli-agent-parity/run_windows_gui_clipboard.ps1",
+      "status": "M",
+      "category": "workflow",
+      "description": "复用一次 Mesa 准备，分别执行 en 与 zh-CN 独立 GUI 进程；分目录保留证据，任意失败使整体失败。",
+      "added": 49,
+      "deleted": 21,
+      "final_git_object": "f8348e2adb84ff9c8f8cbe1dd1af47496a5a4b67",
+      "base_git_object": "c311c95633418539a548d61fdac9e8e01bf2a866"
+    },
+    {
+      "path": "specs/cli-agent-parity/ACCEPTANCE_FIXED_VERSIONS_20260924.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 12,
+      "deleted": 4,
+      "final_git_object": "177815c51464269a1728618f6b759564d4f0fee1",
+      "base_git_object": "d56d168faa1bb7db5da7b1db297068a394d11be1"
+    },
+    {
+      "path": "specs/cli-agent-parity/CAPABILITY_MATRIX.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "0b5c9faaedac084167dbc73184590baf5788b60e",
+      "base_git_object": "079aded2500d304d28c6970977fa7ac385b42951"
+    },
+    {
+      "path": "specs/cli-agent-parity/CLI_AUTOUPDATE.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "b8d7bc9aa06af732c82a52cc0cfa2db9852117d2",
+      "base_git_object": "394d6286e345462e3f5be6b3c8a9e7f99154ee65"
+    },
+    {
+      "path": "specs/cli-agent-parity/HANDOFF_20260921_REOPEN.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "67d361ac4429b3d3259578a297e5903905fb83c5",
+      "base_git_object": "a7a0086785c6fd046a088b94c644d2d70d0c10bd"
+    },
+    {
+      "path": "specs/cli-agent-parity/HANDOFF_20260921_STAGE_CHECKPOINT.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "ceca13a213e0dbc139951c4be49889c45db4d4e3",
+      "base_git_object": "86429561f2c1b4e29b5456f9041b317e232ae92f"
+    },
+    {
+      "path": "specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 3,
+      "deleted": 1,
+      "final_git_object": "fb17828952e4108bd2e307cfdb245a9b9a1d89a7",
+      "base_git_object": "8ac22b27c2edd8f214e9430673cdb99ed6a74fe1"
+    },
+    {
+      "path": "specs/cli-agent-parity/PLAN.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "652a0abd26d67bd5f6af996ffe8e0595c9374576",
+      "base_git_object": "c61f5210de71e77be886761d58d64fa8998c9827"
+    },
+    {
+      "path": "specs/cli-agent-parity/VALIDATION_REPORT.md",
+      "status": "M",
+      "category": "documentation",
+      "description": "固定版本验收、能力、计划或交接记录更新。",
+      "added": 1,
+      "deleted": 1,
+      "final_git_object": "1d155419e49fe6e03c323354265e01f0ca090c04",
+      "base_git_object": "385e1a7e0c7a479ed772ea737e86c003cdce6b30"
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36028161259-windows-codex-atomic.safe.json",
+      "status": "A",
+      "category": "receipt",
+      "description": "补充先前固定版本验证的安全收据；不构成 ee839 的重新执行。",
+      "added": 180,
+      "deleted": 0,
+      "final_git_object": "cd4b81b7bb27dd2c8de826859134eceda954f6ea",
+      "base_git_object": null
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36028161259-windows-final.safe.json",
+      "status": "A",
+      "category": "receipt",
+      "description": "补充先前固定版本验证的安全收据；不构成 ee839 的重新执行。",
+      "added": 262,
+      "deleted": 0,
+      "final_git_object": "d9e2e8612081ceedd62e4584307575cc38af6363",
+      "base_git_object": null
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/ci-36028161259-windows-grok.safe.json",
+      "status": "A",
+      "category": "receipt",
+      "description": "补充先前固定版本验证的安全收据；不构成 ee839 的重新执行。",
+      "added": 264,
+      "deleted": 0,
+      "final_git_object": "b5745a9390678746411d8655c5ab5223e2e43045",
+      "base_git_object": null
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json",
+      "status": "A",
+      "category": "receipt",
+      "description": "补充先前固定版本验证的安全收据；不构成 ee839 的重新执行。",
+      "added": 94,
+      "deleted": 0,
+      "final_git_object": "2bba5375dfd672b4fc3c6a9e96b47eec474eaf2f",
+      "base_git_object": null
+    },
+    {
+      "path": "specs/cli-agent-parity/validation/macos-fixed-versions-20260924/source-binding-b3acf2a69.safe.json",
+      "status": "A",
+      "category": "receipt",
+      "description": "补充先前固定版本验证的安全收据；不构成 ee839 的重新执行。",
+      "added": 39,
+      "deleted": 0,
+      "final_git_object": "9f3551c71a7adc47a2cc9da78acc4325ebed952c",
+      "base_git_object": null
+    }
+  ],
+  "changed_file_counts": {
+    "workflow": 2,
+    "localization": 2,
+    "product": 3,
+    "test": 6,
+    "documentation": 8,
+    "receipt": 5
+  },
+  "original_nine_domain_comparison": [
+    {
+      "path": "app/src/ai/cli_agent_runtime/codex.rs",
+      "object_type": "blob",
+      "base_git_object": "6b061df562a30923d803d88603813e1faba8f9f4",
+      "final_git_object": "6b061df562a30923d803d88603813e1faba8f9f4",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/claude.rs",
+      "object_type": "blob",
+      "base_git_object": "7375d36ad9d3ba697e602ffaee270fbe3349bc6b",
+      "final_git_object": "7375d36ad9d3ba697e602ffaee270fbe3349bc6b",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok.rs",
+      "object_type": "blob",
+      "base_git_object": "20c2ecd967d3590bbe1de2760994b4e3a6d7f329",
+      "final_git_object": "20c2ecd967d3590bbe1de2760994b4e3a6d7f329",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/grok_profile.rs",
+      "object_type": "blob",
+      "base_git_object": "8a87d70869aa2676cb17211bc5e91dc36ebf00b5",
+      "final_git_object": "8a87d70869aa2676cb17211bc5e91dc36ebf00b5",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/permissions.rs",
+      "object_type": "blob",
+      "base_git_object": "8d4d701cc49c151c794db6755ddd87c553b0b2af",
+      "final_git_object": "8d4d701cc49c151c794db6755ddd87c553b0b2af",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/coordinator.rs",
+      "object_type": "blob",
+      "base_git_object": "ad542876a56832161ed46bce2edfcda3398ce082",
+      "final_git_object": "ad542876a56832161ed46bce2edfcda3398ce082",
+      "equal": true
+    },
+    {
+      "path": "app/src/ai/cli_agent_runtime/runtime_host.rs",
+      "object_type": "blob",
+      "base_git_object": "42b9015dece97caed758f8ae9758076675d486be",
+      "final_git_object": "42b9015dece97caed758f8ae9758076675d486be",
+      "equal": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions",
+      "object_type": "tree",
+      "base_git_object": "9db62dc378fb753774ffb81f25a538e77e0c8e03",
+      "final_git_object": "9db62dc378fb753774ffb81f25a538e77e0c8e03",
+      "equal": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates",
+      "object_type": "tree",
+      "base_git_object": "de230f3c773dcd09c47b000456535d7257ff1560",
+      "final_git_object": "94675a55838526de8cea27a7767a1038bc7785cc",
+      "equal": false,
+      "changed_paths": [
+        "app/src/terminal/cli_agent_updates/sources_live_tests.rs"
+      ]
+    }
+  ],
+  "original_nine_summary": {
+    "equal": 8,
+    "different": 1,
+    "different_path": "app/src/terminal/cli_agent_updates",
+    "reason": "该目录中仅 sources_live_tests.rs 测试诊断改变，生产 sources.rs blob 未变；目录 tree 不能称为一致。"
+  },
+  "additional_domain_comparison": [
+    {
+      "domain": "permission_profiles_and_skills",
+      "objects": [
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile.rs",
+          "object_type": "blob",
+          "base_git_object": "9c1c32cd65ce0308a35d3aa7c3694f2b7fe046f3",
+          "final_git_object": "9c1c32cd65ce0308a35d3aa7c3694f2b7fe046f3",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_profile_preflight.rs",
+          "object_type": "blob",
+          "base_git_object": "2dd057a3dcb0d3877ae1586399cf89bf1ffaa4bb",
+          "final_git_object": "2dd057a3dcb0d3877ae1586399cf89bf1ffaa4bb",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/claude_permission_snapshot.rs",
+          "object_type": "blob",
+          "base_git_object": "95cee122da318015541ac2088b531458cf1f5930",
+          "final_git_object": "95cee122da318015541ac2088b531458cf1f5930",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok_skills.rs",
+          "object_type": "blob",
+          "base_git_object": "d25ef77c21b89cc30b40d96a5a8320ead9324b20",
+          "final_git_object": "d25ef77c21b89cc30b40d96a5a8320ead9324b20",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok_local_tools.rs",
+          "object_type": "blob",
+          "base_git_object": "4b9483c634276e7cdb2680f35615e6b041a881e7",
+          "final_git_object": "4b9483c634276e7cdb2680f35615e6b041a881e7",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/grok_tool_lease.rs",
+          "object_type": "blob",
+          "base_git_object": "99d8d93126f6eea3c953cb6dc4534fc9243c45aa",
+          "final_git_object": "99d8d93126f6eea3c953cb6dc4534fc9243c45aa",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/local_skills.rs",
+          "object_type": "blob",
+          "base_git_object": "a5afce60aa06605f12b300ff538fa217627b7d81",
+          "final_git_object": "a5afce60aa06605f12b300ff538fa217627b7d81",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/local_tools.rs",
+          "object_type": "blob",
+          "base_git_object": "9bcd49d8d292e40365d0343e7cf18d32da8596f9",
+          "final_git_object": "9bcd49d8d292e40365d0343e7cf18d32da8596f9",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "domain": "task_coordination_messaging_recovery",
+      "objects": [
+        {
+          "path": "app/src/ai/cli_agent_runtime/mod.rs",
+          "object_type": "blob",
+          "base_git_object": "693d62d823da70fa5cf3421c09bcb91a26e761df",
+          "final_git_object": "693d62d823da70fa5cf3421c09bcb91a26e761df",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/coordinator_tools.rs",
+          "object_type": "blob",
+          "base_git_object": "6460df1dc9d6fabfe609515470546902f82e697a",
+          "final_git_object": "6460df1dc9d6fabfe609515470546902f82e697a",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/conversation_bridge.rs",
+          "object_type": "blob",
+          "base_git_object": "4a78d8835fc9c88974a5c473335a54efce770ac0",
+          "final_git_object": "4a78d8835fc9c88974a5c473335a54efce770ac0",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_input.rs",
+          "object_type": "blob",
+          "base_git_object": "fe9596165833b586e5ee6d8b349a29a1c907c3d4",
+          "final_git_object": "fe9596165833b586e5ee6d8b349a29a1c907c3d4",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_input.rs",
+          "object_type": "blob",
+          "base_git_object": "12b16cae8c8be4840602e6f9160babce19c273ae",
+          "final_git_object": "12b16cae8c8be4840602e6f9160babce19c273ae",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_history.rs",
+          "object_type": "blob",
+          "base_git_object": "7a52936fa4e4c57f11a715ca5c4f7452c7ee780b",
+          "final_git_object": "7a52936fa4e4c57f11a715ca5c4f7452c7ee780b",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_view.rs",
+          "object_type": "blob",
+          "base_git_object": "f1bf95cd97161dd4db625c84ef0abedc711e1351",
+          "final_git_object": "f1bf95cd97161dd4db625c84ef0abedc711e1351",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/local_cli_mailbox.rs",
+          "object_type": "blob",
+          "base_git_object": "600bcb8d6168a8c2bb07b1a9ca3046f067a94382",
+          "final_git_object": "600bcb8d6168a8c2bb07b1a9ca3046f067a94382",
+          "equal": true
+        },
+        {
+          "path": "app/src/persistence/local_cli_tasks.rs",
+          "object_type": "blob",
+          "base_git_object": "3a64078df865ee5d3829d9c1feb69bc811424395",
+          "final_git_object": "3a64078df865ee5d3829d9c1feb69bc811424395",
+          "equal": true
+        },
+        {
+          "path": "app/src/persistence/sqlite.rs",
+          "object_type": "blob",
+          "base_git_object": "ff493ade28034efb55164d0d3806263cf88da6ac",
+          "final_git_object": "ff493ade28034efb55164d0d3806263cf88da6ac",
+          "equal": true
+        },
+        {
+          "path": "app/src/terminal/cli_agent_sessions/local_tasks.rs",
+          "object_type": "blob",
+          "base_git_object": "05ca9f664e686d77d72a8ec5aceb3db2a56ae88c",
+          "final_git_object": "05ca9f664e686d77d72a8ec5aceb3db2a56ae88c",
+          "equal": true
+        },
+        {
+          "path": "crates/persistence/migrations/2026-09-16-000000_add_local_cli_tasks",
+          "object_type": "tree",
+          "base_git_object": "7e960b560dfe111a6f7cc124edd9610d99a985fe",
+          "final_git_object": "7e960b560dfe111a6f7cc124edd9610d99a985fe",
+          "equal": true
+        },
+        {
+          "path": "crates/persistence/migrations/2026-09-16-000001_include_unconfirmed_local_cli_sessions",
+          "object_type": "tree",
+          "base_git_object": "e29319012b53f5e5aa3fb288cff7320ee3859b92",
+          "final_git_object": "e29319012b53f5e5aa3fb288cff7320ee3859b92",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "domain": "plugin_manager_and_bundles",
+      "objects": [
+        {
+          "path": "app/src/terminal/cli_agent_sessions/plugin_manager",
+          "object_type": "tree",
+          "base_git_object": "7074468070a62a4309e223f46325ab897ec6cc22",
+          "final_git_object": "7074468070a62a4309e223f46325ab897ec6cc22",
+          "equal": true
+        },
+        {
+          "path": "app/assets/bundled/cli-agent-plugins",
+          "object_type": "tree",
+          "base_git_object": "70f3f1a2627b68184966a156311d624b08fb5518",
+          "final_git_object": "70f3f1a2627b68184966a156311d624b08fb5518",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "domain": "update_production_and_settings",
+      "objects": [
+        {
+          "path": "app/src/terminal/cli_agent_updates.rs",
+          "object_type": "blob",
+          "base_git_object": "ca5cd8a119489e600c68a55eeef4655c1eed4df1",
+          "final_git_object": "ca5cd8a119489e600c68a55eeef4655c1eed4df1",
+          "equal": true
+        },
+        {
+          "path": "app/src/terminal/cli_agent_updates/sources.rs",
+          "object_type": "blob",
+          "base_git_object": "9ca3e167db4f868c71e0506102f90885dbdbe14e",
+          "final_git_object": "9ca3e167db4f868c71e0506102f90885dbdbe14e",
+          "equal": true
+        },
+        {
+          "path": "app/src/settings/ai.rs",
+          "object_type": "blob",
+          "base_git_object": "3f3bebae920e1eb1cfd8a45fe9f6a4f271fc821b",
+          "final_git_object": "3f3bebae920e1eb1cfd8a45fe9f6a4f271fc821b",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "domain": "native_platform_supervision",
+      "objects": [
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+          "object_type": "blob",
+          "base_git_object": "cc53272b8632848a6e3cf2c6de85712775ea9a09",
+          "final_git_object": "cc53272b8632848a6e3cf2c6de85712775ea9a09",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
+          "object_type": "blob",
+          "base_git_object": "07900ab15d35bb79ddb02b8c77c27cafe81d308b",
+          "final_git_object": "07900ab15d35bb79ddb02b8c77c27cafe81d308b",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_linux.rs",
+          "object_type": "blob",
+          "base_git_object": "912896233a0d8cdc2e876f8fcba217a540c6694b",
+          "final_git_object": "912896233a0d8cdc2e876f8fcba217a540c6694b",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs",
+          "object_type": "blob",
+          "base_git_object": "acb951c82a1e41c300fa2abd4f8addd0a7dd6439",
+          "final_git_object": "acb951c82a1e41c300fa2abd4f8addd0a7dd6439",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows.rs",
+          "object_type": "blob",
+          "base_git_object": "18725e2ef62f1e778ac69526c167f3739388d576",
+          "final_git_object": "18725e2ef62f1e778ac69526c167f3739388d576",
+          "equal": true
+        },
+        {
+          "path": "crates/command/src",
+          "object_type": "tree",
+          "base_git_object": "f8ad7c6fa139be1df246cea691490e8efc4fc58b",
+          "final_git_object": "f8ad7c6fa139be1df246cea691490e8efc4fc58b",
+          "equal": true
+        },
+        {
+          "path": "app/src/ai/harness_availability.rs",
+          "object_type": "blob",
+          "base_git_object": "8373bc356dddfca2af9433c685d014688531ff86",
+          "final_git_object": "8373bc356dddfca2af9433c685d014688531ff86",
+          "equal": true
+        }
+      ]
+    },
+    {
+      "domain": "dependency_manifests",
+      "objects": [
+        {
+          "path": "Cargo.toml",
+          "object_type": "blob",
+          "base_git_object": "47fa3e7472d201f2787ba17d85ba78fcb34fcf9c",
+          "final_git_object": "47fa3e7472d201f2787ba17d85ba78fcb34fcf9c",
+          "equal": true
+        },
+        {
+          "path": "Cargo.lock",
+          "object_type": "blob",
+          "base_git_object": "c954fa1ce1dfa7c34878660222265a82c5223f16",
+          "final_git_object": "c954fa1ce1dfa7c34878660222265a82c5223f16",
+          "equal": true
+        },
+        {
+          "path": "app/Cargo.toml",
+          "object_type": "blob",
+          "base_git_object": "07c52fe713f9e9978bb9ea9eb35b481ddceb40e0",
+          "final_git_object": "07c52fe713f9e9978bb9ea9eb35b481ddceb40e0",
+          "equal": true
+        },
+        {
+          "path": "crates/command/Cargo.toml",
+          "object_type": "blob",
+          "base_git_object": "5b53d8dff95b5fb265744288a797929211cdcb46",
+          "final_git_object": "5b53d8dff95b5fb265744288a797929211cdcb46",
+          "equal": true
+        }
+      ]
+    }
+  ],
+  "update_directory_inventory": [
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources.rs",
+      "object_type": "blob",
+      "base_git_object": "9ca3e167db4f868c71e0506102f90885dbdbe14e",
+      "final_git_object": "9ca3e167db4f868c71e0506102f90885dbdbe14e",
+      "equal": true,
+      "classification": "product"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_environment_tests.rs",
+      "object_type": "blob",
+      "base_git_object": "01b4fd86b0517404fb023d66d624b8830f5802ac",
+      "final_git_object": "01b4fd86b0517404fb023d66d624b8830f5802ac",
+      "equal": true,
+      "classification": "test"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+      "object_type": "blob",
+      "base_git_object": "903876d3fa630c0d246ca68977b66b5acbff8654",
+      "final_git_object": "9491f880936ee5b62f59ddd376165a656eb582f0",
+      "equal": false,
+      "classification": "test"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_tests.rs",
+      "object_type": "blob",
+      "base_git_object": "fc9b68d61f64164fb38f0e825219ba45a845c807",
+      "final_git_object": "fc9b68d61f64164fb38f0e825219ba45a845c807",
+      "equal": true,
+      "classification": "test"
+    },
+    {
+      "path": "app/src/terminal/cli_agent_updates/sources_windows_live_tests.rs",
+      "object_type": "blob",
+      "base_git_object": "51a2825da3cbb5fbbae875974a90848d5353f487",
+      "final_git_object": "51a2825da3cbb5fbbae875974a90848d5353f487",
+      "equal": true,
+      "classification": "test"
+    }
+  ],
+  "runtime_tree_comparison": {
+    "path": "app/src/ai/cli_agent_runtime",
+    "object_type": "tree",
+    "base_git_object": "d2b1237c33d290d5ea068e83a2c53fe31553cb97",
+    "final_git_object": "4f25e493468a0571960aed0818e54c8d9902c71f",
+    "equal": false,
+    "changed_paths": [
+      "app/src/ai/cli_agent_runtime/managed_process.rs",
+      "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+      "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs"
+    ]
+  },
+  "changed_shared_runtime": {
+    "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+    "object_type": "blob",
+    "base_git_object": "65e7557dc1e13b05d0344aa60b2fa5ae6f090bb3",
+    "final_git_object": "3228a22b610bac574ecbc4a593ac66d8b8638470",
+    "equal": false,
+    "scope": "三款 CLI 共用的受监督启动/取消握手；自动升级监督执行也依赖该实现。",
+    "implication": "适配器、权限、协调器等 blob 相同不表示整个运行时行为从未变更；本处变更必须保留并用新监督验证覆盖。"
+  },
+  "new_supervision_evidence": {
+    "platform": "macOS 本机",
+    "type": "零模型的真实本地监督进程夹具；不是三款真实 CLI 模型生命周期重跑。",
+    "execution_source": "9af6 基线上的提交前候选；不是已冻结 ee839 的新一次执行。",
+    "candidate_base_commit": "9af6de393a8f9fb108eb4fc8a3c871550ff2daf5",
+    "final_source_binding": {
+      "all_recorded_candidate_files_bound": true,
+      "raw_git_blob_bytes_equal_count": 8,
+      "crlf_checkout_rule_bound_count": 1,
+      "all_non_documentation_changes_from_candidate_base_covered": true,
+      "files": [
+        {
+          "path": ".github/workflows/cross-platform-preflight.yml",
+          "candidate_sha256": "ed6265b45705f37051c625449c3476646ee8b4c8414068198d908ade3b319d00",
+          "final_git_blob_sha256": "ed6265b45705f37051c625449c3476646ee8b4c8414068198d908ade3b319d00",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/i18n/en/warp.ftl",
+          "candidate_sha256": "e0f15b5c25992100c8038594c140c9774f5375eaabd83485a6b515db5f3c7a9d",
+          "final_git_blob_sha256": "e0f15b5c25992100c8038594c140c9774f5375eaabd83485a6b515db5f3c7a9d",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/i18n/zh-CN/warp.ftl",
+          "candidate_sha256": "9ada26a16baa9b13bb6f22be384fe583c4486b678875cfd1f50235d7d4df5fe8",
+          "final_git_blob_sha256": "9ada26a16baa9b13bb6f22be384fe583c4486b678875cfd1f50235d7d4df5fe8",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process.rs",
+          "candidate_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+          "final_git_blob_sha256": "b1124f022e80c56e01b66b4ca2f0ea49a20eb3672b9dcf9aef53b9756123ba66",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/managed_process_live_tests.rs",
+          "candidate_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+          "final_git_blob_sha256": "28d250a5bdd00f5653eaf4f358fde25f104906174a0aa26132d32ffce9d69b7c",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/src/ai/cli_agent_runtime/task_manager_clipboard_integration.rs",
+          "candidate_sha256": "253990bc6738e989d38c4414707c0e36ddbfde688b82158339363b60e4aec072",
+          "final_git_blob_sha256": "253990bc6738e989d38c4414707c0e36ddbfde688b82158339363b60e4aec072",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "app/src/terminal/cli_agent_updates/sources_live_tests.rs",
+          "candidate_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+          "final_git_blob_sha256": "cf6ad0e6fe2d43f46499a6e27de79c94386777b004cbccd65ede7040f01b12ff",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "crates/integration/src/test/cli_composer_system_clipboard.rs",
+          "candidate_sha256": "681e2cd1279601871f721b25ba5403493f116483ee01ec5b865b9353d9f90fe8",
+          "final_git_blob_sha256": "681e2cd1279601871f721b25ba5403493f116483ee01ec5b865b9353d9f90fe8",
+          "raw_bytes_equal": true,
+          "bound_to_final_source": true
+        },
+        {
+          "path": "script/cli-agent-parity/run_windows_gui_clipboard.ps1",
+          "candidate_sha256": "d1fd44f090c9aef03dd5cb5e8966ffcf295ea299cf2a3bef772f32a1561c243f",
+          "final_git_blob_sha256": "0d73f959b68c8dda3ee232290fa6e5efc4540512698b9e219dd606721f7b2049",
+          "raw_bytes_equal": false,
+          "checkout_crlf_sha256": "d1fd44f090c9aef03dd5cb5e8966ffcf295ea299cf2a3bef772f32a1561c243f",
+          "bound_to_final_source": true,
+          "line_ending_rule": {
+            "path": ".gitattributes",
+            "git_object": "3c558c13c706f4ae5dde58e26edaf0aa84888cb0",
+            "rule": "*.ps1 text eol=crlf",
+            "note": "Git blob 为 LF；预提交收据为按仓库规则检出的 CRLF 字节。除换行编码外完全一致，不称原始字节一致。"
+          }
+        }
+      ]
+    },
+    "receipt": {
+      "path": "startup-bilingual-local/local-gates.safe.json",
+      "sha256": "ec82aa7df928cca4a5b6a598d498fe2381bb255f677b5701342b5f52ba0cd019"
+    },
+    "diagnostic_receipt": {
+      "path": "startup-bilingual-local/native-diagnosis.safe.json",
+      "sha256": "78c4c2e07d178da9fcff96c9ecdddbabb25a731bdd03180b64ca09204cf473fb"
+    },
+    "command": [
+      "cargo",
+      "nextest",
+      "run",
+      "--no-fail-fast",
+      "-p",
+      "warp",
+      "--lib",
+      "--run-ignored",
+      "only",
+      "--test-threads",
+      "1",
+      "-E",
+      "test(managed_process::live_tests::supervised_)"
+    ],
+    "nextest_run_id": "58601c06-b018-4fff-8e8a-a4a7446bf77b",
+    "exit_code": 0,
+    "log_sha256": "7dee9a19b6a7e4da4d78c6b66767c02a35ce5d7d91b305f085b007b88351d40c",
+    "counts": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 7699
+    },
+    "tests": [
+      {
+        "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_cancel_before_control_handshake_confirms_process_tree_exit",
+        "elapsed_seconds": 11.979,
+        "result": "passed"
+      },
+      {
+        "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_detachment_obeys_platform_containment_boundary",
+        "elapsed_seconds": 3.456,
+        "result": "passed"
+      },
+      {
+        "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_finish_stops_root_and_descendants_and_missing_receipt_blocks_resume",
+        "elapsed_seconds": 3.461,
+        "result": "passed"
+      },
+      {
+        "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_host_sigkill_stops_root_and_descendants_before_receipt",
+        "elapsed_seconds": 3.48,
+        "result": "passed"
+      },
+      {
+        "name": "ai::cli_agent_runtime::managed_process::live_tests::supervised_native_nonzero_exit_code_is_preserved",
+        "elapsed_seconds": 0.898,
+        "result": "passed"
+      }
+    ],
+    "new_test_in_this_diff": "ai::cli_agent_runtime::managed_process::live_tests::supervised_cancel_before_control_handshake_confirms_process_tree_exit",
+    "binary_identity_limit": "本节二进制摘要在测试后读取；本节没有在启动前独立捕获二进制摘要，不能冒称独立的逐次启动前绑定。",
+    "prior_failures_preserved": {
+      "receipt": {
+        "path": "startup-cancel-fix/local-gates.safe.json",
+        "sha256": "f232d68136bcce341661ed80a01a70fd3cb8341a45b5cb3050d7675adfd6ba7a"
+      },
+      "counts": {
+        "passed": 2,
+        "failed": 3,
+        "skipped": 7699
+      },
+      "causal_limit": "系统日志证明首次监督器启动前存在9.016秒扫描；两个既有c通道超时仍缺少当时的wrapper进程状态，不能全部归因于系统扫描或新修复。后续通过不会抹去这些失败。"
+    },
+    "frozen_commit_gate_reference": {
+      "receipt": {
+        "path": "final-ee839/local-gates.safe.json",
+        "sha256": "6c316118705056eeee5b04b7670d5e2fb75b9a0837c11c18a782f7388d898a3d"
+      },
+      "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+      "passed": true,
+      "note": "该收据包含冻结提交 check、workspace、TUI 标签、desktop-build；不会把未运行的 ignored 监督测试计入本收据。"
+    }
+  },
+  "conclusions": [
+    "三款协议适配器、权限与 profile、协调器/消息/历史恢复、插件管理及插件资源的列明 Git 对象一致。",
+    "自动升级生产实现、设置及平台专用监督实现一致；升级目录因测试诊断变化而不再是相同 tree。",
+    "共享 managed_process.rs 启动取消握手确实改变；五项监督测试是本轮新增执行证据，提交前候选源码已逐文件绑定 ee839。",
+    "桌面默认入口、对应测试、英/简中 Claude 提示及双语 GUI 工作流发生变化，须采用本轮真实平台和双语界面收据。",
+    "源码一致性只补充历史验收的来源关系；历史真 CLI 验收仍保留原始 SHA、版本、平台和模式，不改记为 ee839 重新实测。"
+  ],
+  "remaining_evidence_boundaries": [
+    "ee839 的 macOS/Linux/Windows 受监督启动取消、默认入口及双语 GUI 结果由各自本轮收据说明；本 Git 审计本身不判平台通过。",
+    "本轮五项本机监督夹具不证明 Linux/Windows 平台通过，不证明模型调用、认证、第三方服务或三款真实 CLI 全链重新运行。",
+    "源码树相同不证明外部 CLI 二进制、远程 API 或用户配置相同；历史真 CLI 结果只能在原记录的固定版本与执行边界内使用。",
+    "本比较不支持将整个 cli_agent_runtime 目录、整个 cli_agent_updates 目录或全产品标为未改动。"
+  ],
+  "historical_native_lifecycle_reexecution_claimed": false,
+  "sensitive_data_included": false,
+  "repository_modified_by_audit": false
+}

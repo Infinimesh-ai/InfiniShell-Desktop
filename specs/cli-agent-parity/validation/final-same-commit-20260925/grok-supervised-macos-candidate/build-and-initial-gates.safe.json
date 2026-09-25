@@ -1,0 +1,177 @@
+{
+  "scope": "Grok native EOF observation and production supervised exit precommit gates",
+  "base_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "source_sha256": {
+    ".github/workflows/cross-platform-preflight.yml": "bd068d828f3354e541557121278ba0b6d311a931d1c966325342f317705afd41",
+    "app/src/ai/cli_agent_runtime/grok.rs": "b87fd7d08f750f6ddc3721cee68c1984636ed1062032baa79ebc23a45b7b8b14",
+    "app/src/ai/cli_agent_runtime/grok_supervised_exit_live_tests.rs": "dc8a9b9d362cd8b8e33fa3170438c19b8134848819bb1b7627bb703518d2f2d6",
+    "script/cli-agent-parity/grok_fixed_acp_probe.py": "e65dfe9e01759cc6b15d7169293cd3c195d73d343cc39ede1ac0a6240dea178a",
+    "script/cli-agent-parity/grok_fixed_acp_probe_tests.py": "8501ede77f2b09966089368c074768588ea1fc6e2e5983dcb71bcbf9a3125a74",
+    "script/cli-agent-parity/prepare_grok_cli.py": "0ac553512f9d99f187cb5225a9eb7d72acf308e4f4f78abc938dc0812feab111",
+    "script/cli-agent-parity/run_grok_supervised_exit.py": "f4093c567141bb1e5aed04b3a6070d0a65732b92ca888fb5771e3add51ccbc23",
+    "script/cli-agent-parity/run_grok_supervised_exit_tests.py": "87f41f58373f387c2c48292f86387773e62b1c1aadc322d747a4671abde7330d"
+  },
+  "gates": [
+    {
+      "name": "probe-tests",
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "script/cli-agent-parity",
+        "-p",
+        "grok_fixed_acp_probe_tests.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.4,
+      "log_sha256": "f492ee33ff170d22f5b07ff83f5965f313b49e0facad3ea8eecd1cd1ef8be6f8",
+      "summary": [
+        "Ran 26 tests in 0.275s",
+        "OK (skipped=1)"
+      ]
+    },
+    {
+      "name": "catalog-tests",
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "script/cli-agent-parity",
+        "-p",
+        "prepare_grok_cli_tests.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.17,
+      "log_sha256": "94718e0153e6520d35b611db8e95c60a17b590e0da7f8ae5adeb4e2df72a13ba",
+      "summary": [
+        "Ran 21 tests in 0.066s",
+        "OK"
+      ]
+    },
+    {
+      "name": "runner-tests",
+      "command": [
+        "python3",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "script/cli-agent-parity",
+        "-p",
+        "run_grok_supervised_exit_tests.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.13,
+      "log_sha256": "3e22fab1b3114babdc36e0460ef16652ca43f42d69582ef67453ce9fa40e4d63",
+      "summary": [
+        "Ran 16 tests in 0.016s",
+        "OK"
+      ]
+    },
+    {
+      "name": "check",
+      "command": [
+        "cargo",
+        "check",
+        "-p",
+        "warp"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.84,
+      "log_sha256": "4f254574a8465d9944881d7172822f09dc6dc2fc0177f2b333578b2ad9221e21",
+      "summary": []
+    },
+    {
+      "name": "supervisor-build",
+      "command": [
+        "cargo",
+        "build",
+        "-p",
+        "warp_tui",
+        "--bin",
+        "infinishell-tui"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.23,
+      "log_sha256": "f4868b8662e9133e96383086a2fe4d15789acce2ba6da432bffd2663ec5b2000",
+      "summary": []
+    },
+    {
+      "name": "libtest-build",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "--no-run",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 119.8,
+      "log_sha256": "48fdf43faf5744d73ac9c15e56d109f387984caee7646dc390d594c661f9693c",
+      "summary": []
+    },
+    {
+      "name": "i18n",
+      "command": [
+        "cargo",
+        "test",
+        "-p",
+        "warp",
+        "--lib",
+        "i18n::tests"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 15.22,
+      "log_sha256": "1db985e0fe8ecb118bff19806c5fd8c79f4c1bec9e32e1ff8f16596e280d55a3",
+      "summary": [
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 7694 filtered out; finished in 5.23s"
+      ]
+    },
+    {
+      "name": "live-supervised",
+      "command": [
+        "cargo",
+        "nextest",
+        "run",
+        "--no-fail-fast",
+        "-p",
+        "warp",
+        "--lib",
+        "--run-ignored",
+        "only",
+        "--test-threads",
+        "1",
+        "-E",
+        "test(managed_process::live_tests::supervised_)"
+      ],
+      "exit_code": 100,
+      "elapsed_seconds": 63.48,
+      "log_sha256": "19702472fa1e7d857d6fd902539c73d2e0b7b28e3bbf319375a6078a6c5a100a",
+      "summary": [
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7704 filtered out; finished in 15.18s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7704 filtered out; finished in 15.14s",
+        "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 7704 filtered out; finished in 15.14s",
+        "Summary [  61.623s] 5 tests run: 2 passed, 3 failed, 7700 skipped"
+      ]
+    }
+  ],
+  "passed": false,
+  "source_unchanged": true,
+  "worker_location": {
+    "source": "/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop/debug/infinishell-tui",
+    "executed_copy": "/Users/zhishi/.isp-final-w5gpyd6w/grok-supervised-final-lmq2vj8g/infinishell-tui",
+    "sha256": "670c91e9d11aaf5bbba7faf43e66bd830b4ff611cc7f2af6222ef24910935827",
+    "bytes": 804780032,
+    "same_bytes": true,
+    "reason": "同字节内置盘位置对照已跨过外置卷 pre-main 加载阻塞；不改产品超时或系统权限。"
+  }
+}

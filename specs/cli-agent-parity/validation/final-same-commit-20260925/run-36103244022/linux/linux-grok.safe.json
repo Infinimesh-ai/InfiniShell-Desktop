@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "run_id": 36103244022,
+  "source_commit": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "receipt": {
+    "file": "grok-production-installer.safe.json",
+    "bytes": 5973,
+    "sha256": "e6badaa261fb1e98954b70848795a9b09129bea7537220312677978dcc2a52e1"
+  },
+  "all_listed_source_hashes_match_exact_git_checkout": true,
+  "source_comparisons": [
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs",
+      "git_blob_sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+      "checkout_sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+      "receipt_sha256": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+      "checkout_eol": "lf",
+      "matches_checkout_bytes": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs",
+      "git_blob_sha256": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+      "checkout_sha256": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+      "receipt_sha256": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+      "checkout_eol": "lf",
+      "matches_checkout_bytes": true
+    },
+    {
+      "path": "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs",
+      "git_blob_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "checkout_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "receipt_sha256": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "checkout_eol": "lf",
+      "matches_checkout_bytes": true
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs",
+      "git_blob_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "checkout_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "receipt_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "checkout_eol": "lf",
+      "matches_checkout_bytes": true
+    },
+    {
+      "path": "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json",
+      "git_blob_sha256": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+      "checkout_sha256": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+      "receipt_sha256": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+      "checkout_eol": "lf",
+      "matches_checkout_bytes": true
+    },
+    {
+      "path": "script/cli-agent-parity/codex_windows_hook_command.ps1",
+      "git_blob_sha256": "327603d72b007e9ea68a3902cee3f8b4cda4ebd70c6729826f58de79651d8952",
+      "checkout_sha256": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25",
+      "receipt_sha256": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25",
+      "checkout_eol": "crlf",
+      "matches_checkout_bytes": true
+    }
+  ],
+  "source_eol_note": "ee839 的 .gitattributes 将 *.ps1 强制为 CRLF；对应原始 Git blob 为 LF，按该属性还原 checkout 后摘要与收据完全一致。",
+  "result": {
+    "schema_version": 1,
+    "passed": true,
+    "fixed_version": "1.0.41",
+    "platform": "linux",
+    "native_sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+    "test_binary_sha256": "f3926e6616d843569df5c1b9936612f11abba1266188107bae8e19357d136b62",
+    "node_sha256": "a7d572c52208171a81b9afd7c347e8ff38a90ade77d200ee6b3a9dd88df4b0f3",
+    "runner_sha256": "08cc1fa0fac964c6b258bb383c0dbde56731a0cc2cc4c3c7d6cb44e92671067a",
+    "source_sha256": {
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok.rs": "f4c9cf431c58067df56b951dba3de4f0b7ac17290a499cc0f6394f19492c39d2",
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok_tests.rs": "17be34cfa75348eea3d1b6dc4d5fdb849f4e7b3ce32462c8f9c324661eaedeeb",
+      "app/src/terminal/cli_agent_sessions/plugin_manager/grok_native_hook_bridge.cjs": "0b20136124a7fc3a27c65818000cde659b1d743e30841902828948ad88419d13",
+      "app/assets/bundled/cli-agent-plugins/grok/hooks/notify.cjs": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+      "app/assets/bundled/cli-agent-plugins/grok/.grok-plugin/plugin.json": "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+      "script/cli-agent-parity/codex_windows_hook_command.ps1": "00a87e8ad8deed1344a97ca761307056cf56222679a0fc9d530eafb70a1dac25"
+    },
+    "credentials_provided": false,
+    "model_inputs": 0,
+    "native_hook_execution_verified": false,
+    "worker_conout_verified": false,
+    "gui_verified": false,
+    "private_root_removed": true,
+    "timed_out": false,
+    "exit_code": 0,
+    "output_bytes": 506,
+    "output_sha256": "0dee630eee43b3c7b28f24c8be751214004be8e33551d36a3a48f4fbb0a2d780",
+    "failure_diagnostics": {
+      "panic_locations": [],
+      "raw_output_exported": false,
+      "private_paths_exported": false
+    },
+    "receipt": {
+      "credentials_provided": false,
+      "grok_sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+      "grok_version": "1.0.41",
+      "model_input_submitted": false,
+      "native_hook_execution_verified": false,
+      "native_inspect_verified": true,
+      "node_sha256": "a7d572c52208171a81b9afd7c347e8ff38a90ade77d200ee6b3a9dd88df4b0f3",
+      "node_version": "v20.9.0",
+      "passed": true,
+      "progress": [
+        "binary_bindings_verified",
+        "runtime_verification",
+        "runtime_verified",
+        "node_version_probe",
+        "node_version_verified",
+        "grok_version_probe",
+        "grok_version_verified",
+        "production_install",
+        "native_inspect",
+        "installed_hook_export",
+        "production_install_verified",
+        "legacy_fixture_install",
+        "production_upgrade_known_013_to_014",
+        "production_upgrade_verified",
+        "production_same_version_update",
+        "production_same_version_update_verified",
+        "production_disabled_update_rejected",
+        "production_disabled_update_rejected_verified",
+        "file_transaction_failure_rollback",
+        "file_transaction_failure_rollback_verified",
+        "production_update_after_rollback",
+        "finished"
+      ],
+      "stage": "finished",
+      "steps": [
+        {
+          "installed_hook_export": {
+            "config_registry_and_cache_unchanged": true,
+            "installed_hook_export_version_verified": true,
+            "installed_manifest_version": "0.1.4",
+            "installed_notify_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+            "kind": "installed_module_export_probe",
+            "main_entry_verified": false,
+            "manager_minimum_plugin_version": "0.1.4",
+            "model_input_submitted": false,
+            "node_exit_code": 0,
+            "plugin_version": "0.1.4",
+            "stderr_bytes": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_bytes": 217,
+            "stdout_sha256": "f95c0290528e1e48f1a593e19adc986a730eabd08c8d6c8e903cc85e96f6404f",
+            "tty_main_validation_required": true
+          },
+          "installed_hook_main_verified": false,
+          "passed": true,
+          "step": "production_install"
+        },
+        {
+          "current_plugin_version": "0.1.4",
+          "fixture_old_native_install": true,
+          "installed_hook_export": {
+            "config_registry_and_cache_unchanged": true,
+            "installed_hook_export_version_verified": true,
+            "installed_manifest_version": "0.1.4",
+            "installed_notify_sha256": "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+            "kind": "installed_module_export_probe",
+            "main_entry_verified": false,
+            "manager_minimum_plugin_version": "0.1.4",
+            "model_input_submitted": false,
+            "node_exit_code": 0,
+            "plugin_version": "0.1.4",
+            "stderr_bytes": 0,
+            "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_bytes": 217,
+            "stdout_sha256": "4ffcf056289daef7fc10ae90ea4314be3defad3a1afbc3bc80a4d2b92054d802",
+            "tty_main_validation_required": true
+          },
+          "installed_hook_main_verified": false,
+          "legacy_source_unchanged": true,
+          "model_input_submitted": false,
+          "passed": true,
+          "previous_plugin_version": "0.1.3",
+          "production_update_call": true,
+          "step": "production_upgrade_known_013_to_014"
+        },
+        {
+          "config_and_registry_unchanged": true,
+          "passed": true,
+          "step": "production_same_version_update"
+        },
+        {
+          "config_and_files_unchanged": true,
+          "passed": true,
+          "step": "production_disabled_update_rejected"
+        },
+        {
+          "fault_after_first_replacement": true,
+          "passed": true,
+          "production_apply_call": false,
+          "step": "file_transaction_failure_rollback"
+        },
+        {
+          "passed": true,
+          "step": "production_update_after_rollback"
+        }
+      ],
+      "test_binary_sha256": "f3926e6616d843569df5c1b9936612f11abba1266188107bae8e19357d136b62"
+    },
+    "source_unchanged": true
+  }
+}
