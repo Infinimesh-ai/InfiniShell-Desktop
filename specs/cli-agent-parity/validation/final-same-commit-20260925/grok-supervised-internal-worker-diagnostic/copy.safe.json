@@ -1,9 +1,0 @@
-{
-  "purpose": "byte_identical_worker_location_comparison",
-  "source": "/Volumes/ACASIS/CargoTarget/InfiniShell-Desktop/debug/infinishell-tui",
-  "copy": "/Users/zhishi/.isp-final-w5gpyd6w/grok-internal-worker-pe7j29da/infinishell-tui",
-  "sha256": "670c91e9d11aaf5bbba7faf43e66bd830b4ff611cc7f2af6222ef24910935827",
-  "bytes": 804780032,
-  "unchanged_product_timeouts": true,
-  "permission_settings_modified": false
-}

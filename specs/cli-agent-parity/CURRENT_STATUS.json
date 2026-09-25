@@ -1,9 +1,8 @@
 {
   "schema": 1,
-  "recorded_at_utc": "2026-09-25T10:20:25.716158+00:00",
   "status": "stage_delivery_original_goal_incomplete",
   "status_zh": "固定版本阶段交付；原 Goal 完整验收尚未满足",
-  "authority": "当前完成结论；已知缺项与合并范围以同目录 KNOWN_GAPS.md、MERGE_READINESS_20260925.md 为准。历史原始验证文件不可据此改写。",
+  "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
   "assessed_branch": "codex/cli-agent-parity",
   "assessment_baseline": "3c5910678b4e38844bcb6bd161766a8d6040cf98",
   "fixed_versions": {
@@ -43,75 +42,37 @@
   ],
   "tracked_items_total": 18,
   "gap_register": "KNOWN_GAPS.md",
-  "merge_description": "MERGE_READINESS_20260925.md",
   "partial_merge_is_goal_waiver": false,
   "source_behavior_changed_in_this_revision": false,
   "supersedes_overall_completion_conclusions": [
     {
-      "file": "validation/final-same-commit-20260925/final-acceptance.safe.json",
       "sha256": "1abf5f02fb6e9d751f0824b717cd175ad751d05de7358a335bdd557b6fac16ba",
       "bytes": 9851,
       "superseded_summary_fields": [
         "all_required_acceptance_satisfied",
         "remaining_required_items"
       ],
-      "original_bytes_preserved": true,
-      "correction": "只撤回整体完成推断；各项测试结果、源码及平台来源不变。"
+      "correction": "只撤回整体完成推断；各项测试结果、源码及平台来源不变。",
+      "historical_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/final-same-commit-20260925/final-acceptance.safe.json"
     },
     {
-      "file": "validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json",
       "sha256": "4743cdbf1a6a02301d605df9f7ca347b5ada276b7d5b35b4f54776461993176e",
       "bytes": 3667,
       "superseded_summary_fields": [
         "all_required_acceptance_satisfied"
       ],
-      "original_bytes_preserved": true,
-      "correction": "只撤回整体完成推断；各项测试结果、源码及平台来源不变。"
+      "correction": "只撤回整体完成推断；各项测试结果、源码及平台来源不变。",
+      "historical_url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json"
     }
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 36116931025,
-  "merge_assessment_snapshot": {
-    "remote_main": "d9073748ab1fd7c20b0152c5ee895c72c814d78b",
-    "main_is_ancestor": true,
-    "branch_commits_ahead_before_documentation_revision": 110,
-    "branch_commits_behind": 0,
-    "readiness": "阶段合并文档准备；实际合并前重新核对远端和变更。",
-    "merge_performed": false,
-    "published": false,
-    "pr_created": false
-  },
-  "goal_tool_state_note": "本文件纠正验收结论，不声称已恢复应用中的旧 Goal 或创建新 Goal。",
-  "local_validation": {
-    "cargo_check": {
-      "command": [
-        "cargo",
-        "check",
-        "-p",
-        "warp"
-      ],
-      "exit_code": 0,
-      "passed": true,
-      "seconds": 2.37,
-      "log_sha256": "df1021fd02a4a19a5e2f1c69d5d28aef603da59c9475cc3038d3cb70d2f707e0",
-      "source_baseline": "3c5910678b4e38844bcb6bd161766a8d6040cf98",
-      "scope": "仅文档修正，未启动应用或CLI，未新增产品或本地化变更"
-    },
-    "documentation_audit": {
-      "passed": true,
-      "document_and_status_files": 13,
-      "local_links_checked": 754,
-      "unique_tracked_ids": 18,
-      "historical_index_entries_preserved": 173,
-      "superseded_original_files_hashes_verified": 2,
-      "validation_directory_unchanged": true,
-      "production_source_unchanged": true,
-      "diff_check_passed": true,
-      "credential_pattern_matches": 0
-    }
-  },
-  "localization": "仅修改开发与交付文档，无产品或可见界面变化，无需本地化变更；没有重跑源码未变的 i18n/GUI/在线 CLI/跨平台验证。",
-  "history_preservation": "validation/ 现有目录和所有原始失败、通过、截图、索引均保持不变。",
+  "localization": "仅整理规格与验证结论，无产品或可见界面变化，无需本地化变更。",
+  "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。",
   "internal_execution_policy": "后续需启动的验收二进制/应用从内置盘同字节副本运行；外置盘只保留构建缓存。",
-  "scope_interpretation": "清单区分直接功能缺项、有限模式、原生语义和验收覆盖，不表示每一项均为同一级合并阻断或新增强制功能；原Goal要求需逐项完成、举证或由用户明确范围，文档整理不自行豁免。"
+  "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
+  "documentation_updated_at": "2026-09-25",
+  "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
+  "validation_report": "VALIDATION_REPORT.md",
+  "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/"
 }

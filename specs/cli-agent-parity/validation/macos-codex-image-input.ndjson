@@ -1,7 +1,0 @@
-{"event":"session_ready","native_session_id":"01a0a94e-c579-76d1-9d5b-d54b77f45cab","permissions":{"approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":{"excludeSlashTmp":false,"excludeTmpdirEnvVar":false,"networkAccess":false,"type":"workspaceWrite","writableRoots":[]}}}
-{"event":"phase_started","phase":"image_input"}
-{"event":"message_accepted","message_id":"71e1c193-d196-4c0b-b6f9-74cc5312a970","phase":"image_input","turn_id":"01a0a94e-c597-7031-a4a0-7bdebc0bc601"}
-{"event":"turn_started","phase":"image_input","turn_id":"01a0a94e-c597-7031-a4a0-7bdebc0bc601"}
-{"event":"turn_finished","outcome":"Completed","output":"GREEN","phase":"image_input","turn_id":"01a0a94e-c597-7031-a4a0-7bdebc0bc601"}
-{"event":"connection_shutdown","native_session_id":"01a0a94e-c579-76d1-9d5b-d54b77f45cab"}
-{"error":null,"event":"image_probe_finished","passed":true}

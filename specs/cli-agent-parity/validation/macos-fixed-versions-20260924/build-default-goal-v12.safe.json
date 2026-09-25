@@ -1,7 +1,0 @@
-{
-  "previous_gui_executable_sha256": "c21f4bc4edf9c08de58d32bdb06f7daeaa448eee66479340a02f19de476ee132",
-  "default_supervisor_sha256": "01580b7fd55379fa427c28eab80617e9831b3085978f48621acbbc2f88166614",
-  "gui_executable_sha256": "81e8eb79cd366fc33c19c438f167469d4994d0dcff0ad2c939f61d0ab8b8b5d4",
-  "compiled_managed_feature": false,
-  "strict_bundle_signature": true
-}

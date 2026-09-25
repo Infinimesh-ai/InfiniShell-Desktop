@@ -1,3 +1,0 @@
-{"app_restart_verified": false, "event": "acceptance_started", "filesystem_sandbox_verified": false, "max_native_inputs": 6, "native_effective_policy_verified": false, "production_prepare": true, "real_gui_verified": false, "scope": "real_grok_fixed_policy_parent_child", "test_argv_override": false}
-{"cleanup_confirmed": true, "event": "cleanup_verified", "runtime_sha256": "87cf3c8aa426994820cb6c55e34f9515bb36446a4a1fc85a29d7a7533f7d9ea2", "scope": "real_grok_fixed_policy_parent_child"}
-{"event": "acceptance_failed", "reason_bytes": 21, "reason_sha256": "9c34c41bc4937c1fd43b012e982297862db021daf4f5cb3f9e10c0851ebda63a", "scope": "real_grok_fixed_policy_parent_child"}

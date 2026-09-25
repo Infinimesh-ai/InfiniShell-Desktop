@@ -1,198 +1,47 @@
 # CLI 能力矩阵
 
-> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据继续有效；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[合并准备说明](MERGE_READINESS_20260925.md)。本更正覆盖下方“全部完成”的历史总结，不改写原始通过或失败记录，也不表示已经合并或发布。
+**阶段交付，完整 Goal 尚未完成。** 本表基于 `e3ef39689cd8b686dfe040b90217ed1067b4d268`（2026-09-25），不包括后续未提交实现。它说明当前产品能力及限制，不将代码路径存在等同于全平台验收；具体通过范围见[验证结论](VALIDATION_REPORT.md)，剩余项见[已知缺项](KNOWN_GAPS.md)，整体状态见 [CURRENT_STATUS](CURRENT_STATUS.json)。
 
-## 当前固定版本与模式边界（2026-09-25）
-
-本表说明现有产品能力；原生补验的通过范围以[同提交报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)为准。真实模型链保留原 macOS 来源，Linux／Windows 不冒充重跑全部模型交互。
+## 固定版本与模式
 
 | 能力 | Codex CLI 0.156.1 | Claude Code 2.1.280 | Grok Build 1.0.41 |
 | --- | --- | --- | --- |
-| 三平台桌面入口 | 默认开放，保留版本与来源检查 | 默认开放，保留版本与来源检查 | **默认开放**，保留版本、策略与来源检查 |
-| 正式托管协议 | app-server | 结构化流接口 | ACP，继承设置与固定策略分别判定 |
-| 托管文本、文件上下文与图片 | 中英多行、文件上下文、原生类型化图片；模型识图另见 V04 | 中英多行、文件上下文；仅 PNG＋文字，图片与技能不能同轮（G04／G05） | 中英多行、文件上下文；托管图片未实现（G02） |
-| 普通终端富输入与附件 | 可发送文本；文件附件卡片拒绝，远程图片拒绝（G07／G08） | 可发送文本；文件附件卡片拒绝，远程图片拒绝（G07／G08） | 文本需手动复制到原生输入；图片拒绝（G01／G03），另有 G07／G08 |
-| 托管技能 | 保留原生技能调用 | 每轮一个，只能使用连接启动时登记的技能；固定文件策略禁用（G06／G10） | 继承设置支持启动时绑定的单个技能及恢复；固定策略禁用（G06／G10） |
-| 审批与权限 | 当前请求允许／拒绝；不固定跳过审批 | 当前请求允许／拒绝；启动不改全局配置 | 固定读取／文件策略分别验权；拒绝可能返回 Cancelled，不改写为成功 |
-| 父子任务与双向消息 | 正式派发、分阶段 ACK 和结果回收 | 固定文件策略的派发、权限上限、双向 ACK 和结果回收；非任意继承配置（G10） | 固定策略及 SDK 合同满足时开放；继承设置不开放父子工具（G10） |
-| 运行中追加与恢复 | 原生追加；活跃重连和历史继续分开 | 原生合并／后续轮次；不是 Codex steer（G11） | 仅后续回合排队；不支持即时 steer（G11），按原生会话恢复 |
-| 通知配套 | codex-warp 0.4.0；原生 hook 信任单独审核 | warp 2.2.0；保留禁用与无关配置 | infinishell-grok 0.1.4；安装、启用、完整性分别检查 |
+| 桌面入口、身份、安装与版本 | 默认开放；检查实际路径、来源、版本 | 默认开放；安装不等于登录 | **默认开放**；保留版本、来源、策略与能力门禁 |
+| 托管协议 | app-server | 双向结构化流／control | ACP；继承设置与固定策略分别判断 |
+| 托管文本与文件上下文 | 中英多行、文件上下文 | 中英多行、文件上下文 | 中英多行、文件上下文 |
+| 托管图片 | 原生类型化输入；模型识图另见 V04 | PNG＋非空文字；不能与技能同轮（G04／G05） | 未实现（G02）；未登录 `image:false` 不能证明所有已认证模型无能力 |
+| 普通终端富输入与附件 | 文本可发送；文件附件卡片、远程图片拒绝（G07／G08） | 文本可发送；文件附件卡片、远程图片拒绝（G07／G08） | 文本需复制到原生输入；图片拒绝（G01／G03），另有 G07／G08 |
+| 技能来源与调用 | 保留 `$` 与原生技能调用 | `/`；托管每轮一个且在连接启动时登记，固定策略禁用（G06／G10） | Grok／兼容 Claude 来源及已支持 Home Agents 来源；继承模式绑定单技能及恢复，固定策略禁用（G06／G10） |
+| 文件引用与代码评审 | 复用路径、选区、评审上下文 | 同类上下文入口 | 同类上下文入口；均不等同于任意附件卡片支持 |
+| 审批与配置 | 当前请求允许／拒绝；不固定跳过审批 | 当前请求允许／拒绝；启动不改全局配置 | 固定读取／文件策略分别验权；拒绝可能返回 Cancelled，不改写为成功 |
+| 父子任务与消息 | 派发、父权限上限、分阶段 ACK、进度与结果回收 | 固定文件策略派发及双向 ACK／结果；非任意继承配置（G10） | 固定策略和 SDK 合同满足时派发；继承模式无父子工具（G10） |
+| 子任务工具范围 | 按可验证的父权限快照约束 | `ClaudeRestrictedFilesV1` 的 Read／Edit；禁用 Bash／Write／Skill／hooks（G10） | 固定读取／文件工具；禁用原生 shell／hooks／技能（G10）；两款固定策略均非 OS 沙箱 |
+| 运行中追加 | 当前活跃回合 `Steer` | 原生合并或后续轮次，不是 Codex steer（G11） | 仅后续回合排队，不支持即时 steer（G11） |
+| 持久化与恢复 | 任务、原生 ID、父子、消息／结果；活跃重关联与历史继续分开 | 同类持久化；继续受原生会话与权限约束 | 同类持久化；技能／策略合同须在恢复时继续成立 |
+| 配套通知插件 | `codex-warp 0.4.0`；原生 hooks 信任单独审核 | `warp 2.2.0`；保留禁用与无关配置 | `infinishell-grok 0.1.4`；安装、启用及完整性分别核对 |
 | 自动升级渠道 | latest／alpha | latest／stable | stable／alpha |
-| 自动升级来源 | 已核验原生安装；npm、Homebrew、未知来源手动 | 已核验原生安装；npm、Homebrew、未知来源手动 | 已核验原生安装；npm、Homebrew、未知来源手动 |
-| 完成与清理 | 可信原生终态；普通 PTY Escape 不证明工具退出 | 可信原生终态与当前代次清理回执 | 原生五秒 EOF 不可靠；托管清理以当前代次的真实监督回执为准 |
+| 自动升级来源 | 已核验原生安装；npm、Homebrew、未知来源手动 | 同左；WinGet 尚未可靠绑定来源（G09） | 已核验原生安装；npm、Homebrew、未知来源手动 |
+| 完成与清理 | 可信原生终态；普通 PTY Escape 不证明工具退出（G12） | 可信原生终态及本代清理回执 | 原生五秒 EOF 不可靠；托管清理依赖当前代次监督回执 |
 
-各 ID 的影响、替代方式、优先级与完成条件见[已知缺项](KNOWN_GAPS.md)。自动升级来源范围见 G09，新版本兼容范围见 G13；平台验收缺口见 V01–V05。配套说明与回退条件见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。下方按时间保留历史验收，不把旧版候选或旧提交结果当作当前重跑。
+CLI 升级、插件更新与托管兼容分别判断；渠道与来源详细合同见 [CLI_AUTOUPDATE](CLI_AUTOUPDATE.md)，用户支持范围与回退见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。本表中的能力不外推到未来 CLI 版本（G13）。
 
-## 历史阶段记录
+## 共同状态与消息合同
 
-> **历史阶段总结（总体完成判断已撤回）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项当时被汇总为“全部完成”；该总体判断已撤回，剩余项见[统一清单](KNOWN_GAPS.md)。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
+- 应用实例、代次、原生会话／回合 ID 和事件来源用于隔离重复、乱序及旧回调；插件文件来源不能替代真实 CLI 身份。
+- 普通 PTY Stop／基础通知不证明完整终态，缺依据保持未知；已绑定任务的未确认结果保存 `Unconfirmed`。托管完成、取消、失败、断线与清理各有独立判据。
+- `native_protocol` 只说明原生接收，`application_history` 只说明进入应用历史；ACK 不证明模型已执行完成。父子结果要与实际任务及回合关联。
+- 重启恢复记录不自动重放输入；活跃重关联复用核验过的宿主，历史继续才新起进程；同一原生会话不得并发恢复，失败不能偷偷改为新建。
+- 插件缺失或不兼容时可保留普通终端；禁用不自动启用，未知文件和并发编辑不覆盖。具体故障与降级不能被“默认开放”掩盖。
 
-> **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；Codex `0.155.1` 已在干净 `c2ed42fe…` 上通过 macOS 产品适配器运行中工具取消；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)、[receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) 和 [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
+## 平台与验收边界
 
-## 2026-09-24 早期 dirty 增量（历史）
-
-| 要求 | 当前证据 | 结果与边界 |
+| 验收项 | 当前结论 | 仍需处理 |
 | --- | --- | --- |
-| Claude `2.1.280` 父子权限与结果交付 | [receipt145](validation/macos-working-tree-145-a25701d2-claude-21280-parent-child-owned.safe.json)：真实父子派发、受限权限继承、子任务文件效果、双向原生 ACK、自动结果及两代监督清理 | **dirty tree 的 test-only 候选通过**；receipt142 首次失败保留，正式门禁、GUI、SSH／tmux 和同 SHA 跨平台仍缺 |
-| Grok `1.0.41` 完整 P0 | [receipt146](validation/macos-working-tree-146-a25701d2-grok-1041-p0-external-failures.safe.json) 外置尝试；[receipt147](validation/macos-working-tree-147-a25701d2-grok-1041-p0-internal-missing-catalog.safe.json) 内置复测 | **失败／正式门禁关闭**：第一会话零输入握手通过；第二会话原生 leader 内部广播命令，但 ACP 未交付目录，初始化超时，0 次业务输入。模型回合、审批、取消及恢复未验收 |
+| macOS 固定版本真实链 | 有三款限定模式的托管、父子、GUI 恢复与普通终端证据 | 能力模式与附件限制仍按 G01–G10，不代表所有组合完成 |
+| Linux／Windows | 已有工作区／相关回归、原生安装升级、通知、监督清理和部分 GUI | 三款完整在线模型生命周期未全部覆盖（V01） |
+| 中文输入法 | macOS 实际拼音输入法已有证据 | Linux／Windows 剪贴板、中文字形不等于真实组合输入与候选选择（V02） |
+| SSH／tmux | 主要为 macOS 到本机隔离 OpenSSH，包含断连重接 | 目标远端系统组合；Codex 关闭透传须独立证明内层发送与外层无接收（V03） |
+| 图片理解 | Codex 类型化投递已证实，该轮识色错误；Claude 对应 PNG 识色通过 | 保留失败并排查、取得独立正例；不扩大格式或平台，也不承诺任意图片回答准确（V04） |
+| 英文／简体中文布局 | 已有各平台选定视口与资源一致性检查 | Linux／Windows Grok 权限、技能禁用、审批及完整滚动区域（V05） |
 
-## 2026-09-23 当时提交的最新版候选（历史）
-
-| 要求 | `a25701d2…` 的实测证据 | 结果与边界 |
-| --- | --- | --- |
-| Codex `0.156.1` 在线托管生命周期 | [receipt137](validation/macos-clean-commit-137-a25701d2-codex-01561-lifecycle.safe.json)：macOS arm64 干净提交、官方固定完整包、同源签名监督者；文本双轮、审批允许／拒绝及文件效果、追加、取消、进程重启恢复 | **test-only 候选通过**；正式版本门禁、运行中工具树取消、GUI、SSH／tmux、跨平台和升级未通过 |
-| Claude `2.1.280` 在线托管基本链 | [receipt139](validation/macos-clean-commit-139-a25701d2-claude-21280-lifecycle.safe.json)：同提交干净工作树、已授权默认账户，允许／拒绝、排队输入、取消及重启恢复 | **test-only 候选通过**；正式门禁、父子受限策略、GUI、SSH／tmux、跨平台和升级未通过 |
-| Grok `1.0.41` 所选技能 | [receipt140](validation/macos-clean-commit-140-a25701d2-grok-1041-selected-skill.safe.json)：同提交零输入目录及一次真实默认 leader 技能回合、精确只读审批、上下文读取和历史匹配 | **test-only 候选通过**；正式门禁、完整生命周期、GUI、SSH／tmux、跨平台和升级未通过 |
-| Codex `0.156.1` 运行中工具取消 | [receipt141](validation/macos-working-tree-141-a25701d2-codex-01561-running-tool-cancel.safe.json)：未提交增量的 macOS arm64 真实工具开始、取消 ACK、同代清理、父子零残留及五事件顺序 | **dirty tree 的 test-only 候选通过**；仍需干净提交复验，正式门禁和其他平台未通过 |
-
-## 2026-09-23 receipt115–128 增量
-
-| 要求 | 当前证据 | 结果与边界 |
-| --- | --- | --- |
-| `645e8b4f…` 同提交 Linux／Windows 聚焦预检 | [receipt115](validation/cross-platform-preflight-115-645e8b4f.safe.json)：run 35827672098；Linux 28 成功／1 失败／7 跳过，Windows 44 成功／1 失败／3 跳过；6 artifact／31 文件结构及常见敏感模式核验通过 | **两个平台均失败**。Linux hook 夹具发生 5 秒超时及通知缺失，原始日志未证明共同原因；Windows 两项严格 Job 测试每项重试三次，都在首个 debug event 前超时。Windows 主线程恢复顺序及有界超时已形成未受测候选；原子执行、GUI、full workspace 和最终同提交验收均未通过 |
-| 官方 Grok `1.0.41` 零输入 P0 | [receipt116](validation/macos-working-tree-116-grok-1041-zero-input-p0.safe.json)：macOS arm64 固定二进制 SHA，真实 ACP initialize／authenticate／session/new／EOF，0 模型输入、0 业务工具，隔离认证副本与隧道清理 | **零输入候选通过／产品仍关闭**。首次配置逐字节审计因官方 marketplace 初始化失败；第二次仅按已审核范围通过。模型回合、审批、取消、恢复、技能、工具、子任务、GUI 和跨平台未验；不继承 `1.0.40` 的能力结论 |
-| 安装版 Grok hook 冷启动 | 本机复制后的原生 worker 首次 `--protocol-version` 约 6.9 秒；显式预检后测试为 15 通过／2 环境跳过 | **冷路径未验收**：500 毫秒协议预算下首次投递不能据预热后的通过计成功；Linux receipt115 的两项错误仍保留。当前夹具将冷启动身份与已就绪终端路径分开记录，尚未证明生产安装路径冷启动可靠 |
-| Grok `1.0.41` 同提交零输入 P0 | [receipt117](validation/macos-clean-commit-117-grok-1041-zero-input-p0.safe.json) 在干净 `84a174f9…` 上固定官方 SHA；原生 initialize／authenticate／session/new／EOF，0 模型输入／工具 | **P0 候选通过**；只证明该 SHA 的 macOS 原生零输入链及隔离清理，产品托管与模型能力仍未通过 |
-| Grok `1.0.41` 选定技能与设置广播 | [receipt118](validation/macos-working-tree-118-grok-1041-selected-skill-catalog.safe.json) 保留旧 23 字段拒绝；[receipt119](validation/macos-working-tree-119-grok-1041-settings-schema.safe.json) 定位唯一新增布尔字段；test-only 精确 24 字段候选 Rust 7／7、旧版 13／13、隔离 check 通过；[receipt121](validation/macos-working-tree-121-grok-1041-selected-skill-catalog.safe.json) raw ACP 零输入 30 条目录中唯一技能路径匹配，后续真实 Rust adapter 结果见 receipt124／125／131 | **目录候选通过／产品仍关闭**：首次公告通知拒绝保留；正式 `supported_version`／`verified_version` 仍拒绝新版。raw ACP 结果自身不证明产品技能可用，后续 test-only 实链亦不开放正式门禁 |
-| Grok `1.0.41` 单次真实输入 | [receipt122](validation/macos-working-tree-122-grok-1041-selected-skill-turn.safe.json) 的原始 ACP 输入无 ACK；[receipt130](validation/macos-clean-commit-130-a7c7a688-grok-1041-turn-failed.safe.json) 的 Rust adapter 新输入获 ACK 但审批拒绝；[receipt131](validation/macos-clean-commit-131-09798856-grok-1041-selected-skill.safe.json) 在干净 `09798856…` 的 test-only 候选以另一次新输入完成默认 leader 唯一技能、精确只读审批、上下文读取和最终随机标记匹配 | **macOS test-only 单技能候选通过／正式产品门禁关闭**：两份旧失败保留；本次 runner 未独立核对 Git SHA，HTTP 模型调用数不可观察，不能外推到 GUI、其他平台、取消恢复或完整 Goal |
-| `84a174f9…` 同提交 Linux／Windows 聚焦预检 | [receipt120](validation/cross-platform-preflight-120-84a174f9.safe.json)：[run 35837274454](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35837274454)；Linux 34 成功／2 跳过，Windows 44 成功／1 失败／3 跳过；6 artifact／37 文件安全核验通过 | **Linux 通过／Windows 严格 Job 诊断失败**：安装版 Grok `1.0.40` hook 15 通过／2 环境跳过；Windows 系统命令原生退出测试通过，非系统 DLL 拒绝测试三次到外层 30 秒仍未取得根映像事件确认，原因未定位。未证明 DLL 拒绝或 Windows 原子产品升级；GUI 与 full workspace 按输入跳过 |
-| Grok `1.0.41` Rust adapter 零输入目录 | [receipt124](validation/macos-working-tree-124-grok-1041-rust-adapter-zero-input.safe.json)：`932167716…` 基础上的未清洁工作树，官方固定二进制与 test-only Rust `connect_protocol`，默认 leader 的 30 条目录中唯一选定本地技能路径匹配，原生退出／清理确认；首轮 wrapper 身份误校验失败保留 | **零输入候选通过／产品仍关闭**：模型输入、审批、工具均为 0；没有完整技能回合或同提交验收。正式 `supported_version`／`verified_version` 仍拒绝 `1.0.41` |
-| `932167716…` Windows 严格 Job 聚焦预检 | [receipt123](validation/cross-platform-preflight-123-93216771.safe.json)：[run 35847734427](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35847734427)；Windows 46 成功／0 失败／2 跳过，Linux 按输入跳过；严格 Job 系统进程原生退出 0.352 秒、非系统 DLL 拒绝 32.788 秒，均首试通过 | **受测拒绝链通过／产品自动升级仍关闭**：测试断言精确拒绝错误、恶意 DLL 标记不存在、严格 Job 清理和回执匹配；成功测试的内部阶段耗时及独立 ActiveProcesses 数值未公开。此 run 不证明三款真实 CLI 原子升级、Linux／macOS 同提交、GUI 或 full workspace |
-| Codex `0.155.1` 运行中工具取消夹具 | `cddafab7…` 新增显式模型验收：只有原生执行项已开始且固定 Python 父子进程均存活，才发送取消；随后检查原生 ACK、同代清理回执、父子零残留及取消终态顺序。外层脚本仅对私有夹具作身份限定的残留审计和失败兜底 | **先前实链失败，后续定向通过**：receipt125–127 保留三个不同观测／环境失败；当前成功见 receipt128。receipt92 的原生 app-server 失败仍保留历史 |
-| `cddafab7…` macOS Grok 零输入与 Codex 运行中取消 | [receipt125](validation/macos-clean-commit-125-cddafab7-zero-input-and-cancel-failed.safe.json)：同源签名 supervisor；Grok `1.0.41` 实际 Rust adapter 默认 leader 30 条目录中唯一选定技能路径匹配、0 输入、清理确认；Codex `0.155.1` 实链只投影到 SessionReady 和提交阶段，未记录工具开始或取消，夹具残留审计为 0。相同 libtest 摘要从外置盘执行无模型宿主心跳失败，内置 `/private/tmp` 副本 2／2 通过 | **Grok 零输入候选通过／Codex 取消失败**：Codex 原生输入接受和失败事件类别未知，不能把 0 残留计为取消通过；正式 Grok 版本门禁与完整技能回合仍关闭。当前新增安全事件类别诊断须经新 SHA 实测 |
-| `c2ed42fe…` Codex 运行中工具取消 | [receipt126](validation/macos-clean-commit-126-4ebd031c-codex-tool-start-failed.safe.json) 与 [receipt127](validation/macos-clean-commit-127-99c04310-codex-tree-identity-failed.safe.json) 保留先前失败；[receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json) 在干净源码提交、内置盘同源签名监督者和官方 `0.155.1` 上完成真实 Rust 产品适配器取消 | **macOS 固定夹具通过／总 Goal 未完成**：原生固定命令开始、审批、父子树、取消 ACK、同代清理回执、父子零残留和终态顺序全序通过；外层 0 兜底强杀、0 残留。receipt92 原生 app-server 的历史失败不被抹去；GUI、SSH／tmux、其他平台及全量生命周期仍缺证据 |
-
-## 2026-09-23 receipt102–114 阶段补充矩阵
-
-下表覆盖 receipt100／101 对相同要求的“当前”结论；旧表继续保留历史快照。Grok root 候选绑定干净提交 `ac0fa70e…`，Claude 父子链绑定干净提交 `45ba0d11…`，Linux／Windows 聚焦预检绑定 `c25221a22…`；这些不同提交的证据不能拼成最终同提交全范围证明。
-
-| 要求 | 实现 | CLI 版本 | 源码提交 | 模式／平台 | 收据 | 结果 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Claude 官方账户固定权限与父子链 | 默认账户模式不设置 `CLAUDE_CONFIG_DIR`；固定 profile 使用 restricted、空 setting sources、manual／原生 default、host prompts 与 Read/Edit 窄工具集；用户／项目／本地设置及不可验证管理员策略 fail closed。隔离验收标记只增加机器可审计的原生结果关联，普通会话事件不变 | `2.1.278`／官方 `claude-sonnet-4-6` | clean `45ba0d11972d94b1c5bf289eb50938bcfd09a44b` | production runtime-host + stream-json／macOS arm64 | [receipt102](validation/macos-working-tree-102-claude-authorized-parent-child-current.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json) | **真实父子链通过／总 Goal 未完成**：保留 receipt102 的 plan 拒绝和外置 debug supervisor EAGAIN；receipt107 的签名 release 链完成 5 次审批、4 次工具、5 输入／3 执行、2 次合并、父子双向 ACK、自动结果、3 条完整关联与两份 v2 密封清理回执。真实 GUI、SSH／tmux、其他平台和完整异常矩阵未验证 |
-| Grok 1.0.40 根生命周期 | 精确 OAuth、偏序 setup、动态有界模型目录与相关 resume replay；当前版 root 能力仍由 test-only candidate gate 隔离，正式产品入口未开放 | stable `1.0.40`／官方 `grok-4.7` | clean `ac0fa70eea4372675367dfa59ac0226396c613df` | 生产 supervisor + ACP／macOS arm64 | [receipt103](validation/macos-working-tree-103-grok-1040-root-lifecycle-current.safe.json)、[receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json) | **根候选实链通过／产品仍关闭**：保留 receipt103 的握手竞态失败；receipt106 同提交完成两轮、允许／拒绝、排队 ACK 与结果、取消、权威历史及新进程恢复，清理完整。same-turn steering、技能、本地工具、子任务、父权限上限、GUI、网络隔离与其他平台未验证 |
-| Grok 1.0.40 默认入口选定技能组合 | test-only root＋单技能候选；Inherit、独立 leader、显式合成项目信任；静态目录只允许唯一绑定技能增量；产品门禁未开放 | 固定 `1.0.40`／`grok-4.7`／固定 SHA；本机默认命令已更新为 `1.0.41`，未用于本验收 | receipt111 为 dirty tree on `a54f3520…`；receipt113 为 clean `4b12091e788fb79f7bbf12c1fbf67d98c52aabe3` | macOS arm64 原生 ACP／不透明私有认证副本 | [receipt110](validation/macos-working-tree-110-grok-1040-selected-skill-gate-failed.safe.json)、[receipt111](validation/macos-working-tree-111-grok-1040-selected-skill-combination.safe.json)、[receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) | **干净提交隔离候选真实组合通过／产品仍关闭**：保留 receipt110 负证据及 receipt111 工作树通过；receipt113 在固定 `1.0.40`、同提交签名 release supervisor 下再次完成 30 条目录的 0 输入握手，随后 1 次真实输入／接收、1 次精确只读审批、唯一上下文读取、3 条原生工具事件、最终历史与随机标记匹配，清理完整。外置 supervisor 的 EAGAIN 是单独环境失败；GUI、当前默认 `1.0.41`、同提交跨平台全范围和正式入口尚未验收 |
-| Windows 原子自动更新 | PE／导入／debugger 候选只保留受限代码；产品入口和三款来源在事务副作用前 `ManualOnly` | Codex `0.155.1`；Claude `2.1.278`；Grok `1.0.40` | dirty tree on `e6e9d619`；资产纠正核对 `6e289ab39` | Windows x64 实机；官方 API 核对 | [receipt104](validation/windows-working-tree-104-atomic-real-cli-failclosed.safe.json)、[receipt105](validation/macos-working-tree-105-codex-01551-windows-asset-correction.safe.json) | **实际失败＋可靠降级**：PE 13、租约 2 项通过；cwd 可改名、debug 链不退出、Claude／Grok 强杀后曾残留，三款 updater 无退出收据。receipt104 的 Codex 漂移是误与 legacy `0.147.0` 清单比较；`0.155.1` 官方摘要与版本选择后的仓内清单一致，但其余 Windows 阻断仍成立 |
-| 同提交 Linux／Windows 聚焦预检 | workflow 为当前运行时保留 Codex `0.155.1`，只把精确绑定 legacy 插件合同的生产通知安装器分流到官方 `0.147.0`；其余 Claude／Grok／IPC／生命周期／双语／清理门禁保持不变 | Codex `0.155.1`＋installer contract `0.147.0`；Claude `2.1.278`；Grok `1.0.40` | 旧成功 `c25221a22b03c28ca8c8538bee9229ca1bb0ec87`；失败更新 `2c4880f15ead4fb929ee8eeef7a463a250a47ee7`、`4b12091e788fb79f7bbf12c1fbf67d98c52aabe3` | self-hosted Linux x64／Windows x64；`full_workspace_tests=false` | [receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)、[receipt112](validation/cross-platform-preflight-112-2c4880f-windows-debug-fixture.safe.json)、[receipt114](validation/cross-platform-preflight-114-4b12091-grok-unix-test-gate.safe.json) | **旧聚焦矩阵通过／更新矩阵失败／总 Goal 未完成**：run 35746148046 的 Linux 34、Windows 45 个步骤成功；run 35815324806 的 Windows 严格 Job 因内层 `--exact` 名错误实际筛出 0 项；run 35821695492 的 Linux 34 成功，Windows 39 成功但 Grok Unix-only 探针测试在 libtest 编译首败，生命周期测试及原子诊断均未执行。两次失败均不能证明原子 debug 成败；后续 receipt120 已在新 SHA 实机运行：系统命令原生退出通过，非系统 DLL 拒绝仍超时，详见上表。GUI integration 与 workspace 按输入跳过；同提交 macOS、真实 GUI、SSH／tmux、原子 updater 完整退出清理及全量异常矩阵未验证 |
-| Linux 原子执行机制 | `NativeFile` 冻结到 sealed memfd，调用 `execveat(AT_EMPTY_PATH)`；失败不回退 pathname | 静态 ELF 夹具，非三款 CLI 更新器 | clean `c25221a22b03c28ca8c8538bee9229ca1bb0ec87` | self-hosted Linux x64 原生执行 | [receipt109](validation/linux-atomic-execveat-109-c25221a22.safe.json) | **机制实测通过／产品事务未验**：run 35746148046 日志中的 argv／env／cwd 转发与失败不回退两项 PASS；Codex／Claude／Grok 产品升级、退出回执和恢复仍为 false |
-| 阶段门禁与剩余总范围 | `c25221a22…` 已通过本地 feature check、Python 16＋48、workflow 静态门禁及 Linux／Windows 聚焦预检；Claude 117／协调器 63／Python 66／真实父子仍只属于 `45ba0d11…`，Grok 139／Python 37 仍只属于 `ac0fa70e…` | 三方 | preflight clean `c25221a22…`；Claude clean `45ba0d11…`；Grok clean `ac0fa70e…` | macOS 本地＋Linux／Windows CI | receipt102–109 | **跨平台聚焦边界通过，但 Goal 未完成**：SSH／tmux 当前产品接收、真实 GUI IME／双语布局、Linux 三款产品原子升级事务、Codex 当前产品完整生命周期、Grok 扩展／GUI、完整异常矩阵、同提交 macOS 与 full workspace 仍待完成 |
-
-## 2026-09-21 receipt100 矩阵（历史）
-
-当前分支仍为 `codex/cli-agent-parity`，`HEAD`／上游均为 `e6e9d619318e87d0bb889df344c8570f97977e90`，历史受测提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。下列实现尚未冻结或提交；[receipt100](validation/macos-working-tree-100-auth-autoupdate-live.safe.json) 绑定 macOS 扩展属性修复、Claude／Grok 当前源码产品更新成功及两款已认证独立 CLI 实测，[receipt99](validation/macos-working-tree-99-atomic-update-current.safe.json) 保留修复前的产品边界，[receipt98](validation/macos-working-tree-98-current-runtime-binding-gates.safe.json) 保留 Runtime Host／父子／协议门禁，[receipt97](validation/macos-working-tree-97-ssh-tmux-current-preflight.safe.json) 绑定当前远端只读前置核查。所有当前收据都明确 `full_goal_passed=false`。
-
-| 要求 | 当前实现 | CLI 版本 | 源码提交 | 模式／平台 | 当前收据 | 结果分类 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Grok 运行中追加、固定权限允许／拒绝、技能、本地工具及子任务 | 当前 adapter 已固定 1.0.40 三平台输入，并严格验证已登录 `[cached_token,grok.com]` 与 11 阶段 setup 顺序／会话身份；仅开放基础初始化。UI、submit、cancel、resume、审批、固定策略、queue、技能、本地工具和子任务继续关闭 | 当前 stable `1.0.40` | dirty tree on `e6e9d619` | 独立 CLI／托管／macOS | receipt100；1.0.40 无模型握手实测；Rust 133／133、profile 26／26、permissions 9／9、task manager 36／36 | **基础握手通过＋扩展功能缺失**：OAuth 有效，独立 1.0.40 两轮、新进程恢复、真实拒绝和交互“本次允许”执行通过；产品只确认无模型新会话 setup，所有模型回合能力仍 fail closed，故尚无最新版托管追加、技能、工具、子任务、进度、结果或恢复实链；不能把基础版本支持外推为能力通过 |
-| Codex 当前正式版完整生命周期 | adapter 对未结束的命令／文件／MCP 工具先要求同代进程树清理和尾部收据，再发布终态；清理不确定时不声称成功 | latest `0.155.1`；alpha `0.156.0-alpha.12` | dirty tree on `e6e9d619` | app-server／macOS | receipt89–92；receipt98 的 Codex 35／35（2 ignored） | **部分通过＋历史实际失败**：两轮、允许／拒绝、steer、重启恢复真实通过；receipt92 的取消后工具残留仍是失败。当前 adapter 合同已编译，但未跑当前 InfiniShell 产品链 |
-| Claude 官方在线账户托管生命周期 | runner 新增显式授权默认账户模式，完全省略 `CLAUDE_CONFIG_DIR`，只让固定原生 CLI 访问既有账户；生产 adapter 保持原生 UUID、审批和恢复合同 | 官方 `2.1.278` | dirty tree on `e6e9d619` | stream-json／macOS | [receipt101](validation/macos-working-tree-101-claude-authorized-account-live.safe.json) | **进程级托管链通过＋最终证据不足**：两轮、允许／拒绝、运行中后续输入 ACK／结果、取消后同连接继续和新进程同原生会话恢复通过；先前隔离登录失败保留。受测 worker 后续被覆盖，且没有应用 GUI 重启、父子或同提交三平台结论 |
-| 父子权限、双向消息、原生 ACK、进度、结果与持久恢复 | Runtime Host 以 owner epoch、journal、SQLite ACK、水位恢复和启动／退出见证 fail closed；子终态结果可在重启后幂等补齐；普通父子消息先持久排队，再原子 claim 为 `Sent`；只有真实 `MessageAccepted` 生成原生 ACK，`Sent` 未确认消息不重投 | 三方共用基础设施 | dirty tree on `e6e9d619` | 平台无关逻辑／macOS 夹具 | receipt98：runtime 30／30、coordinator 62／62、tools 10／10、persistence 5／5 | **代码合同通过＋真实链证据不足**：失败、取消、已发送或已 ACK 消息均不被伪重放；尚无当前字节上的三款已认证父子实链、进度和应用重启恢复 |
-| Runtime Host IPC 和监督进程安全 | 72 MiB 双向上限、畸形 payload 协议失败、取消 frame 收敛；Drop 监视器只有观察宿主和原生域均退出才清启动标记；OS spawn 前先落 `spawn-attempt`，只有显式 spawn 错误写 `spawn-rejected`。macOS 快照在复制后逐字节镜像源扩展属性 | 非 CLI 协议层 | dirty tree on `e6e9d619` | macOS／平台无关 | receipt100；receipt88；macOS atomic 15／15 | **当前源码定向通过**：签名私有快照实际执行 1／1，Claude／Grok 产品更新各 1／1；证明当前 macOS 原子执行及这两个版本对，不外推为 Codex、Linux／Windows或完整生命周期通过 |
-| SSH／tmux 真实 CLI 触发与产品接收 | 历史探针支持 direct、tmux、断连重连和严格路径；本轮只读核对三台既有 SSH 主机、CLI、插件、tmux、worker 进程与版本绑定 | 当前三台远端均未发现 Codex／Claude／Grok | dirty tree on `e6e9d619` | Linux／Windows 远端前置核查 | receipt97；历史 receipt82–84 | **前置缺失／证据不足**：三台均可 BatchMode 连接，但无当前 CLI、插件或当前源码 worker；bwh-2t 无 tmux。历史传输与重连不等于当前产品接收或三款 CLI 通过 |
-| 消费者自动升级、渠道持久化及事务恢复 | 来源层使用结构化 `ArtifactRole`／`ArgumentRef`／`LaunchBinding`，journal、manifest、exit receipt 绑定 digest；macOS 使用签名私有 generation 快照，Linux 使用 sealed memfd＋`execveat`，Windows 已有 replacement lease 和挂起启动，但真实 PE 导入闭包仍拒绝 | Codex `0.155.1`；Claude stable `2.1.267`／latest `2.1.278`；Grok stable `1.0.40` | dirty tree on `e6e9d619` | macOS 当前执行；Linux／Windows 合同 | receipt100：Claude／Grok 产品更新通过；receipt99；Python verifier 27／27 | **macOS 两款真实通过＋总体未完成**：Claude 与 Grok 当前同源更新均 `inspect=2`、`execute=1`、配置和参考字节不变、journal 清理；历史不安全祖先、xattr 与网络失败仍保留。Codex 当前产品目标、Linux 实际执行、Windows 真实 CLI、三款渠道切换和应用重启事务恢复尚未闭环 |
-| 正式消费者入口 | GUI/TUI 入口代码会参与构建，任务历史和设置已存在；`LocalCLIManagedTasks` 仍保持默认关闭 | 三方 | dirty tree on `e6e9d619` | GUI／三平台目标 | receipt98 的 default 与 feature `cargo check` | **有意未推广**：在真实完整验收前关闭功能不能计作完成，也不按 feature promotion 流程提前开放 |
-| IME、英文／简体中文布局 | Fluent 键和变量同步；三平台 IME／marked-text 与布局合同已有测试 | 三方 UI | dirty tree on `e6e9d619` | macOS／Linux／Windows | receipt98：i18n 11／11；无当前 GUI 收据 | **静态通过＋实际证据不足**：本轮最新代码无新增可见文案；真实 IME 候选、混排多行、英文／简体中文像素布局仍未执行 |
-| 最终同提交三平台与发布门禁 | 当前启用 `local_cli_managed_tasks` 的 `cargo check -p warp`、主二进制 build、i18n、Python verifier、全仓 `cargo fmt --check` 与 diff check 通过；四个交叉目标只做平台源码 typecheck | 三方当前版本 | 无冻结提交 | macOS／Linux／Windows | receipt100 | **未执行**：dirty tree 未提交、未推送，故未派发跨平台 workflow；交叉编译、模拟或本机绿色结果均不等于同提交 Linux／Windows 实际验证通过 |
-
-本机认证现状：Codex 已登录；Grok OAuth 已经用户授权且 `grok models` 成功；Claude 的兼容 Anthropic API 凭据只保存在 macOS 钥匙串，官方在线账户也已获授权并有有效订阅，任何凭据和账户身份均未进入仓库或安全收据。Grok 已沿现有 internal stable 渠道从 `1.0.34` 实际升级到 `1.0.40`，再次检查为 stable、无更新；Claude 仍沿现有 Homebrew `claude-code` stable 保持 `2.1.267`，官方更新入口报告已是该渠道最新，`2.1.278` 属于 `claude-code@latest`。开发环境、独立 CLI 与 receipt101 的进程级托管结果仍不能替代应用 GUI、父子链、渠道事务或最终同提交验收。
-
-## receipt95 及更早的续接工作树历史矩阵（已被 receipt98 取代）
-
-当前分支仍为 `codex/cli-agent-parity`，`HEAD`／远端基线为 `e6e9d619318e87d0bb889df344c8570f97977e90`，受测历史代码提交为 `38a611773b8ee53860f9ab731b2476b9a40d1819`。下表新增实现仍在未冻结、未提交的工作树中；不能把 dirty-tree 定向测试、历史提交或不同版本收据拼成最终同提交通过。
-
-| 要求 | 当前实现 | CLI 版本 | 源码提交 | 模式／平台 | 当前收据 | 结果分类 |
-| --- | --- | --- | --- | --- | --- | --- |
-| Grok 最新正式版权限、追加、技能、工具与子任务 | 已加入官方 `1.0.34` 可执行摘要与版本绑定；固定策略启动和恢复必须匹配精确摘要、保存 profile、只读策略、无本地工具及无 selectedSkills，并在写目录／配置／认证缓存前拒绝越界；运行中第二次提交保持零写入拒绝。安装二进制的隔离帮助、inspect 与物化指南显示 queue/interject、技能、MCP SDK、子任务、进度、结果及恢复候选接口，但当前适配器未据静态字符串扩大门禁 | Grok `1.0.34` | dirty tree on `e6e9d619` | 托管／macOS | [receipt94](validation/macos-official-94-grok-1034-interface-static.safe.json)（无认证静态接口审计）；无当前认证在线扩展能力收据 | **功能缺失＋外部认证缺失**：准备器 19／19 通过，历史 Rust 定向 119 项及 Grok Python 435 项通过、1 项跳过；新增 Rust 保护尚未编译。receipt94 绑定签名二进制和指南字节但明确 `overall_product_acceptance=false`；上游指南还明确直接根子拓扑不支持子→根原生消息，故任意双向 ACK 必须由已验证的 Runtime Host／MCP 桥补齐。追加、selectedSkills、本地工具及父子协议仍无满足产品身份／租约／恢复要求的 1.0.34 实链，继续关闭，不能把可靠降级计作能力完成 |
-| Codex 最新正式版开发协议 | 本机 Homebrew latest 已升级；隔离 app-server 完成 initialize、空线程及负向合同；复用既有登录态的独立私有 HOME 又执行两轮文本、精确命令允许／拒绝、运行中 steer、interrupt 和 app-server 重启后同 thread 恢复。当前产品 adapter 候选会跟踪未完成的 `commandExecution`／`fileChange`／`mcpToolCall`：若回合终态到达时仍缺执行终态，先停止并核验托管进程树清理，再发布取消；原生声称成功或失败也降为清理后失败。清理失败、尾部读取失败或事件背压均不发布终态；已有执行终态则保留连接 | Codex `0.155.1` | dirty tree on `e6e9d619` | 原生 app-server／macOS | [receipt89](validation/macos-official-89-codex-01551-development-upgrade.safe.json)、[receipt90](validation/macos-official-90-codex-01551-isolated-protocol.safe.json)、[receipt92](validation/macos-official-92-codex-01551-native-lifecycle.safe.json)、[receipt95](validation/macos-working-tree-95-current-candidate-static.safe.json)（当前候选静态证据；receipt93 为修正前历史快照） | **部分通过＋实际失败＋候选修复未验**：两轮、允许、拒绝、steer 原生 ACK、恢复及结果均真实通过；取消 RPC ACK 且 turn 为 `interrupted`，但 10 秒内固定工具进程仍存活且没有命令终态，直到 app-server 关闭后才消失，因此 `native_lifecycle_passed=false`。adapter 的“清理回执先于终态”候选只有源码合同，尚未编译或经过真实产品链；不能改写 receipt92，也不能把接收取消冒充清理完成 |
-| 父子宿主持久化、双向 ACK、进度、结果与恢复 | 新增 V2 runtime host、私有 IPC、owner epoch、hash-chain journal、SQLite 提交后 ACK、水位恢复和三态退出；当前实现又补请求先登记再发送、10 秒调用上限、业务提交后 checkpoint 前的幂等重放、journal 失败安全收敛、子结果 ACK 前落盘、本地工具 ACK 前租约、命令队列有界背压与 claim-tail catch-up 屏障。启动路径候选另增加与 manifest／代次绑定的 `startup-exit` 收据和先于进程创建落盘的 `startup-incomplete` 标记：spawn 失败先持久化 `not_started` 再清标记；ready-handshake 失败先观察直接宿主退出并等待真实 CLI 域收敛；启动 future 被取消时只请求终止并保留标记，恢复明确降为 `NativeExitUnconfirmed`。协调器在读取 manifest 前先核对启动证据与数据库任务身份，缺少可重建启动契约时不重投 | 三方共用基础设施；fake native fixture | dirty tree on `e6e9d619` | macOS 真实多进程夹具 | [receipt80](validation/macos-working-tree-80-runtime-host-parent-child.safe.json)（本轮 IPC／恢复／启动修复前快照）、[receipt95](validation/macos-working-tree-95-current-candidate-static.safe.json)（当前候选静态证据；receipt93 为修正前历史快照） | **历史定向通过／当前证据不足**：当时 runtime host 14、通用监督 23、macOS 监督 14、协调器竞态 4 项通过；当前 Full 等待会二次校验 owner，旧 epoch 命令不越权投递；重关联先追平固定 tail 再恢复工具，已开始无结果的副作用禁止重放；启动失败与取消候选不再凭 kill 请求、租约或缺文件伪造已退出，但取消后的直接宿主退出和原生域清理仍没有独立监视收据，保持 `Unconfirmed`。新增测试均尚未实际编译运行，且夹具不能替代三款真实 CLI 父子链或 Linux／Windows |
-| Runtime Host IPC 超大帧、畸形消息与调用取消 | 通用 IPC 增加默认关闭的 opt-in 双向 frame limit；Runtime Host 两端使用 72 MiB 上限，在入站分配／反序列化和出站序列化前拒绝；畸形 service payload 返回协议失败而非 panic；per-request 原子状态和 Drop guard 让写前取消零写入、写中取消补全 frame 并清理 pending | 非 CLI 协议层 | dirty tree on `e6e9d619` | macOS 平台无关 IPC 单测 | [receipt88](validation/macos-working-tree-88-ipc-cancellation.safe.json) | **部分通过**：独立本机 target 的 `ipc` 11／11 与 IPC no-deps clippy 通过，含 4096 次取消压力；Runtime Host 恶意连接后继续服务及最终集成测试因 ORICO test worker 不可读尚未编译／运行，也没有 Linux／Windows |
-| SSH／tmux 真实触发、断连与重连 | rev5 正式 Codex 插件；严格 TTY 路由；探针现将远端根限制为固定私有前缀、安全引用全部参数并在上传前拒绝越界；detach 与本地 SSH 客户端 SIGKILL 后重连保持同一 session，新 prompt 产生新 turn且不重放旧 `session_start` | Codex `0.155.1`、tmux `3.6` | dirty tree on `e6e9d619` | macOS 客户端→bwh-2t SSH／tmux | [receipt82](validation/macos-official-82-codex-01551-bwh2t-ssh-tmux-rerun.safe.json)–[receipt84](validation/macos-official-84-codex-01551-bwh2t-rerun-boundary.safe.json)；71–79 保留历史 | **部分通过／证据不足**：修复后 direct／tmux 传输及真实断连重连生命周期通过；receipt84 总体仍为 `false`，完整实时产品 UI、产品解析器本轮执行、同身份重复／乱序／旧事件拒绝和 Windows 最终字节仍未证明 |
-| 三款消费者自动升级与渠道持久化 | 增加 `Verifying`、stale operation guard、失败 intent、执行前身份复核、源码／构建／签名绑定、Windows reparse 拒绝与事务恢复；program、entry、manager、helper、registration 的 canonical path／大小／SHA-256 冻结后交给最终 worker 在真实 exec 前复核；身份 capture 现以同一 no-follow handle 绑定 file ID／大小／摘要。journal 对真实更新持久保存实际 manager program、参数和 cwd；只有 `prepared`／合法 Claude 准备阶段且监督代次目录确实缺失时，才按该命令持久证明 `not_started`，旧 journal、畸形 Claude 阶段及后期缺账本均 fail-closed；Python driver 27／27；本机开发 Codex 已按原 Homebrew latest 来源从 `0.154.0` 升到 `0.155.1` | Codex `0.155.1`；Claude `2.1.278`（产品 latest）／本机 stable `2.1.267`；Grok `1.0.34` | dirty tree on `e6e9d619` | macOS 私有夹具／开发环境 | [receipt81](validation/macos-working-tree-81-cli-autoupdate-io-blocked.safe.json)（产品审查修复前阻塞快照）；[receipt89](validation/macos-official-89-codex-01551-development-upgrade.safe.json)（开发环境）；[receipt95](validation/macos-working-tree-95-current-candidate-static.safe.json)（当前事务候选静态证据；receipt93 为修正前历史快照） | **部分通过＋实际阻塞**：同 handle capture、真实 launch 绑定的 pre-spawn 恢复与畸形 journal 拒绝均尚未编译；receipt89 只证明本机 Homebrew Codex latest 对齐；ORICO 当前连小文件首字节也不可读，产品 `inspect=0`、`execute=0`，真实产品升级未执行。监督 manifest 持久化后到 OS spawn 之间仍缺独立 witness，且最终 worker 仍按 pathname 执行、脚本／helper 依赖未钉住；需来源层结构化 `LaunchBinding` 后再做平台专用执行或私有快照，不能计完整安全通过 |
-| 正式消费者托管入口 | 实现会被三平台原生构建编译；`LocalCLIManagedTasks` 正反入口测试与 TUI 默认关闭契约已新增 | 三方 | dirty tree on `e6e9d619` | GUI／三平台目标 | 无运行收据 | **功能缺失**：正式 InfiniShell GUI 当前仍默认关闭；为避免误开 TUI，只能在最终验收后由 OSS GUI 入口显式启用，不能用 Cargo default 或共享 channel 数组冒进 |
-| IME、英文／简体中文布局 | 本轮新增本地工具并发上限文案已英中同键；桌面三平台 IME flag、marked-text 门控与中英日 preedit、760×580／90% 高度／软换行／滚动布局合同已增加源码或模型测试 | 三方 UI | dirty tree on `e6e9d619` | macOS／Linux／Windows | 本轮静态审计；无当前实际 GUI 收据 | **证据不足**：英文／简体中文 5,309 个 FTL 键及变量静态一致，但新增 Rust 测试未编译；真实候选选择、混排多行输入及两种语言像素布局仍未执行，不能把源码合同当实际布局通过 |
-| 最终同提交三平台与发布门禁 | 尚未冻结提交；Linux／Windows self-hosted runner 初查不可用，当前已重新核对为 `online`、空闲 | 三方目标版本 | 无候选提交 | macOS／Linux／Windows | 无最终收据 | **未执行**：runner 可用不等于验证通过；`cargo check -p warp`、i18n、完整受影响模块、实际三平台与 GUI 均不能沿用旧提交结果 |
-
-本机当前仅 Codex 有既有认证；Claude Code `2.1.267` 与 Grok `1.0.34` 均未认证。已请求仅启动官方交互登录的明确授权，在授权到达前不读取、复制或记录凭据，也不把缺少在线证据写成产品失败。
-
-2026-09-21 当前官方通道已另存 [receipt85](validation/official-85-cli-channel-discovery.safe.json)：Codex latest `0.155.1`／alpha `0.156.0-alpha.10`，Claude stable `2.1.267`／latest `2.1.278`，Grok stable `1.0.34`／alpha `1.0.38`。该收据仅证明通道发现；历史 Codex alpha.7 往返不能追认为 alpha.10 已运行，三款正式版生命周期也仍按各自真实收据判断。
-
-阶段性收尾与新会话入口：[2026-09-19 续接交接](HANDOFF_20260919_CLI_PARITY.md)。source56 已统一 Claude 固定策略的受支持版本判定，并以官方 2.1.278 完成固定策略恢复、真实父子派发／双向 ACK／结果回收、运行批量取消和待编辑审批取消；原父子失败与验收脚本误判均保留。Grok 1.0.34 P0 生产链、GUI 原生读取审批及本机 SSH／tmux worker已按各自快照通过；最终 Goal 仍未完成。
-[自动升级与最新版当前验证](OFFICIAL_42_AUTOUPDATE_VERIFICATION.md)：source50 同源测试程序与签名监督程序已通过 Claude 2.1.278 Latest → Stable 2.1.267、反向 Stable → Latest 及同版本渠道同步；source56 又补齐最新版固定权限、父子和两类取消原生链，并通过启用托管任务 feature 的签名 GUI 核对官方 2.1.278 检出、固定审批入口及双语布局。整个 source56 尚无 GUI 任务运行／重启或 Linux／Windows 复验，不能回填为最终同提交通过。Codex／Grok 已有渠道结果、最新版协议任务链、完整工作区及最终跨平台仍按各自证据边界继续验收。
-
-[source41候选](OFFICIAL_40_RECOVERY_AND_INPUT_GUARDS.md)已通过check、i18n11项、受影响Rust1826项和桌面构建；Grok文件允许／拒绝及待审批取消五阶段通过，冷继续恢复与输入ACK已到达，但测试代理连接预算耗尽，整体仍失败。普通Grok复合启动工具栏、英文与简体中文完整提示、两种语言多行草稿显式复制往返均通过；自动PTY输入仍为明确降级。source41a另修父子自动结果的时序及跨代恢复，已通过 check、i18n 11 项及受影响 Rust 1834 项；尚未运行该快照的原生链。新增[消费者自动升级与开发最新版对齐](CLI_AUTOUPDATE.md)属于当前Goal；历史固定版本证据保留，不能替代最新版或最终同提交三平台、完整工作区及SSH／tmux验收。
-
-[内部维护兼容修复](GROK_INTERNAL_MAINTENANCE_COMPATIBILITY_FIX.md)、[缓存认证握手修复](GROK_POLICY_AUTH_HANDSHAKE_FIX.md)及[Grok 0.1.1 插件升级修复](GROK_PLUGIN_011_MIGRATION_FIX.md)已合入新的 source32 候选快照：父提交0059，119项输入、18处变更，其他101项逐父Git对象保持一致，新增38项Rust回归包含8项tokio异步测试。诊断测试同步为合法内部维护帧无业务效果且不消耗pending，未知ID、错误帧及夹带会话身份仍拒绝；原source31快照和失败记录保持不变。source32独立门禁已真实全部通过：check退出0／140.859秒、i18n11／320.445秒、Rust1458／25.620秒、Python15组453项无跳过；38项新增Rust（含8项tokio）逐项各1PASS，119项输入与850624232字节测试库前后保持一致。main已真实构建退出0／329.100秒，严格签名退出0、完整中英文资源逐字节嵌入，测试库身份保持一致。[source32原生部分复验](OFFICIAL_32_NATIVE_PARTIAL_VERIFICATION.md)：SDK12（29.281秒）与policy4（13.074秒）均Rust101／runner1，原失败保持；SDK12已实际走通现代发现、tools/list和一次inspect业务调用，2次原生审批允许、transport正常结束及清理收据通过，但六种carrier均无原生S/P/T，身份关联验收未通过，子任务和父权限门禁保持关闭。policy4实际仅发3RPC，initialize及cached_token authenticate成功，session/new关联rpc_error，未完成两阶段接口验收；失败取消的null退出码投影缺口另行修复，不补成退出0。认证副本／连接／目录已清理，配置与策略夹具保持不变，不能将14RPC预算写成已发出计数。原生六阶段插件迁移尚未执行；另发现0.1.1配方的通知仍上报0.1.0，后续候选须同步脚本版本及严格历史夹具，并独立验证真实安装后的通知。[SSH／tmux执行计划](SSH_TMUX_FINAL_ACCEPTANCE_EXECUTION_PLAN.md)仅盘点可复用入口和待验边界，没有新增真实SSH链通过。
-
-更新日期：2026-09-19（北京时间）。此表分别记录实现路径、真实接口证据与最终产品验收。Goal 未完成；历史任务链回归版本为 Codex `0.147.0`、Claude `2.1.273`、Grok `1.0.30`；新正式版 `0.155.1`、`2.1.278`、`1.0.34` 按上述升级、协议与任务验收分别记录，不能互相替代。最新实际已推送提交为 `af1040dc8e7522ccafb09d8f0d4c6b219bd9d607`；下文此前快照结论仅代表各自受测范围。
-
-[source26 门禁](OFFICIAL_26_LOCAL_GATES.md)：同实际436提交，check、i18n11、Rust1393、Python410、main构建、严格签名及完整双语资源嵌入通过。[原生部分验收](OFFICIAL_26_NATIVE_PARTIAL_VERIFICATION.md)：Claude待Edit取消2和继续通过；Grok SDK9及无输入policy1整体失败，子任务仍关闭。[真实GUI](OFFICIAL_26_GUI_PARTIAL_VERIFICATION.md)：三图标与安装检测、目标控件双语布局、Claude同原生ID两轮、允许／拒绝、追加随后执行、取消、历史继续、应用重启记录恢复及不自动重放已核对，重启后新输入的最终记忆结果也已回收。CI12同head的两平台Python失败、原生准备跳过，Windows部分Rust及check已通过，不能据此计整次通过；全工作区未跑。source27诊断候选的独立本地门禁已通过check、i18n11、Rust1410及Python426，不回填source26失败。
-
-检查点 `dec067d2d53fb65f11b37b66a72fa9e11e82cf04` 已实际提交、推送并核对远端一致。该提交干净验证树的 [source23 门禁](OFFICIAL_23_LOCAL_GATES.md)通过 check、i18n11、Rust1301、Python363、main构建、严格签名及完整双语资源嵌入。[source23 在线验收](OFFICIAL_23_NATIVE_LIVE.md)：Claude PNG3三输入、两个正常退出及同原生会话历史继续通过；Grok SDK8整体失败，但现代2026-07-28 MCP发现、工具列表及原生ready实际已观察；Claude等待Edit取消1整体失败，原生interrupt ACK、审批撤销、错误result及cancelled生命周期均已观察，未取得应用可信取消聚合。[CI11](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/35248824124) 同SHA：Linux的Python超时夹具失败、Rust未执行；Windows的Python与Rust定向步骤失败，check和SSH worker构建通过；真实日志已取得，分别定位为纯测试的路径分隔符断言和私有JSON反斜线编码断言，原生准备因前置失败跳过、证据上传缺失为继发失败。两平台均不能计完整通过。后续修复不在该提交：[source24候选门禁](OFFICIAL_24_LOCAL_GATES.md)已冻结111路径并通过check、i18n11、Rust1378、Python410；包含Claude真实取消枚举补丁、Grok测试夹具对生产传输真实错误的诊断、标题栏普通终端启动及本地安装路径回退。只读预检已预编译并核对唯一ignored入口，准备标记已解除，原生接口尚未执行；该候选验证树dirty、未提交，不计新的同提交／跨平台／GUI通过。同一source24快照另行补跑实际`terminal::model::session::test`模块15/15通过，含新增4项，主1378计数不回填。source25已以同一111路径冻结Windows两处测试修复与两平台正确Session筛选，[正式候选门禁](OFFICIAL_25_LOCAL_GATES.md)已通过check、i18n11、Rust1393、Python410；该候选修改后来形成436提交，source26与CI12分别独立复验，不回填当时候选。
-
-source21 的87路径中间快照已通过 check、i18n11、定向1270、Python363；没有 source21 main 或真实CLI。source20构建与严格签名保留历史。随后发现旧独立Claude AgentDriver 的绕过与全局写入，已关闭该旧入口并移除相关实现；source22 的93路径新快照通过 check、i18n11、定向1301、Python363。下表中间证据不代表最终实际修改提交、所有平台或整个能力通过。完整来源、失败与历史入口见 [验证报告](VALIDATION_REPORT.md)。
-
-[source28本地候选门禁](OFFICIAL_28_LOCAL_GATES.md)已覆盖11路径修改，check、i18n11、Rust1410、Python426真实通过，含CI12的临时目录夹具、SQLite关闭与平台哈希断言修复；代码已形成实际e687提交。[CI13第三窗口](CI_13_THIRD_WINDOW_VERIFICATION.md)在e687的Linux／Windows两个job均实际completed/success，所选门禁通过；full_workspace_tests=false、GUI编译步骤跳过，没有完整工作区或在线三方链结论，精确测试计数未从日志取得。[source27原生诊断](OFFICIAL_27_NATIVE_DIAGNOSTIC.md)的policy2、SDK10仍为FAILED；[所有权复核](GROK_SKILLS_RELOAD_OWNERSHIP_REVIEW.md)已找到候选CLI内部watcher发送 `skills-reload`，应用没有发出该请求，固定native内层形状仍待核验。空MCP目录的四路径受限修复已形成实际0059；[source29门禁](OFFICIAL_29_LOCAL_GATES.md)check、i18n11、Rust1420、Python436通过，[实际0059的policy3](OFFICIAL_30_GROK_POLICY_VERIFICATION.md)整体FAILED：初始化及空目录兼容成功，New关联RPC错误，继续／完整退出边界未完成；不推断认证或权限原因。同0059平台验收仍未执行。
-
-[source31本地候选门禁](OFFICIAL_31_LOCAL_GATES.md)通过check、i18n11、Rust1430、Python443，111输入／7修改前后稳定，新增SDK7及UI3逐项各一次PASS。内容为安全成功形状布尔诊断与中英文可读附件／技能历史预览；main构建及严格签名已通过；[双语附件历史布局与复制](OFFICIAL_31_GUI_PREVIEW_VERIFICATION.md)实测通过，无新模型输入，历史三个表完整行哈希不变；真实技能历史布局仍待验。后续四路径探针cached_token握手修复及Grok插件0.1.1完整旧配方迁移尚未Cargo／原生验收，不追认为source31通过。
-
-[真实SDK11与后续兼容修复](GROK_INTERNAL_MAINTENANCE_COMPATIBILITY_FIX.md)：source31唯一一次在线探针仍FAILED（Rust101／runner1），但严格成功形状及私有账本对应校验真实为true，认证副本与隧道已清理。确认固定skills-reload双层封闭成功结构后，后续两路径生产候选仅作内部维护空操作，不消费数值pending，不发出生命周期或提升子任务／权限门禁；新增6项Rust回归未执行，不将原失败追认为修复后成功。
-
-## 身份、普通终端与上下文
-
-| 能力 | Codex CLI | Claude Code | Grok Build |
-| --- | --- | --- | --- |
-| 命令／管理命令、安装及版本识别 | 专用规则及受限版本探测；最终提交回归待验 | 同类专用规则，安装不等于登录 | 独立身份、规则及 `.grok/bin` 探测；默认标题栏已有双语 [入口实测](GROK_TITLEBAR_ENTRY.md) |
-| 普通 PTY 工具栏与富输入 | macOS 隔离 GUI 两轮多行有 [证据](validation/macos-gui-report.md) | 延迟 Enter 策略；认证后完整普通 PTY 组合待验 | 括号粘贴候选；普通 PTY 完整链待验，托管 GUI 证据另列 |
-| 中文输入法／中英多行 | macOS GUI 逐键拼音组合、混排与多行已有证据；候选列表及其他平台待验 | 托管 API／GUI 有多行输入阶段证据；普通 PTY 与三平台待验 | source11 托管 GUI 中英文多行通过；普通 PTY 输入法与三平台待验 |
-| 图片 | `localImage` 原生适配器及 macOS GUI 已实际读图；最终提交与其他平台待验 | 实际436的[source26 PNG GUI](OFFICIAL_26_CLAUDE_PNG_GUI_VERIFICATION.md)三轮识色、同原生ID历史继续、App退出重启、SQLite及唯一磁盘附件引用核对通过；[独立归档审计](OFFICIAL_26_CLAUDE_PNG_GUI_ARCHIVE_AUDIT.md)实际解码夹具并核对31份证据。其他格式、最终提交与其他平台仍待验 | 固定 1.0.30 ACP 明确声明 image:false；托管入口拒绝并保留草稿／附件，不能泛化为普通 CLI 没有读图能力 |
-| 文件与代码评审 | macOS GUI 文件实际读取及有效评审的路径／行号／内容传递有证据 | 复用上下文；普通 PTY 与完整组合待验 | 复用上下文；完整组合待验 |
-| 技能来源与语法 | `$` 与 Agents 来源；新项目发现、选择及原生注入有 macOS GUI 证据 | `/` 与 Claude 来源；source37 普通 PTY 实际选择技能并取得正文标记，托管组合及最终提交仍按各自证据验收 | Grok／Claude 来源，Agents 仅已支持的 Home 来源；source38 原生裸 slash 展开与输入前唯一 canonical 路径已证明；后续候选接入 Inherit 每轮一个显式技能、当前会话唯一路径匹配、不自动授予信任，默认入口组合待验，固定策略禁用技能 |
-| 自动升级与渠道选择（实施中） | 正式 latest／预发布 alpha；原生 update 默认只跟正式，应用需解析目标与匹配来源 | 官方默认 latest／延迟 stable；临时渠道覆盖真实双向更新通过且配置字节不变；npm 组织版本策略待验 | 正式 stable／预发布 alpha；原生升级会重写配置，产品事务及恢复待验 |
-| 原生模型、推理与登录 | 按实际版本／配置保留差异，不从安装推断已登录 | API 鉴权已可用于实测，不将 Inherit 模式视为固定文件策略 | 官方在线授权及根任务已有成功证据，旧额度失败不再作为当前阻塞 |
-
-## 插件、事件与状态
-
-| 能力 | Codex CLI | Claude Code | Grok Build |
-| --- | --- | --- | --- |
-| 插件安装／更新／禁用／恢复 | 固定 rev4、持久来源及原生信任有中间证据；完整负向组合与最终提交待验 | 固定插件版本及来源修补、禁用和事务恢复有阶段记录；未知版本不放行 | 随附独立插件；真实生产安装、同版本修复、禁用及事务回滚有阶段记录；全平台组合待验 |
-| 普通 PTY 完成依据 | Stop／OSC 9 仅候选响应，显示 Unknown；同回合后续有效事件继续处理 | 同样降级 Unknown，不能仅由 Stop 推断聚合完成 | `PermissionDenied` 不表示等待审批；缺可信终态降级 Unknown |
-| 托管终态 | 原生 turn 终态与任务结果分别核对 | 原生输入 UUID／执行归属与完整 result；取消要求完整证据聚合 | 完整原生历史与同回合 completion watermark 核对；不从 `end_turn` 单独推断正文完整 |
-| 重复／乱序／旧回调 | turn／事件 ID、代次与实例约束，定向回归已有证据 | 保留 prompt／UUID 语义，不混用其他 CLI 身份 | 独立身份与来源，兼容 hooks 及乱序的完整真实负向链待验 |
-| Windows hooks | CI10 五项原生注册通过；SessionStart／UserPromptSubmit 两项真实到达 ConPTY，其余三项实效待验 | 无凭据原生边界与事务各按原报告范围；完整模型／GUI 待验 | ACP／插件边界各按原报告范围；完整模型／GUI 待验 |
-
-## 托管任务、权限与恢复
-
-| 能力 | Codex CLI | Claude Code | Grok Build |
-| --- | --- | --- | --- |
-| 传输 | 官方 app-server JSON-RPC | 双向 stream-json／control | ACP；根任务 leader 与 SDK direct 对照分别记录 |
-| 新建／两轮／允许与拒绝 | 完整固定包 [原生适配器](CODEX_COMPLETE_RUNTIME_NATIVE_VERIFICATION.md)和中间 macOS GUI 有证据 | 实际436的[source26 GUI](OFFICIAL_26_GUI_PARTIAL_VERIFICATION.md)同ID两轮及Write允许／拒绝真实文件效果通过；此前失败保留 | 实际436的[source26 Grok GUI](OFFICIAL_26_GROK_GUI_PARTIAL_VERIFICATION.md)两轮及精确Write允许／拒绝通过；拒绝后原生Cancelled，保留差异 |
-| 运行中追加 | 原生 `turn/steer`，必须已有 started；macOS GUI 实际采用追加内容 | 原生可并入当前工具执行或独立下一轮；必须逐 UUID 核对 ACK、合并及完整结果，不宣称 steer | 实际436 source26第5代排队提交、第6代原生ACK与24字节完整结果，提交／执行／原生回合逐ID核对；后续回合排队 |
-| 取消 | interrupt ACK 不等于取消；原生 Cancelled 与下一轮完成已有中间证据 | source56 官方2.1.278运行批量取消与待Edit审批取消均通过：原生ACK、终态、完整结果、文件不变、同会话继续及清理逐项核对；首个批量外层脚本误判和source23取消1失败均保留 | source11 GUI 正文输出后真实 Cancelled，随后同连接继续通过；SDK7 清理不等于取消或完成成功 |
-| 默认权限及配置副作用 | 已移除固定绕过审批／沙箱；普通子 pane 使用可见原生终端 | 可见子 pane 与托管入口已移除固定绕过；旧独立 AgentDriver 已关闭并移除全局信任／onboarding 改写；source37 普通 PTY 完整链六次用户全局配置快照保持不变；托管继续按独立证据验收 | Inherit 根任务保留 CLI 配置；固定只读／文件策略限定应用配置和逐次审批，非 OS 沙箱。source38 只读两输入冷恢复通过，文件策略与子任务待验 |
-| 父子派发／双向 ACK／回收 | macOS 中间 GUI 生产协调器有派发、子进度、父追加、原生 ACK 与实际结果回收；当前工作树另将子任务终态结果改为 ACK 前幂等落父信箱，重复终态可补结果，但新增测试尚未编译 | source56 官方2.1.278固定 `ClaudeRestrictedFilesV1` 真实生产链通过；receipt107 又在干净 `45ba0d11…` 的 release runtime-host 上完成子任务、同策略、双向原生 ACK、3 条结果关联、自动结果及两份 v2 密封清理回执。旧2.1.273字面量、plan 拒绝和外置 debug supervisor EAGAIN 失败均保留；真实 GUI 父子操作仍待验 | source34b lease1 注册／inspect／回收通过；source38 child3 在父首输入 ACK 后目录变化被严格拒绝，尚无子任务；当前工作树公共 runtime host 已补本地工具 ACK 前确定性租约及“已开始无结果不重放”恢复合同，但未编译且不能替代 Grok 原生工具／子任务整链 |
-| 权限上限 | 保存创建时父代完整快照，首输入前核对；未知／漂移／跨 CLI 不等价拒绝 | Inherit 不提供可证明的完整规则上限，派发拒绝；source56 由同一支持版本表验证 2.1.273／2.1.278 固定策略继承并拒绝2.1.279，非OS沙箱 | 固定策略保存创建契约并校验目录，未知或变化拒绝；父子工具集必须完全相同，仅本地任务能力可缩减（Files→Read 也不等价）；source38 child3 实际拒绝目录变化，未证明成功继承与派发 |
-| SQLite 任务／消息／结果 | 父子、代次、revision、原生 ACK 与结果历史；中间故障注入有证据 | source26文本GUI共8输入／8代（7 Completed、1 Cancelled）；PNG专项另有3输入／3代Completed，重启前后消息、结果及附件引用核对；父子完整GUI仍待验 | 实际436 source26 GUI为9消息／9代（6 Completed、2 Cancelled、1 Disconnected），消息／回合／结果逐ID核对及[公共归档审计](OFFICIAL_26_GROK_GUI_ARCHIVE_AUDIT.md)通过；第7代中断不能追认为完成 |
-| 当前连接重新选择 | 复用活跃连接，不启动第二进程 | 同类路径；完整故障恢复待验 | source11 取消后继续复用原连接；历史继续才创建新连接 |
-| 历史继续／应用重启 | GUI 完成与活动退出后的原 ID 显式继续、无重复执行有证据 | 实际436的source26 GUI正常退出重开、任务与消息恢复、无自动重投、原ID新进程历史继续及明确输入记忆结果回收通过；活跃重新关联及父子GUI仍待验 | 实际436的source26 GUI重启后72字节记忆结果与第9代独立历史继续71字节结果均回收，同原生ID、旧输入不重放；第7代仍Disconnected，完整故障链未通过 |
-| 已绑定 PTY 未确认结果 | 保存 Unconfirmed，占用原会话／代次，不能生成最终成功结果 | 共用约束，与托管 Completed 独立 | 共用存储约束不等于子任务已开放 |
-| 真正进程清理 | macOS 资源域的真实 Codex 工具／空闲崩溃有独立证据，最终提交复验待验 | source23 PNG3两代stdio／0与资源域清理有收据；Edit取消1stdio／1、清理true保留失败，真实异常工具崩溃待验 | source11／13 根任务正常 stdio／0 清理有证据；SDK7 exit=null、原始 wait=9、cleanup=true，不能记原生退出0 |
-
-## 2026-09-23 产品开放边界与消息契约（历史）
-
-`LocalCLIManagedTasks` 同时控制入口与托管启动，默认关闭；开发验收使用显式开关。启动前重新探测受测版本，未验证版本只开放已经证明的模式。普通 PTY 不转换成协议任务，本机安装状态不证明 SSH 远端状态。
-
-Grok官方根任务已有阶段GUI与生产coordinator证据；source34b生产SDK租约真实通过一次inspect与完整结果回收。SDK回调仍无原生S/P/T字段，派发归属依靠独占进程、注册nonce及真实工具与审批租约；旧来源探针失败不追认为成功。source38 子任务父首轮因目录变化被严格拒绝，成功派发、双向消息及回收尚未完成。Claude PNG在实际436的source26 GUI完成三轮识色及App重启恢复；这是独立于source23原生wire探针的产品证据，不代表其他格式或最终提交通过。
-
-消息保存明确的 `receipt_kind`：`native_protocol` 表示原生接收；`application_history` 只表示进入应用历史供正常后续请求读取。两者都不能独立证明模型执行完成。发送未确认记录、创建时父代、历史结果和分页查询保持关联；恢复不能自动重投已经执行的输入。完整实现边界见 [消息交付](OZ_LOCAL_MESSAGE_DELIVERY.md)、[Unconfirmed](UNCONFIRMED_TASK_STATE.md) 和原协调器报告。
-
-## 2026-09-23 时尚未满足的验收（历史）
-
-| 要求 | 当前边界 |
-| --- | --- |
-| 三款 CLI 各自完整规定链路 | Claude 当前干净提交已完成父子链、Grok 较早干净提交已完成 root 候选链；Codex 当前版完整链、Grok 扩展和三方统一最终提交仍未完成 |
-| 普通 PTY 与托管模式分别覆盖 | Claude source37 普通 PTY 13 输入与 PNG 专项 GUI 已有证据；Grok 普通 PTY 完整上下文链、其他格式、子任务及最终提交待验 |
-| 负向与故障组合 | 已有定向与部分真实记录，完整插件／崩溃／重投／恢复失败组合待验 |
-| 英文／简体中文 | source38 完整 FTL 嵌入、i18n11 与权限控件六张双语截图通过；source56 又实际核对 Claude 2.1.273／2.1.278 说明及固定审批按钮，两种语言均无截断或重叠；输入法和完整三方组合布局待验 |
-| 同提交三平台／全工作区 | run 35746148046 已在 `c25221a22…` 上完成 Linux／Windows 聚焦预检，两个 job 成功；`full_workspace_tests=false` 令 GUI integration 与 workspace 两步明确 skipped。同提交 macOS 和功能冻结后的 full workspace 仍未运行 |
-| SSH／tmux | 既有原生通知与传输边界保留，三方完整交互和恢复链待验 |
-
-run 35746148046 结算后 Linux／Windows runner 均 online；runner 可用性本身不算门禁成功。source22 不可用入口提示已同步英文与简体中文；聚焦 workflow 的双语 TUI 门禁通过，但最终真实 GUI／IME 双语检查仍待验。
+G01–G10 是功能或模式缺项，V01／V02／V03／V05 是尚未满足的验收；G11／G12 是必须如实展示的原生语义，G13 是持续兼容边界，V04 将投递与模型理解分开。18 项的影响、替代方式与关闭条件只在[统一清单](KNOWN_GAPS.md)维护；安全拒绝、无模型清理或其他平台成功不关闭这些缺项。

@@ -1,8 +1,0 @@
-{
-  "reason": "V11 Rust include_str 历史插件配方补充绑定",
-  "files": {
-    "specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-README.md": "064707b15ef7a620c7e5eb8a2209f8e6922a05b7b73fb15374b24d3d31bcd3ae",
-    "specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-notify.cjs": "4367b24c5565ab5bcdf8a213f3e4b63b898bf3247c6f4a67c852525d3398e898",
-    "specs/cli-agent-parity/fixtures/grok-plugin-0.1.3-plugin.json": "c357e633f907623ff322f88aff2442cded9eaa243d9c14b45cdd66234bd20aa5"
-  }
-}

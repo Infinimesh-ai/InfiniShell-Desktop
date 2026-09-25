@@ -1,9 +1,0 @@
-{
-  "binary_sha256": "290530f74f2722924f53cbef5a19a9a8449373d45e813d958f1e499e7bccdebb",
-  "exit_code": 0,
-  "seconds": 7.635,
-  "result": [
-    "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 7667 filtered out; finished in 0.07s"
-  ],
-  "log_sha256": "6092cd06ea9d2d6e8e7e81095bb1ac92f78fbdd54a1a7de77e23b0e58b481e1b"
-}

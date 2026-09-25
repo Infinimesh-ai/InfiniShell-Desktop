@@ -1,7 +1,0 @@
-{
-  "observed_utc": "2026-09-17T19:34:00.750418+00:00",
-  "only_two_owned_picker_aliases_removed": true,
-  "original_project_fixture_preserved": true,
-  "native_auth_or_config_or_task_history_modified": false,
-  "scope": "文件选择器临时短路径清理，不删除持久化图片引用或历史。"
-}

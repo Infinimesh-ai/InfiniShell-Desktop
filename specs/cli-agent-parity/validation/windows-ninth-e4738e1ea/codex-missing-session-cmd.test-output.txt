@@ -1,8 +1,0 @@
-14:09:33.840 [INFO] [i18n_embed] Selecting translations for domain "warp"
-14:09:33.873 [INFO] [warp::i18n] [i18n] initialized; current_languages=[LanguageIdentifier { language: Language(Some("en")), script: None, region: None, variants: None }], fallback=en
-
-running 1 test
-test ai::cli_agent_runtime::codex::tests::live_codex_missing_session_is_not_replaced ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 6423 filtered out; finished in 0.82s
-

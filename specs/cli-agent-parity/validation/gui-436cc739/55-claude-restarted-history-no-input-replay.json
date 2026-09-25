@@ -1,9 +1,0 @@
-{
-  "observed_utc": "2026-09-17T18:27:06.659779+00:00",
-  "task_id": "2810123a-1c6c-4f90-b5d0-3529979521ed",
-  "native_session_id": "df83284c-f959-4176-a169-dfd4b97350b3",
-  "generation": 8,
-  "state": "queued",
-  "message_count": 7,
-  "history_process_started_without_old_input_replay": true
-}

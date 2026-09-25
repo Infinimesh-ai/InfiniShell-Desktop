@@ -1,8 +1,8 @@
 # CLI 集成的支持与回退说明
 
-> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据继续有效；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[合并准备说明](MERGE_READINESS_20260925.md)。本更正覆盖下方“全部完成”的历史总结，不改写原始通过或失败记录，也不表示已经合并或发布。
+> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据按固定 Git 提交追溯；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[当前状态](CURRENT_STATUS.json)。本说明依据固定基线的实际支持范围，不因目录精简扩大能力，也不表示已经合并或发布。
 
-本文件说明当前分支的产品支持范围与回退行为，不表示已经发布。固定版本的功能证据见 [验收对应表](ACCEPTANCE_FIXED_VERSIONS_20260924.md) 和 [Mac 交付记录](MAC_FIXED_VERSION_DELIVERY_20260924.md)；最终同提交三平台必要补验已通过，实际范围与来源以 [同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md) 为准。不同提交的历史通过不能改记为最终提交通过。
+本文件说明当前分支的产品支持范围与回退行为，不表示已经发布。固定版本的功能证据见 [验收对应表](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/ACCEPTANCE_FIXED_VERSIONS_20260924.md) 和 [Mac 交付记录](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md)；最终同提交三平台必要补验已通过，实际范围与来源以 [验证结论](VALIDATION_REPORT.md) 为准。不同提交的历史通过不能改记为最终提交通过。
 
 ## 版本与运行方式
 
@@ -37,7 +37,7 @@ CLI 升级后若版本或能力没有验证，应保留普通终端入口和本�
 | Claude | `warp 2.2.0` 与固定通知修补 | `2.1.0` 仅是已审计的升级来源；禁用状态和无关用户设置应保留 |
 | Grok | 随附 `infinishell-grok 0.1.4` 与原生通知桥接 | 需要 Node.js 18 或更高版本；桥接补齐 `1.0.41` 初始 hook 加载，按事件去重，无需手动 reload；原生 `plugin update` 成功不证明实际文件已更新，应用另核对安装缓存完整性 |
 
-Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.3` 可迁移到 `0.1.4`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
+Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.3` 可迁移到 `0.1.4`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
 
 Grok 原生审批通知有时只有会话标识、没有回合标识。应用仅在可信的当前会话上显示“需要操作”提醒，不据此宣称当前回合阻塞或成功；工具完成或后续输入会清除提醒。插件通知不授予工具权限。
 
@@ -63,7 +63,7 @@ CLI 可执行文件升级与通知插件升级分别管理。三款 CLI 的自�
 
 macOS、Linux、Windows 已识别且通过来源与身份核验的三款原生安装接入正式升级事务；当前平台证据覆盖 macOS arm64、Linux x64、Windows x64。npm、Homebrew 和未知安装／helper 来源保持手动升级，WinGet 未纳入来源识别；不能仅凭同名命令或安装目录猜测升级方式。版本兼容门禁与升级发现分别判断，发现更新不表示新版本托管能力已经受测。
 
-活跃会话或启动保留期间延期升级，退出后再执行。事务核对来源、目标版本和摘要，保留无关配置，并记录失败回滚及中断恢复；无法确认所有权或清理结果时报告失败，不把进程退出码单独作为升级成功。已有正式三平台事务与历史负例见 [自动升级记录](CLI_AUTOUPDATE.md)，最终提交补验另见 [同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)。
+活跃会话或启动保留期间延期升级，退出后再执行。事务核对来源、目标版本和摘要，保留无关配置，并记录失败回滚及中断恢复；无法确认所有权或清理结果时报告失败，不把进程退出码单独作为升级成功。已有正式三平台事务与历史负例见 [自动升级记录](CLI_AUTOUPDATE.md)，最终提交补验另见 [验证结论](VALIDATION_REPORT.md)。
 
 ## 审批、取消与消息确认
 
@@ -92,6 +92,6 @@ macOS 已保留三款固定版本的普通终端、托管生命周期、父子�
 - 实际中文输入法组合输入在 macOS 验证；Linux／Windows 的系统剪贴板、中文字形及截图不代替物理输入法验收。
 - Codex GUI 已证明类型化图片进入原生请求，该轮模型颜色判断错误不能计作理解正确；Claude GUI 的受测 PNG 字节与模型回答均有证据，不扩大到全部格式。
 - SSH／tmux 是 macOS 到本机隔离 OpenSSH、固定三款 CLI 与实际 PTY 的验证，包含断连再接回；不覆盖其他远端操作系统、容器或 WSL 的所有组合。关闭 tmux 透传的公共解析器风险验证复用 Claude／Grok 正例，Codex 原生发送未独立观察的边界保留。
-- 历史失败、跳过项和旧构建来源均保留。包含本轮实际修改的提交已完成相关三平台门禁，见 [同提交补验](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)。未变功能保留分阶段实际来源，跳过或不支持的能力不计为通过，也不据此宣称已经发布。
+- 历史失败、跳过项和旧构建来源均保留。包含本轮实际修改的提交已完成相关三平台门禁，见 [同提交补验](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/FINAL_SAME_COMMIT_VERIFICATION_20260925.md)。未变功能保留分阶段实际来源，跳过或不支持的能力不计为通过，也不据此宣称已经发布。
 
 本轮随三平台桌面默认开放，同步修正英文和简体中文的 `cli-task-manager-claude-verification` 文案：移除功能开关及待验证表述，明确托管任务支持 Claude Code `2.1.273`、`2.1.278` 和 `2.1.280`。这替代此前“无需本地化变更”的结论。真实 GUI 用例按 `en`／`zh-CN` 分别启动独立进程，分目录保存截图和实际界面语言收据。macOS 已核对默认入口、新说明和 Grok 权限按钮的双语可见布局；Linux／Windows 四张原图分别通过上述视口范围的目视检查。后续仅补充真实进程清理测试和探针观测分类，没有修改产品文案，无需新增本地化变更。

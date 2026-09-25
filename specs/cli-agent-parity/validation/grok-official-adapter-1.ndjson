@@ -1,2 +1,0 @@
-{"credential_files_read_by_probe": false, "event": "acceptance_started", "production_run_process": true, "production_run_transport": true, "public_product_gate_open": false, "same_turn_steering_supported": false, "scope": "production_process_transport_with_test_only_acp_commands", "test_only_internal_command_switch": true}
-{"event": "acceptance_failed", "reason": "<仅保留在私有诊断目录>"}
