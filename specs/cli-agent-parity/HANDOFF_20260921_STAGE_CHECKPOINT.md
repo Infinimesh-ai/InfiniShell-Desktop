@@ -1,10 +1,10 @@
 # CLI Agent Parity 阶段检查点交接（更新至 2026-09-25）
 
-> **2026-09-25 最终收尾验证通过**：三平台桌面已默认开放 Grok 等本地托管入口；产品实现冻结于 `ee839b4fc`，最新验证提交为 `50e1515bc`。三平台必要门禁、所列双语布局及新增真实 Grok 四场景清理均已通过。原生五秒 EOF 负例和各阶段失败保留，清理通过不等于模型任务成功。完整来源与限制见[最终同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)；下方历史结论保留各自版本、构建和验收范围，不重标为本轮实测。
+> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据继续有效；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[合并准备说明](MERGE_READINESS_20260925.md)。本更正覆盖下方“全部完成”的历史总结，不改写原始通过或失败记录，也不表示已经合并或发布。
 
 > **本机运行约定（用户 2026-09-25 确认）**：外置盘仅保留构建缓存；后续需要启动的验收二进制／应用先复制到内置盘，核对源文件与副本摘要后运行。用户不在电脑前时，不依赖外置盘的桌面授权弹窗，也不修改系统权限来绕过授权。历史加载失败与位置对照保留，不能将全部旧超时归为同一原因。
 
-> **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项已全部完成。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
+> **历史阶段总结（总体完成判断已撤回）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项当时被汇总为“全部完成”；该总体判断已撤回，剩余项见[统一清单](KNOWN_GAPS.md)。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
 
 ## 2026-09-24 集中 CI 后的剩余补验（历史）
 

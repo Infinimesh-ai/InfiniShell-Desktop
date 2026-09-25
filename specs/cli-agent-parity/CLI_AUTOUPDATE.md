@@ -1,8 +1,8 @@
 # 三方 CLI 自动升级与最新版对齐
 
-> **2026-09-25 最终收尾验证通过**：三平台桌面已默认开放 Grok 等本地托管入口；产品实现冻结于 `ee839b4fc`，最新验证提交为 `50e1515bc`。三平台必要门禁、所列双语布局及新增真实 Grok 四场景清理均已通过。原生五秒 EOF 负例和各阶段失败保留，清理通过不等于模型任务成功。完整来源与限制见[最终同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)；下方历史结论保留各自版本、构建和验收范围，不重标为本轮实测。
+> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据继续有效；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[合并准备说明](MERGE_READINESS_20260925.md)。本更正覆盖下方“全部完成”的历史总结，不改写原始通过或失败记录，也不表示已经合并或发布。
 
-> **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。Mac 三款正式原生升级及 Claude Latest→Stable 降级、Linux 三款正常／来源变化／失败回滚／中断恢复、Windows 三款正式升级均已通过。最后 Windows Codex 在 `b3acf2a69` 完成 inspect→execute→inspect、目标版本／摘要、13 项配置保全、严格 Job 与 journal 清理。[最终收据](validation/macos-fixed-versions-20260924/ci-36028161259-windows-codex-atomic.safe.json)及[完整验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)保留各源码域和历史失败，后文 ManualOnly 等状态只属于原标注快照。
+> **历史阶段总结（总体完成判断已撤回）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。Mac 三款正式原生升级及 Claude Latest→Stable 降级、Linux 三款正常／来源变化／失败回滚／中断恢复、Windows 三款正式升级均已通过。最后 Windows Codex 在 `b3acf2a69` 完成 inspect→execute→inspect、目标版本／摘要、13 项配置保全、严格 Job 与 journal 清理。[最终收据](validation/macos-fixed-versions-20260924/ci-36028161259-windows-codex-atomic.safe.json)及[完整验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)保留各源码域和历史失败，后文 ManualOnly 等状态只属于原标注快照。
 
 ## 2026-09-19 至 2026-09-23 范围与状态（历史）
 

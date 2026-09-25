@@ -1,30 +1,31 @@
 # CLI 能力矩阵
 
-> **2026-09-25 最终收尾验证通过**：三平台桌面已默认开放 Grok 等本地托管入口；产品实现冻结于 `ee839b4fc`，最新验证提交为 `50e1515bc`。三平台必要门禁、所列双语布局及新增真实 Grok 四场景清理均已通过。原生五秒 EOF 负例和各阶段失败保留，清理通过不等于模型任务成功。完整来源与限制见[最终同提交验证报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)；下方历史结论保留各自版本、构建和验收范围，不重标为本轮实测。
+> **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据继续有效；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[合并准备说明](MERGE_READINESS_20260925.md)。本更正覆盖下方“全部完成”的历史总结，不改写原始通过或失败记录，也不表示已经合并或发布。
 
 ## 当前固定版本与模式边界（2026-09-25）
 
-本表说明现有产品能力；最终补验是否通过以页首状态与[同提交报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)为准。真实模型链保留原 macOS 来源，Linux／Windows 不冒充重跑全部模型交互。
+本表说明现有产品能力；原生补验的通过范围以[同提交报告](FINAL_SAME_COMMIT_VERIFICATION_20260925.md)为准。真实模型链保留原 macOS 来源，Linux／Windows 不冒充重跑全部模型交互。
 
 | 能力 | Codex CLI 0.156.1 | Claude Code 2.1.280 | Grok Build 1.0.41 |
 | --- | --- | --- | --- |
 | 三平台桌面入口 | 默认开放，保留版本与来源检查 | 默认开放，保留版本与来源检查 | **默认开放**，保留版本、策略与来源检查 |
 | 正式托管协议 | app-server | 结构化流接口 | ACP，继承设置与固定策略分别判定 |
-| 文本、文件与图片 | 中英多行、文件上下文、原生类型化图片 | 中英多行、文件上下文、受测图片 | 中英多行、文件上下文；托管图片不支持 |
-| 技能 | 保留原生技能调用 | 保留原生技能调用 | 继承设置支持启动时绑定的单个技能及恢复；固定策略禁用技能 |
+| 托管文本、文件上下文与图片 | 中英多行、文件上下文、原生类型化图片；模型识图另见 V04 | 中英多行、文件上下文；仅 PNG＋文字，图片与技能不能同轮（G04／G05） | 中英多行、文件上下文；托管图片未实现（G02） |
+| 普通终端富输入与附件 | 可发送文本；文件附件卡片拒绝，远程图片拒绝（G07／G08） | 可发送文本；文件附件卡片拒绝，远程图片拒绝（G07／G08） | 文本需手动复制到原生输入；图片拒绝（G01／G03），另有 G07／G08 |
+| 托管技能 | 保留原生技能调用 | 每轮一个，只能使用连接启动时登记的技能；固定文件策略禁用（G06／G10） | 继承设置支持启动时绑定的单个技能及恢复；固定策略禁用（G06／G10） |
 | 审批与权限 | 当前请求允许／拒绝；不固定跳过审批 | 当前请求允许／拒绝；启动不改全局配置 | 固定读取／文件策略分别验权；拒绝可能返回 Cancelled，不改写为成功 |
-| 父子任务与双向消息 | 正式派发、分阶段 ACK 和结果回收 | 正式派发、权限上限、双向 ACK 和结果回收 | 固定策略及 SDK 合同满足时开放；继承设置不开放父子工具 |
-| 运行中追加与恢复 | 原生追加；活跃重连和历史继续分开 | 原生合并／后续轮次；恢复不重投旧输入 | 后续回合排队；按原生会话恢复，不重复执行 |
+| 父子任务与双向消息 | 正式派发、分阶段 ACK 和结果回收 | 固定文件策略的派发、权限上限、双向 ACK 和结果回收；非任意继承配置（G10） | 固定策略及 SDK 合同满足时开放；继承设置不开放父子工具（G10） |
+| 运行中追加与恢复 | 原生追加；活跃重连和历史继续分开 | 原生合并／后续轮次；不是 Codex steer（G11） | 仅后续回合排队；不支持即时 steer（G11），按原生会话恢复 |
 | 通知配套 | codex-warp 0.4.0；原生 hook 信任单独审核 | warp 2.2.0；保留禁用与无关配置 | infinishell-grok 0.1.4；安装、启用、完整性分别检查 |
 | 自动升级渠道 | latest／alpha | latest／stable | stable／alpha |
 | 自动升级来源 | 已核验原生安装；npm、Homebrew、未知来源手动 | 已核验原生安装；npm、Homebrew、未知来源手动 | 已核验原生安装；npm、Homebrew、未知来源手动 |
 | 完成与清理 | 可信原生终态；普通 PTY Escape 不证明工具退出 | 可信原生终态与当前代次清理回执 | 原生五秒 EOF 不可靠；托管清理以当前代次的真实监督回执为准 |
 
-配套说明、回退条件与平台边界见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。下方按时间保留历史验收，不把旧版候选或旧提交结果当作当前重跑。
+各 ID 的影响、替代方式、优先级与完成条件见[已知缺项](KNOWN_GAPS.md)。自动升级来源范围见 G09，新版本兼容范围见 G13；平台验收缺口见 V01–V05。配套说明与回退条件见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。下方按时间保留历史验收，不把旧版候选或旧提交结果当作当前重跑。
 
 ## 历史阶段记录
 
-> **2026-09-25 最终验收**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项已全部完成。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
+> **历史阶段总结（总体完成判断已撤回）**：固定 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41` 的 P0–P5、CLI_AUTOUPDATE 和 REOPEN 必需项当时被汇总为“全部完成”；该总体判断已撤回，剩余项见[统一清单](KNOWN_GAPS.md)。最后受测产品提交为 `b3acf2a69`，[Windows 最终专项](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36028161259)通过；Mac 实链、Linux／Windows 全量及 GUI 按实际源码域关联原始证据。完整对应见[固定版本验收表](ACCEPTANCE_FIXED_VERSIONS_20260924.md)和[最终收据](validation/macos-fixed-versions-20260924/goal-fixed-versions-final.safe.json)。下文保留各阶段原始结果，历史失败与验证边界不改写。
 
 > **当前状态更正（2026-09-23）**：原 Goal 尚未满足全部验收，此前“全部完成”的结论撤回。Grok `1.0.40` 已分别在干净提交 `ac0fa70e…` 和 `4b12091e…` 上通过 macOS root 候选链及默认入口单技能候选链；Claude `2.1.278` 已在干净提交 `45ba0d11…` 上通过 macOS production runtime-host 父子链；Codex `0.155.1` 已在干净 `c2ed42fe…` 上通过 macOS 产品适配器运行中工具取消；`c25221a22…` 又通过 Linux／Windows 聚焦预检。真实 GUI、远程、完整异常矩阵、同提交全范围 macOS 与 full workspace 仍有缺口。当前状态见 [阶段检查点](HANDOFF_20260921_STAGE_CHECKPOINT.md)，各项证据见 [receipt106](validation/macos-working-tree-106-grok-1040-root-lifecycle-clean-commit.safe.json)、[receipt107](validation/macos-working-tree-107-claude-21278-parent-child-clean-commit.safe.json)、[receipt108](validation/cross-platform-preflight-108-c25221a22.safe.json)、[receipt113](validation/macos-clean-commit-113-grok-1040-selected-skill.safe.json) 和 [receipt128](validation/macos-clean-commit-128-c2ed42fe-codex-running-tool-cancel.safe.json)。下文阶段记录只代表各自快照，不能一律视为已解决，也不能忽略后续真实通过。
 
