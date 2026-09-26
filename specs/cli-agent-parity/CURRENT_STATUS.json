@@ -319,8 +319,8 @@
   },
   "current_work_order": {
     "updated_at": "2026-09-26",
-    "mode": "post_implementation_unattended_gates",
-    "user_direction": "已先完成已知功能代码检查点；随后推进无需人工的本地及 Linux/Windows 定向门禁，真实 GUI、输入法与在线模型联测后续进行。",
+    "mode": "code_checkpoint_ready_for_joint_acceptance",
+    "user_direction": "已先完成当前已知功能接线，并收尾无需人工的本地及相关 Linux/Windows 定向门禁。按用户安排，真实 GUI、中文输入法、在线模型及来源升级恢复等验收留待后续共同进行；完整Goal保持未完成。",
     "goal_acceptance_unchanged": true,
     "integration_base_commit": "76dcfdc60254077edaa86175722591333526c05c",
     "g01_g03_worktree": ".worktrees/grok-owned-terminal",
@@ -374,7 +374,7 @@
     "localization_review": "固定技能、受审命令及命令+技能组合、远程Codex/Grok菜单/帮助/失败、Claude原图消费和未知状态说明均同步英中。Grok npm/Homebrew无需新增文案，复用更新状态。本地 cargo check 与 i18n 11 项通过；真实双语布局后置。",
     "remaining_code_scope": [
       "原清单当前已知功能接线已完成并提交；macOS arm64 编译和 i18n 资源门禁通过，后续运行发现的问题继续处理，不能以此关闭 Gap。",
-      "macOS arm64、Linux x64 与 Windows x64 编译均已有当前代码门禁；定向回归和夹具复验见 cross_platform_next。三平台各模式真实验收及双语布局仍待完成，按用户要求留待后续联测。"
+      "本批相关定向门禁已通过：macOS arm64本地，b78b62a48的Windows x64，以及仅测试夹具修正后17c1dcc51的Linux x64。三平台各模式真实验收、来源升级恢复、SSH/tmux与双语布局仍待完成，按用户要求留待后续联测。"
     ],
     "g08_grok_remote_in_progress": "远端ticket/专属leader服务、有界RPC、真实PTY wrapper及固定1.0.41 exec已接线；同连接/终端/代次门禁、同步撤销、查询恢复、GUI caller、重启关联与收起输入框的native事件入口已整合。当前Mac ARM64/Linuxx64远端、Mac ARM64/Linuxx64/Windowsx64客户端，未验收。",
     "g09_codex_npm_code": {
@@ -631,36 +631,34 @@
       "code_review_scope": "本地构建与资源门禁源码绑定；不是安全审计或真实产品验收。"
     },
     "cross_platform_next": {
-      "status": "in_progress",
+      "status": "passed",
       "platforms": [
-        "Linux x64",
-        "Windows x64"
+        "Linux x64"
       ],
       "workflow": ".github/workflows/cross-platform-preflight.yml",
-      "required_source_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
+      "required_source_commit": "17c1dcc516a7f45c2ce61243a0bf82487b3afec0",
       "macos_intel": false,
-      "run_id": 36245112104,
-      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36245112104",
-      "archive": "validation/cloud-post-code-b78b62a48-20260926",
+      "run_id": 36248869156,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36248869156",
+      "archive": "validation/cloud-linux-pty-17c1dcc51-20260926",
       "full_workspace_tests": false,
       "authenticated_model_or_gui": false,
-      "reason": "首轮确定性编译和运行器失败已修，内置盘本地编译/i18n/定向Python通过，验证包含实际修正的同一提交。",
-      "observed_results": {
-        "linux_cargo_check": "passed",
-        "windows_cargo_check": "passed",
-        "windows_codex_native_hooks_and_conpty": "passed_including_fixed_0.156.1",
-        "linux_warp_focused_tests": {
-          "passed": 3166,
-          "failed": 4,
-          "nextest_skipped": 4840
-        },
-        "linux_remote_image_client_contracts": "passed",
-        "remaining_job_steps": "in_progress",
-        "linux_job": "failed",
-        "windows_warp_focused_tests": "passed_counts_pending_final_log"
+      "reason": "仅Unix测试夹具修正；Mac编译/四项/i18n本地通过后，补跑相关Linux平台。Windows复用b78同产品源定向通过，未重复运行。",
+      "linux_job": "passed",
+      "linux_cargo_check": "passed",
+      "linux_warp_focused_tests": {
+        "passed": 3170,
+        "failed": 0,
+        "nextest_skipped": 4840
       },
-      "linux_failure_diagnosis": "grok_owned_input_tests.rs:31，测试进程没有新建PTY的控制TTY，真实Linux身份校验拒绝；后续功能断言尚未运行。",
-      "linux_log_sha256": "b5c5bb6e5a70a9c87517aa356d4a31272debc36059e619d9eb0555a46f6a4ae5"
+      "linux_log_sha256": "fc6e566823439b11f6f321e66d3c4d16ae8c6dcd52bb1454a11596cc94a92406",
+      "evidence_index": {
+        "file": "linux-recheck-evidence-index.safe.json",
+        "files": 60,
+        "original_artifact_zips": 2,
+        "sha256": "4f6c41baa1889aeaf50e94ff54634f83dd7e793a3e019af07e4b2f4274a80901"
+      },
+      "auxiliary_results": "IPC2、图片客户端5、共享actions/skills75、warp_cli129、TUI9、command归属1、宿主崩溃监督5及rust-genai81通过；通知插件/worker、固定CLI无认证恢复/崩溃/清理边界通过。"
     },
     "post_code_local_gates": {
       "base_commit": "c72313648895e7cb1d0d25a721ea8346403324d5",
@@ -812,6 +810,51 @@
           "original_artifact_zips": 7
         },
         "independent_native_results": "两平台Codex插件安装/刷新、Claude固定版本初始化及权限观察、Grok固定版本ACP无认证探针通过；Windows Claude SessionStart通知通过。均未发送模型请求，不计完整生命周期、IME、GUI或功能Gap关闭。"
+      },
+      {
+        "status": "completed_linux_failed_windows_passed",
+        "platforms": [
+          "Linux x64",
+          "Windows x64"
+        ],
+        "workflow": ".github/workflows/cross-platform-preflight.yml",
+        "required_source_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
+        "macos_intel": false,
+        "run_id": 36245112104,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36245112104",
+        "archive": "validation/cloud-post-code-b78b62a48-20260926",
+        "full_workspace_tests": false,
+        "authenticated_model_or_gui": false,
+        "reason": "首轮确定性编译和运行器失败已修，内置盘本地编译/i18n/定向Python通过，验证包含实际修正的同一提交。",
+        "observed_results": {
+          "linux_cargo_check": "passed",
+          "windows_cargo_check": "passed",
+          "windows_codex_native_hooks_and_conpty": "passed_including_fixed_0.156.1",
+          "linux_warp_focused_tests": {
+            "passed": 3166,
+            "failed": 4,
+            "nextest_skipped": 4840
+          },
+          "linux_remote_image_client_contracts": "passed",
+          "remaining_job_steps": "completed",
+          "linux_job": "failed",
+          "windows_warp_focused_tests": {
+            "passed": 2973,
+            "failed": 0,
+            "nextest_skipped": 4772
+          },
+          "windows_job": "passed"
+        },
+        "linux_failure_diagnosis": "grok_owned_input_tests.rs:31，测试进程没有新建PTY的控制TTY，真实Linux身份校验拒绝；后续功能断言尚未运行。",
+        "linux_log_sha256": "b5c5bb6e5a70a9c87517aa356d4a31272debc36059e619d9eb0555a46f6a4ae5",
+        "windows_log_sha256": "a6d756f9a80ae409d3a54b0d673376e460135b8a0edac553115bf75fb5fccb4b",
+        "evidence_index": {
+          "file": "second-run-evidence-index.safe.json",
+          "files": 114,
+          "original_artifact_zips": 10,
+          "sha256": "e71bc6d7c2f4f6f22cc0feb0c8020070351d7c65855295c943d37bc9acfbca05"
+        },
+        "windows_auxiliary_results": "IPC 2、图片客户端5、共享actions/skills75、warp_cli129、TUI9、command归属2、宿主崩溃监督5、rust-genai81通过；固定Codex原生Hook/ConPTY、Claude SessionStart、生产插件及无认证恢复/崩溃/清理探针通过。未运行真实模型、GUI/IME或G09来源更新。"
       }
     ],
     "prepared_macos_binary": {
@@ -825,10 +868,11 @@
       "internal_copy_verified": true,
       "executed": false,
       "packaged_app": false,
-      "scope": "同提交可执行文件构建与内置副本摘要；不是GUI、模型、联测或签名应用包交付。"
+      "scope": "同提交可执行文件构建与内置副本摘要；不是GUI、模型、联测或签名应用包交付。",
+      "later_bundle_record": "current_work_order.prepared_macos_bundle"
     },
     "linux_pty_fixture_followup": {
-      "status": "local_passed_pending_linux_recheck",
+      "status": "macos_local_and_linux_recheck_passed",
       "base_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
       "changed_file": "app/src/terminal/view/grok_owned_input_tests.rs",
       "scope": "仅测试夹具，用经command派生并持有控制PTY的shell建立真实身份；Drop精确kill/wait。生产身份门禁和四项断言不变。",
@@ -849,7 +893,29 @@
       ],
       "macos_local": "passed",
       "windows_source_unchanged": true,
-      "goal_or_gap_closed": false
+      "goal_or_gap_closed": false,
+      "implementation_commit": "17c1dcc516a7f45c2ce61243a0bf82487b3afec0",
+      "cloud_run": 36248869156,
+      "linux_focused_fixture_tests": {
+        "passed": 4,
+        "failed": 0
+      },
+      "cloud_evidence_index_sha256": "4f6c41baa1889aeaf50e94ff54634f83dd7e793a3e019af07e4b2f4274a80901"
+    },
+    "prepared_macos_bundle": {
+      "source_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
+      "archive": "validation/code-checkpoint-bundle-b78b62a48-20260926",
+      "app": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/b78b62a48/InfiniShellParity-b78b62a48.app",
+      "architecture": "arm64",
+      "signed_binary_sha256": "6ff75465683af7d5bf49f765800840e4f4ee526b54c03812b974d70213019327",
+      "resource_ledger_sha256": "5cef5aaca024ff26c488611d140d92492c908d63007950ced9316818474d5bd7",
+      "index_sha256": "ea4da1ca09c09161248e86d476976323a4b24264f05d43b3e94de7212896b17c",
+      "signing": "ad-hoc, explicit --sign -",
+      "signature_verified": true,
+      "executed": false,
+      "data_profile": "parity-code-b78b62a48",
+      "existing_profiles_modified": false,
+      "scope": "内置盘联测应用包；资源逐文件核对，显式临时签名未查询开发者证书。未启动、未认证或完成GUI验收。"
     }
   },
   "supported_target_scope": {
