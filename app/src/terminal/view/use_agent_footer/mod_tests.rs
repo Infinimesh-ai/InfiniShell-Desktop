@@ -1088,6 +1088,38 @@ fn closed_rich_input_file_context_is_one_literal_paste_without_enter() {
 }
 
 #[test]
+fn closed_unowned_grok_context_does_not_open_composer_or_write_to_pty() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Grok, ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, _| {
+                model.set_draft(view.view_id, "保留普通会话草稿".into());
+            });
+            assert!(
+                view.try_send_text_to_cli_agent_or_rich_input("中文文件上下文".into(), ctx)
+                    .is_none()
+            );
+            assert!(!view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .draft_text
+                    .as_deref(),
+                Some("保留普通会话草稿")
+            );
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
 fn slash_skill_selection_uses_the_active_cli_native_prefix() {
     App::test((), |mut app| async move {
         let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);

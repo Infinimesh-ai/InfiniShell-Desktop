@@ -24117,11 +24117,8 @@ impl TerminalView {
         self.focus_input_box(ctx);
     }
 
-    /// Sends `text` to the active CLI agent, routing to rich input when it is open
-    /// or directly to the PTY when it is closed.
-    ///
-    /// Returns `Some(CliAgentRouting)` indicating how the text was sent, or
-    /// `None` if no CLI agent is active.
+    /// 有效的 Grok 富输入会话打开编辑器并追加草稿；其他 CLI 沿用已打开富输入或 PTY 路径。
+    /// 返回所选路由；没有活跃 CLI 或目标不可用时返回 `None`。
     pub fn try_send_text_to_cli_agent_or_rich_input(
         &mut self,
         text: String,
@@ -24132,6 +24129,25 @@ impl TerminalView {
         if !self.cli_agent_input_target_matches(generation, ctx) {
             self.show_error_toast(crate::t!("cli-agent-input-delivery-failed"), ctx);
             return None;
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if self.owned_grok_context_target_matches(ctx) {
+            self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+            if !self.is_cli_agent_rich_input_open(ctx) {
+                return None;
+            }
+            self.input.update(ctx, |input, ctx| {
+                input.append_cli_context_after_open(generation, text, ctx);
+            });
+            return Some(CliAgentRouting::RichInput);
         }
         if self.is_cli_agent_rich_input_open(ctx) {
             self.append_to_rich_input(&text, ctx);
@@ -24145,8 +24161,7 @@ impl TerminalView {
         }
     }
 
-    /// Sends code review comments to a running CLI agent, routing to the
-    /// rich input when it is open or directly to the PTY when closed.
+    /// 沿当前 CLI 的上下文路由投递评审意见。
     pub fn send_review_to_cli_agent_or_rich_input(
         &mut self,
         review: &AgentReviewCommentBatch,
@@ -24158,8 +24173,7 @@ impl TerminalView {
         Ok(())
     }
 
-    /// Sends diff file context hunks to a running CLI agent, routing to the
-    /// rich input when open or the PTY when closed.
+    /// 沿当前 CLI 的上下文路由投递文件差异。
     #[cfg(feature = "local_fs")]
     pub fn send_diff_context_to_cli_agent_or_rich_input(
         &mut self,
@@ -24170,8 +24184,7 @@ impl TerminalView {
         self.try_send_text_to_cli_agent_or_rich_input(text, ctx)
     }
 
-    /// Sends a diff hunk location to a running CLI agent, routing to the
-    /// rich input when open or the PTY when closed.
+    /// 沿当前 CLI 的上下文路由投递差异片段位置。
     pub fn send_diff_hunk_to_cli_agent_or_rich_input(
         &mut self,
         file_path: &str,

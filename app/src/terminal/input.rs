@@ -1128,6 +1128,11 @@ pub enum InputAction {
     SelectCLIAttachment {
         generation: Uuid,
     },
+    /// 原草稿恢复后，仅向仍然打开的同代 CLI 输入追加上下文。
+    AppendCLIContextAfterOpen {
+        generation: Uuid,
+        text: String,
+    },
     FocusInputBox,
     CtrlR,
     CtrlD,
@@ -6343,6 +6348,19 @@ impl Input {
         ctx.dispatch_typed_action_deferred(InputAction::SelectCLIAttachment { generation });
     }
 
+    pub(super) fn append_cli_context_after_open(
+        &mut self,
+        generation: Uuid,
+        text: String,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        // 与附件入口相同，先处理打开事件，避免追加内容被恢复草稿覆盖。
+        ctx.dispatch_typed_action_deferred(InputAction::AppendCLIContextAfterOpen {
+            generation,
+            text,
+        });
+    }
+
     fn select_image(&mut self, ctx: &mut ViewContext<Self>) {
         self.focus_input_box(ctx);
         // CLI 富输入的附件属于当前 CLI 草稿，不为文件选择切换用户锁定的输入模式。
@@ -6641,7 +6659,7 @@ impl Input {
             .session(self.terminal_view_id)
             .is_some_and(|session| session.agent == CLIAgent::Grok)
         {
-            return Cow::Owned(crate::t!("terminal-input-grok-manual-copy-hint"));
+            return Cow::Owned(crate::t!("terminal-input-grok-draft-delivery-hint"));
         }
         if self.is_locked_in_shell_mode(ctx) {
             return Cow::Owned(translate_input_key(
@@ -15678,6 +15696,18 @@ impl TypedActionView for Input {
                     && sessions.is_input_open(self.terminal_view_id)
                 {
                     self.select_image(ctx);
+                }
+            }
+            InputAction::AppendCLIContextAfterOpen { generation, text } => {
+                let sessions = CLIAgentSessionsModel::as_ref(ctx);
+                if sessions.input_generation(self.terminal_view_id) == Some(*generation)
+                    && sessions.is_input_open(self.terminal_view_id)
+                {
+                    // 追加到末尾，保留恢复草稿及等待期间用户选中的内容。
+                    self.editor
+                        .update(ctx, |editor, ctx| editor.move_to_buffer_end(ctx));
+                    self.append_to_buffer(text, ctx);
+                    self.focus_input_box(ctx);
                 }
             }
             InputAction::FocusInputBox => self.focus_input_box(ctx),

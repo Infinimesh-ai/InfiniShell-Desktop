@@ -5833,7 +5833,7 @@ cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
 cli-agent-grok-input-manual-copy-required = 未发送。复制草稿，关闭富输入，再到 Grok 粘贴提交。
 cli-agent-input-copy-unsent-text = 复制未发送文本
-terminal-input-grok-manual-copy-hint = 为 Grok 编写草稿；提交后可复制，再在 Grok 提示符处粘贴
+terminal-input-grok-draft-delivery-hint = Grok 富输入会话可从此提交；普通会话需复制后粘贴
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = 已保存的会话尚不能使用这个较旧的 CLI 版本继续。

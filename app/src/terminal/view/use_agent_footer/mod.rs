@@ -344,6 +344,38 @@ impl TerminalView {
         CLIAgentSessionsModel::as_ref(app).is_input_open(self.view_id)
     }
 
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    pub(super) fn owned_grok_context_target_matches(&self, ctx: &AppContext) -> bool {
+        let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            return false;
+        };
+        if session.agent != CLIAgent::Grok {
+            return false;
+        }
+        let native_session = session.session_context.session_id.as_deref();
+        // 这里只把上下文送入草稿；实际发送仍须通过原有进程、审批和单次领取校验。
+        if session.remote_host.is_some() {
+            self.grok_remote_owned.as_ref().is_some_and(|owned| {
+                owned
+                    .native_session
+                    .is_some_and(|native| native_session == Some(native.to_string().as_str()))
+            }) && self.remote_owned_grok_is_current(ctx)
+        } else {
+            self.grok_owned_input.as_ref().is_some_and(|owned| {
+                !owned.invalidated
+                    && native_session == Some(owned.owner.session_id.to_string().as_str())
+            }) && self.owned_grok_identity_matches()
+        }
+    }
+
     /// Checks if the footer should be rendered.
     /// Reads the CLI agent from the sessions model (single source of truth).
     pub(super) fn should_render_use_agent_footer(

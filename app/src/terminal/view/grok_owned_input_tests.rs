@@ -189,6 +189,105 @@ async fn received_event(receiver: oneshot::Receiver<()>) {
 }
 
 #[test]
+fn closed_owned_grok_context_restores_draft_without_writing_to_pty() {
+    App::test((), |mut app| async move {
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let review = crate::ai::agent::AgentReviewCommentBatch {
+            comments: Vec::new(),
+            diff_set: Default::default(),
+        };
+        let review_prompt = crate::terminal::cli_agent::build_review_prompt(&review);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if matches!(event, Event::WriteBytesToPty { .. }) {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
+                model.close_input(view.view_id, false, ctx);
+                model.set_draft(view.view_id, "保留原草稿".into());
+            });
+            assert!(matches!(
+                view.try_send_text_to_cli_agent_or_rich_input("\n中文路径/file.rs".into(), ctx),
+                Some(super::super::CliAgentRouting::RichInput)
+            ));
+            // 同一事件轮的第二次投递也必须排在草稿恢复后，不能覆盖或丢失任一段。
+            view.send_review_to_cli_agent_or_rich_input(&review, ctx)
+                .unwrap();
+        });
+        terminal.read(&app, |view, ctx| {
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                format!("保留原草稿\n中文路径/file.rs{review_prompt}")
+            );
+        });
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
+fn cancelled_owned_grok_context_callback_does_not_append_to_new_generation() {
+    App::test((), |mut app| async move {
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.update(&mut app, |view, ctx| {
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
+                model.close_input(view.view_id, false, ctx);
+                model.set_draft(view.view_id, "只保留草稿".into());
+            });
+            assert!(
+                view.try_send_text_to_cli_agent_or_rich_input("过期上下文".into(), ctx)
+                    .is_some()
+            );
+            // 在打开事件和追加动作处理前取消；旧动作不能写入新的输入代次。
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
+                model.observe_ctrl_c_write(view.view_id, ctx);
+            });
+        });
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "只保留草稿");
+        });
+    });
+}
+
+#[test]
+fn invalidated_owned_grok_context_keeps_saved_draft_closed() {
+    App::test((), |mut app| async move {
+        let _review = FeatureFlag::HoaCodeReview.override_enabled(true);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.update(&mut app, |view, ctx| {
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |model, ctx| {
+                model.close_input(view.view_id, false, ctx);
+                model.set_draft(view.view_id, "保留原草稿".into());
+            });
+            view.grok_owned_input.as_mut().unwrap().invalidated = true;
+            assert!(
+                view.try_send_text_to_cli_agent_or_rich_input("未送达上下文".into(), ctx)
+                    .is_none()
+            );
+            assert!(!view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .draft_text
+                    .as_deref(),
+                Some("保留原草稿")
+            );
+        });
+    });
+}
+
+#[test]
 fn forwarded_ctrl_c_revokes_pending_owned_input_even_without_cancel_observation() {
     App::test((), |mut app| async move {
         let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(false);
