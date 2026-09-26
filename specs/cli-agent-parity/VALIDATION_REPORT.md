@@ -10,7 +10,9 @@
 
 本地 Mac ARM64 第二轮编译检查、i18n 11 项、远程图片 36 项、更新模块 199 项（6 忽略）、footer 47 项、Grok 上下文 7 项及 actionlint 全通过，包含新增 19 项回归；Python 运行器 15 项分别在 3.12.13／3.14.6 通过。19 个冻结文件与 `bd80cc9ed9a6dbc032602e457a64d1c55e7998ba` Git blob 一致，绑定收据 SHA-256 `6265114b19a1c4b517ae4f56f7cf5ae2f00689b089f0c6ff63b6debc6129e1f3`；原始日志、固定 Claude 时序复核和清理收据位于 `validation/remote-image-recovery-20260927`。第一轮测试链接因空间峰值失败，832 字节坏产物及日志完整保留，未进入测试；第二轮通过不覆盖旧失败。仅清理确认停用的项目编译缓存，真实原生程序、应用和证据保留。
 
-同提交 [Actions 36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 已启动 Linux／Windows 定向验证与 Windows 真实 npm 五场景，结果待补；macOS Intel 明确排除。实际远程延迟 Allow／Read 回收、GUI 双语、认证模型及完整生命周期仍后置；旧 `2b59` 应用不含本批代码，G08／G09 与 Goal 不关闭。
+同提交 [Actions 36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 已启动 Linux／Windows 定向验证与 Windows 真实 npm 五场景，结果待补；macOS Intel 明确排除。实际远程延迟 Allow／Read 回收、GUI 双语、认证模型及完整生命周期仍后置，G08／G09 与 Goal 不关闭。
+
+新版 Mac ARM64 联测包已按 `8876fa3c5a3950154c8569ea1344507f38f964eb` 构建，其产品源码与 `bd80cc9ed` 完全一致；路径为 `/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/8876fa3c5/InfiniShellParity-8876fa3c5.app`。签名前摘要 `98244b1f7e9686e64f3c45381e5f4ae73260925f8303b850e00ccccae15d06de`，签名后摘要 `e3cf04b650d0b719075e45d270a5b03ea4c25f3bbe8d049d90cf7cd22b6d3423`；四份完整英中 FTL、131 项资源及 ad-hoc 签名核验通过。包装收据位于本运行 `prepared-app-8876fa3c5/bundle.safe.json`，摘要 `5ba79365f640e5e5da5f5133f792f31972609e32a6d4c6457b66ac63af3b8622`。应用未启动，独立 profile `parity-code-8876fa3c5`；未检查认证、未计 GUI／模型通过，旧包不动。此轮仅构建交付 app，默认 feature 的编译／i18n 门禁按同产品源码复用，不冒充 debug-embed feature 的运行测试。
 
 **2026-09-27 Grok 上下文与升级空闲通知补接**：功能提交 `debed8c51cc54f1d017fda809c9254fbc658b80b`，独立夹具修正 `c7ef8d95b48df4a01f64985471b42e80beeda1eb`，均已推送。有效本地／远端专属 Grok 的代码、评审和 diff 上下文现在统一先打开富输入、等待原草稿恢复，再按同代次顺序追加；已经打开的专属会话也走同一队列，连续上下文不会抢在恢复前被覆盖。取消、关闭、换代或失效时旧回调不写入，未绑定普通会话不因此获得 PTY 发送能力。Grok 操作提示已同步英中，实际双语布局仍待共同验收。另将升级器既有 sessions model observe 对齐三支持平台，使 Linux／Windows 无存活 pane 的专属 Grok 清理后能够重新同步空闲条件；没有新增终端锁或第二份观察订阅。
 

@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "ee839b4fc7dacd58bac0806aa549500af5776b30",
+  "product_behavior_freeze": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -1536,8 +1536,26 @@
       "gui_or_model": false,
       "scope": "定向编译/模块门禁含远程图片；Windows真实npm五场景。未改的已通过场景复用原源码绑定，不重复完整矩阵。"
     },
-    "joint_test_app": "旧2b59联测包保留，不能代表本批代码；新代码联测包待本阶段代码稳定后构建。",
+    "joint_test_app": {
+      "source_commit": "8876fa3c5a3950154c8569ea1344507f38f964eb",
+      "product_source_commit": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
+      "product_source_equivalent": true,
+      "path": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/8876fa3c5/InfiniShellParity-8876fa3c5.app",
+      "source_binary_sha256": "98244b1f7e9686e64f3c45381e5f4ae73260925f8303b850e00ccccae15d06de",
+      "signed_binary_sha256": "e3cf04b650d0b719075e45d270a5b03ea4c25f3bbe8d049d90cf7cd22b6d3423",
+      "bundle_receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/remote-image-recovery-20260927/prepared-app-8876fa3c5/bundle.safe.json",
+      "bundle_receipt_sha256": "5ba79365f640e5e5da5f5133f792f31972609e32a6d4c6457b66ac63af3b8622",
+      "architecture": "arm64",
+      "profile": "parity-code-8876fa3c5",
+      "resource_files": 131,
+      "embedded_ftl_files": 4,
+      "signature_verified": true,
+      "executed": false,
+      "scope": "仅新版交付app编译/资源/签名通过；复用相同产品源码默认feature的check与i18n11，未运行新版GUI或debug-embed feature测试，不另建默认后端程序。旧应用与原始证据保留。"
+    },
     "closed_gaps": [],
-    "goal_complete": false
+    "goal_complete": false,
+    "integration_review": "G07本地专属文件卡与G10四个受审命令分支只读复核未发现确定的接线缺口；不计真实GUI/模型验收。integration-review-03.safe.json摘要5109944c4e6d9239eeee107f9b904b9c33e4a3787f9a9ff2ca62a3f384ba859f。",
+    "joint_app_cache_cleanup": "编译前再按身份/摘要/无占用清理两份停用Cargo缓存，逻辑857205203字节；实际验收程序、旧应用与原始收据不动。app-build-cache-cleanup-01.safe.json。"
   }
 }
