@@ -51,6 +51,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_claude_npm_updates:
+        description: Linux 私有 npm 安装的 Claude 2.1.280 更新及中断恢复
+        required: true
+        default: false
+        type: boolean
       run_atomic_windows_debug:
         description: Diagnose bounded native Windows image-debug exit and rejection
         required: true
@@ -191,6 +196,7 @@ jobs:
           python3 -B script/cli-agent-parity/prepare_codex_cli_tests.py -v
           python3 -B script/cli-agent-parity/verify_cli_autoupdate_tests.py -v
           python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py -v
+          python3 -B script/cli-agent-parity/claude_npm_update_live_runner_tests.py -v
           # 原始 Grok P0 的 POSIX 离线夹具；不启动真实 CLI 或模型。
           python3 -B script/cli-agent-parity/grok_native_p0_probe_tests.py -v
           python3 -B script/cli-agent-parity/prepare_claude_cli_tests.py -v
@@ -405,6 +411,48 @@ jobs:
         with:
           name: cli-linux-fixed-atomic-updates-${{ github.sha }}
           path: ${{ runner.temp }}/fixed-cli-atomic-evidence/*.safe.json
+          if-no-files-found: error
+          retention-days: 14
+
+      # 私有 HOME 下构造官方 npm 安装副本；不运行安装脚本，也不使用认证或模型。
+      - name: Verify fixed Linux Claude npm update transactions without credentials
+        id: claude_npm_updates
+        if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          test_binary="$(cargo test -p warp --lib --no-run --message-format=json | python3 -c 'import json,sys; items=[json.loads(line) for line in sys.stdin]; paths=[item["executable"] for item in items if item.get("reason")=="compiler-artifact" and item.get("target",{}).get("name")=="warp" and item.get("profile",{}).get("test") and item.get("executable")]; assert len(paths)==1, paths; print(paths[0])')"
+          fixture_parent="$(mktemp -d "$HOME/infinishell-claude-npm.XXXXXXXX")"
+          printf 'CLAUDE_NPM_EVIDENCE=%s/evidence\n' "$fixture_parent" >> "$GITHUB_ENV"
+          # 独立复制同提交二进制，避免 Cargo 的硬链接被识别为可共享的执行入口。
+          install -m 0755 "$target_dir/debug/infinishell-tui" "$fixture_parent/supervisor"
+          install -m 0755 "$test_binary" "$fixture_parent/warp-libtest"
+          node_path="$(python3 -c 'import pathlib,shutil; print(pathlib.Path(shutil.which("node")).resolve(strict=True))')"
+          npm_path="$(python3 -c 'import pathlib,shutil; print(pathlib.Path(shutil.which("npm")).resolve(strict=True))')"
+          digest() { sha256sum "$1" | cut -d ' ' -f 1; }
+          test "$(digest "$target_dir/debug/infinishell-tui")" = "$(digest "$fixture_parent/supervisor")"
+          test "$(digest "$test_binary")" = "$(digest "$fixture_parent/warp-libtest")"
+          python3 -B script/cli-agent-parity/run_claude_npm_update_live.py \
+            --repo "$GITHUB_WORKSPACE" --output "$fixture_parent/evidence" \
+            --test-binary "$fixture_parent/warp-libtest" --test-binary-sha256 "$(digest "$fixture_parent/warp-libtest")" \
+            --supervisor "$fixture_parent/supervisor" --supervisor-sha256 "$(digest "$fixture_parent/supervisor")" \
+            --node "$node_path" --node-sha256 "$(digest "$node_path")" \
+            --npm-cli "$npm_path" --npm-cli-sha256 "$(digest "$npm_path")"
+
+      - name: Preserve Linux Claude npm update receipts
+        if: ${{ !cancelled() && inputs.run_claude_npm_updates && steps.claude_npm_updates.outcome != 'skipped' && env.CLAUDE_NPM_EVIDENCE != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-claude-npm-updates-${{ github.sha }}
+          path: |
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.safe.json
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.metadata.json
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stdout
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/*.stderr
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.json
+            ${{ env.CLAUDE_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.log
           if-no-files-found: error
           retention-days: 14
 

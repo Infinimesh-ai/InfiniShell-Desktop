@@ -31,16 +31,27 @@ use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 #[path = "sources_npm.rs"]
 mod npm;
 
+#[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+#[path = "sources_npm_release.rs"]
+mod npm_release;
+#[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+#[path = "sources_npm_transaction.rs"]
+mod npm_transaction;
+
 const PROBE_TIMEOUT: Duration = Duration::from_secs(15);
 const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 18] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 22] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_npm.rs"),
+    include_bytes!("sources_npm_release.rs"),
+    include_bytes!("sources_npm_transaction.rs"),
+    include_bytes!("sources_npm_tree_unix.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_version_probe.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
@@ -476,6 +487,9 @@ pub(super) async fn inspect(
     let journal_root = journal_root()?;
     // 检查与恢复共用同一把锁，先确认旧更新已退出，再启动任何版本/来源探测。
     let _lock = lock_journal(&journal_root, agent)?;
+    // npm 单包交换可能先于收据落盘；必须先按目录身份收敛，再读取 CLI 版本。
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    npm_transaction::recover(agent, &entry, &journal_root)?;
     let pending = preflight_recovery(agent, &entry, &journal_root)?;
     let installed_version = version(agent, &entry).await?;
     if pending {
@@ -488,6 +502,11 @@ pub(super) async fn inspect(
         installation.error = Some(Error::UnsupportedPlatform);
     }
     let target_version = latest(agent, installation.channel, client).await?;
+    // 这里只开放宿主负责的已登记 npm 布局；ManualOnly 的 npm/Node 启动合同保持禁止执行。
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    if installation.source == Source::Npm {
+        installation.error = npm_transaction::supports(agent, &target_version).err();
+    }
     let version_matches = installed_version == target_version;
     let mut error = installation.error;
     if installation
@@ -504,7 +523,10 @@ pub(super) async fn inspect(
         error = Some(Error::ChannelMismatch);
     }
     let config = snapshot_config(&installation, &installed_version, &target_version, channel)?;
-    if agent == CLIAgent::Claude && source_is_native_claude(&installation) && !version_matches {
+    if agent == CLIAgent::Claude
+        && (source_is_native_claude(&installation) || installation.source == Source::Npm)
+        && !version_matches
+    {
         let compatibility = config
             .as_ref()
             .ok_or(Error::UnsupportedSource)
@@ -638,6 +660,15 @@ async fn latest(
     channel: Channel,
     client: &http_client::Client,
 ) -> Result<String, Error> {
+    #[cfg(all(
+        test,
+        feature = "local_fs",
+        any(target_os = "macos", target_os = "linux")
+    ))]
+    if let Some(version) = npm_transaction::fixed_test_release(agent, channel) {
+        return Ok(version);
+    }
+
     #[cfg(all(test, unix))]
     if let Some(version) = live_tests::fixed_release(agent, channel) {
         return Ok(version);
@@ -1275,13 +1306,9 @@ async fn discover_npm(
     if !prefix.is_absolute() {
         return Ok(None);
     }
-    let Some(registration) = npm::registered_installation(
-        agent,
-        installation,
-        installed,
-        &prefix,
-        cfg!(windows),
-    )? else {
+    let Some(registration) =
+        npm::registered_installation(agent, installation, installed, &prefix, cfg!(windows))?
+    else {
         return Ok(None);
     };
     let mut found = installation.clone();
@@ -1344,7 +1371,12 @@ async fn discover_npm(
                 .join("settings.json");
             found.channel = claude_channel(&config)?;
         }
-        // npm install 不经过 Claude 的托管版本约束；保留来源检查但不派生更新器。
+        let home = user_home().ok_or(Error::UnsupportedSource)?;
+        let config = absolute_env("CLAUDE_CONFIG_DIR")
+            .unwrap_or_else(|| home.join(".claude"))
+            .join("settings.json");
+        found.config = Some((config, ConfigKind::Claude));
+        // npm 本身仍不可派生；宿主单包事务另受相同的缓存版本约束与渠道配置检查。
     }
     Ok(Some(found))
 }
@@ -1585,6 +1617,13 @@ enum RunFailure {
 }
 
 async fn run(invocation: &Invocation, timeout: Duration) -> Result<Vec<u8>, Error> {
+    #[cfg(all(
+        test,
+        feature = "local_fs",
+        any(target_os = "macos", target_os = "linux")
+    ))]
+    npm_transaction::audit_test_probe(invocation)?;
+
     run_process(invocation, timeout)
         .await
         .map_err(|failure| match failure {
@@ -2722,6 +2761,11 @@ pub(super) async fn execute(
     }
     let installation = &plan.installation;
     verify_installation_identity(installation)?;
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    if installation.source == Source::Npm {
+        // 调用方已取得原有忙碌/启动预约许可与本 agent journal 锁，不能旁路更新状态机。
+        return npm_transaction::execute(&plan, &root, verification_progress).await;
+    }
     if version(plan.agent, &installation.entry).await? != plan.installed_version {
         return Err(Error::SourceChanged);
     }
@@ -3596,6 +3640,12 @@ pub(super) fn recovery_pending(agent: CLIAgent) -> bool {
 fn recovery_pending_in(root: &Path, agent: CLIAgent) -> bool {
     if plain_ancestors(root).is_err() {
         return true;
+    }
+    let npm_path = root.join(format!("{}-npm.json", agent.command_prefix()));
+    match fs::symlink_metadata(npm_path) {
+        Ok(_) => return true,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return true,
     }
     let path = root.join(format!("{}.json", agent.command_prefix()));
     match fs::symlink_metadata(path) {

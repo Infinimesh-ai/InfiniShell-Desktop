@@ -158,7 +158,7 @@
   },
   "grok_skill_increment": {
     "baseline_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
-    "status": "默认继承模式多技能与空闲热新增实现、本地门禁、macOS 真实适配器及 GUI 三轮通过；本增量同提交云端门禁待运行，G06 未关闭",
+    "status": "默认继承模式多技能与空闲热新增实现、本地门禁、macOS 真实适配器及 GUI 三轮通过；本增量同提交 Linux/Windows 定向门禁通过，G06 未关闭",
     "closed_gaps": [],
     "fixed_scope": "Grok 1.0.41 / grok-4.7，Inherit、无 profile/model 覆盖、无本地父子工具，私有独占 leader；最多 32 项不同的原生本地技能。图片与技能混用仍拒绝。",
     "protocol": "首技能由原生 slash 展开，后续技能由模型原生 read_file 加载；不伪造严格串行调用。热新增须等待精确 reload ACK、同一会话目录和逐路径/内容核验。",
@@ -185,7 +185,60 @@
       "cargo_check": "passed",
       "cargo_build": "passed"
     },
-    "cloud_status": "待本增量提交推送后，按 cross-platform-cloud-verification 运行 Linux/Windows focused 门禁"
+    "cloud_status": "同提交 Linux x64 / Windows x64 定向门禁均通过；不含已认证模型或 GUI 生命周期",
+    "implementation_commit": "fe135e3436c22eaa7857c31bfaf94969eb1aa11f",
+    "cloud_run": 36213944594,
+    "commit_binding_sha256": "3419077aa75a1af26e05c9f5114c43cf8190ac179df1ae11ff27b7937dc2e9d2",
+    "cloud_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/cloud-g06-fe135e343",
+    "cloud_archive_index_sha256": "323bb6af8d3df103331f0069657e2c6c30bafeee60e7b54e0a85ee4f4403fcfb"
+  },
+  "npm_transaction_increment": {
+    "baseline_commit": "fe135e3436c22eaa7857c31bfaf94969eb1aa11f",
+    "status": "Claude 固定 npm 单包事务的本地门禁、macOS 五个真实后端场景及英中错误布局通过；同提交 Linux/Windows 待验，G09 未关闭",
+    "closed_gaps": [],
+    "fixed_scope": "Claude 目标 2.1.280，macOS 与 Linux 官方 glibc 平台包，单包完整树/POSIX 权限；Codex npm、Windows npm、musl、Homebrew、WinGet 和额外 ACL 尚未完成",
+    "implementation": "两份官方归档逐份 SHA-512 SRI、完整成员及 manifest 合同；宿主物化已核验 native 公共入口，不执行 npm install 或生命周期脚本；固定 --version 私有空配置与网络拒绝；持久 journal、目录原子交换及原清单约束的清理",
+    "local_gates": {
+      "cargo_check": "passed",
+      "i18n": 11,
+      "updates": 182,
+      "updates_ignored": 4,
+      "managed_process": 85,
+      "managed_process_ignored": 17,
+      "python_runner": 16,
+      "cargo_build": "passed",
+      "workflow_lint": "passed_with_declared_self_hosted_label"
+    },
+    "localization": "英中 ProbeFailed 文案同步；同一 macOS 内置盘构建在独立 profile 显示三款真实错误提示，完整文本/渠道/按钮布局可读。合成无效版本只计布局，不计更新事务。",
+    "first_live_failure": "共享 /private/tmp 祖先被既有 atomic_macos 检查拒绝；native exit 1、cleanup_confirmed，旧公共程序摘要未变、暂存树清理。保留失败，以相同源码/程序改用用户私有内置缓存目录复验，不放宽生产检查。",
+    "archive_pending": false,
+    "cloud_status": "同提交 Linux x64 / Windows x64 定向门禁通过；Linux 官方固定 Claude npm 五场景通过，不含已认证模型或 GUI/IME",
+    "second_live_failure": "用户私有内置目录通过祖先检查，但监督者就绪后的原子镜像验证超出普通版本查询 15 秒预算，输出为空、stdio_closed、cleanup_confirmed；旧公共摘要未变、暂存树已回收。不能据此声称候选进入 CLI 主程序。版本探针改用既有更新事务的有界 300 秒预算，区分 TimedOut；新源码门禁及后续真实五场景已通过，原失败不覆盖。",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/claude-npm-20260926",
+    "archive_index_sha256": "7f0a70056a1edfafd746a962699d8f2ae70685ce909658bf745c217b7a2ec022",
+    "macos_live": {
+      "platform": "macOS arm64",
+      "mode": "official_npm_single_package_tree",
+      "old_version": "2.1.278",
+      "target_version": "2.1.280",
+      "cases": [
+        "updated",
+        "swap_receipt_missing",
+        "external_change_preserved",
+        "candidate_changed_preserved",
+        "unreviewed_downgrade_rejected"
+      ],
+      "accepted": true,
+      "model_inputs_sent": 0,
+      "supervisor_sha256": "63c34a50b1ce86d3bfdd8774aee3ee9ab070bef348c9d3bc8cda2e9e5c30499b",
+      "test_binary_sha256": "ebc56ba3d43ccb0f8b92838cd777831e4ea8d484b6fcf68aeaebd4eb7f041a96",
+      "scope": "官方归档在私有前缀物化，真实 npm 只读归属查询、生产 Rust 后端与监督原子执行；不是 npm 安装脚本、GUI 更新点击或模型生命周期。忙碌仅复用产品状态机回归，插件重检未覆盖。"
+    },
+    "implementation_commit": "529512a354d66fdcf48f70db1bbe63216c36a3da",
+    "cloud_run": 36217724224,
+    "commit_binding_sha256": "6d2b4d5c7836803e3d1890998d924edf6af214761145f1ba42475b784ed51be8",
+    "cloud_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/cloud-g09-529512a35",
+    "cloud_archive_index_sha256": "97ca36b14ecbd9eecf2d6313ab4a3fc51a662a26c27953934d0ba2b207a2e991"
   },
   "grok_owned_terminal_increment": {
     "status": "native_foundation_verified_gui_integration_pending",
@@ -208,7 +261,7 @@
     "cloud_status": "基础提交 922308af 的 Linux 失败：原生 hook 与安装收据脚本仍要求插件 0.1.4，实际为 0.1.5；Windows 仍运行。原失败保留，修复另行提交验证。",
     "commit_binding_sha256": "7e88b8fea31de65fa5d58639f8295083cebb78d67b706349d4b3c17579432ed5",
     "recovery_increment": {
-      "implementation_commit": "本提交；仓外提交绑定在提交后生成",
+      "implementation_commit": "044263a61b38fa95af32de2b758c1101aae08226",
       "status": "macOS 本地门禁、原生两轮回归与空白 GUI 双语启动通过，GUI 输入与真实重启模型链未完成",
       "behavior": "异步侧车接收不阻塞 GUI；退出保留已核对清单；SQLite 恢复前同步置忙，恢复仅关联启动占用，不重新派发；旧回调、重复定时器和托管恢复交叉隔离",
       "gates": "cargo check -p warp、i18n11、PTY身份2、会话423/6忽略、持久化78、完整协调器111/4忽略、应用构建及运行器6通过",
@@ -220,7 +273,18 @@
       "archive_index_sha256": "0c1fbc47dec6f0a7cd9c2bc7c8c6a6cc59c73a707dc0c95518096cb4386f8402",
       "preserved_failures": "v1 Timer返回类型编译错误；v2门禁后主动中止构建；v3遗漏未确认宿主统计隔离；中文首图实际仍为英文，重启正例另存",
       "remaining": "GUI新启动登记/派发/握手/草稿发送尚未接线；启动失败或绑定前崩溃回收、真实审批、活跃重关联与冷继续、跨平台仍欠",
-      "localization": "无需本地化变更：复用已有无效启动/未确认状态文案，内部恢复与异步通道未改变已显示语义。"
+      "localization": "无需本地化变更：复用已有无效启动/未确认状态文案，内部恢复与异步通道未改变已显示语义。",
+      "commit_binding_sha256": "3491a456e67a69582ee2333d8314a78bdb7dca4e46c5f6a0deef4a0d0f1b6338"
+    },
+    "cloud_script_repair": "4ed5b3d80 同步真实0.1.5版本断言；本地validator15和真实worker15/2跳过通过，旧/未知/缺失/混合版本仍拒绝。旧云端失败不改写，整合提交待Linux/Windows复验。",
+    "integration": {
+      "source_commit": "本合并提交；提交后追加仓外逐文件绑定",
+      "with_branch": "codex/cli-agent-parity",
+      "gates": "cargo check -p warp、i18n11、PTY身份2、会话423/6忽略、协调器111/4忽略、升级182/4忽略、版本探测7/1忽略、持久化78、运行器6、插件验证器15及应用构建通过",
+      "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g01-g09-integration-20260926",
+      "archive_index_sha256": "67b875a435b5408373166375e16adbe24b65cdeaa485b8f72146491666f18c64",
+      "cloud": "原分支同提交Linux/Windows定向门禁待安排；G01基础922旧失败不改写",
+      "model_scope": "没有新增在线模型调用，原生和GUI证据仍绑定各自实现/二进制"
     }
   }
 }
