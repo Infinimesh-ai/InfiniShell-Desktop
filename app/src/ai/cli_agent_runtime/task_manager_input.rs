@@ -1,6 +1,6 @@
 //! 托管任务输入复用编辑器、附件 Chip 和技能发现，异步结果保留原草稿归属。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use crate::ui_components::blended_colors;
@@ -22,6 +22,7 @@ use warpui::{AppContext, Element, SingletonEntity, ViewContext, ViewHandle};
 use super::{LocalCLITaskManagerEvent, LocalCLITaskManagerView, TaskManagerAction};
 use crate::ai::agent::ImageContext;
 use crate::ai::cli_agent_runtime::PermissionPolicy;
+use crate::ai::cli_agent_runtime::coordinator::ManagedTaskSnapshot;
 use crate::ai::skills::SkillManager;
 use crate::appearance::Appearance;
 use crate::editor::{
@@ -81,6 +82,87 @@ impl ManagedInputState {
             skill_index_directory: None,
         }
     }
+}
+
+fn grok_plain_skill_options(options: &super::SavedLaunchOptions) -> bool {
+    options.permission_policy == PermissionPolicy::Inherit
+        && options.permission_ceiling.is_none()
+        && options.claude_profile.is_none()
+        && options.grok_profile.is_none()
+        && options.local_tools.is_none()
+        && options.model.is_none()
+}
+
+/// 界面只允许当前原生握手的范围；独占 leader 来源仍由协议发送端核对。
+fn grok_current_skill_snapshot(snapshot: &ManagedTaskSnapshot) -> bool {
+    if snapshot.task.harness != "grok"
+        || !snapshot.ready
+        || !snapshot.connected
+        || snapshot
+            .task
+            .native_session_id
+            .as_deref()
+            .is_none_or(str::is_empty)
+    {
+        return false;
+    }
+    let Ok(config) = serde_json::from_str::<Value>(&snapshot.task.config_json) else {
+        return false;
+    };
+    let runtime = config["runtime_generation"]
+        .as_str()
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .filter(|value| !value.is_nil());
+    if runtime.is_none()
+        || config["cli_version_runtime_generation"] != config["runtime_generation"]
+        || config["cli_version"] != "1.0.41"
+        || config["effective_permissions"]["requestedPolicy"] != "inherit"
+        || config["effective_permissions"]["appCreationPolicyApplied"] != false
+        || config["effective_permissions"]["verifiedCapabilities"]["submit"] != true
+        || config["effective_permissions"]["verifiedCapabilities"]["localTools"] != false
+        || config["effective_permissions"]["reportedMetadata"]["models"]["currentModelId"]
+            != "grok-4.7"
+    {
+        return false;
+    }
+    serde_json::from_value::<super::SavedLaunchOptions>(config)
+        .is_ok_and(|options| grok_plain_skill_options(&options))
+}
+
+fn grok_skill_refresh_idle(snapshot: &ManagedTaskSnapshot) -> bool {
+    if !grok_current_skill_snapshot(snapshot)
+        || snapshot.active_turn_id.is_some()
+        || !snapshot.approvals.is_empty()
+    {
+        return false;
+    }
+    let Ok(config) = serde_json::from_str::<Value>(&snapshot.task.config_json) else {
+        return false;
+    };
+    // 当前输入关联会保留到下一轮，用于恢复和拒绝旧事件；关联存在不等于仍在运行。
+    let current_finished = config.get("grok_current_input").is_none_or(|input| {
+        input.is_null()
+            || (snapshot.task.state.is_terminal()
+                && input["runtime_generation"] == config["runtime_generation"]
+                && input["native_turn_id"].as_str().is_some_and(|turn_id| {
+                    snapshot
+                        .task
+                        .terminal_evidence
+                        .as_deref()
+                        .is_some_and(|evidence| {
+                            serde_json::from_str::<Value>(evidence).is_ok_and(|evidence| {
+                                evidence["native_session_id"].as_str()
+                                    == snapshot.task.native_session_id.as_deref()
+                                    && evidence["event"]["TurnFinished"]["turn_id"].as_str()
+                                        == Some(turn_id)
+                            })
+                        })
+                }))
+    });
+    current_finished
+        && config.get("grok_pending_inputs").is_none_or(|pending| {
+            pending.is_null() || pending.as_array().is_some_and(Vec::is_empty)
+        })
 }
 
 impl LocalCLITaskManagerView {
@@ -210,14 +292,11 @@ impl LocalCLITaskManagerView {
             Harness::Grok => {
                 if self.permission != PermissionPolicy::Inherit
                     || !self.managed_input.attachments.skills.is_empty()
-                    || !self.verified_installation(Harness::Grok, ctx).is_some_and(
-                        |installation| {
-                            super::grok_current_installation(
-                                Harness::Grok,
-                                &installation.version,
-                            )
-                        },
-                    )
+                    || !self
+                        .verified_installation(Harness::Grok, ctx)
+                        .is_some_and(|installation| {
+                            super::grok_current_installation(Harness::Grok, &installation.version)
+                        })
                 {
                     return false;
                 }
@@ -238,7 +317,10 @@ impl LocalCLITaskManagerView {
                     .is_some_and(|options| {
                         options.permission_policy == PermissionPolicy::Inherit
                             && options.selected_skills.is_empty()
-                            && options.model.as_deref().is_none_or(|model| model == "grok-4.7")
+                            && options
+                                .model
+                                .as_deref()
+                                .is_none_or(|model| model == "grok-4.7")
                     })
             }
             Harness::Oz | Harness::OpenCode | Harness::Gemini | Harness::Unknown => false,
@@ -325,8 +407,45 @@ impl LocalCLITaskManagerView {
         ctx.notify();
     }
 
+    fn grok_skill_policy_available(&self, ctx: &AppContext) -> bool {
+        if self.permission != PermissionPolicy::Inherit
+            || self.local_tools.allow_spawn
+            || self.local_tools.allow_message
+        {
+            return false;
+        }
+        if self.selected_task.is_none() {
+            return true;
+        }
+        self.selected_record(ctx)
+            .and_then(|task| {
+                serde_json::from_str::<super::SavedLaunchOptions>(&task.config_json).ok()
+            })
+            .is_some_and(|options| grok_plain_skill_options(&options))
+    }
+
+    fn grok_composer_skill_limit(&self, ctx: &AppContext) -> usize {
+        if !self.grok_skill_policy_available(ctx) {
+            return 1;
+        }
+        let current = if self.selected_task.is_none() {
+            // 新任务尚无原生模型；这里只暂存选择，发送必须等固定版本/模型/目录校验。
+            self.verified_installation(Harness::Grok, ctx)
+                .is_some_and(|installation| {
+                    super::grok_current_installation(Harness::Grok, &installation.version)
+                })
+        } else {
+            self.selected_snapshot(ctx)
+                .as_ref()
+                .is_some_and(grok_current_skill_snapshot)
+        };
+        if current { 32 } else { 1 }
+    }
+
     fn session_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
-        if self.permission.is_claude_file_profile() {
+        if self.permission.is_claude_file_profile()
+            || (self.harness == Harness::Grok && !self.grok_skill_policy_available(ctx))
+        {
             return false;
         }
         if self.selected_task.is_none() || !matches!(self.harness, Harness::Claude | Harness::Grok)
@@ -347,8 +466,24 @@ impl LocalCLITaskManagerView {
             && config["cli_version"]
                 .as_str()
                 .is_some_and(super::super::grok::current_root_supported_version);
-        if self.harness != Harness::Claude && !bound_grok {
-            return true;
+        if self.harness == Harness::Grok {
+            if config["cli_version"] == "1.0.30" {
+                return true;
+            }
+            if !bound_grok {
+                return false;
+            }
+            if !self
+                .pending_inputs
+                .contains_key(self.selected_task.as_deref().expect("已选择任务"))
+                && self
+                    .selected_snapshot(ctx)
+                    .as_ref()
+                    .is_some_and(grok_skill_refresh_idle)
+            {
+                // 目录中看得到不等于已注册；发送端仍须 reload ACK、关联拉取和逐路径核验。
+                return true;
+            }
         }
         serde_json::from_value::<super::SavedLaunchOptions>(config)
             .ok()
@@ -369,15 +504,27 @@ impl LocalCLITaskManagerView {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if self.harness == Harness::Grok && !self.managed_input.attachments.skills.is_empty() {
-            if self.permission != PermissionPolicy::Inherit {
+            if !self.grok_skill_policy_available(ctx) {
                 return Err(crate::t!("cli-agent-grok-skill-policy-required"));
             }
-            if self.managed_input.attachments.skills.len() > 1 {
-                return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+            if !self.managed_input.attachments.images.is_empty() {
+                return Err(crate::t!(
+                    "cli-agent-input-images-unverified",
+                    cli = Harness::Grok.display_name()
+                ));
+            }
+            let limit = self.grok_composer_skill_limit(ctx);
+            if self.managed_input.attachments.skills.len() > limit {
+                return Err(if limit == 1 {
+                    crate::t!("cli-agent-task-skill-one-per-turn")
+                } else {
+                    crate::t!("cli-agent-grok-skill-selection-invalid")
+                });
             }
         }
         let manager = SkillManager::as_ref(ctx);
-        self.managed_input
+        let parsed = self
+            .managed_input
             .attachments
             .skills
             .iter()
@@ -397,7 +544,14 @@ impl LocalCLITaskManagerView {
                         )
                     })
             })
-            .collect()
+            .collect::<Result<Vec<_>, String>>()?;
+        if self.harness == Harness::Grok {
+            let mut names = HashSet::new();
+            if parsed.iter().any(|skill| !names.insert(&skill.name)) {
+                return Err(crate::t!("cli-agent-grok-skill-selection-invalid"));
+            }
+        }
+        Ok(parsed)
     }
 
     pub(super) fn select_composer_skill(
@@ -413,16 +567,35 @@ impl LocalCLITaskManagerView {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if self.harness == Harness::Grok {
-            if self.permission != PermissionPolicy::Inherit {
+            if !self.grok_skill_policy_available(ctx) {
                 return Err(crate::t!("cli-agent-grok-skill-policy-required"));
             }
-            if !self.managed_input.attachments.skills.is_empty()
+            if !self.managed_input.attachments.images.is_empty() {
+                return Err(crate::t!(
+                    "cli-agent-input-images-unverified",
+                    cli = Harness::Grok.display_name()
+                ));
+            }
+            let limit = self.grok_composer_skill_limit(ctx);
+            if self.managed_input.attachments.skills.len() >= limit
                 && !self.managed_input.attachments.skills.contains(reference)
             {
-                return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+                return Err(if limit == 1 {
+                    crate::t!("cli-agent-task-skill-one-per-turn")
+                } else {
+                    crate::t!("cli-agent-grok-skill-selection-invalid")
+                });
             }
         }
         if !self.session_skill_was_registered(reference, ctx) {
+            if self.harness == Harness::Grok
+                && self
+                    .selected_snapshot(ctx)
+                    .as_ref()
+                    .is_some_and(grok_current_skill_snapshot)
+            {
+                return Err(crate::t!("cli-agent-grok-skill-refresh-idle"));
+            }
             return Err(crate::t!("cli-task-manager-skills-session-fixed"));
         }
         let skill = SkillManager::as_ref(ctx)
@@ -807,3 +980,7 @@ impl LocalCLITaskManagerView {
         self.refresh_managed_input(ctx);
     }
 }
+
+#[cfg(test)]
+#[path = "task_manager_input_tests.rs"]
+mod tests;

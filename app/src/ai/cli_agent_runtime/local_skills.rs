@@ -316,8 +316,11 @@ pub(crate) fn prepare_local_cli_skill_inputs(
     {
         return Err(crate::t!("cli-agent-task-skills-require-managed"));
     }
-    if harness == Harness::Grok && skills.len() > 1 {
-        return Err(crate::t!("cli-agent-task-skill-one-per-turn"));
+    if harness == Harness::Grok {
+        let mut names = HashSet::new();
+        if skills.len() > 32 || skills.iter().any(|skill| !names.insert(&skill.name)) {
+            return Err(crate::t!("cli-agent-grok-skill-selection-invalid"));
+        }
     }
     if harness == Harness::Claude {
         let mut names = HashSet::new();

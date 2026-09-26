@@ -2690,7 +2690,29 @@ pub(crate) async fn start_acknowledged_host_for_test(
     tokio::sync::mpsc::Receiver<RuntimeCommand>,
     RuntimeHostRecord,
 )> {
-    let record = create_record(task_id, task_generation, Harness::Codex, options)?;
+    start_acknowledged_host_for_harness_for_test(
+        task_id,
+        task_generation,
+        Harness::Codex,
+        options,
+        events,
+    )
+    .await
+}
+
+#[cfg(test)]
+pub(crate) async fn start_acknowledged_host_for_harness_for_test(
+    task_id: String,
+    task_generation: i64,
+    harness: Harness,
+    options: SessionOptions,
+    events: Vec<RuntimeEvent>,
+) -> io::Result<(
+    ipc::Server,
+    tokio::sync::mpsc::Receiver<RuntimeCommand>,
+    RuntimeHostRecord,
+)> {
+    let record = create_record(task_id, task_generation, harness, options)?;
     let mut state = RuntimeHostState::new(
         &record.directory,
         record.manifest.clone(),

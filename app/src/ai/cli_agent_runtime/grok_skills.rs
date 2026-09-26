@@ -1,5 +1,6 @@
 //! 原生技能目录只用于当前会话的路径绑定，不进入展示快照或自动授予项目信任。
 
+use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -10,7 +11,8 @@ use sha2::{Digest, Sha256};
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::super::InputContent;
-use super::MAX_NATIVE_IDENTITIES;
+use super::super::local_skills::SelectedLocalSkill;
+use super::{MAX_LINE_BYTES, MAX_NATIVE_IDENTITIES};
 use crate::terminal::CLIAgent;
 use crate::terminal::input::skills::is_user_invocable;
 
@@ -22,6 +24,13 @@ pub(super) struct SelectedSkill {
 }
 
 impl SelectedSkill {
+    pub(super) fn reference(&self) -> SelectedLocalSkill {
+        SelectedLocalSkill {
+            name: self.name.clone(),
+            path: self.path.clone(),
+        }
+    }
+
     pub(super) fn new(name: String, path: PathBuf) -> Result<Self, String> {
         let (canonical_path, content_sha256) = validate_reference(&name, &path)?;
         Ok(Self {
@@ -76,6 +85,8 @@ pub(super) fn unavailable() -> String {
 struct NativeCommand {
     name: String,
     bare_name: Option<String>,
+    scope: Option<String>,
+    qualified_name: Option<String>,
     path: Option<PathBuf>,
     canonical_path: Option<PathBuf>,
 }
@@ -100,6 +111,8 @@ impl SkillCatalog {
                 NativeCommand {
                     name: entry["name"].as_str().unwrap_or_default().to_owned(),
                     bare_name: entry["_meta"]["bareName"].as_str().map(str::to_owned),
+                    scope: entry["_meta"]["scope"].as_str().map(str::to_owned),
+                    qualified_name: entry["_meta"]["qualifiedName"].as_str().map(str::to_owned),
                     canonical_path: path.as_ref().and_then(|path| path.canonicalize().ok()),
                     path,
                 }
@@ -143,6 +156,79 @@ impl SkillCatalog {
             return Err(unavailable());
         }
         Ok(&command.name)
+    }
+
+    /// 原生目录必须逐个绑定所选名称与本地路径，不能只检查返回数量。
+    pub(super) fn verify_selection(&self, selected: &[SelectedSkill]) -> Result<(), String> {
+        if selected.is_empty() || selected.len() > 32 {
+            return Err(crate::t!("cli-agent-grok-skill-selection-invalid"));
+        }
+        let mut names = HashSet::new();
+        let mut paths = HashSet::new();
+        for skill in selected {
+            if !names.insert(&skill.name) || !paths.insert(&skill.canonical_path) {
+                return Err(crate::t!("cli-agent-grok-skill-selection-invalid"));
+            }
+            self.command_for(skill)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify_root_selection(&self, selected: &[SelectedSkill]) -> Result<(), String> {
+        self.verify_selection(selected)?;
+        for skill in selected {
+            let name = self.command_for(skill)?;
+            let command = self
+                .commands
+                .iter()
+                .find(|command| command.name == name)
+                .ok_or_else(unavailable)?;
+            let qualified = format!("local:{}", skill.name);
+            if command.scope.as_deref() != Some("local")
+                || command.qualified_name.as_deref() != Some(qualified.as_str())
+                || (name != skill.name && name != qualified)
+            {
+                return Err(unavailable());
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn encode_selected(
+        &self,
+        input: Vec<InputContent>,
+        selected: &[SelectedSkill],
+    ) -> Result<Vec<Value>, String> {
+        self.verify_selection(selected)?;
+        let content = if selected.len() == 1 {
+            self.encode(input, &selected[0])?
+        } else {
+            // 1.0.41 默认 profile 原生展开首个 slash，后续技能由模型按原生目录加载。
+            // 每个技能保留独立文本块；不复制正文、不伪造工具调用或审批。
+            let mut content = selected
+                .iter()
+                .map(|skill| {
+                    self.command_for(skill)
+                        .map(|command| json!({"type":"text", "text":format!("/{command}")}))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            for part in input {
+                match part {
+                    InputContent::Text(text) => content.push(json!({"type":"text", "text":text})),
+                    InputContent::Skill { .. } => {}
+                    InputContent::LocalImage(_) => return Err(unavailable()),
+                }
+            }
+            content
+        };
+        if serde_json::to_vec(&content)
+            .map_err(|_| unavailable())?
+            .len()
+            > MAX_LINE_BYTES - 64 * 1024
+        {
+            return Err(crate::t!("cli-agent-runtime-data-too-large"));
+        }
+        Ok(content)
     }
 
     pub(super) fn encode(

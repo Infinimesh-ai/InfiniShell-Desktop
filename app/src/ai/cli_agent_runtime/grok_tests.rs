@@ -138,6 +138,134 @@ fn current_waiting_for_setup() -> GrokProtocol {
     protocol
 }
 
+fn fixed_root_waiting_for_setup_without_mcp_refresh() -> GrokProtocol {
+    let mut protocol = GrokProtocol::new(options());
+    protocol
+        .bind_cli_version(super::ROOT_VERSION_OUTPUT)
+        .unwrap();
+    protocol.initialize().unwrap();
+    let mut initialize = current_initialize();
+    initialize["result"]["_meta"]["agentVersion"] = json!(super::ROOT_VERSION);
+    protocol.receive(initialize).unwrap();
+    protocol.receive(fixture_response(2)).unwrap();
+    assert!(protocol.production_root_verified());
+    protocol
+}
+
+#[test]
+fn fixed_root_accepts_empty_mcp_refresh_after_pre_response_setup() {
+    let mut protocol = fixed_root_waiting_for_setup_without_mcp_refresh();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for message in &setup[..5] {
+        assert!(protocol.receive(message.clone()).unwrap().events.is_empty());
+    }
+    let refresh =
+        json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}});
+    assert!(protocol.receive(refresh.clone()).unwrap().events.is_empty());
+    assert!(protocol.receive(refresh).is_err());
+    assert!(
+        protocol
+            .receive(fixture_response(3))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(setup[5].clone())
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    let mut events = Vec::new();
+    for notification in current_display_notifications() {
+        events.extend(protocol.receive(notification).unwrap().events);
+    }
+    assert!(matches!(
+        events.as_slice(),
+        [RuntimeEventKind::SessionReady { .. }]
+    ));
+}
+
+#[test]
+fn fixed_root_missing_empty_mcp_refresh_never_becomes_ready() {
+    let mut protocol = fixed_root_waiting_for_setup_without_mcp_refresh();
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let setup = current_setup_messages(&session_id);
+    for message in &setup[..5] {
+        assert!(protocol.receive(message.clone()).unwrap().events.is_empty());
+    }
+    assert!(
+        protocol
+            .receive(fixture_response(3))
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    assert!(
+        protocol
+            .receive(setup[5].clone())
+            .unwrap()
+            .events
+            .is_empty()
+    );
+    for notification in current_display_notifications() {
+        assert!(protocol.receive(notification).unwrap().events.is_empty());
+    }
+    assert!(protocol.current_setup.is_some());
+    assert!(!protocol.current_mcp_refresh_received);
+    // 本次只实测到响应前的迟到刷新；响应后的新顺序仍拒绝，不能补造就绪证明。
+    assert!(protocol.receive(json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":{"mcpServers":[]}})).is_err());
+}
+
+#[test]
+fn fixed_root_late_refresh_does_not_accept_nonempty_catalog_or_unknown_fields() {
+    for params in [
+        json!({"mcpServers":[{"name":"未授权来源"}]}),
+        json!({"mcpServers":[],"extra":true}),
+    ] {
+        let mut protocol = fixed_root_waiting_for_setup_without_mcp_refresh();
+        let session_id = fixture_response(3)["result"]["sessionId"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        for message in current_setup_messages(&session_id).into_iter().take(5) {
+            protocol.receive(message).unwrap();
+        }
+        assert!(
+            protocol
+                .receive(
+                    json!({"jsonrpc":"2.0","method":"_x.ai/mcp/servers_updated","params":params})
+                )
+                .is_err()
+        );
+        assert!(!protocol.current_mcp_refresh_received);
+        assert!(protocol.session_id.is_none());
+    }
+}
+
+#[test]
+fn older_version_keeps_its_mcp_before_setup_requirement() {
+    let mut protocol = current_waiting_for_setup();
+    protocol.current_mcp_refresh_received = false;
+    let session_id = fixture_response(3)["result"]["sessionId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        protocol
+            .receive(current_setup_messages(&session_id).remove(0))
+            .is_err()
+    );
+}
+
 fn current_waiting_for_resume(session_id: &str) -> GrokProtocol {
     let mut resumed = options();
     resumed.target = SessionTarget::Resume {

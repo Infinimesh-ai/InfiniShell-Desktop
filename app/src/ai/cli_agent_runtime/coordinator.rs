@@ -1542,7 +1542,9 @@ async fn recover_runtime_hosts_in_state_dir(
             let history = load_task_generations(sender, task.task_id.clone())?
                 .await
                 .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
-            let messages = if task.harness == "claude" && config["cli_version"] == "2.1.280" {
+            let messages = if (task.harness == "claude" && config["cli_version"] == "2.1.280")
+                || (task.harness == "grok" && config["cli_version"] == "1.0.41")
+            {
                 load_task_messages(sender, task.task_id.clone())?
                     .await
                     .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
@@ -1957,7 +1959,7 @@ fn runtime_host_history_matches(
     }
     if !chain
         .windows(2)
-        .all(|pair| runtime_host_skill_history_matches(pair[0], pair[1], messages))
+        .all(|pair| runtime_host_skill_history_matches(pair[0], pair[1], history, messages))
     {
         return false;
     }
@@ -1990,10 +1992,11 @@ fn runtime_host_history_matches(
     })
 }
 
-// 只有固定 Claude 原生确认过的热注册可以扩展清单；旧技能顺序和真实路径不能改变。
+// 只有固定版本原生确认过的技能输入可以扩展清单；旧技能顺序和真实路径不能改变。
 fn runtime_host_skill_history_matches(
     previous: &LocalCliTask,
     current: &LocalCliTask,
+    history: &[LocalCliTask],
     messages: &[LocalCliMessage],
 ) -> bool {
     let (Ok(before), Ok(after)) = (
@@ -2004,6 +2007,9 @@ fn runtime_host_skill_history_matches(
     };
     if before["selected_skills"] == after["selected_skills"] {
         return true;
+    }
+    if previous.harness == "grok" && current.harness == "grok" {
+        return grok_skill_history_matches(previous, current, history, messages);
     }
     if previous.harness != "claude"
         || current.harness != "claude"
@@ -2051,6 +2057,252 @@ fn runtime_host_skill_history_matches(
                     })
                 )
         })
+    })
+}
+
+/// 该范围来自同一运行的 SessionReady；选项中的 model 为空，实际模型须原生报告 grok-4.7。
+fn grok_skill_registration_scope(task: &LocalCliTask, config: &serde_json::Value) -> bool {
+    let runtime = config["runtime_generation"]
+        .as_str()
+        .and_then(|value| Uuid::parse_str(value).ok())
+        .filter(|value| !value.is_nil());
+    task.harness == "grok"
+        && runtime.is_some()
+        && config["cli_version"] == "1.0.41"
+        && config["cli_version_runtime_generation"] == config["runtime_generation"]
+        && config["permission_policy"] == "Inherit"
+        && [
+            "model",
+            "permission_ceiling",
+            "local_tools",
+            "claude_profile",
+            "grok_profile",
+        ]
+        .iter()
+        .all(|key| config[*key].is_null())
+        && config["effective_permissions"]["requestedPolicy"] == "inherit"
+        && config["effective_permissions"]["appCreationPolicyApplied"] == false
+        && config["effective_permissions"]["verifiedCapabilities"]["submit"] == true
+        && config["effective_permissions"]["verifiedCapabilities"]["localTools"] == false
+        && config["effective_permissions"]["reportedMetadata"]["models"]["currentModelId"]
+            == "grok-4.7"
+}
+
+fn grok_skill_selection(
+    config: &serde_json::Value,
+) -> Result<Vec<super::local_skills::SelectedLocalSkill>, String> {
+    let selected: Vec<super::local_skills::SelectedLocalSkill> = serde_json::from_value(
+        config
+            .get("selected_skills")
+            .cloned()
+            .unwrap_or_else(|| json!([])),
+    )
+    .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    let mut names = HashSet::new();
+    if selected.len() > 32
+        || selected.iter().any(|skill| {
+            skill.name.trim().is_empty() || !skill.path.is_absolute() || !names.insert(&skill.name)
+        })
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    Ok(selected)
+}
+
+/// 调用者先核对 GrokInputLink 与消息来源；父子邮箱正文永远不按 RuntimeAction 解析。
+async fn grok_skill_input_config(
+    sender: &SyncSender<ModelEvent>,
+    task: &LocalCliTask,
+    input: &GrokInputLink,
+) -> Result<Option<String>, String> {
+    if input.mailbox_sha256.is_some() {
+        return Ok(None);
+    }
+    let messages = load_messages(sender, task.task_id.clone(), input.submission_generation)?
+        .await
+        .map_err(|_| crate::t!("cli-agent-task-save-failed"))??;
+    let message = messages
+        .iter()
+        .find(|message| message.message_id == input.message_id.to_string())
+        .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?;
+    if message.sender_task_id != task.task_id
+        || message.recipient_task_id != task.task_id
+        || message.sender_generation != input.submission_generation
+        || message.recipient_generation != input.submission_generation
+        || message.subject != "user_input"
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    let RuntimeAction::Submit { input: contents } =
+        serde_json::from_str::<RuntimeAction>(&message.body)
+            .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?
+    else {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    };
+    if !contents
+        .iter()
+        .any(|part| matches!(part, InputContent::Skill { .. }))
+    {
+        return Ok(None);
+    }
+    let mut config: serde_json::Value = serde_json::from_str(&task.config_json)
+        .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    let mut selected = grok_skill_selection(&config)?;
+    let previous_len = selected.len();
+    for part in contents {
+        if let InputContent::Skill { name, path } = part {
+            if let Some(previous) = selected.iter().find(|skill| skill.name == name) {
+                if previous.path != path {
+                    return Err(crate::t!("cli-agent-task-invalid-launch"));
+                }
+            } else if !name.trim().is_empty() && path.is_absolute() && selected.len() < 32 {
+                selected.push(super::local_skills::SelectedLocalSkill { name, path });
+            } else {
+                return Err(crate::t!("cli-agent-task-invalid-launch"));
+            }
+        }
+    }
+    if selected.len() == previous_len {
+        return Ok(None);
+    }
+    let original = if input.submission_generation == task.generation {
+        task.clone()
+    } else {
+        load_task_generations(sender, task.task_id.clone())?
+            .await
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))??
+            .into_iter()
+            .find(|record| record.generation == input.submission_generation)
+            .ok_or_else(|| crate::t!("cli-agent-task-invalid-launch"))?
+    };
+    if !grok_skill_registration_scope(task, &config)
+        || !grok_skill_origin_matches(task, &original, input)
+    {
+        return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    config["selected_skills"] = json!(selected);
+    Ok(Some(config.to_string()))
+}
+
+/// 原提交代必须保留当时领取的同一链接；跨代才收到 ACK 时，旧记录允许尚无 native turn。
+fn grok_skill_origin_matches(
+    current: &LocalCliTask,
+    original: &LocalCliTask,
+    input: &GrokInputLink,
+) -> bool {
+    let (Ok(config), Ok(links)) = (
+        serde_json::from_str::<serde_json::Value>(&original.config_json),
+        grok_input_links(original),
+    ) else {
+        return false;
+    };
+    original.version == 1
+        && current.version == 1
+        && original.task_id == current.task_id
+        && original.generation == input.submission_generation
+        && original.native_session_id == current.native_session_id
+        && original.working_directory == current.working_directory
+        && original.parent_task_id == current.parent_task_id
+        && original.parent_generation == current.parent_generation
+        && config["runtime_generation"] == json!(input.runtime_generation)
+        && grok_skill_registration_scope(original, &config)
+        && links
+            .pending
+            .iter()
+            .chain(links.current.iter())
+            .any(|saved| {
+                saved.message_id == input.message_id
+                    && saved.submission_generation == input.submission_generation
+                    && saved.runtime_generation == input.runtime_generation
+                    && saved.mailbox_sha256.is_none()
+                    && saved
+                        .native_turn_id
+                        .as_ref()
+                        .is_none_or(|turn| Some(turn) == input.native_turn_id.as_ref())
+            })
+}
+
+async fn commit_grok_skill_registration(
+    sender: &SyncSender<ModelEvent>,
+    snapshot: &mut ManagedTaskSnapshot,
+    input: &GrokInputLink,
+) -> Result<bool, String> {
+    verify_grok_input_message(sender, &snapshot.task, input, true).await?;
+    let Some(config_json) = grok_skill_input_config(sender, &snapshot.task, input).await? else {
+        return Ok(false);
+    };
+    let previous = snapshot.task.clone();
+    let mut updated = previous.clone();
+    updated.config_json = config_json;
+    commit_transition(sender, &mut updated, &previous).await?;
+    snapshot.task = updated;
+    Ok(true)
+}
+
+fn grok_skill_history_matches(
+    previous: &LocalCliTask,
+    current: &LocalCliTask,
+    history: &[LocalCliTask],
+    messages: &[LocalCliMessage],
+) -> bool {
+    let (Ok(before), Ok(after)) = (
+        serde_json::from_str::<serde_json::Value>(&previous.config_json),
+        serde_json::from_str::<serde_json::Value>(&current.config_json),
+    ) else {
+        return false;
+    };
+    if !grok_skill_registration_scope(previous, &before)
+        || !grok_skill_registration_scope(current, &after)
+    {
+        return false;
+    }
+    let (Ok(before_skills), Ok(after_skills), Ok(links)) = (
+        grok_skill_selection(&before),
+        grok_skill_selection(&after),
+        grok_input_links(current),
+    ) else {
+        return false;
+    };
+    if !after_skills.starts_with(&before_skills) {
+        return false;
+    }
+    after_skills[before_skills.len()..].iter().all(|skill| {
+        links
+            .pending
+            .iter()
+            .chain(links.current.iter())
+            .any(|input| {
+                if input.mailbox_sha256.is_some() || input.native_turn_id.is_none() {
+                    return false;
+                }
+                let Some(original) = history.iter().find(|task| {
+                    task.generation == input.submission_generation
+                        && task.task_id == current.task_id
+                }) else {
+                    return false;
+                };
+                if !grok_skill_origin_matches(current, original, input) {
+                    return false;
+                }
+                messages.iter().any(|message| {
+                    message.version == 1
+                        && message.message_id == input.message_id.to_string()
+                        && message.sender_task_id == current.task_id
+                        && message.recipient_task_id == current.task_id
+                        && message.sender_generation == input.submission_generation
+                        && message.recipient_generation == input.submission_generation
+                        && message.subject == "user_input"
+                        && message.state == LocalCliMessageState::Acknowledged
+                        && message.receipt_kind == Some(LocalCliReceiptKind::NativeProtocol)
+                        && matches!(
+                            serde_json::from_str::<RuntimeAction>(&message.body),
+                            Ok(RuntimeAction::Submit { input }) if input.iter().any(|part| {
+                                matches!(part, InputContent::Skill { name, path }
+                                    if name == &skill.name && path == &skill.path)
+                            })
+                        )
+                })
+            })
     })
 }
 
@@ -3537,6 +3789,7 @@ async fn commit_runtime_event(
         return Ok(false);
     }
     let mut grok_receipt_generation = None;
+    let mut grok_skill_input = None;
     let mut grok_started = false;
     let mut grok_failed_input = None;
     if snapshot.task.harness == "grok" {
@@ -3602,11 +3855,14 @@ async fn commit_runtime_event(
                 if input.native_turn_id.as_ref() != Some(turn_id) {
                     return Err(crate::t!("cli-agent-task-invalid-launch"));
                 }
-                // 原生重复确认只核对已提交的原回执，不能跨代再次变更消息状态。
-                return Ok(false);
+                // ACK 已提交而技能清单尚未写入时，只幂等补登记，不再次派发或改写消息。
+                return commit_grok_skill_registration(sender, snapshot, input).await;
             }
             grok_receipt_generation = Some(input.submission_generation);
             input.native_turn_id = Some(turn_id.clone());
+            // 在持久 links 前验证技能增长是否合法；真正登记仍必须等 NativeProtocol ACK。
+            grok_skill_input_config(sender, &snapshot.task, input).await?;
+            grok_skill_input = Some(input.clone());
         } else if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
             let input = grok_links
                 .pending
@@ -3859,6 +4115,10 @@ async fn commit_runtime_event(
     };
     if grok_receipt_generation.is_some() && receipt.is_none() {
         return Err(crate::t!("cli-agent-task-invalid-launch"));
+    }
+    if let Some(input) = grok_skill_input {
+        // 顺序不能倒置：原生回合关联先落盘，ACK 再落盘，最后登记技能；宿主水位尚未推进。
+        commit_grok_skill_registration(sender, snapshot, &input).await?;
     }
     if let Some(message_id) = grok_failed_input {
         // 先以仍然持久的等待关联核验失败回执，再清槽；跨代失败不能借无关联写回。

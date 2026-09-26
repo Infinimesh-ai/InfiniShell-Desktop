@@ -5641,7 +5641,7 @@ cli-task-manager-installation = { $cli }：{ $version }
 cli-task-manager-local-only = 这些任务在本机运行。关闭面板后，已连接的任务仍会继续运行。SSH 和 tmux 终端会话单独管理。
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 支持文本任务、审批、取消、历史继续和任务消息。固定只读或文件工具策略要求逐次审批，子任务使用相同工具，任务权限不得扩大。这两种策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。“继承”策略每轮可使用一个显式选择的技能，其完整路径必须唯一匹配当前会话的技能目录。应用不会自动授予项目信任。托管模式不支持图片。
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 仅开放已验证的 P0 路径：新建文本任务、精确原生读取请求的逐次允许或拒绝、真实输出后的取消，以及原生会话继续。追加输入、关闭会话、文件写入、本地任务工具、技能、子任务和托管图片仍不可用。终端命令、钩子以及 CLI 或管理员策略不在该 P0 保证范围内；这不是文件系统沙箱。
-cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。“继承”策略使用 CLI 设置，启动时可选择一个技能。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下支持 PNG 图片，不能同时选择技能。
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。在“继承”策略与 grok-4.7 下，可以选择多个技能，并在会话空闲时新增技能。Grok 展开首个技能，通过原生工具加载其余技能；新增技能确认后才发送。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下支持 PNG 图片，不能同时选择技能。
 cli-task-manager-grok-root-tools-unavailable = 当前 Grok 版本与权限策略组合不支持本地任务工具和子任务。
 cli-task-manager-grok-spawn-unavailable = 选择固定只读或文件工具策略后，才能允许 Grok 子任务。
 cli-task-manager-claude-verification = 托管任务支持 Claude Code 2.1.273、2.1.278 和 2.1.280。
@@ -5885,3 +5885,7 @@ cli-agent-claude-skill-reload-idle = 请等待当前 Claude 回合结束后再�
 cli-agent-claude-skill-version-required = 会话中新增技能或选择多个技能需要 Claude Code 2.1.280，并使用继承权限模式。
 cli-agent-claude-image-multiple-skills-unverified = 向 Claude 发送图片时最多选择一个技能。图片与多个技能组合尚未验证。
 cli-agent-claude-skills-reload-help = 可以选择多个技能。新增技能会在会话空闲时注册，并在 Claude 确认注册后发送。
+
+cli-agent-grok-skill-refresh-idle = 请等待当前 Grok 回合结束后再添加新技能。
+
+cli-agent-grok-skill-selection-invalid = 最多选择 32 个不同的 Grok 技能；已注册的技能名称必须保留原来源。

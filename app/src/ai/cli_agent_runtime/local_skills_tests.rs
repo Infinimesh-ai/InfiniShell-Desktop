@@ -263,3 +263,22 @@ fn claude_same_name_from_a_different_source_cannot_replace_a_registered_skill() 
     );
     assert!(plugin.command_for("review-local", &first_path).is_some());
 }
+
+#[test]
+fn grok_multiple_distinct_skills_keep_local_references_for_native_validation() {
+    let (_first_root, first) = skill();
+    let second_root = TempDir::new().unwrap();
+    let path = second_root.path().join("SKILL.md");
+    fs::write(&path,"---\nname: second-local\ndescription: 第二技能\nuser-invocable: true\n---\n第二份独立内容。\n").unwrap();
+    let second = parse_skill(&path).unwrap();
+    let result = prepare_local_cli_skill_inputs(vec![first, second], Harness::Grok, true).unwrap();
+    assert_eq!(result.len(), 2);
+    assert!(matches!(&result[0],InputContent::Skill { name, .. } if name=="review-local"));
+    assert_eq!(
+        result[1],
+        InputContent::Skill {
+            name: "second-local".into(),
+            path
+        }
+    );
+}

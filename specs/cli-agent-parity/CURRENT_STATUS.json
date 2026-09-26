@@ -11,7 +11,7 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "ee839b4fc7dacd58bac0806aa549500af5776b30",
-  "latest_related_verified_source_commit": "50e1515bcd3f20cf120edf5565766975b6a68d5d",
+  "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
@@ -66,10 +66,10 @@
     }
   ],
   "selected_related_gates_remain_passed": true,
-  "selected_remote_run": 36116931025,
+  "selected_remote_run": 36210156960,
   "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。",
   "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。 本次图片仓外证据已逐字节复制到持久归档并生成 SHA-256 索引，保留 /private/tmp 原件，不含认证文件。",
-  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，保留至少 12 GiB。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。",
+  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，保留至少 12 GiB。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。 新签名验收程序使用独立测试 profile，避免读取旧签名创建的钥匙串条目时等待人工授权；原 profile、凭据和系统安全设置不改动。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
   "documentation_updated_at": "2026-09-26",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
@@ -99,7 +99,7 @@
     ],
     "gui_scope": "84102bb1c macOS Claude JPEG及纯PNG真实GUI、活跃重关联与冷恢复分别确认；后续摘要绑定工作区 Grok 双图 GUI、同nativeID冷恢复、同宿主重关联及双语滚动区已通过，旧选择器/握手失败保留。"
   },
-  "selected_related_gates_scope": "仅沿用历史对应提交的通过；不代表本次输入增量门禁全绿，当前结果与待补见 current_increment 和 VALIDATION_REPORT.md。",
+  "selected_related_gates_scope": "83e511583 文件卡片增量在 Linux x64 与 Windows x64 的同提交定向门禁均通过；不含已认证在线模型、真实输入法或 Grok 专属完整双语布局。G06 新增工作区改动另行验收，不继承此提交的通过。",
   "pending_integration": {
     "implementation_sources": [
       "3b4d8e8a3f937d9a6c7d20570f082399c8538df7",
@@ -116,7 +116,7 @@
     ],
     "status": "已整合提交并推送；36个最终构建源文件与6790b185 Git blob一致，run36176479030 Linux和Windows相关门禁均通过，原Goal未完成",
     "closed_gaps": [],
-    "local_gate_scope": "内置首轮 runtime1038/53跳过；修正邮箱ACK后 fixed轮 runtime1044/53跳过，i18n11、check和build通过。随后 joined重放修正的 replay-fixed轮 coordinator91/4跳过、i18n11、check和build通过；各轮来源分别绑定，未把跳过在线项计为通过。Windows附件断言已修且本地footer45通过，同提交Windows复验仍待补。 恢复清单/隔离与ACK顺序后续定向复验：coordinator101/4跳过、i18n11、check/build通过；此前task-manager46通过。",
+    "local_gate_scope": "内置首轮 runtime1038/53跳过；修正邮箱ACK后 fixed轮 runtime1044/53跳过，i18n11、check和build通过。随后 joined重放修正的 replay-fixed轮 coordinator91/4跳过、i18n11、check和build通过；各轮来源分别绑定，未把跳过在线项计为通过。Windows附件断言已修且本地footer45通过，6790b185 同提交 Windows 复验通过。 恢复清单/隔离与ACK顺序后续定向复验：coordinator101/4跳过、i18n11、check/build通过；此前task-manager46通过。",
     "claude_image_skill_scope": "固定2.1.280/Opus5.5 macOS arm64生产适配器Inherit单技能：两独立PNG、两次精确Skill AllowOnce、同nativeID冷恢复及两代自然退出清理通过；libtest ec718473…、supervisor48018a00…，source摘要绑定工作区。",
     "source_snapshot_sha256": "05e7fcbb8d4e8ef98e924ccf1b17426564239b3b2313639ab34a4fc100306461",
     "source_binding": "36个最终恢复源码与6790b185 Git blob逐字节一致；commit-binding.safe.json摘要613cb19968667392a08829f4f831030af6da4a2fca7d9fa58ef538e4e6b80060。原在线结果仍绑定此前各自构建，未回填为新程序通过。",
@@ -133,7 +133,9 @@
       "g07-picker-negative-20260926/index.safe.json": "f41dad825484fc447a7fe03a534808011341eaa97b1143d591da4e2475ae5ea1",
       "g07-picker-recheck-20260926/index.safe.json": "653e648cd37a62a1fa1b74d19f726d3edde34af6a20788c0e097b70cbc926b7e",
       "claude-recovery-local-gates-20260926/index.safe.json": "c446536dc2eb113f75941666bc562963619aabc48ec975799ba4064e0a9baa0a",
-      "g07-picker-gui-20260926/index.safe.json": "1432fbbf90e6b9b0e82a2cffb6826e6082f112c705c74d07eb872e6ca6d59162"
+      "g07-picker-gui-20260926/index.safe.json": "1432fbbf90e6b9b0e82a2cffb6826e6082f112c705c74d07eb872e6ca6d59162",
+      "cloud-integrated-6790b185/index.safe.json": "8239de43dd32999ba0348146d923df701e9d7b97e0b5e079022beff9d2abcdc3",
+      "cloud-g07-83e511583/index.safe.json": "20373845cd0a8228ae23fca12f57db91aec0e8bb6dc62986d462fa302678a364"
     },
     "claude_recovery_fix": "固定2.1.280/Inherit只有同代NativeProtocol确认的技能前缀追加可恢复；真正身份冲突保留终态结果并阻止冷恢复。固定Claude新增技能先保存原生ACK再更新清单，宿主水位最后推进；ACK或清单写入失败与重复重放的真实SQLite回归通过且零重发。最终来源05e7fcbb…：i18n11、coordinator101/4跳过、check/build通过；上轮未再修改的task-manager46通过。",
     "g07_gui_scope": "原入口仅插正文负例保留；后续6790b185基线四文件增量接通选择器PendingFile卡片。macOS Codex0.156.1/gpt-6-luna英文GUI双文件原生shell读取正例，中文原模型转TextEdit被拒的负例保留；两语言卡片可读。Grok1.0.41两卡片可建，发送拒绝且草稿保留，零模型轮次；Claude已认证但普通TUI首次向导未完成，未执行此GUI模型链。G07不关闭。",
@@ -143,11 +145,46 @@
   },
   "file_picker_increment": {
     "baseline_commit": "6790b185a0c0bc581f804edf975960047df85db7",
-    "status": "四文件增量本地门禁和限定GUI验证通过，待提交绑定及同提交相关平台验证",
+    "status": "已提交推送；本地门禁与限定 GUI 范围通过，同提交 Linux x64 / Windows x64 定向门禁通过，G07 未关闭",
     "source_manifest_sha256": "e02d7239b30e43019a209688348eb23bf7b76246b0798267d291d00ebb73477e",
     "local_gates": "i18n11、editor6、footer46、cargo check -p warp、应用构建通过",
     "signed_gui_sha256": "d383765f2e24f0f49747e25a1ec3f8d69a9f2237bd9b0586c8a986eeb17d2688",
     "closed_gaps": [],
-    "localization": "无需本地化变更；既有附加文件入口语义正确。Codex英文/简体中文两卡片和正文布局已实际检查，Grok英文未发送提示完整。"
+    "localization": "无需本地化变更；既有附加文件入口语义正确。Codex英文/简体中文两卡片和正文布局已实际检查，Grok英文未发送提示完整。",
+    "implementation_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
+    "cloud_run": 36210156960,
+    "commit_binding_sha256": "c5d1b0a42184cdb9f31fab2b812a5b0195f23375a1e0f33aa3bbf4ba22c0635d",
+    "cloud_archive_index_sha256": "20373845cd0a8228ae23fca12f57db91aec0e8bb6dc62986d462fa302678a364"
+  },
+  "grok_skill_increment": {
+    "baseline_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
+    "status": "默认继承模式多技能与空闲热新增实现、本地门禁、macOS 真实适配器及 GUI 三轮通过；本增量同提交云端门禁待运行，G06 未关闭",
+    "closed_gaps": [],
+    "fixed_scope": "Grok 1.0.41 / grok-4.7，Inherit、无 profile/model 覆盖、无本地父子工具，私有独占 leader；最多 32 项不同的原生本地技能。图片与技能混用仍拒绝。",
+    "protocol": "首技能由原生 slash 展开，后续技能由模型原生 read_file 加载；不伪造严格串行调用。热新增须等待精确 reload ACK、同一会话目录和逐路径/内容核验。",
+    "adapter_scope": "macOS arm64，v3 构建真实三轮：初始双技能、热新增、同原生会话冷恢复；逐轮原生正文/实际读取字节/完整输出/最终答案与消息 ACK 交叉核对，零重复输入，两代自然退出并清理。",
+    "gui_scope": "macOS arm64：v3 首轮 alpha/beta 实际原生展开及 read_file 成功；v4 同会话热新增 gamma、两次应用重启重关联、停止 CLI 后新进程继续同原生会话并执行 gamma/beta，三条 NativeProtocol ACK、零自动重投、两代正常退出并清理。英文及简体中文长说明、权限、技能卡、消息和结果完整滚动区可读。未信任目录、setup 顺序与完成关联误判忙碌的旧失败保留，未改写全局审批配置。",
+    "recovery": "原生输入关联先落盘、原提交代 NativeProtocol ACK 再落盘、技能清单最后登记；ACK 后清单写入失败的恢复仅补登记。五代历史、数据库故障及同宿主 IPC 恢复回归覆盖零重发。",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-g06-20260926",
+    "source_binding": "v3/v4 各轮源码快照及二进制摘要独立保留，v4 仅修正完成回合后的技能入口，未变协议/持久化回归按源码复用；提交后以仓外 commit-binding.safe.json 核对本增量文件，不冒充同一二进制全量重跑。",
+    "platform_gaps": [
+      "Linux/Windows 已认证模型与 GUI",
+      "Grok 用户级来源扩展",
+      "固定权限策略下技能范围"
+    ],
+    "archive_index_sha256": "3606b77b9c1e716e1d85f4a1705213dea5170c8b4ca694ea029635482acb3710",
+    "local_gates": {
+      "i18n": 11,
+      "grok": 454,
+      "grok_ignored": 15,
+      "coordinator": 88,
+      "local_skills": 12,
+      "runtime_host": 31,
+      "runtime_host_ignored": 1,
+      "task_manager": 59,
+      "cargo_check": "passed",
+      "cargo_build": "passed"
+    },
+    "cloud_status": "待本增量提交推送后，按 cross-platform-cloud-verification 运行 Linux/Windows focused 门禁"
   }
 }
