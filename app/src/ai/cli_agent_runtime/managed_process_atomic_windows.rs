@@ -87,6 +87,7 @@ pub(super) struct WindowsReplacementLease {
     system_directory: AncestorLease,
     powershell: Option<SystemHelperLease>,
     child_image: Option<WindowsChildImage>,
+    package_images: Option<Vec<(bool, SystemHelperLease)>>,
 }
 
 /// 固定系统 helper 的文件和祖先租约；不接受同目录其他程序或 DLL。
@@ -153,6 +154,7 @@ pub(super) struct WindowsImageDebugSession {
     system_directory: AncestorLease,
     powershell: Option<SystemHelperLease>,
     child_image: Option<WindowsChildImage>,
+    package_images: Option<Vec<(bool, SystemHelperLease)>>,
     child_images: HashMap<u32, SystemHelperLease>,
     component_images: HashMap<u32, Vec<SystemHelperLease>>,
     processes: HashMap<u32, OwnedHandle>,
@@ -191,6 +193,31 @@ impl WindowsDirectoryLease {
 }
 
 impl WindowsReplacementLease {
+    pub(super) fn set_package_images(
+        &mut self,
+        images: Vec<ExpectedFileIdentity>,
+    ) -> io::Result<()> {
+        if images.is_empty() || images.len() > 64 || self.child_image.is_some() {
+            return Err(error("npm 包探针映像集合无效"));
+        }
+        let mut identities = HashSet::new();
+        let mut leases = Vec::new();
+        for expected in images {
+            let dll = expected
+                .path
+                .extension()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("dll"));
+            let lease = prepare_package_image(&expected, dll)?;
+            if !identities.insert((lease.identity.id.volume, lease.identity.id.index)) {
+                return Err(error("npm 包探针映像身份重复"));
+            }
+            leases.push((dll, lease));
+        }
+        self.package_images = Some(leases);
+        Ok(())
+    }
+
     pub(super) fn set_child_image(&mut self, image: Option<WindowsChildImage>) -> io::Result<()> {
         if let Some(image) = &image {
             image.validate()?;
@@ -268,6 +295,16 @@ impl WindowsReplacementLease {
                 .map(SystemHelperLease::try_clone)
                 .transpose()?,
             child_image: self.child_image.clone(),
+            package_images: self
+                .package_images
+                .as_ref()
+                .map(|images| {
+                    images
+                        .iter()
+                        .map(|(dll, lease)| Ok((*dll, lease.try_clone()?)))
+                        .collect::<io::Result<Vec<_>>>()
+                })
+                .transpose()?,
             child_images: HashMap::new(),
             component_images: HashMap::new(),
             processes: HashMap::new(),
@@ -302,6 +339,12 @@ impl WindowsImageDebugSession {
     /// 后续 `LOAD_DLL_DEBUG_EVENT` 同样在新映像初始化前暂停。拒绝事件时先终止全部
     /// debuggee，再继续并排空事件，未验证映像没有执行窗口。
     pub(super) fn wait_for_exit(&mut self, child: &mut Child) -> io::Result<ExitStatus> {
+        self.drain_until_exit()?;
+        child.wait()
+    }
+
+    /// 原生 CreateProcess 探针持有自己的进程句柄，仍共享完全相同的映像事件校验。
+    pub(super) fn drain_until_exit(&mut self) -> io::Result<()> {
         let mut root_exit_observed = false;
         let deadline = Instant::now() + DEBUG_SESSION_TIMEOUT;
         loop {
@@ -323,7 +366,7 @@ impl WindowsImageDebugSession {
             }
             continue_debug_event(&event, continue_status)?;
             if root_exit_observed && self.processes.is_empty() {
-                return child.wait();
+                return Ok(());
             }
         }
     }
@@ -362,7 +405,14 @@ impl WindowsImageDebugSession {
             LOAD_DLL_DEBUG_EVENT => {
                 let information = unsafe { event.u.LoadDll };
                 let file = file_from_debug_handle(information.hFile)?;
-                if self.verify_system_image(&file).is_err() {
+                if let Some((_, lease)) = self.package_images.as_ref().and_then(|images| {
+                    images.iter().find(|(dll, lease)| {
+                        *dll && inspect_handle(&file)
+                            .is_ok_and(|identity| identity.id == lease.identity.id)
+                    })
+                }) {
+                    lease.verify_image(&file)?;
+                } else if self.verify_system_image(&file).is_err() {
                     let dependencies = self.component_images.entry(event.dwProcessId).or_default();
                     let identity = inspect_handle(&file)?;
                     if let Some(held) = dependencies
@@ -410,6 +460,13 @@ impl WindowsImageDebugSession {
         // 原生安装器会再次执行当前 CLI 查询版本；必须仍是根映像的同一文件身份与摘要。
         if root || inspect_handle(&file)?.id == self.expected_program_id {
             self.verify_root_image(&file)
+        } else if let Some(images) = &self.package_images {
+            let identity = inspect_handle(&file)?;
+            let (_, lease) = images
+                .iter()
+                .find(|(dll, lease)| !*dll && lease.identity.id == identity.id)
+                .ok_or_else(|| error("npm 包探针拒绝未绑定的子进程映像"))?;
+            lease.verify_image(&file)
         } else if let Some(helper) = &self.powershell
             && inspect_handle(&file)?.id == helper.identity.id
         {
@@ -594,6 +651,50 @@ pub(super) fn prepare(expected: &ExpectedFileIdentity) -> io::Result<WindowsRepl
         system_directory,
         powershell,
         child_image: None,
+        package_images: None,
+    })
+}
+
+fn prepare_package_image(
+    expected: &ExpectedFileIdentity,
+    dll: bool,
+) -> io::Result<SystemHelperLease> {
+    validate_expected(expected)?;
+    let mut ancestors = Vec::new();
+    for path in expected
+        .canonical_path
+        .parent()
+        .ok_or_else(|| error("npm 映像缺少父目录"))?
+        .ancestors()
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+    {
+        let file = open_ancestor(path)?;
+        let identity = inspect_handle(&file)?;
+        if !is_plain_kind(identity.attributes, true) {
+            return Err(error("npm 映像祖先不是普通目录"));
+        }
+        ancestors.push(AncestorLease { file, identity });
+    }
+    let mut program = open_program(&expected.canonical_path)?;
+    let identity = inspect_handle(&program)?;
+    if Some(identity.id) != expected.file_id
+        || identity.size != expected.size
+        || !is_plain_kind(identity.attributes, false)
+    {
+        return Err(error("npm 映像身份不匹配"));
+    }
+    require_pe_kind(&mut program, identity.size, dll)?;
+    let sha256 = sha256_file(&mut program)?;
+    if sha256 != expected.sha256 || inspect_handle(&program)? != identity {
+        return Err(error("npm 映像内容改变"));
+    }
+    Ok(SystemHelperLease {
+        program,
+        identity,
+        sha256,
+        ancestors,
     })
 }
 

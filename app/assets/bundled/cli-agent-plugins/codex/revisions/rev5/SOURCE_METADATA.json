@@ -1,0 +1,190 @@
+{
+  "upstream_repository": "https://github.com/warpdotdev/codex-warp.git",
+  "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
+  "cli_contract_version": "0.147.0",
+  "plugin_version": "0.4.0",
+  "patch_revision": 5,
+  "directory": "codex-warp-0.4.0-rev5",
+  "files": {
+    ".agents/plugins/marketplace.json": {
+      "upstream_sha256": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
+      "sha256": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
+      "mode": 420
+    },
+    ".github/workflows/test.yml": {
+      "upstream_sha256": "20204501cdb85f00a6c8f20130602a616e0a790016a62a8f20629fe99fa3a06a",
+      "sha256": "20204501cdb85f00a6c8f20130602a616e0a790016a62a8f20629fe99fa3a06a",
+      "mode": 420
+    },
+    "LICENSE": {
+      "upstream_sha256": "b6686c85488c50963919885a98bb86ad7e10fe1b60139b98149fe9fad488c7c8",
+      "sha256": "b6686c85488c50963919885a98bb86ad7e10fe1b60139b98149fe9fad488c7c8",
+      "mode": 420
+    },
+    "README.md": {
+      "upstream_sha256": "e0b2cb724fee2c3ecec7fe3c1e09018b787d8fa53c230d4257edd109e8b751e6",
+      "sha256": "e0b2cb724fee2c3ecec7fe3c1e09018b787d8fa53c230d4257edd109e8b751e6",
+      "mode": 420
+    },
+    "plugins/orchestration/.codex-plugin/plugin.json": {
+      "upstream_sha256": "f009943a7794e7764d7d71c5c7ece7cf8baab42b103d4e2dbf2191ef9616a51e",
+      "sha256": "f009943a7794e7764d7d71c5c7ece7cf8baab42b103d4e2dbf2191ef9616a51e",
+      "mode": 420
+    },
+    "plugins/orchestration/hooks/hooks.json": {
+      "upstream_sha256": "758d851b5d916fd5d2d75795b1f6d41cc827a51e0b6608be0bf43031ab5a0113",
+      "sha256": "758d851b5d916fd5d2d75795b1f6d41cc827a51e0b6608be0bf43031ab5a0113",
+      "mode": 420
+    },
+    "plugins/orchestration/scripts/drain-mailbox.sh": {
+      "upstream_sha256": "3647d900f161beb247d406f3c5f41c735b59f8b888551ad29aea561b56478e7a",
+      "sha256": "3647d900f161beb247d406f3c5f41c735b59f8b888551ad29aea561b56478e7a",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/on-post-tool-use.sh": {
+      "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/on-prompt-submit.sh": {
+      "upstream_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/on-session-end.sh": {
+      "upstream_sha256": "d693a293622158a95c7c18bbd153dffd8c041b3b13cf83d91feb175fc9076ec7",
+      "sha256": "d693a293622158a95c7c18bbd153dffd8c041b3b13cf83d91feb175fc9076ec7",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/on-session-start.sh": {
+      "upstream_sha256": "436a73ee08f44aa87febf4397aeecc409592e028bf95070e8e981855f68d88bb",
+      "sha256": "436a73ee08f44aa87febf4397aeecc409592e028bf95070e8e981855f68d88bb",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/on-stop.sh": {
+      "upstream_sha256": "bccbaabdb87e59d86648092af0fa0ce1485268faa40e3091da20ec769cac515c",
+      "sha256": "bccbaabdb87e59d86648092af0fa0ce1485268faa40e3091da20ec769cac515c",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/oz-parent-common.sh": {
+      "upstream_sha256": "51cd1833e4cc1d5a2072f0d73392cfaaaf711ebd03710d50facd4dcc1fd80a66",
+      "sha256": "51cd1833e4cc1d5a2072f0d73392cfaaaf711ebd03710d50facd4dcc1fd80a66",
+      "mode": 493
+    },
+    "plugins/orchestration/scripts/oz-parent-listener.sh": {
+      "upstream_sha256": "ad3b870d1719ea8eba527a4a7a273fb9bf533e3599455f22e02efa87253bf62e",
+      "sha256": "ad3b870d1719ea8eba527a4a7a273fb9bf533e3599455f22e02efa87253bf62e",
+      "mode": 493
+    },
+    "plugins/orchestration/skills/factory-files/SKILL.md": {
+      "upstream_sha256": "219664b416c5591af2471c8930224eb0e6a35916ec900492b1dd98b9fcf49a66",
+      "sha256": "219664b416c5591af2471c8930224eb0e6a35916ec900492b1dd98b9fcf49a66",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/factory-files/references/examples.md": {
+      "upstream_sha256": "9fd905c3b08b440c8f40a5d42e9efff868c820b4b129f40c08ddefe587b1280d",
+      "sha256": "9fd905c3b08b440c8f40a5d42e9efff868c820b4b129f40c08ddefe587b1280d",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/factory-files/references/scorers.md": {
+      "upstream_sha256": "8a18d06091e01b332e2751836f8e3616583de48fe7ea2bb76aacdb6017f2bb25",
+      "sha256": "8a18d06091e01b332e2751836f8e3616583de48fe7ea2bb76aacdb6017f2bb25",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/factory-files/references/validation.md": {
+      "upstream_sha256": "5c53ceea4c9d7dac1a4b237f09abca6b846d4219e76241fac8dbf1279cc8ae95",
+      "sha256": "5c53ceea4c9d7dac1a4b237f09abca6b846d4219e76241fac8dbf1279cc8ae95",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/factory-files/scripts/validate_factory_files.py": {
+      "upstream_sha256": "3e9faa9f43dc5c2eb2b9f10bb3716cc53e251d8c59d685989548a1a85cd1f29b",
+      "sha256": "3e9faa9f43dc5c2eb2b9f10bb3716cc53e251d8c59d685989548a1a85cd1f29b",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/oz-child-agent-orchestration/SKILL.md": {
+      "upstream_sha256": "70cda0056e96d30b11283e23495e3ff23e03a9e0e9bb2a1a2df39073242fa52d",
+      "sha256": "70cda0056e96d30b11283e23495e3ff23e03a9e0e9bb2a1a2df39073242fa52d",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/oz-finish-task/SKILL.md": {
+      "upstream_sha256": "5b6d83f467b105c8a74e8f937501e026683e9171c7bfb4d8153e611e60e38590",
+      "sha256": "5b6d83f467b105c8a74e8f937501e026683e9171c7bfb4d8153e611e60e38590",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/oz-notify-user/SKILL.md": {
+      "upstream_sha256": "dd8a74b320cd90081f1bd729fba1faca9bb13f58744c3d82a15dddd12a8cffc3",
+      "sha256": "dd8a74b320cd90081f1bd729fba1faca9bb13f58744c3d82a15dddd12a8cffc3",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/oz-report-pr/SKILL.md": {
+      "upstream_sha256": "fad6c455cdae4a0a019793be24afb28e024ac8fee6ef97a4bf8689517dc58b13",
+      "sha256": "fad6c455cdae4a0a019793be24afb28e024ac8fee6ef97a4bf8689517dc58b13",
+      "mode": 420
+    },
+    "plugins/orchestration/skills/oz-upload-file/SKILL.md": {
+      "upstream_sha256": "83007bcc06df76fceef9564a72e91d062293d3318f8344f33f08a3c839ae9b5e",
+      "sha256": "83007bcc06df76fceef9564a72e91d062293d3318f8344f33f08a3c839ae9b5e",
+      "mode": 420
+    },
+    "plugins/orchestration/tests/test-factory-files.sh": {
+      "upstream_sha256": "d20fa0c689189e8ed0ac54444edcee9d48ced83588a5d616a25839e2030f545b",
+      "sha256": "d20fa0c689189e8ed0ac54444edcee9d48ced83588a5d616a25839e2030f545b",
+      "mode": 493
+    },
+    "plugins/warp/.codex-plugin/plugin.json": {
+      "upstream_sha256": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "sha256": "95a31f5cb4756dd5200d0722bfc6263115de5217f4cad7262deaead2cd1aa62e",
+      "mode": 420
+    },
+    "plugins/warp/hooks/hooks.json": {
+      "upstream_sha256": "79b5f2bc55848ba1bc3cb7ddb9a4979249681b9b3719420752a512bb95881cdc",
+      "sha256": "0dd32ef391296e43284e3a45e8c712271f0ccb1e61e27c7fb38b14f1db451d96",
+      "mode": 420
+    },
+    "plugins/warp/scripts/build-payload.sh": {
+      "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
+      "sha256": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "mode": 493
+    },
+    "plugins/warp/scripts/on-permission-request.sh": {
+      "upstream_sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "sha256": "7cb1837e22143632a679ede9d84a0699f2ec56cf35f28ac59f00760793612ec1",
+      "mode": 493
+    },
+    "plugins/warp/scripts/on-post-tool-use.sh": {
+      "upstream_sha256": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "sha256": "02a0d02a1377a405ec88f2a1a109242934807571efefedaee766ee63fb500427",
+      "mode": 493
+    },
+    "plugins/warp/scripts/on-prompt-submit.sh": {
+      "upstream_sha256": "2427b7468c34b30313ad8eb0826cefa50a200c34c5031eb44c9ff1fc1576d8b8",
+      "sha256": "68051813eb32d83faf5e3c33f2e49111e1b469f23afa220648b35a882d9cb082",
+      "mode": 493
+    },
+    "plugins/warp/scripts/on-session-start.sh": {
+      "upstream_sha256": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "sha256": "25cfd3180e0a563c9fcaeb1b4cc627b52c68c1c8af8213b24232a7e376672495",
+      "mode": 493
+    },
+    "plugins/warp/scripts/on-stop.sh": {
+      "upstream_sha256": "a2de778f79114c32bc64e4a8a8697b566c0a1fe22faac5010cfccdefa05406ec",
+      "sha256": "fcdca28230d1db1fdcd92fa7a214a38bcc386b32ca366ce95338b18c0c38a3b8",
+      "mode": 493
+    },
+    "plugins/warp/scripts/should-use-structured.sh": {
+      "upstream_sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "sha256": "05054402d58b61e832a35f9ca85f1e6501658c7f24495335d9d40da021170e39",
+      "mode": 493
+    },
+    "plugins/warp/scripts/warp-notify.sh": {
+      "upstream_sha256": "e163227e156cb8129377c51ecbfd9ff600ce8948f59244bc5eee3c8a83aa3366",
+      "sha256": "536763501a57a3774c12850a1a028304f078f113ced05599e5c0964e54d4ad29",
+      "mode": 493
+    },
+    "tests/test-hooks.sh": {
+      "upstream_sha256": "cfd7b359b09f4008ab989e477d7190631631b892d596f77d73cd67c67ae4c601",
+      "sha256": "cfd7b359b09f4008ab989e477d7190631631b892d596f77d73cd67c67ae4c601",
+      "mode": 493
+    }
+  }
+}

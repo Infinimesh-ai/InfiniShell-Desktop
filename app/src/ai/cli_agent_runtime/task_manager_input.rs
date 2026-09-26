@@ -28,7 +28,7 @@ use crate::appearance::Appearance;
 use crate::editor::{
     AttachedImage, EditorBufferRevision, Event as EditorEvent, ImageContextOptions,
 };
-use crate::terminal::cli_agent::CLIAgent;
+use crate::terminal::cli_agent::{CLIAgent, CLIAgentVersionStatus};
 use crate::terminal::input::skills::{is_user_invocable, selectable_cli_skill};
 use crate::view_components::{Dropdown, DropdownItem};
 
@@ -408,6 +408,24 @@ impl LocalCLITaskManagerView {
     }
 
     fn grok_skill_policy_available(&self, ctx: &AppContext) -> bool {
+        if self.permission.is_grok_fixed_skills() {
+            if self.selected_task.is_none() {
+                return self.verified_installation(Harness::Grok, ctx).is_some_and(|installation| {
+                    matches!(&installation.version, CLIAgentVersionStatus::Detected(version) if version == "1.0.41")
+                });
+            }
+            return self
+                .selected_record(ctx)
+                .and_then(|task| {
+                    serde_json::from_str::<super::SavedLaunchOptions>(&task.config_json).ok()
+                })
+                .is_some_and(|options| {
+                    options.permission_policy.is_grok_fixed_skills()
+                        && options.grok_profile.as_ref().is_some_and(|profile| {
+                            profile.skill_selection_matches(&options.selected_skills)
+                        })
+                });
+        }
         if self.permission != PermissionPolicy::Inherit
             || self.local_tools.allow_spawn
             || self.local_tools.allow_message
@@ -425,6 +443,9 @@ impl LocalCLITaskManagerView {
     }
 
     fn grok_composer_skill_limit(&self, ctx: &AppContext) -> usize {
+        if self.permission.is_grok_fixed_skills() && self.grok_skill_policy_available(ctx) {
+            return 32;
+        }
         if !self.grok_skill_policy_available(ctx) {
             return 1;
         }
@@ -443,7 +464,7 @@ impl LocalCLITaskManagerView {
     }
 
     fn session_skill_was_registered(&self, reference: &SkillReference, ctx: &AppContext) -> bool {
-        if self.permission.is_claude_file_profile()
+        if self.permission.is_claude_file_profile() && !self.permission.is_claude_fixed_skills()
             || (self.harness == Harness::Grok && !self.grok_skill_policy_available(ctx))
         {
             return false;
@@ -458,6 +479,16 @@ impl LocalCLITaskManagerView {
         else {
             return false;
         };
+        if self.permission.is_claude_fixed_skills() || self.permission.is_grok_fixed_skills() {
+            return serde_json::from_value::<super::SavedLaunchOptions>(config)
+                .ok()
+                .is_some_and(|options| {
+                    options.selected_skills.iter().any(|skill| {
+                        *reference
+                            == SkillReference::Path(LocalOrRemotePath::Local(skill.path.clone()))
+                    })
+                });
+        }
         if self.harness == Harness::Claude && config["cli_version"] == "2.1.280" {
             // 只开放原生已验证的热注册版本；实际发送仍等待注册 ACK。
             return self.permission == PermissionPolicy::Inherit;
@@ -499,6 +530,7 @@ impl LocalCLITaskManagerView {
         ctx: &AppContext,
     ) -> Result<Vec<ParsedSkill>, String> {
         if self.permission.is_claude_file_profile()
+            && !self.permission.is_claude_fixed_skills()
             && !self.managed_input.attachments.skills.is_empty()
         {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
@@ -563,7 +595,7 @@ impl LocalCLITaskManagerView {
         if generation != self.input_generation {
             return Err(crate::t!("cli-agent-input-target-changed"));
         }
-        if self.permission.is_claude_file_profile() {
+        if (self.permission.is_claude_file_profile() && !self.permission.is_claude_fixed_skills()) {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if self.harness == Harness::Grok {
@@ -676,7 +708,7 @@ impl LocalCLITaskManagerView {
         let mut body = Flex::column();
         body.add_child(self.row(&["attach-files", "import-review"]));
         body.add_child(self.text(crate::t!("cli-task-manager-skills"), appearance));
-        if self.permission.is_claude_file_profile() {
+        if (self.permission.is_claude_file_profile() && !self.permission.is_claude_fixed_skills()) {
             body.add_child(self.text(
                 crate::t!("cli-task-manager-permission-claude-files-skills"),
                 appearance,
@@ -760,6 +792,12 @@ impl LocalCLITaskManagerView {
     }
 
     pub(super) fn send_input(&mut self, ctx: &mut ViewContext<Self>) -> Result<(), String> {
+        if self
+            .selected_snapshot(ctx)
+            .is_some_and(|snapshot| !snapshot.connected && self.permission.is_reviewed_commands())
+        {
+            return Err(crate::t!("cli-agent-reviewed-command-resume"));
+        }
         let snapshot = self
             .selected_snapshot(ctx)
             .filter(|snapshot| snapshot.ready && snapshot.connected)

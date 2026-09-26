@@ -27,6 +27,42 @@ use crate::remote_server::diff_state_tracker::DiffModelKey;
 fn test_model(app: &mut App) -> ServerModel {
     ServerModel {
         connection_senders: HashMap::new(),
+        #[cfg(all(unix, feature = "local_fs"))]
+        image_staging: None,
+        #[cfg(all(unix, feature = "local_fs"))]
+        image_staging_connections: HashMap::new(),
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        grok_owned: None,
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        codex_owned: None,
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        grok_owned_connections: HashMap::new(),
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        codex_owned_connections: HashMap::new(),
         snapshot_sent_roots_by_connection: HashMap::new(),
         grace_timer_cancel: None,
         in_progress: HashMap::new(),

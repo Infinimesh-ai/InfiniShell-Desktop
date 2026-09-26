@@ -6,6 +6,7 @@ fn manifest(directory: &Path) -> LaunchManifest {
         version: 1,
         launch_id: Uuid::from_u128(1),
         session_id: Uuid::from_u128(2),
+        history: None,
         executable: PathBuf::from("/private/tmp/grok"),
         app_executable: PathBuf::from("/private/tmp/InfiniShell.app/Contents/MacOS/infinishell"),
         cwd: PathBuf::from("/private/tmp/中文 项目"),
@@ -602,4 +603,65 @@ fn leader_lock_alias_and_extra_bytes_are_preserved() {
     assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
     assert_eq!(fs::read(other).unwrap(), b"2147483647");
     assert!(lock.exists());
+}
+
+#[test]
+fn lifecycle_capture_never_turns_a_restored_launch_into_input_authority() {
+    let (_directory, root, manifest, checksum) = persisted_launch();
+    let (receipt, bound) = process_receipts(&manifest, &checksum);
+    write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+    write_new(
+        &root.join("exec.json"),
+        &serde_json::to_vec(&receipt).unwrap(),
+    )
+    .unwrap();
+    let mut restored = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+    restored.record_owned_processes(&bound, &receipt).unwrap();
+    restored.refresh_bound_processes().unwrap();
+    assert!(restored.processes.is_some());
+    // 已记录生命周期也不能借未知或非原生权限取得可发送输入的 binding。
+    let observation = GrokPermissionObservation {
+        session_id: manifest.session_id.to_string(),
+        cwd: manifest.cwd.to_string_lossy().into_owned(),
+        mode: "unknown".into(),
+        session_start_event_id: String::new(),
+    };
+    assert!(matches!(
+        restored.bind(Uuid::new_v4(), Uuid::new_v4(), &observation),
+        Err(GrokLeaderInputError::InvalidTarget)
+    ));
+    assert!(restored.take_launch_argv().is_err());
+}
+
+#[test]
+fn concurrent_same_owned_identity_is_idempotent_but_another_leader_is_rejected() {
+    let (_directory, root, manifest, checksum) = persisted_launch();
+    let (receipt, bound) = process_receipts(&manifest, &checksum);
+    write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+    write_new(
+        &root.join("exec.json"),
+        &serde_json::to_vec(&receipt).unwrap(),
+    )
+    .unwrap();
+    let launch = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+    launch.record_owned_processes(&bound, &receipt).unwrap();
+    launch.record_owned_processes(&bound, &receipt).unwrap();
+    let original = fs::read(root.join("bound.json")).unwrap();
+    let mut different = bound;
+    different.leader.unique_id += 1;
+    assert!(launch.record_owned_processes(&different, &receipt).is_err());
+    assert_eq!(fs::read(root.join("bound.json")).unwrap(), original);
+}
+
+#[test]
+fn no_permission_event_and_no_process_receipt_cannot_create_a_cleanup_target() {
+    let (_directory, root, _manifest, checksum) = persisted_launch();
+    write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+    let mut launch = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+    // 旧系统启动清单不能在当前 boot 上捕获同号 PID，也不能留下新的进程记录。
+    assert!(launch.capture_owned_processes().is_err());
+    launch.stop_leader_after_tui_exit().unwrap();
+    assert!(launch.processes.is_none());
+    assert!(!root.join("bound.json").exists());
+    assert!(!root.join("retired.json").exists());
 }

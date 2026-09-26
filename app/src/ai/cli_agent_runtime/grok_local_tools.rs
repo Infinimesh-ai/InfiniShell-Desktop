@@ -12,7 +12,7 @@ use super::super::grok_tool_lease::{GrokToolLeaseLedger, VerifiedGrokToolLease};
 use super::{
     INSPECT_TOOL_NAME, LocalToolPermissions, LocalToolReplyTarget, MAX_ARGUMENT_BYTES,
     MCP_SERVER_NAME, NativeLocalToolRequest, SEND_MESSAGE, arguments, identifier, request_id,
-    tool_definitions, tool_reply,
+ tool_reply,
 };
 
 const SDK_CALL: &str = "x.ai/mcp/sdk_call";
@@ -59,6 +59,7 @@ pub(crate) struct GrokMcpBridge {
     server_id: String,
     allow_message: bool,
     allow_spawn: bool,
+    allow_project_commands: bool,
     outer_requests: HashMap<String, OuterRequest>,
     inner_requests: HashMap<String, InnerRequest>,
     retained_reply_bytes: usize,
@@ -72,6 +73,7 @@ impl GrokMcpBridge {
             server_id: format!("infinishell-{process_epoch}"),
             allow_message: permissions.allow_message,
             allow_spawn: false,
+            allow_project_commands: false,
             outer_requests: HashMap::new(),
             inner_requests: HashMap::new(),
             retained_reply_bytes: 0,
@@ -87,6 +89,7 @@ impl GrokMcpBridge {
         let permissions = profile.local_tools().ok_or("固定策略没有本地工具")?;
         let mut bridge = Self::new(process_epoch, permissions);
         bridge.allow_spawn = permissions.allow_spawn;
+        bridge.allow_project_commands = permissions.allow_project_commands;
         Ok(bridge)
     }
 
@@ -336,7 +339,7 @@ impl GrokMcpBridge {
                     GrokMcpRequest::Immediate(envelope(
                         outer_id.clone(),
                         json!({"jsonrpc":"2.0","id":inner_id,"result":{
-                            "tools":tool_definitions(self.allow_spawn, self.allow_message)
+                            "tools":LocalToolPermissions { allow_spawn:self.allow_spawn, allow_message:self.allow_message, allow_project_commands:self.allow_project_commands }.definitions()
                         }}),
                     ))
                 }
@@ -366,6 +369,7 @@ impl GrokMcpBridge {
                     } else if tool != INSPECT_TOOL_NAME
                         && !(tool == "run_agents" && self.allow_spawn)
                         && !(tool == SEND_MESSAGE.name && self.allow_message)
+                        && !(tool == super::super::reviewed_project_commands_windows::TOOL_NAME && self.allow_project_commands)
                     {
                         Some("本地工具不存在或当前连接权限不允许调用")
                     } else {

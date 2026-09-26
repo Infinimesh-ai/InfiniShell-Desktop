@@ -760,8 +760,16 @@ impl CodexProtocol {
                 match self.options.permission_policy {
                     PermissionPolicy::ClaudeRestrictedFilesV1
                     | PermissionPolicy::ClaudeRestrictedFilesV2
+                    | PermissionPolicy::ClaudeRestrictedFilesV3
+                    | PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
                     | PermissionPolicy::GrokRestrictedReadV1
-                    | PermissionPolicy::GrokRestrictedFilesV1 => {
+                    | PermissionPolicy::GrokRestrictedFilesV1
+                    | PermissionPolicy::GrokRestrictedFilesV2
+                    | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1 => {
                         return Err(RuntimeError::InvalidConfiguration(
                             "Claude fixed file policy cannot be applied to Codex".into(),
                         ));
@@ -827,8 +835,16 @@ impl CodexProtocol {
                 let expected_sandbox = match self.options.permission_policy {
                     PermissionPolicy::ClaudeRestrictedFilesV1
                     | PermissionPolicy::ClaudeRestrictedFilesV2
+                    | PermissionPolicy::ClaudeRestrictedFilesV3
+                    | PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
                     | PermissionPolicy::GrokRestrictedReadV1
-                    | PermissionPolicy::GrokRestrictedFilesV1 => {
+                    | PermissionPolicy::GrokRestrictedFilesV1
+                    | PermissionPolicy::GrokRestrictedFilesV2
+                    | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1 => {
                         return Err(RuntimeError::InvalidConfiguration(
                             "Claude fixed file policy cannot be applied to Codex".into(),
                         ));

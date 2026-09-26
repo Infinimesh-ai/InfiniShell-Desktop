@@ -69,6 +69,9 @@ pub(crate) fn init(app: &mut AppContext) {
 }
 
 pub(crate) enum LocalCLITaskManagerEvent {
+    ContinueOwnedGrok {
+        task: LocalCliTask,
+    },
     Close,
     ImportReview {
         draft_key: String,
@@ -381,8 +384,16 @@ impl LocalCLITaskManagerView {
             PermissionPolicy::WorkspaceWrite,
             PermissionPolicy::ClaudeRestrictedFilesV1,
             PermissionPolicy::ClaudeRestrictedFilesV2,
+            PermissionPolicy::ClaudeRestrictedFilesV3,
+            PermissionPolicy::ClaudeRestrictedSkillsV1,
+            PermissionPolicy::ClaudeReviewedCommandsV1,
+            PermissionPolicy::ClaudeReviewedCommandsSkillsV1,
             PermissionPolicy::GrokRestrictedReadV1,
             PermissionPolicy::GrokRestrictedFilesV1,
+            PermissionPolicy::GrokRestrictedFilesV2,
+            PermissionPolicy::GrokRestrictedSkillsV1,
+            PermissionPolicy::GrokReviewedCommandsV1,
+            PermissionPolicy::GrokReviewedCommandsSkillsV1,
         ]
         .into_iter()
         .map(|permission| {
@@ -791,7 +802,7 @@ impl LocalCLITaskManagerView {
             if !cwd.is_absolute() || !cwd.is_dir() {
                 return Err(crate::t!("cli-task-manager-invalid-directory"));
             }
-            let saved = SavedLaunchOptions {
+            let mut saved = SavedLaunchOptions {
                 permission_policy: self.permission,
                 permission_ceiling: None,
                 claude_profile: None,
@@ -818,6 +829,10 @@ impl LocalCLITaskManagerView {
                     )
                 },
             };
+            if self.permission.is_reviewed_commands() {
+                let permissions = saved.local_tools.get_or_insert_with(Default::default);
+                permissions.allow_project_commands = true;
+            }
             let task = LocalCliTask {
                 version: 1,
                 task_id: Uuid::new_v4().to_string(),
@@ -1287,10 +1302,11 @@ impl LocalCLITaskManagerView {
                 !enabled
                     || snapshot.as_ref().is_some_and(|snapshot| snapshot.connected)
                     || self.selected_record(ctx).is_none_or(|task| {
-                        task.native_session_id.is_none()
-                            || task.state.is_active()
-                            || task.state == LocalCliTaskState::Unknown
-                            || verify_recovery_identity(&task).is_err()
+                        !is_owned_grok_history(&task)
+                            && (task.native_session_id.is_none()
+                                || task.state.is_active()
+                                || task.state == LocalCliTaskState::Unknown
+                                || verify_recovery_identity(&task).is_err())
                     }),
             ),
             ("cancel", !connected || !running),
@@ -1301,6 +1317,23 @@ impl LocalCLITaskManagerView {
         ] {
             self.buttons[key].update(ctx, |button, ctx| button.set_disabled(disabled, ctx));
         }
+        let owned_history = self
+            .selected_record(ctx)
+            .is_some_and(|task| is_owned_grok_history(&task));
+        self.buttons["resume"].update(ctx, |button, ctx| {
+            button.set_label(
+                if owned_history {
+                    crate::t!("cli-agent-grok-history-continue")
+                } else {
+                    crate::t!("cli-task-manager-resume")
+                },
+                ctx,
+            );
+            button.set_tooltip(
+                owned_history.then(|| crate::t!("cli-agent-grok-history-help")),
+                ctx,
+            );
+        });
         if let Some(snapshot) = &snapshot {
             for (key, action) in [
                 (
@@ -1346,6 +1379,10 @@ impl LocalCLITaskManagerView {
                             self.permission,
                             PermissionPolicy::GrokRestrictedReadV1
                                 | PermissionPolicy::GrokRestrictedFilesV1
+                                | PermissionPolicy::GrokRestrictedFilesV2
+                                | PermissionPolicy::GrokRestrictedSkillsV1
+                                | PermissionPolicy::GrokReviewedCommandsV1
+                                | PermissionPolicy::GrokReviewedCommandsSkillsV1
                         )),
             ),
             (
@@ -1724,6 +1761,12 @@ impl View for LocalCLITaskManagerView {
         let snapshot = self.selected_snapshot(ctx);
         if let Some(snapshot) = &snapshot {
             for approval in &snapshot.approvals {
+                if approval.details.get("appCommandContext").is_some() {
+                    body.add_child(self.text(
+                        crate::t!("cli-task-manager-reviewed-command-approval"),
+                        appearance,
+                    ));
+                }
                 body.add_child(self.text(
                     crate::t!(
                         "cli-task-manager-approval",
@@ -1950,6 +1993,10 @@ impl TypedActionView for LocalCLITaskManagerView {
                             self.permission,
                             PermissionPolicy::GrokRestrictedReadV1
                                 | PermissionPolicy::GrokRestrictedFilesV1
+                                | PermissionPolicy::GrokRestrictedFilesV2
+                                | PermissionPolicy::GrokRestrictedSkillsV1
+                                | PermissionPolicy::GrokReviewedCommandsV1
+                                | PermissionPolicy::GrokReviewedCommandsSkillsV1
                         ))
                 {
                     self.local_tools.allow_spawn = !self.local_tools.allow_spawn;
@@ -2013,7 +2060,14 @@ impl TypedActionView for LocalCLITaskManagerView {
                 Ok(())
             }
             TaskManagerAction::Start => self.start(false, ctx),
-            TaskManagerAction::Resume => self.start(true, ctx),
+            TaskManagerAction::Resume => {
+                if let Some(task) = self.selected_record(ctx).filter(is_owned_grok_history) {
+                    ctx.emit(LocalCLITaskManagerEvent::ContinueOwnedGrok { task });
+                    Ok(())
+                } else {
+                    self.start(true, ctx)
+                }
+            }
             TaskManagerAction::Send => self.send_input(ctx),
             TaskManagerAction::Control {
                 task_id,
@@ -2282,10 +2336,18 @@ fn supported_local_tools(
     permissions: Option<LocalToolPermissions>,
 ) -> Option<LocalToolPermissions> {
     permissions.map(|mut permissions| {
+        if !policy.is_reviewed_commands() {
+            permissions.allow_project_commands = false;
+        }
         if harness == Harness::Grok
             && !matches!(
                 policy,
-                PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+                PermissionPolicy::GrokRestrictedReadV1
+                    | PermissionPolicy::GrokRestrictedFilesV1
+                    | PermissionPolicy::GrokRestrictedFilesV2
+                    | PermissionPolicy::GrokRestrictedSkillsV1
+                    | PermissionPolicy::GrokReviewedCommandsV1
+                    | PermissionPolicy::GrokReviewedCommandsSkillsV1
             )
         {
             permissions.allow_spawn = false;
@@ -2425,6 +2487,18 @@ fn harness_name(harness: Harness) -> String {
 
 fn permission_name(permission: PermissionPolicy) -> String {
     match permission {
+        PermissionPolicy::ClaudeReviewedCommandsSkillsV1 => {
+            crate::t!("cli-task-manager-permission-claude-commands-skills-v1")
+        }
+        PermissionPolicy::ClaudeReviewedCommandsV1 => {
+            crate::t!("cli-task-manager-permission-claude-commands-v1")
+        }
+        PermissionPolicy::GrokReviewedCommandsSkillsV1 => {
+            crate::t!("cli-task-manager-permission-grok-commands-skills-v1")
+        }
+        PermissionPolicy::GrokReviewedCommandsV1 => {
+            crate::t!("cli-task-manager-permission-grok-commands-v1")
+        }
         PermissionPolicy::Inherit => crate::t!("cli-task-manager-permission-inherit"),
         PermissionPolicy::ReadOnly => crate::t!("cli-task-manager-permission-readonly"),
         PermissionPolicy::WorkspaceWrite => crate::t!("cli-task-manager-permission-workspace"),
@@ -2434,11 +2508,23 @@ fn permission_name(permission: PermissionPolicy) -> String {
         PermissionPolicy::ClaudeRestrictedFilesV2 => {
             crate::t!("cli-task-manager-permission-claude-files-v2")
         }
+        PermissionPolicy::ClaudeRestrictedFilesV3 => {
+            crate::t!("cli-task-manager-permission-claude-files-v3")
+        }
+        PermissionPolicy::ClaudeRestrictedSkillsV1 => {
+            crate::t!("cli-task-manager-permission-claude-skills-v1")
+        }
         PermissionPolicy::GrokRestrictedReadV1 => {
             crate::t!("cli-task-manager-permission-grok-read")
         }
         PermissionPolicy::GrokRestrictedFilesV1 => {
             crate::t!("cli-task-manager-permission-grok-files")
+        }
+        PermissionPolicy::GrokRestrictedFilesV2 => {
+            crate::t!("cli-task-manager-permission-grok-files-v2")
+        }
+        PermissionPolicy::GrokRestrictedSkillsV1 => {
+            crate::t!("cli-task-manager-permission-grok-skills-v1")
         }
     }
 }
@@ -2459,6 +2545,15 @@ fn permission_name_for_version(
 
 fn permission_help(permission: PermissionPolicy) -> Option<String> {
     match permission {
+        PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+        | PermissionPolicy::GrokReviewedCommandsSkillsV1 => Some(crate::t!(
+            "cli-task-manager-permission-reviewed-commands-skills-help"
+        )),
+        PermissionPolicy::ClaudeReviewedCommandsV1 | PermissionPolicy::GrokReviewedCommandsV1 => {
+            Some(crate::t!(
+                "cli-task-manager-permission-reviewed-commands-help"
+            ))
+        }
         PermissionPolicy::Inherit => Some(crate::t!("cli-task-manager-permission-inherit-help")),
         PermissionPolicy::ClaudeRestrictedFilesV1 => {
             Some(crate::t!("cli-task-manager-permission-claude-files-help"))
@@ -2466,11 +2561,23 @@ fn permission_help(permission: PermissionPolicy) -> Option<String> {
         PermissionPolicy::ClaudeRestrictedFilesV2 => Some(crate::t!(
             "cli-task-manager-permission-claude-files-v2-help"
         )),
+        PermissionPolicy::ClaudeRestrictedFilesV3 => Some(crate::t!(
+            "cli-task-manager-permission-claude-files-v3-help"
+        )),
+        PermissionPolicy::ClaudeRestrictedSkillsV1 => Some(crate::t!(
+            "cli-task-manager-permission-claude-skills-v1-help"
+        )),
         PermissionPolicy::GrokRestrictedReadV1 => {
             Some(crate::t!("cli-task-manager-permission-grok-read-help"))
         }
         PermissionPolicy::GrokRestrictedFilesV1 => {
             Some(crate::t!("cli-task-manager-permission-grok-files-help"))
+        }
+        PermissionPolicy::GrokRestrictedFilesV2 => {
+            Some(crate::t!("cli-task-manager-permission-grok-files-v2-help"))
+        }
+        PermissionPolicy::GrokRestrictedSkillsV1 => {
+            Some(crate::t!("cli-task-manager-permission-grok-skills-v1-help"))
         }
         PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => None,
     }
@@ -2494,12 +2601,18 @@ fn permission_supported(harness: Harness, permission: PermissionPolicy) -> bool 
     match permission {
         PermissionPolicy::Inherit => true,
         PermissionPolicy::ReadOnly | PermissionPolicy::WorkspaceWrite => harness == Harness::Codex,
-        PermissionPolicy::ClaudeRestrictedFilesV1 | PermissionPolicy::ClaudeRestrictedFilesV2 => {
-            harness == Harness::Claude
-        }
-        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1 => {
-            harness == Harness::Grok
-        }
+        PermissionPolicy::ClaudeRestrictedFilesV1
+        | PermissionPolicy::ClaudeRestrictedFilesV2
+        | PermissionPolicy::ClaudeRestrictedFilesV3
+        | PermissionPolicy::ClaudeRestrictedSkillsV1
+        | PermissionPolicy::ClaudeReviewedCommandsV1
+        | PermissionPolicy::ClaudeReviewedCommandsSkillsV1 => harness == Harness::Claude,
+        PermissionPolicy::GrokRestrictedReadV1
+        | PermissionPolicy::GrokRestrictedFilesV1
+        | PermissionPolicy::GrokRestrictedFilesV2
+        | PermissionPolicy::GrokRestrictedSkillsV1
+        | PermissionPolicy::GrokReviewedCommandsV1
+        | PermissionPolicy::GrokReviewedCommandsSkillsV1 => harness == Harness::Grok,
     }
 }
 
@@ -2508,11 +2621,36 @@ fn permission_supported_for_version(
     permission: PermissionPolicy,
     version: Option<&CLIAgentVersionStatus>,
 ) -> bool {
+    if permission.is_reviewed_commands()
+        && !cfg!(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        ))
+    {
+        return false;
+    }
     if !permission_supported(harness, permission) {
         return false;
     }
-    if permission == PermissionPolicy::ClaudeRestrictedFilesV2 {
+    if matches!(
+        permission,
+        PermissionPolicy::ClaudeRestrictedFilesV2
+            | PermissionPolicy::ClaudeRestrictedFilesV3
+            | PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+    ) {
         return matches!(version, Some(CLIAgentVersionStatus::Detected(version)) if version == "2.1.280");
+    }
+    if matches!(
+        permission,
+        PermissionPolicy::GrokRestrictedFilesV2
+            | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1
+    ) {
+        return matches!(version, Some(CLIAgentVersionStatus::Detected(version)) if version == "1.0.41");
     }
     if version.is_some_and(|version| grok_root_only_mode(harness, permission, version)) {
         return permission == PermissionPolicy::Inherit;
@@ -2537,3 +2675,17 @@ fn task_state_name(state: LocalCliTaskState) -> String {
 #[cfg(test)]
 #[path = "task_manager_view_tests.rs"]
 mod tests;
+
+fn is_owned_grok_history(task: &LocalCliTask) -> bool {
+    cfg!(all(
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    )) && task.harness == "grok"
+        && task.native_session_id.is_some()
+        && serde_json::from_str::<serde_json::Value>(&task.config_json)
+            .is_ok_and(|config| config["execution_kind"] == "grok_owned_terminal")
+}

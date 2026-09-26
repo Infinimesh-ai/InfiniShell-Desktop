@@ -16174,6 +16174,7 @@ dependencies = [
  "block",
  "blocking",
  "bounded-vec-deque",
+ "brotli",
  "build_cache",
  "byte-unit",
  "bytecount",
@@ -16444,6 +16445,7 @@ dependencies = [
  "x11rb",
  "zbus 5.9.0",
  "zeroize",
+ "zip 2.4.2",
 ]
 
 [[package]]

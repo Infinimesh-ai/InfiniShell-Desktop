@@ -53,6 +53,7 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use settings::{Setting as _, ToggleableSetting};
 use string_offset::{ByteOffset, CharOffset};
+use uuid::Uuid;
 use vec1::Vec1;
 use vim::vim::{VimHandler, VimMode};
 use warp_cli::agent::Harness;
@@ -1123,6 +1124,10 @@ pub enum InputState {
 
 #[derive(Clone, Debug)]
 pub enum InputAction {
+    /// 等待打开编辑器的模型事件完成后，再选择当前代次的附件。
+    SelectCLIAttachment {
+        generation: Uuid,
+    },
     FocusInputBox,
     CtrlR,
     CtrlD,
@@ -2590,7 +2595,8 @@ impl Input {
                 // These events are handled by UseAgentToolbar's subscription.
                 // The UseAgentToolbar shares this same AgentInputFooter instance,
                 // so its subscriber always fires alongside ours for every chip click.
-                AgentInputFooterEvent::InsertIntoCLI { .. }
+                AgentInputFooterEvent::SelectCLIFile { .. }
+                | AgentInputFooterEvent::InsertIntoCLI { .. }
                 | AgentInputFooterEvent::ToggleCodeReviewPane(_)
                 | AgentInputFooterEvent::ToggleFileExplorer(_) => {}
                 AgentInputFooterEvent::ToggledChipMenu { open } => {
@@ -6328,6 +6334,15 @@ impl Input {
         }
     }
 
+    pub(super) fn select_cli_attachment_after_open(
+        &mut self,
+        generation: Uuid,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        // 模型事件先恢复草稿及编辑器附件合同，再派发文件选择；不依赖定时延迟。
+        ctx.dispatch_typed_action_deferred(InputAction::SelectCLIAttachment { generation });
+    }
+
     fn select_image(&mut self, ctx: &mut ViewContext<Self>) {
         self.focus_input_box(ctx);
         // CLI 富输入的附件属于当前 CLI 草稿，不为文件选择切换用户锁定的输入模式。
@@ -6921,6 +6936,44 @@ impl Input {
         } else {
             CanExecuteCommand::Yes
         }
+    }
+
+    /// 已落盘的 owned 启动只领取一次；失败时也不能由后续 shell 事件重派。
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    pub(crate) fn execute_owned_cli_command_once(
+        &mut self,
+        command: &str,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !self.has_pending_command {
+            return false;
+        }
+        self.has_pending_command = false;
+        if self.can_execute_command(ctx).is_no() {
+            return false;
+        }
+        self.try_execute_command(command, ctx)
+    }
+
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    pub(crate) fn cancel_owned_cli_pending_command(&mut self) {
+        self.has_pending_command = false;
     }
 
     pub fn execute_pending_command(&mut self, ctx: &mut ViewContext<Self>) {
@@ -11331,6 +11384,18 @@ impl Input {
         in_agent_mode || is_buffer_empty || in_active_agent_view
     }
 
+    /// 普通 Grok 的显式图片粘贴先进入已打开的 CLI 编辑器，提交仍由用户触发。
+    pub(crate) fn attach_cli_clipboard_images(
+        &mut self,
+        content: ClipboardContent,
+        ctx: &mut ViewContext<Self>,
+    ) -> usize {
+        if !CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id) {
+            return 0;
+        }
+        self.handle_pasted_image_data(content, ctx)
+    }
+
     /// Handle direct image data from clipboard (e.g., copied images). Returns number of images attached.
     fn handle_pasted_image_data(
         &mut self,
@@ -15607,6 +15672,14 @@ impl TypedActionView for Input {
 
     fn handle_action(&mut self, action: &InputAction, ctx: &mut ViewContext<Self>) {
         match action {
+            InputAction::SelectCLIAttachment { generation } => {
+                let sessions = CLIAgentSessionsModel::as_ref(ctx);
+                if sessions.input_generation(self.terminal_view_id) == Some(*generation)
+                    && sessions.is_input_open(self.terminal_view_id)
+                {
+                    self.select_image(ctx);
+                }
+            }
             InputAction::FocusInputBox => self.focus_input_box(ctx),
             InputAction::Up => self.editor_up(ctx),
             InputAction::PageUp => self.editor_page_up(ctx),

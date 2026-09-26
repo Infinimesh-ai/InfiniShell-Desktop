@@ -16,6 +16,7 @@ pub(crate) mod codex;
 pub(crate) mod conversation_bridge;
 #[cfg(feature = "local_fs")]
 pub(crate) mod coordinator;
+mod file_search_scope;
 pub(crate) mod grok;
 mod grok_profile;
 pub(crate) mod grok_tool_lease;
@@ -25,6 +26,11 @@ pub(crate) mod managed_input;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) mod managed_process;
 pub(crate) mod permissions;
+mod reviewed_project_commands;
+mod reviewed_project_commands_host;
+mod reviewed_project_commands_lifecycle;
+mod reviewed_project_commands_unix;
+mod reviewed_project_commands_windows;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub(crate) mod runtime_host;
 #[cfg(feature = "local_fs")]
@@ -54,17 +60,62 @@ pub enum PermissionPolicy {
     ClaudeRestrictedFilesV1,
     /// 固定 2.1.280 的文件审批策略，额外允许经审批创建文件。
     ClaudeRestrictedFilesV2,
+    /// 固定 2.1.280 的文件与搜索工具，搜索范围和每次授权由宿主核对。
+    ClaudeRestrictedFilesV3,
+    /// 固定文件工具与创建时选定的原生技能，逐次 Skill 审批。
+    ClaudeRestrictedSkillsV1,
+    /// 当前账号下的固定项目命令，逐条审批并等待监督代清理。
+    ClaudeReviewedCommandsV1,
+    /// 固定原生技能与受审命令的显式组合，两组父上限分别核验。
+    ClaudeReviewedCommandsSkillsV1,
     /// 固定 Grok 只读工具与应用 SDK 子集，逐次审批；不等价于操作系统沙箱。
     GrokRestrictedReadV1,
     /// 应用固定 Grok 文件工具及逐次审批，不声明原生文件系统沙箱。
     GrokRestrictedFilesV1,
+    /// 固定 1.0.41 的文件、目录和内容搜索工具，保留逐次审批。
+    GrokRestrictedFilesV2,
+    /// 固定 1.0.41 文件工具和创建时选定的原生技能，逐次审批。
+    GrokRestrictedSkillsV1,
+    /// 当前账号下的固定项目命令，逐条审批并等待监督代清理。
+    GrokReviewedCommandsV1,
+    /// 固定原生技能与受审命令的显式组合，两组父上限分别核验。
+    GrokReviewedCommandsSkillsV1,
 }
 
 impl PermissionPolicy {
+    pub(crate) fn is_claude_fixed_skills(self) -> bool {
+        matches!(
+            self,
+            Self::ClaudeRestrictedSkillsV1 | Self::ClaudeReviewedCommandsSkillsV1
+        )
+    }
+
+    pub(crate) fn is_grok_fixed_skills(self) -> bool {
+        matches!(
+            self,
+            Self::GrokRestrictedSkillsV1 | Self::GrokReviewedCommandsSkillsV1
+        )
+    }
+
+    pub(crate) fn is_reviewed_commands(self) -> bool {
+        matches!(
+            self,
+            Self::ClaudeReviewedCommandsV1
+                | Self::ClaudeReviewedCommandsSkillsV1
+                | Self::GrokReviewedCommandsV1
+                | Self::GrokReviewedCommandsSkillsV1
+        )
+    }
+
     pub(crate) fn is_claude_file_profile(self) -> bool {
         matches!(
             self,
-            Self::ClaudeRestrictedFilesV1 | Self::ClaudeRestrictedFilesV2
+            Self::ClaudeRestrictedFilesV1
+                | Self::ClaudeRestrictedFilesV2
+                | Self::ClaudeRestrictedFilesV3
+                | Self::ClaudeRestrictedSkillsV1
+                | Self::ClaudeReviewedCommandsV1
+                | Self::ClaudeReviewedCommandsSkillsV1
         )
     }
 }

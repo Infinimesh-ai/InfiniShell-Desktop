@@ -8,6 +8,14 @@ use sha2::{Digest as _, Sha256};
 
 use super::{BLOCKED_TOOLS, ClaudeRestrictedFilesV1, RuntimeError, reject};
 use crate::ai::cli_agent_runtime::PermissionPolicy;
+use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
+
+#[path = "claude_profile_search.rs"]
+mod search;
+pub use search::{
+    ClaudeRestrictedFilesV3, ClaudeRestrictedSkillsV1, ClaudeReviewedCommandsSkillsV1,
+    ClaudeReviewedCommandsV1,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
@@ -22,6 +30,10 @@ pub struct ClaudeRestrictedFilesV2 {
 pub enum ClaudeFileProfile {
     V1(ClaudeRestrictedFilesV1),
     V2(ClaudeRestrictedFilesV2),
+    V3(ClaudeRestrictedFilesV3),
+    SkillsV1(ClaudeRestrictedSkillsV1),
+    CommandsV1(ClaudeReviewedCommandsV1),
+    CommandsSkillsV1(ClaudeReviewedCommandsSkillsV1),
 }
 
 impl From<ClaudeRestrictedFilesV1> for ClaudeFileProfile {
@@ -202,11 +214,27 @@ impl ClaudeFileProfile {
             PermissionPolicy::ClaudeRestrictedFilesV2 => {
                 ClaudeRestrictedFilesV2::compile(base).map(Self::V2)
             }
+            PermissionPolicy::ClaudeRestrictedFilesV3 => {
+                ClaudeRestrictedFilesV3::compile(base).map(Self::V3)
+            }
+            PermissionPolicy::ClaudeReviewedCommandsV1 => {
+                ClaudeReviewedCommandsV1::compile(base).map(Self::CommandsV1)
+            }
+            PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1 => {
+                Err(reject("claude_skills_selection_required"))
+            }
             PermissionPolicy::Inherit
             | PermissionPolicy::ReadOnly
             | PermissionPolicy::WorkspaceWrite
             | PermissionPolicy::GrokRestrictedReadV1
-            | PermissionPolicy::GrokRestrictedFilesV1 => Err(reject("claude_profile_wrong_policy")),
+            | PermissionPolicy::GrokRestrictedFilesV1
+            | PermissionPolicy::GrokRestrictedFilesV2
+            | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1 => {
+                Err(reject("claude_profile_wrong_policy"))
+            }
         }
     }
 
@@ -214,6 +242,10 @@ impl ClaudeFileProfile {
         match self {
             Self::V1(_) => PermissionPolicy::ClaudeRestrictedFilesV1,
             Self::V2(_) => PermissionPolicy::ClaudeRestrictedFilesV2,
+            Self::V3(_) => PermissionPolicy::ClaudeRestrictedFilesV3,
+            Self::SkillsV1(_) => PermissionPolicy::ClaudeRestrictedSkillsV1,
+            Self::CommandsV1(_) => PermissionPolicy::ClaudeReviewedCommandsV1,
+            Self::CommandsSkillsV1(_) => PermissionPolicy::ClaudeReviewedCommandsSkillsV1,
         }
     }
 
@@ -221,6 +253,10 @@ impl ClaudeFileProfile {
         match self {
             Self::V1(_) => "claudeRestrictedFilesV1",
             Self::V2(_) => "claudeRestrictedFilesV2",
+            Self::V3(_) => "claudeRestrictedFilesV3",
+            Self::SkillsV1(_) => "claudeRestrictedSkillsV1",
+            Self::CommandsV1(_) => "claudeReviewedCommandsV1",
+            Self::CommandsSkillsV1(_) => "claudeReviewedCommandsSkillsV1",
         }
     }
 
@@ -228,6 +264,10 @@ impl ClaudeFileProfile {
         match self {
             Self::V1(profile) => profile.validate(cwd),
             Self::V2(profile) => profile.validate(cwd),
+            Self::V3(profile) => profile.validate(cwd),
+            Self::SkillsV1(profile) => profile.validate(cwd),
+            Self::CommandsV1(profile) => profile.validate(cwd),
+            Self::CommandsSkillsV1(profile) => profile.validate(cwd),
         }
     }
 
@@ -246,6 +286,10 @@ impl ClaudeFileProfile {
                 &profile.blocked_tools(),
                 profile.settings(),
             ),
+            Self::V3(profile) => profile.arguments(),
+            Self::SkillsV1(profile) => profile.arguments(),
+            Self::CommandsV1(profile) => profile.arguments(),
+            Self::CommandsSkillsV1(profile) => profile.arguments(),
         }
     }
 
@@ -266,6 +310,10 @@ impl ClaudeFileProfile {
                 &profile.settings(),
                 &profile.blocked_tools(),
             ),
+            Self::V3(profile) => profile.verify_live(settings, rules, hooks, mcp),
+            Self::SkillsV1(profile) => profile.verify_live(settings, rules, hooks, mcp),
+            Self::CommandsV1(profile) => profile.verify_live(settings, rules, hooks, mcp),
+            Self::CommandsSkillsV1(profile) => profile.verify_live(settings, rules, hooks, mcp),
         }
     }
 
@@ -273,6 +321,10 @@ impl ClaudeFileProfile {
         match self {
             Self::V1(profile) => profile.approval_allowed(tool, input),
             Self::V2(profile) => profile.approval_allowed(tool, input),
+            Self::V3(profile) => profile.approval_allowed(tool, input),
+            Self::SkillsV1(profile) => profile.approval_allowed(tool, input),
+            Self::CommandsV1(profile) => profile.approval_allowed(tool, input),
+            Self::CommandsSkillsV1(profile) => profile.approval_allowed(tool, input),
         }
     }
 
@@ -282,6 +334,63 @@ impl ClaudeFileProfile {
             Self::V2(profile) => profile
                 .base
                 .verify_system_init_for(message, &["Read", "Edit", "Write", "EndConversation"]),
+            Self::V3(profile) => profile.verify_system_init(message),
+            Self::SkillsV1(profile) => profile.verify_system_init(message),
+            Self::CommandsV1(profile) => profile.verify_system_init(message),
+            Self::CommandsSkillsV1(profile) => profile.verify_system_init(message),
+        }
+    }
+
+    pub(crate) fn host_commands(
+        &self,
+    ) -> Option<&crate::ai::cli_agent_runtime::reviewed_project_commands::ReviewedCommandCeilingV1>
+    {
+        match self {
+            Self::CommandsV1(profile) => profile.host_commands(),
+            Self::CommandsSkillsV1(profile) => profile.host_commands(),
+            Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::SkillsV1(_) => None,
+        }
+    }
+
+    pub(crate) fn skills_profile(&self) -> Option<&ClaudeRestrictedSkillsV1> {
+        match self {
+            Self::SkillsV1(profile) => Some(profile),
+            Self::CommandsSkillsV1(profile) => Some(profile.skills_profile()),
+            Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::CommandsV1(_) => None,
+        }
+    }
+
+    pub(crate) fn derive_child(
+        &self,
+        selected: &[SelectedLocalSkill],
+    ) -> Result<Self, RuntimeError> {
+        match self {
+            Self::SkillsV1(profile) => profile.derive_child(selected).map(Self::SkillsV1),
+            Self::CommandsSkillsV1(profile) => {
+                profile.derive_child(selected).map(Self::CommandsSkillsV1)
+            }
+            Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::CommandsV1(_)
+                if selected.is_empty() =>
+            {
+                Ok(self.clone())
+            }
+            Self::V1(_) | Self::V2(_) | Self::V3(_) | Self::CommandsV1(_) => {
+                Err(reject("claude_profile_skills_unsupported"))
+            }
+        }
+    }
+
+    pub(crate) fn allows_child(&self, child: &Self) -> bool {
+        if let (Self::SkillsV1(parent), Self::SkillsV1(child)) = (self, child) {
+            parent.allows_child(child)
+        } else if let (Self::CommandsSkillsV1(parent), Self::CommandsSkillsV1(child)) =
+            (self, child)
+        {
+            parent.allows_child(child)
+        } else if let (Self::CommandsV1(parent), Self::CommandsV1(child)) = (self, child) {
+            parent.allows_child(child)
+        } else {
+            self == child
         }
     }
 

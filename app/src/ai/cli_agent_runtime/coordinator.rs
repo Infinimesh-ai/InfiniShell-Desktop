@@ -874,6 +874,10 @@ impl LocalCLITaskCoordinator {
                         options.permission_policy,
                         PermissionPolicy::GrokRestrictedReadV1
                             | PermissionPolicy::GrokRestrictedFilesV1
+                            | PermissionPolicy::GrokRestrictedFilesV2
+                            | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1
                     ) || options.permission_ceiling.is_none())
                 {
                     return Err(crate::t!("cli-agent-grok-managed-unverified"));
@@ -4259,6 +4263,10 @@ fn verified_claude_profile(
     let key = match config["permission_policy"].as_str() {
         Some("ClaudeRestrictedFilesV1") => "claudeRestrictedFilesV1",
         Some("ClaudeRestrictedFilesV2") => "claudeRestrictedFilesV2",
+        Some("ClaudeRestrictedFilesV3") => "claudeRestrictedFilesV3",
+        Some("ClaudeRestrictedSkillsV1") => "claudeRestrictedSkillsV1",
+        Some("ClaudeReviewedCommandsV1") => "claudeReviewedCommandsV1",
+        Some("ClaudeReviewedCommandsSkillsV1") => "claudeReviewedCommandsSkillsV1",
         _ => return Err(reject()),
     };
     let profile: super::permissions::ClaudeFileProfile =
@@ -4387,7 +4395,14 @@ fn apply_runtime_event(
             }
             if matches!(
                 config["permission_policy"].as_str(),
-                Some("ClaudeRestrictedFilesV1" | "ClaudeRestrictedFilesV2")
+                Some(
+                    "ClaudeRestrictedFilesV1"
+                        | "ClaudeRestrictedFilesV2"
+                        | "ClaudeRestrictedFilesV3"
+                        | "ClaudeRestrictedSkillsV1"
+                        | "ClaudeReviewedCommandsV1"
+                        | "ClaudeReviewedCommandsSkillsV1"
+                )
             ) {
                 let profile =
                     verified_claude_profile(&snapshot.task, &config, effective_permissions)?;
@@ -4396,7 +4411,14 @@ fn apply_runtime_event(
             }
             if matches!(
                 config["permission_policy"].as_str(),
-                Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
+                Some(
+                    "GrokRestrictedReadV1"
+                        | "GrokRestrictedFilesV1"
+                        | "GrokRestrictedFilesV2"
+                        | "GrokRestrictedSkillsV1"
+                        | "GrokReviewedCommandsV1"
+                        | "GrokReviewedCommandsSkillsV1"
+                )
             ) {
                 if snapshot.task.harness != "grok"
                     || effective_permissions["appCreationPolicyApplied"] != true

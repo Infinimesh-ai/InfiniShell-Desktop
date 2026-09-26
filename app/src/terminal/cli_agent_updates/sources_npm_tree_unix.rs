@@ -14,6 +14,9 @@ use sha2::{Digest as _, Sha256};
 
 use super::Error;
 
+#[path = "sources_npm_grok_mirror.rs"]
+pub(super) mod grok_mirror;
+
 const MAX_FILES: usize = 2048;
 const MAX_TREE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
@@ -93,6 +96,24 @@ pub(super) struct Directory {
     file: File,
 }
 
+/// Grok 官方 postinstall 唯一包内链接；记录链接自身，不跟随它读取或删除。
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct GrokLink {
+    device: u64,
+    inode: u64,
+    uid: u32,
+    gid: u32,
+    mode: u32,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct GrokSnapshot {
+    pub(super) tree: Snapshot,
+    pub(super) link: Option<GrokLink>,
+}
+
 fn name(value: &OsStr) -> Result<CString, Error> {
     let bytes = value.as_bytes();
     if bytes.is_empty() || bytes == b"." || bytes == b".." || bytes.contains(&b'/') {
@@ -110,7 +131,7 @@ fn file(fd: libc::c_int) -> Result<File, Error> {
 
 // 本版只保留 POSIX mode/uid/gid；有额外 ACL 或安全属性时拒绝，不能静默丢失权限。
 #[cfg(target_os = "macos")]
-fn reject_extra_permissions(file: &File) -> Result<(), Error> {
+pub(super) fn reject_extra_permissions(file: &File) -> Result<(), Error> {
     unsafe extern "C" {
         fn acl_get_fd_np(fd: libc::c_int, kind: libc::c_int) -> *mut libc::c_void;
         fn acl_free(acl: *mut libc::c_void) -> libc::c_int;
@@ -151,6 +172,136 @@ fn reject_extra_permissions(file: &File) -> Result<(), Error> {
 }
 
 impl Directory {
+    fn grok_link(&self, leaf: &OsStr) -> Result<GrokLink, Error> {
+        let leaf = name(leaf)?;
+        let read = || {
+            let mut value = std::mem::MaybeUninit::<libc::stat>::uninit();
+            if unsafe {
+                libc::fstatat(
+                    self.file.as_raw_fd(),
+                    leaf.as_ptr(),
+                    value.as_mut_ptr(),
+                    libc::AT_SYMLINK_NOFOLLOW,
+                )
+            } != 0
+            {
+                return Err(Error::SourceChanged);
+            }
+            let value = unsafe { value.assume_init() };
+            if value.st_mode & libc::S_IFMT != libc::S_IFLNK
+                || value.st_uid != unsafe { libc::geteuid() }
+                || value.st_nlink != 1
+            {
+                return Err(Error::UnsupportedSource);
+            }
+            Ok(GrokLink {
+                device: value.st_dev as u64,
+                inode: value.st_ino as u64,
+                uid: value.st_uid,
+                gid: value.st_gid,
+                mode: value.st_mode as u32,
+            })
+        };
+        let before = read()?;
+        let mut target = [0_u8; 64];
+        let length = unsafe {
+            libc::readlinkat(
+                self.file.as_raw_fd(),
+                leaf.as_ptr(),
+                target.as_mut_ptr().cast(),
+                target.len(),
+            )
+        };
+        if length < 0
+            || target.get(..length as usize) != Some(b"./grok-native".as_slice())
+            || read()? != before
+        {
+            return Err(Error::SourceChanged);
+        }
+        Ok(before)
+    }
+
+    pub(super) fn grok_snapshot(&self) -> Result<GrokSnapshot, Error> {
+        let root = self.identity()?;
+        let mut nodes = BTreeMap::new();
+        let mut link = None;
+        self.snapshot_into_grok(Path::new(""), &mut nodes, &mut 0, &mut link, true)?;
+        if self.identity()? != root {
+            return Err(Error::SourceChanged);
+        }
+        if let Some(expected) = &link
+            && self
+                .child(OsStr::new("bin"))?
+                .grok_link(OsStr::new("grok"))?
+                != *expected
+        {
+            return Err(Error::SourceChanged);
+        }
+        Ok(GrokSnapshot {
+            tree: Snapshot { root, nodes },
+            link,
+        })
+    }
+
+    pub(super) fn create_grok_link(&self) -> Result<(), Error> {
+        let bin = self.child(OsStr::new("bin"))?;
+        let native = bin.read_file(OsStr::new("grok-native"))?;
+        reject_extra_permissions(&native)?;
+        Identity::read(&native.metadata().map_err(|_| Error::SourceChanged)?)?;
+        if unsafe {
+            libc::symlinkat(
+                c"./grok-native".as_ptr(),
+                bin.file.as_raw_fd(),
+                c"grok".as_ptr(),
+            )
+        } != 0
+        {
+            return Err(Error::PersistenceFailed);
+        }
+        bin.grok_link(OsStr::new("grok"))?;
+        bin.sync()
+    }
+
+    pub(super) fn apply_grok_permissions(
+        &self,
+        old: &Snapshot,
+        executables: &BTreeMap<PathBuf, bool>,
+    ) -> Result<(), Error> {
+        self.apply_snapshot_permissions(old, executables, self.grok_snapshot()?.tree)
+    }
+
+    pub(super) fn remove_grok_matching(
+        &self,
+        leaf: &OsStr,
+        expected: &GrokSnapshot,
+    ) -> Result<(), Error> {
+        let directory = self.child(leaf)?;
+        let current = directory.grok_snapshot()?;
+        if current.tree.root != expected.tree.root
+            || current
+                .tree
+                .nodes
+                .iter()
+                .any(|(path, node)| expected.tree.nodes.get(path) != Some(node))
+            || current
+                .link
+                .as_ref()
+                .is_some_and(|link| Some(link) != expected.link.as_ref())
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if let Some(link) = current.link {
+            let bin = directory.child(OsStr::new("bin"))?;
+            if bin.grok_link(OsStr::new("grok"))? != link
+                || unsafe { libc::unlinkat(bin.file.as_raw_fd(), c"grok".as_ptr(), 0) } != 0
+            {
+                return Err(Error::RecoveryRequired);
+            }
+            bin.sync()?;
+        }
+        self.remove_matching(leaf, &expected.tree)
+    }
+
     pub(super) fn open(path: &Path) -> Result<Self, Error> {
         if !path.is_absolute() {
             return Err(Error::SourceChanged);
@@ -302,6 +453,17 @@ impl Directory {
         nodes: &mut BTreeMap<PathBuf, Node>,
         bytes: &mut u64,
     ) -> Result<(), Error> {
+        self.snapshot_into_grok(relative, nodes, bytes, &mut None, false)
+    }
+
+    fn snapshot_into_grok(
+        &self,
+        relative: &Path,
+        nodes: &mut BTreeMap<PathBuf, Node>,
+        bytes: &mut u64,
+        link: &mut Option<GrokLink>,
+        grok: bool,
+    ) -> Result<(), Error> {
         if relative.components().count() > 32 {
             return Err(Error::UnsupportedSource);
         }
@@ -311,13 +473,17 @@ impl Directory {
                 return Err(Error::UnsupportedSource);
             }
             let path = relative.join(leaf);
+            if grok && path == Path::new("bin/grok") {
+                *link = Some(self.grok_link(leaf)?);
+                continue;
+            }
             let mut opened = self.read_file(leaf)?;
             reject_extra_permissions(&opened)?;
             let before = opened.metadata().map_err(|_| Error::SourceChanged)?;
             let identity = Identity::read(&before)?;
             let node = if before.is_dir() {
                 let child = Self { file: opened };
-                child.snapshot_into(&path, nodes, bytes)?;
+                child.snapshot_into_grok(&path, nodes, bytes, link, grok)?;
                 Node {
                     identity,
                     length: 0,
@@ -464,6 +630,15 @@ impl Directory {
         executables: &BTreeMap<PathBuf, bool>,
     ) -> Result<(), Error> {
         let new = self.snapshot()?;
+        self.apply_snapshot_permissions(old, executables, new)
+    }
+
+    fn apply_snapshot_permissions(
+        &self,
+        old: &Snapshot,
+        executables: &BTreeMap<PathBuf, bool>,
+        new: Snapshot,
+    ) -> Result<(), Error> {
         for (path, node) in &new.nodes {
             let (parent, leaf) = self.relative_parent(path, false)?;
             let opened = parent.read_file(&leaf)?;

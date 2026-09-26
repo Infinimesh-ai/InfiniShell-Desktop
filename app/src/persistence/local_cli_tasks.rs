@@ -1472,7 +1472,7 @@ fn update_message_state_with_receipt(
     connection.transaction(|connection| {
         let mut message = read_message(connection, message_id)?.context("本地消息不存在")?;
         // 普通 Grok 侧车只能由绑定 RPC/session/prompt 的专用事务确认，不能退回通用 ACK。
-        if message.subject == grok_terminal::INPUT_SUBJECT {
+        if grok_terminal::is_input_subject(&message.subject) {
             bail!("普通 Grok 输入必须使用原生精确回执");
         }
         let recipient = read_task(connection, task_id)?.context("本地任务不存在")?;
@@ -1575,7 +1575,7 @@ fn update_message_state_with_receipt(
 
 fn write_message_state(connection: &mut SqliteConnection, message: &LocalCliMessage) -> Result<()> {
     // 保留专用领取扩展；通用队列清理仅可取消尚未派发、没有投递记录的消息。
-    if message.subject == grok_terminal::INPUT_SUBJECT {
+    if grok_terminal::is_input_subject(&message.subject) {
         grok_terminal::validate_unclaimed_cancellation(connection, message)?;
     }
     diesel::update(

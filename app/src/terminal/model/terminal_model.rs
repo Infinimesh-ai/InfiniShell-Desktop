@@ -45,7 +45,11 @@ use super::lifecycle::{
     BlockLifecycleCoordinator, CommandStartKind, IgnoreReason, LifecycleAction, LifecycleInput,
     LifecycleSnapshot, LifecycleTransition, PreexecObservation, StartCommandOutcome,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(
+    target_os = "macos",
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+))]
 use super::local_pty_identity::LocalPtyIdentity;
 use super::secrets::{RespectObfuscatedSecrets, SecretAndHandle};
 use super::selection::ScrollDelta;
@@ -557,7 +561,11 @@ pub struct TerminalModel {
 
     /// The shell type of the login shell for this session.
     shell_launch_state: ShellLaunchState,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    ))]
     local_pty_identity: Option<LocalPtyIdentity>,
 
     /// Whether or not to respect secrets that are obfuscated, respecting the Safe Mode/Secret Redaction setting.
@@ -1172,7 +1180,11 @@ impl TerminalModel {
             handled_exit: false,
             env_var_collection_name: None,
             shell_launch_state: shell_state,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(
+                target_os = "macos",
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            ))]
             local_pty_identity: None,
             obfuscate_secrets,
             shared_session_status,
@@ -1565,7 +1577,11 @@ impl TerminalModel {
         let transition = self.plan_lifecycle_transition(LifecycleInput::Exit, None, None, None);
 
         self.handled_exit = true;
-        #[cfg(target_os = "macos")]
+        #[cfg(any(
+            target_os = "macos",
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        ))]
         {
             self.local_pty_identity = None;
         }
@@ -1744,12 +1760,27 @@ impl TerminalModel {
         &self.shell_launch_state
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    ))]
     pub(crate) fn local_pty_identity(&self) -> Option<LocalPtyIdentity> {
-        self.local_pty_identity
+        #[cfg(windows)]
+        if self.local_pty_identity.as_ref().is_some_and(|identity| !identity.is_active()) {
+            return None;
+        }
+        self.local_pty_identity.clone()
     }
 
-    #[cfg(all(target_os = "macos", feature = "local_tty"))]
+    #[cfg(all(
+        feature = "local_tty",
+        any(
+            target_os = "macos",
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
     pub(crate) fn set_local_pty_identity(&mut self, identity: Option<LocalPtyIdentity>) {
         self.local_pty_identity = identity;
     }

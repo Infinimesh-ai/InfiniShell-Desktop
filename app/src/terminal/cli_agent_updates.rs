@@ -10,6 +10,8 @@ use warpui::r#async::Timer;
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::cli_agent::{CLIAgent, CLIAgentInstallModel};
+#[cfg(feature = "local_fs")]
+use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
 
 mod sources;
 
@@ -62,6 +64,7 @@ pub enum CliAgentUpdateError {
     TimedOut,
     VersionMismatch,
     ChannelMismatch,
+    ResumeIncompatible,
     RecoveryRequired,
     PersistenceFailed,
 }
@@ -154,7 +157,8 @@ impl Entry {
             CliAgentUpdateError::NotInstalled
             | CliAgentUpdateError::UnsupportedSource
             | CliAgentUpdateError::UnsupportedPlatform
-            | CliAgentUpdateError::ChannelMismatch => CliAgentUpdatePhase::Unsupported,
+            | CliAgentUpdateError::ChannelMismatch
+            | CliAgentUpdateError::ResumeIncompatible => CliAgentUpdatePhase::Unsupported,
             CliAgentUpdateError::SourceChanged
             | CliAgentUpdateError::Network
             | CliAgentUpdateError::InvalidRelease
@@ -535,6 +539,38 @@ impl CliAgentUpdatesModel {
                 self.changed(agent, ctx);
             }
             return;
+        }
+        #[cfg(feature = "local_fs")]
+        if entry
+            .plan
+            .as_ref()
+            .is_some_and(sources::UpdatePlan::requires_downgrade_guard)
+        {
+            let coordinator = LocalCLITaskCoordinator::as_ref(ctx);
+            // 派发前读取真实宿主状态，回合结束不等于进程已退出。
+            if coordinator.cli_update_busy(agent.command_prefix()) {
+                entry.status.phase = CliAgentUpdatePhase::WaitingForIdle;
+                entry.status.busy = true;
+                entry.reported_busy = true;
+                self.changed(agent, ctx);
+                return;
+            }
+            let compatible = entry.plan.as_ref().is_some_and(|plan| {
+                plan.downgrade_history_compatible(
+                    coordinator
+                        .restored_tasks()
+                        .iter()
+                        .chain(coordinator.snapshots().map(|snapshot| &snapshot.task)),
+                )
+            });
+            if !compatible {
+                entry.plan = None;
+                entry.manual_update = false;
+                entry.status.error = Some(CliAgentUpdateError::ResumeIncompatible);
+                entry.status.phase = CliAgentUpdatePhase::Unsupported;
+                self.changed(agent, ctx);
+                return;
+            }
         }
         let Some(plan) = entry.plan.take() else {
             return;

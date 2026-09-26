@@ -1,0 +1,534 @@
+{
+  "schema": 1,
+  "versions": [
+    "1.0.40",
+    "1.0.41"
+  ],
+  "targets": [
+    "darwin-arm64",
+    "linux-x64",
+    "win32-x64"
+  ],
+  "packages": {
+    "@xai-official/grok@1.0.40": {
+      "integrity": "sha512-p+5yWC9FpiOJXiSb+PDyoKnH63sAWoihi64y0eAOmqmyi9h8TAHHiQsvJWxiQiPK2CsRu0SZOZO1cJUlTaLCVw==",
+      "manifest": {
+        "name": "@xai-official/grok",
+        "version": "1.0.40",
+        "bin": {
+          "grok": "bin/grok"
+        },
+        "dependencies": {
+          "@iarna/toml": "^3.0.0"
+        },
+        "optionalDependencies": {
+          "@xai-official/grok-linux-x64": "1.0.40",
+          "@xai-official/grok-win32-x64": "1.0.40",
+          "@xai-official/grok-darwin-x64": "1.0.40",
+          "@xai-official/grok-linux-arm64": "1.0.40",
+          "@xai-official/grok-win32-arm64": "1.0.40",
+          "@xai-official/grok-darwin-arm64": "1.0.40"
+        },
+        "scripts": {
+          "postinstall": "node bin/postinstall.js"
+        },
+        "os": [
+          "darwin",
+          "linux",
+          "win32"
+        ],
+        "cpu": [
+          "arm64",
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok": {
+          "length": 208,
+          "sha256": "1318858fefd9de11c5eb7e6a6f325aa7b0b6c1570981c9596085ed252fa68a51",
+          "executable": true
+        },
+        "bin/grok-bootstrap.js": {
+          "length": 5245,
+          "sha256": "15abbdc3e34d3c1e53b71def7f9c59f22bd793c51c5f6f88c645103742cc544e",
+          "executable": true
+        },
+        "bin/postinstall.js": {
+          "length": 10799,
+          "sha256": "9debd63b905270da66d3e0f29d2a16fee1b52c9eddd8b270e05e855e53b2f69d",
+          "executable": false
+        },
+        "package.json": {
+          "length": 930,
+          "sha256": "e639240aeff1532c9f98250c0608f76c118d37b69ce7065388c845e640a692bc",
+          "executable": false
+        },
+        "README.md": {
+          "length": 1181,
+          "sha256": "75d71c9c0839562335ff62a28095266351aab853ad70127aceb990aa58af2b6f",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-darwin-arm64@1.0.40": {
+      "integrity": "sha512-F3bRv0W3Ud9mPyDOxTEAnFAfz5KSMQnJFmG+WYJ0gEBOzPSyVmQ/PJ422iAxRVlSVT39bDFWWF4pb3GwKb6jtQ==",
+      "manifest": {
+        "name": "@xai-official/grok-darwin-arm64",
+        "version": "1.0.40",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "darwin"
+        ],
+        "cpu": [
+          "arm64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.br": {
+          "length": 42414711,
+          "sha256": "44be3886ac1523acfc171e3a80b5e60743cefee2f13fb4c1b7b8aa6e6c066d09",
+          "executable": false
+        },
+        "package.json": {
+          "length": 431,
+          "sha256": "d553f98c64ce6cabb07e8d00868307d16055586044c8043888ef26b9d4e49f2c",
+          "executable": false
+        },
+        "README.md": {
+          "length": 379,
+          "sha256": "7724d078f35ac67bbe858396e1c0ff87e8e668888aaf91b3d85ed6dc37391eee",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-linux-x64@1.0.40": {
+      "integrity": "sha512-vMD2GFDHrsViUg61G7Tc6/g6kz9IXYDn12yTMOhZy5J8E2qMxQaYsPJt2NSLjxy4Of8cTu8Zq7aws5xmZtTVEw==",
+      "manifest": {
+        "name": "@xai-official/grok-linux-x64",
+        "version": "1.0.40",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "linux"
+        ],
+        "cpu": [
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.br": {
+          "length": 49081915,
+          "sha256": "fe98209666ad4caf3f1f9de18b33e565569867ce5befeb88a636c5a880c13097",
+          "executable": false
+        },
+        "package.json": {
+          "length": 422,
+          "sha256": "56e0c23dbd8b3ee9bcfdc6d811e4ead43979a94d9a8d7665b3c15c537680f018",
+          "executable": false
+        },
+        "README.md": {
+          "length": 373,
+          "sha256": "1b74f13698d746e9e3f3ce84ac4112f7d5cff4cdb33bc2f6f48ba14a76fa9ebb",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-win32-x64@1.0.40": {
+      "integrity": "sha512-pP+N0bM2bmCk14BSTFADz9jg4dOwQSWaYm3U6ygulc1IPEt4eOIwgZBlxxfhfjMlkBlEP4aiCeD3lIfqlKutdQ==",
+      "manifest": {
+        "name": "@xai-official/grok-win32-x64",
+        "version": "1.0.40",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "win32"
+        ],
+        "cpu": [
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.exe.br": {
+          "length": 46379325,
+          "sha256": "f2e928630ac4e67fa80dbcb8838e09aeba923938e7faeb2cd3ebabd6fd74af23",
+          "executable": false
+        },
+        "package.json": {
+          "length": 422,
+          "sha256": "ff9a69aa77a3df451de8f80d8e64288c1bd3379822160f1ba9bcad0a5d9fba6f",
+          "executable": false
+        },
+        "README.md": {
+          "length": 373,
+          "sha256": "f33d07a1d2650000d28b3285423129fb6e644d503fc6ce853dbf6c3aa00cc437",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok@1.0.41": {
+      "integrity": "sha512-eRAK7JzMb/sHVfj8VtLJ26LFqVwiI+PPp6lIMxtN/Ys+/AU5XvE20liO2iDitVw4kAlC5iziomgnemGuy/QAPw==",
+      "manifest": {
+        "name": "@xai-official/grok",
+        "version": "1.0.41",
+        "bin": {
+          "grok": "bin/grok"
+        },
+        "dependencies": {
+          "@iarna/toml": "^3.0.0"
+        },
+        "optionalDependencies": {
+          "@xai-official/grok-linux-x64": "1.0.41",
+          "@xai-official/grok-win32-x64": "1.0.41",
+          "@xai-official/grok-darwin-x64": "1.0.41",
+          "@xai-official/grok-linux-arm64": "1.0.41",
+          "@xai-official/grok-win32-arm64": "1.0.41",
+          "@xai-official/grok-darwin-arm64": "1.0.41"
+        },
+        "scripts": {
+          "postinstall": "node bin/postinstall.js"
+        },
+        "os": [
+          "darwin",
+          "linux",
+          "win32"
+        ],
+        "cpu": [
+          "arm64",
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok": {
+          "length": 208,
+          "sha256": "1318858fefd9de11c5eb7e6a6f325aa7b0b6c1570981c9596085ed252fa68a51",
+          "executable": true
+        },
+        "bin/grok-bootstrap.js": {
+          "length": 5245,
+          "sha256": "15abbdc3e34d3c1e53b71def7f9c59f22bd793c51c5f6f88c645103742cc544e",
+          "executable": true
+        },
+        "bin/postinstall.js": {
+          "length": 10799,
+          "sha256": "9debd63b905270da66d3e0f29d2a16fee1b52c9eddd8b270e05e855e53b2f69d",
+          "executable": false
+        },
+        "package.json": {
+          "length": 930,
+          "sha256": "fbb144c26a2d59f8a0bc6dc12c17f1ca7f6ecd8c6aa73013752f86132669d606",
+          "executable": false
+        },
+        "README.md": {
+          "length": 1181,
+          "sha256": "75d71c9c0839562335ff62a28095266351aab853ad70127aceb990aa58af2b6f",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-darwin-arm64@1.0.41": {
+      "integrity": "sha512-EVyCWTOe1ZDdURiK8EvRUw9Q8BPU2Upnc6o+ECwXYXSCtRmlR9/MxqNt6beZtOujjyAsAWE7VRBvjZrtyCTFWw==",
+      "manifest": {
+        "name": "@xai-official/grok-darwin-arm64",
+        "version": "1.0.41",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "darwin"
+        ],
+        "cpu": [
+          "arm64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.br": {
+          "length": 42517447,
+          "sha256": "f3d4ad9e61cd9fd1e81e311b96c25d924428dc50b9295b630353d77ea195c725",
+          "executable": false
+        },
+        "package.json": {
+          "length": 431,
+          "sha256": "8bc7eec9e5203b03de5921f68b4a7e7a133f5cf7e8e6ca329baed25c53710ed8",
+          "executable": false
+        },
+        "README.md": {
+          "length": 379,
+          "sha256": "7724d078f35ac67bbe858396e1c0ff87e8e668888aaf91b3d85ed6dc37391eee",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-linux-x64@1.0.41": {
+      "integrity": "sha512-5KS0AMeGYQh3++0EEZPKVjAcalFQma8K5SKMhBu1k1OVNpA/lO+fRgecS1/kOsLaGaPDPfQm611Z+a5J9dLfAg==",
+      "manifest": {
+        "name": "@xai-official/grok-linux-x64",
+        "version": "1.0.41",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "linux"
+        ],
+        "cpu": [
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.br": {
+          "length": 49174987,
+          "sha256": "90f67689153380f2a363cf3c6a7e5e1ab303e9b7eb07f8092dca86471f1fce5d",
+          "executable": false
+        },
+        "package.json": {
+          "length": 422,
+          "sha256": "8215a598c1d300612d89a14b1614483f6614883e9d9147950332375d537326d7",
+          "executable": false
+        },
+        "README.md": {
+          "length": 373,
+          "sha256": "1b74f13698d746e9e3f3ce84ac4112f7d5cff4cdb33bc2f6f48ba14a76fa9ebb",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@xai-official/grok-win32-x64@1.0.41": {
+      "integrity": "sha512-1Z/0+cXzTJJlnqu45lfQMFErBARASXglFYpDNk0rQJVIuKAB0h4bxKCvc3SRlxX908badaSA+9ZB+KjwDO7opw==",
+      "manifest": {
+        "name": "@xai-official/grok-win32-x64",
+        "version": "1.0.41",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {},
+        "os": [
+          "win32"
+        ],
+        "cpu": [
+          "x64"
+        ],
+        "libc": null
+      },
+      "files": {
+        "bin/grok.exe.br": {
+          "length": 46488279,
+          "sha256": "64ae687638a244eb04f8e13bd8174b4dc6d9831291a129d51545320ee7ee692f",
+          "executable": false
+        },
+        "package.json": {
+          "length": 422,
+          "sha256": "4ea64ae4291458dfff13b10f0198b534b3b2031744b623b9eb450de4bed60749",
+          "executable": false
+        },
+        "README.md": {
+          "length": 373,
+          "sha256": "f33d07a1d2650000d28b3285423129fb6e644d503fc6ce853dbf6c3aa00cc437",
+          "executable": false
+        },
+        "THIRD_PARTY_NOTICES.md": {
+          "length": 7995,
+          "sha256": "e8785a6098a7ee780cd2db35745b8e53061cfb1b6da19147a308579466ea4e50",
+          "executable": false
+        }
+      }
+    },
+    "@iarna/toml@3.0.0": {
+      "integrity": "sha512-td6ZUkz2oS3VeleBcN+m//Q6HlCFCPrnI0FZhrt/h4XqLEdOyYp2u21nd8MdsR+WJy5r9PTDaHTDDfhf4H4l6Q==",
+      "manifest": {
+        "name": "@iarna/toml",
+        "version": "3.0.0",
+        "bin": {},
+        "dependencies": {},
+        "optionalDependencies": {},
+        "scripts": {
+          "test": "tap -J --100 test/*.js test/toml-stream/*.js",
+          "prepack": "rm -f *~",
+          "prepare": "npm run setup-burntsushi-toml-suite && npm run setup-iarna-toml-suite",
+          "pretest": "iarna-standard",
+          "benchmark": "node benchmark.js && node benchmark-per-file.js && node results2table.js",
+          "prerelease": "npm t",
+          "update-coc": "weallbehave -o . && git add CODE_OF_CONDUCT.md && git commit -m 'docs(coc): updated CODE_OF_CONDUCT.md'",
+          "postpublish": "git push --follow-tags",
+          "update-contrib": "weallcontribute -o . && git add CONTRIBUTING.md && git commit -m 'docs(contributing): updated CONTRIBUTING.md'",
+          "setup-iarna-toml-suite": "[ -d test/spec-test ] || (git clone https://github.com/iarna/toml-spec-tests -b 1.0.0-rc.1 test/spec-test; rimraf test/spec-test/.git/hooks/*); cd test/spec-test; git pull",
+          "setup-burntsushi-toml-suite": "[ -d test/burntsushi-toml-test ] || (git clone https://github.com/BurntSushi/toml-test test/burntsushi-toml-test; rimraf test/burntsushi-toml-test/.git/hooks/*); cd test/burntsushi-toml-test; git pull"
+        },
+        "os": null,
+        "cpu": null,
+        "libc": null
+      },
+      "files": {
+        "LICENSE": {
+          "length": 752,
+          "sha256": "d4dc58571be1260e45f2fb8ab174e0a838c9ca361720e1b0e2ca020c037988b2",
+          "executable": true
+        },
+        "lib/create-date.js": {
+          "length": 485,
+          "sha256": "3941f4748f25f11c5ccf55c85ddc41e06e85379482e5885a8aff8b964d6a2ad8",
+          "executable": true
+        },
+        "lib/create-datetime-float.js": {
+          "length": 663,
+          "sha256": "aa5ac5619fafcb487edf249d3a8bbd9d672626299966eba6945afbc96470c6c1",
+          "executable": true
+        },
+        "lib/create-datetime.js": {
+          "length": 197,
+          "sha256": "b83215e9dd32e34332c7ddd9b868e03e321dcb28cde830d1b7951df68325bbbf",
+          "executable": true
+        },
+        "lib/create-time.js": {
+          "length": 508,
+          "sha256": "2d40222ea3f60c1c95cf3f60e3b1554f39cc3a0d5ef5ff8bfb031635fa987707",
+          "executable": true
+        },
+        "lib/format-num.js": {
+          "length": 120,
+          "sha256": "b4f02ed3ea839792827aacd1bd1492f0150f53024a006832579cd6ec43e92801",
+          "executable": true
+        },
+        "parse-async.js": {
+          "length": 863,
+          "sha256": "277f98c122d6f3c6755d2a1bf81bece2472696e0e899f02a193d8ad57255493f",
+          "executable": true
+        },
+        "parse-pretty-error.js": {
+          "length": 1045,
+          "sha256": "4e9783b41b343c62be4d3bf3b21fb7972bfc27523e913a782c4624c008a80eb1",
+          "executable": true
+        },
+        "parse-stream.js": {
+          "length": 1625,
+          "sha256": "b1ce5edabc3a7a4db886c9a5a0903cd2e20ffbcd338405b7b08da853b04c5913",
+          "executable": true
+        },
+        "parse-string.js": {
+          "length": 415,
+          "sha256": "cd9e497870ffda7ad1e266b86580c270388a45c2d04e75acd985a42a0597fdb0",
+          "executable": true
+        },
+        "parse.js": {
+          "length": 227,
+          "sha256": "a103f6919f045c44cddda84af4cd44b94fe4a253f8d07a81d779db06ab081976",
+          "executable": true
+        },
+        "lib/parser-debug.js": {
+          "length": 1986,
+          "sha256": "3e202f84762b40144f338b1040a597aa2a0fa1537abbb22e13cd5480313df2ce",
+          "executable": true
+        },
+        "lib/parser.js": {
+          "length": 2975,
+          "sha256": "175e4cc273aea2e0505e0f0000bcba471f8da041d219a9ab73978567e8f66029",
+          "executable": true
+        },
+        "stringify.js": {
+          "length": 7622,
+          "sha256": "fb74cb2cf4504facc60640801dc8127353a362f2db50e5425bbfb2a762920d38",
+          "executable": true
+        },
+        "lib/toml-parser.js": {
+          "length": 46935,
+          "sha256": "59ac2261f3b40a9780db5cdf99de4fc9b70d462651df2becb2da020c0c59c844",
+          "executable": true
+        },
+        "toml.js": {
+          "length": 97,
+          "sha256": "b6bdf7ac57047ec0a2fab0e34c42d500fb95a3234fa649c3ff5725aef9d09eb0",
+          "executable": true
+        },
+        "package.json": {
+          "length": 2715,
+          "sha256": "360a7c4b213f5aedb8efc842bc11cd4f91bc53c34602a6770913315688a4dad0",
+          "executable": true
+        },
+        "CHANGELOG.md": {
+          "length": 11295,
+          "sha256": "b46126574c44bcc69f84380cea2d26d619985e4289551438add0fbc236820335",
+          "executable": true
+        },
+        "README.md": {
+          "length": 17754,
+          "sha256": "4a0f8cef35fe27ee7d0fd09b2664b97f621da7c682f4a11a221e75ad55e0b91d",
+          "executable": true
+        },
+        "index.d.ts": {
+          "length": 1681,
+          "sha256": "72c6cda658c066bfd9f51a34a077648f11a0d8867050733f2cef365729043bf0",
+          "executable": true
+        }
+      }
+    }
+  },
+  "native": {
+    "1.0.40": {
+      "darwin-arm64": {
+        "length": 145308720,
+        "sha256": "3f2aef9618191a2c60d18a5044fa462c9c77bdc4187b02ed716b0394e8d4fef2"
+      },
+      "linux-x64": {
+        "length": 165587968,
+        "sha256": "92c997dfd109c0672d40d5ae6fbd15835d53ffaf12cf9ea124d22aaef3ff23fc"
+      },
+      "win32-x64": {
+        "length": 153720832,
+        "sha256": "be64017f7f5f5b85cd10b59eebcb596af8d3dcde077aad08aa8eae8defdc5e2a"
+      }
+    },
+    "1.0.41": {
+      "darwin-arm64": {
+        "length": 145657952,
+        "sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d"
+      },
+      "linux-x64": {
+        "length": 165967424,
+        "sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407"
+      },
+      "win32-x64": {
+        "length": 154072576,
+        "sha256": "6db593f5aeb1e12b1f4f36fac7fad34c2dfe8f9fcb853bff5fc01928c95c53fa"
+      }
+    }
+  }
+}

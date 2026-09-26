@@ -3,6 +3,9 @@
 use std::io::{Read as _, Write as _};
 use std::path::{Component, Path, PathBuf};
 
+#[cfg(all(windows, target_arch = "x86_64"))]
+use crate::terminal::cli_agent_sessions::grok_owned_history_source_windows::NpmGrokSource;
+
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -10,7 +13,9 @@ use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Value, json};
 
-use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME, tool_definitions};
+#[cfg(test)]
+use super::local_tools::tool_definitions;
+use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME};
 use super::{PermissionPolicy, RuntimeError, SessionTarget};
 
 const LEGACY_VERIFIED_VERSION: &str = "1.0.30";
@@ -30,6 +35,14 @@ const VERIFIED_EXECUTABLES: &[(&str, &str, &str, &str)] = &[
         "x86_64",
         FIXED_SCOPE_VERSION,
         "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+    ),
+    // 官方 npm 包未附 Authenticode；去除官网映像证书、校验和及安全目录后字节完全一致。
+    // 仍单独绑定 npm 固定摘要，不能据此跳过各平台的原生策略与工具租约核验。
+    (
+        "windows",
+        "x86_64",
+        FIXED_SCOPE_VERSION,
+        "6db593f5aeb1e12b1f4f36fac7fad34c2dfe8f9fcb853bff5fc01928c95c53fa",
     ),
     (
         "macos",
@@ -98,6 +111,17 @@ const WRITE_TOOL: &str = "OpenCode:write";
 const EDIT_TOOL: &str = "GrokBuild:search_replace";
 const SEARCH_TOOL: &str = "GrokBuild:search_tool";
 const USE_TOOL: &str = "GrokBuild:use_tool";
+const GREP_TOOL: &str = "GrokBuild:grep";
+const LIST_TOOL: &str = "GrokBuild:list_dir";
+
+#[path = "grok_profile_search.rs"]
+mod search;
+#[path = "grok_profile_skills.rs"]
+mod skills;
+use skills::GrokSkillCeilingV1;
+#[path = "grok_profile_commands_skills.rs"]
+mod commands_skills;
+use super::reviewed_project_commands::ReviewedCommandCeilingV1;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,6 +129,10 @@ enum GrokToolSet {
     #[default]
     Read,
     Files,
+    FilesSearch,
+    Skills,
+    Commands,
+    CommandsSkills,
 }
 
 impl GrokToolSet {
@@ -127,6 +155,10 @@ pub struct GrokCreationPolicyV1 {
     tool_set: GrokToolSet,
     #[serde(deserialize_with = "deserialize_local_tools")]
     local_tools: Option<LocalToolPermissions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    skills: Option<GrokSkillCeilingV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    commands: Option<ReviewedCommandCeilingV1>,
 }
 
 fn deserialize_local_tools<'de, D: Deserializer<'de>>(
@@ -139,10 +171,12 @@ fn deserialize_local_tools<'de, D: Deserializer<'de>>(
     let object = value
         .as_object()
         .ok_or_else(|| D::Error::custom("invalid local tool permissions"))?;
-    if object
-        .keys()
-        .any(|key| !matches!(key.as_str(), "allow_spawn" | "allow_message"))
-    {
+    if object.keys().any(|key| {
+        !matches!(
+            key.as_str(),
+            "allow_spawn" | "allow_message" | "allow_project_commands"
+        )
+    }) {
         return Err(D::Error::custom("unknown local tool permission"));
     }
     serde_json::from_value(value)
@@ -186,11 +220,19 @@ impl GrokCreationPolicyV1 {
         let tool_set = match permission_policy {
             PermissionPolicy::GrokRestrictedReadV1 => GrokToolSet::Read,
             PermissionPolicy::GrokRestrictedFilesV1 => GrokToolSet::Files,
+            PermissionPolicy::GrokRestrictedFilesV2 => GrokToolSet::FilesSearch,
+            PermissionPolicy::GrokRestrictedSkillsV1 => GrokToolSet::Skills,
+            PermissionPolicy::GrokReviewedCommandsV1 => GrokToolSet::Commands,
+            PermissionPolicy::GrokReviewedCommandsSkillsV1 => GrokToolSet::CommandsSkills,
             PermissionPolicy::Inherit
             | PermissionPolicy::ReadOnly
             | PermissionPolicy::WorkspaceWrite
             | PermissionPolicy::ClaudeRestrictedFilesV1
-            | PermissionPolicy::ClaudeRestrictedFilesV2 => {
+            | PermissionPolicy::ClaudeRestrictedFilesV2
+            | PermissionPolicy::ClaudeRestrictedFilesV3
+            | PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1 => {
                 return Err(reject("grok_creation_policy_not_selected"));
             }
         };
@@ -203,13 +245,35 @@ impl GrokCreationPolicyV1 {
             config_sha256,
             tool_set,
             local_tools,
+            commands: (matches!(
+                tool_set,
+                GrokToolSet::Commands | GrokToolSet::CommandsSkills
+            ))
+            .then(|| ReviewedCommandCeilingV1::capture(cwd))
+            .transpose()?,
+            skills: (matches!(tool_set, GrokToolSet::Skills | GrokToolSet::CommandsSkills))
+                .then(|| GrokSkillCeilingV1::capture(&[]))
+                .transpose()?,
         };
         policy.validate()?;
         Ok(policy)
     }
 
     pub(super) fn validate(&self) -> Result<(), RuntimeError> {
-        if self.version != 1
+        if self
+            .local_tools
+            .is_some_and(|tools| tools.allow_project_commands)
+            != self
+                .commands
+                .as_ref()
+                .is_some_and(|commands| commands.is_host())
+        {
+            return Err(reject("grok_reviewed_commands_mcp_permission_mismatch"));
+        }
+        if (matches!(self.tool_set, GrokToolSet::FilesSearch | GrokToolSet::Skills | GrokToolSet::Commands | GrokToolSet::CommandsSkills) && !self.matches_cli_version(FIXED_SCOPE_VERSION))
+            || (matches!(self.tool_set, GrokToolSet::Skills | GrokToolSet::CommandsSkills)) != self.skills.is_some()
+            || (matches!(self.tool_set, GrokToolSet::Commands | GrokToolSet::CommandsSkills)) != self.commands.is_some()
+            || self.version != 1
             || self.storage_id.is_nil()
             || !self.canonical_working_directory.is_absolute()
             // 原生目录信任对文件系统根自动放行，固定项目策略不能使用该例外。
@@ -222,6 +286,18 @@ impl GrokCreationPolicyV1 {
             || !valid_sha256(&self.config_sha256)
         {
             return Err(reject("grok_creation_policy_invalid"));
+        }
+        if let (Some(commands), Some(skills)) = (&self.commands, &self.skills) {
+            commands_skills::validate(commands, skills, &self.canonical_working_directory)?;
+        }
+        if let Some(commands) = &self.commands {
+            commands.validate()?;
+            if !commands.matches_directory(&self.canonical_working_directory) {
+                return Err(reject("grok_command_directory_changed"));
+            }
+        }
+        if let Some(skills) = &self.skills {
+            skills.validate()?;
         }
         Ok(())
     }
@@ -238,7 +314,7 @@ impl GrokCreationPolicyV1 {
         if !self.matches_cli_version(cli_version) {
             return Err(reject("grok_creation_policy_cli_version_changed"));
         }
-        let current = Self::compile(
+        let mut current = Self::compile(
             cwd,
             cli_version,
             executable_sha256,
@@ -246,6 +322,8 @@ impl GrokCreationPolicyV1 {
             self.local_tools,
             permission_policy,
         )?;
+        current.skills = self.skills.clone();
+        current.commands = self.commands.clone();
         self.validate_child(&current)?;
         Ok(())
     }
@@ -258,6 +336,10 @@ impl GrokCreationPolicyV1 {
         match self.tool_set {
             GrokToolSet::Read => PermissionPolicy::GrokRestrictedReadV1,
             GrokToolSet::Files => PermissionPolicy::GrokRestrictedFilesV1,
+            GrokToolSet::FilesSearch => PermissionPolicy::GrokRestrictedFilesV2,
+            GrokToolSet::Skills => PermissionPolicy::GrokRestrictedSkillsV1,
+            GrokToolSet::Commands => PermissionPolicy::GrokReviewedCommandsV1,
+            GrokToolSet::CommandsSkills => PermissionPolicy::GrokReviewedCommandsSkillsV1,
         }
     }
 
@@ -267,7 +349,7 @@ impl GrokCreationPolicyV1 {
         })
     }
 
-    /// 这里只描述已取得真实收据的生产启动范围；保存记录能够反序列化不等于该版本可执行。
+    /// 核对固定版本和创建策略；原生工具目录与逐次审批仍在会话启动后分别检查。
     pub(super) fn runtime_scope_verified(
         &self,
         cli_version: &str,
@@ -287,8 +369,27 @@ impl GrokCreationPolicyV1 {
 
     pub(super) fn native_tool_ids(&self) -> Vec<&'static str> {
         let mut tools = vec![READ_TOOL];
-        if self.tool_set == GrokToolSet::Files {
+        if matches!(
+            self.tool_set,
+            GrokToolSet::Files
+                | GrokToolSet::FilesSearch
+                | GrokToolSet::Skills
+                | GrokToolSet::Commands
+                | GrokToolSet::CommandsSkills
+        ) {
             tools.extend([WRITE_TOOL, EDIT_TOOL]);
+        }
+        if matches!(
+            self.tool_set,
+            GrokToolSet::FilesSearch
+                | GrokToolSet::Skills
+                | GrokToolSet::Commands
+                | GrokToolSet::CommandsSkills
+        ) {
+            tools.extend([GREP_TOOL, LIST_TOOL]);
+        }
+        if self.skills.is_some() {
+            tools.push(skills::NATIVE_TOOL);
         }
         if self.local_tools.is_some() {
             tools.extend([SEARCH_TOOL, USE_TOOL]);
@@ -313,12 +414,28 @@ impl GrokCreationPolicyV1 {
                 "infinishell-managed-grok-files-v1",
                 "Application-managed file tools and local task tools.",
             ),
+            GrokToolSet::CommandsSkills => (
+                "infinishell-reviewed-commands-skills-v1",
+                "Application-reviewed foreground project commands, file tools and selected native skills. Every command and skill requires single-use permission. Skills cannot expand the approved command set. Commands run as the current OS account, not in an OS sandbox.",
+            ),
+            GrokToolSet::Commands => (
+                "infinishell-reviewed-commands-v1",
+                "Application-reviewed foreground project commands and file tools. Each command requires fresh single-use permission and runs in an independent supervised process; confirmed cleanup precedes the next command in the same CLI session. Commands run as the current OS account, not in an OS sandbox.",
+            ),
+            GrokToolSet::Skills => (
+                "infinishell-managed-grok-skills-v1",
+                "Application-managed project file tools and selected user skills. Invoke each exact user-qualified skill name with the native skill tool, awaiting permission for every invocation. Shell commands, hooks and native subagents are unavailable.",
+            ),
+            GrokToolSet::FilesSearch => (
+                "infinishell-managed-grok-files-v2",
+                "Application-managed file, directory-listing, and single-file content-search tools. Use an explicit project file path for grep; shell commands and skills are unavailable.",
+            ),
         };
         let profile = json!({
             "name":name,
             "description":description,
             "permissionMode":"default",
-            "discoverSkills":false,
+            "discoverSkills":self.skills.is_some(),
             "inheritSkills":false,
             "agentsMd":false,
             "injectDefaultTools":false,
@@ -329,9 +446,18 @@ impl GrokCreationPolicyV1 {
             "mcpInheritance":"none",
             "hooks":{},
         });
-        Ok(format!(
+        let mut document = format!(
             "---\n{profile}\n---\nUse the application local-task tools for managed child tasks.\n"
-        ))
+        );
+        if let Some(commands) = &self.commands {
+            let instruction = match &self.skills {
+                Some(skills) => commands_skills::instruction(commands, skills),
+                None => commands.instruction(),
+            };
+            document.push_str(&instruction);
+            document.push('\n');
+        }
+        Ok(document)
     }
 
     /// 只用于独占冷进程的创建输入；这些 false 不是 warm load 降权确认。
@@ -352,6 +478,67 @@ impl GrokCreationPolicyV1 {
         Ok(child)
     }
 
+    pub(super) fn derive_child_with_skills(
+        &self,
+        local_tools: Option<LocalToolPermissions>,
+        selected: &[super::local_skills::SelectedLocalSkill],
+    ) -> Result<Self, RuntimeError> {
+        let mut child = self.derive_child(local_tools)?;
+        match &self.skills {
+            Some(skills) => child.skills = Some(skills.derive_child(selected)?),
+            None if selected.is_empty() => {}
+            None => return Err(reject("grok_skills_parent_ceiling")),
+        }
+        self.validate_child(&child)?;
+        Ok(child)
+    }
+
+    pub(super) fn skill_selection_matches(
+        &self,
+        selected: &[super::local_skills::SelectedLocalSkill],
+    ) -> bool {
+        match &self.skills {
+            Some(skills) => skills.matches_selection(selected),
+            None => selected.is_empty(),
+        }
+    }
+
+    pub(super) fn permits_selected_skill(&self, name: &str, path: &Path) -> bool {
+        self.skills
+            .as_ref()
+            .is_some_and(|skills| skills.contains(name, path))
+    }
+
+    pub(super) fn verify_skill_catalog(
+        &self,
+        state: &Path,
+        commands: &Value,
+    ) -> Result<(), RuntimeError> {
+        if let Some(skills) = &self.skills {
+            skills.verify_catalog(&self.managed_home(state)?, commands)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn encode_skill_prompt(
+        &self,
+        state: &Path,
+        commands: &Value,
+        input: Vec<super::InputContent>,
+    ) -> Result<Vec<Value>, RuntimeError> {
+        self.skills
+            .as_ref()
+            .ok_or_else(|| reject("grok_skills_policy_required"))?
+            .encode_prompt(&self.managed_home(state)?, commands, input)
+    }
+
+    fn managed_home(&self, state: &Path) -> Result<PathBuf, RuntimeError> {
+        Ok(state
+            .canonicalize()?
+            .join("grok-managed")
+            .join(self.storage_id.to_string()))
+    }
+
     pub(super) fn validate_child(&self, child: &Self) -> Result<(), RuntimeError> {
         self.validate()?;
         child.validate()?;
@@ -359,6 +546,16 @@ impl GrokCreationPolicyV1 {
             || self.executable_sha256 != child.executable_sha256
             || self.config_sha256 != child.config_sha256
             || self.tool_set != child.tool_set
+            || !match (&self.commands, &child.commands) {
+                (Some(parent), Some(child)) => parent.allows_child(child),
+                (None, None) => true,
+                (Some(_), None) | (None, Some(_)) => false,
+            }
+            || !match (&self.skills, &child.skills) {
+                (Some(parent), Some(child)) => parent.allows_child(child),
+                (None, None) => true,
+                (Some(_), None) | (None, Some(_)) => false,
+            }
         {
             return Err(reject("grok_child_creation_identity_changed"));
         }
@@ -368,6 +565,7 @@ impl GrokCreationPolicyV1 {
             (Some(parent), Some(child)) => {
                 (!child.allow_spawn || parent.allow_spawn)
                     && (!child.allow_message || parent.allow_message)
+                    && (!child.allow_project_commands || parent.allow_project_commands)
             }
         };
         if !subset {
@@ -387,7 +585,8 @@ impl GrokCreationPolicyV1 {
         let Some(tool_name) = qualified_target.strip_prefix(&format!("{MCP_SERVER_NAME}__")) else {
             return false;
         };
-        tool_definitions(permissions.allow_spawn, permissions.allow_message)
+        permissions
+            .definitions()
             .iter()
             .any(|tool| tool["name"].as_str() == Some(tool_name))
     }
@@ -529,8 +728,10 @@ impl GrokCreationPolicyV1 {
             "search_replace",
             "search_tool",
             "use_tool",
+            "grep",
+            "list_dir",
         ];
-        let mut known_counts = [0usize; 5];
+        let mut known_counts = [0usize; 7];
         let mut unknown_strings = 0;
         let mut non_strings = 0;
         let mut duplicate_strings = 0;
@@ -594,11 +795,35 @@ impl GrokCreationPolicyV1 {
             return Err(reject("grok_creation_files_missing"));
         }
         immutable_file(&config, self.fixed_configuration().as_bytes())?;
-        immutable_file(&profile, self.profile_document()?.as_bytes())
+        immutable_file(&profile, self.profile_document()?.as_bytes())?;
+        if let Some(commands) = &self.commands {
+            commands.verify_sources()?;
+        }
+        if let Some(skills) = &self.skills {
+            skills.verify_home(&home)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn host_commands(&self) -> Option<&ReviewedCommandCeilingV1> {
+        self.commands.as_ref().filter(|commands| commands.is_host())
     }
 
     pub(super) fn permits_native_request(&self, tool_call: &Value) -> bool {
+        if tool_call["rawInput"]["variant"] == "Bash" {
+            return false;
+        }
         let input = &tool_call["rawInput"];
+        if let Some(skills) = &self.skills {
+            if tool_call["_meta"]["x.ai/tool"]["name"] == "skill" {
+                return skills.permits_request(tool_call);
+            }
+            if matches!(input["variant"].as_str(), Some("Write" | "SearchReplace"))
+                && !skills.permits_write(&self.canonical_working_directory, input)
+            {
+                return false;
+            }
+        }
         if let Some(target) = input["tool_name"].as_str() {
             return input["variant"] == "UseTool"
                 && self.permits_sdk_target(target)
@@ -609,7 +834,26 @@ impl GrokCreationPolicyV1 {
         {
             return input.is_object();
         }
-        if self.tool_set != GrokToolSet::Files || self.validate().is_err() {
+        if matches!(
+            self.tool_set,
+            GrokToolSet::FilesSearch
+                | GrokToolSet::Skills
+                | GrokToolSet::Commands
+                | GrokToolSet::CommandsSkills
+        ) && matches!(input["variant"].as_str(), Some("GrepSearch" | "ListDir"))
+        {
+            return self.validate().is_ok()
+                && search::approval_allowed(&self.canonical_working_directory, tool_call);
+        }
+        if !matches!(
+            self.tool_set,
+            GrokToolSet::Files
+                | GrokToolSet::FilesSearch
+                | GrokToolSet::Skills
+                | GrokToolSet::Commands
+                | GrokToolSet::CommandsSkills
+        ) || self.validate().is_err()
+        {
             return false;
         }
         let Some(fields) = input.as_object() else {
@@ -683,6 +927,15 @@ impl GrokCreationPolicyV1 {
             options.local_tools,
             options.permission_policy,
         )?;
+        if let Some(skills) = &mut policy.skills {
+            *skills = GrokSkillCeilingV1::capture(&options.selected_skills)?;
+        }
+        if let Some(commands) = &policy.commands {
+            commands.verify_sources()?;
+        }
+        if !policy.skill_selection_matches(&options.selected_skills) {
+            return Err(reject("grok_skills_selection_changed"));
+        }
         if !policy.runtime_scope_verified(
             cli_version,
             options.local_tools,
@@ -699,8 +952,14 @@ impl GrokCreationPolicyV1 {
                 policy.config_sha256.clone(),
                 options.permission_policy,
             )?;
+            if !saved.skill_selection_matches(&options.selected_skills) {
+                return Err(reject("grok_skills_selection_changed"));
+            }
             if saved.local_tools != options.local_tools {
                 return Err(reject("grok_saved_local_permissions_changed"));
+            }
+            if let Some(commands) = &saved.commands {
+                commands.verify_sources()?;
             }
             policy = saved.clone();
         } else if options.target != super::SessionTarget::New {
@@ -750,6 +1009,9 @@ impl GrokCreationPolicyV1 {
             &launch.profile_path,
             launch.policy.profile_document()?.as_bytes(),
         )?;
+        if let Some(skills) = &launch.policy.skills {
+            skills.prepare_home(&launch.home)?;
+        }
         // 只复制原生认证缓存，不导入用户配置、插件、hooks 或历史会话。
         let target = launch.home.join("grok/auth.json");
         // 先清除旧运行遗留的副本；用户退出登录后不能沿用旧缓存。
@@ -858,6 +1120,17 @@ fn verified_executable_digest(path: &Path) -> Result<(&'static str, String), Run
     {
         return Err(reject("grok_creation_platform_unverified"));
     }
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let npm_source = NpmGrokSource::capture(path)?;
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let _source_files = npm_source
+        .as_ref()
+        .map(|source| source.validate_and_hold())
+        .transpose()?;
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let path = npm_source
+        .as_ref()
+        .map_or(path, |source| source.executable.as_path());
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha256::new();
     let mut bytes = [0u8; 64 * 1024];

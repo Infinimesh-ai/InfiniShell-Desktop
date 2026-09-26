@@ -3,8 +3,8 @@
   "upstream_commit": "31ce59d9011cfb1d78f265649a228dac5de58d76",
   "cli_contract_version": "0.147.0",
   "plugin_version": "0.4.0",
-  "patch_revision": 5,
-  "directory": "codex-warp-0.4.0-rev5",
+  "patch_revision": 6,
+  "directory": "codex-warp-0.4.0-rev6",
   "files": {
     ".agents/plugins/marketplace.json": {
       "upstream_sha256": "9a051e04663470d26cac04a50eaa29c3bca830697f93c7fe261329514db2e5ce",
@@ -143,7 +143,7 @@
     },
     "plugins/warp/scripts/build-payload.sh": {
       "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
-      "sha256": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "sha256": "87fc88b087c7215d76b28206236ecd1eb1f82d1247f47e096065fb3506d63582",
       "mode": 493
     },
     "plugins/warp/scripts/on-permission-request.sh": {

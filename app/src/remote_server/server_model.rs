@@ -22,6 +22,37 @@ use warpui::r#async::{Spawnable, SpawnableOutput, SpawnedFutureHandle};
 use warpui::platform::TerminationMode;
 use warpui::{Entity, ModelContext, ModelHandle, SingletonEntity};
 
+#[cfg(all(unix, feature = "local_fs"))]
+use super::cli_image_staging_rpc::{ImageStagingConnection, ImageStagingService};
+use super::proto::{
+    CliImageStagingError, CliImageStagingErrorCode, CliImageStagingRequest,
+    CliImageStagingResponse, cli_image_staging_response,
+};
+
+#[path = "server_model_codex.rs"]
+mod codex;
+#[path = "server_model_grok.rs"]
+mod grok;
+
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+use super::cli_image_codex_owned::{
+    Connection as CodexOwnedConnection, Service as CodexOwnedService,
+};
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+use super::cli_image_grok::{Connection as GrokOwnedConnection, Service as GrokOwnedService};
+
 use super::codebase_index_status::{
     disabled_codebase_index_status, not_enabled_codebase_index_status,
 };
@@ -291,6 +322,42 @@ pub struct ServerModel {
     /// a connection's `Uuid` to the channel the connection task drains to
     /// write `ServerMessage`s back to its proxy.
     connection_senders: HashMap<ConnectionId, async_channel::Sender<ServerMessage>>,
+    #[cfg(all(unix, feature = "local_fs"))]
+    image_staging: Option<Arc<ImageStagingService>>,
+    #[cfg(all(unix, feature = "local_fs"))]
+    image_staging_connections: HashMap<ConnectionId, Arc<ImageStagingConnection>>,
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    grok_owned: Option<Arc<GrokOwnedService>>,
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    codex_owned: Option<Arc<CodexOwnedService>>,
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    grok_owned_connections: HashMap<ConnectionId, Arc<GrokOwnedConnection>>,
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    codex_owned_connections: HashMap<ConnectionId, Arc<CodexOwnedConnection>>,
     /// Per-connection set of repo roots for which we've already sent a
     /// snapshot in this connection's lifetime.
     ///
@@ -373,6 +440,42 @@ impl ServerModel {
         let remote_agent_context_snapshot = remote_agent_context_snapshot(1, &bundled_skills, ctx);
         let mut model = Self {
             connection_senders: HashMap::new(),
+            #[cfg(all(unix, feature = "local_fs"))]
+            image_staging: None,
+            #[cfg(all(unix, feature = "local_fs"))]
+            image_staging_connections: HashMap::new(),
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            grok_owned: None,
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            codex_owned: None,
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            grok_owned_connections: HashMap::new(),
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            codex_owned_connections: HashMap::new(),
             snapshot_sent_roots_by_connection: HashMap::new(),
             grace_timer_cancel: None,
             in_progress: HashMap::new(),
@@ -838,6 +941,30 @@ impl ServerModel {
         if let Some(handle) = self.grace_timer_cancel.take() {
             handle.abort();
         }
+        #[cfg(all(unix, feature = "local_fs"))]
+        self.image_staging_connections
+            .entry(conn_id)
+            .or_insert_with(|| Arc::new(ImageStagingConnection::new(conn_id)));
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        self.grok_owned_connections
+            .entry(conn_id)
+            .or_insert_with(|| Arc::new(GrokOwnedConnection::new()));
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        self.codex_owned_connections
+            .entry(conn_id)
+            .or_insert_with(|| Arc::new(CodexOwnedConnection::new()));
         self.connection_senders.insert(conn_id, conn_tx);
         self.snapshot_sent_roots_by_connection
             .insert(conn_id, HashSet::new());
@@ -847,8 +974,41 @@ impl ServerModel {
     /// Called when a proxy disconnects.  Removes it from the connection map
     /// and starts the grace timer if no connections remain.
     pub fn deregister_connection(&mut self, conn_id: ConnectionId, ctx: &mut ModelContext<Self>) {
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        if let Some(connection) = self.grok_owned_connections.remove(&conn_id) {
+            connection.disconnect();
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        if let Some(connection) = self.codex_owned_connections.remove(&conn_id) {
+            connection.disconnect();
+        }
         self.snapshot_sent_roots_by_connection.remove(&conn_id);
         self.remote_agent_context_snapshot_sent.remove(&conn_id);
+        #[cfg(all(unix, feature = "local_fs"))]
+        if let Some(connection) = self.image_staging_connections.remove(&conn_id) {
+            connection.revoke();
+            if let Some(staging) = self.image_staging.clone() {
+                ctx.background_executor()
+                    .spawn(async move {
+                        if let Err(error) = staging.disconnect(conn_id) {
+                            log::warn!("未投递图片暂存清理失败；错误类型={:?}", error.kind());
+                        }
+                    })
+                    .detach();
+            }
+        }
         // Guard against double-deregister (reader and writer tasks both call
         // this on connection close; the second call must be a safe no-op).
         if self.connection_senders.remove(&conn_id).is_none() {
@@ -1063,8 +1223,22 @@ impl ServerModel {
                     Some(session_scoped_request::Message::OpenBuffer(_)) => {
                         local_fs_unsupported_response()
                     }
+                    Some(session_scoped_request::Message::CliGrokOwned(m)) => {
+                        self.handle_cli_grok_owned(m, &request_id, conn_id, ctx)
+                    }
+                    Some(session_scoped_request::Message::CliCodexOwned(m)) => {
+                        self.handle_cli_codex_owned(m, &request_id, conn_id, ctx)
+                    }
                     Some(session_scoped_request::Message::GetDiffState(m)) => {
                         self.handle_get_diff_state(m, &request_id, conn_id, ctx)
+                    }
+                    #[cfg(all(unix, feature = "local_fs"))]
+                    Some(session_scoped_request::Message::CliImageStaging(m)) => {
+                        self.handle_cli_image_staging(m, &request_id, conn_id, ctx)
+                    }
+                    #[cfg(not(all(unix, feature = "local_fs")))]
+                    Some(session_scoped_request::Message::CliImageStaging(m)) => {
+                        image_staging_unavailable(m, CliImageStagingErrorCode::Unsupported)
                     }
                     None => {
                         log::warn!(
@@ -1090,7 +1264,91 @@ impl ServerModel {
                     Some(notification::Message::UpdatePreferences(m)) => {
                         self.handle_update_preferences(m, ctx);
                     }
+                    Some(notification::Message::RevokeCliImageStaging(request)) => {
+                        #[cfg(all(unix, feature = "local_fs"))]
+                        if matches!(
+                            request.action,
+                            Some(
+                                super::proto::cli_image_staging_request::Action::Revoke(_)
+                                    | super::proto::cli_image_staging_request::Action::Release(_)
+                            )
+                        ) && let (Some(connection), Some(staging)) = (
+                            self.image_staging_connections.get(&conn_id).cloned(),
+                            self.image_staging.clone(),
+                        ) {
+                            connection.revoke_request(&request);
+                            ctx.background_executor()
+                                .spawn(async move {
+                                    let _ = staging.handle(&connection, request);
+                                })
+                                .detach();
+                        }
+                        #[cfg(not(all(unix, feature = "local_fs")))]
+                        let _ = request;
+                    }
+                    Some(notification::Message::RevokeCliGrokOwned(request)) => {
+                        self.revoke_cli_grok_owned(request, conn_id);
+                    }
+                    Some(notification::Message::RevokeCliCodexOwned(request)) => {
+                        self.revoke_cli_codex_owned(request, conn_id);
+                    }
                     Some(notification::Message::SessionBootstrapped(m)) => {
+                        #[cfg(all(
+                            feature = "local_fs",
+                            any(
+                                all(target_os = "macos", target_arch = "aarch64"),
+                                all(target_os = "linux", target_arch = "x86_64")
+                            )
+                        ))]
+                        if ShellType::from_name(&m.shell_type).is_some()
+                            && let Some(connection) = self.grok_owned_connections.get(&conn_id)
+                        {
+                            connection.bootstrap(
+                                m.session_id,
+                                &m.image_staging_epoch,
+                                m.image_staging_epoch_revision,
+                            );
+                        }
+                        #[cfg(all(
+                            feature = "local_fs",
+                            any(
+                                all(target_os = "macos", target_arch = "aarch64"),
+                                all(target_os = "linux", target_arch = "x86_64")
+                            )
+                        ))]
+                        if ShellType::from_name(&m.shell_type).is_some()
+                            && let Some(connection) = self.codex_owned_connections.get(&conn_id)
+                        {
+                            connection.bootstrap(
+                                m.session_id,
+                                &m.image_staging_epoch,
+                                m.image_staging_epoch_revision,
+                            );
+                        }
+                        #[cfg(all(unix, feature = "local_fs"))]
+                        if ShellType::from_name(&m.shell_type).is_some()
+                            && let Some(connection) = self.image_staging_connections.get(&conn_id)
+                        {
+                            let retired = connection.bootstrap(
+                                SessionId::from(m.session_id),
+                                &m.image_staging_epoch,
+                                m.image_staging_epoch_revision,
+                            );
+                            if let (Some(scope), Some(staging)) =
+                                (retired, self.image_staging.clone())
+                            {
+                                ctx.background_executor()
+                                    .spawn(async move {
+                                        if let Err(error) = staging.retire_scope(conn_id, &scope) {
+                                            log::warn!(
+                                                "旧终端图片暂存清理失败；错误类型={:?}",
+                                                error.kind()
+                                            );
+                                        }
+                                    })
+                                    .detach();
+                            }
+                        }
                         self.handle_session_bootstrapped(m);
                     }
                     #[cfg(feature = "local_fs")]
@@ -1448,17 +1706,173 @@ impl ServerModel {
         // buffers it as a push event during the handshake.
         self.send_remote_agent_context_snapshot_to_connection(conn_id);
 
+        #[cfg(all(unix, feature = "local_fs"))]
+        if let Some(connection) = self.image_staging_connections.get(&conn_id) {
+            connection.initialize();
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        if let Some(connection) = self.grok_owned_connections.get(&conn_id) {
+            connection.initialize();
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        if let Some(connection) = self.codex_owned_connections.get(&conn_id) {
+            connection.initialize();
+        }
         let server_version = ChannelState::app_version().unwrap_or("").to_string();
         HandlerOutcome::Sync(server_message::Message::InitializeResponse(
             InitializeResponse {
                 server_version,
                 host_id: self.host_id.clone(),
-                capabilities: vec![
-                    RemoteServerCapability::SshByteStreamV1.into(),
-                    RemoteServerCapability::SshTransportV2.into(),
-                ],
+                capabilities: self.remote_capabilities(),
             },
         ))
+    }
+
+    fn remote_capabilities(&self) -> Vec<i32> {
+        let capabilities = vec![
+            RemoteServerCapability::SshByteStreamV1.into(),
+            RemoteServerCapability::SshTransportV2.into(),
+        ];
+        #[cfg(all(unix, feature = "local_fs"))]
+        {
+            let mut capabilities = capabilities;
+            if self.image_staging.is_some() {
+                capabilities.push(RemoteServerCapability::CliImageUnpublishedStagingV1.into());
+                capabilities.push(RemoteServerCapability::CliImageSessionReferencesV1.into());
+                capabilities.push(RemoteServerCapability::CliImageReferenceRecoveryV1.into());
+                #[cfg(any(target_os = "macos", target_os = "linux"))]
+                capabilities.push(RemoteServerCapability::CliImageCodexQueueV1.into());
+                #[cfg(any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                ))]
+                capabilities.push(RemoteServerCapability::CliImageClaudeReadV1.into());
+            }
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            if self.grok_owned.is_some() && self.image_staging.is_some() {
+                capabilities.push(RemoteServerCapability::CliGrokOwnedV1.into());
+            }
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            if self.codex_owned.is_some() && self.image_staging.is_some() {
+                capabilities.push(RemoteServerCapability::CliCodexOwnedV1.into());
+            }
+            capabilities
+        }
+        #[cfg(not(all(unix, feature = "local_fs")))]
+        {
+            capabilities
+        }
+    }
+
+    #[cfg(all(unix, feature = "local_fs"))]
+    pub(super) fn configure_image_staging(&mut self, private_parent: &Path) -> std::io::Result<()> {
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        {
+            self.grok_owned = Some(Arc::new(GrokOwnedService::new(
+                self.host_id.clone(),
+                private_parent,
+            )?));
+            self.codex_owned = Some(Arc::new(CodexOwnedService::new(
+                self.host_id.clone(),
+                private_parent,
+            )?));
+        }
+        let staging =
+            ImageStagingService::new(super::HostId::new(self.host_id.clone()), private_parent)?;
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
+        let staging = staging.with_codex_owned(self.codex_owned.clone());
+        self.image_staging = Some(Arc::new(staging));
+        Ok(())
+    }
+
+    #[cfg(all(unix, feature = "local_fs"))]
+    fn handle_cli_image_staging(
+        &mut self,
+        request: CliImageStagingRequest,
+        request_id: &RequestId,
+        conn_id: ConnectionId,
+        ctx: &mut ModelContext<Self>,
+    ) -> HandlerOutcome {
+        let Some(staging) = self.image_staging.clone() else {
+            return image_staging_unavailable(request, CliImageStagingErrorCode::Unsupported);
+        };
+        let Some(connection) = self.image_staging_connections.get(&conn_id).cloned() else {
+            return image_staging_unavailable(request, CliImageStagingErrorCode::Disconnected);
+        };
+        connection.revoke_request(&request);
+        let scope = request.scope.clone();
+        let revision = request.revision;
+        let (sender, receiver) = futures::channel::oneshot::channel();
+        ctx.background_executor()
+            .spawn(async move {
+                // 无图片内容或原生路径日志；持有的连接活性会在锁内再核验。
+                let response = staging.handle(&connection, request);
+                let _ = sender.send(response);
+            })
+            .detach();
+        let response_id = request_id.clone();
+        let handle = self.spawn_request_handler(
+            request_id.clone(),
+            receiver,
+            move |me, result, _| {
+                let response = match result {
+                    Ok(response) => response,
+                    Err(_) => CliImageStagingResponse {
+                        scope,
+                        revision,
+                        result: Some(cli_image_staging_response::Result::Error(
+                            CliImageStagingError {
+                                code: CliImageStagingErrorCode::StorageFailure.into(),
+                                message: "image staging worker unavailable".into(),
+                            },
+                        )),
+                    },
+                };
+                me.send_server_message(
+                    Some(conn_id),
+                    Some(&response_id),
+                    server_message::Message::CliImageStaging(response),
+                );
+            },
+            ctx,
+        );
+        HandlerOutcome::Async(Some(handle))
     }
 
     /// Applies the auth token from an `Initialize` message.
@@ -3839,3 +4253,21 @@ fn file_context_result_to_proto(result: ReadFileContextResult) -> ReadFileContex
 #[cfg(test)]
 #[path = "server_model_tests.rs"]
 mod tests;
+
+fn image_staging_unavailable(
+    request: CliImageStagingRequest,
+    code: CliImageStagingErrorCode,
+) -> HandlerOutcome {
+    HandlerOutcome::Sync(server_message::Message::CliImageStaging(
+        CliImageStagingResponse {
+            scope: request.scope,
+            revision: request.revision,
+            result: Some(cli_image_staging_response::Result::Error(
+                CliImageStagingError {
+                    code: code.into(),
+                    message: "image staging is unavailable on this connection".into(),
+                },
+            )),
+        },
+    ))
+}

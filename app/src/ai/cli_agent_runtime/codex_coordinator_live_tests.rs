@@ -399,6 +399,7 @@ async fn drive(
         grok_profile: None,
         model: None,
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         }),

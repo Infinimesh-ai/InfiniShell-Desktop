@@ -3,6 +3,11 @@
 pub use remote_server::*;
 
 #[cfg(not(target_family = "wasm"))]
+pub(crate) mod cli_image_submission;
+#[cfg(not(target_family = "wasm"))]
+mod cli_image_submission_journal;
+
+#[cfg(not(target_family = "wasm"))]
 pub mod auth_context;
 #[cfg(not(target_family = "wasm"))]
 pub mod codebase_index_model;
@@ -81,3 +86,62 @@ pub fn run_daemon(_identity_key: String) -> anyhow::Result<()> {
 // 上游在本次合并里给该函数追加了 crash-reporting 偏好 / codebase-index limits
 // 的转发(`current_codebase_index_limits`),依赖 `warp_server_client::auth` 与
 // `crate::server::server_api::ServerApiProvider`,两者均已从本 fork 剥离,故一并不引入。
+
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_claude_queue;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_codex_binding;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_codex_owned_socket;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_codex_queue;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_native_claude_binding;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_native_process;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_staging;
+#[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_staging_rpc;
+
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+mod cli_image_grok;
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+pub(crate) mod cli_image_grok_client;
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+pub(crate) mod cli_image_grok_launch;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod cli_image_grok_protocol;
+
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+mod cli_image_codex_owned;
+#[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+pub(crate) mod cli_image_codex_owned_client;
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+pub(crate) mod cli_image_codex_owned_launch;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod cli_image_codex_owned_protocol;

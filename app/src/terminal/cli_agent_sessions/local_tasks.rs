@@ -118,7 +118,11 @@ impl CLIAgentSessionsModel {
         sender: SyncSender<ModelEvent>,
         ctx: &mut ModelContext<Self>,
     ) {
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        #[cfg(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        ))]
         {
             // 同步置忙，先于初始化更新器；后台读盘期间不得出现空闲窗口。
             self.grok_owned_recovery.pending = true;
@@ -132,7 +136,11 @@ impl CLIAgentSessionsModel {
             |model, result, ctx| {
                 match result {
                     Ok(tasks) => {
-                        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+                        #[cfg(any(
+                            all(target_os = "macos", target_arch = "aarch64"),
+                            all(target_os = "linux", target_arch = "x86_64"),
+                            all(windows, target_arch = "x86_64")
+                        ))]
                         model.restore_grok_owned_launches(tasks.clone(), ctx);
                         model.restored_local_tasks = tasks;
                         #[cfg(not(target_family = "wasm"))]

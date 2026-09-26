@@ -15,6 +15,7 @@ fn synthetic_bundle() -> (tempfile::TempDir, BTreeMap<String, FileHashes>) {
             FileHashes {
                 upstream_sha256: sha256(original.as_bytes()),
                 replacement_sha256: sha256(replacement.as_bytes()),
+                previous_replacement_sha256: Vec::new(),
             },
         );
     }
@@ -198,6 +199,7 @@ fn hook_manifest_and_notify_failures_restore_files_in_spaced_chinese_path() {
                 FileHashes {
                     upstream_sha256: sha256(original.as_bytes()),
                     replacement_sha256: sha256(replacement.as_bytes()),
+                    previous_replacement_sha256: Vec::new(),
                 },
             );
             originals.insert(*relative, original);

@@ -1,9 +1,61 @@
 //! 应用明确发起的固定 Grok 普通 TUI 启动；通过 exec 继承原 PTY，不接管原生审批。
-//! 仅 macOS arm64 已有原生合同。其他平台不启动，不能据此宣称跨平台验收完成。
+//! macOS arm64、Linux x86_64 与 Windows x86_64 使用独立后端；实现接线不代表验收完成。
 
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64")))]
+use super::grok_owned_history::HistorySource;
 use std::io;
 
 pub const OWNED_GROK_COMMAND: &str = "--infinishell-owned-grok-tui";
+
+/// 远端 wrapper 已取得独占 ticket 后复用同一 exec 检查；不会派生第二个会话。
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(crate) fn exec_owned_from_manifest(path: &std::path::Path) -> io::Result<()> {
+    #[cfg(target_os = "macos")]
+    return native::exec_owned(path);
+    #[cfg(target_os = "linux")]
+    return linux::exec_owned(path);
+}
+
+/// 只能由正在目标终端前台运行的 wrapper 调用，daemon 不能以候选路径代替此检查。
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+fn current_remote_terminal() -> io::Result<(i32, u64)> {
+    let parent = unsafe { libc::getppid() };
+    let group = unsafe { libc::getpgrp() };
+    let session = unsafe { libc::getsid(0) };
+    if parent <= 1
+        || group <= 0
+        || session <= 0
+        || unsafe { libc::getsid(parent) } != session
+        || unsafe { libc::tcgetpgrp(0) } != group
+    {
+        return Err(io::Error::other("远端 Grok wrapper 未持有前台控制终端"));
+    }
+    let mut device = None;
+    for descriptor in [0, 1, 2] {
+        let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+        if unsafe { libc::isatty(descriptor) } != 1
+            || unsafe { libc::fstat(descriptor, stat.as_mut_ptr()) } != 0
+        {
+            return Err(io::Error::other("远端 Grok 标准流未连接同一个 PTY"));
+        }
+        let stat = unsafe { stat.assume_init() };
+        let current = stat.st_rdev as u64;
+        if stat.st_mode & libc::S_IFMT != libc::S_IFCHR
+            || current == 0
+            || device.is_some_and(|device| device != current)
+        {
+            return Err(io::Error::other("远端 Grok 标准流的终端身份不同"));
+        }
+        device = Some(current);
+    }
+    Ok((parent, device.expect("已读取三个标准流")))
+}
 
 /// 必须在 GUI、线程池和信号处理器初始化前调用；入口只接受单个私有 manifest 路径。
 pub fn run_owned_grok_from_args() -> Option<io::Result<()>> {
@@ -19,7 +71,15 @@ pub fn run_owned_grok_from_args() -> Option<io::Result<()>> {
     }
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
     return Some(native::exec_owned(std::path::Path::new(&path)));
-    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    return Some(linux::exec_owned(std::path::Path::new(&path)));
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    return Some(windows_native::exec_owned(std::path::Path::new(&path)));
+    #[cfg(not(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
     {
         let _ = path;
         Some(Err(io::Error::new(
@@ -48,10 +108,12 @@ mod native {
     use command::blocking::Command;
     use command::managed::{
         MacosProcessIdentity, macos_boot_session, macos_peer_identity, macos_process_identity,
+        macos_signal_owned_process,
     };
     use command::unix::CommandExt as _;
     use serde::{Deserialize, Serialize};
     use sha2::{Digest as _, Sha256};
+    use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
     use uuid::Uuid;
     use warpui::{AppContext, EntityId, SingletonEntity};
 
@@ -102,6 +164,32 @@ mod native {
             })
         }
 
+        pub(crate) fn from_current_terminal() -> io::Result<Self> {
+            let (parent, device) = current_remote_terminal()?;
+            let shell = macos_process_identity(parent)?;
+            let mut info = unsafe { std::mem::zeroed::<libc::proc_bsdinfo>() };
+            if unsafe {
+                libc::proc_pidinfo(
+                    parent,
+                    libc::PROC_PIDTBSDINFO,
+                    0,
+                    (&mut info as *mut libc::proc_bsdinfo).cast(),
+                    std::mem::size_of_val(&info) as i32,
+                )
+            } != std::mem::size_of_val(&info) as i32
+                || info.pbi_uid != unsafe { libc::geteuid() }
+                || info.e_tdev as u64 != device
+                || macos_process_identity(parent)? != shell
+                || current_remote_terminal()? != (parent, device)
+            {
+                return Err(io::Error::other("远端 Grok 父 shell 与控制终端不匹配"));
+            }
+            Ok(Self {
+                shell: shell.into(),
+                device,
+            })
+        }
+
         #[cfg(test)]
         pub(crate) fn capture(shell_pid: i32, slave: &Path) -> io::Result<Self> {
             let metadata = fs::metadata(slave)?;
@@ -121,6 +209,8 @@ mod native {
         version: u32,
         launch_id: Uuid,
         session_id: Uuid,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        history: Option<HistorySource>,
         executable: PathBuf,
         app_executable: PathBuf,
         cwd: PathBuf,
@@ -261,6 +351,30 @@ mod native {
             state_directory: &Path,
             pty: GrokOwnedPty,
         ) -> io::Result<Self> {
+            Self::prepare_with_history(executable, app_executable, cwd, state_directory, pty, None)
+        }
+
+        pub(crate) fn prepare_history(
+            executable: &Path,
+            app_executable: &Path,
+            cwd: &Path,
+            state_directory: &Path,
+            pty: GrokOwnedPty,
+            history: HistorySource,
+        ) -> io::Result<Self> {
+            history.validate_target(cwd, history.session_id)?;
+            history.verify_exited()?;
+            Self::prepare_with_history(executable, app_executable, cwd, state_directory, pty, Some(history))
+        }
+
+        fn prepare_with_history(
+            executable: &Path,
+            app_executable: &Path,
+            cwd: &Path,
+            state_directory: &Path,
+            pty: GrokOwnedPty,
+            history: Option<HistorySource>,
+        ) -> io::Result<Self> {
             let executable = executable.canonicalize()?;
             verify_binary(&executable)?;
             let output = Command::new(&executable).arg("--version").output()?;
@@ -281,7 +395,8 @@ mod native {
             let manifest = LaunchManifest {
                 version: 2,
                 launch_id: Uuid::new_v4(),
-                session_id: Uuid::new_v4(),
+                session_id: history.as_ref().map_or_else(Uuid::new_v4, |source| source.session_id),
+                history,
                 executable,
                 app_executable: app_executable.canonicalize()?,
                 cwd,
@@ -355,6 +470,21 @@ mod native {
                 OWNED_GROK_COMMAND.into(),
                 self.directory.join("launch.json").into_os_string(),
             ])
+        }
+
+        /// 调用方先持有远端 ticket 排他锁，并持久化本清单及 Unknown 派发记录。
+        /// 远端占用独立于本机更新模型；恢复对象永远不能取得此一次派发资格。
+        pub(crate) fn dispatch_remote_reserved(&mut self) -> io::Result<PathBuf> {
+            if self.phase != LaunchPhase::Prepared || self.reservation.is_some() {
+                return Err(io::Error::other("远端 Grok 启动已领取或属于本地占用"));
+            }
+            verify_binary(&self.manifest.executable)?;
+            write_new(
+                &self.directory.join("dispatched"),
+                self.manifest_sha256.as_bytes(),
+            )?;
+            self.phase = LaunchPhase::Dispatched;
+            Ok(self.manifest_path())
         }
 
         pub(crate) fn launch_id(&self) -> Uuid {
@@ -443,19 +573,7 @@ mod native {
                 leader: leader.into(),
             };
             validate_bound_processes(&bound, &receipt)?;
-            let path = self.directory.join("bound.json");
-            if let Some(bytes) = read_optional_private(&path)? {
-                let previous: BoundProcesses =
-                    serde_json::from_slice(&bytes).map_err(io::Error::other)?;
-                if previous != bound {
-                    return Err(GrokLeaderInputError::IdentityChanged);
-                }
-            } else {
-                write_new(
-                    &path,
-                    &serde_json::to_vec(&bound).map_err(io::Error::other)?,
-                )?;
-            }
+            self.record_owned_processes(&bound, &receipt)?;
             self.processes = Some((actual, leader));
             Ok(GrokOwnedBinding {
                 target,
@@ -467,12 +585,165 @@ mod native {
             })
         }
 
+        fn record_owned_processes(
+            &self,
+            bound: &BoundProcesses,
+            receipt: &ExecReceipt,
+        ) -> io::Result<()> {
+            validate_bound_processes(bound, receipt)?;
+            let path = self.directory.join("bound.json");
+            match write_new(&path, &serde_json::to_vec(bound).map_err(io::Error::other)?) {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+                    // 输入绑定和只读生命周期捕获可以并发，只接受完全相同的首次落盘身份。
+                    let previous: BoundProcesses =
+                        serde_json::from_slice(&read_private(&path)?).map_err(io::Error::other)?;
+                    if previous == *bound {
+                        Ok(())
+                    } else {
+                        Err(io::Error::other("owned Grok 进程身份记录已变化"))
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+
+        /// 只保存本次 exec 与私有 socket 的内核身份，不构造输入 target、不授权或合成事件。
+        /// 在后台执行；插件缺失也要独立记录原生进程，供退出清理和恢复核对。
+        pub(crate) fn capture_owned_processes(&mut self) -> io::Result<()> {
+            if self.phase != LaunchPhase::Dispatched
+                || macos_boot_session()? != self.manifest.boot_session
+            {
+                return Err(io::Error::other("owned Grok 生命周期捕获状态无效"));
+            }
+            self.refresh_bound_processes()?;
+            if self.processes.is_some() {
+                return Ok(());
+            }
+            let receipt = self.exec_receipt()?;
+            let tui = macos_process_identity(receipt.process.pid)?;
+            if !exec_identity_matches(&receipt.process, tui)
+                || unsafe { libc::getpgid(tui.pid) } != receipt.process_group
+            {
+                return Err(io::Error::other("owned Grok exec 身份已经改变"));
+            }
+            validate_socket_directory(&self.manifest)?;
+            let socket = fs::symlink_metadata(&self.manifest.socket_path)?;
+            if !socket.file_type().is_socket()
+                || socket.uid() != unsafe { libc::geteuid() }
+                || socket.mode() & 0o022 != 0
+            {
+                return Err(io::Error::other("owned Grok 生命周期 socket 无效"));
+            }
+            // 只建立本机 socket 并读取内核凭据，不发送原生协议帧或模型输入。
+            let peer = UnixStream::connect(&self.manifest.socket_path)?;
+            let leader = macos_peer_identity(&peer)?;
+            let pids = [
+                Pid::from_u32(tui.pid as u32),
+                Pid::from_u32(leader.pid as u32),
+            ];
+            let mut system = System::new();
+            system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&pids),
+                true,
+                ProcessRefreshKind::nothing()
+                    .with_exe(UpdateKind::Always)
+                    .with_cmd(UpdateKind::Always),
+            );
+            for pid in pids {
+                let process = system
+                    .process(pid)
+                    .ok_or_else(|| io::Error::other("owned Grok 原生进程已经退出"))?;
+                if process
+                    .exe()
+                    .and_then(|path| path.canonicalize().ok())
+                    .as_ref()
+                    != Some(&self.manifest.executable)
+                {
+                    return Err(io::Error::other("owned Grok 原生映像不匹配"));
+                }
+            }
+            let actual = system
+                .process(pids[0])
+                .ok_or_else(|| io::Error::other("owned Grok TUI 已经退出"))?;
+            if actual.cmd().get(1..) != Some(native_arguments(&self.manifest).as_slice()) {
+                return Err(io::Error::other("owned Grok TUI 参数不匹配"));
+            }
+            let socket_after = fs::symlink_metadata(&self.manifest.socket_path)?;
+            if macos_process_identity(tui.pid)? != tui
+                || macos_process_identity(leader.pid)? != leader
+                || socket.dev() != socket_after.dev()
+                || socket.ino() != socket_after.ino()
+            {
+                return Err(io::Error::other("owned Grok 生命周期捕获期间身份改变"));
+            }
+            let bound = BoundProcesses {
+                version: 1,
+                launch_id: self.launch_id(),
+                manifest_sha256: self.manifest_sha256.clone(),
+                tui: tui.into(),
+                leader: leader.into(),
+            };
+            self.record_owned_processes(&bound, &receipt)?;
+            self.processes = Some((tui, leader));
+            Ok(())
+        }
+
+        /// 原生 TUI 已退出才请求停止此启动独有的 leader；侧车断开不能触发停止。
+        /// 发出信号不是退出证明；下一次 reaper 仍须分别核对真实进程身份。
+        pub(crate) fn stop_leader_after_tui_exit(&self) -> io::Result<()> {
+            if self.phase != LaunchPhase::Dispatched
+                || macos_boot_session()? != self.manifest.boot_session
+            {
+                return Ok(());
+            }
+            let Some((tui, leader)) = self.processes else {
+                return Err(io::Error::other(
+                    "owned Grok 尚未捕获进程，不能猜测退出目标",
+                ));
+            };
+            if identity_exited(tui) && !identity_exited(leader) {
+                macos_signal_owned_process(leader, &self.manifest.boot_session, libc::SIGTERM)?;
+            }
+            Ok(())
+        }
+
+        /// 后台 GUI 绑定完成后，原全局占用对象也读取同一清单下的已验证身份。
+        pub(crate) fn refresh_bound_processes(&mut self) -> io::Result<()> {
+            if self.phase != LaunchPhase::Dispatched || self.processes.is_some() {
+                return Ok(());
+            }
+            let path = self.directory.join("bound.json");
+            if let Some(bytes) = read_optional_private(&path)? {
+                let bound: BoundProcesses =
+                    serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+                validate_bound_processes(&bound, &self.exec_receipt()?)?;
+                self.processes =
+                    Some((kernel_identity(&bound.tui), kernel_identity(&bound.leader)));
+            }
+            Ok(())
+        }
+
         pub(crate) fn is_retired(&self) -> bool {
             self.phase == LaunchPhase::Released
         }
 
         pub(crate) fn was_dispatched(&self) -> bool {
             self.phase == LaunchPhase::Dispatched
+        }
+
+        pub(crate) fn confirm_history_exit(&mut self) -> io::Result<()> {
+            if self.phase == LaunchPhase::Released && read_optional_private(&self.directory.join("dispatched"))?.is_none() { return self.confirm_not_dispatched(); }
+            let previous_phase = self.phase;
+            if self.phase == LaunchPhase::Released { self.phase = LaunchPhase::Dispatched; }
+            let refreshed = self.refresh_bound_processes();
+            self.phase = previous_phase;
+            refreshed?;
+            self.confirm_exit()
+        }
+
+        pub(crate) fn matches_history_pty(&self, pty: &GrokOwnedPty) -> io::Result<bool> {
+            Ok(self.manifest.shell == pty.shell && self.manifest.tty_device == pty.device)
         }
 
         pub(crate) fn working_directory(&self) -> &Path {
@@ -530,6 +801,16 @@ mod native {
         }
 
         fn retire(&mut self, dispatched: bool, ctx: &mut AppContext) -> io::Result<()> {
+            self.record_retired(dispatched)?;
+            if let Some(reservation) = self.reservation.take() {
+                CliAgentUpdatesModel::handle(ctx)
+                    .update(ctx, |model, ctx| model.release_launch(reservation, ctx));
+            }
+            self.phase = LaunchPhase::Released;
+            Ok(())
+        }
+
+        fn record_retired(&self, dispatched: bool) -> io::Result<()> {
             // 先保留可恢复的退出收据，再释放占用。任务历史仍引用清单，不能直接删目录。
             let receipt = RetiredLaunch {
                 version: 1,
@@ -542,10 +823,30 @@ mod native {
                 &self.directory.join("retired.json"),
                 &serde_json::to_vec(&receipt).map_err(io::Error::other)?,
             )?;
-            if let Some(reservation) = self.reservation.take() {
-                CliAgentUpdatesModel::handle(ctx)
-                    .update(ctx, |model, ctx| model.release_launch(reservation, ctx));
+            Ok(())
+        }
+
+        /// 仅后台核对远端占用；断连、socket 消失或无法读取进程均不代表已退出。
+        pub(crate) fn release_remote_after_exit(&mut self) -> io::Result<()> {
+            if self.reservation.is_some() {
+                return Err(io::Error::other("不能用远端清理接口释放本地启动占用"));
             }
+            if self.phase == LaunchPhase::Released {
+                self.confirm_exit()?;
+                return Ok(());
+            }
+            if self.phase != LaunchPhase::Dispatched {
+                return Err(io::Error::other("远端 Grok 尚未派发"));
+            }
+            self.refresh_bound_processes()?;
+            if self.processes.is_none()
+                && macos_boot_session()? == self.manifest.boot_session
+                && read_optional_private(&self.directory.join("exec-failed.json"))?.is_none()
+            {
+                self.capture_owned_processes()?;
+            }
+            self.confirm_exit()?;
+            self.record_retired(true)?;
             self.phase = LaunchPhase::Released;
             Ok(())
         }
@@ -869,7 +1170,7 @@ mod native {
             manifest.cwd.as_os_str().to_owned(),
             "--leader-socket".into(),
             manifest.socket_path.as_os_str().to_owned(),
-            "--session-id".into(),
+            if manifest.history.is_some() { "--resume".into() } else { "--session-id".into() },
             manifest.session_id.to_string().into(),
             "--model".into(),
             MODEL.into(),
@@ -905,6 +1206,10 @@ mod native {
         let process_group = unsafe { libc::getpgrp() };
         if process_group <= 0 || unsafe { libc::tcgetpgrp(0) } != process_group {
             return Err(io::Error::other("owned Grok 未拥有前台 PTY 作业"));
+        }
+        if let Some(history) = &manifest.history {
+            history.validate_target(&manifest.cwd, manifest.session_id)?;
+            history.verify_exited()?;
         }
         verify_binary(&manifest.executable)?;
         let receipt = ExecReceipt {
@@ -945,3 +1250,17 @@ mod native {
     #[path = "grok_owned_native_live_tests.rs"]
     mod live_tests;
 }
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "grok_owned_launch_linux.rs"]
+mod linux;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) use linux::{GrokOwnedBinding, GrokOwnedLaunch, GrokOwnedPty};
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[path = "grok_owned_launch_windows.rs"]
+mod windows_native;
+#[cfg(all(windows, target_arch = "x86_64"))]
+pub(crate) use windows_native::{
+    GrokOwnedBinding, GrokOwnedLaunch, GrokOwnedPty, windows_launch_command,
+};

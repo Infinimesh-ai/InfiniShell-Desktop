@@ -86,32 +86,38 @@ def verify_owned(home, bundle):
     return source
 
 
-def previous_revision(bundle):
-    data = checked_file(bundle / 'codex/revisions/rev3', 'SOURCE_METADATA.json').read_bytes()
+def previous_revision(bundle, revision=3):
+    require(revision in (3, 4, 5), '未知的旧来源修补版本')
+    data = checked_file(bundle / f'codex/revisions/rev{revision}', 'SOURCE_METADATA.json').read_bytes()
     metadata = json.loads(data)
     require(metadata['upstream_commit'] == COMMIT and metadata['cli_contract_version'] == '0.147.0'
-            and metadata['patch_revision'] == 3 and metadata['directory'] == 'codex-warp-0.4.0-rev3'
-            and len(metadata['files']) == 36, '旧版本迁移契约不是固定 rev3')
+            and metadata['patch_revision'] == revision
+            and metadata['directory'] == f'codex-warp-0.4.0-rev{revision}'
+            and len(metadata['files']) == 36, '旧版本迁移契约不匹配固定来源')
     return metadata, data
 
 
-def verify_previous(home, bundle):
-    metadata, data = previous_revision(bundle)
+def verify_previous(home, bundle, revision=3):
+    metadata, data = previous_revision(bundle, revision)
     source = source_path(home, metadata)
     require(checked_file(source.parent, 'SOURCE_METADATA.json').read_bytes() == data
             and tree(source) == {name: entry['sha256'] for name, entry in metadata['files'].items()},
-            '旧 rev3 来源有修改、缺失或额外文件')
+            '旧来源有修改、缺失或额外文件')
     verify_modes(source, metadata['files'])
     return source
 
 
 def verify_previous_cache(root, bundle):
-    metadata, _ = previous_revision(bundle)
-    files = {name.removeprefix('plugins/warp/'): entry for name, entry in metadata['files'].items()
-             if name.startswith('plugins/warp/')}
-    require(tree(root) == {name: entry['sha256'] for name, entry in files.items()},
-            '旧缓存不是完整固定 rev3，拒绝新旧混合或自定义脚本')
-    verify_modes(root, files)
+    actual = tree(root)
+    # 只能接受某个完整已部署版本，不能按文件拼凑不同修补版本。
+    for revision in (5, 4, 3):
+        metadata, _ = previous_revision(bundle, revision)
+        files = {name.removeprefix('plugins/warp/'): entry for name, entry in metadata['files'].items()
+                 if name.startswith('plugins/warp/')}
+        if actual == {name: entry['sha256'] for name, entry in files.items()}:
+            verify_modes(root, files)
+            return
+    raise ValueError('旧缓存不是完整固定版本，拒绝新旧混合或自定义脚本')
 
 
 def validate_source(home, settings, bundle):
@@ -122,11 +128,12 @@ def validate_source(home, settings, bundle):
     if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, metadata)):
         verify_owned(home, bundle)
         return True
-    previous, _ = previous_revision(bundle)
-    if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, previous)):
-        verify_previous(home, bundle)
-        # 旧版可以迁移，但检查命令不能把它报告为当前配方。
-        return False
+    for revision in (5, 4, 3):
+        previous, _ = previous_revision(bundle, revision)
+        if entry.get('source_type') == 'local' and entry.get('source') == str(source_path(home, previous)):
+            verify_previous(home, bundle, revision)
+            # 旧版可以迁移，但检查命令不能把它报告为当前配方。
+            return False
     require(entry.get('source_type') == 'git' and entry.get('source') in (
         'https://github.com/warpdotdev/codex-warp.git', 'https://github.com/warpdotdev/codex-warp',
         'warpdotdev/codex-warp') and entry.get('ref') in (None, COMMIT) and

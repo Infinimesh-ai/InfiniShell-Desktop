@@ -9,11 +9,14 @@ fn policy(permissions: Option<LocalToolPermissions>) -> GrokCreationPolicyV1 {
         config_sha256: "b".repeat(64),
         tool_set: GrokToolSet::Read,
         local_tools: permissions,
+        skills: None,
+        commands: None,
     }
 }
 
 fn permissions(spawn: bool, message: bool) -> Option<LocalToolPermissions> {
     Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: spawn,
         allow_message: message,
     })

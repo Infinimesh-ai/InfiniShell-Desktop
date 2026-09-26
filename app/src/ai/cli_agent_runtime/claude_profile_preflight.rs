@@ -14,13 +14,15 @@ use warpui::r#async::FutureExt as _;
 
 use super::{MAX_LINE_BYTES, write_message};
 use crate::ai::cli_agent_runtime::claude_profile::{
-    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2,
+    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2, ClaudeRestrictedSkillsV1, ClaudeReviewedCommandsSkillsV1,
     FIXED_PERMISSION_MODE_ARGUMENT, ISOLATED_SETTINGS_ARGUMENTS, reject,
 };
 use crate::ai::cli_agent_runtime::{PermissionPolicy, RuntimeError, SessionOptions, SessionTarget};
 
 pub(super) async fn prepare(options: &SessionOptions) -> Result<ClaudeFileProfile, RuntimeError> {
-    if !options.selected_skills.is_empty() {
+    if !options.selected_skills.is_empty()
+        && !options.permission_policy.is_claude_fixed_skills()
+    {
         return Err(reject("claude_profile_skills_unsupported"));
     }
     if options.target != SessionTarget::New && options.claude_profile.is_none() {
@@ -93,15 +95,27 @@ pub(super) async fn prepare(options: &SessionOptions) -> Result<ClaudeFileProfil
             &rules,
             &hooks,
         )?;
-        let profile = ClaudeFileProfile::compile(options.permission_policy, profile)?;
+        let profile = if options.permission_policy == PermissionPolicy::ClaudeReviewedCommandsSkillsV1 {
+            ClaudeFileProfile::CommandsSkillsV1(ClaudeReviewedCommandsSkillsV1::compile(profile, &options.selected_skills)?)
+        } else if options.permission_policy.is_claude_fixed_skills() {
+            ClaudeFileProfile::SkillsV1(ClaudeRestrictedSkillsV1::compile(
+                profile,
+                &options.selected_skills,
+            )?)
+        } else {
+            ClaudeFileProfile::compile(options.permission_policy, profile)?
+        };
         if let Some(saved) = &options.claude_profile {
             saved.verify_source(&profile)?;
         }
         if let Some(ceiling) = &options.permission_ceiling {
-            ceiling
+            if !ceiling
                 .claude_profile()
                 .ok_or_else(|| reject("claude_profile_wrong_parent"))?
-                .verify_source(&profile)?;
+                .allows_child(&profile)
+            {
+                return Err(reject("claude_skills_parent_ceiling"));
+            }
         }
         Ok(profile)
     }
@@ -178,7 +192,14 @@ fn executable_digest_for_policy(
         digest.update(&bytes[..count]);
     }
     let actual = format!("{:x}", digest.finalize());
-    if policy == PermissionPolicy::ClaudeRestrictedFilesV2 {
+    if matches!(
+        policy,
+        PermissionPolicy::ClaudeRestrictedFilesV2
+            | PermissionPolicy::ClaudeRestrictedFilesV3
+            | PermissionPolicy::ClaudeRestrictedSkillsV1
+            | PermissionPolicy::ClaudeReviewedCommandsV1
+            | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+    ) {
         return if ClaudeRestrictedFilesV2::executable_verified(&actual) {
             Ok(actual)
         } else {

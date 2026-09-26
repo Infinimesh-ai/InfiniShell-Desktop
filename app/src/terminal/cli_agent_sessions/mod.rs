@@ -2,9 +2,29 @@ pub mod event;
 mod event_cursor;
 pub(crate) mod grok_leader_input;
 pub(crate) mod grok_owned_launch;
-#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64")))]
+pub(crate) mod grok_owned_history;
+#[cfg(all(windows, target_arch = "x86_64"))]
+pub(crate) mod grok_owned_history_source_windows;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod grok_owned_prompt;
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
 mod grok_owned_recovery;
-#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(
+    feature = "local_fs",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
 pub(crate) mod grok_owned_worker;
 mod grok_permission_evidence;
 pub use grok_permission_evidence::{GrokPermissionEvidence, GrokPermissionObservation};
@@ -17,7 +37,10 @@ pub(crate) mod plugin_manager;
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use event::{CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType};
+use event::{
+    CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType, ClaudeProcessEvidence,
+    CodexProcessEvidence,
+};
 use uuid::Uuid;
 use warpui::r#async::SpawnedFutureHandle;
 use warpui::{Entity, EntityId, ModelContext, ModelHandle, SingletonEntity};
@@ -84,6 +107,10 @@ pub struct CLIAgentSessionContext {
     pub response: Option<String>,
     /// 仅本次监听期间的原生 SessionStart 证据，不能从数据库恢复为有效证据。
     pub grok_permission_evidence: GrokPermissionEvidence,
+    /// 仅在当前监听器和原生 UUID 下有效；不可从持久化历史恢复为进程身份。
+    pub codex_process_evidence: Option<CodexProcessEvidence>,
+    /// 当前监听器的 Claude 进程与历史路径候选，不从历史状态恢复权限。
+    pub claude_image_evidence: Option<(ClaudeProcessEvidence, String)>,
 }
 
 /// State of the rich input editor for composing a prompt to send to a CLI agent.
@@ -437,7 +464,14 @@ pub struct CLIAgentSessionsModel {
     restored_local_tasks: Vec<crate::persistence::model::LocalCliTask>,
     #[cfg(feature = "local_fs")]
     local_task_recovery_failed: bool,
-    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
     grok_owned_recovery: grok_owned_recovery::GrokOwnedRecovery,
 }
 
@@ -463,7 +497,14 @@ impl CLIAgentSessionsModel {
             restored_local_tasks: Vec::new(),
             #[cfg(feature = "local_fs")]
             local_task_recovery_failed: false,
-            #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
             grok_owned_recovery: Default::default(),
         }
     }
@@ -474,7 +515,14 @@ impl CLIAgentSessionsModel {
 
     /// 空闲升级要求原生会话已退出；等待输入或已完成回合仍可能持有 CLI 进程。
     pub(crate) fn has_local_session(&self, agent: CLIAgent) -> bool {
-        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
         if agent == CLIAgent::Grok && self.grok_owned_recovery.busy() {
             return true;
         }
@@ -549,11 +597,29 @@ impl CLIAgentSessionsModel {
         listener: ModelHandle<CLIAgentSessionListener>,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(not(target_family = "wasm"))]
+        crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke(terminal_view_id);
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.revoke_owned_grok_input(terminal_view_id);
         if let Some(session) = self
             .sessions
             .get_mut(&terminal_view_id)
             .filter(|s| s.agent == agent)
         {
+            // Codex 来源候选只属于原监听器；注册新监听器后必须等待其真实 hook。
+            if matches!(session.agent, CLIAgent::Codex | CLIAgent::Claude) {
+                session.session_context.codex_process_evidence = None;
+                session.session_context.claude_image_evidence = None;
+            }
             // 监听器被替换或会话身份变化后，旧证据不能随上下文一起继承。
             if session.agent == CLIAgent::Grok
                 && (session
@@ -607,6 +673,19 @@ impl CLIAgentSessionsModel {
     }
 
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
+        #[cfg(not(target_family = "wasm"))]
+        crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke(terminal_view_id);
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.revoke_owned_grok_input(terminal_view_id);
         self.input_generations.remove(&terminal_view_id);
         self.input_submissions.remove(&terminal_view_id);
         self.abort_pending_cancel(terminal_view_id);
@@ -679,17 +758,49 @@ impl CLIAgentSessionsModel {
                 .get_mut(&terminal_view_id)
                 .expect("session checked above");
             let context = &mut session.session_context;
-            if context.grok_permission_evidence.observe(
+            let codex_evidence_changed = if session.agent == CLIAgent::Codex
+                && event.source == CLIAgentEventSource::RichPlugin
+            {
+                let incoming =
+                    event.codex_process_evidence_for_session(context.session_id.as_deref());
+                let changed = context.codex_process_evidence != incoming;
+                context.codex_process_evidence = incoming;
+                if changed {
+                    #[cfg(not(target_family = "wasm"))]
+                    crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+                }
+                changed
+            } else {
+                false
+            };
+            let claude_evidence_changed = if session.agent == CLIAgent::Claude
+                && event.source == CLIAgentEventSource::RichPlugin
+            {
+                let incoming =
+                    event.claude_image_evidence_for_session(context.session_id.as_deref());
+                let changed = context.claude_image_evidence != incoming;
+                context.claude_image_evidence = incoming;
+                if changed {
+                    #[cfg(not(target_family = "wasm"))]
+                    crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+                }
+                changed
+            } else {
+                false
+            };
+            if (context.grok_permission_evidence.observe(
                 event,
                 context.session_id.as_deref(),
                 context.cwd.as_deref(),
-            ) && !(disposition == EventDisposition::Accept
-                && matches!(
-                    event.event,
-                    CLIAgentEventType::SessionStart
-                        | CLIAgentEventType::PromptSubmit
-                        | CLIAgentEventType::ToolComplete
-                ))
+            ) || codex_evidence_changed
+                || claude_evidence_changed)
+                && !(disposition == EventDisposition::Accept
+                    && matches!(
+                        event.event,
+                        CLIAgentEventType::SessionStart
+                            | CLIAgentEventType::PromptSubmit
+                            | CLIAgentEventType::ToolComplete
+                    ))
             {
                 ctx.emit(CLIAgentSessionsModelEvent::SessionUpdated {
                     terminal_view_id,
@@ -697,6 +808,27 @@ impl CLIAgentSessionsModel {
                 });
             }
         }
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.revoke_stale_owned_grok_input(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke_unless(
+            terminal_view_id,
+            self.sessions.get(&terminal_view_id).and_then(|session| {
+                match &session.session_context.grok_permission_evidence {
+                    GrokPermissionEvidence::Observed(observed) => Some(observed),
+                    GrokPermissionEvidence::Unobserved | GrokPermissionEvidence::Invalidated => {
+                        None
+                    }
+                }
+            }),
+        );
         let session = self
             .sessions
             .get(&terminal_view_id)
@@ -840,6 +972,10 @@ impl CLIAgentSessionsModel {
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(not(target_family = "wasm"))]
+        crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke(terminal_view_id);
         if let Some(generation) = self.input_generations.get_mut(&terminal_view_id) {
             *generation = Uuid::new_v4();
         }
@@ -1013,6 +1149,19 @@ impl CLIAgentSessionsModel {
         should_auto_toggle_input: bool,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(not(target_family = "wasm"))]
+        crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke(terminal_view_id);
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.close_owned_grok_input_editor(terminal_view_id);
         let Some(session) = self.sessions.get_mut(&terminal_view_id) else {
             return;
         };
@@ -1036,9 +1185,25 @@ impl CLIAgentSessionsModel {
     pub fn set_session(
         &mut self,
         terminal_view_id: EntityId,
-        session: CLIAgentSession,
+        mut session: CLIAgentSession,
         ctx: &mut ModelContext<Self>,
     ) {
+        // 新注册、恢复和克隆上下文都必须重新观察本次监听器的原生进程候选。
+        session.session_context.codex_process_evidence = None;
+        session.session_context.claude_image_evidence = None;
+        #[cfg(not(target_family = "wasm"))]
+        crate::remote_server::cli_image_submission::revoke(terminal_view_id);
+        #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+        crate::remote_server::cli_image_grok_client::revoke(terminal_view_id);
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.revoke_owned_grok_input(terminal_view_id);
         let agent = session.agent;
         self.input_generations
             .insert(terminal_view_id, Uuid::new_v4());

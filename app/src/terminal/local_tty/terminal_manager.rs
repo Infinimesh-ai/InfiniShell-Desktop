@@ -683,7 +683,11 @@ fn on_shell_determined<S: TerminalSurface>(
     let pid = pty.get_pid();
     #[cfg(unix)]
     let fd = pty.get_fd();
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    ))]
     model.lock().set_local_pty_identity(pty.local_identity());
 
     // Create the channel above and pass the receving side to the event loop.

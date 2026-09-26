@@ -44,7 +44,7 @@ const CLAUDE_PREPARE: &str = "node -e \"if (!process.env.AUTHORIZED) { console.e
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Layout {
     Codex01561,
-    Claude21280,
+    ClaudeNativeV1,
 }
 
 /// 两个 tarball 各自有独立 SRI；平台目录名不等同于平台包清单中的 name。
@@ -111,8 +111,12 @@ impl NpmRelease {
         // 消费者渠道仍由外层选择；布局合同不会把本次验收外推到未知版本。
         let layout = if agent == CLIAgent::Codex && version == "0.156.1" {
             Layout::Codex01561
-        } else if agent == CLIAgent::Claude && version == "2.1.280" {
-            Layout::Claude21280
+        } else if agent == CLIAgent::Claude
+            && (version == "2.1.280"
+                || (version == super::claude_downgrade::TO
+                    && matches!(target, "darwin-arm64" | "linux-x64")))
+        {
+            Layout::ClaudeNativeV1
         } else {
             return Err(Error::InvalidRelease);
         };
@@ -123,7 +127,7 @@ impl NpmRelease {
                 "bin/codex.js",
                 CODEX_TARGETS.as_slice(),
             ),
-            Layout::Claude21280 => (
+            Layout::ClaudeNativeV1 => (
                 "@anthropic-ai/claude-code",
                 "claude",
                 "bin/claude.exe",
@@ -138,14 +142,14 @@ impl NpmRelease {
             .map(|target| {
                 let requirement = match layout {
                     Layout::Codex01561 => format!("npm:{package}@{version}-{target}"),
-                    Layout::Claude21280 => version.to_owned(),
+                    Layout::ClaudeNativeV1 => version.to_owned(),
                 };
                 (format!("{package}-{target}"), requirement)
             })
             .collect();
         let scripts = match layout {
             Layout::Codex01561 => json!({}),
-            Layout::Claude21280 => {
+            Layout::ClaudeNativeV1 => {
                 json!({"prepare":CLAUDE_PREPARE,"postinstall":"node install.cjs"})
             }
         };
@@ -157,12 +161,12 @@ impl NpmRelease {
         let platform_package = format!("{package}-{target}");
         let (platform_name, platform_version) = match layout {
             Layout::Codex01561 => (package.to_owned(), format!("{version}-{target}")),
-            Layout::Claude21280 => (platform_package.clone(), version.to_owned()),
+            Layout::ClaudeNativeV1 => (platform_package.clone(), version.to_owned()),
         };
         let mut components = target.split('-');
         let os = components.next().ok_or(Error::InvalidRelease)?;
         let cpu = components.next().ok_or(Error::InvalidRelease)?;
-        let libc = if layout == Layout::Claude21280 && os == "linux" {
+        let libc = if layout == Layout::ClaudeNativeV1 && os == "linux" {
             json!([if target.ends_with("-musl") {
                 "musl"
             } else {
@@ -193,7 +197,7 @@ impl NpmRelease {
                 let binary = if os == "win32" { "codex.exe" } else { "codex" };
                 PathBuf::from(format!("vendor/{triple}/bin/{binary}"))
             }
-            Layout::Claude21280 => PathBuf::from(if os == "win32" {
+            Layout::ClaudeNativeV1 => PathBuf::from(if os == "win32" {
                 "claude.exe"
             } else {
                 "claude"
@@ -206,7 +210,7 @@ impl NpmRelease {
             native_entry,
             public_entry: PathBuf::from(entry),
             // Claude 的官方 postinstall 仅由宿主已审查的文件复制替代，永远不执行 install.cjs。
-            materialize_native_entry: layout == Layout::Claude21280,
+            materialize_native_entry: layout == Layout::ClaudeNativeV1,
         })
     }
 
@@ -271,6 +275,19 @@ fn contract(manifest: &Value) -> Result<Value, Error> {
 }
 
 impl NpmArtifact {
+    /// Grok 的三包闭包使用固定 SRI 和清单；仍由统一解析器拒绝归档路径与依赖漂移。
+    pub(super) fn from_pinned_metadata(
+        bytes: &[u8],
+        expected: Value,
+        integrity: &str,
+    ) -> Result<Self, Error> {
+        let metadata: Value = serde_json::from_slice(bytes).map_err(|_| Error::InvalidRelease)?;
+        if metadata["dist"]["integrity"] != integrity {
+            return Err(Error::InvalidRelease);
+        }
+        Self::from_metadata(bytes, expected)
+    }
+
     fn from_metadata(bytes: &[u8], expected: Value) -> Result<Self, Error> {
         if bytes.len() > MAX_METADATA {
             return Err(Error::InvalidRelease);

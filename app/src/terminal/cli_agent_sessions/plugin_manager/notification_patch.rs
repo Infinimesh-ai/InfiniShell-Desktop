@@ -164,6 +164,8 @@ struct CompatibleBase {
 struct FileHashes {
     upstream_sha256: String,
     replacement_sha256: String,
+    #[serde(default)]
+    previous_replacement_sha256: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -616,7 +618,11 @@ fn validate_tree(installation: &Installation, kind: PatchKind) -> io::Result<()>
                 .files
                 .get(&relative)
                 .map(|file| &file.replacement_sha256);
-            if &digest != original && replacement != Some(&digest) {
+            let prior = metadata
+                .files
+                .get(&relative)
+                .is_some_and(|file| file.previous_replacement_sha256.contains(&digest));
+            if &digest != original && replacement != Some(&digest) && !prior {
                 return Err(invalid_state());
             }
             observed += 1;
@@ -743,7 +749,9 @@ fn apply_files(
         let original = fs::read(&path)?;
         let expected = hashes.get(*relative).ok_or_else(invalid_state)?;
         let digest = sha256(&original);
-        if (digest != expected.upstream_sha256 && digest != expected.replacement_sha256)
+        if (digest != expected.upstream_sha256
+            && digest != expected.replacement_sha256
+            && !expected.previous_replacement_sha256.contains(&digest))
             || sha256(replacement.as_bytes()) != expected.replacement_sha256
         {
             return Err(invalid_state());

@@ -20,8 +20,8 @@ pub(super) fn package_name(agent: CLIAgent) -> Option<&'static str> {
     match agent {
         CLIAgent::Codex => Some("@openai/codex"),
         CLIAgent::Claude => Some("@anthropic-ai/claude-code"),
-        CLIAgent::Grok
-        | CLIAgent::Gemini
+        CLIAgent::Grok => Some("@xai-official/grok"),
+        CLIAgent::Gemini
         | CLIAgent::Amp
         | CLIAgent::Droid
         | CLIAgent::OpenCode
@@ -150,6 +150,22 @@ pub(super) fn registered_installation(
     }
     let matches_entry = if canonical_bin == installation.stamp.canonical {
         true
+    } else if agent == CLIAgent::Grok && cfg!(feature = "local_fs") {
+        #[cfg(feature = "local_fs")]
+        {
+            if super::npm_grok_contract::registered_mirror(installation, &package_root, installed)?
+            {
+                true
+            } else if windows_layout {
+                matches_windows_cmd_shim(installation, &prefix, package, &bin, &bin_path)?
+            } else {
+                false
+            }
+        }
+        #[cfg(not(feature = "local_fs"))]
+        {
+            false
+        }
     } else if windows_layout {
         matches_windows_cmd_shim(installation, &prefix, package, &bin, &bin_path)?
     } else {
@@ -177,10 +193,34 @@ fn matches_windows_cmd_shim(
     bin_path: &Path,
 ) -> Result<bool, Error> {
     // cmd-shim 的完整脚本必须匹配；只搜包含目标路径的行会误接受自定义附加命令。
+    #[cfg(windows)]
+    if package == "@openai/codex"
+        && bin == Path::new("bin/codex.js")
+        && installation.stamp.canonical == prefix.join("codex.ps1")
+    {
+        return Ok(read_limited(&installation.entry, 16 * 1024)?
+            == super::npm_windows_contract::powershell_shim().as_bytes());
+    }
+    #[cfg(windows)]
+    if package == "@anthropic-ai/claude-code"
+        && bin == Path::new("bin/claude.exe")
+        && installation.stamp.canonical == prefix.join("claude.ps1")
+    {
+        return Ok(read_limited(&installation.entry, 16 * 1024)?
+            == super::npm_claude_windows_contract::powershell_shim().as_bytes());
+    }
+    #[cfg(windows)]
+    if package == "@xai-official/grok" && bin == Path::new("bin/grok")
+        && installation.stamp.canonical == prefix.join("grok.ps1")
+    {
+        return Ok(read_limited(&installation.entry, 16 * 1024)?
+            == super::npm_grok_windows_contract::powershell_shim().as_bytes());
+    }
     let expected_entry = prefix.join(format!(
         "{}.cmd",
         match package {
             "@openai/codex" => "codex",
+            "@xai-official/grok" => "grok",
             "@anthropic-ai/claude-code" => "claude",
             _ => return Ok(false),
         }

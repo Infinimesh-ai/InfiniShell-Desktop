@@ -1653,7 +1653,7 @@ async fn eof_does_not_complete_an_active_turn() {
 
 #[tokio::test]
 async fn full_event_queue_fails_instead_of_blocking_approvals() {
-    let protocol = ready_protocol();
+    let mut protocol = ready_protocol();
     let (events, _receiver) = mpsc::channel(1);
     events
         .try_send(protocol.event(RuntimeEventKind::Disconnected {
@@ -1668,7 +1668,7 @@ async fn full_event_queue_fails_instead_of_blocking_approvals() {
         }],
     };
     assert!(matches!(
-        flush_effects(&protocol, &mut stdin, &events, effects).await,
+        flush_effects(&mut protocol, &mut stdin, &events, effects).await,
         Err(RuntimeError::EventBackpressure)
     ));
 }

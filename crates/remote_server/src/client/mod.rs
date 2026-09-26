@@ -41,6 +41,9 @@ use warpui_core::r#async::TransportStream;
 
 use crate::protocol::{self, ProtocolError, RequestId};
 
+mod codex_owned;
+mod grok_owned;
+mod image_staging;
 mod tunnel;
 pub use tunnel::TunnelStream;
 
@@ -284,6 +287,10 @@ pub struct RemoteServerClient {
     #[expect(dead_code)]
     host_response_tx: async_channel::Sender<ServerMessage>,
 
+    // 仅缓存当前连接的握手结果，重连创建新 client，不继承旧能力。
+    initialize_response: RwLock<Option<InitializeResponse>>,
+    image_staging_sessions:
+        RwLock<std::collections::HashMap<SessionId, image_staging::ImageStagingSession>>,
     tunnel_outbound_tx: mpsc::Sender<ClientMessage>,
     tunnel_multiplexer: tunnel::TunnelMultiplexer,
 }
@@ -384,6 +391,8 @@ impl RemoteServerClient {
                 disconnected,
                 failure_tx,
                 host_response_tx,
+                initialize_response: RwLock::new(None),
+                image_staging_sessions: RwLock::new(std::collections::HashMap::new()),
                 tunnel_outbound_tx,
                 tunnel_multiplexer,
             },
@@ -413,6 +422,10 @@ impl RemoteServerClient {
         auth_token: Option<&str>,
         params: InitializeParams,
     ) -> Result<InitializeResponse, ClientError> {
+        *self
+            .initialize_response
+            .write()
+            .expect("initialize response lock poisoned") = None;
         let request_id = RequestId::new();
         let msg = ClientMessage::session_scoped(
             request_id.to_string(),
@@ -428,7 +441,13 @@ impl RemoteServerClient {
         let response = self.send_request_internal(request_id, msg).await?;
 
         match response.message {
-            Some(server_message::Message::InitializeResponse(resp)) => Ok(resp),
+            Some(server_message::Message::InitializeResponse(resp)) => {
+                *self
+                    .initialize_response
+                    .write()
+                    .expect("initialize response lock poisoned") = Some(resp.clone());
+                Ok(resp)
+            }
             other => {
                 safe_error!(
                     safe: ("Remote server unexpected response for Initialize"),
@@ -607,11 +626,15 @@ impl RemoteServerClient {
         shell_type: &str,
         shell_path: Option<&str>,
     ) {
+        let (image_staging_epoch, image_staging_epoch_revision) =
+            self.advance_image_staging_session(session_id);
         let msg = ClientMessage::notification(notification::Message::SessionBootstrapped(
             SessionBootstrapped {
                 session_id: session_id.as_u64(),
                 shell_type: shell_type.to_owned(),
                 shell_path: shell_path.map(ToOwned::to_owned),
+                image_staging_epoch,
+                image_staging_epoch_revision,
             },
         ));
         self.send_notification(msg);

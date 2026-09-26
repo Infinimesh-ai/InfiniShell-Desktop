@@ -87,16 +87,23 @@ struct NativeCommand {
     bare_name: Option<String>,
     scope: Option<String>,
     qualified_name: Option<String>,
+    input_is_empty: bool,
     path: Option<PathBuf>,
     canonical_path: Option<PathBuf>,
 }
 
 pub(super) struct SkillCatalog {
     commands: Vec<NativeCommand>,
+    native_commands: Value,
 }
 
 impl SkillCatalog {
+    pub(super) fn native_commands(&self) -> &Value {
+        &self.native_commands
+    }
+
     pub(super) fn from_native(commands: &Value) -> Result<Self, String> {
+        let native_commands = commands.clone();
         let entries = commands
             .as_array()
             .filter(|entries| entries.len() <= MAX_NATIVE_IDENTITIES)
@@ -113,12 +120,16 @@ impl SkillCatalog {
                     bare_name: entry["_meta"]["bareName"].as_str().map(str::to_owned),
                     scope: entry["_meta"]["scope"].as_str().map(str::to_owned),
                     qualified_name: entry["_meta"]["qualifiedName"].as_str().map(str::to_owned),
+                    input_is_empty: entry.get("input").is_some_and(Value::is_null),
                     canonical_path: path.as_ref().and_then(|path| path.canonicalize().ok()),
                     path,
                 }
             })
             .collect();
-        Ok(Self { commands })
+        Ok(Self {
+            commands,
+            native_commands,
+        })
     }
 
     fn command_for(&self, selected: &SelectedSkill) -> Result<&str, String> {
@@ -183,8 +194,14 @@ impl SkillCatalog {
                 .iter()
                 .find(|command| command.name == name)
                 .ok_or_else(unavailable)?;
-            let qualified = format!("local:{}", skill.name);
-            if command.scope.as_deref() != Some("local")
+            // 用户级技能必须由当前原生目录明确公布来源；不从文件名推断或改写来源。
+            let scope = match command.scope.as_deref() {
+                Some("local") => "local",
+                Some("user") => "user",
+                _ => return Err(unavailable()),
+            };
+            let qualified = format!("{scope}:{}", skill.name);
+            if !command.input_is_empty
                 || command.qualified_name.as_deref() != Some(qualified.as_str())
                 || (name != skill.name && name != qualified)
             {

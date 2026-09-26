@@ -34,6 +34,8 @@ fn fixture() -> (tempfile::TempDir, Manifest) {
         atomic_launch_kind: Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1),
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
     };
     (temporary, manifest)
 }

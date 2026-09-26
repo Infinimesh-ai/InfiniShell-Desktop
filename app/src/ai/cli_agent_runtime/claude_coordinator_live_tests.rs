@@ -480,6 +480,7 @@ async fn drive(
         grok_profile: None,
         model: Some(model.clone()),
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         }),
@@ -812,6 +813,7 @@ async fn verify_v1_ceiling_rejection(
         grok_profile: None,
         model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "缺少固定模型")?),
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         }),

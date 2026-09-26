@@ -26,6 +26,9 @@ const PREVIOUS_METADATA: &str = include_str!(
 const REV4_METADATA: &str = include_str!(
     "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev4/SOURCE_METADATA.json"
 );
+const REV5_METADATA: &str = include_str!(
+    "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/SOURCE_METADATA.json"
+);
 
 #[derive(Deserialize)]
 struct SourceMetadata {
@@ -48,6 +51,9 @@ static PREVIOUS_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
 });
 static REV4_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
     serde_json::from_str(REV4_METADATA).expect("随附 Codex rev4 完整来源元数据必须有效")
+});
+static REV5_BUNDLE: LazyLock<SourceMetadata> = LazyLock::new(|| {
+    serde_json::from_str(REV5_METADATA).expect("随附 Codex rev5 完整来源元数据必须有效")
 });
 static CURRENT: LazyLock<Mutex<BTreeMap<PathBuf, (Instant, bool)>>> =
     LazyLock::new(|| Mutex::new(BTreeMap::new()));
@@ -237,12 +243,12 @@ fn verify_revision_modes(root: &Path, prefix: &str, revision: &SourceMetadata) -
     Ok(())
 }
 
-/// 只接收 rev3/rev4 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
+/// 只接收 rev3/rev4/rev5 的完整已部署树；不能将任意新旧脚本组合当作可迁移版本。
 pub(super) fn is_previous_notification_cache(root: &Path) -> bool {
     let Ok(actual) = tree(root, false) else {
         return false;
     };
-    [&*REV4_BUNDLE, &*PREVIOUS_BUNDLE]
+    [&*REV5_BUNDLE, &*REV4_BUNDLE, &*PREVIOUS_BUNDLE]
         .into_iter()
         .any(|revision| {
             actual == revision_tree(revision, "plugins/warp/", false)
@@ -348,6 +354,9 @@ pub(super) fn has_custom_source(home: &Path) -> bool {
             Some(_) if owned_revision_entry(&document, home, &REV4_BUNDLE) => {
                 verify_revision(home, &REV4_BUNDLE, REV4_METADATA).is_err()
             }
+            Some(_) if owned_revision_entry(&document, home, &REV5_BUNDLE) => {
+                verify_revision(home, &REV5_BUNDLE, REV5_METADATA).is_err()
+            }
             Some(_) => !owned_entry(&document, home) || !is_current(home),
         },
         Err(_) => true,
@@ -399,6 +408,9 @@ fn validate_existing(home: &Path, document: &DocumentMut) -> io::Result<()> {
         }
         Some(_) if owned_revision_entry(document, home, &REV4_BUNDLE) => {
             verify_revision(home, &REV4_BUNDLE, REV4_METADATA)?;
+        }
+        Some(_) if owned_revision_entry(document, home, &REV5_BUNDLE) => {
+            verify_revision(home, &REV5_BUNDLE, REV5_METADATA)?;
         }
         Some(_) => return Err(invalid()),
     }

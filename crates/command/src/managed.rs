@@ -5,13 +5,29 @@ use std::process::{Child, ExitStatus};
 use std::thread;
 use std::time::{Duration, Instant};
 
+#[cfg(windows)]
+#[path = "managed_windows.rs"]
+mod windows_identity;
+#[cfg(windows)]
+pub use windows_identity::{WindowsProcessIdentity, WindowsProcessLease, windows_process_exited};
+
 #[cfg(target_os = "macos")]
 #[path = "managed_macos.rs"]
 mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::{
     MacosCoalition, MacosProcessIdentity, macos_boot_session, macos_peer_identity,
-    macos_process_identity,
+    macos_process_identity, macos_signal_owned_process,
+};
+
+#[cfg(target_os = "linux")]
+#[path = "managed_linux.rs"]
+mod linux;
+#[cfg(target_os = "linux")]
+pub use linux::{
+    LinuxProcessHandle, LinuxProcessIdentity, LinuxProcessSnapshot, linux_boot_session,
+    linux_peer_handle, linux_peer_identity, linux_process_exited, linux_process_identity,
+    linux_signal_owned_process, linux_verify_identity_support,
 };
 
 #[cfg(target_os = "linux")]

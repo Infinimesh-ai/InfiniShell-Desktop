@@ -348,6 +348,16 @@ use crate::terminal::available_shells::AvailableShells;
 use crate::terminal::block_list_viewport::InputMode;
 use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
 #[cfg(not(target_family = "wasm"))]
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+use crate::terminal::cli_agent_sessions::grok_leader_input::calibrated_platform;
 use crate::terminal::cli_agent_sessions::plugin_manager::{PluginModalKind, plugin_manager_for};
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionsModel, CLIAgentSessionsModelEvent};
 use crate::terminal::general_settings::GeneralSettings;
@@ -2019,6 +2029,43 @@ impl Workspace {
         let body = ctx.add_typed_action_view(LocalCLITaskManagerView::new);
         ctx.subscribe_to_view(&body, |workspace, manager, event, ctx| match event {
             LocalCLITaskManagerEvent::Close => workspace.close_local_cli_task_manager(ctx),
+            LocalCLITaskManagerEvent::ContinueOwnedGrok { task } => {
+                #[cfg(all(
+                    feature = "local_tty",
+                    any(
+                        all(target_os = "macos", target_arch = "aarch64"),
+                        all(target_os = "linux", target_arch = "x86_64"),
+                        all(windows, target_arch = "x86_64")
+                    )
+                ))]
+                let result = workspace
+                    .active_session_view(ctx)
+                    .ok_or_else(|| crate::t!("cli-agent-grok-history-unavailable"))
+                    .and_then(|terminal| {
+                        terminal.update(ctx, |view, ctx| {
+                            view.queue_owned_grok_history(task.clone(), ctx)
+                        })
+                    });
+                #[cfg(not(all(
+                    feature = "local_tty",
+                    any(
+                        all(target_os = "macos", target_arch = "aarch64"),
+                        all(target_os = "linux", target_arch = "x86_64"),
+                        all(windows, target_arch = "x86_64")
+                    )
+                )))]
+                let result = {
+                    let _ = task;
+                    Err(crate::t!("cli-agent-grok-history-unavailable"))
+                };
+                match result {
+                    Ok(()) => workspace.close_local_cli_task_manager(ctx),
+                    Err(error) => {
+                        manager.update(ctx, |view, ctx| view.show_input_error(error, ctx))
+                    }
+                }
+            }
+
             LocalCLITaskManagerEvent::ImportReview {
                 draft_key,
                 input_generation,
@@ -4432,7 +4479,12 @@ impl Workspace {
     }
 
     /// 新建终端标签页并忽略默认 Agent 模式，然后执行指定 CLI agent 的启动命令。
-    fn add_tab_with_specific_agent(&mut self, agent: CLIAgent, ctx: &mut ViewContext<Self>) {
+    fn add_tab_with_specific_agent(
+        &mut self,
+        agent: CLIAgent,
+        owned_grok: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
         let executable = CLIAgentInstallModel::as_ref(ctx)
             .executable(agent)
             .map(Path::to_path_buf);
@@ -4448,10 +4500,46 @@ impl Workspace {
         self.active_tab_pane_group().update(ctx, |pane_group, ctx| {
             if let Some(terminal_view) = pane_group.active_session_view(ctx) {
                 terminal_view.update(ctx, |view, ctx| {
-                    view.execute_specific_cli_agent_or_set_pending(agent, executable, ctx);
+                    view.queue_specific_cli_agent(agent, executable, owned_grok, ctx);
                 });
             }
         });
+        ctx.notify();
+    }
+
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    fn start_remote_owned_grok(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(terminal_view) = self.active_session_view(ctx) {
+            terminal_view.update(ctx, |view, ctx| {
+                if view.is_remote_owned_grok_launch_available(ctx) {
+                    view.queue_specific_cli_agent(CLIAgent::Grok, None, true, ctx);
+                }
+            });
+        }
+        ctx.notify();
+    }
+
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    fn start_remote_owned_codex(&mut self, ctx: &mut ViewContext<Self>) {
+        if let Some(terminal_view) = self.active_session_view(ctx) {
+            terminal_view.update(ctx, |view, ctx| view.queue_remote_owned_codex(ctx));
+        }
         ctx.notify();
     }
 
@@ -7351,6 +7439,72 @@ impl Workspace {
                     .with_on_select_action(WorkspaceAction::AddSpecificAgentTab(agent))
                     .with_icon(icon);
                 menu_items.push(item.into_item());
+                #[cfg(all(
+                    feature = "local_fs",
+                    feature = "local_tty",
+                    any(
+                        all(target_os = "macos", target_arch = "aarch64"),
+                        all(target_os = "linux", target_arch = "x86_64"),
+                        all(windows, target_arch = "x86_64")
+                    )
+                ))]
+                if agent == CLIAgent::Grok && calibrated_platform().is_ok() {
+                    menu_items.push(
+                        MenuItemFields::new(crate::t!("workspace-new-grok-rich-input"))
+                            .with_on_select_action(WorkspaceAction::AddGrokRichInputTab)
+                            .with_icon(icon)
+                            .into_item(),
+                    );
+                }
+            }
+            // 远端使用当前 pane 的安装状态，不依赖本机是否装有 Grok。
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            if AISettings::as_ref(ctx).is_cli_agent_tab_menu_enabled(CLIAgent::Grok)
+                && self
+                    .active_session_view(ctx)
+                    .is_some_and(|view| view.as_ref(ctx).is_remote_owned_grok_launch_available(ctx))
+            {
+                menu_items.push(
+                    MenuItemFields::new(crate::t!("workspace-start-remote-grok-rich-input"))
+                        .with_on_select_action(
+                            WorkspaceAction::StartRemoteOwnedGrokInCurrentTerminal,
+                        )
+                        .with_tooltip(crate::t!("workspace-start-remote-grok-rich-input-help"))
+                        .with_icon(CLIAgent::Grok.icon().unwrap_or(icons::Icon::LayoutAlt01))
+                        .into_item(),
+                );
+            }
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            if AISettings::as_ref(ctx).is_cli_agent_tab_menu_enabled(CLIAgent::Codex)
+                && self.active_session_view(ctx).is_some_and(|view| {
+                    view.as_ref(ctx).is_remote_owned_codex_launch_available(ctx)
+                })
+            {
+                menu_items.push(
+                    MenuItemFields::new(crate::t!("workspace-start-remote-codex-rich-input"))
+                        .with_on_select_action(
+                            WorkspaceAction::StartRemoteOwnedCodexInCurrentTerminal,
+                        )
+                        .with_tooltip(crate::t!("workspace-start-remote-codex-rich-input-help"))
+                        .with_icon(CLIAgent::Codex.icon().unwrap_or(icons::Icon::LayoutAlt01))
+                        .into_item(),
+                );
             }
             menu_items.len() - start_len
         };
@@ -23137,7 +23291,37 @@ impl TypedActionView for Workspace {
             }
             AddGetStartedTab => self.add_get_started_tab(ctx),
             AddAgentTab => self.add_terminal_tab_with_new_agent_view(ctx),
-            AddSpecificAgentTab(agent) => self.add_tab_with_specific_agent(*agent, ctx),
+            AddSpecificAgentTab(agent) => self.add_tab_with_specific_agent(*agent, false, ctx),
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            AddGrokRichInputTab => self.add_tab_with_specific_agent(CLIAgent::Grok, true, ctx),
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            StartRemoteOwnedGrokInCurrentTerminal => self.start_remote_owned_grok(ctx),
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            StartRemoteOwnedCodexInCurrentTerminal => self.start_remote_owned_codex(ctx),
             AddDockerSandboxTab => self.add_docker_sandbox_tab(ctx),
             StartAgentOnboardingTutorial(tutorial) => {
                 self.start_agent_onboarding_tutorial(tutorial.clone(), ctx)

@@ -5552,6 +5552,9 @@ settings-network-error-timeout = { $seconds } 秒后超时
 cli-agent-status-unknown = 状态未知。请在终端中确认任务结果。
 cli-agent-status-disconnected = 连接已中断。任务结果尚未确认。
 cli-agent-waiting-for-answer = 等待你的答复
+cli-agent-grok-history-continue = 继续 Grok 会话
+cli-agent-grok-history-help = 重新关联本终端仍活跃的 Grok 进程，或在旧进程退出后继续已保存的会话。不会再次发送旧消息。
+cli-agent-grok-history-unavailable = 暂时无法继续此 Grok 会话。请在相同工作目录、命令行为空的空闲本地终端操作，或从拥有活跃进程的原终端重新关联。
 cli-agent-grok-managed-unavailable = Grok Build 托管任务需要已验证的 CLI 1.0.30 版本。仍可使用终端会话。
 ambient-agent-local-harness-terminal-unavailable = 无法打开本地任务终端。原生提示必须可见，因此未启动任务。
 
@@ -5559,7 +5562,7 @@ cli-agent-plugin-refresh-marketplace-step = 刷新插件市场并保留已安装
 cli-agent-plugin-disabled = 此插件已禁用。请手动启用以恢复通知。
 cli-agent-plugin-enable-step = 启用已安装插件：
 cli-agent-plugin-enable-codex-config-step = 在 Codex 的 config.toml 中启用此插件：
-cli-agent-grok-image-paste-unavailable = 当前 Grok Build 版本尚未验证图片粘贴。请移除图片附件后再发送。
+cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法直接粘贴图片。请在 InfiniShell 启动的 Grok 富输入会话中，将图片粘贴或拖入输入框后提交。
 cli-agent-image-too-large = { $filename } 过大，无法发送给智能体（上限 { $limit_mb } MB）。
 
 cli-agent-task-already-bound = 此终端已关联一个本地任务。
@@ -5641,7 +5644,7 @@ cli-task-manager-installation = { $cli }：{ $version }
 cli-task-manager-local-only = 这些任务在本机运行。关闭面板后，已连接的任务仍会继续运行。SSH 和 tmux 终端会话单独管理。
 cli-task-manager-grok-unavailable = Grok Build 1.0.30 支持文本任务、审批、取消、历史继续和任务消息。固定只读或文件工具策略要求逐次审批，子任务使用相同工具，任务权限不得扩大。这两种策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。“继承”策略每轮可使用一个显式选择的技能，其完整路径必须唯一匹配当前会话的技能目录。应用不会自动授予项目信任。托管模式不支持图片。
 cli-task-manager-grok-p0-verification = Grok Build 1.0.34 仅开放已验证的 P0 路径：新建文本任务、精确原生读取请求的逐次允许或拒绝、真实输出后的取消，以及原生会话继续。追加输入、关闭会话、文件写入、本地任务工具、技能、子任务和托管图片仍不可用。终端命令、钩子以及 CLI 或管理员策略不在该 P0 保证范围内；这不是文件系统沙箱。
-cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。在“继承”策略与 grok-4.7 下，可以选择多个技能，并在会话空闲时新增技能。Grok 展开首个技能，通过原生工具加载其余技能；新增技能确认后才发送。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下支持 PNG 图片，不能同时选择技能。
+cli-task-manager-grok-current-verification = Grok Build 1.0.41 支持文本任务、审批、追加指令、取消和历史继续。在“继承”策略与 grok-4.7 下，可以选择多个项目或用户级技能，并在会话空闲时新增技能。Grok 展开首个技能，通过原生工具加载其余技能；新增技能确认后才发送。固定只读或文件工具策略要求逐次审批，支持本地任务工具及权限不扩大的子任务。固定策略禁用钩子、技能和终端命令；系统管理员策略仍然适用，文件访问不受沙箱隔离。在“继承”策略与 grok-4.7 下支持 PNG 图片，不能同时选择技能。
 cli-task-manager-grok-root-tools-unavailable = 当前 Grok 版本与权限策略组合不支持本地任务工具和子任务。
 cli-task-manager-grok-spawn-unavailable = 选择固定只读或文件工具策略后，才能允许 Grok 子任务。
 cli-task-manager-claude-verification = 托管任务支持 Claude Code 2.1.273、2.1.278 和 2.1.280。
@@ -5713,7 +5716,7 @@ cli-agent-plugin-codex-patch-manual-note = 仅执行原生安装不会应用 Inf
 cli-agent-message-unconfirmed-id = 消息 { $message_id } 的接收尚未确认。请查询原记录，勿自动重投。{ $error }
 
 cli-agent-task-skill-plugin-failed = 无法准备隔离技能插件：{ $error }
-cli-agent-task-skill-one-per-turn = 托管 Grok 任务中，每轮请选择一个技能。
+cli-agent-task-skill-one-per-turn = 当前 Grok 版本或权限策略每轮仅接受一个技能。
 cli-agent-task-parent-changed = 父任务已进入另一轮。请从当前轮重新派发此子任务。
 cli-agent-input-images-unverified = 尚未验证 { $cli } 的托管图片输入。草稿已保留。
 cli-agent-claude-image-formats = 已验证的 Claude Code 2.1.280 支持 PNG、JPEG、静态 GIF 和 WebP 图片，也支持纯图片输入。继承 CLI 设置时，还可将图片与单个已选技能组合。
@@ -5745,7 +5748,9 @@ cli-agent-input-delivery-failed = 输入未能完整送达。草稿已保留；�
 
 cli-agent-input-image-delivery-failed = 图片未能全部送达。草稿和附件已保留；重试前请检查 CLI。
 
-cli-agent-input-remote-image-unavailable = 远程 CLI 的剪贴板图片传输尚未验证。请使用远程文件路径。
+cli-agent-input-remote-image-unavailable = 当前 CLI 会话的远程图片输入尚不可用。草稿和附件已保留。
+cli-agent-input-remote-image-queued = 图片已加入 Codex 后续输入队列，空闲时可能立即开始新回合。
+cli-agent-input-remote-image-queue-hint = 将这条输入排队到 Codex 新回合，不修改当前回合或批准工具。
 
 cli-agent-input-target-changed = 等待操作完成期间，CLI 输入会话已变更。未插入文本。
 
@@ -5822,7 +5827,7 @@ cli-task-manager-permission-grok-read-help = 使用应用专属的 Grok 配置�
 cli-task-manager-permission-grok-files-help = 使用应用专属的 Grok 配置，固定读取、写入和编辑工具，每次调用均需审批。钩子、技能和终端命令均已禁用。这不是文件系统沙箱，系统管理员策略仍然适用。
 cli-task-manager-permission-grok-p0-help = 仅向用户显示精确原生读取请求，并逐次允许或拒绝；未验证的原生工具审批请求会被拒绝。Grok 仍会继承其 CLI 配置。终端命令、钩子和管理员策略不在已验证的 P0 边界内。这不是文件系统沙箱。
 cli-agent-grok-fixed-command-unavailable = 固定 Grok 策略不支持斜杠命令。使用继承配置的新任务运行原生命令。
-cli-agent-grok-skill-policy-required = Grok 技能需要继承策略；固定工具策略不加载技能。
+cli-agent-grok-skill-policy-required = Grok 技能需要继承策略或已选技能策略；其他固定工具策略不加载技能。
 cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话中无法唯一匹配其原始路径。请刷新技能并重新选择。
 
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
@@ -5831,6 +5836,7 @@ cli-agent-input-copy-unsent-text = 复制未发送文本
 terminal-input-grok-manual-copy-hint = 为 Grok 编写草稿；提交后可复制，再在 Grok 提示符处粘贴
 
 # 三方 CLI 自动升级与官方渠道选择
+settings-cli-updates-resume-incompatible = 已保存的会话尚不能使用这个较旧的 CLI 版本继续。
 settings-cli-updates-auto = 自动更新 { $agent }
 settings-cli-updates-description = InfiniShell 内没有终端会话或托管任务使用此 CLI 时执行更新。CLI 更新不会自动启用尚未验证的托管功能。
 settings-cli-updates-channel = 发布渠道
@@ -5889,3 +5895,57 @@ cli-agent-claude-skills-reload-help = 可以选择多个技能。新增技能会
 cli-agent-grok-skill-refresh-idle = 请等待当前 Grok 回合结束后再添加新技能。
 
 cli-agent-grok-skill-selection-invalid = 最多选择 32 个不同的 Grok 技能；已注册的技能名称必须保留原来源。
+
+cli-task-manager-permission-claude-files-v3 = Claude 文件与搜索
+cli-task-manager-permission-claude-skills-v1 = Claude 文件与受审技能
+cli-task-manager-permission-claude-skills-v1-help = Claude 2.1.280：文件写入、搜索和每次已注册 Skill 调用分别审批。技能在创建时固定，子任务只能使用子集。禁止钩子、终端命令、技能自行授权和隐式文件引用。这不是操作系统沙箱。
+cli-agent-claude-fixed-skills-unavailable = 此技能未在固定权限任务创建时注册。
+cli-task-manager-permission-claude-files-v3-help = Claude Code 2.1.280 可读取、编辑和创建项目文件，查找文件名，以及搜索指定单个文件的内容。每次搜索和写入均需审批。终端命令、钩子和技能均禁用。子任务保持此策略，旧任务不会自动增加权限。这不是操作系统沙箱。
+cli-task-manager-permission-grok-files-v2 = Grok 文件与搜索
+cli-task-manager-permission-grok-skills-v1 = Grok 文件与受审技能
+cli-task-manager-permission-grok-skills-v1-help = Grok 1.0.41 每次工具调用均需审批。技能使用固定来源副本并通过原生技能工具调用；子任务只能使用父任务技能的子集。请使用卡片选择技能。此策略禁用斜杠技能命令、终端命令和钩子。这不是操作系统沙箱。
+cli-agent-grok-fixed-skills-unavailable = 此 Grok 任务仅接受创建时选定的技能。请使用技能卡片，并保持技能来源不变。此策略禁用斜杠技能命令。
+cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 可读取、编辑和创建项目文件，列举目录，以及搜索指定单个文件的内容。每次工具调用均需审批。终端命令、钩子和技能均禁用。子任务保持此策略，旧任务不会自动增加权限。这不是操作系统沙箱。
+
+workspace-new-grok-rich-input = Grok 富输入（grok-4.7）
+workspace-start-remote-grok-rich-input = 在当前远程终端启动 Grok 富输入
+workspace-start-remote-codex-rich-input = 在当前远程终端启动 Codex 富输入
+workspace-start-remote-codex-rich-input-help = 启动 Codex 0.156.1，为当前 SSH/tmux 窗格绑定独立 app server。需要 Bash 或 Zsh 及远程图片支持。
+cli-agent-codex-remote-launch-unavailable = 远程 Codex 会话未能启动。需要 Codex 0.156.1、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
+cli-agent-codex-owned-launch-claimed = 此 Codex 启动已被认领或状态尚未确认，请先检查当前远程终端，再启动其他会话。
+workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中使用 grok-4.7 启动 Grok 1.0.41。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
+cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要 Grok 1.0.41、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
+
+cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
+
+cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份已变化，已保留草稿。
+
+cli-agent-grok-owned-input-claimed = 此输入已提交或投递尚未确认，请检查原生 Grok 会话后再发送新草稿。
+
+cli-agent-grok-owned-image-budget = 本次 Grok 图片输入总量超出原生连接上限，请减少图片数量或缩小图片。草稿已保留。
+
+cli-agent-input-remote-claude-image-consumed = 远程 Claude 会话已读取附件原图；请查看模型回复确认图片理解结果。
+
+cli-task-manager-permission-claude-commands-v1 = Claude 受审项目命令
+
+cli-task-manager-permission-grok-commands-v1 = Grok 受审项目命令
+
+cli-task-manager-permission-claude-commands-skills-v1 = Claude 命令 + 技能 V1
+
+cli-task-manager-permission-grok-commands-skills-v1 = Grok 命令 + 技能 V1
+
+cli-task-manager-permission-reviewed-commands-skills-help = 项目文件工具、创建时固定的技能和经审批的项目命令。每次技能调用和命令都需审批。命令以当前系统账号运行，可访问该账号的文件与网络；这不是操作系统沙箱。同一 CLI 会话可逐条执行命令，每条最长 120 秒，下一条须等待进程清理完成。可能需要原生工具权限和应用单独确认。技能不能扩大命令集合；原生终端命令工具、钩子和原生子代理保持关闭。
+
+cli-task-manager-permission-reviewed-commands-help = 项目文件工具，以及逐次审批的 cargo check/test/fmt --check、python -m pytest 和创建时固定的 npm 脚本。命令以当前系统账号运行，可访问该账号的文件与网络；这不是操作系统沙箱。同一 CLI 会话可逐条执行命令，每条最长 120 秒。每条命令都需新的审批，并等待上一条的进程清理完成。可能需要原生工具权限和应用单独确认；原生终端命令工具保持关闭。
+
+cli-task-manager-reviewed-command-approval = 请核对下方的精确程序、参数、工作目录和超时。单次允许仅授权使用当前系统账号执行一次。下一条命令须等待进程清理完成，并重新审批。
+
+cli-agent-reviewed-command-timeout = 已批准的命令超时，正在停止该命令的进程。
+
+cli-agent-reviewed-command-resume = 上一条命令仍在清理，尚不能执行下一条；不会重发上一条命令。
+
+cli-agent-reviewed-command-background = CLI 在仅允许前台执行的策略下报告了后台任务，正在停止本次进程代次。
+
+cli-agent-input-remote-image-unconfirmed = 图片投递尚未确认，CLI 可能已收到这条输入。草稿和附件已保留；请先查看 CLI，再决定如何继续。应用不会自动重发。
+
+cli-agent-input-remote-claude-image-hint = 将输入发送到远程 Claude 会话，由其读取原图。如需 Read 审批，请在终端确认；仅有文本入队不代表图片已送达。

@@ -11,6 +11,10 @@ pub mod r#async;
 pub mod blocking;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub mod managed;
+#[cfg(windows)]
+pub mod owned_console_windows;
+#[cfg(unix)]
+pub mod reviewed_unix;
 #[cfg(unix)]
 pub mod unix;
 #[cfg(windows)]

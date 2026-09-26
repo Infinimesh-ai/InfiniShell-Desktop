@@ -6,6 +6,11 @@ use serde::{Deserialize, Serialize};
 use super::*;
 
 pub(crate) const INPUT_SUBJECT: &str = "grok_owned_terminal_input";
+pub(crate) const RICH_INPUT_SUBJECT: &str = "grok_owned_terminal_rich_input_v1";
+
+pub(crate) fn is_input_subject(subject: &str) -> bool {
+    subject == INPUT_SUBJECT || subject == RICH_INPUT_SUBJECT
+}
 const EXECUTION_KIND: &str = "grok_owned_terminal";
 
 /// input_revision 是当前编辑器及附件快照的独立 UUID，不能复用任务 generation。
@@ -230,7 +235,7 @@ fn read_record(
     let record: GrokTerminalInputRecord = serde_json::from_str(&raw)?;
     let message = &record.message;
     if message.version != 1
-        || message.subject != INPUT_SUBJECT
+        || !is_input_subject(&message.subject)
         || message.sender_generation < 1
         || message.message_id != message_id.to_string()
         || message.sender_task_id != message.recipient_task_id
@@ -294,7 +299,7 @@ fn claimed_inputs(
     let mut deliveries = Vec::new();
     for message in messages
         .into_iter()
-        .filter(|message| message.subject == INPUT_SUBJECT)
+        .filter(|message| is_input_subject(&message.subject))
     {
         let id = Uuid::parse_str(&message.message_id)?;
         let (_, record) = read_record(connection, id)?.context("普通 Grok 输入记录已丢失")?;

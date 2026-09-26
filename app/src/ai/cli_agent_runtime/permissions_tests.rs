@@ -355,6 +355,7 @@ fn fixed_grok_creation_policy_binds_parent_without_claiming_native_verification(
             digest.into(),
             "b".repeat(64),
             Some(super::super::local_tools::LocalToolPermissions {
+                allow_project_commands: false,
                 allow_spawn: true,
                 allow_message: true,
             }),
@@ -422,6 +423,7 @@ fn fixed_file_parent_and_child_require_the_saved_and_reported_tool_set_to_match(
         "d53b6e543e482716236748914331db50145c696ac7af91f1ebdedcf5654cfecb".into(),
         "b".repeat(64),
         Some(super::super::local_tools::LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         }),

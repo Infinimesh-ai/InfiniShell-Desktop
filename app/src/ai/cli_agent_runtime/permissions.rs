@@ -12,7 +12,8 @@ use uuid::Uuid;
 
 use super::RuntimeError;
 pub use super::claude_profile::{
-    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2,
+    ClaudeFileProfile, ClaudeRestrictedFilesV1, ClaudeRestrictedFilesV2, ClaudeRestrictedFilesV3,
+    ClaudeRestrictedSkillsV1, ClaudeReviewedCommandsV1, ClaudeReviewedCommandsSkillsV1,
 };
 pub use super::grok_profile::GrokCreationPolicyV1;
 #[cfg(feature = "local_fs")]
@@ -39,6 +40,14 @@ enum NativePermissions {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged, deny_unknown_fields)]
 enum ClaudePermissionProof {
+    CommandsSkillsV1 {
+        #[serde(rename = "claudeReviewedCommandsSkillsV1")]
+        profile: ClaudeReviewedCommandsSkillsV1,
+    },
+    CommandsV1 {
+        #[serde(rename = "claudeReviewedCommandsV1")]
+        profile: ClaudeReviewedCommandsV1,
+    },
     V1 {
         #[serde(rename = "claudeRestrictedFilesV1")]
         profile: ClaudeRestrictedFilesV1,
@@ -47,13 +56,25 @@ enum ClaudePermissionProof {
         #[serde(rename = "claudeRestrictedFilesV2")]
         profile: ClaudeRestrictedFilesV2,
     },
+    V3 {
+        #[serde(rename = "claudeRestrictedFilesV3")]
+        profile: ClaudeRestrictedFilesV3,
+    },
+    SkillsV1 {
+        #[serde(rename = "claudeRestrictedSkillsV1")]
+        profile: ClaudeRestrictedSkillsV1,
+    },
 }
 
 impl ClaudePermissionProof {
     fn profile(&self) -> ClaudeFileProfile {
         match self {
+            Self::CommandsSkillsV1 { profile } => ClaudeFileProfile::CommandsSkillsV1(profile.clone()),
+            Self::CommandsV1 { profile } => ClaudeFileProfile::CommandsV1(profile.clone()),
             Self::V1 { profile } => ClaudeFileProfile::V1(profile.clone()),
             Self::V2 { profile } => ClaudeFileProfile::V2(profile.clone()),
+            Self::V3 { profile } => ClaudeFileProfile::V3(profile.clone()),
+            Self::SkillsV1 { profile } => ClaudeFileProfile::SkillsV1(profile.clone()),
         }
     }
 }
@@ -61,8 +82,12 @@ impl ClaudePermissionProof {
 impl From<ClaudeFileProfile> for ClaudePermissionProof {
     fn from(profile: ClaudeFileProfile) -> Self {
         match profile {
+            ClaudeFileProfile::CommandsSkillsV1(profile) => Self::CommandsSkillsV1 { profile },
+            ClaudeFileProfile::CommandsV1(profile) => Self::CommandsV1 { profile },
             ClaudeFileProfile::V1(profile) => Self::V1 { profile },
             ClaudeFileProfile::V2(profile) => Self::V2 { profile },
+            ClaudeFileProfile::V3(profile) => Self::V3 { profile },
+            ClaudeFileProfile::SkillsV1(profile) => Self::SkillsV1 { profile },
         }
     }
 }
@@ -152,7 +177,14 @@ fn claude_parent_version_verified(
     let Some(version) = config.get("cli_version").and_then(Value::as_str) else {
         return false;
     };
-    if profile.policy() == super::PermissionPolicy::ClaudeRestrictedFilesV2 {
+    if matches!(
+        profile.policy(),
+        super::PermissionPolicy::ClaudeRestrictedFilesV2
+            | super::PermissionPolicy::ClaudeRestrictedFilesV3
+            | super::PermissionPolicy::ClaudeRestrictedSkillsV1
+            | super::PermissionPolicy::ClaudeReviewedCommandsV1
+            | super::PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+    ) {
         return version == "2.1.280";
     }
     if super::claude::supported_version(version) {
@@ -216,7 +248,14 @@ pub(crate) fn ceiling_from_parent(
         "claude"
             if matches!(
                 config["permission_policy"].as_str(),
-                Some("ClaudeRestrictedFilesV1" | "ClaudeRestrictedFilesV2")
+                Some(
+                    "ClaudeRestrictedFilesV1"
+                        | "ClaudeRestrictedFilesV2"
+                        | "ClaudeRestrictedFilesV3"
+                        | "ClaudeRestrictedSkillsV1"
+                        | "ClaudeReviewedCommandsV1"
+                        | "ClaudeReviewedCommandsSkillsV1"
+                )
             ) && observed["fixedProfileVerified"] == true
                 && observed["permissionMode"]
                     == super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE =>
@@ -240,7 +279,14 @@ pub(crate) fn ceiling_from_parent(
                     || super::grok::current_fixed_scope_supported_version(version)
             }) && matches!(
                 config["permission_policy"].as_str(),
-                Some("GrokRestrictedReadV1" | "GrokRestrictedFilesV1")
+                Some(
+                    "GrokRestrictedReadV1"
+                        | "GrokRestrictedFilesV1"
+                        | "GrokRestrictedFilesV2"
+                        | "GrokRestrictedSkillsV1"
+                        | "GrokReviewedCommandsV1"
+                        | "GrokReviewedCommandsSkillsV1"
+                )
             ) && observed["appCreationPolicyApplied"] == true
                 && observed["permissionEnforcementVerified"] == false
                 && config["grok_profile"] == observed["grokCreationPolicyV1"] =>
@@ -348,7 +394,7 @@ pub(crate) fn verify_effective_permissions(
             })?;
             if actual["fixedProfileVerified"] != true
                 || actual["permissionMode"] != super::claude_profile::FIXED_PROTOCOL_PERMISSION_MODE
-                || !expected_profile.same_scope(&profile)
+                || !expected_profile.allows_child(&profile)
             {
                 return Err(rejected(
                     Some(ceiling),

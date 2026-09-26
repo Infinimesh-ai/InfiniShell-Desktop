@@ -9143,6 +9143,9 @@ fn cli_agent_update_error_label(error: &CliAgentUpdateError) -> String {
         CliAgentUpdateError::TimedOut => crate::t!("settings-cli-updates-timeout"),
         CliAgentUpdateError::VersionMismatch => crate::t!("settings-cli-updates-version-mismatch"),
         CliAgentUpdateError::ChannelMismatch => crate::t!("settings-cli-updates-channel-mismatch"),
+        CliAgentUpdateError::ResumeIncompatible => {
+            crate::t!("settings-cli-updates-resume-incompatible")
+        }
         CliAgentUpdateError::RecoveryRequired => crate::t!("settings-cli-updates-recovery"),
         CliAgentUpdateError::PersistenceFailed => crate::t!("settings-cli-updates-persistence"),
     }

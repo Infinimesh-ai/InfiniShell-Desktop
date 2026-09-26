@@ -71,6 +71,18 @@ impl ClaudeProtocol {
         if selected.iter().any(|skill| !names.insert(&skill.name)) {
             return Err(crate::t!("cli-agent-claude-skill-duplicate"));
         }
+        if self.options.permission_policy.is_claude_fixed_skills() {
+            self.verify_fixed_skill_plugin()
+                .map_err(|error| error.to_string())?;
+            if selected.iter().any(|skill| {
+                self.skill_plugin
+                    .as_ref()
+                    .is_none_or(|plugin| plugin.command_for(&skill.name, &skill.path).is_none())
+            }) {
+                return Err(crate::t!("cli-agent-claude-fixed-skills-unavailable"));
+            }
+            return Ok(None);
+        }
         if self.options.permission_policy.is_claude_file_profile() {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }

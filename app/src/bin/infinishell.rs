@@ -27,6 +27,14 @@ pub static AmdPowerXpressRequestHighPerformance: u32 = 1;
 
 // Zap OSS 构建的入口,简单包一层 warp::run()。
 fn main() -> Result<()> {
+    if let Some(result) = warp::run_remote_owned_codex_from_args() {
+        result?;
+        return Ok(());
+    }
+    if let Some(result) = warp::run_remote_owned_grok_from_args() {
+        result?;
+        return Ok(());
+    }
     if let Some(result) = warp::run_owned_grok_from_args() {
         result?;
         return Ok(());

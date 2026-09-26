@@ -6,6 +6,7 @@ fn bridge() -> GrokMcpBridge {
     GrokMcpBridge::new(
         Uuid::nil(),
         LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         },
@@ -907,6 +908,7 @@ fn bridge_protocol_rollback_keeps_lease_but_never_revives_expired_epoch() {
     let mut foreign = GrokMcpBridge::new(
         Uuid::from_u128(1),
         LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: false,
             allow_message: false,
         },

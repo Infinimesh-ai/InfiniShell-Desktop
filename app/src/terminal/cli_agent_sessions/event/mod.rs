@@ -1,7 +1,9 @@
 mod v1;
 
 use serde::Deserialize;
+use uuid::Uuid;
 pub use warp_core::cli_agent_protocol::CLI_AGENT_NOTIFICATION_SENTINEL;
+pub use warp_core::cli_agent_protocol::{ClaudeProcessEvidence, CodexProcessEvidence};
 use warp_errors::report_error;
 
 use crate::terminal::CLIAgent;
@@ -56,6 +58,9 @@ pub struct CLIAgentEventPayload {
     pub terminal_unverified: Option<bool>,
     /// 原生权限模式观察值，不等于当前输入就绪或安全认证。
     pub permission_mode: Option<String>,
+    /// 当前原生 hook 的来源候选；不得单凭它发送图片或恢复输入权限。
+    pub codex_process_evidence: Option<CodexProcessEvidence>,
+    pub claude_process_evidence: Option<ClaudeProcessEvidence>,
     pub query: Option<String>,
     pub response: Option<String>,
     pub transcript_path: Option<String>,
@@ -80,6 +85,53 @@ pub struct CLIAgentEvent {
     pub project: Option<String>,
     pub payload: CLIAgentEventPayload,
     pub source: CLIAgentEventSource,
+}
+
+impl CLIAgentEvent {
+    /// 历史路径只作来源候选，不可凭通知中的路径直接读取或清理文件。
+    pub(super) fn claude_image_evidence_for_session(
+        &self,
+        active_session_id: Option<&str>,
+    ) -> Option<(ClaudeProcessEvidence, String)> {
+        if self.agent != CLIAgent::Claude || self.source != CLIAgentEventSource::RichPlugin {
+            return None;
+        }
+        let native_id = self.session_id.as_deref()?;
+        let uuid = Uuid::parse_str(native_id).ok()?;
+        let transcript = self.payload.transcript_path.as_ref()?;
+        if uuid.is_nil()
+            || uuid.to_string() != native_id
+            || active_session_id.is_some_and(|active| active != native_id)
+            || !transcript.starts_with('/')
+            || transcript.len() > 4096
+            || transcript.chars().any(char::is_control)
+        {
+            return None;
+        }
+        Some((
+            self.payload.claude_process_evidence.clone()?,
+            transcript.clone(),
+        ))
+    }
+
+    /// 仅关联当前原生 UUID 的插件通知可更新候选；本地合成事件不提供证据。
+    pub(super) fn codex_process_evidence_for_session(
+        &self,
+        active_session_id: Option<&str>,
+    ) -> Option<CodexProcessEvidence> {
+        if self.agent != CLIAgent::Codex || self.source != CLIAgentEventSource::RichPlugin {
+            return None;
+        }
+        let native_id = self.session_id.as_deref()?;
+        let uuid = Uuid::parse_str(native_id).ok()?;
+        if uuid.is_nil()
+            || uuid.to_string() != native_id
+            || active_session_id.is_some_and(|active| active != native_id)
+        {
+            return None;
+        }
+        self.payload.codex_process_evidence.clone()
+    }
 }
 
 /// Version-specific parsers, indexed by (version - 1).

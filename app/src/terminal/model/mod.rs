@@ -33,6 +33,12 @@ pub mod kitty;
 pub(in crate::terminal) mod lifecycle;
 #[cfg(target_os = "macos")]
 pub(crate) mod local_pty_identity;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "local_pty_identity_linux.rs"]
+pub(crate) mod local_pty_identity;
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[path = "local_pty_identity_windows.rs"]
+pub(crate) mod local_pty_identity;
 pub mod secrets;
 pub mod selection;
 pub mod session;

@@ -33,6 +33,36 @@ use crate::ssh_manager::password_prompt::{
 };
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+mod grok_owned_input;
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+mod grok_remote_owned;
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+mod codex_remote_owned;
 mod link_detection;
 mod open_in_warp;
 mod pane_impl;
@@ -2366,6 +2396,9 @@ struct CtrlCActiveBlockState {
 struct PendingSpecificCLIAgentLaunch {
     agent: CLIAgent,
     executable: Option<PathBuf>,
+    owned_grok: bool,
+    owned_codex: bool,
+    preparation: Option<uuid::Uuid>,
     revision: crate::editor::EditorBufferRevision,
 }
 
@@ -2594,6 +2627,66 @@ pub struct TerminalView {
     pending_command_queue: VecDeque<String>,
     pending_specific_cli_agent_launch: Option<PendingSpecificCLIAgentLaunch>,
     /// 只由同一命令块结束或真实 PTY 退出释放，旧回调不能释放后续启动。
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    grok_owned_input: Option<grok_owned_input::OwnedInput>,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    grok_owned_history_request: Option<uuid::Uuid>,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    grok_remote_owned: Option<grok_remote_owned::RemoteOwned>,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    grok_remote_restore_generation: Option<Uuid>,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    codex_remote_owned: Option<codex_remote_owned::RemoteOwned>,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    codex_remote_restore_generation: Option<Uuid>,
     cli_agent_launch_reservation_block_id: Option<BlockId>,
     cli_agent_hook_input_target: Option<CLIAgentHookInputTarget>,
     /// When true, enter agent view after pending setup commands complete
@@ -4307,6 +4400,66 @@ impl TerminalView {
             awaiting_pending_command_completion: false,
             pending_command_queue: Default::default(),
             pending_specific_cli_agent_launch: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            grok_owned_input: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            grok_owned_history_request: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            grok_remote_owned: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            grok_remote_restore_generation: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            codex_remote_owned: None,
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            codex_remote_restore_generation: None,
             cli_agent_launch_reservation_block_id: None,
             cli_agent_hook_input_target: None,
             enter_agent_view_after_pending_commands: false,
@@ -9607,6 +9760,26 @@ impl TerminalView {
         let bytes = data.into();
         if bytes.as_ref() == [0x03] {
             self.pending_specific_cli_agent_launch = None;
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
+            { self.grok_owned_history_request = None; }
+
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            if let Some(lease) = self
+                .grok_owned_input
+                .as_ref()
+                .and_then(|owned| owned.lease.as_ref())
+            {
+                // 只取消尚未写入的输入，已领取的原生回合继续接收确切回执。
+                lease.revoke_before_write();
+            }
         }
         ctx.emit(Event::WriteBytesToPty { bytes });
     }
@@ -11225,6 +11398,36 @@ impl TerminalView {
     }
 
     fn on_user_block_completed(&mut self, block_id: &BlockId, ctx: &mut ViewContext<Self>) {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.retire_owned_grok_input_for_block(block_id, ctx);
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.retire_remote_owned_grok_for_block(block_id, ctx);
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.retire_remote_owned_codex_for_block(block_id, ctx);
         self.model.lock().end_notify_on_ssh_login_complete();
 
         // If the block that just ended was an agent-requested long running command for which the user took over control,
@@ -11816,6 +12019,16 @@ impl TerminalView {
     }
 
     fn handle_terminal_event(&mut self, event: &ModelEvent, ctx: &mut ViewContext<Self>) {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.invalidate_owned_grok_if_changed(ctx);
         match event {
             ModelEvent::TerminalClear => {
                 self.handle_terminal_wakeup((), ctx);
@@ -13368,6 +13581,37 @@ impl TerminalView {
         }
 
         if notification.event == CLIAgentEventType::SessionStart {
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            { self.observe_owned_grok_history(ctx);
+            self.observe_owned_grok_start(ctx); }
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            self.observe_remote_owned_grok_start(ctx);
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            self.observe_remote_owned_codex_start(ctx);
             send_telemetry_from_ctx!(
                 TelemetryEvent::CLIAgentPluginDetected {
                     cli_agent: notification.agent.into(),
@@ -13551,6 +13795,32 @@ impl TerminalView {
                 }
             }
             _ => {}
+        }
+        // listener 注册后的通知走此模型事件；重关联不能依赖再发一次 SessionStart。
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if event.terminal_view_id() == self.view_id {
+            if matches!(event, CLIAgentSessionsModelEvent::Ended { .. }) {
+                self.grok_remote_restore_generation = None;
+                self.revoke_remote_owned_grok();
+                self.revoke_remote_owned_codex();
+            } else if matches!(
+                event,
+                CLIAgentSessionsModelEvent::Started { .. }
+                    | CLIAgentSessionsModelEvent::StatusChanged { .. }
+                    | CLIAgentSessionsModelEvent::SessionUpdated { .. }
+            ) {
+                self.observe_owned_grok_history(ctx);
+                self.observe_remote_owned_grok_start(ctx);
+                self.observe_remote_owned_codex_start(ctx);
+            }
         }
         if event.terminal_view_id() == self.view_id
             && matches!(
@@ -15688,6 +15958,16 @@ impl TerminalView {
         executable: Option<PathBuf>,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.queue_specific_cli_agent(agent, executable, false, ctx);
+    }
+
+    pub(crate) fn queue_specific_cli_agent(
+        &mut self,
+        agent: CLIAgent,
+        executable: Option<PathBuf>,
+        owned_grok: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
         if self
             .input
             .as_ref(ctx)
@@ -15709,6 +15989,9 @@ impl TerminalView {
         self.pending_specific_cli_agent_launch = Some(PendingSpecificCLIAgentLaunch {
             agent,
             executable,
+            owned_grok,
+            owned_codex: false,
+            preparation: None,
             revision: self
                 .input
                 .as_ref(ctx)
@@ -15774,6 +16057,58 @@ impl TerminalView {
                 ctx,
             );
             return false;
+        }
+        if intent.owned_codex {
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            self.prepare_remote_owned_codex_pending(ctx);
+            return false;
+        }
+        if intent.owned_grok {
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            if self.prepare_remote_owned_grok_pending(ctx) {
+                return false;
+            }
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            {
+                return self.prepare_owned_grok_pending(ctx);
+            }
+            #[cfg(not(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            )))]
+            {
+                self.show_error_toast(crate::t!("cli-agent-grok-owned-launch-unavailable"), ctx);
+                return false;
+            }
         }
         let has_local_pty = self.inactive_pty_reads_rx(ctx).is_some();
         let replacement = {

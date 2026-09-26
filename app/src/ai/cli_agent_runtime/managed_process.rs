@@ -22,6 +22,9 @@ use tempfile::NamedTempFile;
 use uuid::Uuid;
 use warpui::r#async::FutureExt as _;
 
+#[cfg(all(windows, target_arch = "x86_64"))]
+use crate::terminal::cli_agent_sessions::grok_owned_history_source_windows::NpmGrokSource;
+
 pub(super) const WORKER_COMMAND: &str = "cli-agent-supervisor";
 const EXEC_CONTROL_ENV: &str = "INFINISHELL_CLI_EXEC_CONTROL";
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -82,7 +85,21 @@ pub(crate) struct ExpectedFileIdentity {
 #[serde(rename_all = "snake_case")]
 enum AtomicLaunchKind {
     NativeFile,
+    WindowsReviewedProjectCommandV1,
+    UnixReviewedProjectCommandV1,
     ClaudeNpmVersionProbeV1,
+    ClaudeHomebrewVersionProbeV1,
+    ClaudeWingetVersionProbeV1,
+    CodexHomebrewVersionProbeV1,
+    /// 固定 Grok ARM cask 的版本及三种补全探针。
+    GrokHomebrewVersionProbeV1,
+    CodexNpmVersionProbeV1,
+    CodexWindowsNpmVersionProbeV1,
+    CodexWindowsWingetVersionProbeV1,
+    GrokWindowsWingetVersionProbeV1,
+    GrokWindowsNpmVersionProbeV1,
+    ClaudeWindowsNpmVersionProbeV1,
+    GrokNpmVersionProbeV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -122,8 +139,25 @@ impl WindowsChildImage {
 }
 
 impl PreparedLaunchBinding {
+    pub(crate) fn grok_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::GrokNpmVersionProbeV1))
+    }
+
     pub(crate) fn new(digest: String) -> io::Result<Self> {
         Self::with_kind(digest, None)
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn windows_reviewed_project_command(digest: String) -> io::Result<Self> {
+        Self::with_kind(
+            digest,
+            Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1),
+        )
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn unix_reviewed_project_command(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::UnixReviewedProjectCommandV1))
     }
 
     pub(crate) fn native_file(digest: String) -> io::Result<Self> {
@@ -134,11 +168,98 @@ impl PreparedLaunchBinding {
         Self::with_kind(digest, Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1))
     }
 
+    pub(crate) fn claude_homebrew_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1))
+    }
+
+    pub(crate) fn claude_winget_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::ClaudeWingetVersionProbeV1))
+    }
+
+    pub(crate) fn grok_homebrew_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::GrokHomebrewVersionProbeV1))
+    }
+
+    pub(crate) fn codex_homebrew_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1))
+    }
+
+    pub(crate) fn codex_windows_winget_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(
+            digest,
+            Some(AtomicLaunchKind::CodexWindowsWingetVersionProbeV1),
+        )
+    }
+
+    pub(crate) fn grok_windows_winget_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(
+            digest,
+            Some(AtomicLaunchKind::GrokWindowsWingetVersionProbeV1),
+        )
+    }
+
+    pub(crate) fn codex_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::CodexNpmVersionProbeV1))
+    }
+
+    pub(crate) fn grok_windows_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::GrokWindowsNpmVersionProbeV1))
+    }
+
+    pub(crate) fn codex_windows_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(
+            digest,
+            Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1),
+        )
+    }
+
+    pub(crate) fn claude_windows_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(
+            digest,
+            Some(AtomicLaunchKind::ClaudeWindowsNpmVersionProbeV1),
+        )
+    }
+
     pub(crate) fn from_persisted(digest: String, kind: Option<&str>) -> io::Result<Self> {
         let kind = match kind {
+            Some("unix_reviewed_project_command_v1") => {
+                Some(AtomicLaunchKind::UnixReviewedProjectCommandV1)
+            }
+            Some("windows_reviewed_project_command_v1") => {
+                Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1)
+            }
             None => None,
             Some("native_file") => Some(AtomicLaunchKind::NativeFile),
+            Some("codex_windows_winget_version_probe_v1") => {
+                Some(AtomicLaunchKind::CodexWindowsWingetVersionProbeV1)
+            }
+            Some("grok_windows_winget_version_probe_v1") => {
+                Some(AtomicLaunchKind::GrokWindowsWingetVersionProbeV1)
+            }
             Some("claude_npm_version_probe_v1") => Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1),
+            Some("claude_homebrew_version_probe_v1") => {
+                Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1)
+            }
+            Some("claude_winget_version_probe_v1") => {
+                Some(AtomicLaunchKind::ClaudeWingetVersionProbeV1)
+            }
+            Some("codex_npm_version_probe_v1") => Some(AtomicLaunchKind::CodexNpmVersionProbeV1),
+            Some("grok_npm_version_probe_v1") => Some(AtomicLaunchKind::GrokNpmVersionProbeV1),
+            Some("claude_windows_npm_version_probe_v1") => {
+                Some(AtomicLaunchKind::ClaudeWindowsNpmVersionProbeV1)
+            }
+            Some("grok_windows_npm_version_probe_v1") => {
+                Some(AtomicLaunchKind::GrokWindowsNpmVersionProbeV1)
+            }
+            Some("codex_windows_npm_version_probe_v1") => {
+                Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
+            }
+            Some("grok_homebrew_version_probe_v1") => {
+                Some(AtomicLaunchKind::GrokHomebrewVersionProbeV1)
+            }
+            Some("codex_homebrew_version_probe_v1") => {
+                Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1)
+            }
             Some(_) => {
                 return Err(io::Error::other(
                     "managed_process.launch_binding_kind_invalid",
@@ -191,8 +312,43 @@ impl PreparedLaunchBinding {
 
     pub(crate) fn kind_name(&self) -> Option<&'static str> {
         match self.kind {
+            Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) => {
+                Some("unix_reviewed_project_command_v1")
+            }
+            Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1) => {
+                Some("windows_reviewed_project_command_v1")
+            }
             Some(AtomicLaunchKind::NativeFile) => Some("native_file"),
+            Some(AtomicLaunchKind::CodexWindowsWingetVersionProbeV1) => {
+                Some("codex_windows_winget_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::GrokWindowsWingetVersionProbeV1) => {
+                Some("grok_windows_winget_version_probe_v1")
+            }
             Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) => Some("claude_npm_version_probe_v1"),
+            Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1) => {
+                Some("claude_homebrew_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::ClaudeWingetVersionProbeV1) => {
+                Some("claude_winget_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::CodexNpmVersionProbeV1) => Some("codex_npm_version_probe_v1"),
+            Some(AtomicLaunchKind::GrokNpmVersionProbeV1) => Some("grok_npm_version_probe_v1"),
+            Some(AtomicLaunchKind::ClaudeWindowsNpmVersionProbeV1) => {
+                Some("claude_windows_npm_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::GrokWindowsNpmVersionProbeV1) => {
+                Some("grok_windows_npm_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) => {
+                Some("codex_windows_npm_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::GrokHomebrewVersionProbeV1) => {
+                Some("grok_homebrew_version_probe_v1")
+            }
+            Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1) => {
+                Some("codex_homebrew_version_probe_v1")
+            }
             None => None,
         }
     }
@@ -358,6 +514,18 @@ fn windows_file_attributes_are_plain(attributes: u32) -> bool {
 }
 
 impl ManagedEnvironment {
+    /// 只允许受审命令策略关闭原生后台能力并固定前台时限，不引入任意环境覆写。
+    pub(crate) fn claude_reviewed_commands() -> Self {
+        Self {
+            values: vec![
+                ("CLAUDE_CODE_DISABLE_BACKGROUND_TASKS".into(), "1".into()),
+                ("BASH_DEFAULT_TIMEOUT_MS".into(), "120000".into()),
+                ("BASH_MAX_TIMEOUT_MS".into(), "120000".into()),
+            ],
+            remove: Vec::new(),
+        }
+    }
+
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     fn update_snapshot_root(
         &self,
@@ -409,11 +577,19 @@ impl ManagedEnvironment {
                         | "HOMEBREW_NO_AUTO_UPDATE"
                         | "HOMEBREW_NO_INSTALL_CLEANUP"
                         | "CLAUDE_CONFIG_DIR"
+                        | "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS"
+                        | "BASH_DEFAULT_TIMEOUT_MS"
+                        | "BASH_MAX_TIMEOUT_MS"
                 )
             ) || !names.insert(name)
                 || value.as_encoded_bytes().contains(&0)
                 || value.as_encoded_bytes().len() > 32 * 1024
                 || name == "CLAUDE_CONFIG_DIR" && !Path::new(value).is_absolute()
+                || name == "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS" && value != "1"
+                || matches!(
+                    name.to_str(),
+                    Some("BASH_DEFAULT_TIMEOUT_MS" | "BASH_MAX_TIMEOUT_MS")
+                ) && value != "120000"
             {
                 return Err(io::Error::other("更新环境覆盖不符合启动契约"));
             }
@@ -533,6 +709,9 @@ struct Manifest {
     #[cfg(windows)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     child_image: Option<WindowsChildImage>,
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    grok_npm_source: Option<NpmGrokSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     atomic_cwd: Option<AtomicDirectoryIdentity>,
 }
@@ -765,6 +944,93 @@ pub(crate) async fn spawn(
     .await
 }
 
+/// Windows 项目命令只接受创建时的精确映像与 argv；不复用更新器执行或任意 Shell。
+#[cfg(windows)]
+pub(super) async fn spawn_reviewed_windows_command(
+    state_dir: &Path,
+    generation: Uuid,
+    reviewed: &super::reviewed_project_commands::ReviewedCommand,
+) -> io::Result<ManagedChild> {
+    let command = reviewed
+        .windows
+        .as_ref()
+        .ok_or_else(|| io::Error::other("缺少 Windows 命令绑定"))?;
+    command
+        .validate()
+        .map_err(|error| io::Error::other(error.to_string()))?;
+    if reviewed.argv != command.arguments
+        || reviewed.cwd != command.cwd
+        || reviewed.unix.is_some()
+        || !(1..=120_000).contains(&reviewed.timeout_ms)
+    {
+        return Err(io::Error::other("Windows 命令参数与审批不一致"));
+    }
+    let binding = PreparedLaunchBinding::windows_reviewed_project_command(sha256(
+        &serde_json::to_vec(reviewed).map_err(io::Error::other)?,
+    ))?;
+    let arguments: Vec<OsString> = command.arguments.iter().map(OsString::from).collect();
+    validate_expected_files_contract(&command.executable, &command.files)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        &command.executable,
+        &arguments,
+        &reviewed.cwd,
+        None,
+        None,
+        None,
+        command.files.clone(),
+        Some(&binding),
+    )
+    .await
+}
+
+/// Unix 项目命令通过独立监督代执行；内部 argv 只承载已绑定合同，不发送给 Shell。
+#[cfg(unix)]
+pub(super) async fn spawn_reviewed_unix_command(
+    state_dir: &Path,
+    generation: Uuid,
+    reviewed: &super::reviewed_project_commands::ReviewedCommand,
+) -> io::Result<ManagedChild> {
+    let command = reviewed
+        .unix
+        .as_ref()
+        .ok_or_else(|| io::Error::other("缺少 Unix 命令绑定"))?;
+    command
+        .validate()
+        .map_err(|error| io::Error::other(error.to_string()))?;
+    command
+        .verify_entry()
+        .map_err(|error| io::Error::other(error.to_string()))?;
+    if reviewed.windows.is_some()
+        || reviewed.argv != command.arguments
+        || reviewed.cwd != command.directory.path
+        || !(1..=120_000).contains(&reviewed.timeout_ms)
+    {
+        return Err(io::Error::other("Unix 命令参数与审批不一致"));
+    }
+    let binding = PreparedLaunchBinding::unix_reviewed_project_command(sha256(
+        &serde_json::to_vec(reviewed).map_err(io::Error::other)?,
+    ))?;
+    let arguments = [OsString::from(
+        serde_json::to_string(command).map_err(io::Error::other)?,
+    )];
+    validate_expected_files_contract(&command.executable, &command.files)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        &command.executable,
+        &arguments,
+        &reviewed.cwd,
+        None,
+        None,
+        None,
+        command.files.clone(),
+        Some(&binding),
+    )
+    .await
+}
+
 pub(crate) async fn spawn_with_isolated_home(
     state_dir: &Path,
     generation: Uuid,
@@ -870,7 +1136,7 @@ pub(crate) async fn spawn_bound_update(
     .await
 }
 
-/// 固定 Claude npm 公共 native 入口的版本探针；不接受通用环境覆盖或任意参数。
+/// 固定 Claude 包入口的版本探针；各来源独立绑定布局，不接受通用环境覆盖或任意参数。
 pub(crate) async fn spawn_bound_version_probe(
     state_dir: &Path,
     generation: Uuid,
@@ -878,7 +1144,391 @@ pub(crate) async fn spawn_bound_version_probe(
     expected: ExpectedFileIdentity,
     binding: &PreparedLaunchBinding,
 ) -> io::Result<ManagedChild> {
-    if binding.kind != Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+    spawn_bound_package_probe(
+        state_dir,
+        generation,
+        executable,
+        expected,
+        binding,
+        &["--version".into()],
+    )
+    .await
+}
+
+/// Grok cask 只允许固定的 completions 子命令，不开放模型、更新器或用户环境。
+pub(crate) async fn spawn_bound_grok_cask_completion(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    expected: ExpectedFileIdentity,
+    binding: &PreparedLaunchBinding,
+    shell: &str,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::GrokHomebrewVersionProbeV1)
+        || !matches!(shell, "bash" | "zsh" | "fish")
+    {
+        return Err(io::Error::other("Grok cask 补全探针参数不匹配"));
+    }
+    spawn_bound_package_probe(
+        state_dir,
+        generation,
+        executable,
+        expected,
+        binding,
+        &["completions".into(), shell.into()],
+    )
+    .await
+}
+
+/// Codex cask 只增加固定的三种补全输出，不开放任意子命令或用户环境。
+pub(crate) async fn spawn_bound_codex_cask_completion(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    expected: ExpectedFileIdentity,
+    binding: &PreparedLaunchBinding,
+    shell: &str,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1)
+        || !matches!(shell, "bash" | "zsh" | "fish")
+    {
+        return Err(io::Error::other("Codex cask 补全探针参数不匹配"));
+    }
+    spawn_bound_package_probe(
+        state_dir,
+        generation,
+        executable,
+        expected,
+        binding,
+        &["completion".into(), shell.into()],
+    )
+    .await
+}
+
+#[cfg(unix)]
+pub(crate) fn capture_codex_npm_node_closure(
+    node: &ExpectedFileIdentity,
+) -> io::Result<Vec<ExpectedFileIdentity>> {
+    npm_probe::capture_node(node)
+}
+
+#[cfg(unix)]
+pub(crate) fn validate_codex_npm_probe_contract(
+    node: &Path,
+    arguments: &[OsString],
+    files: &[ExpectedFileIdentity],
+) -> io::Result<()> {
+    npm_probe::validate_contract(node, arguments, files)
+}
+
+#[cfg(unix)]
+pub(crate) fn verify_codex_npm_probe_dependencies(
+    node: &Path,
+    arguments: &[OsString],
+    files: &[ExpectedFileIdentity],
+) -> io::Result<()> {
+    npm_probe::verify_node_dependencies(node, arguments, files)
+}
+
+#[cfg(unix)]
+pub(crate) async fn spawn_bound_codex_npm_version_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    node: &Path,
+    arguments: &[OsString],
+    expected_files: Vec<ExpectedFileIdentity>,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::CodexNpmVersionProbeV1) {
+        return Err(io::Error::other("Codex npm 版本探针绑定类型不匹配"));
+    }
+    npm_probe::validate_contract(node, arguments, &expected_files)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        node,
+        arguments,
+        &cwd,
+        None,
+        None,
+        None,
+        expected_files,
+        Some(binding),
+    )
+    .await
+}
+
+#[cfg(windows)]
+pub(crate) type WindowsCodexNpmProbeInputs = npm_windows_probe::ProbeInputs;
+
+#[cfg(windows)]
+pub(crate) fn capture_windows_codex_npm_probe(
+    mode: &str,
+    node: &Path,
+    stage: &Path,
+    prefix: &Path,
+) -> io::Result<WindowsCodexNpmProbeInputs> {
+    npm_windows_probe::capture(mode, node, stage, prefix)
+}
+
+#[cfg(windows)]
+pub(crate) fn validate_windows_codex_npm_probe(
+    input: &WindowsCodexNpmProbeInputs,
+) -> io::Result<()> {
+    npm_windows_probe::validate(input)
+}
+
+#[cfg(windows)]
+pub(crate) fn verify_windows_codex_npm_probe_dependencies(
+    input: &WindowsCodexNpmProbeInputs,
+) -> io::Result<()> {
+    npm_windows_probe::verify_external(input)
+}
+
+#[cfg(windows)]
+pub(crate) async fn spawn_bound_windows_codex_npm_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    input: &WindowsCodexNpmProbeInputs,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) {
+        return Err(io::Error::other("Windows Codex npm 探针绑定类型不匹配"));
+    }
+    npm_windows_probe::validate(input)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        input.program(),
+        input.arguments(),
+        &cwd,
+        None,
+        None,
+        None,
+        input.files(),
+        Some(binding),
+    )
+    .await
+}
+
+#[cfg(windows)]
+pub(crate) type WindowsGrokNpmProbeInputs = grok_npm_windows_probe::ProbeInputs;
+
+#[cfg(windows)]
+pub(crate) fn capture_windows_grok_npm_probe(
+    mode: &str,
+    node: &Path,
+    stage: &Path,
+    prefix: &Path,
+    canonical_stage: &Path,
+    version_stage: &Path,
+) -> io::Result<WindowsGrokNpmProbeInputs> {
+    grok_npm_windows_probe::capture(mode, node, stage, prefix, canonical_stage, version_stage)
+}
+
+#[cfg(windows)]
+pub(crate) fn validate_windows_grok_npm_probe(input: &WindowsGrokNpmProbeInputs) -> io::Result<()> {
+    grok_npm_windows_probe::validate(input)
+}
+
+#[cfg(windows)]
+pub(crate) fn verify_windows_grok_npm_probe_dependencies(
+    input: &WindowsGrokNpmProbeInputs,
+) -> io::Result<()> {
+    grok_npm_windows_probe::verify_external(input)
+}
+
+#[cfg(windows)]
+pub(crate) async fn spawn_bound_windows_grok_npm_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    input: &WindowsGrokNpmProbeInputs,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::GrokWindowsNpmVersionProbeV1) {
+        return Err(io::Error::other("Windows Grok npm 探针绑定类型不匹配"));
+    }
+    grok_npm_windows_probe::validate(input)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        input.program(),
+        input.arguments(),
+        &cwd,
+        None,
+        None,
+        None,
+        input.files(),
+        Some(binding),
+    )
+    .await
+}
+
+#[cfg(windows)]
+pub(crate) type WindowsCodexWingetProbeInputs = codex_winget_windows_probe::ProbeInputs;
+
+#[cfg(windows)]
+pub(crate) fn capture_windows_codex_winget_probe(
+    stage: &Path,
+    prefix: &Path,
+    rg: &Path,
+    runtime: &[ExpectedFileIdentity],
+) -> io::Result<WindowsCodexWingetProbeInputs> {
+    codex_winget_windows_probe::capture(stage, prefix, rg, runtime)
+}
+
+#[cfg(windows)]
+pub(crate) fn validate_windows_codex_winget_probe(
+    input: &WindowsCodexWingetProbeInputs,
+) -> io::Result<()> {
+    codex_winget_windows_probe::validate(input)
+}
+
+#[cfg(windows)]
+pub(crate) fn verify_windows_codex_winget_probe_dependencies(
+    input: &WindowsCodexWingetProbeInputs,
+) -> io::Result<()> {
+    codex_winget_windows_probe::verify_external(input)
+}
+
+#[cfg(windows)]
+pub(crate) async fn spawn_bound_windows_codex_winget_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    input: &WindowsCodexWingetProbeInputs,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::CodexWindowsWingetVersionProbeV1) {
+        return Err(io::Error::other("Windows Codex WinGet 探针绑定类型不匹配"));
+    }
+    codex_winget_windows_probe::validate(input)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        input.program(),
+        input.arguments(),
+        &cwd,
+        None,
+        None,
+        None,
+        input.files(),
+        Some(binding),
+    )
+    .await
+}
+
+#[cfg(windows)]
+pub(crate) type WindowsGrokWingetProbeInputs = grok_winget_windows_probe::ProbeInputs;
+
+#[cfg(windows)]
+pub(crate) fn capture_windows_grok_winget_probe(
+    stage: &Path,
+    prefix: &Path,
+    runtime: &[ExpectedFileIdentity],
+) -> io::Result<WindowsGrokWingetProbeInputs> {
+    grok_winget_windows_probe::capture(stage, prefix, runtime)
+}
+
+#[cfg(windows)]
+pub(crate) fn validate_windows_grok_winget_probe(
+    input: &WindowsGrokWingetProbeInputs,
+) -> io::Result<()> {
+    grok_winget_windows_probe::validate(input)
+}
+
+#[cfg(windows)]
+pub(crate) async fn spawn_bound_windows_grok_winget_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    input: &WindowsGrokWingetProbeInputs,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::GrokWindowsWingetVersionProbeV1) {
+        return Err(io::Error::other("Windows Grok WinGet 探针绑定类型不匹配"));
+    }
+    grok_winget_windows_probe::validate(input)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        input.program(),
+        input.arguments(),
+        &cwd,
+        None,
+        None,
+        None,
+        input.files(),
+        Some(binding),
+    )
+    .await
+}
+
+#[cfg(windows)]
+pub(crate) type WindowsClaudeNpmProbeInputs = claude_npm_windows_probe::ProbeInputs;
+
+#[cfg(windows)]
+pub(crate) fn capture_windows_claude_npm_probe(
+    mode: &str,
+    stage: &Path,
+    prefix: &Path,
+) -> io::Result<WindowsClaudeNpmProbeInputs> {
+    claude_npm_windows_probe::capture(mode, stage, prefix)
+}
+
+#[cfg(windows)]
+pub(crate) fn validate_windows_claude_npm_probe(
+    input: &WindowsClaudeNpmProbeInputs,
+) -> io::Result<()> {
+    claude_npm_windows_probe::validate(input)
+}
+
+#[cfg(windows)]
+pub(crate) fn verify_windows_claude_npm_probe_dependencies(
+    input: &WindowsClaudeNpmProbeInputs,
+) -> io::Result<()> {
+    claude_npm_windows_probe::verify_external(input)
+}
+
+#[cfg(windows)]
+pub(crate) async fn spawn_bound_windows_claude_npm_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    input: &WindowsClaudeNpmProbeInputs,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::ClaudeWindowsNpmVersionProbeV1) {
+        return Err(io::Error::other("Windows Claude npm 探针绑定类型不匹配"));
+    }
+    claude_npm_windows_probe::validate(input)?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        input.program(),
+        input.arguments(),
+        &cwd,
+        None,
+        None,
+        None,
+        input.files(),
+        Some(binding),
+    )
+    .await
+}
+
+async fn spawn_bound_package_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    expected: ExpectedFileIdentity,
+    binding: &PreparedLaunchBinding,
+    arguments: &[OsString],
+) -> io::Result<ManagedChild> {
+    if !version_probe::is_probe(binding.kind) {
         return Err(io::Error::other("版本探针绑定类型不匹配"));
     }
     version_probe::supported_platform()?;
@@ -888,7 +1538,7 @@ pub(crate) async fn spawn_bound_version_probe(
         state_dir,
         generation,
         executable,
-        &["--version".into()],
+        arguments,
         &cwd,
         None,
         None,
@@ -910,6 +1560,74 @@ async fn spawn_configured(
     environment: Option<ManagedEnvironment>,
     expected_files: Vec<ExpectedFileIdentity>,
     binding: Option<&PreparedLaunchBinding>,
+) -> io::Result<ManagedChild> {
+    spawn_configured_inner(
+        state_dir,
+        generation,
+        executable,
+        arguments,
+        cwd,
+        isolated_home,
+        isolated_state_dir,
+        environment,
+        expected_files,
+        binding,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        None,
+    )
+    .await
+}
+
+/// 保留 npm 公开入口的完整来源合同，固定策略仍使用自己的私有 GROK_HOME。
+#[cfg(all(windows, target_arch = "x86_64"))]
+pub(crate) async fn spawn_with_grok_npm_source(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    arguments: &[OsString],
+    cwd: &Path,
+    isolated_home: Option<&Path>,
+    isolated_state_dir: Option<&Path>,
+    source: Option<NpmGrokSource>,
+) -> io::Result<ManagedChild> {
+    let _source_files = source
+        .as_ref()
+        .map(NpmGrokSource::validate_and_hold)
+        .transpose()?;
+    if source
+        .as_ref()
+        .is_some_and(|source| source.executable != executable)
+    {
+        return Err(io::Error::other("Grok npm 启动程序与来源不一致"));
+    }
+    spawn_configured_inner(
+        state_dir,
+        generation,
+        executable,
+        arguments,
+        cwd,
+        isolated_home,
+        isolated_state_dir,
+        None,
+        Vec::new(),
+        None,
+        source,
+    )
+    .await
+}
+
+async fn spawn_configured_inner(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    arguments: &[OsString],
+    cwd: &Path,
+    isolated_home: Option<&Path>,
+    isolated_state_dir: Option<&Path>,
+    environment: Option<ManagedEnvironment>,
+    expected_files: Vec<ExpectedFileIdentity>,
+    binding: Option<&PreparedLaunchBinding>,
+    #[cfg(all(windows, target_arch = "x86_64"))] grok_npm_source: Option<NpmGrokSource>,
 ) -> io::Result<ManagedChild> {
     let worker = supervisor_executable()?;
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
@@ -933,9 +1651,11 @@ async fn spawn_configured(
         atomic_launch_kind,
         #[cfg(windows)]
         child_image: binding.and_then(|binding| binding.child_image.clone()),
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source,
         atomic_cwd,
     };
-    if atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+    if version_probe::is_probe(atomic_launch_kind) {
         version_probe::validate(&manifest, state_dir)?;
     }
     let (directory, manifest_bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -1021,6 +1741,8 @@ pub(crate) fn record_not_started(
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -1054,6 +1776,8 @@ pub(crate) fn record_not_started_with_binding(
         atomic_launch_kind: binding.kind,
         #[cfg(windows)]
         child_image: binding.child_image.clone(),
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state_dir, &manifest)?;
@@ -1222,7 +1946,7 @@ fn read_worker_launch_binding(
         ));
     }
     let binding = PreparedLaunchBinding::with_kind(record.binding_digest, record.kind)?;
-    if binding.kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+    if version_probe::is_probe(binding.kind) {
         version_probe::validate(
             manifest,
             directory
@@ -1230,6 +1954,16 @@ fn read_worker_launch_binding(
                 .and_then(Path::parent)
                 .ok_or_else(|| io::Error::other("版本探针缺少状态域"))?,
         )?;
+    } else if binding.kind == Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) {
+        #[cfg(unix)]
+        reviewed_unix::validate(manifest)?;
+        #[cfg(not(unix))]
+        return Err(io::Error::other("Unix 项目命令记录不能在其他平台执行"));
+    } else if binding.kind == Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1) {
+        #[cfg(windows)]
+        reviewed_windows::validate(manifest)?;
+        #[cfg(not(windows))]
+        return Err(io::Error::other("Windows 项目命令记录不能在其他平台执行"));
     } else {
         binding.validate_update_execution()?;
     }
@@ -1404,6 +2138,33 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         return Err(io::Error::other("托管进程启动契约不匹配"));
     }
     validate_expected_files_contract(&manifest.executable, &manifest.expected_files)?;
+    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) {
+        #[cfg(unix)]
+        reviewed_unix::validate(&manifest)?;
+        #[cfg(not(unix))]
+        return Err(io::Error::other("Unix 项目命令记录不能在其他平台执行"));
+    }
+    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1) {
+        #[cfg(windows)]
+        reviewed_windows::validate(&manifest)?;
+        #[cfg(not(windows))]
+        return Err(io::Error::other("Windows 项目命令记录不能在其他平台执行"));
+    }
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    if let Some(source) = &manifest.grok_npm_source {
+        if source.executable != manifest.executable
+            || manifest.atomic_launch_kind.is_some()
+            || manifest.environment.is_some()
+            || !manifest.expected_files.is_empty()
+            || manifest
+                .arguments
+                .first()
+                .is_none_or(|argument| argument != "agent")
+        {
+            return Err(io::Error::other("Grok npm 监督来源与启动合同不一致"));
+        }
+    }
+
     #[cfg(windows)]
     if let Some(image) = &manifest.child_image {
         image.validate()?;
@@ -1413,7 +2174,7 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
             ));
         }
     }
-    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+    if version_probe::is_probe(manifest.atomic_launch_kind) {
         version_probe::validate(
             &manifest,
             directory
@@ -1529,6 +2290,9 @@ pub(crate) fn confirmed_exit(
     }
     #[cfg(target_os = "linux")]
     cleanup_linux_update_snapshot(&directory, &manifest, &manifest_bytes, &receipt)?;
+    if !super::reviewed_project_commands_host::cleanup_for_parent(state_dir, generation)? {
+        return Ok(None);
+    }
     Ok(Some(receipt))
 }
 
@@ -1812,7 +2576,8 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
         version: 1,
         generation: manifest.generation,
         // CLI 正常派生的工具也会另建进程组，异常退出不能作为整个任务已停止的证明。
-        cleanup_confirmed: containment != "unix_process_group" || status.success(),
+        cleanup_confirmed: (containment != "unix_process_group" || status.success())
+            && version_probe::cleanup_confirmed(path, manifest),
         containment: containment.to_owned(),
         exit_reason: reason,
         exit_code: status.code(),
@@ -1846,6 +2611,14 @@ mod atomic_linux;
 #[cfg(windows)]
 #[path = "managed_process_atomic_windows.rs"]
 mod atomic_windows;
+
+#[cfg(windows)]
+#[path = "reviewed_project_commands_windows_worker.rs"]
+mod reviewed_windows;
+
+#[cfg(unix)]
+#[path = "reviewed_project_commands_unix_worker.rs"]
+mod reviewed_unix;
 
 fn write_receipt(directory: &Path, receipt: &ExitReceipt) -> io::Result<()> {
     // 只有原生进程树收尾后才删除本代认证副本；失败不能生成成功清理回执。
@@ -1996,7 +2769,65 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
         .ok_or_else(|| io::Error::other("缺少托管记录目录"))?;
     if let Some(binding) = read_worker_launch_binding(directory, manifest, manifest_bytes)? {
         match binding.kind {
-            Some(AtomicLaunchKind::NativeFile | AtomicLaunchKind::ClaudeNpmVersionProbeV1) => {
+            Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) => {
+                #[cfg(unix)]
+                return reviewed_unix::execute(manifest);
+                #[cfg(not(unix))]
+                return Err(io::Error::other("Unix 项目命令不能在其他平台执行"));
+            }
+            Some(AtomicLaunchKind::WindowsReviewedProjectCommandV1) => {
+                #[cfg(windows)]
+                return reviewed_windows::execute(manifest);
+                #[cfg(not(windows))]
+                return Err(io::Error::other("Windows 项目命令不能在其他平台执行"));
+            }
+            Some(AtomicLaunchKind::ClaudeWindowsNpmVersionProbeV1) => {
+                #[cfg(windows)]
+                return claude_npm_windows_probe::execute(manifest, directory);
+                #[cfg(not(windows))]
+                return Err(io::Error::other(
+                    "Windows Claude npm 探针不能在其他平台执行",
+                ));
+            }
+            Some(AtomicLaunchKind::GrokWindowsNpmVersionProbeV1) => {
+                #[cfg(windows)]
+                return grok_npm_windows_probe::execute(manifest, directory);
+                #[cfg(not(windows))]
+                return Err(io::Error::other("Windows Grok npm 探针不能在其他平台执行"));
+            }
+            Some(AtomicLaunchKind::CodexWindowsWingetVersionProbeV1) => {
+                #[cfg(windows)]
+                return codex_winget_windows_probe::execute(manifest, directory);
+                #[cfg(not(windows))]
+                return Err(io::Error::other("Codex WinGet 版本探针仅支持 Windows"));
+            }
+            Some(AtomicLaunchKind::GrokWindowsWingetVersionProbeV1) => {
+                #[cfg(windows)]
+                return grok_winget_windows_probe::execute(manifest, directory);
+                #[cfg(not(windows))]
+                return Err(io::Error::other("Grok WinGet 版本探针仅支持 Windows"));
+            }
+            Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) => {
+                #[cfg(windows)]
+                return npm_windows_probe::execute(manifest, directory);
+                #[cfg(not(windows))]
+                return Err(io::Error::other("Windows Codex npm 探针不能在其他平台执行"));
+            }
+            Some(AtomicLaunchKind::CodexNpmVersionProbeV1) => {
+                #[cfg(unix)]
+                return npm_probe::execute(manifest);
+                #[cfg(not(unix))]
+                return Err(io::Error::other("Codex npm 版本探针未实现此平台闭包"));
+            }
+            Some(
+                AtomicLaunchKind::NativeFile
+                | AtomicLaunchKind::ClaudeNpmVersionProbeV1
+                | AtomicLaunchKind::ClaudeHomebrewVersionProbeV1
+                | AtomicLaunchKind::ClaudeWingetVersionProbeV1
+                | AtomicLaunchKind::CodexHomebrewVersionProbeV1
+                | AtomicLaunchKind::GrokNpmVersionProbeV1
+                | AtomicLaunchKind::GrokHomebrewVersionProbeV1,
+            ) => {
                 #[cfg(target_os = "linux")]
                 {
                     if manifest.expected_files.len() != 1
@@ -2042,9 +2873,17 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     }
                     enter_atomic_cwd(manifest)?;
                     let environment = resolved_atomic_environment(manifest)?;
-                    if manifest.atomic_launch_kind
-                        == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1)
-                    {
+                    if matches!(
+                        manifest.atomic_launch_kind,
+                        Some(
+                            AtomicLaunchKind::ClaudeHomebrewVersionProbeV1
+                                | AtomicLaunchKind::CodexHomebrewVersionProbeV1
+                                | AtomicLaunchKind::GrokHomebrewVersionProbeV1
+                        )
+                    ) {
+                        npm_probe::protect_linux_candidate(&manifest.cwd)?;
+                    }
+                    if version_probe::is_probe(manifest.atomic_launch_kind) {
                         version_probe::deny_network()?;
                     }
                     return Err(atomic_linux::execute(
@@ -2081,9 +2920,7 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                         &manifest.expected_files[0],
                     )?;
                     executable.verify_for_execution()?;
-                    if manifest.atomic_launch_kind
-                        == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1)
-                    {
+                    if version_probe::is_probe(manifest.atomic_launch_kind) {
                         version_probe::deny_network()?;
                     }
                     return run_path_exec_worker(manifest, executable.execution_path(), false);
@@ -2108,6 +2945,29 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                         ));
                     }
                     let cwd = atomic_windows::prepare_directory(cwd_identity)?;
+                    if manifest.atomic_launch_kind
+                        == Some(AtomicLaunchKind::ClaudeWingetVersionProbeV1)
+                    {
+                        executable.verify_for_spawn()?;
+                        cwd.verify_for_spawn()?;
+                        let mut probe = command::windows::AppContainerProbe::spawn_suspended(
+                            executable.execution_path(),
+                            cwd.execution_path(),
+                            &resolved_atomic_environment(manifest)?,
+                            &format!("InfiniShell.Version.{}", manifest.generation),
+                        )?;
+                        probe.resume()?;
+                        let mut image_debug = executable.begin_image_debug_session(probe.id())?;
+                        image_debug.drain_until_exit()?;
+                        let code = probe.exit_code()?;
+                        drop(cwd);
+                        // 收据位于探针无写权限的托管目录，不能由候选在自己的可写 profile 中伪造。
+                        probe.write_cleanup_receipt(&directory.join("appcontainer-cleanup-v1"))?;
+                        if code == 0 {
+                            return Ok(());
+                        }
+                        std::process::exit(code as i32);
+                    }
                     let mut command = command::blocking::Command::new(executable.execution_path());
                     command
                         .args(&manifest.arguments)
@@ -2214,6 +3074,21 @@ fn run_path_exec_worker(
             .env_clear()
             .envs(resolved_atomic_environment(manifest)?);
     }
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let _grok_source_files = if let Some(source) = &manifest.grok_npm_source {
+        if !verify_original_files || source.executable != executable {
+            return Err(io::Error::other("Grok npm 来源不能用于其他执行路径"));
+        }
+        let held = source.validate_and_hold()?;
+        command.env("GROK_MANAGED_BY_NPM", "1");
+        if manifest.isolated_home.is_none() {
+            command.env("GROK_HOME", &source.grok_home);
+        }
+        // 文件禁止写入和删除共享；目录禁止删除共享，持有到原生进程退出。
+        Some(held)
+    } else {
+        None
+    };
     // 此核对必须尽量贴近最终 exec/status，不能只信 GUI 写 manifest 前的哈希。
     if verify_original_files {
         verify_expected_files(&manifest.expected_files)?;
@@ -2256,8 +3131,39 @@ fn enter_atomic_cwd(manifest: &Manifest) -> io::Result<()> {
 
 #[cfg(any(unix, windows))]
 fn resolved_atomic_environment(manifest: &Manifest) -> io::Result<Vec<(OsString, OsString)>> {
-    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
-        return Ok(version_probe::environment(&manifest.cwd));
+    if version_probe::is_probe(manifest.atomic_launch_kind) {
+        let mut environment = version_probe::resolved_environment(&manifest.cwd)?;
+        if matches!(
+            manifest.atomic_launch_kind,
+            Some(
+                AtomicLaunchKind::CodexHomebrewVersionProbeV1
+                    | AtomicLaunchKind::CodexNpmVersionProbeV1
+            )
+        ) {
+            environment.push((
+                "CODEX_HOME".into(),
+                manifest.cwd.join("config").into_os_string(),
+            ));
+        }
+        if matches!(
+            manifest.atomic_launch_kind,
+            Some(
+                AtomicLaunchKind::GrokHomebrewVersionProbeV1
+                    | AtomicLaunchKind::GrokNpmVersionProbeV1
+            )
+        ) {
+            environment.push((
+                "GROK_HOME".into(),
+                manifest.cwd.join("config").into_os_string(),
+            ));
+            if let [command, shell] = manifest.arguments.as_slice()
+                && command == "completions"
+                && matches!(shell.to_str(), Some("bash" | "zsh" | "fish"))
+            {
+                environment.push(("SHELL".into(), shell.clone()));
+            }
+        }
+        return Ok(environment);
     }
     let mut values = if let Some(home) = &manifest.isolated_home {
         isolated_environment(home)
@@ -2309,5 +3215,29 @@ mod tests;
 #[path = "managed_process_live_tests.rs"]
 mod live_tests;
 
+#[cfg(windows)]
+#[path = "managed_process_claude_npm_probe_windows.rs"]
+mod claude_npm_windows_probe;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "managed_process_codex_cask_probe_linux.rs"]
+mod codex_cask_linux_probe;
+#[cfg(unix)]
+#[path = "managed_process_npm_probe.rs"]
+mod npm_probe;
+#[cfg(windows)]
+#[path = "managed_process_npm_probe_windows.rs"]
+mod npm_windows_probe;
 #[path = "managed_process_version_probe.rs"]
 mod version_probe;
+
+#[cfg(windows)]
+#[path = "managed_process_grok_npm_probe_windows.rs"]
+mod grok_npm_windows_probe;
+
+#[cfg(windows)]
+#[path = "managed_process_winget_codex_probe_windows.rs"]
+mod codex_winget_windows_probe;
+
+#[cfg(windows)]
+#[path = "managed_process_winget_grok_probe_windows.rs"]
+mod grok_winget_windows_probe;

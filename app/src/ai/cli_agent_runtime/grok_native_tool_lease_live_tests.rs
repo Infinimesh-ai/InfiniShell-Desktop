@@ -67,6 +67,7 @@ async fn exercise(root: &Path, file: &mut File) -> Result<(), String> {
         grok_profile: None,
         model: None,
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: false,
             allow_message: false,
         }),

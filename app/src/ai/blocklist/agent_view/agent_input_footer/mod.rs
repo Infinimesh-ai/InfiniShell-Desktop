@@ -172,6 +172,7 @@ fn plugin_chip_key(agent_prefix: &str, remote_host: &Option<String>) -> String {
 /// `UseAgentToolbar`, rendering the appropriate mode in each context.
 pub struct AgentInputFooter {
     terminal_view_id: EntityId,
+    ai_context_model: ModelHandle<BlocklistAIContextModel>,
     #[cfg_attr(not(feature = "voice_input"), allow(unused))]
     mic_button: ViewHandle<ActionButton>,
     nld_button: ViewHandle<ActionButton>,
@@ -705,8 +706,11 @@ impl AgentInputFooter {
             None
         };
 
+        ctx.observe(&ai_context_model, |_, _, ctx| ctx.notify());
+
         let mut me = Self {
             terminal_view_id,
+            ai_context_model,
             ambient_agent_view_model,
             nld_button,
             mic_button,
@@ -830,48 +834,6 @@ impl AgentInputFooter {
         CLIAgentSessionsModel::as_ref(app)
             .session(self.terminal_view_id)
             .is_some()
-    }
-
-    fn select_cli_file(&mut self, ctx: &mut ViewContext<Self>) {
-        let Some(generation) =
-            CLIAgentSessionsModel::as_ref(ctx).input_generation(self.terminal_view_id)
-        else {
-            return;
-        };
-        let window_id = ctx.window_id();
-        let view_id = ctx.view_id();
-        let file_picker_config = warpui::platform::FilePickerConfiguration::new();
-
-        ctx.open_file_picker(
-            move |result, ctx| match result {
-                Ok(paths) => {
-                    if let Some(path) = paths.first() {
-                        ctx.dispatch_typed_action_for_view(
-                            window_id,
-                            view_id,
-                            &AgentInputFooterAction::InsertFilePath {
-                                path: path.clone(),
-                                generation,
-                            },
-                        );
-                    }
-                }
-                Err(err) => {
-                    let window_id = ctx.window_id();
-                    ToastStack::handle(ctx).update(ctx, |toast_stack, ctx| {
-                        toast_stack.add_ephemeral_toast(
-                            DismissibleToast::error(crate::t!(
-                                "file-picker-select-file-error",
-                                error = err.to_string()
-                            )),
-                            window_id,
-                            ctx,
-                        );
-                    });
-                }
-            },
-            file_picker_config,
-        );
     }
 
     /// Which plugin chip to show, if any.
@@ -1423,6 +1385,47 @@ impl AgentInputFooter {
             })
             .finish();
 
+        let image_hint = if self.has_active_cli_agent_input_session(app)
+            && !self
+                .ai_context_model
+                .as_ref(app)
+                .pending_images()
+                .is_empty()
+        {
+            CLIAgentSessionsModel::as_ref(app)
+                .session(self.terminal_view_id)
+                .filter(|session| session.is_remote())
+                .and_then(|session| {
+                    if session.agent == CLIAgent::Codex {
+                        Some(crate::t!("cli-agent-input-remote-image-queue-hint"))
+                    } else if session.agent == CLIAgent::Claude {
+                        Some(crate::t!("cli-agent-input-remote-claude-image-hint"))
+                    } else {
+                        None
+                    }
+                })
+        } else {
+            None
+        };
+        let content = if let Some(image_hint) = image_hint {
+            Flex::column()
+                .with_child(content)
+                .with_child(
+                    Text::new(
+                        image_hint,
+                        appearance.ui_font_family(),
+                        appearance.monospace_font_size() - 2.,
+                    )
+                    .with_color(appearance.theme().foreground().into_solid())
+                    .with_line_height_ratio(DEFAULT_UI_LINE_HEIGHT_RATIO)
+                    .with_selectable(false)
+                    .finish(),
+                )
+                .with_spacing(4.)
+                .finish()
+        } else {
+            content
+        };
         Container::new(content).with_vertical_padding(4.).finish()
     }
 
@@ -2149,12 +2152,15 @@ impl TypedActionView for AgentInputFooter {
                 }
             }
             AgentInputFooterAction::SelectFile => {
-                // 富输入复用编辑器的文件卡片与图片预处理，保留其异步回调代次校验。
-                // 收起富输入时仍沿用普通终端的路径插入入口。
                 if self.has_active_cli_agent_input_session(ctx) {
                     ctx.emit(AgentInputFooterEvent::SelectFile);
                 } else if self.is_cli_agent_session_active(ctx) {
-                    self.select_cli_file(ctx);
+                    if let Some(generation) =
+                        CLIAgentSessionsModel::as_ref(ctx).input_generation(self.terminal_view_id)
+                    {
+                        // 打开与选择合为一个带代次的事件，不再向终端插入裸路径。
+                        ctx.emit(AgentInputFooterEvent::SelectCLIFile { generation });
+                    }
                 } else {
                     ctx.emit(AgentInputFooterEvent::SelectFile);
                 }
@@ -2163,7 +2169,7 @@ impl TypedActionView for AgentInputFooter {
                 if let Some(agent) = self.cli_agent(ctx) {
                     send_telemetry_from_ctx!(
                         TelemetryEvent::CLIAgentToolbarImageAttached {
-                            cli_agent: agent.into(),
+                            cli_agent: agent.into()
                         },
                         ctx
                     );
@@ -2346,6 +2352,9 @@ pub enum AgentInputFooterEvent {
     #[cfg(feature = "voice_input")]
     ToggleVoiceInput(voice_input::VoiceInputToggledFrom),
     SelectFile,
+    SelectCLIFile {
+        generation: Uuid,
+    },
     /// 异步输入携带发起代际，消费者不能重新猜测其目标会话。
     InsertIntoCLI {
         text: String,

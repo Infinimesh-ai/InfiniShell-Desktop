@@ -142,7 +142,19 @@ pub(crate) fn launch_daemon(identity_key: &str, ctx: &mut warpui::AppContext) {
         })
         .detach();
 
-        ServerModel::new(ctx)
+        let model = ServerModel::new(ctx);
+        #[cfg(feature = "local_fs")]
+        let model = {
+            let mut model = model;
+            if let Some(parent) = socket_path.parent()
+                && let Err(error) = model.configure_image_staging(parent)
+            {
+                // 暂存能力缺失不影响其它远端功能；不输出私有目录或认证资料。
+                log::warn!("未启用远端未投递图片暂存；错误类型={:?}", error.kind());
+            }
+            model
+        };
+        model
     });
 }
 

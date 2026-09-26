@@ -527,6 +527,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
             grok_profile: None,
             model: Some(env::var("INFINISHELL_CLAUDE_LIVE_MODEL").map_err(|_| "必须固定实际模型")?),
             local_tools: Some(LocalToolPermissions {
+                allow_project_commands: false,
                 allow_spawn: false,
                 allow_message: false,
             }),

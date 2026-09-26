@@ -332,6 +332,7 @@ async fn grok_sdk_catalog_zero_input() {
         grok_profile: None,
         model: None,
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: true,
         }),

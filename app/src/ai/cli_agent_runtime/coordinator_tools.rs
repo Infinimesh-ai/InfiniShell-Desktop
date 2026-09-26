@@ -15,7 +15,7 @@ use crate::ai::agent_providers::tools::local_orchestration::{LocalHarness, Local
 use crate::ai::cli_agent_runtime::PermissionPolicy;
 use crate::ai::cli_agent_runtime::conversation_bridge::recorded_history_identity;
 use crate::ai::cli_agent_runtime::local_skills::{
-    collect_local_child_skills, prepare_local_cli_skill_inputs,
+    SelectedLocalSkill, collect_local_child_skills, prepare_local_cli_skill_inputs,
 };
 use crate::ai::cli_agent_runtime::local_tools::{
     BoundLocalToolCall, LocalToolOperation, NativeLocalToolRequest, ResultPage,
@@ -618,6 +618,21 @@ async fn spawn_children(
         Harness::parse_orchestration_harness(harness).ok_or("子任务 CLI 无效")?,
         true,
     )?;
+    let selected_skills = skill_inputs
+        .iter()
+        .filter_map(|part| match part {
+            InputContent::Skill { name, path } => Some(SelectedLocalSkill {
+                name: name.clone(),
+                path: path.clone(),
+            }),
+            InputContent::Text(_) | InputContent::LocalImage(_) => None,
+        })
+        .collect::<Vec<_>>();
+    let claude_profile = permission_ceiling
+        .claude_profile()
+        .map(|profile| profile.derive_child(&selected_skills))
+        .transpose()
+        .map_err(|error| error.to_string())?;
     let mut children = Vec::new();
     for (index, child) in run.agent_run_configs.iter().enumerate() {
         ensure_current(spawner, call).await?;
@@ -648,13 +663,13 @@ async fn spawn_children(
             serde_json::to_value(&permission_ceiling).map_err(|error| error.to_string())?;
         let grok_profile = permission_ceiling
             .grok_profile()
-            .map(|profile| profile.derive_child(options.local_tools))
+            .map(|profile| profile.derive_child_with_skills(options.local_tools, &selected_skills))
             .transpose()
             .map_err(|error| error.to_string())?;
         config["grok_profile"] =
             serde_json::to_value(&grok_profile).map_err(|error| error.to_string())?;
-        config["claude_profile"] = serde_json::to_value(permission_ceiling.claude_profile())
-            .map_err(|error| error.to_string())?;
+        config["claude_profile"] =
+            serde_json::to_value(&claude_profile).map_err(|error| error.to_string())?;
         config["name"] = json!(child.name);
         config["title"] = json!(child.title);
         let task = LocalCliTask {
@@ -677,7 +692,7 @@ async fn spawn_children(
             .map_err(|_| "子任务提交确认已关闭")??;
         let mut child_options = options.clone();
         child_options.permission_ceiling = Some(permission_ceiling.clone());
-        child_options.claude_profile = permission_ceiling.claude_profile();
+        child_options.claude_profile = claude_profile.clone();
         child_options.grok_profile = grok_profile;
         child_options.executable = executable;
         child_options.target = SessionTarget::New;

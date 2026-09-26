@@ -20,6 +20,28 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod file_attachments;
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+mod grok_owned;
+#[cfg(all(
+    feature = "local_fs",
+    feature = "local_tty",
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )
+))]
+mod grok_remote_images;
+#[cfg(not(target_family = "wasm"))]
+mod remote_images;
 mod warpify_footer;
 
 use crate::editor::EditorBufferRevision;
@@ -171,6 +193,8 @@ impl TerminalView {
         &mut self,
         ctx: &mut ViewContext<Self>,
     ) {
+        #[cfg(not(target_family = "wasm"))]
+        self.register_remote_image_recovery(ctx);
         let ai_settings = AISettings::handle(ctx);
         ctx.subscribe_to_model(&ai_settings, |me, _, event, ctx| match event {
             AISettingsChangedEvent::IsAnyAIEnabled { .. }
@@ -275,6 +299,21 @@ impl TerminalView {
             }
             UseAgentToolbarEvent::ToggleFileExplorer(cli_agent) => {
                 self.toggle_file_tree(Some((*cli_agent).into()), ctx);
+            }
+            UseAgentToolbarEvent::SelectCLIFile { generation } => {
+                if !self.cli_agent_input_target_matches(*generation, ctx) {
+                    self.show_error_toast(crate::t!("cli-agent-input-target-changed"), ctx);
+                    return;
+                }
+                self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+                if self.has_active_cli_agent_input_session(ctx)
+                    && let Some(generation) =
+                        CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+                {
+                    self.input.update(ctx, |input, ctx| {
+                        input.select_cli_attachment_after_open(generation, ctx);
+                    });
+                }
             }
             UseAgentToolbarEvent::OpenRichInput => {
                 if self.has_active_cli_agent_input_session(ctx) {
@@ -399,6 +438,18 @@ impl TerminalView {
         model: &TerminalModel,
         ctx: &AppContext,
     ) -> Option<(CLIAgent, Option<String>)> {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if self.is_owned_grok_command(model) {
+            return Some((CLIAgent::Grok, None));
+        }
         let active_block = model.block_list().active_block();
 
         let command = active_block.command_with_secrets_obfuscated(false);
@@ -709,6 +760,32 @@ impl TerminalView {
         else {
             return;
         };
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if agent == CLIAgent::Grok && self.grok_remote_owned.is_some() {
+            self.submit_remote_owned_grok_input(text, ctx);
+            return;
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if agent == CLIAgent::Grok && self.grok_owned_input.is_some() {
+            self.submit_owned_grok_input(text, ctx);
+            return;
+        }
         if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
             return;
         }
@@ -728,7 +805,11 @@ impl TerminalView {
                 return;
             }
         }
-        if !images.is_empty() && self.cli_agent_image_paste_bytes(ctx).is_none() {
+        let remote_images = !images.is_empty()
+            && CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|session| session.remote_host.is_some());
+        if !remote_images && !images.is_empty() && self.cli_agent_image_paste_bytes(ctx).is_none() {
             return;
         }
         if !self.begin_cli_agent_text_submit(generation, ctx) {
@@ -907,6 +988,11 @@ impl TerminalView {
             );
             return;
         }
+        #[cfg(not(target_family = "wasm"))]
+        if self.is_remote_cli_image_input(ctx) {
+            self.submit_remote_cli_images(images, text_bytes, generation, snapshot, ctx);
+            return;
+        }
         let Some(paste_bytes) = self.cli_agent_image_paste_bytes(ctx) else {
             self.release_cli_agent_input_submission(generation, ctx);
             return;
@@ -1029,6 +1115,25 @@ impl TerminalView {
         &mut self,
         ctx: &mut ViewContext<Self>,
     ) -> bool {
+        #[cfg(not(target_family = "wasm"))]
+        if self.is_remote_cli_image_input(ctx) {
+            return self.attach_remote_clipboard_images(ctx);
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if self.prepare_owned_grok_image_composer(ctx) {
+            let content = ctx.clipboard().read();
+            return self.input.update(ctx, |input, ctx| {
+                input.attach_cli_clipboard_images(content, ctx)
+            }) > 0;
+        }
         let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
         else {
             return false;
@@ -1054,6 +1159,26 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) {
         if image_filepaths.is_empty() {
+            return;
+        }
+        #[cfg(not(target_family = "wasm"))]
+        if self.is_remote_cli_image_input(ctx) {
+            self.attach_remote_dropped_images(image_filepaths, ctx);
+            return;
+        }
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if self.prepare_owned_grok_image_composer(ctx) {
+            self.input.update(ctx, |input, ctx| {
+                input.handle_pasted_or_dragdropped_image_filepaths(image_filepaths, ctx)
+            });
             return;
         }
         let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
@@ -1653,6 +1778,11 @@ impl UseAgentToolbar {
             AgentInputFooterEvent::ToggleFileExplorer(agent) => {
                 ctx.emit(UseAgentToolbarEvent::ToggleFileExplorer(*agent));
             }
+            AgentInputFooterEvent::SelectCLIFile { generation } => {
+                ctx.emit(UseAgentToolbarEvent::SelectCLIFile {
+                    generation: *generation,
+                });
+            }
             AgentInputFooterEvent::OpenRichInput => {
                 ctx.emit(UseAgentToolbarEvent::OpenRichInput);
             }
@@ -1746,6 +1876,8 @@ pub enum UseAgentToolbarEvent {
     ToggleFileExplorer(CLIAgent),
     /// Open the rich input editor for composing a prompt.
     OpenRichInput,
+    /// 选择当前 CLI 附件，包含打开编辑器与选择文件的同一次意图。
+    SelectCLIFile { generation: Uuid },
     /// Hide the rich input editor (same as Escape).
     HideRichInput,
     /// User chose to warpify the subshell.

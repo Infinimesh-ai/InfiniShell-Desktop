@@ -448,6 +448,7 @@ fn local_task_mcp_keeps_an_explicit_approval_rule_and_cannot_expand_saved_rights
     let cwd = std::env::temp_dir();
     let mut profile = profile(&cwd);
     profile.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: true,
     });

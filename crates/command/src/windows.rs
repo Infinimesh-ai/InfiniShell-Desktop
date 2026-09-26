@@ -7,6 +7,10 @@ use std::process::Child;
 use anyhow::{Context, Result};
 use warp_errors::report_error;
 
+#[path = "windows_appcontainer.rs"]
+mod appcontainer;
+pub use appcontainer::AppContainerProbe;
+
 /// 主线程仍处于 `CREATE_SUSPENDED` 状态的子进程。
 ///
 /// 此类型不提供直接取出 [`Child`] 的通道；只有原生恢复成功后才会移交进程所有权。
@@ -88,6 +92,12 @@ impl SuspendedChild {
 
         self.primary_thread.take();
         Ok(self.child.take().expect("冻结进程必须存在"))
+    }
+}
+
+impl std::os::windows::io::AsRawHandle for SuspendedChild {
+    fn as_raw_handle(&self) -> std::os::windows::io::RawHandle {
+        self.child.as_ref().expect("冻结进程必须存在").as_raw_handle()
     }
 }
 

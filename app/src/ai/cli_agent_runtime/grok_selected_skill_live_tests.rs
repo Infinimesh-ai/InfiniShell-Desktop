@@ -205,6 +205,7 @@ async fn exercise(
         grok_profile: None,
         model: None,
         local_tools: (mode == "sdk").then_some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: false,
             allow_message: false,
         }),

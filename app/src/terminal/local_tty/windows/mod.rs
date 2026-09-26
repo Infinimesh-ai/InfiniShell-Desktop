@@ -11,6 +11,8 @@ mod event_loop_tests;
 use std::ffi::{OsStr, OsString};
 use std::os::windows::ffi::OsStrExt;
 use std::os::windows::io::FromRawHandle as _;
+#[cfg(target_arch = "x86_64")]
+use std::os::windows::io::BorrowedHandle;
 use std::path::PathBuf;
 
 use anyhow::Context as _;
@@ -38,6 +40,8 @@ use super::{EventedPty, EventedReadWrite, PtyOptions, SizeInfo, mio_channel};
 use crate::terminal::local_tty::spawner::{PtySpawnInfo, PtySpawner};
 use crate::terminal::local_tty::windows::proc_thread_attribute_list::ProcThreadAttributeList;
 use crate::terminal::writeable_pty;
+#[cfg(target_arch = "x86_64")]
+use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 trait ToCoord {
     fn to_coord(&self) -> COORD;
@@ -64,6 +68,8 @@ unsafe impl Send for ShareableHandle {}
 unsafe impl Sync for ShareableHandle {}
 
 pub(super) struct PtySpawnResult {
+    #[cfg(target_arch = "x86_64")]
+    local_identity: Option<LocalPtyIdentity>,
     pub pty_handle: HPCON,
     pub pipe: mio::windows::NamedPipe,
     pub conpty_api: ConptyApi,
@@ -269,7 +275,14 @@ pub(super) fn spawn(
     let child = PseudoConsoleChild {
         process_info: process_information,
     };
+    // 原始创建句柄与此 ConPTY 的伪控制台属性来自同一次 CreateProcessW。
+    #[cfg(target_arch = "x86_64")]
+    let local_identity = LocalPtyIdentity::from_spawned_conpty(
+        &unsafe { BorrowedHandle::borrow_raw(process_information.hProcess.0) },
+    ).ok();
     let result = PtySpawnResult {
+        #[cfg(target_arch = "x86_64")]
+        local_identity,
         pty_handle,
         pipe,
         conpty_api,
@@ -378,6 +391,8 @@ fn append_quoted(arg: &OsStr, cmdline: &mut Vec<u16>) {
 }
 
 pub struct Pty {
+    #[cfg(target_arch = "x86_64")]
+    local_identity: Option<LocalPtyIdentity>,
     child_exit_watcher: ChildExitWatcher,
     handle: Box<dyn PtyHandle>,
     /// An arbitrary type on Windows used to interact with the psuedoconsole.
@@ -403,6 +418,8 @@ impl Pty {
             .map(
                 |(
                     PtySpawnResult {
+                        #[cfg(target_arch = "x86_64")]
+                        local_identity,
                         pty_handle,
                         pipe,
                         conpty_api,
@@ -411,6 +428,8 @@ impl Pty {
                     handle,
                 )| {
                     let mut pty = Self {
+                        #[cfg(target_arch = "x86_64")]
+                        local_identity,
                         child_exit_watcher,
                         handle,
                         pty_handle,
@@ -429,6 +448,11 @@ impl Pty {
         self.handle.pid()
     }
 
+    #[cfg(target_arch = "x86_64")]
+    pub(crate) fn local_identity(&self) -> Option<LocalPtyIdentity> {
+        self.local_identity.clone()
+    }
+
     /// Closes the pseudoconsole and disconnects from the console host.
     ///
     /// Closing the pseudoconsole ends the console session: the console host terminates every client
@@ -441,6 +465,10 @@ impl Pty {
             return;
         }
         self.pty_closed = true;
+        #[cfg(target_arch = "x86_64")]
+        if let Some(identity) = &self.local_identity {
+            identity.invalidate();
+        }
 
         unsafe {
             self.conpty_api.close(self.pty_handle);

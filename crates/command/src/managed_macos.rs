@@ -254,6 +254,29 @@ pub fn macos_process_identity(pid: i32) -> io::Result<MacosProcessIdentity> {
     Api::load()?.identity(pid)
 }
 
+/// 调用方必须先证明此进程归本次任务所有；内核 token 只解决身份重用，不能授予所有权。
+/// 不按进程组或共享 coalition 扩大信号范围，也不在接口缺失时退化为裸 PID kill。
+pub fn macos_signal_owned_process(
+    expected: MacosProcessIdentity,
+    boot_session: &str,
+    signal: i32,
+) -> io::Result<()> {
+    if macos_boot_session()? != boot_session || expected.pid <= 0 {
+        return Err(io::Error::other("拒绝向旧启动或无效进程发送信号"));
+    }
+    let api = Api::load()?;
+    if api.identity(expected.pid)? != expected {
+        return Err(io::Error::other("拒绝向身份已改变的进程发送信号"));
+    }
+    let mut token = [0u32; 8];
+    token[5] = expected.pid as u32;
+    token[7] = expected.pid_version;
+    if unsafe { (api.signal)(&mut token, signal) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
 /// 只能由已认证、尚未派生 CLI 的专属 job wrapper 建立；普通共享域无法领取。
 pub struct MacosCoalition {
     api: Api,

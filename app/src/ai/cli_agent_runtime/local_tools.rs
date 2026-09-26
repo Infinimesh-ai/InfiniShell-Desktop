@@ -27,6 +27,22 @@ const MAX_ARGUMENT_BYTES: usize = 1024 * 1024;
 pub(crate) struct LocalToolPermissions {
     pub allow_spawn: bool,
     pub allow_message: bool,
+    #[serde(default, skip_serializing_if = "command_permission_disabled")]
+    pub allow_project_commands: bool,
+}
+
+fn command_permission_disabled(value: &bool) -> bool {
+    !*value
+}
+
+impl LocalToolPermissions {
+    pub(super) fn definitions(self) -> Vec<Value> {
+        let mut definitions = tool_definitions(self.allow_spawn, self.allow_message);
+        if self.allow_project_commands {
+            definitions.push(super::reviewed_project_commands_windows::tool_definition());
+        }
+        definitions
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -170,6 +186,22 @@ pub(crate) fn claude_mcp_request(
     allow_spawn: bool,
     allow_message: bool,
 ) -> Result<ClaudeMcpRequest, String> {
+    claude_mcp_request_scoped(
+        message,
+        active_turn_id,
+        LocalToolPermissions {
+            allow_spawn,
+            allow_message,
+            allow_project_commands: false,
+        },
+    )
+}
+
+pub(crate) fn claude_mcp_request_scoped(
+    message: &Value,
+    active_turn_id: Option<&str>,
+    permissions: LocalToolPermissions,
+) -> Result<ClaudeMcpRequest, String> {
     let request = &message["request"];
     if message["type"] != "control_request"
         || request["subtype"] != "mcp_message"
@@ -201,7 +233,7 @@ pub(crate) fn claude_mcp_request(
             json!({"protocolVersion":"2025-11-25","capabilities":{"tools":{}},
                 "serverInfo":{"name":MCP_SERVER_NAME,"version":"0.1.0"}})
         }
-        "tools/list" => json!({"tools":tool_definitions(allow_spawn, allow_message)}),
+        "tools/list" => json!({"tools":permissions.definitions()}),
         "ping" => json!({}),
         "tools/call" => {
             let turn_id = active_turn_id

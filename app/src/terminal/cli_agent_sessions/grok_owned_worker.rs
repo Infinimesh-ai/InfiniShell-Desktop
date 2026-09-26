@@ -1,5 +1,9 @@
 //! 普通 owned Grok 的一次侧车工作线程；SQLite Unknown 必须先提交，任何断连都不重投。
-#![cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#![cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+))]
 
 use std::io;
 use std::path::Path;
@@ -57,10 +61,17 @@ impl GrokOwnedInputLease {
     pub(crate) fn revoke(&self) {
         self.state.store(REVOKED, Ordering::SeqCst);
     }
-    fn revoked(&self) -> bool {
+    /// 关闭编辑器只撤销尚未写入的授权；已领取的原生回合继续收取回执。
+    pub(crate) fn revoke_before_write(&self) {
+        let _ = self
+            .state
+            .compare_exchange(AVAILABLE, REVOKED, Ordering::SeqCst, Ordering::SeqCst);
+    }
+
+    pub(crate) fn revoked(&self) -> bool {
         self.state.load(Ordering::SeqCst) == REVOKED
     }
-    fn claim_write(&self) -> Result<(), GrokLeaderInputError> {
+    pub(crate) fn claim_write(&self) -> Result<(), GrokLeaderInputError> {
         self.state
             .compare_exchange(AVAILABLE, WRITE_CLAIMED, Ordering::SeqCst, Ordering::SeqCst)
             .map(|_| ())
@@ -191,7 +202,7 @@ fn input_snapshot_matches(
         && message.recipient_task_id == task.task_id
         && message.sender_generation == task.generation
         && message.recipient_generation == task.generation
-        && message.subject == grok_terminal::INPUT_SUBJECT
+        && grok_terminal::is_input_subject(&message.subject)
         && message.state == LocalCliMessageState::Queued
         && message.receipt_kind.is_none()
         && Uuid::parse_str(&message.message_id).is_ok_and(|id| !id.is_nil())
@@ -228,13 +239,15 @@ fn run(
         *recorded = Some(existing);
         return Err(GrokOwnedWorkerStop::AlreadyClaimed);
     }
+    let prompt = super::grok_owned_prompt::decode(&message.subject, &message.body)
+        .map_err(|_| GrokOwnedWorkerStop::InvalidBinding)?;
     let mut bridge = GrokLeaderInput::connect(binding.into_target(), None)
         .map_err(|_| GrokOwnedWorkerStop::Native)?;
     let mut claimed: Option<GrokTerminalDelivery> = None;
-    let submitted = bridge.submit_once_checked(
+    let submitted = bridge.submit_prompt_once_checked(
         lease.binding_id,
         message_id,
-        &message.body,
+        &prompt,
         |delivery| {
             if !current() {
                 return Err(io::Error::other("owned Grok 输入已撤销"));

@@ -1163,6 +1163,7 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         system_directory: prepare_system_directory().unwrap(),
         powershell: None,
         child_image: None,
+        package_images: None,
         child_images: HashMap::new(),
         component_images: HashMap::new(),
         processes: HashMap::new(),

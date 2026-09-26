@@ -290,6 +290,7 @@ fn saved_tool_permissions_default_off_and_round_trip_without_escalation() {
         model: None,
         selected_skills: Vec::new(),
         local_tools: Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: true,
             allow_message: false,
         }),
@@ -1188,6 +1189,7 @@ fn switching_to_grok_preserves_messages_without_inheriting_child_spawn_permissio
             assert_eq!(
                 view.local_tools,
                 LocalToolPermissions {
+                    allow_project_commands: false,
                     allow_spawn: true,
                     allow_message: true
                 }
@@ -1197,6 +1199,7 @@ fn switching_to_grok_preserves_messages_without_inheriting_child_spawn_permissio
             assert_eq!(
                 view.local_tools,
                 LocalToolPermissions {
+                    allow_project_commands: false,
                     allow_spawn: false,
                     allow_message: true
                 }
@@ -1214,6 +1217,7 @@ fn switching_to_grok_preserves_messages_without_inheriting_child_spawn_permissio
             assert_eq!(
                 view.local_tools,
                 LocalToolPermissions {
+                    allow_project_commands: false,
                     allow_spawn: false,
                     allow_message: true
                 }
@@ -1237,6 +1241,7 @@ fn restored_grok_permissions_keep_messages_but_cannot_reenable_saved_spawn_permi
             grok_profile: None,
             model: None,
             local_tools: Some(LocalToolPermissions {
+                allow_project_commands: false,
                 allow_spawn: true,
                 allow_message: true,
             }),
@@ -1250,6 +1255,7 @@ fn restored_grok_permissions_keep_messages_but_cannot_reenable_saved_spawn_permi
                 ctx,
             );
             let constrained = LocalToolPermissions {
+                allow_project_commands: false,
                 allow_spawn: false,
                 allow_message: true,
             };
@@ -1282,6 +1288,7 @@ fn restored_grok_permissions_keep_messages_but_cannot_reenable_saved_spawn_permi
 #[test]
 fn grok_spawn_selection_requires_the_explicit_fixed_policy() {
     let tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -1292,6 +1299,7 @@ fn grok_spawn_selection_requires_the_explicit_fixed_policy() {
     assert_eq!(
         supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, tools),
         Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: false,
             allow_message: true
         })
@@ -1313,6 +1321,7 @@ fn grok_spawn_selection_requires_the_explicit_fixed_policy() {
 #[test]
 fn grok_file_policy_exposes_child_tools_without_changing_inherited_launches() {
     let tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -1339,6 +1348,7 @@ fn grok_file_policy_exposes_child_tools_without_changing_inherited_launches() {
     assert_eq!(
         supported_local_tools(Harness::Grok, PermissionPolicy::Inherit, tools),
         Some(LocalToolPermissions {
+            allow_project_commands: false,
             allow_spawn: false,
             allow_message: true
         })

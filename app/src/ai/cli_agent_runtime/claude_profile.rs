@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use super::RuntimeError;
-use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME, tool_definitions};
+use super::local_tools::{LocalToolPermissions, MCP_SERVER_NAME};
 
 const BLOCKED_TOOLS: [&str; 10] = [
     "Bash",
@@ -62,7 +62,7 @@ fn deserialize_local_tools<'de, D: Deserializer<'de>>(
         .ok_or_else(|| D::Error::custom("invalid local tool permissions"))?;
     if object
         .keys()
-        .any(|key| !matches!(key.as_str(), "allow_spawn" | "allow_message"))
+        .any(|key| !matches!(key.as_str(), "allow_spawn" | "allow_message" | "allow_project_commands"))
     {
         return Err(D::Error::custom("unknown local tool permission"));
     }
@@ -261,7 +261,7 @@ impl ClaudeRestrictedFilesV1 {
     fn fixed_settings(&self) -> Value {
         let mut ask = vec!["Edit".to_owned()];
         if let Some(permissions) = self.local_tools {
-            for tool in tool_definitions(permissions.allow_spawn, permissions.allow_message) {
+            for tool in permissions.definitions() {
                 if let Some(name) = tool["name"].as_str() {
                     ask.push(format!("mcp__{MCP_SERVER_NAME}__{name}"));
                 }
@@ -373,7 +373,7 @@ impl ClaudeRestrictedFilesV1 {
                     .filter_map(|tool| tool["name"].as_str())
                     .collect::<BTreeSet<_>>();
                 let definitions =
-                    tool_definitions(permissions.allow_spawn, permissions.allow_message);
+                    permissions.definitions();
                 let expected = definitions
                     .iter()
                     .filter_map(|tool| tool["name"].as_str())
@@ -396,7 +396,7 @@ impl ClaudeRestrictedFilesV1 {
             return false;
         }
         if let Some(permissions) = self.local_tools {
-            let allowed = tool_definitions(permissions.allow_spawn, permissions.allow_message)
+            let allowed = permissions.definitions()
                 .iter()
                 .any(|definition| {
                     definition["name"]
@@ -476,7 +476,7 @@ impl ClaudeRestrictedFilesV1 {
             .map(|tool| (*tool).to_owned())
             .collect::<BTreeSet<_>>();
         if let Some(permissions) = self.local_tools {
-            for tool in tool_definitions(permissions.allow_spawn, permissions.allow_message) {
+            for tool in permissions.definitions() {
                 let name = tool["name"]
                     .as_str()
                     .ok_or_else(|| reject("claude_profile_mcp_tools"))?;
@@ -506,7 +506,9 @@ impl ClaudeRestrictedFilesV1 {
 
 #[path = "claude_profile_v2.rs"]
 mod v2;
-pub use v2::{ClaudeFileProfile, ClaudeRestrictedFilesV2};
+pub use v2::{
+    ClaudeFileProfile, ClaudeRestrictedFilesV2, ClaudeRestrictedFilesV3, ClaudeRestrictedSkillsV1, ClaudeReviewedCommandsV1, ClaudeReviewedCommandsSkillsV1,
+};
 
 fn mcp_denied(rule: &str, tool: &str) -> bool {
     rule == "mcp__*" || rule == tool
@@ -573,14 +575,20 @@ fn validate_settings(value: &Value, fixed: bool) -> Result<(), RuntimeError> {
                 | "localSettings"
                 | "flagSettings"
                 | "policySettings"
-        ) || settings
-            .keys()
-            .any(|key| !matches!(key.as_str(), "permissions" | "sandbox" | "$schema"))
-        {
+        ) || settings.keys().any(|key| {
+            !matches!(key.as_str(), "permissions" | "sandbox" | "$schema")
+                && !(fixed
+                    && matches!(
+                        key.as_str(),
+                        "disableAllHooks" | "disableSkillShellExecution"
+                    )
+                    && settings.get(key).and_then(Value::as_bool) == Some(true))
+        }) {
             return Err(reject("claude_profile_settings_unsupported"));
         }
         if let Some(sandbox) = settings.get("sandbox") {
-            if sandbox != &json!({"enabled":false}) {
+            if sandbox != &json!({"enabled":false})
+                && !(fixed && sandbox == &json!({"enabled":false,"autoAllowBashIfSandboxed":false})) {
                 return Err(reject("claude_profile_sandbox_unsupported"));
             }
         }

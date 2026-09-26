@@ -1792,6 +1792,7 @@ fn launch_local_harness_child(
                     model: managed_model,
                     local_tools: (allow_local_child_messages && parent_harness == Harness::Oz)
                         .then_some(LocalToolPermissions {
+                            allow_project_commands: false,
                             allow_spawn: false,
                             allow_message: true,
                         }),

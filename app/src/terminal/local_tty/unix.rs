@@ -44,7 +44,7 @@ use crate::terminal::local_tty::docker_sandbox::{
 use crate::terminal::local_tty::shell::{
     DirectShellStarter, ShellStarter, extra_path_entries, ssh_socket_dir,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", all(target_os = "linux", target_arch = "x86_64")))]
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 use crate::terminal::model::session::command_executor::shell_escape_single_quotes;
 use crate::terminal::shell::ShellType;
@@ -214,7 +214,7 @@ fn parse_passwd_line(line: &str, uid: u32) -> Option<CurrentUser> {
 
 pub struct Pty {
     pty_handle: Box<dyn PtyHandle>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", all(target_os = "linux", target_arch = "x86_64")))]
     local_identity: Option<LocalPtyIdentity>,
     fd: File,
     token: mio::Token,
@@ -653,7 +653,7 @@ impl Pty {
 
         let mut pty = Pty {
             pty_handle,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", all(target_os = "linux", target_arch = "x86_64")))]
             local_identity: LocalPtyIdentity::capture(pid, &fd).ok(),
             fd,
             token: PTY_TOKEN,
@@ -668,7 +668,7 @@ impl Pty {
         self.pty_handle.pid()
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", all(target_os = "linux", target_arch = "x86_64")))]
     pub(crate) fn local_identity(&self) -> Option<LocalPtyIdentity> {
         self.local_identity
     }

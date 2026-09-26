@@ -898,6 +898,7 @@ fn captured_dynamic_tool_registration_is_opt_in_and_never_added_to_resume() {
     let mut settings = options();
     settings.permission_policy = PermissionPolicy::Inherit;
     settings.local_tools = Some(local_tools::LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: true,
     });

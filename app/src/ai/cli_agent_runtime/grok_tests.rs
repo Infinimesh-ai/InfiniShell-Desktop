@@ -596,6 +596,7 @@ fn production_root_1041_rejects_unverified_options_and_allows_only_one_skill() {
     let mut launches = Vec::new();
     let mut tools = options();
     tools.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: false,
     });
@@ -706,6 +707,7 @@ fn test_candidate_1041_p0_requires_exact_inherit_without_skill_or_local_tools() 
     assert!(!candidate.test_candidate_p0_for_live());
     candidate.options.selected_skills.clear();
     candidate.options.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: false,
     });
@@ -1007,6 +1009,7 @@ fn p0_version_enables_only_the_receipted_fixed_read_scope() {
     );
     let mut tools = options();
     tools.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: true,
     });
@@ -1711,6 +1714,7 @@ fn current_selected_skill_candidate_requires_separate_live_opt_in() {
     assert!(candidate.current_selected_skill_candidate_for_live());
 
     selected.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: false,
         allow_message: false,
     });
@@ -5500,6 +5504,7 @@ fn root_adapter_accepts_leased_tools_but_rejects_unknown_parent_ceiling_before_s
 fn leased_protocol() -> GrokProtocol {
     let mut launch = options();
     launch.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -5608,6 +5613,7 @@ fn leased_request(
 fn production_sdk_registration_uses_process_nonce_and_never_advertises_spawn() {
     let mut launch = options();
     launch.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -6088,6 +6094,7 @@ fn fixed_grok_creation_does_not_convert_unknown_history_to_a_restricted_task() {
     launch.target = SessionTarget::New;
     launch.permission_policy = PermissionPolicy::Inherit;
     launch.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -6321,6 +6328,7 @@ fn fixed_file_unknown_write_variant_is_cancelled_without_opening_an_approval() {
 fn catalog_sdk_protocol() -> GrokProtocol {
     let mut options = options();
     options.local_tools = Some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });
@@ -6480,6 +6488,7 @@ fn production_fixed_waiting_for_setup(local_tools: bool, resume: bool) -> GrokPr
     launch.cwd = std::env::temp_dir().canonicalize().unwrap();
     launch.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
     launch.local_tools = local_tools.then_some(LocalToolPermissions {
+        allow_project_commands: false,
         allow_spawn: true,
         allow_message: true,
     });

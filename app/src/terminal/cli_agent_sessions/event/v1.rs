@@ -54,6 +54,12 @@ pub(super) fn parse(body: &str) -> Option<CLIAgentEvent> {
             prompt_id: raw.prompt_id,
             terminal_unverified: raw.terminal_unverified,
             permission_mode: raw.permission_mode,
+            codex_process_evidence: (agent == CLIAgent::Codex)
+                .then_some(raw.codex_process_evidence)
+                .flatten(),
+            claude_process_evidence: (agent == CLIAgent::Claude)
+                .then_some(raw.claude_process_evidence)
+                .flatten(),
             query: raw.query,
             response: raw.response,
             transcript_path: raw.transcript_path,

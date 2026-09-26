@@ -89,6 +89,7 @@ enum-iterator.workspace = true
 event-listener.workspace = true
 field_mask.workspace = true
 flate2 = "1.0.17"
+brotli = "7.0.0"
 tar = "0.4"
 float-cmp.workspace = true
 futures-lite.workspace = true
@@ -414,7 +415,8 @@ windows = { workspace = true, features = [
 ] }
 windows-registry = { workspace = true }
 windows-result = { workspace = true }
-winreg.workspace = true
+winreg = { workspace = true, features = ["transactions"] }
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 ai = { workspace = true, features = ["test-util"] }

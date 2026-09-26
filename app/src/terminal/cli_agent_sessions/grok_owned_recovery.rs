@@ -1,9 +1,11 @@
 //! 应用重启仅恢复已落盘的普通 Grok 启动占用，不启动原生进程、不恢复输入授权。
 
+use super::grok_owned_worker::GrokOwnedInputLease;
+use super::{GrokPermissionEvidence, GrokPermissionObservation};
 use serde_json::Value;
 use uuid::Uuid;
-use warpui::ModelContext;
 use warpui::r#async::{SpawnedFutureHandle, Timer};
+use warpui::{EntityId, ModelContext};
 
 use super::CLIAgentSessionsModel;
 use super::grok_owned_launch::GrokOwnedLaunch;
@@ -16,6 +18,10 @@ pub(super) struct GrokOwnedRecovery {
     failed: bool,
     request: Option<Uuid>,
     launches: Vec<GrokOwnedLaunch>,
+    leases: std::collections::HashMap<
+        EntityId,
+        (EntityId, GrokPermissionObservation, GrokOwnedInputLease),
+    >,
     timer: Option<(Uuid, SpawnedFutureHandle)>,
 }
 
@@ -26,6 +32,72 @@ impl GrokOwnedRecovery {
 }
 
 impl CLIAgentSessionsModel {
+    pub(crate) fn adopt_grok_owned_launch(
+        &mut self,
+        launch: GrokOwnedLaunch,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        self.grok_owned_recovery.launches.push(launch);
+        self.reap_grok_owned_launches(ctx);
+        ctx.notify();
+    }
+
+    pub(super) fn close_owned_grok_input_editor(&self, view: EntityId) {
+        if let Some((_, _, lease)) = self.grok_owned_recovery.leases.get(&view) {
+            lease.revoke_before_write();
+        }
+    }
+
+    pub(crate) fn revoke_owned_grok_input(&mut self, view: EntityId) {
+        if let Some((_, _, lease)) = self.grok_owned_recovery.leases.remove(&view) {
+            lease.revoke();
+        }
+    }
+
+    pub(crate) fn register_owned_grok_input(
+        &mut self,
+        view: EntityId,
+        observation: GrokPermissionObservation,
+        lease: GrokOwnedInputLease,
+    ) -> bool {
+        self.revoke_owned_grok_input(view);
+        let Some(session) = self.sessions.get(&view) else {
+            return false;
+        };
+        let Some(listener) = session.listener.as_ref() else {
+            return false;
+        };
+        if session.is_remote()
+            || session.session_context.grok_permission_evidence
+                != GrokPermissionEvidence::Observed(observation.clone())
+        {
+            return false;
+        }
+        self.grok_owned_recovery
+            .leases
+            .insert(view, (listener.id(), observation, lease));
+        true
+    }
+
+    pub(super) fn revoke_stale_owned_grok_input(&mut self, view: EntityId) {
+        let stale =
+            self.grok_owned_recovery
+                .leases
+                .get(&view)
+                .is_some_and(|(listener, observed, _)| {
+                    self.sessions.get(&view).is_none_or(|session| {
+                        session.is_remote()
+                            || session.listener.as_ref().map(|handle| handle.id())
+                                != Some(*listener)
+                            || session.session_context.grok_permission_evidence
+                                != GrokPermissionEvidence::Observed(observed.clone())
+                    })
+                });
+        if stale {
+            self.revoke_owned_grok_input(view);
+        }
+    }
+
     pub(super) fn restore_grok_owned_launches(
         &mut self,
         tasks: Vec<LocalCliTask>,
@@ -86,14 +158,35 @@ impl CLIAgentSessionsModel {
         }
         self.grok_owned_recovery.launches.retain_mut(|launch| {
             // 侧车断开、会话 Ended 或回合 Stop 均不能代替两个真实进程的退出证据。
+            let _ = launch.refresh_bound_processes();
             launch.release_after_exit(ctx).is_err()
         });
         if !self.grok_owned_recovery.launches.is_empty() {
             let token = Uuid::new_v4();
+            let launches: Vec<_> = self
+                .grok_owned_recovery
+                .launches
+                .iter()
+                .map(|launch| (launch.manifest_path(), launch.manifest_sha256().to_owned()))
+                .collect();
             self.grok_owned_recovery.timer = Some((
                 token,
                 ctx.spawn(
-                    async {
+                    async move {
+                        blocking::unblock(move || {
+                            for (path, sha256) in launches {
+                                let Ok(mut launch) = GrokOwnedLaunch::restore(&path, &sha256)
+                                else {
+                                    continue;
+                                };
+                                // 旧回调只处理原清单；不能借重新捕获绑定当前 pane 或授予输入权限。
+                                if launch.was_dispatched() {
+                                    let _ = launch.capture_owned_processes();
+                                    let _ = launch.stop_leader_after_tui_exit();
+                                }
+                            }
+                        })
+                        .await;
                         Timer::after(std::time::Duration::from_secs(2)).await;
                     },
                     move |model, (), ctx| {
@@ -137,7 +230,7 @@ fn restore_known_launches(tasks: &[LocalCliTask]) -> Vec<std::io::Result<GrokOwn
             let sha256 = config["launch_sha256"].as_str().ok_or_else(invalid)?;
             if task.version != 1
                 || task.harness != "grok"
-                || task.generation != 1
+                || task.generation < 1
                 || task.parent_task_id.is_some()
                 || task.parent_generation.is_some()
                 || !Uuid::parse_str(&task.task_id).is_ok_and(|id| !id.is_nil())

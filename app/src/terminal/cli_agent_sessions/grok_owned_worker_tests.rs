@@ -171,3 +171,29 @@ fn incompatible_version_and_permission_policy_cannot_match_fixed_owner() {
         json!({"execution_kind":"grok_owned_terminal","grok_terminal":changed}).to_string();
     assert!(!input_snapshot_matches(&task, &message, &owner, cwd));
 }
+
+#[test]
+fn closing_editor_before_write_revokes_all_lease_clones() {
+    let input = lease();
+    let worker = input.clone();
+    input.revoke_before_write();
+    assert!(worker.revoked());
+    assert!(matches!(
+        worker.claim_write(),
+        Err(GrokLeaderInputError::StaleBinding)
+    ));
+}
+
+#[test]
+fn native_permission_ui_can_close_editor_after_write_without_losing_receipt() {
+    let input = lease();
+    input.claim_write().unwrap();
+    input.revoke_before_write();
+    assert!(!input.revoked());
+    assert!(matches!(
+        input.claim_write(),
+        Err(GrokLeaderInputError::StaleBinding)
+    ));
+    input.revoke();
+    assert!(input.revoked());
+}

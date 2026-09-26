@@ -19,6 +19,24 @@ pub const WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV: &str = "WARP_CLI_AGENT_NOTIFY_EX
 /// Environment variable that identifies the hosting Warp client version.
 pub const WARP_CLIENT_VERSION_ENV: &str = "WARP_CLIENT_VERSION";
 
+/// Codex hook 观察到的进程候选，不代表 TUI 身份、权限或输入授权。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CodexProcessEvidence {
+    pub daemon_pid_candidate: u32,
+    pub codex_home: String,
+    pub tty_path: String,
+}
+
+/// Claude hook 提供的进程候选；必须由远端内核、注册表和会话历史共同核验。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ClaudeProcessEvidence {
+    pub process_id_candidate: u32,
+    pub claude_config_directory: String,
+    pub tty_path: String,
+}
+
 /// Wire representation of a structured CLI-agent notification.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +67,11 @@ pub struct CLIAgentNotification {
     /// 原生权限观察值；缺失或异常不能默认成 default，也不能单独证明会话身份。
     #[serde(default, deserialize_with = "deserialize_permission_mode")]
     pub permission_mode: Option<String>,
+    /// 只用于当前监听器的原生会话；服务端必须再核对内核进程和终端归属。
+    #[serde(default, deserialize_with = "deserialize_codex_process_evidence")]
+    pub codex_process_evidence: Option<CodexProcessEvidence>,
+    #[serde(default, deserialize_with = "deserialize_claude_process_evidence")]
+    pub claude_process_evidence: Option<ClaudeProcessEvidence>,
 }
 
 impl CLIAgentNotification {
@@ -74,8 +97,59 @@ impl CLIAgentNotification {
             prompt_id: None,
             terminal_unverified: None,
             permission_mode: None,
+            codex_process_evidence: None,
+            claude_process_evidence: None,
         }
     }
+}
+
+fn deserialize_codex_process_evidence<'de, D>(
+    deserializer: D,
+) -> Result<Option<CodexProcessEvidence>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // 字段损坏时保留通知并撤销旧候选，避免整条解析失败后沿用旧身份。
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value::<CodexProcessEvidence>(raw)
+        .ok()
+        .filter(|evidence| {
+            (2..=i32::MAX as u32).contains(&evidence.daemon_pid_candidate)
+                && absolute_unix_candidate(&evidence.codex_home, 4096)
+                && absolute_unix_candidate(&evidence.tty_path, 256)
+                && evidence.tty_path.starts_with("/dev/")
+                && evidence.tty_path != "/dev/tty"
+        }))
+}
+
+fn deserialize_claude_process_evidence<'de, D>(
+    deserializer: D,
+) -> Result<Option<ClaudeProcessEvidence>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    Ok(serde_json::from_value::<ClaudeProcessEvidence>(raw)
+        .ok()
+        .filter(|evidence| {
+            (2..=i32::MAX as u32).contains(&evidence.process_id_candidate)
+                && absolute_unix_candidate(&evidence.claude_config_directory, 4096)
+                && absolute_unix_candidate(&evidence.tty_path, 256)
+                && evidence.tty_path.starts_with("/dev/")
+                && evidence.tty_path != "/dev/tty"
+        }))
+}
+
+fn absolute_unix_candidate(value: &str, limit: usize) -> bool {
+    // 远端 Unix 路径不能用本地 Windows Path 规则判断，也不能先在本机 canonicalize。
+    value.starts_with('/')
+        && value.len() > 1
+        && value.len() <= limit
+        && !value.chars().any(char::is_control)
+        && value
+            .split('/')
+            .skip(1)
+            .all(|component| !matches!(component, "" | "." | ".."))
 }
 
 // 异常字段保留为无证据通知，避免整条解析失败后应用继续保留旧权限证据。

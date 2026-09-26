@@ -1,10 +1,14 @@
 //! Grok 固定版本的 ACP 适配；按版本分别维护 P0 与扩展生命周期的验收边界。
 
+use super::reviewed_project_commands_lifecycle::ReviewedCommandLifecycle;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
 #[cfg(test)]
 use std::io::Read;
 use std::path::{Path, PathBuf};
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+use crate::terminal::cli_agent_sessions::grok_owned_history_source_windows::NpmGrokSource;
 #[cfg(test)]
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -126,6 +130,15 @@ fn connect_protocol(mut protocol: GrokProtocol) -> RuntimeConnection {
 }
 
 fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
+    if options
+        .local_tools
+        .is_some_and(|tools| tools.allow_project_commands)
+        != options.permission_policy.is_reviewed_commands()
+    {
+        return Err(super::reviewed_project_commands::reject(
+            "reviewed_commands_explicit_policy_required",
+        ));
+    }
     if !options.executable.is_absolute() || !options.cwd.is_absolute() {
         return Err(RuntimeError::InvalidConfiguration(
             "executable and cwd must be absolute".into(),
@@ -142,6 +155,10 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         PermissionPolicy::Inherit
             | PermissionPolicy::GrokRestrictedReadV1
             | PermissionPolicy::GrokRestrictedFilesV1
+            | PermissionPolicy::GrokRestrictedFilesV2
+            | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1
     ) || options.claude_profile.is_some()
         || options.model.is_some()
     {
@@ -150,6 +167,7 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         )));
     }
     if !options.selected_skills.is_empty()
+        && !options.permission_policy.is_grok_fixed_skills()
         && (options.permission_policy != PermissionPolicy::Inherit || options.local_tools.is_some())
     {
         return Err(RuntimeError::InvalidConfiguration(crate::t!(
@@ -181,7 +199,12 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
                 ));
             }
         }
-        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1 => {
+        PermissionPolicy::GrokRestrictedReadV1
+        | PermissionPolicy::GrokRestrictedFilesV1
+        | PermissionPolicy::GrokRestrictedFilesV2
+        | PermissionPolicy::GrokRestrictedSkillsV1
+        | PermissionPolicy::GrokReviewedCommandsV1
+        | PermissionPolicy::GrokReviewedCommandsSkillsV1 => {
             if options.target != SessionTarget::New && options.grok_profile.is_none() {
                 return Err(super::permissions::rejected(
                     None,
@@ -192,7 +215,9 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
             }
             if let Some(profile) = &options.grok_profile {
                 profile.validate()?;
-                if profile.permission_policy() != options.permission_policy {
+                if profile.permission_policy() != options.permission_policy
+                    || !profile.skill_selection_matches(&options.selected_skills)
+                {
                     return Err(super::permissions::rejected(
                         None,
                         &Value::Null,
@@ -223,7 +248,11 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         PermissionPolicy::ReadOnly
         | PermissionPolicy::WorkspaceWrite
         | PermissionPolicy::ClaudeRestrictedFilesV1
-        | PermissionPolicy::ClaudeRestrictedFilesV2 => unreachable!("已拒绝其他 CLI 策略"),
+        | PermissionPolicy::ClaudeRestrictedFilesV2
+        | PermissionPolicy::ClaudeRestrictedFilesV3
+        | PermissionPolicy::ClaudeRestrictedSkillsV1
+        | PermissionPolicy::ClaudeReviewedCommandsV1
+        | PermissionPolicy::ClaudeReviewedCommandsSkillsV1 => unreachable!("已拒绝其他 CLI 策略"),
     }
     Ok(())
 }
@@ -320,7 +349,12 @@ async fn run_process(
     }
     let launch = if matches!(
         protocol.options.permission_policy,
-        PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+        PermissionPolicy::GrokRestrictedReadV1
+            | PermissionPolicy::GrokRestrictedFilesV1
+            | PermissionPolicy::GrokRestrictedFilesV2
+            | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1
     ) {
         let launch = super::grok_profile::GrokCreationPolicyV1::prepare(
             &protocol.options,
@@ -335,7 +369,19 @@ async fn run_process(
     } else {
         None
     };
-    let mut version = Command::new(&protocol.options.executable);
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let npm_source = NpmGrokSource::capture(&protocol.options.executable)?;
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let _source_files = npm_source
+        .as_ref()
+        .map(|source| source.validate_and_hold())
+        .transpose()?;
+    let executable = protocol.options.executable.clone();
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    let executable = npm_source
+        .as_ref()
+        .map_or(executable, |source| source.executable.clone());
+    let mut version = Command::new(&executable);
     version
         .arg("--version")
         .stdin(Stdio::null())
@@ -347,6 +393,13 @@ async fn run_process(
             .env_clear()
             .envs(super::managed_process::isolated_environment(&launch.home))
             .current_dir(launch.home.join("startup"));
+    }
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    if let Some(source) = &npm_source {
+        version.env("GROK_MANAGED_BY_NPM", "1");
+        if launch.is_none() {
+            version.env("GROK_HOME", &source.grok_home);
+        }
     }
     let output = version
         .output()
@@ -412,10 +465,14 @@ async fn run_process(
         .as_ref()
         .map(|launch| launch.home.join("startup"))
         .unwrap_or_else(|| protocol.options.cwd.clone());
-    let mut child = super::managed_process::spawn_with_isolated_home(
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    use super::managed_process::spawn_with_grok_npm_source as spawn_native;
+    #[cfg(not(all(windows, target_arch = "x86_64")))]
+    use super::managed_process::spawn_with_isolated_home as spawn_native;
+    let mut child = spawn_native(
         &protocol.options.state_dir,
         protocol.options.generation,
-        &protocol.options.executable,
+        &executable,
         &arguments,
         &process_cwd,
         launch.as_ref().map(|launch| launch.home.as_path()),
@@ -423,6 +480,8 @@ async fn run_process(
             (protocol.profile_state_dir != protocol.options.state_dir)
                 .then_some(protocol.profile_state_dir.as_path())
         }),
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        npm_source,
     )
     .await?;
     // 只有本次私有目录/唯一 socket 成功派生的默认 leader 才能刷新技能。
@@ -448,8 +507,12 @@ async fn run_process(
         .take()
         .ok_or_else(|| RuntimeError::Protocol("missing Grok stdout".into()))?;
     let result = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
+    let host_cleanup = protocol.host_commands.finish().await;
     let effects = protocol.finish_transport(&result);
     for kind in effects.events {
+        let Some(kind) = protocol.reviewed_commands.before_publish(kind) else {
+            continue;
+        };
         let _ = events.try_send(protocol.event(kind));
     }
     drop(stdin);
@@ -468,7 +531,7 @@ async fn run_process(
             })?;
         }
     };
-    let graceful = result.is_ok();
+    let graceful = result.is_ok() && !protocol.reviewed_commands.has_command();
     let finish = async move {
         if graceful {
             child.finish_after_stdin_close().await
@@ -478,9 +541,20 @@ async fn run_process(
     };
     let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
     // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
+    host_cleanup?;
     result?;
     finished?;
     drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    for kind in protocol.host_commands.take_cancelled_events() {
+        events
+            .try_send(protocol.event(kind))
+            .map_err(|_| RuntimeError::EventBackpressure)?;
+    }
+    for kind in protocol.reviewed_commands.cleanup_confirmed() {
+        events
+            .try_send(protocol.event(kind))
+            .map_err(|_| RuntimeError::EventBackpressure)?;
+    }
     Ok(())
 }
 
@@ -533,6 +607,16 @@ async fn run_transport(
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
+        if protocol.reviewed_commands.retiring() {
+            return Ok(());
+        }
+        if protocol.reviewed_commands.timed_out() {
+            let effects = protocol.stop_reviewed_command(TurnOutcome::Failed {
+                message: crate::t!("cli-agent-reviewed-command-timeout"),
+            });
+            flush_effects(protocol, stdin, events, effects).await?;
+            return Ok(());
+        }
         let effects = protocol.poll_final_output();
         flush_effects(protocol, stdin, events, effects).await?;
         if protocol.closed {
@@ -549,18 +633,21 @@ async fn run_transport(
             Command(Option<RuntimeCommand>),
             Tick,
             ConsumerClosed,
+            HostCommand(Result<RuntimeCommand, RuntimeError>),
         }
         let incoming = {
             let read = stdout.read(&mut chunk).fuse();
             let command = commands.recv().fuse();
             let tick = Timer::after(Duration::from_millis(250)).fuse();
             let closed = events.closed().fuse();
-            pin_mut!(read, command, tick, closed);
+            let host_command = protocol.next_host_command_reply().fuse();
+            pin_mut!(read, command, tick, closed, host_command);
             select! {
                 result = read => Incoming::Bytes(result),
                 result = command => Incoming::Command(result),
                 _ = tick => Incoming::Tick,
                 () = closed => Incoming::ConsumerClosed,
+                result = host_command => Incoming::HostCommand(result),
             }
         };
         let effects = match incoming {
@@ -593,6 +680,14 @@ async fn run_transport(
                     ));
                 }
                 continue;
+            }
+            Incoming::HostCommand(result) => {
+                let mut effects = protocol.command(result?);
+                if protocol.host_rpc_completion_pending && !protocol.reviewed_commands.has_command()
+                {
+                    protocol.complete_rpc(&mut effects);
+                }
+                effects
             }
             Incoming::Command(Some(command)) => protocol.command(command),
             Incoming::Command(None) | Incoming::ConsumerClosed => return Ok(()),
@@ -795,6 +890,10 @@ async fn flush_effects(
     events: &mpsc::Sender<RuntimeEvent>,
     effects: Effects,
 ) -> Result<(), RuntimeError> {
+    let mut effects = effects;
+    effects
+        .events
+        .extend(protocol.host_commands.take_cancelled_events());
     let generation = protocol.options.generation;
     let native_session_id = protocol.session_id.clone();
     let publish = |kind| {
@@ -809,7 +908,12 @@ async fn flush_effects(
                 mpsc::error::TrySendError::Closed(_) => RuntimeError::ControllerClosed,
             })
     };
-    let (confirmed, after_write): (Vec<_>, Vec<_>) = effects.events.into_iter().partition(|kind| {
+    let visible_events: Vec<_> = effects
+        .events
+        .into_iter()
+        .filter_map(|kind| protocol.reviewed_commands.before_publish(kind))
+        .collect();
+    let (confirmed, after_write): (Vec<_>, Vec<_>) = visible_events.into_iter().partition(|kind| {
         matches!(
             kind,
             RuntimeEventKind::TurnFinished { .. }
@@ -835,6 +939,14 @@ async fn flush_effects(
         }
         // 缓存或生成回复不能证明真实写入；必须在 write_all 和 flush 都成功后登记。
         protocol.sdk_written_message(&message)?;
+        if protocol.host_cancel_write_pending && message["method"] == "session/cancel" {
+            protocol.host_cancel_write_pending = false;
+            let mut cancelled = Vec::new();
+            protocol.retire_sdk(&mut cancelled);
+            for kind in cancelled {
+                publish(kind)?;
+            }
+        }
         #[cfg(test)]
         if let Some(probe) = &protocol.catalog_probe_for_live {
             probe.observe_written(&message);
@@ -924,6 +1036,7 @@ struct PendingApproval {
     tool_call_id: String,
     resolved: bool,
     lease_permission: Option<Value>,
+    fixed_tool_call: Value,
 }
 
 #[derive(Default)]
@@ -1130,6 +1243,10 @@ impl GrokSdkConnection {
 }
 
 struct GrokProtocol {
+    reviewed_commands: ReviewedCommandLifecycle,
+    host_rpc_completion_pending: bool,
+    host_cancel_write_pending: bool,
+    host_commands: super::reviewed_project_commands_host::ReviewedCommandHost,
     probed_version: Option<&'static str>,
     paired_version: Option<&'static str>,
     creation_catalog_session: Option<String>,
@@ -1192,6 +1309,12 @@ struct GrokProtocol {
 }
 
 impl GrokProtocol {
+    async fn next_host_command_reply(&mut self) -> Result<RuntimeCommand, RuntimeError> {
+        self.host_commands
+            .next_reply(&mut self.reviewed_commands)
+            .await
+    }
+
     fn current_version_candidate(&self, version: &str) -> bool {
         if version == CURRENT_VERSION || current_root_supported_version(version) {
             return true;
@@ -1248,8 +1371,22 @@ impl GrokProtocol {
                 .is_some_and(|models| models.current_model_id == "grok-4.7")
     }
 
+    fn fixed_skills_verified(&self) -> bool {
+        self.options.permission_policy.is_grok_fixed_skills()
+            && self.probed_version == Some(ROOT_VERSION)
+            && self.production_fixed_verified()
+    }
+
     fn verify_initial_skill_catalog(&self, commands: &Value) -> Result<(), RuntimeError> {
-        if self.options.selected_skills.len() <= 1 {
+        if self.fixed_skills_verified() {
+            return self
+                .options
+                .grok_profile
+                .as_ref()
+                .expect("固定技能已有策略")
+                .verify_skill_catalog(&self.profile_state_dir, commands);
+        }
+        if self.options.selected_skills.is_empty() {
             return Ok(());
         }
         let selected = self
@@ -1279,15 +1416,15 @@ impl GrokProtocol {
 
     fn production_fixed_scope(&self, version: &str) -> bool {
         current_fixed_scope_supported_version(version)
-            && self.options.selected_skills.is_empty()
             && self.options.model.is_none()
             && self.options.claude_profile.is_none()
             && self.options.grok_profile.as_ref().is_some_and(|profile| {
-                profile.runtime_scope_verified(
-                    version,
-                    self.options.local_tools,
-                    self.options.permission_policy,
-                )
+                profile.skill_selection_matches(&self.options.selected_skills)
+                    && profile.runtime_scope_verified(
+                        version,
+                        self.options.local_tools,
+                        self.options.permission_policy,
+                    )
             })
     }
 
@@ -1492,6 +1629,10 @@ impl GrokProtocol {
             catalog_direct_for_live: false,
             #[cfg(all(test, unix))]
             direct_mcp_initialized_received: false,
+            reviewed_commands: Default::default(),
+            host_rpc_completion_pending: false,
+            host_cancel_write_pending: false,
+            host_commands: Default::default(),
             profile_state_dir: options.state_dir.clone(),
             options,
             session_id: None,
@@ -1566,14 +1707,14 @@ impl GrokProtocol {
             version.ok_or_else(|| RuntimeError::UnsupportedVersion(output.trim().to_owned()))?;
         // 1.0.34 只开放已有原生收据覆盖的精确读取策略；写入、技能、SDK 租约和
         // 扩展生命周期仍使用各自门禁，不能把一次读取审批外推为整版兼容。
-        let latest_scope_verified = self.options.selected_skills.is_empty()
-            && self.options.grok_profile.as_ref().is_some_and(|profile| {
-                profile.runtime_scope_verified(
+        let latest_scope_verified = self.options.grok_profile.as_ref().is_some_and(|profile| {
+            profile.skill_selection_matches(&self.options.selected_skills)
+                && profile.runtime_scope_verified(
                     version,
                     self.options.local_tools,
                     self.options.permission_policy,
                 )
-            });
+        });
         if version != VERIFIED_VERSION
             && self.options.permission_policy != PermissionPolicy::Inherit
             && !latest_scope_verified
@@ -1586,6 +1727,7 @@ impl GrokProtocol {
             && ((self.options.local_tools.is_some() && !self.production_fixed_scope(version))
                 || (!self.options.selected_skills.is_empty()
                     && !(self.production_root_scope(version)
+                        || self.production_fixed_scope(version)
                         || (self.current_version_candidate(version)
                             && self.current_selected_skill_candidate_for_live()))))
         {
@@ -1593,7 +1735,10 @@ impl GrokProtocol {
                 "cli-agent-grok-managed-unverified"
             )));
         }
-        if self.options.selected_skills.len() > 1 && !self.production_root_scope(version) {
+        if self.options.selected_skills.len() > 1
+            && !self.production_root_scope(version)
+            && !self.production_fixed_scope(version)
+        {
             return Err(RuntimeError::InvalidConfiguration(crate::t!(
                 "cli-agent-task-skill-one-per-turn"
             )));
@@ -1636,6 +1781,10 @@ impl GrokProtocol {
             .unwrap_or_default()
     }
 
+    fn host_command_owns_call(&self, call_id: &str) -> bool {
+        self.host_commands.owns_call(call_id)
+    }
+
     fn sdk_timed_out(&self, now: Instant) -> bool {
         self.sdk.as_ref().is_some_and(|sdk| {
             sdk.retired_at
@@ -1646,7 +1795,9 @@ impl GrokProtocol {
                     .values()
                     .any(|(_, deadline)| now >= *deadline)
                 || sdk.calls.values().any(|call| {
-                    !call.replied && now.duration_since(call.requested_at) >= REQUEST_TIMEOUT
+                    !call.replied
+                        && now.duration_since(call.requested_at) >= REQUEST_TIMEOUT
+                        && !self.host_command_owns_call(&call.request.call_id)
                 })
         })
     }
@@ -1670,6 +1821,7 @@ impl GrokProtocol {
             for (call_id, call) in &mut sdk.calls {
                 if call.request.turn_id == turn_id && !call.cancelled && !call.closed {
                     call.cancelled = true;
+                    self.host_commands.cancel_call(&call.request.call_id);
                     events.push(RuntimeEventKind::LocalToolCancelled {
                         turn_id: turn_id.to_owned(),
                         call_id: call_id.clone(),
@@ -1902,6 +2054,25 @@ impl GrokProtocol {
                 update_lease_audit(&self.lease_audit_for_live, |audit| {
                     audit.business_dispatches += 1
                 });
+                if request.tool == super::reviewed_project_commands_windows::TOOL_NAME {
+                    let ceiling = self
+                        .options
+                        .grok_profile
+                        .as_ref()
+                        .and_then(|profile| profile.host_commands())
+                        .ok_or_else(|| {
+                            super::reviewed_project_commands::reject(
+                                "reviewed_commands_parent_missing",
+                            )
+                        })?;
+                    let events = self
+                        .host_commands
+                        .request(request, &self.options, ceiling)?;
+                    return Ok(Effects {
+                        writes: Vec::new(),
+                        events,
+                    });
+                }
                 Ok(Effects {
                     writes: Vec::new(),
                     events: vec![RuntimeEventKind::LocalToolRequested { request }],
@@ -2147,12 +2318,63 @@ impl GrokProtocol {
         })
     }
 
+    fn stop_reviewed_command(&mut self, outcome: TurnOutcome) -> Effects {
+        let mut effects = Effects::default();
+        if let Some(turn_id) = self.reviewed_commands.turn().map(str::to_owned) {
+            let output = self
+                .prompt
+                .as_ref()
+                .map(|prompt| prompt.output.clone())
+                .unwrap_or_default();
+            effects.events.push(RuntimeEventKind::TurnFinished {
+                turn_id,
+                outcome,
+                output,
+            });
+        }
+        self.reviewed_commands.retire();
+        self.closed = true;
+        self.complete_rpc(&mut effects);
+        effects
+    }
+
     fn command(&mut self, command: RuntimeCommand) -> Effects {
         if command.generation != self.options.generation {
             return rejected_command(
                 command.message_id,
                 RuntimeError::StaleGeneration.to_string(),
             );
+        }
+        {
+            if matches!(&command.action, RuntimeAction::RespondApproval { approval_id, .. } if approval_id.starts_with("project-command:"))
+            {
+                if self
+                    .options
+                    .grok_profile
+                    .as_ref()
+                    .is_none_or(|profile| profile.verify_files(&self.profile_state_dir).is_err())
+                {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-managed-unverified"),
+                    );
+                }
+            }
+            if let Some(result) = self
+                .host_commands
+                .respond(&command, &mut self.reviewed_commands)
+            {
+                return match result {
+                    Ok(events) => Effects {
+                        writes: Vec::new(),
+                        events,
+                    },
+                    Err(error) => rejected_command(command.message_id, error.to_string()),
+                };
+            }
+            if command.action == RuntimeAction::Shutdown {
+                self.host_commands.cancel();
+            }
         }
         // 追加输入只排队到后续回合；本地工具另由独占进程与原生租约验证。
         self.acp_command(command)
@@ -2267,6 +2489,10 @@ impl GrokProtocol {
                 }
                 if matches!(self.options.permission_policy,
                     PermissionPolicy::GrokRestrictedReadV1 | PermissionPolicy::GrokRestrictedFilesV1
+                | PermissionPolicy::GrokRestrictedFilesV2
+                | PermissionPolicy::GrokRestrictedSkillsV1
+            | PermissionPolicy::GrokReviewedCommandsV1
+            | PermissionPolicy::GrokReviewedCommandsSkillsV1
                 )
                     && input.iter().any(|part| matches!(part, InputContent::Text(text) if text.trim_start().starts_with('/'))) {
                     return rejected_command(command.message_id, crate::t!("cli-agent-grok-fixed-command-unavailable"));
@@ -2326,6 +2552,25 @@ impl GrokProtocol {
                             }
                         }
                         InputContent::Skill { name, path } => {
+                            if self.fixed_skills_verified() {
+                                if !self.options.grok_profile.as_ref().is_some_and(|profile| {
+                                    profile.permits_selected_skill(name, path)
+                                }) || !selected_names.insert(name)
+                                    || selected_skills.len() >= 32
+                                {
+                                    return rejected_command(
+                                        command.message_id,
+                                        crate::t!("cli-agent-grok-fixed-skills-unavailable"),
+                                    );
+                                }
+                                match skills::SelectedSkill::new(name.clone(), path.clone()) {
+                                    Ok(selected) => selected_skills.push(selected),
+                                    Err(error) => {
+                                        return rejected_command(command.message_id, error);
+                                    }
+                                }
+                                continue;
+                            }
                             if self.probed_version != Some(VERIFIED_VERSION)
                                 && !(self.production_root_verified()
                                     && (self.skill_updates_verified()
@@ -2460,17 +2705,35 @@ impl GrokProtocol {
                 if prompt.cancel_sent.is_some() {
                     return Effects::default();
                 }
-                prompt.cancel_sent = Some(Instant::now());
+                let mut cancellation_writes = Vec::new();
                 let mut cancelled = Vec::new();
-                self.retire_sdk(&mut cancelled);
+                for reply in self.host_commands.cancel_turn(&turn_id) {
+                    if let RuntimeAction::RespondLocalTool {
+                        turn_id,
+                        call_id,
+                        result,
+                    } = reply.action
+                    {
+                        let effects =
+                            self.respond_local_tool(reply.message_id, &turn_id, &call_id, result);
+                        cancellation_writes.extend(effects.writes);
+                        cancelled.extend(effects.events);
+                    }
+                }
+                self.prompt.as_mut().expect("已确认当前回合").cancel_sent = Some(Instant::now());
+                if cancellation_writes.is_empty() {
+                    self.retire_sdk(&mut cancelled);
+                } else {
+                    // 尚未执行的宿主命令先按原租约写拒绝结果，再封闭本回合账本。
+                    self.host_cancel_write_pending = true;
+                }
                 cancelled.push(RuntimeEventKind::CommandDispatched {
                     message_id: command.message_id,
                     turn_id: Some(turn_id),
                 });
+                cancellation_writes.push(json!({"jsonrpc": "2.0", "method": "session/cancel", "params": {"sessionId": self.session_id}}));
                 Effects {
-                    writes: vec![
-                        json!({"jsonrpc": "2.0", "method": "session/cancel", "params": {"sessionId": self.session_id}}),
-                    ],
+                    writes: cancellation_writes,
                     events: cancelled,
                 }
             }
@@ -2490,6 +2753,18 @@ impl GrokProtocol {
                     &json!({"approval": approval_id, "decision": decision}),
                 ) {
                     return effects;
+                }
+                if decision == ApprovalDecision::AllowOnce
+                    && self.approvals.get(&approval_id).is_some_and(|approval| {
+                        self.options.grok_profile.as_ref().is_some_and(|profile| {
+                            !profile.permits_native_request(&approval.fixed_tool_call)
+                        })
+                    })
+                {
+                    return rejected_command(
+                        command.message_id,
+                        crate::t!("cli-agent-grok-fixed-skills-unavailable"),
+                    );
                 }
                 let Some(approval) = self.approvals.get_mut(&approval_id) else {
                     return rejected_command(command.message_id, "Unknown Grok approval".into());
@@ -2594,14 +2869,42 @@ impl GrokProtocol {
                 events: Vec::new(),
             };
         }
-        if queued.skills.len() > 1 && !self.skill_updates_verified() {
+        if queued.skills.len() > 1
+            && !self.skill_updates_verified()
+            && !self.fixed_skills_verified()
+        {
             return rejected_command(
                 queued.message_id,
                 crate::t!("cli-agent-grok-managed-unverified"),
             );
         }
-        let content = if !queued.skills.is_empty() {
-            if self.production_root_verified() && queued.skills.len() > 1 {
+        let content = if self.fixed_skills_verified() {
+            let Some(catalog) = &self.skill_catalog else {
+                return rejected_command(
+                    queued.message_id,
+                    crate::t!("cli-agent-grok-fixed-skills-unavailable"),
+                );
+            };
+            match self
+                .options
+                .grok_profile
+                .as_ref()
+                .expect("固定技能已有策略")
+                .encode_skill_prompt(
+                    &self.profile_state_dir,
+                    catalog.native_commands(),
+                    queued.input,
+                ) {
+                Ok(content) => content,
+                Err(_) => {
+                    return rejected_command(
+                        queued.message_id,
+                        crate::t!("cli-agent-grok-fixed-skills-unavailable"),
+                    );
+                }
+            }
+        } else if !queued.skills.is_empty() {
+            if self.production_root_verified() {
                 if let Err(error) = self
                     .skill_catalog
                     .as_ref()
@@ -2670,6 +2973,36 @@ impl GrokProtocol {
     }
 
     fn complete_rpc(&mut self, effects: &mut Effects) {
+        if let Some(turn_id) = self
+            .prompt
+            .as_ref()
+            .and_then(|prompt| prompt.native_id.clone())
+        {
+            // 原生回合已终止，尚未执行的同回合命令不能在清理后重新申请权限。
+            for reply in self.host_commands.cancel_turn(&turn_id) {
+                if let RuntimeAction::RespondLocalTool {
+                    turn_id, call_id, ..
+                } = reply.action
+                {
+                    if let Some(call) = self
+                        .sdk
+                        .as_mut()
+                        .and_then(|sdk| sdk.calls.get_mut(&call_id))
+                    {
+                        call.cancelled = true;
+                    }
+                    effects
+                        .events
+                        .push(RuntimeEventKind::LocalToolCancelled { turn_id, call_id });
+                }
+            }
+        }
+        if self.reviewed_commands.has_command() {
+            // 已收到原生回合结束，但独立命令仍在清理；原生排队先保持到同一清理回执。
+            self.host_rpc_completion_pending = true;
+            return;
+        }
+        self.host_rpc_completion_pending = false;
         self.cancel_approvals(&mut effects.events);
         if self.sdk.as_ref().is_some_and(|sdk| sdk.retired) {
             self.closed = true;
@@ -2849,6 +3182,7 @@ impl GrokProtocol {
                 tool_call_id: call_id.expect("关联成功后必须存在工具调用").to_owned(),
                 resolved: false,
                 lease_permission,
+                fixed_tool_call: params["toolCall"].clone(),
             },
         );
         Ok(Effects {
@@ -3370,6 +3704,22 @@ impl GrokProtocol {
                         "Grok tool call id was reused in another turn".into(),
                     ));
                 }
+                if self.reviewed_commands.owns_tool(call_id)
+                    && (matches!(
+                        update["rawOutput"]["type"].as_str(),
+                        Some("Background" | "BackgroundTaskStarted")
+                    ) || matches!(
+                        update["rawOutput"]["variant"].as_str(),
+                        Some("BackgroundTaskStarted")
+                    ) || matches!(
+                        update["rawOutput"]["signal"].as_str(),
+                        Some("backgrounded" | "auto_backgrounded")
+                    ))
+                {
+                    return Ok(self.stop_reviewed_command(TurnOutcome::Failed {
+                        message: crate::t!("cli-agent-reviewed-command-background"),
+                    }));
+                }
                 if matches!(update["status"].as_str(), Some("completed" | "failed")) {
                     tool.finished = true;
                     for (id, approval) in &mut self.approvals {
@@ -3851,7 +4201,9 @@ impl GrokProtocol {
                         !leader_catalog,
                     )?;
                 }
-                if self.options.permission_policy == PermissionPolicy::Inherit {
+                if self.options.permission_policy == PermissionPolicy::Inherit
+                    || self.fixed_skills_verified()
+                {
                     self.skill_catalog = Some(
                         skills::SkillCatalog::from_native(&result["commands"])
                             .map_err(RuntimeError::Protocol)?,
@@ -4144,7 +4496,10 @@ impl GrokProtocol {
         ];
         let display_only =
             allow_display_refresh && self.creation_catalog_session.as_deref() == Some(session);
-        let valid_commands = if display_only {
+        let valid_commands = if self.fixed_skills_verified() {
+            self.verify_initial_skill_catalog(commands)?;
+            valid_display_commands(commands)
+        } else if display_only {
             // 就绪后的命令是动态显示目录，不能授予执行权限；固定范围始终禁止 slash 和技能输入。
             valid_display_commands(commands)
         } else {
@@ -4343,6 +4698,15 @@ impl GrokProtocol {
         )?;
         if !self.record_notification_id(message)? {
             return Ok(Some(Effects::default()));
+        }
+        if self.fixed_skills_verified() {
+            let catalog = skills::SkillCatalog::from_native(&update["availableCommands"])
+                .map_err(RuntimeError::Protocol)?;
+            if self.session_id.as_deref() == Some(session.as_str()) {
+                self.skill_catalog = Some(catalog);
+            } else {
+                self.early_skill_catalogs.insert(session.clone(), catalog);
+            }
         }
         self.creation_catalog_session = Some(session);
         if let Some(setup) = &mut self.current_setup {
@@ -5644,32 +6008,11 @@ fn validate_root_command_catalog(
         ));
     }
     if let Some(selected) = selected_skill {
-        let path = selected
-            .path
-            .canonicalize()
-            .map_err(|_| RuntimeError::Protocol(skills::unavailable()))?;
-        let matches = commands
-            .as_array()
-            .expect("显示目录已验证")
-            .iter()
-            .filter(|command| {
-                command["_meta"]["path"]
-                    .as_str()
-                    .map(Path::new)
-                    .filter(|path| path.is_absolute())
-                    .and_then(|path| path.canonicalize().ok())
-                    .is_some_and(|candidate| candidate == path)
-            })
-            .collect::<Vec<_>>();
-        if matches.len() != 1
-            || matches[0]["_meta"]["bareName"] != selected.name
-            || matches[0]["_meta"]["scope"] != "local"
-            || !matches[0]["input"].is_null()
-        {
-            return Err(RuntimeError::Protocol(
-                "Grok selected skill catalog path or identity changed".into(),
-            ));
-        }
+        let selected = skills::SelectedSkill::new(selected.name.clone(), selected.path.clone())
+            .map_err(RuntimeError::Protocol)?;
+        skills::SkillCatalog::from_native(commands)
+            .and_then(|catalog| catalog.verify_root_selection(&[selected]))
+            .map_err(RuntimeError::Protocol)?;
     }
     Ok(())
 }

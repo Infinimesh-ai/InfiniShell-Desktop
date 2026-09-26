@@ -55,6 +55,7 @@ fn fixture() -> Fixture {
         old_version: "2.1.278".into(),
         target_version: "2.1.280".into(),
         intent: "fixed-test-intent".into(),
+        downgrade: None,
         stage_name,
         phase: Phase::SwapIntent,
         original,
@@ -336,6 +337,7 @@ fn platform_native_probe_cannot_substitute_for_public_entry() {
         program_stamp: stamp(&native).unwrap(),
         binding_digest: "0".repeat(64),
         observed_version: Some("2.1.280".into()),
+        codex_closure: None,
     });
     assert_eq!(
         validate(

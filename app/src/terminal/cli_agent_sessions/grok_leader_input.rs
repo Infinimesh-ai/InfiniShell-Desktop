@@ -3,7 +3,8 @@
 //! 调用者必须先绑定本地活动 PTY、原生 SessionStart 和输入 generation，且在目标或权限
 //! 改变时立即废弃该绑定。本模块不发现其他 leader，不启动进程，也不恢复或重投历史输入。
 //! 首次校准仅覆盖 macOS arm64、1.0.41、grok-4.7、default 权限和文本（可含文件引用）。
-//! 文件仍由原生工具按原生权限读取；本模块不读取附件正文，也不替代附件有效性检查。
+//! 文件仍由原生工具按原生权限读取；图片走独立类型化内容，不能将文本路径计为图片接收。
+//! 图片扩展复用固定 ACP 编码，普通 TUI 的图片显示及模型链仍待独立验收。
 
 use std::io;
 
@@ -11,10 +12,74 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::ai::agent::ImageContext;
+use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
+
 const CLI_VERSION: &str = "1.0.41";
 const MODEL_ID: &str = "grok-4.7";
 const MAX_FRAME_BYTES: usize = 4 * 1024 * 1024;
 const MAX_PROMPT_BYTES: usize = 1024 * 1024;
+
+/// 已准备的单轮原生内容；普通文本与图片分别构造，不能把用户文本解释为协议。
+pub(crate) struct GrokLeaderPrompt {
+    content: Vec<Value>,
+}
+
+impl GrokLeaderPrompt {
+    pub(crate) fn text(text: &str) -> Result<Self, GrokLeaderInputError> {
+        if text.trim().is_empty() {
+            return Err(GrokLeaderInputError::EmptyPrompt);
+        }
+        if text.len() > MAX_PROMPT_BYTES {
+            return Err(GrokLeaderInputError::FrameTooLarge);
+        }
+        let prompt = Self {
+            content: vec![json!({"type":"text","text":text})],
+        };
+        prompt.validate_budget()?;
+        Ok(prompt)
+    }
+
+    /// 图片已经由持久附件读取器校验；这里保留固定 PNG 合同和整批帧上限。
+    pub(crate) fn with_png(
+        text: Option<String>,
+        images: Vec<ImageContext>,
+    ) -> Result<Self, GrokLeaderInputError> {
+        if images.is_empty() || images.len() > MAX_IMAGE_COUNT_FOR_QUERY {
+            return Err(GrokLeaderInputError::Protocol);
+        }
+        let mut content = Vec::new();
+        if let Some(text) = text {
+            if text.len() > MAX_PROMPT_BYTES {
+                return Err(GrokLeaderInputError::FrameTooLarge);
+            }
+            if !text.is_empty() {
+                content.push(json!({"type":"text","text":text}));
+            }
+        }
+        for image in images {
+            if image.mime_type != "image/png" {
+                return Err(GrokLeaderInputError::Protocol);
+            }
+            content.push(json!({"type":"image","mimeType":"image/png","data":image.data}));
+        }
+        let prompt = Self { content };
+        prompt.validate_budget()?;
+        Ok(prompt)
+    }
+
+    fn frame(&self, rpc_id: Uuid, session_id: Uuid) -> Value {
+        acp_frame(json!({
+            "jsonrpc":"2.0", "id":rpc_id.to_string(), "method":"session/prompt",
+            "params":{"sessionId":session_id.to_string(), "prompt":self.content}
+        }))
+    }
+
+    fn validate_budget(&self) -> Result<(), GrokLeaderInputError> {
+        // UUID 的编码长度固定；在 SQLite 领取之前检查包含转义开销的最终帧。
+        encode_frame(&self.frame(Uuid::nil(), Uuid::nil())).map(|_| ())
+    }
+}
 
 /// 协议错误只返回稳定分类；不得把可能包含输入或认证材料的原生错误正文写入日志。
 #[derive(Debug)]
@@ -42,9 +107,24 @@ impl From<io::Error> for GrokLeaderInputError {
 }
 
 pub(crate) fn calibrated_platform() -> Result<(), GrokLeaderInputError> {
-    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
         Ok(())
-    } else {
+    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        linux::platform_available()
+    }
+    #[cfg(all(windows, target_arch = "x86_64"))]
+    {
+        command::owned_console_windows::platform_available().map_err(GrokLeaderInputError::Io)
+    }
+    #[cfg(not(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+    {
         Err(GrokLeaderInputError::UnsupportedPlatform)
     }
 }
@@ -283,6 +363,14 @@ fn decode_acp(frame: &Value) -> Result<Value, GrokLeaderInputError> {
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 pub(crate) use native::{GrokLeaderInput, GrokLeaderTarget};
 
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[path = "grok_leader_input_windows.rs"]
+mod windows_native;
+#[cfg(all(windows, target_arch = "x86_64"))]
+pub(crate) use windows_native::pipe_name as windows_leader_pipe_name;
+#[cfg(all(windows, target_arch = "x86_64"))]
+pub(crate) use windows_native::{GrokLeaderInput, GrokLeaderTarget};
+
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod native {
     use std::ffi::OsString;
@@ -422,7 +510,9 @@ mod native {
             let tui = system
                 .process(pids[0])
                 .ok_or(GrokLeaderInputError::IdentityChanged)?;
-            if tui.cmd().get(1..) != Some(expected.as_slice()) {
+            let mut resumed = expected.clone();
+            resumed[7] = "--resume".into();
+            if tui.cmd().get(1..) != Some(expected.as_slice()) && tui.cmd().get(1..) != Some(resumed.as_slice()) {
                 return Err(GrokLeaderInputError::InvalidTarget);
             }
             Ok(())
@@ -505,20 +595,30 @@ mod native {
             persist: impl FnOnce(&GrokLeaderDelivery) -> io::Result<()>,
             authorize_write: impl FnOnce() -> Result<(), GrokLeaderInputError>,
         ) -> Result<(), GrokLeaderInputError> {
+            let prompt = GrokLeaderPrompt::text(text)?;
+            self.submit_prompt_once_checked(
+                current_binding_id,
+                message_id,
+                &prompt,
+                persist,
+                authorize_write,
+            )
+        }
+
+        /// 图片与文本共用同一次领取和原生终态回执，不通过剪贴板或 PTY 模拟图片粘贴。
+        pub(crate) fn submit_prompt_once_checked(
+            &mut self,
+            current_binding_id: Uuid,
+            message_id: Uuid,
+            prompt: &GrokLeaderPrompt,
+            persist: impl FnOnce(&GrokLeaderDelivery) -> io::Result<()>,
+            authorize_write: impl FnOnce() -> Result<(), GrokLeaderInputError>,
+        ) -> Result<(), GrokLeaderInputError> {
             self.tracker.check_binding(current_binding_id)?;
-            if text.trim().is_empty() {
-                return Err(GrokLeaderInputError::EmptyPrompt);
-            }
-            if text.len() > MAX_PROMPT_BYTES {
-                return Err(GrokLeaderInputError::FrameTooLarge);
-            }
+            prompt.validate_budget()?;
             self.validate_connection()?;
             let record = self.tracker.record_before_write(message_id, persist)?;
-            let frame = acp_frame(json!({
-                "jsonrpc":"2.0", "id":record.rpc_id.to_string(), "method":"session/prompt",
-                "params":{"sessionId":record.session_id.to_string(),
-                    "prompt":[{"type":"text","text":text}]}
-            }));
+            let frame = prompt.frame(record.rpc_id, record.session_id);
             // 持久化可能耗时，再核对进程；即便此时失败，也保留已经领取的 Unknown。
             let result = self
                 .validate_connection()
@@ -758,3 +858,9 @@ mod native {
 #[cfg(test)]
 #[path = "grok_leader_input_tests.rs"]
 mod tests;
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[path = "grok_leader_input_linux.rs"]
+mod linux;
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+pub(crate) use linux::{GrokLeaderInput, GrokLeaderTarget};

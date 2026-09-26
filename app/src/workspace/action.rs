@@ -285,6 +285,38 @@ pub enum WorkspaceAction {
     AddAgentTab,
     /// Add a new terminal tab and launch a specific CLI agent.
     AddSpecificAgentTab(CLIAgent),
+    /// 使用明确的固定模型启动可绑定富输入的普通 Grok。
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    AddGrokRichInputTab,
+    /// 在当前远程终端内启动专属 Grok，保留原 SSH/tmux 会话。
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    StartRemoteOwnedGrokInCurrentTerminal,
+    #[cfg(all(
+        feature = "local_fs",
+        feature = "local_tty",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )
+    ))]
+    StartRemoteOwnedCodexInCurrentTerminal,
     /// Add a new tab running a local Docker sandbox via `sbx`.
     AddDockerSandboxTab,
     OpenNewSessionMenu {
@@ -965,6 +997,16 @@ impl WorkspaceAction {
             | OpenVerticalTabsPanel => true, // actions that actually change a state of the state of user's
             // workspace would most likely require a save, so that if the app gets
             // restarted, the user can continue working
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            AddGrokRichInputTab | StartRemoteOwnedGrokInCurrentTerminal | StartRemoteOwnedCodexInCurrentTerminal => true,
             AutoupdateFailureLink
             | ApplyUpdate
             | CopyVersion(_)

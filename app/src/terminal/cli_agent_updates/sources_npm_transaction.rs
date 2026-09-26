@@ -1,4 +1,4 @@
-//! 官方 npm 单包树事务。只由宿主构建已校验的树，不派生 npm、Node 或生命周期脚本。
+//! 官方 npm 单包树事务。宿主构建完整树；只有固定 Codex launcher 在隔离版本探针中运行 Node。
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -20,9 +20,9 @@ use super::{
     UPDATE_TIMEOUT, UpdatePlan, VerificationProgress, managed_process, npm, plain_ancestors,
     read_limited, read_optional_config, stamp, verify_installation_identity,
 };
+use super::{claude_downgrade, npm_codex};
 
-#[path = "sources_npm_tree_unix.rs"]
-mod tree;
+use super::package_tree as tree;
 use tree::{Directory, Identity, Snapshot};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -67,6 +67,8 @@ struct Probe {
     program_stamp: Stamp,
     binding_digest: String,
     observed_version: Option<String>,
+    #[serde(default)]
+    codex_closure: Option<npm_codex::ProbeClosure>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -80,6 +82,8 @@ struct Journal {
     old_version: String,
     target_version: String,
     intent: String,
+    #[serde(default)]
+    downgrade: Option<claude_downgrade::Intent>,
     stage_name: OsString,
     phase: Phase,
     original: Snapshot,
@@ -95,14 +99,17 @@ struct Journal {
 
 pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
     target()?;
-    // Codex 的公共入口还需要 Node 和 launcher 执行闭包；平台 native 的版本不能替代它。
+    if agent == CLIAgent::Codex {
+        return npm_codex::supports(version);
+    }
     if agent != CLIAgent::Claude {
         return Err(Error::UnsupportedSource);
     }
-    if version != "2.1.280" {
-        return Err(Error::InvalidRelease);
+    match version {
+        "2.1.280" => Ok(()),
+        claude_downgrade::TO => claude_downgrade::platform().map(|_| ()),
+        _ => Err(Error::InvalidRelease),
     }
-    Ok(())
 }
 
 fn target() -> Result<String, Error> {
@@ -353,6 +360,14 @@ pub(super) async fn execute(
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
     supports(plan.agent, &plan.target_version)?;
+    if plan.agent == CLIAgent::Claude {
+        claude_downgrade::validate(
+            plan.downgrade,
+            &plan.installed_version,
+            &plan.target_version,
+            &plan.config,
+        )?;
+    }
     if journal_path(root, plan.agent)
         .try_exists()
         .map_err(|_| Error::RecoveryRequired)?
@@ -396,6 +411,11 @@ pub(super) async fn execute(
         return Ok(plan.target_version.clone());
     }
     let platform = target()?;
+    if plan.agent == CLIAgent::Codex
+        && !matches!(plan.installed_version.as_str(), "0.155.1" | "0.156.1")
+    {
+        return Err(Error::InvalidRelease);
+    }
     let package = npm::package_name(plan.agent).ok_or(Error::UnsupportedSource)?;
     let platform_name = if plan.agent == CLIAgent::Codex {
         package.to_owned()
@@ -420,6 +440,11 @@ pub(super) async fn execute(
         root,
     )
     .await?;
+    if plan.agent == CLIAgent::Codex {
+        npm_codex::verify_metadata(&wrapper_meta, &platform_meta)?;
+    } else if plan.target_version == claude_downgrade::TO {
+        claude_downgrade::verify_metadata(&platform, &wrapper_meta, &platform_meta)?;
+    }
     let release = NpmRelease::from_metadata(
         plan.agent,
         &plan.target_version,
@@ -473,6 +498,11 @@ pub(super) async fn execute(
         .platform
         .verify_archive(platform_file.as_file_mut())?;
     release.verify_entries(&wrapper_verified, &platform_verified)?;
+    if plan.agent == CLIAgent::Codex {
+        npm_codex::verify_archives(&release, &wrapper_verified, &platform_verified)?;
+    } else if plan.target_version == claude_downgrade::TO {
+        claude_downgrade::verify_archives(&platform, &wrapper_verified, &platform_verified)?;
+    }
     #[cfg(test)]
     live_tests::preserve_verified_inputs(
         &wrapper_meta,
@@ -496,6 +526,7 @@ pub(super) async fn execute(
         old_version: plan.installed_version.clone(),
         target_version: plan.target_version.clone(),
         intent: plan.intent.clone(),
+        downgrade: plan.downgrade,
         stage_name,
         phase: Phase::Allocating,
         original,
@@ -593,6 +624,7 @@ pub(super) async fn execute(
             &public_program,
             native.length,
             native.sha256,
+            &expected_files,
         )
         .await?;
         unchanged(&journal.config, false)?;
@@ -600,6 +632,7 @@ pub(super) async fn execute(
         if let Some(scope) = &journal.claude_policy {
             super::verify_claude_originals(scope)?;
         }
+        verify_probe_dependencies(&journal)?;
         let current_parent = journal.owner.verify_external()?;
         if current_parent.child(&package_name)?.snapshot()? != journal.original
             || current_parent.child(&journal.stage_name)?.snapshot()?
@@ -653,17 +686,44 @@ async fn probe_version(
     program: &Path,
     release_length: u64,
     release_digest: [u8; 32],
+    release_files: &BTreeMap<PathBuf, (u64, [u8; 32])>,
 ) -> Result<(), Error> {
+    let codex_closure = if agent == CLIAgent::Codex {
+        let stage = program
+            .parent()
+            .and_then(Path::parent)
+            .ok_or(Error::SourceChanged)?;
+        let node = journal
+            .owner
+            .external_files
+            .first()
+            .ok_or(Error::SourceChanged)?;
+        Some(npm_codex::capture_probe(node, stage, release_files)?)
+    } else {
+        None
+    };
+    let program = if codex_closure.is_some() {
+        journal
+            .owner
+            .external_files
+            .first()
+            .ok_or(Error::SourceChanged)?
+            .canonical
+            .clone()
+    } else {
+        program.to_owned()
+    };
+    let program = program.as_path();
     let program_stamp = stamp(program)?;
-    let digest = format!(
-        "{:x}",
-        Sha256::digest(
-            serde_json::to_vec(&(&program_stamp, "--version", journal.id))
-                .map_err(|_| Error::PersistenceFailed)?
-        )
-    );
-    let binding = managed_process::PreparedLaunchBinding::claude_npm_version_probe(digest.clone())
-        .map_err(|_| Error::UnsupportedPlatform)?;
+    let digest_bytes = if codex_closure.is_some() {
+        serde_json::to_vec(&(&program_stamp, "--version", journal.id, &codex_closure))
+    } else {
+        // Claude 保留既有收据绑定格式，不能因扩展 Codex 入口改变旧事务合同。
+        serde_json::to_vec(&(&program_stamp, "--version", journal.id))
+    }
+    .map_err(|_| Error::PersistenceFailed)?;
+    let digest = format!("{:x}", Sha256::digest(digest_bytes));
+    let binding = probe_binding(agent == CLIAgent::Codex, digest.clone())?;
     let generation = Uuid::new_v4();
     journal.probe = Some(Probe {
         generation,
@@ -671,14 +731,9 @@ async fn probe_version(
         program_stamp,
         binding_digest: digest,
         observed_version: None,
+        codex_closure,
     });
     save(path, journal)?;
-    let expected = managed_process::ExpectedFileIdentity::capture_release_image(
-        program,
-        release_length,
-        release_digest,
-    )
-    .map_err(|_| Error::SourceChanged)?;
     if stamp(program)?
         != journal
             .probe
@@ -688,10 +743,32 @@ async fn probe_version(
     {
         return Err(Error::SourceChanged);
     }
-    let mut child =
+    let mut child = if let Some(closure) = journal
+        .probe
+        .as_ref()
+        .and_then(|probe| probe.codex_closure.as_ref())
+    {
+        managed_process::spawn_bound_codex_npm_version_probe(
+            root,
+            generation,
+            program,
+            &closure.arguments,
+            closure.expected_files.clone(),
+            &binding,
+        )
+        .await
+        .map_err(|_| Error::RecoveryRequired)?
+    } else {
+        let expected = managed_process::ExpectedFileIdentity::capture_release_image(
+            program,
+            release_length,
+            release_digest,
+        )
+        .map_err(|_| Error::SourceChanged)?;
         managed_process::spawn_bound_version_probe(root, generation, program, expected, &binding)
             .await
-            .map_err(|_| Error::RecoveryRequired)?;
+            .map_err(|_| Error::RecoveryRequired)?
+    };
     let mut stdout = child.stdout.take().ok_or(Error::RecoveryRequired)?;
     let mut bytes = Vec::new();
     // 监督者就绪后仍需校验并原子执行候选镜像，不能套用普通版本查询的 15 秒预算。
@@ -737,6 +814,7 @@ async fn probe_version(
 }
 
 fn verify_swapped(journal: &Journal) -> Result<Directory, Error> {
+    verify_probe_dependencies(journal)?;
     let parent = journal.owner.verify_external()?;
     let name = journal
         .owner
@@ -752,8 +830,30 @@ fn verify_swapped(journal: &Journal) -> Result<Directory, Error> {
     Ok(parent)
 }
 
+fn probe_binding(
+    codex: bool,
+    digest: String,
+) -> Result<managed_process::PreparedLaunchBinding, Error> {
+    if codex {
+        managed_process::PreparedLaunchBinding::codex_npm_version_probe(digest)
+    } else {
+        managed_process::PreparedLaunchBinding::claude_npm_version_probe(digest)
+    }
+    .map_err(|_| Error::RecoveryRequired)
+}
+
 fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Error> {
     supports(agent, &journal.target_version)?;
+    if agent == CLIAgent::Claude {
+        claude_downgrade::validate(
+            journal.downgrade,
+            &journal.old_version,
+            &journal.target_version,
+            &journal.config,
+        )?;
+    } else if journal.downgrade.is_some() {
+        return Err(Error::RecoveryRequired);
+    }
     let package = npm::package_name(agent).ok_or(Error::RecoveryRequired)?;
     if journal.schema != 1
         || journal.layout_version != LAYOUT_VERSION
@@ -762,7 +862,12 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
         || journal.stage_name != OsString::from(format!(".infinishell-npm-{}", journal.id))
         || journal.owner.package_root != journal.owner.prefix.join("lib/node_modules").join(package)
         || !journal.owner.prefix.is_absolute()
-        || journal.owner.public_relative != Path::new("bin/claude.exe")
+        || journal.owner.public_relative
+            != Path::new(if agent == CLIAgent::Codex {
+                "bin/codex.js"
+            } else {
+                "bin/claude.exe"
+            })
     {
         return Err(Error::RecoveryRequired);
     }
@@ -773,8 +878,55 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
             .parent()
             .ok_or(Error::RecoveryRequired)?
             .join(&journal.stage_name);
-        if probe.program != stage.join(&journal.owner.public_relative)
-            || probe.program_stamp.canonical != probe.program
+        if probe.program_stamp.canonical != probe.program {
+            return Err(Error::RecoveryRequired);
+        }
+        if agent == CLIAgent::Codex {
+            let closure = probe
+                .codex_closure
+                .as_ref()
+                .ok_or(Error::RecoveryRequired)?;
+            let node = journal
+                .owner
+                .external_files
+                .first()
+                .ok_or(Error::RecoveryRequired)?;
+            if probe.program != node.canonical
+                || probe.program_stamp != *node
+                || closure.arguments
+                    != [
+                        stage.join("bin/codex.js").into_os_string(),
+                        "--version".into(),
+                    ]
+                || closure
+                    .expected_files
+                    .first()
+                    .is_none_or(|file| file.path() != probe.program)
+                || closure.expected_files.len() < 4
+                || managed_process::validate_codex_npm_probe_contract(
+                    &probe.program,
+                    &closure.arguments,
+                    &closure.expected_files,
+                )
+                .is_err()
+                || probe.binding_digest
+                    != format!(
+                        "{:x}",
+                        Sha256::digest(
+                            serde_json::to_vec(&(
+                                &probe.program_stamp,
+                                "--version",
+                                journal.id,
+                                &probe.codex_closure
+                            ))
+                            .map_err(|_| Error::RecoveryRequired)?
+                        )
+                    )
+            {
+                return Err(Error::RecoveryRequired);
+            }
+        } else if probe.codex_closure.is_some()
+            || probe.program != stage.join(&journal.owner.public_relative)
         {
             return Err(Error::RecoveryRequired);
         }
@@ -784,15 +936,16 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
 
 fn verified_probe_exit(root: &Path, journal: &Journal) -> Result<(), Error> {
     if let Some(probe) = &journal.probe {
-        let binding = managed_process::PreparedLaunchBinding::claude_npm_version_probe(
-            probe.binding_digest.clone(),
-        )
-        .map_err(|_| Error::RecoveryRequired)?;
+        let binding = probe_binding(journal.agent == "codex", probe.binding_digest.clone())?;
+        let arguments = probe.codex_closure.as_ref().map_or_else(
+            || vec!["--version".into()],
+            |closure| closure.arguments.clone(),
+        );
         super::record_not_started_if_missing(
             root,
             probe.generation,
             &probe.program,
-            &["--version".into()],
+            &arguments,
             &binding,
         )?;
         let receipt =
@@ -808,6 +961,20 @@ fn verified_probe_exit(root: &Path, journal: &Journal) -> Result<(), Error> {
     Ok(())
 }
 
+fn verify_probe_dependencies(journal: &Journal) -> Result<(), Error> {
+    if let Some(probe) = &journal.probe
+        && let Some(closure) = &probe.codex_closure
+    {
+        managed_process::verify_codex_npm_probe_dependencies(
+            &probe.program,
+            &closure.arguments,
+            &closure.expected_files,
+        )
+        .map_err(|_| Error::SourceChanged)?;
+    }
+    Ok(())
+}
+
 pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Option<String>, Error> {
     let path = journal_path(root, agent);
     if !path.try_exists().map_err(|_| Error::RecoveryRequired)? {
@@ -817,6 +984,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         .map_err(|_| Error::RecoveryRequired)?;
     validate(agent, entry, &journal)?;
     verified_probe_exit(root, &journal)?;
+    verify_probe_dependencies(&journal)?;
     if let Some(scope) = &journal.claude_policy {
         super::verify_claude_originals(scope)?;
     }
@@ -902,6 +1070,7 @@ fn finish_committed(
         return Err(Error::RecoveryRequired);
     }
     verified_probe_exit(root, journal)?;
+    verify_probe_dependencies(journal)?;
     if let Some(scope) = &journal.claude_policy {
         super::verify_claude_originals(scope)?;
     }

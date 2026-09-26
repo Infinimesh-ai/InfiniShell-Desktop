@@ -315,6 +315,8 @@ fn legacy_manifest_without_expected_files_stays_compatible() {
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let mut value = serde_json::to_value(manifest).unwrap();
@@ -348,6 +350,8 @@ fn atomic_manifest_never_downgrades_when_binding_record_is_missing() {
         atomic_launch_kind: Some(AtomicLaunchKind::NativeFile),
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: Some(cwd),
     };
     let (directory, bytes) = create_launch_manifest(state.path(), &manifest).unwrap();
@@ -484,6 +488,8 @@ fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let bytes = serde_json::to_vec(&manifest).unwrap();
@@ -517,6 +523,8 @@ fn attempted_fixture(state: &Path, generation: Uuid) -> (PathBuf, Manifest, Vec<
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(state, &manifest).unwrap();
@@ -601,6 +609,8 @@ fn spawn_rejection_removes_isolated_auth_before_becoming_recoverable() {
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
+        #[cfg(all(windows, target_arch = "x86_64"))]
+        grok_npm_source: None,
         atomic_cwd: None,
     };
     let (directory, bytes) = create_launch_manifest(&state_path, &manifest).unwrap();

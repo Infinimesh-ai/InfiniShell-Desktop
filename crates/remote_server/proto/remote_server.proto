@@ -72,6 +72,11 @@ message SessionScopedRequest {
     // connection, so the response must come back on that same connection.
     OpenBuffer open_buffer = 5;
     GetDiffState get_diff_state = 6;
+    // 只暂存尚未向原生 CLI 投递的字节，禁止主机级故障转移。
+    CliImageStagingRequest cli_image_staging = 7;
+    // 专属 Grok 的启动和图片只属于此连接，断连不重投。
+    CliGrokOwnedRequest cli_grok_owned = 8;
+    CliCodexOwnedRequest cli_codex_owned = 9;
   }
 }
 
@@ -83,6 +88,10 @@ message Notification {
     Authenticate authenticate = 2;
     UpdatePreferences update_preferences = 3;
     SessionBootstrapped session_bootstrapped = 4;
+    // 即使调用方 future 已丢弃，也先撤销图片作用域，再后台清理。
+    CliImageStagingRequest revoke_cli_image_staging = 11;
+    CliGrokOwnedRequest revoke_cli_grok_owned = 12;
+    CliCodexOwnedRequest revoke_cli_codex_owned = 13;
     BufferEdit buffer_edit = 5;
     CloseBuffer close_buffer = 6;
     UnsubscribeDiffState unsubscribe_diff_state = 7;
@@ -139,6 +148,9 @@ message ServerMessage {
     ReadFileChunkResponse read_file_chunk_response = 41;
     WriteFileChunkResponse write_file_chunk_response = 42;
     TunnelServerMessage tunnel = 43;
+    CliImageStagingResponse cli_image_staging = 44;
+    CliGrokOwnedResponse cli_grok_owned = 45;
+    CliCodexOwnedResponse cli_codex_owned = 46;
   }
 }
 
@@ -198,6 +210,17 @@ enum RemoteServerCapability {
   REMOTE_SERVER_CAPABILITY_UNSPECIFIED = 0;
   SSH_BYTE_STREAM_V1 = 1;
   SSH_TRANSPORT_V2 = 2;
+  // 不是原生图片输入能力；只有未投递字节暂存协议。
+  CLI_IMAGE_UNPUBLISHED_STAGING_V1 = 3;
+  // 仅原始文件引用及显式释放；不授予原生 CLI 工具权限。
+  CLI_IMAGE_SESSION_REFERENCES_V1 = 4;
+  CLI_IMAGE_REFERENCE_RECOVERY_V1 = 5;
+  // 同一既有 Codex daemon 的类型化后续输入队列，不是 PTY 当前回合追加。
+  CLI_IMAGE_CODEX_QUEUE_V1 = 6;
+  CLI_GROK_OWNED_V1 = 7;
+  // Claude 原生后续输入触发 Read；只有历史中匹配的图片内容才确认消费。
+  CLI_IMAGE_CLAUDE_READ_V1 = 8;
+  CLI_CODEX_OWNED_V1 = 9;
 }
 
 // ── SSH 字节流隧道 ───────────────────────────────────────────────
@@ -343,6 +366,9 @@ message SessionBootstrapped {
   // The full path to the shell binary (e.g. "/usr/bin/zsh").
   // When present, the server uses this directly instead of doing a PATH lookup.
   optional string shell_path = 3;
+  // 当前连接内严格递增，旧 bootstrap 不得恢复旧图片租约。
+  string image_staging_epoch = 4;
+  uint64 image_staging_epoch_revision = 5;
 }
 
 // Sent by the client to execute a shell command on the remote host.
@@ -1001,5 +1027,172 @@ message WriteFileChunkResponse {
   oneof result {
     WriteFileChunkSuccess success = 1;
     FileOperationError error = 2;
+  }
+}
+
+// ── 未投递的 CLI 图片字节暂存 v1 ────────────────────────────
+// connection_id 故意不在请求中：服务端只能使用接收连接的可信 ConnectionId。
+message CliImageStagingScope {
+  string host_id = 1;
+  uint64 terminal_session_id = 2;
+  string cli_session_id = 3;
+  string input_generation = 4;
+  string submission_id = 5;
+  string terminal_epoch = 6;
+}
+message CliImageStagingSpec {
+  uint64 byte_len = 1;
+  bytes sha256 = 2;
+}
+message CliImageStagingActivate {}
+message CliImageStagingBegin {
+  string transfer_id = 1;
+  CliImageStagingSpec spec = 2;
+}
+message CliImageStagingChunk {
+  string transfer_id = 1;
+  uint64 offset = 2;
+  bytes bytes = 3;
+}
+message CliImageStagingVerify {
+  string transfer_id = 1;
+  CliImageStagingSpec expected_spec = 2;
+}
+message CliImageStagingCancel { string transfer_id = 1; }
+message CliImageStagingRevoke {}
+// 发布仅交付远端文件引用，不是 CLI 原生消费回执。
+message CliImageStagingPublish { string transfer_id = 1; string recovery_key = 2; }
+message CliImageStagingRelease { string transfer_id = 1; string recovery_key = 2; }
+// 恢复凭据只允许引用查询/释放，不能创建上传租约或授予原生输入权限。
+message CliImageStagingRecover { string transfer_id = 1; string recovery_key = 2; bool release = 3; }
+message CliImageCodexBinding {
+  uint32 daemon_pid_candidate = 1;
+  string codex_home = 2;
+  string tty_path = 3;
+  string working_directory = 4;
+  string owned_ticket_id = 5;
+  string owned_manifest_sha256 = 6;
+}
+message CliImageClaudeBinding {
+  uint32 process_id_candidate = 1;
+  string claude_config_directory = 2;
+  string tty_path = 3;
+  string working_directory = 4;
+  string transcript_path = 5;
+}
+message CliImageClaudeQueue {
+  CliImageClaudeBinding binding = 1;
+  string text = 2;
+  repeated CliImageQueueReference references = 3;
+  bytes subject_sha256 = 4;
+  string recovery_key = 5;
+}
+message CliImageQueueReference { string transfer_id = 1; string recovery_key = 2; }
+message CliImageCodexQueue {
+  CliImageCodexBinding binding = 1;
+  string text = 2;
+  repeated CliImageQueueReference references = 3;
+  bytes subject_sha256 = 4;
+  string recovery_key = 5;
+}
+// 只能查询原提交的持久接收状态；查不到也不得重投未知输入。
+message CliImageCodexQueueStatus { string submission_id = 1; string recovery_key = 2; }
+message CliImageCodexQueueResult {
+  string submission_id = 1;
+  bytes subject_sha256 = 2;
+  // unknown / confirmed / rejected / absent 为协议稳定值，不能直接展示。
+  string status = 3;
+  string native_queue_id = 4;
+}
+message CliImageStagingRequest {
+  CliImageStagingScope scope = 1;
+  // activate 为本连接预分配的前序号；其他动作使用其加一后的提交序号。
+  // 新提交可以跳过已撤销的序号，但绝不能回退到旧序号。
+  uint64 revision = 2;
+  oneof action {
+    CliImageStagingActivate activate = 3;
+    CliImageStagingBegin begin = 4;
+    CliImageStagingChunk chunk = 5;
+    CliImageStagingVerify verify = 6;
+    CliImageStagingCancel cancel = 7;
+    CliImageStagingRevoke revoke = 8;
+    CliImageStagingPublish publish = 9;
+    CliImageStagingRelease release = 10;
+    CliImageStagingRecover recover = 11;
+    CliImageCodexQueue codex_queue = 12;
+    CliImageCodexQueueStatus codex_queue_status = 13;
+    CliImageClaudeQueue claude_queue = 14;
+    CliImageCodexQueueStatus claude_queue_status = 15;
+  }
+}
+message CliImageStagingActivated {}
+// 内层使用固定 v1 的 deny_unknown_fields JSON；请求和响应各不超过 4 MiB。
+// 外层与内层的主机、终端、代次必须相同，内层 ticket 不赋予跨终端权限。
+message CliCodexOwnedRequest {
+  CliImageStagingScope scope = 1;
+  bytes body_json = 2;
+}
+message CliCodexOwnedResponse {
+  CliImageStagingScope scope = 1;
+  bytes body_json = 2;
+}
+message CliGrokOwnedRequest {
+  CliImageStagingScope scope = 1;
+  bytes body_json = 2;
+}
+message CliGrokOwnedResponse {
+  CliImageStagingScope scope = 1;
+  bytes body_json = 2;
+}
+message CliImageStagingProgress {
+  string transfer_id = 1;
+  uint64 next_offset = 2;
+}
+message CliImageStagingVerified {
+  string transfer_id = 1;
+  CliImageStagingSpec spec = 2;
+}
+message CliImageStagingCancelled { string transfer_id = 1; }
+message CliImageStagingRevoked {}
+message CliImageStagingPublished {
+  string transfer_id = 1;
+  string remote_path = 2;
+  CliImageStagingSpec spec = 3;
+}
+message CliImageStagingReleased { string transfer_id = 1; }
+message CliImageStagingRecovered {
+  string transfer_id = 1;
+  CliImageStagingPublished reference = 2;
+  bool released = 3;
+}
+enum CliImageStagingErrorCode {
+  CLI_IMAGE_STAGING_ERROR_CODE_UNSPECIFIED = 0;
+  CLI_IMAGE_STAGING_ERROR_CODE_UNSUPPORTED = 1;
+  CLI_IMAGE_STAGING_ERROR_CODE_INVALID_SCOPE = 2;
+  CLI_IMAGE_STAGING_ERROR_CODE_STALE_SCOPE = 3;
+  CLI_IMAGE_STAGING_ERROR_CODE_INVALID_TRANSFER = 4;
+  CLI_IMAGE_STAGING_ERROR_CODE_STORAGE_FAILURE = 5;
+  CLI_IMAGE_STAGING_ERROR_CODE_DISCONNECTED = 6;
+}
+message CliImageStagingError {
+  CliImageStagingErrorCode code = 1;
+  // 内部诊断，无路径、认证或图片内容；不能直接展示为 GUI 文案。
+  string message = 2;
+}
+message CliImageStagingResponse {
+  CliImageStagingScope scope = 1;
+  uint64 revision = 2;
+  oneof result {
+    CliImageStagingActivated activated = 3;
+    CliImageStagingProgress progress = 4;
+    CliImageStagingVerified verified = 5;
+    CliImageStagingCancelled cancelled = 6;
+    CliImageStagingError error = 7;
+    CliImageStagingRevoked revoked = 8;
+    CliImageStagingPublished published = 9;
+    CliImageStagingReleased released = 10;
+    CliImageStagingRecovered recovered = 11;
+    CliImageCodexQueueResult codex_queue = 12;
+    CliImageCodexQueueResult claude_queue = 13;
   }
 }

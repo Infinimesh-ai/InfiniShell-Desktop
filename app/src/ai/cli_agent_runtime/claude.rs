@@ -1,5 +1,6 @@
 //! Claude Code 精确版本的双向 stream-json；输入排队与同回合 steering 保持区别。
 
+use super::reviewed_project_commands_lifecycle::ReviewedCommandLifecycle;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -34,6 +35,8 @@ use super::{
 use crate::ai::agent::ImageContext;
 use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
 
+#[path = "claude_profile_skill_protocol.rs"]
+mod fixed_skills;
 #[path = "claude_skills.rs"]
 mod skills;
 
@@ -120,6 +123,7 @@ fn test_candidate_enabled(options: &SessionOptions) -> bool {
         || options.permission_policy != PermissionPolicy::ClaudeRestrictedFilesV1
         || options.local_tools
             != Some(super::local_tools::LocalToolPermissions {
+                allow_project_commands: false,
                 allow_spawn: true,
                 allow_message: true,
             })
@@ -287,9 +291,13 @@ async fn run_process(
     protocol.bind_probed_version(output.status.success(), &detected)?;
 
     protocol.skill_plugin = if protocol.probed_version == Some("2.1.280")
-        && protocol.options.permission_policy == PermissionPolicy::Inherit
-    {
-        // 空槽也在启动时注册，后续新增技能无需修改全局配置或重启会话。
+        && matches!(
+            protocol.options.permission_policy,
+            PermissionPolicy::Inherit
+                | PermissionPolicy::ClaudeRestrictedSkillsV1
+                | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+        ) {
+        // 继承模式保留热新增空槽；固定技能策略只注册创建时的集合，禁止扩大。
         Some(
             prepare_empty_or_selected_claude_skill_plugin(&protocol.options.selected_skills)
                 .map_err(RuntimeError::InvalidConfiguration)?,
@@ -298,6 +306,19 @@ async fn run_process(
         prepare_claude_skill_plugin(&protocol.options.selected_skills)
             .map_err(RuntimeError::InvalidConfiguration)?
     };
+    if let Some(profile) = protocol
+        .options
+        .claude_profile
+        .as_ref()
+        .and_then(|profile| profile.skills_profile())
+    {
+        profile.verify_plugin(
+            protocol
+                .skill_plugin
+                .as_ref()
+                .ok_or_else(|| super::claude_profile::reject("claude_skills_plugin_missing"))?,
+        )?;
+    }
     let mut arguments: Vec<OsString> = launch_arguments(&protocol.options)
         .into_iter()
         .map(OsString::from)
@@ -323,6 +344,7 @@ async fn run_process(
         .take()
         .ok_or_else(|| RuntimeError::Protocol("missing stdout".into()))?;
     let result = run_transport(protocol, &mut stdin, &mut stdout, commands, events).await;
+    let host_cleanup = protocol.host_commands.finish().await;
     drop(stdin);
     // 保留读端至 EOF，让监督者转发尚未读完的末帧；读取有总预算与超时。
     let drain = async move {
@@ -339,7 +361,7 @@ async fn run_process(
         Ok::<(), RuntimeError>(())
     };
     let finish = async {
-        if result.is_ok() {
+        if result.is_ok() && !protocol.reviewed_commands.has_command() {
             child.finish_after_stdin_close().await
         } else {
             child.finish().await
@@ -347,9 +369,20 @@ async fn run_process(
     };
     let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
     // 完成清理后保留原传输失败；监督或 EOF 失败仍阻止正常关闭被计为成功。
+    host_cleanup?;
     result?;
     finished?;
     drained.map_err(|_| RuntimeError::RequestTimedOut)??;
+    for kind in protocol.host_commands.take_cancelled_events() {
+        events
+            .try_send(protocol.event(kind))
+            .map_err(|_| RuntimeError::EventBackpressure)?;
+    }
+    for kind in protocol.reviewed_commands.cleanup_confirmed() {
+        events
+            .try_send(protocol.event(kind))
+            .map_err(|_| RuntimeError::EventBackpressure)?;
+    }
     Ok(())
 }
 
@@ -367,6 +400,16 @@ async fn run_transport(
     let mut buffer = Vec::new();
     let mut chunk = [0u8; 8192];
     loop {
+        if protocol.reviewed_commands.retiring() {
+            return Ok(());
+        }
+        if protocol.reviewed_commands.timed_out() {
+            let effects = protocol.stop_reviewed_command(TurnOutcome::Failed {
+                message: crate::t!("cli-agent-reviewed-command-timeout"),
+            });
+            flush_effects(protocol, stdin, events, effects).await?;
+            return Ok(());
+        }
         if let Some(error) = protocol.profile_error.take() {
             return Err(error);
         }
@@ -387,18 +430,21 @@ async fn run_transport(
             Command(Option<RuntimeCommand>),
             Tick,
             ConsumerClosed,
+            HostCommand(Result<RuntimeCommand, RuntimeError>),
         }
         let incoming = {
             let read = stdout.read(&mut chunk).fuse();
             let command = commands.recv().fuse();
             let tick = Timer::after(Duration::from_millis(250)).fuse();
             let closed = events.closed().fuse();
-            pin_mut!(read, command, tick, closed);
+            let host_command = protocol.next_host_command_reply().fuse();
+            pin_mut!(read, command, tick, closed, host_command);
             select! {
                 result = read => Incoming::Bytes(result),
                 result = command => Incoming::Command(result),
                 _ = tick => Incoming::Tick,
                 () = closed => Incoming::ConsumerClosed,
+                result = host_command => Incoming::HostCommand(result),
             }
         };
         match incoming {
@@ -428,12 +474,19 @@ async fn run_transport(
                         return Err(error);
                     }
                     flush_effects(protocol, stdin, events, effects).await?;
+                    if protocol.reviewed_commands.retiring() {
+                        return Ok(());
+                    }
                 }
                 if buffer.len() > MAX_LINE_BYTES {
                     return Err(RuntimeError::Protocol(
                         "Claude stream-json message exceeds the size limit".into(),
                     ));
                 }
+            }
+            Incoming::HostCommand(result) => {
+                let effects = protocol.command(result?);
+                flush_effects(protocol, stdin, events, effects).await?;
             }
             Incoming::Command(Some(command)) => {
                 let shutdown = command.action == RuntimeAction::Shutdown
@@ -789,17 +842,24 @@ async fn write_message(
 }
 
 async fn flush_effects(
-    protocol: &ClaudeProtocol,
+    protocol: &mut ClaudeProtocol,
     stdin: &mut (impl AsyncWrite + Unpin),
     events: &mpsc::Sender<RuntimeEvent>,
     effects: Effects,
 ) -> Result<(), RuntimeError> {
+    let mut effects = effects;
+    effects
+        .events
+        .extend(protocol.host_commands.take_cancelled_events());
     for message in effects.writes {
         #[cfg(test)]
         record_live_native_ids(protocol, &message, "stdin")?;
         write_message(stdin, &message).await?;
     }
     for kind in effects.events {
+        let Some(kind) = protocol.reviewed_commands.before_publish(kind) else {
+            continue;
+        };
         events
             .try_send(protocol.event(kind))
             .map_err(|error| match error {
@@ -811,12 +871,25 @@ async fn flush_effects(
 }
 
 fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
+    if options
+        .local_tools
+        .is_some_and(|tools| tools.allow_project_commands)
+        != options.permission_policy.is_reviewed_commands()
+    {
+        return Err(super::reviewed_project_commands::reject(
+            "reviewed_commands_explicit_policy_required",
+        ));
+    }
     if options.grok_profile.is_some()
         || !matches!(
             options.permission_policy,
             PermissionPolicy::Inherit
                 | PermissionPolicy::ClaudeRestrictedFilesV1
                 | PermissionPolicy::ClaudeRestrictedFilesV2
+                | PermissionPolicy::ClaudeRestrictedFilesV3
+                | PermissionPolicy::ClaudeRestrictedSkillsV1
+                | PermissionPolicy::ClaudeReviewedCommandsV1
+                | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
         )
     {
         return Err(RuntimeError::InvalidConfiguration(
@@ -824,7 +897,9 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
         ));
     }
     if options.permission_policy.is_claude_file_profile() {
-        if !options.selected_skills.is_empty() {
+        if !options.selected_skills.is_empty()
+            && !options.permission_policy.is_claude_fixed_skills()
+        {
             return Err(super::claude_profile::reject(
                 "claude_profile_skills_unsupported",
             ));
@@ -839,7 +914,11 @@ fn validate_options(options: &SessionOptions) -> Result<(), RuntimeError> {
             let expected = ceiling
                 .claude_profile()
                 .ok_or_else(|| super::claude_profile::reject("claude_profile_wrong_parent"))?;
-            if options.claude_profile.as_ref() != Some(&expected) {
+            if !options
+                .claude_profile
+                .as_ref()
+                .is_some_and(|profile| expected.allows_child(profile))
+            {
                 return Err(super::claude_profile::reject(
                     "claude_profile_parent_mismatch",
                 ));
@@ -907,6 +986,7 @@ enum PermissionStage {
 
 enum PendingKind {
     Initialize,
+    VerifyFixedSkills,
     ReloadSkills {
         message_id: Uuid,
         input: Vec<InputContent>,
@@ -971,6 +1051,7 @@ struct PendingApproval {
     turn_id: Uuid,
     input: Value,
     tool_name: String,
+    tool_call_id: String,
     response: Option<Value>,
     cancelled: bool,
 }
@@ -1000,6 +1081,7 @@ struct ClaudeProtocol {
     mcp_replies: HashMap<String, ([u8; 32], Value)>,
     skill_plugin: Option<PreparedClaudeSkillPlugin>,
     skill_reload_failed: bool,
+    fixed_skill_registration_verified: bool,
     permission_observation: Option<Observation>,
     permission_observation_started: Option<Instant>,
     ready_permissions: Value,
@@ -1016,6 +1098,8 @@ struct ClaudeProtocol {
     profile_pending_command: Option<(Uuid, RuntimeAction)>,
     profile_command_authorized: bool,
     native_result_evidence: bool,
+    reviewed_commands: ReviewedCommandLifecycle,
+    host_commands: super::reviewed_project_commands_host::ReviewedCommandHost,
     #[cfg(any(test, feature = "claude_21280_test_candidate"))]
     test_candidate_21280: bool,
     #[cfg(test)]
@@ -1023,6 +1107,12 @@ struct ClaudeProtocol {
 }
 
 impl ClaudeProtocol {
+    async fn next_host_command_reply(&mut self) -> Result<RuntimeCommand, RuntimeError> {
+        self.host_commands
+            .next_reply(&mut self.reviewed_commands)
+            .await
+    }
+
     fn new(options: SessionOptions) -> Self {
         let native_result_evidence = native_result_evidence_enabled(&options.state_dir);
         Self {
@@ -1047,6 +1137,7 @@ impl ClaudeProtocol {
             mcp_replies: HashMap::new(),
             skill_plugin: None,
             skill_reload_failed: false,
+            fixed_skill_registration_verified: false,
             permission_observation: None,
             permission_observation_started: None,
             ready_permissions: Value::Null,
@@ -1063,6 +1154,8 @@ impl ClaudeProtocol {
             profile_pending_command: None,
             profile_command_authorized: false,
             native_result_evidence,
+            reviewed_commands: Default::default(),
+            host_commands: Default::default(),
             #[cfg(any(test, feature = "claude_21280_test_candidate"))]
             test_candidate_21280: false,
             #[cfg(test)]
@@ -1073,8 +1166,14 @@ impl ClaudeProtocol {
     fn bind_probed_version(&mut self, succeeded: bool, detected: &str) -> Result<(), RuntimeError> {
         self.probed_version = None;
         self.paired_version = None;
-        if self.options.permission_policy == PermissionPolicy::ClaudeRestrictedFilesV2
-            && detected != "2.1.280 (Claude Code)"
+        if matches!(
+            self.options.permission_policy,
+            PermissionPolicy::ClaudeRestrictedFilesV2
+                | PermissionPolicy::ClaudeRestrictedFilesV3
+                | PermissionPolicy::ClaudeRestrictedSkillsV1
+                | PermissionPolicy::ClaudeReviewedCommandsV1
+                | PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+        ) && detected != "2.1.280 (Claude Code)"
         {
             return Err(RuntimeError::UnsupportedVersion(detected.to_owned()));
         }
@@ -1160,6 +1259,10 @@ impl ClaudeProtocol {
         self.permission_observation_started = None;
         self.pending
             .retain(|_, request| !matches!(request.kind, PendingKind::PermissionObservation(_)));
+        if let Err(error) = self.verify_fixed_skill_plugin() {
+            self.profile_error = Some(error);
+            return Effects::default();
+        }
         if let Some(profile) = &self.options.claude_profile {
             if let Err(error) = profile.verify_live(
                 &self.profile_settings,
@@ -1342,8 +1445,25 @@ impl ClaudeProtocol {
         effects
     }
 
+    fn stop_reviewed_command(&mut self, outcome: TurnOutcome) -> Effects {
+        let mut events = Vec::new();
+        if let Some(turn) = self
+            .reviewed_commands
+            .turn()
+            .and_then(|turn| Uuid::parse_str(turn).ok())
+        {
+            self.finish_turn(turn, outcome, None, &mut events);
+        }
+        self.reviewed_commands.retire();
+        Effects {
+            writes: Vec::new(),
+            events,
+        }
+    }
+
     fn apply_command(&mut self, message_id: Uuid, action: RuntimeAction) -> Effects {
         if action == RuntimeAction::Shutdown {
+            self.host_commands.cancel();
             return accepted(message_id, None);
         }
         if !self.initialized || self.profile_error.is_some() {
@@ -1362,6 +1482,25 @@ impl ClaudeProtocol {
             self.profile_pending_command = Some((message_id, action));
             return self.start_permission_observation(&self.initialize_info.clone());
         }
+        {
+            let command = RuntimeCommand {
+                generation: self.options.generation,
+                message_id,
+                action: action.clone(),
+            };
+            if let Some(result) = self
+                .host_commands
+                .respond(&command, &mut self.reviewed_commands)
+            {
+                return match result {
+                    Ok(events) => Effects {
+                        writes: Vec::new(),
+                        events,
+                    },
+                    Err(error) => failed(message_id, &error.to_string()),
+                };
+            }
+        }
         match action {
             RuntimeAction::Submit { input } => {
                 match self.begin_skill_registration(message_id, &input) {
@@ -1375,11 +1514,15 @@ impl ClaudeProtocol {
                     && input
                         .iter()
                         .any(|part| matches!(part, InputContent::Skill { .. }));
-                let projection =
-                    match encode_input(input, self.skill_plugin.as_ref(), &self.attachment_store) {
-                        Ok(projection) => projection,
-                        Err(error) => return failed(message_id, &error),
-                    };
+                let encoded = if self.options.permission_policy.is_claude_fixed_skills() {
+                    self.encode_fixed_skill_input(input)
+                } else {
+                    encode_input(input, self.skill_plugin.as_ref(), &self.attachment_store)
+                };
+                let projection = match encoded {
+                    Ok(projection) => projection,
+                    Err(error) => return failed(message_id, &error),
+                };
                 let (content, expected_replay) = projection.into_parts();
                 if self.probed_version != Some("2.1.280")
                     && (image_with_skill
@@ -1445,6 +1588,12 @@ impl ClaudeProtocol {
                         "interrupt requires the currently running command",
                     );
                 }
+                let mut command_cancellations = Effects::default();
+                for reply in self.host_commands.cancel_turn(&turn_id.to_string()) {
+                    let effects = self.apply_command(reply.message_id, reply.action);
+                    command_cancellations.writes.extend(effects.writes);
+                    command_cancellations.events.extend(effects.events);
+                }
                 self.clear_assistant_origin(turn_id);
                 self.turns
                     .get_mut(&turn_id)
@@ -1459,10 +1608,8 @@ impl ClaudeProtocol {
                     },
                     json!({"subtype":"interrupt"}),
                 );
-                Effects {
-                    writes: vec![request],
-                    events: Vec::new(),
-                }
+                command_cancellations.writes.push(request);
+                command_cancellations
             }
             RuntimeAction::RespondApproval {
                 approval_id,
@@ -1485,6 +1632,16 @@ impl ClaudeProtocol {
                     );
                 }
                 let turn_id = approval.turn_id;
+                // 受审命令可访问当前账号文件；再次加载 Skill 前核对私有插件完整字节。
+                let plugin_changed = self.options.permission_policy
+                    == PermissionPolicy::ClaudeReviewedCommandsSkillsV1
+                    && approval.tool_name == "Skill"
+                    && self.verify_fixed_skill_plugin().is_err();
+                let decision = if decision == ApprovalDecision::AllowOnce && plugin_changed {
+                    ApprovalDecision::DenyOnce
+                } else {
+                    decision
+                };
                 let decision = if decision == ApprovalDecision::AllowOnce
                     && self.options.claude_profile.as_ref().is_some_and(|profile| {
                         !profile.approval_allowed(&approval.tool_name, &approval.input)
@@ -1592,6 +1749,7 @@ impl ClaudeProtocol {
                 && call.response.is_none()
             {
                 call.cancelled = true;
+                self.host_commands.cancel_call(&call.request.call_id);
                 effects.events.push(RuntimeEventKind::LocalToolCancelled {
                     turn_id: call.request.turn_id.clone(),
                     call_id: call.request.call_id.clone(),
@@ -1704,19 +1862,39 @@ impl ClaudeProtocol {
                 }
             }
             "user" => {
+                if message["session_id"].as_str() == self.session_id.as_deref()
+                    && message["message"]["content"]
+                        .as_array()
+                        .is_some_and(|blocks| {
+                            blocks.iter().any(|block| {
+                                block["type"] == "tool_result"
+                                    && block["tool_use_id"]
+                                        .as_str()
+                                        .is_some_and(|id| self.reviewed_commands.owns_tool(id))
+                            })
+                        })
+                    && (message["tool_use_result"]["backgroundTaskId"].is_string()
+                        || message["tool_use_result"]["isAsync"] == true)
+                {
+                    return Ok(self.stop_reviewed_command(TurnOutcome::Failed {
+                        message: crate::t!("cli-agent-reviewed-command-background"),
+                    }));
+                }
                 if message.get("isReplay").and_then(Value::as_bool) == Some(true) {
                     let turn_id = parse_uuid(&message, "uuid")?;
                     if let Some(turn) = self.turns.get(&turn_id) {
                         let content = &message["message"]["content"];
-                        if matches!(turn.expected_replay, ExpectedReplay::Blocks(_))
-                            && (message["message"]["role"] != "user"
-                                || message
-                                    .get("parent_tool_use_id")
-                                    .is_some_and(|id| !id.is_null())
-                                || message["session_id"]
-                                    .as_str()
-                                    .is_none_or(|id| id.is_empty())
-                                || message["session_id"].as_str() != self.session_id.as_deref())
+                        if matches!(
+                            turn.expected_replay,
+                            ExpectedReplay::Blocks(_) | ExpectedReplay::FixedSkillText(_)
+                        ) && (message["message"]["role"] != "user"
+                            || message
+                                .get("parent_tool_use_id")
+                                .is_some_and(|id| !id.is_null())
+                            || message["session_id"]
+                                .as_str()
+                                .is_none_or(|id| id.is_empty())
+                            || message["session_id"].as_str() != self.session_id.as_deref())
                         {
                             return Err(RuntimeError::Protocol(crate::t!(
                                 "cli-agent-claude-image-replay-invalid"
@@ -1727,7 +1905,7 @@ impl ClaudeProtocol {
                                 ExpectedReplay::Blocks(_) => {
                                     crate::t!("cli-agent-claude-image-replay-invalid")
                                 }
-                                ExpectedReplay::Text(_) => {
+                                ExpectedReplay::Text(_) | ExpectedReplay::FixedSkillText(_) => {
                                     "replayed input differs from the submitted command".into()
                                 }
                             };
@@ -2085,7 +2263,39 @@ impl ClaudeProtocol {
                 self.ready_permissions = effective_permissions;
                 // 首次握手不提供原生 ID；观察只绑定当前连接代次和原生 PID。
                 // 后续重复 initialize 只含 subtype，不重新注册 MCP、技能或 hooks。
-                effects = self.start_permission_observation(&response["response"]);
+                effects = if self.options.permission_policy.is_claude_fixed_skills() {
+                    Effects {
+                        writes: vec![self.request(
+                            PendingKind::VerifyFixedSkills,
+                            json!({"subtype":"reload_plugins"}),
+                        )],
+                        events: Vec::new(),
+                    }
+                } else {
+                    self.start_permission_observation(&response["response"])
+                };
+            }
+            PendingKind::VerifyFixedSkills => {
+                if !success || self.probed_version != Some("2.1.280") {
+                    return Err(super::claude_profile::reject(
+                        "claude_skills_registration_failed",
+                    ));
+                }
+                let profile = self
+                    .options
+                    .claude_profile
+                    .as_ref()
+                    .and_then(|profile| profile.skills_profile())
+                    .ok_or_else(|| {
+                        super::claude_profile::reject("claude_skills_profile_missing")
+                    })?;
+                let plugin = self
+                    .skill_plugin
+                    .as_ref()
+                    .ok_or_else(|| super::claude_profile::reject("claude_skills_plugin_missing"))?;
+                profile.verify_registration(plugin, &response["response"])?;
+                self.fixed_skill_registration_verified = true;
+                effects = self.start_permission_observation(&self.initialize_info.clone());
             }
             PendingKind::PermissionObservation(stage) => {
                 if !success {
@@ -2261,11 +2471,10 @@ impl ClaudeProtocol {
             .active_turn
             .filter(|turn| self.turn_is_running(*turn))
             .map(|turn| turn.to_string());
-        let request = match local_tools::claude_mcp_request(
+        let request = match local_tools::claude_mcp_request_scoped(
             message,
             active_turn.as_deref(),
-            permissions.allow_spawn,
-            permissions.allow_message,
+            permissions,
         ) {
             Ok(request) => request,
             Err(reason) => return Ok(control_error(&id, &reason)),
@@ -2279,12 +2488,10 @@ impl ClaudeProtocol {
                 })
             }
             ClaudeMcpRequest::Tool(request) => {
-                if !local_tools::tool_definitions(
-                    permissions.allow_spawn,
-                    permissions.allow_message,
-                )
-                .iter()
-                .any(|tool| tool["name"] == request.tool)
+                if !permissions
+                    .definitions()
+                    .iter()
+                    .any(|tool| tool["name"] == request.tool)
                 {
                     return Ok(control_error(&id, "local task tool is not authorized"));
                 }
@@ -2297,6 +2504,23 @@ impl ClaudeProtocol {
                         cancelled: false,
                     },
                 );
+                if request.tool == super::reviewed_project_commands_windows::TOOL_NAME {
+                    let ceiling = self
+                        .options
+                        .claude_profile
+                        .as_ref()
+                        .and_then(|profile| profile.host_commands())
+                        .ok_or_else(|| {
+                            super::claude_profile::reject("reviewed_commands_parent_missing")
+                        })?;
+                    let events = self
+                        .host_commands
+                        .request(request, &self.options, ceiling)?;
+                    return Ok(Effects {
+                        writes: Vec::new(),
+                        events,
+                    });
+                }
                 Ok(Effects {
                     writes: Vec::new(),
                     events: vec![RuntimeEventKind::LocalToolRequested { request }],
@@ -2460,6 +2684,7 @@ impl ClaudeProtocol {
                 fingerprint: request_fingerprint,
                 turn_id,
                 input: request["input"].clone(),
+                tool_call_id: request["tool_use_id"].as_str().unwrap_or_default().into(),
                 tool_name: request["tool_name"]
                     .as_str()
                     .expect("validated tool name")
@@ -2539,6 +2764,17 @@ impl ClaudeProtocol {
         }
         turn.finished = true;
         turn.cancellation = None;
+        for reply in self.host_commands.cancel_turn(&turn_id.to_string()) {
+            if let RuntimeAction::RespondLocalTool {
+                turn_id, call_id, ..
+            } = reply.action
+            {
+                if let Some(call) = self.local_tools.get_mut(&call_id) {
+                    call.cancelled = true;
+                }
+                events.push(RuntimeEventKind::LocalToolCancelled { turn_id, call_id });
+            }
+        }
         let outcome = match &turn.error {
             Some(message) => TurnOutcome::Failed {
                 message: message.clone(),
@@ -2666,6 +2902,9 @@ fn error_text(message: &Value) -> String {
 }
 
 enum InputProjection {
+    FixedSkillText {
+        content: String,
+    },
     Text {
         content: String,
         expected_replay: String,
@@ -2679,6 +2918,10 @@ enum InputProjection {
 impl InputProjection {
     fn into_parts(self) -> (Value, ExpectedReplay) {
         match self {
+            Self::FixedSkillText { content } => (
+                json!([{"type":"text","text":content}]),
+                ExpectedReplay::FixedSkillText(content),
+            ),
             Self::Text {
                 content,
                 expected_replay,
@@ -2693,6 +2936,7 @@ impl InputProjection {
 
 #[derive(Debug, PartialEq, Eq)]
 enum ExpectedReplay {
+    FixedSkillText(String),
     Text(String),
     Blocks(BlockReplay),
 }
@@ -2700,6 +2944,7 @@ enum ExpectedReplay {
 impl ExpectedReplay {
     fn matches(&self, content: &Value) -> bool {
         match self {
+            Self::FixedSkillText(expected) => *content == json!([{"type":"text","text":expected}]),
             Self::Text(expected) => content.as_str() == Some(expected.as_str()),
             Self::Blocks(expected) => summarize_blocks(content).as_ref() == Ok(expected),
         }

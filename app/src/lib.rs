@@ -144,6 +144,62 @@ pub mod tab_configs;
 pub mod terminal;
 #[doc(hidden)]
 pub use terminal::cli_agent_sessions::grok_owned_launch::run_owned_grok_from_args;
+
+/// 内部远端启动入口必须先于 GUI 和线程初始化，其他平台显式拒绝此命令。
+#[doc(hidden)]
+pub fn run_remote_owned_grok_from_args() -> Option<std::io::Result<()>> {
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    {
+        remote_server::cli_image_grok_launch::run_from_args()
+    }
+    #[cfg(not(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    )))]
+    {
+        (std::env::args_os().nth(1).as_deref()
+            == Some(std::ffi::OsStr::new("--infinishell-remote-owned-grok")))
+        .then(|| Err(std::io::Error::other("当前平台不支持远端 Grok 专属入口")))
+    }
+}
+
+/// 内部远端启动入口必须先于 GUI 和线程初始化，其他平台显式拒绝此命令。
+#[doc(hidden)]
+pub fn run_remote_owned_codex_from_args() -> Option<std::io::Result<()>> {
+    #[cfg(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    ))]
+    {
+        remote_server::cli_image_codex_owned_launch::run_from_args()
+    }
+    #[cfg(not(all(
+        feature = "local_fs",
+        any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )
+    )))]
+    {
+        (std::env::args_os().nth(1).as_deref()
+            == Some(std::ffi::OsStr::new("--infinishell-remote-owned-codex"))
+            || std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--infinishell-remote-owned-codex-child")))
+        .then(|| Err(std::io::Error::other("当前平台不支持远端 Codex 专属入口")))
+    }
+}
+
 pub mod themes;
 use ::ai::project_context::model::ProjectContextModel;
 pub use ai::agent::todos::AIAgentTodoList;

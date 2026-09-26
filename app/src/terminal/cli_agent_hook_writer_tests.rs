@@ -604,3 +604,55 @@ fn killed_partial_pty_frame_resynchronizes_at_the_next_complete_notification() {
     assert!(result.printed.is_empty());
     drop(slave);
 }
+
+#[test]
+fn native_permission_mode_survives_writer_and_product_event_parser() {
+    let mut value = payload();
+    value["event"] = json!("session_start");
+    value["plugin_version"] = json!("0.1.5");
+    value["cwd"] = json!("/private/tmp/原生权限");
+    for mode in ["default", "acceptEdits", "plan", "futureMode"] {
+        value["permission_mode"] = json!(mode);
+        let frame = encode_frame(&parsed(&value), false).unwrap();
+        let osc = parse_osc(&frame);
+        assert_eq!(osc.values.len(), 1);
+        let event = parse_event(
+            Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+            &osc.values[0].to_string(),
+        )
+        .unwrap();
+        assert_eq!(event.payload.permission_mode.as_deref(), Some(mode));
+        assert_eq!(event.event, CLIAgentEventType::SessionStart);
+    }
+    // 缺失字段仍须传递，让会话层撤销旧证据；写入器不猜测 default。
+    value.as_object_mut().unwrap().remove("permission_mode");
+    let osc = parse_osc(&encode_frame(&parsed(&value), false).unwrap());
+    let event = parse_event(
+        Some(CLI_AGENT_NOTIFICATION_SENTINEL),
+        &osc.values[0].to_string(),
+    )
+    .unwrap();
+    assert!(event.payload.permission_mode.is_none());
+}
+
+#[test]
+fn permission_mode_rejects_non_native_shape_without_relaxing_unknown_fields() {
+    for mode in [
+        json!(true),
+        json!(1),
+        json!({"mode":"default"}),
+        json!(""),
+        json!("a".repeat(65)),
+        json!("1default"),
+        json!("默认"),
+        json!("default;\u{1b}"),
+    ] {
+        let mut value = payload();
+        value["permission_mode"] = mode;
+        assert!(parse_notification(&serde_json::to_vec(&value).unwrap()).is_err());
+    }
+    let mut value = payload();
+    value["permission_mode"] = json!("default");
+    value["approval_decision"] = json!("allow");
+    assert!(parse_notification(&serde_json::to_vec(&value).unwrap()).is_err());
+}

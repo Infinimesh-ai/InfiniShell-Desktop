@@ -58,6 +58,8 @@ struct Notification {
     #[serde(skip_serializing_if = "Option::is_none")]
     prompt_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    permission_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     terminal_unverified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     cwd: Option<String>,
@@ -111,6 +113,14 @@ fn parse_notification(bytes: &[u8]) -> Result<Notification> {
             .prompt_id
             .as_deref()
             .is_some_and(|id| !valid_id(id))
+        || notification.permission_mode.as_deref().is_some_and(|mode| {
+            mode.is_empty()
+                || mode.len() > 64
+                || !mode.as_bytes()[0].is_ascii_alphabetic()
+                || !mode
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        })
         || !event_id.is_some_and(|id| {
             id.len() == 64
                 && id

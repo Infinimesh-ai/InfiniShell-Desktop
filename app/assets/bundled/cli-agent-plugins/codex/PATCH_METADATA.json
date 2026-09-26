@@ -1,5 +1,5 @@
 {
-  "patch_revision": 5,
+  "patch_revision": 6,
   "upstream_repository": "https://github.com/warpdotdev/codex-warp",
   "upstream_plugin": "warp",
   "compatible_bases": [
@@ -28,7 +28,7 @@
   "files": {
     "scripts/build-payload.sh": {
       "upstream_sha256": "2e34b5874724234c14222b2c271efdf4dbfd33ad993bfb411d963a2eb468f24e",
-      "replacement_sha256": "2b81be38c890448820012b2b86478bc0992140fcd4560c95f850ca212834a01a",
+      "replacement_sha256": "87fc88b087c7215d76b28206236ecd1eb1f82d1247f47e096065fb3506d63582",
       "mode": "0755"
     },
     "scripts/on-stop.sh": {
@@ -53,5 +53,7 @@
     }
   },
   "windows_product_enabled": false,
-  "windows_uninstrumented_hooks_verified": false
+  "windows_uninstrumented_hooks_verified": false,
+  "process_evidence_contract_version": "0.156.1",
+  "process_evidence_native_verified": false
 }
