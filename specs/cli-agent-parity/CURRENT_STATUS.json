@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
+  "product_behavior_freeze": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -1488,8 +1488,8 @@
     "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
-  "latest_increment": "remote_image_recovery_and_windows_npm_increment",
+  "latest_implementation_commit": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
+  "latest_increment": "windows_npm_probe_cleanup_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -1569,5 +1569,42 @@
     "goal_complete": false,
     "integration_review": "G07本地专属文件卡与G10四个受审命令分支只读复核未发现确定的接线缺口；不计真实GUI/模型验收。integration-review-03.safe.json摘要5109944c4e6d9239eeee107f9b904b9c33e4a3787f9a9ff2ca62a3f384ba859f。",
     "joint_app_cache_cleanup": "编译前再按身份/摘要/无占用清理两份停用Cargo缓存，逻辑857205203字节；实际验收程序、旧应用与原始收据不动。app-build-cache-cleanup-01.safe.json。 打包完成后另清理同轮已结束链接所用rlib/rmeta两份缓存，共958184401字节，当前check缓存、测试程序和应用保留；app-library-cache-cleanup-01.safe.json。"
+  },
+  "windows_npm_probe_cleanup_increment": {
+    "date": "2026-09-27",
+    "implementation_commit": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
+    "status": "已提交推送，本地提交门禁通过；Windows同提交原生验证进行中，原候选拒绝原因待新诊断",
+    "scope": "G09 Windows Codex npm候选探针；未扩大映像允许列表、未改原入口、版本及审批边界",
+    "implementation": "派生成功返回后，resume/首事件/调试事件/退出码的错误统一终止本次严格Job，再继续并排空调试事件；Continue成功后才清除pending及EXIT状态。写收据前同一3秒期限等待原进程句柄signaled和Job0，随后ACL/profile只清理一次；清理失败保持Unknown，原映像错误仍非零。spawn内部尚未返回句柄的失败不因此获得清理证明。",
+    "diagnostics": "仅固定映像名称/目录分类、hFile身份/大小/摘要及包身份/摘要匹配布尔值；未知名称、用户路径、命令行、环境和控制材料不输出。分类与摘要相同均不是新增授权依据。",
+    "tests_added": "3个Windows真实AppContainer显式场景：未绑定子映像拒绝、首事件前终止、Continue失败保留pending；另有脱敏、EXIT失败保留状态、ACL外部改变3项普通回归。Windows尚未实际运行，不计通过。",
+    "local_gates": {
+      "platform": "macos-arm64",
+      "cargo_check": "passed",
+      "i18n": "11 passed",
+      "actionlint": "passed",
+      "diff_check": "passed",
+      "source_blob_matches": 12
+    },
+    "localization": "无需本地化变更；仅监督诊断与清理证明，不改用户界面文案。",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/windows-npm-probe-cleanup-20260927",
+    "source_commit_binding_sha256": "f7600b6cccbdda6592f60db1a843f013a742e94c79f83f5926da07b0ab1f52bb",
+    "same_commit_ci": {
+      "run_id": 36270700886,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886",
+      "head_sha": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
+      "status": "in_progress",
+      "platforms": [
+        "windows-x64"
+      ],
+      "macos_intel": false,
+      "linux": false,
+      "full_workspace": false,
+      "gui_or_model": false,
+      "scope": "Windows最小来源/更新/监督/i18n回归，command ACL合同、五个显式原生调试场景与真实Codex npm事务；沿用先前不受影响的Linux证据。"
+    },
+    "cache_cleanup": "仅清理已完成app链接的重复deps缓存769658992逻辑字节，同摘要debug/infinishell、签名app、测试程序和原证据保留；retired-app-link-cache-01.safe.json。",
+    "closed_gaps": [],
+    "goal_complete": false
   }
 }

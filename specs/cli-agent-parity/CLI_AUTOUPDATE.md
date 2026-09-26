@@ -8,6 +8,8 @@
 
 `97649deb2` 修正 npm 验收的 Windows 路径表示；`bd80cc9ed` 将 cmd-shim 6.0.1 与既有 8 按三份原字节完整校验，旧事务摘要固定模板，候选和恢复禁止改换身份。无需本地化变更；九项新回归、本地更新模块与编译门禁通过，同提交 [36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 的真实 npm 登记通过，但首个 CMD 候选探针拒绝未绑定子映像，停留 Prepared，清理未获完整证明；PowerShell、发布和后续恢复场景未执行，不宣称升级完成。
 
+`ca37b9cbf` 已补 Windows npm 拒绝后的显式 Job／ACL／profile 清理与脱敏映像诊断；本地编译和 i18n 门禁通过，仅 Windows 的[同提交验证 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 进行中。候选拒绝仍需定位，未扩大白名单或宣称真实升级完成。
+
 `debed8c51` 已补 Linux／Windows 的会话模型变更通知，使专属 Grok 恢复清理后重新同步空闲条件；沿用既有英中等待说明，本地门禁通过，真实更新链待验。`c7ef8d95b` 仅修 Python 重解析点验收夹具，生产来源与隔离合同不变。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。

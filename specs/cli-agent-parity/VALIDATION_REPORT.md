@@ -4,6 +4,10 @@
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
 
+**2026-09-27 Windows npm 探针拒绝后的显式清理**：实现提交 `ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf` 保留完整映像白名单，补充固定分类／句柄身份／摘要诊断；未知文件名、完整用户路径、命令行和控制材料不输出。派生成功返回后的失败先终止精确 Job，再继续并排空原线程调试事件；pending 与 EXIT 集合只在 Continue 成功后更新。收据前有界等待根进程句柄退出及 Job 清空，再一次恢复 ACL／删除 profile；原映像拒绝仍失败，清理证明单独记录。派生内部尚未返回句柄的失败仍保持未知。
+
+Mac ARM64 `cargo check -p warp`、i18n 11 项、actionlint 与差异检查通过；12 个文件 Git blob 与冻结快照一致，绑定收据摘要 `f7600b6cccbdda6592f60db1a843f013a742e94c79f83f5926da07b0ab1f52bb`，原件位于 `validation/windows-npm-probe-cleanup-20260927`。三个真实 Windows AppContainer 场景和三个普通负例已添加，尚未计运行通过。[Actions 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 仅选择 Windows x64：最小相关门禁、五个显式调试场景和真实 npm 事务；关闭 Linux、Mac Intel、全工作区及 GUI／模型。此前 `bd80cc9ed` 原始失败保留，被拒子映像原因仍待本轮诊断。此批无需本地化变更，不关闭 G09 或 Goal。
+
 **2026-09-27 远程图片恢复与 Windows npm 模板兼容**：`5aac3f7d0` 补齐 Claude 延迟审批后的图片状态查询／回收，以及 Grok 明确未派发取消后的主动重试。Claude 原生事件最多触发三次只读补查，固定 `2.1.280` 的原字节证明工具完成 hook 可早于最终历史写出；无精确回执仍保留 Unknown。Grok 仅在 Submit future 尚未创建时保存绑定完整 ticket／message／subject 的未派发终态，原领取字节保留；真正开始 RPC 后仍不重发，两路径均不清除新草稿。新 Grok 提示英中同步，布局待验。
 
 `97649deb2` 修正真实 npm `10.1.0` 对命名空间 Windows 路径的递归问题，转换前核验同一文件对象；诊断采用固定官方 Node/npm 原字节的独立纯函数复现，未冒充 Windows 新安装通过。`bd80cc9ed` 另接 `cmd-shim 6.0.1` 与既有 8 的整组三件套精确校验，旧事务三份 SHA 固定模板，候选／退出／恢复不得切换到另一模板；产品仍复制真实入口原字节，不升级 Node/npm、不改写验收 shim，也不放宽 AppContainer。此部分无需本地化变更。
