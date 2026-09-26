@@ -234,7 +234,12 @@ impl Mirror {
                 expected.digest()?,
             )?;
             let file = directory.read_file(&self.file_stage)?;
-            if unsafe { libc::fchmod(file.as_raw_fd(), 0o755) } != 0 {
+            // 新版本沿用原镜像的 POSIX 权限，不能因升级扩大组或其他用户的访问范围。
+            let old = &self.old_file.identity;
+            if unsafe { libc::fchown(file.as_raw_fd(), old.uid, old.gid) } != 0
+                || unsafe { libc::fchmod(file.as_raw_fd(), (old.mode & 0o777) as libc::mode_t) }
+                    != 0
+            {
                 return Err(Error::PersistenceFailed);
             }
             file.sync_all().map_err(|_| Error::PersistenceFailed)?;

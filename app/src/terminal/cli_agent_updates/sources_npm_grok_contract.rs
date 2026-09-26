@@ -171,6 +171,10 @@ pub(super) fn registered_mirror(
 }
 
 pub(super) async fn latest(client: &http_client::Client) -> Result<String, Error> {
+    #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
+    if let Some(version) = super::npm_grok::live_tests::fixed_release() {
+        return Ok(version);
+    }
     let url = "https://registry.npmjs.org/@xai-official/grok/latest";
     let response = client
         .get(url)
@@ -339,6 +343,11 @@ pub(super) async fn download_release(root: &Path) -> Result<Vec<DownloadedPackag
 }
 
 async fn download(url: &str, output: &mut File, limit: u64) -> Result<(), Error> {
+    #[cfg(all(test, any(target_os = "macos", target_os = "linux")))]
+    if let Some(result) = super::npm_grok::live_tests::copy_fixed_download(url, output, limit) {
+        result?;
+        return output.sync_all().map_err(|_| Error::PersistenceFailed);
+    }
     let response = http_client::Client::new()
         .get(url)
         .timeout(UPDATE_TIMEOUT)

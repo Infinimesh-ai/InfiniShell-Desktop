@@ -54,7 +54,11 @@ pub(super) fn verify_signature(path: &Path) -> io::Result<()> {
 }
 
 fn expand(value: &str, loader: &Path, executable: &Path) -> io::Result<PathBuf> {
-    if let Some(relative) = value.strip_prefix("@loader_path/") {
+    if value == "@loader_path" {
+        Ok(loader.parent().ok_or_else(invalid)?.to_owned())
+    } else if value == "@executable_path" {
+        Ok(executable.parent().ok_or_else(invalid)?.to_owned())
+    } else if let Some(relative) = value.strip_prefix("@loader_path/") {
         Ok(loader.parent().ok_or_else(invalid)?.join(relative))
     } else if let Some(relative) = value.strip_prefix("@executable_path/") {
         Ok(executable.parent().ok_or_else(invalid)?.join(relative))
@@ -221,13 +225,17 @@ pub(super) fn isolate(root: &Path, node: &Path, native: &Path) -> io::Result<()>
     let native = literal(native)?;
     // 只给本次私有 Node 闭包设置 DYLD_LIBRARY_PATH；原始 Cellar/opt 路径没有读取回退。
     // 包与解释器目录对被测进程只读，认证/配置仅能写入本次空 profile。
+    // 新版 macOS 将系统 dyld 缓存放在 Cryptex 中；只开放该系统目录的读取。
+    // libignition 先打开根目录句柄；literal 仅允许该目录本身，不开放子目录或文件。
     let profile = format!(
         r#"(version 1)
 (allow default)
 (deny network*)
 (deny file-read-data (require-all (regex #"^/")
+    (require-not (literal "/"))
     (require-not (subpath {root})) (require-not (subpath "/usr/lib"))
     (require-not (subpath "/System/Library")) (require-not (subpath "/private/var/db/dyld"))
+    (require-not (subpath "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld"))
     (require-not (literal "/dev/null")) (require-not (literal "/dev/urandom")) (require-not (literal "/dev/random"))))
 (deny file-write* (require-all (regex #"^/") (require-not (subpath {root})) (require-not (literal "/dev/null"))))
 (deny file-write* (subpath (string-append {root} "/package")))
@@ -246,3 +254,7 @@ pub(super) fn isolate(root: &Path, node: &Path, native: &Path) -> io::Result<()>
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "managed_process_npm_probe_macos_tests.rs"]
+mod tests;

@@ -1880,12 +1880,27 @@ async fn run(invocation: &Invocation, timeout: Duration) -> Result<Vec<u8>, Erro
         any(target_os = "macos", target_os = "linux")
     ))]
     npm_transaction::audit_test_probe(invocation)?;
+    #[cfg(all(
+        test,
+        feature = "local_fs",
+        any(target_os = "macos", target_os = "linux")
+    ))]
+    npm_grok::live_tests::audit_probe(invocation)?;
 
-    run_process(invocation, timeout)
+    let result = run_process(invocation, timeout)
         .await
         .map_err(|failure| match failure {
             RunFailure::NotStarted(error) | RunFailure::Started(error) => error,
-        })
+        });
+    #[cfg(all(
+        test,
+        feature = "local_fs",
+        any(target_os = "macos", target_os = "linux")
+    ))]
+    if let Ok(bytes) = &result {
+        npm_grok::live_tests::preserve_readonly_stdout(invocation, bytes);
+    }
+    result
 }
 
 async fn run_process(invocation: &Invocation, timeout: Duration) -> Result<Vec<u8>, RunFailure> {

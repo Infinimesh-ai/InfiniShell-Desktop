@@ -423,6 +423,8 @@ pub(super) fn execute(manifest: &Manifest) -> io::Result<()> {
             manifest.cwd.join("node-runtime/lib").into_os_string(),
         ));
         environment.push(("DYLD_FALLBACK_LIBRARY_PATH".into(), "/usr/lib".into()));
+        // Homebrew Node 会读取全局 OpenSSL 配置；离线版本探针只使用空配置。
+        environment.push(("OPENSSL_CONF".into(), "/dev/null".into()));
         super::enter_atomic_cwd(manifest)?;
         macos::isolate(&manifest.cwd, &node, &native)?;
         use command::unix::CommandExt as _;

@@ -350,6 +350,8 @@ pub(super) async fn execute(
             .map_err(|_| Error::PersistenceFailed)?;
         journal.mirror.prepare(native.as_file_mut())?;
         save(&path, &journal)?;
+        #[cfg(test)]
+        live_tests::checkpoint(live_tests::Point::Prepared).await;
         probe(root, &path, &mut journal).await?;
         config_unchanged(&journal, false)?;
         let parent = journal.owner.parent()?;
@@ -362,6 +364,8 @@ pub(super) async fn execute(
         save(&path, &journal)?;
         parent.exchange(OsStr::new("grok"), &journal.stage)?;
         journal.mirror.publish()?;
+        #[cfg(test)]
+        live_tests::checkpoint(live_tests::Point::Exchanged).await;
         if let Some(progress) = progress {
             progress.enter().await;
         }
@@ -441,6 +445,8 @@ async fn probe(root: &Path, path: &Path, journal: &mut Journal) -> Result<(), Er
         .read_to_end(&mut bytes)
         .with_timeout(UPDATE_TIMEOUT)
         .await;
+    #[cfg(test)]
+    live_tests::preserve_probe_stdout(generation, &bytes);
     drop(stdout);
     let receipt = if result.is_ok() {
         child.finish_after_stdin_close().await
@@ -642,3 +648,7 @@ fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
     fs::remove_file(path).map_err(|_| Error::RecoveryRequired)?;
     super::sync_config_directory(root)
 }
+
+#[cfg(test)]
+#[path = "sources_grok_npm_live_tests.rs"]
+pub(super) mod live_tests;

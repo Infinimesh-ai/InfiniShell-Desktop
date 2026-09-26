@@ -510,6 +510,13 @@ pub(super) async fn execute(
         wrapper.path(),
         platform_file.path(),
     );
+    #[cfg(test)]
+    codex_live_tests::preserve_verified_inputs(
+        &wrapper_meta,
+        &platform_meta,
+        wrapper.path(),
+        platform_file.path(),
+    );
 
     let id = Uuid::new_v4();
     let stage_name = OsString::from(format!(".infinishell-npm-{id}"));
@@ -608,6 +615,8 @@ pub(super) async fn execute(
         save(&path, &journal)?;
         #[cfg(test)]
         live_tests::checkpoint(live_tests::Point::Prepared).await;
+        #[cfg(test)]
+        codex_live_tests::checkpoint(codex_live_tests::Point::Prepared).await;
         // 精确执行即将发布的公共入口，不以依赖包中的同名 native 代替入口验收。
         let public_program = journal
             .owner
@@ -645,6 +654,8 @@ pub(super) async fn execute(
         current_parent.exchange(&package_name, &journal.stage_name)?;
         #[cfg(test)]
         live_tests::checkpoint(live_tests::Point::Exchanged).await;
+        #[cfg(test)]
+        codex_live_tests::checkpoint(codex_live_tests::Point::Exchanged).await;
         // 在交换和后续记录之间退出时，恢复通过两侧树身份判断是否交换，不能依赖 phase 猜测。
         verify_swapped(&journal)?;
         if let Some(progress) = progress {
@@ -780,6 +791,8 @@ async fn probe_version(
     drop(stdout);
     #[cfg(test)]
     live_tests::preserve_probe_stdout(generation, &bytes);
+    #[cfg(test)]
+    codex_live_tests::preserve_probe_stdout(generation, &bytes);
     let receipt = if output.is_ok() {
         child.finish_after_stdin_close().await
     } else {
@@ -1111,11 +1124,17 @@ mod tests;
 mod live_tests;
 
 #[cfg(test)]
+#[path = "sources_codex_npm_live_tests.rs"]
+mod codex_live_tests;
+
+#[cfg(test)]
 pub(super) fn fixed_test_release(agent: CLIAgent, channel: super::Channel) -> Option<String> {
     live_tests::fixed_release(agent, channel)
+        .or_else(|| codex_live_tests::fixed_release(agent, channel))
 }
 
 #[cfg(test)]
 pub(super) fn audit_test_probe(invocation: &super::Invocation) -> Result<(), Error> {
-    live_tests::audit_probe(invocation)
+    live_tests::audit_probe(invocation)?;
+    codex_live_tests::audit_probe(invocation)
 }
