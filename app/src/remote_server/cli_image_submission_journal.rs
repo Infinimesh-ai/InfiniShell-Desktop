@@ -85,6 +85,8 @@ impl Drop for Guard<'_> {
     }
 }
 
+type RecoveryWork = (Intent, bool, Option<Arc<PendingLease>>);
+
 impl Journal {
     pub(super) fn open() -> io::Result<Self> {
         #[cfg(not(feature = "local_fs"))]
@@ -274,42 +276,79 @@ impl Journal {
         scope: &CliImageStagingScope,
         revision: u64,
     ) -> io::Result<()> {
-        let work = {
-            let _guard = self.acquire()?;
-            let mut work = Vec::new();
-            let mut leases: HashMap<Uuid, Arc<PendingLease>> = HashMap::new();
-            for intent in self.intents()? {
-                if intent.host != scope.host_id
-                    || self
-                        .read::<bool>(&self.path("done", intent.transfer_id))?
-                        .is_some()
-                {
-                    continue;
-                }
-                let unclaimed = self
-                    .read::<Claim>(&self.path("claim", intent.submission_id))?
-                    .is_none();
-                let explicit_release =
-                    self.read::<bool>(&self.path("release", intent.submission_id))? == Some(true);
-                let lease = if unclaimed && !explicit_release {
-                    if let Some(lease) = leases.get(&intent.submission_id) {
-                        Some(lease.clone())
-                    } else {
-                        let Some(lease) = self.try_lease(intent.submission_id)? else {
-                            continue;
-                        };
-                        let lease = Arc::new(lease);
-                        leases.insert(intent.submission_id, lease.clone());
-                        Some(lease)
-                    }
-                } else {
-                    None
-                };
-                work.push((intent, unclaimed || explicit_release, lease));
+        self.recover_matching(client, scope, revision, false)
+            .await
+            .map(|_| ())
+    }
+
+    /// 只检查当前 Claude 会话的旧意图；返回是否仍有未确认引用，供有限后续查询使用。
+    pub(super) async fn recover_claude(
+        &self,
+        client: &RemoteServerClient,
+        scope: &CliImageStagingScope,
+        revision: u64,
+    ) -> io::Result<bool> {
+        self.recover_matching(client, scope, revision, true).await
+    }
+
+    fn recovery_work(
+        &self,
+        scope: &CliImageStagingScope,
+        claude_only: bool,
+    ) -> io::Result<Vec<RecoveryWork>> {
+        let _guard = self.acquire()?;
+        let mut work = Vec::new();
+        let mut leases: HashMap<Uuid, Arc<PendingLease>> = HashMap::new();
+        for intent in self.intents()? {
+            if intent.host != scope.host_id
+                || self
+                    .read::<bool>(&self.path("done", intent.transfer_id))?
+                    .is_some()
+            {
+                continue;
             }
-            work
-        };
+            if claude_only
+                && (intent.native_session != scope.cli_session_id
+                    || !self
+                        .read::<QueueIntent>(&self.path("queue", intent.submission_id))?
+                        .is_some_and(|queue| queue.claude))
+            {
+                continue;
+            }
+            let unclaimed = self
+                .read::<Claim>(&self.path("claim", intent.submission_id))?
+                .is_none();
+            let explicit_release =
+                self.read::<bool>(&self.path("release", intent.submission_id))? == Some(true);
+            let lease = if unclaimed && !explicit_release {
+                if let Some(lease) = leases.get(&intent.submission_id) {
+                    Some(lease.clone())
+                } else {
+                    let Some(lease) = self.try_lease(intent.submission_id)? else {
+                        continue;
+                    };
+                    let lease = Arc::new(lease);
+                    leases.insert(intent.submission_id, lease.clone());
+                    Some(lease)
+                }
+            } else {
+                None
+            };
+            work.push((intent, unclaimed || explicit_release, lease));
+        }
+        Ok(work)
+    }
+
+    async fn recover_matching(
+        &self,
+        client: &RemoteServerClient,
+        scope: &CliImageStagingScope,
+        revision: u64,
+        claude_only: bool,
+    ) -> io::Result<bool> {
+        let work = self.recovery_work(scope, claude_only)?;
         let mut recovered_queues = HashMap::new();
+        let mut unconfirmed = false;
         for (intent, mut release, lease) in work {
             let mut request_scope = scope.clone();
             request_scope.cli_session_id = intent.native_session.clone();
@@ -379,10 +418,12 @@ impl Journal {
             if recovered.released {
                 let _guard = self.acquire()?;
                 self.write(&self.path("done", intent.transfer_id), &true)?;
+            } else {
+                unconfirmed = true;
             }
             drop(lease);
         }
-        Ok(())
+        Ok(unconfirmed)
     }
 
     fn intents(&self) -> io::Result<Vec<Intent>> {
@@ -518,3 +559,7 @@ fn sync_directory(path: &Path) -> io::Result<()> {
 fn invalid() -> io::Error {
     io::Error::other("remote image reference journal unavailable")
 }
+
+#[cfg(test)]
+#[path = "cli_image_submission_journal_tests.rs"]
+mod tests;

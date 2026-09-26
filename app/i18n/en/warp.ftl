@@ -6111,6 +6111,8 @@ cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session 
 
 cli-agent-grok-owned-input-claimed = This input has already been submitted or its delivery is unconfirmed. Check the native Grok session before sending a new draft.
 
+cli-agent-grok-owned-input-not-dispatched = This input was cancelled before it was sent. Your draft and attachments are kept. You can submit them again.
+
 cli-agent-grok-owned-image-budget = The combined Grok image input exceeds the native connection limit. Reduce the number or size of images. Your draft has been kept.
 
 cli-agent-input-remote-claude-image-consumed = The remote Claude session has read the attached images. Check its reply for image understanding.

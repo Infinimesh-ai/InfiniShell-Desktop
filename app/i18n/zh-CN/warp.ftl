@@ -5923,6 +5923,8 @@ cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份�
 
 cli-agent-grok-owned-input-claimed = 此输入已提交或投递尚未确认，请检查原生 Grok 会话后再发送新草稿。
 
+cli-agent-grok-owned-input-not-dispatched = 此输入在发送前已取消。草稿和附件已保留，可以再次提交。
+
 cli-agent-grok-owned-image-budget = 本次 Grok 图片输入总量超出原生连接上限，请减少图片数量或缩小图片。草稿已保留。
 
 cli-agent-input-remote-claude-image-consumed = 远程 Claude 会话已读取附件原图；请查看模型回复确认图片理解结果。

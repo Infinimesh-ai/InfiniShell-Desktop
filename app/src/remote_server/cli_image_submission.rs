@@ -2,6 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, LazyLock, Mutex};
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -23,10 +24,51 @@ const CHUNK_BYTES: usize = 1024 * 1024;
 const MAX_BATCH_BYTES: usize = 500_000_000;
 const MAX_BATCH_IMAGES: usize = 20;
 
+fn claude_recovery_delay(attempt: usize, unconfirmed: bool) -> Option<Duration> {
+    unconfirmed
+        .then_some([
+            Duration::ZERO,
+            Duration::from_secs(1),
+            Duration::from_secs(3),
+        ])
+        .and_then(|delays| delays.get(attempt).copied())
+}
+
 #[derive(Default)]
 struct Registry {
     active: HashMap<EntityId, Arc<RemoteImageSubmission>>,
     unknown: HashSet<(EntityId, EntityId, EntityId, String, [u8; 32])>,
+    claude_recoveries: HashMap<ClaudeRecoveryKey, bool>,
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct ClaudeRecoveryKey {
+    client: usize,
+    terminal_session: SessionId,
+    terminal_epoch: String,
+    native_session: String,
+}
+
+impl Registry {
+    fn request_claude_recovery(&mut self, key: ClaudeRecoveryKey) -> bool {
+        if let Some(pending) = self.claude_recoveries.get_mut(&key) {
+            // 查询中发生的原生事件不能丢失，但同时只需保留一次后续查询。
+            *pending = true;
+            false
+        } else {
+            self.claude_recoveries.insert(key, false);
+            true
+        }
+    }
+
+    fn finish_claude_recovery(&mut self, key: &ClaudeRecoveryKey) -> bool {
+        if self.claude_recoveries.remove(key) == Some(true) {
+            self.claude_recoveries.insert(key.clone(), false);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -272,9 +314,12 @@ impl RemoteImageSubmission {
             _ => return Err(()),
         };
         // Claude 原生 Read 可能等待用户审批；这里只查询原提交，任何状态下均不重发。
+        // 收起编辑器会撤销发送租约，但不禁止在原连接/终端实例内查询已经领取的提交。
         if self.binding.consumer.is_claude() {
             for _ in 0..120 {
-                if result.status != "unknown" || !self.is_live() {
+                if result.status != "unknown"
+                    || !self.client.cli_image_scope_is_current(&self.scope)
+                {
                     break;
                 }
                 async_io::Timer::after(std::time::Duration::from_secs(1)).await;
@@ -487,3 +532,77 @@ pub(crate) fn schedule_reference_recovery(
         })
         .detach();
 }
+
+/// 原生事件只触发原会话已有 Claude 提交的状态查询与明确回收，不创建上传或发送租约。
+pub(crate) fn schedule_claude_reference_recovery(
+    client: Arc<RemoteServerClient>,
+    session_id: SessionId,
+    native_session: &str,
+    ctx: &AppContext,
+) {
+    if !client.cli_image_claude_read_available() {
+        return;
+    }
+    let Ok((scope, revision)) =
+        client.allocate_cli_image_scope(session_id, native_session, Uuid::new_v4(), Uuid::new_v4())
+    else {
+        return;
+    };
+    let key = ClaudeRecoveryKey {
+        client: Arc::as_ptr(&client) as usize,
+        terminal_session: session_id,
+        terminal_epoch: scope.terminal_epoch.clone(),
+        native_session: native_session.to_owned(),
+    };
+    if !SUBMISSIONS
+        .lock()
+        .expect("image registry poisoned")
+        .request_claude_recovery(key.clone())
+    {
+        return;
+    }
+    ctx.background_executor()
+        .spawn(async move {
+            loop {
+                if !client.cli_image_scope_is_current(&scope) {
+                    SUBMISSIONS
+                        .lock()
+                        .expect("image registry poisoned")
+                        .claude_recoveries
+                        .remove(&key);
+                    break;
+                }
+                if let Ok(journal) = journal::Journal::open() {
+                    let mut attempt = 0;
+                    let mut unconfirmed = true;
+                    while let Some(delay) = claude_recovery_delay(attempt, unconfirmed) {
+                        // 固定 Claude 的 PostToolUse 早于最终历史落盘；事件后只做有限补查。
+                        if !delay.is_zero() {
+                            async_io::Timer::after(delay).await;
+                        }
+                        if !client.cli_image_scope_is_current(&scope) {
+                            break;
+                        }
+                        unconfirmed = matches!(
+                            journal.recover_claude(&client, &scope, revision).await,
+                            Ok(true)
+                        );
+                        attempt += 1;
+                    }
+                }
+                if !SUBMISSIONS
+                    .lock()
+                    .expect("image registry poisoned")
+                    .finish_claude_recovery(&key)
+                {
+                    break;
+                }
+                // 本轮预算用尽后，只有查询期间的新事件才开始下一轮，不因 Unknown 永久循环。
+            }
+        })
+        .detach();
+}
+
+#[cfg(test)]
+#[path = "cli_image_submission_tests.rs"]
+mod tests;

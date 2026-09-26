@@ -15,11 +15,29 @@ use crate::remote_server::cli_image_submission::{
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::{RemoteServerManager, RemoteServerManagerEvent};
 use crate::terminal::CLIAgent;
-use crate::terminal::cli_agent_sessions::{CLIAgentInputEntrypoint, CLIAgentSessionsModel};
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputEntrypoint, CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
+};
 use crate::util::image::MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT;
 
 impl TerminalView {
     pub(super) fn register_remote_image_recovery(&mut self, ctx: &mut ViewContext<Self>) {
+        ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |me, _, event, ctx| {
+            if event.terminal_view_id() == me.view_id
+                && matches!(
+                    event,
+                    CLIAgentSessionsModelEvent::SessionUpdated {
+                        agent: CLIAgent::Claude,
+                        ..
+                    } | CLIAgentSessionsModelEvent::StatusChanged {
+                        agent: CLIAgent::Claude,
+                        ..
+                    }
+                )
+            {
+                me.recover_current_claude_image_references(ctx);
+            }
+        });
         ctx.subscribe_to_model(&RemoteServerManager::handle(ctx), |me, _, event, ctx| {
             if let RemoteServerManagerEvent::SessionConnected { session_id, .. }
             | RemoteServerManagerEvent::SessionReconnected { session_id, .. } = event
@@ -38,6 +56,45 @@ impl TerminalView {
                 me.observe_remote_owned_grok_start(ctx);
             }
         });
+    }
+
+    fn recover_current_claude_image_references(&self, ctx: &AppContext) {
+        let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            return;
+        };
+        let Some(target) = &self.cli_agent_hook_input_target else {
+            return;
+        };
+        if session.agent != CLIAgent::Claude
+            || session.remote_host.is_none()
+            || !session.received_rich_notification
+            || session.listener.as_ref().map(|listener| listener.id()) != Some(target.listener_id)
+            || session.session_context.session_id.as_ref() != Some(&target.native_session_id)
+            || self.model_events_handle.id() != target.model_events_id
+        {
+            return;
+        }
+        let session_id = {
+            let model = self.model.lock();
+            let block = model.block_list().active_block();
+            if block.id() != &target.block_id {
+                return;
+            }
+            let Some(session_id) = block.session_id() else {
+                return;
+            };
+            session_id
+        };
+        let Some(client) = RemoteServerManager::as_ref(ctx).client_for_session(session_id) else {
+            return;
+        };
+        // 不读取当前输入代次，也不清草稿；旧代次仅通过账本中的精确回执完成回收。
+        cli_image_submission::schedule_claude_reference_recovery(
+            client.clone(),
+            session_id,
+            &target.native_session_id,
+            ctx,
+        );
     }
 
     fn recover_current_remote_image_references(&self, ctx: &AppContext) {

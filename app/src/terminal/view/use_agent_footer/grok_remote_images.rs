@@ -229,7 +229,28 @@ impl TerminalView {
                         .pending_attachments_revision()
                         != snapshot.attachments_revision
                 {
-                    view.fail_remote_grok_worker(&binding, ctx);
+                    let launch = binding.launch.clone();
+                    let message_id = input.message_id;
+                    ctx.spawn(
+                        blocking::unblock(move || {
+                            Journal::open()?.record_not_dispatched(&launch, message_id, &subject)
+                        }),
+                        move |view, result, ctx| {
+                            // 此分支尚未创建 Submit future；不把真正派发后的错误改成可重试。
+                            if result.is_err() {
+                                view.fail_remote_grok_worker(&binding, ctx);
+                                return;
+                            }
+                            view.finish_remote_grok_worker(&binding);
+                            if view.remote_grok_binding_matches(&binding, ctx) {
+                                view.fail_cli_agent_text_submit(
+                                    binding.generation,
+                                    crate::t!("cli-agent-grok-owned-input-not-dispatched"),
+                                    ctx,
+                                );
+                            }
+                        },
+                    );
                     return;
                 }
                 let worker_binding = binding.clone();

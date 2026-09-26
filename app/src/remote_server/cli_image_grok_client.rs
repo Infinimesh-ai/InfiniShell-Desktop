@@ -198,6 +198,7 @@ impl Journal {
                 let (id, previous): (Uuid, String) = self.read(&entry.path())?;
                 if previous == subject
                     && !self.directory.join(format!("{id}-finished.json")).exists()
+                    && !self.input_not_dispatched(launch, id, &previous)?
                 {
                     return Err(invalid());
                 }
@@ -209,6 +210,62 @@ impl Journal {
         ));
         self.write(&path, &(input.message_id, &subject))?;
         Ok(subject)
+    }
+
+    /// 仅用于尚未调用 Submit 的本地取消；已开始 RPC 的未知结果不能使用此终态。
+    pub(crate) fn record_not_dispatched(
+        &self,
+        launch: &Launch,
+        message_id: Uuid,
+        subject: &str,
+    ) -> io::Result<()> {
+        let _guard = self.acquire()?;
+        let claim = self
+            .directory
+            .join(format!("{}-{message_id}-unknown.json", launch.ticket.id));
+        let (expected, hash): (Uuid, String) = self.read(&claim)?;
+        if expected != message_id
+            || hash != subject
+            || self
+                .directory
+                .join(format!("{message_id}-finished.json"))
+                .exists()
+        {
+            return Err(invalid());
+        }
+        if !self.input_not_dispatched(launch, message_id, subject)? {
+            // 保留原领取字节，另写不可变终态；写入失败仍保持 Unknown。
+            self.write(
+                &self.directory.join(format!(
+                    "{}-{message_id}-not-dispatched.json",
+                    launch.ticket.id
+                )),
+                &(&launch.ticket, message_id, subject),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn input_not_dispatched(
+        &self,
+        launch: &Launch,
+        message_id: Uuid,
+        subject: &str,
+    ) -> io::Result<bool> {
+        let path = self.directory.join(format!(
+            "{}-{message_id}-not-dispatched.json",
+            launch.ticket.id
+        ));
+        match self.read::<(Ticket, Uuid, String)>(&path) {
+            Ok((ticket, expected, hash))
+                if ticket == launch.ticket && expected == message_id && hash == subject =>
+            {
+                Ok(true)
+            }
+            Ok(_) => Err(invalid()),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     pub(crate) fn record_reply(&self, launch: &Launch, reply: &Reply) -> io::Result<()> {
@@ -295,8 +352,10 @@ impl Journal {
             {
                 continue;
             }
-            let (id, _): (Uuid, String) = self.read(&entry.path())?;
-            if !self.directory.join(format!("{id}-finished.json")).exists() {
+            let (id, subject): (Uuid, String) = self.read(&entry.path())?;
+            if !self.directory.join(format!("{id}-finished.json")).exists()
+                && !self.input_not_dispatched(launch, id, &subject)?
+            {
                 ids.push(id);
             }
         }
@@ -455,3 +514,7 @@ fn check_private(path: &Path, directory: bool) -> io::Result<()> {
 fn invalid() -> io::Error {
     io::Error::other("远端 Grok 意图或连接不可用")
 }
+
+#[cfg(test)]
+#[path = "cli_image_grok_client_tests.rs"]
+mod tests;
