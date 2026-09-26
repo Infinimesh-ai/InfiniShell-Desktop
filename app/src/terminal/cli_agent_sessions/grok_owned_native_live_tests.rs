@@ -109,6 +109,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             &executable,
             &app_executable,
             &cwd,
+            &root,
             GrokOwnedPty::from_local_pty(pty).unwrap(),
         )
         .unwrap();
@@ -299,5 +300,46 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
         );
         writer.sender.send(ModelEvent::Terminate).unwrap();
         writer.handle.join().unwrap();
+    });
+}
+
+#[test]
+#[ignore = "需由隔离原生运行器确认 TUI 与 leader 已退出；不提交模型输入"]
+fn grok_owned_native_recovery_after_exit() {
+    App::test((), |mut app| async move {
+        let root = PathBuf::from(env::var_os("INFINISHELL_GROK_OWNED_LIVE_ROOT").unwrap())
+            .canonicalize()
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join(".owned-live")).unwrap(),
+            "grok-owned-native-v1\n"
+        );
+        let command: Value =
+            serde_json::from_slice(&read_private(&root.join("launch-command.json")).unwrap())
+                .unwrap();
+        let path = PathBuf::from(command["manifest_path"].as_str().unwrap());
+        assert!(path.starts_with(root.join("grok-owned-terminal")));
+        let sha = command["manifest_sha256"].as_str().unwrap();
+        let mut launch = GrokOwnedLaunch::restore(&path, sha).unwrap();
+        let socket_root = launch.manifest.socket_path.parent().unwrap().to_owned();
+        assert!(launch.take_launch_argv().is_err());
+        app.update(|ctx| launch.release_after_exit(ctx).unwrap());
+        assert!(path.exists());
+        assert!(!socket_root.exists());
+        let mut restored = GrokOwnedLaunch::restore(&path, sha).unwrap();
+        assert!(restored.is_retired());
+        assert!(restored.take_launch_argv().is_err());
+        write_evidence(
+            &root,
+            "native-recovery-result.json",
+            json!({
+                "passed": true,
+                "manifest_retained": true,
+                "socket_directory_removed": true,
+                "retired_launch_not_replayed": true,
+                "model_inputs": 0,
+                "application_restart_verified": false
+            }),
+        );
     });
 }

@@ -10,6 +10,7 @@ fn manifest(directory: &Path) -> LaunchManifest {
         app_executable: PathBuf::from("/private/tmp/InfiniShell.app/Contents/MacOS/infinishell"),
         cwd: PathBuf::from("/private/tmp/中文 项目"),
         socket_path: directory.join("leader.sock"),
+        socket_directory: None,
         boot_session: Uuid::from_u128(3).to_string(),
         shell: ProcessIdentity {
             pid: 10,
@@ -397,4 +398,208 @@ fn an_alive_process_never_produces_a_retired_receipt() {
         assert!(app.update(|ctx| launch.release_after_exit(ctx)).is_err());
         assert!(!root.join("retired.json").exists());
     });
+}
+
+fn durable_manifest(state: &Path) -> (tempfile::TempDir, tempfile::TempDir, LaunchManifest) {
+    let (directory, socket) = create_launch_directories(state).unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    let socket_root = socket.path().canonicalize().unwrap();
+    let metadata = fs::symlink_metadata(&socket_root).unwrap();
+    let mut value = manifest(&root);
+    value.version = 2;
+    value.socket_path = socket_root.join("leader.sock");
+    value.socket_directory = Some(SocketDirectoryIdentity {
+        device: metadata.dev(),
+        inode: metadata.ino(),
+    });
+    (directory, socket, value)
+}
+
+#[test]
+fn long_profile_keeps_manifest_persistent_and_native_socket_short() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("profile-".repeat(30));
+    fs::create_dir(&root).unwrap();
+    let (directory, socket, manifest) = durable_manifest(&root);
+    assert!(
+        directory
+            .path()
+            .starts_with(root.join("grok-owned-terminal"))
+    );
+    assert!(directory.path().as_os_str().len() > 104);
+    assert!(manifest.socket_path.as_os_str().len() < 104);
+    assert_eq!(socket.path().parent(), Some(Path::new("/private/tmp")));
+    validate_manifest(&directory.path().join("launch.json"), &manifest).unwrap();
+    validate_socket_directory(&manifest).unwrap();
+}
+
+#[test]
+fn socket_removal_does_not_remove_recovery_history_or_replay_launch() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (directory, socket, manifest) = durable_manifest(&root);
+    let path = directory.path().join("launch.json");
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    write_new(&path, &bytes).unwrap();
+    drop(socket);
+    let mut restored = GrokOwnedLaunch::restore(&path, &digest(&bytes)).unwrap();
+    assert_eq!(restored.phase, LaunchPhase::RecoveredUnsent);
+    assert!(restored.take_launch_argv().is_err());
+    assert!(path.exists());
+    assert!(!manifest.socket_path.parent().unwrap().exists());
+}
+
+#[test]
+fn durable_recovery_parent_rejects_symlinks_and_shared_write_access() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let alias = root.join("alias");
+    symlink(&root, &alias).unwrap();
+    assert!(create_launch_directories(&alias).is_err());
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o770)).unwrap();
+    assert!(create_launch_directories(&root).is_err());
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let private = root.join("grok-owned-terminal");
+    fs::create_dir(&private).unwrap();
+    fs::set_permissions(&private, fs::Permissions::from_mode(0o750)).unwrap();
+    assert!(create_launch_directories(&root).is_err());
+}
+
+#[test]
+fn replacement_socket_directory_is_neither_connected_nor_removed() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    let backup = root.join("original-socket-directory");
+    fs::rename(socket.path(), &backup).unwrap();
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .create(socket.path())
+        .unwrap();
+    let sentinel = socket.path().join("keep.txt");
+    fs::write(&sentinel, b"keep replacement").unwrap();
+    assert!(validate_socket_directory(&manifest).is_err());
+    assert!(cleanup_socket_directory(&manifest, None).is_err());
+    assert_eq!(fs::read(sentinel).unwrap(), b"keep replacement");
+}
+
+#[test]
+fn socket_cleanup_preserves_unknown_files_and_non_socket_replacements() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    fs::write(&manifest.socket_path, b"not a socket").unwrap();
+    assert!(cleanup_socket_directory(&manifest, None).is_err());
+    assert_eq!(fs::read(&manifest.socket_path).unwrap(), b"not a socket");
+    fs::remove_file(&manifest.socket_path).unwrap();
+    let sentinel = socket.path().join("keep.txt");
+    fs::write(&sentinel, b"keep unknown").unwrap();
+    assert!(cleanup_socket_directory(&manifest, None).is_err());
+    assert_eq!(fs::read(sentinel).unwrap(), b"keep unknown");
+}
+
+#[test]
+fn durable_cancel_removes_socket_directory_but_keeps_retired_manifest() {
+    warpui::App::test((), |mut app| async move {
+        let state = tempfile::tempdir().unwrap();
+        let root = state.path().canonicalize().unwrap();
+        let (directory, socket, manifest) = durable_manifest(&root);
+        let path = directory.path().join("launch.json");
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        write_new(&path, &bytes).unwrap();
+        let mut launch = GrokOwnedLaunch::restore(&path, &digest(&bytes)).unwrap();
+        app.update(|ctx| launch.cancel_before_dispatch(ctx).unwrap());
+        assert!(!socket.path().exists());
+        assert!(path.exists());
+        let mut restored = GrokOwnedLaunch::restore(&path, &digest(&bytes)).unwrap();
+        assert!(restored.is_retired());
+        assert!(restored.take_launch_argv().is_err());
+    });
+}
+
+#[test]
+fn manifest_versions_cannot_mix_legacy_and_durable_socket_contracts() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (directory, _socket, mut value) = durable_manifest(&root);
+    let path = directory.path().join("launch.json");
+    value.version = 1;
+    assert!(validate_manifest(&path, &value).is_err());
+    value.version = 3;
+    assert!(validate_manifest(&path, &value).is_err());
+    value.version = 2;
+    value.socket_directory = None;
+    assert!(validate_manifest(&path, &value).is_err());
+    let legacy = manifest(directory.path());
+    validate_manifest(&path, &legacy).unwrap();
+    assert!(
+        serde_json::to_value(legacy)
+            .unwrap()
+            .get("socket_directory")
+            .is_none()
+    );
+}
+
+#[test]
+fn native_leader_lock_requires_bound_exited_lifetime_and_exact_bytes() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    let lock = socket.path().join("leader.lock");
+    write_new(&lock, b"2147483647").unwrap();
+    assert!(cleanup_socket_directory(&manifest, None).is_err());
+    let exited = MacosProcessIdentity {
+        pid: i32::MAX,
+        pid_version: 1,
+        unique_id: 1,
+        resource_cid: 1,
+    };
+    assert!(identity_exited(exited));
+    let wrong = MacosProcessIdentity {
+        pid: i32::MAX - 1,
+        ..exited
+    };
+    assert!(cleanup_socket_directory(&manifest, Some(wrong)).is_err());
+    assert_eq!(fs::read(&lock).unwrap(), b"2147483647");
+    cleanup_socket_directory(&manifest, Some(exited)).unwrap();
+    assert!(!socket.path().exists());
+}
+
+#[test]
+fn live_leader_lock_is_preserved_even_when_pid_text_matches() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    let live = macos_process_identity(std::process::id() as i32).unwrap();
+    let lock = socket.path().join("leader.lock");
+    write_new(&lock, live.pid.to_string().as_bytes()).unwrap();
+    assert!(cleanup_socket_directory(&manifest, Some(live)).is_err());
+    assert!(lock.exists());
+}
+
+#[test]
+fn leader_lock_alias_and_extra_bytes_are_preserved() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    let exited = MacosProcessIdentity {
+        pid: i32::MAX,
+        pid_version: 1,
+        unique_id: 1,
+        resource_cid: 1,
+    };
+    let lock = socket.path().join("leader.lock");
+    write_new(&lock, b"2147483647\n").unwrap();
+    assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
+    fs::remove_file(&lock).unwrap();
+    let other = root.join("other.lock");
+    write_new(&other, b"2147483647").unwrap();
+    fs::hard_link(&other, &lock).unwrap();
+    assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
+    assert_eq!(fs::read(other).unwrap(), b"2147483647");
+    assert!(lock.exists());
 }

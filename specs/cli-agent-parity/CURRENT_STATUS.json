@@ -278,13 +278,30 @@
     },
     "cloud_script_repair": "4ed5b3d80 同步真实0.1.5版本断言；本地validator15和真实worker15/2跳过通过，旧/未知/缺失/混合版本仍拒绝。旧云端失败不改写，整合提交待Linux/Windows复验。",
     "integration": {
-      "source_commit": "本合并提交；提交后追加仓外逐文件绑定",
+      "source_commit": "32a932f952deba15ae8c0d994617fbbd3aeee263",
       "with_branch": "codex/cli-agent-parity",
       "gates": "cargo check -p warp、i18n11、PTY身份2、会话423/6忽略、协调器111/4忽略、升级182/4忽略、版本探测7/1忽略、持久化78、运行器6、插件验证器15及应用构建通过",
       "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g01-g09-integration-20260926",
       "archive_index_sha256": "67b875a435b5408373166375e16adbe24b65cdeaa485b8f72146491666f18c64",
-      "cloud": "原分支同提交Linux/Windows定向门禁待安排；G01基础922旧失败不改写",
-      "model_scope": "没有新增在线模型调用，原生和GUI证据仍绑定各自实现/二进制"
+      "cloud": "同提交Linux执行中、Windows排队；基础922失败收据独立保留，尚未计通过",
+      "model_scope": "没有新增在线模型调用，原生和GUI证据仍绑定各自实现/二进制",
+      "commit_binding_sha256": "1e740c5889fa3d507169984bc2d5f1966f4d33553121b8c08bbbcbac66811781",
+      "cloud_run": 36223768480
+    },
+    "durable_storage_increment": {
+      "implementation_commit": "本提交；提交后另存仓外 Git blob 绑定",
+      "platform": "仅 macOS arm64 owned 原生路径",
+      "behavior": "新 v2 清单保存在当前任务数据库的数据域，短路径 socket 目录独立并绑定设备号/inode；旧 v1 清单仍按旧合同恢复。退出仅移除明确归属且生存期结束的原生 socket/leader.lock，未知文件及被替换目录均保留",
+      "gates": "v2 cargo check -p warp、i18n11、PTY身份2、会话433/7忽略、运行器6及应用构建通过",
+      "native_v1": "固定Grok1.0.41/grok-4.7/default，2次原生输入、2条精确ACK及独立标记通过；TUI/leader/shell和临时认证清理确认，但初次退出恢复因原生leader.lock残留失败，原passed=false保留",
+      "recovery_v2": "新libtest在同一真实退出现场通过生产恢复/精确锁清理；0新增模型输入，清单保留、socket目录消失、旧启动不可重派。不是单一二进制全链或实际GUI应用重启",
+      "binary_sha256": "9cfa85844f368467a34e98edbaac27834eb56da2024d00d36543f41bb4730222",
+      "test_binary_sha256": "f54d7d283807bc4ae4fc7e5fd9fb5e965cd5477fd1b6eab96e63c55d650f34a9",
+      "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-owned-durable-20260926",
+      "archive_index_sha256": "257d7844508552621e8c10637c3c5149642b4d7ac7a6eb5c03b7aafaebc7f050",
+      "localization": "无需本地化变更：内部清单与退出清理没有新增或改变用户界面语义；GUI入口仍未接通",
+      "platform_scope": "生产改动完全位于macOS arm64条件模块；Mac原生复验如上，Linux/Windows不执行此路径，相关共享基础另由32a932f95同提交矩阵验证",
+      "remaining": "GUI显式模型入口、新启动登记与草稿发送，绑定前异常退出回收、审批允许/拒绝、长文本/文件卡、真实应用重启恢复和平台验收"
     }
   }
 }

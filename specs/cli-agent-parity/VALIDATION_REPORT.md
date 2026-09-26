@@ -247,3 +247,11 @@ macOS arm64 v4 `cargo check -p warp`、i18n 11、PTY 身份 2、CLI 会话 423�
 恢复实现提交 `044263a61b38fa95af32de2b758c1101aae08226` 已逐文件绑定上述 11 个编译源文件，提交绑定 SHA-256 `3491a456e67a69582ee2333d8314a78bdb7dca4e46c5f6a0deef4a0d0f1b6338`。基础提交 Linux 的两个失败门禁已定位为 Python 仍硬编码插件 0.1.4：实际安装步骤退出 0，原始 `passed=false` 收据保留。`4ed5b3d80` 同步严格目标至 0.1.5，旧版/未知版/缺失/混合版本均拒绝；本地验证器 15 项、真实原生 worker 17 项中 15 通过/2 个缺少 shell 场景跳过。稳定步骤键沿用历史名称，真实目标由 `current_plugin_version` 核对。没有重跑 Linux 安装或回填旧失败；整合后同提交跨平台复验。无需本地化变更。
 
 G01 与原分支 G09 整合后再次通过本地 `cargo check -p warp`、i18n 11、PTY 身份 2、会话 423/6 忽略、协调器 111/4 忽略、升级 182/4 忽略、受监督版本探测 7/1 忽略、持久化 78、运行器 6、插件验证器 15 及应用构建。105 文件索引位于仓外 `validation/g01-g09-integration-20260926/`，SHA-256 `67b875a435b5408373166375e16adbe24b65cdeaa485b8f72146491666f18c64`；没有重跑在线模型，原先各轮来源不变。整合提交将从原分支执行同 SHA 跨平台门禁。
+
+G01 持久目录增量：新 v2 清单写入当前任务数据库的数据域，socket 另存短路径私有目录并绑定设备号/inode；旧 v1 清单仍按旧路径合同恢复。v2 本地 check、i18n 11、PTY 身份 2、CLI 会话 433（7 忽略）、运行器 6 和应用构建通过。未修改的共享协调器/升级路径沿用 `32a932f95` 整合门禁；该提交 [Actions 36223768480](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36223768480) 正在执行 Linux/Windows 相关门禁，尚未通过。
+
+固定 macOS arm64 Grok `1.0.41/grok-4.7/default` 的持久目录 v1 两轮原生输入通过，独立审计确认 2 个 prompt ID、2 个正确模型标记和 SQLite 两条 NativeProtocol ACK；TUI/leader/shell 与临时认证副本清理确认。新增退出恢复检查因原生 `leader.lock` 残留报目录非空，原 `passed=false`、panic 和文件字节均保留。v2 仅补精确锁归属清理：要求目录身份未变、leader 真实生存期已结束、私有单链接文件原字节等于绑定 PID；未知文件或别名不删除。新 libtest 在同一真实退出现场恢复成功、socket 目录移除、持久清单保留，旧记录仍不能派发；零新增模型输入。两轮来源分开，不把 v1 整体失败改写为成功，也不宣称同一二进制重跑模型。
+
+v1 应用 SHA-256 `e0bbfaa089f795ff92573a2a3b2735540730d350dceddbe73febc53c2f19efde`、libtest `cd34e4ff95be2d05295235806768dcd8939779c6eb2fba60aa2ab82f0bad3d53`；v2 应用 `9cfa85844f368467a34e98edbaac27834eb56da2024d00d36543f41bb4730222`、libtest `f54d7d283807bc4ae4fc7e5fd9fb5e965cd5477fd1b6eab96e63c55d650f34a9`。79 文件索引位于仓外 `validation/grok-owned-durable-20260926/`，SHA-256 `257d7844508552621e8c10637c3c5149642b4d7ac7a6eb5c03b7aafaebc7f050`。二进制采用 gzip 无损保存，并核对解压后的原始摘要；原始失败及各轮源码保留。
+
+生产改动仅在 macOS arm64 条件模块内；Linux/Windows 不执行本项原生路径，共享基础的同提交矩阵单独记录。无需本地化变更，现有用户界面语义未改变。本项未接通 GUI 提交、新启动注册与真实应用重启模型链，G01 仍开放。

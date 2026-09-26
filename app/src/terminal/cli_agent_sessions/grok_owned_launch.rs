@@ -39,7 +39,8 @@ mod native {
     use std::fs::{self, File, OpenOptions};
     use std::io::{Read as _, Write as _};
     use std::os::unix::fs::{
-        FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _,
+        DirBuilderExt as _, FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _,
+        PermissionsExt as _,
     };
     use std::os::unix::net::UnixStream;
     use std::path::{Path, PathBuf};
@@ -124,9 +125,18 @@ mod native {
         app_executable: PathBuf,
         cwd: PathBuf,
         socket_path: PathBuf,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        socket_directory: Option<SocketDirectoryIdentity>,
         boot_session: String,
         shell: ProcessIdentity,
         tty_device: u64,
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct SocketDirectoryIdentity {
+        device: u64,
+        inode: u64,
     }
 
     #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -248,6 +258,7 @@ mod native {
             executable: &Path,
             app_executable: &Path,
             cwd: &Path,
+            state_directory: &Path,
             pty: GrokOwnedPty,
         ) -> io::Result<Self> {
             let executable = executable.canonicalize()?;
@@ -263,19 +274,22 @@ mod native {
             if !cwd.is_dir() {
                 return Err(io::Error::other("Grok 工作目录无效"));
             }
-            let directory = tempfile::Builder::new()
-                .prefix("isp-grok-owned-")
-                .tempdir_in("/private/tmp")?;
-            fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
+            let (directory, socket_directory) = create_launch_directories(state_directory)?;
             let root = directory.path().canonicalize()?;
+            let socket_root = socket_directory.path().canonicalize()?;
+            let socket_metadata = fs::symlink_metadata(&socket_root)?;
             let manifest = LaunchManifest {
-                version: 1,
+                version: 2,
                 launch_id: Uuid::new_v4(),
                 session_id: Uuid::new_v4(),
                 executable,
                 app_executable: app_executable.canonicalize()?,
                 cwd,
-                socket_path: root.join("leader.sock"),
+                socket_path: socket_root.join("leader.sock"),
+                socket_directory: Some(SocketDirectoryIdentity {
+                    device: socket_metadata.dev(),
+                    inode: socket_metadata.ino(),
+                }),
                 boot_session: macos_boot_session()?,
                 shell: pty.shell,
                 tty_device: pty.device,
@@ -283,6 +297,7 @@ mod native {
             let bytes = serde_json::to_vec(&manifest).map_err(io::Error::other)?;
             write_new(&root.join("launch.json"), &bytes)?;
             let _ = directory.keep();
+            let _ = socket_directory.keep();
             Ok(Self {
                 directory: root,
                 manifest,
@@ -406,6 +421,7 @@ mod native {
                 return Err(GrokLeaderInputError::IdentityChanged);
             }
             // PID 来自本次入口的真实 exec 进程；leader 来自本次私有 socket 的内核对端。
+            validate_socket_directory(&self.manifest)?;
             let peer = UnixStream::connect(&self.manifest.socket_path)?;
             let leader = macos_peer_identity(&peer)?;
             drop(peer);
@@ -505,6 +521,11 @@ mod native {
                     return Err(io::Error::other("owned Grok 存在派发或原生执行证据"));
                 }
             }
+            if !matches!(fs::symlink_metadata(&self.manifest.socket_path),
+                Err(error) if error.kind() == io::ErrorKind::NotFound)
+            {
+                return Err(io::Error::other("owned Grok 原生 socket 存在或无法核对"));
+            }
             Ok(())
         }
 
@@ -516,6 +537,7 @@ mod native {
                 manifest_sha256: self.manifest_sha256.clone(),
                 dispatched,
             };
+            cleanup_socket_directory(&self.manifest, self.processes.map(|(_, leader)| leader))?;
             write_new(
                 &self.directory.join("retired.json"),
                 &serde_json::to_vec(&receipt).map_err(io::Error::other)?,
@@ -625,7 +647,6 @@ mod native {
             .parent()
             .ok_or_else(|| io::Error::other("启动清单缺少目录"))?;
         if path.file_name() != Some(std::ffi::OsStr::new("launch.json"))
-            || manifest.version != 1
             || manifest.launch_id.is_nil()
             || manifest.session_id.is_nil()
             || Uuid::parse_str(&manifest.boot_session).is_err()
@@ -635,11 +656,130 @@ mod native {
             || !manifest.executable.is_absolute()
             || !manifest.app_executable.is_absolute()
             || !manifest.cwd.is_absolute()
-            || manifest.socket_path != directory.join("leader.sock")
         {
             return Err(io::Error::other("owned Grok 启动清单无效"));
         }
+        match (manifest.version, &manifest.socket_directory) {
+            (1, None) if manifest.socket_path == directory.join("leader.sock") => Ok(()),
+            (2, Some(identity))
+                if identity.inode != 0
+                    && manifest.socket_path.file_name()
+                        == Some(std::ffi::OsStr::new("leader.sock"))
+                    && manifest.socket_path.parent().is_some_and(|root| {
+                        root.parent() == Some(Path::new("/private/tmp"))
+                            && root
+                                .file_name()
+                                .and_then(|name| name.to_str())
+                                .is_some_and(|name| name.starts_with("isp-grok-owned-socket-"))
+                    }) =>
+            {
+                Ok(())
+            }
+            // 旧版本只接受旧路径合同；未知版本或混合布局不能授予执行权限。
+            _ => Err(io::Error::other("owned Grok socket 清单版本或路径无效")),
+        }
+    }
+
+    fn create_launch_directories(
+        state_directory: &Path,
+    ) -> io::Result<(tempfile::TempDir, tempfile::TempDir)> {
+        let state = fs::symlink_metadata(state_directory)?;
+        if state_directory.canonicalize()? != state_directory
+            || !state.is_dir()
+            || state.uid() != unsafe { libc::geteuid() }
+            || state.mode() & 0o022 != 0
+        {
+            return Err(io::Error::other("owned Grok 恢复目录不可信"));
+        }
+        let parent = state_directory.join("grok-owned-terminal");
+        match fs::DirBuilder::new().mode(0o700).create(&parent) {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
+        }
+        validate_private_directory(&parent)?;
+        let directory = tempfile::Builder::new()
+            .prefix("launch-")
+            .tempdir_in(&parent)?;
+        fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
+        let socket = tempfile::Builder::new()
+            .prefix("isp-grok-owned-socket-")
+            .tempdir_in("/private/tmp")?;
+        fs::set_permissions(socket.path(), fs::Permissions::from_mode(0o700))?;
+        // 清单留在数据库数据域；socket 用短路径，避免用户目录或 profile 名超过 sockaddr_un 限制。
+        Ok((directory, socket))
+    }
+
+    fn validate_private_directory(path: &Path) -> io::Result<fs::Metadata> {
+        let metadata = fs::symlink_metadata(path)?;
+        if path.canonicalize()? != path
+            || !metadata.is_dir()
+            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.mode() & 0o077 != 0
+        {
+            return Err(io::Error::other("owned Grok 私有目录被替换或权限无效"));
+        }
+        Ok(metadata)
+    }
+
+    fn validate_socket_directory(manifest: &LaunchManifest) -> io::Result<()> {
+        if let Some(identity) = &manifest.socket_directory {
+            let root = manifest
+                .socket_path
+                .parent()
+                .ok_or_else(|| io::Error::other("socket 缺少目录"))?;
+            let metadata = validate_private_directory(root)?;
+            if metadata.dev() != identity.device || metadata.ino() != identity.inode {
+                return Err(io::Error::other("owned Grok socket 目录身份已变化"));
+            }
+        }
         Ok(())
+    }
+
+    fn cleanup_socket_directory(
+        manifest: &LaunchManifest,
+        leader: Option<MacosProcessIdentity>,
+    ) -> io::Result<()> {
+        // 旧清单的 socket 与恢复记录同目录，不删除旧恢复目录。
+        if manifest.socket_directory.is_none() {
+            return Ok(());
+        }
+        let root = manifest
+            .socket_path
+            .parent()
+            .ok_or_else(|| io::Error::other("socket 缺少目录"))?;
+        match fs::symlink_metadata(root) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error),
+            Ok(_) => {}
+        }
+        validate_socket_directory(manifest)?;
+        let lock = root.join("leader.lock");
+        if let Some(bytes) = read_optional_private(&lock)? {
+            // 固定 1.0.41 留下只含 leader PID 的私有锁文件。只有已绑定进程退出，且
+            // 原始字节与该 leader 完全一致时才清理；文件名或可复用的 PID 单独均不够。
+            let expected = leader.ok_or_else(|| io::Error::other("缺少原生 leader 锁归属"))?;
+            if !identity_exited(expected)
+                || bytes != expected.pid.to_string().as_bytes()
+                || fs::symlink_metadata(&lock)?.nlink() != 1
+            {
+                return Err(io::Error::other("原生 leader 锁归属或退出状态不匹配"));
+            }
+            fs::remove_file(&lock)?;
+        }
+        match fs::symlink_metadata(&manifest.socket_path) {
+            Ok(metadata)
+                if metadata.file_type().is_socket()
+                    && metadata.uid() == unsafe { libc::geteuid() } =>
+            {
+                fs::remove_file(&manifest.socket_path)?
+            }
+            Ok(_) => return Err(io::Error::other("owned Grok socket 被非原生文件替换")),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        // 不递归删除；出现未知文件时保留现场并返回清理失败。
+        fs::remove_dir(root)
     }
 
     fn verify_binary(path: &Path) -> io::Result<()> {
@@ -743,6 +883,7 @@ mod native {
             .parent()
             .ok_or_else(|| io::Error::other("启动清单缺少目录"))?;
         validate_manifest(path, &manifest)?;
+        validate_socket_directory(&manifest)?;
         if manifest.cwd.canonicalize()? != manifest.cwd
             || std::env::current_exe()?.canonicalize()? != manifest.app_executable
             || macos_boot_session()? != manifest.boot_session

@@ -253,8 +253,10 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
         cleanup = {"tui_exited": False, "leader_exited": False}
         if launch:
             directory = Path(launch["manifest_path"]).parent
-            socket_path = directory / "leader.sock"
             try:
+                manifest_bytes = Path(launch["manifest_path"]).read_bytes()
+                assert hashlib.sha256(manifest_bytes).hexdigest() == launch["manifest_sha256"]
+                socket_path = Path(json.loads(manifest_bytes)["socket_path"])
                 receipt_path, bound_path = directory / "exec.json", directory / "bound.json"
                 receipt = json.loads(receipt_path.read_text()) if receipt_path.exists() else None
                 bound = json.loads(bound_path.read_text()) if bound_path.exists() else None
@@ -276,12 +278,28 @@ if (notification) fs.appendFileSync(process.argv[3], JSON.stringify(notification
                     cleanup["leader_exited"] = stop_owned(leader)
             except BaseException as error:
                 cleanup["failure_class"] = type(error).__name__
-            for name in ("launch.json", "dispatched", "exec.json", "exec-failed.json", "bound.json"):
+            if cleanup["tui_exited"] and cleanup["leader_exited"]:
+                # 第二个独立测试进程只核对退出恢复与生产清理，不重新登录或提交模型输入。
+                recovery_env = env.copy()
+                recovery_env["INFINISHELL_GROK_OWNED_LIVE_ROOT"] = str(root)
+                try:
+                    with (root / "recovery.log").open("xb") as log:
+                        recovery = subprocess.run([str(root / "bin/test"),
+                            TEST.replace("grok_owned_native_two_turns_and_duplicate_guard", "grok_owned_native_recovery_after_exit"),
+                            "--exact", "--ignored", "--nocapture", "--test-threads=1"],
+                            env=recovery_env, cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=30)
+                    receipt = json.loads((root / "native-recovery-result.json").read_text())
+                    result["recovery_after_exit_verified"] = recovery.returncode == 0 and receipt.get("passed") is True
+                except BaseException as error:
+                    result["recovery_after_exit_verified"] = False
+                    result["recovery_failure_class"] = type(error).__name__
+            for name in ("launch.json", "dispatched", "exec.json", "exec-failed.json", "bound.json", "retired.json"):
                 source = directory / name
                 if source.exists():
                     shutil.copy2(source, root / ("launch-" + name))
         result["cleanup"] = cleanup
-        result["passed"] = result["passed"] and cleanup["tui_exited"] and cleanup["leader_exited"]
+        result["passed"] = (result["passed"] and cleanup["tui_exited"] and cleanup["leader_exited"]
+                            and result.get("recovery_after_exit_verified") is True)
         result["shell_reaped"] = close_pty_and_reap_shell(master, shell)
         master = None
         if auth:
