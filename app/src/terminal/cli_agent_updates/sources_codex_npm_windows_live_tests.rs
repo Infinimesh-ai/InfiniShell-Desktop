@@ -343,7 +343,8 @@ fn manager_inventory(manifest: &Manifest) -> Result<BTreeMap<String, Member>, St
 }
 fn verify_shims(manifest: &Manifest) -> Result<(), String> {
     check(manifest.shims.len() == 3, "shim_count")?;
-    for (name, bytes) in contract::shims() {
+    let template = contract::identify_shims(&manifest.shims).ok_or("real_npm_shim_contract")?;
+    for (name, bytes) in template.shims() {
         let path = manifest.root.join("prefix").join(name);
         check(
             fs::read(&path).ok().as_deref() == Some(bytes.as_bytes())

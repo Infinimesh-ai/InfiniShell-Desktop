@@ -114,12 +114,14 @@ impl Owner {
             .ok_or(Error::SourceChanged)?
             .join("package.json");
         let mut shims = BTreeMap::new();
-        for (name, expected) in contract::shims() {
+        for name in contract::SHIM_NAMES {
             let path = registration.prefix.join(name);
-            if read_limited(&path, 16384)? != expected.as_bytes() {
-                return Err(Error::UnsupportedSource);
+            let contents = read_limited(&path, 16384)?;
+            let captured = stamp(&path)?;
+            if hex(&Sha256::digest(&contents)) != hex(&captured.digest) {
+                return Err(Error::SourceChanged);
             }
-            shims.insert(name.to_owned(), stamp(&path)?);
+            shims.insert(name.to_owned(), captured);
         }
         let local_node = registration.prefix.join("node.exe");
         let node = if local_node.try_exists().map_err(|_| Error::SourceChanged)? {
@@ -149,8 +151,20 @@ impl Owner {
             dependencies: vec![manager, helper, stamp(&npm_manifest)?],
             shims,
         };
+        owner
+            .shim_template()
+            .map_err(|_| Error::UnsupportedSource)?;
         owner.verify()?;
         Ok(owner)
+    }
+
+    fn shim_template(&self) -> Result<contract::ShimTemplate, Error> {
+        let digests = self
+            .shims
+            .iter()
+            .map(|(name, stamp)| (name.clone(), hex(&stamp.digest)))
+            .collect();
+        contract::identify_shims(&digests).ok_or(Error::SourceChanged)
     }
 
     fn verify(&self) -> Result<(), Error> {
@@ -173,10 +187,8 @@ impl Owner {
                 return Err(Error::SourceChanged);
             }
         }
-        if self.shims.len() != 3 {
-            return Err(Error::SourceChanged);
-        }
-        for (name, contents) in contract::shims() {
+        // 合同来自事务原三份摘要；当前磁盘换成另一已知模板也不能覆盖旧身份。
+        for (name, contents) in self.shim_template()?.shims() {
             let path = self.prefix.join(name);
             if self.shims.get(name) != Some(&stamp(&path)?)
                 || read_limited(&path, 16384)? != contents.as_bytes()
@@ -365,6 +377,11 @@ async fn probe(root: &Path, journal: &mut Journal, mode: &str) -> Result<(), Err
         &journal.owner.prefix,
     )
     .map_err(|_| Error::SourceChanged)?;
+    if input.shim_template_id().map_err(|_| Error::SourceChanged)?
+        != journal.owner.shim_template()?.id()
+    {
+        return Err(Error::SourceChanged);
+    }
     let digest = probe_digest(&input, journal.id)?;
     let binding =
         managed_process::PreparedLaunchBinding::codex_windows_npm_version_probe(digest.clone())
@@ -436,6 +453,11 @@ fn verified_exit(root: &Path, journal: &Journal, success: bool) -> Result<(), Er
         if probe.input.stage() != journal.stage
             || probe.input.node() != journal.owner.node.canonical
             || probe.input.prefix() != journal.owner.prefix
+            || probe
+                .input
+                .shim_template_id()
+                .map_err(|_| Error::RecoveryRequired)?
+                != journal.owner.shim_template()?.id()
         {
             return Err(Error::RecoveryRequired);
         }

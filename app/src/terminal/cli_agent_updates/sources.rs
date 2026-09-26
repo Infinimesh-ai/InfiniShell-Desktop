@@ -60,7 +60,7 @@ mod npm_grok_windows_tree;
 #[cfg(all(feature = "local_fs", windows))]
 #[path = "sources_npm_codex_windows.rs"]
 mod npm_windows;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 #[path = "sources_npm_codex_windows_contract.rs"]
 mod npm_windows_contract;
 #[cfg(all(feature = "local_fs", windows))]

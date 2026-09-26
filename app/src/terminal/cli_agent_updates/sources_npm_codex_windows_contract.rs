@@ -1,9 +1,11 @@
-//! Codex 0.156.1 Windows x64 npm 与 cmd-shim 8 的固定字节合同。
+//! Codex 0.156.1 Windows x64 npm 与 cmd-shim 6.0.1 / 8 的固定字节合同。
 //! 此模块不读取安装环境，来源事务与进程监督者分别用相同合同核验输入。
 
 use std::collections::BTreeMap;
 use std::io;
 use std::path::PathBuf;
+
+use sha2::{Digest as _, Sha256};
 
 pub(crate) const VERSION: &str = "0.156.1";
 pub(crate) const WRAPPER_INTEGRITY: &str = "sha512-nI1iVl/n2SO2lSvlwEsJx63zdSI4C4Me2gR7AG0OWMJiGSakz2tY2hx43E39Zq5aEoeB5bZjJXzp5Sqhog6vyA==";
@@ -84,17 +86,63 @@ pub(crate) fn powershell_shim() -> &'static str {
     )
 }
 
-pub(crate) fn shell_shim() -> &'static str {
+fn shell_shim_8() -> &'static str {
     concat!(
         "#!/bin/sh\nbasedir=$(dirname \"$(echo \"$0\" | sed -e 's,\\\\,/,g')\")\n\ncase `uname` in\n    *CYGWIN*|*MINGW*|*MSYS*)\n        if command -v cygpath > /dev/null 2>&1; then\n            basedir=`cygpath -w \"$basedir\"`\n        fi\n    ;;\nesac\n\n",
         "if [ -x \"$basedir/node\" ]; then\n  exec \"$basedir/node\"  \"$basedir/node_modules/@openai/codex/bin/codex.js\" \"$@\"\nelse \n  exec node  \"$basedir/node_modules/@openai/codex/bin/codex.js\" \"$@\"\nfi\n"
     )
 }
 
-pub(crate) fn shims() -> [(&'static str, &'static str); 3] {
-    [
-        ("codex.cmd", cmd_shim()),
-        ("codex.ps1", powershell_shim()),
-        ("codex", shell_shim()),
-    ]
+fn shell_shim_601() -> &'static str {
+    concat!(
+        "#!/bin/sh\nbasedir=$(dirname \"$(echo \"$0\" | sed -e 's,\\\\,/,g')\")\n\ncase `uname` in\n    *CYGWIN*|*MINGW*|*MSYS*) basedir=`cygpath -w \"$basedir\"`;;\nesac\n\n",
+        "if [ -x \"$basedir/node\" ]; then\n  exec \"$basedir/node\"  \"$basedir/node_modules/@openai/codex/bin/codex.js\" \"$@\"\nelse \n  exec node  \"$basedir/node_modules/@openai/codex/bin/codex.js\" \"$@\"\nfi\n"
+    )
 }
+
+pub(crate) const SHIM_NAMES: [&str; 3] = ["codex.cmd", "codex.ps1", "codex"];
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ShimTemplate {
+    CmdShim601,
+    CmdShim8,
+}
+
+impl ShimTemplate {
+    pub(crate) fn id(self) -> &'static str {
+        match self {
+            Self::CmdShim601 => "cmd-shim-6.0.1",
+            Self::CmdShim8 => "cmd-shim-8",
+        }
+    }
+
+    pub(crate) fn shims(self) -> [(&'static str, &'static str); 3] {
+        let shell = match self {
+            Self::CmdShim601 => shell_shim_601(),
+            Self::CmdShim8 => shell_shim_8(),
+        };
+        [
+            ("codex.cmd", cmd_shim()),
+            ("codex.ps1", powershell_shim()),
+            ("codex", shell),
+        ]
+    }
+}
+
+/// 从已持久化的三个摘要选择完整合同；不归一化字节，也不逐文件混用模板。
+pub(crate) fn identify_shims(digests: &BTreeMap<String, String>) -> Option<ShimTemplate> {
+    if digests.len() != SHIM_NAMES.len() {
+        return None;
+    }
+    [ShimTemplate::CmdShim601, ShimTemplate::CmdShim8]
+        .into_iter()
+        .find(|template| {
+            template.shims().into_iter().all(|(name, contents)| {
+                digests.get(name) == Some(&format!("{:x}", Sha256::digest(contents.as_bytes())))
+            })
+        })
+}
+
+#[cfg(test)]
+#[path = "sources_npm_codex_windows_contract_tests.rs"]
+mod tests;

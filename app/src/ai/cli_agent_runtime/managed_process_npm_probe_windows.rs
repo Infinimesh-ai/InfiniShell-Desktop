@@ -52,6 +52,26 @@ impl ProbeInputs {
     pub(super) fn files(&self) -> Vec<ExpectedFileIdentity> {
         self.files.clone()
     }
+
+    fn shim_template(&self) -> io::Result<contract::ShimTemplate> {
+        let mut digests = BTreeMap::new();
+        for file in &self.files {
+            for name in contract::SHIM_NAMES {
+                if file.path == self.prefix().join(name)
+                    && digests
+                        .insert(name.to_owned(), file.sha256.clone())
+                        .is_some()
+                {
+                    return Err(invalid());
+                }
+            }
+        }
+        contract::identify_shims(&digests).ok_or_else(invalid)
+    }
+
+    pub(crate) fn shim_template_id(&self) -> io::Result<&'static str> {
+        self.shim_template().map(contract::ShimTemplate::id)
+    }
 }
 
 fn invalid() -> io::Error {
@@ -122,7 +142,10 @@ pub(super) fn validate(input: &ProbeInputs) -> io::Result<()> {
     }
     super::validate_expected_files_contract(&input.program, &input.files)?;
     let mut required = contract::files()?;
-    let mut shims: BTreeMap<_, _> = contract::shims()
+    // 三份文件摘要已进入启动摘要与退出收据；监督者只接受同一个完整官方模板。
+    let mut shims: BTreeMap<_, _> = input
+        .shim_template()?
+        .shims()
         .into_iter()
         .map(|(name, text)| (input.prefix().join(name), text))
         .collect();
@@ -199,7 +222,7 @@ pub(crate) fn capture(
         ExpectedFileIdentity::capture(&program)?,
         ExpectedFileIdentity::capture(node)?,
     ];
-    for (name, _contents) in contract::shims() {
+    for name in contract::SHIM_NAMES {
         files.push(ExpectedFileIdentity::capture(&prefix.join(name))?);
     }
     for path in contract::files()?.into_keys() {
