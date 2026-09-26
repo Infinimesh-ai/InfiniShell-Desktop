@@ -12,6 +12,8 @@
 
 后续 `console-binding-04` 已在 `43c9709d2` 提交：仅 Codex npm 候选预先绑定系统 `conhost.exe` 精确租约，并在事件继续前验证本次 Job、相同 AppContainer SID 与零 capability；未知映像及系统目录兜底不放行，所有退出句柄跨失败保留。同提交 Windows 编译和普通／原生边界回归通过；真实 `0.156.1` npm 的首个 CMD 候选仍在 `Prepared` 返回 `RecoveryRequired`，CMD 报 verbatim 工作目录不兼容及拒绝访问，`cleanup_confirmed=false`，缺 AppContainer 清理收据；PowerShell、发布和后续恢复未到达。后续须核 npm 专属 cwd 的 DOS 路径传递及独立清理原因，不能仅据 stderr 判定全部根因。本地 check、i18n 重试02（11项）和 actionlint 通过，首次链接空间不足原件保留；无需本地化变更，不关闭 G09，详见[验证结论](VALIDATION_REPORT.md)。
 
+Windows npm 工作目录后续增量以 `6408131e2` 为基线：明确区分 canonical ACL 路径与 CreateProcessW 执行路径，启动前重复核对同一目录，其他来源调用保持原参数。固定阶段诊断用于定位旧输出超时与清理未知，未调整时限；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows 待验，真实更新／恢复待复验，G09 不关闭。
+
 `debed8c51` 已补 Linux／Windows 的会话模型变更通知，使专属 Grok 恢复清理后重新同步空闲条件；沿用既有英中等待说明，本地门禁通过，真实更新链待验。`c7ef8d95b` 仅修 Python 重解析点验收夹具，生产来源与隔离合同不变。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。

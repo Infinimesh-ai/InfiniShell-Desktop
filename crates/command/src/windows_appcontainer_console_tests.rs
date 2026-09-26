@@ -4,6 +4,42 @@ use std::os::windows::io::AsHandle as _;
 
 use super::*;
 
+#[test]
+fn package_execution_cwd_rejects_a_different_directory_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+
+    let result = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        Path::new("unused.exe"),
+        "unused".as_ref(),
+        &cwd,
+        other.path(),
+        &[],
+        "unused-profile",
+        &[],
+    );
+
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
+#[test]
+fn package_execution_cwd_rejects_relative_paths_before_creating_profile() {
+    let cwd = std::env::current_dir().unwrap().canonicalize().unwrap();
+
+    let result = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        Path::new("unused.exe"),
+        "unused".as_ref(),
+        &cwd,
+        Path::new("."),
+        &[],
+        "unused-profile",
+        &[],
+    );
+
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
 fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
     let directory = tempfile::tempdir().unwrap();
     let mut hash = DefaultHasher::new();

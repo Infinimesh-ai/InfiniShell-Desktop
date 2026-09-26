@@ -1840,6 +1840,32 @@
       "executed": false,
       "profile": "parity-code-43c9709d2",
       "scope": "准备内置盘联合测试包；含最新Claude/Grok图片技能代码，不代替GUI、模型、布局或debug-embed运行测试。887旧包保留。"
+    },
+    "cwd_followup": {
+      "date": "2026-09-27",
+      "base_commit": "6408131e230b1a5ef16bb5f92b7465d2b62d59df",
+      "status": "本地门禁通过，待提交推送后运行同提交Windows定向验证；真实npm仍未通过，不关闭G09",
+      "scope": "Windows Codex npm候选仅在CreateProcessW边界传经canonical路径及卷/文件ID核验的DOS cwd；ACL与readonly保留原canonical路径及句柄合同。其他CLI沿用原启动API参数。",
+      "diagnostics": "增加固定phase/单调耗时/数量及脱敏错误类型，区分根EXIT放行、整树退出及清理；不记录路径/参数/认证。",
+      "prior_failure_refinement": "旧stop_requested由上层stdout的300秒超时触发；exit_code1是外层worker，不证明CMD自身退出码。共享debug drain也300秒，仅提示可能预算竞争，未调整时限或清理边界。",
+      "archive": "validation/windows-npm-cwd-20260927",
+      "cache_cleanup": "经固定清单、摘要与lsof复核，只删除已完成debug-embed链接的rlib/rmeta两缓存；空闲由1285206016到2240983040字节，两个app和原unsigned程序重新核验保留。",
+      "localization": "无需本地化变更；既有英中失败提示不变，固定诊断字段只进入原监督stderr。",
+      "closed_gaps": [],
+      "goal_complete": false,
+      "tests": "新增npm路径3项与command执行目录2项；前者长路径正例仅证明文件系统身份转换，不代表真实长路径启动。",
+      "source_snapshot_sha256": "dbeaaea4ce14b65e46f7b531584e66c83a8dbf3be836268891602d7ccedc4f67",
+      "cache_inventory_sha256": "c0e082657cade572edeb46a92c18fb68f19fa7efd856eca73f7da4f9aa0e2ecb",
+      "local_gates": {
+        "platform": "macos-arm64",
+        "cargo_check": "通过，99.35秒",
+        "i18n": "11项通过，249.30秒",
+        "actionlint": "通过",
+        "diff_check": "通过",
+        "windows_native": "本轮待验，3项npm路径与2项command新增回归仅Windows执行",
+        "source_snapshot_sha256": "dbeaaea4ce14b65e46f7b531584e66c83a8dbf3be836268891602d7ccedc4f67"
+      },
+      "static_review_sha256": "a406d9eb989d3a25dd35fcec3423dec40ad4e2bd3864eecf8d7969803ed99a68"
     }
   }
 }

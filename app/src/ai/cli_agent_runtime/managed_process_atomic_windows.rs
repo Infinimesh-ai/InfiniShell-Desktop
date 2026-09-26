@@ -474,7 +474,8 @@ impl WindowsImageDebugSession {
         reject_on_error: bool,
         container: Option<&AppContainerProbe>,
     ) -> io::Result<()> {
-        let deadline = Instant::now() + DEBUG_SESSION_TIMEOUT;
+        let started = Instant::now();
+        let deadline = started + DEBUG_SESSION_TIMEOUT;
         if container.is_some() {
             for process in self.processes.values() {
                 self.held_package_processes.push(process.try_clone()?);
@@ -499,6 +500,19 @@ impl WindowsImageDebugSession {
                     .push(self.processes[&event.dwProcessId].try_clone()?);
             }
             self.continue_pending(continue_status)?;
+            if self.npm_console_host.is_some()
+                && event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT
+                && event.dwProcessId == self.root_process_id
+            {
+                // 根 EXIT 放行不等于整棵树退出；只记录计数以定位监督阶段，不记录进程身份。
+                let remaining = self.processes.len();
+                let held = self.held_package_processes.len();
+                let elapsed_ms = started.elapsed().as_millis();
+                warp_core::safe_eprintln!(
+                    safe: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held}"),
+                    full: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held}")
+                );
+            }
             if self.root_exit_observed && self.processes.is_empty() {
                 // EXIT Continue 仅释放调试事件；仍须逐个确认已授权映像的真实进程句柄 signaled。
                 return self.wait_for_package_processes_exit(deadline);

@@ -271,7 +271,7 @@ impl AppContainerProbe {
         environment: &[(OsString, OsString)],
         name: &str,
     ) -> io::Result<Self> {
-        Self::spawn_internal(program, None, cwd, environment, name, None)
+        Self::spawn_internal(program, None, cwd, cwd, environment, name, None)
     }
 
     /// 调用方绑定固定公共包装入口；候选树只读，仍先核对零 capability 与严格 Job。
@@ -283,6 +283,30 @@ impl AppContainerProbe {
         name: &str,
         readonly: &[std::path::PathBuf],
     ) -> io::Result<Self> {
+        Self::spawn_package_suspended_with_execution_cwd(
+            program,
+            arguments,
+            cwd,
+            cwd,
+            environment,
+            name,
+            readonly,
+        )
+    }
+
+    /// ACL 仍绑定原规范目录；仅允许给进程传入指向同一目录的另一种路径表示。
+    pub fn spawn_package_suspended_with_execution_cwd(
+        program: &Path,
+        arguments: &std::ffi::OsStr,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+    ) -> io::Result<Self> {
+        if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
+            return Err(io::Error::other("版本探针执行目录不匹配"));
+        }
         if readonly.is_empty()
             || readonly.len() > 128
             || readonly
@@ -295,6 +319,7 @@ impl AppContainerProbe {
             program,
             Some(arguments),
             cwd,
+            execution_cwd,
             environment,
             name,
             Some(readonly),
@@ -305,6 +330,7 @@ impl AppContainerProbe {
         program: &Path,
         arguments: Option<&std::ffi::OsStr>,
         cwd: &Path,
+        execution_cwd: &Path,
         environment: &[(OsString, OsString)],
         name: &str,
         readonly: Option<&[std::path::PathBuf]>,
@@ -438,7 +464,11 @@ impl AppContainerProbe {
         command.extend("\" ".encode_utf16());
         let arguments = wide(arguments.unwrap_or_else(|| std::ffi::OsStr::new("--version")))?;
         command.extend_from_slice(&arguments);
-        let cwd_wide = wide(cwd.as_os_str())?;
+        // Grant 已持有规范目录的句柄；重验别名后才交给 CreateProcessW，禁止切换目录。
+        if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
+            return Err(io::Error::other("版本探针执行目录不匹配"));
+        }
+        let cwd_wide = wide(execution_cwd.as_os_str())?;
         let mut environment = environment.to_vec();
         environment.sort_by_key(|(key, _)| key.to_string_lossy().to_ascii_uppercase());
         let mut block = Vec::new();

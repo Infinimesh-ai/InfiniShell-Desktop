@@ -7,6 +7,7 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStringExt as _;
 use std::os::windows::fs::OpenOptionsExt as _;
 use std::path::{Component, Path, PathBuf};
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -14,6 +15,7 @@ use uuid::Uuid;
 use windows::Win32::Storage::FileSystem::{FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ};
 use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
 
+use super::atomic_windows::{WindowsDirectoryLease, capture_directory_id, prepare_directory};
 use super::{ExpectedFileIdentity, Manifest};
 
 #[path = "../../terminal/cli_agent_updates/sources_npm_codex_windows_contract.rs"]
@@ -287,6 +289,49 @@ fn dos_path(path: &Path) -> io::Result<String> {
     Ok(value.to_owned())
 }
 
+fn dos_bound_path(path: &Path) -> io::Result<PathBuf> {
+    // Win32 会重新解释这些名称；不能把 verbatim 对象静默换成另一个 DOS 对象。
+    for part in path.components() {
+        if let Component::Normal(name) = part {
+            let name = name.to_str().ok_or_else(invalid)?;
+            let stem = name.split('.').next().unwrap_or_default();
+            let upper = stem.to_ascii_uppercase();
+            if name.ends_with(['.', ' '])
+                || matches!(
+                    upper.as_str(),
+                    "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$" | "CLOCK$"
+                )
+                || upper
+                    .strip_prefix("COM")
+                    .or_else(|| upper.strip_prefix("LPT"))
+                    .is_some_and(|suffix| {
+                        matches!(
+                            suffix,
+                            "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+                        )
+                    })
+            {
+                return Err(invalid());
+            }
+        }
+    }
+    let normalized = PathBuf::from(dos_path(path)?);
+    if normalized.canonicalize()? != path {
+        return Err(invalid());
+    }
+    Ok(normalized)
+}
+
+fn dos_directory_path(lease: &WindowsDirectoryLease) -> io::Result<PathBuf> {
+    lease.verify_for_spawn()?;
+    let original = lease.execution_path();
+    let normalized = dos_bound_path(original)?;
+    if capture_directory_id(&normalized)? != capture_directory_id(original)? {
+        return Err(invalid());
+    }
+    Ok(normalized)
+}
+
 pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Result<()> {
     let input = ProbeInputs {
         program: manifest.executable.clone(),
@@ -379,21 +424,27 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
     let mut executable = super::atomic_windows::prepare(&input.files[0])?;
     executable.set_package_images(images)?;
     executable.enable_npm_console_host()?;
-    let cwd = super::atomic_windows::prepare_directory(
-        manifest.atomic_cwd.as_ref().ok_or_else(invalid)?,
-    )?;
+    let cwd = prepare_directory(manifest.atomic_cwd.as_ref().ok_or_else(invalid)?)?;
+    let execution_cwd = dos_directory_path(&cwd)?;
     executable.verify_for_spawn()?;
     cwd.verify_for_spawn()?;
     let mut debugger = executable.prepare_image_debug_session()?;
-    let mut process = command::windows::AppContainerProbe::spawn_package_suspended(
-        executable.execution_path(),
-        arguments.as_ref(),
-        cwd.execution_path(),
-        &environment,
-        &format!("InfiniShell.Version.{}", manifest.generation),
-        &readonly,
-    )?;
-    let result = run_package_probe(&mut process, &mut debugger);
+    let mut process =
+        command::windows::AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+            executable.execution_path(),
+            arguments.as_ref(),
+            cwd.execution_path(),
+            &execution_cwd,
+            &environment,
+            &format!("InfiniShell.Version.{}", manifest.generation),
+            &readonly,
+        )?;
+    let started = Instant::now();
+    let result = run_package_probe(&mut process, &mut debugger, started);
+    if let Err(failure) = &result {
+        record_phase("probe_failed", started, Some(failure));
+    }
+    record_phase("cleanup_before", started, None);
     // 派生后任何失败都保留原事件状态；先请求终止精确 Job，才允许继续未验证事件。
     let termination = match &result {
         Ok(_) => Ok(()),
@@ -403,6 +454,10 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
     let cleanup = termination.and_then(|()| {
         process.write_cleanup_receipt(&record_directory.join("appcontainer-cleanup-v1"))
     });
+    match &cleanup {
+        Ok(()) => record_phase("cleanup_complete", started, None),
+        Err(failure) => record_phase("cleanup_failed", started, Some(failure)),
+    }
     drop(handles);
     let code = match result {
         Ok(code) => {
@@ -432,11 +487,27 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
 fn run_package_probe(
     process: &mut command::windows::AppContainerProbe,
     debugger: &mut super::atomic_windows::WindowsImageDebugSession,
+    started: Instant,
 ) -> io::Result<u32> {
+    record_phase("resume_before", started, None);
     process.resume()?;
+    record_phase("initial_image_before", started, None);
     debugger.verify_package_initial_image_in_container(process)?;
+    record_phase("drain_before", started, None);
     debugger.drain_package_in_container_until_exit(process)?;
+    record_phase("exit_code_before", started, None);
     process.exit_code()
+}
+
+fn record_phase(phase: &'static str, started: Instant, failure: Option<&io::Error>) {
+    let elapsed_ms = started.elapsed().as_millis();
+    let kind = failure.map(io::Error::kind);
+    let os_code = failure.and_then(io::Error::raw_os_error);
+    // 两个日志分支只含固定阶段与非敏感诊断值，不输出错误正文。
+    warp_core::safe_eprintln!(
+        safe: ("managed_process.windows_npm_probe phase={phase} elapsed_ms={elapsed_ms} kind={kind:?} os_code={os_code:?}"),
+        full: ("managed_process.windows_npm_probe phase={phase} elapsed_ms={elapsed_ms} kind={kind:?} os_code={os_code:?}")
+    );
 }
 
 fn terminate_package_probe(
@@ -447,3 +518,7 @@ fn terminate_package_probe(
     // 显式传入已持有的根进程身份，包含 resume 自身失败、尚无首事件的路径。
     debugger.drain_terminated_package_in_container(process)
 }
+
+#[cfg(test)]
+#[path = "managed_process_npm_probe_windows_tests.rs"]
+mod tests;
