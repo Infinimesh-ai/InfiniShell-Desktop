@@ -11,10 +11,10 @@ import run_grok_plugin_live as runner
 
 
 def valid_receipt():
-    export = {'installed_hook_export_version_verified': True, 'plugin_version': '0.1.4', 'main_entry_verified': False}
+    export = {'installed_hook_export_version_verified': True, 'plugin_version': '0.1.5', 'main_entry_verified': False}
     steps = [dict(step=name, passed=True) for name in runner.STEPS]
     steps[0]['installed_hook_export'] = export
-    steps[1].update(installed_hook_export=export, previous_plugin_version='0.1.3', current_plugin_version='0.1.4',
+    steps[1].update(installed_hook_export=export, previous_plugin_version='0.1.3', current_plugin_version='0.1.5',
                     legacy_source_unchanged=True, production_update_call=True)
     steps[2]['config_and_registry_unchanged'] = True
     steps[3]['config_and_files_unchanged'] = True
@@ -157,6 +157,19 @@ class GrokPluginLiveRunnerTests(unittest.TestCase):
             receipt = valid_receipt(); receipt[field] = value
             self.assertFalse(self.accept(receipt), field)
         self.assertFalse(self.accept(valid_receipt(), 'darwin'))
+
+    def test_old_missing_unknown_or_mixed_plugin_versions_are_rejected(self):
+        for version in ('0.1.4', '0.1.6', '', None):
+            for position in ('upgrade', 'install_export', 'upgrade_export'):
+                with self.subTest(version=version, position=position):
+                    receipt = valid_receipt()
+                    if position == 'upgrade':
+                        receipt['steps'][1]['current_plugin_version'] = version
+                    else:
+                        index = 0 if position == 'install_export' else 1
+                        receipt['steps'][index]['installed_hook_export'] = dict(
+                            receipt['steps'][index]['installed_hook_export'], plugin_version=version)
+                    self.assertFalse(self.accept(receipt))
 
     def test_failure_timeout_partial_or_reordered_steps_never_pass(self):
         for change in ({'exit_code': 1}, {'timed_out': True}, {'output': ''}):

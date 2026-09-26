@@ -17,6 +17,7 @@ from run_codex_source_live import digest, stop_group
 
 TEST_NAME = ('terminal::cli_agent_sessions::plugin_manager::grok::tests::'
              'live_grok_production_installer_repairs_and_preserves_disable')
+# 升级步骤键保留历史收据的稳定标识；实际目标版本在下方严格校验为 0.1.5。
 STEPS = ['production_install', 'production_upgrade_known_013_to_014',
          'production_same_version_update', 'production_disabled_update_rejected',
          'file_transaction_failure_rollback', 'production_update_after_rollback']
@@ -203,7 +204,7 @@ def verified_receipt(exit_code, timed_out, output, receipt, native_sha, node_sha
             or any(item.get('passed') is not True for item in steps)):
         return False
     if (steps[1].get('previous_plugin_version') != '0.1.3'
-            or steps[1].get('current_plugin_version') != '0.1.4'
+            or steps[1].get('current_plugin_version') != '0.1.5'
             or steps[1].get('legacy_source_unchanged') is not True
             or steps[1].get('production_update_call') is not True
             or steps[2].get('config_and_registry_unchanged') is not True
@@ -214,7 +215,7 @@ def verified_receipt(exit_code, timed_out, output, receipt, native_sha, node_sha
     for item in steps[:2]:
         export = item.get('installed_hook_export', {})
         if (export.get('installed_hook_export_version_verified') is not True
-                or export.get('plugin_version') != '0.1.4' or export.get('main_entry_verified') is not False):
+                or export.get('plugin_version') != '0.1.5' or export.get('main_entry_verified') is not False):
             return False
     if host_platform == 'win32':
         args = receipt.get('windows_bridge_argv', {})
