@@ -4,6 +4,14 @@
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
 
+**2026-09-27 Grok 上下文与升级空闲通知补接**：功能提交 `debed8c51cc54f1d017fda809c9254fbc658b80b`，独立夹具修正 `c7ef8d95b48df4a01f64985471b42e80beeda1eb`，均已推送。有效本地／远端专属 Grok 的代码、评审和 diff 上下文现在统一先打开富输入、等待原草稿恢复，再按同代次顺序追加；已经打开的专属会话也走同一队列，连续上下文不会抢在恢复前被覆盖。取消、关闭、换代或失效时旧回调不写入，未绑定普通会话不因此获得 PTY 发送能力。Grok 操作提示已同步英中，实际双语布局仍待共同验收。另将升级器既有 sessions model observe 对齐三支持平台，使 Linux／Windows 无存活 pane 的专属 Grok 清理后能够重新同步空闲条件；没有新增终端锁或第二份观察订阅。
+
+本地 Mac ARM64 编译检查、i18n 11 项、Grok 视图 7 项、footer 47 项、更新模块 190 项（6 忽略）及 actionlint 通过，含四项新增顺序／旧回调／失效／未绑定回归。十份源码／资源／工作流 Git blob 与冻结快照一致，原始日志、独立静态复核和绑定位于 `validation/grok-context-routing-20260927`。旧 Mac `2b59c8c62` 联测包保留但不含本批 UI 修改，新包及真实三平台／远端发送仍待补；G01/G09 与 Goal 不关闭。
+
+`56f6da217` 的 [Actions 36262495627](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36262495627) 已结束为失败：Linux／Windows 基础编译及定向 Rust 分别 958／818 项通过，Linux 固定 Node 原文件的只读依赖闭包 1 项通过。两平台离线合集原始日志均确认 `Reparse` 测试夹具缺 `st_mode`，与已提交的 `c7ef8d95b` 修正一致；CI 实际 Python 3.13.15。Windows 真实 npm 私有登记另返回 `Maximum call stack size exceeded`，尚未生成真实 shim 或进入产品升级事务，原因继续诊断，五场景不能记作执行。完整原始日志 ZIP 摘要 `17bd8e61eec57354bfc196ec02fe065fc91a7d30794c43bc11328cb9eb8494c0`，运行结论收据摘要 `174bda32c1dee1a1fa33f470dd38c20cd60c2aa54ef8d002ba2f3250364bb918`，统一归档于 `validation/g09-followup-20260927/ci-36262495627`。本轮 Windows 定向无 `LEAK`，不据此关闭旧运行的泄漏疑点。此运行不覆盖后续 `debed8c51`。
+
+本地 47 脚本／1,164 项 Python 3.14 全通过，Python 3.12 独立复现上述夹具错误；仅修夹具后 11 项在两个版本通过，生产检查未改。此前诊断字段的 CI 3.11 推断已另存更正，原字节保留；原始批次与更正在 `validation/g09-followup-20260927/offline-batch-diagnosis`。本轮还按已授权范围，仅清理两份停用 Cargo 测试链接输出共 1,604,934,608 字节；身份、摘要和无占用均核验，原始验收程序／日志／源码／工作树保留，清理收据为同归档 `retired-test-link-cleanup-01.safe.json`。
+
 **2026-09-27 G09 Linux ELF 修正与 Windows npm 实测入口**：实现提交 `56f6da21789c2aa90abf2fdff6a2e10aea03283d`。旧 Linux Codex 失败的直接原因是官方 Node 20.9.0 的 `DT_STRSZ=5,291,274` 被误套 1 MiB 动态记录表上限；本次保留整段唯一映射和文件边界，改为每个已引用依赖名至多读取 256 字节。新增七项边界回归及固定 Node 原字节的只读系统依赖闭包测试；依赖名、加载器、网络和 Landlock 门禁均不弱化。ABI1 仍独立限制候选隔离，不把解析修正等同于该主机可以执行 Codex npm 更新。
 
 Windows 新入口通过真实 npm 在私有前缀登记固定 `0.155.1`，并调用产品后端更新至 `0.156.1`；包含正常更新、OldMoved 冷恢复、发布后缺收据冷恢复、外部改动保留、候选改动拒绝。cmd、PowerShell 两候选各需真实 AppContainer／Job 退出收据；三种 shim 保留 npm 原产字节，不为通过而改写。固定渠道和断点只进入测试构建。初始 npm 登记不是产品 Job 隔离证明，超时不得记作已清理；消费者渠道、忙碌／插件重检及 GUI 均不在此入口结论内。

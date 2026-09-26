@@ -1397,7 +1397,7 @@
   "g09_followup_increment": {
     "date": "2026-09-27",
     "implementation_commit": "56f6da21789c2aa90abf2fdff6a2e10aea03283d",
-    "status": "代码已推送，本地门禁通过；同提交 Linux/Windows CI 正在运行；G09 未关闭",
+    "status": "56f6da217同提交CI已结束：两平台编译/定向Rust与Linux原文件依赖闭包通过；Python夹具及Windows npm私有登记失败，G09未关闭",
     "linux_glibc": "修正将 1 MiB 动态记录表上限误用于官方 Node 20.9.0 的 5,291,274 字节字符串表；保留整段唯一 LOAD 映射和文件边界，只读取每个已引用依赖名最多 256 字节。依赖数、名称长度、加载器、网络与 Landlock 校验不变。新增 7 项边界回归及固定 Node 原字节的只读真实依赖闭包测试；Mac 门禁不代替 Linux 运行。",
     "windows_codex_npm": "新增固定 0.155.1→0.156.1 真实 npm 私有登记入口：正常更新、旧目录移走后冷恢复、发布后缺收据冷恢复、外部改动保留及候选改动拒绝。三 shim 由绑定 npm 生成，cmd/PowerShell 各需真实监督退出证据；仅测试构建可使用渠道/断点钩子。入口实现不计五场景已通过。",
     "local_gates": {
@@ -1419,8 +1419,8 @@
       "run_id": 36262495627,
       "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36262495627",
       "head_sha": "56f6da21789c2aa90abf2fdff6a2e10aea03283d",
-      "status": "in_progress",
-      "conclusion": "",
+      "status": "completed",
+      "conclusion": "failure",
       "selected_platforms": [
         "linux-x64",
         "windows-x64"
@@ -1433,7 +1433,59 @@
       "gui_or_ime": false,
       "scope": "定向编译/模块门禁、Linux 固定 Node 只读真实依赖闭包、Windows Codex npm 五场景入口。ABI1 下不重复 Unix Codex 更新；未改的 Grok Linux 四场景沿用39941原收据。",
       "receipt": "ci-36262495627/initial.safe.json",
-      "sha256": "88357e478519d86bbfe2e5e06baf3665bc3b96eb6a20488f69f4e5b6c3e8e5b1"
+      "sha256": "88357e478519d86bbfe2e5e06baf3665bc3b96eb6a20488f69f4e5b6c3e8e5b1",
+      "intermediate_receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927/ci-36262495627/observed-before-context-docs-1790448767774810000.safe.json",
+      "observed_failure": "原始两平台日志已确认Reparse夹具缺st_mode，与c7ef修正一致；Windows真实npm私有登记另返回Maximum call stack size exceeded，尚未生成shim或进入产品事务，正在定位。",
+      "successful_observations": {
+        "Linux x64": [
+          "Check InfiniShell-Desktop",
+          "Test agent lifecycle, terminal cancellation, and Responses integration",
+          "Verify fixed Linux Node glibc dependency binding without execution"
+        ],
+        "Windows x64": [
+          "Check InfiniShell-Desktop",
+          "Test agent lifecycle, terminal cancellation, and Responses integration"
+        ]
+      },
+      "completed_receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927/ci-36262495627/completed-review.safe.json",
+      "completed_receipt_sha256": "174bda32c1dee1a1fa33f470dd38c20cd60c2aa54ef8d002ba2f3250364bb918",
+      "focused_tests": {
+        "linux-x64": 958,
+        "windows-x64": 818
+      },
+      "leak_scope": "本轮Windows定向无LEAK，不代表旧39941运行的LEAK已修复。",
+      "raw_logs_zip_sha256": "17bd8e61eec57354bfc196ec02fe065fc91a7d30794c43bc11328cb9eb8494c0"
     }
+  },
+  "grok_context_and_update_idle_increment": {
+    "date": "2026-09-27",
+    "implementation_commit": "debed8c51cc54f1d017fda809c9254fbc658b80b",
+    "fixture_commit": "c7ef8d95b48df4a01f64985471b42e80beeda1eb",
+    "status": "实现与本地门禁完成并推送；同提交平台、真实GUI和模型链待验",
+    "g01": "仅有效本地/远端专属Grok，将代码、选区、评审及diff上下文送入富输入草稿；打开或已打开均延迟到原草稿恢复后按顺序追加到末尾，回调核generation与open。不为未绑定原生PTY开放写入或提交，实际发送仍执行原身份/审批/单次领取校验。",
+    "g09": "sessions model observe的编译条件对齐Mac ARM64/Linux x64/Windows x64；恢复后的owned Grok确认清理时可重新同步空闲条件，避免两平台无活跃pane时永久等待空闲。未新增锁或重复观察订阅。",
+    "python_fixture": "只补重解析点夹具的真实目录st_mode并加普通目录正例，生产plain校验及拒绝断言不变。47脚本1164项在Python3.14通过；3.12首轮仅该脚本失败，修后11项分别在3.12与3.14通过。",
+    "local_gates": {
+      "platform": "macos-arm64",
+      "cargo_check": "passed",
+      "i18n": "11 passed",
+      "grok_owned_view": "7 passed",
+      "footer": "47 passed",
+      "updates": "190 passed / 6 ignored",
+      "new_behavior_tests": "4 passed",
+      "actionlint": "passed",
+      "source_blob_matches": 10
+    },
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-context-routing-20260927",
+    "source_commit_binding_sha256": "1e40fb4715201e8c87e790b6f6790ea8a33c6ea0dae8ef082f245737e2b7b15f",
+    "localization": "Grok条件式操作提示已同步英文/简体中文，无新增变量；更新等待空闲沿用准确的既有英中说明。真实双语占位布局后置，未计通过。",
+    "ci": "36262495627已结束，绑定56f6da217；待Windows私有登记失败诊断后合并一次新提交平台验证，旧运行不覆盖本增量。",
+    "cache_cleanup": {
+      "receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927/retired-test-link-cleanup-01.safe.json",
+      "scope": "仅两份停用Cargo测试链接缓存；摘要/身份/无占用均核验，原始归档程序、日志、当前程序与工作树保留",
+      "logical_bytes_removed": 1604934608
+    },
+    "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
+    "goal_complete": false
   }
 }

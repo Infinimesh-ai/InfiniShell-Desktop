@@ -28,6 +28,7 @@
 - **恢复增量**：本次侧车改为异步接收；退出清单保留，SQLite 恢复前同步置忙，旧回调及定时器隔离，普通 TUI 禁止进入托管新建/恢复。macOS 本地回归与两轮原生输入通过；空白 GUI 双语启动不代替真实会话重启验收，未接通消费者自动发送。
 - **持久目录增量**：新清单与临时 socket 分离，绑定目录内核身份；两轮原生输入通过，首轮退出恢复的 `leader.lock` 残留失败保留，修复后在原退出现场独立复验清理通过。旧启动不可重派，GUI、真实重启与其余关闭条件仍未完成。
 - **未验证代码增量**：macOS arm64 与 Linux x86_64 的 GUI 启动、原生侧车输入、精确回执、恢复占用及菜单已合入主工作区。Linux 通过真实 PTY、pidfd 和 SO_PEERPIDFD 绑定进程，缺少内核能力时不使用裸 PID 替代；不能声明全部 Linux 版本可用。Windows 已合入原始 ConPTY shell 句柄、创建时原子 Job 归属、命名管道侧车、PowerShell 启动及恢复接线；原生 Job／控制台／管道链仍须真实校准。任务列表历史继续也已接同UUID --resume、新generation CAS及活跃原PTY只读关联；最后实机链仍欠。之前“GUI 尚未接线”描述对应已提交基线。
+- **上下文补接**：`debed8c51` 已将有效本地／远端专属 Grok 的代码／评审／diff 上下文接入恢复后的同代草稿队列，已打开会话也保持连续追加顺序；新增四项回归本地通过，英中操作提示已同步。普通未绑定 PTY 的拒绝不变，三平台真实发送与双语布局待验，G01 不关闭。
 - **当前替代方式**：保留草稿，明确点击复制，关闭富输入后由用户粘贴到原生 CLI；也可使用已验证的托管文本输入。
 - **源码／证据**：[普通终端提交与拒绝路径](../../app/src/terminal/view/use_agent_footer/mod.rs#L1153)、[历史明确复制验收](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/OFFICIAL_40_RECOVERY_AND_INPUT_GUARDS.md)。
 - **关闭条件**：固定版本的真实普通 PTY 能在可信输入就绪时自动发送中文、多行和长文本；审批、旧会话、重连与重复点击不得误批准、丢失或重投。取得实际回合接收与结果证据后，才可移除无条件拒绝。
@@ -100,7 +101,8 @@
 - **未验证代码增量**：Homebrew Claude 固定 cask、WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探针、发布及恢复已写入；Codex 三种 shell 补全纳入交换和回滚。Codex npm macOS ARM64／Linux x64 已补官方 wrapper、完整平台资源、实际 Node 公共入口、依赖快照及恢复身份绑定；Homebrew Node 使用私有 dylib 副本，不改原安装，Linux 探针要求 Landlock ABI 3。Windows x64 Codex npm 的 cmd/PowerShell → Node → 完整平台包、AppContainer 双探针、两步无覆盖发布及恢复已合入；Claude Windows npm 的精确包内硬链接和双入口探针已接；Grok 三平台 npm 的完整三包/原生解压、包目录与用户 bin 多位置事务，以及 Mac ARM Homebrew 双别名/三补全也已接。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同也已接，但要求显式Stable且官方实时指针恰为2.1.278；当前2.1.274仍拒绝，不算当前渠道可降级。三款 Linux x64 Homebrew cask 和 Grok WinGet 固定来源事务现也已接入，Linux 来源发现与执行总入口已接；Claude 三探针、Codex 完整 musl 包及补全、Grok 双别名及补全分别绑定。macOS Intel 已按用户明确范围排除。用户安装未运行升级；实际公共入口、隔离、回滚与恢复仍待验，未知版本门禁保留。
 - **本批真实验收入口**：`39941b281` 接入 Codex/Grok 私有 npm 四场景入口；Mac ARM Grok 正常升级及后续 `2b59c8c62` Codex 正常升级已按各自源码独立复核；`39941b281` 的 Linux Grok 四场景也已通过并核验清理／冷恢复，不外推其他平台或来源。旧 Codex/Grok 失败和清理未知原件保留；旧 CI 的 Linux glibc ELF 失败与 ABI1 能力事实分开，Windows 一项 `LEAK` 仍待明确。详细正常结果与旧失败统一见[验证结论](VALIDATION_REPORT.md)。
 - **隔离前置增量**：`2b59c8c62` 在生成 Linux Codex npm／三款 Linux Homebrew 版本变更计划前核验 Landlock ABI≥3，并同步英中不可用原因；原 worker 门禁不变。Grok npm、其他来源、Mac／Windows与同版本无候选执行不误限。本地检查通过；相关平台同提交 CI、实际双语布局和真实来源事务仍待补，不关闭 G09。
-- **当前解析与入口增量**：`56f6da217` 修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口及五场景实测入口；本地门禁通过，目标平台结果待补，G09 不关闭。无需本地化变更。
+- **当前解析与入口增量**：`56f6da217` 修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口及五场景实测入口；本地门禁及同提交两平台编译／定向 Rust 通过，Linux 原文件依赖闭包通过；Windows 私有 npm 登记失败，产品事务尚未执行，G09 不关闭。无需本地化变更。
+- **空闲通知补接**：`debed8c51` 将升级器的会话模型观察对齐三支持平台，避免 Linux／Windows 恢复清理后仍沿用旧 busy 状态；本地门禁通过，目标平台真实更新链待验。`c7ef8d95b` 仅修跨 Python 版本的验收夹具，不改生产校验。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
