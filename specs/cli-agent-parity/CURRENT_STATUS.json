@@ -67,9 +67,9 @@
   ],
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 36210156960,
-  "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。",
+  "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。 2b59c8c62新增Linux候选隔离不可用原因已同步英文/简体中文，i18n11项通过；真实双语布局仍后置，不继承历史错误布局通过。",
   "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。 本次图片仓外证据已逐字节复制到持久归档并生成 SHA-256 索引，保留 /private/tmp 原件，不含认证文件。",
-  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，按实际可用空间监测并保留必要余量，不将 12 GiB 作为已达到的事实。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。 新签名验收程序使用独立测试 profile，避免读取旧签名创建的钥匙串条目时等待人工授权；原 profile、凭据和系统安全设置不改动。 本轮另经授权仅清理 6 个已不用的中间文件，共 2,051,019,161 字节，保留当前 rlib、测试程序及所有原始证据；g09-unused-build-cache-cleanup-20260926/result.safe.json 记录清理后约 10.1 GiB 可用空间，该读数不代表当前实时余量。",
+  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，按实际可用空间监测并保留必要余量，不将 12 GiB 作为已达到的事实。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。 新签名验收程序使用独立测试 profile，避免读取旧签名创建的钥匙串条目时等待人工授权；原 profile、凭据和系统安全设置不改动。 本轮另经授权仅清理 6 个已不用的中间文件，共 2,051,019,161 字节，保留当前 rlib、测试程序及所有原始证据；g09-unused-build-cache-cleanup-20260926/result.safe.json 记录清理后约 10.1 GiB 可用空间，该读数不代表当前实时余量。 2026-09-27又按精确清单清理7个停用单测可执行缓存（逻辑4,936,347,344字节），保留5个当前或原生验收角色及全部原始收据/日志/元数据；当时3GiB运行门槛的空间阻塞已解除，清理后6,597,607,424字节不是后续实时余量。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
   "documentation_updated_at": "2026-09-27",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
@@ -915,14 +915,15 @@
       "executed": false,
       "data_profile": "parity-code-b78b62a48",
       "existing_profiles_modified": false,
-      "scope": "内置盘联测应用包；资源逐文件核对，显式临时签名未查询开发者证书。未启动、未认证或完成GUI验收。"
+      "scope": "内置盘联测应用包；资源逐文件核对，显式临时签名未查询开发者证书。未启动、未认证或完成GUI验收。",
+      "later_bundle_record": "g09_isolation_preflight_increment.prepared_macos_bundle"
     }
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
     "baseline_commit": "acc29e1549fb09e6e0dce1549af5ade469df30ef",
     "implementation_commit": "39941b2815506997198091082b92d19e11d92761",
-    "status": "源码已提交推送并绑定；Grok macOS arm64 私有正常升级通过；Codex 独立私有入口与七项隔离负例通过，修后完整事务因空间不足3GiB未运行；同提交Linux/Windows CI进行中，G09未关闭",
+    "status": "39941b281源码已提交推送并绑定；Grok macOS arm64私有正常升级通过；后续2b59c8c62 Codex私有完整normal已独立复核通过，旧失败和不足3GiB历史保留；旧提交Linux/Windows编译和定向模块通过，Linux Codex实际失败为glibc ELF校验，Windows存在1项LEAK，整轮CI进行中，G09未关闭",
     "source_binding": "source-commit-binding-01.safe.json 确认17个代码/工作流/脚本Git blob与source-snapshot-05.safe.json一致；39941b2815506997198091082b92d19e11d92761已推送并核对远端SHA。旧快照和所有原始收据保留。",
     "closed_gaps": [],
     "fixed_transactions": {
@@ -1010,9 +1011,9 @@
       "codex_cache_after_system_cache_fix": "codex-live-07-normal 在精确系统cache目录读取修正后仍返回 ProbeFailed；native PID 12908、generation 29ce7311-7a17-4066-8b29-e5fee11fb238 的 Node 在 dyld 初始化 SIGABRT（native_wait_status=6），cleanup_confirmed/job_removed/resource_cid_destroyed 均为 true。codex-cache-normal-03.safe.json/log 及 codex-live-07-dyld-diagnosis-20260927/crash.safe.json、cleanup.safe.json 原样保留；清理通过不等于升级成功。",
       "codex_private_entry_global_openssl": "dyld-private-codex-entry-01的entry因全局OpenSSL配置读取EPERM退出1；同私有字节包在02仅设置OPENSSL_CONF=/dev/null后返回codex-cli 0.156.1退出0，原失败保留。"
     },
-    "pending_recheck": "codex-live-07-normal已失败且精确代次清理确认。后续独立私有Node root_only和原包入口成功、七项隔离负例EPERM；修后完整Codex npm normal尚未运行，内置盘空间不足运行器3GiB门槛，不降低门槛。supervisor-build-05已通过，同提交Linux/Windows CI进行中；其余故障、冷恢复和消费者验收仍待补。",
+    "pending_recheck": "codex-live-07-normal失败与精确代次清理原样保留；解除空间阻塞后2b59c8c62的codex-live-09-normal已独立复核通过，仅固定Mac ARM私有正常升级。三种恢复/故障、消费者渠道、GUI与其他来源真实验收仍待补；39941b281的CI不覆盖新隔离前置代码。",
     "scope": "固定 test 候选只覆盖包事务后端，不覆盖消费者实时渠道解析、GUI 更新入口、模型生命周期或 Homebrew/WinGet 真实升级与恢复；Windows 本轮新增运行器仅纳入脚本可移植性与 cfg 门禁，Mac Intel 排除。",
-    "localization": "无需本地化变更：已有权限说明和用户界面语义不变。",
+    "localization": "39941b281增量无需本地化变更；后续2b59c8c62的新增隔离原因提示已同步英中，实际布局仍待验，见g09_isolation_preflight_increment。",
     "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-npm-live-integration-20260926",
     "cleanup_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-unused-build-cache-cleanup-20260926",
     "grok_macos_normal": {
@@ -1032,7 +1033,7 @@
       "summary_sha256": "d9f7a6b51850be70a3318773f071954dae7fbdf89e56c2d954eac6f4cf713145",
       "scope": "仅固定私有安装的正常升级、完整包与用户镜像、实际 npm 只读来源查询及候选退出清理；不包含冷恢复、其余故障场景、消费者实时渠道、GUI 或模型。Documents 首轮 cleanup_unknown 不回填。"
     },
-    "workflow_receipts": "两新增npm artifact仅在私有证据白名单中启用隐藏.local目录，并分别收集最新codex-npm.json/grok-npm.json恢复账本，不扩为用户HOME；39941b281同提交CI正在运行，尚无云端真实事务结果。",
+    "workflow_receipts": "两新增npm artifact仅收集私有证据白名单；39941b281的CI编译和定向模块通过，但Linux Codex正常场景glibc ELF校验失败，Windows原生步骤有1项LEAK，整轮仍进行中。Grok npm实际回执待核；不覆盖2b59c8c62。",
     "receipt_copies": {
       "grok_cache_normal": {
         "files": 48,
@@ -1125,7 +1126,206 @@
       "run_codex_npm_updates": true,
       "run_grok_npm_updates": true,
       "initial_receipt": "ci-36257833211/initial.safe.json",
-      "macos_intel_jobs": "both_skipped"
+      "macos_intel_jobs": "both_skipped",
+      "completed_scope": "Linux/Windows编译和定向模块已通过；整轮仍在运行，不将尚未取得的真实事务结果记为通过。",
+      "excluded_increment": "2b59c8c62c7c46bc30211a9872f966c52317202e",
+      "environment_preflight": {
+        "linux": {
+          "receipt": "ci-36257833211/linux-environment.safe.json",
+          "sha256": "a77be625e80bd07be1b953e3c9030f7de2d9b018f6ccda0b72dda6da4ad65e9f",
+          "euid": 1000,
+          "landlock_abi": 1,
+          "abi3_available": false,
+          "home_linuxbrew": "absent",
+          "unshare_command_exit_code": 127,
+          "scope": "ABI1不满足Codex npm和三CLI Linux Homebrew候选隔离；Grok npm不要求该ABI，须核实际回执。命令缺失不等于内核禁止namespace。"
+        },
+        "windows": {
+          "receipt": "ci-36257833211/windows-environment.safe.json",
+          "sha256": "5079f6613e2aba0b00082e257edcff4ef2783670c8c6f077e3d6b5846c540e3f",
+          "winget_command_found": false,
+          "hkcu": "readable",
+          "effective_admin_membership": false,
+          "scope": "不证明已登记portable来源事务可用或不可用；仍需来源、权限、依赖、候选隔离及真实事务验收。"
+        }
+      },
+      "codex_npm_observed_failure": {
+        "status": "failed",
+        "artifact": "ci-36257833211/codex-npm-artifact-10911429927",
+        "zip_sha256": "938191725ef7c9a273f13cb5d546adc169519a326d9acf280ebfe48a1b497fcb",
+        "review_sha256": "1c803d57fdd6f0ecd90707b16a09fcd3825b39f52626fcede31a47cf0ae291eb",
+        "generation": "8ace5170-0ab8-4bed-8fc8-300ef3323612",
+        "result_error": "ProbeFailed",
+        "worker_exit_code": 101,
+        "supervisor_stderr": "Error: managed_process.linux_glibc_elf_invalid",
+        "native_exit_code": 1,
+        "exit_reason": "stdio_closed",
+        "cleanup_confirmed": true,
+        "scope": "实际失败不能归因为独立环境预检ABI1；没有观察到本次执行走到Landlock拒绝。"
+      },
+      "windows_leak": {
+        "job_conclusion": "success",
+        "raw_log": "ci-36257833211/windows-job.raw.log",
+        "line": 4136,
+        "test": "supervised_cancel_before_control_handshake_confirms_process_tree_exit",
+        "nextest_status": "LEAK",
+        "step_passed": 5,
+        "step_leaky": 1,
+        "scope": "原始LEAK保留；本轮未进一步诊断或重跑，不能宣称完全无残余进程/句柄。"
+      }
+    },
+    "unit_test_cache_cleanup": {
+      "receipt": "unit-test-cache-cleanup-20260927.safe.json",
+      "sha256": "be9a5e8064eba29e713b5ceadd48aef097f4746d06b3a5083ea60f12c1848f11",
+      "deleted_count": 7,
+      "logical_bytes_removed": 4936347344,
+      "free_bytes_before": 1675784192,
+      "free_bytes_after": 6597607424,
+      "retained_current_and_native_roles": 5,
+      "scope": "只清理停用单测可执行缓存，原始日志/源码/元数据/收据及当前或原生验收角色保留；解除当时3GiB空间阻塞，不回填历史失败。"
+    }
+  },
+  "g09_isolation_preflight_increment": {
+    "updated_at": "2026-09-27",
+    "baseline_commit": "6db38e0da2fd0c066eeb31f4f2de9f7b446fd4fb",
+    "implementation_commit": "2b59c8c62c7c46bc30211a9872f966c52317202e",
+    "status": "已提交；本地编译、i18n、更新模块与监督程序构建通过；同提交Mac Codex npm私有完整正常升级独立复核通过；相关平台CI及实际双语布局待补，G09未关闭",
+    "closed_gaps": [],
+    "scope": "仅Linux Codex npm与Codex/Claude/Grok Homebrew在版本变化且既有来源/版本/渠道门禁通过后只读查询Landlock ABI>=3；失败不生成可执行UpdatePlan，状态机清除旧计划并阻止手动/自动派发。",
+    "unchanged_boundaries": "原worker ABI硬门禁和隔离规则安装保留，能力查询不代替执行时核验；Grok npm、其他来源、macOS/Windows及同版本无候选的检查/配置同步不受该门槛影响；未知版本兼容门禁不变。",
+    "source_binding": {
+      "files": 9,
+      "snapshot": "source-snapshot-01.safe.json",
+      "snapshot_sha256": "16fa1247cbaf7db9d74db7ea5f2ef7f83f0c52dce530be768e0f38bca46a616e",
+      "receipt": "source-commit-binding-01.safe.json",
+      "receipt_sha256": "14e2ea8349e7273c568ecdd34f601ad750a2104228bb9a669e68ddc30d21ddf9",
+      "git_blobs_match_validated_bytes": true
+    },
+    "local_gates": {
+      "platform": "macOS arm64",
+      "cargo_check_01": {
+        "status": "passed",
+        "elapsed_seconds": 98.56
+      },
+      "i18n_01": {
+        "passed": 11,
+        "elapsed_seconds": 252.42
+      },
+      "updates_01": {
+        "passed": 190,
+        "ignored": 6,
+        "new_behavior_tests_passed": 4,
+        "elapsed_seconds": 4.67
+      },
+      "supervisor_build_01": {
+        "status": "passed",
+        "elapsed_seconds": 177.29,
+        "log_sha256": "c265c002e38c944e2253a86ce79d735e82f08bfb2eb9e902f0a9b1d448834113"
+      },
+      "embedded_i18n_01": {
+        "passed": 11,
+        "elapsed_seconds": 262.1,
+        "feature": "rust-embed/debug-embed",
+        "receipt_sha256": "407e119ffb4c3f16840b9172f51d71672d5cbd43dfff9fbea8e29d8e5b10263b",
+        "log_sha256": "f5eb07cc48f6983562207e813046635d2cf982591d7901a79dd5672dbe2ba09c"
+      },
+      "embedded_build": {
+        "command": [
+          "cargo",
+          "build",
+          "-p",
+          "warp",
+          "--bin",
+          "infinishell",
+          "--features",
+          "rust-embed/debug-embed"
+        ],
+        "first_run": "Cargo exit0但rust-objcopy因空间不足留下无效3280字节产物；包装架构校验在创建应用前拒绝，原字节及日志保留，不计可用构建",
+        "first_log_sha256": "318518cd7704dd079ddda24014e8924bd238dae721d165655ab7f3c5555ce669",
+        "relink_run": "精确清理停用缓存后复用库重新链接成功；ARM64/四份FTL原字节/严格签名核验通过",
+        "relink_receipt_sha256": "217bd2878adc389000553c34c1b29c395f32dfd71dd7f5619bf0a0869cc8a8e4",
+        "relink_log_sha256": "44b83bcafd01a532a4f3add33b5a5708c2d70fde7c06692074cfb1441b98737e",
+        "actual_gui_layout": "deferred"
+      }
+    },
+    "localization": "新增settings-cli-updates-isolation-unavailable已同步英文/简体中文，复用既有设置状态段落；资源门禁通过，实际双语换行/截断/尺寸仍待共同验收。",
+    "related_platform_ci": "待同提交验证；36257833211绑定39941b281，不继承其编译、模块或事务结论。",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-isolation-preflight-20260927",
+    "acceptance_limit": "仅能力前置与提示增量；ABI1安全拒绝不计升级成功，不关闭G09或Goal，不替代真实安装/恢复/GUI/模型验收。",
+    "macos_codex_normal": {
+      "status": "passed_independently_rechecked",
+      "source_commit": "2b59c8c62c7c46bc30211a9872f966c52317202e",
+      "platform": "macOS arm64",
+      "mode": "fixed_official_npm_node_transaction",
+      "case": "updated",
+      "run": "codex-live-09-normal",
+      "old_version": "0.155.1",
+      "target_version": "0.156.1",
+      "runner_exit_code": 0,
+      "elapsed_seconds": 354.88,
+      "source_files_matching_git_blobs": 18,
+      "working_tree_dirty": true,
+      "dirty_scope": "文档编辑；18个运行器追踪源码逐个匹配实现提交和运行后字节。",
+      "worker_sha256": "0ecd5d870874e3eb64b89d773a11a664cdf97afa5c4f34a28c8e921389f96d9e",
+      "supervisor_sha256": "974cea9a90df40a3c57fbcf0106db8bcbdb12f0fdd4e20db266d6ad3a57e27df",
+      "official_archives_sri_verified": 4,
+      "published_files_verified": 47,
+      "candidate_bound_files_verified": 69,
+      "entry_link_identity_preserved": true,
+      "uid_gid_mode_preserved": true,
+      "root_inode_before": 93465119,
+      "root_inode_after": 93465346,
+      "public_node_launcher_executed": true,
+      "public_version": "0.156.1",
+      "generation": "59b819cb-c243-4d70-b27b-14ff4625c4a5",
+      "binding_digest": "426819db88d3d4d68143972a39823686fd0122f423f9a7346e670fa078fb48db",
+      "native_wait_status": 0,
+      "cleanup_confirmed": true,
+      "job_removed": true,
+      "resource_cid_destroyed": true,
+      "old_stage_and_active_journal_absent": true,
+      "private_config": "fixture原本缺失的.codex/config.toml仍缺失；不读取或声称验收用户真实配置。",
+      "summary_sha256": "4e2badeb87bf60fbb66b73aaecdb17574863712988e530bff9f9842a216d35a2",
+      "receipt_copies": {
+        "directory": "codex-cache-normal-success-receipts",
+        "raw_files": 46,
+        "raw_bytes": 411026,
+        "index_sha256": "1277e2bb2e980bad3281738115205d51cfe7d223092dcfc390831b32436dfdff",
+        "independent_review_sha256": "29ea4436b3ee4379f7347cb3bc3b30a37649a493924a3b946061edee3e239ec1"
+      },
+      "model_inputs_sent": 0,
+      "recover_invoked": false,
+      "consumer_channel_discovery_covered": false,
+      "gui_covered": false,
+      "busy_or_plugin_recheck_covered": false,
+      "scope": "正常升级后端通过，不含其余三种恢复/故障场景；固定test候选不替代消费者实时渠道，不关闭G09/Goal。"
+    },
+    "embedded_app_build": "进行中；不计实际双语布局通过。",
+    "prepared_macos_bundle": {
+      "source_commit": "2b59c8c62c7c46bc30211a9872f966c52317202e",
+      "status": "prepared_not_executed",
+      "app": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/2b59c8c62/InfiniShellParity-2b59c8c62.app",
+      "architecture": "arm64",
+      "features": [
+        "rust-embed/debug-embed"
+      ],
+      "unsigned_sha256": "2b8525dd45177214659f11d4fed71c763bc30a54029b1ade835b2e96944c6afc",
+      "signed_sha256": "a42a0439886fc5174ba6db7d51211949133c4a9232e3e448d22d946bbb6029fd",
+      "profile": "parity-code-2b59c8c62",
+      "signature_verified": true,
+      "executed": false,
+      "four_ftl_bytes_embedded": true,
+      "resource_files": 131,
+      "archive": "validation/g09-isolation-preflight-20260927/prepared-app-2b59c8c62",
+      "bundle_receipt_sha256": "6d706e45584115fce4feef72120921937969356820358bb587f77f71e20af6e4",
+      "archive_index_sha256": "92a3d9bfc3f94cb1ac60cbc452430e5910b22c6387aebe9f2b4ffca57e8fef50",
+      "default_backend_sha256": "974cea9a90df40a3c57fbcf0106db8bcbdb12f0fdd4e20db266d6ad3a57e27df",
+      "scope": "同源码不同feature/摘要；默认后端正常事务不等于本交付程序GUI/模型验收。旧应用、原配置及原始收据保留。"
+    },
+    "delivery_cache_cleanup": {
+      "first_receipt_sha256": "f401c7442cac2a7a161ac6784ee0693ffb213490cc8d06dbb0360631e11f9fd3",
+      "relink_receipt_sha256": "078ea5d47e36c0c349b790bd1b21d889872604fead82b5fa32509a38b135e4f4",
+      "scope": "只清理核对摘要、身份和无进程占用的停用单测与旧主程序编译缓存；无效链接输出先另存原字节。真实native worker/supervisor、旧应用、源码与全部日志/元数据/收据保留。"
     }
   },
   "supported_target_scope": {

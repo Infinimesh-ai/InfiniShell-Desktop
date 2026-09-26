@@ -2,7 +2,9 @@
 
 **自动升级属于原 Goal；阶段交付，整体尚未完成。** 本文基于 `e3ef39689cd8b686dfe040b90217ed1067b4d268`（2026-09-25），固定开发／验收版本为 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。不将历史渠道发现写成今日最新版，也不把本机手动更新当作产品事务通过。状态见 [CURRENT_STATUS](CURRENT_STATUS.json)，真实范围见[验证结论](VALIDATION_REPORT.md)。
 
-2026-09-27 G09 私有 npm 复验增量已提交并推送为 `39941b2815506997198091082b92d19e11d92761`：Codex `0.155.1→0.156.1`／Grok `1.0.40→1.0.41` 已有正常更新、交换后缺收据冷恢复、外部改动保留及候选改写拒绝四场景入口；Linux 用默认关闭的窄开关执行同源码 libtest／supervisor，另独立归档 Linux／Windows 包来源只读预检。产品修正包括 Grok 新版本 Mirror 继承旧 uid/gid/mode、Codex macOS Node 裸加载路径解析，以及离线探针的根目录 literal 只读、精确系统 dyld 缓存目录读取和空 OpenSSL 配置；签名、来源与身份核验未放宽，未开放 OS／Rosetta 整目录或网络。Grok macOS arm64 私有正常升级已独立复核通过，范围仍限该后端路径；Codex 旧 Stable 误用、UnsupportedSource、05／07 的 ProbeFailed／dyld SIGABRT，以及 Grok Documents cleanup_unknown 均保留。后续独立私有 Node 及原包入口已成功，七项隔离负例均为 EPERM；原包入口首次全局 OpenSSL 配置读取被拒的失败亦保留。Mac 修后完整 Codex npm 正常升级未运行：内置盘空间不足运行器 3 GiB 门槛，保留现场且不降低门槛。两新归档只收集私有证据白名单，包含隐藏 `.local` 和最新恢复 journal。冷恢复等其余场景、消费者实时渠道、GUI／模型和 Homebrew／WinGet 真实事务仍欠，G09 与 Goal 不关闭；Mac 仅 Apple Silicon。[同提交 Linux／Windows CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36257833211) 正在运行，尚不记通过；最新门禁、构建状态与原始收据见[验证结论](VALIDATION_REPORT.md)。无需本地化变更，既有权限说明和界面语义不变。
+2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；其余恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+
+仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
 
 2026-09-26 未验证代码增量：Claude Homebrew／WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探测、替换及中断恢复已接入。Codex 固定 0.156.1 的完整归档与三种 shell 补全共同恢复；Codex npm macOS ARM64／Linux x64／Windows x64 的 Node、官方 wrapper、完整平台包与事务恢复现也已接线；实际 Node 公共入口在私有依赖快照中探测，不能仅测 native 二进制。Windows x64 保留实际 cmd/PowerShell 公共 shim 两条 Node 链，私有 AppContainer 候选经真实退出后才能发布，源码已接；Claude Windows npm 的固定包内硬链接和公开双入口、Grok 三平台 npm 的完整三包/Brotli解压/用户bin多位置事务、Grok Mac ARM Homebrew 的双别名和三补全也已接入。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同已接，仅在显式Stable且官方实时指针匹配时开放；当前2.1.274仍拒绝。macOS Intel 已按用户明确范围排除，Mac 仅支持 Apple Silicon。功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译与 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。新增来源的真实升级与恢复验收仍待补；下文历史结果保持原范围，不能据此扩大支持。
 
@@ -26,6 +28,7 @@ Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefi
 - macOS arm64、Linux x64、Windows x64 的已核验官方原生安装已有正式更新事务证据；具体源码与版本范围以验证结论为准，不外推其他架构。
 - 已验收的 Claude Unix npm 单包事务与上方新增未验证代码分开记录；新 npm、Homebrew、WinGet 路径不能继承其通过结论。未知来源、未审核版本和不同安装布局仍不可自动执行（G09），开发机手动升级成功不能关闭缺项。
 - 原生、npm、Homebrew、WinGet、自定义入口与 helper 分别识别实际路径、来源、依赖和渠道；无权限、企业策略、不支持组合或身份不确定时显示原因与下一步，不猜测更新命令。
+- Linux Codex npm 和三款 Linux Homebrew 的候选执行要求 Landlock ABI≥3；检查阶段只读查询能力，执行时仍须真实安装隔离规则。ABI1 的拒绝表示该环境不可执行这些更新，不是更新成功；Grok npm 不使用这一 Landlock 门槛，须按其真实事务回执判断。`unshare` 命令缺失不能推出内核禁止 namespace；Windows 的 `WinGet.exe` 不在 PATH 也不能单独推出已登记 portable 来源的宿主事务不可用，仍须核验安装归属、权限、依赖与实际执行。
 - SSH／tmux 以远端实际版本与安装来源为准，本机发现或升级不代表远端更新成功。
 
 2026-09-25 续接增量已收紧 npm 安装归属：包名、精确版本、清单中的入口及当前命令必须属于同一前缀，npm 管理器本身也须有注册清单；Windows 入口支持 npm `cmd-shim 8` 的 Node 和原生二进制模板，拒绝追加命令、跨前缀入口和 `npm link`。macOS 已用实际隔离安装的 Codex `0.156.1`、Claude `2.1.280` 验证来源识别；模板测试不代替 Windows 实机验证。该来源识别提交当时不执行包管理器升级，npm／Homebrew 为 `ManualOnly`；后续单包事务见下文，G09 保持未关闭。没有新增或改变界面文案，**无需本地化变更**；现有来源标签语义仍适用。

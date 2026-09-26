@@ -8,7 +8,9 @@
 
 按用户要求形成的功能代码检查点现已进入无人值守回归阶段；真实 GUI／模型验收仍后置。代码检查点 `704bb33bb2943f8a686b24b843c3b3a1ba656c19` 中的 G01/G03 专属 TUI GUI／PNG 输入、G08 远端图片、G09 安装来源事务、G10 搜索与受限技能增量见 [CURRENT_STATUS](CURRENT_STATUS.json) 的 `current_work_order`；该检查点已通过 macOS arm64 编译和 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收，也不扩大下表的真实功能验收范围。Codex 远端图片已接入[固定 0.156.1 的原生队列](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L899)及[图片快照](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/local_media.rs#L20)，按后续输入排队处理；仍须后续真实 SSH／tmux 接收证明。共享 daemon 默认路径仍只允许唯一前台客户端和唯一 loaded thread；新增每 pane 独立 app-server、明确 socket 和当前 TUI 票据绑定及 GUI入口；Grok 远端专属会话、当前 pane 入口、图片发送和查询恢复已接线；Claude 新增上传原图→原生 Read→历史图片字节证明及未知状态恢复，不能把文本入队计为图像消费。三 CLI 三目标平台 npm、三 CLI Mac ARM/Linux x64 Homebrew、三 CLI Windows x64 WinGet、Claude/Grok 受限 Skill 和 Mac/Linux 命令+技能组合已有未验证接线；三平台受审命令现统一通过宿主工具逐条独立监督、审批和清理，同会话多命令及原生追加均已接；Grok普通终端历史继续也已接同UUID恢复与新代次CAS。
 
-2026-09-27 G09 最新增量已提交并推送为 `39941b2815506997198091082b92d19e11d92761`，17 个代码／工作流／脚本 Git blob 与 `source-snapshot-05.safe.json` 一致。Codex `0.155.1→0.156.1`／Grok `1.0.40→1.0.41` 已有私有 npm 四场景后端入口、Linux 窄工作流及包来源只读预检。产品修正包括 Grok 新版本 Mirror 继承旧 uid/gid/mode、Codex macOS Node 裸加载路径解析，以及离线探针的根目录 literal 只读、精确系统 dyld 缓存目录读取和空 OpenSSL 配置；签名、来源与身份核验未放宽，未开放 OS／Rosetta 整目录或网络。Grok macOS arm64 私有正常升级已独立复核通过，范围仍限该后端路径；Codex 旧 Stable 误用、UnsupportedSource、05／07 的 ProbeFailed／dyld SIGABRT，以及 Grok Documents cleanup_unknown 均保留。后续独立私有 Node 及原包入口已成功，七项隔离负例均为 EPERM；原包入口首次全局 OpenSSL 配置读取被拒的失败亦保留。Mac 修后完整 Codex npm 正常升级未运行：内置盘空间不足运行器 3 GiB 门槛，保留现场且不降低门槛。冷恢复等其余场景、消费者实时渠道、GUI／模型和 Homebrew／WinGet 真实事务仍欠，G09 与 Goal 不关闭；Mac 仅 Apple Silicon。[同提交 Linux／Windows CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36257833211) 正在运行，尚不记通过；最新门禁、构建状态与原始收据见[验证结论](VALIDATION_REPORT.md)。
+2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；其余恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+
+仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
 
 ## 固定版本与模式
 
@@ -28,7 +30,7 @@
 | 持久化与恢复 | 任务、原生 ID、父子、消息／结果；活跃重关联与历史继续分开 | 同类持久化；继续受原生会话与权限约束 | 同类持久化；技能／策略合同须在恢复时继续成立 |
 | 配套通知插件 | `codex-warp 0.4.0`；原生 hooks 信任单独审核 | `warp 2.2.0`；保留禁用与无关配置 | `infinishell-grok 0.1.5`；安装、启用及完整性分别核对，原生权限观察不得替代审批 |
 | 自动升级渠道 | latest／alpha | latest／stable | stable／alpha |
-| 自动升级来源 | 原生安装已有验收；三平台 npm、Mac ARM/Linux x64 Homebrew、Windows x64 WinGet 固定来源事务已接，新增代码未验证（G09） | 原生安装及固定 Unix npm 单包事务已有各自限定验收；Windows npm、两平台 Homebrew、WinGet 代码已接，新增路径待验。主动降级仅条件合同，当前渠道不匹配仍拒绝（G09） | 原生安装已有验收；三平台 npm、两平台 Homebrew、WinGet 固定来源事务已接，新增代码未验证（G09） |
+| 自动升级来源 | 原生安装已有验收；三平台 npm、Mac ARM/Linux x64 Homebrew、Windows x64 WinGet 固定来源事务已接；Mac npm 私有正常升级通过，其余新增场景及路径待验（G09） | 原生安装及固定 Unix npm 单包事务已有各自限定验收；Windows npm、两平台 Homebrew、WinGet 代码已接，新增路径待验。主动降级仅条件合同，当前渠道不匹配仍拒绝（G09） | 原生安装已有验收；三平台 npm、两平台 Homebrew、WinGet 固定来源事务已接；Mac npm 私有正常升级通过，其余新增场景及路径待验（G09） |
 | 完成与清理 | 可信原生终态；普通 PTY Escape 不证明工具退出（G12） | 可信原生终态及本代清理回执 | 原生五秒 EOF 不可靠；托管清理依赖当前代次监督回执 |
 
 CLI 升级、插件更新与托管兼容分别判断；渠道与来源详细合同见 [CLI_AUTOUPDATE](CLI_AUTOUPDATE.md)，用户支持范围与回退见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。本表中的能力不外推到未来 CLI 版本（G13）。
