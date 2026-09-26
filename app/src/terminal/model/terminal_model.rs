@@ -45,6 +45,8 @@ use super::lifecycle::{
     BlockLifecycleCoordinator, CommandStartKind, IgnoreReason, LifecycleAction, LifecycleInput,
     LifecycleSnapshot, LifecycleTransition, PreexecObservation, StartCommandOutcome,
 };
+#[cfg(target_os = "macos")]
+use super::local_pty_identity::LocalPtyIdentity;
 use super::secrets::{RespectObfuscatedSecrets, SecretAndHandle};
 use super::selection::ScrollDelta;
 use super::session::{BootstrapSessionType, InBandCommandOutputReceiver, SessionId};
@@ -555,6 +557,8 @@ pub struct TerminalModel {
 
     /// The shell type of the login shell for this session.
     shell_launch_state: ShellLaunchState,
+    #[cfg(target_os = "macos")]
+    local_pty_identity: Option<LocalPtyIdentity>,
 
     /// Whether or not to respect secrets that are obfuscated, respecting the Safe Mode/Secret Redaction setting.
     obfuscate_secrets: ObfuscateSecrets,
@@ -1168,6 +1172,8 @@ impl TerminalModel {
             handled_exit: false,
             env_var_collection_name: None,
             shell_launch_state: shell_state,
+            #[cfg(target_os = "macos")]
+            local_pty_identity: None,
             obfuscate_secrets,
             shared_session_status,
             shared_session_source: None,
@@ -1559,6 +1565,10 @@ impl TerminalModel {
         let transition = self.plan_lifecycle_transition(LifecycleInput::Exit, None, None, None);
 
         self.handled_exit = true;
+        #[cfg(target_os = "macos")]
+        {
+            self.local_pty_identity = None;
+        }
         // Forcibly exit the alt screen so that we can show the user the
         // banner informing them that the shell process exited.
         self.exit_alt_screen(true);
@@ -1732,6 +1742,16 @@ impl TerminalModel {
 
     pub fn shell_launch_state(&self) -> &ShellLaunchState {
         &self.shell_launch_state
+    }
+
+    #[cfg(target_os = "macos")]
+    pub(crate) fn local_pty_identity(&self) -> Option<LocalPtyIdentity> {
+        self.local_pty_identity
+    }
+
+    #[cfg(all(target_os = "macos", feature = "local_tty"))]
+    pub(crate) fn set_local_pty_identity(&mut self, identity: Option<LocalPtyIdentity>) {
+        self.local_pty_identity = identity;
     }
 
     pub fn pending_subshell_session(&self) -> Option<&SubshellInitializationInfo> {

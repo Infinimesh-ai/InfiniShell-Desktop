@@ -31,6 +31,8 @@ pub mod index;
 pub mod iterm_image;
 pub mod kitty;
 pub(in crate::terminal) mod lifecycle;
+#[cfg(target_os = "macos")]
+pub(crate) mod local_pty_identity;
 pub mod secrets;
 pub mod selection;
 pub mod session;

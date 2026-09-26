@@ -142,6 +142,8 @@ pub mod settings;
 pub mod settings_view;
 pub mod tab_configs;
 pub mod terminal;
+#[doc(hidden)]
+pub use terminal::cli_agent_sessions::grok_owned_launch::run_owned_grok_from_args;
 pub mod themes;
 use ::ai::project_context::model::ProjectContextModel;
 pub use ai::agent::todos::AIAgentTodoList;

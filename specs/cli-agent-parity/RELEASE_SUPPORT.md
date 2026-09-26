@@ -35,9 +35,9 @@ CLI 升级后若版本或能力没有验证，应保留普通终端入口和本�
 | --- | --- | --- |
 | Codex | `codex-warp 0.4.0` 与随附持久来源、固定通知修补 | 安装与原生 hooks 信任分别检查；在 Codex 内使用 `/hooks` 审核并决定信任当前定义。应用不代写信任摘要 |
 | Claude | `warp 2.2.0` 与固定通知修补 | `2.1.0` 仅是已审计的升级来源；禁用状态和无关用户设置应保留 |
-| Grok | 随附 `infinishell-grok 0.1.4` 与原生通知桥接 | 需要 Node.js 18 或更高版本；桥接补齐 `1.0.41` 初始 hook 加载，按事件去重，无需手动 reload；原生 `plugin update` 成功不证明实际文件已更新，应用另核对安装缓存完整性 |
+| Grok | 随附 `infinishell-grok 0.1.5` 与原生通知桥接 | 需要 Node.js 18 或更高版本；桥接补齐 `1.0.41` 初始 hook 加载，按事件去重，无需手动 reload；原生 `plugin update` 成功不证明实际文件已更新，应用另核对安装缓存完整性 |
 
-Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.3` 可迁移到 `0.1.4`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
+Grok 安装状态与启用状态分开。已禁用的插件不会因修复而自动重新启用。受控旧版 `0.1.0`–`0.1.4` 可迁移到 `0.1.5`；同版本受控文件损坏可以由用户触发修复，未知来源或并发编辑不能被直接覆盖。升级失败时仅回退属于此次操作的文件和配置，无法确认所有权时保留恢复资料并报告失败。详细操作与各阶段证据见 [通知兼容说明](PLUGIN_COMPATIBILITY.md)、[Codex 持久来源](CODEX_PLUGIN_CACHE_REFRESH.md)、[Claude 升级事务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/CLAUDE_PLUGIN_UPGRADE_TRANSACTION.md) 和 [Grok 完整性](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/GROK_PLUGIN_INTEGRITY_VERIFICATION.md)。
 
 Grok 原生审批通知有时只有会话标识、没有回合标识。应用仅在可信的当前会话上显示“需要操作”提醒，不据此宣称当前回合阻塞或成功；工具完成或后续输入会清除提醒。插件通知不授予工具权限。
 
@@ -103,3 +103,5 @@ macOS 已保留三款固定版本的普通终端、托管生命周期、父子�
 历史默认开放增量曾随三平台桌面入口，同步修正英文和简体中文的 `cli-task-manager-claude-verification` 文案：移除功能开关及待验证表述，明确托管任务支持 Claude Code `2.1.273`、`2.1.278` 和 `2.1.280`。这替代此前“无需本地化变更”的结论。真实 GUI 用例按 `en`／`zh-CN` 分别启动独立进程，分目录保存截图和实际界面语言收据。macOS 已核对默认入口、新说明和 Grok 权限按钮的双语可见布局；Linux／Windows 四张原图分别通过上述视口范围的目视检查。其后的历史进程清理补验没有修改产品文案；这不适用于本次输入增量。
 
 本次输入增量已同步英文与简体中文图片/文件说明；macOS 重启后两种语言的 Claude 格式说明及 Grok 顶部说明均可读。后续 Grok 已检查英中权限、附件、技能限制、消息与历史结果完整滚动区，另有独立双图 GUI 在线链。整合工作区内置门禁已通过，按各轮源码快照和二进制计证；最终提交绑定与 Linux/Windows 验证仍待补。本次状态文档更新无需本地化变更。详见 [当前增量验证](VALIDATION_REPORT.md#2026-09-25-继续实现增量)。
+
+G01 的 owned 普通 Grok 路径正在接线：macOS arm64 固定版本原生两轮与 SQLite 去重已验证，入口与恢复 UI 尚未交付。该内部增量不解除普通 Grok 富输入现有门禁，不能解释为三平台消费者验收通过。

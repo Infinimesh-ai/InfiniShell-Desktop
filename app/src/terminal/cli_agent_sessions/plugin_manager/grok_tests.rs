@@ -587,7 +587,9 @@ fn bridge_migration_recovers_registry_commit_before_json_and_rejects_modified_bi
             "none" => {}
             "json_digest" => record["old_json_sha256"] = json!("0".repeat(64)),
             "script_digest" => record["old_script_sha256"] = json!("0".repeat(64)),
-            "target_version" => record["target_version"] = json!("0.1.5"),
+            "target_version" => {
+                record["target_version"] = json!(format!("{PLUGIN_VERSION}-changed"))
+            }
             "source" => fs::write(old_source.join("hooks/notify.cjs"), "用户修改").unwrap(),
             "json" => fs::write(&files[1].0, "用户修改").unwrap(),
             "script" => fs::write(&files[0].0, "用户修改").unwrap(),
@@ -2113,7 +2115,8 @@ fn live_installer_failure(error: &PluginInstallError, home: &Path, source_root: 
     let registered = registered_plugin(home);
     let registered_version = match &registered {
         Ok(Some(plugin)) if plugin.version == "0.1.3" => "legacy_013",
-        Ok(Some(plugin)) if plugin.version == PLUGIN_VERSION => "current_014",
+        Ok(Some(plugin)) if plugin.version == "0.1.4" => "legacy_014",
+        Ok(Some(plugin)) if plugin.version == PLUGIN_VERSION => "current_015",
         Ok(Some(_)) => "other",
         Ok(None) => "absent",
         Err(_) => "unreadable_or_invalid",
@@ -2733,4 +2736,49 @@ async fn run_live_grok_production_installer() {
         .push(json!({"step": "production_update_after_rollback", "passed": true}));
     evidence["passed"] = json!(true);
     record_live_installer_stage(&artifact, &mut evidence, "finished");
+}
+
+#[test]
+fn known_014_recipe_is_preserved_and_changed_bytes_cannot_acquire_ownership() {
+    let directory = tempfile::tempdir().unwrap();
+    let source = directory.path().join("0.1.4");
+    for (name, bytes) in [
+        (
+            ".grok-plugin/plugin.json",
+            include_bytes!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.4-plugin.json"
+            )
+            .as_slice(),
+        ),
+        ("hooks/hooks.json", BUNDLED_FILES[1].1.as_bytes()),
+        (
+            "hooks/notify.cjs",
+            include_bytes!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.4-notify.cjs"
+            )
+            .as_slice(),
+        ),
+        (
+            "README.md",
+            include_bytes!(
+                "../../../../../specs/cli-agent-parity/fixtures/grok-plugin-0.1.4-README.md"
+            )
+            .as_slice(),
+        ),
+    ] {
+        let path = source.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+    let original = validate_expected_tree(&source, "0.1.4").unwrap();
+    let backup = backup_plugin(&source, directory.path()).unwrap();
+    assert_eq!(validate_expected_tree(&backup, "0.1.4").unwrap(), original);
+    assert!(validate_expected_tree(&source, PLUGIN_VERSION).is_err());
+    fs::write(source.join("hooks/notify.cjs"), "用户修改").unwrap();
+    assert!(validate_expected_tree(&source, "0.1.4").is_err());
+    assert_eq!(validate_expected_tree(&backup, "0.1.4").unwrap(), original);
+    assert_eq!(
+        fs::read_to_string(source.join("hooks/notify.cjs")).unwrap(),
+        "用户修改"
+    );
 }

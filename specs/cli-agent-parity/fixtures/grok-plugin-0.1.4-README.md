@@ -1,6 +1,6 @@
 # InfiniShell Grok 状态插件
 
-原生插件 `0.1.5` 仅转换已知 hook 为 InfiniShell v1 通知，不决定权限或执行工具。管理器的 CLI 精确支持集合为桌面平台上的 `1.0.30` 与 `1.0.41`，不把兼容性推广到其他版本。各平台安装、原生派发和传输证据按对应固定构建分别验收。
+原生插件 `0.1.4` 仅转换已知 hook 为 InfiniShell v1 通知，不决定权限或执行工具。管理器的 CLI 精确支持集合为桌面平台上的 `1.0.30` 与 `1.0.41`，不把兼容性推广到其他版本。各平台安装、原生派发和传输证据按对应固定构建分别验收。
 
 ## 安装、升级与禁用
 
@@ -34,7 +34,3 @@ Node 按包含 tmux 包装的完整 OSC 帧预估 4096 字节上限；C1 和分�
 ## 验证边界
 
 安装或 inspect 成功不等于原生 hook 已派发，也不等于应用已接收。无凭据安装检查不宣称 SessionStart 或审批 UI 验收。Windows 的编码启动命令沿用相同通知 mapper 与 worker；真实 shell 参数与 CONOUT 传输须由对应平台验收。
-
-原生 `permissionMode` / `permission_mode` 仅作为同一活动会话的权限观察值透传；缺失、冲突或变化会撤销旧证据，不改变审批规则，也不构成独立身份认证。
-
-Native `permissionMode` / `permission_mode` is forwarded only as an observation for the same active session. Missing, conflicting, or changed values invalidate prior evidence; they neither change approval rules nor authenticate the session on their own.

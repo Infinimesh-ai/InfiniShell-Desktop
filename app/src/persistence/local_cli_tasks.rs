@@ -19,6 +19,9 @@ pub(crate) use super::model::{
 };
 use super::schema::{local_cli_messages, local_cli_task_generations, local_cli_tasks};
 
+#[path = "local_cli_tasks_grok_terminal.rs"]
+pub(crate) mod grok_terminal;
+
 const TASK_RESULT_SUBJECT: &str = "local_task_result";
 
 pub(crate) type CommitReceiver = oneshot::Receiver<Result<(), String>>;
@@ -31,6 +34,7 @@ pub enum LocalCliEnqueueOutcome {
 
 #[derive(Debug)]
 pub enum LocalCliPersistenceRequest {
+    GrokTerminal(grok_terminal::GrokTerminalPersistenceRequest),
     CheckpointTask {
         task: LocalCliTask,
         expected_generation: Option<i64>,
@@ -352,6 +356,9 @@ pub(super) fn handle_request(
     connection: &mut SqliteConnection,
 ) -> Result<()> {
     match request {
+        LocalCliPersistenceRequest::GrokTerminal(request) => {
+            grok_terminal::handle_request(request, connection)
+        }
         LocalCliPersistenceRequest::CheckpointTask {
             task,
             expected_generation,
@@ -451,6 +458,9 @@ pub(super) fn handle_request(
 pub(super) fn reject_request(request: LocalCliPersistenceRequest) {
     let error = "SQLite 写入器已暂停".to_owned();
     match request {
+        LocalCliPersistenceRequest::GrokTerminal(request) => {
+            grok_terminal::reject_request(request, error);
+        }
         LocalCliPersistenceRequest::CheckpointTask { completion, .. }
         | LocalCliPersistenceRequest::AcknowledgeApplicationHistory { completion, .. }
         | LocalCliPersistenceRequest::AcknowledgeMessage { completion, .. } => {
@@ -1461,6 +1471,10 @@ fn update_message_state_with_receipt(
 ) -> Result<()> {
     connection.transaction(|connection| {
         let mut message = read_message(connection, message_id)?.context("本地消息不存在")?;
+        // 普通 Grok 侧车只能由绑定 RPC/session/prompt 的专用事务确认，不能退回通用 ACK。
+        if message.subject == grok_terminal::INPUT_SUBJECT {
+            bail!("普通 Grok 输入必须使用原生精确回执");
+        }
         let recipient = read_task(connection, task_id)?.context("本地任务不存在")?;
         let is_native_ack = state == LocalCliMessageState::Acknowledged
             && receipt == Some(LocalCliReceiptKind::NativeProtocol);
@@ -1560,6 +1574,10 @@ fn update_message_state_with_receipt(
 }
 
 fn write_message_state(connection: &mut SqliteConnection, message: &LocalCliMessage) -> Result<()> {
+    // 保留专用领取扩展；通用队列清理仅可取消尚未派发、没有投递记录的消息。
+    if message.subject == grok_terminal::INPUT_SUBJECT {
+        grok_terminal::validate_unclaimed_cancellation(connection, message)?;
+    }
     diesel::update(
         local_cli_messages::table.filter(local_cli_messages::message_id.eq(&message.message_id)),
     )

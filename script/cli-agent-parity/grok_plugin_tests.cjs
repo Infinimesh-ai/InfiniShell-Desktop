@@ -249,3 +249,36 @@ test("仅原生 permission_prompt 类别映射为等待审批，正文不影响�
   }
   assert.throws(() => normalized("notification", {notificationType:"permission_prompt", notification_type:"idle_prompt"}), /conflicting_alias/);
 });
+
+test("原生权限两种拼写保留明确观察值且不改变审批事件", () => {
+  const camel = plugin.makeNotification(normalized("session_start", { permissionMode: "default" }));
+  const snake = plugin.makeNotification(normalized("session_start", { permission_mode: "default" }));
+  const both = plugin.makeNotification(normalized("session_start", { permissionMode: "default", permission_mode: "default" }));
+  assert.equal(camel.permission_mode, "default");
+  assert.equal(snake.permission_mode, "default");
+  assert.equal(camel.event_id, snake.event_id);
+  assert.equal(snake.event_id, both.event_id);
+  assert.equal(both.event, "session_start");
+});
+
+test("缺失冲突及异常权限仍发送无证据通知撤销旧状态", () => {
+  const missing = plugin.makeNotification(normalized("notification"));
+  const conflict = plugin.makeNotification(normalized("notification", { permissionMode: "default", permission_mode: "auto" }));
+  const invalid = plugin.makeNotification(normalized("notification", { permissionMode: { default: true } }));
+  const empty = plugin.makeNotification(normalized("notification", { permissionMode: "" }));
+  assert.equal(missing.permission_mode, undefined);
+  assert.equal(conflict.permission_mode, undefined);
+  assert.equal(invalid.permission_mode, undefined);
+  assert.equal(empty.permission_mode, undefined);
+  assert.equal(conflict.event, "notification");
+  assert.equal(invalid.event, "notification");
+  assert.equal(JSON.parse(JSON.stringify(conflict)).permission_mode, undefined);
+});
+
+test("权限模式变化不会被去重成原有 default 事件", () => {
+  const initial = plugin.makeNotification(normalized("notification", { permissionMode: "default" }));
+  const changed = plugin.makeNotification(normalized("notification", { permissionMode: "auto" }));
+  assert.notEqual(initial.event_id, changed.event_id);
+  assert.equal(changed.permission_mode, "auto");
+  assert.equal(plugin.fitNotification(changed).permission_mode, "auto");
+});

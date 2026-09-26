@@ -1,5 +1,11 @@
 pub mod event;
 mod event_cursor;
+pub(crate) mod grok_leader_input;
+pub(crate) mod grok_owned_launch;
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+pub(crate) mod grok_owned_worker;
+mod grok_permission_evidence;
+pub use grok_permission_evidence::{GrokPermissionEvidence, GrokPermissionObservation};
 pub mod listener;
 #[cfg(feature = "local_fs")]
 mod local_tasks;
@@ -74,6 +80,8 @@ pub struct CLIAgentSessionContext {
     pub summary: Option<String>,
     pub query: Option<String>,
     pub response: Option<String>,
+    /// 仅本次监听期间的原生 SessionStart 证据，不能从数据库恢复为有效证据。
+    pub grok_permission_evidence: GrokPermissionEvidence,
 }
 
 /// State of the rich input editor for composing a prompt to send to a CLI agent.
@@ -536,6 +544,22 @@ impl CLIAgentSessionsModel {
             .get_mut(&terminal_view_id)
             .filter(|s| s.agent == agent)
         {
+            // 监听器被替换或会话身份变化后，旧证据不能随上下文一起继承。
+            if session.agent == CLIAgent::Grok
+                && (session
+                    .listener
+                    .as_ref()
+                    .is_some_and(|previous| previous.id() != listener.id())
+                    || session_id
+                        .as_ref()
+                        .zip(session.session_context.session_id.as_ref())
+                        .is_some_and(|(incoming, active)| incoming != active))
+            {
+                session
+                    .session_context
+                    .grok_permission_evidence
+                    .invalidate();
+            }
             // Upgrade existing session with plugin context.
             session.listener = Some(listener);
             session.plugin_version = plugin_version;
@@ -638,6 +662,35 @@ impl CLIAgentSessionsModel {
             .entry(terminal_view_id)
             .or_default()
             .accept(event);
+        // 先去重，再观察权限；无回合 ID 的会话提醒也必须撤销失效证据。
+        if disposition != EventDisposition::Drop {
+            let session = self
+                .sessions
+                .get_mut(&terminal_view_id)
+                .expect("session checked above");
+            let context = &mut session.session_context;
+            if context.grok_permission_evidence.observe(
+                event,
+                context.session_id.as_deref(),
+                context.cwd.as_deref(),
+            ) && !(disposition == EventDisposition::Accept
+                && matches!(
+                    event.event,
+                    CLIAgentEventType::SessionStart
+                        | CLIAgentEventType::PromptSubmit
+                        | CLIAgentEventType::ToolComplete
+                ))
+            {
+                ctx.emit(CLIAgentSessionsModelEvent::SessionUpdated {
+                    terminal_view_id,
+                    agent: session.agent,
+                });
+            }
+        }
+        let session = self
+            .sessions
+            .get(&terminal_view_id)
+            .expect("session checked above");
         match disposition {
             EventDisposition::Drop => return,
             EventDisposition::SessionAttention => {

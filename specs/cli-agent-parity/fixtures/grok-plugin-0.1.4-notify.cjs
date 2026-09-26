@@ -5,7 +5,7 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { TextDecoder } = require("node:util");
 
-const PLUGIN_VERSION = "0.1.5";
+const PLUGIN_VERSION = "0.1.4";
 const MAX_INPUT_BYTES = 1024 * 1024;
 const MAX_FRAME_BYTES = 4096;
 const TOTAL_TIMEOUT_MS = 4000;
@@ -35,16 +35,6 @@ function alias(payload, camel, snake) {
   return first === undefined ? second : first;
 }
 
-function permissionMode(payload) {
-  const first = payload.permissionMode;
-  const second = payload.permission_mode;
-  // 身份有效但权限字段冲突时仍发送通知，让应用撤销旧证据，不能静默保留 default。
-  if (first !== undefined && second !== undefined && first !== second) return undefined;
-  const value = first === undefined ? second : first;
-  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(value)
-    ? value : undefined;
-}
-
 function normalize(payload, environment) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
   // 子代理字段只要出现就不能当成主会话，空值和异常类型也不例外。
@@ -63,7 +53,6 @@ function normalize(payload, environment) {
     event,
     sessionId,
     promptId,
-    permission_mode: permissionMode(payload),
     timestamp: text(payload.timestamp),
     notificationType: text(alias(payload, "notificationType", "notification_type")),
     cwd: text(payload.cwd),
@@ -134,7 +123,6 @@ function makeNotification(input) {
     event,
     session_id: input.sessionId,
     prompt_id: input.promptId,
-    permission_mode: input.permission_mode,
     event_id: `grok:${id}`,
     plugin_version: PLUGIN_VERSION,
     terminal_unverified: terminalUnverified,

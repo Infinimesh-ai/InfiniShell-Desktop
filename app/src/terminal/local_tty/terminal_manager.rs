@@ -683,6 +683,8 @@ fn on_shell_determined<S: TerminalSurface>(
     let pid = pty.get_pid();
     #[cfg(unix)]
     let fd = pty.get_fd();
+    #[cfg(target_os = "macos")]
+    model.lock().set_local_pty_identity(pty.local_identity());
 
     // Create the channel above and pass the receving side to the event loop.
     let event_loop_handle = TerminalManager::<S>::start_pty_event_loop(

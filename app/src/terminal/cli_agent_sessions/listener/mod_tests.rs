@@ -481,3 +481,17 @@ fn replaced_listener_queued_and_late_dispatches_cannot_poison_current_turn() {
         drop(old_listener);
     });
 }
+
+#[test]
+fn grok_listener_preserves_late_session_start_for_permission_invalidation() {
+    let mut handler = create_handler(&CLIAgent::Grok).unwrap();
+    let body = r#"{"v":1,"agent":"grok","event":"session_start","session_id":"current","permission_mode":"auto","event_id":"late-start"}"#;
+    let parsed = handler
+        .try_parse(Some(CLI_AGENT_NOTIFICATION_SENTINEL), body, true)
+        .unwrap();
+    let handled = handler
+        .handle_event(parsed)
+        .expect("Grok 权限变化不得在 listener 提前丢弃");
+    assert_eq!(handled.event, CLIAgentEventType::SessionStart);
+    assert_eq!(handled.payload.permission_mode.as_deref(), Some("auto"));
+}

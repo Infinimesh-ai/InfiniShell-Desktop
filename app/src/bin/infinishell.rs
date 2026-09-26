@@ -27,6 +27,10 @@ pub static AmdPowerXpressRequestHighPerformance: u32 = 1;
 
 // Zap OSS 构建的入口,简单包一层 warp::run()。
 fn main() -> Result<()> {
+    if let Some(result) = warp::run_owned_grok_from_args() {
+        result?;
+        return Ok(());
+    }
     if std::env::args_os().nth(1).as_deref()
         == Some(std::ffi::OsStr::new(
             "--infinishell-claude-21280-test-build",

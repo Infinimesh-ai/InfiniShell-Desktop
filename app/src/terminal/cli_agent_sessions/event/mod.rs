@@ -54,6 +54,8 @@ pub struct CLIAgentEventPayload {
     pub turn_id: Option<String>,
     pub prompt_id: Option<String>,
     pub terminal_unverified: Option<bool>,
+    /// 原生权限模式观察值，不等于当前输入就绪或安全认证。
+    pub permission_mode: Option<String>,
     pub query: Option<String>,
     pub response: Option<String>,
     pub transcript_path: Option<String>,

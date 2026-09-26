@@ -126,8 +126,8 @@ struct DefaultSessionListener;
 
 impl CLIAgentSessionHandler for DefaultSessionListener {
     fn handle_event(&mut self, event: CLIAgentEvent) -> Option<CLIAgentEvent> {
-        // Skip session_start events (handled during listener construction)
-        if event.event == CLIAgentEventType::SessionStart {
+        // Grok 后续开始事件也可能携带权限变化，交给 cursor 去重及证据失效规则处理。
+        if event.event == CLIAgentEventType::SessionStart && event.agent != CLIAgent::Grok {
             return None;
         }
 

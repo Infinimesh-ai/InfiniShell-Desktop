@@ -23,7 +23,7 @@ use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, Pl
 use crate::util::path::resolve_executable_in_path;
 
 const PLUGIN_NAME: &str = "infinishell-grok";
-const PLUGIN_VERSION: &str = "0.1.4";
+const PLUGIN_VERSION: &str = "0.1.5";
 const TESTED_GROK_VERSION: &str = "1.0.30";
 const STARTUP_BRIDGE_NAME: &str = "infinishell-1.0.41";
 // 仅认可已发布 Mac 补桥的完整原字节，并要求原生 JSON 同时匹配本次安装。
@@ -80,6 +80,25 @@ const LEGACY_013_SHA256: &[(&str, &str)] = &[
     (
         "README.md",
         "064707b15ef7a620c7e5eb8a2209f8e6922a05b7b73fb15374b24d3d31bcd3ae",
+    ),
+];
+// 0.1.4 已发布完整配方；新权限字段不得改变旧来源和恢复副本的原字节。
+const LEGACY_014_SHA256: &[(&str, &str)] = &[
+    (
+        ".grok-plugin/plugin.json",
+        "605f8827419c63229b8797e7df6dc069c5f93baeb32fd9a30e5acbab4fcdaafe",
+    ),
+    (
+        "hooks/hooks.json",
+        "626fbb11c3593cb56ca17e83176923c8554394422d28551a1aa357925747cabe",
+    ),
+    (
+        "hooks/notify.cjs",
+        "590f50218f00b529a717d65c8dd515a67ceaa824aee08e1109b0196c66a39c9e",
+    ),
+    (
+        "README.md",
+        "50308b3c9a7822afd1f6985ec049ffabdf62b5d0f027d924e6b22f046d84f534",
     ),
 ];
 const BUNDLED_FILES: &[(&str, &str)] = &[
@@ -1167,7 +1186,9 @@ fn plugin_tree(root: &Path, allow_missing: bool) -> io::Result<PluginTree> {
 
 fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> {
     let tree = plugin_tree(root, false)?;
-    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3") && version != PLUGIN_VERSION {
+    if !matches!(version, "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4")
+        && version != PLUGIN_VERSION
+    {
         return Err(invalid_tree());
     }
     for (name, expected) in BUNDLED_FILES {
@@ -1200,6 +1221,11 @@ fn validate_expected_tree(root: &Path, version: &str) -> io::Result<PluginTree> 
                     name == *expected_name && digest == *expected_digest
                 }),
             ("0.1.3", name) => LEGACY_013_SHA256
+                .iter()
+                .any(|(expected_name, expected_digest)| {
+                    name == *expected_name && digest == *expected_digest
+                }),
+            ("0.1.4", name) => LEGACY_014_SHA256
                 .iter()
                 .any(|(expected_name, expected_digest)| {
                     name == *expected_name && digest == *expected_digest

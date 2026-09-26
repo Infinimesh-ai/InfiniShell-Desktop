@@ -186,5 +186,23 @@
       "cargo_build": "passed"
     },
     "cloud_status": "待本增量提交推送后，按 cross-platform-cloud-verification 运行 Linux/Windows focused 门禁"
+  },
+  "grok_owned_terminal_increment": {
+    "status": "native_foundation_verified_gui_integration_pending",
+    "implementation_commit": "本条所在实现提交；真实收据另有未提交构建源文件摘要，待绑定提交",
+    "closed_gaps": [],
+    "versions": {
+      "grok": "1.0.41",
+      "model": "grok-4.7",
+      "notification_plugin": "0.1.5"
+    },
+    "platform_mode": "macOS arm64，真实本地 shell PTY + 生产 owned 启动/侧车/SQLite；未经过 GUI",
+    "local_gates": "v7 cargo check -p warp、i18n11、PTY身份2、CLI会话413/6跳过及应用构建通过；未变更持久化模块复用v4 78项；运行器修复后6项通过",
+    "native_scope": "v2两轮中文、精确原生ACK、独立模型标记、重复消息拒绝、旧启动记录不可重派；TUI/leader/shell和私有认证副本清理均确认",
+    "preserved_failure": "v1两轮通过，但运行器在关闭PTY master之前无界等待shell；代理终止本轮运行器后确认全部进程和认证副本清理。v2改为先关闭master再有界等待",
+    "raw_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-owned-20260926",
+    "raw_index_sha256": "d49082ee7e6290bf007f2b316c3db5c96b80967fcc40377e38df7cf407fbec33",
+    "remaining": "GUI启动/发送/权限失效/草稿接线，启动失败/退出/重启恢复，真实审批允许拒绝与信号，长文本和多行、文件卡片、同提交Linux/Windows门禁及真实生命周期",
+    "localization": "无需本地化变更：本增量为内部启动/通知/持久化基础，未新增GUI入口或改变已显示文案；后续GUI接线须另行双语审计及布局验收"
   }
 }

@@ -53,6 +53,7 @@ pub(super) fn parse(body: &str) -> Option<CLIAgentEvent> {
             turn_id: raw.turn_id,
             prompt_id: raw.prompt_id,
             terminal_unverified: raw.terminal_unverified,
+            permission_mode: raw.permission_mode,
             query: raw.query,
             response: raw.response,
             transcript_path: raw.transcript_path,

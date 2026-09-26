@@ -46,6 +46,9 @@ pub struct CLIAgentNotification {
     pub prompt_id: Option<String>,
     /// 插件只能确认发生过结束通知，但缺少原生回合关联；不能视为成功。
     pub terminal_unverified: Option<bool>,
+    /// 原生权限观察值；缺失或异常不能默认成 default，也不能单独证明会话身份。
+    #[serde(default, deserialize_with = "deserialize_permission_mode")]
+    pub permission_mode: Option<String>,
 }
 
 impl CLIAgentNotification {
@@ -70,6 +73,26 @@ impl CLIAgentNotification {
             turn_id: None,
             prompt_id: None,
             terminal_unverified: None,
+            permission_mode: None,
         }
     }
+}
+
+// 异常字段保留为无证据通知，避免整条解析失败后应用继续保留旧权限证据。
+fn deserialize_permission_mode<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = serde_json::Value::deserialize(deserializer)?;
+    Ok(raw
+        .as_str()
+        .filter(|mode| {
+            !mode.is_empty()
+                && mode.len() <= 64
+                && mode.as_bytes()[0].is_ascii_alphabetic()
+                && mode
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        })
+        .map(str::to_owned))
 }
