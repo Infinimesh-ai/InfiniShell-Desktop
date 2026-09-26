@@ -8,6 +8,8 @@
 
 2026-09-26 功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`：三平台专属 Grok 普通会话 PNG 输入、Codex 远端图片队列、收起编辑器时的文件卡片入口、Codex 三目标平台 npm／Homebrew／Claude WinGet 来源升级、子任务搜索与 Claude/Grok 受限技能已写入代码，Grok 远端专属会话/图片/重启关联已接，Claude 远程原图经原生 Read 和历史消费回执的链路已接；Codex每pane独立app-server/明确socket票据绑定、Claude/Grok Mac/Linux受审命令及命令+技能组合、Claude Windows npm、Grok三平台npm和Mac ARM Homebrew双别名也已接入；Codex WinGet完整目录/安装登记/依赖事务已接；Windows受审命令MCP与Job清理也已接；Grok普通终端同UUID历史继续和Claude Unix npm固定版本受限降级合同也已接；当前渠道不匹配仍拒绝。三款 Linux x64 Homebrew cask 与 Grok WinGet 固定来源事务现也已接入；G10 同会话顺序多命令和运行中原生追加也已接入；三平台命令各用独立监督代，真实清理后才能继续。该检查点已通过 macOS arm64 编译与 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。真实功能、GUI／模型与双语布局验收仍待补，不扩大以下支持承诺；最终仍需绑定提交、平台、版本及模式验收。
 
+2026-09-27 G09 最新支持边界：提交 `39941b2815506997198091082b92d19e11d92761` 已推送，私有 npm 四场景入口、Linux 窄工作流和来源环境只读预检已接；17 个源码 Git blob 已绑定本地门禁快照。产品修正包括 Grok 新版本 Mirror 继承旧 uid/gid/mode、Codex macOS Node 裸加载路径解析，以及离线探针的根目录 literal 只读、精确系统 dyld 缓存目录读取和空 OpenSSL 配置；签名、来源与身份核验未放宽，未开放 OS／Rosetta 整目录或网络。Grok macOS arm64 私有正常升级已独立复核通过，范围仍限该后端路径；Codex 旧 Stable 误用、UnsupportedSource、05／07 的 ProbeFailed／dyld SIGABRT，以及 Grok Documents cleanup_unknown 均保留。后续独立私有 Node 及原包入口已成功，七项隔离负例均为 EPERM；原包入口首次全局 OpenSSL 配置读取被拒的失败亦保留。Mac 修后完整 Codex npm 正常升级未运行：内置盘空间不足运行器 3 GiB 门槛，保留现场且不降低门槛。冷恢复等其余场景、消费者实时渠道、GUI／模型和 Homebrew／WinGet 真实事务仍欠，G09 与 Goal 不关闭；Mac 仅 Apple Silicon。不扩大支持承诺。[同提交 Linux／Windows CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36257833211) 正在运行，尚不记通过；最新门禁、构建状态与原始收据见[验证结论](VALIDATION_REPORT.md)。
+
 ## 版本与运行方式
 
 本次固定受测版本为 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，本轮不因上游继续发布而更换验收目标。这些版本不是所有未来版本的兼容保证。应用分别检测命令、安装和版本；安装成功不能证明已经登录或获得模型额度。
