@@ -87,15 +87,6 @@ impl ClaudeProtocol {
             return Err(crate::t!("cli-task-manager-permission-claude-files-skills"));
         }
         if selected.len() > 1
-            && input
-                .iter()
-                .any(|part| matches!(part, InputContent::LocalImage(_)))
-        {
-            return Err(crate::t!(
-                "cli-agent-claude-image-multiple-skills-unverified"
-            ));
-        }
-        if selected.len() > 1
             && (self.probed_version != Some("2.1.280")
                 || self.options.permission_policy != PermissionPolicy::Inherit)
         {

@@ -445,6 +445,80 @@ fn claude_picture_and_single_skill_keep_both_typed_parts() {
 }
 
 #[test]
+fn claude_picture_preserves_every_selected_skill_in_order() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let first = skill(directory.path());
+    let second_path = directory.path().join("second.md");
+    fs::write(
+        &second_path,
+        "---\nname: second-review\ndescription: 第二项技能\n---\n第二项原生技能正文。\n",
+    )
+    .unwrap();
+    let second = parse_skill(&second_path).unwrap();
+    let image = image_context();
+
+    let input = prepare_managed_input(
+        Harness::Claude,
+        String::new(),
+        &[image.clone()],
+        vec![second, first],
+        &store,
+    )
+    .unwrap();
+
+    assert_eq!(input.len(), 3);
+    assert_eq!(
+        fs::read(local_image(&input)).unwrap(),
+        STANDARD.decode(image.data).unwrap()
+    );
+    assert_eq!(
+        input[1],
+        InputContent::Skill {
+            name: "second-review".into(),
+            path: second_path
+        }
+    );
+    assert_eq!(
+        input[2],
+        InputContent::Skill {
+            name: "local-review".into(),
+            path: directory.path().join("SKILL.md")
+        }
+    );
+}
+
+#[test]
+fn claude_complete_skill_list_is_budgeted_before_persisting_images() {
+    let directory = TempDir::new().unwrap();
+    let store = directory.path().join("local-cli-attachments");
+    let first = skill(directory.path());
+    let second_path = directory.path().join("second.md");
+    fs::write(
+        &second_path,
+        "---\nname: second-review\ndescription: 第二项技能\n---\n第二项原生技能正文。\n",
+    )
+    .unwrap();
+    let second = parse_skill(&second_path).unwrap();
+    let text = "x".repeat(1_048_376);
+    let image = image_context();
+    let single = prepare_managed_input(
+        Harness::Claude,
+        text.clone(),
+        &[image.clone()],
+        vec![first.clone()],
+        &directory.path().join("single-skill-assets"),
+    );
+    assert!(single.is_ok());
+
+    let result =
+        prepare_managed_input(Harness::Claude, text, &[image], vec![first, second], &store);
+
+    assert_eq!(result, Err(crate::t!("cli-agent-input-text-too-large")));
+    assert!(!store.exists());
+}
+
+#[test]
 fn claude_image_skill_instruction_is_counted_before_persisting_assets() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");

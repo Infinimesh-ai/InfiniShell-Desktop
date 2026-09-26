@@ -34,8 +34,9 @@ use windows::Win32::Storage::FileSystem::{
 };
 use windows::Win32::System::Diagnostics::Debug::{
     CREATE_PROCESS_DEBUG_EVENT, CREATE_THREAD_DEBUG_EVENT, ContinueDebugEvent, DEBUG_EVENT,
-    EXCEPTION_DEBUG_EVENT, EXIT_PROCESS_DEBUG_EVENT, EXIT_THREAD_DEBUG_EVENT, LOAD_DLL_DEBUG_EVENT,
-    OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT, WaitForDebugEvent,
+    DEBUG_EVENT_CODE, EXCEPTION_DEBUG_EVENT, EXIT_PROCESS_DEBUG_EVENT, EXIT_THREAD_DEBUG_EVENT,
+    LOAD_DLL_DEBUG_EVENT, OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT,
+    WaitForDebugEvent,
 };
 use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
 use windows::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
@@ -159,7 +160,7 @@ pub(super) struct WindowsImageDebugSession {
     component_images: HashMap<u32, Vec<SystemHelperLease>>,
     processes: HashMap<u32, OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
-    pending_event: Option<(u32, u32, u32)>,
+    pending_event: Option<(u32, u32, DEBUG_EVENT_CODE)>,
     root_exit_observed: bool,
 }
 

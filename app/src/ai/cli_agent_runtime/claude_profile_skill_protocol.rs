@@ -30,11 +30,15 @@ impl ClaudeProtocol {
     ) -> Result<InputProjection, String> {
         self.verify_fixed_skill_plugin()
             .map_err(|error| error.to_string())?;
+        if input
+            .iter()
+            .any(|part| matches!(part, InputContent::LocalImage(_)))
+        {
+            // 图片内容块不会展开 slash；与准备阶段共用完整技能名称和预算，审批仍由固定策略逐次核验。
+            return encode_input(input, self.skill_plugin.as_ref(), &self.attachment_store);
+        }
         let mut commands = Vec::new();
         let mut parts = Vec::new();
-        let has_images = input
-            .iter()
-            .any(|part| matches!(part, InputContent::LocalImage(_)));
         for part in input {
             match part {
                 InputContent::Skill { name, path } => {
@@ -50,11 +54,6 @@ impl ClaudeProtocol {
                 }
                 InputContent::Text(_) | InputContent::LocalImage(_) => parts.push(part),
             }
-        }
-        if has_images && commands.len() > 1 {
-            return Err(crate::t!(
-                "cli-agent-claude-image-multiple-skills-unverified"
-            ));
         }
         if !commands.is_empty() {
             let names = serde_json::to_string(&commands).expect("技能名称可以序列化");

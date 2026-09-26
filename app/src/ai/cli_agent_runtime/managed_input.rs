@@ -35,11 +35,6 @@ pub(crate) fn prepare_managed_input(
             return Err(crate::t!("cli-agent-managed-version-unavailable"));
         }
     }
-    if harness == Harness::Claude && !images.is_empty() && skills.len() > 1 {
-        return Err(crate::t!(
-            "cli-agent-claude-image-multiple-skills-unverified"
-        ));
-    }
     if harness == Harness::Grok && !images.is_empty() && !skills.is_empty() {
         return Err(crate::t!(
             "cli-agent-input-images-unverified",

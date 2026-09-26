@@ -5719,7 +5719,7 @@ cli-agent-task-skill-plugin-failed = 无法准备隔离技能插件：{ $error }
 cli-agent-task-skill-one-per-turn = 当前 Grok 版本或权限策略每轮仅接受一个技能。
 cli-agent-task-parent-changed = 父任务已进入另一轮。请从当前轮重新派发此子任务。
 cli-agent-input-images-unverified = 尚未验证 { $cli } 的托管图片输入。草稿已保留。
-cli-agent-claude-image-formats = 已验证的 Claude Code 2.1.280 支持 PNG、JPEG、静态 GIF 和 WebP 图片，也支持纯图片输入。继承 CLI 设置时，还可将图片与单个已选技能组合。
+cli-agent-claude-image-formats = Claude Code 2.1.280 支持 PNG、JPEG、静态 GIF 和 WebP 图片，也支持纯图片输入。图片可与已注册的所选技能组合，每次 Skill 调用遵循当前会话的权限策略。
 cli-agent-claude-image-format-unsupported = Claude Code 托管任务支持 PNG、JPEG、静态 GIF 和 WebP 图片。
 cli-agent-claude-animated-gif-unverified = Claude Code 托管任务目前仅支持静态 GIF 图片。草稿已保留。
 cli-agent-claude-rich-images-version = 这些图片格式、纯图片输入及图片与技能组合需要已验证的 Claude Code 2.1.280。
@@ -5890,7 +5890,6 @@ cli-agent-claude-skill-reload-failed = Claude 未确认所有所选技能，草�
 cli-agent-claude-skill-reload-pending = Claude 正在注册所选技能。请等待注册结束后再发送。
 cli-agent-claude-skill-reload-idle = 请等待当前 Claude 回合结束后再新增技能。草稿已保留。
 cli-agent-claude-skill-version-required = 会话中新增技能或选择多个技能需要 Claude Code 2.1.280，并使用继承权限模式。
-cli-agent-claude-image-multiple-skills-unverified = 向 Claude 发送图片时最多选择一个技能。图片与多个技能组合尚未验证。
 cli-agent-claude-skills-reload-help = 可以选择多个技能。新增技能会在会话空闲时注册，并在 Claude 确认注册后发送。
 
 cli-agent-grok-skill-refresh-idle = 请等待当前 Grok 回合结束后再添加新技能。

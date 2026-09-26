@@ -1,5 +1,8 @@
 //! 持久图片输入与原生数组回放的离线安全回归，不执行真实 CLI。
 
+#[path = "claude_image_skill_combination_tests.rs"]
+mod skill_combination_tests;
+
 use std::fs;
 use std::io::Cursor as ImageCursor;
 use std::path::PathBuf;

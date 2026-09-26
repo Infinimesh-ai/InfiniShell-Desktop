@@ -5907,7 +5907,7 @@ cli-agent-task-skill-plugin-failed = Could not prepare the isolated skill plugin
 cli-agent-task-skill-one-per-turn = This Grok version or permission policy accepts one skill per turn.
 cli-agent-task-parent-changed = The parent task has moved to another turn. Launch this child again from the current turn.
 cli-agent-input-images-unverified = Managed image input has not been verified for { $cli }. Your draft is unchanged.
-cli-agent-claude-image-formats = Verified Claude Code 2.1.280 supports PNG, JPEG, static GIF, and WebP images, including image-only inputs. With inherited CLI settings, images can also be combined with one selected skill.
+cli-agent-claude-image-formats = Claude Code 2.1.280 supports PNG, JPEG, static GIF, and WebP images, including image-only inputs. Images can be combined with selected registered skills. Each Skill call follows the session’s permission policy.
 cli-agent-claude-image-format-unsupported = Managed Claude Code tasks support PNG, JPEG, static GIF, and WebP images.
 cli-agent-claude-animated-gif-unverified = Claude Code managed tasks currently support static GIF images only. Your draft is unchanged.
 cli-agent-claude-rich-images-version = These image formats, image-only inputs, and image with skill combinations require verified Claude Code 2.1.280.
@@ -6078,7 +6078,6 @@ cli-agent-claude-skill-reload-failed = Claude did not confirm every selected ski
 cli-agent-claude-skill-reload-pending = Claude is registering selected skills. Wait for registration to finish before sending again.
 cli-agent-claude-skill-reload-idle = Wait for the current Claude turn to finish before adding a new skill. Your draft is retained.
 cli-agent-claude-skill-version-required = Adding skills during a session or selecting multiple skills requires Claude Code 2.1.280 in Inherit mode.
-cli-agent-claude-image-multiple-skills-unverified = Select at most one skill when sending images to Claude. Multiple skills with images have not been verified.
 cli-agent-claude-skills-reload-help = You can select multiple skills. New skills are registered when this session is idle, and sending waits for Claude to confirm registration.
 
 cli-agent-grok-skill-refresh-idle = Wait until the current Grok turn finishes before adding new skills.

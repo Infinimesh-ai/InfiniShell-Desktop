@@ -781,11 +781,14 @@ pub(super) fn verify_prepared_image_budget(
     images: &[ImageContext],
     skills: &[InputContent],
 ) -> Result<(), String> {
-    let command = skills.iter().find_map(|part| match part {
-        InputContent::Skill { name, .. } => Some(format!("{CLAUDE_SKILL_PLUGIN_NAME}:{name}")),
-        InputContent::Text(_) | InputContent::LocalImage(_) => None,
-    });
-    let text = image_prompt(text, command.as_deref());
+    let commands = skills
+        .iter()
+        .filter_map(|part| match part {
+            InputContent::Skill { name, .. } => Some(format!("{CLAUDE_SKILL_PLUGIN_NAME}:{name}")),
+            InputContent::Text(_) | InputContent::LocalImage(_) => None,
+        })
+        .collect::<Vec<_>>();
+    let text = image_prompt(text, &commands);
     if text.len() > MAX_INPUT_BYTES {
         return Err(crate::t!("cli-agent-input-text-too-large"));
     }
@@ -3050,13 +3053,19 @@ fn supported_image_mime_type(mime_type: &str) -> bool {
 }
 
 // 数组文本不会触发原生 slash 展开；显式调用已注册 Skill，保留原有权限审批。
-fn image_prompt(text: &str, skill_command: Option<&str>) -> String {
-    let Some(command) = skill_command else {
-        return text.to_owned();
+fn image_prompt(text: &str, skill_commands: &[String]) -> String {
+    let mut prompt = match skill_commands {
+        [] => return text.to_owned(),
+        [command] => format!(
+            "Invoke the Skill tool with skill={command}, then apply that skill to the attached images."
+        ),
+        commands => {
+            let names = serde_json::to_string(commands).expect("技能名称可以序列化");
+            format!(
+                "Invoke the Skill tool for each registered skill in order: {names}. Apply each skill to the attached images after its tool call completes."
+            )
+        }
     };
-    let mut prompt = format!(
-        "Invoke the Skill tool with skill={command}, then apply that skill to the attached images."
-    );
     if !text.is_empty() {
         prompt.push_str("\n\n");
         prompt.push_str(text);
@@ -3089,12 +3098,7 @@ fn encode_input(
     }
     let text = texts.join("\n\n");
     if !images.is_empty() {
-        if skill_commands.len() > 1 {
-            return Err(crate::t!(
-                "cli-agent-claude-image-multiple-skills-unverified"
-            ));
-        }
-        let text = image_prompt(&text, skill_commands.first().map(String::as_str));
+        let text = image_prompt(&text, &skill_commands);
         if text.len() > MAX_INPUT_BYTES {
             return Err(crate::t!("cli-agent-input-text-too-large"));
         }
