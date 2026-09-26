@@ -20,9 +20,10 @@ use windows::Win32::Security::Authorization::{
 };
 use windows::Win32::Security::Isolation::{CreateAppContainerProfile, DeleteAppContainerProfile};
 use windows::Win32::Security::{
-    ACL, DACL_SECURITY_INFORMATION, EqualSid, FreeSid, GetTokenInformation, IsValidAcl,
-    PSECURITY_DESCRIPTOR, PSID, SECURITY_CAPABILITIES, TOKEN_APPCONTAINER_INFORMATION, TOKEN_QUERY,
-    TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
+    ACL, CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, EqualSid, FreeSid, GetTokenInformation,
+    IsValidAcl, NO_INHERITANCE, OBJECT_INHERIT_ACE, PSECURITY_DESCRIPTOR, PSID,
+    SECURITY_CAPABILITIES, TOKEN_APPCONTAINER_INFORMATION, TOKEN_QUERY, TokenAppContainerSid,
+    TokenCapabilities, TokenIsAppContainer,
 };
 use windows::Win32::Storage::FileSystem::{
     FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_SHARE_READ, FILE_SHARE_WRITE,
@@ -115,7 +116,11 @@ impl Grant {
             0x001200a9
         };
         entry.grfAccessMode = GRANT_ACCESS;
-        entry.grfInheritance = if writable_directory { 3 } else { 0 };
+        entry.grfInheritance = if writable_directory {
+            OBJECT_INHERIT_ACE | CONTAINER_INHERIT_ACE
+        } else {
+            NO_INHERITANCE
+        };
         entry.Trustee = TRUSTEE_W {
             TrusteeForm: TRUSTEE_IS_SID,
             TrusteeType: TRUSTEE_IS_UNKNOWN,

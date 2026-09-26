@@ -148,7 +148,7 @@ pub(super) fn reject_extra_permissions(file: &File) -> Result<(), Error> {
 }
 
 #[cfg(target_os = "linux")]
-fn reject_extra_permissions(file: &File) -> Result<(), Error> {
+pub(super) fn reject_extra_permissions(file: &File) -> Result<(), Error> {
     let size = unsafe { libc::flistxattr(file.as_raw_fd(), std::ptr::null_mut(), 0) };
     if size < 0 || size > 64 * 1024 {
         return Err(Error::UnsupportedSource);

@@ -19,21 +19,25 @@ def probe_bundle(repo, mode):
     bundle = repo / 'app/assets/bundled/cli-agent-plugins'
     if mode == 'formal':
         metadata, replacements = bundle_data(bundle, 'codex')
-        require(metadata['patch_revision'] == 5, '正式直验要求固定 rev5 配方')
+        require(metadata['patch_revision'] == 6, '正式直验要求固定 rev6 配方')
         source, source_bytes, hashes = source_bundle(bundle)
-        require(source['patch_revision'] == 5, '正式完整来源不是 rev5')
+        require(source['patch_revision'] == 6, '正式完整来源不是 rev6')
         for name, contents in replacements.items():
             require(hashes['plugins/warp/' + name] == hashlib.sha256(contents).hexdigest(),
                     '正式替换件与完整来源不一致')
         return metadata, replacements, hashlib.sha256(source_bytes).hexdigest()
     require(mode == 'candidate', '未知通知验收模式')
-    # 旧候选从保留的 rev3 原字节出发，禁止向正式 rev5 再次应用候选变换。
+    # 旧候选从保留的 rev3 原字节出发，禁止向正式 rev6 再次应用候选变换。
     previous = bundle / 'codex/revisions/rev3'
     metadata = json.loads(checked_file(previous, 'PATCH_METADATA.json').read_bytes())
     require(metadata['patch_revision'] == 3 and len(metadata['files']) == 4, '候选基线不是固定 rev3')
     replacements = {}
     for name, entry in metadata['files'].items():
-        root = previous if (previous / name).exists() else bundle / 'codex'
+        if name == 'scripts/build-payload.sh':
+            # rev3–rev5 共用归档 payload，不能回退到当前 rev6 的进程证据字段。
+            root = bundle / 'codex/revisions/rev5'
+        else:
+            root = previous if (previous / name).exists() else bundle / 'codex'
         contents = checked_file(root, name).read_bytes()
         require(hashlib.sha256(contents).hexdigest() == entry['replacement_sha256'], 'rev3 候选基线摘要不匹配')
         replacements[name] = contents

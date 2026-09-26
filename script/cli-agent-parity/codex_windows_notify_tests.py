@@ -22,7 +22,7 @@ class NotifyCandidateTests(unittest.TestCase):
     def original(self):
         return (ASSETS / 'codex/revisions/rev3/scripts/warp-notify.sh').read_text(encoding='utf-8')
 
-    def test_rev5_resources_keep_reviewable_windows_payload_and_five_native_commands(self):
+    def test_rev6_resources_keep_reviewable_windows_payload_and_five_native_commands(self):
         notify = (ASSETS / 'codex/scripts/warp-notify.sh').read_text(encoding='utf-8')
         encoded = re.findall(r'-EncodedCommand ([A-Za-z0-9+/=]+)', notify)
         self.assertEqual(len(encoded), 1)
@@ -40,7 +40,7 @@ class NotifyCandidateTests(unittest.TestCase):
             self.assertEqual((ASSETS / 'codex' / name).read_bytes(),
                              (ASSETS / 'codex/source/plugins/warp' / name).read_bytes())
         metadata = json.loads((ASSETS / 'codex/PATCH_METADATA.json').read_text())
-        self.assertEqual(metadata['patch_revision'], 5)
+        self.assertEqual(metadata['patch_revision'], 6)
         self.assertFalse(metadata['windows_product_enabled'])
         self.assertFalse(metadata['windows_uninstrumented_hooks_verified'])
 

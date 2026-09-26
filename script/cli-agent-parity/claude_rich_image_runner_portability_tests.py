@@ -3,6 +3,7 @@
 from contextlib import ExitStack, redirect_stdout
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -74,6 +75,10 @@ import probe_claude_rich_images
                     raise subprocess.TimeoutExpired(command, 1, output=FAILURE_TEXT.encode("utf-8"),
                                                     stderr=b"")
                 # 真实管道发出 UTF-8 字节，模拟 Rust；不调用命令行中的验收二进制。
+                # setup-python 的 Linux 解释器需要自身运行库路径；只补给夹具，不改变 CLI 环境。
+                kwargs["env"] = kwargs["env"].copy()
+                if "LD_LIBRARY_PATH" in os.environ:
+                    kwargs["env"]["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
                 return REAL_RUN([sys.executable, "-c",
                                  "import sys;sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]));sys.exit(1)",
                                  FAILURE_TEXT.encode("utf-8").hex()], **kwargs)
@@ -104,6 +109,25 @@ import probe_claude_rich_images
             self.assertFalse(receipt["acceptance_passed"] if module is rich else receipt["passed"])
             if missing_private_tmp:
                 self.assertEqual(requested_dirs, [None])
+
+    def test_fixture_preserves_its_python_loader_environment(self):
+        loader_path = os.pathsep.join(filter(None, (
+            str(Path(tempfile.gettempdir()) / "offline-python-loader-fixture"),
+            os.environ.get("LD_LIBRARY_PATH"))))
+        real_run = REAL_RUN
+        observed = []
+
+        def checked_run(command, **kwargs):
+            observed.append(kwargs["env"].get("LD_LIBRARY_PATH"))
+            self.assertEqual(observed[-1], loader_path)
+            return real_run(command, **kwargs)
+
+        with patch.dict(os.environ, {"LD_LIBRARY_PATH": loader_path}):
+            with patch(f"{__name__}.REAL_RUN", side_effect=checked_run):
+                for module in (rich, skill):
+                    with self.subTest(module=module.__name__):
+                        self.failed_probe(module)
+        self.assertEqual(len(observed), 2)
 
     def test_source_binding_git_queries_use_the_runner_repository(self):
         for module in (rich, skill):

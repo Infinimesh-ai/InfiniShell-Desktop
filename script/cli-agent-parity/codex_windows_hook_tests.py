@@ -41,17 +41,58 @@ class FormalResourceTests(unittest.TestCase):
         repo = Path(__file__).resolve().parents[2]
         current, replacements, source_hash = probe_bundle(repo, 'formal')
         old, old_replacements, old_source_hash = probe_bundle(repo, 'candidate')
-        self.assertEqual((current['patch_revision'], old['patch_revision']), (5, 3))
+        self.assertEqual((current['patch_revision'], old['patch_revision']), (6, 3))
         self.assertEqual(len(source_hash), 64)
         self.assertIsNone(old_source_hash)
         self.assertNotIn('scripts/on-prompt-submit.sh', old_replacements)
         self.assertNotEqual(replacements['scripts/warp-notify.sh'], old_replacements['scripts/warp-notify.sh'])
+        self.assertNotEqual(replacements['scripts/build-payload.sh'], old_replacements['scripts/build-payload.sh'])
         plugin = repo / 'app/assets/bundled/cli-agent-plugins/codex/source/plugins/warp'
         self.assertEqual(len(exact_plugin_tree(plugin, current)), 10)
         with self.assertRaises(ValueError):
             exact_plugin_tree(plugin, old)
         with self.assertRaises(ValueError):
             probe_bundle(repo, 'unknown')
+
+    def test_formal_bundle_rejects_old_or_unknown_revision_with_unchanged_files(self):
+        repo = Path(__file__).resolve().parents[2]
+        relative = Path('app/assets/bundled/cli-agent-plugins/codex')
+        for name in ('PATCH_METADATA.json', 'SOURCE_METADATA.json'):
+            for revision in (5, 7):
+                with self.subTest(name=name, revision=revision), tempfile.TemporaryDirectory() as temporary:
+                    candidate = Path(temporary)
+                    shutil.copytree(repo / relative, candidate / relative)
+                    path = candidate / relative / name
+                    metadata = json.loads(path.read_bytes())
+                    metadata['patch_revision'] = revision
+                    path.write_text(json.dumps(metadata))
+                    with self.assertRaisesRegex(ValueError, 'rev6'):
+                        probe_bundle(candidate, 'formal')
+
+    def test_historical_payload_archive_rejects_current_or_unknown_bytes(self):
+        repo = Path(__file__).resolve().parents[2]
+        relative = Path('app/assets/bundled/cli-agent-plugins/codex')
+        current = (repo / relative / 'scripts/build-payload.sh').read_bytes()
+        for contents in (current, b'unknown payload'):
+            with self.subTest(contents_length=len(contents)), tempfile.TemporaryDirectory() as temporary:
+                candidate = Path(temporary)
+                shutil.copytree(repo / relative, candidate / relative)
+                archive = candidate / relative / 'revisions/rev5/scripts/build-payload.sh'
+                archive.write_bytes(contents)
+                with self.assertRaisesRegex(ValueError, 'rev3 候选基线摘要不匹配'):
+                    probe_bundle(candidate, 'candidate')
+
+    def test_formal_full_tree_rejects_historical_payload(self):
+        repo = Path(__file__).resolve().parents[2]
+        bundle = repo / 'app/assets/bundled/cli-agent-plugins/codex'
+        metadata, _, _ = probe_bundle(repo, 'formal')
+        with tempfile.TemporaryDirectory() as temporary:
+            plugin = Path(temporary) / 'plugin'
+            shutil.copytree(bundle / 'source/plugins/warp', plugin)
+            (plugin / 'scripts/build-payload.sh').write_bytes(
+                (bundle / 'revisions/rev5/scripts/build-payload.sh').read_bytes())
+            with self.assertRaisesRegex(ValueError, '完整树与固定配方不一致'):
+                exact_plugin_tree(plugin, metadata)
 
     def test_formal_full_tree_rejects_missing_extra_and_modified_files(self):
         repo = Path(__file__).resolve().parents[2]

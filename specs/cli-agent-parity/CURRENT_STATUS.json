@@ -604,7 +604,7 @@
       "warnings": 5,
       "implementation_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19"
     },
-    "new_tests_scope": "仅提交前 i18n 资源门禁：11 项通过、0 项失败。尚无本轮功能/模型/GUI/跨平台测试结果。",
+    "new_tests_scope": "代码检查点后已执行定向本地回归，原失败与修后范围见post_code_local_gates；首轮Linux/Windows无人值守门禁失败，修正与复验继续。尚未启动本批GUI或已认证模型。",
     "integration_i18n": {
       "status": "passed",
       "command": "cargo test -p warp --lib i18n::tests",
@@ -631,19 +631,33 @@
       "code_review_scope": "本地构建与资源门禁源码绑定；不是安全审计或真实产品验收。"
     },
     "cross_platform_next": {
-      "status": "ready_to_dispatch_after_push",
+      "status": "failed_pending_source_fix",
       "platforms": [
         "Linux x64",
         "Windows x64"
       ],
       "workflow": ".github/workflows/cross-platform-preflight.yml",
-      "required_source_commit": "修正通过并提交后的精确 SHA",
+      "required_source_commit": "bc9bb1f28d08717f6a5ded8a562571779a653ea0",
       "macos_intel": false,
-      "reason": "本地编译、受影响回归中的原失败及进程夹具复验已通过；推送后验证精确提交，full_workspace_tests=false、run_macos_intel=false。",
+      "reason": "本地确定性失败已修正并定向复验；两平台在线空闲后对同一提交派发。",
       "added_coverage": [
         "warp 默认筛选增加 remote_server::cli_image 和 terminal::view::grok_owned_input",
         "remote_server crate 的 client::image_staging::tests 两平台定向执行；Unix服务端用例不外推为Windows原生覆盖"
-      ]
+      ],
+      "run_id": 36244024291,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36244024291",
+      "archive": "validation/cloud-post-code-bc9bb1f28-20260926",
+      "full_workspace_tests": false,
+      "authenticated_model_or_gui": false,
+      "observed_failure": "首轮Linux/Windows两作业均失败：Linux图片运行器可移植性夹具4项失败及权限校验函数私有E0603；Windows旧rev5断言/历史payload混用，以及AppContainer继承标志ACE_FLAGS类型错误。原始日志和产物已完整保留。",
+      "local_script_diagnosis_archive": "validation/cloud-post-code-bc9bb1f28-20260926/local-script-diagnosis",
+      "first_run_evidence_index": {
+        "file": "first-run-evidence-index.safe.json",
+        "sha256": "c89e7f2edc1182bcd3b2e714c18fd841d27093838abf14136381009ec2cc4b2b",
+        "files": 13,
+        "original_artifact_zips": 7
+      },
+      "independent_native_results": "两平台Codex插件安装/刷新、Claude固定版本初始化及权限观察、Grok固定版本ACP无认证探针通过；Windows Claude SessionStart通知通过。均未发送模型请求，不计完整生命周期、IME、GUI或功能Gap关闭。"
     },
     "post_code_local_gates": {
       "base_commit": "c72313648895e7cb1d0d25a721ea8346403324d5",
@@ -726,6 +740,43 @@
         "plugin_compatibility_python": 14,
         "codex_persistent_source_python_after_fix": 13,
         "actionlint": "passed"
+      },
+      "fix_commit": "bc9bb1f28d08717f6a5ded8a562571779a653ea0"
+    },
+    "cross_platform_first_fixes": {
+      "status": "local_gates_passed_pending_platform_recheck",
+      "base_commit": "bc9bb1f28d08717f6a5ded8a562571779a653ea0",
+      "archive": "validation/cloud-round1-fixes-local-20260926",
+      "changes": [
+        "Linux权限校验函数仅扩大到父模块可见性，ACL/xattr校验原逻辑不变。",
+        "Windows AppContainer继承改用ACE_FLAGS命名常量，原数值3/0及权限范围不变。",
+        "Codex正式运行器精确校验rev6，历史rev3载入归档payload并保持原SHA；增加旧/未知修订及混合树拒绝回归。",
+        "Claude图片Python夹具只补自身加载器环境，生产CLI白名单与UTF8原字节断言不变。"
+      ],
+      "local_python": {
+        "codex_windows_hook": {
+          "passed": 48,
+          "windows_only_skipped": 2
+        },
+        "codex_windows_notify": {
+          "passed": 6
+        },
+        "claude_image_runner_portability": {
+          "passed": 9
+        }
+      },
+      "localization": "无需本地化变更：平台编译兼容及验收夹具修正，无用户界面或交互语义变化。",
+      "real_model_or_gui_run": false,
+      "gap_closed": false,
+      "local_cargo_check": "passed",
+      "local_i18n": {
+        "passed": 11,
+        "failed": 0
+      },
+      "evidence_index": {
+        "file": "local-evidence-index.safe.json",
+        "sha256": "e6e7adb9a7df71e4e47def3844abc262b5fdd7e842caf875e145d8a07750cec8",
+        "files": 13
       }
     }
   },
