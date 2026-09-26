@@ -6,7 +6,7 @@ use std::io::{self, Write as _};
 use std::mem::{size_of, size_of_val};
 use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::fs::OpenOptionsExt as _;
-use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+use std::os::windows::io::{AsRawHandle as _, BorrowedHandle, FromRawHandle as _, OwnedHandle};
 use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -488,12 +488,38 @@ impl AppContainerProbe {
         Ok(result)
     }
 
+    /// 只接受本次精确 Job 中、具有同一零 capability AppContainer 身份的调试进程。
+    pub fn verify_package_process(&self, process: BorrowedHandle<'_>) -> io::Result<()> {
+        if !self.contains_package_process(process)? {
+            return Err(io::Error::other("版本探针子进程不在本次 Job"));
+        }
+        self.verify_token_for(HANDLE(process.as_raw_handle()))
+    }
+
+    /// 调试器只借用实际事件句柄；不得通过 PID 重开而引入身份复用窗口。
+    pub fn contains_package_process(&self, process: BorrowedHandle<'_>) -> io::Result<bool> {
+        let mut contained = BOOL::default();
+        unsafe {
+            IsProcessInJob(
+                HANDLE(process.as_raw_handle()),
+                Some(handle(&self.job)),
+                &mut contained,
+            )
+        }
+        .map_err(io::Error::other)?;
+        Ok(contained.as_bool())
+    }
+
     fn verify_token(&self) -> io::Result<()> {
         let process = handle(
             self.process
                 .as_ref()
                 .ok_or_else(|| io::Error::other("版本探针进程缺失"))?,
         );
+        self.verify_token_for(process)
+    }
+
+    fn verify_token_for(&self, process: HANDLE) -> io::Result<()> {
         let mut token = HANDLE::default();
         unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }.map_err(io::Error::other)?;
         let token = owned(token);
@@ -666,3 +692,7 @@ impl Drop for AppContainerProbe {
 #[cfg(test)]
 #[path = "windows_appcontainer_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "windows_appcontainer_console_tests.rs"]
+mod console_tests;

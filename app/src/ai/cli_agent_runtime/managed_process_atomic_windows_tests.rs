@@ -1164,9 +1164,11 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         powershell: None,
         child_image: None,
         package_images: None,
+        npm_console_host: None,
         child_images: HashMap::new(),
         component_images: HashMap::new(),
         processes: HashMap::new(),
+        held_package_processes: Vec::new(),
         initial_breakpoints: HashSet::new(),
         pending_event: None,
         root_exit_observed: false,
@@ -1252,6 +1254,10 @@ struct PackageProbeFixture {
 
 impl PackageProbeFixture {
     fn new() -> Self {
+        Self::with_bound_child(false)
+    }
+
+    fn with_bound_child(bind_child: bool) -> Self {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().canonicalize().unwrap();
         for name in ["home", "config", "cache", "data", "tmp"] {
@@ -1266,9 +1272,12 @@ impl PackageProbeFixture {
         fs::copy(&program, &allowed).unwrap();
         fs::copy(&program, &rejected).unwrap();
         let mut lease = prepare(&ExpectedFileIdentity::capture(&program).unwrap()).unwrap();
-        lease
-            .set_package_images(vec![ExpectedFileIdentity::capture(&allowed).unwrap()])
-            .unwrap();
+        let mut images = vec![ExpectedFileIdentity::capture(&allowed).unwrap()];
+        if bind_child {
+            images.push(ExpectedFileIdentity::capture(&rejected).unwrap());
+        }
+        lease.set_package_images(images).unwrap();
+        lease.enable_npm_console_host().unwrap();
         let debugger = lease.prepare_image_debug_session().unwrap();
         let marker = root.join("tmp").join("unverified-image-ran.txt");
         // 使用真正的 Windows cmd 子映像；拒绝时其用户态重定向不应执行。
@@ -1303,7 +1312,7 @@ impl PackageProbeFixture {
     fn finish(&mut self) {
         self.process.terminate_job().unwrap();
         self.debugger
-            .drain_terminated_processes(self.process.id())
+            .drain_terminated_package_in_container(&self.process)
             .unwrap();
         self.process.write_cleanup_receipt(&self.receipt).unwrap();
         assert_eq!(
@@ -1327,7 +1336,7 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
     fixture.process.resume().unwrap();
     fixture
         .debugger
-        .verify_package_initial_image(fixture.process.id())
+        .verify_package_initial_image_in_container(&fixture.process)
         .unwrap();
     let deadline = Instant::now() + DEBUG_DRIVER_TIMEOUT;
     let (failure, rejected_identity) = loop {
@@ -1342,7 +1351,10 @@ fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
             let identity = inspect_handle(&file).unwrap().id;
             identity
         });
-        match fixture.debugger.validate_event(&event) {
+        match fixture
+            .debugger
+            .validate_event_in_container(&event, Some(&fixture.process))
+        {
             Ok(status) => fixture.debugger.continue_pending(status).unwrap(),
             Err(failure) => break (failure, image),
         }
@@ -1385,7 +1397,7 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
     fixture.process.resume().unwrap();
     fixture
         .debugger
-        .verify_package_initial_image(fixture.process.id())
+        .verify_package_initial_image_in_container(&fixture.process)
         .unwrap();
     let event = fixture
         .debugger
@@ -1394,14 +1406,17 @@ fn package_probe_continue_failure_preserves_pending_cleanup() {
             "测试未收到 loader 事件",
         )
         .unwrap();
-    fixture.debugger.validate_event(&event).unwrap();
+    fixture
+        .debugger
+        .validate_event_in_container(&event, Some(&fixture.process))
+        .unwrap();
     let pending = fixture.debugger.pending_event.unwrap();
     fixture.debugger.pending_event = Some((pending.0, 0, pending.2));
     fixture.process.terminate_job().unwrap();
     assert!(
         fixture
             .debugger
-            .drain_terminated_processes(fixture.process.id())
+            .drain_terminated_package_in_container(&fixture.process)
             .is_err()
     );
     assert_eq!(
@@ -1465,3 +1480,6 @@ fn debug_process_duplicate_does_not_own_or_close_the_original_handle() {
         process_id
     );
 }
+
+#[path = "managed_process_atomic_windows_console_tests.rs"]
+mod console_binding;

@@ -378,6 +378,7 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
     environment.push(("COMSPEC".into(), system_program("cmd")?.into_os_string()));
     let mut executable = super::atomic_windows::prepare(&input.files[0])?;
     executable.set_package_images(images)?;
+    executable.enable_npm_console_host()?;
     let cwd = super::atomic_windows::prepare_directory(
         manifest.atomic_cwd.as_ref().ok_or_else(invalid)?,
     )?;
@@ -433,8 +434,8 @@ fn run_package_probe(
     debugger: &mut super::atomic_windows::WindowsImageDebugSession,
 ) -> io::Result<u32> {
     process.resume()?;
-    debugger.verify_package_initial_image(process.id())?;
-    debugger.drain_package_until_exit()?;
+    debugger.verify_package_initial_image_in_container(process)?;
+    debugger.drain_package_in_container_until_exit(process)?;
     process.exit_code()
 }
 
@@ -444,5 +445,5 @@ fn terminate_package_probe(
 ) -> io::Result<()> {
     process.terminate_job()?;
     // 显式传入已持有的根进程身份，包含 resume 自身失败、尚无首事件的路径。
-    debugger.drain_terminated_processes(process.id())
+    debugger.drain_terminated_package_in_container(process)
 }

@@ -16,6 +16,8 @@
 
 `ca37b9cbf` 已补 Windows npm 拒绝后的显式 Job／ACL／profile 清理与脱敏映像诊断；本地编译和 i18n 门禁通过，仅 Windows 的[同提交验证 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 因 Win32 事件码字段类型错误在编译阶段失败，原生场景未运行；字段修正待新增量复验。候选拒绝仍需定位，未扩大白名单或宣称真实升级完成。
 
+本提交的 `console-binding-04` 仅补 Windows Codex npm 探针所需的精确系统控制台依赖：文件租约之外仍须同 Job、同 AppContainer SID、零 capability，失败保持拒绝；退出未获全部真实句柄确认时不记清理成功。当前本地 check、i18n 重试02（11项）及 actionlint 通过，首次链接空间不足失败保留，Windows 原生／升级恢复仍未验，不扩大消费者支持承诺。复用既有英中探针失败提示，无需本地化变更；GUI／在线联测后置，G09 不关闭。
+
 `debed8c51` 补接有效专属 Grok 的上下文草稿队列及 Linux／Windows 升级空闲通知，英中提示已同步，本地门禁通过；真实三平台／远端发送、双语布局及同提交平台结果仍待补，G01/G09 不关闭。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
@@ -24,7 +26,7 @@ Homebrew 范围仅为已登记默认前缀的固定 cask（Mac ARM `/opt/homebre
 
 Mac ARM64 的 `2b59c8c62` 联测包已在内置盘准备，英文／简体中文资源内嵌、独立测试 profile、签名及摘要已核验；尚未启动，不作为 GUI／模型验收。构建与原始失败范围见[验证结论](VALIDATION_REPORT.md)，路径和摘要见 `CURRENT_STATUS.json.g09_isolation_preflight_increment.prepared_macos_bundle`。
 
-2026-09-27 Grok 图片与技能组合已接线：固定 `1.0.41/grok-4.7`、Inherit 根会话、私有独占 leader，按当前会话目录核验所选技能；排队及刷新后再次核对并保留失败草稿。Mac ARM64 原生两轮仅证明单技能＋PNG及冷加载同历史后的双技能＋PNG，图片原字节、技能读取与识色分别通过；适配器、GUI、热新增组合、权限交互及 Linux／Windows 仍待验。英中说明同步，布局后置。
+2026-09-27 `ba73c4df3` 的 Grok 图片与技能组合已接线：固定 `1.0.41/grok-4.7`、Inherit 根会话、私有独占 leader，按当前会话目录核验所选技能；排队及刷新后再次核对并保留失败草稿。Mac ARM64 原生两轮仅证明单技能＋PNG及冷加载同历史后的双技能＋PNG，图片原字节、技能读取与识色分别通过；适配器、GUI、热新增组合、权限交互及 Linux／Windows 仍待验。英中说明同步，布局后置。
 
 ## 版本与运行方式
 
