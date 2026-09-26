@@ -2,7 +2,7 @@
 
 **自动升级属于原 Goal；阶段交付，整体尚未完成。** 本文基于 `e3ef39689cd8b686dfe040b90217ed1067b4d268`（2026-09-25），固定开发／验收版本为 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。不将历史渠道发现写成今日最新版，也不把本机手动更新当作产品事务通过。状态见 [CURRENT_STATUS](CURRENT_STATUS.json)，真实范围见[验证结论](VALIDATION_REPORT.md)。
 
-2026-09-26 未验证代码增量：Claude Homebrew／WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探测、替换及中断恢复已接入。Codex 固定 0.156.1 的完整归档与三种 shell 补全共同恢复；Codex npm macOS ARM64／Linux x64／Windows x64 的 Node、官方 wrapper、完整平台包与事务恢复现也已接线；实际 Node 公共入口在私有依赖快照中探测，不能仅测 native 二进制。Windows x64 保留实际 cmd/PowerShell 公共 shim 两条 Node 链，私有 AppContainer 候选经真实退出后才能发布，源码已接；Claude Windows npm 的固定包内硬链接和公开双入口、Grok 三平台 npm 的完整三包/Brotli解压/用户bin多位置事务、Grok Mac ARM Homebrew 的双别名和三补全也已接入。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同已接，仅在显式Stable且官方实时指针匹配时开放；当前2.1.274仍拒绝。macOS Intel 已按用户明确范围排除，Mac 仅支持 Apple Silicon。功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，macOS arm64 编译与 i18n 11 项通过；按用户要求，本轮未运行真实安装升级或功能测试；下文历史结果保持原范围，不能据此扩大支持。
+2026-09-26 未验证代码增量：Claude Homebrew／WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探测、替换及中断恢复已接入。Codex 固定 0.156.1 的完整归档与三种 shell 补全共同恢复；Codex npm macOS ARM64／Linux x64／Windows x64 的 Node、官方 wrapper、完整平台包与事务恢复现也已接线；实际 Node 公共入口在私有依赖快照中探测，不能仅测 native 二进制。Windows x64 保留实际 cmd/PowerShell 公共 shim 两条 Node 链，私有 AppContainer 候选经真实退出后才能发布，源码已接；Claude Windows npm 的固定包内硬链接和公开双入口、Grok 三平台 npm 的完整三包/Brotli解压/用户bin多位置事务、Grok Mac ARM Homebrew 的双别名和三补全也已接入。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同已接，仅在显式Stable且官方实时指针匹配时开放；当前2.1.274仍拒绝。macOS Intel 已按用户明确范围排除，Mac 仅支持 Apple Silicon。功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译与 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归、夹具复验及未完成作业见[最新门禁](VALIDATION_REPORT.md)，不据此宣称两平台整体通过。新增来源的真实升级与恢复验收仍待补；下文历史结果保持原范围，不能据此扩大支持。
 
 Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefix、完整安装登记、来源发现、受监督候选、原子交换与恢复；Claude 单独记录旧入口／候选／新入口三个探针，Codex 与 Grok 分别保留完整资源与补全／别名。Grok Windows x64 官方 WinGet portable 1.0.40→1.0.41 也已接通原文件、别名、公共链接及 ARP 事务，保留 ACL 和下载来源标记。官方原始材料已归档，实际升级均未执行，G09 保持开放。
 
@@ -28,9 +28,9 @@ Linux x64 三款固定 Homebrew cask 的代码现已接通默认 Linuxbrew prefi
 
 2026-09-25 续接增量已收紧 npm 安装归属：包名、精确版本、清单中的入口及当前命令必须属于同一前缀，npm 管理器本身也须有注册清单；Windows 入口支持 npm `cmd-shim 8` 的 Node 和原生二进制模板，拒绝追加命令、跨前缀入口和 `npm link`。macOS 已用实际隔离安装的 Codex `0.156.1`、Claude `2.1.280` 验证来源识别；模板测试不代替 Windows 实机验证。该来源识别提交当时不执行包管理器升级，npm／Homebrew 为 `ManualOnly`；后续单包事务见下文，G09 保持未关闭。没有新增或改变界面文案，**无需本地化变更**；现有来源标签语义仍适用。
 
-2026-09-26 工作区继续接入 Claude npm 单包更新：从两份官方归档验证 SHA-512 SRI、精确清单与完整成员，在原前缀构造私有新树；宿主复制官方 native 到公共 `bin/claude.exe`，不执行安装脚本。候选只在空配置、拒绝网络的监督进程中运行 `--version`，确认退出和清理后才交换目录；公共 symlink 保留，原有 POSIX 权限保留。额外 ACL/安全属性、未审核目标和 Codex Node 闭包仍不支持。journal 负责交换中断恢复；清理逐成员复核身份及内容，发现外部改动保留现场，不宣称防御任意同 UID 恶意竞争。macOS 私有安装的真实更新、交换后冷恢复、外部改动保留、候选改动拒绝及未审核降级拒绝五场景已通过。原 15 秒探针预算不足已改为受监督更新的 300 秒上限；先确认清理再报告超时，保留原失败。该范围不含 GUI 更新点击、插件重检或模型生命周期，跨平台仍待验，不能据此关闭 G09。
+2026-09-26 工作区继续接入 Claude npm 单包更新：从两份官方归档验证 SHA-512 SRI、精确清单与完整成员，在原前缀构造私有新树；宿主复制官方 native 到公共 `bin/claude.exe`，不执行安装脚本。候选只在空配置、拒绝网络的监督进程中运行 `--version`，确认退出和清理后才交换目录；公共 symlink 保留，原有 POSIX 权限保留。额外 ACL／安全属性与未审核目标仍拒绝；Codex Node 闭包已由上方代码检查点所列增量接入，真实事务验收待补。journal 负责交换中断恢复；清理逐成员复核身份及内容，发现外部改动保留现场，不宣称防御任意同 UID 恶意竞争。macOS 私有安装的真实更新、交换后冷恢复、外部改动保留、候选改动拒绝及未审核降级拒绝五场景已通过。原 15 秒探针预算不足已改为受监督更新的 300 秒上限；先确认清理再报告超时，保留原失败。该范围不含 GUI 更新点击、插件重检或模型生命周期，跨平台仍待验，不能据此关闭 G09。
 
-当前三款 CLI 的 Mac ARM/Linux x64 Homebrew cask 与 Windows x64 WinGet 固定来源事务已纳入上述代码提交。该批代码尚未执行真实升级、恢复或跨平台测试，未修改本机用户安装；保留既有未知版本兼容门禁。按用户新优先级先整合功能，再集中验证，不将来源识别直接记为升级能力完成。
+当前三款 CLI 的 Mac ARM/Linux x64 Homebrew cask 与 Windows x64 WinGet 固定来源事务已纳入上述代码提交。该批新增路径的真实升级与恢复验收仍待补，未修改本机用户安装；保留既有未知版本兼容门禁。已开展的跨平台编译与定向回归见[最新门禁](VALIDATION_REPORT.md)，不将来源识别或自动化门禁直接记为升级能力完成。
 
 ## 事务与配置合同
 

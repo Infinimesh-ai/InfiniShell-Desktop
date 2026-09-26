@@ -328,7 +328,7 @@
       "G01": "macOS arm64、Linux x86_64 和 Windows x86_64 的专属 Grok TUI 启动、消息领取、回执、恢复占用和 GUI 已合入主工作区。Linux 要求真实 PTY/pidfd/SO_PEERPIDFD；Windows 持原 ConPTY shell 句柄、原子 Job 归属及命名管道 peer。本地 macOS arm64 编译和 i18n 门禁通过；固定版本真实运行及其他平台仍待验收。普通历史继续已接任务列表入口：旧进程核实退出后同UUID --resume、同task_id新generation先CAS后派发；活跃进程仅按原PTY/listener身份重关联，不重放旧消息。",
       "G03": "macOS/Linux/Windows 已共用专属 TUI PNG 类型化输入、持久图片、纯图/文字混合、粘贴/拖放及整批帧上限；Windows ConPTY 入口已整合。本轮未验证图片链和双语布局。",
       "G08": "Codex 独立 app-server/显式 Unix socket/当前 TUI 一次启动票据/内核身份/GUI入口已接，补齐原共享 daemon 多 pane 无可靠归属的问题；默认已有 daemon 路径仍要求唯一客户端及唯一 loaded thread。Grok 远端专属 ticket/RPC、PTY wrapper、GUI图片发送及重启查询已接。Claude 2.1.280上传→原生next消息→Read→历史原图消费证明及只查询恢复已接。断线均不重发输入。全部为未验证代码，不代替真实SSH/tmux。",
-      "G09": "Codex/Claude/Grok 的 Mac ARM、Linux x64、Windows x64 npm，三款 Mac ARM/Linux x64 Homebrew cask 和三款 Windows x64 WinGet portable 的固定来源事务已接入。完整官方包、公开入口、依赖与安装登记分别绑定，候选监督与恢复保持来源专用合同。Linux Homebrew 来源发现与执行总入口已接，使用默认 Linuxbrew prefix 与 renameat2 原子交换；Grok WinGet 保留版本原文件、grok.exe 别名、公共链接、ARP 与下载来源标记。Claude Unix npm 2.1.280→2.1.278 受限主动降级只在显式 Stable 且实时指针匹配时开放，当前 2.1.274 仍拒绝。未操作用户安装或运行升级，本地 macOS arm64 编译通过；Linux/Windows 条件代码及真实事务仍待验收。",
+      "G09": "Codex/Claude/Grok 的 Mac ARM、Linux x64、Windows x64 npm，三款 Mac ARM/Linux x64 Homebrew cask 和三款 Windows x64 WinGet portable 的固定来源事务已接入。完整官方包、公开入口、依赖与安装登记分别绑定，候选监督与恢复保持来源专用合同。Linux Homebrew 来源发现与执行总入口已接，使用默认 Linuxbrew prefix 与 renameat2 原子交换；Grok WinGet 保留版本原文件、grok.exe 别名、公共链接、ARP 与下载来源标记。Claude Unix npm 2.1.280→2.1.278 受限主动降级只在显式 Stable 且实时指针匹配时开放，当前 2.1.274 仍拒绝。未操作用户安装或运行升级，本地 macOS arm64 与 b78b62a48 同提交 Linux/Windows 编译通过；真实事务仍待验收。",
       "G10": "Claude/Grok 文件搜索、固定受审技能、受审命令及命令+技能组合已接。Mac ARM/Linux x64/Windows x64 均通过固定 SDK MCP 将精确命令交宿主独立监督；每条按父代/回合/调用身份登记、逐次审批、前条真实清理后顺序执行，同一 CLI 会话保留。运行中 Submit 已回到原生合并/后续排队语义；取消先结束未执行请求，再取消原生回合，已启动命令仍等待清理。父集合仅可缩小，原生 shell 不开放，命令使用当前系统账号，非 OS 沙箱。本地 macOS arm64 编译和 i18n 门禁通过；功能测试、其他平台及双语布局仍待验收。",
       "G06": "新增固定 Grok 原生 user 目录技能来源；初始选择、热新增与冷恢复统一核对唯一路径、来源限定名称及摘要。本轮未测试，真实用户级目录和模型链仍待验。",
       "G07": "收起CLI富输入时选择文件已改为带输入代次的单一事件：TerminalView打开编辑器，再延后到模型事件完成后调用既有附件选择器，生成卡片；旧裸路径异步回调兼容保留，但新选择入口不再产生它。未运行GUI或回归。"
@@ -374,7 +374,7 @@
     "localization_review": "固定技能、受审命令及命令+技能组合、远程Codex/Grok菜单/帮助/失败、Claude原图消费和未知状态说明均同步英中。Grok npm/Homebrew无需新增文案，复用更新状态。本地 cargo check 与 i18n 11 项通过；真实双语布局后置。",
     "remaining_code_scope": [
       "原清单当前已知功能接线已完成并提交；macOS arm64 编译和 i18n 资源门禁通过，后续运行发现的问题继续处理，不能以此关闭 Gap。",
-      "Linux/Windows 编译、受影响模块回归、三平台各模式真实验收和双语布局仍待完成；按用户代码优先指示后置。"
+      "macOS arm64、Linux x64 与 Windows x64 编译均已有当前代码门禁；定向回归和夹具复验见 cross_platform_next。三平台各模式真实验收及双语布局仍待完成，按用户要求留待后续联测。"
     ],
     "g08_grok_remote_in_progress": "远端ticket/专属leader服务、有界RPC、真实PTY wrapper及固定1.0.41 exec已接线；同连接/终端/代次门禁、同步撤销、查询恢复、GUI caller、重启关联与收起输入框的native事件入口已整合。当前Mac ARM64/Linuxx64远端、Mac ARM64/Linuxx64/Windowsx64客户端，未验收。",
     "g09_codex_npm_code": {
@@ -429,7 +429,7 @@
       "permission": "精确argv/cwd/timeout逐次AllowOnce/DenyOnce，父集合只可缩小；命令使用当前系统账号OS作用域，非OS沙箱。",
       "cleanup": "每条命令独立监督代，稳定调用身份和永久结果；真实整树清理后才发布结果、释放当前命令和审批下一条。同一 CLI 会话可顺序多条，Unknown 仍阻止继续/回收。取消未执行请求与已执行命令分别处理。",
       "remaining": [
-        "同提交编译/本地化门禁、实际审批/连续多命令/追加/取消/进程清理/冷恢复及双语布局验收。"
+        "实际审批/连续多命令/追加/取消/进程清理/冷恢复及双语布局验收；已完成编译/本地化门禁和运行中定向回归的准确范围见 cross_platform_next 与 VALIDATION_REPORT.md。"
       ],
       "windows": {
         "status": "unverified_implementation_wired",
@@ -631,33 +631,36 @@
       "code_review_scope": "本地构建与资源门禁源码绑定；不是安全审计或真实产品验收。"
     },
     "cross_platform_next": {
-      "status": "failed_pending_source_fix",
+      "status": "in_progress",
       "platforms": [
         "Linux x64",
         "Windows x64"
       ],
       "workflow": ".github/workflows/cross-platform-preflight.yml",
-      "required_source_commit": "bc9bb1f28d08717f6a5ded8a562571779a653ea0",
+      "required_source_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
       "macos_intel": false,
-      "reason": "本地确定性失败已修正并定向复验；两平台在线空闲后对同一提交派发。",
-      "added_coverage": [
-        "warp 默认筛选增加 remote_server::cli_image 和 terminal::view::grok_owned_input",
-        "remote_server crate 的 client::image_staging::tests 两平台定向执行；Unix服务端用例不外推为Windows原生覆盖"
-      ],
-      "run_id": 36244024291,
-      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36244024291",
-      "archive": "validation/cloud-post-code-bc9bb1f28-20260926",
+      "run_id": 36245112104,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36245112104",
+      "archive": "validation/cloud-post-code-b78b62a48-20260926",
       "full_workspace_tests": false,
       "authenticated_model_or_gui": false,
-      "observed_failure": "首轮Linux/Windows两作业均失败：Linux图片运行器可移植性夹具4项失败及权限校验函数私有E0603；Windows旧rev5断言/历史payload混用，以及AppContainer继承标志ACE_FLAGS类型错误。原始日志和产物已完整保留。",
-      "local_script_diagnosis_archive": "validation/cloud-post-code-bc9bb1f28-20260926/local-script-diagnosis",
-      "first_run_evidence_index": {
-        "file": "first-run-evidence-index.safe.json",
-        "sha256": "c89e7f2edc1182bcd3b2e714c18fd841d27093838abf14136381009ec2cc4b2b",
-        "files": 13,
-        "original_artifact_zips": 7
+      "reason": "首轮确定性编译和运行器失败已修，内置盘本地编译/i18n/定向Python通过，验证包含实际修正的同一提交。",
+      "observed_results": {
+        "linux_cargo_check": "passed",
+        "windows_cargo_check": "passed",
+        "windows_codex_native_hooks_and_conpty": "passed_including_fixed_0.156.1",
+        "linux_warp_focused_tests": {
+          "passed": 3166,
+          "failed": 4,
+          "nextest_skipped": 4840
+        },
+        "linux_remote_image_client_contracts": "passed",
+        "remaining_job_steps": "in_progress",
+        "linux_job": "failed",
+        "windows_warp_focused_tests": "passed_counts_pending_final_log"
       },
-      "independent_native_results": "两平台Codex插件安装/刷新、Claude固定版本初始化及权限观察、Grok固定版本ACP无认证探针通过；Windows Claude SessionStart通知通过。均未发送模型请求，不计完整生命周期、IME、GUI或功能Gap关闭。"
+      "linux_failure_diagnosis": "grok_owned_input_tests.rs:31，测试进程没有新建PTY的控制TTY，真实Linux身份校验拒绝；后续功能断言尚未运行。",
+      "linux_log_sha256": "b5c5bb6e5a70a9c87517aa356d4a31272debc36059e619d9eb0555a46f6a4ae5"
     },
     "post_code_local_gates": {
       "base_commit": "c72313648895e7cb1d0d25a721ea8346403324d5",
@@ -777,7 +780,76 @@
         "file": "local-evidence-index.safe.json",
         "sha256": "e6e7adb9a7df71e4e47def3844abc262b5fdd7e842caf875e145d8a07750cec8",
         "files": 13
+      },
+      "fix_commit": "b78b62a48223235e8c29157e3786747c8db2ff68"
+    },
+    "cross_platform_prior_runs": [
+      {
+        "status": "failed_pending_source_fix",
+        "platforms": [
+          "Linux x64",
+          "Windows x64"
+        ],
+        "workflow": ".github/workflows/cross-platform-preflight.yml",
+        "required_source_commit": "bc9bb1f28d08717f6a5ded8a562571779a653ea0",
+        "macos_intel": false,
+        "reason": "本地确定性失败已修正并定向复验；两平台在线空闲后对同一提交派发。",
+        "added_coverage": [
+          "warp 默认筛选增加 remote_server::cli_image 和 terminal::view::grok_owned_input",
+          "remote_server crate 的 client::image_staging::tests 两平台定向执行；Unix服务端用例不外推为Windows原生覆盖"
+        ],
+        "run_id": 36244024291,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36244024291",
+        "archive": "validation/cloud-post-code-bc9bb1f28-20260926",
+        "full_workspace_tests": false,
+        "authenticated_model_or_gui": false,
+        "observed_failure": "首轮Linux/Windows两作业均失败：Linux图片运行器可移植性夹具4项失败及权限校验函数私有E0603；Windows旧rev5断言/历史payload混用，以及AppContainer继承标志ACE_FLAGS类型错误。原始日志和产物已完整保留。",
+        "local_script_diagnosis_archive": "validation/cloud-post-code-bc9bb1f28-20260926/local-script-diagnosis",
+        "first_run_evidence_index": {
+          "file": "first-run-evidence-index.safe.json",
+          "sha256": "c89e7f2edc1182bcd3b2e714c18fd841d27093838abf14136381009ec2cc4b2b",
+          "files": 13,
+          "original_artifact_zips": 7
+        },
+        "independent_native_results": "两平台Codex插件安装/刷新、Claude固定版本初始化及权限观察、Grok固定版本ACP无认证探针通过；Windows Claude SessionStart通知通过。均未发送模型请求，不计完整生命周期、IME、GUI或功能Gap关闭。"
       }
+    ],
+    "prepared_macos_binary": {
+      "source_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
+      "command": "cargo build -p warp --bin infinishell",
+      "status": "passed",
+      "architecture": "arm64",
+      "archive": "validation/code-checkpoint-app-b78b62a48-20260926",
+      "binary_sha256": "ca2d6a34cab2e98f810158571fe4d8e5eacb122c382d9131f3067e26eb325997",
+      "index_sha256": "c89b0c49199b65a45360e3c5b27777ed4b651f776b13fa7ca0e260f42ea33418",
+      "internal_copy_verified": true,
+      "executed": false,
+      "packaged_app": false,
+      "scope": "同提交可执行文件构建与内置副本摘要；不是GUI、模型、联测或签名应用包交付。"
+    },
+    "linux_pty_fixture_followup": {
+      "status": "local_passed_pending_linux_recheck",
+      "base_commit": "b78b62a48223235e8c29157e3786747c8db2ff68",
+      "changed_file": "app/src/terminal/view/grok_owned_input_tests.rs",
+      "scope": "仅测试夹具，用经command派生并持有控制PTY的shell建立真实身份；Drop精确kill/wait。生产身份门禁和四项断言不变。",
+      "local_cargo_check": "passed",
+      "local_focused_tests": {
+        "passed": 4,
+        "failed": 0
+      },
+      "local_i18n": {
+        "passed": 11,
+        "failed": 0
+      },
+      "archive": "validation/linux-pty-fixture-fix-local-20260926",
+      "index_sha256": "b5babc7f3476e2fc22c8e3b73d774fc2506103abf25fd0c14ea6019ee93913f6",
+      "localization": "无需本地化变更；只修测试夹具。",
+      "related_platform_recheck": [
+        "Linux x64"
+      ],
+      "macos_local": "passed",
+      "windows_source_unchanged": true,
+      "goal_or_gap_closed": false
     }
   },
   "supported_target_scope": {

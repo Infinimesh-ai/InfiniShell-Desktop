@@ -4,9 +4,9 @@
 
 **阶段交付，完整 Goal 尚未完成。** 本表记录固定历史基线及输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`，npm 来源绑定提交为 `b6f93f662`。早期在线收据按 WIP 摘要计证；`84102bb1c` 后续已有静态 GIF、GUI JPEG／纯 PNG 窄复验，当前技能／权限工作区增量已有内置门禁、G10 两条生产协调器链和 Grok 双图 GUI 正例，最终提交与相关平台验证仍待补。它说明当前产品能力及限制，不将代码路径存在等同于全平台验收；具体通过范围见[验证结论](VALIDATION_REPORT.md)，剩余项见[已知缺项](KNOWN_GAPS.md)，整体状态见 [CURRENT_STATUS](CURRENT_STATUS.json)。
 
-普通终端富输入的“附加文件”已在后续增量接通文件卡片选择器；macOS Codex 两卡片原生 shell 读取正例与中英文布局通过，原入口仅插路径及模型读取失败记录保留。Claude GUI 尚待首次启动向导完成，Grok 卡片可建但自动发送仍被 G01 阻止，不能将显示卡片或安全拒绝计作投递完成。
+普通终端富输入的“附加文件”已在后续增量接通文件卡片选择器；macOS Codex 两卡片原生 shell 读取正例与中英文布局通过，原入口仅插路径及模型读取失败记录保留。Claude GUI 尚待首次启动向导后的真实投递验收；早期 Grok 卡片正例仅证明可建卡，后续专属普通会话自动发送已接线但尚未完成真实验收，不能将显示卡片或安全拒绝计作投递完成。
 
-当前按用户要求先补功能代码，后集中修复与测试。代码检查点 `704bb33bb2943f8a686b24b843c3b3a1ba656c19` 中的 G01/G03 专属 TUI GUI／PNG 输入、G08 远端图片、G09 安装来源事务、G10 搜索与受限技能增量见 [CURRENT_STATUS](CURRENT_STATUS.json) 的 `current_work_order`；本批仅 macOS arm64 编译和 i18n 11 项通过，下表的已验证范围不因此扩大。Codex 远端图片已接入[固定 0.156.1 的原生队列](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L899)及[图片快照](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/local_media.rs#L20)，按后续输入排队处理；仍须后续真实 SSH／tmux 接收证明。共享 daemon 默认路径仍只允许唯一前台客户端和唯一 loaded thread；新增每 pane 独立 app-server、明确 socket 和当前 TUI 票据绑定及 GUI入口；Grok 远端专属会话、当前 pane 入口、图片发送和查询恢复已接线；Claude 新增上传原图→原生 Read→历史图片字节证明及未知状态恢复，不能把文本入队计为图像消费。三 CLI 三目标平台 npm、三 CLI Mac ARM/Linux x64 Homebrew、三 CLI Windows x64 WinGet、Claude/Grok 受限 Skill 和 Mac/Linux 命令+技能组合已有未验证接线；三平台受审命令现统一通过宿主工具逐条独立监督、审批和清理，同会话多命令及原生追加均已接；Grok普通终端历史继续也已接同UUID恢复与新代次CAS。
+按用户要求形成的功能代码检查点现已进入无人值守回归阶段；真实 GUI／模型验收仍后置。代码检查点 `704bb33bb2943f8a686b24b843c3b3a1ba656c19` 中的 G01/G03 专属 TUI GUI／PNG 输入、G08 远端图片、G09 安装来源事务、G10 搜索与受限技能增量见 [CURRENT_STATUS](CURRENT_STATUS.json) 的 `current_work_order`；该检查点已通过 macOS arm64 编译和 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归、夹具复验及未完成作业见[最新门禁](VALIDATION_REPORT.md)，不据此宣称两平台整体通过，也不扩大下表的真实功能验收范围。Codex 远端图片已接入[固定 0.156.1 的原生队列](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L899)及[图片快照](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/local_media.rs#L20)，按后续输入排队处理；仍须后续真实 SSH／tmux 接收证明。共享 daemon 默认路径仍只允许唯一前台客户端和唯一 loaded thread；新增每 pane 独立 app-server、明确 socket 和当前 TUI 票据绑定及 GUI入口；Grok 远端专属会话、当前 pane 入口、图片发送和查询恢复已接线；Claude 新增上传原图→原生 Read→历史图片字节证明及未知状态恢复，不能把文本入队计为图像消费。三 CLI 三目标平台 npm、三 CLI Mac ARM/Linux x64 Homebrew、三 CLI Windows x64 WinGet、Claude/Grok 受限 Skill 和 Mac/Linux 命令+技能组合已有未验证接线；三平台受审命令现统一通过宿主工具逐条独立监督、审批和清理，同会话多命令及原生追加均已接；Grok普通终端历史继续也已接同UUID恢复与新代次CAS。
 
 ## 固定版本与模式
 
@@ -16,7 +16,7 @@
 | 托管协议 | app-server | 双向结构化流／control | ACP；继承设置与固定策略分别判断 |
 | 托管文本与文件上下文 | 中英多行、文件上下文 | 中英多行、文件上下文 | 中英多行、文件上下文 |
 | 托管图片 | 原生类型化输入；模型识图另见 V04 | 已接 PNG/JPEG/静态 GIF/WebP、纯图和单技能组合；格式/纯图有 Mac 适配器正例，84102 GUI JPEG/纯 PNG 正例；图加单技能已有工作区 Mac 适配器及 GUI字节/识色/逐次审批正例（G04／G05） | 已接固定 1.0.41/grok-4.7、Inherit 无技能 PNG；Mac 适配器及双图 GUI 字节/识色正例，GUI 同原生 ID 冷恢复、同宿主重关联和清理分别通过；最终提交及跨平台待验（G02） |
-| 普通终端富输入与附件 | 文本可发送；本地双文件卡片已有 Mac GUI 原生 shell 读取正例，中英文布局通过；跨平台待验、远程图片拒绝（G07／G08） | 文本可发送；本地文件卡已接显式路径引用，产品链待验；远程图片拒绝（G07／G08） | 自动发送仍拒绝，图片仅原生手动正例；文件卡共享转换已接但受 G01 阻止（G01／G03／G07／G08） |
+| 普通终端富输入与附件 | 文本可发送；本地双文件卡片已有 Mac GUI 原生 shell 读取正例，中英文布局通过；跨平台待验；远程图片原生队列已接线，真实 SSH／tmux 链待验（G07／G08） | 文本可发送；本地文件卡已接显式路径引用，产品链待验；远程原图经原生 Read 与历史消费收据已接线，真实链待验（G07／G08） | 专属普通会话自动发送、PNG 和文件卡已接线，远端专属会话图片也已接线；真实目标平台验收待补（G01／G03／G07／G08） |
 | 技能来源与调用 | 保留 `$` 与原生技能调用 | `/` 与原生 Skill；当前增量接通无图多技能和会话内新增，Mac 适配器通过，Mac GUI 双技能、热新增及图片加单技能逐次允许通过；修复后同宿主重关联不重投并清理，跨平台待补；固定 V1/V2 策略禁用（G06／G10） | Grok／兼容 Claude 来源及已支持 Home Agents 来源；已接固定默认继承模式多技能/空闲热新增，Mac 生产适配器及 GUI 双技能→热新增→同原生 ID 冷恢复三轮通过，应用重启同宿主零重投、两代清理和双语布局通过；各轮源码/二进制独立绑定，同提交云端及两平台模型/GUI 待补。reload 为同 leader 范围，仅向私有独占 leader 发送；固定策略禁用（G06／G10） |
 | 文件引用与代码评审 | 复用路径、选区、评审上下文 | 同类上下文入口 | 同类上下文入口；文件卡为路径引用，不等于任意二进制内容传输 |
 | 审批与配置 | 当前请求允许／拒绝；不固定跳过审批 | 当前请求允许／拒绝；启动不改全局配置 | 固定读取／文件策略分别验权；拒绝可能返回 Cancelled，不改写为成功 |

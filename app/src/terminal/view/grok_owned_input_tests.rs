@@ -1,11 +1,16 @@
 use std::fs::File;
-use std::os::unix::io::FromRawFd;
+use std::io;
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::process::Child;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
+use command::Stdio;
+use command::blocking::Command;
 use futures::channel::oneshot;
 use futures::future::{Either, select};
+use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use warpui::r#async::Timer;
 use warpui::{App, ViewHandle};
 
@@ -21,14 +26,61 @@ use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use crate::workspace::{ToastStack, ToastStackEvent};
 
-fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, File, File) {
+struct OwnedPtyFixture {
+    master: File,
+    shell: Child,
+}
+
+impl OwnedPtyFixture {
+    fn new() -> Self {
+        let pty = nix::pty::openpty(None, None).unwrap();
+        let (master, slave) =
+            unsafe { (File::from_raw_fd(pty.master), File::from_raw_fd(pty.slave)) };
+        for file in [&master, &slave] {
+            fcntl(file.as_raw_fd(), FcntlArg::F_SETFD(FdFlag::FD_CLOEXEC)).unwrap();
+        }
+        // shell 只执行阻塞的 read 内建命令；不加载用户环境、不派生后代或启动 Grok。
+        let mut command = Command::new("/bin/sh");
+        command
+            .args(["-c", "read -r infinishell_pty_fixture"])
+            .env_clear()
+            .stdin(Stdio::from(slave.try_clone().unwrap()))
+            .stdout(Stdio::from(slave.try_clone().unwrap()))
+            .stderr(Stdio::from(slave));
+        // 与真实 PTY 派生一致；这里只调用 fork 后安全的系统调用，spawn 会等待 exec 成功。
+        unsafe {
+            command.pre_exec(|| {
+                if libc::setsid() < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                if libc::ioctl(libc::STDIN_FILENO, libc::TIOCSCTTY as _, 0) < 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        Self {
+            master,
+            shell: command.spawn().unwrap(),
+        }
+    }
+}
+
+impl Drop for OwnedPtyFixture {
+    fn drop(&mut self) {
+        // 包括断言失败路径，精确回收本次直接子进程并等待退出，避免遗留 shell 或僵尸。
+        let _ = self.shell.kill();
+        let _ = self.shell.wait();
+    }
+}
+
+fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, OwnedPtyFixture) {
     initialize_app_for_terminal_view(app);
     app.add_singleton_model(|_| ToastStack);
     let terminal = add_window_with_terminal(app, None);
-    let pty = nix::pty::openpty(None, None).unwrap();
-    let (master, slave) = unsafe { (File::from_raw_fd(pty.master), File::from_raw_fd(pty.slave)) };
-    // 只构造本地 PTY 身份；测试不启动 Grok、连接原生 socket 或读取认证材料。
-    let identity = LocalPtyIdentity::capture(std::process::id(), &master).unwrap();
+    let pty = OwnedPtyFixture::new();
+    // 使用实际持有该控制终端的 shell；测试不连接原生 socket 或读取认证材料。
+    let identity = LocalPtyIdentity::capture(pty.shell.id(), &pty.master).unwrap();
     terminal.update(app, |view, ctx| {
         let snapshot = {
             let mut model = view.model.lock();
@@ -126,7 +178,7 @@ fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, File, File) {
             launch_command: None,
         });
     });
-    (terminal, master, slave)
+    (terminal, pty)
 }
 
 async fn received_event(receiver: oneshot::Receiver<()>) {
@@ -140,7 +192,7 @@ async fn received_event(receiver: oneshot::Receiver<()>) {
 fn forwarded_ctrl_c_revokes_pending_owned_input_even_without_cancel_observation() {
     App::test((), |mut app| async move {
         let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(false);
-        let (terminal, _master, _slave) = owned_terminal(&mut app);
+        let (terminal, _pty) = owned_terminal(&mut app);
         let lease = terminal.read(&app, |view, _| {
             view.grok_owned_input
                 .as_ref()
@@ -173,7 +225,7 @@ fn forwarded_ctrl_c_revokes_pending_owned_input_even_without_cancel_observation(
 #[test]
 fn forwarded_ctrl_c_keeps_claimed_input_able_to_receive_its_ack() {
     App::test((), |mut app| async move {
-        let (terminal, _master, _slave) = owned_terminal(&mut app);
+        let (terminal, _pty) = owned_terminal(&mut app);
         let lease = terminal.read(&app, |view, _| {
             view.grok_owned_input
                 .as_ref()
@@ -208,7 +260,7 @@ fn forwarded_ctrl_c_keeps_claimed_input_able_to_receive_its_ack() {
 #[test]
 fn ordinary_pty_bytes_do_not_cancel_pending_owned_input() {
     App::test((), |mut app| async move {
-        let (terminal, _master, _slave) = owned_terminal(&mut app);
+        let (terminal, _pty) = owned_terminal(&mut app);
         let lease = terminal.read(&app, |view, _| {
             view.grok_owned_input
                 .as_ref()
@@ -225,7 +277,7 @@ fn ordinary_pty_bytes_do_not_cancel_pending_owned_input() {
 #[test]
 fn failed_second_attachment_keeps_first_unknown_draft_blocked() {
     App::test((), |mut app| async move {
-        let (terminal, _master, _slave) = owned_terminal(&mut app);
+        let (terminal, _pty) = owned_terminal(&mut app);
         let requests = Arc::new(AtomicUsize::new(0));
         let observed = requests.clone();
         let (sender, receiver) = mpsc::sync_channel(64);

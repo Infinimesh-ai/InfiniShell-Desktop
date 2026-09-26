@@ -18,7 +18,7 @@
 
 ## 功能与模式
 
-2026-09-26 工作顺序按用户最新指示改为**功能代码优先**，集中修复、新增测试和真实 GUI／模型验收后续进行。下列“未验证代码”不关闭缺项，也不改变已有原始成功／失败的范围；G01/G03 的 macOS／Linux／Windows 专属后端已合入当前主工作区，原 `.worktrees/grok-owned-terminal` 工作树保留；其他增量也已整合。代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，仅 macOS arm64 编译及 i18n 11 项门禁通过，以下未验证均指真实功能／目标平台验收尚未完成。
+2026-09-26 按用户要求形成的**功能代码优先**检查点现已进入无人值守回归阶段；真实 GUI／模型验收仍后置。下列“未验证代码”不关闭缺项，也不改变已有原始成功／失败的范围；G01/G03 的 macOS／Linux／Windows 专属后端已合入当前主工作区，原 `.worktrees/grok-owned-terminal` 工作树保留；其他增量也已整合。代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译及 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归、夹具复验及未完成作业见[最新门禁](VALIDATION_REPORT.md)，不据此宣称两平台整体通过。以下未验证均指真实功能／目标平台验收尚未完成。
 
 ### G01 — Grok 普通终端富输入自动提交
 
@@ -44,7 +44,7 @@
 
 - **状态／优先级／范围**：功能缺项，高；P0、P1、P5。
 - **实际情况与影响**：普通终端图片门禁仍保留。本次 macOS 原生 Ctrl+V 后再粘贴 bracketed text 会重复附图；改用普通 UTF-8 输入并以 Alt+Enter 换行取得恰好一段文字加一张图片及正确识色，但没有剪贴板消费 ACK 或可信输入就绪，未接通应用自动链。G02 的 ACP 正例不替代本项。
-- **未验证代码增量**：专属 TUI 会话新增 PNG 类型化输入，图片先校验后持久化为当前数据库 scope 的哈希文件；独立富消息主题保存文本和图片引用，worker 重读核验后发送同一 session/prompt，沿用单次领取和原生回执。纯图、文字加多图、粘贴／拖放进富输入框及失败保留已接线；不再依靠剪贴板时序。macOS arm64、Linux x86_64 与 Windows x86_64 已共用固定 1.0.41/grok-4.7/default 输入；Windows ConPTY 入口已整合。本轮未跑测试或图片模型验收。
+- **未验证代码增量**：专属 TUI 会话新增 PNG 类型化输入，图片先校验后持久化为当前数据库 scope 的哈希文件；独立富消息主题保存文本和图片引用，worker 重读核验后发送同一 session/prompt，沿用单次领取和原生回执。纯图、文字加多图、粘贴／拖放进富输入框及失败保留已接线；不再依靠剪贴板时序。macOS arm64、Linux x86_64 与 Windows x86_64 已共用固定 1.0.41/grok-4.7/default 输入；Windows ConPTY 入口已整合。已开展的自动化门禁见[最新门禁](VALIDATION_REPORT.md)，图片模型及真实 GUI 验收仍待补。
 - **当前替代方式**：使用文字描述，或使用已经验证的其他 CLI 图片入口；不能把手工粘贴成功当作现有应用自动路径已通过。
 - **源码／证据**：[图片按键策略](../../app/src/terminal/view/use_agent_footer/mod.rs#L96)、[图片投递门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)。
 - **关闭条件**：分别确认三平台固定 Grok 原生图片接收方式，并在普通 PTY 实测剪贴板／拖放、焦点、审批等待与多附件顺序，证明图片进入正确会话且失败保留草稿。
@@ -82,12 +82,12 @@
 - **源码／证据**：[文件附件投递](../../app/src/terminal/view/use_agent_footer/mod.rs#L694)。
 - **关闭条件**：界定支持的文件种类和投递语义，完成三款普通 PTY 的附件转换、正确路径／字节接收、空格与中文路径、失效文件和权限拒绝验收；不能只删除拒绝分支。
 
-- **未验证入口增量**：CLI 富输入收起时点击选择文件，现改为携带当前输入代次打开富输入，待草稿恢复事件完成后复用附件选择器，生成文件卡片。新入口不再直接插入裸路径；旧异步路径回调仍可处理。未运行本轮 GUI 或平台回归。
+- **未验证入口增量**：CLI 富输入收起时点击选择文件，现改为携带当前输入代次打开富输入，待草稿恢复事件完成后复用附件选择器，生成文件卡片。新入口不再直接插入裸路径；旧异步路径回调仍可处理。该入口真实 GUI 验收仍待补，已开展的平台自动化回归见[最新门禁](VALIDATION_REPORT.md)。
 
 ### G08 — 远程 CLI 图片传输
 
 - **状态／优先级／范围**：功能缺项，中；P1 附件、P5 SSH／tmux。
-- **实际情况与影响**：普通终端只要存在 `remote_host` 即拒绝图片粘贴；本地图片没有自动传到远端 CLI 可访问位置。三款均受此远程门禁约束。
+- **实际情况与影响**：远程图片的上传、会话绑定和三款 CLI 原生消费者均已接线，未满足来源／会话合同的输入仍拒绝；真实 SSH／tmux 投递、消费及恢复验收尚未完成。
 - **未验证代码增量**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。各路径均未运行本轮实测，不以可靠拒绝代替完成。
 - **当前替代方式**：用户先将图片放到目标环境，再使用该 CLI 已验证的远程文件路径读取方式；本机附件路径不能直接当远程路径。
 - **源码／证据**：[远程图片门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)、[SSH 现有覆盖](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)。
@@ -106,7 +106,7 @@
 
 - **状态／优先级／范围**：模式限制，高；P3 权限、P4 子任务与双向消息。
 - **实际情况与影响**：Claude 原有子任务要求 `ClaudeRestrictedFilesV1`；当前工作区新增独立 `ClaudeRestrictedFilesV2`，仅固定 `2.1.280` 开放受审 `Write` 创建或覆盖项目内文件，V1 父任务不可扩为 V2；macOS `claude-opus-5-5` 的真实生产父子链已证明精确 Write 允许生效、拒绝不改文件、双向 ACK／结果回收及两代正常清理，另有真实 V1 父扩为 V2 在发送原生输入前拒绝的独立链；Grok 子任务仅在相应固定读取／文件策略和已核验 SDK 合同下开放，继承设置不能证明完整父权限上限。固定策略禁用原生 shell、hooks 和技能；Claude V1 工具限 `Read`／`Edit`，V2 仅增加 `Write`；V1 的 `Write` 及两策略的 `Bash`、`Skill` 等仍被拒绝。新 V2 的待审批取消、活跃重关联、冷恢复、GUI 和跨平台尚未在线验证。现有父子消息、结果回收真实通过，不等于已提供可任意运行命令和技能的通用编码子任务。**固定策略不是操作系统文件或网络沙箱。**
-- **未验证代码增量**：ClaudeRestrictedFilesV3／GrokRestrictedFilesV2 的文件与搜索策略已接线。新增 ClaudeRestrictedSkillsV1 固定创建时技能及完整资源树，子任务仅取父集合子集；原生插件注册确认后逐次 Skill 审批，禁技能自行授权、隐式文件引用及动态 shell。旧策略不扩权。GrokRestrictedSkillsV1 也已接原生 user 技能目录与逐次 Skill 审批，旧策略不扩权。Claude/Grok ReviewedCommandsV1 及 ReviewedCommandsSkillsV1 已接精确 argv/cwd/timeout、父集合子集、逐次审批及整代清理后恢复，三目标平台现统一接固定 SDK MCP 的宿主受审命令，原生 shell 保持关闭。每条命令有独立监督代、稳定调用身份、审批和真实清理回执；前条清理后可在同一 CLI 会话继续下一条。运行中 Submit 已接回原生合并/后续排队语义；取消先结束未执行请求，已运行命令仍需真实清理。命令使用当前系统账号，不宣称操作系统沙箱。技能与命令英中说明已同步，macOS arm64 编译与 i18n 11 项通过；尚未进行本批功能测试、其他平台编译或布局检查，不计验收完成。
+- **未验证代码增量**：ClaudeRestrictedFilesV3／GrokRestrictedFilesV2 的文件与搜索策略已接线。新增 ClaudeRestrictedSkillsV1 固定创建时技能及完整资源树，子任务仅取父集合子集；原生插件注册确认后逐次 Skill 审批，禁技能自行授权、隐式文件引用及动态 shell。旧策略不扩权。GrokRestrictedSkillsV1 也已接原生 user 技能目录与逐次 Skill 审批，旧策略不扩权。Claude/Grok ReviewedCommandsV1 及 ReviewedCommandsSkillsV1 已接精确 argv/cwd/timeout、父集合子集、逐次审批及整代清理后恢复，三目标平台现统一接固定 SDK MCP 的宿主受审命令，原生 shell 保持关闭。每条命令有独立监督代、稳定调用身份、审批和真实清理回执；前条清理后可在同一 CLI 会话继续下一条。运行中 Submit 已接回原生合并/后续排队语义；取消先结束未执行请求，已运行命令仍需真实清理。命令使用当前系统账号，不宣称操作系统沙箱。技能与命令英中说明已同步；本地资源门禁、同提交 Linux／Windows 编译及定向回归状态见[最新门禁](VALIDATION_REPORT.md)。真实命令／模型链和双语布局验收仍待补，不计验收完成。
 - **当前替代方式**：在固定策略内拆分允许的文件任务；需要原生 shell 或技能时使用用户明确启动的继承设置根任务，不把它称为具有同等父权限保证的受控子任务。
 - **源码／证据**：[子任务派发限制](../../app/src/ai/cli_agent_runtime/coordinator_tools.rs#L590)、[Claude 固定工具与参数](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L13)、[Claude 空 hooks 验证](../../app/src/ai/cli_agent_runtime/claude_profile.rs#L612)、[Grok 固定工具与空技能／hooks](../../app/src/ai/cli_agent_runtime/grok_profile.rs#L316)、[Grok 父子实链](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/grok-parent-child-v8.safe.json)。
 - **关闭条件**：先明确允许扩展的子任务工具范围，验证真实可约束的父权限上限，再逐项接入命令／技能等能力；审批允许／拒绝、越界拒绝、取消后进程清理、双向 ACK、冷恢复及结果必须有真实链。不得以固定绕过审批或修改用户全局配置换取可用性。
