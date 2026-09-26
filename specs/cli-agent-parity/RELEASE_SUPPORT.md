@@ -18,7 +18,7 @@
 
 `43c9709d2` 的 `console-binding-04` 已补 Windows Codex npm 精确控制台依赖，文件租约、同 Job、同 AppContainer SID、零 capability 与真实退出确认仍强制。同提交 Windows 编译及普通／原生边界回归通过，但真实 npm 首个 CMD 候选返回 `RecoveryRequired`，stderr 报工作目录不兼容及拒绝访问，清理未确认；发布、PowerShell 与恢复未到达，不扩大消费者支持承诺。本地 check、i18n 重试02（11项）和 actionlint 通过，首次空间不足失败保留。复用英中探针失败提示，无需本地化变更；修复及 GUI／在线联测按用户要求后置，G09 不关闭。
 
-Windows npm 工作目录后续增量以 `6408131e2` 为基线，仅修执行路径表示，授权对象和隔离门禁保持；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows 待验，真实事务尚未复验，不改变消费者支持承诺。无需本地化变更，完整 GUI／在线验收仍后置。
+Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`），仅修执行路径表示，授权对象和隔离门禁保持；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 进行中，真实事务尚未复验，不改变消费者支持承诺。无需本地化变更，完整 GUI／在线验收仍后置。
 
 `debed8c51` 补接有效专属 Grok 的上下文草稿队列及 Linux／Windows 升级空闲通知，英中提示已同步，本地门禁通过；真实三平台／远端发送、双语布局及同提交平台结果仍待补，G01/G09 不关闭。
 

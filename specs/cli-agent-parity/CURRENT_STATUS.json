@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "43c9709d2a1000ebccd3820e386022babba34599",
+  "product_behavior_freeze": "05b0b8faa0ddfab6ec45cb0b783219155afe387c",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -1506,7 +1506,7 @@
     "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "43c9709d2a1000ebccd3820e386022babba34599",
+  "latest_implementation_commit": "05b0b8faa0ddfab6ec45cb0b783219155afe387c",
   "latest_increment": "windows_npm_console_binding_increment",
   "supported_platforms": [
     "macos-arm64",
@@ -1844,7 +1844,7 @@
     "cwd_followup": {
       "date": "2026-09-27",
       "base_commit": "6408131e230b1a5ef16bb5f92b7465d2b62d59df",
-      "status": "本地门禁通过，待提交推送后运行同提交Windows定向验证；真实npm仍未通过，不关闭G09",
+      "status": "05b0b8faa已提交推送，本地门禁通过；同提交Windows定向验证进行中，G09不关闭",
       "scope": "Windows Codex npm候选仅在CreateProcessW边界传经canonical路径及卷/文件ID核验的DOS cwd；ACL与readonly保留原canonical路径及句柄合同。其他CLI沿用原启动API参数。",
       "diagnostics": "增加固定phase/单调耗时/数量及脱敏错误类型，区分根EXIT放行、整树退出及清理；不记录路径/参数/认证。",
       "prior_failure_refinement": "旧stop_requested由上层stdout的300秒超时触发；exit_code1是外层worker，不证明CMD自身退出码。共享debug drain也300秒，仅提示可能预算竞争，未调整时限或清理边界。",
@@ -1865,7 +1865,23 @@
         "windows_native": "本轮待验，3项npm路径与2项command新增回归仅Windows执行",
         "source_snapshot_sha256": "dbeaaea4ce14b65e46f7b531584e66c83a8dbf3be836268891602d7ccedc4f67"
       },
-      "static_review_sha256": "a406d9eb989d3a25dd35fcec3423dec40ad4e2bd3864eecf8d7969803ed99a68"
+      "static_review_sha256": "a406d9eb989d3a25dd35fcec3423dec40ad4e2bd3864eecf8d7969803ed99a68",
+      "implementation_commit": "05b0b8faa0ddfab6ec45cb0b783219155afe387c",
+      "source_commit_binding_sha256": "c76e1a48e40271375aac8e42244b01cc31b19b877998967501331f136d74acb3",
+      "same_commit_ci": {
+        "run_id": 36280073722,
+        "head_sha": "05b0b8faa0ddfab6ec45cb0b783219155afe387c",
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722",
+        "status": "in_progress",
+        "platforms": [
+          "windows-x64"
+        ],
+        "macos_intel": false,
+        "linux_unchanged": true,
+        "full_workspace": false,
+        "gui_or_model": false,
+        "scope": "Windows编译、相关回归、原生隔离边界及固定Codex npm真实私有事务；进行中不能计通过。"
+      }
     }
   }
 }
