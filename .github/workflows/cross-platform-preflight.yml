@@ -61,6 +61,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_windows_codex_npm_updates:
+        description: Windows 私有 npm 安装的 Codex 0.156.1 公共入口更新及中断恢复
+        required: true
+        default: false
+        type: boolean
       run_grok_npm_updates:
         description: Linux 私有 npm 安装的 Grok 1.0.41 后端更新事务及中断恢复
         required: true
@@ -228,6 +233,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_fixed_cli_autoupdate_tests.py -v
           python3 -B script/cli-agent-parity/claude_npm_update_live_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_npm_update_live_runner_tests.py -v
+          python3 -B script/cli-agent-parity/codex_npm_windows_update_live_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_npm_update_live_runner_tests.py -v
           python3 -B script/cli-agent-parity/probe_package_source_environment_tests.py -v
           # 原始 Grok P0 的 POSIX 离线夹具；不启动真实 CLI 或模型。
@@ -357,6 +363,17 @@ jobs:
           -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 客户端图片 RPC 合同属于 remote_server crate，warp 的筛选不会执行这些用例。
+      # 只读解析固定 Node 与系统 loader/cache/依赖，不启动候选或绕过 Landlock。
+      - name: Verify fixed Linux Node glibc dependency binding without execution
+        if: ${{ !cancelled() && steps.test_app.outcome == 'success' && steps.native_node.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          INFINISHELL_LINUX_NODE_ELF_PROBE="$(python3 -c 'import pathlib,shutil; print(pathlib.Path(shutil.which("node")).resolve(strict=True))')"
+          export INFINISHELL_LINUX_NODE_ELF_PROBE
+          cargo nextest run --no-fail-fast --no-tests fail -p warp --lib --run-ignored only -- --exact ai::cli_agent_runtime::managed_process::atomic_linux::glibc::tests::real_fixed_node_20_9_0_glibc_closure_without_execution
+
       - name: Test remote CLI image client contracts
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
         shell: bash
@@ -944,6 +961,7 @@ jobs:
 
       # 与仓库共用构建引导使用同一固定 Node 版本；缺依赖必须失败，不能跳过校验。
       - name: Install Node for CLI plugin verification
+        id: native_node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20.9.0
@@ -974,6 +992,16 @@ jobs:
         run: |
           python -B script/cli-agent-parity/prepare_grok_cli_tests.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok preparation runner tests failed' }
+
+      - name: Test Windows Codex npm runner in installer-only verification
+        if: ${{ inputs.windows_grok_installer_only && inputs.run_windows_codex_npm_updates && !inputs.full_workspace_tests }}
+        shell: pwsh
+        timeout-minutes: 3
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          python -B script/cli-agent-parity/codex_npm_windows_update_live_runner_tests.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm runner contract tests failed' }
 
       - name: Test notification patch file transactions
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) }}
@@ -1024,6 +1052,7 @@ jobs:
             'verify_cli_autoupdate_tests.py',
             'run_fixed_cli_autoupdate_tests.py',
             'codex_npm_update_live_runner_tests.py',
+            'codex_npm_windows_update_live_runner_tests.py',
             'grok_npm_update_live_runner_tests.py',
             'probe_package_source_environment_tests.py',
             'prepare_claude_cli_tests.py',
@@ -1348,7 +1377,7 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && inputs.run_cli_atomic_updates && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
@@ -1441,7 +1470,7 @@ jobs:
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
 
@@ -1456,11 +1485,67 @@ jobs:
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
         id: supervisor
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
         run: cargo build -p warp_tui --bin infinishell-tui
+
+      # 真实 npm 生成私有安装登记和入口；不改写用户前缀、凭据或执行策略。
+      - name: Verify fixed Windows Codex npm update transactions without credentials
+        id: codex_npm_updates
+        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.check_app.outcome == 'success' && steps.supervisor.outcome == 'success' && steps.native_python.outcome == 'success' && steps.native_node.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 45
+        env:
+          PYTHONUTF8: "1"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildMessages = cargo test -p warp --lib --no-run --message-format=json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit warp libtest discovery failed' }
+          $executables = @($buildMessages | ForEach-Object { $_ | ConvertFrom-Json } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'warp' -and $_.profile.test -and $_.executable } | ForEach-Object { $_.executable })
+          if ($executables.Count -ne 1) { throw 'Expected exactly one same-commit warp libtest executable' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Same-commit supervisor lookup failed' }
+          $parityFixture = Join-Path $env:RUNNER_TEMP ('infinishell-codex-npm-' + [guid]::NewGuid().ToString())
+          New-Item -ItemType Directory -Path $parityFixture | Out-Null
+          $evidence = Join-Path $parityFixture 'evidence'
+          "WINDOWS_CODEX_NPM_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $testBinary = Join-Path $parityFixture 'warp-libtest.exe'
+          $supervisor = Join-Path $parityFixture 'supervisor.exe'
+          $sourceSupervisor = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          Copy-Item -LiteralPath $executables[0] -Destination $testBinary
+          Copy-Item -LiteralPath $sourceSupervisor -Destination $supervisor
+          function Get-ParityDigest([string] $path) {
+            return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          }
+          if ((Get-ParityDigest $testBinary) -ne (Get-ParityDigest $executables[0])) { throw 'Copied libtest hash mismatch' }
+          if ((Get-ParityDigest $supervisor) -ne (Get-ParityDigest $sourceSupervisor)) { throw 'Copied supervisor hash mismatch' }
+          $nodePath = (Get-Command node.exe -CommandType Application).Source
+          $npmPath = Join-Path (Split-Path -Parent $nodePath) 'node_modules/npm/bin/npm-cli.js'
+          if (-not (Test-Path -LiteralPath $npmPath -PathType Leaf)) { throw 'Fixed Node npm entry is missing' }
+          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath)
+          if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }
+
+      - name: Preserve Windows Codex npm update receipts
+        if: ${{ !cancelled() && inputs.run_windows_codex_npm_updates && steps.codex_npm_updates.outcome != 'skipped' && env.WINDOWS_CODEX_NPM_EVIDENCE != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-codex-npm-updates-${{ github.sha }}
+          include-hidden-files: true
+          path: |
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*.safe.json
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*.metadata.json
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*-metadata.json
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*.tgz
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*.stdout
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/*.stderr
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/before-config.raw
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/journal/codex-npm-windows.json
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.json
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.log
+          if-no-files-found: error
+          retention-days: 14
 
       # Windows 仍走已有严格 Job 调试候选，实际执行固定 update/install，并核对退出和新入口。
       - name: Verify fixed Windows CLI atomic update candidates without credentials

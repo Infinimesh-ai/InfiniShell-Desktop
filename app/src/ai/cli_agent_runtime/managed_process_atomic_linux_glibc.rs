@@ -18,6 +18,7 @@ const CACHE: &str = "/etc/ld.so.cache";
 const MAX_TABLE: usize = 1024 * 1024;
 const MAX_CACHE: u64 = 16 * 1024 * 1024;
 const MAX_OBJECTS: usize = 128;
+const MAX_SONAME_BYTES: usize = 255;
 const HWCAP_EXTENSION: u64 = 1 << 62;
 
 fn invalid() -> io::Error {
@@ -497,18 +498,33 @@ fn parse_elf(file: &File, size: u64) -> io::Result<ElfImage> {
         }
     }
     let (vaddr, length) = (strtab.ok_or_else(invalid)?, strsz.ok_or_else(invalid)?);
-    if !terminated || needed.len() > MAX_OBJECTS || length == 0 || length > MAX_TABLE as u64 {
+    if !terminated || needed.len() > MAX_OBJECTS || length == 0 {
         return Err(invalid());
     }
     let offset = mapped_offset(&loads, vaddr, length)?;
-    let strings = read(file, offset, length as usize, size)?;
+    if offset.checked_add(length).is_none_or(|end| end > size) {
+        return Err(invalid());
+    }
+    // Node 的导出符号表可大于动态记录表；仍核对整段唯一映射，仅有界读取引用的依赖名。
+    let read_name = |relative| {
+        let remaining = length
+            .checked_sub(relative)
+            .filter(|remaining| *remaining != 0)
+            .ok_or_else(invalid)?;
+        let at = offset.checked_add(relative).ok_or_else(invalid)?;
+        let bytes = read(
+            file,
+            at,
+            remaining.min((MAX_SONAME_BYTES + 1) as u64) as usize,
+            size,
+        )?;
+        soname_at(&bytes, 0)
+    };
     let needed = needed
         .into_iter()
-        .map(|offset| soname_at(&strings, offset))
+        .map(read_name)
         .collect::<io::Result<_>>()?;
-    let soname = soname
-        .map(|offset| soname_at(&strings, offset))
-        .transpose()?;
+    let soname = soname.map(read_name).transpose()?;
     Ok(ElfImage {
         interpreter,
         soname,
@@ -540,7 +556,7 @@ fn soname_at(bytes: &[u8], offset: u64) -> io::Result<String> {
         .ok_or_else(invalid)?;
     let name = std::str::from_utf8(&tail[..length]).map_err(|_| invalid())?;
     if name.is_empty()
-        || name.len() > 255
+        || name.len() > MAX_SONAME_BYTES
         || !name
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'+'))

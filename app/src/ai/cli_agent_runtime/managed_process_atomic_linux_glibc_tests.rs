@@ -1,7 +1,7 @@
 use super::*;
 use std::fs;
 use std::io::Write as _;
-use std::os::unix::fs::PermissionsExt as _;
+use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
 
 fn cache(entries: &[(&str, &str, u64, u32)], hwcaps: &[&str]) -> Vec<u8> {
     let mut bytes = vec![0; 48 + entries.len() * 24];
@@ -233,6 +233,111 @@ fn elf_reads_bounded_needed_and_soname_from_virtual_string_mapping() {
     assert_eq!(image.soname.as_deref(), Some("libfixture.so.1"));
 }
 
+fn elf_with_large_string_table() -> tempfile::NamedTempFile {
+    let file = elf(0, "libc.so.6");
+    // 官方 Node 20.9.0 Linux x64 的 DT_STRSZ 是 5,291,274；只需要读取依赖名。
+    file.as_file().set_len(5_291_786).unwrap();
+    for at in [96, 104] {
+        file.as_file()
+            .write_all_at(&5_291_786_u64.to_le_bytes(), at)
+            .unwrap();
+    }
+    file.as_file()
+        .write_all_at(&5_291_274_u64.to_le_bytes(), 280)
+        .unwrap();
+    file.as_file()
+        .write_all_at(&5_291_248_u64.to_le_bytes(), 296)
+        .unwrap();
+    file.as_file()
+        .write_all_at(&5_291_258_u64.to_le_bytes(), 312)
+        .unwrap();
+    file.as_file()
+        .write_all_at(b"libc.so.6\0libfixture.so.1\0", 5_291_760)
+        .unwrap();
+    file
+}
+
+#[test]
+fn elf_reads_short_names_at_the_end_of_a_large_string_table() {
+    let file = elf_with_large_string_table();
+    let image = parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).unwrap();
+
+    assert_eq!(image.needed, ["libc.so.6"]);
+    assert_eq!(image.soname.as_deref(), Some("libfixture.so.1"));
+}
+
+#[test]
+fn elf_rejects_a_large_string_table_outside_the_file_mapping() {
+    for length in [5_291_275_u64, u64::MAX] {
+        let file = elf_with_large_string_table();
+        file.as_file()
+            .write_all_at(&length.to_le_bytes(), 280)
+            .unwrap();
+
+        assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+    }
+}
+
+#[test]
+fn elf_rejects_string_references_at_or_beyond_the_table_end() {
+    for field in [296, 312] {
+        for reference in [5_291_274_u64, u64::MAX] {
+            let file = elf_with_large_string_table();
+            file.as_file()
+                .write_all_at(&reference.to_le_bytes(), field)
+                .unwrap();
+
+            assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+        }
+    }
+}
+
+#[test]
+fn elf_rejects_a_string_table_spanning_distinct_load_segments() {
+    let file = elf(0, "libc.so.6");
+    file.as_file().set_len(8192).unwrap();
+    file.as_file()
+        .write_all_at(&3_u16.to_le_bytes(), 56)
+        .unwrap();
+    for at in [96, 104, 184, 192, 208, 216, 224, 280] {
+        file.as_file()
+            .write_all_at(&4096_u64.to_le_bytes(), at)
+            .unwrap();
+    }
+    file.as_file()
+        .write_all_at(&1_u32.to_le_bytes(), 176)
+        .unwrap();
+
+    assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+}
+
+#[test]
+fn elf_rejects_a_dependency_without_a_nul_inside_the_string_table() {
+    let file = elf(0, "libc.so.6");
+    file.as_file().write_all_at(b"libc.so.6", 513).unwrap();
+    file.as_file()
+        .write_all_at(&10_u64.to_le_bytes(), 280)
+        .unwrap();
+
+    assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+}
+
+#[test]
+fn elf_accepts_a_255_byte_dependency_name() {
+    let name = "a".repeat(255);
+    let file = elf(0, &name);
+    let image = parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).unwrap();
+
+    assert_eq!(image.needed, [name]);
+}
+
+#[test]
+fn elf_rejects_a_dependency_name_longer_than_255_bytes() {
+    let file = elf(0, &"a".repeat(256));
+
+    assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+}
+
 #[test]
 fn elf_rejects_external_search_audit_filter_and_path_dependencies() {
     for tag in [
@@ -299,4 +404,35 @@ fn elf_rejects_dynamic_table_with_a_different_mapped_address() {
         .write_all_at(&272_u64.to_le_bytes(), 136)
         .unwrap();
     assert!(parse_elf(file.as_file(), file.as_file().metadata().unwrap().len()).is_err());
+}
+
+#[test]
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[ignore = "仅显式指定官方 Node 20.9.0 x64 原文件时核验真实系统依赖闭包；不执行 Node"]
+fn real_fixed_node_20_9_0_glibc_closure_without_execution() {
+    let path = PathBuf::from(
+        std::env::var_os("INFINISHELL_LINUX_NODE_ELF_PROBE")
+            .expect("必须显式提供 INFINISHELL_LINUX_NODE_ELF_PROBE"),
+    );
+    assert!(path.is_absolute(), "固定 Node 路径必须是绝对路径");
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW)
+        .open(&path)
+        .expect("必须能够只读打开固定 Node 普通文件");
+    let metadata = file.metadata().expect("必须能够读取固定 Node 文件元数据");
+    assert!(
+        metadata.is_file() && metadata.len() > 0 && metadata.len() <= MAX_NATIVE_EXECUTABLE_BYTES,
+        "固定 Node 必须是有界普通文件"
+    );
+    assert_eq!(
+        sha256_file(&mut file).expect("固定 Node 摘要读取失败"),
+        "a7d572c52208171a81b9afd7c347e8ff38a90ade77d200ee6b3a9dd88df4b0f3",
+        "必须使用本次失败收据绑定的官方 Node 20.9.0 Linux x64 原字节"
+    );
+
+    prepare(&file, metadata.len())
+        .expect("固定 Node 的真实系统依赖闭包绑定失败")
+        .verify()
+        .expect("固定 Node 的真实系统依赖闭包复核失败");
 }

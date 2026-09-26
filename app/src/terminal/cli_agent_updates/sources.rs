@@ -948,6 +948,10 @@ async fn latest(
     if let Some(version) = live_tests::fixed_release(agent, channel) {
         return Ok(version);
     }
+    #[cfg(all(test, windows, feature = "local_fs"))]
+    if let Some(version) = npm_windows::live_tests::fixed_release(agent, channel) {
+        return Ok(version);
+    }
     #[cfg(all(test, windows))]
     if let Some(version) = windows_live_tests::fixed_release(agent, channel) {
         return Ok(version);
@@ -1906,6 +1910,8 @@ enum RunFailure {
 }
 
 async fn run(invocation: &Invocation, timeout: Duration) -> Result<Vec<u8>, Error> {
+    #[cfg(all(test, windows, feature = "local_fs"))]
+    npm_windows::live_tests::audit_probe(invocation)?;
     #[cfg(all(
         test,
         feature = "local_fs",
@@ -1924,6 +1930,10 @@ async fn run(invocation: &Invocation, timeout: Duration) -> Result<Vec<u8>, Erro
         .map_err(|failure| match failure {
             RunFailure::NotStarted(error) | RunFailure::Started(error) => error,
         });
+    #[cfg(all(test, windows, feature = "local_fs"))]
+    if let Ok(bytes) = &result {
+        npm_windows::live_tests::preserve_readonly_stdout(invocation, bytes);
+    }
     #[cfg(all(
         test,
         feature = "local_fs",
@@ -2777,6 +2787,10 @@ fn validate_codex_publication(journal: &Journal) -> Result<(), Error> {
 }
 
 fn journal_root() -> Result<PathBuf, Error> {
+    #[cfg(all(test, windows, feature = "local_fs"))]
+    if let Some(root) = npm_windows::live_tests::journal_root() {
+        return Ok(root);
+    }
     #[cfg(all(test, windows))]
     if let Some(root) = windows_live_tests::journal_root() {
         return Ok(root);

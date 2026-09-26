@@ -389,6 +389,8 @@ async fn probe(root: &Path, journal: &mut Journal, mode: &str) -> Result<(), Err
         .with_timeout(UPDATE_TIMEOUT)
         .await;
     drop(stdout);
+    #[cfg(test)]
+    live_tests::preserve_probe_stdout(generation, &bytes);
     let receipt = if result.is_ok() {
         child.finish_after_stdin_close().await
     } else {
@@ -582,6 +584,13 @@ pub(super) async fn execute(
     let platform_archive = release.platform.verify_archive(platform.as_file_mut())?;
     release.verify_entries(&wrapper_archive, &platform_archive)?;
     verify_archives(&wrapper_archive, &platform_archive)?;
+    #[cfg(test)]
+    live_tests::preserve_verified_inputs(
+        &wrapper_bytes,
+        &platform_bytes,
+        wrapper.path(),
+        platform.path(),
+    );
     journal.owner.verify()?;
     save(root, &journal)?;
     let result = async {
@@ -649,6 +658,8 @@ pub(super) async fn execute(
         journal.prepared = Some(tree::snapshot(&journal.stage)?);
         journal.phase = Phase::Prepared;
         save(root, &journal)?;
+        #[cfg(test)]
+        live_tests::checkpoint(live_tests::Point::Prepared).await;
         probe(root, &mut journal, "cmd").await?;
         probe(root, &mut journal, "powershell").await?;
         verified_exit(root, &journal, true)?;
@@ -663,11 +674,15 @@ pub(super) async fn execute(
         tree::rename(&journal.owner.package, &journal.backup, &journal.original)?;
         journal.phase = Phase::OldMoved;
         save(root, &journal)?;
+        #[cfg(test)]
+        live_tests::checkpoint(live_tests::Point::OldMoved).await;
         tree::rename(
             &journal.stage,
             &journal.owner.package,
             journal.prepared.as_ref().ok_or(Error::RecoveryRequired)?,
         )?;
+        #[cfg(test)]
+        live_tests::checkpoint(live_tests::Point::Published).await;
         journal.phase = Phase::Published;
         save(root, &journal)?;
         drop(_images);
@@ -799,3 +814,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
     super::sync_config_directory(root)?;
     Ok(None)
 }
+
+#[cfg(test)]
+#[path = "sources_codex_npm_windows_live_tests.rs"]
+pub(super) mod live_tests;
