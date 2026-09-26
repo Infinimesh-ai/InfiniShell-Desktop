@@ -89,6 +89,7 @@ enum-iterator.workspace = true
 event-listener.workspace = true
 field_mask.workspace = true
 flate2 = "1.0.17"
+tar = "0.4"
 float-cmp.workspace = true
 futures-lite.workspace = true
 futures-util.workspace = true

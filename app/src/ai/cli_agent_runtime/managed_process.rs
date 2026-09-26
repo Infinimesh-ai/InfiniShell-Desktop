@@ -82,6 +82,7 @@ pub(crate) struct ExpectedFileIdentity {
 #[serde(rename_all = "snake_case")]
 enum AtomicLaunchKind {
     NativeFile,
+    ClaudeNpmVersionProbeV1,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -129,10 +130,15 @@ impl PreparedLaunchBinding {
         Self::with_kind(digest, Some(AtomicLaunchKind::NativeFile))
     }
 
+    pub(crate) fn claude_npm_version_probe(digest: String) -> io::Result<Self> {
+        Self::with_kind(digest, Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1))
+    }
+
     pub(crate) fn from_persisted(digest: String, kind: Option<&str>) -> io::Result<Self> {
         let kind = match kind {
             None => None,
             Some("native_file") => Some(AtomicLaunchKind::NativeFile),
+            Some("claude_npm_version_probe_v1") => Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1),
             Some(_) => {
                 return Err(io::Error::other(
                     "managed_process.launch_binding_kind_invalid",
@@ -186,6 +192,7 @@ impl PreparedLaunchBinding {
     pub(crate) fn kind_name(&self) -> Option<&'static str> {
         match self.kind {
             Some(AtomicLaunchKind::NativeFile) => Some("native_file"),
+            Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) => Some("claude_npm_version_probe_v1"),
             None => None,
         }
     }
@@ -222,6 +229,23 @@ struct OpenedFileMetadata {
 impl ExpectedFileIdentity {
     pub(crate) fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// 把执行身份直接绑定到调用方独立校验的官方归档成员，拒绝捕获期间的内容替换。
+    pub(crate) fn capture_release_image(
+        path: &Path,
+        size: u64,
+        digest: [u8; 32],
+    ) -> io::Result<Self> {
+        let captured = Self::capture(path)?;
+        let expected = digest
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        if captured.size != size || captured.sha256 != expected {
+            return Err(io::Error::other("候选执行文件与官方归档成员不匹配"));
+        }
+        Ok(captured)
     }
 
     pub(crate) fn capture(path: &Path) -> io::Result<Self> {
@@ -846,6 +870,35 @@ pub(crate) async fn spawn_bound_update(
     .await
 }
 
+/// 固定 Claude npm 公共 native 入口的版本探针；不接受通用环境覆盖或任意参数。
+pub(crate) async fn spawn_bound_version_probe(
+    state_dir: &Path,
+    generation: Uuid,
+    executable: &Path,
+    expected: ExpectedFileIdentity,
+    binding: &PreparedLaunchBinding,
+) -> io::Result<ManagedChild> {
+    if binding.kind != Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+        return Err(io::Error::other("版本探针绑定类型不匹配"));
+    }
+    version_probe::supported_platform()?;
+    validate_expected_files_contract(executable, std::slice::from_ref(&expected))?;
+    let cwd = version_probe::prepare_directory(state_dir, generation)?;
+    spawn_configured(
+        state_dir,
+        generation,
+        executable,
+        &["--version".into()],
+        &cwd,
+        None,
+        None,
+        None,
+        vec![expected],
+        Some(binding),
+    )
+    .await
+}
+
 async fn spawn_configured(
     state_dir: &Path,
     generation: Uuid,
@@ -882,6 +935,9 @@ async fn spawn_configured(
         child_image: binding.and_then(|binding| binding.child_image.clone()),
         atomic_cwd,
     };
+    if atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+        version_probe::validate(&manifest, state_dir)?;
+    }
     let (directory, manifest_bytes) = create_launch_manifest(state_dir, &manifest)?;
     if let Some(binding) = binding {
         write_launch_binding(&directory, &manifest, &manifest_bytes, binding)?;
@@ -1166,7 +1222,17 @@ fn read_worker_launch_binding(
         ));
     }
     let binding = PreparedLaunchBinding::with_kind(record.binding_digest, record.kind)?;
-    binding.validate_update_execution()?;
+    if binding.kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+        version_probe::validate(
+            manifest,
+            directory
+                .parent()
+                .and_then(Path::parent)
+                .ok_or_else(|| io::Error::other("版本探针缺少状态域"))?,
+        )?;
+    } else {
+        binding.validate_update_execution()?;
+    }
     Ok(Some(binding))
 }
 
@@ -1346,6 +1412,15 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
                 "managed_process.child_image_binding_invalid",
             ));
         }
+    }
+    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+        version_probe::validate(
+            &manifest,
+            directory
+                .parent()
+                .and_then(Path::parent)
+                .ok_or_else(|| io::Error::other("版本探针缺少状态域"))?,
+        )?;
     }
     if manifest.isolated_state_dir.is_some() && manifest.isolated_home.is_none() {
         return Err(io::Error::other("隔离持久状态域缺少隔离目录"));
@@ -1921,7 +1996,7 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
         .ok_or_else(|| io::Error::other("缺少托管记录目录"))?;
     if let Some(binding) = read_worker_launch_binding(directory, manifest, manifest_bytes)? {
         match binding.kind {
-            Some(AtomicLaunchKind::NativeFile) => {
+            Some(AtomicLaunchKind::NativeFile | AtomicLaunchKind::ClaudeNpmVersionProbeV1) => {
                 #[cfg(target_os = "linux")]
                 {
                     if manifest.expected_files.len() != 1
@@ -1967,6 +2042,11 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                     }
                     enter_atomic_cwd(manifest)?;
                     let environment = resolved_atomic_environment(manifest)?;
+                    if manifest.atomic_launch_kind
+                        == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1)
+                    {
+                        version_probe::deny_network()?;
+                    }
                     return Err(atomic_linux::execute(
                         &executable,
                         &manifest.executable,
@@ -2001,6 +2081,11 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                         &manifest.expected_files[0],
                     )?;
                     executable.verify_for_execution()?;
+                    if manifest.atomic_launch_kind
+                        == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1)
+                    {
+                        version_probe::deny_network()?;
+                    }
                     return run_path_exec_worker(manifest, executable.execution_path(), false);
                 }
                 #[cfg(windows)]
@@ -2171,6 +2256,9 @@ fn enter_atomic_cwd(manifest: &Manifest) -> io::Result<()> {
 
 #[cfg(any(unix, windows))]
 fn resolved_atomic_environment(manifest: &Manifest) -> io::Result<Vec<(OsString, OsString)>> {
+    if manifest.atomic_launch_kind == Some(AtomicLaunchKind::ClaudeNpmVersionProbeV1) {
+        return Ok(version_probe::environment(&manifest.cwd));
+    }
     let mut values = if let Some(home) = &manifest.isolated_home {
         isolated_environment(home)
             .into_iter()
@@ -2220,3 +2308,6 @@ mod tests;
 #[cfg(test)]
 #[path = "managed_process_live_tests.rs"]
 mod live_tests;
+
+#[path = "managed_process_version_probe.rs"]
+mod version_probe;

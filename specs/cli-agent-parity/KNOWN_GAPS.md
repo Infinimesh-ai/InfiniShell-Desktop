@@ -85,7 +85,7 @@
 ### G09 — 包管理器安装的自动升级
 
 - **状态／优先级／范围**：功能缺项，高；CLI_AUTOUPDATE、P0 来源识别、P5 平台维护。
-- **实际情况与影响**：提交 `b6f93f6627738fb83b6be776dd225666a900ac90` 已把 Codex/Claude 的 npm 管理器包清单、CLI 包登记、真实命令入口和安装前缀进行绑定，拒绝同名伪入口；npm 执行仍为 `ManualOnly`，Node/依赖树/lifecycle script 的执行闭包和真实升级恢复尚未完成。Homebrew 仍手动，WinGet 尚未可靠绑定。此来源识别增量不等于包管理器自动升级完成。
+- **实际情况与影响**：提交 `b6f93f6627738fb83b6be776dd225666a900ac90` 已把 Codex/Claude 的 npm 管理器包清单、CLI 包登记、真实命令入口和安装前缀进行绑定，拒绝同名伪入口；该来源识别提交的 npm 执行为 `ManualOnly`。后续工作区已接入 Claude 目标 `2.1.280` 的 Unix 官方单包事务：完整归档/成员核验、原子目录交换、私有无网络版本探针、POSIX 权限及中断 journal；不执行 npm install 或 lifecycle script。本地门禁和英中错误布局已过；macOS 官方包私有安装的真实更新、交换后冷恢复、外部改动保留、候选改动拒绝及未审核降级拒绝五场景通过，原失败保留。同提交 Linux/Windows 待验；不是 GUI 更新或模型生命周期验收。Codex Node/launcher 闭包、Windows npm、musl、额外 ACL、合法降级、Homebrew 和 WinGet 均未完成；此增量不关闭包管理器自动升级。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
