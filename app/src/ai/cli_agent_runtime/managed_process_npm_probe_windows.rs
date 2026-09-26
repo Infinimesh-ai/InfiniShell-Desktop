@@ -383,6 +383,7 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
     )?;
     executable.verify_for_spawn()?;
     cwd.verify_for_spawn()?;
+    let mut debugger = executable.prepare_image_debug_session()?;
     let mut process = command::windows::AppContainerProbe::spawn_package_suspended(
         executable.execution_path(),
         arguments.as_ref(),
@@ -391,16 +392,57 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
         &format!("InfiniShell.Version.{}", manifest.generation),
         &readonly,
     )?;
-    process.resume()?;
-    let mut debugger = executable.begin_image_debug_session(process.id())?;
-    debugger.drain_until_exit()?;
-    let code = process.exit_code()?;
+    let result = run_package_probe(&mut process, &mut debugger);
+    // 派生后任何失败都保留原事件状态；先请求终止精确 Job，才允许继续未验证事件。
+    let termination = match &result {
+        Ok(_) => Ok(()),
+        Err(_) => terminate_package_probe(&process, &mut debugger),
+    };
     drop(cwd);
-    process.write_cleanup_receipt(&record_directory.join("appcontainer-cleanup-v1"))?;
+    let cleanup = termination.and_then(|()| {
+        process.write_cleanup_receipt(&record_directory.join("appcontainer-cleanup-v1"))
+    });
     drop(handles);
+    let code = match result {
+        Ok(code) => {
+            cleanup?;
+            code
+        }
+        Err(failure) => {
+            if let Err(cleanup_failure) = cleanup {
+                let kind = cleanup_failure.kind();
+                let os_code = cleanup_failure.raw_os_error();
+                // 保留原映像拒绝错误；额外清理错误只输出固定类型，不含路径或控制材料。
+                warp_core::safe_eprintln!(
+                    safe: ("managed_process.windows_npm_cleanup_unconfirmed kind={kind:?} os_code={os_code:?}"),
+                    full: ("managed_process.windows_npm_cleanup_unconfirmed kind={kind:?} os_code={os_code:?}")
+                );
+            }
+            return Err(failure);
+        }
+    };
     if code == 0 {
         Ok(())
     } else {
         std::process::exit(code as i32);
     }
+}
+
+fn run_package_probe(
+    process: &mut command::windows::AppContainerProbe,
+    debugger: &mut super::atomic_windows::WindowsImageDebugSession,
+) -> io::Result<u32> {
+    process.resume()?;
+    debugger.verify_package_initial_image(process.id())?;
+    debugger.drain_package_until_exit()?;
+    process.exit_code()
+}
+
+fn terminate_package_probe(
+    process: &command::windows::AppContainerProbe,
+    debugger: &mut super::atomic_windows::WindowsImageDebugSession,
+) -> io::Result<()> {
+    process.terminate_job()?;
+    // 显式传入已持有的根进程身份，包含 resume 自身失败、尚无首事件的路径。
+    debugger.drain_terminated_processes(process.id())
 }

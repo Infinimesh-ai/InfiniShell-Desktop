@@ -1,7 +1,7 @@
 use std::fs::{self, OpenOptions};
 use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStrExt as _;
-use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _};
+use std::os::windows::io::{AsRawHandle as _, BorrowedHandle, FromRawHandle as _};
 use std::process::Stdio;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -1168,6 +1168,8 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         component_images: HashMap::new(),
         processes: HashMap::new(),
         initial_breakpoints: HashSet::new(),
+        pending_event: None,
+        root_exit_observed: false,
     };
     assert!(session.verify_root_image(&file).is_ok());
     let copy = fixture.bin.join("same-name-copy.exe");
@@ -1179,6 +1181,235 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
     );
     fs::write(&fixture.program, vec![0; expected.size as usize]).unwrap();
     assert!(session.verify_root_image(&file).is_err());
+}
+
+#[test]
+fn package_image_rejection_diagnostics_hide_unknown_paths() {
+    let fixture = Fixture::new();
+    let mut lease = prepare(&fixture.expected()).unwrap();
+    lease.set_package_images(vec![fixture.expected()]).unwrap();
+    let session = lease.prepare_image_debug_session().unwrap();
+    let fields = session.package_image_rejection_fields(&File::open(&fixture.program).unwrap());
+
+    assert_eq!(fields["basename_class"], "unknown");
+    assert_eq!(fields["directory_class"], "outside_windows");
+    assert_eq!(fields["package_identity_match"], true);
+    assert_eq!(fields["package_digest_match"], true);
+    assert_eq!(fields["handle_identity_unchanged"], true);
+    assert!(!fields.to_string().contains("updater"));
+    assert!(
+        !fields
+            .to_string()
+            .contains(&fixture.directory.path().display().to_string())
+    );
+    assert_eq!(
+        rejected_image_basename(Some(Path::new(r"C:\private\NODE.EXE"))),
+        "node.exe"
+    );
+    assert_eq!(
+        rejected_image_basename(Some(Path::new(r"C:\private\secret.exe"))),
+        "unknown"
+    );
+}
+
+#[test]
+fn failed_exit_continue_keeps_process_and_pending_event() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    let process_id = unsafe { GetCurrentProcessId() };
+    session.root_process_id = process_id;
+    session.processes.insert(
+        process_id,
+        duplicate_process_handle(unsafe { GetCurrentProcess() }).unwrap(),
+    );
+    // 当前测试进程不是 debuggee，且线程 0 无效；真实 ContinueDebugEvent 必须失败。
+    session.pending_event = Some((process_id, 0, EXIT_PROCESS_DEBUG_EVENT));
+
+    assert!(session.continue_pending(DBG_CONTINUE).is_err());
+
+    assert_eq!(
+        session.pending_event,
+        Some((process_id, 0, EXIT_PROCESS_DEBUG_EVENT))
+    );
+    assert!(session.processes.contains_key(&process_id));
+    assert!(!session.root_exit_observed);
+}
+
+struct PackageProbeFixture {
+    process: command::windows::AppContainerProbe,
+    debugger: WindowsImageDebugSession,
+    _lease: WindowsReplacementLease,
+    marker: PathBuf,
+    receipt: PathBuf,
+    rejected_identity: ExpectedFileId,
+    _directory: tempfile::TempDir,
+}
+
+impl PackageProbeFixture {
+    fn new() -> Self {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path().canonicalize().unwrap();
+        for name in ["home", "config", "cache", "data", "tmp"] {
+            fs::create_dir(root.join(name)).unwrap();
+        }
+        let system = prepare_system_directory().unwrap();
+        let program = final_path_from_handle(&system.file)
+            .unwrap()
+            .join("cmd.exe");
+        let allowed = root.join("allowed.exe");
+        let rejected = root.join("unbound.exe");
+        fs::copy(&program, &allowed).unwrap();
+        fs::copy(&program, &rejected).unwrap();
+        let mut lease = prepare(&ExpectedFileIdentity::capture(&program).unwrap()).unwrap();
+        lease
+            .set_package_images(vec![ExpectedFileIdentity::capture(&allowed).unwrap()])
+            .unwrap();
+        let debugger = lease.prepare_image_debug_session().unwrap();
+        let marker = root.join("tmp").join("unverified-image-ran.txt");
+        // 使用真正的 Windows cmd 子映像；拒绝时其用户态重定向不应执行。
+        let command_path = rejected.to_str().unwrap().strip_prefix(r"\\?\").unwrap();
+        let marker_path = marker.to_str().unwrap().strip_prefix(r"\\?\").unwrap();
+        let arguments =
+            format!(r#"/d /v:off /s /c ""{command_path}" /d /c "echo forbidden>"{marker_path}"""#);
+        let environment = super::super::version_probe::resolved_environment(&root).unwrap();
+        let process = command::windows::AppContainerProbe::spawn_package_suspended(
+            lease.execution_path(),
+            arguments.as_ref(),
+            &root,
+            &environment,
+            &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+            &[allowed, rejected.clone()],
+        )
+        .unwrap();
+        Self {
+            process,
+            debugger,
+            _lease: lease,
+            marker,
+            receipt: root.join("appcontainer-cleanup-v1"),
+            rejected_identity: ExpectedFileIdentity::capture(&rejected)
+                .unwrap()
+                .file_id
+                .unwrap(),
+            _directory: directory,
+        }
+    }
+
+    fn finish(&mut self) {
+        self.process.terminate_job().unwrap();
+        self.debugger
+            .drain_terminated_processes(self.process.id())
+            .unwrap();
+        self.process.write_cleanup_receipt(&self.receipt).unwrap();
+        assert_eq!(
+            fs::read(&self.receipt).unwrap(),
+            b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n"
+        );
+        assert!(!self.marker.exists());
+    }
+}
+
+#[test]
+#[ignore = "Windows AppContainer 实际映像拒绝与整树退出须显式运行"]
+fn package_probe_rejects_unbound_child_and_confirms_cleanup() {
+    let name = "package_probe_rejects_unbound_child_and_confirms_cleanup";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let mut fixture = PackageProbeFixture::new();
+    fixture.process.resume().unwrap();
+    fixture
+        .debugger
+        .verify_package_initial_image(fixture.process.id())
+        .unwrap();
+    let deadline = Instant::now() + DEBUG_DRIVER_TIMEOUT;
+    let (failure, rejected_identity) = loop {
+        let event = fixture
+            .debugger
+            .next_event(deadline, "测试未收到子映像事件")
+            .unwrap();
+        let image = (event.dwDebugEventCode == CREATE_PROCESS_DEBUG_EVENT).then(|| {
+            // 复制 hFile，仅供断言；实际事件所有权仍由 validate_event 接管。
+            let handle = unsafe { BorrowedHandle::borrow_raw(event.u.CreateProcessInfo.hFile.0) };
+            let file = File::from(handle.try_clone_to_owned().unwrap());
+            let identity = inspect_handle(&file).unwrap().id;
+            identity
+        });
+        match fixture.debugger.validate_event(&event) {
+            Ok(status) => fixture.debugger.continue_pending(status).unwrap(),
+            Err(failure) => break (failure, image),
+        }
+    };
+    assert_eq!(failure.to_string(), "npm 包探针拒绝未绑定的子进程映像");
+    assert_eq!(rejected_identity, Some(fixture.rejected_identity));
+    assert!(!fixture.marker.exists());
+    assert!(!fixture.receipt.exists());
+    fixture.finish();
+    record_debug_native_exit(name);
+}
+
+#[test]
+#[ignore = "Windows AppContainer 首事件前的终止闭包须显式运行"]
+fn package_probe_cleans_up_before_initial_debug_event() {
+    let name = "package_probe_cleans_up_before_initial_debug_event";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let mut fixture = PackageProbeFixture::new();
+    // 主线程未恢复、会话尚未领到首事件，仍须用本次已持有根 PID 完成显式清理。
+    assert_eq!(fixture.debugger.root_process_id, 0);
+    assert!(fixture.debugger.pending_event.is_none());
+    fixture.finish();
+    record_debug_native_exit(name);
+}
+
+#[test]
+#[ignore = "Windows AppContainer Continue 失败后的事件保留须显式运行"]
+fn package_probe_continue_failure_preserves_pending_cleanup() {
+    let name = "package_probe_continue_failure_preserves_pending_cleanup";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let mut fixture = PackageProbeFixture::new();
+    fixture.process.resume().unwrap();
+    fixture
+        .debugger
+        .verify_package_initial_image(fixture.process.id())
+        .unwrap();
+    let event = fixture
+        .debugger
+        .next_event(
+            Instant::now() + DEBUG_DRIVER_TIMEOUT,
+            "测试未收到 loader 事件",
+        )
+        .unwrap();
+    fixture.debugger.validate_event(&event).unwrap();
+    let pending = fixture.debugger.pending_event.unwrap();
+    fixture.debugger.pending_event = Some((pending.0, 0, pending.2));
+    fixture.process.terminate_job().unwrap();
+    assert!(
+        fixture
+            .debugger
+            .drain_terminated_processes(fixture.process.id())
+            .is_err()
+    );
+    assert_eq!(
+        fixture.debugger.pending_event,
+        Some((pending.0, 0, pending.2))
+    );
+    assert!(!fixture.debugger.root_exit_observed);
+    assert!(!fixture.receipt.exists());
+    // 恢复仍未继续的同一真实事件，清理私有夹具；不是把失败当作确认退出。
+    fixture.debugger.pending_event = Some(pending);
+    fixture.finish();
+    record_debug_native_exit(name);
 }
 
 #[cfg(target_arch = "x86_64")]

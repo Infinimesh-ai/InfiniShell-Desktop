@@ -12,7 +12,7 @@
 
 `56f6da217` 已修正 Linux 官方 Node 大 ELF 字符串表误拒，同提交 Linux 原文件依赖闭包通过；新增 Windows Codex npm 五场景入口仍在真实私有 npm 登记阶段失败，尚未进入产品事务。两平台编译与定向 Rust 通过，离线夹具修复已另提交；G09 未关闭，详细范围见[验证结论](VALIDATION_REPORT.md)。
 
-`5aac3f7d0` 已补远程 Claude 延迟图片回收与 Grok 明确未派发后的主动重试；`bd80cc9ed` 已接 Windows Codex npm 两组固定入口模板。新增 19 项回归及本地编译／英中门禁通过，同提交 Linux／Windows [验证 36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 进行中；实际远端／GUI／模型链仍待验，G08/G09 不关闭。
+`5aac3f7d0` 已补远程 Claude 延迟图片回收与 Grok 明确未派发后的主动重试；`bd80cc9ed` 已接 Windows Codex npm 两组固定入口模板。新增 19 项回归及本地编译／英中门禁通过，同提交 [验证 36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) Linux 通过，Windows 编译／定向回归通过但真实 npm 首个 CMD 候选探针拒绝未绑定子映像，后续场景未执行；实际远端／GUI／模型链仍待验，G08/G09 不关闭。
 
 `debed8c51` 补接有效专属 Grok 的上下文草稿队列及 Linux／Windows 升级空闲通知，英中提示已同步，本地门禁通过；真实三平台／远端发送、双语布局及同提交平台结果仍待补，G01/G09 不关闭。
 

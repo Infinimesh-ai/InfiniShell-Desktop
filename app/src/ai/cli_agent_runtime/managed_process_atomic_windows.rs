@@ -159,6 +159,8 @@ pub(super) struct WindowsImageDebugSession {
     component_images: HashMap<u32, Vec<SystemHelperLease>>,
     processes: HashMap<u32, OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
+    pending_event: Option<(u32, u32, u32)>,
+    root_exit_observed: bool,
 }
 
 impl WindowsDirectoryLease {
@@ -280,8 +282,16 @@ impl WindowsReplacementLease {
         self,
         root_process_id: u32,
     ) -> io::Result<WindowsImageDebugSession> {
-        let mut session = WindowsImageDebugSession {
-            root_process_id,
+        let mut session = self.prepare_image_debug_session()?;
+        session.verify_initial_image(root_process_id, true)?;
+        drop(self);
+        Ok(session)
+    }
+
+    /// 包探针在派生前准备状态，首事件失败时仍由调用方持有待继续的事件。
+    pub(super) fn prepare_image_debug_session(&self) -> io::Result<WindowsImageDebugSession> {
+        Ok(WindowsImageDebugSession {
+            root_process_id: 0,
             expected_program_id: self.program_identity.id,
             expected_program_size: self.program_identity.size,
             expected_program_sha256: self.expected_sha256.clone(),
@@ -309,30 +319,84 @@ impl WindowsReplacementLease {
             component_images: HashMap::new(),
             processes: HashMap::new(),
             initial_breakpoints: HashSet::new(),
-        };
-        let event = wait_for_debug_event_until(
+            pending_event: None,
+            root_exit_observed: false,
+        })
+    }
+}
+
+impl WindowsImageDebugSession {
+    fn next_event(
+        &mut self,
+        deadline: Instant,
+        timeout_message: &'static str,
+    ) -> io::Result<DEBUG_EVENT> {
+        if self.pending_event.is_some() {
+            return Err(error(
+                "managed_process.atomic_windows_debug_event_still_pending",
+            ));
+        }
+        let event = wait_for_debug_event_until(deadline, timeout_message)?;
+        self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
+        Ok(event)
+    }
+
+    fn continue_pending(&mut self, status: windows::Win32::Foundation::NTSTATUS) -> io::Result<()> {
+        let (process_id, thread_id, code) = self
+            .pending_event
+            .ok_or_else(|| error("managed_process.atomic_windows_debug_event_missing"))?;
+        unsafe { ContinueDebugEvent(process_id, thread_id, status) }.map_err(io::Error::other)?;
+        self.pending_event = None;
+        // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
+        if code == EXIT_PROCESS_DEBUG_EVENT {
+            self.processes.remove(&process_id);
+            self.initial_breakpoints.remove(&process_id);
+            self.child_images.remove(&process_id);
+            self.component_images.remove(&process_id);
+            if process_id == self.root_process_id {
+                self.root_exit_observed = true;
+            }
+        }
+        Ok(())
+    }
+
+    fn verify_initial_image(
+        &mut self,
+        root_process_id: u32,
+        reject_on_error: bool,
+    ) -> io::Result<()> {
+        self.root_process_id = root_process_id;
+        let event = self.next_event(
             Instant::now() + DEBUG_INITIAL_TIMEOUT,
             "managed_process.atomic_windows_initial_debug_event_timed_out",
         )?;
         if event.dwDebugEventCode != CREATE_PROCESS_DEBUG_EVENT
             || event.dwProcessId != root_process_id
         {
+            close_unconsumed_debug_image(&event)?;
             // 未识别首事件时不放行任何用户态执行；外层严格 Job 清理整棵树。
             return Err(error(
                 "managed_process.atomic_windows_initial_debug_event_invalid",
             ));
         }
-        if let Err(failure) = session.handle_create_process(&event, true) {
-            session.reject_event_and_drain(&event);
+        if let Err(failure) = self.handle_create_process(&event, true) {
+            if reject_on_error {
+                self.reject_event_and_drain(&event);
+            }
             return Err(failure);
         }
-        drop(self);
-        continue_debug_event(&event, DBG_CONTINUE)?;
-        Ok(session)
+        self.continue_pending(DBG_CONTINUE)
     }
-}
 
-impl WindowsImageDebugSession {
+    pub(super) fn verify_package_initial_image(&mut self, root_process_id: u32) -> io::Result<()> {
+        if self.package_images.is_none() {
+            return Err(error(
+                "managed_process.atomic_windows_package_images_missing",
+            ));
+        }
+        self.verify_initial_image(root_process_id, false)
+    }
+
     /// loader 运行期间持续验证每个根进程、子进程与 DLL 的实际映像句柄。
     ///
     /// Windows 的初始调试断点发生在静态 DLL 已映射、但任何 DLL 初始化例程执行前；
@@ -345,27 +409,37 @@ impl WindowsImageDebugSession {
 
     /// 原生 CreateProcess 探针持有自己的进程句柄，仍共享完全相同的映像事件校验。
     pub(super) fn drain_until_exit(&mut self) -> io::Result<()> {
-        let mut root_exit_observed = false;
+        self.drain_events(true)
+    }
+
+    /// 专属包探针由调用方先终止精确 Job，再收敛保留下来的失败事件。
+    pub(super) fn drain_package_until_exit(&mut self) -> io::Result<()> {
+        if self.package_images.is_none() {
+            return Err(error(
+                "managed_process.atomic_windows_package_images_missing",
+            ));
+        }
+        self.drain_events(false)
+    }
+
+    fn drain_events(&mut self, reject_on_error: bool) -> io::Result<()> {
         let deadline = Instant::now() + DEBUG_SESSION_TIMEOUT;
         loop {
-            let event = wait_for_debug_event_until(
+            let event = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_session_timed_out",
             )?;
             let continue_status = match self.validate_event(&event) {
                 Ok(status) => status,
                 Err(failure) => {
-                    self.reject_event_and_drain(&event);
+                    if reject_on_error {
+                        self.reject_event_and_drain(&event);
+                    }
                     return Err(failure);
                 }
             };
-            if event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT
-                && event.dwProcessId == self.root_process_id
-            {
-                root_exit_observed = true;
-            }
-            continue_debug_event(&event, continue_status)?;
-            if root_exit_observed && self.processes.is_empty() {
+            self.continue_pending(continue_status)?;
+            if self.root_exit_observed && self.processes.is_empty() {
                 return Ok(());
             }
         }
@@ -395,13 +469,7 @@ impl WindowsImageDebugSession {
             EXIT_THREAD_DEBUG_EVENT | OUTPUT_DEBUG_STRING_EVENT | UNLOAD_DLL_DEBUG_EVENT => {
                 Ok(DBG_CONTINUE)
             }
-            EXIT_PROCESS_DEBUG_EVENT => {
-                self.processes.remove(&event.dwProcessId);
-                self.initial_breakpoints.remove(&event.dwProcessId);
-                self.child_images.remove(&event.dwProcessId);
-                self.component_images.remove(&event.dwProcessId);
-                Ok(DBG_CONTINUE)
-            }
+            EXIT_PROCESS_DEBUG_EVENT => Ok(DBG_CONTINUE),
             LOAD_DLL_DEBUG_EVENT => {
                 let information = unsafe { event.u.LoadDll };
                 let file = file_from_debug_handle(information.hFile)?;
@@ -465,7 +533,15 @@ impl WindowsImageDebugSession {
             let (_, lease) = images
                 .iter()
                 .find(|(dll, lease)| !*dll && lease.identity.id == identity.id)
-                .ok_or_else(|| error("npm 包探针拒绝未绑定的子进程映像"))?;
+                .ok_or_else(|| {
+                    let details = self.package_image_rejection_fields(&file);
+                    // 监督 worker 尚未初始化 GUI 日志；仅向已封存的 stderr 写固定分类和句柄证据。
+                    warp_core::safe_eprintln!(
+                        safe: ("managed_process.windows_npm_rejected_image={details}"),
+                        full: ("managed_process.windows_npm_rejected_image={details}")
+                    );
+                    error("npm 包探针拒绝未绑定的子进程映像")
+                })?;
             lease.verify_image(&file)
         } else if let Some(helper) = &self.powershell
             && inspect_handle(&file)?.id == helper.identity.id
@@ -561,10 +637,12 @@ impl WindowsImageDebugSession {
                 return;
             }
         }
-        let _ = continue_debug_event(event, DBG_CONTINUE);
+        if self.continue_pending(DBG_CONTINUE).is_err() {
+            return;
+        }
         let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
         while !self.processes.is_empty() {
-            let Ok(next) = wait_for_debug_event_until(
+            let Ok(next) = self.next_event(
                 deadline,
                 "managed_process.atomic_windows_debug_drain_timed_out",
             ) else {
@@ -586,12 +664,147 @@ impl WindowsImageDebugSession {
                 if !information.hFile.is_invalid() {
                     let _ = file_from_debug_handle(information.hFile);
                 }
-            } else if next.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT {
-                self.processes.remove(&next.dwProcessId);
             }
-            let _ = continue_debug_event(&next, DBG_CONTINUE);
+            if self.continue_pending(DBG_CONTINUE).is_err() {
+                return;
+            }
         }
     }
+
+    /// 只能在本次 AppContainer Job 已成功请求终止后调用，仍在原调试线程排空事件。
+    pub(super) fn drain_terminated_processes(&mut self, root_process_id: u32) -> io::Result<()> {
+        if self.root_process_id != 0 && self.root_process_id != root_process_id {
+            return Err(error(
+                "managed_process.atomic_windows_cleanup_root_mismatch",
+            ));
+        }
+        self.root_process_id = root_process_id;
+        if let Some((process_id, _, _)) = self.pending_event {
+            if process_id != root_process_id && !self.processes.contains_key(&process_id) {
+                return Err(error(
+                    "managed_process.atomic_windows_cleanup_unknown_event",
+                ));
+            }
+            // 验证阶段已接管并释放 hFile；这里只继续原事件，不能再次构造 File。
+            self.continue_pending(DBG_CONTINUE)?;
+        }
+        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
+        while !self.root_exit_observed || !self.processes.is_empty() {
+            let event = self.next_event(
+                deadline,
+                "managed_process.atomic_windows_debug_drain_timed_out",
+            )?;
+            match event.dwDebugEventCode {
+                CREATE_PROCESS_DEBUG_EVENT => {
+                    close_unconsumed_debug_image(&event)?;
+                    let process =
+                        duplicate_process_handle(unsafe { event.u.CreateProcessInfo.hProcess })?;
+                    if self.processes.insert(event.dwProcessId, process).is_some() {
+                        return Err(error(
+                            "managed_process.atomic_windows_duplicate_process_event",
+                        ));
+                    }
+                }
+                LOAD_DLL_DEBUG_EVENT => close_unconsumed_debug_image(&event)?,
+                CREATE_THREAD_DEBUG_EVENT
+                | EXIT_THREAD_DEBUG_EVENT
+                | EXIT_PROCESS_DEBUG_EVENT
+                | EXCEPTION_DEBUG_EVENT
+                | OUTPUT_DEBUG_STRING_EVENT
+                | UNLOAD_DLL_DEBUG_EVENT
+                | RIP_EVENT => {}
+                _code => {
+                    return Err(error(
+                        "managed_process.atomic_windows_cleanup_unknown_event",
+                    ));
+                }
+            }
+            self.continue_pending(DBG_CONTINUE)?;
+        }
+        Ok(())
+    }
+
+    fn package_image_rejection_fields(&self, file: &File) -> serde_json::Value {
+        let path = final_path_from_handle(file).ok();
+        let system_path = final_path_from_handle(&self.system_directory.file).ok();
+        let identity = inspect_handle(file).ok();
+        let digest = identity
+            .filter(|value| value.size <= MAX_NATIVE_EXECUTABLE_BYTES)
+            .and_then(|_| file.try_clone().ok())
+            .and_then(|mut file| sha256_file(&mut file).ok());
+        let identity_unchanged =
+            identity.is_some_and(|value| inspect_handle(file).ok() == Some(value));
+        let images = self.package_images.as_deref().unwrap_or_default();
+        serde_json::json!({
+            "basename_class": rejected_image_basename(path.as_deref()),
+            "directory_class": rejected_image_directory(path.as_deref(), system_path.as_deref()),
+            "volume": identity.map(|value| value.id.volume),
+            "file_index": identity.map(|value| value.id.index),
+            "size": identity.map(|value| value.size),
+            "sha256": digest.as_deref(),
+            "handle_identity_unchanged": identity_unchanged,
+            "package_identity_match": identity.is_some_and(|value| images.iter().any(|(dll, lease)| !*dll && lease.identity.id == value.id)),
+            "package_digest_match": digest.as_ref().is_some_and(|value| images.iter().any(|(dll, lease)| !*dll && lease.sha256 == *value)),
+        })
+    }
+}
+
+fn rejected_image_basename(path: Option<&Path>) -> &'static str {
+    let name = path
+        .and_then(Path::file_name)
+        .and_then(|value| value.to_str());
+    [
+        "cmd.exe",
+        "powershell.exe",
+        "node.exe",
+        "conhost.exe",
+        "openconsole.exe",
+        "codex.exe",
+        "codex-code-mode-host.exe",
+        "codex-command-runner.exe",
+        "codex-windows-sandbox-setup.exe",
+        "codex-voice-host.exe",
+        "rg.exe",
+    ]
+    .into_iter()
+    .find(|known| name.is_some_and(|value| value.eq_ignore_ascii_case(known)))
+    .unwrap_or("unknown")
+}
+
+fn rejected_image_directory(path: Option<&Path>, system: Option<&Path>) -> &'static str {
+    let Some((path, system)) = path.zip(system) else {
+        return "unresolved";
+    };
+    if path.parent() == Some(system) {
+        return "windows_system32";
+    }
+    let relative = system
+        .parent()
+        .and_then(|root| path.strip_prefix(root).ok());
+    match relative
+        .and_then(|value| value.components().next())
+        .and_then(|part| part.as_os_str().to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("system32") => "windows_system32_subdirectory",
+        Some("microsoft.net") => "windows_microsoft_net",
+        Some("winsxs") => "windows_winsxs",
+        Some(_) => "windows_other",
+        None => "outside_windows",
+    }
+}
+
+fn close_unconsumed_debug_image(event: &DEBUG_EVENT) -> io::Result<()> {
+    let handle = match event.dwDebugEventCode {
+        CREATE_PROCESS_DEBUG_EVENT => unsafe { event.u.CreateProcessInfo.hFile },
+        LOAD_DLL_DEBUG_EVENT => unsafe { event.u.LoadDll.hFile },
+        _code => return Ok(()),
+    };
+    if !handle.is_invalid() {
+        drop(file_from_debug_handle(handle)?);
+    }
+    Ok(())
 }
 
 /// 从冻结身份创建租约。祖先按卷根到直接父目录的顺序锁定，逐层拒绝 reparse。
@@ -1187,14 +1400,6 @@ fn wait_for_debug_event_until(
             failure
         }
     })
-}
-
-fn continue_debug_event(
-    event: &DEBUG_EVENT,
-    status: windows::Win32::Foundation::NTSTATUS,
-) -> io::Result<()> {
-    unsafe { ContinueDebugEvent(event.dwProcessId, event.dwThreadId, status) }
-        .map_err(io::Error::other)
 }
 
 fn is_plain_kind(attributes: u32, directory: bool) -> bool {

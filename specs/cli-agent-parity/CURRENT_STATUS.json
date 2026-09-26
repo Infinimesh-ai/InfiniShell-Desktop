@@ -1479,7 +1479,7 @@
     "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-context-routing-20260927",
     "source_commit_binding_sha256": "1e40fb4715201e8c87e790b6f6790ea8a33c6ea0dae8ef082f245737e2b7b15f",
     "localization": "Grok条件式操作提示已同步英文/简体中文，无新增变量；更新等待空闲沿用准确的既有英中说明。真实双语占位布局后置，未计通过。",
-    "ci": "包含本增量的bd80cc9ed已派发同提交Linux/Windows验证36266539274，结果待补；旧56f6运行不覆盖该增量。",
+    "ci": "包含本增量的bd80cc9ed运行36266539274已结束：Linux通过，Windows编译/定向回归通过但真实npm探针失败；Grok实际GUI/模型未验。",
     "cache_cleanup": {
       "receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927/retired-test-link-cleanup-01.safe.json",
       "scope": "仅两份停用Cargo测试链接缓存；摘要/身份/无占用均核验，原始归档程序、日志、当前程序与工作树保留",
@@ -1497,7 +1497,7 @@
   ],
   "remote_image_recovery_and_windows_npm_increment": {
     "date": "2026-09-27",
-    "status": "三个独立实现提交已推送，本地门禁通过；相关平台同提交CI进行中，真实GUI/远端/模型链待验",
+    "status": "三个实现提交已推送，本地与同提交Linux门禁通过；Windows编译/定向回归通过，真实npm首个候选探针拒绝，后续场景未执行；真实GUI/远端/模型链待验",
     "implementation_commit": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
     "g08_commit": "5aac3f7d0d0707a24210a26625ab1b9308236359",
     "npm_runner_commit": "97649deb263e1fe79d29ecd4d8d70b2954f7c4da",
@@ -1526,7 +1526,7 @@
       "run_id": 36266539274,
       "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274",
       "head_sha": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
-      "status": "in_progress",
+      "status": "completed",
       "platforms": [
         "linux-x64",
         "windows-x64"
@@ -1534,7 +1534,19 @@
       "macos_intel": false,
       "full_workspace": false,
       "gui_or_model": false,
-      "scope": "定向编译/模块门禁含远程图片；Windows真实npm五场景。未改的已通过场景复用原源码绑定，不重复完整矩阵。"
+      "scope": "定向编译/模块、无认证原生通知/清理；不是在线模型、GUI、输入法或真实远端图片验收。独立图片客户端crate步骤未执行。",
+      "conclusion": "failure",
+      "linux": "passed",
+      "windows": "failed_real_npm_candidate_probe",
+      "linux_focused_rust": "1068 passed / 6982 skipped",
+      "windows_focused_rust": "903 passed / 6876 skipped",
+      "i18n": "11 passed on each platform",
+      "g08_new_regressions": "10 passed on each platform",
+      "windows_npm": "真实npm登记成功；首个updated场景在Prepared阶段的CMD候选探针拒绝未绑定子映像，未到PowerShell、OldMoved或发布；cleanup_confirmed=false，不能推断ACL/profile已恢复，其余四场景未执行。",
+      "archive": "validation/remote-image-recovery-20260927/ci-36266539274",
+      "archive_index_sha256": "336d2074d748526ba52d3b9de0446f7ab8fa5d32cd3492ab0a4060038e916d2e",
+      "platform_review_sha256": "52bf8ffe432abeff199f0781f90521d3029bd62f91dc23a3cf7af6a376320ab2",
+      "raw_logs_sha256": "75d4aad6b6af7f6c9f7e7c7d3868da2ff24c58421a9a631e5677af643d34caa4"
     },
     "joint_test_app": {
       "source_commit": "8876fa3c5a3950154c8569ea1344507f38f964eb",
@@ -1556,6 +1568,6 @@
     "closed_gaps": [],
     "goal_complete": false,
     "integration_review": "G07本地专属文件卡与G10四个受审命令分支只读复核未发现确定的接线缺口；不计真实GUI/模型验收。integration-review-03.safe.json摘要5109944c4e6d9239eeee107f9b904b9c33e4a3787f9a9ff2ca62a3f384ba859f。",
-    "joint_app_cache_cleanup": "编译前再按身份/摘要/无占用清理两份停用Cargo缓存，逻辑857205203字节；实际验收程序、旧应用与原始收据不动。app-build-cache-cleanup-01.safe.json。"
+    "joint_app_cache_cleanup": "编译前再按身份/摘要/无占用清理两份停用Cargo缓存，逻辑857205203字节；实际验收程序、旧应用与原始收据不动。app-build-cache-cleanup-01.safe.json。 打包完成后另清理同轮已结束链接所用rlib/rmeta两份缓存，共958184401字节，当前check缓存、测试程序和应用保留；app-library-cache-cleanup-01.safe.json。"
   }
 }

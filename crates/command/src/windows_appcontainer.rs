@@ -12,7 +12,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{
-    DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE, HLOCAL, LocalFree,
+    DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE, HLOCAL, LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authorization::{
     EXPLICIT_ACCESS_W, GRANT_ACCESS, GetSecurityInfo, SE_FILE_OBJECT, SetEntriesInAclW,
@@ -45,6 +45,7 @@ use windows::Win32::System::Threading::{
     OpenProcessToken, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
     PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ResumeThread,
     STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
+    WaitForSingleObject,
 };
 use windows::core::{BOOL, PCWSTR, PWSTR};
 
@@ -575,12 +576,21 @@ impl AppContainerProbe {
         Ok(code)
     }
 
-    pub fn cleanup(&mut self) -> io::Result<()> {
-        if self.cleaned {
-            return Ok(());
-        }
-        if self.process.is_some() {
-            self.exit_code()?;
+    /// 仅请求终止本次严格 Job；调用方仍须在原调试线程继续并排空已领取的事件。
+    pub fn terminate_job(&self) -> io::Result<()> {
+        unsafe { TerminateJobObject(handle(&self.job), 1) }.map_err(io::Error::other)
+    }
+
+    fn processes_terminated(&self) -> io::Result<bool> {
+        if let Some(process) = &self.process {
+            // EXIT 调试事件尚未继续时也可能已有退出码；必须另证原句柄已发出退出信号。
+            let state = unsafe { WaitForSingleObject(handle(process), 0) };
+            if state == WAIT_TIMEOUT {
+                return Ok(false);
+            }
+            if state != WAIT_OBJECT_0 {
+                return Err(io::Error::last_os_error());
+            }
         }
         let mut state = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
         unsafe {
@@ -593,8 +603,18 @@ impl AppContainerProbe {
             )
         }
         .map_err(io::Error::other)?;
-        if state.ActiveProcesses != 0 {
-            return Err(io::Error::other("版本探针 Job 尚有进程"));
+        Ok(state.ActiveProcesses == 0)
+    }
+
+    pub fn cleanup(&mut self) -> io::Result<()> {
+        if self.cleaned {
+            return Ok(());
+        }
+        if !self.processes_terminated()? {
+            return Err(io::Error::other("版本探针进程或 Job 尚未确认退出"));
+        }
+        if self.process.is_some() {
+            self.exit_code()?;
         }
         for grant in self.grants.iter_mut().rev() {
             grant.restore()?;
@@ -607,6 +627,18 @@ impl AppContainerProbe {
     }
 
     pub fn write_cleanup_receipt(&mut self, path: &Path) -> io::Result<()> {
+        // ContinueDebugEvent 返回后，内核退出信号可能稍后到达。只等待进程/Job 暂态；
+        // ACL 外部修改、profile 删除和文件写入失败均保持原错误，不在这里重试。
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !self.processes_terminated()? {
+            if Instant::now() >= deadline {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "版本探针退出确认超时",
+                ));
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
         self.cleanup()?;
         let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
         file.write_all(b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n")?;
@@ -630,3 +662,7 @@ impl Drop for AppContainerProbe {
         unsafe { FreeSid(self.sid) };
     }
 }
+
+#[cfg(test)]
+#[path = "windows_appcontainer_tests.rs"]
+mod tests;
