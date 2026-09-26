@@ -107,12 +107,14 @@ class RunnerTests(unittest.TestCase):
         target = self.root / "directory"
         target.mkdir()
         original = target.lstat()
+        self.assertEqual(runner.plain(target).st_mode, original.st_mode)
         class Reparse:
+            # Python 3.11/3.12 的 is_symlink 也会读取 lstat，保留真实目录类型。
+            st_mode = original.st_mode
             st_file_attributes = 0x400
         with patch.object(Path,"lstat",return_value=Reparse()):
             with self.assertRaisesRegex(ValueError,"reparse_point"):
                 runner.plain(target)
-        self.assertTrue(original.st_mode)
 
     def test_full_tree_keeps_platform_auxiliary_files(self):
         expected = runner.expected_files({"bin/codex.js":(b"js",True)},
