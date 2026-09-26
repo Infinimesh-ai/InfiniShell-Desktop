@@ -258,7 +258,7 @@
     "remaining": "GUI启动/发送/权限失效/草稿接线，启动失败/退出/重启恢复，真实审批允许拒绝与信号，长文本和多行、文件卡片、同提交Linux/Windows门禁及真实生命周期",
     "localization": "无需本地化变更：本增量为内部启动/通知/持久化基础，未新增GUI入口或改变已显示文案；后续GUI接线须另行双语审计及布局验收",
     "cloud_run": 36220234098,
-    "cloud_status": "基础提交 922308af 的 Linux 失败：原生 hook 与安装收据脚本仍要求插件 0.1.4，实际为 0.1.5；Windows 仍运行。原失败保留，修复另行提交验证。",
+    "cloud_status": "基础提交 922308af 的 Linux 因脚本仍要求插件 0.1.4、实际为 0.1.5 失败；Windows 安装前 verify_runtime 的 3 秒版本检查超时。两个平台原失败均保留，不归为同一原因。",
     "commit_binding_sha256": "7e88b8fea31de65fa5d58639f8295083cebb78d67b706349d4b3c17579432ed5",
     "recovery_increment": {
       "implementation_commit": "044263a61b38fa95af32de2b758c1101aae08226",
@@ -283,10 +283,12 @@
       "gates": "cargo check -p warp、i18n11、PTY身份2、会话423/6忽略、协调器111/4忽略、升级182/4忽略、版本探测7/1忽略、持久化78、运行器6、插件验证器15及应用构建通过",
       "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g01-g09-integration-20260926",
       "archive_index_sha256": "67b875a435b5408373166375e16adbe24b65cdeaa485b8f72146491666f18c64",
-      "cloud": "同提交Linux执行中、Windows排队；基础922失败收据独立保留，尚未计通过",
+      "cloud": "同提交 32a932f952deba15ae8c0d994617fbbd3aeee263 的 Linux x64 / Windows x64 定向门禁均通过；不包含已认证模型、实际 GUI/IME 或后续工作区 GUI 增量",
       "model_scope": "没有新增在线模型调用，原生和GUI证据仍绑定各自实现/二进制",
       "commit_binding_sha256": "1e740c5889fa3d507169984bc2d5f1966f4d33553121b8c08bbbcbac66811781",
-      "cloud_run": 36223768480
+      "cloud_run": 36223768480,
+      "cloud_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/cloud-g01-g09-32a932f95",
+      "cloud_archive_index_sha256": "6e9f25d861b94d6927099a734b92577f1e392e4efb309da9da472cb3b6a4c0cc"
     },
     "durable_storage_increment": {
       "implementation_commit": "本提交；提交后另存仓外 Git blob 绑定",
@@ -314,5 +316,342 @@
     "online_model_inputs": 0,
     "localization": "无需本地化变更：仅验收运行器和工作流测试列表",
     "closed_gaps": []
+  },
+  "current_work_order": {
+    "updated_at": "2026-09-26",
+    "mode": "feature_implementation_first",
+    "user_direction": "先从代码侧覆盖原目标功能，集中修复、测试与实机验收后续进行。",
+    "goal_acceptance_unchanged": true,
+    "integration_base_commit": "76dcfdc60254077edaa86175722591333526c05c",
+    "g01_g03_worktree": ".worktrees/grok-owned-terminal",
+    "code_in_progress": {
+      "G01": "macOS arm64、Linux x86_64 和 Windows x86_64 的专属 Grok TUI 启动、消息领取、回执、恢复占用和 GUI 已合入主工作区。Linux 要求真实 PTY/pidfd/SO_PEERPIDFD；Windows 持原 ConPTY shell 句柄、原子 Job 归属及命名管道 peer。本地 macOS arm64 编译和 i18n 门禁通过；固定版本真实运行及其他平台仍待验收。普通历史继续已接任务列表入口：旧进程核实退出后同UUID --resume、同task_id新generation先CAS后派发；活跃进程仅按原PTY/listener身份重关联，不重放旧消息。",
+      "G03": "macOS/Linux/Windows 已共用专属 TUI PNG 类型化输入、持久图片、纯图/文字混合、粘贴/拖放及整批帧上限；Windows ConPTY 入口已整合。本轮未验证图片链和双语布局。",
+      "G08": "Codex 独立 app-server/显式 Unix socket/当前 TUI 一次启动票据/内核身份/GUI入口已接，补齐原共享 daemon 多 pane 无可靠归属的问题；默认已有 daemon 路径仍要求唯一客户端及唯一 loaded thread。Grok 远端专属 ticket/RPC、PTY wrapper、GUI图片发送及重启查询已接。Claude 2.1.280上传→原生next消息→Read→历史原图消费证明及只查询恢复已接。断线均不重发输入。全部为未验证代码，不代替真实SSH/tmux。",
+      "G09": "Codex/Claude/Grok 的 Mac ARM、Linux x64、Windows x64 npm，三款 Mac ARM/Linux x64 Homebrew cask 和三款 Windows x64 WinGet portable 的固定来源事务已接入。完整官方包、公开入口、依赖与安装登记分别绑定，候选监督与恢复保持来源专用合同。Linux Homebrew 来源发现与执行总入口已接，使用默认 Linuxbrew prefix 与 renameat2 原子交换；Grok WinGet 保留版本原文件、grok.exe 别名、公共链接、ARP 与下载来源标记。Claude Unix npm 2.1.280→2.1.278 受限主动降级只在显式 Stable 且实时指针匹配时开放，当前 2.1.274 仍拒绝。未操作用户安装或运行升级，本地 macOS arm64 编译通过；Linux/Windows 条件代码及真实事务仍待验收。",
+      "G10": "Claude/Grok 文件搜索、固定受审技能、受审命令及命令+技能组合已接。Mac ARM/Linux x64/Windows x64 均通过固定 SDK MCP 将精确命令交宿主独立监督；每条按父代/回合/调用身份登记、逐次审批、前条真实清理后顺序执行，同一 CLI 会话保留。运行中 Submit 已回到原生合并/后续排队语义；取消先结束未执行请求，再取消原生回合，已启动命令仍等待清理。父集合仅可缩小，原生 shell 不开放，命令使用当前系统账号，非 OS 沙箱。本地 macOS arm64 编译和 i18n 门禁通过；功能测试、其他平台及双语布局仍待验收。",
+      "G06": "新增固定 Grok 原生 user 目录技能来源；初始选择、热新增与冷恢复统一核对唯一路径、来源限定名称及摘要。本轮未测试，真实用户级目录和模型链仍待验。",
+      "G07": "收起CLI富输入时选择文件已改为带输入代次的单一事件：TerminalView打开编辑器，再延后到模型事件完成后调用既有附件选择器，生成卡片；旧裸路径异步回调兼容保留，但新选择入口不再产生它。未运行GUI或回归。"
+    },
+    "new_tests_run": true,
+    "new_online_model_or_gui_runs": false,
+    "commit_policy": "功能代码先整合；提交推送前仍执行仓库要求的最小编译和本地化门禁，真实验收不被取消。",
+    "g03_unverified_source_snapshot": {
+      "archive": "validation/grok-owned-images-code-494927897b53",
+      "sha256": "494927897b5325c550b1e0bd4b776f0fec4a15b2ef240931bc9165bb97500503",
+      "kind": "source_checkpoint_only_not_validation"
+    },
+    "g01_g03_integration": "三平台实现与 Windows 16 文件接线已合入当前主工作区，保留原工作树和旧证据；G08 footer、G09 AppContainer 与 root 原生 IPC 均保留。已完成本地 macOS arm64 编译与 i18n 门禁；功能和其他平台验收后置。",
+    "linux_backend_contract": {
+      "architecture": "x86_64",
+      "cli_version": "1.0.41",
+      "model": "grok-4.7",
+      "binary_sha256": "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407",
+      "requires": "pidfd_open、pidfd_send_signal、SO_PEERPIDFD、TIOCGPTPEER、真实 procfs 与同 UID 进程信息",
+      "status": "unverified_implementation"
+    },
+    "windows_backend_contract": {
+      "architecture": "x86_64",
+      "cli_version": "1.0.41",
+      "binary_sha256": "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25",
+      "official_transport_source": "https://github.com/xai-org/grok-build/blob/75810042ca2762aa0b0fa17864f3f68823ccbea5/crates/codegen/xai-grok-shell/src/leader/transport.rs",
+      "scope": "Windows 二进制只作静态读取；官方公开源码不是固定 4220f3b224a6 构建证明，管道映射仍须独立运行校准",
+      "status": "unverified_implementation",
+      "requires": "原始 ConPTY CreateProcess 句柄、当前登录/SID、PROC_THREAD_ATTRIBUTE_JOB_LIST 原子归属、KILL_ON_JOB_CLOSE Job、固定映像及内核命名管道 peer；仅 PowerShell 专属入口。"
+    },
+    "g08_codex_queue_contract": {
+      "cli_version": "0.156.1",
+      "native_method": "thread/queue/add",
+      "semantics": "后续输入队列；空闲线程可能立即开启新回合，不是当前回合 steer。",
+      "required_binding": "当前终端及原生进程证据、内核 Unix socket peer、既存 daemon loaded thread UUID/cwd；不启动或恢复另一个线程。",
+      "release_proof": "本次 rpc/client id 和原生 queued id 回执，逐张 detail=original 的内联 PNG 字节数/SHA 一致，回执持久化后释放。",
+      "retry": "发请求前持久化 Unknown；超时/断连/部分写入不自动重发。",
+      "status": "unverified_implementation_wired",
+      "remaining_binding_issue": "独立owned app-server路线已接显式socket、当前TUI票据、内核peer与进程出生身份，GUI可在当前远程pane启动；恢复只查询已有票据，不能重派launch/input。默认已有daemon继续要求唯一客户端和唯一loaded thread。两条路径均未真实验收。",
+      "fixed_source": "https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/hooks/src/registry.rs"
+    },
+    "interrupted_parallel_batch": "三代理按不重叠写入域继续安装来源事务、受审命令、远程原生图片消费者；主代理整合共享RPC/插件/GUI/状态。",
+    "localization_review": "固定技能、受审命令及命令+技能组合、远程Codex/Grok菜单/帮助/失败、Claude原图消费和未知状态说明均同步英中。Grok npm/Homebrew无需新增文案，复用更新状态。本地 cargo check 与 i18n 11 项通过；真实双语布局后置。",
+    "remaining_code_scope": [
+      "原清单当前已知功能接线已完成并提交；macOS arm64 编译和 i18n 资源门禁通过，后续运行发现的问题继续处理，不能以此关闭 Gap。",
+      "Linux/Windows 编译、受影响模块回归、三平台各模式真实验收和双语布局仍待完成；按用户代码优先指示后置。"
+    ],
+    "g08_grok_remote_in_progress": "远端ticket/专属leader服务、有界RPC、真实PTY wrapper及固定1.0.41 exec已接线；同连接/终端/代次门禁、同步撤销、查询恢复、GUI caller、重启关联与收起输入框的native事件入口已整合。当前Mac ARM64/Linuxx64远端、Mac ARM64/Linuxx64/Windowsx64客户端，未验收。",
+    "g09_codex_npm_code": {
+      "target_version": "0.156.1",
+      "platforms": [
+        "macOS arm64",
+        "Linux x64",
+        "Windows x64"
+      ],
+      "previous_versions": [
+        "0.155.1",
+        "0.156.1"
+      ],
+      "contract": "固定官方 wrapper 三文件与平台完整资源树、Node/依赖身份共同绑定；私有副本实际执行 Node → bin/codex.js → native --version。macOS Homebrew Node 复制原字节 dylib 并限定私有解析；Linux 要求 Landlock ABI≥3 的候选只读边界。",
+      "status": "unverified_implementation_wired",
+      "remaining": "实际 dyld/Seatbelt、Linux Landlock、公共入口及中断恢复待验，源码校验不算执行成功。",
+      "windows": "完整50文件（3 wrapper+47平台文件），原公共cmd/ps1模板复用、实际Node链分别在私有AppContainer中探测、Job退出及ACL清理后两步无覆盖发布/恢复。固定npm包仅作静态读取，未执行。"
+    },
+    "g08_claude_read_code": {
+      "fixed_version": "2.1.280",
+      "platforms": [
+        "macOS arm64 remote",
+        "Linux x64 remote"
+      ],
+      "status": "unverified_implementation_wired",
+      "native_consumer": "cc-socks priority next 文本请求指向已上传原图，保留原生Read权限；最终会话历史中同请求后代的Read tool_use和tool_result原始image/base64逐字节匹配。",
+      "recovery": "token只存在清零内存；持久记录只含路径/进程候选/历史inode与offset/原图摘要。Unknown只查历史，不重新连接输入或重发。已消费回执先保存，再清理精确引用。",
+      "limits": "单图20MiB、合计32MiB、最多20张；原生压缩使原字节改变时不冒充消费证明。",
+      "contract_evidence": "/private/tmp/isp-claude-read-image-receipt-20260926/native-contract-index.json",
+      "runtime_verified": false
+    },
+    "g10_reviewed_commands_code": {
+      "status": "unverified_implementation_wired",
+      "policies": [
+        "ClaudeReviewedCommandsV1",
+        "GrokReviewedCommandsV1",
+        "ClaudeReviewedCommandsSkillsV1",
+        "GrokReviewedCommandsSkillsV1"
+      ],
+      "platforms": [
+        "macOS arm64",
+        "Linux x64",
+        "Windows x64"
+      ],
+      "commands": [
+        "cargo check",
+        "cargo test",
+        "cargo fmt --check",
+        "python -m pytest",
+        "npm run <创建时捕获的脚本>"
+      ],
+      "permission": "精确argv/cwd/timeout逐次AllowOnce/DenyOnce，父集合只可缩小；命令使用当前系统账号OS作用域，非OS沙箱。",
+      "cleanup": "每条命令独立监督代，稳定调用身份和永久结果；真实整树清理后才发布结果、释放当前命令和审批下一条。同一 CLI 会话可顺序多条，Unknown 仍阻止继续/回收。取消未执行请求与已执行命令分别处理。",
+      "remaining": [
+        "同提交编译/本地化门禁、实际审批/连续多命令/追加/取消/进程清理/冷恢复及双语布局验收。"
+      ],
+      "windows": {
+        "status": "unverified_implementation_wired",
+        "transport": "固定SDK MCP工具链与宿主精确命令审批；不使用未校准的原生Shell argv。",
+        "ownership": "挂起创建时核映像及原子Job归属，父adapter持有命令监督future，取消先等真实Job清理再出终态；恢复检查子命令回执。",
+        "permissions": "allow_project_commands默认false，旧配置不扩权，新增显式策略仅捕获创建时存在的命令；允许集合受父权限上限约束。",
+        "patch_sha256": [
+          "66f40c7b8aa719e30ac334d8dd79a8a119d5374e3f2ccb5ee9c5987695265670",
+          "2fa0f0cafc2ee5c83133092493a2d91fd6616820437a3e8a39d7176338ec60bd"
+        ]
+      },
+      "transport": "三目标平台统一 SDK MCP 宿主命令；原生 shell 工具关闭。固定命令/参数、cwd、程序与创建时脚本来源绑定；不冻结任意项目依赖，不宣称 OS 沙箱。",
+      "append": "Claude/Grok 仍为原生合并或后续排队，不开放同回合 Steer。",
+      "sequential_patch_sha256": [
+        "3a4bb9128dd2fae3b79b7dc5a904c3666a20e3179f39bf5ab74c23e8169c01f8",
+        "e63d81e8a5a629ee003b715aa8de271a8a4a0e9fa1020ba8d5964e5bdf307b64",
+        "88b79f32499c9e4c3a3653c015b1b7bb62333160f9743b9536eec071a8460caf",
+        "4003895d937b004de668074cb8de738b21c4edae701d545783a05f01a8392a8e",
+        "09a91d3f4c605972bb087a2d064c006b49fe51f9982ebf9eef4b92702f18cffa"
+      ]
+    },
+    "g08_codex_owned_code": {
+      "status": "unverified_implementation_wired",
+      "remote_targets": [
+        "macOS arm64",
+        "Linux x64"
+      ],
+      "client_targets": [
+        "macOS arm64",
+        "Linux x64",
+        "Windows x64"
+      ],
+      "binding": "每pane独立codex app-server --listen unix://私有socket 与 codex --remote 同endpoint；固定0.156.1，保留原CODEX_HOME和审批。",
+      "recovery": "持久票据、原进程身份和socket内核身份；查询不重派，真实退出后清理。"
+    },
+    "g09_claude_windows_npm_code": {
+      "status": "unverified_implementation_wired",
+      "versions": [
+        "2.1.278",
+        "2.1.280"
+      ],
+      "target": "2.1.280",
+      "contract": "精确包内两路径硬链接、完整11成员、实际cmd/ps1公共入口、AppContainer/Job清理、无覆盖发布与恢复；不执行install.cjs。"
+    },
+    "g09_grok_packages_code": {
+      "status": "unverified_implementation_wired",
+      "npm_targets": [
+        "macOS arm64",
+        "Linux x64",
+        "Windows x64"
+      ],
+      "homebrew_targets": [
+        "macOS arm64",
+        "Linux x64"
+      ],
+      "target": "1.0.41",
+      "previous_versions": [
+        "1.0.40",
+        "1.0.41"
+      ],
+      "npm_manifest": "script/cli-agent-parity/grok_1041_npm_manifest.json",
+      "npm_contract": "固定wrapper+对应平台包+@iarna/toml3.0.0，完整SRI/成员/解压native；npm包目录与GROK_HOME/bin多位置发布及恢复，保留配置其他字段，不运行postinstall。",
+      "windows_native_sha256": "6db593f5aeb1e12b1f4f36fac7fad34c2dfe8f9fcb853bff5fc01928c95c53fa",
+      "windows_native_note": "官方npm映像与官网签名映像分别绑定；静态PE逐节摘要相同，移除官网尾部签名并规范化checksum/security directory后逐字节相同。该结果不计运行或模型验收。",
+      "homebrew_contract": "固定cask源码SHA、grok/agent双别名归属、三shell补全、独立监督清理收据，保留用户自有agent。",
+      "static_contract_archive": {
+        "path": "validation/grok-package-static-contract-20260926",
+        "index_sha256": "bab479385537d2a73069e27a8ce832041d3b6b5e9370b6475e41e71a716fec12",
+        "kind": "static_official_package_contract_not_execution",
+        "files": 34,
+        "runtime_executed": false
+      },
+      "windows_runtime_source": "Windows官方npm cmd/ps1和PATH前置native解析为完整固定包来源，托管预检与实际worker均重验并持句柄；固定策略不覆盖私有GROK_HOME。普通终端的完整来源与历史继续接线也已整合。"
+    },
+    "g09_codex_winget_code": {
+      "status": "unverified_implementation_wired",
+      "platform": "Windows x64",
+      "versions": [
+        "0.156.0",
+        "0.156.1"
+      ],
+      "target": "0.156.1",
+      "contract": "默认用户portable完整SQLite1.0索引、三个公共入口、完整官方zip资源、ripgrep与VC依赖身份、AppContainer候选和Job清理；ARP DisplayVersion事务按原值更新，外部变化保留。",
+      "runtime_verified": false
+    },
+    "g01_history_code": {
+      "status": "unverified_implementation_wired",
+      "platforms": [
+        "macOS arm64",
+        "Linux x64",
+        "Windows x64"
+      ],
+      "semantics": "活跃任务只重关联原PTY/listener/原生会话；真实退出后显式使用--resume继续同UUID。",
+      "dispatch": "同task_id新generation必须先数据库CAS成功再领取一次启动argv；富输入消息也使用新generation，旧消息与Unknown不自动重投。",
+      "patch_sha256": "aee5cd6981a20f27f149ffef992c5cd2caf906202837549e3067dedcb9ec794b",
+      "runtime_verified": false,
+      "windows_source_consistency": "prepare/take/exec只核同一持久NpmGrokSource；只在初始prepare捕获，后续shell的GROK_HOME不重新选择来源。固定profile保持私有GROK_HOME。"
+    },
+    "g09_claude_downgrade_code": {
+      "status": "conditional_contract_implemented_not_current_channel_availability",
+      "platforms": [
+        "macOS arm64",
+        "Linux x64 glibc"
+      ],
+      "source": "npm",
+      "from": "2.1.280",
+      "to": "2.1.278",
+      "condition": "用户显式Stable且派发时官方npm stable恰为2.1.278；当前2.1.274保持兼容门禁拒绝。",
+      "history": "核本应用持久和在内存任务；活跃宿主延期，未知/较新版历史与新权限策略拒绝。应用外原生历史不在本批兼容证明范围。",
+      "recovery": "固定归档和完整成员、持久降级意图、原子目录事务及无覆盖恢复；失败回滚不算主动降级。",
+      "patch_sha256": "731f899768e24330806ba71a7ae0c0bc4f0d6044fb106185234308096e095aa5",
+      "runtime_verified": false
+    },
+    "code_archive_indices": {
+      "g10-windows-mcp-code-20260926/index.safe.json": "2c14f4f232b12983ae2dd752feb1eec85e39a1fbb714fc69d3c3d507e1e6e61e",
+      "grok-owned-history-code-20260926/index.safe.json": "03863309f0d36142de3bffad3bd2ea9fb3b272eb78eec6e9cd5a9abb3bfce8c8",
+      "codex-linux-brew-static-20260926/index.safe.json": "20a223b2beba18d7bcccd7486998bdb910c6bc4db177500f2e472cca0ead61ac",
+      "claude-downgrade-code-20260926/index.safe.json": "93b3c9f1a09cf33a98e05b3d1346fdf1cfd20b02751c87da4a84c50af1f782e5",
+      "claude-linux-brew-code-20260926/archive-index.safe.json": "7a1dc7277e0fc35e755ab2fa38503363f0fed76186fd8d874d812386d37d00a9",
+      "linux-brew-grok-winget-static-20260926/archive-index.safe.json": "fbbd302d7bba7770dba3e21f274899253a886ec2794c358da7823d9082703534",
+      "code-checkpoint-linux-sources-20260926/archive-index.safe.json": "dbf67735f72d5b32ca50216ffde09365b54167324900f9038c6abcb774658e64",
+      "g10-unix-command-code-20260926/archive-index.safe.json": "7a1f6eb72023ac07de356f4bc01e66696603871eb5d44f2df23ea835598334f3",
+      "code-integration-g10-sequential-20260926/archive-index.safe.json": "c04dd4690120084caa926be99251ce57d404853f7093a9aad8fd4c75208b4596"
+    },
+    "g09_linux_homebrew_code": {
+      "status": "unverified_implementation_wired",
+      "platform": "Linux x64",
+      "prefix": "/home/linuxbrew/.linuxbrew",
+      "receipt_version": "Homebrew 7.0.4",
+      "fixed_versions": {
+        "Codex": "0.156.1",
+        "Claude": "2.1.280",
+        "Grok": "1.0.41"
+      },
+      "contract": "三个固定 cask、完整发行树与安装登记、公共链接；Codex 三补全、Grok 双别名及三补全纳入事务。密封原生快照、Landlock ABI 3 与禁网探针，真实清理后发布；renameat2 RENAME_EXCHANGE 与身份绑定恢复。",
+      "claude_probes": "旧公开入口、候选、新公开入口三个受监督版本探针与永久清理收据。",
+      "metadata": "架构 x86_64；无声明依赖时 runtime_dependencies 为 {}；数字 version 不生成 LATEST_DOWNLOAD_SHA256，@latest token 不等于 version :latest。",
+      "runtime_verified": false
+    },
+    "g09_grok_winget_code": {
+      "status": "unverified_implementation_wired",
+      "platform": "Windows x64",
+      "versions": [
+        "1.0.40",
+        "1.0.41"
+      ],
+      "target": "1.0.41",
+      "scope": "默认用户级 portable、HKCU 64 位登记、xAI.GrokBuild 官方来源。",
+      "contract": "版本原 EXE、grok.exe 别名、公共链接及 ARP DisplayVersion/SHA256/TargetFullPath 事务；既有 VC Runtime 依赖身份、原 ACL 与 Zone.Identifier 保留；私有 AppContainer 候选与 Job 清理。官方 direct EXE 不创建 archive SQLite 索引。",
+      "runtime_verified": false
+    },
+    "source_coverage_review": {
+      "G01-G08": "按现有关闭条件核对生产调用链，未发现新的确定接线缺项；不把 Claude 图片多技能/Grok 图片技能/远程文件全排列扩大为额外需求。真实验收仍开放。",
+      "G09": "三 CLI 三目标平台 npm、Mac ARM/Linux x64 Homebrew、Windows x64 WinGet 固定来源的发现、恢复、执行及探针均已接。未知版本及不同布局仍保留兼容门禁。",
+      "G10": "同会话顺序多命令、运行中原生 Submit、取消与逐命令清理均已接，静态调用链核对完成；真实验收仍开放。",
+      "G11-G13": "已有真实原生语义分流、提示和版本门禁；原始真实验收及未来逐版本维护边界保留。",
+      "runtime_verified": false
+    },
+    "implementation_checkpoint": "已知剩余功能接线已提交；本地 macOS arm64 cargo check 与 i18n 11 项通过，未启动本批 GUI 或在线模型；原 Goal 保持未完成。",
+    "integration_compilation": {
+      "command": "cargo check -p warp",
+      "status": "passed",
+      "target_dir": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-20260926",
+      "archive": "validation/code-integration-g10-sequential-20260926",
+      "log": "cargo-check-03.log",
+      "source_checkpoint_sha256": "5e1377eec76a32c201bc2b0b17f15d236996761707a0440d2f1fb8938bd1298e",
+      "scope": "代码接线收口后的必要编译检查；不是测试、GUI、模型或跨平台验收。",
+      "environment": "cargo-check-02.environment.safe.json",
+      "previous_attempt": "01 主动中止以恢复历史 SPLIT_DEBUGINFO=off 并复用内置缓存；原日志及中止说明保留，不记为编译失败或通过。",
+      "previous_failure": "02 exit 101：24条错误，来自远程图片可见性/Send、技能引用/Uuid导入及菜单借用；原日志保留。相关接口修正后运行03，不回填原失败。",
+      "result": "cargo-check-03.result.safe.json",
+      "warnings": 5,
+      "implementation_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19"
+    },
+    "new_tests_scope": "仅提交前 i18n 资源门禁：11 项通过、0 项失败。尚无本轮功能/模型/GUI/跨平台测试结果。",
+    "integration_i18n": {
+      "status": "passed",
+      "command": "cargo test -p warp --lib i18n::tests",
+      "platform": "macOS arm64",
+      "archive": "validation/code-integration-g10-sequential-20260926",
+      "log": "i18n-02.log",
+      "result": "i18n-02.result.safe.json",
+      "passed": 11,
+      "failed": 0,
+      "filtered_out": 8034,
+      "source_checkpoint_sha256": "b3b4ab3fe1d6a7859b857c5b662d3c27d2e36d63290e0f3207f0948283463116",
+      "implementation_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19",
+      "runner": "先复制至内置盘、核对 SHA-256 后执行；未启动 GUI 或模型。",
+      "previous_failure": "01 在测试程序编译时出现 3 条错误：ServerModel 测试构造器缺新增字段及两处字节断言类型不明确；原日志保留。只修测试源码后 02 通过。",
+      "scope": "只证明英中资源键、变量及相关本地化约束通过，不替代实际双语布局或功能验收。"
+    },
+    "implementation_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19",
+    "implementation_source_binding": {
+      "archive": "validation/code-integration-g10-sequential-20260926",
+      "receipt": "implementation-commit-binding.safe.json",
+      "receipt_sha256": "f9d2655235bc936acc63aed604d03024e0f3e29558736107583311369a8cdd17",
+      "source_files": 223,
+      "git_blobs_match": true,
+      "code_review_scope": "本地构建与资源门禁源码绑定；不是安全审计或真实产品验收。"
+    },
+    "cross_platform_next": {
+      "status": "deferred_by_user_work_order",
+      "platforms": [
+        "Linux x64",
+        "Windows x64"
+      ],
+      "workflow": ".github/workflows/cross-platform-preflight.yml",
+      "required_source_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19",
+      "macos_intel": false,
+      "reason": "按用户指示先代码覆盖，集中修复与测试后续进行；恢复验证时遵循 cross-platform-cloud-verification。"
+    }
+  },
+  "supported_target_scope": {
+    "platforms": [
+      "macOS arm64",
+      "Linux x64",
+      "Windows x64"
+    ],
+    "excluded": [
+      "macOS Intel / x86_64，包括 Codex CLI 安装、自动升级和验收"
+    ],
+    "authorization": "2026-09-26 用户明确不再支持 Mac Intel；不影响 Linux/Windows x64。",
+    "original_goal_remaining": true
   }
 }

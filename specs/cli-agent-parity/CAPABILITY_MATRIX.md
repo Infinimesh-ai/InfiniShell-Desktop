@@ -1,8 +1,12 @@
 # CLI 能力矩阵
 
+2026-09-26 用户明确目标平台为 macOS Apple Silicon、Linux x64 和 Windows x64；macOS Intel（包括 Codex CLI）不属于当前开发或验收范围。历史 Intel 记录保留原范围。
+
 **阶段交付，完整 Goal 尚未完成。** 本表记录固定历史基线及输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`，npm 来源绑定提交为 `b6f93f662`。早期在线收据按 WIP 摘要计证；`84102bb1c` 后续已有静态 GIF、GUI JPEG／纯 PNG 窄复验，当前技能／权限工作区增量已有内置门禁、G10 两条生产协调器链和 Grok 双图 GUI 正例，最终提交与相关平台验证仍待补。它说明当前产品能力及限制，不将代码路径存在等同于全平台验收；具体通过范围见[验证结论](VALIDATION_REPORT.md)，剩余项见[已知缺项](KNOWN_GAPS.md)，整体状态见 [CURRENT_STATUS](CURRENT_STATUS.json)。
 
 普通终端富输入的“附加文件”已在后续增量接通文件卡片选择器；macOS Codex 两卡片原生 shell 读取正例与中英文布局通过，原入口仅插路径及模型读取失败记录保留。Claude GUI 尚待首次启动向导完成，Grok 卡片可建但自动发送仍被 G01 阻止，不能将显示卡片或安全拒绝计作投递完成。
+
+当前按用户要求先补功能代码，后集中修复与测试。代码检查点 `704bb33bb2943f8a686b24b843c3b3a1ba656c19` 中的 G01/G03 专属 TUI GUI／PNG 输入、G08 远端图片、G09 安装来源事务、G10 搜索与受限技能增量见 [CURRENT_STATUS](CURRENT_STATUS.json) 的 `current_work_order`；本批仅 macOS arm64 编译和 i18n 11 项通过，下表的已验证范围不因此扩大。Codex 远端图片已接入[固定 0.156.1 的原生队列](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L899)及[图片快照](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/local_media.rs#L20)，按后续输入排队处理；仍须后续真实 SSH／tmux 接收证明。共享 daemon 默认路径仍只允许唯一前台客户端和唯一 loaded thread；新增每 pane 独立 app-server、明确 socket 和当前 TUI 票据绑定及 GUI入口；Grok 远端专属会话、当前 pane 入口、图片发送和查询恢复已接线；Claude 新增上传原图→原生 Read→历史图片字节证明及未知状态恢复，不能把文本入队计为图像消费。三 CLI 三目标平台 npm、三 CLI Mac ARM/Linux x64 Homebrew、三 CLI Windows x64 WinGet、Claude/Grok 受限 Skill 和 Mac/Linux 命令+技能组合已有未验证接线；三平台受审命令现统一通过宿主工具逐条独立监督、审批和清理，同会话多命令及原生追加均已接；Grok普通终端历史继续也已接同UUID恢复与新代次CAS。
 
 ## 固定版本与模式
 
@@ -22,7 +26,7 @@
 | 持久化与恢复 | 任务、原生 ID、父子、消息／结果；活跃重关联与历史继续分开 | 同类持久化；继续受原生会话与权限约束 | 同类持久化；技能／策略合同须在恢复时继续成立 |
 | 配套通知插件 | `codex-warp 0.4.0`；原生 hooks 信任单独审核 | `warp 2.2.0`；保留禁用与无关配置 | `infinishell-grok 0.1.5`；安装、启用及完整性分别核对，原生权限观察不得替代审批 |
 | 自动升级渠道 | latest／alpha | latest／stable | stable／alpha |
-| 自动升级来源 | 已核验原生安装；npm 来源/入口绑定已加强但仍手动，Homebrew/未知来源手动 | 原生同左；Unix npm 固定目标 2.1.280 已接入单包事务，本地门禁和 macOS 五个真实后端场景通过，同提交云端待验；Windows npm、Homebrew、WinGet 仍未完成（G09） | 已核验原生安装；未建立受控 npm 包身份，其他来源不自动升级（G09） |
+| 自动升级来源 | 原生安装已有验收；三平台 npm、Mac ARM/Linux x64 Homebrew、Windows x64 WinGet 固定来源事务已接，新增代码未验证（G09） | 原生安装及固定 Unix npm 单包事务已有各自限定验收；Windows npm、两平台 Homebrew、WinGet 代码已接，新增路径待验。主动降级仅条件合同，当前渠道不匹配仍拒绝（G09） | 原生安装已有验收；三平台 npm、两平台 Homebrew、WinGet 固定来源事务已接，新增代码未验证（G09） |
 | 完成与清理 | 可信原生终态；普通 PTY Escape 不证明工具退出（G12） | 可信原生终态及本代清理回执 | 原生五秒 EOF 不可靠；托管清理依赖当前代次监督回执 |
 
 CLI 升级、插件更新与托管兼容分别判断；渠道与来源详细合同见 [CLI_AUTOUPDATE](CLI_AUTOUPDATE.md)，用户支持范围与回退见 [RELEASE_SUPPORT](RELEASE_SUPPORT.md)。本表中的能力不外推到未来 CLI 版本（G13）。

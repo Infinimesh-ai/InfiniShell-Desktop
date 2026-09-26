@@ -8,7 +8,7 @@
 
 三款 CLI 在 InfiniShell 中具备可靠、一致的终端交互体验和本地任务管理能力。P0–P5、[消费者自动升级](CLI_AUTOUPDATE.md)、开发与验收版本维护均属本 Goal。以固定版本小步迭代，升级发现与托管兼容分别判断，不因上游连续发布反复更换验收基线。
 
-- 覆盖 macOS、Linux、Windows 桌面 GUI、其中的普通终端与应用托管任务；SSH／tmux 单独验收。
+- 覆盖 macOS Apple Silicon、Linux x64、Windows x64 桌面 GUI、其中的普通终端与应用托管任务；SSH／tmux 单独验收。2026-09-26 用户明确不再支持 macOS Intel，Codex 等三款 CLI 的 Intel 适配与验收均不在本目标范围。
 - 保留真实协议、模型、技能、MCP、权限与输入差异，不跨 CLI 自动复制配置，不降低其他 CLI 的已有能力制造一致性。
 - `warp_tui` 前端、云端任务、模型 API／BYOP、SuperGrok OAuth 重接是独立范围，不作为本 Goal 前置条件。
 - Grok 桌面入口默认开放；实际操作仍受版本、来源、认证、权限及能力检查约束。

@@ -4,6 +4,16 @@
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
 
+当前代码批次以 `76dcfdc60254077edaa86175722591333526c05c` 为基线，按用户要求先完成功能接线；代码已提交为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，macOS arm64 内置盘 `cargo check -p warp` 及 i18n 资源门禁 11 项通过，尚未运行本批功能测试、GUI 或在线模型。三平台 Grok 专属普通终端、远端图片协议、包管理器事务和受限技能的代码范围见 `CURRENT_STATUS.json.current_work_order`；不继承下文历史门禁的通过结论。用户已明确 macOS 仅支持 Apple Silicon，Mac Intel 不再属于实现或验收范围；本轮新增的 Intel 清单与适配已撤回，仓外静态下载资料保留，不计成功验收。
+
+本轮另外归档固定 Grok npm 三平台、Homebrew cask 与完整依赖的官方静态原始材料：仓外 `validation/grok-package-static-contract-20260926`，34 个文件，索引 SHA-256 为 `bab479385537d2a73069e27a8ce832041d3b6b5e9370b6475e41e71a716fec12`。Windows npm 原生映像与官网映像的所有 PE 节内容一致，移除官网尾部签名并规范化 checksum/security directory 后逐字节相同；两种发行映像仍各自绑定摘要。此归档只证明源码/包/映像静态合同，没有执行 CLI、安装脚本、升级、模型或 GUI，不扩大历史验收范围。
+
+本批 Windows 受审命令、Grok 普通历史继续、受限降级及 Linux Codex cask 的代码/静态原始资料分别存入仓外 `validation/g10-windows-mcp-code-20260926`、`grok-owned-history-code-20260926`、`claude-downgrade-code-20260926` 和 `codex-linux-brew-static-20260926`，索引摘要见 `CURRENT_STATUS.json` 的 `current_work_order.code_archive_indices`。Linux Codex 固定官方归档为 145,976,992 字节，SHA-256 `8b711520beddf385467b8da4d2c93736637c6ba1e46811cf0d8606b7c490b6f6`；44 文件/10 目录与固定清单的字节、类型、模式一致，原生 ELF64 x86_64 没有 PT_INTERP/DT_NEEDED。这里只列静态合同，未执行归档内程序或重跑模型，不能据此关闭 G09。Homebrew 的 `LATEST_DOWNLOAD_SHA256` 只在 `cask.version.latest?` 条件下写入，数字固定版本不因此增加该文件；`@latest` 名称不等同 `version :latest`。
+
+Linux Claude cask 和其余 Linux cask/Grok WinGet 官方材料已分别复制归档至 `validation/claude-linux-brew-code-20260926`（29 文件）和 `validation/linux-brew-grok-winget-static-20260926`（25 文件）；原临时资料保持原字节，索引见 `CURRENT_STATUS.json.current_work_order.code_archive_indices`。三款 Linux Homebrew 与 Grok WinGet 的最后共享接线已经合入工作区，源码绑定包含 69 个唯一且存在的文件。上述均为静态资料／源码归档，未运行候选、安装器或测试。
+
+G10 后续增量已接通三平台宿主逐命令监督、同会话顺序多命令、逐次审批和原生 Submit；原生 shell 保持关闭。Unix 独立执行器原始代码存入 `validation/g10-unix-command-code-20260926`，整批代码检查点及编译日志位于 `validation/code-integration-g10-sequential-20260926`。第一次编译因缓存参数不一致主动中止，不记失败或通过；恢复原参数后的第二轮 exit 101，24 条类型/可见性/借用/Send 错误保留，相关接口修正后第三轮 `cargo check -p warp` 通过。i18n 第一轮在测试程序编译时出现 3 条错误，补齐测试构造字段及两处字节断言后第二轮 11 项通过、0 失败；原失败均保留。223 个代码、插件与资源文件逐个核对 Git blob 与本地门禁快照一致，绑定收据为 `implementation-commit-binding.safe.json`，摘要见当前状态。这里仅确认本地编译与英中资源约束，不包含功能、模型、双语布局或跨平台通过结论。Linux/Windows 同提交验证按用户最新代码优先指示后置，Mac Intel 不再选择。
+
 ## 验收基线与追溯
 
 | 项目 | 固定来源与解释 |
@@ -232,7 +242,7 @@ macOS arm64 生产适配器 v3 三轮通过；真实 GUI v3 首轮双技能、v4
 
 原始证据归档 `~/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-owned-20260926`，146 文件索引 SHA-256 `d49082ee7e6290bf007f2b316c3db5c96b80967fcc40377e38df7cf407fbec33`。v1 两轮输入通过，但运行器关闭 PTY master 的顺序导致 shell 回收卡住；代理收尾及原失败均保留。仅修改验收运行器，v2 57.04 秒完成两轮和 TUI／leader／shell 回收，私有认证副本已移除。独立检查确认恰好两个原生输入和两个正确标记，SQLite 两条消息均已 ACK。复用相同程序和 libtest 摘要，未改产品源码来放行复验。
 
-本地 v7 `cargo check -p warp`、i18n 11、PTY 内核身份 2、CLI 会话 413（6 项专门环境测试跳过）及应用构建通过；独立运行随后显式执行其中一项原生在线测试。未变更的持久化模块复用 v4 78 项，修复后的运行器 6 项通过。构建源文件摘要已逐文件绑定实现提交 `922308af60cbdd7f84ea69fb3e465ae08b303213`，独立提交绑定 SHA-256 `7e88b8fea31de65fa5d58639f8295083cebb78d67b706349d4b3c17579432ed5`；[Actions 36220234098](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36220234098) Linux 通知/安装验收因脚本仍要求 0.1.4、实际插件为 0.1.5 失败；Windows 仍在执行。旧失败另存，修复后同提交复验。**不是 GUI、真实 IME、工具审批或跨平台在线生命周期验收。G01 保持开放，尚不能解除普通终端无条件拒绝。**
+本地 v7 `cargo check -p warp`、i18n 11、PTY 内核身份 2、CLI 会话 413（6 项专门环境测试跳过）及应用构建通过；独立运行随后显式执行其中一项原生在线测试。未变更的持久化模块复用 v4 78 项，修复后的运行器 6 项通过。构建源文件摘要已逐文件绑定实现提交 `922308af60cbdd7f84ea69fb3e465ae08b303213`，独立提交绑定 SHA-256 `7e88b8fea31de65fa5d58639f8295083cebb78d67b706349d4b3c17579432ed5`；[Actions 36220234098](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36220234098) Linux 通知/安装验收因脚本仍要求 0.1.4、实际插件为 0.1.5 失败；Windows 安装前 `verify_runtime` 的 3 秒版本检查超时，原因与 Linux 不同。两平台原失败另存 `validation/cloud-g01-922308af6`，102 文件索引 SHA-256 `f2846ce145b2e1214b34f5c7a7688eaa70313ee2a2b21d475a5ce67198bde0f0`。后续整合提交独立复验，旧失败不改写。**不是 GUI、真实 IME、工具审批或跨平台在线生命周期验收。G01 保持开放，尚不能解除普通终端无条件拒绝。**
 
 无需本地化变更：该增量尚未改变消费者入口和现有显示文案；后续 GUI 接线须同步英文／简体中文并分别检查实际布局。
 
@@ -248,7 +258,7 @@ macOS arm64 v4 `cargo check -p warp`、i18n 11、PTY 身份 2、CLI 会话 423�
 
 G01 与原分支 G09 整合后再次通过本地 `cargo check -p warp`、i18n 11、PTY 身份 2、会话 423/6 忽略、协调器 111/4 忽略、升级 182/4 忽略、受监督版本探测 7/1 忽略、持久化 78、运行器 6、插件验证器 15 及应用构建。105 文件索引位于仓外 `validation/g01-g09-integration-20260926/`，SHA-256 `67b875a435b5408373166375e16adbe24b65cdeaa485b8f72146491666f18c64`；没有重跑在线模型，原先各轮来源不变。整合提交将从原分支执行同 SHA 跨平台门禁。
 
-G01 持久目录增量：新 v2 清单写入当前任务数据库的数据域，socket 另存短路径私有目录并绑定设备号/inode；旧 v1 清单仍按旧路径合同恢复。v2 本地 check、i18n 11、PTY 身份 2、CLI 会话 433（7 忽略）、运行器 6 和应用构建通过。未修改的共享协调器/升级路径沿用 `32a932f95` 整合门禁；该提交 [Actions 36223768480](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36223768480) 正在执行 Linux/Windows 相关门禁，尚未通过。
+G01 持久目录增量：新 v2 清单写入当前任务数据库的数据域，socket 另存短路径私有目录并绑定设备号/inode；旧 v1 清单仍按旧路径合同恢复。v2 本地 check、i18n 11、PTY 身份 2、CLI 会话 433（7 忽略）、运行器 6 和应用构建通过。未修改的共享协调器/升级路径沿用 `32a932f95` 整合门禁；该提交 [Actions 36223768480](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36223768480) Linux x64 与 Windows x64 相关定向门禁均已通过；不含已认证模型或实际 GUI/IME。140 文件原始日志与产物归档 `validation/cloud-g01-g09-32a932f95`，索引 SHA-256 `6e9f25d861b94d6927099a734b92577f1e392e4efb309da9da472cb3b6a4c0cc`。后续未提交 GUI 增量不沿用此通过结论。
 
 固定 macOS arm64 Grok `1.0.41/grok-4.7/default` 的持久目录 v1 两轮原生输入通过，独立审计确认 2 个 prompt ID、2 个正确模型标记和 SQLite 两条 NativeProtocol ACK；TUI/leader/shell 与临时认证副本清理确认。新增退出恢复检查因原生 `leader.lock` 残留报目录非空，原 `passed=false`、panic 和文件字节均保留。v2 仅补精确锁归属清理：要求目录身份未变、leader 真实生存期已结束、私有单链接文件原字节等于绑定 PID；未知文件或别名不删除。新 libtest 在同一真实退出现场恢复成功、socket 目录移除、持久清单保留，旧记录仍不能派发；零新增模型输入。两轮来源分开，不把 v1 整体失败改写为成功，也不宣称同一二进制重跑模型。
 
