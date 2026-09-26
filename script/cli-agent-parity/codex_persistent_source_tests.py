@@ -25,6 +25,9 @@ class SourceTests(unittest.TestCase):
         shutil.copytree(self.bundle / 'codex/source', root)
         for name in ('hooks/hooks.json', 'scripts/warp-notify.sh', 'scripts/on-prompt-submit.sh'):
             (root / 'plugins/warp' / name).write_bytes((self.bundle / 'codex/revisions/rev3' / name).read_bytes())
+        # rev3–rev5 共用旧 payload，不能将当前 rev6 字节混入历史来源。
+        (root / 'plugins/warp/scripts/build-payload.sh').write_bytes(
+            (self.bundle / 'codex/revisions/rev5/scripts/build-payload.sh').read_bytes())
         (root.parent / 'SOURCE_METADATA.json').write_bytes(data)
         source.verify_previous(self.home, self.bundle)
         cache = self.home / 'plugins/cache/codex-warp/warp/0.4.0'

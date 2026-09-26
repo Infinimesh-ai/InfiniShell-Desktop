@@ -791,7 +791,7 @@ fn rejected_catalog_reports_only_known_names_and_structure() {
                     "expected_names": ["read_file", "search_tool", "use_tool"],
                     "known_name_counts": {
                         "read_file": 2, "write": 1, "search_replace": 1,
-                        "search_tool": 1, "use_tool": 1
+                        "search_tool": 1, "use_tool": 1, "grep": 0, "list_dir": 0
                     },
                     "unknown_string_count": 2, "non_string_count": 3,
                     "duplicate_string_count": 2

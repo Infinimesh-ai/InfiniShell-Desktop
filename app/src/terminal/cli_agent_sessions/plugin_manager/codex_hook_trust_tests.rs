@@ -125,7 +125,7 @@ fn native_contract_is_exactly_the_recorded_cli_response_and_bundled_manifest() {
         "../../../../assets/bundled/cli-agent-plugins/codex/PATCH_METADATA.json"
     ))
     .unwrap();
-    assert_eq!(patch_metadata["patch_revision"], 5);
+    assert_eq!(patch_metadata["patch_revision"], 6);
     assert_eq!(
         bundled["cli"],
         format!(
@@ -423,6 +423,14 @@ fn windows_contract_uses_only_the_formal_five_hooks_and_exact_resource_bytes() {
     }
     let directory = controlled_home();
     let plugin = directory.path().join("plugins/cache/codex-warp/warp/0.4.0");
+    // 此收据只覆盖 rev4 原字节；旧 payload 在 rev3–rev5 间保持相同。
+    fs::write(
+        plugin.join("scripts/build-payload.sh"),
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/scripts/build-payload.sh"
+        ),
+    )
+    .unwrap();
     fs::write(
         plugin.join("scripts/warp-notify.sh"),
         include_bytes!(

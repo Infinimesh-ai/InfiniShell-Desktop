@@ -319,8 +319,8 @@
   },
   "current_work_order": {
     "updated_at": "2026-09-26",
-    "mode": "feature_implementation_first",
-    "user_direction": "先从代码侧覆盖原目标功能，集中修复、测试与实机验收后续进行。",
+    "mode": "post_implementation_unattended_gates",
+    "user_direction": "已先完成已知功能代码检查点；随后推进无需人工的本地及 Linux/Windows 定向门禁，真实 GUI、输入法与在线模型联测后续进行。",
     "goal_acceptance_unchanged": true,
     "integration_base_commit": "76dcfdc60254077edaa86175722591333526c05c",
     "g01_g03_worktree": ".worktrees/grok-owned-terminal",
@@ -631,15 +631,102 @@
       "code_review_scope": "本地构建与资源门禁源码绑定；不是安全审计或真实产品验收。"
     },
     "cross_platform_next": {
-      "status": "deferred_by_user_work_order",
+      "status": "ready_to_dispatch_after_push",
       "platforms": [
         "Linux x64",
         "Windows x64"
       ],
       "workflow": ".github/workflows/cross-platform-preflight.yml",
-      "required_source_commit": "704bb33bb2943f8a686b24b843c3b3a1ba656c19",
+      "required_source_commit": "修正通过并提交后的精确 SHA",
       "macos_intel": false,
-      "reason": "按用户指示先代码覆盖，集中修复与测试后续进行；恢复验证时遵循 cross-platform-cloud-verification。"
+      "reason": "本地编译、受影响回归中的原失败及进程夹具复验已通过；推送后验证精确提交，full_workspace_tests=false、run_macos_intel=false。",
+      "added_coverage": [
+        "warp 默认筛选增加 remote_server::cli_image 和 terminal::view::grok_owned_input",
+        "remote_server crate 的 client::image_staging::tests 两平台定向执行；Unix服务端用例不外推为Windows原生覆盖"
+      ]
+    },
+    "post_code_local_gates": {
+      "base_commit": "c72313648895e7cb1d0d25a721ea8346403324d5",
+      "archive": "validation/post-code-local-gates-c72313648-20260926",
+      "platform": "macOS arm64",
+      "initial_results": {
+        "cli_agent": {
+          "passed": 1832,
+          "failed": 17,
+          "ignored": 67
+        },
+        "remote_image_server": {
+          "passed": 1,
+          "failed": 25
+        },
+        "grok_owned_input": {
+          "passed": 50,
+          "failed": 0,
+          "ignored": 2
+        },
+        "remote_image_client": {
+          "passed": 5,
+          "failed": 0
+        },
+        "codex_persistent_source_python": {
+          "passed": 10,
+          "errors": 3
+        }
+      },
+      "findings": [
+        "远端图片暂存目录 Builder 未显式设置0700，被现有私有目录校验拒绝；修正创建权限，保留拒绝和清理边界。",
+        "Grok 技能正例缺真实 scope/qualifiedName 与有效 frontmatter；Codex 历史树混入当前 payload，当前版本断言未同步；修测试建树，不改历史原字节或降低兼容门禁。",
+        "Codex npm 已有固定来源实现，旧一律 UnsupportedSource 断言失效；改为未知版本拒绝与缺完整 Node 探针闭包拒绝。"
+      ],
+      "fix_verification": "passed_with_targeted_handoff_recheck",
+      "fix_archive": "validation/post-code-local-fixes-c72313648-20260926",
+      "localization": "无需本地化变更：只修目录创建权限、回归夹具和门禁筛选，无界面文案或交互语义变化。",
+      "real_model_or_gui_run": false,
+      "gap_closed": false,
+      "first_fix_results": {
+        "cargo_check": "passed",
+        "affected": {
+          "passed": 1880,
+          "failed": 1,
+          "ignored": 67
+        },
+        "i18n": {
+          "passed": 11,
+          "failed": 0
+        },
+        "remaining_failure": "runtime_host::real_process_host_survives_gui_exit_and_reconnects_without_replay"
+      },
+      "remaining_failure_diagnosis": "夹具逐次发送 MessageAccepted 与 Progress，却只等待 ACK 即保存交接游标；首条 Progress 可能合法地晚于游标。原失败未打印具体事件，不推断其原值；补明确双事件同步和诊断，不放宽新客户端仅允许第二条消息的断言。",
+      "archived_runs": {
+        "post-code-local-gates-c72313648-20260926": {
+          "file_count": 16,
+          "index_sha256": "f65cbafe440891e27c6d1e8ee97f1531c5ee6f8856e04ad04c75b10b2ccf1944"
+        },
+        "post-code-local-fixes-c72313648-20260926": {
+          "file_count": 20,
+          "index_sha256": "a02120050735ae2b61bebcf0b7f4dd65153eae88eacc0b918726266bb2263b99"
+        }
+      },
+      "handoff_followup": {
+        "archive": "validation/post-code-handoff-sync-20260926",
+        "process_tests": {
+          "passed": 3,
+          "failed": 0
+        },
+        "i18n": {
+          "passed": 11,
+          "failed": 0
+        },
+        "index_sha256": "f03d624dd6ca67c6589f6962007c573accaf82ddf57a7a7febcca36854f93feb",
+        "scope": "只修测试helper后，复跑其影响的三条合成进程用例；不把上一轮整批失败重记为整批通过。"
+      },
+      "other_local_gates": {
+        "remote_image_client": 5,
+        "notification_patch_python": 20,
+        "plugin_compatibility_python": 14,
+        "codex_persistent_source_python_after_fix": 13,
+        "actionlint": "passed"
+      }
     }
   },
   "supported_target_scope": {

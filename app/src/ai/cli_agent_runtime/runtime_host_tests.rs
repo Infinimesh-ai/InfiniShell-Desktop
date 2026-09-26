@@ -2032,20 +2032,34 @@ fn wait_for_events(
     message_id: Uuid,
 ) -> Vec<HostedEvent> {
     let deadline = Instant::now() + PROCESS_TIMEOUT;
+    let expected_turn = format!("turn-{message_id}");
+    let expected_progress = message_id.to_string();
     loop {
         let events = block_on(client.pull_events(after_sequence)).unwrap();
-        if events.iter().any(|event| {
+        let accepted = events.iter().any(|event| {
             matches!(
-                event.event.kind,
+                &event.event.kind,
                 RuntimeEventKind::MessageAccepted {
                     message_id: actual,
-                    ..
-                } if actual == message_id
+                    turn_id: Some(turn_id),
+                } if *actual == message_id && turn_id == &expected_turn
             )
-        }) {
+        });
+        let progressed = events.iter().any(|event| {
+            matches!(
+                &event.event.kind,
+                RuntimeEventKind::Progress { turn_id, message }
+                    if turn_id == &expected_turn && message == &expected_progress
+            )
+        });
+        // 假适配器的 ACK 与 Progress 分别落盘；收齐本次结果后才能设置旧 GUI 的交接水位。
+        if accepted && progressed {
             return events;
         }
-        assert!(Instant::now() < deadline, "等待假 CLI 原生 ACK 超时");
+        assert!(
+            Instant::now() < deadline,
+            "等待假 CLI 的 ACK 与 Progress 超时：message_id={message_id}，after_sequence={after_sequence}，accepted={accepted}，progressed={progressed}，events={events:#?}"
+        );
         thread::sleep(Duration::from_millis(20));
     }
 }
@@ -2203,26 +2217,29 @@ fn run_new_gui(root: &Path) {
     }
     let events = block_on(client.pull_events(acknowledged_sequence)).unwrap();
     assert!(!events.is_empty());
-    assert!(events.iter().all(|event| match &event.event.kind {
-        RuntimeEventKind::MessageAccepted { message_id, .. } => {
-            *message_id == handoff.second_message
-        }
-        RuntimeEventKind::Progress { message, .. } =>
-            message == &handoff.second_message.to_string(),
-        RuntimeEventKind::SessionReady { .. }
-        | RuntimeEventKind::CommandDispatched { .. }
-        | RuntimeEventKind::TurnStarted { .. }
-        | RuntimeEventKind::InputJoined { .. }
-        | RuntimeEventKind::TextDelta { .. }
-        | RuntimeEventKind::ApprovalRequested { .. }
-        | RuntimeEventKind::ApprovalResolved { .. }
-        | RuntimeEventKind::ApprovalCancelled { .. }
-        | RuntimeEventKind::LocalToolCancelled { .. }
-        | RuntimeEventKind::LocalToolRequested { .. }
-        | RuntimeEventKind::TurnFinished { .. }
-        | RuntimeEventKind::RequestFailed { .. }
-        | RuntimeEventKind::Disconnected { .. } => false,
-    }));
+    assert!(
+        events.iter().all(|event| match &event.event.kind {
+            RuntimeEventKind::MessageAccepted { message_id, .. } => {
+                *message_id == handoff.second_message
+            }
+            RuntimeEventKind::Progress { message, .. } =>
+                message == &handoff.second_message.to_string(),
+            RuntimeEventKind::SessionReady { .. }
+            | RuntimeEventKind::CommandDispatched { .. }
+            | RuntimeEventKind::TurnStarted { .. }
+            | RuntimeEventKind::InputJoined { .. }
+            | RuntimeEventKind::TextDelta { .. }
+            | RuntimeEventKind::ApprovalRequested { .. }
+            | RuntimeEventKind::ApprovalResolved { .. }
+            | RuntimeEventKind::ApprovalCancelled { .. }
+            | RuntimeEventKind::LocalToolCancelled { .. }
+            | RuntimeEventKind::LocalToolRequested { .. }
+            | RuntimeEventKind::TurnFinished { .. }
+            | RuntimeEventKind::RequestFailed { .. }
+            | RuntimeEventKind::Disconnected { .. } => false,
+        }),
+        "新 GUI 只能收到第二条输入的未确认事件：handoff={handoff:?}，after_sequence={acknowledged_sequence}，events={events:#?}"
+    );
     block_on(client.send_command(RuntimeCommand {
         generation: handoff.generation,
         message_id: Uuid::new_v4(),

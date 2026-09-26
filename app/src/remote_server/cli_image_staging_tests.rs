@@ -1,5 +1,13 @@
 use super::*;
 
+fn private_parent() -> tempfile::TempDir {
+    // 正例显式满足生产私有父目录合同，不依赖测试进程的 umask。
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap()
+}
+
 fn scope(connection_id: Uuid) -> RemoteImageScope {
     RemoteImageScope {
         terminal_epoch: Uuid::from_u128(3),
@@ -25,7 +33,7 @@ fn staging(parent: &Path, max_bytes: u64) -> RemoteImageStaging {
 
 #[test]
 fn exact_bytes_and_duplicate_chunks_produce_the_same_verified_receipt() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -70,7 +78,7 @@ fn exact_bytes_and_duplicate_chunks_produce_the_same_verified_receipt() {
 
 #[test]
 fn changed_duplicate_and_out_of_order_chunk_do_not_replace_original_bytes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -98,7 +106,7 @@ fn changed_duplicate_and_out_of_order_chunk_do_not_replace_original_bytes() {
 
 #[test]
 fn matching_length_with_wrong_digest_does_not_verify() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -115,7 +123,7 @@ fn matching_length_with_wrong_digest_does_not_verify() {
 
 #[test]
 fn changed_native_session_or_generation_rejects_old_callbacks_and_removes_unpublished_bytes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let original = scope(Uuid::new_v4());
     store.activate_scope(original.clone()).unwrap();
@@ -138,7 +146,7 @@ fn changed_native_session_or_generation_rejects_old_callbacks_and_removes_unpubl
 
 #[test]
 fn sibling_connection_with_equal_terminal_number_cannot_access_or_cancel_other_bytes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let first = scope(Uuid::new_v4());
     let second = scope(Uuid::new_v4());
@@ -157,7 +165,7 @@ fn sibling_connection_with_equal_terminal_number_cannot_access_or_cancel_other_b
 
 #[test]
 fn disconnected_connection_cannot_reuse_old_transfer_on_new_connection() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let original = scope(Uuid::new_v4());
     store.activate_scope(original.clone()).unwrap();
@@ -177,7 +185,7 @@ fn disconnected_connection_cannot_reuse_old_transfer_on_new_connection() {
 
 #[test]
 fn canceled_transfer_is_not_resurrected_by_late_begin() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -192,7 +200,7 @@ fn canceled_transfer_is_not_resurrected_by_late_begin() {
 
 #[test]
 fn total_reservation_is_enforced_before_writing_bytes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 5);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -207,7 +215,7 @@ fn total_reservation_is_enforced_before_writing_bytes() {
 
 #[test]
 fn staging_uses_private_directory_and_files_without_user_paths() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -251,7 +259,7 @@ fn non_private_or_symlink_parent_is_rejected_without_changing_permissions() {
 
 #[test]
 fn unknown_host_cannot_register_an_image_scope() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let mut binding = scope(Uuid::new_v4());
     binding.host_id = HostId::new("daemon-b".into());
@@ -264,7 +272,7 @@ fn unknown_host_cannot_register_an_image_scope() {
 fn cleanup_refuses_to_delete_a_replacement_symlink() {
     use std::os::unix::fs::symlink;
 
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -291,7 +299,7 @@ fn cleanup_refuses_to_delete_a_replacement_symlink() {
 
 #[test]
 fn new_submission_in_same_cli_generation_rejects_previous_batch_callbacks() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let original = scope(Uuid::new_v4());
     store.activate_scope(original.clone()).unwrap();
@@ -307,7 +315,7 @@ fn new_submission_in_same_cli_generation_rejects_previous_batch_callbacks() {
 
 #[test]
 fn changed_duplicate_spec_cannot_overwrite_the_existing_transfer() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -321,7 +329,7 @@ fn changed_duplicate_spec_cannot_overwrite_the_existing_transfer() {
 
 #[test]
 fn cancel_before_begin_keeps_a_tombstone_for_late_upload() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -337,7 +345,7 @@ fn cancel_before_begin_keeps_a_tombstone_for_late_upload() {
 
 #[test]
 fn successful_drop_removes_only_owned_staging_files() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -351,7 +359,7 @@ fn successful_drop_removes_only_owned_staging_files() {
 
 #[test]
 fn drop_preserves_a_replacement_regular_file_after_cleanup_rejection() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -369,7 +377,7 @@ fn drop_preserves_a_replacement_regular_file_after_cleanup_rejection() {
 
 #[test]
 fn drop_preserves_an_unregistered_file_in_the_staging_directory() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();
@@ -387,7 +395,7 @@ fn drop_preserves_an_unregistered_file_in_the_staging_directory() {
 
 #[test]
 fn replaced_directory_rejects_new_uploads_and_survives_drop() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let mut store = staging(parent.path(), 32);
     let binding = scope(Uuid::new_v4());
     store.activate_scope(binding.clone()).unwrap();

@@ -312,10 +312,49 @@ fn future_release_does_not_inherit_fixed_layout_acceptance() {
 }
 
 #[test]
-fn codex_public_launcher_is_not_enabled_by_native_layout_evidence() {
+fn codex_npm_release_support_does_not_extend_to_an_unknown_version() {
+    assert_eq!(supports(CLIAgent::Codex, "0.156.1"), Ok(()));
     assert_eq!(
-        supports(CLIAgent::Codex, "0.156.1"),
-        Err(Error::UnsupportedSource)
+        supports(CLIAgent::Codex, "0.156.2"),
+        Err(Error::InvalidRelease)
+    );
+}
+
+#[test]
+fn codex_public_launcher_requires_more_than_a_native_binary_probe() {
+    let mut fixture = fixture();
+    let journal = &mut fixture.journal;
+    journal.agent = "codex".into();
+    journal.old_version = "0.155.1".into();
+    journal.target_version = "0.156.1".into();
+    journal.owner.package_root = journal.owner.prefix.join("lib/node_modules/@openai/codex");
+    journal.owner.public_relative = "bin/codex.js".into();
+    journal.owner.entry = journal.owner.prefix.join("bin/codex");
+    let stage = journal
+        .owner
+        .package_root
+        .parent()
+        .unwrap()
+        .join(&journal.stage_name);
+    fs::create_dir_all(&stage).unwrap();
+    let native = stage.join("codex");
+    fs::write(&native, b"native probe without the Node launcher").unwrap();
+    assert_eq!(
+        validate(CLIAgent::Codex, &journal.owner.entry, journal),
+        Ok(())
+    );
+    journal.probe = Some(Probe {
+        generation: Uuid::new_v4(),
+        program: native.clone(),
+        program_stamp: stamp(&native).unwrap(),
+        binding_digest: "0".repeat(64),
+        observed_version: Some("0.156.1".into()),
+        codex_closure: None,
+    });
+
+    assert_eq!(
+        validate(CLIAgent::Codex, &journal.owner.entry, journal),
+        Err(Error::RecoveryRequired)
     );
 }
 

@@ -103,6 +103,7 @@ impl RemoteImageStaging {
         }
         let mut root = tempfile::Builder::new()
             .prefix("cli-image-unpublished-")
+            .permissions(fs::Permissions::from_mode(0o700))
             .tempdir_in(parent)?;
         // 禁止 TempDir 析构递归删除；身份不明的磁盘项必须留给显式恢复。
         root.disable_cleanup(true);

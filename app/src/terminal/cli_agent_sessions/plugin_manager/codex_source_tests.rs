@@ -34,6 +34,7 @@ fn previous_home(home: &Path) -> PathBuf {
     }
     for (name, contents) in [
         ("hooks/hooks.json", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/hooks/hooks.json").as_slice()),
+        ("scripts/build-payload.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/scripts/build-payload.sh").as_slice()),
         ("scripts/warp-notify.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/scripts/warp-notify.sh").as_slice()),
         ("scripts/on-prompt-submit.sh", include_bytes!("../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev3/scripts/on-prompt-submit.sh").as_slice()),
     ] {
@@ -79,6 +80,14 @@ fn rev4_home(home: &Path) -> PathBuf {
             .unwrap();
         }
     }
+    // rev3–rev5 共用这份原始 payload；不能从当前 rev6 来源混入新进程字段。
+    fs::write(
+        source.join("plugins/warp/scripts/build-payload.sh"),
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/scripts/build-payload.sh"
+        ),
+    )
+    .unwrap();
     fs::write(
         source.join("plugins/warp/scripts/warp-notify.sh"),
         include_bytes!(
@@ -106,7 +115,7 @@ fn rev4_home(home: &Path) -> PathBuf {
 }
 
 #[test]
-fn exact_rev4_migrates_to_rev5_without_overwriting_previous_source() {
+fn exact_rev4_migrates_to_rev6_without_overwriting_previous_source() {
     let (_directory, home) = private_home();
     let previous = rev4_home(&home);
     let old_tree = tree(&previous, false).unwrap();
@@ -130,6 +139,95 @@ fn exact_rev4_migrates_to_rev5_without_overwriting_previous_source() {
     assert!(is_previous_notification_cache(
         &transaction.path().join("previous-cache/0.4.0")
     ));
+}
+
+fn rev5_home(home: &Path) -> PathBuf {
+    let source = home
+        .join("plugins/infinishell-sources")
+        .join(&REV5_BUNDLE.directory)
+        .join("source");
+    for (name, contents) in FILES {
+        let path = source.join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, contents).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            fs::set_permissions(
+                &path,
+                fs::Permissions::from_mode(REV5_BUNDLE.files[*name].mode),
+            )
+            .unwrap();
+        }
+    }
+    fs::write(
+        source.join("plugins/warp/scripts/build-payload.sh"),
+        include_bytes!(
+            "../../../../assets/bundled/cli-agent-plugins/codex/revisions/rev5/scripts/build-payload.sh"
+        ),
+    )
+    .unwrap();
+    fs::write(
+        source.parent().unwrap().join("SOURCE_METADATA.json"),
+        REV5_METADATA,
+    )
+    .unwrap();
+    verify_revision(home, &REV5_BUNDLE, REV5_METADATA).unwrap();
+    for name in revision_tree(&REV5_BUNDLE, "plugins/warp/", false).keys() {
+        let path = cache_root(home, "warp").join("0.4.0").join(name);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::copy(source.join("plugins/warp").join(name), path).unwrap();
+    }
+    let mut document = DocumentMut::new();
+    document["marketplaces"][MARKETPLACE]["source_type"] = toml_edit::value("local");
+    document["marketplaces"][MARKETPLACE]["source"] = toml_edit::value(source.to_str().unwrap());
+    document["plugins"]["warp@codex-warp"]["enabled"] = toml_edit::value(true);
+    document["plugins"]["orchestration@codex-warp"]["enabled"] = toml_edit::value(false);
+    document["hooks"]["state"]["user"]["trusted_hash"] = toml_edit::value("保持用户信任");
+    save(home, &document);
+    source
+}
+
+#[test]
+fn exact_rev5_migrates_to_rev6_without_overwriting_previous_source_or_trust() {
+    let (_directory, home) = private_home();
+    let previous = rev5_home(&home);
+    let old_tree = tree(&previous, false).unwrap();
+    let old_cache = cache_snapshot(&cache_root(&home, "warp")).unwrap();
+    assert!(!has_custom_source(&home));
+    assert!(!is_current(&home));
+    assert!(notification_patch::preflight(&home, PatchKind::Codex).unwrap());
+    validate_existing(&home, &config(&home)).unwrap();
+
+    let (transaction, staged, original, installed) = prepared(&home);
+    commit_install(
+        &home,
+        "warp",
+        &original,
+        &installed,
+        &staged,
+        transaction.path(),
+        |_, _| Ok(()),
+    )
+    .unwrap();
+    invalidate(&home);
+
+    assert!(is_current(&home));
+    verify_installed_cache(&cache_root(&home, "warp"), "warp").unwrap();
+    verify_revision(&home, &REV5_BUNDLE, REV5_METADATA).unwrap();
+    assert_eq!(tree(&previous, false).unwrap(), old_tree);
+    assert_eq!(
+        cache_snapshot(&transaction.path().join("previous-cache")).unwrap(),
+        old_cache
+    );
+    assert_eq!(
+        config(&home)["hooks"]["state"]["user"]["trusted_hash"].as_str(),
+        Some("保持用户信任")
+    );
+    assert_eq!(
+        config(&home)["plugins"]["orchestration@codex-warp"]["enabled"].as_bool(),
+        Some(false)
+    );
 }
 
 #[test]

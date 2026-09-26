@@ -1515,7 +1515,8 @@ fn current_catalog_pull_requires_the_selected_skill_path() {
             9,
             json!({
                 "name":"infinishell-native-skill","description":"selected fixture","input":null,
-                "_meta":{"scope":"local","bareName":"infinishell-native-skill","path":path}
+                "_meta":{"scope":"local","bareName":"infinishell-native-skill",
+                    "qualifiedName":"local:infinishell-native-skill","path":path}
             }),
         );
     let ready = protocol.receive(response.clone()).unwrap();
@@ -2192,7 +2193,8 @@ fn production_resume_waiting_for_skill(path: PathBuf) -> (GrokProtocol, Value, V
             9,
             json!({
                 "name":"resume-skill","description":"恢复技能","input":null,
-                "_meta":{"scope":"local","bareName":"resume-skill","path":path}
+                "_meta":{"scope":"local","bareName":"resume-skill",
+                    "qualifiedName":"local:resume-skill","path":path}
             }),
         );
     (protocol, response, push)
@@ -2203,7 +2205,11 @@ fn production_resume_waiting_for_skill(path: PathBuf) -> (GrokProtocol, Value, V
 fn production_resume_skill_waits_for_pull_regardless_of_push_order() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("SKILL.md");
-    std::fs::write(&path, "resume skill fixture").unwrap();
+    std::fs::write(
+        &path,
+        "---\nname: resume-skill\ndescription: 恢复技能\nuser-invocable: true\n---\n恢复技能正文。\n",
+    )
+    .unwrap();
     for push_before_response in [true, false] {
         let (mut protocol, loaded, push) = production_resume_waiting_for_skill(path.clone());
         if push_before_response {
@@ -2257,7 +2263,11 @@ fn production_resume_skill_waits_for_pull_regardless_of_push_order() {
 fn production_resume_skill_pull_rejects_timeout_and_changed_bindings_after_push() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("SKILL.md");
-    std::fs::write(&path, "resume skill fixture").unwrap();
+    std::fs::write(
+        &path,
+        "---\nname: resume-skill\ndescription: 恢复技能\nuser-invocable: true\n---\n恢复技能正文。\n",
+    )
+    .unwrap();
     for mutation in ["timeout", "path", "session", "id", "error"] {
         let (mut protocol, loaded, push) = production_resume_waiting_for_skill(path.clone());
         let pulling = protocol.receive(loaded).unwrap();
@@ -2294,8 +2304,23 @@ fn production_resume_skill_pull_rejects_timeout_and_changed_bindings_after_push(
 fn production_resume_skill_pull_accepts_the_full_leader_catalog_with_the_bound_path() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("SKILL.md");
-    std::fs::write(&path, "resume skill fixture").unwrap();
-    for mutation in ["valid", "reduced", "path", "count", "shape", "tools"] {
+    std::fs::write(
+        &path,
+        "---\nname: resume-skill\ndescription: 恢复技能\nuser-invocable: true\n---\n恢复技能正文。\n",
+    )
+    .unwrap();
+    for mutation in [
+        "valid",
+        "reduced",
+        "path",
+        "missing_scope",
+        "missing_qualified_name",
+        "changed_scope",
+        "changed_qualified_name",
+        "count",
+        "shape",
+        "tools",
+    ] {
         let (mut protocol, loaded, push) = production_resume_waiting_for_skill(path.clone());
         let pulling = protocol.receive(loaded).unwrap();
         let mut response = json!({"jsonrpc":"2.0","id":pulling.writes[0]["id"],"result":{
@@ -2317,6 +2342,25 @@ fn production_resume_skill_pull_accepts_the_full_leader_catalog_with_the_bound_p
             "path" => {
                 response["result"]["commands"][9]["_meta"]["path"] =
                     json!(directory.path().join("wrong.md"))
+            }
+            "missing_scope" => {
+                response["result"]["commands"][9]["_meta"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("scope");
+            }
+            "missing_qualified_name" => {
+                response["result"]["commands"][9]["_meta"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("qualifiedName");
+            }
+            "changed_scope" => {
+                response["result"]["commands"][9]["_meta"]["scope"] = json!("user");
+            }
+            "changed_qualified_name" => {
+                response["result"]["commands"][9]["_meta"]["qualifiedName"] =
+                    json!("user:resume-skill");
             }
             "count" => {
                 response["result"]["commands"] = json!((0..129).map(|index|
@@ -2350,7 +2394,11 @@ fn production_resume_skill_pull_accepts_the_full_leader_catalog_with_the_bound_p
 fn production_resume_skill_ignores_replay_and_keeps_unbound_resume_unchanged() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("SKILL.md");
-    std::fs::write(&path, "resume skill fixture").unwrap();
+    std::fs::write(
+        &path,
+        "---\nname: resume-skill\ndescription: 恢复技能\nuser-invocable: true\n---\n恢复技能正文。\n",
+    )
+    .unwrap();
     let (mut protocol, loaded, mut replay) = production_resume_waiting_for_skill(path.clone());
     replay["params"]["_meta"]["isReplay"] = json!(true);
     protocol.receive(replay).unwrap();
@@ -7093,7 +7141,11 @@ fn production_root_extended_setup_rejects_skips_wrong_sessions_and_early_respons
 fn production_root_catalog_keeps_unique_skill_binding_and_bounded_safe_entries() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("SKILL.md");
-    std::fs::write(&path, "resume skill fixture").unwrap();
+    std::fs::write(
+        &path,
+        "---\nname: resume-skill\ndescription: 恢复技能\nuser-invocable: true\n---\n恢复技能正文。\n",
+    )
+    .unwrap();
     for mutation in [
         "duplicate_path",
         "duplicate_name",

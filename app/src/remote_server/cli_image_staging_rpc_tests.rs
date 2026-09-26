@@ -1,8 +1,19 @@
+use std::fs;
+use std::os::unix::fs::PermissionsExt as _;
+
 use super::super::proto::{
     CliImageStagingActivate, CliImageStagingBegin, CliImageStagingChunk, CliImageStagingVerify,
 };
 use super::*;
 use sha2::{Digest, Sha256};
+
+fn private_parent() -> tempfile::TempDir {
+    // RPC 正例使用创建时即为私有的目录，生产入口仍核对权限与所有者。
+    tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap()
+}
 
 fn request(
     session: u64,
@@ -65,7 +76,7 @@ fn error_code(response: CliImageStagingResponse) -> CliImageStagingErrorCode {
 
 #[test]
 fn live_initialized_connection_stages_and_verifies_original_binary_bytes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = connection();
     let activated = service.handle(&connection, activate(7, 0));
@@ -111,7 +122,7 @@ fn live_initialized_connection_stages_and_verifies_original_binary_bytes() {
 
 #[test]
 fn initialize_and_same_connection_bootstrap_are_both_required() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = ImageStagingConnection::new(Uuid::new_v4());
     connection.bootstrap(
@@ -136,7 +147,7 @@ fn initialize_and_same_connection_bootstrap_are_both_required() {
 
 #[test]
 fn stale_activation_cannot_restore_an_older_generation() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = connection();
     let original = activate(7, 0);
@@ -159,7 +170,7 @@ fn stale_activation_cannot_restore_an_older_generation() {
 
 #[test]
 fn same_host_and_terminal_number_on_sibling_connection_cannot_read_existing_transfer() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let first = connection();
     let second = connection();
@@ -182,7 +193,7 @@ fn same_host_and_terminal_number_on_sibling_connection_cannot_read_existing_tran
 
 #[test]
 fn different_terminal_in_same_connection_cannot_access_other_terminal_transfer() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = connection();
     connection.bootstrap(
@@ -203,7 +214,7 @@ fn different_terminal_in_same_connection_cannot_access_other_terminal_transfer()
 
 #[test]
 fn revocation_rejects_requests_before_background_cleanup_completes() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = connection();
     service.handle(&connection, activate(7, 0));
@@ -225,7 +236,7 @@ fn revocation_rejects_requests_before_background_cleanup_completes() {
 
 #[test]
 fn mismatched_host_is_rejected_on_an_authenticated_connection() {
-    let parent = tempfile::tempdir().unwrap();
+    let parent = private_parent();
     let service = ImageStagingService::new(HostId::new("daemon-a".into()), parent.path()).unwrap();
     let connection = connection();
     let mut request = activate(7, 0);
