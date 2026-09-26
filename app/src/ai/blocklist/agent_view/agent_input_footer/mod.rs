@@ -2149,10 +2149,11 @@ impl TypedActionView for AgentInputFooter {
                 }
             }
             AgentInputFooterAction::SelectFile => {
-                // Fork based on CLI agent session: in CLI mode, open a file
-                // picker and insert/write the path; in normal mode, use the
-                // standard AI file attachment flow.
-                if self.is_cli_agent_session_active(ctx) {
+                // 富输入复用编辑器的文件卡片与图片预处理，保留其异步回调代次校验。
+                // 收起富输入时仍沿用普通终端的路径插入入口。
+                if self.has_active_cli_agent_input_session(ctx) {
+                    ctx.emit(AgentInputFooterEvent::SelectFile);
+                } else if self.is_cli_agent_session_active(ctx) {
                     self.select_cli_file(ctx);
                 } else {
                     ctx.emit(AgentInputFooterEvent::SelectFile);

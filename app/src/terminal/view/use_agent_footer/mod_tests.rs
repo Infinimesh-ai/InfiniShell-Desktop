@@ -11,11 +11,12 @@ use crate::ai::agent::conversation::AIConversationId;
 use crate::ai::agent::task::TaskId;
 use crate::ai::agent::{AIAgentInput, ServerOutputId, UserQueryMode};
 use crate::ai::blocklist::agent_view::AgentViewEntryOrigin;
+use crate::ai::blocklist::agent_view::agent_input_footer::AgentInputFooterAction;
 use crate::ai::blocklist::block::cli_controller::UserTakeOverReason;
 use crate::ai::blocklist::model::{
     AIBlockModel, AIBlockOutputStatus, AIRequestType, OutputStatusUpdateCallback,
 };
-use crate::ai::blocklist::{AIBlock, ClientIdentifiers};
+use crate::ai::blocklist::{AIBlock, ClientIdentifiers, InputConfig, InputType};
 use crate::ai::llms::LLMId;
 use crate::features::FeatureFlag;
 use crate::settings::AISettings;
@@ -1150,3 +1151,60 @@ mod input_approval_guard_tests;
 
 #[path = "file_submission_tests.rs"]
 mod file_submission_tests;
+
+#[test]
+fn rich_cli_picker_without_plugin_uses_attachment_flow_and_preserves_shell_lock() {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+        App::test((), move |mut app| async move {
+            let terminal = prepare_rich_cli_test(&mut app, agent);
+            let writes = collect_cli_test_writes(&mut app, &terminal);
+            let selected = Rc::new(RefCell::new(0));
+            let captured = selected.clone();
+            let footer = terminal.read(&app, |view, ctx| {
+                view.use_agent_footer.as_ref(ctx).agent_input_footer.clone()
+            });
+            app.update(|ctx| {
+                ctx.subscribe_to_view(&footer, move |_, event, _| {
+                    if matches!(event, AgentInputFooterEvent::SelectFile) {
+                        *captured.borrow_mut() += 1;
+                    }
+                });
+            });
+            terminal.update(&mut app, |view, ctx| {
+                let session = CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap();
+                assert!(session.listener.is_none());
+                assert!(!session.received_rich_notification);
+                view.input.update(ctx, |input, ctx| {
+                    input.ai_input_model().update(ctx, |model, ctx| {
+                        model.set_input_config(
+                            InputConfig {
+                                input_type: InputType::Shell,
+                                is_locked: true,
+                            },
+                            false,
+                            None,
+                            ctx,
+                        );
+                    });
+                    input.insert_into_cli_agent_rich_input("保留草稿", ctx);
+                });
+                footer.update(ctx, |footer, ctx| {
+                    footer.handle_action(&AgentInputFooterAction::SelectFile, ctx)
+                });
+            });
+            // 无头选择器返回取消；验证真实 footer 事件接到了附件入口且没有立即写入 PTY。
+            Timer::after(Duration::from_millis(50)).await;
+            assert_eq!(*selected.borrow(), 1);
+            assert!(writes.borrow().is_empty());
+            terminal.read(&app, |view, ctx| {
+                let input = view.input.as_ref(ctx);
+                assert_eq!(input.buffer_text(ctx), "保留草稿");
+                assert!(!input.ai_input_model().as_ref(ctx).input_type().is_ai());
+                assert!(input.ai_input_model().as_ref(ctx).is_input_type_locked());
+                assert!(view.ai_context_model.as_ref(ctx).pending_files().is_empty());
+            });
+        });
+    }
+}

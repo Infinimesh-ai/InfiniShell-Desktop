@@ -114,12 +114,12 @@
       "G10 Claude V2受审创建文件",
       "G02 Grok图片入口遗漏修复"
     ],
-    "status": "工作区整合后内置门禁与限定在线链通过；待提交后同源码绑定及相关平台验证，原 Goal 未完成",
+    "status": "已整合提交并推送；36个最终构建源文件与6790b185 Git blob一致，run36176479030 Linux和Windows相关门禁均通过，原Goal未完成",
     "closed_gaps": [],
     "local_gate_scope": "内置首轮 runtime1038/53跳过；修正邮箱ACK后 fixed轮 runtime1044/53跳过，i18n11、check和build通过。随后 joined重放修正的 replay-fixed轮 coordinator91/4跳过、i18n11、check和build通过；各轮来源分别绑定，未把跳过在线项计为通过。Windows附件断言已修且本地footer45通过，同提交Windows复验仍待补。 恢复清单/隔离与ACK顺序后续定向复验：coordinator101/4跳过、i18n11、check/build通过；此前task-manager46通过。",
     "claude_image_skill_scope": "固定2.1.280/Opus5.5 macOS arm64生产适配器Inherit单技能：两独立PNG、两次精确Skill AllowOnce、同nativeID冷恢复及两代自然退出清理通过；libtest ec718473…、supervisor48018a00…，source摘要绑定工作区。",
     "source_snapshot_sha256": "05e7fcbb8d4e8ef98e924ccf1b17426564239b3b2313639ab34a4fc100306461",
-    "source_binding": "baseline84102bb1c的36个工作区源码摘要，最终恢复写入顺序构建；测试与监督者各自摘要见claude-recovery-local-gates-20260926。原在线结果仍绑定此前各自构建，未回填为新程序通过。提交后须核对Git blob并完成相关平台验证。",
+    "source_binding": "36个最终恢复源码与6790b185 Git blob逐字节一致；commit-binding.safe.json摘要613cb19968667392a08829f4f831030af6da4a2fca7d9fa58ef538e4e6b80060。原在线结果仍绑定此前各自构建，未回填为新程序通过。",
     "grok_gui_scope": "macOS arm64、1.0.41/grok-4.7、Inherit无技能：两张独立PNG实际识色；新进程同nativeID冷恢复前消息仍1条；第二轮完成后重启精确重关联同host/native进程、代次2、消息2条且未重发。两代自然exit0并有清理回执；两轮分别绑定源码/签名后应用摘要。",
     "grok_skill_native_scope": "仅默认profile显式leader原生校准：同轮双技能首项原生展开、后项read_file读完整正文；热新增须显式reload，刷新覆盖同leader两会话而非单session。零审批请求，不计产品adapter、父权限上限、GUI或跨平台。",
     "claude_skill_gui_scope": "三轮真实 GUI（双技能、热新增、PNG加单技能）共5次精确Skill AllowOnce，原生历史模型为claude-opus-5-5且图片字节摘要匹配；恢复修复前错误及原始记录保留。修复构建重关联同宿主/原生进程、同会话和代次3，仍3条输入，原生历史字节不变；正常断开exit0并确认清理。英文和简体中文相关说明、技能列表、消息与历史结果可读。模型轮次与重关联程序分别绑定各自源码/二进制，不宣称新构建重跑模型。跨平台仍待补，不关闭G05/G06。",
@@ -132,9 +132,22 @@
       "gui-claude-hot-skills-20260926/index.safe.json": "a13e13a571adec83aae6361398313dda3e7cf47342301c091f1840d70079d737",
       "g07-picker-negative-20260926/index.safe.json": "f41dad825484fc447a7fe03a534808011341eaa97b1143d591da4e2475ae5ea1",
       "g07-picker-recheck-20260926/index.safe.json": "653e648cd37a62a1fa1b74d19f726d3edde34af6a20788c0e097b70cbc926b7e",
-      "claude-recovery-local-gates-20260926/index.safe.json": "c446536dc2eb113f75941666bc562963619aabc48ec975799ba4064e0a9baa0a"
+      "claude-recovery-local-gates-20260926/index.safe.json": "c446536dc2eb113f75941666bc562963619aabc48ec975799ba4064e0a9baa0a",
+      "g07-picker-gui-20260926/index.safe.json": "1432fbbf90e6b9b0e82a2cffb6826e6082f112c705c74d07eb872e6ca6d59162"
     },
     "claude_recovery_fix": "固定2.1.280/Inherit只有同代NativeProtocol确认的技能前缀追加可恢复；真正身份冲突保留终态结果并阻止冷恢复。固定Claude新增技能先保存原生ACK再更新清单，宿主水位最后推进；ACK或清单写入失败与重复重放的真实SQLite回归通过且零重发。最终来源05e7fcbb…：i18n11、coordinator101/4跳过、check/build通过；上轮未再修改的task-manager46通过。",
-    "g07_gui_scope": "macOS Codex 0.156.1普通终端真实附加文件入口能选择txt，但仅插入路径正文，没有文件卡片。两会话零模型输入并正常退出；原点击未选中的类型过滤误判已撤回，原截图及复核均保留。入口接线待补，不关闭G07。"
+    "g07_gui_scope": "原入口仅插正文负例保留；后续6790b185基线四文件增量接通选择器PendingFile卡片。macOS Codex0.156.1/gpt-6-luna英文GUI双文件原生shell读取正例，中文原模型转TextEdit被拒的负例保留；两语言卡片可读。Grok1.0.41两卡片可建，发送拒绝且草稿保留，零模型轮次；Claude已认证但普通TUI首次向导未完成，未执行此GUI模型链。G07不关闭。",
+    "implementation_commit": "6790b185a0c0bc581f804edf975960047df85db7",
+    "cloud_run": 36176479030,
+    "cloud_scope": "Linux x64及Windows x64定向工作流均成功；不包含已认证在线模型、物理IME或Grok专属双语完整布局"
+  },
+  "file_picker_increment": {
+    "baseline_commit": "6790b185a0c0bc581f804edf975960047df85db7",
+    "status": "四文件增量本地门禁和限定GUI验证通过，待提交绑定及同提交相关平台验证",
+    "source_manifest_sha256": "e02d7239b30e43019a209688348eb23bf7b76246b0798267d291d00ebb73477e",
+    "local_gates": "i18n11、editor6、footer46、cargo check -p warp、应用构建通过",
+    "signed_gui_sha256": "d383765f2e24f0f49747e25a1ec3f8d69a9f2237bd9b0586c8a986eeb17d2688",
+    "closed_gaps": [],
+    "localization": "无需本地化变更；既有附加文件入口语义正确。Codex英文/简体中文两卡片和正文布局已实际检查，Grok英文未发送提示完整。"
   }
 }

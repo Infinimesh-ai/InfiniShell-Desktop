@@ -5,10 +5,15 @@ use std::time::Duration;
 
 use warpui::r#async::Timer;
 use warpui::platform::WindowStyle;
-use warpui::{AddSingletonModel, App, TypedActionView, ViewHandle};
+use warpui::{AddSingletonModel, App, EntityId, TypedActionView, ViewHandle};
 
 use super::*;
 use crate::editor::{AttachedImage, EditorAction, ImageContextOptions};
+use crate::terminal::CLIAgent;
+use crate::terminal::cli_agent_sessions::{
+    CLIAgentInputState, CLIAgentSession, CLIAgentSessionContext, CLIAgentSessionStatus,
+};
+use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use crate::workspace::ToastStack;
 
@@ -176,6 +181,95 @@ fn an_invalid_image_rejects_the_whole_managed_batch() {
         assert!(events.borrow().is_empty());
         editor.read(&app, |editor, _| {
             assert!(editor.image_input.pending.is_none())
+        });
+    });
+}
+
+fn set_cli_picker_session(app: &mut App, terminal_id: EntityId, agent: CLIAgent) {
+    CLIAgentSessionsModel::handle(app).update(app, |sessions, ctx| {
+        sessions.set_session(
+            terminal_id,
+            CLIAgentSession {
+                agent,
+                status: CLIAgentSessionStatus::InProgress,
+                session_context: CLIAgentSessionContext::default(),
+                input_state: CLIAgentInputState::Closed,
+                should_auto_toggle_input: false,
+                listener: None,
+                remote_host: None,
+                plugin_version: None,
+                draft_text: None,
+                custom_command_prefix: None,
+                received_rich_notification: false,
+            },
+            ctx,
+        );
+    });
+}
+
+#[test]
+fn cli_picker_file_callback_adds_cards_without_inserting_paths_into_text() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let editor = terminal.read(&app, |view, ctx| view.input().as_ref(ctx).editor().clone());
+        set_cli_picker_session(&mut app, terminal.id(), CLIAgent::Codex);
+        let directory = tempfile::tempdir().unwrap();
+        let paths = [
+            directory.path().join("第一份 文件.txt"),
+            directory.path().join("second quoted file.txt"),
+        ];
+        for path in &paths {
+            std::fs::write(path, "无需在选择阶段读取正文").unwrap();
+        }
+        editor.update(&mut app, |editor, ctx| {
+            editor.user_insert("保留草稿", ctx);
+            let scope = editor.image_input_scope(ctx);
+            editor.handle_action(
+                &EditorAction::ProcessNonImageFiles {
+                    file_paths: paths
+                        .iter()
+                        .map(|path| path.to_string_lossy().into_owned())
+                        .collect(),
+                    scope,
+                },
+                ctx,
+            );
+            let context = editor.context_model.as_ref().unwrap().as_ref(ctx);
+            let files = context.pending_files();
+            assert_eq!(files.len(), 2);
+            assert_eq!(files[0].file_path, paths[0]);
+            assert_eq!(files[1].file_path, paths[1]);
+            assert!(files.iter().all(|file| file.mime_type == "text/plain"));
+            assert_eq!(editor.buffer_text(ctx), "保留草稿");
+            assert!(context.pending_images().is_empty());
+        });
+    });
+}
+
+#[test]
+fn replaced_cli_session_rejects_old_file_picker_callback() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let editor = terminal.read(&app, |view, ctx| view.input().as_ref(ctx).editor().clone());
+        set_cli_picker_session(&mut app, terminal.id(), CLIAgent::Codex);
+        let scope = editor.read(&app, |editor, ctx| editor.image_input_scope(ctx));
+        set_cli_picker_session(&mut app, terminal.id(), CLIAgent::Claude);
+        editor.update(&mut app, |editor, ctx| {
+            editor.handle_action(
+                &EditorAction::ProcessNonImageFiles {
+                    file_paths: vec!["/missing/stale.txt".into()],
+                    scope,
+                },
+                ctx,
+            );
+            let context = editor.context_model.as_ref().unwrap().as_ref(ctx);
+            assert!(context.pending_files().is_empty());
+            assert!(context.pending_images().is_empty());
+            assert!(editor.buffer_text(ctx).is_empty());
         });
     });
 }

@@ -6330,11 +6330,14 @@ impl Input {
 
     fn select_image(&mut self, ctx: &mut ViewContext<Self>) {
         self.focus_input_box(ctx);
-        self.ensure_agent_mode_for_ai_features(
-            true,
-            Some(InputTypeAutoDetectionSource::AttachmentForcedAi),
-            ctx,
-        );
+        // CLI 富输入的附件属于当前 CLI 草稿，不为文件选择切换用户锁定的输入模式。
+        if !CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id) {
+            self.ensure_agent_mode_for_ai_features(
+                true,
+                Some(InputTypeAutoDetectionSource::AttachmentForcedAi),
+                ctx,
+            );
+        }
 
         // Update image context options immediately after switching to AI mode
         // to ensure attach_images has the correct state
