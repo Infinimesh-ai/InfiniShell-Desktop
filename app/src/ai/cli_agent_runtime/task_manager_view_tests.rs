@@ -393,7 +393,10 @@ fn grok_image_picker_tracks_fixed_version_permission_and_draft_skills() {
                     ),
                 )];
                 view.refresh_managed_input(ctx);
-                assert!(!view.prompt.as_ref(ctx).image_context_options.is_enabled());
+                assert_eq!(
+                    view.prompt.as_ref(ctx).image_context_options.is_enabled(),
+                    enabled
+                );
                 view.managed_input.attachments.skills.clear();
                 view.managed_input.processing_images = true;
                 view.refresh_managed_input(ctx);
@@ -416,7 +419,7 @@ fn grok_image_picker_keeps_saved_session_skill_and_model_boundaries() {
             (
                 "bound-skill",
                 serde_json::json!({"permission_policy":"Inherit", "cli_version":"1.0.41", "model":null, "selected_skills":[{"name":"bound", "path":std::env::temp_dir().join("SKILL.md") }]}),
-                false,
+                true,
             ),
             (
                 "other-model",

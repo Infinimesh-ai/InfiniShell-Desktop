@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
+  "product_behavior_freeze": "3dbe79e588c26e0485a9c1f4d834c9dc96886efa",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -318,9 +318,9 @@
     "closed_gaps": []
   },
   "current_work_order": {
-    "updated_at": "2026-09-26",
-    "mode": "code_checkpoint_ready_for_joint_acceptance",
-    "user_direction": "已先完成当前已知功能接线，并收尾无需人工的本地及相关 Linux/Windows 定向门禁。按用户安排，真实 GUI、中文输入法、在线模型及来源升级恢复等验收留待后续共同进行；完整Goal保持未完成。",
+    "updated_at": "2026-09-27",
+    "mode": "code_first_incremental_integration",
+    "user_direction": "优先功能代码开发；提交仍运行最小门禁。GUI、物理输入法及完整在线验收留待共同测试；必要原生接口校准单独记范围，Goal仍未完成。",
     "goal_acceptance_unchanged": true,
     "integration_base_commit": "76dcfdc60254077edaa86175722591333526c05c",
     "g01_g03_worktree": ".worktrees/grok-owned-terminal",
@@ -334,7 +334,7 @@
       "G07": "收起CLI富输入时选择文件已改为带输入代次的单一事件：TerminalView打开编辑器，再延后到模型事件完成后调用既有附件选择器，生成卡片；旧裸路径异步回调兼容保留，但新选择入口不再产生它。未运行GUI或回归。"
     },
     "new_tests_run": true,
-    "new_online_model_or_gui_runs": false,
+    "new_online_model_or_gui_runs": "新增两次Grok原生图片技能接口校准，无GUI；不属于完整产品验收。",
     "commit_policy": "功能代码先整合；提交推送前仍执行仓库要求的最小编译和本地化门禁，真实验收不被取消。",
     "g03_unverified_source_snapshot": {
       "archive": "validation/grok-owned-images-code-494927897b53",
@@ -373,8 +373,8 @@
     "interrupted_parallel_batch": "三代理按不重叠写入域继续安装来源事务、受审命令、远程原生图片消费者；主代理整合共享RPC/插件/GUI/状态。",
     "localization_review": "固定技能、受审命令及命令+技能组合、远程Codex/Grok菜单/帮助/失败、Claude原图消费和未知状态说明均同步英中。Grok npm/Homebrew无需新增文案，复用更新状态。本地 cargo check 与 i18n 11 项通过；真实双语布局后置。",
     "remaining_code_scope": [
-      "原清单当前已知功能接线已完成并提交；macOS arm64 编译和 i18n 资源门禁通过，后续运行发现的问题继续处理，不能以此关闭 Gap。",
-      "本批相关定向门禁已通过：macOS arm64本地，b78b62a48的Windows x64，以及仅测试夹具修正后17c1dcc51的Linux x64。三平台各模式真实验收、来源升级恢复、SSH/tmux与双语布局仍待完成，按用户要求留待后续联测。"
+      "主要G01–G10入口已接线，Claude图片多技能已提交，Grok图片技能本增量已接；不能称代码存在即全部功能可用。",
+      "Windows真实npm候选探针仍拒绝系统conhost子映像，保持拒绝并单独定位；失败清理本轮已确认。其它安装布局/原生策略限制和真实平台链仍按缺项保留，未获用户范围删减。"
     ],
     "g08_grok_remote_in_progress": "远端ticket/专属leader服务、有界RPC、真实PTY wrapper及固定1.0.41 exec已接线；同连接/终端/代次门禁、同步撤销、查询恢复、GUI caller、重启关联与收起输入框的native事件入口已整合。当前Mac ARM64/Linuxx64远端、Mac ARM64/Linuxx64/Windowsx64客户端，未验收。",
     "g09_codex_npm_code": {
@@ -1489,7 +1489,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "ca37b9cbf2738ea4059c0a865bff2b1492ba1dcf",
-  "latest_increment": "claude_image_multiskill_increment",
+  "latest_increment": "grok_image_skill_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -1615,8 +1615,8 @@
   },
   "claude_image_multiskill_increment": {
     "date": "2026-09-27",
-    "implementation_commit": null,
-    "status": "实现已冻结，本地提交门禁通过；同提交Linux/Windows待运行，真实组合与布局未验",
+    "implementation_commit": "3dbe79e588c26e0485a9c1f4d834c9dc96886efa",
+    "status": "已提交推送，本地门禁及同提交Linux通过；Windows三项后续检查失败，真实组合与布局未验",
     "scope": "G05/G06：固定Claude 2.1.280图片与已注册多技能；另修正G09 Windows DEBUG_EVENT_CODE字段类型",
     "implementation": "准备预算及实际图片帧共用完整有序技能名；全部注册ACK前不派发，保留重复消息抑制、注册失败原子性和图片原字节。固定技能画像核验注册副本、父权限集合和逐次原生审批；Inherit遵循会话原设置。",
     "compatibility": "普通Inherit零/单技能图片编码保持；固定技能单技能加图片改用共享前缀，旧字节收据不能证明该新分支。Grok图片技能组合未因此放开。",
@@ -1630,11 +1630,70 @@
     },
     "localization": "英文与简体中文图片说明已同步，删除旧多技能拒绝提示；实际双语布局仍待联测。",
     "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/claude-image-multiskill-20260927",
-    "same_commit_ci": null,
+    "same_commit_ci": {
+      "run_id": 36272432719,
+      "head_sha": "3dbe79e588c26e0485a9c1f4d834c9dc96886efa",
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36272432719",
+      "status": "completed",
+      "platforms": [
+        "linux-x64",
+        "windows-x64"
+      ],
+      "macos_intel": false,
+      "full_workspace": false,
+      "gui_or_model": false,
+      "conclusion": "failure",
+      "linux": "通过：主套件1310/1310，Node闭包1/1，监督5/5；无模型范围分别计证",
+      "windows": "失败：主套件908/909，一项测试伪句柄错误；显式atomic调试4/5，conhost先于目标未绑定映像被拒；真实npm同因失败，cleanup_confirmed=true",
+      "new_claude_tests": "两平台新增九项组合/准备测试通过",
+      "archive": "ci-36272432719",
+      "artifact_collection_sha256": "562a5eb6e6221a77ebca64c19ce7d8d528b23e37238496aeac1b2e8cb45f7f62",
+      "job_logs_collection_sha256": "9ab02676308921444c163d987cb59942734d0be6c6893a897dc661346741d8c4",
+      "archive_scope": "五个小产物ZIP完整摘要已核；462436244B Codex ZIP仅保留37个所选原字节成员，完整ZIP及官方整包摘要未核。run日志ZIP不支持Range，已另存两平台独立job原文本。"
+    },
     "native_combination_verified": false,
     "closed_gaps": [],
     "goal_complete": false,
     "first_test_build_failure": "i18n-01在rust-objcopy时空间耗尽，3168B损坏产物及日志保留；未执行测试。源码未变，仅warp测试包停用重复strip后另存02结果。",
-    "cache_cleanup": "仅8个停用mcp/ai库，105871728逻辑字节；实际native程序/官方包/恢复树及原证据全部保留。"
+    "cache_cleanup": "仅8个停用mcp/ai库，105871728逻辑字节；实际native程序/官方包/恢复树及原证据全部保留。 后续仅清理另117个停用Cargo中间文件和6空目录，实际可用空间增加426930176字节，身份/SHA及保留产物核对收据另存。",
+    "source_commit_binding_sha256": "90d1e0ffe91c7c3c60fb7b772765a9bfc1d4a1373d6618c28e3baedda05e8777",
+    "prepared_app_scope": "既有8876fa3c5内置ARM64联测包不包含本次Claude组合修改；未把旧包计作本次功能验收。"
+  },
+  "grok_image_skill_increment": {
+    "date": "2026-09-27",
+    "implementation_commit": "待本增量提交后绑定",
+    "status": "代码已完成，本地最小门禁通过；待提交及同提交平台验证",
+    "scope": "G02/G06：固定Grok 1.0.41/grok-4.7、Inherit根会话的PNG与单/多技能组合",
+    "implementation": "私有独占leader和本次输入技能决定组合门禁；原生slash引用与类型化PNG共用完整帧预算。排队及目录刷新完整ACK后重验版本、模型、来源路径/摘要和图片原字节；不注入技能正文，不扩大固定权限策略。GUI选择器与草稿组合已接，失败保留。",
+    "compatibility": "无技能图片保留原门禁，无图零/单技能编码保持；组合仍要求原生目录确认。多技能首项原生展开、其余可能由原生read_file加载，不宣称全部slash同步展开。",
+    "native_calibration": {
+      "archive": "validation/grok-image-skill-calibration-20260927",
+      "audit_sha256": "b58d6ba250e8719239fa56d01f59d4e58fcf278128da08bfcd0ad02216d5af08",
+      "platform": "macOS ARM64",
+      "version": "1.0.41 (4220f3b224a6)",
+      "model": "grok-4.7",
+      "model_inputs": 2,
+      "scope": "原生ACP单技能+PNG；新leader冷加载同历史后双技能+PNG。两轮图片字节、技能来源/结果和独立识色通过；第二技能实际read_file完整读取。",
+      "exclusions": "不代替应用适配器、GUI、热新增图片组合、审批允许/拒绝、父子权限或跨平台验收。",
+      "cleanup": "两轮只清理本次私有leader/client，确认退出；首轮清理路径别名误拒及后续精确身份复验保留。"
+    },
+    "archive": "validation/grok-image-skill-integration-20260927",
+    "localization": "英文与简体中文两处Grok说明同步，无变量变化；真实布局后置。",
+    "local_gates": {
+      "platform": "macOS ARM64",
+      "source_snapshot": "source-snapshot-02.safe.json",
+      "cargo_check": "通过",
+      "i18n": "11通过",
+      "grok": "464通过/15忽略",
+      "managed_input": "29通过",
+      "task_manager": "59通过",
+      "actionlint": "通过",
+      "diff_check": "通过"
+    },
+    "same_commit_ci": "未派发",
+    "closed_gaps": [],
+    "goal_complete": false,
+    "first_local_result": "check通过、i18n11通过、Grok464通过/15忽略；managed_input28通过/1失败，旧全拒绝断言尚未随组合功能更新，已移除该过期断言并保留重复/缺失技能失败测试；原日志不覆盖，02门禁已全部通过，失败不回填。",
+    "windows_test_fixture": "同步修正failed_exit_continue_keeps_process_and_pending_event的伪句柄夹具，改用OpenProcess真实句柄RAII，生产校验未改。"
   }
 }

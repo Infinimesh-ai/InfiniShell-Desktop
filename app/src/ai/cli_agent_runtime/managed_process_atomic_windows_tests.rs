@@ -1218,10 +1218,14 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     let lease = prepare(&fixture.expected()).unwrap();
     let mut session = lease.prepare_image_debug_session().unwrap();
     let process_id = unsafe { GetCurrentProcessId() };
+    // 调试事件提供真实句柄；避免把 GetCurrentProcess 的 -1 伪句柄交给生产校验。
+    let original =
+        unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) }.unwrap();
+    let original = unsafe { OwnedHandle::from_raw_handle(original.0) };
     session.root_process_id = process_id;
     session.processes.insert(
         process_id,
-        duplicate_process_handle(unsafe { GetCurrentProcess() }).unwrap(),
+        duplicate_process_handle(HANDLE(original.as_raw_handle())).unwrap(),
     );
     // 当前测试进程不是 debuggee，且线程 0 无效；真实 ContinueDebugEvent 必须失败。
     session.pending_event = Some((process_id, 0, EXIT_PROCESS_DEBUG_EVENT));

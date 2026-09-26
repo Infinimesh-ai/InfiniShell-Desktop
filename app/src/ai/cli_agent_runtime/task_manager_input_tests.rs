@@ -259,7 +259,7 @@ fn legacy_grok_draft_keeps_the_single_skill_limit() {
 }
 
 #[test]
-fn image_draft_cannot_mix_with_a_selected_grok_skill() {
+fn current_grok_image_skill_draft_keeps_both_parts_and_rechecks_permission_and_version() {
     App::test((), |mut app| async move {
         let project = tempfile::tempdir().unwrap();
         let manager = manager_view(&mut app);
@@ -274,12 +274,24 @@ fn image_draft_cannot_mix_with_a_selected_grok_skill() {
                 file_name: "fixture.png".into(),
                 is_figma: false,
             });
+            view.select_composer_skill(&alpha, view.input_generation, ctx)
+                .unwrap();
+            assert_eq!(view.parsed_composer_skills(ctx).unwrap().len(), 1);
+            view.permission = PermissionPolicy::GrokRestrictedFilesV1;
+            assert!(view.parsed_composer_skills(ctx).is_err());
+            assert_eq!(view.managed_input.attachments.images.len(), 1);
+            assert_eq!(view.managed_input.attachments.skills, vec![alpha.clone()]);
+            view.permission = PermissionPolicy::Inherit;
+        });
+        installation(&mut app, "1.0.42");
+        manager.update(&mut app, |view, ctx| {
+            assert!(view.parsed_composer_skills(ctx).is_err());
             assert!(
                 view.select_composer_skill(&alpha, view.input_generation, ctx)
                     .is_err()
             );
-            view.managed_input.attachments.skills.push(alpha);
-            assert!(view.parsed_composer_skills(ctx).is_err());
+            assert_eq!(view.managed_input.attachments.images.len(), 1);
+            assert_eq!(view.managed_input.attachments.skills, vec![alpha]);
         });
     });
 }

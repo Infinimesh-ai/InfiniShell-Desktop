@@ -169,19 +169,11 @@ fn invalid_image_batch_fails_before_creating_assets() {
 }
 
 #[test]
-fn unsupported_cli_and_missing_skills_do_not_silently_remove_content() {
+fn duplicate_or_missing_skills_fail_before_persisting_images() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let image = image_context();
     let skill = skill(directory.path());
-    assert!(prepare_managed_input(
-        Harness::Grok,
-        "图片与技能".to_owned(),
-        &[image.clone()],
-        vec![skill.clone()],
-        &store
-    )
-    .is_err());
     assert!(prepare_managed_input(
         Harness::Claude,
         "多个技能".to_owned(),
@@ -789,7 +781,7 @@ fn restoring_images_rejects_symlink_assets_and_store() {
 }
 
 #[test]
-fn grok_preserves_text_and_selected_skill_but_rejects_image_skill_mix_before_writing() {
+fn grok_preserves_text_and_selected_skill_with_typed_image() {
     let directory = TempDir::new().unwrap();
     let store = directory.path().join("local-cli-attachments");
     let text = "中文与 English\n文件上下文：note.txt\n评审意见：保留末尾换行";
@@ -815,13 +807,25 @@ fn grok_preserves_text_and_selected_skill_but_rejects_image_skill_mix_before_wri
         ]
     );
     assert!(!store.exists());
-    assert!(prepare_managed_input(
+    let image = image_context();
+    let prepared = prepare_managed_input(
         Harness::Grok,
         text.into(),
-        &[image_context()],
+        &[image.clone()],
         vec![skill(directory.path())],
-        &store
+        &store,
     )
-    .is_err());
-    assert!(!store.exists());
+    .unwrap();
+    assert_eq!(prepared[0], InputContent::Text(text.into()));
+    assert_eq!(
+        fs::read(local_image(&prepared)).unwrap(),
+        STANDARD.decode(image.data).unwrap()
+    );
+    assert_eq!(
+        prepared[2],
+        InputContent::Skill {
+            name: "local-review".into(),
+            path: directory.path().join("SKILL.md")
+        }
+    );
 }

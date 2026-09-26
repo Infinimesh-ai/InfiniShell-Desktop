@@ -1401,12 +1401,13 @@ impl GrokProtocol {
             .map_err(RuntimeError::Protocol)
     }
 
-    fn image_input_verified(&self) -> bool {
-        // 1.0.41 的已认证 ACP 实测接收图片，但仍声明 image=false；此校准仅绑定该版本和模型。
+    fn image_input_verified(&self, with_skills: bool) -> bool {
+        // 原生仍声明 image=false；组合校准额外要求私有独占 leader，保留原无技能图片范围。
+        // 技能目录另在实际派发前逐项核对，不能以会话已选技能为空代替来源确认。
         self.probed_version == Some(ROOT_VERSION)
             && self.paired_version == Some(ROOT_VERSION)
             && self.production_root_verified()
-            && self.options.selected_skills.is_empty()
+            && (!with_skills || self.skill_updates_verified())
             && self
                 .reported_metadata
                 .models
@@ -2537,11 +2538,14 @@ impl GrokProtocol {
                 let mut selected_skills = Vec::new();
                 let mut selected_names = HashSet::new();
                 let mut refresh_skills = false;
+                let with_skills = input
+                    .iter()
+                    .any(|part| matches!(part, InputContent::Skill { .. }));
                 for item in &input {
                     match item {
                         InputContent::Text(_) => {}
                         InputContent::LocalImage(_) => {
-                            if !self.image_input_verified() {
+                            if !self.image_input_verified(with_skills) {
                                 return rejected_command(
                                     command.message_id,
                                     crate::t!(
@@ -2844,6 +2848,21 @@ impl GrokProtocol {
     }
 
     fn start_prompt(&mut self, mut queued: QueuedPrompt) -> Effects {
+        // 排队或刷新期间版本、模型与连接归属可能改变；所有图片路径在派发前重新核对。
+        if queued
+            .input
+            .iter()
+            .any(|part| matches!(part, InputContent::LocalImage(_)))
+            && !self.image_input_verified(!queued.skills.is_empty())
+        {
+            return rejected_command(
+                queued.message_id,
+                crate::t!(
+                    "cli-agent-input-images-unverified",
+                    cli = Harness::Grok.display_name()
+                ),
+            );
+        }
         if queued.refresh_skills {
             if !self.skill_updates_verified()
                 || self.pending.is_some()
@@ -2918,27 +2937,18 @@ impl GrokProtocol {
                 .skill_catalog
                 .as_ref()
                 .ok_or_else(skills::unavailable)
-                .and_then(|catalog| catalog.encode_selected(queued.input, &queued.skills));
+                .and_then(|catalog| {
+                    catalog.encode_selected(
+                        queued.input,
+                        &queued.skills,
+                        &self.profile_state_dir.join("local-cli-attachments"),
+                    )
+                });
             match result {
                 Ok(content) => content,
                 Err(error) => return rejected_command(queued.message_id, error),
             }
         } else {
-            // 排队期间模型可能改变、附件可能失效；发出前再次核对，失败不发送部分内容。
-            if queued
-                .input
-                .iter()
-                .any(|part| matches!(part, InputContent::LocalImage(_)))
-                && !self.image_input_verified()
-            {
-                return rejected_command(
-                    queued.message_id,
-                    crate::t!(
-                        "cli-agent-input-images-unverified",
-                        cli = Harness::Grok.display_name()
-                    ),
-                );
-            }
             match encode_prompt_content(
                 queued.input,
                 &self.profile_state_dir.join("local-cli-attachments"),

@@ -6,13 +6,13 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use ai::skills::{SkillProvider, SkillScope, parse_skill_content_at_location};
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use warp_util::local_or_remote_path::LocalOrRemotePath;
 
 use super::super::InputContent;
 use super::super::local_skills::SelectedLocalSkill;
-use super::{MAX_LINE_BYTES, MAX_NATIVE_IDENTITIES};
+use super::{MAX_LINE_BYTES, MAX_NATIVE_IDENTITIES, encode_prompt_content};
 use crate::terminal::CLIAgent;
 use crate::terminal::input::skills::is_user_invocable;
 
@@ -215,10 +215,11 @@ impl SkillCatalog {
         &self,
         input: Vec<InputContent>,
         selected: &[SelectedSkill],
+        attachment_store: &Path,
     ) -> Result<Vec<Value>, String> {
         self.verify_selection(selected)?;
         let content = if selected.len() == 1 {
-            self.encode(input, &selected[0])?
+            self.encode(input, &selected[0], attachment_store)?
         } else {
             // 1.0.41 默认 profile 原生展开首个 slash，后续技能由模型按原生目录加载。
             // 每个技能保留独立文本块；不复制正文、不伪造工具调用或审批。
@@ -226,17 +227,18 @@ impl SkillCatalog {
                 .iter()
                 .map(|skill| {
                     self.command_for(skill)
-                        .map(|command| json!({"type":"text", "text":format!("/{command}")}))
+                        .map(|command| InputContent::Text(format!("/{command}")))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             for part in input {
                 match part {
-                    InputContent::Text(text) => content.push(json!({"type":"text", "text":text})),
+                    part @ (InputContent::Text(_) | InputContent::LocalImage(_)) => {
+                        content.push(part)
+                    }
                     InputContent::Skill { .. } => {}
-                    InputContent::LocalImage(_) => return Err(unavailable()),
                 }
             }
-            content
+            encode_prompt_content(content, attachment_store)?
         };
         if serde_json::to_vec(&content)
             .map_err(|_| unavailable())?
@@ -252,6 +254,7 @@ impl SkillCatalog {
         &self,
         input: Vec<InputContent>,
         selected: &SelectedSkill,
+        attachment_store: &Path,
     ) -> Result<Vec<Value>, String> {
         let command = self.command_for(selected)?;
         let mut content = Vec::new();
@@ -259,22 +262,22 @@ impl SkillCatalog {
         for part in input {
             match part {
                 InputContent::Text(text) => {
-                    let text = if prefixed {
-                        text
+                    if prefixed {
+                        content.push(InputContent::Text(text));
                     } else {
                         prefixed = true;
-                        format!("/{command} {text}")
-                    };
-                    content.push(json!({"type":"text", "text":text}));
+                        // 首个 slash 必须位于图片之前，才沿原生技能展开入口处理。
+                        content.insert(0, InputContent::Text(format!("/{command} {text}")));
+                    }
                 }
                 InputContent::Skill { .. } => {}
-                InputContent::LocalImage(_) => return Err(unavailable()),
+                image @ InputContent::LocalImage(_) => content.push(image),
             }
         }
         if !prefixed {
-            content.push(json!({"type":"text", "text":format!("/{command}")}));
+            content.insert(0, InputContent::Text(format!("/{command}")));
         }
-        Ok(content)
+        encode_prompt_content(content, attachment_store)
     }
 }
 

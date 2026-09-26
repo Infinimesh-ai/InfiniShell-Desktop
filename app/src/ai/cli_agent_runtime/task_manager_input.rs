@@ -291,7 +291,8 @@ impl LocalCLITaskManagerView {
             Harness::Codex | Harness::Claude => true,
             Harness::Grok => {
                 if self.permission != PermissionPolicy::Inherit
-                    || !self.managed_input.attachments.skills.is_empty()
+                    || (!self.managed_input.attachments.skills.is_empty()
+                        && !self.grok_skill_policy_available(ctx))
                     || !self
                         .verified_installation(Harness::Grok, ctx)
                         .is_some_and(|installation| {
@@ -316,7 +317,6 @@ impl LocalCLITaskManagerView {
                     })
                     .is_some_and(|options| {
                         options.permission_policy == PermissionPolicy::Inherit
-                            && options.selected_skills.is_empty()
                             && options
                                 .model
                                 .as_deref()
@@ -539,7 +539,9 @@ impl LocalCLITaskManagerView {
             if !self.grok_skill_policy_available(ctx) {
                 return Err(crate::t!("cli-agent-grok-skill-policy-required"));
             }
-            if !self.managed_input.attachments.images.is_empty() {
+            if !self.managed_input.attachments.images.is_empty()
+                && !self.managed_image_entry_supported(ctx)
+            {
                 return Err(crate::t!(
                     "cli-agent-input-images-unverified",
                     cli = Harness::Grok.display_name()
@@ -602,7 +604,9 @@ impl LocalCLITaskManagerView {
             if !self.grok_skill_policy_available(ctx) {
                 return Err(crate::t!("cli-agent-grok-skill-policy-required"));
             }
-            if !self.managed_input.attachments.images.is_empty() {
+            if !self.managed_input.attachments.images.is_empty()
+                && !self.managed_image_entry_supported(ctx)
+            {
                 return Err(crate::t!(
                     "cli-agent-input-images-unverified",
                     cli = Harness::Grok.display_name()

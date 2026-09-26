@@ -101,10 +101,11 @@ fn native_image_advertisement_does_not_expand_fixed_version_model_or_policy() {
         available_models: Vec::new(),
     });
     protocol.reported_capabilities = json!({"promptCapabilities":{"image":false}});
-    assert!(protocol.image_input_verified());
+    assert!(protocol.image_input_verified(false));
+    assert!(!protocol.image_input_verified(true));
     protocol.reported_capabilities["promptCapabilities"]["image"] = json!(true);
     protocol.probed_version = Some(CURRENT_VERSION);
-    assert!(!protocol.image_input_verified());
+    assert!(!protocol.image_input_verified(false));
     protocol.probed_version = Some(ROOT_VERSION);
     protocol
         .reported_metadata
@@ -112,7 +113,7 @@ fn native_image_advertisement_does_not_expand_fixed_version_model_or_policy() {
         .as_mut()
         .unwrap()
         .current_model_id = "unknown".into();
-    assert!(!protocol.image_input_verified());
+    assert!(!protocol.image_input_verified(false));
     protocol
         .reported_metadata
         .models
@@ -120,12 +121,18 @@ fn native_image_advertisement_does_not_expand_fixed_version_model_or_policy() {
         .unwrap()
         .current_model_id = "grok-4.7".into();
     protocol.options.permission_policy = PermissionPolicy::GrokRestrictedFilesV1;
-    assert!(!protocol.image_input_verified());
+    assert!(!protocol.image_input_verified(false));
     protocol.options.permission_policy = PermissionPolicy::Inherit;
     protocol.options.selected_skills.push(SelectedLocalSkill {
         name: "image-session-skill".into(),
         path: protocol.options.cwd.join("SKILL.md"),
     });
-    // 本轮没有技能块，也不能将纯图片证据扩大到启动时已注册技能的会话。
-    assert!(!protocol.image_input_verified());
+    // 是否组合按本次输入判断；图片与技能还必须绑定私有独占 leader。
+    assert!(protocol.image_input_verified(false));
+    assert!(!protocol.image_input_verified(true));
+    protocol.owned_skill_leader = true;
+    assert!(protocol.image_input_verified(true));
 }
+
+#[path = "grok_image_skill_tests.rs"]
+mod image_skill_tests;
