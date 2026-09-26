@@ -154,9 +154,55 @@ def environment(root, binaries, system_root, step):
 
 def npm_install_arguments(binaries, prefix, archive):
     # shim 由绑定的真实 npm 生成；不执行生命周期，也不向用户的全局 prefix 安装。
-    return [binaries["node"]["path"], binaries["npm_cli"]["path"], "install", "--global", "--prefix", str(prefix),
+    return [npm_path(binaries["node"]["path"]), npm_path(binaries["npm_cli"]["path"]), "install", "--global", "--prefix", npm_path(prefix),
             "--ignore-scripts", "--no-audit", "--no-fund", "--install-strategy=nested", "--package-lock=false",
-            "--registry=https://registry.npmjs.org/", str(archive)]
+            "--registry=https://registry.npmjs.org/", npm_path(archive)]
+
+
+def npm_path(path):
+    original = str(path)
+    result = original[4:] if original.startswith("\\\\?\\") else original
+    if os.name == "nt":
+        # npm 10.1.0 的 Arborist 不把命名空间盘符根识别为根；身份清单仍用 canonical。
+        require(re.match(r"^[A-Za-z]:\\", result), "npm_path_not_local_drive")
+        require(os.path.samefile(original, result), "npm_path_identity_changed")
+    return result
+
+
+def npm_environment(root, binaries, system_root):
+    result = environment(root, binaries, system_root, "install")
+    for name in (*ENV_PATHS, "SYSTEMROOT", "WINDIR", "COMSPEC"):
+        result[name] = npm_path(result[name])
+    result["PATH"] = os.pathsep.join(npm_path(part) for part in result["PATH"].split(os.pathsep))
+    return result
+
+
+def preserve_npm_debug_logs(root):
+    # 只读取本次新建、无认证的私有缓存；不沿 npm 错误文字查找用户全局日志。
+    require((root / ".infinishell-windows-npm-live").read_bytes() == MARKER, "npm_log_fixture_marker")
+    directory = root / "npm/cache/_logs"
+    records = []
+    if directory.exists():
+        for parent in (root, root / "npm", root / "npm/cache", directory):
+            require(stat.S_ISDIR(plain(parent).st_mode), "npm_log_parent_not_directory")
+        paths = sorted(directory.glob("*.log"))
+        require(len(paths) <= 16, "npm_log_count")
+        for index, path in enumerate(paths):
+            before = plain(path)
+            require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1 and before.st_size <= 4 * 1024**2,
+                    "npm_log_not_bounded_regular_file")
+            with path.open("rb") as stream:
+                opened = os.fstat(stream.fileno())
+                require((opened.st_dev, opened.st_ino) == (before.st_dev, before.st_ino), "npm_log_identity_changed")
+                raw = stream.read(4 * 1024**2 + 1)
+            after = plain(path)
+            require(len(raw) == before.st_size and (after.st_dev, after.st_ino, after.st_size)
+                    == (before.st_dev, before.st_ino, before.st_size), "npm_log_changed")
+            name = f"npm-debug-{index:02d}.stderr"
+            write(root / name, raw)
+            records.append({"source":path.relative_to(root).as_posix(),"copy":name,
+                            "length":len(raw),"sha256":hashlib.sha256(raw).hexdigest()})
+    write(root / "npm-debug-logs.safe.json", {"private_cache_only":True,"files":records})
 
 
 def verify_registration(root, old, receipt):
@@ -182,17 +228,20 @@ def fixture(args, case, binaries, sources, old, manager_tree, system_root):
     for relative in ("prefix", "project", "journal"):
         (root / relative).mkdir()
     write(root / ".infinishell-windows-npm-live", MARKER)
-    write(root / "npm/user.npmrc", ("prefix=" + str(root / "prefix").replace("\\", "/")
+    write(root / "npm/user.npmrc", ("prefix=" + npm_path(root / "prefix").replace("\\", "/")
         + "\nregistry=https://registry.npmjs.org/\nignore-scripts=true\naudit=false\nfund=false\n").encode())
     write(root / "npm/global.npmrc", b"")
     write(root / "home/.codex/config.toml", b"# private update acceptance; no credentials\n")
     write(root / "before-config.raw", (root / "home/.codex/config.toml").read_bytes())
     arguments = npm_install_arguments(binaries, root / "prefix", args.output / "official-inputs/openai-codex-0.155.1.tgz")
-    env = environment(root, binaries, system_root, "install")
-    with (root / "npm-install.stdout").open("xb") as stdout, (root / "npm-install.stderr").open("xb") as stderr:
-        # 超时保留现场且失败，不声称 npm 后代已清理；不尝试继续产品更新。
-        result = subprocess.run(arguments, cwd=root / "project", env=env, stdin=subprocess.DEVNULL,
-            stdout=stdout, stderr=stderr, timeout=900, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+    env = npm_environment(root, binaries, system_root)
+    try:
+        with (root / "npm-install.stdout").open("xb") as stdout, (root / "npm-install.stderr").open("xb") as stderr:
+            # 超时保留现场且失败，不声称 npm 后代已清理；不尝试继续产品更新。
+            result = subprocess.run(arguments, cwd=npm_path(root / "project"), env=env, stdin=subprocess.DEVNULL,
+                stdout=stdout, stderr=stderr, timeout=900, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+    finally:
+        preserve_npm_debug_logs(root)
     receipt = {"operation":"real_npm_private_install","arguments":arguments,"exit_code":result.returncode,
         "scripts_disabled":True,"private_prefix":str(root / "prefix"),"node":binaries["node"],
         "npm_cli":binaries["npm_cli"],"wrapper_archive_sha256":sha(Path(arguments[-1])),
