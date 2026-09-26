@@ -2,7 +2,9 @@
 
 **自动升级属于原 Goal；阶段交付，整体尚未完成。** 本文基于 `e3ef39689cd8b686dfe040b90217ed1067b4d268`（2026-09-25），固定开发／验收版本为 Codex `0.156.1`、Claude `2.1.280`、Grok `1.0.41`。不将历史渠道发现写成今日最新版，也不把本机手动更新当作产品事务通过。状态见 [CURRENT_STATUS](CURRENT_STATUS.json)，真实范围见[验证结论](VALIDATION_REPORT.md)。
 
-2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；其余恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；另有 `39941b281` 的 Linux Grok 正常升级、交换后恢复、外部改动保留、候选改动拒绝四场景通过。其他平台恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+
+`56f6da217` 已修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口与五场景验收入口；本地门禁通过，目标平台实测仍待补，未关闭 G09。无需本地化变更；详细来源和范围见[验证结论](VALIDATION_REPORT.md)。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
 

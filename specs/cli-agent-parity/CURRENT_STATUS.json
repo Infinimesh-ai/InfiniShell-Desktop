@@ -923,7 +923,7 @@
     "updated_at": "2026-09-27",
     "baseline_commit": "acc29e1549fb09e6e0dce1549af5ade469df30ef",
     "implementation_commit": "39941b2815506997198091082b92d19e11d92761",
-    "status": "39941b281源码已提交推送并绑定；Grok macOS arm64私有正常升级通过；后续2b59c8c62 Codex私有完整normal已独立复核通过，旧失败和不足3GiB历史保留；旧提交Linux/Windows编译和定向模块通过，Linux Codex实际失败为glibc ELF校验，Windows存在1项LEAK，整轮CI进行中，G09未关闭",
+    "status": "39941b281源码已推送并绑定；Mac Grok正常升级、后续2b59 Codex正常升级、39941 Linux Grok四场景分别通过；旧CI整体failure，Linux Codex ELF错误和Windows LEAK保留；G09未关闭",
     "source_binding": "source-commit-binding-01.safe.json 确认17个代码/工作流/脚本Git blob与source-snapshot-05.safe.json一致；39941b2815506997198091082b92d19e11d92761已推送并核对远端SHA。旧快照和所有原始收据保留。",
     "closed_gaps": [],
     "fixed_transactions": {
@@ -1033,7 +1033,7 @@
       "summary_sha256": "d9f7a6b51850be70a3318773f071954dae7fbdf89e56c2d954eac6f4cf713145",
       "scope": "仅固定私有安装的正常升级、完整包与用户镜像、实际 npm 只读来源查询及候选退出清理；不包含冷恢复、其余故障场景、消费者实时渠道、GUI 或模型。Documents 首轮 cleanup_unknown 不回填。"
     },
-    "workflow_receipts": "两新增npm artifact仅收集私有证据白名单；39941b281的CI编译和定向模块通过，但Linux Codex正常场景glibc ELF校验失败，Windows原生步骤有1项LEAK，整轮仍进行中。Grok npm实际回执待核；不覆盖2b59c8c62。",
+    "workflow_receipts": "39941b281 的 CI 已完成，整体 failure。Linux Grok 四个真实私有 npm 场景通过；Linux Codex 正常场景 glibc ELF 校验失败，Windows 原生步骤有 1 项 LEAK。两 npm artifact 仅收集私有证据白名单，原始日志和产物已封存并分别复核；不覆盖后续源码。",
     "receipt_copies": {
       "grok_cache_normal": {
         "files": 48,
@@ -1117,7 +1117,7 @@
       "run_id": 36257833211,
       "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36257833211",
       "head_sha": "39941b2815506997198091082b92d19e11d92761",
-      "status": "in_progress",
+      "status": "completed",
       "run_linux": true,
       "run_windows": true,
       "run_macos_intel": false,
@@ -1127,7 +1127,7 @@
       "run_grok_npm_updates": true,
       "initial_receipt": "ci-36257833211/initial.safe.json",
       "macos_intel_jobs": "both_skipped",
-      "completed_scope": "Linux/Windows编译和定向模块已通过；整轮仍在运行，不将尚未取得的真实事务结果记为通过。",
+      "completed_scope": "Linux/Windows编译和定向模块通过；Linux Codex npm失败，Grok npm四场景成功；Windows作业成功但保留1项LEAK。新隔离前置和后续解析增量不继承本轮通过。",
       "excluded_increment": "2b59c8c62c7c46bc30211a9872f966c52317202e",
       "environment_preflight": {
         "linux": {
@@ -1172,7 +1172,11 @@
         "step_passed": 5,
         "step_leaky": 1,
         "scope": "原始LEAK保留；本轮未进一步诊断或重跑，不能宣称完全无残余进程/句柄。"
-      }
+      },
+      "conclusion": "failure",
+      "final_receipt": "ci-36257833211/final.safe.json",
+      "completed_review": "ci-36257833211/completed-review.safe.json",
+      "completed_review_sha256": "e7bbda8643cd2ddb8593baab1b66a7a55a5658ad24a37c516ed57807104310ab"
     },
     "unit_test_cache_cleanup": {
       "receipt": "unit-test-cache-cleanup-20260927.safe.json",
@@ -1183,6 +1187,56 @@
       "free_bytes_after": 6597607424,
       "retained_current_and_native_roles": 5,
       "scope": "只清理停用单测可执行缓存，原始日志/源码/元数据/收据及当前或原生验收角色保留；解除当时3GiB空间阻塞，不回填历史失败。"
+    },
+    "grok_linux_transactions": {
+      "source_commit": "39941b2815506997198091082b92d19e11d92761",
+      "platform": "linux-x64",
+      "old_version": "1.0.40",
+      "target_version": "1.0.41",
+      "cases": [
+        {
+          "case": "updated",
+          "accepted": true,
+          "public_version": "1.0.41",
+          "cold_recovery_process": false,
+          "candidate_never_started": false,
+          "cleanup_generations": [
+            "4b19017c-2869-45b5-8299-410fc2aa82e3"
+          ]
+        },
+        {
+          "case": "swap_receipt_missing",
+          "accepted": true,
+          "public_version": "1.0.40",
+          "cold_recovery_process": true,
+          "candidate_never_started": null,
+          "cleanup_generations": [
+            "137233f9-01f6-4296-8c25-d5b9e4c41968"
+          ]
+        },
+        {
+          "case": "external_change_preserved",
+          "accepted": true,
+          "public_version": "1.0.41",
+          "cold_recovery_process": true,
+          "candidate_never_started": null,
+          "cleanup_generations": [
+            "972f1b66-b35b-4bdd-b9c1-0336201e7d83"
+          ]
+        },
+        {
+          "case": "candidate_changed_preserved",
+          "accepted": true,
+          "public_version": "1.0.40",
+          "cold_recovery_process": false,
+          "candidate_never_started": true,
+          "cleanup_generations": []
+        }
+      ],
+      "artifact_zip_sha256": "4ab0266dc82cdf588b2e28cc3d9c58e335d295faa390cceff61fcf9ac21d6428",
+      "source_files_bound": 16,
+      "scope": "私有无模型后端固定版本 npm 事务；不覆盖消费者实时渠道、GUI、模型、插件复检或 G09 完成",
+      "originals_preserved": true
     }
   },
   "g09_isolation_preflight_increment": {
@@ -1339,5 +1393,47 @@
     ],
     "authorization": "2026-09-26 用户明确不再支持 Mac Intel；不影响 Linux/Windows x64。",
     "original_goal_remaining": true
+  },
+  "g09_followup_increment": {
+    "date": "2026-09-27",
+    "implementation_commit": "56f6da21789c2aa90abf2fdff6a2e10aea03283d",
+    "status": "代码已推送，本地门禁通过；同提交 Linux/Windows CI 正在运行；G09 未关闭",
+    "linux_glibc": "修正将 1 MiB 动态记录表上限误用于官方 Node 20.9.0 的 5,291,274 字节字符串表；保留整段唯一 LOAD 映射和文件边界，只读取每个已引用依赖名最多 256 字节。依赖数、名称长度、加载器、网络与 Landlock 校验不变。新增 7 项边界回归及固定 Node 原字节的只读真实依赖闭包测试；Mac 门禁不代替 Linux 运行。",
+    "windows_codex_npm": "新增固定 0.155.1→0.156.1 真实 npm 私有登记入口：正常更新、旧目录移走后冷恢复、发布后缺收据冷恢复、外部改动保留及候选改动拒绝。三 shim 由绑定 npm 生成，cmd/PowerShell 各需真实监督退出证据；仅测试构建可使用渠道/断点钩子。入口实现不计五场景已通过。",
+    "local_gates": {
+      "platform": "macos-arm64",
+      "cargo_check": "passed",
+      "i18n": "11 passed",
+      "updates": "190 passed / 6 ignored",
+      "windows_runner_python": "11 passed",
+      "actionlint": "passed",
+      "source_snapshot": "source-snapshot-01.safe.json",
+      "source_commit_binding_sha256": "034517807bac708dad126b412a4d76006f01541dad3c722553bb2b02c7094199"
+    },
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927",
+    "localization": "无需本地化变更；本批仅内部解析和验收入口，没有新增界面文案。真实双语布局仍后置。",
+    "excluded": "macOS Intel 不在用户目标范围，不执行该平台任务；不改 CLI 固定基线，不升级 Node/npm 以迁就验收，不取消未知版本或安全边界。",
+    "remaining": "Windows 五场景实测、Linux 原文件闭包、G09 其余来源及消费者链、GUI/IME/认证模型均未由本地门禁证明。初始 npm 登记的安装器树清理不属于本入口已证明范围。",
+    "goal_complete": false,
+    "same_commit_ci": {
+      "run_id": 36262495627,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36262495627",
+      "head_sha": "56f6da21789c2aa90abf2fdff6a2e10aea03283d",
+      "status": "in_progress",
+      "conclusion": "",
+      "selected_platforms": [
+        "linux-x64",
+        "windows-x64"
+      ],
+      "excluded_platforms": [
+        "macos-x86_64"
+      ],
+      "full_workspace": false,
+      "authenticated_model_inputs": false,
+      "gui_or_ime": false,
+      "scope": "定向编译/模块门禁、Linux 固定 Node 只读真实依赖闭包、Windows Codex npm 五场景入口。ABI1 下不重复 Unix Codex 更新；未改的 Grok Linux 四场景沿用39941原收据。",
+      "receipt": "ci-36262495627/initial.safe.json",
+      "sha256": "88357e478519d86bbfe2e5e06baf3665bc3b96eb6a20488f69f4e5b6c3e8e5b1"
+    }
   }
 }

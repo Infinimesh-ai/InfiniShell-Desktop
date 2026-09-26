@@ -8,7 +8,9 @@
 
 2026-09-26 功能代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`：三平台专属 Grok 普通会话 PNG 输入、Codex 远端图片队列、收起编辑器时的文件卡片入口、Codex 三目标平台 npm／Homebrew／Claude WinGet 来源升级、子任务搜索与 Claude/Grok 受限技能已写入代码，Grok 远端专属会话/图片/重启关联已接，Claude 远程原图经原生 Read 和历史消费回执的链路已接；Codex每pane独立app-server/明确socket票据绑定、Claude/Grok Mac/Linux受审命令及命令+技能组合、Claude Windows npm、Grok三平台npm和Mac ARM Homebrew双别名也已接入；Codex WinGet完整目录/安装登记/依赖事务已接；Windows受审命令MCP与Job清理也已接；Grok普通终端同UUID历史继续和Claude Unix npm固定版本受限降级合同也已接；当前渠道不匹配仍拒绝。三款 Linux x64 Homebrew cask 与 Grok WinGet 固定来源事务现也已接入；G10 同会话顺序多命令和运行中原生追加也已接入；三平台命令各用独立监督代，真实清理后才能继续。该检查点已通过 macOS arm64 编译与 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。真实功能、GUI／模型与双语布局验收仍待补，不扩大以下支持承诺；最终仍需绑定提交、平台、版本及模式验收。
 
-2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；其余恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；另有 `39941b281` 的 Linux Grok 正常升级、交换后恢复、外部改动保留、候选改动拒绝四场景通过。其他平台恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+
+`56f6da217` 已修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口与五场景验收入口；本地门禁通过，目标平台实测仍待补，未关闭 G09。无需本地化变更；详细来源和范围见[验证结论](VALIDATION_REPORT.md)。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
 

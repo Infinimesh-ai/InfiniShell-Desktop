@@ -8,7 +8,9 @@
 
 按用户要求形成的功能代码检查点现已进入无人值守回归阶段；真实 GUI／模型验收仍后置。代码检查点 `704bb33bb2943f8a686b24b843c3b3a1ba656c19` 中的 G01/G03 专属 TUI GUI／PNG 输入、G08 远端图片、G09 安装来源事务、G10 搜索与受限技能增量见 [CURRENT_STATUS](CURRENT_STATUS.json) 的 `current_work_order`；该检查点已通过 macOS arm64 编译和 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收，也不扩大下表的真实功能验收范围。Codex 远端图片已接入[固定 0.156.1 的原生队列](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/app-server-protocol/src/protocol/v2/thread.rs#L899)及[图片快照](https://github.com/openai/codex/blob/rust-v0.156.1/codex-rs/protocol/src/local_media.rs#L20)，按后续输入排队处理；仍须后续真实 SSH／tmux 接收证明。共享 daemon 默认路径仍只允许唯一前台客户端和唯一 loaded thread；新增每 pane 独立 app-server、明确 socket 和当前 TUI 票据绑定及 GUI入口；Grok 远端专属会话、当前 pane 入口、图片发送和查询恢复已接线；Claude 新增上传原图→原生 Read→历史图片字节证明及未知状态恢复，不能把文本入队计为图像消费。三 CLI 三目标平台 npm、三 CLI Mac ARM/Linux x64 Homebrew、三 CLI Windows x64 WinGet、Claude/Grok 受限 Skill 和 Mac/Linux 命令+技能组合已有未验证接线；三平台受审命令现统一通过宿主工具逐条独立监督、审批和清理，同会话多命令及原生追加均已接；Grok普通终端历史继续也已接同UUID恢复与新代次CAS。
 
-2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；其余恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+2026-09-27 G09 增量：`39941b281` 已接私有 npm 四场景验收入口；后续 `2b59c8c62` 新增 Linux 候选隔离能力前置与英中提示。本地门禁通过，Mac ARM Codex `0.155.1→0.156.1` 与 Grok `1.0.40→1.0.41` 的私有正常升级分别按各自源码收据通过；另有 `39941b281` 的 Linux Grok 正常升级、交换后恢复、外部改动保留、候选改动拒绝四场景通过。其他平台恢复／故障、消费者渠道、GUI 与 Homebrew／WinGet 真实事务仍待验，G09 和 Goal 不关闭。详细结果、原失败与收据集中见[验证结论](VALIDATION_REPORT.md)及[当前状态](CURRENT_STATUS.json)。
+
+`56f6da217` 已修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口与五场景验收入口；本地门禁通过，目标平台实测仍待补，未关闭 G09。无需本地化变更；详细来源和范围见[验证结论](VALIDATION_REPORT.md)。
 
 仅 Linux Codex npm 和三款 Linux Homebrew 在确需更换版本时要求 Landlock ABI≥3；不足时不生成更新计划，原 worker 硬门禁保留。Grok npm、其他来源、macOS／Windows与同版本无候选执行的检查／配置同步不受此门槛影响。`2b59c8c62` 相关平台 CI 和实际双语布局待补；旧 `39941b281` CI 的 Linux glibc ELF 失败与 ABI1 事实分开记录，Windows 作业成功但保留一项 `LEAK`，均不外推为完整通过。
 
