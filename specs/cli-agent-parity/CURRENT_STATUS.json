@@ -1479,13 +1479,65 @@
     "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-context-routing-20260927",
     "source_commit_binding_sha256": "1e40fb4715201e8c87e790b6f6790ea8a33c6ea0dae8ef082f245737e2b7b15f",
     "localization": "Grok条件式操作提示已同步英文/简体中文，无新增变量；更新等待空闲沿用准确的既有英中说明。真实双语占位布局后置，未计通过。",
-    "ci": "36262495627已结束，绑定56f6da217；待Windows私有登记失败诊断后合并一次新提交平台验证，旧运行不覆盖本增量。",
+    "ci": "包含本增量的bd80cc9ed已派发同提交Linux/Windows验证36266539274，结果待补；旧56f6运行不覆盖该增量。",
     "cache_cleanup": {
       "receipt": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/g09-followup-20260927/retired-test-link-cleanup-01.safe.json",
       "scope": "仅两份停用Cargo测试链接缓存；摘要/身份/无占用均核验，原始归档程序、日志、当前程序与工作树保留",
       "logical_bytes_removed": 1604934608
     },
     "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
+    "goal_complete": false
+  },
+  "latest_implementation_commit": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
+  "latest_increment": "remote_image_recovery_and_windows_npm_increment",
+  "supported_platforms": [
+    "macos-arm64",
+    "linux-x64",
+    "windows-x64"
+  ],
+  "remote_image_recovery_and_windows_npm_increment": {
+    "date": "2026-09-27",
+    "status": "三个独立实现提交已推送，本地门禁通过；相关平台同提交CI进行中，真实GUI/远端/模型链待验",
+    "implementation_commit": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
+    "g08_commit": "5aac3f7d0d0707a24210a26625ab1b9308236359",
+    "npm_runner_commit": "97649deb263e1fe79d29ecd4d8d70b2954f7c4da",
+    "g08_claude": "原发送租约撤销后仍仅查询原提交；同原生会话事件触发最多三查（立即、1秒后、再3秒后），每次核host/终端epoch并合并重复事件，精确回执后回收。固定Claude PostToolUse先于历史落盘的原字节已核对；不是本轮在线验收。",
+    "g08_grok": "仅确认Submit future尚未创建的取消分支写不可变未派发终态；完整ticket/message/subject匹配后允许新用户提交，Unknown不重投、旧领取原字节保留，不清新草稿。",
+    "g09": "真实npm10.1.0命名空间路径触发递归，运行器改为samefile核对后的DOS表示；Rust规范路径绑定保留。产品新增cmd-shim6.0.1与既有8的整组三模板精确合同，旧journal三SHA绑定贯穿Owner/候选/退出/恢复；不更换npm/Node、不改原shim或AppContainer。",
+    "local_gates": {
+      "platform": "macos-arm64",
+      "cargo_check": "passed",
+      "i18n": "11 passed",
+      "remote_images": "36 passed",
+      "updates": "199 passed / 6 ignored",
+      "footer": "47 passed",
+      "grok_context": "7 passed",
+      "new_regressions": "19 passed",
+      "python_runner": "15 passed on each Python 3.12.13 / 3.14.6",
+      "actionlint": "passed",
+      "source_blob_matches": 19
+    },
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/remote-image-recovery-20260927",
+    "source_commit_binding_sha256": "6265114b19a1c4b517ae4f56f7cf5ae2f00689b089f0c6ff63b6debc6129e1f3",
+    "prior_failed_gate": "01轮编译通过，但测试链接strip因空间峰值生成832字节无效产物；测试未运行。原字节/日志/指纹保留，未chmod绕过。清理确切停用缓存后02轮重新编译测试通过。",
+    "cleanup": "仅清理4份停用/重复/失败链接缓存和2份不被当前测试或保留应用构建引用的旧资源缓存；实际worker/supervisor、应用、证据、源码及工作树保留。详见link-space-cleanup-01与retired-asset-cache-cleanup-01。",
+    "localization": "Grok确认未派发提示英中同步，无变量；Claude回收与固定npm模板兼容沿用既有准确文案。实际双语布局后置，未计通过。",
+    "same_commit_ci": {
+      "run_id": 36266539274,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274",
+      "head_sha": "bd80cc9ed9a6dbc032602e457a64d1c55e7998ba",
+      "status": "in_progress",
+      "platforms": [
+        "linux-x64",
+        "windows-x64"
+      ],
+      "macos_intel": false,
+      "full_workspace": false,
+      "gui_or_model": false,
+      "scope": "定向编译/模块门禁含远程图片；Windows真实npm五场景。未改的已通过场景复用原源码绑定，不重复完整矩阵。"
+    },
+    "joint_test_app": "旧2b59联测包保留，不能代表本批代码；新代码联测包待本阶段代码稳定后构建。",
+    "closed_gaps": [],
     "goal_complete": false
   }
 }

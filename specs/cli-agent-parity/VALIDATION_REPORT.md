@@ -4,6 +4,14 @@
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
 
+**2026-09-27 远程图片恢复与 Windows npm 模板兼容**：`5aac3f7d0` 补齐 Claude 延迟审批后的图片状态查询／回收，以及 Grok 明确未派发取消后的主动重试。Claude 原生事件最多触发三次只读补查，固定 `2.1.280` 的原字节证明工具完成 hook 可早于最终历史写出；无精确回执仍保留 Unknown。Grok 仅在 Submit future 尚未创建时保存绑定完整 ticket／message／subject 的未派发终态，原领取字节保留；真正开始 RPC 后仍不重发，两路径均不清除新草稿。新 Grok 提示英中同步，布局待验。
+
+`97649deb2` 修正真实 npm `10.1.0` 对命名空间 Windows 路径的递归问题，转换前核验同一文件对象；诊断采用固定官方 Node/npm 原字节的独立纯函数复现，未冒充 Windows 新安装通过。`bd80cc9ed` 另接 `cmd-shim 6.0.1` 与既有 8 的整组三件套精确校验，旧事务三份 SHA 固定模板，候选／退出／恢复不得切换到另一模板；产品仍复制真实入口原字节，不升级 Node/npm、不改写验收 shim，也不放宽 AppContainer。此部分无需本地化变更。
+
+本地 Mac ARM64 第二轮编译检查、i18n 11 项、远程图片 36 项、更新模块 199 项（6 忽略）、footer 47 项、Grok 上下文 7 项及 actionlint 全通过，包含新增 19 项回归；Python 运行器 15 项分别在 3.12.13／3.14.6 通过。19 个冻结文件与 `bd80cc9ed9a6dbc032602e457a64d1c55e7998ba` Git blob 一致，绑定收据 SHA-256 `6265114b19a1c4b517ae4f56f7cf5ae2f00689b089f0c6ff63b6debc6129e1f3`；原始日志、固定 Claude 时序复核和清理收据位于 `validation/remote-image-recovery-20260927`。第一轮测试链接因空间峰值失败，832 字节坏产物及日志完整保留，未进入测试；第二轮通过不覆盖旧失败。仅清理确认停用的项目编译缓存，真实原生程序、应用和证据保留。
+
+同提交 [Actions 36266539274](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36266539274) 已启动 Linux／Windows 定向验证与 Windows 真实 npm 五场景，结果待补；macOS Intel 明确排除。实际远程延迟 Allow／Read 回收、GUI 双语、认证模型及完整生命周期仍后置；旧 `2b59` 应用不含本批代码，G08／G09 与 Goal 不关闭。
+
 **2026-09-27 Grok 上下文与升级空闲通知补接**：功能提交 `debed8c51cc54f1d017fda809c9254fbc658b80b`，独立夹具修正 `c7ef8d95b48df4a01f64985471b42e80beeda1eb`，均已推送。有效本地／远端专属 Grok 的代码、评审和 diff 上下文现在统一先打开富输入、等待原草稿恢复，再按同代次顺序追加；已经打开的专属会话也走同一队列，连续上下文不会抢在恢复前被覆盖。取消、关闭、换代或失效时旧回调不写入，未绑定普通会话不因此获得 PTY 发送能力。Grok 操作提示已同步英中，实际双语布局仍待共同验收。另将升级器既有 sessions model observe 对齐三支持平台，使 Linux／Windows 无存活 pane 的专属 Grok 清理后能够重新同步空闲条件；没有新增终端锁或第二份观察订阅。
 
 本地 Mac ARM64 编译检查、i18n 11 项、Grok 视图 7 项、footer 47 项、更新模块 190 项（6 忽略）及 actionlint 通过，含四项新增顺序／旧回调／失效／未绑定回归。十份源码／资源／工作流 Git blob 与冻结快照一致，原始日志、独立静态复核和绑定位于 `validation/grok-context-routing-20260927`。旧 Mac `2b59c8c62` 联测包保留但不含本批 UI 修改，新包及真实三平台／远端发送仍待补；G01/G09 与 Goal 不关闭。
@@ -16,7 +24,7 @@
 
 Windows 新入口通过真实 npm 在私有前缀登记固定 `0.155.1`，并调用产品后端更新至 `0.156.1`；包含正常更新、OldMoved 冷恢复、发布后缺收据冷恢复、外部改动保留、候选改动拒绝。cmd、PowerShell 两候选各需真实 AppContainer／Job 退出收据；三种 shim 保留 npm 原产字节，不为通过而改写。固定渠道和断点只进入测试构建。初始 npm 登记不是产品 Job 隔离证明，超时不得记作已清理；消费者渠道、忙碌／插件重检及 GUI 均不在此入口结论内。
 
-本地 Mac ARM64 `cargo check -p warp`、i18n 11 项、更新模块 190 项（6 忽略）、Python 11 项及 actionlint 通过，八份源码／工作流与提交 Git blob 一致。原始日志及审查位于 `validation/g09-followup-20260927`；此前 actionlint 的 SC2155 失败保留，拆开赋值与 export 后独立通过。同提交 [Actions 36262495627](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36262495627) 已启动 Linux／Windows 定向验证，结果仍待补；本批无需本地化变更，不重包或重跑 Mac GUI，不选择 macOS Intel，G09 与 Goal 均不关闭。
+本地 Mac ARM64 `cargo check -p warp`、i18n 11 项、更新模块 190 项（6 忽略）、Python 11 项及 actionlint 通过，八份源码／工作流与提交 Git blob 一致。原始日志及审查位于 `validation/g09-followup-20260927`；此前 actionlint 的 SC2155 失败保留，拆开赋值与 export 后独立通过。同提交 [Actions 36262495627](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36262495627) 的实际终态与失败已在上文记录；本批无需本地化变更，不重包或重跑 Mac GUI，不选择 macOS Intel，G09 与 Goal 均不关闭。
 
 **2026-09-27 G09 Linux 隔离能力前置增量（本地门禁通过，平台及布局待验）**：实现提交 `2b59c8c62c7c46bc30211a9872f966c52317202e`，基线 `6db38e0da2fd0c066eeb31f4f2de9f7b446fd4fb`。仅 Linux Codex npm 和三款 Linux Homebrew 在版本确需更换、且既有来源／版本／渠道检查无错误时查询 Landlock ABI≥3；不可用时不生成计划，既有状态机清除旧计划并阻止手动或自动派发。Grok npm、其他来源、macOS／Windows以及同版本无需候选执行的检查／配置同步不加此门槛；原 worker 的 ABI 拒绝与实际隔离规则安装保留，查询通过不代替执行时核验。新增错误提示已同步英文／简体中文，实际双语布局仍待共同验收。
 

@@ -90,6 +90,7 @@
 - **状态／优先级／范围**：功能缺项，中；P1 附件、P5 SSH／tmux。
 - **实际情况与影响**：远程图片的上传、会话绑定和三款 CLI 原生消费者均已接线，未满足来源／会话合同的输入仍拒绝；真实 SSH／tmux 投递、消费及恢复验收尚未完成。
 - **未验证代码增量**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。各路径均未运行本轮实测，不以可靠拒绝代替完成。
+- **恢复补接**：`5aac3f7d0` 增加同会话 Claude 原生事件后的有限只读补查，并在 Grok 确认未进入 Submit 时保存精确未派发终态，允许用户主动重试；未知 RPC 不重投、不清新草稿。新增十项回归本地通过，英中提示同步；真实远程延迟审批／回收及布局待验，G08 不关闭。
 - **当前替代方式**：用户先将图片放到目标环境，再使用该 CLI 已验证的远程文件路径读取方式；本机附件路径不能直接当远程路径。
 - **源码／证据**：[远程图片门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)、[SSH 现有覆盖](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)。
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
@@ -102,6 +103,7 @@
 - **本批真实验收入口**：`39941b281` 接入 Codex/Grok 私有 npm 四场景入口；Mac ARM Grok 正常升级及后续 `2b59c8c62` Codex 正常升级已按各自源码独立复核；`39941b281` 的 Linux Grok 四场景也已通过并核验清理／冷恢复，不外推其他平台或来源。旧 Codex/Grok 失败和清理未知原件保留；旧 CI 的 Linux glibc ELF 失败与 ABI1 能力事实分开，Windows 一项 `LEAK` 仍待明确。详细正常结果与旧失败统一见[验证结论](VALIDATION_REPORT.md)。
 - **隔离前置增量**：`2b59c8c62` 在生成 Linux Codex npm／三款 Linux Homebrew 版本变更计划前核验 Landlock ABI≥3，并同步英中不可用原因；原 worker 门禁不变。Grok npm、其他来源、Mac／Windows与同版本无候选执行不误限。本地检查通过；相关平台同提交 CI、实际双语布局和真实来源事务仍待补，不关闭 G09。
 - **当前解析与入口增量**：`56f6da217` 修正 Linux 官方 Node 大 ELF 字符串表误拒，并补 Windows Codex npm 真实登记、双入口及五场景实测入口；本地门禁及同提交两平台编译／定向 Rust 通过，Linux 原文件依赖闭包通过；Windows 私有 npm 登记失败，产品事务尚未执行，G09 不关闭。无需本地化变更。
+- **真实 npm 模板补接**：`97649deb2` 修运行器的 Windows 路径表示；`bd80cc9ed` 精确支持 cmd-shim 6.0.1 与既有 8 的整组三入口，原三 SHA 固定身份贯穿候选和恢复，不接受未知或事务内切换模板。本地九项新增合同回归通过；同提交 Windows 真实事务仍待验，不关闭 G09。
 - **空闲通知补接**：`debed8c51` 将升级器的会话模型观察对齐三支持平台，避免 Linux／Windows 恢复清理后仍沿用旧 busy 状态；本地门禁通过，目标平台真实更新链待验。`c7ef8d95b` 仅修跨 Python 版本的验收夹具，不改生产校验。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
