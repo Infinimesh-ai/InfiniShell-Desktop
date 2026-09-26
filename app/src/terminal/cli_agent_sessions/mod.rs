@@ -3,6 +3,8 @@ mod event_cursor;
 pub(crate) mod grok_leader_input;
 pub(crate) mod grok_owned_launch;
 #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+mod grok_owned_recovery;
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
 pub(crate) mod grok_owned_worker;
 mod grok_permission_evidence;
 pub use grok_permission_evidence::{GrokPermissionEvidence, GrokPermissionObservation};
@@ -435,6 +437,8 @@ pub struct CLIAgentSessionsModel {
     restored_local_tasks: Vec<crate::persistence::model::LocalCliTask>,
     #[cfg(feature = "local_fs")]
     local_task_recovery_failed: bool,
+    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    grok_owned_recovery: grok_owned_recovery::GrokOwnedRecovery,
 }
 
 impl Entity for CLIAgentSessionsModel {
@@ -459,6 +463,8 @@ impl CLIAgentSessionsModel {
             restored_local_tasks: Vec::new(),
             #[cfg(feature = "local_fs")]
             local_task_recovery_failed: false,
+            #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+            grok_owned_recovery: Default::default(),
         }
     }
 
@@ -468,6 +474,10 @@ impl CLIAgentSessionsModel {
 
     /// 空闲升级要求原生会话已退出；等待输入或已完成回合仍可能持有 CLI 进程。
     pub(crate) fn has_local_session(&self, agent: CLIAgent) -> bool {
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        if agent == CLIAgent::Grok && self.grok_owned_recovery.busy() {
+            return true;
+        }
         self.sessions
             .values()
             .any(|session| session.agent == agent && !session.is_remote())

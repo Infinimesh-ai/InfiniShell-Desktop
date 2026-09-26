@@ -5,9 +5,10 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
+use std::sync::mpsc::SyncSender;
 use std::thread;
 
+use async_channel::{Receiver, Sender};
 use futures::executor::block_on;
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
@@ -127,7 +128,8 @@ impl GrokOwnedWorker {
         }
         let disconnected = Arc::new(AtomicBool::new(false));
         let cancelled = disconnected.clone();
-        let (events, receiver) = mpsc::channel();
+        // GUI 可直接 await 接收；同步原生 I/O 始终留在本次侧车线程。
+        let (events, receiver) = async_channel::unbounded();
         thread::Builder::new()
             .name("grok-owned-input".into())
             .spawn(move || {
@@ -152,7 +154,7 @@ impl GrokOwnedWorker {
                         .and_then(Result::ok)
                         .flatten()
                         .or(recorded);
-                    let _ = events.send(GrokOwnedWorkerEvent::Stopped {
+                    let _ = events.send_blocking(GrokOwnedWorkerEvent::Stopped {
                         reason,
                         record: stored,
                     });
@@ -255,7 +257,7 @@ fn run(
             .ok_or_else(|| io::Error::other("输入已经领取或取消"))?;
             claimed = record.grok_terminal_delivery.clone();
             *recorded = Some(record.clone());
-            let _ = events.send(GrokOwnedWorkerEvent::Claimed(record));
+            let _ = events.send_blocking(GrokOwnedWorkerEvent::Claimed(record));
             Ok(())
         },
         || {
@@ -284,7 +286,8 @@ fn run(
         {
             Some(GrokLeaderInputEvent::NativePermissionPending { tool_call_id }) => {
                 // 只报告原生审批；worker 没有 RespondApproval 或 PTY 按键通道。
-                let _ = events.send(GrokOwnedWorkerEvent::NativePermissionPending { tool_call_id });
+                let _ = events
+                    .send_blocking(GrokOwnedWorkerEvent::NativePermissionPending { tool_call_id });
             }
             Some(GrokLeaderInputEvent::Delivery(_)) => {
                 let response = bridge
@@ -301,7 +304,7 @@ fn run(
                 .map_err(|_| GrokOwnedWorkerStop::Persistence)?
                 .ok_or(GrokOwnedWorkerStop::Persistence)?;
                 *recorded = Some(result.clone());
-                let _ = events.send(GrokOwnedWorkerEvent::Finished(result));
+                let _ = events.send_blocking(GrokOwnedWorkerEvent::Finished(result));
                 bridge.disconnect();
                 return Ok(());
             }

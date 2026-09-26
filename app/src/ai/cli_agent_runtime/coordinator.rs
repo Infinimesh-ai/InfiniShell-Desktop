@@ -781,6 +781,11 @@ impl LocalCLITaskCoordinator {
             return Err(crate::t!("cli-agent-task-already-running"));
         }
         let harness = Harness::parse_orchestration_harness(&task.harness);
+        if serde_json::from_str::<serde_json::Value>(&task.config_json)
+            .is_ok_and(|config| config["execution_kind"] == "grok_owned_terminal")
+        {
+            return Err(crate::t!("cli-agent-task-invalid-launch"));
+        }
         // 新建、历史继续和子任务都经过此处；升级未收敛前不创建原生连接。
         if let Some(agent) = harness.and_then(CLIAgent::from_harness)
             && cli_agent_update_in_progress(agent, ctx)
@@ -1392,6 +1397,10 @@ async fn persist_recovery_checkpoint(
 pub(crate) fn verify_recovery_identity(task: &LocalCliTask) -> Result<(), String> {
     let config: serde_json::Value = serde_json::from_str(&task.config_json)
         .map_err(|_| crate::t!("cli-agent-task-invalid-launch"))?;
+    // 普通 TUI 的历史不能改由托管 ACP 继续，否则可能并行启动第二个原生进程。
+    if config["execution_kind"] == "grok_owned_terminal" {
+        return Err(crate::t!("cli-agent-task-outcome-unconfirmed"));
+    }
     if matches!(
         config["runtime_host_start_state"].as_str(),
         Some(
@@ -1442,6 +1451,12 @@ async fn recover_runtime_hosts_in_state_dir(
     let mut hosts = Vec::new();
     let mut results: Vec<(LocalCliTask, LocalCliMessage)> = Vec::new();
     for task in &mut records {
+        // 普通 TUI 只由其启动清单恢复占用；不把混入的托管字段当成 ACP 重连授权。
+        if serde_json::from_str::<serde_json::Value>(&task.config_json)
+            .is_ok_and(|config| config["execution_kind"] == "grok_owned_terminal")
+        {
+            continue;
+        }
         // 任务终态可能已提交，而同一宿主事件尚未来得及生成父任务结果。
         // 结果 ID 由任务及代数确定；这里只补齐仍为 Queued 的记录，Sent 仍表示
         // 交付不确定，不能因应用重启而再次执行父任务输入。
@@ -1902,6 +1917,10 @@ async fn recover_runtime_hosts_in_state_dir(
         let generation = serde_json::from_str::<serde_json::Value>(&task.config_json)
             .ok()
             .and_then(|config| {
+                // 普通 TUI 的占用由独立恢复模型核对，不能同时归入托管宿主。
+                if config["execution_kind"] == "grok_owned_terminal" {
+                    return None;
+                }
                 config["runtime_generation"]
                     .as_str()
                     .and_then(|value| Uuid::parse_str(value).ok())

@@ -157,6 +157,15 @@ mod native {
         os_error: Option<i32>,
     }
 
+    #[derive(Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct RetiredLaunch {
+        version: u32,
+        launch_id: Uuid,
+        manifest_sha256: String,
+        dispatched: bool,
+    }
+
     #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     enum LaunchPhase {
         Prepared,
@@ -212,6 +221,24 @@ mod native {
                 validate_bound_processes(&bound, &receipt)?;
                 launch.processes =
                     Some((kernel_identity(&bound.tui), kernel_identity(&bound.leader)));
+            }
+            if let Some(bytes) = read_optional_private(&directory.join("retired.json"))? {
+                let retired: RetiredLaunch =
+                    serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+                if retired.version != 1
+                    || retired.launch_id != launch.launch_id()
+                    || retired.manifest_sha256 != expected_sha256
+                    || retired.dispatched != (phase == LaunchPhase::Dispatched)
+                {
+                    return Err(io::Error::other("owned Grok 退出归档与启动不匹配"));
+                }
+                // 归档仍保留原生身份；损坏或尚存活的进程不能借此放行升级。
+                if retired.dispatched {
+                    launch.confirm_exit()?;
+                } else {
+                    launch.confirm_not_dispatched()?;
+                }
+                launch.phase = LaunchPhase::Released;
             }
             Ok(launch)
         }
@@ -424,11 +451,19 @@ mod native {
             })
         }
 
-        /// 只释放本次已核对的 TUI 与 leader 都消失后的启动占用；不发送任何终止信号。
-        pub(crate) fn release_after_exit(&mut self, ctx: &mut AppContext) -> io::Result<()> {
-            if self.phase != LaunchPhase::Dispatched {
-                return Err(io::Error::other("owned Grok 尚未派发或已释放"));
-            }
+        pub(crate) fn is_retired(&self) -> bool {
+            self.phase == LaunchPhase::Released
+        }
+
+        pub(crate) fn was_dispatched(&self) -> bool {
+            self.phase == LaunchPhase::Dispatched
+        }
+
+        pub(crate) fn working_directory(&self) -> &Path {
+            &self.manifest.cwd
+        }
+
+        fn confirm_exit(&self) -> io::Result<()> {
             if macos_boot_session()? == self.manifest.boot_session {
                 if let Some((tui, leader)) = self.processes {
                     if !identity_exited(tui) || !identity_exited(leader) {
@@ -453,27 +488,65 @@ mod native {
                     }
                 }
             }
+            Ok(())
+        }
+
+        fn confirm_not_dispatched(&self) -> io::Result<()> {
+            for name in [
+                "dispatched",
+                "exec.json",
+                "exec-failed.json",
+                "bound.json",
+                "leader.sock",
+            ] {
+                if !matches!(fs::symlink_metadata(self.directory.join(name)),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound)
+                {
+                    return Err(io::Error::other("owned Grok 存在派发或原生执行证据"));
+                }
+            }
+            Ok(())
+        }
+
+        fn retire(&mut self, dispatched: bool, ctx: &mut AppContext) -> io::Result<()> {
+            // 先保留可恢复的退出收据，再释放占用。任务历史仍引用清单，不能直接删目录。
+            let receipt = RetiredLaunch {
+                version: 1,
+                launch_id: self.launch_id(),
+                manifest_sha256: self.manifest_sha256.clone(),
+                dispatched,
+            };
+            write_new(
+                &self.directory.join("retired.json"),
+                &serde_json::to_vec(&receipt).map_err(io::Error::other)?,
+            )?;
             if let Some(reservation) = self.reservation.take() {
                 CliAgentUpdatesModel::handle(ctx)
                     .update(ctx, |model, ctx| model.release_launch(reservation, ctx));
             }
-            fs::remove_dir_all(&self.directory)?;
             self.phase = LaunchPhase::Released;
             Ok(())
         }
 
-        /// 尚未派发才可撤销并清理；已派发的更新占用必须等真实 TUI/leader 退出证据再释放。
+        /// 只释放本次已核对的 TUI 与 leader 都消失后的启动占用；不发送任何终止信号。
+        pub(crate) fn release_after_exit(&mut self, ctx: &mut AppContext) -> io::Result<()> {
+            if self.phase != LaunchPhase::Dispatched {
+                return Err(io::Error::other("owned Grok 尚未派发或已释放"));
+            }
+            self.confirm_exit()?;
+            self.retire(true, ctx)
+        }
+
+        /// 尚未派发才可撤销；已派发的更新占用必须等真实 TUI/leader 退出证据再释放。
         pub(crate) fn cancel_before_dispatch(&mut self, ctx: &mut AppContext) -> io::Result<()> {
+            if self.phase == LaunchPhase::Released {
+                return Ok(());
+            }
             if self.phase == LaunchPhase::Dispatched {
                 return Err(io::Error::other("owned Grok 已派发，退出尚未确认"));
             }
-            if let Some(reservation) = self.reservation.take() {
-                CliAgentUpdatesModel::handle(ctx)
-                    .update(ctx, |model, ctx| model.release_launch(reservation, ctx));
-            }
-            fs::remove_dir_all(&self.directory)?;
-            self.phase = LaunchPhase::Released;
-            Ok(())
+            self.confirm_not_dispatched()?;
+            self.retire(false, ctx)
         }
     }
 

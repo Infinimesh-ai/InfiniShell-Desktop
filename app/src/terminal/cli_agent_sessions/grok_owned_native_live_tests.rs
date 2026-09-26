@@ -58,6 +58,22 @@ fn observation(root: &Path, session_id: Uuid, cwd: &Path) -> GrokPermissionObser
     panic!("未收到本次原生 SessionStart/default 权限证据");
 }
 
+fn receive_event(
+    events: &async_channel::Receiver<GrokOwnedWorkerEvent>,
+    timeout: Duration,
+) -> Result<GrokOwnedWorkerEvent, async_channel::TryRecvError> {
+    // 仅原生验收线程使用有界等待；产品 GUI 接收器必须使用 recv().await。
+    let deadline = Instant::now() + timeout;
+    loop {
+        match events.try_recv() {
+            Err(async_channel::TryRecvError::Empty) if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            result => return result,
+        }
+    }
+}
+
 #[test]
 #[ignore = "由隔离运行器启动真实本地 PTY；两轮已授权模型调用，不能作为 GUI 或跨平台验收"]
 fn grok_owned_native_two_turns_and_duplicate_guard() {
@@ -197,7 +213,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             let mut claimed = None;
             let finished = loop {
                 assert!(Instant::now() < deadline, "原生输入尚未完成");
-                match events.recv_timeout(Duration::from_secs(1)) {
+                match receive_event(&events, Duration::from_secs(1)) {
                     Ok(GrokOwnedWorkerEvent::Claimed(record)) => {
                         assert!(claimed.is_none());
                         assert_eq!(record.message.state, LocalCliMessageState::Sent);
@@ -220,8 +236,8 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                         );
                         panic!("侧车未完成: {reason:?}");
                     }
-                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    Err(async_channel::TryRecvError::Empty) => {}
+                    Err(async_channel::TryRecvError::Closed) => {
                         panic!("侧车事件通道关闭")
                     }
                 }
@@ -263,7 +279,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             )
             .unwrap();
             assert!(matches!(
-                events.recv_timeout(Duration::from_secs(5)).unwrap(),
+                receive_event(&events, Duration::from_secs(5)).unwrap(),
                 GrokOwnedWorkerEvent::Stopped {
                     reason: GrokOwnedWorkerStop::AlreadyClaimed,
                     ..

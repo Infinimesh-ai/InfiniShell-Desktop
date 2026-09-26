@@ -307,3 +307,94 @@ fn recovery_rejects_bound_processes_without_their_exact_exec_transition() {
         assert!(root.join("bound.json").exists());
     }
 }
+
+#[test]
+fn cancelled_launch_keeps_a_durable_non_replayable_receipt() {
+    warpui::App::test((), |mut app| async move {
+        let (_directory, root, _, checksum) = persisted_launch();
+        let mut launch = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+        app.update(|ctx| launch.cancel_before_dispatch(ctx).unwrap());
+        assert!(root.join("launch.json").exists());
+        assert!(root.join("retired.json").exists());
+        let mut recovered = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+        assert!(recovered.is_retired());
+        assert!(!recovered.was_dispatched());
+        assert!(recovered.take_launch_argv().is_err());
+        app.update(|ctx| recovered.cancel_before_dispatch(ctx).unwrap());
+    });
+}
+
+#[test]
+fn apparent_unsent_launch_with_exec_evidence_cannot_be_cancelled() {
+    warpui::App::test((), |mut app| async move {
+        for name in ["exec.json", "exec-failed.json", "leader.sock", "dispatched"] {
+            let (_directory, root, _, checksum) = persisted_launch();
+            let mut launch =
+                GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+            write_new(&root.join(name), b"unexpected").unwrap();
+            assert!(
+                app.update(|ctx| launch.cancel_before_dispatch(ctx))
+                    .is_err()
+            );
+            assert!(!root.join("retired.json").exists());
+        }
+    });
+}
+
+#[test]
+fn retired_receipt_cannot_change_dispatch_or_manifest_identity() {
+    for mutation in ["version", "launch", "sha", "dispatch"] {
+        let (_directory, root, manifest, checksum) = persisted_launch();
+        let mut receipt = RetiredLaunch {
+            version: 1,
+            launch_id: manifest.launch_id,
+            manifest_sha256: checksum.clone(),
+            dispatched: false,
+        };
+        match mutation {
+            "version" => receipt.version = 2,
+            "launch" => receipt.launch_id = Uuid::new_v4(),
+            "sha" => receipt.manifest_sha256 = "0".repeat(64),
+            "dispatch" => receipt.dispatched = true,
+            other => panic!("未知夹具 {other}"),
+        }
+        write_new(
+            &root.join("retired.json"),
+            &serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).is_err(),
+            "{mutation}"
+        );
+    }
+}
+
+#[test]
+fn retired_after_reboot_keeps_known_launch_history() {
+    warpui::App::test((), |mut app| async move {
+        let (_directory, root, _, checksum) = persisted_launch();
+        write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+        let mut launch = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+        // 夹具的 boot ID 与当前机器不同，旧进程不可能跨系统启动继续存活。
+        assert_ne!(launch.manifest.boot_session, macos_boot_session().unwrap());
+        app.update(|ctx| launch.release_after_exit(ctx).unwrap());
+        let mut recovered = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+        assert!(recovered.is_retired());
+        assert!(recovered.take_launch_argv().is_err());
+    });
+}
+
+#[test]
+fn an_alive_process_never_produces_a_retired_receipt() {
+    warpui::App::test((), |mut app| async move {
+        let (_directory, root, _, checksum) = persisted_launch();
+        write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+        let mut launch = GrokOwnedLaunch::restore(&root.join("launch.json"), &checksum).unwrap();
+        launch.manifest.boot_session = macos_boot_session().unwrap();
+        let process = macos_process_identity(std::process::id() as i32).unwrap();
+        launch.processes = Some((process, process));
+        assert!(app.update(|ctx| launch.release_after_exit(ctx)).is_err());
+        assert!(!root.join("retired.json").exists());
+    });
+}

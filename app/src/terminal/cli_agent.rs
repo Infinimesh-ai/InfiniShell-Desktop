@@ -1250,6 +1250,11 @@ pub(crate) fn init_cli_agent_updates(ctx: &mut AppContext) {
     ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |_, _, ctx| {
         sync_cli_agent_update_conditions(ctx);
     });
+    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    ctx.observe_model(&CLIAgentSessionsModel::handle(ctx), |_, ctx| {
+        // 已恢复的普通 Grok 可能没有存活 pane；占用回收通过模型变更通知更新器。
+        sync_cli_agent_update_conditions(ctx);
+    });
     #[cfg(feature = "local_fs")]
     ctx.subscribe_to_model(&LocalCLITaskCoordinator::handle(ctx), |_, _, ctx| {
         sync_cli_agent_update_conditions(ctx);

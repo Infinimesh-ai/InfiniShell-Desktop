@@ -8932,3 +8932,56 @@ fn grok_hot_skill_live_host_reattaches_without_native_input_or_reload() {
     writer.sender.send(ModelEvent::Terminate).unwrap();
     writer.handle.join().unwrap();
 }
+
+#[test]
+fn owned_terminal_history_never_authorizes_managed_resume() {
+    let mut task = snapshot().task;
+    task.harness = "grok".into();
+    task.config_json = json!({"execution_kind":"grok_owned_terminal",
+        "runtime_generation":Uuid::new_v4(), "runtime_host_start_state":"exited_recovered"})
+    .to_string();
+    // 即使混入托管宿主字段，也必须保留普通 TUI 与 ACP 的执行模式边界。
+    assert!(verify_recovery_identity(&task).is_err());
+}
+
+#[test]
+fn owned_terminal_history_is_skipped_by_automatic_managed_recovery() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("owned.sqlite")).unwrap();
+    let mut task = snapshot().task;
+    task.harness = "grok".into();
+    task.config_json =
+        json!({"execution_kind":"grok_owned_terminal", "runtime_generation":Uuid::new_v4()})
+            .to_string();
+    let original = task.clone();
+    block_on(async {
+        checkpoint_task(&writer.sender, task.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        let batch = recover_runtime_hosts_in_state_dir(
+            &writer.sender,
+            vec![task],
+            &HashMap::new(),
+            directory.path(),
+        )
+        .await
+        .unwrap();
+        assert!(batch.hosts.is_empty());
+        assert!(batch.results.is_empty());
+        assert!(batch.unconfirmed_hosts.is_empty());
+        assert_eq!(batch.records, vec![original.clone()]);
+        assert_eq!(
+            load_tasks(&writer.sender, false)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            vec![original]
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}

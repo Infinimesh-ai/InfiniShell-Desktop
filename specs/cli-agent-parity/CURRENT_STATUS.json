@@ -189,7 +189,7 @@
   },
   "grok_owned_terminal_increment": {
     "status": "native_foundation_verified_gui_integration_pending",
-    "implementation_commit": "本条所在实现提交；真实收据另有未提交构建源文件摘要，待绑定提交",
+    "implementation_commit": "922308af60cbdd7f84ea69fb3e465ae08b303213",
     "closed_gaps": [],
     "versions": {
       "grok": "1.0.41",
@@ -203,6 +203,24 @@
     "raw_archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-owned-20260926",
     "raw_index_sha256": "d49082ee7e6290bf007f2b316c3db5c96b80967fcc40377e38df7cf407fbec33",
     "remaining": "GUI启动/发送/权限失效/草稿接线，启动失败/退出/重启恢复，真实审批允许拒绝与信号，长文本和多行、文件卡片、同提交Linux/Windows门禁及真实生命周期",
-    "localization": "无需本地化变更：本增量为内部启动/通知/持久化基础，未新增GUI入口或改变已显示文案；后续GUI接线须另行双语审计及布局验收"
+    "localization": "无需本地化变更：本增量为内部启动/通知/持久化基础，未新增GUI入口或改变已显示文案；后续GUI接线须另行双语审计及布局验收",
+    "cloud_run": 36220234098,
+    "cloud_status": "基础提交 922308af 的 Linux 失败：原生 hook 与安装收据脚本仍要求插件 0.1.4，实际为 0.1.5；Windows 仍运行。原失败保留，修复另行提交验证。",
+    "commit_binding_sha256": "7e88b8fea31de65fa5d58639f8295083cebb78d67b706349d4b3c17579432ed5",
+    "recovery_increment": {
+      "implementation_commit": "本提交；仓外提交绑定在提交后生成",
+      "status": "macOS 本地门禁、原生两轮回归与空白 GUI 双语启动通过，GUI 输入与真实重启模型链未完成",
+      "behavior": "异步侧车接收不阻塞 GUI；退出保留已核对清单；SQLite 恢复前同步置忙，恢复仅关联启动占用，不重新派发；旧回调、重复定时器和托管恢复交叉隔离",
+      "gates": "cargo check -p warp、i18n11、PTY身份2、会话423/6忽略、持久化78、完整协调器111/4忽略、应用构建及运行器6通过",
+      "live": "macOS arm64 Grok1.0.41/grok-4.7/default，两条精确原生ACK、两组独立prompt ID及正确模型标记；TUI/leader/shell与私有认证副本清理确认",
+      "gui": "内置盘独立空白 profile，英文与简体中文设置/Grok版本区可读，零人工授权弹窗；不是 GUI 输入或有模型会话的重启验收",
+      "binary_sha256": "f630b6362389f021b9b1c98578378adfc2e7767e220fc039572707d3ef606e02",
+      "signed_gui_sha256": "0e5d6f237062bbd99a3b810e33a9db8f4b47a205c47f9d8c2ccf67664ca6e174",
+      "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/grok-owned-recovery-20260926",
+      "archive_index_sha256": "0c1fbc47dec6f0a7cd9c2bc7c8c6a6cc59c73a707dc0c95518096cb4386f8402",
+      "preserved_failures": "v1 Timer返回类型编译错误；v2门禁后主动中止构建；v3遗漏未确认宿主统计隔离；中文首图实际仍为英文，重启正例另存",
+      "remaining": "GUI新启动登记/派发/握手/草稿发送尚未接线；启动失败或绑定前崩溃回收、真实审批、活跃重关联与冷继续、跨平台仍欠",
+      "localization": "无需本地化变更：复用已有无效启动/未确认状态文案，内部恢复与异步通道未改变已显示语义。"
+    }
   }
 }
