@@ -23,13 +23,13 @@ def digest(path):
 
 
 def source_binding():
-    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=REPOSITORY, text=True)
+    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=REPOSITORY, text=True, encoding="utf-8")
     paths = ["app/src/ai/cli_agent_runtime/claude.rs",
              "app/src/ai/cli_agent_runtime/claude_live_tests.rs",
              "app/src/ai/cli_agent_runtime/claude_image_skill_live_tests.rs",
              "app/src/ai/cli_agent_runtime/managed_input.rs",
              "app/src/ai/cli_agent_runtime/local_skills.rs"]
-    return {"source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True).strip(),
+    return {"source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True, encoding="utf-8").strip(),
             "source_worktree_dirty": bool(status.strip()), "source_commit_is_baseline_only": bool(status.strip()),
             "source_status_porcelain": status, "runner_sha256": digest(Path(__file__)),
             "critical_source_sha256": {name: digest(REPOSITORY / name) for name in paths}}
@@ -125,18 +125,18 @@ def main():
     receipt.update(source_binding())
     try:
         process = subprocess.run([str(args.test_binary.resolve()), TEST, "--exact", "--ignored", "--nocapture", "--test-threads=1"],
-                                 cwd=REPOSITORY, env=environment, capture_output=True, text=True, timeout=510)
+                                 cwd=REPOSITORY, env=environment, capture_output=True, text=True, encoding="utf-8", timeout=510)
     except subprocess.TimeoutExpired as error:
         receipt["timed_out"] = True
         process = subprocess.CompletedProcess([], -1,
             (error.stdout or b"").decode("utf-8", "replace"), (error.stderr or b"").decode("utf-8", "replace"))
     output = sanitize(process.stdout + process.stderr, root, None, None)
-    (args.output / "test-output.txt").write_text(output)
+    (args.output / "test-output.txt").write_text(output, encoding="utf-8", newline="\n")
     evidence = args.output / "events.ndjson"
-    events = [json.loads(line) for line in evidence.read_text().splitlines()] if evidence.exists() else []
+    events = [json.loads(line) for line in evidence.read_text(encoding="utf-8").splitlines()] if evidence.exists() else []
     traces = [json.loads(line.split("CLAUDE_NATIVE_PROTOCOL_IDS ", 1)[1])
               for line in output.splitlines() if "CLAUDE_NATIVE_PROTOCOL_IDS " in line]
-    (args.output / "native-projections.json").write_text(json.dumps(traces, indent=2) + "\n")
+    (args.output / "native-projections.json").write_text(json.dumps(traces, indent=2) + "\n", encoding="utf-8", newline="\n")
     verified, checks = verify_native_receipts(events, traces)
     receipt.update(exit_code=process.returncode, native_receipt_checks=checks,
                    native_receipts_passed=verified, private_settings_unchanged=digest(settings) == settings_hash,
@@ -145,7 +145,7 @@ def main():
     receipt["passed"] = (verified and process.returncode == 0 and "1 passed" in output
                          and receipt["private_settings_unchanged"] and receipt["critical_sources_unchanged"]
                          and receipt["native_binary_unchanged"])
-    (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({"output": str(args.output), "passed": receipt["passed"]}))
     if not receipt["passed"]:
         raise SystemExit(1)

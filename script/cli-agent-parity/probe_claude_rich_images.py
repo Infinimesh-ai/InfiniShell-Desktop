@@ -15,10 +15,11 @@ import threading
 import time
 import uuid
 
-from PIL import Image
-
 import prepare_claude_cli
 import run_claude_adapter_live as adapter
+
+
+REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def digest(data):
@@ -147,7 +148,8 @@ def run_production(args, contract):
     if args.supervisor is None or args.case is None:
         raise ValueError("生产校准需要监督者和明确用例")
     args.output.mkdir(parents=True, exist_ok=False)
-    root = Path(tempfile.mkdtemp(prefix="infinishell-claude-rich-product-", dir="/private/tmp"))
+    root = Path(tempfile.mkdtemp(prefix="infinishell-claude-rich-product-",
+                                 dir="/private/tmp" if Path("/private/tmp").is_dir() else None))
     settings = adapter.prepare_project(root)
     environment = adapter.authorized_default_account_environment(root)
     evidence = args.output.resolve() / "events.ndjson"
@@ -167,15 +169,15 @@ def run_production(args, contract):
     timed_out = False
     try:
         result = subprocess.run([str(args.test_binary.resolve()), name, "--exact", "--ignored", "--nocapture", "--test-threads=1"],
-                                env=environment, capture_output=True, text=True, timeout=720)
+                                cwd=REPOSITORY, env=environment, capture_output=True, text=True, encoding="utf-8", timeout=720)
     except subprocess.TimeoutExpired as error:
         timed_out = True
         result = subprocess.CompletedProcess([], -1,
             (error.stdout or b"").decode("utf-8", "replace"),
             (error.stderr or b"").decode("utf-8", "replace"))
     output = adapter.sanitize(result.stdout + result.stderr, root, None, None)
-    (args.output / "test-output.txt").write_text(output)
-    events = [json.loads(line) for line in evidence.read_text().splitlines()] if evidence.exists() else []
+    (args.output / "test-output.txt").write_text(output, encoding="utf-8", newline="\n")
+    events = [json.loads(line) for line in evidence.read_text(encoding="utf-8").splitlines()] if evidence.exists() else []
     trace = [json.loads(line.split("CLAUDE_NATIVE_PROTOCOL_IDS ", 1)[1]) for line in output.splitlines()
              if "CLAUDE_NATIVE_PROTOCOL_IDS " in line]
     prepared = [event for event in events if event.get("event") == "rich_attachment_prepared"]
@@ -190,7 +192,7 @@ def run_production(args, contract):
     passed = (not timed_out and sources_unchanged and result.returncode == 0 and "1 passed" in output and bool(events) and events[-1].get("event") == "acceptance_passed"
               and exact_replay and digest(settings.read_bytes()) == settings_sha)
     receipt = {"scope": "production_adapter_process_resume", "case": args.case, "binary": contract,
-               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+               "source_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True, encoding="utf-8").strip(),
                "test_binary_sha256": digest(args.test_binary.read_bytes()),
                "supervisor_sha256": digest(args.supervisor.read_bytes()), "model": args.model,
                "exit_code": result.returncode, "native_image_replay_matches_prepared_bytes": exact_replay,
@@ -198,15 +200,15 @@ def run_production(args, contract):
                "acceptance_passed": passed, "credential_material_read": False,
                "app_restart_or_gui_verified": False, "workspace": str(root)}
     receipt.update(binding)
-    (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    (args.output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({"output": str(args.output), "passed": passed, "case": args.case}))
     if not passed:
         raise SystemExit(1)
 
 
 def source_binding():
-    repository = Path(__file__).resolve().parents[2]
-    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=repository, text=True)
+    repository = REPOSITORY
+    status = subprocess.check_output(["git", "status", "--porcelain"], cwd=repository, text=True, encoding="utf-8")
     files = ['app/src/ai/cli_agent_runtime/claude.rs', 'app/src/ai/cli_agent_runtime/managed_input.rs', 'app/src/ai/cli_agent_runtime/claude_managed_image_live_tests.rs']
     return {"source_commit_is_baseline_only": bool(status.strip()),
             "source_worktree_dirty": bool(status.strip()), "source_status_porcelain": status,
@@ -229,17 +231,20 @@ def main():
     skill_prompt = ("Invoke the Skill tool with skill=infinishell-local-skills:inspect-picture, then apply that skill to the attached image."
                     if args.explicit_skill_tool else "/infinishell-local-skills:inspect-picture")
     contract = prepare_claude_cli.verify_binary(args.executable, prepare_claude_cli.current_platform(), "2.1.280")
-    version = subprocess.check_output([str(args.executable), "--version"], text=True).strip()
-    status = json.loads(subprocess.check_output([str(args.executable), "auth", "status"], text=True))
+    version = subprocess.check_output([str(args.executable), "--version"], text=True, encoding="utf-8").strip()
+    status = json.loads(subprocess.check_output([str(args.executable), "auth", "status"], text=True, encoding="utf-8"))
     if version != "2.1.280 (Claude Code)" or status.get("loggedIn") is not True:
         raise ValueError("需要固定已认证 Claude 2.1.280")
     if args.test_binary is not None:
         return run_production(args, contract)
+    # 生产适配器由 Rust 生成图片；只有下方原生校准需要 Pillow。
+    from PIL import Image
+
     args.output.mkdir(parents=True, exist_ok=False)
     report = {"scope": "native_contract_only", "version": version, "binary": contract,
               "logged_in": True, "credential_material_read": False, "production_adapter_verified": False,
               "runs": [], "cleanup": [], "source_commit": subprocess.check_output(
-                  ["git", "rev-parse", "HEAD"], text=True).strip()}
+                  ["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True, encoding="utf-8").strip()}
     report.update(source_binding())
     with tempfile.TemporaryDirectory(prefix="infinishell-claude-rich-images-", dir="/private/tmp") as temporary:
         root = Path(temporary)

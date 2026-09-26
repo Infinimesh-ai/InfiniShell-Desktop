@@ -172,6 +172,7 @@ jobs:
           python3 -B script/cli-agent-parity/claude_approval_cancel_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_image_probe_runner_tests.py -v
           python3 -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
+          python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
           python3 -B script/cli-agent-parity/codex_source_runner_tests.py -v
           python3 -B script/cli-agent-parity/codex_journal_recovery_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_adapter_runner_tests.py -v
@@ -848,6 +849,7 @@ jobs:
             'claude_approval_cancel_runner_tests.py',
             'claude_image_probe_runner_tests.py',
             'claude_managed_image_runner_tests.py',
+            'claude_rich_image_runner_portability_tests.py',
             'codex_source_runner_tests.py',
             'codex_journal_recovery_runner_tests.py',
             'grok_adapter_runner_tests.py',

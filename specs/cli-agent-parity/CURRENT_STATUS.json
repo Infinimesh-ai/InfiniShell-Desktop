@@ -303,5 +303,16 @@
       "platform_scope": "生产改动完全位于macOS arm64条件模块；Mac原生复验如上，Linux/Windows不执行此路径，相关共享基础另由32a932f95同提交矩阵验证",
       "remaining": "GUI显式模型入口、新启动登记与草稿发送，绑定前异常退出回收、审批允许/拒绝、长文本/文件卡、真实应用重启恢复和平台验收"
     }
+  },
+  "claude_image_runner_portability": {
+    "implementation_commit": "本提交；提交后另存 Git blob 绑定",
+    "status": "本地完成，同提交 Linux/Windows 定向验证待整合后执行",
+    "behavior": "生产验收路径兼容无 /private/tmp 平台；UTF-8 管道和收据；源码与运行 cwd 固定；Pillow 仅原生校准需要",
+    "gates": "portability 8、adapter 22、image probe 25、managed image 20；AST、Bash、PowerShell、workflow lint、cargo check -p warp 通过",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/claude-image-runner-portability-20260926",
+    "archive_index_sha256": "89b652a8f47b67cd6e33e9c739c5b35f3c1a4cd62ea3a47b447dca4f93dc4e0f",
+    "online_model_inputs": 0,
+    "localization": "无需本地化变更：仅验收运行器和工作流测试列表",
+    "closed_gaps": []
   }
 }

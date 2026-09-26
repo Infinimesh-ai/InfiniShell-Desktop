@@ -255,3 +255,9 @@ G01 持久目录增量：新 v2 清单写入当前任务数据库的数据域，
 v1 应用 SHA-256 `e0bbfaa089f795ff92573a2a3b2735540730d350dceddbe73febc53c2f19efde`、libtest `cd34e4ff95be2d05295235806768dcd8939779c6eb2fba60aa2ab82f0bad3d53`；v2 应用 `9cfa85844f368467a34e98edbaac27834eb56da2024d00d36543f41bb4730222`、libtest `f54d7d283807bc4ae4fc7e5fd9fb5e965cd5477fd1b6eab96e63c55d650f34a9`。79 文件索引位于仓外 `validation/grok-owned-durable-20260926/`，SHA-256 `257d7844508552621e8c10637c3c5149642b4d7ac7a6eb5c03b7aafaebc7f050`。二进制采用 gzip 无损保存，并核对解压后的原始摘要；原始失败及各轮源码保留。
 
 生产改动仅在 macOS arm64 条件模块内；Linux/Windows 不执行本项原生路径，共享基础的同提交矩阵单独记录。无需本地化变更，现有用户界面语义未改变。本项未接通 GUI 提交、新启动注册与真实应用重启模型链，G01 仍开放。
+
+## Claude 图片验收运行器跨平台修正（2026-09-26）
+
+生产验收不再要求 `/private/tmp` 或 Pillow；明确 UTF-8 管道、原始文本收据与仓库工作目录。新增八项离线回归覆盖 Windows 旧编码、中文失败/超时原字节、缺少临时目录及 Git 来源绑定，并加入 Linux/Windows 定向工作流。与关联回归合计 75 项通过，主仓 `cargo check -p warp`、脚本语法、工作流检查通过。工作流初次 actionlint 的既有自托管标签未知告警与登记标签后的通过均保留。
+
+原字节归档 `validation/claude-image-runner-portability-20260926`，索引 SHA-256 `89b652a8f47b67cd6e33e9c739c5b35f3c1a4cd62ea3a47b447dca4f93dc4e0f`。本增量零在线模型输入，无需本地化变更；不补记 Linux/Windows 图片理解、恢复或 GUI 验收，G04/G05 保持原边界。同提交云验待与下一实现增量整合后执行。
