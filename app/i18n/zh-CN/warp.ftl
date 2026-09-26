@@ -5867,6 +5867,7 @@ settings-cli-updates-manual = 暂无法自动更新此 CLI。
 settings-cli-updates-not-installed = 尚未安装此 CLI。请打开安装指南进行安装。
 settings-cli-updates-unsupported-source = InfiniShell 暂无法安全更新此安装。请使用原安装工具更新此 CLI。
 settings-cli-updates-unsupported-platform = 当前平台上的此安装暂不支持自动更新。
+settings-cli-updates-isolation-unavailable = 此安装的自动更新需要 Linux 隔离支持（Landlock ABI 3 或更高版本），当前系统不具备此能力。
 settings-cli-updates-source-changed = 检查期间安装发生了变化。请重新检查后更新。
 settings-cli-updates-network = 无法连接发行服务。请检查网络后重试。
 settings-cli-updates-invalid-release = 无法验证发行信息，未启动更新。

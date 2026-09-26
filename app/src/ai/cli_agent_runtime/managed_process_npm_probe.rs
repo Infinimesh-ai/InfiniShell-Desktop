@@ -252,6 +252,19 @@ fn copy_bound(
     output.sync_all()
 }
 
+#[cfg(target_os = "linux")]
+pub(super) fn linux_candidate_isolation_available() -> bool {
+    let abi = unsafe {
+        libc::syscall(
+            libc::SYS_landlock_create_ruleset,
+            std::ptr::null::<u8>(),
+            0usize,
+            1u32,
+        )
+    };
+    abi >= 3
+}
+
 // 只读 mode 不能约束同 UID 的解释器；Linux 还需内核拒绝改写、改名和截断候选。
 // ABI 3 才具备 TRUNCATE；缺失时拒绝执行，不能降级到可改写的候选目录。
 #[cfg(target_os = "linux")]
@@ -270,15 +283,7 @@ pub(super) fn protect_linux_candidate(root: &Path) -> io::Result<()> {
     const WRITE_FILE: u64 = 1 << 1;
     const TRUNCATE: u64 = 1 << 14;
     const MUTATIONS: u64 = WRITE_FILE | (((1 << 15) - 1) & !((1 << 4) - 1));
-    let abi = unsafe {
-        libc::syscall(
-            libc::SYS_landlock_create_ruleset,
-            std::ptr::null::<u8>(),
-            0usize,
-            1u32,
-        )
-    };
-    if abi < 3 {
+    if !linux_candidate_isolation_available() {
         return Err(io::Error::other(
             "Codex npm 探针需要 Landlock ABI 3 的只读候选边界",
         ));

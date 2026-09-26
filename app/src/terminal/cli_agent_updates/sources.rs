@@ -639,6 +639,28 @@ fn plugin_compatibility(agent: CLIAgent) -> Option<PluginCompatibility> {
     })
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn check_linux_candidate_isolation(
+    agent: CLIAgent,
+    source: Source,
+    version_matches: bool,
+    isolation_available: impl FnOnce() -> bool,
+) -> Result<(), Error> {
+    let requires_isolation = matches!(
+        (agent, source),
+        (CLIAgent::Codex, Source::Npm)
+            | (
+                CLIAgent::Codex | CLIAgent::Claude | CLIAgent::Grok,
+                Source::Homebrew
+            )
+    );
+    // 同版本只需检查或同步渠道配置；Grok npm 的 sealed ELF 探针不使用此边界。
+    if !version_matches && requires_isolation && !isolation_available() {
+        return Err(Error::IsolationUnavailable);
+    }
+    Ok(())
+}
+
 pub(super) async fn inspect(
     agent: CLIAgent,
     executable: Option<PathBuf>,
@@ -772,6 +794,16 @@ pub(super) async fn inspect(
         if let Err(reason) = compatibility {
             error = Some(reason);
         }
+    }
+    #[cfg(target_os = "linux")]
+    if error.is_none() {
+        error = check_linux_candidate_isolation(
+            agent,
+            installation.source,
+            version_matches,
+            managed_process::linux_candidate_isolation_available,
+        )
+        .err();
     }
     let up_to_date = version_matches
         && config

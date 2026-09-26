@@ -6055,6 +6055,7 @@ settings-cli-updates-manual = Automatic updates are unavailable for this CLI.
 settings-cli-updates-not-installed = This CLI is not installed. Open the installation guide to get started.
 settings-cli-updates-unsupported-source = InfiniShell cannot safely update this installation. Use the tool originally used to install this CLI.
 settings-cli-updates-unsupported-platform = Automatic updates are not available for this installation on this platform.
+settings-cli-updates-isolation-unavailable = Automatic updates for this installation require Linux isolation support (Landlock ABI 3 or later), which is unavailable on this system.
 settings-cli-updates-source-changed = The installation changed during the check. Check again before updating.
 settings-cli-updates-network = The release service could not be reached. Check your connection and try again.
 settings-cli-updates-invalid-release = Release information could not be verified. No update was started.

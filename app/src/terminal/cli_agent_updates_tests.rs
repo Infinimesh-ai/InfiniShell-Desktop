@@ -318,6 +318,53 @@ fn installation_rescan_discards_old_check_before_it_can_produce_a_plan() {
 }
 
 #[test]
+fn isolation_unavailable_check_removes_the_previous_plan_and_blocks_dispatch() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let (sender, receiver) = mpsc::sync_channel(1);
+                model.recorded_updates = Some(sender);
+                model.operations_enabled = true;
+                let mut entry = available_entry();
+                entry.status.busy = false;
+                entry.manual_update = true;
+                assert!(entry.ready_to_update());
+                entry.active = true;
+                model.entries.insert(CLIAgent::Codex, entry);
+                model.checked(
+                    CLIAgent::Codex,
+                    0,
+                    CliAgentUpdateChannel::FollowInstallation,
+                    Ok(sources::CheckReport {
+                        failed_target: None,
+                        installed_version: "0.155.0".to_owned(),
+                        latest_version: "0.156.1".to_owned(),
+                        source: CliAgentUpdateSource::Npm,
+                        effective_channel: CliAgentUpdateChannel::Latest,
+                        up_to_date: false,
+                        error: Some(CliAgentUpdateError::IsolationUnavailable),
+                        plan: None,
+                    }),
+                    ctx,
+                );
+                let entry = &model.entries[&CLIAgent::Codex];
+                assert_eq!(entry.status.phase, CliAgentUpdatePhase::Unsupported);
+                assert_eq!(
+                    entry.status.error,
+                    Some(CliAgentUpdateError::IsolationUnavailable)
+                );
+                assert!(entry.plan.is_none());
+                assert!(!entry.active);
+                assert!(!entry.manual_update);
+                assert!(!entry.ready_to_update());
+                assert_eq!(receiver.try_recv(), Err(mpsc::TryRecvError::Empty));
+            });
+        });
+    });
+}
+
+#[test]
 fn channel_mismatch_is_never_rendered_as_success_even_if_versions_match() {
     App::test((), |mut app| async move {
         app.add_singleton_model(CliAgentUpdatesModel::new);

@@ -9134,6 +9134,9 @@ fn cli_agent_update_error_label(error: &CliAgentUpdateError) -> String {
         CliAgentUpdateError::UnsupportedPlatform => {
             crate::t!("settings-cli-updates-unsupported-platform")
         }
+        CliAgentUpdateError::IsolationUnavailable => {
+            crate::t!("settings-cli-updates-isolation-unavailable")
+        }
         CliAgentUpdateError::SourceChanged => crate::t!("settings-cli-updates-source-changed"),
         CliAgentUpdateError::Network => crate::t!("settings-cli-updates-network"),
         CliAgentUpdateError::InvalidRelease => crate::t!("settings-cli-updates-invalid-release"),

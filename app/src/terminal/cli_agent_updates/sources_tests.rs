@@ -72,6 +72,65 @@ fn channels_are_agent_specific() {
 }
 
 #[test]
+fn linux_candidate_isolation_rejects_only_the_sources_that_require_landlock() {
+    for (agent, source) in [
+        (CLIAgent::Codex, Source::Npm),
+        (CLIAgent::Codex, Source::Homebrew),
+        (CLIAgent::Claude, Source::Homebrew),
+        (CLIAgent::Grok, Source::Homebrew),
+    ] {
+        assert_eq!(
+            check_linux_candidate_isolation(agent, source, false, || false),
+            Err(Error::IsolationUnavailable),
+            "{agent:?} {source:?}"
+        );
+        assert_eq!(
+            check_linux_candidate_isolation(agent, source, false, || true),
+            Ok(()),
+            "{agent:?} {source:?}"
+        );
+    }
+}
+
+#[test]
+fn linux_candidate_isolation_keeps_other_installation_sources_available() {
+    for (agent, source) in [
+        (CLIAgent::Grok, Source::Npm),
+        (CLIAgent::Claude, Source::Npm),
+        (CLIAgent::Codex, Source::Native),
+        (CLIAgent::Claude, Source::Native),
+        (CLIAgent::Grok, Source::Native),
+        (CLIAgent::Codex, Source::WinGet),
+        (CLIAgent::Claude, Source::WinGet),
+        (CLIAgent::Grok, Source::WinGet),
+    ] {
+        assert_eq!(
+            check_linux_candidate_isolation(agent, source, false, || {
+                panic!("此来源不应查询 Landlock：{agent:?} {source:?}")
+            }),
+            Ok(())
+        );
+    }
+}
+
+#[test]
+fn linux_candidate_isolation_does_not_block_same_version_configuration_sync() {
+    for (agent, source) in [
+        (CLIAgent::Codex, Source::Npm),
+        (CLIAgent::Codex, Source::Homebrew),
+        (CLIAgent::Claude, Source::Homebrew),
+        (CLIAgent::Grok, Source::Homebrew),
+    ] {
+        assert_eq!(
+            check_linux_candidate_isolation(agent, source, true, || {
+                panic!("同版本无需执行候选：{agent:?} {source:?}")
+            }),
+            Ok(())
+        );
+    }
+}
+
+#[test]
 fn valid_release_targets_do_not_enable_unverified_managed_versions() {
     // 渠道安装目标与托管合同分别判断；不能为切换发行渠道放宽运行时版本门禁。
     for (version, managed_supported) in [

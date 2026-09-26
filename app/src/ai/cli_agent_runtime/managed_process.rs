@@ -1221,6 +1221,12 @@ pub(crate) fn validate_codex_npm_probe_contract(
     npm_probe::validate_contract(node, arguments, files)
 }
 
+/// 只查询内核能力，不在检查更新的宿主线程上安装不可逆的隔离规则。
+#[cfg(target_os = "linux")]
+pub(crate) fn linux_candidate_isolation_available() -> bool {
+    npm_probe::linux_candidate_isolation_available()
+}
+
 #[cfg(unix)]
 pub(crate) fn verify_codex_npm_probe_dependencies(
     node: &Path,

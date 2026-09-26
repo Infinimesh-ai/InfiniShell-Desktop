@@ -55,6 +55,7 @@ pub enum CliAgentUpdateError {
     NotInstalled,
     UnsupportedSource,
     UnsupportedPlatform,
+    IsolationUnavailable,
     SourceChanged,
     Network,
     InvalidRelease,
@@ -157,6 +158,7 @@ impl Entry {
             CliAgentUpdateError::NotInstalled
             | CliAgentUpdateError::UnsupportedSource
             | CliAgentUpdateError::UnsupportedPlatform
+            | CliAgentUpdateError::IsolationUnavailable
             | CliAgentUpdateError::ChannelMismatch
             | CliAgentUpdateError::ResumeIncompatible => CliAgentUpdatePhase::Unsupported,
             CliAgentUpdateError::SourceChanged
