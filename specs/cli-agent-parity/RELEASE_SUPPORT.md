@@ -16,7 +16,7 @@
 
 `ca37b9cbf` 已补 Windows npm 拒绝后的显式 Job／ACL／profile 清理与脱敏映像诊断；本地编译和 i18n 门禁通过，仅 Windows 的[同提交验证 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 因 Win32 事件码字段类型错误在编译阶段失败，原生场景未运行；字段修正待新增量复验。候选拒绝仍需定位，未扩大白名单或宣称真实升级完成。
 
-本提交的 `console-binding-04` 仅补 Windows Codex npm 探针所需的精确系统控制台依赖：文件租约之外仍须同 Job、同 AppContainer SID、零 capability，失败保持拒绝；退出未获全部真实句柄确认时不记清理成功。当前本地 check、i18n 重试02（11项）及 actionlint 通过，首次链接空间不足失败保留，Windows 原生／升级恢复仍未验，不扩大消费者支持承诺。复用既有英中探针失败提示，无需本地化变更；GUI／在线联测后置，G09 不关闭。
+`43c9709d2` 的 `console-binding-04` 已补 Windows Codex npm 精确控制台依赖，文件租约、同 Job、同 AppContainer SID、零 capability 与真实退出确认仍强制。同提交 Windows 编译及普通／原生边界回归通过，但真实 npm 首个 CMD 候选返回 `RecoveryRequired`，stderr 报工作目录不兼容及拒绝访问，清理未确认；发布、PowerShell 与恢复未到达，不扩大消费者支持承诺。本地 check、i18n 重试02（11项）和 actionlint 通过，首次空间不足失败保留。复用英中探针失败提示，无需本地化变更；修复及 GUI／在线联测按用户要求后置，G09 不关闭。
 
 `debed8c51` 补接有效专属 Grok 的上下文草稿队列及 Linux／Windows 升级空闲通知，英中提示已同步，本地门禁通过；真实三平台／远端发送、双语布局及同提交平台结果仍待补，G01/G09 不关闭。
 

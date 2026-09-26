@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "ba73c4df359751603133509a016b0ee92c139848",
+  "product_behavior_freeze": "43c9709d2a1000ebccd3820e386022babba34599",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -918,6 +918,22 @@
       "scope": "内置盘联测应用包；资源逐文件核对，显式临时签名未查询开发者证书。未启动、未认证或完成GUI验收。",
       "later_bundle_record": "g09_isolation_preflight_increment.prepared_macos_bundle",
       "retired_cache": "2026-09-27经停用缓存清单核验后清理未执行的旧.app；原始准备收据/资源账本保留，当前待联测包见g09_isolation_preflight_increment.prepared_macos_bundle之后的8876fa3c5记录。"
+    },
+    "latest_code_path_review": {
+      "source_commit": "43c9709d2a1000ebccd3820e386022babba34599",
+      "scopes": [
+        "G01",
+        "G03",
+        "G04",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "G10"
+      ],
+      "result": "两项独立只读复核未发现确定的产品入口漏接；不把固定父权限/版本限制或未验原生能力改写为已完成。",
+      "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
+      "macos_intel": "按用户明确要求排除，包括Codex"
     }
   },
   "g09_npm_live_increment": {
@@ -1490,7 +1506,7 @@
     "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "ba73c4df359751603133509a016b0ee92c139848",
+  "latest_implementation_commit": "43c9709d2a1000ebccd3820e386022babba34599",
   "latest_increment": "windows_npm_console_binding_increment",
   "supported_platforms": [
     "macos-arm64",
@@ -1724,8 +1740,8 @@
   },
   "windows_npm_console_binding_increment": {
     "date": "2026-09-27",
-    "implementation_commit": "本提交；提交后在仓外另存Git blob绑定",
-    "status": "实现已纳入本次提交，本地check、i18n重试02与actionlint通过；Windows原生和同提交门禁待验，G09不关闭",
+    "implementation_commit": "43c9709d2a1000ebccd3820e386022babba34599",
+    "status": "43c9709d2已提交推送，本地门禁和同提交Windows编译/边界回归通过；真实Codex npm首个CMD候选失败且清理未确认，G09不关闭",
     "scope": "仅Windows x64 Codex npm公共入口候选探针的精确System32/conhost.exe依赖；不扩大其他探针或系统目录允许范围",
     "implementation": "派生前锁定系统API定位的conhost单文件及祖先，核普通文件、受保护owner/DACL、PE、FileID、大小和摘要；CREATE事件在Continue前另核真实hProcess属于本次精确Job、同AppContainer SID且零capability。不满足仍拒绝，不替换官方包或修改全局配置。",
     "cleanup": "所有待确认退出句柄保存在debug session中，跨错误和Wait超时保留，仅全部signaled后清空；Job外被拒进程通过本次真实句柄发起终止后才继续事件，失败保持pending/Unknown。正常及中止路径均完成句柄确认后再核根进程/Job0并恢复ACL、删除profile，才能写清理收据。",
@@ -1734,7 +1750,7 @@
       "platform": "macos-arm64",
       "cargo_check": "check-01通过，exit0，99.26秒",
       "i18n": "i18n-01链接阶段因errno28磁盘空间不足退出101，237.07秒；测试未运行，原日志保留",
-      "windows_native": "未执行本增量",
+      "windows_native": "本地macOS不执行Windows原生场景；同提交云端结果见same_commit_ci",
       "actionlint": "actionlint-01通过",
       "diff_check": "diff-01通过",
       "i18n_retry": "i18n-02通过，11项，exit0，251.61秒；同source-snapshot-01，保留首次ENOSPC原日志",
@@ -1744,7 +1760,7 @@
     "patch_sha256": "1883326785a274f86abdfeb7db8cbf7426246080d3ab15d48b63a7e66cd29307",
     "draft_index_sha256": "16b387586e42e22a6f87e96c039adf5a80b0fc4d54b60c39cdb37e47a1bf640b",
     "localization": "无需本地化变更；复用英中settings-cli-updates-probe-failed，新增脱敏诊断不进入界面。",
-    "acceptance_boundary": "不继承ba73c4df3或CI36275037039的门禁；Windows原生及同提交验收待补，GUI/在线联测后置，macOS Intel排除。",
+    "acceptance_boundary": "同提交Windows结果仅按下列范围计证；Codex npm未到发布/恢复，GUI/在线联测后置，macOS Intel排除；不继承其他提交通过或清理结论。",
     "closed_gaps": [],
     "goal_complete": false,
     "cache_cleanup": {
@@ -1752,7 +1768,78 @@
       "receipt_sha256": "c79712e89697f0d3dbfb91b4b84e2024bb4fc27b81d36608730d76b8c18fe722",
       "scope": "已核摘要和无占用，仅删除从未执行且被8876fa3c5取代的b78b62a48/2b59c8c62应用缓存，268文件；保留原准备收据、资源账本、实际验收程序和当前8876fa3c5包。",
       "free_bytes_after": 2465824768,
-      "historical_paths": "两旧准备包路径已失效；历史executed:false与准备结论保留，旧包装脚本若再用须选当前基底。"
+      "historical_paths": "两旧准备包路径已失效；历史executed:false与准备结论保留，旧包装脚本若再用须选当前基底。",
+      "unit_followup": "普通i18n02单测程序已结束且源摘要/原收据保留，仅退休其826550008字节可重建缓存以构建新app；retired-unit-cache-04.safe.json，不涉及native验收程序。"
+    },
+    "source_commit_binding_sha256": "f08458ad80aea769b684666ccaa03960da48c33666e09ca706a8baf6696feb0b",
+    "same_commit_ci": {
+      "run_id": 36277108115,
+      "head_sha": "43c9709d2a1000ebccd3820e386022babba34599",
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36277108115",
+      "status": "completed",
+      "platforms": [
+        "windows-x64"
+      ],
+      "macos_intel": false,
+      "linux_unchanged": true,
+      "full_workspace": false,
+      "gui_or_model": false,
+      "scope": "Windows编译、978项主回归、5项command回归和7项显式原生边界回归通过；Codex 0.156.1私有npm真实事务首个CMD候选失败。",
+      "conclusion": "failure",
+      "job_id": 108501893434,
+      "passed": {
+        "cargo_check": true,
+        "warp_focused": 978,
+        "command": 5,
+        "atomic_native": 7,
+        "new_console_unit": 3,
+        "new_command_console_unit": 2,
+        "new_console_native": 2,
+        "unbound_child_rejection_and_cleanup": true
+      },
+      "npm_failure": {
+        "scenario": "updated",
+        "entry": "cmd",
+        "generation": "52dcdf97-c48f-4ea4-a71e-4c243346933e",
+        "result": "RecoveryRequired",
+        "journal_phase": "Prepared",
+        "observed_generations": 1,
+        "stderr": "CMD将verbatim目录误作UNC路径，回退Windows目录后报告拒绝访问；具体拒绝对象及清理失败原因未定。",
+        "cleanup_confirmed": false,
+        "exit_reason": "stop_requested",
+        "appcontainer_cleanup_receipt_present": false,
+        "not_reached": [
+          "PowerShell候选",
+          "版本发布",
+          "后续恢复场景"
+        ],
+        "followup": "npm专属CreateProcessW的cwd仍使用execution_path()，后续应在保留目录句柄/身份校验的前提下核对DOS路径传递；不是唯一根因结论，不放宽Job/token/文件租约边界。"
+      },
+      "evidence_archive": "validation/windows-npm-console-binding-20260927/ci-36277108115",
+      "original_job_log_sha256": "159339121c0b2f027b3eb9ab48377f0584ae40af6a6ea8168bd700aa67e17ac8",
+      "original_stderr_sha256": "533025afc65a9b6e9ae781e546a1d2c6bd00f149c22d02a1b7baab5433a65824",
+      "original_exit_receipt_sha256": "b83dd9d038d296d6c6fa54e94155e8ec74ae94a7c31e4fc4b2d9a70cc94ae1d4",
+      "collection_boundary": "两个小ZIP完整核官方摘要；462446568字节npm ZIP仅按Range保存37个选定原始成员，未验证完整ZIP摘要，未下载大二进制。",
+      "next_work_order": "按用户代码优先、修复与完整联测后置要求保留本轮失败，不自动重试或扩大验证矩阵；Goal仍active。",
+      "diagnosis_receipt": "job-text-01/diagnosis.safe.json",
+      "diagnosis_sha256": "7d82e2cbedd6a11e4debee0c71c39a868c01e2f9d6a0469f8a99577ae60be5d1",
+      "raw_member_collection_sha256": "d48f377a456bc8faa11897ee1315fdc96de79cee230746b3f77a015167dce440"
+    },
+    "prepared_macos_bundle": {
+      "source_commit": "43c9709d2a1000ebccd3820e386022babba34599",
+      "archive": "validation/code-checkpoint-app-43c9709d2-20260927/prepared-app-43c9709d2",
+      "app": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/43c9709d2/InfiniShellParity-43c9709d2.app",
+      "architecture": "arm64",
+      "build": "178.44秒通过；debug-embed与命令局部dev.strip=none",
+      "source_binary_sha256": "003577f0cc33c31eda1fd62c88215ab674f44cf71254aca353388651299e38aa",
+      "signed_binary_sha256": "317fa4e8165a7e5af8600922e63a365c6d4e0453c1e4ca87dc0483c35a1ac248",
+      "receipt_sha256": "a0f096b3bd5f58d390fa3bc0eee3db08f47d592993f96a041b0b81bd5842022a",
+      "archive_index_sha256": "c291df9d481f016fa4507c42f9b2e4bb54a180e85e40d1fa35c952442866926e",
+      "embedded_ftl": "目标提交四份英中Fluent完整字节在签名前后均核验，外置131资源账本一致",
+      "signature_verified": true,
+      "executed": false,
+      "profile": "parity-code-43c9709d2",
+      "scope": "准备内置盘联合测试包；含最新Claude/Grok图片技能代码，不代替GUI、模型、布局或debug-embed运行测试。887旧包保留。"
     }
   }
 }

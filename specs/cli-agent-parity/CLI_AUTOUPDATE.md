@@ -10,7 +10,7 @@
 
 `ca37b9cbf` 已补 Windows npm 拒绝后的显式 Job／ACL／profile 清理与脱敏映像诊断；本地编译和 i18n 门禁通过，仅 Windows 的[同提交验证 36270700886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36270700886) 因 Win32 事件码字段类型错误在编译阶段失败，原生场景未运行；字段修正待新增量复验。候选拒绝仍需定位，未扩大白名单或宣称真实升级完成。
 
-后续 `console-binding-04` 已纳入本次提交：仅 Codex npm 候选预先绑定系统 `conhost.exe` 的精确文件租约，并在事件继续前验证本次 Job、相同 AppContainer SID 与零 capability；不能满足仍拒绝，未知映像及系统目录兜底不放行。所有已观察进程句柄跨错误／超时保留，全部确认退出后才允许清理收据。本地 check、i18n 重试02（11项）及 actionlint 通过，首次链接空间不足失败保留；Windows 原生和真实事务未验，不关闭 G09。无需本地化变更，归档及边界见[验证结论](VALIDATION_REPORT.md)。
+后续 `console-binding-04` 已在 `43c9709d2` 提交：仅 Codex npm 候选预先绑定系统 `conhost.exe` 精确租约，并在事件继续前验证本次 Job、相同 AppContainer SID 与零 capability；未知映像及系统目录兜底不放行，所有退出句柄跨失败保留。同提交 Windows 编译和普通／原生边界回归通过；真实 `0.156.1` npm 的首个 CMD 候选仍在 `Prepared` 返回 `RecoveryRequired`，CMD 报 verbatim 工作目录不兼容及拒绝访问，`cleanup_confirmed=false`，缺 AppContainer 清理收据；PowerShell、发布和后续恢复未到达。后续须核 npm 专属 cwd 的 DOS 路径传递及独立清理原因，不能仅据 stderr 判定全部根因。本地 check、i18n 重试02（11项）和 actionlint 通过，首次链接空间不足原件保留；无需本地化变更，不关闭 G09，详见[验证结论](VALIDATION_REPORT.md)。
 
 `debed8c51` 已补 Linux／Windows 的会话模型变更通知，使专属 Grok 恢复清理后重新同步空闲条件；沿用既有英中等待说明，本地门禁通过，真实更新链待验。`c7ef8d95b` 仅修 Python 重解析点验收夹具，生产来源与隔离合同不变。
 
