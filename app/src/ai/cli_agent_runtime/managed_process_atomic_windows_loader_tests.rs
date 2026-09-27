@@ -14,6 +14,7 @@ pub(super) struct LoaderTrace {
     emitted_bytes: usize,
     dropped_events: usize,
     dll_counts: HashMap<u32, usize>,
+    pub(super) bound_console_exit_events: usize,
 }
 
 impl LoaderTrace {
@@ -76,12 +77,24 @@ impl LoaderTrace {
                     "tokens": loader_tokens(&text),
                 })
             }
-            EXIT_PROCESS_DEBUG_EVENT => serde_json::json!({
-                "event": "loader_exit_summary",
-                "dll_events": self.dll_counts.remove(&event.dwProcessId).unwrap_or(0),
-                "initial_breakpoint_observed": session.initial_breakpoints.contains(&event.dwProcessId),
-                "dropped_events": self.dropped_events,
-            }),
+            EXIT_PROCESS_DEBUG_EVENT => {
+                // 角色仅在原 CREATE 的身份、Job 和令牌全部核验后赋值。
+                // 这里只记收到 EXIT；调用方还必须要求完整 drain 和清理成功。
+                if role == "console"
+                    && session
+                        .npm_diagnostics
+                        .as_ref()
+                        .is_some_and(|diagnostics| !diagnostics.cleanup)
+                {
+                    self.bound_console_exit_events += 1;
+                }
+                serde_json::json!({
+                    "event": "loader_exit_summary",
+                    "dll_events": self.dll_counts.remove(&event.dwProcessId).unwrap_or(0),
+                    "initial_breakpoint_observed": session.initial_breakpoints.contains(&event.dwProcessId),
+                    "dropped_events": self.dropped_events,
+                })
+            }
             CREATE_PROCESS_DEBUG_EVENT
             | CREATE_THREAD_DEBUG_EVENT
             | EXIT_THREAD_DEBUG_EVENT

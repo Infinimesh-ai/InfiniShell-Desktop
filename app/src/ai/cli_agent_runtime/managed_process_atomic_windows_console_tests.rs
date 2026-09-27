@@ -859,16 +859,58 @@ fn npm_fixed_node_root_with_worker_stdio() {
     );
 }
 
+#[test]
+#[ignore = "隐藏独立控制台的 CMD 基线须保持相同 Job 与 AppContainer 核验"]
+fn npm_cmd_full_shim_bound_cmd_with_hidden_console() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_cmd_full_shim_bound_cmd_with_hidden_console",
+        WorkerStdioControl::HiddenBoundCmd,
+    );
+}
+
+#[test]
+#[ignore = "隐藏独立控制台的 Node 子进程须显式核验版本、映像及完整清理"]
+fn npm_cmd_full_shim_fixed_node_with_hidden_console() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_cmd_full_shim_fixed_node_with_hidden_console",
+        WorkerStdioControl::HiddenNodeChild,
+    );
+}
+
+#[test]
+#[ignore = "隐藏独立控制台的 Node 根进程须与原控制台模式独立对照"]
+fn npm_fixed_node_root_with_hidden_console() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_fixed_node_root_with_hidden_console",
+        WorkerStdioControl::HiddenNodeRoot,
+    );
+}
+
 #[derive(Clone, Copy)]
 enum WorkerStdioControl {
     BoundCmd,
     NodeChild,
     NodeRoot,
+    HiddenBoundCmd,
+    HiddenNodeChild,
+    HiddenNodeRoot,
 }
 
 fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
-    let real_node = !matches!(mode, WorkerStdioControl::BoundCmd);
-    let shim_executed = !matches!(mode, WorkerStdioControl::NodeRoot);
+    let real_node = !matches!(
+        mode,
+        WorkerStdioControl::BoundCmd | WorkerStdioControl::HiddenBoundCmd
+    );
+    let shim_executed = !matches!(
+        mode,
+        WorkerStdioControl::NodeRoot | WorkerStdioControl::HiddenNodeRoot
+    );
+    let hidden_console = matches!(
+        mode,
+        WorkerStdioControl::HiddenBoundCmd
+            | WorkerStdioControl::HiddenNodeChild
+            | WorkerStdioControl::HiddenNodeRoot
+    );
     let (case, expected_line, child_arguments) = match mode {
         WorkerStdioControl::BoundCmd => (
             "bound_cmd",
@@ -877,6 +919,17 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         ),
         WorkerStdioControl::NodeChild => ("node_20_9_0", "v20.9.0", "--version"),
         WorkerStdioControl::NodeRoot => ("node_20_9_0_root", "v20.9.0", "--version"),
+        WorkerStdioControl::HiddenBoundCmd => (
+            "bound_cmd_hidden_console",
+            "routing-child",
+            r#"/d /v:off /s /c "echo routing-child""#,
+        ),
+        WorkerStdioControl::HiddenNodeChild => {
+            ("node_20_9_0_hidden_console", "v20.9.0", "--version")
+        }
+        WorkerStdioControl::HiddenNodeRoot => {
+            ("node_20_9_0_root_hidden_console", "v20.9.0", "--version")
+        }
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_stdio_fixture_in_strict_job(name, case, expected_line);
@@ -891,6 +944,7 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         "atomic_windows_cmd_stdio_handles={}",
         serde_json::json!({
             "case": case,
+            "console_mode": if hidden_console { "hidden_new_console" } else { "no_window" },
             "stdio_scope": "npm_acceptance_fixture",
             "stdin_kind": stdin_kind,
             "stdout_kind": stdout_kind,
@@ -996,7 +1050,13 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     } else {
         "--version"
     };
-    let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+    // 新模式仅由本对照显式选择；正式 npm 调用及其他来源继续使用原默认入口。
+    let spawn = if hidden_console {
+        AppContainerProbe::spawn_package_suspended_with_hidden_console
+    } else {
+        AppContainerProbe::spawn_package_suspended_with_execution_cwd
+    };
+    let mut process = spawn(
         lease.execution_path(),
         arguments.as_ref(),
         cwd.execution_path(),
@@ -1055,6 +1115,11 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
                 .as_ref()
                 .is_err_and(|failure| failure.kind() == io::ErrorKind::NotFound)
     });
+    let bound_console_exit_events = debugger
+        .loader_trace
+        .as_ref()
+        .unwrap()
+        .bound_console_exit_events;
     let receipt_matches = fs::read(&receipt)
         .is_ok_and(|bytes| bytes == b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n");
     eprintln!(
@@ -1062,6 +1127,7 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         serde_json::json!({
             "case": case,
             "real_node": real_node,
+            "console_mode": if hidden_console { "hidden_new_console" } else { "no_window" },
             "shim_executed": shim_executed,
             "source_sha256": expected_source.sha256,
             "native_exit_code": result.as_ref().ok().copied(),
@@ -1070,6 +1136,7 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
             "before_marker_matches": before_matches,
             "branch_marker_matches": branch_matches,
             "shim_markers_absent": shim_markers_absent,
+            "bound_console_exit_events": bound_console_exit_events,
             "cleanup_confirmed": cleanup.is_ok(),
             "cleanup_failure_kind": cleanup.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
             "cleanup_os_code": cleanup.as_ref().err().and_then(io::Error::raw_os_error),
@@ -1079,6 +1146,12 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     );
     cleanup.expect("标准流对照必须恢复 ACL、删除 profile 并清空 Job");
     assert_eq!(result.unwrap(), 0);
+    if hidden_console {
+        assert!(
+            bound_console_exit_events > 0,
+            "隐藏控制台必须取得已核验 conhost 的退出事件"
+        );
+    }
     if shim_executed {
         assert_eq!(before_matches, Some(true));
         assert_eq!(branch_matches, Some(true));

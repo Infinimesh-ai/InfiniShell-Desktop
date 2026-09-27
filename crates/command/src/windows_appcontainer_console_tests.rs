@@ -5,6 +5,91 @@ use std::os::windows::io::AsHandle as _;
 use super::*;
 
 #[test]
+fn no_window_mode_preserves_redirected_standard_handles_without_show_flags() {
+    // 仅比较启动结构中的哨兵值，不把它们交给任何句柄 API。
+    let mut startup = STARTUPINFOW {
+        dwFlags: STARTF_USESTDHANDLES,
+        hStdInput: HANDLE(11_usize as *mut c_void),
+        hStdOutput: HANDLE(12_usize as *mut c_void),
+        hStdError: HANDLE(13_usize as *mut c_void),
+        ..Default::default()
+    };
+
+    let flags = ProbeConsoleMode::NoWindow.configure_startup(&mut startup);
+
+    assert_eq!(flags, CREATE_NO_WINDOW);
+    assert_eq!(flags & CREATE_NEW_CONSOLE, PROCESS_CREATION_FLAGS(0));
+    assert_eq!(startup.dwFlags, STARTF_USESTDHANDLES);
+    assert_eq!(startup.wShowWindow, 0);
+    assert_eq!(startup.hStdInput, HANDLE(11_usize as *mut c_void));
+    assert_eq!(startup.hStdOutput, HANDLE(12_usize as *mut c_void));
+    assert_eq!(startup.hStdError, HANDLE(13_usize as *mut c_void));
+}
+
+#[test]
+fn hidden_new_console_preserves_redirected_standard_handles_and_excludes_no_window() {
+    // 隐藏窗口不能把固定标准流重置成新控制台的输入或屏幕缓冲区。
+    let mut startup = STARTUPINFOW {
+        dwFlags: STARTF_USESTDHANDLES,
+        hStdInput: HANDLE(21_usize as *mut c_void),
+        hStdOutput: HANDLE(22_usize as *mut c_void),
+        hStdError: HANDLE(23_usize as *mut c_void),
+        ..Default::default()
+    };
+
+    let flags = ProbeConsoleMode::HiddenNewConsole.configure_startup(&mut startup);
+
+    assert_eq!(flags, CREATE_NEW_CONSOLE);
+    assert_eq!(flags & CREATE_NO_WINDOW, PROCESS_CREATION_FLAGS(0));
+    assert_eq!(startup.dwFlags, STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW);
+    assert_eq!(startup.wShowWindow, SW_HIDE.0 as u16);
+    assert_eq!(startup.hStdInput, HANDLE(21_usize as *mut c_void));
+    assert_eq!(startup.hStdOutput, HANDLE(22_usize as *mut c_void));
+    assert_eq!(startup.hStdError, HANDLE(23_usize as *mut c_void));
+}
+
+#[test]
+fn hidden_console_rejects_a_different_execution_directory_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+
+    let result = AppContainerProbe::spawn_package_suspended_with_hidden_console(
+        Path::new("unused.exe"),
+        "unused".as_ref(),
+        &cwd,
+        other.path(),
+        &[],
+        "unused-profile",
+        &[],
+    );
+
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
+#[test]
+fn hidden_console_rejects_readonly_objects_outside_the_candidate_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+
+    let result = AppContainerProbe::spawn_package_suspended_with_hidden_console(
+        Path::new("unused.exe"),
+        "unused".as_ref(),
+        &cwd,
+        &cwd,
+        &[],
+        "unused-profile",
+        &[other.path().canonicalize().unwrap()],
+    );
+
+    assert_eq!(
+        result.err().unwrap().to_string(),
+        "包探针的只读对象范围无效"
+    );
+}
+
+#[test]
 fn package_execution_cwd_rejects_a_different_directory_before_creating_profile() {
     let directory = tempfile::tempdir().unwrap();
     let cwd = directory.path().canonicalize().unwrap();

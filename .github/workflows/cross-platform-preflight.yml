@@ -1470,7 +1470,7 @@ jobs:
         run: cargo nextest run --no-fail-fast -p warp_tui --lib -E 'test(tool_call_labels::tests::)'
 
       - name: Test managed command process ownership
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && (!cancelled() && steps.check_app.outcome == 'success') }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
 

@@ -39,14 +39,15 @@ use windows::Win32::System::JobObjects::{
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::Threading::{
-    CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW, DEBUG_PROCESS,
-    DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT, GetCurrentProcess,
-    GetExitCodeProcess, InitializeProcThreadAttributeList, LPPROC_THREAD_ATTRIBUTE_LIST,
-    OpenProcessToken, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
-    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_INFORMATION, ResumeThread,
-    STARTF_USESTDHANDLES, STARTUPINFOEXW, TerminateProcess, UpdateProcThreadAttribute,
-    WaitForSingleObject,
+    CREATE_NEW_CONSOLE, CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
+    CreateProcessW, DEBUG_PROCESS, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
+    GetCurrentProcess, GetExitCodeProcess, InitializeProcThreadAttributeList,
+    LPPROC_THREAD_ATTRIBUTE_LIST, OpenProcessToken, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_CREATION_FLAGS, PROCESS_INFORMATION,
+    ResumeThread, STARTF_USESHOWWINDOW, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW,
+    TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
+use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{BOOL, PCWSTR, PWSTR};
 
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
@@ -264,6 +265,25 @@ pub struct AppContainerProbe {
     cleaned: bool,
 }
 
+enum ProbeConsoleMode {
+    NoWindow,
+    HiddenNewConsole,
+}
+
+impl ProbeConsoleMode {
+    fn configure_startup(self, startup: &mut STARTUPINFOW) -> PROCESS_CREATION_FLAGS {
+        match self {
+            Self::NoWindow => CREATE_NO_WINDOW,
+            Self::HiddenNewConsole => {
+                // 隐藏独立控制台，不替换调用方绑定的三个标准流句柄。
+                startup.dwFlags |= STARTF_USESHOWWINDOW;
+                startup.wShowWindow = SW_HIDE.0 as u16;
+                CREATE_NEW_CONSOLE
+            }
+        }
+    }
+}
+
 impl AppContainerProbe {
     pub fn spawn_suspended(
         program: &Path,
@@ -271,7 +291,16 @@ impl AppContainerProbe {
         environment: &[(OsString, OsString)],
         name: &str,
     ) -> io::Result<Self> {
-        Self::spawn_internal(program, None, cwd, cwd, environment, name, None)
+        Self::spawn_internal(
+            program,
+            None,
+            cwd,
+            cwd,
+            environment,
+            name,
+            None,
+            ProbeConsoleMode::NoWindow,
+        )
     }
 
     /// 调用方绑定固定公共包装入口；候选树只读，仍先核对零 capability 与严格 Job。
@@ -304,6 +333,50 @@ impl AppContainerProbe {
         name: &str,
         readonly: &[std::path::PathBuf],
     ) -> io::Result<Self> {
+        Self::spawn_package_internal(
+            program,
+            arguments,
+            cwd,
+            execution_cwd,
+            environment,
+            name,
+            readonly,
+            ProbeConsoleMode::NoWindow,
+        )
+    }
+
+    /// 显式选择隐藏独立控制台；调用方仍须绑定精确控制台宿主并核验完整调试进程树。
+    pub fn spawn_package_suspended_with_hidden_console(
+        program: &Path,
+        arguments: &std::ffi::OsStr,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+    ) -> io::Result<Self> {
+        Self::spawn_package_internal(
+            program,
+            arguments,
+            cwd,
+            execution_cwd,
+            environment,
+            name,
+            readonly,
+            ProbeConsoleMode::HiddenNewConsole,
+        )
+    }
+
+    fn spawn_package_internal(
+        program: &Path,
+        arguments: &std::ffi::OsStr,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+        console_mode: ProbeConsoleMode,
+    ) -> io::Result<Self> {
         if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
             return Err(io::Error::other("版本探针执行目录不匹配"));
         }
@@ -323,6 +396,7 @@ impl AppContainerProbe {
             environment,
             name,
             Some(readonly),
+            console_mode,
         )
     }
 
@@ -334,6 +408,7 @@ impl AppContainerProbe {
         environment: &[(OsString, OsString)],
         name: &str,
         readonly: Option<&[std::path::PathBuf]>,
+        console_mode: ProbeConsoleMode,
     ) -> io::Result<Self> {
         if !name.starts_with("InfiniShell.Version.")
             || name.len() != "InfiniShell.Version.".len() + 36
@@ -455,6 +530,7 @@ impl AppContainerProbe {
         startup.StartupInfo.hStdOutput = handles[1];
         startup.StartupInfo.hStdError = handles[2];
         startup.lpAttributeList = attributes.list;
+        let console_flags = console_mode.configure_startup(&mut startup.StartupInfo);
         let program_wide = wide(program.as_os_str())?;
         if program_wide.contains(&(b'"' as u16)) {
             return Err(io::Error::other("版本探针路径含引号"));
@@ -491,7 +567,7 @@ impl AppContainerProbe {
                 None,
                 true,
                 CREATE_SUSPENDED
-                    | CREATE_NO_WINDOW
+                    | console_flags
                     | CREATE_UNICODE_ENVIRONMENT
                     | EXTENDED_STARTUPINFO_PRESENT
                     | DEBUG_PROCESS,

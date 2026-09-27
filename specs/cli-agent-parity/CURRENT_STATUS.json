@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Windows 4c4b73c1d 固定Node标准流对照已自然退出0xc0000142，CMD基线通过，清理确认；继续定位loader初始化并比较同一Node根/子进程拓扑，不改官方入口或放宽隔离。真实npm原ProbeFailed保留，随后补G01/G03审批、恢复、多附件和其他平台真实链；14项必要缺项仍开放。"
+    "next_work_order": "固定Node根/子均在首断点后自然退出0xc0000142；shim不是必要条件。继续通过显式测试入口比较隐藏独立控制台，生产默认和隔离不变；不能指定致错DLL或等同旧npm超时。随后补G01/G03审批、恢复、多附件和其他平台真实链；14项必要缺项开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -2261,7 +2261,7 @@
     "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
     "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
     "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
-    "next": "保留原成功断言；在固定Node/CMD受控测试中观察DLL加载、异常与首断点，并对照同一Node直接作为隔离根进程；尚未证明具体DLL或真实npm挂起根因。",
+    "next": "保持生产默认；仅新增隐藏独立控制台显式测试入口，与原3组对照比较；不得放宽隔离或改写官方shim。",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "cmd_shim_matrix": {
@@ -2320,6 +2320,27 @@
       "node_parent_job_cleanup_confirmed": true,
       "summary_sha256": "e17c30272bebe420442e56565974fcb9e56a960269e0479c2a5eb0fe8487abd1",
       "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-node-stdio"
+    },
+    "fixed_node_loader_control": {
+      "source_commit": "70c1725609a2a8c6545febb3cc01c58a9b0ef9e2",
+      "run_id": 36327294348,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36327294348",
+      "result": "failure",
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 504,
+      "loader_units_passed": 3,
+      "atomic_passed": 16,
+      "atomic_failed": 3,
+      "atomic_retries": 0,
+      "job_log_sha256": "463cd829caca7d55199cccbae38f30885aa1f378c4b7ae81c436146e8d0e6770",
+      "interpretation": "固定Node根和子进程均在首断点后自然DLL初始化失败，shim不是必要条件；具体DLL及真实npm超时根因仍未知。conhost首机会异常也出现在成功CMD基线，不能直接认作致命根因。",
+      "real_npm_rerun": false,
+      "artifact_id": 10934806024,
+      "artifact_scope": "9个小成员逐项CRC/SHA256，未核整ZIP摘要",
+      "next": "保持生产默认；仅新增隐藏独立控制台显式测试入口，与原3组对照比较；不得放宽隔离或改写官方shim。",
+      "case_summary": "CMD基线退出0；固定Node根/子均0xc0000142，无取消、无版本输出。根shim标记不存在，子shim标记匹配；3组Job及AppContainer清理确认。Node已见首断点，DLL事件根29/子28；所有摘要dropped_events=0。",
+      "summary_sha256": "6b6600c023890cfa8028806a47b511284daf66b2a58642ed1cfb297d4c24917c",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-node-loader"
     }
   }
 }
