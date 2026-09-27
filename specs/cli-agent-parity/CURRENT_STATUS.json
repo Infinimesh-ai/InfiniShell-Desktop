@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Windows b3908488c 真实 npm 首个 CMD 仍 ProbeFailed，清理确认；本轮没有重现旧 unknown CREATE。先比较完整 shim 的 PATH 选路与 stdin EOF/open，再按证据修复，不改写官方入口或放宽隔离。随后补 G01/G03 审批、恢复、多附件和其他平台真实链；14项必要缺项仍开放。"
+    "next_work_order": "Windows b3908488c真实npm首CMD仍ProbeFailed但清理确认；a0e6662b2的完整shim选路与stdin四组对照均通过。继续用固定Node及真实stdio布置收窄差异，不将CMD副本成功当npm成功，不改写官方入口或放宽隔离。随后补G01/G03审批、恢复、多附件和其他平台真实链；14项必要缺项仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -2261,8 +2261,26 @@
     "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
     "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
     "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
-    "next": "补完整 shim 选路与 stdin EOF/open 的绑定 CMD 原生对照；按结果决定下一次修复。",
+    "next": "固定Node真实镜像和绑定CMD基线，按真实stdin/stdout管道、stderr磁盘文件布置对照；不能先按未证实原因改生产逻辑。",
     "g09_closed": false,
-    "all_required_acceptance_satisfied": false
+    "all_required_acceptance_satisfied": false,
+    "cmd_shim_matrix": {
+      "source_commit": "a0e6662b2eab4aa2c4d36d575ae90a8b2d8504fb",
+      "run_id": 36324306564,
+      "result": "failure",
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 504,
+      "atomic_passed": 15,
+      "atomic_failed": 1,
+      "atomic_failure": "原NUL输出对照",
+      "new_cases_passed": 4,
+      "cases": "显式runtime路径/PATH裸node × stdin EOF/open；子映像均为绑定CMD副本，原生退出0、标记及清理确认。",
+      "real_npm": false,
+      "real_node": false,
+      "interpretation": "两个变量单独不足以复现挂起；不能以CMD副本正例代替真实Node。",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-shim-matrix",
+      "summary_sha256": "a34518b2a16ce6f34aff2ac74bf41c750bb03e6a867e6d3068287eee72bcae8b",
+      "job_log_sha256": "5736b293e94061f2cc10e639cb4eb1a200d105140c3e1a2c1c788bfac295525d"
+    }
   }
 }

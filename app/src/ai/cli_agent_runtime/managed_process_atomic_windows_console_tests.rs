@@ -833,6 +833,208 @@ fn run_cmd_full_shim_control(name: &str, explicit_node: bool, keep_stdin_open: b
 }
 
 #[test]
+#[ignore = "CMD 基线须在 npm 验收运行器的管道与磁盘 stderr 布置中显式验证"]
+fn npm_cmd_full_shim_bound_cmd_with_worker_stdio() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_cmd_full_shim_bound_cmd_with_worker_stdio",
+        false,
+    );
+}
+
+#[test]
+#[ignore = "固定 Node 20.9.0 须在 npm 验收标准流与 AppContainer 边界中显式验证"]
+fn npm_cmd_full_shim_fixed_node_with_worker_stdio() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_cmd_full_shim_fixed_node_with_worker_stdio",
+        true,
+    );
+}
+
+fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
+    let (case, expected_line, child_arguments) = if real_node {
+        ("node_20_9_0", "v20.9.0", "--version")
+    } else {
+        (
+            "bound_cmd",
+            "routing-child",
+            r#"/d /v:off /s /c "echo routing-child""#,
+        )
+    };
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_stdio_fixture_in_strict_job(name, case, expected_line);
+        return;
+    }
+    await_debug_driver_authorization();
+    // 此处对齐 cfg(test) 验收运行器；非测试产品的 stderr 仍是 Stdio::null()。
+    let [stdin_kind, stdout_kind, stderr_kind] =
+        [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE]
+            .map(|stream| unsafe { GetStdHandle(stream) }.map_or("unavailable", debug_stdio_kind));
+    eprintln!(
+        "atomic_windows_cmd_stdio_handles={}",
+        serde_json::json!({
+            "case": case,
+            "stdio_scope": "npm_acceptance_fixture",
+            "stdin_kind": stdin_kind,
+            "stdout_kind": stdout_kind,
+            "stderr_kind": stderr_kind,
+        })
+    );
+    assert_eq!(
+        (stdin_kind, stdout_kind, stderr_kind),
+        ("pipe", "pipe", "disk")
+    );
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    for relative in ["home", "config", "cache", "data", "tmp", "runtime"] {
+        fs::create_dir(root.join(relative)).unwrap();
+    }
+    let system = prepare_system_directory().unwrap();
+    let program = final_path_from_handle(&system.file)
+        .unwrap()
+        .join("cmd.exe");
+    let source = if real_node {
+        PathBuf::from(std::env::var_os(NODE_CONTROL_ENV).expect("必须提供固定 Node 输入"))
+            .canonicalize()
+            .unwrap()
+    } else {
+        program.clone()
+    };
+    let expected_source = ExpectedFileIdentity::capture(&source).unwrap();
+    if real_node {
+        let digest = std::env::var(NODE_CONTROL_SHA256_ENV)
+            .expect("必须提供固定 Node 的 SHA256")
+            .to_ascii_lowercase();
+        assert!(digest.len() == 64 && digest.bytes().all(|value| value.is_ascii_hexdigit()));
+        assert_eq!(expected_source.sha256, digest, "固定 Node 输入摘要不匹配");
+    }
+    // 原始 Node 始终持读租约；只从该句柄复制并核对摘要，执行仅使用私有副本。
+    let source_lease = prepare(&expected_source).unwrap();
+    let mut source_file = source_lease.program.try_clone().unwrap();
+    source_file.rewind().unwrap();
+    let runtime = root.join("runtime");
+    let child = runtime.join("node.exe");
+    let mut destination = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&child)
+        .unwrap();
+    assert_eq!(
+        io::copy(&mut source_file, &mut destination).unwrap(),
+        expected_source.size
+    );
+    destination.sync_all().unwrap();
+    drop(destination);
+    let expected_child = ExpectedFileIdentity::capture(&child).unwrap();
+    assert_eq!(expected_child.sha256, expected_source.sha256);
+    assert_eq!(expected_child.size, expected_source.size);
+    let script = root.join("worker-stdio-control.cmd");
+    // 诊断脚本保留官方选路控制流；参数为 CMD 标记或 Node --version，不运行 codex.js。
+    let contents = format!(
+        concat!(
+            "@ECHO off\r\nGOTO start\r\n:find_dp0\r\nSET dp0=%~dp0\r\nEXIT /b\r\n",
+            ":start\r\nSETLOCAL\r\nCALL :find_dp0\r\n>tmp\\before.txt echo routing-before\r\n",
+            "IF EXIST \"%dp0%\\node.exe\" (\r\n  SET \"_prog=%dp0%\\node.exe\"\r\n",
+            "  >tmp\\branch.txt echo explicit\r\n) ELSE (\r\n  SET \"_prog=node\"\r\n",
+            "  SET PATHEXT=%PATHEXT:;.JS;=;%\r\n  >tmp\\branch.txt echo path\r\n)\r\n",
+            "endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & \"%_prog%\" {child_arguments}\r\n"
+        ),
+        child_arguments = child_arguments,
+    );
+    fs::write(&script, contents).unwrap();
+    let script_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&script)
+        .unwrap();
+    let mut lease = prepare(&ExpectedFileIdentity::capture(&program).unwrap()).unwrap();
+    lease.set_package_images(vec![expected_child]).unwrap();
+    lease.enable_npm_console_host().unwrap();
+    let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
+    let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
+    assert_eq!(execution_cwd.canonicalize().unwrap(), root);
+    let mut environment = super::super::super::version_probe::resolved_environment(&root).unwrap();
+    let system_path = environment
+        .iter_mut()
+        .find(|(name, _)| name == "PATH")
+        .unwrap();
+    system_path.1 = std::env::join_paths(
+        std::iter::once(execution_cwd.join("runtime")).chain(std::env::split_paths(&system_path.1)),
+    )
+    .unwrap();
+    environment.push(("CODEX_HOME".into(), root.join("config").into_os_string()));
+    environment.push(("NODE_DISABLE_COMPILE_CACHE".into(), "1".into()));
+    environment.push(("COMSPEC".into(), program.into_os_string()));
+    let mut debugger = lease.prepare_image_debug_session().unwrap();
+    let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        lease.execution_path(),
+        r#"/d /v:off /s /c "worker-stdio-control.cmd""#.as_ref(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &environment,
+        &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+        &[runtime, script, child],
+    )
+    .unwrap();
+    let cancellation = Arc::new(AtomicBool::new(false));
+    debugger.bind_cancellation(cancellation.clone());
+    let (completed, completion) = mpsc::channel();
+    let watchdog = thread::spawn(move || {
+        if completion.recv_timeout(Duration::from_secs(30)).is_err() {
+            cancellation.store(true, Ordering::Release);
+        }
+    });
+    let result = (|| -> io::Result<u32> {
+        process.resume()?;
+        debugger.verify_package_initial_image_in_container(&process)?;
+        debugger.drain_package_in_container_until_exit(&process)?;
+        process.exit_code()
+    })();
+    let _ = completed.send(());
+    let watchdog_completed = watchdog.join().is_ok();
+    let termination = if result.is_err() {
+        debugger.record_package_termination_request();
+        process
+            .terminate_job()
+            .and_then(|()| debugger.drain_terminated_package_in_container(&process))
+    } else {
+        Ok(())
+    };
+    drop(cwd);
+    let receipt = root.join("appcontainer-cleanup-v1");
+    let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
+    drop(script_handle);
+    let before_matches =
+        fs::read(root.join("tmp/before.txt")).is_ok_and(|bytes| bytes == b"routing-before\r\n");
+    let branch_matches =
+        fs::read(root.join("tmp/branch.txt")).is_ok_and(|bytes| bytes == b"path\r\n");
+    let receipt_matches = fs::read(&receipt)
+        .is_ok_and(|bytes| bytes == b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n");
+    eprintln!(
+        "atomic_windows_cmd_stdio_control={}",
+        serde_json::json!({
+            "case": case,
+            "real_node": real_node,
+            "source_sha256": expected_source.sha256,
+            "native_exit_code": result.as_ref().ok().copied(),
+            "failure_kind": result.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
+            "os_code": result.as_ref().err().and_then(io::Error::raw_os_error),
+            "before_marker_matches": before_matches,
+            "branch_marker_matches": branch_matches,
+            "cleanup_confirmed": cleanup.is_ok(),
+            "cleanup_failure_kind": cleanup.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
+            "cleanup_os_code": cleanup.as_ref().err().and_then(io::Error::raw_os_error),
+            "receipt_matches": receipt_matches,
+            "watchdog_completed": watchdog_completed,
+        })
+    );
+    cleanup.expect("标准流对照必须恢复 ACL、删除 profile 并清空 Job");
+    assert_eq!(result.unwrap(), 0);
+    assert!(before_matches && branch_matches && receipt_matches && watchdog_completed);
+    record_debug_native_exit(name);
+}
+
+#[test]
 #[ignore = "Windows npm 缺少进程隔离核验时必须在首事件前停止"]
 fn npm_console_host_rejects_missing_container_guard() {
     let name = "console_binding::npm_console_host_rejects_missing_container_guard";

@@ -3,12 +3,19 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::io::{AsRawHandle as _, BorrowedHandle, FromRawHandle as _};
 use std::process::Stdio;
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 use command::blocking::Command as BlockingCommand;
 use command::managed::{Containment, ManagedTree};
 use command::windows::SuspendedChild;
+use windows::Win32::Storage::FileSystem::{
+    FILE_TYPE_CHAR, FILE_TYPE_DISK, FILE_TYPE_PIPE, GetFileType,
+};
+use windows::Win32::System::Console::{
+    GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+};
 use windows::Win32::System::LibraryLoader::LoadLibraryW;
 use windows::Win32::System::Threading::{
     DEBUG_PROCESS, GetCurrentProcessId, GetProcessId, OpenProcess,
@@ -58,6 +65,9 @@ const REAL_CLI_ENV_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_ENV";
 const REAL_CLI_TARGET_ENV: &str = "INFINISHELL_WINDOWS_REAL_CLI_TARGET";
 const DEBUG_DRIVER_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_DRIVER";
 const DEBUG_DRIVER_RECEIPT_ENV: &str = "INFINISHELL_WINDOWS_ATOMIC_DEBUG_RECEIPT";
+const NODE_CONTROL_ENV: &str = "INFINISHELL_WINDOWS_NODE_CONTROL";
+const NODE_CONTROL_SHA256_ENV: &str = "INFINISHELL_WINDOWS_NODE_CONTROL_SHA256";
+const NODE_CONTROL_OUTPUT_ENV: &str = "INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT";
 const DEBUG_DRIVER_TIMEOUT: Duration = Duration::from_secs(30);
 const DEBUG_LARGE_IMAGE_TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -176,6 +186,181 @@ fn run_debug_fixture_in_strict_job_with_stdin(
         "调试链 {test_name} 失败；严格 Job 已清空，测试根进程：{status}"
     );
     assert_eq!(fs::read_to_string(receipt).unwrap(), test_name);
+}
+
+fn run_debug_stdio_fixture_in_strict_job(test_name: &str, case: &str, expected_line: &str) {
+    const OUTPUT_LIMIT: usize = 64 * 1024;
+    let (_, test_module) = module_path!().split_once("::").unwrap();
+    let exact_name = format!("{test_module}::{test_name}");
+    let directory = tempfile::tempdir().unwrap();
+    let receipt = directory.path().join("native-exit.txt");
+    let stderr_path = directory.path().join("driver.stderr");
+    let stderr_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&stderr_path)
+        .unwrap();
+    let output_root = std::env::var_os(NODE_CONTROL_OUTPUT_ENV)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            tempfile::Builder::new()
+                .prefix("infinishell-node-control-evidence-")
+                .tempdir()
+                .unwrap()
+                .keep()
+        });
+    fs::create_dir_all(&output_root).unwrap();
+    let output = output_root.join(case);
+    fs::create_dir(&output).expect("stdio 对照证据目录必须全新，不能覆盖旧证据");
+    let stderr_kind = debug_stdio_kind(HANDLE(stderr_file.as_raw_handle()));
+    let mut command = Command::new(std::env::current_exe().unwrap());
+    command
+        .args([
+            "--ignored",
+            "--exact",
+            &exact_name,
+            "--nocapture",
+            "--test-threads=1",
+            "--format=terse",
+        ])
+        .env(DEBUG_DRIVER_ENV, "1")
+        .env(DEBUG_DRIVER_RECEIPT_ENV, &receipt)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::from(stderr_file))
+        .inherit_managed_job();
+    let mut tree = ManagedTree::claim(command.spawn().unwrap()).unwrap();
+    assert_eq!(tree.containment(), Containment::WindowsJob);
+    let mut input = tree.child_mut().stdin.take().unwrap();
+    let mut stdout = tree.child_mut().stdout.take().unwrap();
+    let stdin_kind = debug_stdio_kind(HANDLE(input.as_raw_handle()));
+    let stdout_kind = debug_stdio_kind(HANDLE(stdout.as_raw_handle()));
+    let stdout_exceeded = Arc::new(AtomicBool::new(false));
+    let reader_exceeded = stdout_exceeded.clone();
+    let (capture_sender, capture_receiver) = mpsc::channel();
+    // 始终排空管道，只保留前 64 KiB；超量同时通知父线程终止本次严格 Job。
+    let reader = thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let mut total = 0_u64;
+        let mut buffer = [0_u8; 4096];
+        let failure = loop {
+            match stdout.read(&mut buffer) {
+                Ok(0) => break None,
+                Ok(count) => {
+                    total = total.saturating_add(count as u64);
+                    let keep = count.min(OUTPUT_LIMIT.saturating_sub(bytes.len()));
+                    bytes.extend_from_slice(&buffer[..keep]);
+                    if keep != count {
+                        reader_exceeded.store(true, Ordering::Release);
+                    }
+                }
+                Err(failure) if failure.kind() == io::ErrorKind::Interrupted => {}
+                Err(failure) => break Some(format!("{:?}", failure.kind())),
+            }
+        };
+        let _ = capture_sender.send((bytes, total, failure));
+    });
+    let mut stderr_exceeded = false;
+    let deadline = Instant::now() + DEBUG_LARGE_IMAGE_TIMEOUT;
+    let outcome = input.write_all(b"1").and_then(|()| {
+        loop {
+            stderr_exceeded = fs::metadata(&stderr_path)?.len() > OUTPUT_LIMIT as u64;
+            if stderr_exceeded || stdout_exceeded.load(Ordering::Acquire) {
+                break Ok(false);
+            }
+            if tree.root_exited()? {
+                break Ok(false);
+            }
+            if Instant::now() >= deadline {
+                break Ok(true);
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+    });
+    // stdin 写端一直保留到 Job 收尾，不能用提前 EOF 掩盖原生进程挂起。
+    let status = tree.terminate_and_confirm(Duration::from_secs(5));
+    drop(input);
+    let captured = capture_receiver.recv_timeout(Duration::from_secs(5));
+    let reader_completed = captured.is_ok() && reader.join().is_ok();
+    let (stdout_bytes, stdout_total, stdout_failure) =
+        captured.unwrap_or_else(|failure| (Vec::new(), 0, Some(format!("{failure:?}"))));
+    let stderr_total = fs::metadata(&stderr_path).unwrap().len();
+    stderr_exceeded |= stderr_total > OUTPUT_LIMIT as u64;
+    let mut stderr_bytes = Vec::new();
+    File::open(&stderr_path)
+        .unwrap()
+        .take(OUTPUT_LIMIT as u64)
+        .read_to_end(&mut stderr_bytes)
+        .unwrap();
+    let expected_line_count = String::from_utf8_lossy(&stdout_bytes)
+        .lines()
+        .filter(|line| *line == expected_line)
+        .count();
+    let native_receipt_matches = fs::read_to_string(&receipt).is_ok_and(|value| value == test_name);
+    let summary = serde_json::json!({
+        "case": case,
+        "stdio_scope": "npm_acceptance_fixture",
+        "stdin_kind": stdin_kind,
+        "stdout_kind": stdout_kind,
+        "stderr_kind": stderr_kind,
+        "stdin_held_until_job_cleanup": true,
+        "timed_out": outcome.as_ref().ok().copied(),
+        "driver_failure_kind": outcome.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
+        "driver_exit_code": status.as_ref().ok().and_then(|status| status.code()),
+        "job_cleanup_confirmed": status.is_ok(),
+        "native_receipt_matches": native_receipt_matches,
+        "stdout_total_bytes": stdout_total,
+        "stderr_total_bytes": stderr_total,
+        "stdout_truncated": stdout_exceeded.load(Ordering::Acquire),
+        "stderr_truncated": stderr_exceeded,
+        "stdout_read_failure": stdout_failure,
+        "stdout_reader_completed": reader_completed,
+        "expected_stdout_line": expected_line,
+        "expected_stdout_line_count": expected_line_count,
+    });
+    eprintln!("atomic_windows_cmd_stdio_driver={summary}");
+    eprintln!(
+        "atomic_windows_cmd_stdio_stderr_begin case={case}\n{}\natomic_windows_cmd_stdio_stderr_end case={case}",
+        String::from_utf8_lossy(&stderr_bytes)
+    );
+    let summary_bytes = serde_json::to_vec_pretty(&summary).unwrap();
+    for (name, bytes) in [
+        ("control.stdout", stdout_bytes.as_slice()),
+        ("control.stderr", stderr_bytes.as_slice()),
+        ("control.safe.json", summary_bytes.as_slice()),
+    ] {
+        OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(output.join(name))
+            .unwrap()
+            .write_all(bytes)
+            .unwrap();
+    }
+    assert_eq!(
+        (stdin_kind, stdout_kind, stderr_kind),
+        ("pipe", "pipe", "disk")
+    );
+    assert!(
+        status.unwrap().success(),
+        "stdio 对照子测试失败，证据已保留"
+    );
+    assert!(!outcome.unwrap(), "stdio 对照超时，证据已保留");
+    assert!(!stdout_exceeded.load(Ordering::Acquire));
+    assert!(!stderr_exceeded);
+    assert!(reader_completed);
+    assert!(stdout_failure.is_none());
+    assert!(native_receipt_matches);
+    assert_eq!(expected_line_count, 1);
+}
+
+fn debug_stdio_kind(handle: HANDLE) -> &'static str {
+    match unsafe { GetFileType(handle) } {
+        FILE_TYPE_PIPE => "pipe",
+        FILE_TYPE_DISK => "disk",
+        FILE_TYPE_CHAR => "char",
+        _kind => "unknown",
+    }
 }
 
 fn await_debug_driver_authorization() {
