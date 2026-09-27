@@ -71,7 +71,7 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
-  "documentation_updated_at": "2026-09-27",
+  "documentation_updated_at": "2026-09-28",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
@@ -318,7 +318,7 @@
     "closed_gaps": []
   },
   "current_work_order": {
-    "updated_at": "2026-09-27",
+    "updated_at": "2026-09-28",
     "mode": "incremental_development_and_scoped_acceptance",
     "user_direction": "按用户继续推进及 runner 恢复指示，执行同提交定向云端验证，并完成当前 Mac 联测包的可独立执行 GUI／模型窄验收；完整验收条件不缩减。",
     "goal_acceptance_unchanged": true,
@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "隐藏独立控制台三组均在根进程首断点前失败，不能接入生产；保持NoWindow默认。下一步先只读核对runner窗口站、桌面及隔离令牌的实际访问边界，再决定最小诊断，不改全局ACL或隔离。具体DLL和真实npm超时根因仍未知；14项必要缺项开放。"
+    "next_work_order": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -2261,7 +2261,7 @@
     "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
     "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
     "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
-    "next": "隐藏独立控制台三组均在根进程首断点前失败，不能接入生产；保持NoWindow默认。下一步先只读核对runner窗口站、桌面及隔离令牌的实际访问边界，再决定最小诊断，不改全局ACL或隔离。具体DLL和真实npm超时根因仍未知；14项必要缺项开放。",
+    "next": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "cmd_shim_matrix": {
@@ -2395,6 +2395,58 @@
         ],
         "interpretation": "runner收尾另清理conhost PID2004；无法归属至某个case。六组绑定进程的清理收据不等于机器级无残留。"
       }
+    },
+    "environment_control": {
+      "source_commit": "5ea2614e05ab5668d1ddb48f5ac2d87d626dc980",
+      "run_id": 36334101650,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36334101650",
+      "result": "failure",
+      "local_cargo_check": "passed",
+      "local_i18n_passed": 11,
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 504,
+      "command_units_passed": 11,
+      "loader_units_passed": 3,
+      "environment_units_passed": 4,
+      "atomic_passed": 16,
+      "atomic_failed": 6,
+      "atomic_retries": 0,
+      "observation_count": 14,
+      "observations_equivalent": true,
+      "runner": {
+        "session_id": 0,
+        "integrity": "high",
+        "elevated": true,
+        "is_appcontainer": false,
+        "window_station_class": "other",
+        "window_station_visible": false,
+        "desktop_class": "default",
+        "win32k_disable_flags": 0,
+        "strict_handle_flags": 0
+      },
+      "bound_processes": {
+        "session_id": 0,
+        "integrity": "low",
+        "elevated": false,
+        "is_appcontainer": true,
+        "win32k_disable_flags": 0,
+        "strict_handle_flags": 3,
+        "thread_desktop_query": "query_failed; hresult=0, os_code=null，不能解释为已证实访问拒绝"
+      },
+      "case_results": "原NoWindow CMD成功，Node根/子首断点后0xc0000142；三组隐藏root首断点前同码失败。与上轮阶段一致，不能相互混同。",
+      "cleanup": "六组AppContainer和父层Job清理确认，无取消/超时/输出截断/loader事件丢弃；runner收尾仅记录vctip PID7876，不匹配已记录PID。本轮未记录orphan conhost，不回填上一轮未知归属，也不声称机器级无残留。",
+      "interpretation": "环境事实尚未证明目标窗口站/桌面对象及有效访问，也未定位具体DLL。候选strict_handle_flags=3在成功CMD基线也相同，不能据此归因。未执行DACL模拟。",
+      "real_npm_rerun": false,
+      "production_default_changed": false,
+      "codex_js_run": false,
+      "localization": "无需本地化变更",
+      "artifact_id": 10936654594,
+      "artifact_scope": "17923字节完整ZIP官方SHA256及18成员CRC/SHA256已核",
+      "artifact_zip_sha256": "81cf27e7a13d51d6b82d4ef4228ae65e1fed2eb901ba72ac5b3358f615ef037e",
+      "summary_sha256": "81897a3638abf2f083a7722d555027a1570351d5d99501ca53f1636433805f77",
+      "job_log_sha256": "27f3dde2a6e480569234a51e1f8429e6cb7a37378c22bd98f009938aea3e7110",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-environment",
+      "next": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。"
     }
   }
 }
