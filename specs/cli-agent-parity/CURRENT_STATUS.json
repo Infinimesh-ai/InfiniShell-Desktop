@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "固定Node根/子均在首断点后自然退出0xc0000142；shim不是必要条件。继续通过显式测试入口比较隐藏独立控制台，生产默认和隔离不变；不能指定致错DLL或等同旧npm超时。随后补G01/G03审批、恢复、多附件和其他平台真实链；14项必要缺项开放。"
+    "next_work_order": "隐藏独立控制台三组均在根进程首断点前失败，不能接入生产；保持NoWindow默认。下一步先只读核对runner窗口站、桌面及隔离令牌的实际访问边界，再决定最小诊断，不改全局ACL或隔离。具体DLL和真实npm超时根因仍未知；14项必要缺项开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -2261,7 +2261,7 @@
     "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
     "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
     "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
-    "next": "保持生产默认；仅新增隐藏独立控制台显式测试入口，与原3组对照比较；不得放宽隔离或改写官方shim。",
+    "next": "隐藏独立控制台三组均在根进程首断点前失败，不能接入生产；保持NoWindow默认。下一步先只读核对runner窗口站、桌面及隔离令牌的实际访问边界，再决定最小诊断，不改全局ACL或隔离。具体DLL和真实npm超时根因仍未知；14项必要缺项开放。",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "cmd_shim_matrix": {
@@ -2341,6 +2341,60 @@
       "case_summary": "CMD基线退出0；固定Node根/子均0xc0000142，无取消、无版本输出。根shim标记不存在，子shim标记匹配；3组Job及AppContainer清理确认。Node已见首断点，DLL事件根29/子28；所有摘要dropped_events=0。",
       "summary_sha256": "6b6600c023890cfa8028806a47b511284daf66b2a58642ed1cfb297d4c24917c",
       "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-node-loader"
+    },
+    "hidden_console_control": {
+      "source_commit": "e3f44c29c0313b406e3384b96abe98f662b5323f",
+      "run_id": 36328813817,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36328813817",
+      "result": "failure",
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 504,
+      "command_units_passed": 11,
+      "loader_units_passed": 3,
+      "atomic_passed": 16,
+      "atomic_failed": 6,
+      "atomic_retries": 0,
+      "failures": [
+        "original_nul_output_control",
+        "fixed_node_child_no_window",
+        "fixed_node_root_no_window",
+        "hidden_console_cmd",
+        "hidden_console_node_child_launcher",
+        "hidden_console_node_root"
+      ],
+      "hidden_cases_passed": 0,
+      "hidden_cases_failed": 3,
+      "hidden_case_summary": "三组root均只观察到ntdll/kernel32/KernelBase三条DLL事件，未见初始断点便自然退出0xc0000142。两个CMD launcher均未到shim标记或Node CREATE；Node根对照亦失败。三组均观察到已绑定conhost的正常退出。",
+      "no_window_controls": "绑定CMD基线仍退出0并输出一次标记；固定Node根/子到初始断点后0xc0000142，与隐藏模式的更早失败分开记录。",
+      "cleanup": "六组AppContainer及父层严格Job清理均确认；无超时、取消、输出截断或loader摘要丢弃。",
+      "interpretation": "隐藏独立控制台不是当前修复；仅凭相同退出码不能认定相同失败阶段或真实npm超时根因。未定位具体致错DLL；conhost首机会异常仍也出现在成功CMD基线。",
+      "production_default_changed": false,
+      "real_npm_rerun": false,
+      "codex_js_run": false,
+      "localization": "无需本地化变更",
+      "artifact_id": 10935128705,
+      "artifact_scope": "18个小成员逐项CRC/SHA256，未核整ZIP摘要",
+      "summary_sha256": "f08710378d0538270be663e560ba1ee70176bdaeb2f0b3481e49be4cf23360b1",
+      "job_log_sha256": "bef7c3917c3dd2a26c225cd268b7859a278015de0db4b2204f17e7959108ba30",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-hidden-console",
+      "next": "隐藏独立控制台三组均在根进程首断点前失败，不能接入生产；保持NoWindow默认。下一步先只读核对runner窗口站、桌面及隔离令牌的实际访问边界，再决定最小诊断，不改全局ACL或隔离。具体DLL和真实npm超时根因仍未知；14项必要缺项开放。",
+      "runner_orphan_cleanup": {
+        "processes": [
+          {
+            "pid": 26436,
+            "name": "sccache"
+          },
+          {
+            "pid": 2004,
+            "name": "conhost"
+          },
+          {
+            "pid": 8012,
+            "name": "vctip"
+          }
+        ],
+        "interpretation": "runner收尾另清理conhost PID2004；无法归属至某个case。六组绑定进程的清理收据不等于机器级无残留。"
+      }
     }
   }
 }
