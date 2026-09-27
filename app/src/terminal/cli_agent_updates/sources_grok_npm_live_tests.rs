@@ -215,6 +215,10 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("../../ai/cli_agent_runtime/managed_process_version_probe.rs"),
     ),
     (
+        "app/src/ai/cli_agent_runtime/managed_process_macos.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_macos.rs"),
+    ),
+    (
         "app/src/ai/cli_agent_runtime/managed_process_atomic_macos.rs",
         include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
     ),

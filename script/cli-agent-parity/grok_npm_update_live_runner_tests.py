@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -32,6 +33,308 @@ def archive(entries):
 
 
 class BoundaryTests(unittest.TestCase):
+    def mounted_volume(self, root):
+        volumes = root / "Volumes"
+        volume = volumes / "SanDisk"
+        volume.mkdir(parents=True)
+        self.enterContext(patch.object(runner, "VOLUMES_ROOT", volumes))
+        self.enterContext(patch.object(runner.platform, "system", return_value="Darwin"))
+        self.enterContext(patch.object(runner.os.path, "ismount", side_effect=lambda path: Path(path) == volume))
+        return volume
+
+    def test_external_output_and_binary_remain_rejected_by_default(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            binary = volume / "worker"
+            binary.write_bytes(b"worker")
+            for path, output in ((volume / "new" / "case", True), (binary, False)):
+                with self.subTest(output=output), self.assertRaisesRegex(ValueError, "requires?_internal_disk"):
+                    runner.verify_execution_path(path, None, output=output)
+            self.assertFalse((volume / "new").exists())
+
+    def test_explicit_volume_allows_its_output_and_binaries_and_internal_node(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            worker, node = volume / "worker", root / "node"
+            worker.write_bytes(b"worker")
+            node.write_bytes(b"node")
+            allowed = runner.execution_volume(volume)
+            self.assertEqual(allowed, {"path":str(volume), "st_dev":volume.stat().st_dev})
+            for path, output in ((volume / "new" / "case", True), (worker, False), (node, False)):
+                with self.subTest(path=path):
+                    self.assertEqual(runner.verify_execution_path(path, allowed, output=output), path)
+
+    def test_explicit_volume_must_be_a_mounted_volume_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            child, unmounted = volume / "directory", volume.parent / "Unmounted"
+            child.mkdir()
+            unmounted.mkdir()
+            for path in (root, volume.parent, child, unmounted):
+                with self.subTest(path=path), self.assertRaisesRegex(ValueError, "not_mounted_root"):
+                    runner.execution_volume(path)
+
+    def test_explicit_volume_is_rejected_on_non_macos(self):
+        for system in ("Linux", "Windows"):
+            with self.subTest(system=system), patch.object(runner.platform, "system", return_value=system):
+                with self.assertRaisesRegex(ValueError, "requires_macos"):
+                    runner.execution_volume(Path("/Volumes/SanDisk"))
+
+    def test_missing_volumes_container_keeps_default_internal_paths_available(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            binary = root / "worker"
+            binary.write_bytes(b"worker")
+            with patch.object(runner, "VOLUMES_ROOT", root / "absent-volumes"):
+                self.assertEqual(runner.verify_execution_path(binary, None), binary)
+                self.assertEqual(runner.verify_execution_path(root / "new", None, output=True), root / "new")
+
+    def test_volume_container_aliases_do_not_bypass_disk_policy(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            worker = volume / "worker"
+            worker.write_bytes(b"worker")
+            allowed = runner.execution_volume(volume)
+            aliases = (root / "volumes", root / "System" / "Volumes" / "Data" / "Volumes")
+            for container in aliases:
+                for name in ("SanDisk", "Other"):
+                    path = container / name / "worker"
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b"worker")
+            original = Path.samefile
+            def samefile(path, other):
+                if path in aliases and Path(other) == volume.parent:
+                    return True
+                return original(path, other)
+            with patch.object(Path, "samefile", samefile):
+                for container in aliases:
+                    with self.subTest(container=container):
+                        self.assertEqual(runner.execution_volume(container / "SanDisk"), allowed)
+                        for path, output in ((container / "SanDisk" / "new", True),
+                                             (container / "SanDisk" / "worker", False)):
+                            with self.assertRaisesRegex(ValueError, "requires?_internal_disk"):
+                                runner.verify_execution_path(path, None, output=output)
+                            self.assertEqual(runner.verify_execution_path(path, allowed, output=output),
+                                             volume / path.name)
+                        with self.assertRaisesRegex(ValueError, "outside_allowed_volume"):
+                            runner.verify_execution_path(container / "Other" / "worker", allowed)
+
+    def test_other_volume_and_prefix_lookalike_do_not_match(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            allowed = runner.execution_volume(volume)
+            for name in ("Other", "SanDisk-copy"):
+                other = volume.parent / name
+                other.mkdir()
+                binary = other / "worker"
+                binary.write_bytes(b"worker")
+                for path, output in ((other / "new", True), (binary, False)):
+                    with self.subTest(path=path), self.assertRaisesRegex(ValueError, "outside_allowed_volume"):
+                        runner.verify_execution_path(path, allowed, output=output)
+            with self.assertRaisesRegex(ValueError, "outside_allowed_volume"):
+                runner.verify_execution_path(root / "internal-output", allowed, output=True)
+
+    def test_resolved_aliases_cannot_escape_the_allowed_volume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            other = volume.parent / "Other"
+            other.mkdir()
+            worker = other / "worker"
+            worker.write_bytes(b"worker")
+            allowed = runner.execution_volume(volume)
+            aliases = {volume / "escape" / "new":other / "new",
+                       volume / "escape" / "worker":worker,
+                       root / "volume-alias":volume,
+                       root / "output-alias":volume / "new"}
+            original = Path.resolve
+            def resolve(path, strict=False):
+                return aliases[path] if path in aliases else original(path, strict=strict)
+            # 用解析结果模拟符号链接，不要求 Windows 测试账号有创建链接权限。
+            with patch.object(Path, "resolve", resolve):
+                self.assertEqual(runner.execution_volume(root / "volume-alias"), allowed)
+                self.assertEqual(runner.verify_execution_path(root / "output-alias", allowed, output=True),
+                                 volume / "new")
+                with self.assertRaisesRegex(ValueError, "requires_internal_disk"):
+                    runner.verify_execution_path(root / "output-alias", None, output=True)
+                for path, output in ((volume / "escape" / "new", True), (volume / "escape" / "worker", False)):
+                    with self.subTest(path=path), self.assertRaisesRegex(ValueError, "outside_allowed_volume"):
+                        runner.verify_execution_path(path, allowed, output=output)
+
+    def test_nested_mount_device_is_rejected_for_output_and_binary(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            nested = volume / "nested-mount"
+            returned = nested / "original-device"
+            returned.mkdir(parents=True)
+            binary = returned / "worker"
+            binary.write_bytes(b"worker")
+            allowed = runner.execution_volume(volume)
+            original = Path.stat
+            def stat(path, *args, **kwargs):
+                value = original(path, *args, **kwargs)
+                if path == nested:
+                    fields = list(value)
+                    fields[2] = allowed["st_dev"] + 1
+                    return runner.os.stat_result(fields)
+                return value
+            with patch.object(Path, "stat", stat):
+                for path, output in ((returned / "new" / "case", True), (binary, False)):
+                    with self.subTest(output=output), self.assertRaisesRegex(ValueError, "device_mismatch"):
+                        runner.verify_execution_path(path, allowed, output=output)
+
+    def test_nested_mount_is_rejected_even_with_the_same_device(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            nested = volume / "nested-mount"
+            nested.mkdir()
+            allowed = runner.execution_volume(volume)
+            with patch.object(runner.os.path, "ismount", side_effect=lambda path: Path(path) in (volume, nested)):
+                with self.assertRaisesRegex(ValueError, "nested_mount"):
+                    runner.verify_execution_path(nested / "new" / "case", allowed, output=True)
+
+    def test_unmounted_volume_is_rejected_after_initial_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            allowed = runner.execution_volume(volume)
+            with patch.object(runner.os.path, "ismount", return_value=False):
+                with self.assertRaisesRegex(ValueError, "execution_volume_changed"):
+                    runner.verify_execution_path(volume / "new", allowed, output=True)
+
+    def test_main_rejects_external_output_before_creation_binding_or_download(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            output = volume / "new" / "case"
+            arguments = ["runner", "--repo", str(root), "--output", str(output)]
+            for role in ("test-binary", "supervisor", "node", "npm-cli"):
+                arguments += ["--" + role, str(root / role), "--" + role + "-sha256", "unused"]
+            with patch.object(sys, "argv", arguments), patch.object(runner.platform, "machine", return_value="arm64"), \
+                    patch.object(runner, "binding") as bind, patch.object(runner, "download_inputs") as download:
+                with self.assertRaisesRegex(ValueError, "runtime_requires_internal_disk"):
+                    runner.main()
+            bind.assert_not_called()
+            download.assert_not_called()
+            self.assertFalse((volume / "new").exists())
+
+    def test_main_rejects_other_volume_binary_before_output_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            volume = self.mounted_volume(root)
+            other = volume.parent / "Other"
+            other.mkdir()
+            binary = other / "worker"
+            binary.write_bytes(b"bound input")
+            output = volume / "new" / "case"
+            arguments = ["runner", "--repo", str(root), "--output", str(output), "--allow-external-volume", str(volume)]
+            for role in ("test-binary", "supervisor", "node", "npm-cli"):
+                arguments += ["--" + role, str(binary), "--" + role + "-sha256", runner.sha(binary)]
+            with patch.object(sys, "argv", arguments), patch.object(runner.platform, "machine", return_value="arm64"), \
+                    patch.object(runner, "download_inputs") as download:
+                with self.assertRaisesRegex(ValueError, "outside_allowed_volume"):
+                    runner.main()
+            download.assert_not_called()
+            self.assertFalse((volume / "new").exists())
+
+    def main_fixture(self, root):
+        volume = self.mounted_volume(root)
+        output = volume / "new" / "case"
+        paths = {"test-binary":volume / "worker", "supervisor":volume / "supervisor",
+                 "node":root / "node", "npm-cli":root / "npm" / "bin" / "npm-cli.js"}
+        for path in paths.values():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"bound input")
+        (root / "npm" / "package.json").write_text(json.dumps({"name":"npm", "bin":{"npm":"bin/npm-cli.js"}}))
+        contract = root / "script/cli-agent-parity/grok_1041_npm_manifest.json"
+        contract.parent.mkdir(parents=True)
+        contract.write_text("{}")
+        arguments = ["runner", "--repo", str(root), "--output", str(output), "--official-inputs", str(root),
+                     "--allow-external-volume", str(volume), "--case", "updated"]
+        for role, path in paths.items():
+            arguments += ["--" + role, str(path), "--" + role + "-sha256", "source-digest"]
+        self.enterContext(patch.object(sys, "argv", arguments))
+        self.enterContext(patch.object(runner.platform, "machine", return_value="arm64"))
+        self.enterContext(patch.object(runner, "sha", return_value="source-digest"))
+        self.enterContext(patch.object(runner, "verify_embedded"))
+        self.enterContext(patch.object(runner.subprocess, "run", side_effect=[
+            subprocess.CompletedProcess([], 0, b"", b""),
+            subprocess.CompletedProcess([], 0, "a" * 40, ""),
+            subprocess.CompletedProcess([], 0, b"", b"")]))
+        space = self.enterContext(patch.object(runner.shutil, "disk_usage"))
+        space.return_value.free = 4 * 1024**3
+        self.enterContext(patch.object(runner, "official_inputs", return_value=({}, {runner.OLD:{}})))
+        self.enterContext(patch.object(runner, "prepare_old", return_value={}))
+        self.enterContext(patch.object(runner, "run_test"))
+        self.enterContext(patch.object(runner, "verify_product_archives"))
+        def fixture(*arguments):
+            case = arguments[0].output / "fixture"
+            case.mkdir()
+            (case / "result-execute.safe.json").write_text('{"accepted":true}')
+            return case, {"supervisor":{"path":str(paths["supervisor"])}}
+        self.enterContext(patch.object(runner, "fixture", side_effect=fixture))
+        self.enterContext(patch.object(runner, "download_inputs", side_effect=AssertionError("unexpected_download")))
+        return volume, output
+
+    def test_source_and_success_receipts_record_explicit_execution_volume(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            volume, output = self.main_fixture(Path(temporary).resolve())
+            runner.main()
+            expected = {"mode":"explicit_external_volume",
+                        "external_volume":{"path":str(volume), "st_dev":volume.stat().st_dev}}
+            for name in ("source.safe.json", "summary.safe.json"):
+                with self.subTest(receipt=name):
+                    self.assertEqual(json.loads((output / name).read_bytes())["execution_policy"], expected)
+            self.assertFalse(json.loads((output / "summary.safe.json").read_bytes())["g09_closed"])
+
+    def test_main_rechecks_volume_after_output_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = self.main_fixture(Path(temporary).resolve())[1]
+            original = Path.mkdir
+            def mkdir(path, *args, **kwargs):
+                original(path, *args, **kwargs)
+                if path == output:
+                    self.enterContext(patch.object(runner.os.path, "ismount", return_value=False))
+            with patch.object(Path, "mkdir", mkdir), self.assertRaisesRegex(ValueError, "execution_volume_changed"):
+                runner.main()
+            runner.official_inputs.assert_not_called()
+            self.assertFalse((output / "source.safe.json").exists())
+            self.assertFalse((output / "summary.safe.json").exists())
+
+    def test_unmount_during_case_does_not_produce_success_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = self.main_fixture(Path(temporary).resolve())[1]
+            def unmount(*args):
+                self.enterContext(patch.object(runner.os.path, "ismount", return_value=False))
+            runner.verify_product_archives.side_effect = unmount
+            with self.assertRaisesRegex(ValueError, "execution_volume_changed"):
+                runner.main()
+            self.assertTrue((output / "source.safe.json").is_file())
+            self.assertTrue((output / "fixture/result-execute.safe.json").is_file())
+            self.assertFalse((output / "summary.safe.json").exists())
+
+    def test_changed_volume_device_is_rejected_after_initial_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            volume = self.mounted_volume(Path(temporary).resolve())
+            allowed = runner.execution_volume(volume)
+            original = Path.stat
+            def stat(path, *args, **kwargs):
+                value = original(path, *args, **kwargs)
+                if path == volume:
+                    fields = list(value)
+                    fields[2] = allowed["st_dev"] + 1
+                    return runner.os.stat_result(fields)
+                return value
+            with patch.object(Path, "stat", stat), self.assertRaisesRegex(ValueError, "execution_volume_changed"):
+                runner.verify_execution_path(volume / "new", allowed, output=True)
+
     def test_valid_archive_preserves_exact_bytes(self):
         raw, sri = archive([("package/package.json", b"{}", tarfile.REGTYPE), ("package/bin/grok", b"official", tarfile.REGTYPE)])
         self.assertEqual(runner.archive_members(raw, sri)["bin/grok"][0], b"official")

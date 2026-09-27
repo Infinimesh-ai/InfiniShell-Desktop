@@ -20,6 +20,7 @@ import stat
 SCOPE = "grok_npm_transaction_no_model_v1"
 MARKER = b"InfiniShell private npm transaction fixture; no credentials\n"
 OLD, TARGET = "1.0.40", "1.0.41"
+VOLUMES_ROOT = Path("/Volumes")
 CASES = ("updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved")
 TEST = "terminal::cli_agent_updates::sources::npm_grok::live_tests::real_grok_npm_update_without_model"
 BUSY_TESTS = (
@@ -32,7 +33,7 @@ SOURCE_FILES = (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_grok.rs", "sources_npm_grok_contract.rs",
         "sources_npm_grok_mirror.rs", "sources_npm_tree_unix.rs", "sources_grok_npm_live_tests.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
-        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_macos.rs", "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs")],
+        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_macos.rs", "managed_process_atomic_macos.rs", "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs")],
     "script/cli-agent-parity/grok_1041_npm_manifest.json",
     "script/cli-agent-parity/run_grok_npm_update_live.py",
 )
@@ -63,6 +64,48 @@ def write(path, value):
         stream.write(raw)
         stream.flush()
         os.fsync(stream.fileno())
+
+
+def canonical_execution_path(path, *, strict):
+    canonical = path.resolve(strict=strict)
+    if canonical.is_relative_to(VOLUMES_ROOT) or not VOLUMES_ROOT.exists():
+        return canonical
+    # macOS 的大小写和 Data 卷别名不会由 resolve 统一；仅按目录身份归一化卷容器。
+    for ancestor in (canonical, *canonical.parents):
+        if ancestor.exists() and ancestor.samefile(VOLUMES_ROOT):
+            return VOLUMES_ROOT / canonical.relative_to(ancestor)
+    return canonical
+
+
+def execution_volume(path):
+    if path is None:
+        return None
+    require(platform.system() == "Darwin", "external_volume_requires_macos")
+    volume = canonical_execution_path(path, strict=True)
+    require(volume.parent == VOLUMES_ROOT and volume.is_dir() and os.path.ismount(volume),
+            "external_volume_not_mounted_root")
+    return {"path":str(volume), "st_dev":volume.stat().st_dev}
+
+
+def verify_execution_path(path, volume, *, output=False):
+    canonical = canonical_execution_path(path, strict=not output)
+    if volume is None:
+        require(not canonical.is_relative_to(VOLUMES_ROOT),
+                "runtime_requires_internal_disk" if output else "executables_require_internal_disk")
+    elif output or canonical.is_relative_to(VOLUMES_ROOT):
+        root = Path(volume["path"])
+        require(canonical.is_relative_to(root), "execution_path_outside_allowed_volume")
+        require(os.path.ismount(root) and root.stat().st_dev == volume["st_dev"],
+                "execution_volume_changed")
+        # 输出尚未创建时核对最近的现有祖先；挂入卷内的其他设备不能借路径前缀获准。
+        existing = canonical
+        while not existing.exists():
+            existing = existing.parent
+        while existing != root:
+            require(existing.stat().st_dev == volume["st_dev"], "execution_volume_device_mismatch")
+            require(not os.path.ismount(existing), "execution_volume_nested_mount")
+            existing = existing.parent
+    return canonical
 
 
 def archive_members(raw, integrity):
@@ -348,6 +391,8 @@ def main():
     for name in ("repo", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--official-inputs", type=Path, help="已有原包目录；省略时从固定官方 URL 下载并封存")
+    parser.add_argument("--allow-external-volume", type=Path,
+                        help="仅 macOS：显式允许在 /Volumes 下指定的已挂载卷根执行私有验收")
     for role in ("test-binary", "supervisor", "node", "npm-cli"):
         parser.add_argument("--" + role, type=Path, required=True)
         parser.add_argument("--" + role + "-sha256", required=True)
@@ -357,19 +402,24 @@ def main():
     args.repo = args.repo.resolve(strict=True)
     if args.official_inputs is not None:
         args.official_inputs = args.official_inputs.resolve(strict=True)
-    require(not args.output.exists(), "output_must_be_new")
-    args.output.mkdir(mode=0o700, parents=True)
-    args.output = args.output.resolve(strict=True)
+    volume = execution_volume(args.allow_external_volume)
+    require(not args.output.exists() and not args.output.is_symlink(), "output_must_be_new")
+    args.output = verify_execution_path(args.output, volume, output=True)
     require(all(ord(character) >= 32 for character in str(args.output)), "prefix_has_control_characters")
-    require(not str(args.output).startswith("/Volumes/"), "runtime_requires_internal_disk")
-    require(shutil.disk_usage(args.output).free > 3 * 1024**3, "fixture_space_insufficient")
-    binaries = {key:binding(getattr(args, option), getattr(args, option + "_sha256")) for key,option in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli"))}
-    require(all(not value["path"].startswith("/Volumes/") for value in binaries.values()), "executables_require_internal_disk")
+    binaries = {key:binding(verify_execution_path(getattr(args, option), volume),
+                          getattr(args, option + "_sha256"))
+                for key,option in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli"))}
+    for record in binaries.values():
+        require(str(verify_execution_path(Path(record["path"]), volume)) == record["path"],
+                "binary_path_changed")
     npm_metadata = json.loads((Path(binaries["npm_cli"]["path"]).parent.parent / "package.json").read_bytes())
     require(npm_metadata.get("name") == "npm" and npm_metadata.get("bin", {}).get("npm") == "bin/npm-cli.js", "npm_registration")
     source = {relative:sha(args.repo / relative) for relative in SOURCE_FILES}
     require(source[SOURCE_FILES[-1]] == sha(Path(__file__)), "runner_source_binding")
     verify_embedded(binaries["supervisor"]["path"], args.repo)
+    args.output.mkdir(mode=0o700, parents=True)
+    require(verify_execution_path(args.output, volume, output=True) == args.output, "output_path_changed")
+    require(shutil.disk_usage(args.output).free > 3 * 1024**3, "fixture_space_insufficient")
     if platform.system() == "Darwin":
         result = subprocess.run(["/usr/bin/codesign", "--verify", "--strict", binaries["supervisor"]["path"]], capture_output=True, check=False)
         write(args.output / "supervisor-signature.stdout", result.stdout)
@@ -382,9 +432,10 @@ def main():
     if args.official_inputs is None:
         args.official_inputs = download_inputs(args.output / "official-inputs", contract, target)
     inputs, releases = official_inputs(args.official_inputs, contract, target)
+    execution_policy = {"mode":"explicit_external_volume" if volume else "internal_disk_only", "external_volume":volume}
     write(args.output / "source.safe.json", {"commit":revision,"working_tree_dirty":dirty,"source_sha256":source,"binaries":binaries,
         "official_inputs":inputs,"platform":target,"old_version":OLD,"target_version":TARGET,"consumer_channel_resolution_covered":False,
-        "release_selection":"test-only fixed official 1.0.41; current npm latest not queried"})
+        "release_selection":"test-only fixed official 1.0.41; current npm latest not queried","execution_policy":execution_policy})
     materialization = args.output / "materialization"
     materialization.mkdir(mode=0o700)
     old = prepare_old(materialization, releases[OLD], target, binaries["node"])
@@ -407,9 +458,14 @@ def main():
     # 原始归档如在本轮发生变化，不能把已生成的收据判为整轮成功。
     require(all(sha(value["path"]) == value["sha256"] for value in inputs.values()), "official_cache_changed")
     verify_run_bindings(args.repo, binaries, source)
+    require(verify_execution_path(args.output, volume, output=True) == args.output, "output_path_changed")
+    for record in binaries.values():
+        require(str(verify_execution_path(Path(record["path"]), volume)) == record["path"],
+                "binary_path_changed")
     write(args.output / "summary.safe.json", {"scope":SCOPE,"accepted":True,"cases":results,"model_inputs_sent":0,
         "busy_scope":"existing product model state-machine tests only","plugin_recheck_covered":False,
-        "g09_closed":False,"consumer_channel_resolution_covered":False,"consumer_channels_unchanged":True})
+        "g09_closed":False,"consumer_channel_resolution_covered":False,"consumer_channels_unchanged":True,
+        "execution_policy":execution_policy})
 
 
 if __name__ == "__main__":
