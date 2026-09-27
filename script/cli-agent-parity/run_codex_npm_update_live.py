@@ -20,6 +20,7 @@ SCOPE = "codex_npm_transaction_no_model_v1"
 MARKER = b"InfiniShell private npm transaction fixture; no credentials\n"
 OLD, TARGET = "0.155.1", "0.156.1"
 PACKAGE = "@openai/codex"
+VOLUMES_ROOT = Path("/Volumes")
 CASES = ("updated", "swap_receipt_missing", "external_change_preserved", "candidate_changed_preserved")
 TEST = "terminal::cli_agent_updates::sources::npm_transaction::codex_live_tests::real_codex_npm_update_without_model"
 SOURCE_FILES = (
@@ -53,6 +54,48 @@ def target_platform():
     if value == ("Linux", "x86_64"):
         return "linux-x64", "x86_64-unknown-linux-musl"
     raise ValueError("platform_not_calibrated")
+
+
+def canonical_execution_path(path, *, strict):
+    canonical = path.resolve(strict=strict)
+    if canonical.is_relative_to(VOLUMES_ROOT) or not VOLUMES_ROOT.exists():
+        return canonical
+    # macOS 的大小写和 Data 卷别名不会由 resolve 统一；仅按目录身份归一化卷容器。
+    for ancestor in (canonical, *canonical.parents):
+        if ancestor.exists() and ancestor.samefile(VOLUMES_ROOT):
+            return VOLUMES_ROOT / canonical.relative_to(ancestor)
+    return canonical
+
+
+def execution_volume(path):
+    if path is None:
+        return None
+    require(platform.system() == "Darwin", "external_volume_requires_macos")
+    volume = canonical_execution_path(path, strict=True)
+    require(volume.parent == VOLUMES_ROOT and volume.is_dir() and os.path.ismount(volume),
+            "external_volume_not_mounted_root")
+    return {"path":str(volume), "st_dev":volume.stat().st_dev}
+
+
+def verify_execution_path(path, volume, *, output=False):
+    canonical = canonical_execution_path(path, strict=not output)
+    if volume is None:
+        require(not canonical.is_relative_to(VOLUMES_ROOT),
+                "runtime_requires_internal_disk" if output else "executables_require_internal_disk")
+    elif output or canonical.is_relative_to(VOLUMES_ROOT):
+        root = Path(volume["path"])
+        require(canonical.is_relative_to(root), "execution_path_outside_allowed_volume")
+        require(os.path.ismount(root) and root.stat().st_dev == volume["st_dev"],
+                "execution_volume_changed")
+        # 输出尚未创建时核对最近的现有祖先；挂入卷内的其他设备不能借路径前缀获准。
+        existing = canonical
+        while not existing.exists():
+            existing = existing.parent
+        while existing != root:
+            require(existing.stat().st_dev == volume["st_dev"], "execution_volume_device_mismatch")
+            require(not os.path.ismount(existing), "execution_volume_nested_mount")
+            existing = existing.parent
+    return canonical
 
 
 def package_contract(metadata, members, version):
@@ -226,6 +269,8 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--official-inputs", type=Path,
                         help="复用只读官方材料目录，缺失材料仍从官方 registry 下载并另存原始字节")
+    parser.add_argument("--allow-external-volume", type=Path,
+                        help="仅 macOS：显式允许在 /Volumes 下指定的已挂载卷根执行私有验收")
     for role in ("test-binary", "supervisor", "node", "npm-cli"):
         parser.add_argument("--" + role, type=Path, required=True)
         parser.add_argument("--" + role + "-sha256", required=True)
@@ -235,15 +280,16 @@ def main():
     args.repo = args.repo.resolve(strict=True)
     if args.official_inputs:
         args.official_inputs = args.official_inputs.resolve(strict=True)
-    require(not args.output.exists(), "output_must_be_new")
-    args.output.mkdir(mode=0o700, parents=True)
-    args.output = args.output.resolve(strict=True)
+    volume = execution_volume(args.allow_external_volume)
+    require(not args.output.exists() and not args.output.is_symlink(), "output_must_be_new")
+    args.output = verify_execution_path(args.output, volume, output=True)
     require(all(ord(character) >= 32 for character in str(args.output)), "prefix_has_control_characters")
-    require(not str(args.output).startswith("/Volumes/"), "runtime_requires_internal_disk")
-    require(shutil.disk_usage(args.output).free > 3 * 1024**3, "fixture_space_insufficient")
-    binaries = {key:binding(getattr(args, option), getattr(args, option + "_sha256"))
+    binaries = {key:binding(verify_execution_path(getattr(args, option), volume),
+                          getattr(args, option + "_sha256"))
                 for key,option in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli"))}
-    require(all(not record["path"].startswith("/Volumes/") for record in binaries.values()), "executables_require_internal_disk")
+    for record in binaries.values():
+        require(str(verify_execution_path(Path(record["path"]), volume)) == record["path"],
+                "binary_path_changed")
     npm_manifest = Path(binaries["npm_cli"]["path"]).parent.parent / "package.json"
     npm_metadata = json.loads(npm_manifest.read_bytes())
     require(npm_metadata.get("name") == "npm" and npm_metadata.get("bin", {}).get("npm") == "bin/npm-cli.js",
@@ -251,6 +297,9 @@ def main():
     sources = {name:sha(args.repo / name) for name in SOURCE_FILES}
     require(sources[SOURCE_FILES[-1]] == sha(Path(__file__)), "runner_source_binding")
     verify_embedded(binaries["supervisor"]["path"], args.repo)
+    args.output.mkdir(mode=0o700, parents=True)
+    require(verify_execution_path(args.output, volume, output=True) == args.output, "output_path_changed")
+    require(shutil.disk_usage(args.output).free > 3 * 1024**3, "fixture_space_insufficient")
     if platform.system() == "Darwin":
         signature = subprocess.run(["/usr/bin/codesign","--verify","--strict",binaries["supervisor"]["path"]],
                                    capture_output=True, check=False)
@@ -263,6 +312,8 @@ def main():
     write(args.output / "source.safe.json", {"source_sha256":sources,"binaries":binaries,"commit":revision,
         "working_tree_dirty":bool(status.strip()),"platform":{"system":platform.system(),"machine":platform.machine()},
         "mode":"fixed_official_npm_node_transaction","old_version":OLD,"target_version":TARGET,
+        "execution_policy":{"mode":"explicit_external_volume" if volume else "internal_disk_only",
+                            "external_volume":volume},
         "consumer_channel_discovery_covered":False})
     cache = args.output / "official-inputs"
     cache.mkdir(mode=0o700)
