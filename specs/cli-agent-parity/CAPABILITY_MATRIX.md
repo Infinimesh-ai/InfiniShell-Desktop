@@ -18,7 +18,9 @@
 
 `43c9709d2` 的 `console-binding-04` 已补 Windows Codex npm 的精确 `conhost.exe` 租约、同 Job／AppContainer／零 capability 校验及跨失败退出句柄。本地 check、i18n 重试02（11项）和 actionlint 通过；同提交 Windows 编译、978项主回归、5项 command 与7项原生边界回归通过，真实 npm 首个 CMD 候选仍返回 `RecoveryRequired`，停在 `Prepared`，清理未确认，PowerShell／发布／恢复未执行。CMD 报 verbatim 工作目录不兼容，拒绝访问及清理原因仍待查；保留原始失败，不新增“升级通过”能力。无需本地化变更，G09 仍开放，详见[验证结论](VALIDATION_REPORT.md)。
 
-Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`），仅给 CreateProcessW 传经身份核验的 DOS cwd；ACL／readonly 和隔离门禁不变。本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 进行中，真实事务待复验，不新增已验能力，G09 保持开放。
+Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`），仅给 CreateProcessW 传经身份核验的 DOS cwd；ACL／readonly 和隔离门禁不变。本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 已结束：主组981项、command7项、显式atomic7项通过（含新增5项），真实更新首个CMD候选仍失败。旧UNC提示消失，但原生“拒绝访问”后缺完整清理收据；剩余进程和拒绝对象尚未定位，PowerShell、发布与恢复未执行；不新增已验能力，G09 保持开放。
+
+`0525c9439` 已补 Windows Codex npm 探针协作取消：复用本次已认证连接，原调试线程响应停止后仍先终止精确Job、排空事件、确认真实句柄退出并恢复ACL/profile。8秒协作窗口后保留强制清理，其他模式仍用原2秒；不以停止通知或根EXIT代替清理证明。本地check、i18n 11项、新增控制通道6项、actionlint通过；新增2项原生取消边界由同提交 [Windows CI 36282335500](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36282335500) 验证，当前进行中。无需本地化变更；未修复或关闭原生拒绝访问、G09及完整Goal。
 
 `debed8c51` 补接有效专属 Grok 的上下文草稿队列及 Linux／Windows 升级空闲通知，英中提示已同步，本地门禁通过；真实三平台／远端发送、双语布局及同提交平台结果仍待补，G01/G09 不关闭。
 

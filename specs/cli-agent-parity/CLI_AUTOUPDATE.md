@@ -12,7 +12,9 @@
 
 后续 `console-binding-04` 已在 `43c9709d2` 提交：仅 Codex npm 候选预先绑定系统 `conhost.exe` 精确租约，并在事件继续前验证本次 Job、相同 AppContainer SID 与零 capability；未知映像及系统目录兜底不放行，所有退出句柄跨失败保留。同提交 Windows 编译和普通／原生边界回归通过；真实 `0.156.1` npm 的首个 CMD 候选仍在 `Prepared` 返回 `RecoveryRequired`，CMD 报 verbatim 工作目录不兼容及拒绝访问，`cleanup_confirmed=false`，缺 AppContainer 清理收据；PowerShell、发布和后续恢复未到达。后续须核 npm 专属 cwd 的 DOS 路径传递及独立清理原因，不能仅据 stderr 判定全部根因。本地 check、i18n 重试02（11项）和 actionlint 通过，首次链接空间不足原件保留；无需本地化变更，不关闭 G09，详见[验证结论](VALIDATION_REPORT.md)。
 
-Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`）：明确区分 canonical ACL 路径与 CreateProcessW 执行路径，启动前重复核对同一目录，其他来源调用保持原参数。固定阶段诊断用于定位旧输出超时与清理未知，未调整时限；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 进行中，真实更新／恢复待复验，G09 不关闭。
+Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e2`）：明确区分 canonical ACL 路径与 CreateProcessW 执行路径，启动前重复核对同一目录，其他来源调用保持原参数。固定阶段诊断用于定位旧输出超时与清理未知，未调整时限；本地 check、i18n 11项、actionlint及差异检查通过，同提交 Windows [CI 36280073722](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36280073722) 已结束：主组981项、command7项、显式atomic7项通过（含新增5项），真实更新首个CMD候选仍失败。旧UNC提示消失，但原生“拒绝访问”后缺完整清理收据；剩余进程和拒绝对象尚未定位，PowerShell、发布与恢复未执行；真实更新／恢复仍未通过，G09 不关闭。
+
+`0525c9439` 已补 Windows Codex npm 探针协作取消：复用本次已认证连接，原调试线程响应停止后仍先终止精确Job、排空事件、确认真实句柄退出并恢复ACL/profile。8秒协作窗口后保留强制清理，其他模式仍用原2秒；不以停止通知或根EXIT代替清理证明。本地check、i18n 11项、新增控制通道6项、actionlint通过；新增2项原生取消边界由同提交 [Windows CI 36282335500](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36282335500) 验证，当前进行中。无需本地化变更；未修复或关闭原生拒绝访问、G09及完整Goal。
 
 `debed8c51` 已补 Linux／Windows 的会话模型变更通知，使专属 Grok 恢复清理后重新同步空闲条件；沿用既有英中等待说明，本地门禁通过，真实更新链待验。`c7ef8d95b` 仅修 Python 重解析点验收夹具，生产来源与隔离合同不变。
 
