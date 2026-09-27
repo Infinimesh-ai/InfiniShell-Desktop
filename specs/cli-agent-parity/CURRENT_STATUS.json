@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "0525c9439c5cc0a400f50ca2f8bc663a7235e19f",
+  "product_behavior_freeze": "49ea40561150592be8a583216c7fcecd436d5522",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -1506,7 +1506,7 @@
     "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "0525c9439c5cc0a400f50ca2f8bc663a7235e19f",
+  "latest_implementation_commit": "49ea40561150592be8a583216c7fcecd436d5522",
   "latest_increment": "windows_npm_console_binding_increment",
   "supported_platforms": [
     "macos-arm64",
@@ -1898,7 +1898,7 @@
   "windows_npm_cancellation_increment": {
     "date": "2026-09-27",
     "base_commit": "b22dfdc867a60fcade0261ac1ccbbd87f88fbe34",
-    "status": "0525c9439已提交推送，本地check/i18n/控制通道/actionlint通过；同提交Windows定向CI进行中，G09不关闭",
+    "status": "0525c9439已提交推送；本地门禁通过，同提交Windows986项通过1项失败，新增原生取消2项通过；真实npm返回Network，未进入候选执行，G09不关闭",
     "implementation": "仅已验证CodexWindowsNpmVersionProbeV1保留原generation/token认证连接，非自然退出经同一连接传停止；worker监听只置取消标志，原调试线程每100ms等待片检查，失败先终止精确Job再排空原事件、等真实句柄退出并还原ACL/删除profile。停止写入100ms、协作8秒之后仍保留原10秒Job强制确认，其他模式保留2秒。",
     "boundary": "停止/EOF/异常控制字节均取消，握手10秒不成为探针时限；不新增权限、来源或映像放行，不以停止ACK/退出事件/等待窗口代替清理证明。8.1+10秒是等待预算，不保证文件系统及验证操作的总耗时。未改变原生拒绝访问，故真实更新/发布/恢复仍开放。",
     "tests": "新增6项普通控制通道回归和2项Windows严格Job下首事件前/后取消、子进程不执行及真实清理收据回归；Windows新用例由现有过滤器自动选择。",
@@ -1923,7 +1923,7 @@
       "run_id": 36282335500,
       "head_sha": "0525c9439c5cc0a400f50ca2f8bc663a7235e19f",
       "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36282335500",
-      "status": "in_progress",
+      "status": "completed",
       "platforms": [
         "windows-x64"
       ],
@@ -1931,7 +1931,54 @@
       "linux_unchanged": true,
       "full_workspace": false,
       "gui_or_model": false,
-      "scope": "Windows编译、控制通道、原生取消及固定Codex npm真实私有事务；未得结果不计通过。"
+      "scope": "Windows编译及原生取消边界通过；普通回归含确定Drop回收失败；真实npm未进入候选执行。",
+      "conclusion": "failure",
+      "diagnosis": "validation/windows-npm-cancel-20260927/ci-36282335500/job-text-01/diagnosis.safe.json",
+      "diagnosis_sha256": "8668c0021c9520e23f213c0d41d2f3300b8e0464e18b68601f25c23d79136b2b",
+      "job_log_sha256": "fea2d7a154fa3c93be5c92eeff5b217bad9396ab33a68a1a2ff5921c086cdc5f",
+      "ordinary": "987项运行，986通过/1失败；control5通过，Drop测试2秒超时，nextest既有自动策略3次失败，非手动重试。",
+      "native": "新增首事件前/后取消2项均通过；显式atomic9项、command7项通过。",
+      "npm": "首updated在101.75秒返回Network；完整31成员索引未见journal/generation或supervisor/exit/cleanup。源码572/578/603/604的下载均在617首save之前，收据未区分具体HTTP请求/重定向/流错误；不能继承上轮cleanup=false或计CMD/PowerShell/发布/恢复通过。",
+      "collection": "28小成员；2小ZIP核官方摘要，大Codex ZIP303692124字节未全下载/未核整包摘要。"
+    },
+    "drop_followup": {
+      "date": "2026-09-27",
+      "base_commit": "e3b7fa10144d1d0cf0a426693dccaa650e221021",
+      "status": "49ea40561已提交推送；本地02门禁通过，同提交Windows定向CI进行中，G09不关闭",
+      "scope": "清除握手接收期限，唯一socket移入非阻塞监听线程；WouldBlock时park_timeout100ms，Drop先Release置旗标再unpark/join，覆盖先唤醒竞态；仍保留6项契约和2秒退出断言。",
+      "preserved_failure": "只证明旧Drop未完成，不能区分原shutdown或join卡点；01的接收超时草稿因Win32合同风险被弃，i18n主动SIGINT中止（101），不计最终源码通过，原日志保留。",
+      "primary_source": "https://learn.microsoft.com/en-us/windows/win32/winsock/sol-socket-socket-options",
+      "archive": "validation/windows-npm-cancel-drop-20260927",
+      "source_snapshot_sha256": "497429c516423aa8e7569872981102e7aca558e0877d95c70e073a5a245c5f00",
+      "static_review_sha256": "8f2c51892c319416e48531fabd3c347301c602a8b5a1888ec11f4588e8bbaf49",
+      "localization": "无需本地化变更；无GUI/模型或用户配置变化。",
+      "closed_gaps": [],
+      "goal_complete": false,
+      "implementation_commit": "49ea40561150592be8a583216c7fcecd436d5522",
+      "source_commit_binding_sha256": "b804f806129f5dbd84d2dabb588ecf8c4e6f39dece1c57393f87d6496c864b62",
+      "local_gates": {
+        "platform": "macos-arm64",
+        "cargo_check": "02通过，0.91秒",
+        "i18n": "02通过，11项，251.25秒",
+        "control": "02通过，6项，9.09秒含启动器",
+        "actionlint": "02通过",
+        "diff_check": "02通过",
+        "localization": "无需本地化变更"
+      },
+      "same_commit_ci": {
+        "run_id": 36283908796,
+        "head_sha": "49ea40561150592be8a583216c7fcecd436d5522",
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36283908796",
+        "status": "in_progress",
+        "platforms": [
+          "windows-x64"
+        ],
+        "macos_intel": false,
+        "linux_unchanged": true,
+        "full_workspace": false,
+        "gui_or_model": false,
+        "scope": "Windows编译、控制通道、原生取消边界及固定Codex npm事务；原失败须本提交复验，未得结果不计通过。"
+      }
     }
   }
 }
