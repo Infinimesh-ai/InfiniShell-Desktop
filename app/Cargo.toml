@@ -418,6 +418,12 @@ windows-result = { workspace = true }
 winreg = { workspace = true, features = ["transactions"] }
 zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
 
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+windows = { workspace = true, features = [
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_SystemServices",
+] }
+
 [dev-dependencies]
 ai = { workspace = true, features = ["test-util"] }
 async-process.workspace = true

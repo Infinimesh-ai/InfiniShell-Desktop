@@ -937,6 +937,11 @@ impl WindowsImageDebugSession {
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             diagnostics.roles.insert(event.dwProcessId, role);
         }
+        #[cfg(test)]
+        if self.loader_trace.is_some() && self.npm_console_host.is_some() && container.is_some() {
+            // 仅固定对照在映像、精确 Job 和令牌核验后只读观察；失败不影响事件继续。
+            environment_tests::observe_bound_process(event, role.as_str());
+        }
         Ok(())
     }
 
@@ -2354,6 +2359,10 @@ fn read_at<const N: usize>(file: &mut File, offset: u64, file_size: u64) -> io::
 fn error(message: &'static str) -> io::Error {
     io::Error::other(message)
 }
+
+#[cfg(test)]
+#[path = "managed_process_atomic_windows_environment_tests.rs"]
+mod environment_tests;
 
 #[cfg(test)]
 #[path = "managed_process_atomic_windows_loader_tests.rs"]
