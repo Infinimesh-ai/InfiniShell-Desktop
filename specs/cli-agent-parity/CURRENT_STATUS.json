@@ -10,7 +10,7 @@
     "claude": "2.1.280",
     "grok": "1.0.41"
   },
-  "product_behavior_freeze": "ae4279e480fc34068934b46d7227cd64b3edc610",
+  "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
   "latest_related_verified_source_commit": "83e5115839b301697f3322092f487ddce9d72dfe",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
@@ -68,8 +68,8 @@
   "selected_related_gates_remain_passed": true,
   "selected_remote_run": 36210156960,
   "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。 2b59c8c62新增Linux候选隔离不可用原因已同步英文/简体中文，i18n11项通过；真实双语布局仍后置，不继承历史错误布局通过。 Claude图片多技能说明本轮同步英中，新文案真实布局未验。",
-  "history_preservation": "原始证据不再存放于当前树；固定 Git 提交保留原始字节，目录精简不重写历史，不改变通过、失败或未验结论。 本次图片仓外证据已逐字节复制到持久归档并生成 SHA-256 索引，保留 /private/tmp 原件，不含认证文件。",
-  "internal_execution_policy": "2026-09-26 经用户授权改用内置盘独立 Cargo 缓存；禁用增量与调试符号以控制体积，按实际可用空间监测并保留必要余量，不将 12 GiB 作为已达到的事实。已核对无进程占用并按摘要清理 3.18 GiB 旧测试二进制，不删除源码、工作树或原始证据。验收程序仍核对摘要后从内置盘运行。 新签名验收程序使用独立测试 profile，避免读取旧签名创建的钥匙串条目时等待人工授权；原 profile、凭据和系统安全设置不改动。 本轮另经授权仅清理 6 个已不用的中间文件，共 2,051,019,161 字节，保留当前 rlib、测试程序及所有原始证据；g09-unused-build-cache-cleanup-20260926/result.safe.json 记录清理后约 10.1 GiB 可用空间，该读数不代表当前实时余量。 2026-09-27又按精确清单清理7个停用单测可执行缓存（逻辑4,936,347,344字节），保留5个当前或原生验收角色及全部原始收据/日志/元数据；当时3GiB运行门槛的空间阻塞已解除，清理后6,597,607,424字节不是后续实时余量。",
+  "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
+  "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
   "documentation_updated_at": "2026-09-27",
   "documentation_source_commit": "e3ef39689cd8b686dfe040b90217ed1067b4d268",
@@ -319,14 +319,14 @@
   },
   "current_work_order": {
     "updated_at": "2026-09-27",
-    "mode": "code_first_incremental_integration",
-    "user_direction": "优先功能代码开发；提交仍运行最小门禁。GUI、物理输入法及完整在线验收留待共同测试；必要原生接口校准单独记范围，Goal仍未完成。",
+    "mode": "incremental_development_and_scoped_acceptance",
+    "user_direction": "按用户继续推进及 runner 恢复指示，执行同提交定向云端验证，并完成当前 Mac 联测包的可独立执行 GUI／模型窄验收；完整验收条件不缩减。",
     "goal_acceptance_unchanged": true,
     "integration_base_commit": "76dcfdc60254077edaa86175722591333526c05c",
-    "g01_g03_worktree": ".worktrees/grok-owned-terminal",
+    "g01_g03_worktree": "原分支代码已整合；用户已清理旧工作树，本轮使用当前主工作区。",
     "code_in_progress": {
-      "G01": "macOS arm64、Linux x86_64 和 Windows x86_64 的专属 Grok TUI 启动、消息领取、回执、恢复占用和 GUI 已合入主工作区。Linux 要求真实 PTY/pidfd/SO_PEERPIDFD；Windows 持原 ConPTY shell 句柄、原子 Job 归属及命名管道 peer。本地 macOS arm64 编译和 i18n 门禁通过；固定版本真实运行及其他平台仍待验收。普通历史继续已接任务列表入口：旧进程核实退出后同UUID --resume、同task_id新generation先CAS后派发；活跃进程仅按原PTY/listener身份重关联，不重放旧消息。",
-      "G03": "macOS/Linux/Windows 已共用专属 TUI PNG 类型化输入、持久图片、纯图/文字混合、粘贴/拖放及整批帧上限；Windows ConPTY 入口已整合。本轮未验证图片链和双语布局。",
+      "G01": "macOS arm64、Linux x86_64 和 Windows x86_64 的专属 Grok TUI 启动、消息领取、回执、恢复占用和 GUI 已合入主工作区。Linux 要求真实 PTY/pidfd/SO_PEERPIDFD；Windows 持原 ConPTY shell 句柄、原子 Job 归属及命名管道 peer。本地 macOS arm64 编译和 i18n 门禁通过；固定版本真实运行及其他平台仍待验收。普通历史继续已接任务列表入口：旧进程核实退出后同UUID --resume、同task_id新generation先CAS后派发；活跃进程仅按原PTY/listener身份重关联，不重放旧消息。 2026-09-27 e2eba8596 已通过 Mac 专属入口的一次中文加单图真实 GUI 回合；其余验收边界见最新增量。",
+      "G03": "三目标平台专属 TUI PNG 类型化输入已接；e2eba8596 修复内置模型误用门禁及跨面板模型变化清图。Mac 1.0.41/grok-4.7/default 选择器单图加中文、原字节接收、识色及局部双语布局通过；粘贴、拖放、多图、审批及其余平台产品链待验。",
       "G08": "Codex 独立 app-server/显式 Unix socket/当前 TUI 一次启动票据/内核身份/GUI入口已接，补齐原共享 daemon 多 pane 无可靠归属的问题；默认已有 daemon 路径仍要求唯一客户端及唯一 loaded thread。Grok 远端专属 ticket/RPC、PTY wrapper、GUI图片发送及重启查询已接。Claude 2.1.280上传→原生next消息→Read→历史原图消费证明及只查询恢复已接。断线均不重发输入。全部为未验证代码，不代替真实SSH/tmux。",
       "G09": "Codex/Claude/Grok 的 Mac ARM、Linux x64、Windows x64 npm，三款 Mac ARM/Linux x64 Homebrew cask 和三款 Windows x64 WinGet portable 的固定来源事务已接入。完整官方包、公开入口、依赖与安装登记分别绑定，候选监督与恢复保持来源专用合同。Linux Homebrew 来源发现与执行总入口已接，使用默认 Linuxbrew prefix 与 renameat2 原子交换；Grok WinGet 保留版本原文件、grok.exe 别名、公共链接、ARP 与下载来源标记。Claude Unix npm 2.1.280→2.1.278 受限主动降级只在显式 Stable 且实时指针匹配时开放，当前 2.1.274 仍拒绝。未操作用户安装或运行升级，本地 macOS arm64 与 b78b62a48 同提交 Linux/Windows 编译通过；真实事务仍待验收。",
       "G10": "Claude/Grok 文件搜索、固定受审技能、受审命令及命令+技能组合已接。Mac ARM/Linux x64/Windows x64 均通过固定 SDK MCP 将精确命令交宿主独立监督；每条按父代/回合/调用身份登记、逐次审批、前条真实清理后顺序执行，同一 CLI 会话保留。运行中 Submit 已回到原生合并/后续排队语义；取消先结束未执行请求，再取消原生回合，已启动命令仍等待清理。父集合仅可缩小，原生 shell 不开放，命令使用当前系统账号，非 OS 沙箱。本地 macOS arm64 编译和 i18n 门禁通过；功能测试、其他平台及双语布局仍待验收。",
@@ -334,14 +334,14 @@
       "G07": "收起CLI富输入时选择文件已改为带输入代次的单一事件：TerminalView打开编辑器，再延后到模型事件完成后调用既有附件选择器，生成卡片；旧裸路径异步回调兼容保留，但新选择入口不再产生它。未运行GUI或回归。"
     },
     "new_tests_run": true,
-    "new_online_model_or_gui_runs": "新增两次Grok原生图片技能接口校准，无GUI；不属于完整产品验收。",
+    "new_online_model_or_gui_runs": "历史两次原生图片技能校准独立保留；e2eba8596 新增一次 Mac 专属 TUI GUI 单图模型输入，另一个中文布局会话未发送模型输入。",
     "commit_policy": "功能代码先整合；提交推送前仍执行仓库要求的最小编译和本地化门禁，真实验收不被取消。",
     "g03_unverified_source_snapshot": {
       "archive": "validation/grok-owned-images-code-494927897b53",
       "sha256": "494927897b5325c550b1e0bd4b776f0fec4a15b2ef240931bc9165bb97500503",
       "kind": "source_checkpoint_only_not_validation"
     },
-    "g01_g03_integration": "三平台实现与 Windows 16 文件接线已合入当前主工作区，保留原工作树和旧证据；G08 footer、G09 AppContainer 与 root 原生 IPC 均保留。已完成本地 macOS arm64 编译与 i18n 门禁；功能和其他平台验收后置。",
+    "g01_g03_integration": "三平台实现与 Windows 16 文件接线已合入当前主工作区，原工作树已由用户清理，历史证据仍按原记录范围引用；G08 footer、G09 AppContainer 与 root 原生 IPC 均保留。已完成本地 macOS arm64 编译与 i18n 门禁；功能和其他平台验收后置。",
     "linux_backend_contract": {
       "architecture": "x86_64",
       "cli_version": "1.0.41",
@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "遵循用户先完成代码、修复和测试后置的安排：收口已启动的ae4279e48同提交Windows运行并封存原件，不因猜测拒绝对象继续追加诊断或自动重跑功能矩阵。完整GUI、中文输入法、认证模型及已知功能失败的联测修复留待用户在场；Goal仍active且完成条件未缩减。"
+    "next_work_order": "优先定位 Windows 真实 npm Node/Codex 候选失败：两个 CMD 末行对照已通过，NUL 单独失败不足以证明根因；结合原事件句柄身份核对取消阶段未知子进程，不放宽隔离或改写官方 shim。随后按 G01/G03 清单补审批、恢复、多附件及其他平台真实 GUI／模型链。14项必要缺项仍开放，不将阶段通过标为整体完成。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1504,11 +1504,11 @@
       "scope": "仅两份停用Cargo测试链接缓存；摘要/身份/无占用均核验，原始归档程序、日志、当前程序与工作树保留",
       "logical_bytes_removed": 1604934608
     },
-    "joint_test_app": "历史2b59c8c62未执行缓存已退休；本批UI修正已包含在current_macos_joint_test_bundle所指的2d159360a准备包中，仍未启动或验收。",
+    "joint_test_app": "本批UI修正已包含在当前外置盘联测包，路径见current_macos_joint_test_bundle。旧2d159360a准备包仅作为historical_macos_joint_test_bundle_2d159360a历史记录，不保证旧路径可用。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "ae4279e480fc34068934b46d7227cd64b3edc610",
-  "latest_increment": "windows_npm_console_binding_increment",
+  "latest_implementation_commit": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
+  "latest_increment": "cli_rich_image_gate_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -1583,7 +1583,7 @@
       "signature_verified": true,
       "executed": false,
       "scope": "仅新版交付app编译/资源/签名通过；复用相同产品源码默认feature的check与i18n11，未运行新版GUI或debug-embed feature测试，不另建默认后端程序。旧应用与原始证据保留。",
-      "retired_cache": "2026-09-27已完整归档并核196条目原字节及属性清单后退休缓存；原路径现已失效，恢复档案见current_macos_joint_test_bundle.retired_887_cache。"
+      "retired_cache": "2026-09-27曾完整归档并核196条目原字节及属性清单后退休缓存；原路径失效，历史归档记录见historical_macos_joint_test_bundle_2d159360a.retired_887_cache。用户后续清理后不保证该旧归档仍可用。"
     },
     "closed_gaps": [],
     "goal_complete": false,
@@ -2066,6 +2066,112 @@
     }
   },
   "current_macos_joint_test_bundle": {
+    "source_commit": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
+    "app": "/Volumes/SanDisk/github/InfiniShell-Desktop/target/parity/InfiniShellParity-e2eba8596.app",
+    "profile": "parity-sandisk-20260927",
+    "architecture": "arm64",
+    "bundle_identifier": "dev.infinishell.InfiniShellParity",
+    "binary_sha256": "e6e4d81e506a4aaf9d47e4f1965072e05db36748d01c587a056027c83e04fdf0",
+    "binary_bytes": 764675888,
+    "signature_verified": true,
+    "embedded_bilingual_resources": {
+      "app/i18n/en/warp.ftl": true,
+      "app/i18n/en/warp_tui.ftl": true,
+      "app/i18n/zh-CN/warp.ftl": true,
+      "app/i18n/zh-CN/warp_tui.ftl": true
+    },
+    "external_resource_files": 129,
+    "cli_help_exit": 0,
+    "gui_tested": true,
+    "model_request_sent": true,
+    "localization": "无需本地化变更；i18n 11 项通过；英文与简体中文专属入口、富输入及图片卡片范围布局通过。",
+    "build_log": "build-rich-input-fix.log",
+    "model_request_count": 1,
+    "gui_receipt": "gui-owned-image-e2eba8596.safe.json",
+    "gui_receipt_sha256": "26382f8d123683c12bcf96af2bae54fe6acf34c4e5a6aefb09a50d50c4aa6c98",
+    "native_history_receipt": "grok-gui-native-image.safe.json",
+    "product_implementation_commit": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
+    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/local/bundle-e2eba8596.safe.json",
+    "receipt_sha256": "8ffb743cb486a605fe4afa9440ef403385caebbdb88b4b0d4949ad419ad005a8",
+    "rebuild_policy": "后续仅文档提交不重建；产品源码或构建输入改变后另行构建与验证。",
+    "scope": "macOS arm64 固定 Grok 1.0.41/grok-4.7/default 专属 TUI 单图中文 GUI 回合与局部双语布局；不代表完整恢复、物理 IME、拖放、多图、审批或跨平台产品验收。"
+  },
+  "cli_rich_image_gate_increment": {
+    "source_commit": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
+    "behavior": "CLI 富输入的图片编辑不再依赖内置模型识图能力或输入类型；另一面板切换内置模型时保留图片草稿，提交仍核原 CLI 身份、版本、格式和权限。",
+    "local_gate": {
+      "cargo_check": "passed",
+      "i18n": "11 passed",
+      "rich_input_regressions": "53 passed, 8058 skipped",
+      "actionlint": "passed"
+    },
+    "localization": "无需本地化变更；i18n 11 项通过；英文与简体中文专属入口、富输入及图片卡片范围布局通过。",
+    "remote_run": {
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36313924070",
+      "head_sha": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
+      "status": "completed",
+      "linux": "success",
+      "windows": "failure",
+      "full_workspace_tests": false,
+      "macos_intel": false,
+      "real_windows_npm_updates": false,
+      "windows_check": "passed",
+      "windows_focused_tests": "504 passed, 7323 skipped",
+      "windows_atomic_tests": "11 passed, 1 failed, 7815 skipped; no retries",
+      "windows_installer": "passed",
+      "conclusion": "failure",
+      "linux_check": "passed",
+      "linux_focused_tests": "1386 passed",
+      "linux_auxiliary": "IPC 2、glibc绑定1、命令归属1、宿主崩溃清理5、rust-genai 81通过；Grok监督清理4场景与Codex缺失会话/idle-crash边界步骤通过。",
+      "linux_exclusions": "GUI、双语GUI、TUI专测、全workspace与真实npm更新均未运行。"
+    },
+    "previous_windows_nul_diagnostic": {
+      "source_commit": "91e04eed632d0a24045a5bd0ac889216a1114392",
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36312085199",
+      "check": "passed",
+      "focused_tests": "445 passed",
+      "explicit_atomic_tests": "9 passed, 1 failed",
+      "failure": "NUL 重定向前后标记正确、NUL 标记缺失；原生退出码零，清理确认。三次由既有 nextest 重试策略触发，新工作流禁止此诊断自动重试。",
+      "scope": "未运行真实 npm 更新，不能证明 NUL 是原 240 秒挂起的唯一原因。"
+    },
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927",
+    "full_acceptance": false,
+    "gui_acceptance": {
+      "platform": "macos-arm64",
+      "cli_version": "1.0.41",
+      "model": "grok-4.7",
+      "permission": "default",
+      "mode": "owned-terminal-rich-input",
+      "model_inputs": 1,
+      "image_bytes": 178,
+      "image_sha256": "e0b96cdc63f69c22914913b1d05151b537f5c73e1a57ca8bdb30efc1a7fbe0d3",
+      "product_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/local/gui-owned-image-e2eba8596.safe.json",
+      "product_receipt_sha256": "26382f8d123683c12bcf96af2bae54fe6acf34c4e5a6aefb09a50d50c4aa6c98",
+      "native_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/local/grok-gui-native-image.safe.json",
+      "native_receipt_sha256": "7a6544db95560e3ac2f6c7eb43382ff615831d4e700964d47d69adda2dff10e3",
+      "result": "选择器建卡、中文发送、精确 NativeProtocol ACK、原生图片字节与识色回答通过；正文和图片共用一个 prompt。ACK 后草稿为空，应用重启后消息仍为一条，无自动重投。",
+      "layout": "英文与简体中文专属入口、富输入占位符、按钮、单图卡片及中文文件名在2560×1600可读。",
+      "exclusions": [
+        "活跃重关联或冷恢复模型回合",
+        "物理输入法",
+        "粘贴或拖放图片",
+        "多图及权限失效",
+        "Linux/Windows GUI或模型"
+      ]
+    },
+    "windows_cmd_controls": {
+      "title": "passed",
+      "goto_nul_title": "passed",
+      "bound_child_marker": true,
+      "native_exit_code": 0,
+      "cleanup_confirmed": true,
+      "known_nul_test": "failed: NUL输出仍为空，但原生退出零且清理确认",
+      "scope": "真实 AppContainer 下官方末行顺序能派生绑定 CMD 子映像；不证明真实 Node/Codex 更新，也不能把 NUL 单独失败归为旧240秒挂起根因。",
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-tail-36313924070/SUMMARY.md",
+      "raw_log_sha256": "f30b95478b60b58a4e2c1d6c2c41ebe5c2a39c5915e0bd327aebc684be4a93e5"
+    }
+  },
+  "historical_macos_joint_test_bundle_2d159360a": {
     "source_commit": "2d159360ad76c8edc60e16b86dba1170b578a665",
     "product_implementation_commit": "ae4279e480fc34068934b46d7227cd64b3edc610",
     "product_source_equivalent": true,
@@ -2101,6 +2207,7 @@
       "cleanup_receipt_sha256": "a65d93e38d4c1f09eba80f7a0d0b5a45ce04ee12bb872b8af09256a7daf7c655"
     },
     "retired_link_cache": "仅退休已完成链接且无占用的786037736字节rlib及169792292字节rmeta，保留主程序和两当前应用；retired-linked-lib-01.safe.json。",
-    "documentation_gate": "cargo check -p warp通过，0.94秒；docs-check-01.safe.json。独立只读审查核主程序、43旧包、887归档及29项打包索引一致；未启动或新增功能测试。"
+    "documentation_gate": "cargo check -p warp通过，0.94秒；docs-check-01.safe.json。独立只读审查核主程序、43旧包、887归档及29项打包索引一致；未启动或新增功能测试。",
+    "historical_record_only": "本记录仅保留旧构建证据；用户已清理旧缓存，不保证旧路径仍存在。当前包见 current_macos_joint_test_bundle。"
   }
 }

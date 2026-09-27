@@ -18,17 +18,18 @@
 
 ## 功能与模式
 
-2026-09-26 按用户要求形成的**功能代码优先**检查点现已进入无人值守回归阶段；真实 GUI／模型验收仍后置。下列“未验证代码”不关闭缺项，也不改变已有原始成功／失败的范围；G01/G03 的 macOS／Linux／Windows 专属后端已合入当前主工作区，原 `.worktrees/grok-owned-terminal` 工作树保留；其他增量也已整合。代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译及 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。以下未验证均指真实功能／目标平台验收尚未完成。
+2026-09-26 按用户要求形成的**功能代码优先**检查点已进入无人值守回归阶段；当时真实 GUI／模型验收后置，后续范围以各项注明的最新实测为准。下列“未验证代码”不关闭缺项，也不改变已有原始成功／失败的范围；G01/G03 的 macOS／Linux／Windows 专属后端已合入当前主工作区，原 `.worktrees/grok-owned-terminal` 工作树后来已由用户清理；其他增量也已整合。代码检查点为 `704bb33bb2943f8a686b24b843c3b3a1ba656c19`，已通过 macOS arm64 编译及 i18n 门禁；后续修正提交 `b78b62a48223235e8c29157e3786747c8db2ff68` 的 Linux／Windows 同提交 `cargo check` 均已通过。最新定向回归与夹具复验见[最新门禁](VALIDATION_REPORT.md)，这些门禁不代表完整产品验收。以下未验证均指真实功能／目标平台验收尚未完成。
 
 ### G01 — Grok 普通终端富输入自动提交
 
 - **状态／优先级／范围**：功能缺项，高；P1 富输入、P2 可信状态、P5 验收。
-- **实际情况与影响**：普通 PTY 仍拒绝 Grok 自动提交。本次 macOS 原生 `1.0.41/grok-4.7` 探针确认 `idle_prompt` 在 help 模态、已有未提交草稿及后台工具仍存活时也可能出现，不能证明编辑器为空或 Enter 安全；新启动空会话超过 66 秒又未产生该事件。负例已保留，GUI 自动发送接线尚未完成。
+- **实际情况与影响**：普通未绑定 PTY 仍拒绝 Grok 自动提交；专属 TUI 入口已接线，Mac 限定 GUI 单图加中文正例见下文。历史 `1.0.41/grok-4.7` 探针确认 `idle_prompt` 在 help 模态、已有未提交草稿及后台工具仍存活时也可能出现，不能证明编辑器为空或 Enter 安全；新启动空会话超过66秒又未产生该事件。因此专属路径使用原生侧车及精确回执，不以该事件或延时授权 PTY Enter。
 - **本轮实现**：新增固定 macOS arm64 owned TUI 启动、真实 PTY 内核身份、原生 leader 侧车、SQLite 一次领取和精确 ACK；通知插件 `0.1.5` 观察原生权限，缺失／变化即撤销。生产路径在真实 shell PTY 完成两轮中文输入、独立模型标记、重复拒绝和进程清理；未经过 GUI，审批、编辑／重连、冷恢复及 Linux／Windows 尚待接通验收，不能关闭本项。原始证据与范围见验证报告。
 - **恢复增量**：本次侧车改为异步接收；退出清单保留，SQLite 恢复前同步置忙，旧回调及定时器隔离，普通 TUI 禁止进入托管新建/恢复。macOS 本地回归与两轮原生输入通过；空白 GUI 双语启动不代替真实会话重启验收，未接通消费者自动发送。
 - **持久目录增量**：新清单与临时 socket 分离，绑定目录内核身份；两轮原生输入通过，首轮退出恢复的 `leader.lock` 残留失败保留，修复后在原退出现场独立复验清理通过。旧启动不可重派，GUI、真实重启与其余关闭条件仍未完成。
 - **未验证代码增量**：macOS arm64 与 Linux x86_64 的 GUI 启动、原生侧车输入、精确回执、恢复占用及菜单已合入主工作区。Linux 通过真实 PTY、pidfd 和 SO_PEERPIDFD 绑定进程，缺少内核能力时不使用裸 PID 替代；不能声明全部 Linux 版本可用。Windows 已合入原始 ConPTY shell 句柄、创建时原子 Job 归属、命名管道侧车、PowerShell 启动及恢复接线；原生 Job／控制台／管道链仍须真实校准。任务列表历史继续也已接同UUID --resume、新generation CAS及活跃原PTY只读关联；最后实机链仍欠。之前“GUI 尚未接线”描述对应已提交基线。
 - **上下文补接**：`debed8c51` 已将有效本地／远端专属 Grok 的代码／评审／diff 上下文接入恢复后的同代草稿队列，已打开会话也保持连续追加顺序；新增四项回归本地通过，英中操作提示已同步。普通未绑定 PTY 的拒绝不变，三平台真实发送与双语布局待验，G01 不关闭。
+- **2026-09-27 `e2eba8596` 实际 GUI 增量**：Mac ARM64 固定 `1.0.41/grok-4.7/default` 专属入口已通过中文加单图一次发送、原生同 prompt ACK/end_turn、精确图片字节与识色回答；ACK 清草稿、应用重启不自动重投及局部英中布局通过。普通未绑定 PTY 拒绝保持；多行长文本、审批、活跃／冷恢复和其他平台仍待验，不关闭本项。
 - **当前替代方式**：保留草稿，明确点击复制，关闭富输入后由用户粘贴到原生 CLI；也可使用已验证的托管文本输入。
 - **源码／证据**：[普通终端提交与拒绝路径](../../app/src/terminal/view/use_agent_footer/mod.rs#L1153)、[历史明确复制验收](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/OFFICIAL_40_RECOVERY_AND_INPUT_GUARDS.md)。
 - **关闭条件**：固定版本的真实普通 PTY 能在可信输入就绪时自动发送中文、多行和长文本；审批、旧会话、重连与重复点击不得误批准、丢失或重投。取得实际回合接收与结果证据后，才可移除无条件拒绝。
@@ -46,8 +47,9 @@
 ### G03 — Grok 普通终端图片粘贴
 
 - **状态／优先级／范围**：功能缺项，高；P0、P1、P5。
-- **实际情况与影响**：普通终端图片门禁仍保留。本次 macOS 原生 Ctrl+V 后再粘贴 bracketed text 会重复附图；改用普通 UTF-8 输入并以 Alt+Enter 换行取得恰好一段文字加一张图片及正确识色，但没有剪贴板消费 ACK 或可信输入就绪，未接通应用自动链。G02 的 ACP 正例不替代本项。
+- **实际情况与影响**：普通未绑定终端图片门禁仍保留；专属 TUI 选择器路径已有下文 Mac 单图 GUI 正例，粘贴／拖放仍欠验。历史原生 Ctrl+V 后再粘贴 bracketed text 会重复附图；改用普通 UTF-8 输入及 Alt+Enter 换行虽得到单图识色正例，却没有剪贴板消费 ACK 或可信输入就绪，不能用该手工操作代替应用自动链。G02 的托管 ACP 正例也不替代本项。
 - **未验证代码增量**：专属 TUI 会话新增 PNG 类型化输入，图片先校验后持久化为当前数据库 scope 的哈希文件；独立富消息主题保存文本和图片引用，worker 重读核验后发送同一 session/prompt，沿用单次领取和原生回执。纯图、文字加多图、粘贴／拖放进富输入框及失败保留已接线；不再依靠剪贴板时序。macOS arm64、Linux x86_64 与 Windows x86_64 已共用固定 1.0.41/grok-4.7/default 输入；Windows ConPTY 入口已整合。已开展的自动化门禁见[最新门禁](VALIDATION_REPORT.md)，图片模型及真实 GUI 验收仍待补。
+- **2026-09-27 `e2eba8596` 实际 GUI 增量**：修复选择图片误用内置模型能力及其他面板切换模型清除草稿。Mac 专属 TUI 的选择器单图加中文已取得产品收据、原生图片原字节及识色正例；英中单图卡片与输入控件可读。证据属于选择器路径，不替代粘贴／拖放、纯图、多图、审批失效或其余平台验收。
 - **当前替代方式**：使用文字描述，或使用已经验证的其他 CLI 图片入口；不能把手工粘贴成功当作现有应用自动路径已通过。
 - **源码／证据**：[图片按键策略](../../app/src/terminal/view/use_agent_footer/mod.rs#L96)、[图片投递门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)。
 - **关闭条件**：分别确认三平台固定 Grok 原生图片接收方式，并在普通 PTY 实测剪贴板／拖放、焦点、审批等待与多附件顺序，证明图片进入正确会话且失败保留草稿。
@@ -117,6 +119,7 @@
 
 - **Windows npm 诊断增量 `ae4279e48`**：固定下载角色与失败阶段、已核验 CREATE/EXIT 角色和清理模式已接入，授权、隔离及失败判定不变。本地 check、i18n 11项及 actionlint 通过；同提交 [Windows CI 36285301933](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36285301933) 已结束：Windows 编译、主组990项、command7项、原生atomic9项通过，真实 npm 首个 updated 返回 ProbeFailed。正常阶段仅记录 root／console CREATE；取消清理阶段记录 root／console EXIT1，另有尚未分类的 unknown CREATE／EXIT3221225738，不能据此认定 Node 从未启动或定位拒绝对象。最终取得 cleanup_confirmed=true 及 AppContainer 清理标记；PowerShell、发布与独立恢复未验。CREATE/EXIT 与 root_exit 使用同一 session 时钟，probe 阶段仍用自身起点，不直接相减。按用户代码优先、修复与联测后置要求封存本轮，不自动重试或追加猜测性诊断；G09和Goal保持开放。无需本地化变更。
 - **空闲通知补接**：`debed8c51` 将升级器的会话模型观察对齐三支持平台，避免 Linux／Windows 恢复清理后仍沿用旧 busy 状态；本地门禁通过，目标平台真实更新链待验。`c7ef8d95b` 仅修跨 Python 版本的验收夹具，不改生产校验。
+- **2026-09-27 `e2eba8596` 原生诊断**：同提交 Windows 编译及504项回归通过，atomic为11通过／1失败；TITLE与官方GOTO/NUL/TITLE顺序均启动绑定CMD子映像、退出0、清理确认，原NUL输出对照仍为空且失败。无重试、未跑真实npm更新，不能把此NUL失败当作旧Node/Codex链挂起的唯一根因；下一步需核取消阶段unknown子进程真实身份，隔离和官方shim保持不变。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
