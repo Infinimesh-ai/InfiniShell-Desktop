@@ -53,6 +53,138 @@ fn npm_cleanup_events_preserve_observed_cancellation_without_inventing_it() {
 }
 
 #[test]
+fn npm_creation_timing_does_not_invent_missing_or_negative_ages() {
+    let mut diagnostics = NpmProcessDiagnostics::new();
+    assert_eq!(diagnostics.creation_timing(None), (None, None));
+    assert_eq!(diagnostics.creation_timing(Some(10_000)), (None, None));
+
+    diagnostics.termination_requested_at = Some(50_001);
+    assert_eq!(diagnostics.creation_timing(None), (None, None));
+    assert_eq!(
+        diagnostics.creation_timing(Some(50_002)),
+        (Some(false), None)
+    );
+    assert_eq!(
+        diagnostics.creation_timing(Some(50_001)),
+        (Some(true), Some(0))
+    );
+    assert_eq!(
+        diagnostics.creation_timing(Some(10_000)),
+        (Some(true), Some(4))
+    );
+}
+
+#[test]
+fn npm_creation_timing_preserves_filetime_high_bits_without_overflow() {
+    let created_at = filetime_ticks(FILETIME {
+        dwLowDateTime: 0xffff_ffff,
+        dwHighDateTime: 0x7fff_ffff,
+    });
+    let stopped_at = filetime_ticks(FILETIME {
+        dwLowDateTime: 0x0000_270f,
+        dwHighDateTime: 0x8000_0000,
+    });
+    assert_eq!(created_at, 0x7fff_ffff_ffff_ffff);
+    assert_eq!(stopped_at, 0x8000_0000_0000_270f);
+    let mut diagnostics = NpmProcessDiagnostics::new();
+    diagnostics.termination_requested_at = Some(stopped_at);
+    assert_eq!(
+        diagnostics.creation_timing(Some(created_at)),
+        (Some(true), Some(1))
+    );
+
+    diagnostics.termination_requested_at = Some(filetime_ticks(FILETIME {
+        dwLowDateTime: u32::MAX,
+        dwHighDateTime: u32::MAX,
+    }));
+    assert_eq!(diagnostics.termination_requested_at, Some(u64::MAX));
+    assert_eq!(
+        diagnostics.creation_timing(Some(0)),
+        (Some(true), Some(1_844_674_407_370_955))
+    );
+}
+
+#[test]
+fn npm_termination_request_never_replaces_the_first_timestamp() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    let mut diagnostics = NpmProcessDiagnostics::new();
+    // 固定旧值排除两次实际时钟读取恰好相同而误通过的情况。
+    diagnostics.termination_requested_at = Some(1);
+    session.npm_diagnostics = Some(diagnostics);
+
+    session.record_package_termination_request();
+    session.record_package_termination_request();
+
+    assert_eq!(
+        session
+            .npm_diagnostics
+            .as_ref()
+            .unwrap()
+            .termination_requested_at,
+        Some(1)
+    );
+}
+
+#[test]
+fn npm_creation_time_failure_does_not_invent_a_timestamp() {
+    let fixture = Fixture::new();
+    let file = File::open(&fixture.program).unwrap();
+
+    assert_eq!(process_creation_time(HANDLE::default()), None);
+    assert_eq!(process_creation_time(HANDLE(file.as_raw_handle())), None);
+}
+
+#[test]
+fn npm_cleanup_image_role_uses_bound_identity_instead_of_names_or_bytes() {
+    let fixture = Fixture::new();
+    let node = fixture.bin.join("node.exe");
+    let codex = fixture.bin.join("codex.exe");
+    let other = fixture.bin.join("helper.exe");
+    let unbound = fixture.install.join("node.exe");
+    fs::copy(&fixture.program, &node).unwrap();
+    fs::copy(&fixture.program, &codex).unwrap();
+    fs::copy(&fixture.program, &other).unwrap();
+    fs::copy(&node, &unbound).unwrap();
+    let mut lease = prepare(&fixture.expected()).unwrap();
+    lease
+        .set_package_images(vec![
+            ExpectedFileIdentity::capture(&node).unwrap(),
+            ExpectedFileIdentity::capture(&codex).unwrap(),
+            ExpectedFileIdentity::capture(&other).unwrap(),
+        ])
+        .unwrap();
+    let session = lease.prepare_image_debug_session().unwrap();
+    let node = File::open(node).unwrap();
+    let unbound = File::open(unbound).unwrap();
+    assert_ne!(
+        inspect_handle(&node).unwrap().id,
+        inspect_handle(&unbound).unwrap().id
+    );
+    assert_eq!(
+        sha256_file(&mut node.try_clone().unwrap()).unwrap(),
+        sha256_file(&mut unbound.try_clone().unwrap()).unwrap()
+    );
+
+    assert_eq!(session.cleanup_image_role(&node), NpmProcessRole::Node);
+    assert_eq!(
+        session.cleanup_image_role(&File::open(codex).unwrap()),
+        NpmProcessRole::Codex
+    );
+    assert_eq!(
+        session.cleanup_image_role(&File::open(other).unwrap()),
+        NpmProcessRole::BoundOther
+    );
+    assert_eq!(
+        session.cleanup_image_role(&unbound),
+        NpmProcessRole::Unknown
+    );
+    assert!(session.processes.is_empty());
+    assert!(session.pending_event.is_none());
+}
+
+#[test]
 fn npm_bound_roles_never_expose_unknown_image_names() {
     for (path, role) in [
         (r"C:\private\NODE.EXE", "node"),
@@ -86,7 +218,20 @@ fn npm_cancel_before_initial_event_confirms_cleanup_without_running_child() {
         .unwrap_err();
 
     assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    fixture.debugger.record_package_termination_request();
+    assert!(
+        fixture
+            .debugger
+            .npm_diagnostics
+            .as_ref()
+            .unwrap()
+            .termination_requested_at
+            .is_some()
+    );
     fixture.finish();
+    assert!(fixture.debugger.pending_event.is_none());
+    assert!(fixture.debugger.processes.is_empty());
+    assert!(fixture.debugger.held_package_processes.is_empty());
     record_debug_native_exit(name);
 }
 
@@ -116,7 +261,27 @@ fn npm_cancel_after_initial_event_confirms_cleanup_without_running_child() {
         .unwrap_err();
 
     assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    fixture.debugger.record_package_termination_request();
+    let requested_at = fixture
+        .debugger
+        .npm_diagnostics
+        .as_ref()
+        .unwrap()
+        .termination_requested_at;
+    assert!(requested_at.is_some());
     fixture.finish();
+    assert!(fixture.debugger.pending_event.is_none());
+    assert!(fixture.debugger.processes.is_empty());
+    assert!(fixture.debugger.held_package_processes.is_empty());
+    assert_eq!(
+        fixture
+            .debugger
+            .npm_diagnostics
+            .as_ref()
+            .unwrap()
+            .termination_requested_at,
+        requested_at
+    );
     record_debug_native_exit(name);
 }
 

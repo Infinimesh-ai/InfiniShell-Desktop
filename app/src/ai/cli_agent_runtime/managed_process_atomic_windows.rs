@@ -22,7 +22,7 @@ use command::blocking::Command;
 use command::windows::AppContainerProbe;
 use windows::Win32::Foundation::{
     DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
-    ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
+    ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, FILETIME, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
     WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authorization::{GetSecurityInfo, SE_FILE_OBJECT};
@@ -42,8 +42,12 @@ use windows::Win32::System::Diagnostics::Debug::{
     LOAD_DLL_DEBUG_EVENT, OUTPUT_DEBUG_STRING_EVENT, RIP_EVENT, UNLOAD_DLL_DEBUG_EVENT,
     WaitForDebugEvent,
 };
-use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
-use windows::Win32::System::Threading::{GetCurrentProcess, TerminateProcess, WaitForSingleObject};
+use windows::Win32::System::SystemInformation::{
+    GetSystemDirectoryW, GetSystemTimePreciseAsFileTime,
+};
+use windows::Win32::System::Threading::{
+    GetCurrentProcess, GetProcessTimes, TerminateProcess, WaitForSingleObject,
+};
 use windows::core::HRESULT;
 
 use super::{
@@ -214,6 +218,7 @@ struct NpmProcessDiagnostics {
     pending_exit_code: Option<u32>,
     cleanup: bool,
     cancel_observed: bool,
+    termination_requested_at: Option<u64>,
 }
 
 struct NpmProcessEvent {
@@ -234,6 +239,7 @@ impl NpmProcessDiagnostics {
             pending_exit_code: None,
             cleanup: false,
             cancel_observed: false,
+            termination_requested_at: None,
         }
     }
 
@@ -250,6 +256,18 @@ impl NpmProcessDiagnostics {
     fn begin_cleanup(&mut self, cancel_observed: bool) {
         self.cleanup = true;
         self.cancel_observed |= cancel_observed;
+    }
+
+    fn creation_timing(&self, created_at: Option<u64>) -> (Option<bool>, Option<u64>) {
+        let Some((created_at, stopped_at)) = created_at.zip(self.termination_requested_at) else {
+            return (None, None);
+        };
+        (
+            Some(created_at <= stopped_at),
+            stopped_at
+                .checked_sub(created_at)
+                .map(|ticks| ticks / 10_000),
+        )
     }
 
     fn continued(&mut self, process_id: u32, code: DEBUG_EVENT_CODE) -> Option<NpmProcessEvent> {
@@ -471,6 +489,63 @@ impl WindowsReplacementLease {
 impl WindowsImageDebugSession {
     pub(super) fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
         self.cancellation = Some(cancellation);
+    }
+
+    pub(super) fn record_package_termination_request(&mut self) {
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics
+                .termination_requested_at
+                .get_or_insert_with(|| filetime_ticks(unsafe { GetSystemTimePreciseAsFileTime() }));
+        }
+    }
+
+    fn cleanup_image_role(&self, file: &File) -> NpmProcessRole {
+        let Ok(identity) = inspect_handle(file) else {
+            return NpmProcessRole::Unknown;
+        };
+        if !is_plain_kind(identity.attributes, false) {
+            return NpmProcessRole::Unknown;
+        }
+        if identity.id == self.expected_program_id && identity.size == self.expected_program_size {
+            return NpmProcessRole::Root;
+        }
+        if let Some(console) = &self.npm_console_host
+            && identity == console.identity
+        {
+            return NpmProcessRole::Console;
+        }
+        self.package_images
+            .as_ref()
+            .and_then(|images| {
+                images
+                    .iter()
+                    .find(|(dll, lease)| !*dll && identity == lease.identity)
+            })
+            .map_or(NpmProcessRole::Unknown, |(_, lease)| lease.npm_role)
+    }
+
+    fn record_cleanup_create(&self, event: &DEBUG_EVENT) {
+        let information = unsafe { event.u.CreateProcessInfo };
+        // 接管并释放本次 hFile；观察失败只能成为未知，不能阻断原终止和 Continue。
+        let file = file_from_debug_handle(information.hFile).ok();
+        let Some(diagnostics) = &self.npm_diagnostics else {
+            return;
+        };
+        // 只匹配已持租约的文件身份；这不是正常阶段的映像授权，不回填 roles。
+        let observed_image_role = file
+            .as_ref()
+            .map_or(NpmProcessRole::Unknown, |file| {
+                self.cleanup_image_role(file)
+            })
+            .as_str();
+        let (created_before_stop, creation_age_at_stop_ms) =
+            diagnostics.creation_timing(process_creation_time(information.hProcess));
+        let elapsed_ms = diagnostics.started.elapsed().as_millis();
+        // FILETIME 属于系统时钟，仅供诊断；不证明用户代码执行，也不参与清理判定。
+        warp_core::safe_eprintln!(
+            safe: ("managed_process.windows_npm_cleanup_create observed_image_role={observed_image_role} binding=lease_identity_only created_before_stop={created_before_stop:?} creation_age_at_stop_ms={creation_age_at_stop_ms:?} elapsed_ms={elapsed_ms}"),
+            full: ("managed_process.windows_npm_cleanup_create observed_image_role={observed_image_role} binding=lease_identity_only created_before_stop={created_before_stop:?} creation_age_at_stop_ms={creation_age_at_stop_ms:?} elapsed_ms={elapsed_ms}")
+        );
     }
 
     fn next_event(
@@ -1013,7 +1088,7 @@ impl WindowsImageDebugSession {
             )?;
             match event.dwDebugEventCode {
                 CREATE_PROCESS_DEBUG_EVENT => {
-                    close_unconsumed_debug_image(&event)?;
+                    self.record_cleanup_create(&event);
                     let process =
                         duplicate_process_handle(unsafe { event.u.CreateProcessInfo.hProcess })?;
                     if self.processes.insert(event.dwProcessId, process).is_some() {
@@ -1780,6 +1855,23 @@ fn file_from_debug_handle(handle: HANDLE) -> io::Result<File> {
         ));
     }
     Ok(unsafe { File::from_raw_handle(handle.0) })
+}
+
+fn filetime_ticks(time: FILETIME) -> u64 {
+    (u64::from(time.dwHighDateTime) << 32) | u64::from(time.dwLowDateTime)
+}
+
+fn process_creation_time(process: HANDLE) -> Option<u64> {
+    if process.is_invalid() {
+        return None;
+    }
+    let mut creation = FILETIME::default();
+    let mut exit = FILETIME::default();
+    let mut kernel = FILETIME::default();
+    let mut user = FILETIME::default();
+    unsafe { GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) }
+        .ok()
+        .map(|()| filetime_ticks(creation))
 }
 
 /// 调试事件中的原 process/thread 句柄由系统关闭；本模块只拥有独立副本。

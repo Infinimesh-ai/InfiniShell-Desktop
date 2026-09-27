@@ -521,6 +521,7 @@ fn terminate_package_probe(
     process: &command::windows::AppContainerProbe,
     debugger: &mut super::atomic_windows::WindowsImageDebugSession,
 ) -> io::Result<()> {
+    debugger.record_package_termination_request();
     process.terminate_job()?;
     // 显式传入已持有的根进程身份，包含 resume 自身失败、尚无首事件的路径。
     debugger.drain_terminated_package_in_container(process)
