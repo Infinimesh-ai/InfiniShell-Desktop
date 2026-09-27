@@ -96,6 +96,14 @@ pub(super) fn record_rejected_image(path: &Path, system_directory: &File) {
 }
 
 fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
+    run_debug_fixture_in_strict_job_with_stdin(test_name, timeout, false);
+}
+
+fn run_debug_fixture_in_strict_job_with_stdin(
+    test_name: &str,
+    timeout: Duration,
+    keep_stdin_open: bool,
+) {
     let (_, test_module) = module_path!()
         .split_once("::")
         .expect("测试模块路径应包含 crate 名称");
@@ -121,8 +129,17 @@ fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
     // 子测试先等待授权，父测试可在任何调试事件发生前为整棵树建立严格 Job。
     let mut tree = ManagedTree::claim(driver).unwrap();
     assert_eq!(tree.containment(), Containment::WindowsJob);
-    let authorization = tree.child_mut().stdin.take().unwrap().write_all(b"1");
+    let mut input = tree.child_mut().stdin.take().unwrap();
+    let authorization = input.write_all(b"1");
+    // 旧夹具默认立即发出 EOF；新对照可在整个原生测试期间保留写端。
+    let held_input = if keep_stdin_open {
+        Some(input)
+    } else {
+        drop(input);
+        None
+    };
     if let Err(failure) = authorization {
+        drop(held_input);
         let cleanup = tree.terminate_and_confirm(Duration::from_secs(5));
         panic!("调试夹具授权失败：{failure}；严格 Job 清理：{cleanup:?}");
     }
@@ -141,6 +158,7 @@ fn run_debug_fixture_in_strict_job(test_name: &str, timeout: Duration) {
         thread::sleep(Duration::from_millis(20));
     };
     // 即使调试事件链挂住，也须终止专属 Job、等待测试根进程并确认 ActiveProcesses=0。
+    drop(held_input);
     let status = tree.terminate_and_confirm(Duration::from_secs(5)).unwrap();
     eprintln!("atomic_windows_strict_job_cleanup_confirmed=true");
     let timed_out = outcome.unwrap();

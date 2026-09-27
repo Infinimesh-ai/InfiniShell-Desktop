@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "优先定位 Windows 真实 npm Node/Codex 候选失败：两个 CMD 末行对照已通过，NUL 单独失败不足以证明根因；结合原事件句柄身份核对取消阶段未知子进程，不放宽隔离或改写官方 shim。随后按 G01/G03 清单补审批、恢复、多附件及其他平台真实 GUI／模型链。14项必要缺项仍开放，不将阶段通过标为整体完成。"
+    "next_work_order": "Windows b3908488c 真实 npm 首个 CMD 仍 ProbeFailed，清理确认；本轮没有重现旧 unknown CREATE。先比较完整 shim 的 PATH 选路与 stdin EOF/open，再按证据修复，不改写官方入口或放宽隔离。随后补 G01/G03 审批、恢复、多附件和其他平台真实链；14项必要缺项仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1507,8 +1507,8 @@
     "joint_test_app": "本批UI修正已包含在当前外置盘联测包，路径见current_macos_joint_test_bundle。旧2d159360a准备包仅作为historical_macos_joint_test_bundle_2d159360a历史记录，不保证旧路径可用。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_increment": "cli_rich_image_gate_increment",
+  "latest_implementation_commit": "b3908488ce04f36e4c31c06dd386b8239f4501d0",
+  "latest_increment": "windows_npm_create_timing_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -2209,5 +2209,60 @@
     "retired_link_cache": "仅退休已完成链接且无占用的786037736字节rlib及169792292字节rmeta，保留主程序和两当前应用；retired-linked-lib-01.safe.json。",
     "documentation_gate": "cargo check -p warp通过，0.94秒；docs-check-01.safe.json。独立只读审查核主程序、43旧包、887归档及29项打包索引一致；未启动或新增功能测试。",
     "historical_record_only": "本记录仅保留旧构建证据；用户已清理旧缓存，不保证旧路径仍存在。当前包见 current_macos_joint_test_bundle。"
+  },
+  "windows_npm_create_timing_increment": {
+    "source_commit": "b3908488ce04f36e4c31c06dd386b8239f4501d0",
+    "scope": "Windows npm 取消清理阶段的原 CREATE 文件租约身份和进程创建时序诊断；不改变授权、官方 shim、隔离或失败判定。",
+    "local_gate": {
+      "cargo_check": "passed",
+      "i18n_passed": 11,
+      "rustfmt": "passed",
+      "diff_check": "passed"
+    },
+    "localization": "无需本地化变更；仅固定诊断字段和测试。",
+    "remote_run": {
+      "id": 36322313315,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36322313315",
+      "head_sha": "b3908488ce04f36e4c31c06dd386b8239f4501d0",
+      "result": "failure",
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 995,
+      "command_passed": 7,
+      "atomic_passed": 11,
+      "atomic_failed": 1,
+      "atomic_retries": 0,
+      "atomic_failure": "原 NUL 输出对照仍为空；TITLE 和 GOTO/NUL/TITLE 对照通过。",
+      "other_platforms": "本次仅改 Windows，Linux 与 Mac Intel 未选择；未重建 Mac 联测包。"
+    },
+    "real_npm": {
+      "case": "updated",
+      "error": "ProbeFailed",
+      "probe_failed_ms": 241115,
+      "normal_create_roles": [
+        "root",
+        "console"
+      ],
+      "cleanup_create_count": 0,
+      "native_cleanup_exit_codes": {
+        "root": 1,
+        "console": 1
+      },
+      "cleanup_confirmed": true,
+      "model_inputs_sent": 0,
+      "unreached": [
+        "PowerShell 候选",
+        "发布",
+        "独立恢复"
+      ],
+      "interpretation": "本轮没有复现旧 unknown CREATE，不能给旧事件补造 Node 身份或创建年龄，也不证明 Node 从未被创建。"
+    },
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927/windows-create-timing",
+    "summary": "ci-36322313315/summary.safe.json",
+    "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
+    "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
+    "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
+    "next": "补完整 shim 选路与 stdin EOF/open 的绑定 CMD 原生对照；按结果决定下一次修复。",
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false
   }
 }
