@@ -29,7 +29,7 @@ SOURCE_FILES = (
         "sources.rs", "sources_npm.rs", "sources_npm_release.rs", "sources_npm_transaction.rs",
         "sources_npm_tree_unix.rs", "sources_codex_npm_live_tests.rs", "sources_npm_codex.rs")],
     *["app/src/ai/cli_agent_runtime/" + name for name in (
-        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_macos.rs",
+        "managed_process.rs", "managed_process_version_probe.rs", "managed_process_macos.rs", "managed_process_atomic_macos.rs",
         "managed_process_atomic_linux.rs", "managed_process_atomic_linux_glibc.rs",
         "managed_process_npm_probe.rs", "managed_process_npm_probe_macos.rs")],
     "script/cli-agent-parity/run_claude_npm_update_live.py",

@@ -1,3 +1,5 @@
+use std::os::unix::fs::MetadataExt as _;
+
 use super::super::{confirmed_exit, create_generation_directory, write_new_record};
 use super::*;
 
@@ -301,6 +303,83 @@ fn atomic_proof_publication_never_overwrites_existing_or_partial_records() {
 }
 
 #[test]
+fn launchd_definition_uses_private_control_directory_with_a_persistent_copy() {
+    let state = tempfile::tempdir().unwrap();
+    let control_directory = tempfile::Builder::new()
+        .prefix("is-cli-")
+        .tempdir_in("/tmp")
+        .unwrap();
+    fs::set_permissions(control_directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let definition =
+        b"<plist version=\"1.0\"><dict><key>Label</key><string>fixture</string></dict></plist>";
+
+    let path = persist_job_definition(state.path(), &control_directory, definition).unwrap();
+
+    assert_eq!(path, control_directory.path().join("macos-job.plist"));
+    assert_ne!(path.parent().unwrap(), state.path());
+    assert_eq!(fs::read(&path).unwrap(), definition);
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        definition
+    );
+    let directory_metadata = fs::metadata(control_directory.path()).unwrap();
+    let definition_metadata = fs::metadata(&path).unwrap();
+    assert_eq!(directory_metadata.mode() & 0o777, 0o700);
+    assert_eq!(definition_metadata.mode() & 0o777, 0o600);
+    assert_eq!(directory_metadata.uid(), unsafe { libc::geteuid() });
+    assert_eq!(definition_metadata.uid(), unsafe { libc::geteuid() });
+    assert!(persist_job_definition(state.path(), &control_directory, b"replacement").is_err());
+    assert_eq!(fs::read(&path).unwrap(), definition);
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        definition
+    );
+}
+
+fn unregistered_job(directory: &Path) -> Job {
+    let control_directory = tempfile::tempdir_in(directory).unwrap();
+    fs::set_permissions(control_directory.path(), fs::Permissions::from_mode(0o700)).unwrap();
+    let socket = control_directory.path().join("control");
+    let listener = UnixListener::bind(&socket).unwrap();
+    fs::set_permissions(&socket, fs::Permissions::from_mode(0o600)).unwrap();
+    persist_job_definition(directory, &control_directory, b"definition").unwrap();
+    // 未注册服务也未领取内核域，显式清理与 Drop 均不调用 launchctl。
+    Job {
+        directory: directory.to_owned(),
+        service: label(Uuid::new_v4()),
+        registered: false,
+        bootstrap_pending: false,
+        cleanup_attempted: false,
+        coalition: None,
+        output_completed: None,
+        errors_completed: None,
+        control_directory,
+        listener,
+    }
+}
+
+#[test]
+fn unregistered_job_retains_control_files_until_cleanup_and_drop() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let socket = control_path.join("control");
+    let definition = control_path.join("macos-job.plist");
+
+    assert!(definition.exists() && socket.exists());
+    job.cleanup().unwrap();
+    assert!(job.cleanup_attempted);
+    assert!(definition.exists() && socket.exists());
+    drop(job);
+
+    assert!(!control_path.exists());
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
+}
+
+#[test]
 fn stderr_forwarding_failure_is_reported_without_erasing_completed_cleanup() {
     let state = tempfile::tempdir().unwrap();
     let fixture = Fixture::new(state.path()).save();
@@ -325,7 +404,7 @@ fn stderr_forwarding_failure_is_reported_without_erasing_completed_cleanup() {
         coalition: None,
         output_completed: Some(output_completed),
         errors_completed: Some(errors_completed),
-        _socket_directory: socket_directory,
+        control_directory: socket_directory,
         listener,
     };
     assert!(
@@ -360,4 +439,70 @@ fn failed_job_removal_still_cleans_the_domain_and_preserves_both_errors() {
     assert!(error.to_string().contains("固定域清理失败"));
     let error = cleanup_operations(|| Err(io::Error::other("移除未确认")), || Ok(())).unwrap_err();
     assert_eq!(error.to_string(), "移除未确认");
+}
+
+#[test]
+fn failed_domain_cleanup_preserves_private_definition_after_job_removal() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    // 模拟 cleanup 已完成两项操作，只注入域清理结果，不启动或移除真实服务。
+    job.cleanup_attempted = true;
+
+    let error = job
+        .finish_cleanup(cleanup_operations(
+            || Ok(()),
+            || Err(io::Error::other("固定域清理失败")),
+        ))
+        .unwrap_err();
+    assert_eq!(error.to_string(), "固定域清理失败");
+    drop(job);
+
+    assert_eq!(
+        fs::read(control_path.join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
+    assert!(control_path.join("control").exists());
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
+}
+
+#[test]
+fn failed_job_removal_preserves_control_files_without_retrying_on_drop() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    job.cleanup_attempted = true;
+
+    let error = job
+        .finish_cleanup(cleanup_operations(
+            || Err(io::Error::other("固定移除失败")),
+            || Ok(()),
+        ))
+        .unwrap_err();
+    assert_eq!(error.to_string(), "固定移除失败");
+    drop(job);
+
+    assert_eq!(
+        fs::read(control_path.join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
+    assert!(control_path.join("control").exists());
+}
+
+#[test]
+fn unregistered_job_drop_cleans_control_files_without_touching_persistent_evidence() {
+    let state = tempfile::tempdir().unwrap();
+    let job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+
+    drop(job);
+
+    assert!(!control_path.exists());
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
 }

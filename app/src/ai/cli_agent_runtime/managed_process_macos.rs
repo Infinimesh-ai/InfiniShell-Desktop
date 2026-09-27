@@ -145,6 +145,18 @@ fn persist_record(path: &Path, bytes: &[u8]) -> io::Result<()> {
     fs::File::open(directory)?.sync_all()
 }
 
+fn persist_job_definition(
+    directory: &Path,
+    control_directory: &TempDir,
+    bytes: &[u8],
+) -> io::Result<PathBuf> {
+    // 持久目录仅保留诊断副本；launchd 从具备真实属主权限的私有控制目录读取。
+    persist_record(&directory.join("macos-job.plist"), bytes)?;
+    let path = control_directory.path().join("macos-job.plist");
+    persist_record(&path, bytes)?;
+    Ok(path)
+}
+
 fn frame_write<T: Serialize>(stream: &mut UnixStream, value: &T) -> io::Result<()> {
     let bytes = encode(value)?;
     if bytes.len() > MAX_FRAME_BYTES {
@@ -254,7 +266,7 @@ struct Job {
     coalition: Option<MacosCoalition>,
     output_completed: Option<mpsc::Receiver<io::Result<()>>>,
     errors_completed: Option<mpsc::Receiver<io::Result<()>>>,
-    _socket_directory: TempDir,
+    control_directory: TempDir,
     listener: UnixListener,
 }
 
@@ -361,8 +373,7 @@ impl Job {
         plist::Value::Dictionary(config)
             .to_writer_xml(&mut bytes)
             .map_err(io::Error::other)?;
-        let plist_path = directory.join("macos-job.plist");
-        persist_record(&plist_path, &bytes)?;
+        let plist_path = persist_job_definition(&directory, &socket_directory, &bytes)?;
         let mut job = Self {
             directory,
             service,
@@ -372,7 +383,7 @@ impl Job {
             coalition: None,
             output_completed: None,
             errors_completed: None,
-            _socket_directory: socket_directory,
+            control_directory: socket_directory,
             listener,
         };
         // 只检查本代次随机 label；已有同名 job 不属于本次调用，不能在失败时删除它。
@@ -453,7 +464,7 @@ impl Job {
             coalition,
             ..
         } = self;
-        cleanup_operations(
+        let result = cleanup_operations(
             || {
                 if *registered || *bootstrap_pending {
                     let status = launchctl(&[OsStr::new("bootout"), OsStr::new(service)])?;
@@ -473,7 +484,14 @@ impl Job {
                 }
                 Ok(())
             },
-        )
+        );
+        self.finish_cleanup(result)
+    }
+
+    fn finish_cleanup(&mut self, result: io::Result<()>) -> io::Result<()> {
+        // 服务或资源域尚未确认清理时，保留描述文件及控制目录供后续诊断。
+        self.control_directory.disable_cleanup(result.is_err());
+        result
     }
 
     fn finish_output(&mut self) -> io::Result<()> {

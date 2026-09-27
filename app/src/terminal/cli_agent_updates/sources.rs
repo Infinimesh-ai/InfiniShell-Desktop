@@ -145,7 +145,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 69] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 70] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -201,6 +201,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 69] = [
     include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_version_probe.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux_glibc.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_macos.rs"),
