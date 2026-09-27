@@ -941,8 +941,32 @@ fn private_desktop_failure_summary(failure: &io::Error) -> serde_json::Value {
                 .flatten()
                 .map(|code| (stage, code))
         });
+    // 只认创建站错误后的第一个固定字段；清理正文或任意 JSON 字段都不能进入摘要。
+    let administrator_membership = api
+        .filter(|(stage, _)| *stage == "create_station")
+        .and_then(|_| description.split('；').nth(1))
+        .and_then(|field| field.strip_prefix("administrator_membership="))
+        .filter(|json| json.len() <= 128)
+        .and_then(|json| serde_json::from_str::<serde_json::Value>(json).ok())
+        .filter(|value| {
+            value.as_object().is_some_and(|fields| {
+                fields.len() == 3
+                    && fields
+                        .keys()
+                        .all(|name| matches!(name.as_str(), "status" | "member" | "hresult"))
+                    && ((value["status"] == "ok"
+                        && value["member"].is_boolean()
+                        && value["hresult"].is_null())
+                        || (value["status"] == "query_error"
+                            && value["member"].is_null()
+                            && value["hresult"]
+                                .as_u64()
+                                .is_some_and(|code| code <= u32::MAX as u64)))
+            })
+        });
     serde_json::json!({
         "kind": format!("{:?}", failure.kind()),
+        "administrator_membership": administrator_membership,
         "os_code": failure.raw_os_error(),
         "private_object_api_stage": api.map(|(stage, _)| stage),
         "hresult": api.map(|(_, code)| code).or_else(|| {
@@ -960,6 +984,7 @@ fn private_desktop_failure_keeps_only_fixed_stage_and_numeric_hresult() {
         private_desktop_failure_summary(&failure),
         serde_json::json!({
             "kind": "Other",
+            "administrator_membership": null,
             "os_code": null,
             "private_object_api_stage": "create_station",
             "hresult": 2147942405_u32,
@@ -973,6 +998,7 @@ fn private_desktop_failure_keeps_only_fixed_stage_and_numeric_hresult() {
         private_desktop_failure_summary(&native_failure),
         serde_json::json!({
             "kind": "Other",
+            "administrator_membership": null,
             "os_code": null,
             "private_object_api_stage": null,
             "hresult": 2147942405_u32,
@@ -990,6 +1016,7 @@ fn private_desktop_failure_does_not_echo_sensitive_or_malformed_details() {
         private_desktop_failure_summary(&unknown_stage),
         serde_json::json!({
             "kind": "Other",
+            "administrator_membership": null,
             "os_code": null,
             "private_object_api_stage": null,
             "hresult": null,
@@ -1002,6 +1029,7 @@ fn private_desktop_failure_does_not_echo_sensitive_or_malformed_details() {
         private_desktop_failure_summary(&malformed),
         serde_json::json!({
             "kind": "Other",
+            "administrator_membership": null,
             "os_code": null,
             "private_object_api_stage": null,
             "hresult": null,
@@ -1012,12 +1040,51 @@ fn private_desktop_failure_does_not_echo_sensitive_or_malformed_details() {
 #[test]
 fn private_desktop_failure_excludes_appended_cleanup_body() {
     let failure = io::Error::other(
-        r"私有桌面 create_station 失败：HRESULT=0x80070005；私有对象清理失败：S-1-15-2-777 C:\private-fixture\manifest",
+        r#"私有桌面 create_station 失败：HRESULT=0x80070005；私有对象清理失败：S-1-15-2-777 C:\private-fixture\manifest；administrator_membership={"status":"ok","member":true,"hresult":null}"#,
     );
     assert_eq!(
         private_desktop_failure_summary(&failure),
         serde_json::json!({
             "kind": "Other",
+            "administrator_membership": null,
+            "os_code": null,
+            "private_object_api_stage": "create_station",
+            "hresult": 2147942405_u32,
+        })
+    );
+}
+
+#[test]
+fn private_desktop_failure_preserves_administrator_membership_tristate() {
+    let member = io::Error::other(
+        r#"私有桌面 create_station 失败：HRESULT=0x80070005；administrator_membership={"status":"ok","member":true,"hresult":null}"#,
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&member)["administrator_membership"],
+        serde_json::json!({"status": "ok", "member": true, "hresult": null})
+    );
+    let not_member = io::Error::other(
+        r#"私有桌面 create_station 失败：HRESULT=0x80070005；administrator_membership={"status":"ok","member":false,"hresult":null}"#,
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&not_member)["administrator_membership"],
+        serde_json::json!({"status": "ok", "member": false, "hresult": null})
+    );
+    let query_failed = io::Error::other(
+        r#"私有桌面 create_station 失败：HRESULT=0x80070005；administrator_membership={"status":"query_error","member":null,"hresult":2147942487}"#,
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&query_failed)["administrator_membership"],
+        serde_json::json!({"status": "query_error", "member": null, "hresult": 2147942487_u32})
+    );
+    let untrusted = io::Error::other(
+        r#"私有桌面 create_station 失败：HRESULT=0x80070005；administrator_membership={"status":"ok","member":true,"path":"C:\\private-fixture\\S-1-15-2-777"}"#,
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&untrusted),
+        serde_json::json!({
+            "kind": "Other",
+            "administrator_membership": null,
             "os_code": null,
             "private_object_api_stage": "create_station",
             "hresult": 2147942405_u32,

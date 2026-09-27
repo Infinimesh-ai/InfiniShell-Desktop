@@ -10,11 +10,12 @@ use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
 use windows::Win32::Security::{
-    DACL_SECURITY_INFORMATION, GetSecurityDescriptorControl, GetTokenInformation,
-    GetUserObjectSecurity, IsValidSecurityDescriptor, LABEL_SECURITY_INFORMATION,
-    OWNER_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR, PSID, SE_DACL_PRESENT, SE_DACL_PROTECTED,
-    SE_SACL_PRESENT, SE_SELF_RELATIVE, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR_RELATIVE,
-    TOKEN_QUERY, TOKEN_USER, TokenUser,
+    CheckTokenMembership, CreateWellKnownSid, DACL_SECURITY_INFORMATION,
+    GetSecurityDescriptorControl, GetTokenInformation, GetUserObjectSecurity,
+    IsValidSecurityDescriptor, LABEL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
+    PSECURITY_DESCRIPTOR, PSID, SE_DACL_PRESENT, SE_DACL_PROTECTED, SE_SACL_PRESENT,
+    SE_SELF_RELATIVE, SECURITY_ATTRIBUTES, SECURITY_DESCRIPTOR_RELATIVE, SECURITY_MAX_SID_SIZE,
+    TOKEN_QUERY, TOKEN_USER, TokenUser, WinBuiltinAdministratorsSid,
 };
 use windows::Win32::System::StationsAndDesktops::{
     CloseDesktop, CloseWindowStation, CreateDesktopW, CreateWindowStationW, DESKTOP_CONTROL_FLAGS,
@@ -25,7 +26,7 @@ use windows::Win32::System::Threading::{
     GetCurrentProcess, GetCurrentThreadId, OpenProcessToken, STARTUPINFOW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{CWF_CREATE_ONLY, WSF_VISIBLE};
-use windows::core::{Error as WindowsError, PCWSTR, PWSTR};
+use windows::core::{BOOL, Error as WindowsError, PCWSTR, PWSTR};
 
 use super::{handle, owned, wide};
 
@@ -43,6 +44,33 @@ fn api_error(stage: &'static str, error: WindowsError) -> io::Error {
         "私有桌面 {stage} 失败：HRESULT=0x{:08x}",
         error.code().0 as u32
     ))
+}
+
+// NULL token 查询本次调用线程的有效身份，不安装 token 或启用权限。
+fn calling_thread_administrator_membership() -> Result<bool, u32> {
+    let mut sid = [0u32; SECURITY_MAX_SID_SIZE.div_ceil(4) as usize];
+    let mut size = size_of_val(&sid) as u32;
+    unsafe {
+        CreateWellKnownSid(
+            WinBuiltinAdministratorsSid,
+            None,
+            Some(PSID(sid.as_mut_ptr().cast())),
+            &mut size,
+        )
+    }
+    .map_err(|error| error.code().0 as u32)?;
+    let mut member = BOOL::default();
+    unsafe { CheckTokenMembership(None, PSID(sid.as_mut_ptr().cast()), &mut member) }
+        .map_err(|error| error.code().0 as u32)?;
+    Ok(member.as_bool())
+}
+
+// 只编码布尔值或数值错误码；API 查询失败不能降为非成员。
+fn administrator_membership_json(result: Result<bool, u32>) -> String {
+    match result {
+        Ok(member) => format!(r#"{{"status":"ok","member":{member},"hresult":null}}"#),
+        Err(code) => format!(r#"{{"status":"query_error","member":null,"hresult":{code}}}"#),
+    }
 }
 
 fn invalid(stage: &'static str) -> io::Error {
@@ -342,6 +370,8 @@ impl PrivateDesktop {
         };
         let created = (|| -> io::Result<()> {
             let attributes = result.station_sd.attributes();
+            let membership =
+                administrator_membership_json(calling_thread_administrator_membership());
             result.station = Some(
                 unsafe {
                     CreateWindowStationW(
@@ -351,7 +381,16 @@ impl PrivateDesktop {
                         Some(&attributes),
                     )
                 }
-                .map_err(|error| api_error("create_station", error))?,
+                .map_err(|error| {
+                    eprintln!(
+                        "atomic_windows_private_desktop_admin={{\"scope\":\"create_station_calling_thread\",\"administrator_membership\":{membership}}}"
+                    );
+                    let failure = api_error("create_station", error);
+                    io::Error::other(format!("{failure}；administrator_membership={membership}"))
+                })?,
+            );
+            eprintln!(
+                "atomic_windows_private_desktop_admin={{\"scope\":\"create_station_calling_thread\",\"administrator_membership\":{membership}}}"
             );
             unsafe { SetProcessWindowStation(result.station.unwrap()) }
                 .map_err(|error| api_error("select_station", error))?;

@@ -278,3 +278,8 @@ fn private_descriptor_rejects_label_bytes_without_a_present_sacl() {
 fn private_desktop_never_publishes_a_route_for_missing_objects() {
     super::desktop::test_cases::private_desktop_never_publishes_a_route_for_missing_objects();
 }
+
+#[test]
+fn private_desktop_admin_observation_distinguishes_non_member_from_query_failure() {
+    super::desktop::test_cases::private_desktop_admin_observation_distinguishes_non_member_from_query_failure();
+}

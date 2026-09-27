@@ -137,3 +137,18 @@ pub(crate) fn private_desktop_never_publishes_a_route_for_missing_objects() {
     desktop.close().unwrap();
     assert!(desktop.station.is_none() && desktop.desktop.is_none());
 }
+
+pub(crate) fn private_desktop_admin_observation_distinguishes_non_member_from_query_failure() {
+    assert_eq!(
+        administrator_membership_json(Ok(true)),
+        r#"{"status":"ok","member":true,"hresult":null}"#
+    );
+    assert_eq!(
+        administrator_membership_json(Ok(false)),
+        r#"{"status":"ok","member":false,"hresult":null}"#
+    );
+    assert_eq!(
+        administrator_membership_json(Err(2147942405)),
+        r#"{"status":"query_error","member":null,"hresult":2147942405}"#
+    );
+}
