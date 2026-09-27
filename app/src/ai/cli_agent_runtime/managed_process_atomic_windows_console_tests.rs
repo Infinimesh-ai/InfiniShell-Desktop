@@ -3,6 +3,66 @@ use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 use super::*;
 
 #[test]
+fn npm_event_roles_distinguish_remaining_console_and_reused_process_identity() {
+    let mut diagnostics = NpmProcessDiagnostics::new();
+    for (process_id, role) in [(11, NpmProcessRole::Root), (12, NpmProcessRole::Console)] {
+        diagnostics.received(process_id, CREATE_PROCESS_DEBUG_EVENT, None);
+        diagnostics.roles.insert(process_id, role);
+        let event = diagnostics
+            .continued(process_id, CREATE_PROCESS_DEBUG_EVENT)
+            .unwrap();
+        assert_eq!(event.phase, "create_continued");
+        assert_eq!(event.mode, "normal");
+        assert_eq!(event.native_exit_code, None);
+    }
+
+    diagnostics.received(11, EXIT_PROCESS_DEBUG_EVENT, Some(5));
+    let event = diagnostics.continued(11, EXIT_PROCESS_DEBUG_EVENT).unwrap();
+    assert_eq!(event.role, "root");
+    assert_eq!(event.native_exit_code, Some(5));
+    assert_eq!(event.remaining, [0, 0, 0, 1, 0, 0]);
+
+    // 后续复用同一数值身份也不能继承已退出根进程的角色。
+    diagnostics.received(11, CREATE_PROCESS_DEBUG_EVENT, None);
+    let event = diagnostics
+        .continued(11, CREATE_PROCESS_DEBUG_EVENT)
+        .unwrap();
+    assert_eq!(event.role, "unknown");
+    assert_eq!(event.remaining, [0, 0, 0, 1, 0, 1]);
+}
+
+#[test]
+fn npm_cleanup_events_preserve_observed_cancellation_without_inventing_it() {
+    for cancelled in [false, true] {
+        let mut diagnostics = NpmProcessDiagnostics::new();
+        let started = diagnostics.started;
+        diagnostics.begin_cleanup(cancelled);
+        // 清理禁用取消后再进入收尾，不能抹掉此前已观察的取消。
+        diagnostics.begin_cleanup(false);
+        diagnostics.received(1, CREATE_PROCESS_DEBUG_EVENT, None);
+        let event = diagnostics
+            .continued(1, CREATE_PROCESS_DEBUG_EVENT)
+            .unwrap();
+        assert_eq!(event.mode, "cleanup");
+        assert_eq!(event.role, "unknown");
+        assert_eq!(event.cancel_observed, cancelled);
+        assert_eq!(diagnostics.started, started);
+    }
+}
+
+#[test]
+fn npm_bound_roles_never_expose_unknown_image_names() {
+    for (path, role) in [
+        (r"C:\private\NODE.EXE", "node"),
+        (r"C:\private\codex.exe", "codex"),
+        (r"C:\private\conhost.exe", "bound-other"),
+        (r"C:\private\user-secret.exe", "bound-other"),
+    ] {
+        assert_eq!(NpmProcessRole::bound_image(Path::new(path)).as_str(), role);
+    }
+}
+
+#[test]
 #[ignore = "取消后必须在严格 Job 中收敛真实调试事件和 AppContainer"]
 fn npm_cancel_before_initial_event_confirms_cleanup_without_running_child() {
     let name =

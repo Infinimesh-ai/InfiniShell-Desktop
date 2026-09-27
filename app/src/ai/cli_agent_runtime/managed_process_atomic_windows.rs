@@ -104,6 +104,7 @@ struct SystemHelperLease {
     identity: LeasedIdentity,
     sha256: String,
     ancestors: Vec<AncestorLease>,
+    npm_role: NpmProcessRole,
 }
 
 impl SystemHelperLease {
@@ -112,6 +113,7 @@ impl SystemHelperLease {
             program: self.program.try_clone()?,
             identity: self.identity,
             sha256: self.sha256.clone(),
+            npm_role: self.npm_role,
             ancestors: self
                 .ancestors
                 .iter()
@@ -171,6 +173,115 @@ pub(super) struct WindowsImageDebugSession {
     pending_event: Option<(u32, u32, DEBUG_EVENT_CODE)>,
     root_exit_observed: bool,
     cancellation: Option<Arc<AtomicBool>>,
+    npm_diagnostics: Option<NpmProcessDiagnostics>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NpmProcessRole {
+    Root,
+    Node,
+    Codex,
+    Console,
+    BoundOther,
+    Unknown,
+}
+
+impl NpmProcessRole {
+    fn bound_image(path: &Path) -> Self {
+        match path.file_name().and_then(|name| name.to_str()) {
+            Some(name) if name.eq_ignore_ascii_case("node.exe") => Self::Node,
+            Some(name) if name.eq_ignore_ascii_case("codex.exe") => Self::Codex,
+            Some(_) | None => Self::BoundOther,
+        }
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Root => "root",
+            Self::Node => "node",
+            Self::Codex => "codex",
+            Self::Console => "console",
+            Self::BoundOther => "bound-other",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct NpmProcessDiagnostics {
+    started: Instant,
+    roles: HashMap<u32, NpmProcessRole>,
+    pending_exit_code: Option<u32>,
+    cleanup: bool,
+    cancel_observed: bool,
+}
+
+struct NpmProcessEvent {
+    phase: &'static str,
+    mode: &'static str,
+    role: &'static str,
+    elapsed_ms: u128,
+    native_exit_code: Option<u32>,
+    cancel_observed: bool,
+    remaining: [usize; 6],
+}
+
+impl NpmProcessDiagnostics {
+    fn new() -> Self {
+        Self {
+            started: Instant::now(),
+            roles: HashMap::new(),
+            pending_exit_code: None,
+            cleanup: false,
+            cancel_observed: false,
+        }
+    }
+
+    fn received(&mut self, process_id: u32, code: DEBUG_EVENT_CODE, exit_code: Option<u32>) {
+        if code == CREATE_PROCESS_DEBUG_EVENT {
+            // 清理阶段也可能首次收到 CREATE；未经过原映像门禁时只能记为 unknown。
+            self.roles
+                .entry(process_id)
+                .or_insert(NpmProcessRole::Unknown);
+        }
+        self.pending_exit_code = exit_code;
+    }
+
+    fn begin_cleanup(&mut self, cancel_observed: bool) {
+        self.cleanup = true;
+        self.cancel_observed |= cancel_observed;
+    }
+
+    fn continued(&mut self, process_id: u32, code: DEBUG_EVENT_CODE) -> Option<NpmProcessEvent> {
+        let phase = if code == CREATE_PROCESS_DEBUG_EVENT {
+            "create_continued"
+        } else if code == EXIT_PROCESS_DEBUG_EVENT {
+            "exit_continued"
+        } else {
+            return None;
+        };
+        let role = self
+            .roles
+            .get(&process_id)
+            .copied()
+            .unwrap_or(NpmProcessRole::Unknown);
+        if code == EXIT_PROCESS_DEBUG_EVENT {
+            self.roles.remove(&process_id);
+        }
+        let mut remaining = [0; 6];
+        for role in self.roles.values() {
+            remaining[*role as usize] += 1;
+        }
+        Some(NpmProcessEvent {
+            phase,
+            mode: if self.cleanup { "cleanup" } else { "normal" },
+            role: role.as_str(),
+            elapsed_ms: self.started.elapsed().as_millis(),
+            native_exit_code: self.pending_exit_code.take(),
+            cancel_observed: self.cancel_observed,
+            remaining,
+        })
+    }
 }
 
 impl WindowsDirectoryLease {
@@ -349,6 +460,10 @@ impl WindowsReplacementLease {
             pending_event: None,
             root_exit_observed: false,
             cancellation: None,
+            npm_diagnostics: self
+                .npm_console_host
+                .is_some()
+                .then(NpmProcessDiagnostics::new),
         })
     }
 }
@@ -375,6 +490,11 @@ impl WindowsImageDebugSession {
             None => wait_for_debug_event_until(deadline, timeout_message)?,
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
+                .then(|| unsafe { event.u.ExitProcess.dwExitCode });
+            diagnostics.received(event.dwProcessId, event.dwDebugEventCode, exit_code);
+        }
         Ok(event)
     }
 
@@ -392,6 +512,49 @@ impl WindowsImageDebugSession {
             self.component_images.remove(&process_id);
             if process_id == self.root_process_id {
                 self.root_exit_observed = true;
+            }
+        }
+        // 诊断只在原 Continue 成功后推进，不参与映像授权、事件继续或清理完成判定。
+        let cancel_observed = self
+            .cancellation
+            .as_ref()
+            .is_some_and(|value| value.load(Ordering::Acquire));
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics.cancel_observed |= cancel_observed;
+            if let Some(event) = diagnostics.continued(process_id, code) {
+                let NpmProcessEvent {
+                    phase,
+                    mode,
+                    role,
+                    elapsed_ms,
+                    native_exit_code,
+                    cancel_observed,
+                    remaining,
+                } = event;
+                let [
+                    remaining_root,
+                    remaining_node,
+                    remaining_codex,
+                    remaining_console,
+                    remaining_bound_other,
+                    remaining_unknown,
+                ] = remaining;
+                warp_core::safe_eprintln!(
+                    safe: ("managed_process.windows_npm_event phase={phase} mode={mode} role={role} elapsed_ms={elapsed_ms} native_exit_code={native_exit_code:?} cancel_observed={cancel_observed} remaining_root={remaining_root} remaining_node={remaining_node} remaining_codex={remaining_codex} remaining_console={remaining_console} remaining_bound_other={remaining_bound_other} remaining_unknown={remaining_unknown}"),
+                    full: ("managed_process.windows_npm_event phase={phase} mode={mode} role={role} elapsed_ms={elapsed_ms} native_exit_code={native_exit_code:?} cancel_observed={cancel_observed} remaining_root={remaining_root} remaining_node={remaining_node} remaining_codex={remaining_codex} remaining_console={remaining_console} remaining_bound_other={remaining_bound_other} remaining_unknown={remaining_unknown}")
+                );
+                if code == EXIT_PROCESS_DEBUG_EVENT
+                    && process_id == self.root_process_id
+                    && let Some(native_exit_code) = native_exit_code
+                {
+                    // 保留旧根 EXIT 字段；新旧事件统一使用会话时钟，清理 EXIT 明示 mode。
+                    let remaining = self.processes.len();
+                    let held = self.held_package_processes.len();
+                    warp_core::safe_eprintln!(
+                        safe: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code} mode={mode} cancel_observed={cancel_observed}"),
+                        full: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code} mode={mode} cancel_observed={cancel_observed}")
+                    );
+                }
             }
         }
         Ok(())
@@ -515,20 +678,6 @@ impl WindowsImageDebugSession {
                     .push(self.processes[&event.dwProcessId].try_clone()?);
             }
             self.continue_pending(continue_status)?;
-            if self.npm_console_host.is_some()
-                && event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT
-                && event.dwProcessId == self.root_process_id
-            {
-                // 根 EXIT 放行不等于整棵树退出；只记录计数以定位监督阶段，不记录进程身份。
-                let remaining = self.processes.len();
-                let held = self.held_package_processes.len();
-                let elapsed_ms = started.elapsed().as_millis();
-                let native_exit_code = unsafe { event.u.ExitProcess.dwExitCode };
-                warp_core::safe_eprintln!(
-                    safe: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code}"),
-                    full: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code}")
-                );
-            }
             if self.root_exit_observed && self.processes.is_empty() {
                 // EXIT Continue 仅释放调试事件；仍须逐个确认已授权映像的真实进程句柄 signaled。
                 return self.wait_for_package_processes_exit(deadline);
@@ -642,38 +791,46 @@ impl WindowsImageDebugSession {
                 })?;
         }
         // 原生安装器会再次执行当前 CLI 查询版本；必须仍是根映像的同一文件身份与摘要。
-        if root || inspect_handle(&file)?.id == self.expected_program_id {
-            self.verify_root_image(&file)
+        let role = if root || inspect_handle(&file)?.id == self.expected_program_id {
+            self.verify_root_image(&file)?;
+            if root {
+                NpmProcessRole::Root
+            } else {
+                NpmProcessRole::BoundOther
+            }
         } else if let Some(images) = &self.package_images {
             let identity = inspect_handle(&file)?;
             if let Some(console) = &self.npm_console_host
                 && identity.id == console.identity.id
             {
-                return verify_npm_console_host(console, &file, &self.system_directory);
+                verify_npm_console_host(console, &file, &self.system_directory)?;
+                NpmProcessRole::Console
+            } else {
+                let (_, lease) = images
+                    .iter()
+                    .find(|(dll, lease)| !*dll && lease.identity.id == identity.id)
+                    .ok_or_else(|| {
+                        let details = self.package_image_rejection_fields(&file);
+                        // 监督 worker 尚未初始化 GUI 日志；仅向已封存的 stderr 写固定分类和句柄证据。
+                        warp_core::safe_eprintln!(
+                            safe: ("managed_process.windows_npm_rejected_image={details}"),
+                            full: ("managed_process.windows_npm_rejected_image={details}")
+                        );
+                        error("npm 包探针拒绝未绑定的子进程映像")
+                    })?;
+                lease.verify_image(&file)?;
+                lease.npm_role
             }
-            let (_, lease) = images
-                .iter()
-                .find(|(dll, lease)| !*dll && lease.identity.id == identity.id)
-                .ok_or_else(|| {
-                    let details = self.package_image_rejection_fields(&file);
-                    // 监督 worker 尚未初始化 GUI 日志；仅向已封存的 stderr 写固定分类和句柄证据。
-                    warp_core::safe_eprintln!(
-                        safe: ("managed_process.windows_npm_rejected_image={details}"),
-                        full: ("managed_process.windows_npm_rejected_image={details}")
-                    );
-                    error("npm 包探针拒绝未绑定的子进程映像")
-                })?;
-            lease.verify_image(&file)
         } else if let Some(helper) = &self.powershell
             && inspect_handle(&file)?.id == helper.identity.id
         {
             helper.verify_image(&file)?;
-            Ok(())
+            NpmProcessRole::Unknown
         } else if self.verify_system_image(&file).is_ok() {
-            Ok(())
+            NpmProcessRole::Unknown
         } else if let Ok(lease) = prepare_component_image(&file, &self.system_directory, false) {
             self.child_images.insert(event.dwProcessId, lease);
-            Ok(())
+            NpmProcessRole::Unknown
         } else if let Some(expected) = &self.child_image {
             let lease = prepare_child_image(&file, expected).inspect_err(|_| {
                 #[cfg(test)]
@@ -682,16 +839,20 @@ impl WindowsImageDebugSession {
                 }
             })?;
             self.child_images.insert(event.dwProcessId, lease);
-            Ok(())
+            NpmProcessRole::Unknown
         } else {
             #[cfg(test)]
             if let Ok(path) = final_path_from_handle(&file) {
                 tests::record_rejected_image(&path, &self.system_directory.file);
             }
-            Err(error(
+            return Err(error(
                 "managed_process.atomic_windows_loaded_image_outside_system_directory",
-            ))
+            ));
+        };
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics.roles.insert(event.dwProcessId, role);
         }
+        Ok(())
     }
 
     fn verify_root_image(&self, file: &File) -> io::Result<()> {
@@ -822,6 +983,13 @@ impl WindowsImageDebugSession {
         }
         self.root_process_id = root_process_id;
         // 调用方已经终止精确 Job；停止请求不能再次打断原线程的事件收敛。
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics.begin_cleanup(
+                self.cancellation
+                    .as_ref()
+                    .is_some_and(|value| value.load(Ordering::Acquire)),
+            );
+        }
         self.cancellation = None;
         if let Some(container) = container {
             for process in self.processes.values() {
@@ -1071,6 +1239,7 @@ fn prepare_package_image(
         identity,
         sha256,
         ancestors,
+        npm_role: NpmProcessRole::bound_image(&expected.canonical_path),
     })
 }
 
@@ -1214,6 +1383,7 @@ fn lease_mapped_image(
         identity,
         sha256,
         ancestors,
+        npm_role: NpmProcessRole::Unknown,
     };
     lease.verify_image(file)?;
     Ok(lease)
@@ -1566,6 +1736,7 @@ fn prepare_powershell(system_directory: &AncestorLease) -> io::Result<Option<Sys
         identity,
         sha256,
         ancestors,
+        npm_role: NpmProcessRole::Unknown,
     }))
 }
 

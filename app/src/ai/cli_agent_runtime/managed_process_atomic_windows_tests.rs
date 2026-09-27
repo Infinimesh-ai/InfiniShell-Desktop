@@ -1173,6 +1173,7 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         pending_event: None,
         root_exit_observed: false,
         cancellation: None,
+        npm_diagnostics: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
     let copy = fixture.bin.join("same-name-copy.exe");
@@ -1232,6 +1233,10 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     );
     // 当前测试进程不是 debuggee，且线程 0 无效；真实 ContinueDebugEvent 必须失败。
     session.pending_event = Some((process_id, 0, EXIT_PROCESS_DEBUG_EVENT));
+    let mut diagnostics = NpmProcessDiagnostics::new();
+    diagnostics.roles.insert(process_id, NpmProcessRole::Root);
+    diagnostics.received(process_id, EXIT_PROCESS_DEBUG_EVENT, Some(17));
+    session.npm_diagnostics = Some(diagnostics);
 
     assert!(session.continue_pending(DBG_CONTINUE).is_err());
 
@@ -1241,6 +1246,12 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     );
     assert!(session.processes.contains_key(&process_id));
     assert!(!session.root_exit_observed);
+    let diagnostics = session.npm_diagnostics.as_ref().unwrap();
+    assert_eq!(
+        diagnostics.roles.get(&process_id),
+        Some(&NpmProcessRole::Root)
+    );
+    assert_eq!(diagnostics.pending_exit_code, Some(17));
 }
 
 struct PackageProbeFixture {

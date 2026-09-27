@@ -6,6 +6,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write as _;
 use std::os::windows::ffi::OsStringExt as _;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 use futures::{AsyncReadExt as _, StreamExt as _};
 use serde::{Deserialize, Serialize};
@@ -281,22 +282,54 @@ fn save(root: &Path, journal: &Journal) -> Result<(), Error> {
     super::sync_config_directory(root)
 }
 
-async fn download(url: &str, root: &Path, limit: u64) -> Result<NamedTempFile, Error> {
+async fn download(
+    url: &str,
+    artifact: &'static str,
+    root: &Path,
+    limit: u64,
+) -> Result<NamedTempFile, Error> {
     let mut file = NamedTempFile::new_in(root).map_err(|_| Error::PersistenceFailed)?;
+    let started = Instant::now();
     let response = http_client::Client::new()
         .get(url)
         .timeout(UPDATE_TIMEOUT)
         .send()
         .await
-        .map_err(|_| Error::Network)?;
+        .map_err(|failure| {
+            let elapsed_ms = started.elapsed().as_millis();
+            let timed_out = failure.is_timeout();
+            let connection_failure = failure.is_connect();
+            // 两种日志分支均只记录固定请求角色与分类，不输出 URL、响应正文或错误链。
+            warp_core::safe_eprintln!(
+                safe: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=request elapsed_ms={elapsed_ms} timed_out={timed_out} connection_failure={connection_failure}"),
+                full: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=request elapsed_ms={elapsed_ms} timed_out={timed_out} connection_failure={connection_failure}")
+            );
+            Error::Network
+        })?;
     if !response.status().is_success() || response.url().as_str() != url {
+        let status = response.status().as_u16();
+        let redirected = response.url().as_str() != url;
+        let elapsed_ms = started.elapsed().as_millis();
+        warp_core::safe_eprintln!(
+            safe: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=response elapsed_ms={elapsed_ms} status={status} redirected={redirected}"),
+            full: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=response elapsed_ms={elapsed_ms} status={status} redirected={redirected}")
+        );
         return Err(Error::Network);
     }
     let stream = response.bytes_stream();
     futures::pin_mut!(stream);
     let mut length = 0u64;
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|_| Error::Network)?;
+        let chunk = chunk.map_err(|failure| {
+            let elapsed_ms = started.elapsed().as_millis();
+            let timed_out = failure.is_timeout();
+            let connection_failure = failure.is_connect();
+            warp_core::safe_eprintln!(
+                safe: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=body elapsed_ms={elapsed_ms} received_bytes={length} timed_out={timed_out} connection_failure={connection_failure}"),
+                full: ("cli_agent_updates.windows_codex_npm_download_failed artifact={artifact} phase=body elapsed_ms={elapsed_ms} received_bytes={length} timed_out={timed_out} connection_failure={connection_failure}")
+            );
+            Error::Network
+        })?;
         length = length
             .checked_add(chunk.len() as u64)
             .ok_or(Error::InvalidRelease)?;
@@ -571,12 +604,14 @@ pub(super) async fn execute(
     unchanged(&journal, false)?;
     let wrapper_metadata = download(
         "https://registry.npmjs.org/@openai/codex/0.156.1",
+        "wrapper_metadata",
         root,
         1024 * 1024,
     )
     .await?;
     let platform_metadata = download(
         "https://registry.npmjs.org/@openai/codex/0.156.1-win32-x64",
+        "platform_metadata",
         root,
         1024 * 1024,
     )
@@ -600,8 +635,20 @@ pub(super) async fn execute(
         &wrapper_bytes,
         &platform_bytes,
     )?;
-    let mut wrapper = download(&release.wrapper.tarball_url, root, 512 * 1024 * 1024).await?;
-    let mut platform = download(&release.platform.tarball_url, root, 512 * 1024 * 1024).await?;
+    let mut wrapper = download(
+        &release.wrapper.tarball_url,
+        "wrapper_archive",
+        root,
+        512 * 1024 * 1024,
+    )
+    .await?;
+    let mut platform = download(
+        &release.platform.tarball_url,
+        "platform_archive",
+        root,
+        512 * 1024 * 1024,
+    )
+    .await?;
     let wrapper_archive = release.wrapper.verify_archive(wrapper.as_file_mut())?;
     let platform_archive = release.platform.verify_archive(platform.as_file_mut())?;
     release.verify_entries(&wrapper_archive, &platform_archive)?;
