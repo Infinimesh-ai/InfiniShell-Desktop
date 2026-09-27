@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac bb78 冻结产物的两项恢复已通过；追加正常升级/候选篡改拒绝run-04退出0且独立复核通过，明确14fb检出与19相关源码等价边界。Windows 14fb编译、504/21/13项通过，原生16通过/7失败：新私有窗口站创建0x80070005，尚未执行Node。下一步仅补失败调用点有效管理员成员的只读诊断，先验证必要前提；真实npm及G09/14项缺口仍开放。"
+    "next_work_order": "Mac Codex冻结产物四场景分批验收通过，保留bb78产物/14fb执行检出与19相关源码等价边界。Windows eb2检查及504/22/14项通过，原生16通过/7失败；创建调用点CheckTokenMembership成功返回member=false，私有环境仍未建立，等待独立管理员验收runner信息。主线继续Mac Grok npm外置卷策略、缺失launchd源码绑定与三项恢复/拒绝补验；无需修改当前全局权限。G09及14项必要缺口仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "windows_npm_create_timing_increment.private_desktop_control",
+  "latest_increment": "windows_npm_create_timing_increment.private_desktop_control.administrator_membership_control",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -2687,6 +2687,73 @@
         "path": "independent-review.safe.json",
         "sha256": "75a3ed74e8e87eae762a0b6d99bb8817b58bf90047c21220943946cd3168a369",
         "result": "evidence_boundaries_confirmed_no_deterministic_fix_identified"
+      },
+      "administrator_membership_control": {
+        "source_commit": "eb2b271e3999817db036d244ed34f40bfad9883c",
+        "status": "required_effective_administrator_membership_not_present",
+        "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-private-desktop-admin",
+        "run": {
+          "id": 36344378073,
+          "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36344378073",
+          "conclusion": "failure",
+          "cargo_check": "passed",
+          "ordinary_tests_passed": 504,
+          "command_tests_passed": 22,
+          "diagnostic_tests_passed": 14,
+          "native_tests": {
+            "passed": 16,
+            "failed": 7,
+            "retries": 0
+          }
+        },
+        "local_gates": "cargo check、Windows command测试目标编译、i18n11、格式与差异检查通过",
+        "new_observation": {
+          "scope": "create_station_calling_thread",
+          "query": "CheckTokenMembership(NULL, BuiltinAdministrators SID)",
+          "status": "ok",
+          "member": false,
+          "hresult": null,
+          "interpretation": "调用点有效身份不具备命名站创建所需的有效管理员成员前提；不是API查询失败，不外推为Node DLL根因。"
+        },
+        "create_station_hresult": "0x80070005",
+        "environment_control_established": false,
+        "candidate_node_started": false,
+        "private_objects_verified": false,
+        "inner_cleanup_confirmed": null,
+        "private_objects_closed": null,
+        "outer_job_cleanup_confirmed": true,
+        "prior_controls": "原NUL和五个Node/隐藏组失败保持；NoWindow实际Node子/根分别28/30 DLL，均初始断点后0xc0000142；隐藏三组root仍3 DLL、首断点前失败；六组内外层清理确认。",
+        "runner_orphan_cleanup": {
+          "conhost_pid": 12312,
+          "attribution": "现有日志没有可归属的句柄/创建身份，不分配到case",
+          "other": [
+            "sccache 948",
+            "vctip 16276"
+          ]
+        },
+        "artifact": {
+          "id": 10940515571,
+          "zip_bytes": 21231,
+          "member_count": 21,
+          "full_zip_official_sha256_verified": true,
+          "zip_sha256": "4a2af5038df0f1a7469882694d4a53c791e79aeb49bfee8ebabb61fdaeed14b9",
+          "members_crc_and_sha256_verified": true
+        },
+        "summary_sha256": "b1f6985bcf4ffe74e5d75983a947e9234dc505960c669d2d5f89768c6eb94c0e",
+        "job_log": {
+          "path": "raw-logs/0_Windows x64.txt",
+          "sha256": "c492b3f814a44ea676779e017d91e8b28414ddffbd6f98b5c25778286aa3205e"
+        },
+        "real_npm_rerun": false,
+        "production_default_changed": false,
+        "localization": "无需本地化变更",
+        "next": "等待可用的独立管理员验收runner信息；不自动提权、改变全局ACL或回退匿名/既有站。与此同时继续Mac Grok npm恢复补验准备。",
+        "g09_closed": false,
+        "independent_review": {
+          "path": "independent-review.safe.json",
+          "sha256": "232e2d5d823326d2b7907de7e18fa310ec3cfb88cbccce3eff896c8b35c35864",
+          "result": "evidence_boundaries_confirmed"
+        }
       }
     }
   },

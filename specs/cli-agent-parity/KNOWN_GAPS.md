@@ -134,6 +134,8 @@
 - **Mac 同冻结产物追加回归 run-04**：复用bb78的worker和签名监督程序，在干净14fb检出下补正常更新与候选篡改拒绝，19份相关源码均与bb78字节相同。公开入口实际分别为0.156.1/0.155.1，正常完整新树与候选清理通过，篡改场景保留完整旧树且无候选启动；独立复核通过。与run-03共同形成同冻结产物的四场景分批证据，不外推14fb重建或整SHA全验收，G09仍开放。
 - **Windows 私有对象对照 `14fb66d99`**：同提交 [CI 36342378730](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36342378730) 编译、504项普通回归、command21项及诊断13项通过；原生16通过/7失败，不重试。新增对照在创建窗口站时被拒（0x80070005），尚未验证对象或启动Node，私有/AppContainer清理未获完整收据，外层Job清理确认；原六项失败保持，六组已有对象对照清理确认。runner另清理conhost PID22732但归属未知。下一步只读核验失败调用线程的有效管理员成员前提，不改全局ACL或提权；真实npm未重跑，G09及14项必要缺口保持开放。无需本地化变更。
 
+- **Windows 命名站前提实测 `eb2b271e3`**：同提交CI36344378073编译及504/22/14项通过，原生仍16通过/7失败。创建调用线程的CheckTokenMembership(NULL, BuiltinAdministrators)成功返回member=false，随后CreateWindowStation仍0x80070005；未建立私有环境或执行Node，内层清理未知、外层Job清理确认。这只确认该对照的必要成员前提未满足，不解释原Node DLL失败。等待独立管理员验收runner信息，当前不提权/改全局权限；继续Mac独立工作，G09仍开放。
+
 - **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
 
 ### G10 — Claude／Grok 子任务限固定权限策略
