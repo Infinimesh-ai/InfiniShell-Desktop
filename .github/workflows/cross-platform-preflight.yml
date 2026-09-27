@@ -1491,6 +1491,8 @@ jobs:
           New-Item -ItemType Directory -Path $env:INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT | Out-Null
           "INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT=$env:INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           Write-Output "atomic_windows_node_control_source_version=$nodeControlVersion sha256=$env:INFINISHELL_WINDOWS_NODE_CONTROL_SHA256"
+          cargo nextest run --no-fail-fast --retries 0 -p warp --lib -E 'test(managed_process::atomic_windows::loader_tests::)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p warp --lib --run-ignored only -E 'test(managed_process::atomic_windows::tests::debug_session_runs_system_only_process_to_native_exit) | test(managed_process::atomic_windows::tests::debug_session_rejects_non_system_dynamic_image_before_continue) | test(managed_process::atomic_windows::tests::package_probe_rejects_unbound_child_and_confirms_cleanup) | test(managed_process::atomic_windows::tests::package_probe_cleans_up_before_initial_debug_event) | test(managed_process::atomic_windows::tests::package_probe_continue_failure_preserves_pending_cleanup) | test(managed_process::atomic_windows::tests::console_binding::)'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

@@ -122,6 +122,7 @@
 - **2026-09-27 `e2eba8596` 原生诊断**：同提交 Windows 编译及504项回归通过，atomic为11通过／1失败；TITLE与官方GOTO/NUL/TITLE顺序均启动绑定CMD子映像、退出0、清理确认，原NUL输出对照仍为空且失败。无重试、未跑真实npm更新，不能把此NUL失败当作旧Node/Codex链挂起的唯一根因；下一步需核取消阶段unknown子进程真实身份，隔离和官方shim保持不变。
 - **2026-09-27 `b3908488c` 真实 npm 复验**：新增清理CREATE租约身份及首次终止前创建时序诊断，Windows编译、995项普通回归、command7项通过；显式原生11通过／原NUL对照1失败。真实首个CMD候选约241秒取消后清理确认，仍为ProbeFailed；本轮正常和清理只见root／console，没有重现旧unknown CREATE，不能给旧事件补造Node身份。PowerShell／发布／恢复未到达，G09不关闭；继续比较完整shim选路与stdin EOF/open，保留隔离和官方入口。
 - **2026-09-27 `a0e6662b2` 选路／stdin 对照**：四组完整shim控制流均成功执行绑定CMD副本，显式runtime路径与裸node PATH在EOF／开放stdin下均退出0并清理确认。Windows504项普通回归及原生15项通过，原NUL对照仍失败；未执行真实Node或重跑npm。两变量单独不足以复现挂起，继续固定Node与真实stdio布置对照，不能因CMD副本成功关闭G09。
+- **2026-09-27 `4c4b73c1d` 固定Node标准流对照**：Windows编译及504项普通回归通过；原生16通过／2失败（原NUL和新增Node）。绑定CMD在pipe／pipe／disk下退出0；固定Node20.9.0正常CREATE后自然退出`0xc0000142`，无版本输出、无取消，shim标记及AppContainer／Job清理确认。只证明本对照中的初始化失败，不能等同真实npm超时根因；继续有界loader观察与同一Node根／子进程对照，保留全部成功断言和隔离，G09不关闭。
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。

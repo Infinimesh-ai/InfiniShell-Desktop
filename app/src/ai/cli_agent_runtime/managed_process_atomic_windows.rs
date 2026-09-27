@@ -178,6 +178,8 @@ pub(super) struct WindowsImageDebugSession {
     root_exit_observed: bool,
     cancellation: Option<Arc<AtomicBool>>,
     npm_diagnostics: Option<NpmProcessDiagnostics>,
+    #[cfg(test)]
+    loader_trace: Option<loader_tests::LoaderTrace>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -482,6 +484,8 @@ impl WindowsReplacementLease {
                 .npm_console_host
                 .is_some()
                 .then(NpmProcessDiagnostics::new),
+            #[cfg(test)]
+            loader_trace: None,
         })
     }
 }
@@ -569,6 +573,12 @@ impl WindowsImageDebugSession {
             let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
                 .then(|| unsafe { event.u.ExitProcess.dwExitCode });
             diagnostics.received(event.dwProcessId, event.dwDebugEventCode, exit_code);
+        }
+        #[cfg(test)]
+        if let Some(mut trace) = self.loader_trace.take() {
+            // 仅固定版本对照显式启用；观察失败不改变事件所有权、授权或继续状态。
+            trace.observe(&event, self);
+            self.loader_trace = Some(trace);
         }
         Ok(event)
     }
@@ -2344,6 +2354,10 @@ fn read_at<const N: usize>(file: &mut File, offset: u64, file_size: u64) -> io::
 fn error(message: &'static str) -> io::Error {
     io::Error::other(message)
 }
+
+#[cfg(test)]
+#[path = "managed_process_atomic_windows_loader_tests.rs"]
+mod loader_tests;
 
 #[cfg(test)]
 #[path = "managed_process_atomic_windows_tests.rs"]

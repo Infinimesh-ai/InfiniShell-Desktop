@@ -837,7 +837,7 @@ fn run_cmd_full_shim_control(name: &str, explicit_node: bool, keep_stdin_open: b
 fn npm_cmd_full_shim_bound_cmd_with_worker_stdio() {
     run_cmd_worker_stdio_control(
         "console_binding::npm_cmd_full_shim_bound_cmd_with_worker_stdio",
-        false,
+        WorkerStdioControl::BoundCmd,
     );
 }
 
@@ -846,19 +846,37 @@ fn npm_cmd_full_shim_bound_cmd_with_worker_stdio() {
 fn npm_cmd_full_shim_fixed_node_with_worker_stdio() {
     run_cmd_worker_stdio_control(
         "console_binding::npm_cmd_full_shim_fixed_node_with_worker_stdio",
-        true,
+        WorkerStdioControl::NodeChild,
     );
 }
 
-fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
-    let (case, expected_line, child_arguments) = if real_node {
-        ("node_20_9_0", "v20.9.0", "--version")
-    } else {
-        (
+#[test]
+#[ignore = "固定 Node 根进程须与 CMD 子进程保持相同验收标准流和 AppContainer 边界"]
+fn npm_fixed_node_root_with_worker_stdio() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_fixed_node_root_with_worker_stdio",
+        WorkerStdioControl::NodeRoot,
+    );
+}
+
+#[derive(Clone, Copy)]
+enum WorkerStdioControl {
+    BoundCmd,
+    NodeChild,
+    NodeRoot,
+}
+
+fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
+    let real_node = !matches!(mode, WorkerStdioControl::BoundCmd);
+    let shim_executed = !matches!(mode, WorkerStdioControl::NodeRoot);
+    let (case, expected_line, child_arguments) = match mode {
+        WorkerStdioControl::BoundCmd => (
             "bound_cmd",
             "routing-child",
             r#"/d /v:off /s /c "echo routing-child""#,
-        )
+        ),
+        WorkerStdioControl::NodeChild => ("node_20_9_0", "v20.9.0", "--version"),
+        WorkerStdioControl::NodeRoot => ("node_20_9_0_root", "v20.9.0", "--version"),
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_stdio_fixture_in_strict_job(name, case, expected_line);
@@ -947,7 +965,13 @@ fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
         .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
         .open(&script)
         .unwrap();
-    let mut lease = prepare(&ExpectedFileIdentity::capture(&program).unwrap()).unwrap();
+    // 根 Node 对照保留相同脚本、目录和只读授权，只改变启动拓扑；脚本本身不执行。
+    let expected_program = if shim_executed {
+        ExpectedFileIdentity::capture(&program).unwrap()
+    } else {
+        expected_child.clone()
+    };
+    let mut lease = prepare(&expected_program).unwrap();
     lease.set_package_images(vec![expected_child]).unwrap();
     lease.enable_npm_console_host().unwrap();
     let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
@@ -966,9 +990,15 @@ fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
     environment.push(("NODE_DISABLE_COMPILE_CACHE".into(), "1".into()));
     environment.push(("COMSPEC".into(), program.into_os_string()));
     let mut debugger = lease.prepare_image_debug_session().unwrap();
+    debugger.loader_trace = Some(loader_tests::LoaderTrace::default());
+    let arguments = if shim_executed {
+        r#"/d /v:off /s /c "worker-stdio-control.cmd""#
+    } else {
+        "--version"
+    };
     let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
         lease.execution_path(),
-        r#"/d /v:off /s /c "worker-stdio-control.cmd""#.as_ref(),
+        arguments.as_ref(),
         cwd.execution_path(),
         &execution_cwd,
         &environment,
@@ -1004,10 +1034,27 @@ fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
     let receipt = root.join("appcontainer-cleanup-v1");
     let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
     drop(script_handle);
-    let before_matches =
-        fs::read(root.join("tmp/before.txt")).is_ok_and(|bytes| bytes == b"routing-before\r\n");
-    let branch_matches =
-        fs::read(root.join("tmp/branch.txt")).is_ok_and(|bytes| bytes == b"path\r\n");
+    let before = fs::read(root.join("tmp/before.txt"));
+    let branch = fs::read(root.join("tmp/branch.txt"));
+    let before_matches = shim_executed.then(|| {
+        before
+            .as_ref()
+            .is_ok_and(|bytes| bytes.as_slice() == b"routing-before\r\n")
+    });
+    let branch_matches = shim_executed.then(|| {
+        branch
+            .as_ref()
+            .is_ok_and(|bytes| bytes.as_slice() == b"path\r\n")
+    });
+    // 未执行的 shim 标记记为 null，并单独验证文件不存在，不能把省略记成匹配成功。
+    let shim_markers_absent = (!shim_executed).then(|| {
+        before
+            .as_ref()
+            .is_err_and(|failure| failure.kind() == io::ErrorKind::NotFound)
+            && branch
+                .as_ref()
+                .is_err_and(|failure| failure.kind() == io::ErrorKind::NotFound)
+    });
     let receipt_matches = fs::read(&receipt)
         .is_ok_and(|bytes| bytes == b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n");
     eprintln!(
@@ -1015,12 +1062,14 @@ fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
         serde_json::json!({
             "case": case,
             "real_node": real_node,
+            "shim_executed": shim_executed,
             "source_sha256": expected_source.sha256,
             "native_exit_code": result.as_ref().ok().copied(),
             "failure_kind": result.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
             "os_code": result.as_ref().err().and_then(io::Error::raw_os_error),
             "before_marker_matches": before_matches,
             "branch_marker_matches": branch_matches,
+            "shim_markers_absent": shim_markers_absent,
             "cleanup_confirmed": cleanup.is_ok(),
             "cleanup_failure_kind": cleanup.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
             "cleanup_os_code": cleanup.as_ref().err().and_then(io::Error::raw_os_error),
@@ -1030,7 +1079,13 @@ fn run_cmd_worker_stdio_control(name: &str, real_node: bool) {
     );
     cleanup.expect("标准流对照必须恢复 ACL、删除 profile 并清空 Job");
     assert_eq!(result.unwrap(), 0);
-    assert!(before_matches && branch_matches && receipt_matches && watchdog_completed);
+    if shim_executed {
+        assert_eq!(before_matches, Some(true));
+        assert_eq!(branch_matches, Some(true));
+    } else {
+        assert_eq!(shim_markers_absent, Some(true));
+    }
+    assert!(receipt_matches && watchdog_completed);
     record_debug_native_exit(name);
 }
 

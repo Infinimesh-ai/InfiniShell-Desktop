@@ -1377,6 +1377,7 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         root_exit_observed: false,
         cancellation: None,
         npm_diagnostics: None,
+        loader_trace: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
     let copy = fixture.bin.join("same-name-copy.exe");
