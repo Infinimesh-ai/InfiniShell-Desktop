@@ -1,0 +1,139 @@
+use super::*;
+
+const OWNER: &str = "S-1-5-21-111-222-333-1001";
+const CONTAINER: &str = "S-1-15-2-1-2-3-4-5-6-7";
+
+pub(crate) fn private_descriptor_binds_exact_owner_container_and_low_label() {
+    let descriptor = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let (owner, dacl, label) = relative_parts(descriptor.bytes()).unwrap();
+    assert!(!owner.is_empty());
+    assert_eq!(u16::from_le_bytes([dacl[4], dacl[5]]), 2);
+    assert_eq!(u32::from_le_bytes(label[12..16].try_into().unwrap()), 1);
+    assert_eq!(&label[16..], &[1, 1, 0, 0, 0, 0, 0, 16, 0, 16, 0, 0]);
+    verify_descriptor(descriptor.bytes(), descriptor.bytes()).unwrap();
+}
+
+pub(crate) fn private_descriptor_rejects_broader_container_rights() {
+    let expected = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        DESKTOP_OWNER_ACCESS,
+        DESKTOP_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let broader =
+        Descriptor::new(OWNER, CONTAINER, DESKTOP_OWNER_ACCESS, DESKTOP_OWNER_ACCESS).unwrap();
+    assert!(verify_descriptor(broader.bytes(), expected.bytes()).is_err());
+}
+
+pub(crate) fn private_descriptor_rejects_a_different_container() {
+    let expected = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let other = Descriptor::new(
+        OWNER,
+        "S-1-15-2-1-2-3-4-5-6-8",
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    assert!(verify_descriptor(other.bytes(), expected.bytes()).is_err());
+}
+
+pub(crate) fn private_descriptor_rejects_medium_integrity_or_missing_protection() {
+    let expected = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let mut changed = expected.bytes().to_vec();
+    let header = unsafe {
+        std::ptr::read_unaligned(changed.as_ptr().cast::<SECURITY_DESCRIPTOR_RELATIVE>())
+    };
+    let label_rid = header.Sacl as usize + 24;
+    changed[label_rid..label_rid + 4].copy_from_slice(&0x2000u32.to_le_bytes());
+    assert!(verify_descriptor(&changed, expected.bytes()).is_err());
+
+    let mut changed = expected.bytes().to_vec();
+    let control = u16::from_le_bytes([changed[2], changed[3]]) & !SE_DACL_PROTECTED.0;
+    changed[2..4].copy_from_slice(&control.to_le_bytes());
+    assert!(verify_descriptor(&changed, expected.bytes()).is_err());
+}
+
+pub(crate) fn private_descriptor_rejects_out_of_bounds_relative_offsets_and_ace_sizes() {
+    let expected = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let mut changed = expected.bytes().to_vec();
+    changed[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+    assert!(verify_descriptor(&changed, expected.bytes()).is_err());
+
+    let mut changed = expected.bytes().to_vec();
+    let dacl = u32::from_le_bytes(changed[16..20].try_into().unwrap()) as usize;
+    changed[dacl + 10..dacl + 12].copy_from_slice(&u16::MAX.to_le_bytes());
+    assert!(verify_descriptor(&changed, expected.bytes()).is_err());
+}
+
+pub(crate) fn private_desktop_rejects_unbound_names_before_reading_sid_or_creating_objects() {
+    let result = PrivateDesktop::create("WinSta0\\Default", PSID::default());
+    assert_eq!(result.err().unwrap().to_string(), "私有桌面代次名称无效");
+}
+
+pub(crate) fn private_descriptor_rejects_label_bytes_without_a_present_sacl() {
+    let expected = Descriptor::new(
+        OWNER,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let mut changed = expected.bytes().to_vec();
+    let control = u16::from_le_bytes([changed[2], changed[3]]) & !SE_SACL_PRESENT.0;
+    changed[2..4].copy_from_slice(&control.to_le_bytes());
+    assert!(verify_descriptor(&changed, expected.bytes()).is_err());
+}
+
+pub(crate) fn private_desktop_never_publishes_a_route_for_missing_objects() {
+    let mut desktop = PrivateDesktop {
+        station: None,
+        desktop: None,
+        original: None,
+        startup_name: wide("InfiniShell.Probe.fixture\\Probe".as_ref()).unwrap(),
+        station_sd: Descriptor::new(
+            OWNER,
+            CONTAINER,
+            STATION_OWNER_ACCESS,
+            STATION_CONTAINER_ACCESS,
+        )
+        .unwrap(),
+        desktop_sd: Descriptor::new(
+            OWNER,
+            CONTAINER,
+            DESKTOP_OWNER_ACCESS,
+            DESKTOP_CONTAINER_ACCESS,
+        )
+        .unwrap(),
+    };
+    let mut startup = STARTUPINFOW::default();
+
+    assert!(desktop.configure_startup(&mut startup).is_err());
+    assert!(startup.lpDesktop.is_null());
+    desktop.close().unwrap();
+    assert!(desktop.station.is_none() && desktop.desktop.is_none());
+}

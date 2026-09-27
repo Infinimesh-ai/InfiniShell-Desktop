@@ -130,6 +130,9 @@
 - **当前替代方式**：使用原安装包管理器手动升级，或由用户明确选择官方原生安装；不得自动迁移或猜测同名命令的所属安装。
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
+- Mac ARM Codex npm 补验：`e3a2e5654` 的 run-01 候选改写在启动前拒绝；`bb78f3ac5` 的 run-03 两项冷恢复通过：缺收据后实际 inspect 为旧版 0.155.1 且完整树回滚，外部改动分支返回 RecoveryRequired 并保留 marker、旧备份和 journal。两项交换前候选 Node→codex.js 探针均原生 exit 0、cleanup true；external 的结果版本 0.156.1 为固定字段，非恢复后再次执行。历史正常升级仍单独属于 `2b59c8c6`，未形成同 SHA 四场景验收。证据：`macos-codex-npm-recovery/run-01-review.safe.json`、`run-03/summary.safe.json`、`run-03-index.safe.json`。G09 保持未关闭，14 项必要缺口及消费者发现/GUI/模型/其它平台边界不变。
+- **Windows 私有对象测试增量（本地门禁通过）**：新增固定 Node 根进程的私有窗口站／桌面对照，验证新对象的精确 SID DACL、低完整性标签与清理；本地编译、command Windows 测试目标编译、i18n 11 项及 actionlint 已通过，本机不计 Windows 原生运行。保留原隔离与断言，待同提交 CI，真实 npm 未重跑。无需本地化变更，G09 不关闭。
+
 - **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
 
 ### G10 — Claude／Grok 子任务限固定权限策略

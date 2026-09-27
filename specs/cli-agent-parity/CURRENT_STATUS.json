@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac外置盘托管服务配置修复054ed457e已推送，真实恢复复验仍因launchd打开外置debug stdout而失败；正在修复诊断输出归档。Windows后续：f7e0801f1 六组14次实际token观察中，窗口站／桌面固定掩码与MAXIMUM_ALLOWED共56次DACL模拟均拒绝，成功CMD基线也相同；MIC未评估，目标对象身份和Node具体DLL根因仍未建立。下一步仅计划在独立监督测试worker中，以同一固定Node根进程、NoWindow和原标准流，对照私有窗口站／桌面；先审核新对象安全描述符、完整性标签、权限前提和完整清理，保持零capability、严格Job和映像绑定，不改现有全局ACL或生产默认。该对照尚未实现或执行，真实npm未重跑，G09及14项必要缺项不关闭。"
+    "next_work_order": "Mac bb78f3ac5 两项冷恢复补验及独立证据复核已通过，历史正常升级与候选篡改拒绝仍分源码记录。Windows 私有窗口站／桌面测试对照已实现，本地 check、Windows command 测试目标编译、i18n 11 项及 actionlint 通过，待同提交 Windows 原生执行；保留固定 Node、零 capability、严格 Job、映像绑定及原成功断言，不改现有全局 ACL 或生产默认。真实 Windows npm 尚未重跑；G09 及 14 项必要缺项保持开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1507,8 +1507,8 @@
     "joint_test_app": "本批UI修正已包含在当前外置盘联测包，路径见current_macos_joint_test_bundle。旧2d159360a准备包仅作为historical_macos_joint_test_bundle_2d159360a历史记录，不保证旧路径可用。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "b3908488ce04f36e4c31c06dd386b8239f4501d0",
-  "latest_increment": "windows_npm_create_timing_increment",
+  "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+  "latest_increment": "g09_macos_codex_npm_recovery_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -2595,6 +2595,200 @@
       "atomic_retries": 0,
       "evidence_index_files": 43,
       "evidence_index_sha256": "1ce433396c569428ac1d5e4f839a5d836d75f302a12a8d54e221c4a71f7954d5"
+    },
+    "private_desktop_control": {
+      "status": "implemented_local_gates_passed_windows_execution_pending",
+      "source_binding": "本次提交中的 8 份测试源码/工作流冻结摘要；提交后由 CI headSha 精确绑定",
+      "base_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-private-desktop",
+      "local_gates": {
+        "cargo_check_warp": "passed",
+        "command_windows_target_check_tests_test_util": "passed_type_check_only",
+        "i18n_tests_passed": 11,
+        "actionlint": "passed_only_existing_custom_runner_label_ignored",
+        "rustfmt": "passed",
+        "receipt": "local-01/gates-progress.safe.json"
+      },
+      "scope": "仅测试工具功能下的固定 Node 20.9.0 根进程 --version / NoWindow 对照；不执行 codex.js 或真实 npm 事务",
+      "private_objects": "新建唯一窗口站与桌面；仅创建者和精确 AppContainer SID 的受保护 DACL、低完整性 NW 标签；恢复原站点后派生，Job 空后关闭私有对象",
+      "preserved": [
+        "零 capability",
+        "严格 Job 且禁止 breakaway",
+        "原三个标准流句柄",
+        "精确映像及系统 DLL 绑定",
+        "旧失败和成功断言",
+        "生产默认路径及既有全局 ACL"
+      ],
+      "windows_runtime_verified": false,
+      "g09_closed": false,
+      "localization": "无需本地化变更"
+    }
+  },
+  "g09_macos_codex_npm_recovery_increment": {
+    "status": "macos_recovery_supplement_passed_with_source_cohorts",
+    "platform": "macOS arm64",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-codex-npm-recovery",
+    "execution_policy": {
+      "mode": "explicit_external_volume",
+      "allowed_volume": "/Volumes/SanDisk",
+      "st_dev": 16777266,
+      "persistent_evidence_and_binaries_on_external_volume": true,
+      "private_control_directory": "既有 /tmp/is-cli-*：短 Unix socket、launchd 配置与临时调试 stdio；持久诊断副本/归档仍在 SanDisk",
+      "system_ownership_or_security_configuration_changed": false
+    },
+    "source_cohorts": [
+      {
+        "source_commit": "2b59c8c62c7c46bc30211a9872f966c52317202e",
+        "case": "updated",
+        "status": "historical_passed_original_record_retained",
+        "evidence": "CURRENT_STATUS.json:g09_isolation_preflight_increment.macos_codex_normal",
+        "scope": "历史正常升级，仅保留原记录，不并入本轮同源码验收"
+      },
+      {
+        "source_commit": "e3a2e5654106e5eae9d6ffff99c07e80ca84d475",
+        "case": "candidate_changed_preserved",
+        "status": "accepted",
+        "run": "run-01",
+        "python_tests_passed": 34,
+        "rejected_before_spawn": true,
+        "candidate_started": false,
+        "public_version_preserved": "0.155.1",
+        "evidence": "run-01-review.safe.json"
+      },
+      {
+        "source_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+        "run": "run-03",
+        "status": "accepted",
+        "runner_returncode": 0,
+        "elapsed_seconds": 705.315,
+        "cases": [
+          {
+            "case": "swap_receipt_missing",
+            "status": "accepted",
+            "cold_recovery_process": true,
+            "evidence": "run-03/infinishell-codex-npm-live-n39bmn84/result-recover.safe.json",
+            "candidate_probe": {
+              "timing": "交换前",
+              "entry": "Node → 候选包公开 bin/codex.js --version",
+              "observed_version": "0.156.1",
+              "native_exit_code": 0,
+              "cleanup_confirmed": true
+            },
+            "post_recovery_public_entry_executed": false,
+            "recovery_evidence": {
+              "installed_version_from_product_inspect": "0.155.1",
+              "source": "Npm",
+              "restored_tree_equals_before": true,
+              "journal_removed": true,
+              "public_entry_link_identity_preserved": true
+            },
+            "independent_review": "run-03-swap-review.safe.json",
+            "independent_review_status": "passed"
+          },
+          {
+            "case": "external_change_preserved",
+            "status": "accepted",
+            "cold_recovery_process": true,
+            "evidence": "run-03/infinishell-codex-npm-live-3tsdy69k/result-recover.safe.json",
+            "candidate_probe": {
+              "timing": "交换前",
+              "entry": "Node → 候选包公开 bin/codex.js --version",
+              "observed_version": "0.156.1",
+              "native_exit_code": 0,
+              "cleanup_confirmed": true
+            },
+            "post_recovery_public_entry_executed": false,
+            "recovery_evidence": {
+              "result": "RecoveryRequired",
+              "external_marker_preserved": true,
+              "old_backup_equals_before": true,
+              "journal_preserved": true,
+              "public_entry_link_identity_preserved": true,
+              "result_public_version": "0.156.1",
+              "result_public_version_evidence": "测试分支固定赋值，非恢复后公开入口的版本实测"
+            },
+            "independent_review": "run-03-external-review.safe.json",
+            "independent_review_status": "passed"
+          }
+        ]
+      }
+    ],
+    "resolved_failures": [
+      {
+        "run": "run-01",
+        "source_commit": "e3a2e5654106e5eae9d6ffff99c07e80ca84d475",
+        "case": "swap_receipt_missing",
+        "status": "failed_before_checkpoint",
+        "reason": "launchd 拒绝外置卷 plist：bad ownership/permissions；该卷 Owners Disabled",
+        "fix_commit": "054ed457e818495ba0c946c8823a9099ad170fc8",
+        "fix": "bootstrap 只消费既有私有控制目录的 0600 plist，保留同字节外置诊断副本",
+        "fix_gates": "cargo check、Mac 19 项、i18n 11 项、监督程序构建通过",
+        "evidence": "run-01-review.safe.json"
+      },
+      {
+        "run": "run-02",
+        "source_commit": "054ed457e818495ba0c946c8823a9099ad170fc8",
+        "case": "swap_receipt_missing",
+        "status": "failed_before_checkpoint",
+        "reason": "plist 已加载，但外置 stdout 打开 EPERM，launchd EX_CONFIG(78)，未建立首次资源域或完整清理收据",
+        "fix_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+        "fix": "debug stdio 写入私有控制目录，清理后安全归档；失败清理保留控制目录",
+        "evidence": "run-02-review.safe.json"
+      }
+    ],
+    "current_headless_artifact": {
+      "source_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+      "gates": {
+        "cargo_check": "passed",
+        "macos_tests_passed": 24,
+        "i18n_tests_passed": 11,
+        "supervisor_build": "passed"
+      },
+      "worker": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-codex-npm-recovery/stdio-fix-02/worker-stdio-fix",
+        "sha256": "b5bfedfebe32ec6d4937480743d792102a26f903200845f8a0ea5e662362aada"
+      },
+      "supervisor": {
+        "path": "/Volumes/SanDisk/github/InfiniShell-Desktop/target/parity/InfiniShellParity-macos-stdio-20260928.app/Contents/MacOS/infinishell",
+        "sha256": "63ccfe421e182f4eeb9fa7d2fa1969e1a91c299d12b1af0c6a1d51166878353f"
+      },
+      "signature_verified": true,
+      "resource_files_equal_to_original": 129,
+      "worker_source_files_verified": 19,
+      "supervisor_source_files_verified": 16,
+      "scope": "仅 headless 监督测试；不替换 current_macos_joint_test_bundle 中 e2eba GUI 联测包记录",
+      "evidence": "stdio-fix-02/artifact-ready.safe.json"
+    },
+    "interpretation": "三项缺失恢复/拒绝场景已有分源码证据；本轮 bb78 仅两项恢复通过，不声称四场景同 SHA 全验收。两项原生 exit 0 与 cleanup true 都属于交换前候选 Node 公开入口探针，其原收据在冷恢复时重验。",
+    "independent_review_scope": "run-03-swap-review.safe.json 与 run-03-external-review.safe.json 分别独立复核两项；后者也核对总摘要，均通过。未重运行代次、读取私有 manifest 或将固定版本字段误作恢复后执行结果。",
+    "model_inputs_sent": 0,
+    "gui_covered": false,
+    "global_installation_changed": false,
+    "consumer_channel_discovery_covered": false,
+    "busy_or_plugin_recheck_covered": false,
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false,
+    "remaining_required_items": [
+      "G01",
+      "G02",
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "V01",
+      "V02",
+      "V03",
+      "V05"
+    ],
+    "localization": "无需本地化变更",
+    "evidence_index": {
+      "path": "run-03-index.safe.json",
+      "safe_receipts_and_captured_logs": 59,
+      "scope": "仅安全收据与捕获 stdout/stderr；二进制/源码/官方包身份另见 source.safe.json、artifact-ready 和 archive checks，不声称索引包含全部二进制"
     }
   }
 }

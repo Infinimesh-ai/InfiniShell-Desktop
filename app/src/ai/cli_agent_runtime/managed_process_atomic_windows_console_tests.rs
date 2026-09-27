@@ -886,6 +886,15 @@ fn npm_fixed_node_root_with_hidden_console() {
     );
 }
 
+#[test]
+#[ignore = "私有窗口站和桌面仅供固定 Node 根进程诊断，必须核验新对象并确认完整清理"]
+fn npm_fixed_node_root_with_private_desktop() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_fixed_node_root_with_private_desktop",
+        WorkerStdioControl::NodeRootPrivateDesktop,
+    );
+}
+
 #[derive(Clone, Copy)]
 enum WorkerStdioControl {
     BoundCmd,
@@ -894,6 +903,126 @@ enum WorkerStdioControl {
     HiddenBoundCmd,
     HiddenNodeChild,
     HiddenNodeRoot,
+    NodeRootPrivateDesktop,
+}
+
+// 只回显固定 API 阶段和数值；不输出错误正文、对象名称、SID 或路径。
+fn private_desktop_failure_summary(failure: &io::Error) -> serde_json::Value {
+    let description = failure.to_string();
+    let api = description
+        .strip_prefix("私有桌面 ")
+        .and_then(|text| text.split_once(" 失败：HRESULT=0x"))
+        .and_then(|(stage, code)| {
+            let stage = [
+                "sid_string",
+                "open_token",
+                "token_user",
+                "build_sd",
+                "read_sd",
+                "read_sd_control",
+                "read_object_flags",
+                "original_station",
+                "original_desktop",
+                "create_station",
+                "select_station",
+                "create_desktop",
+                "restore_station",
+                "restore_desktop",
+                "verify_restored_station",
+                "verify_restored_desktop",
+                "close_desktop",
+                "close_station",
+            ]
+            .into_iter()
+            .find(|allowed| *allowed == stage)?;
+            let code = code.split('；').next()?;
+            (code.len() == 8 && code.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                .then(|| u32::from_str_radix(code, 16).ok())
+                .flatten()
+                .map(|code| (stage, code))
+        });
+    serde_json::json!({
+        "kind": format!("{:?}", failure.kind()),
+        "os_code": failure.raw_os_error(),
+        "private_object_api_stage": api.map(|(stage, _)| stage),
+        "hresult": api.map(|(_, code)| code).or_else(|| {
+            failure.get_ref()
+                .and_then(|error| error.downcast_ref::<windows::core::Error>())
+                .map(|error| error.code().0 as u32)
+        }),
+    })
+}
+
+#[test]
+fn private_desktop_failure_keeps_only_fixed_stage_and_numeric_hresult() {
+    let failure = io::Error::other("私有桌面 create_station 失败：HRESULT=0x80070005");
+    assert_eq!(
+        private_desktop_failure_summary(&failure),
+        serde_json::json!({
+            "kind": "Other",
+            "os_code": null,
+            "private_object_api_stage": "create_station",
+            "hresult": 2147942405_u32,
+        })
+    );
+
+    let native_failure = io::Error::other(windows::core::Error::from_hresult(
+        windows::core::HRESULT(-2147024891),
+    ));
+    assert_eq!(
+        private_desktop_failure_summary(&native_failure),
+        serde_json::json!({
+            "kind": "Other",
+            "os_code": null,
+            "private_object_api_stage": null,
+            "hresult": 2147942405_u32,
+        })
+    );
+}
+
+#[test]
+fn private_desktop_failure_does_not_echo_sensitive_or_malformed_details() {
+    // 均为虚构输入；非白名单阶段或混入正文的数值不能进入安全证据。
+    let unknown_stage = io::Error::other(
+        r"私有桌面 S-1-15-2-777 C:\private-fixture\manifest 失败：HRESULT=0x80070005",
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&unknown_stage),
+        serde_json::json!({
+            "kind": "Other",
+            "os_code": null,
+            "private_object_api_stage": null,
+            "hresult": null,
+        })
+    );
+    let malformed = io::Error::other(
+        r"私有桌面 create_station 失败：HRESULT=0x80070005 C:\private-fixture\S-1-15-2-777",
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&malformed),
+        serde_json::json!({
+            "kind": "Other",
+            "os_code": null,
+            "private_object_api_stage": null,
+            "hresult": null,
+        })
+    );
+}
+
+#[test]
+fn private_desktop_failure_excludes_appended_cleanup_body() {
+    let failure = io::Error::other(
+        r"私有桌面 create_station 失败：HRESULT=0x80070005；私有对象清理失败：S-1-15-2-777 C:\private-fixture\manifest",
+    );
+    assert_eq!(
+        private_desktop_failure_summary(&failure),
+        serde_json::json!({
+            "kind": "Other",
+            "os_code": null,
+            "private_object_api_stage": "create_station",
+            "hresult": 2147942405_u32,
+        })
+    );
 }
 
 fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
@@ -903,8 +1032,11 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     );
     let shim_executed = !matches!(
         mode,
-        WorkerStdioControl::NodeRoot | WorkerStdioControl::HiddenNodeRoot
+        WorkerStdioControl::NodeRoot
+            | WorkerStdioControl::HiddenNodeRoot
+            | WorkerStdioControl::NodeRootPrivateDesktop
     );
+    let private_desktop = matches!(mode, WorkerStdioControl::NodeRootPrivateDesktop);
     let hidden_console = matches!(
         mode,
         WorkerStdioControl::HiddenBoundCmd
@@ -929,6 +1061,9 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         }
         WorkerStdioControl::HiddenNodeRoot => {
             ("node_20_9_0_root_hidden_console", "v20.9.0", "--version")
+        }
+        WorkerStdioControl::NodeRootPrivateDesktop => {
+            ("node_20_9_0_root_private_desktop", "v20.9.0", "--version")
         }
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
@@ -1050,22 +1185,55 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     } else {
         "--version"
     };
-    // 新模式仅由本对照显式选择；正式 npm 调用及其他来源继续使用原默认入口。
-    let spawn = if hidden_console {
-        AppContainerProbe::spawn_package_suspended_with_hidden_console
+    // 私有桌面只在独立 driver 中创建；此入口固定 --version 与 NoWindow。
+    let mut process = if private_desktop {
+        match AppContainerProbe::spawn_package_suspended_with_private_desktop(
+            lease.execution_path(),
+            cwd.execution_path(),
+            &execution_cwd,
+            &environment,
+            &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+            &[runtime, script, child],
+        ) {
+            Ok(process) => process,
+            Err(failure) => {
+                // 没有返回可核验的进程，Drop 的尽力清理不能替代完整清理证明。
+                eprintln!(
+                    "atomic_windows_private_desktop_control={}",
+                    serde_json::json!({
+                        "case": case,
+                        "phase": "spawn_private_desktop_failed",
+                        "environment_control_established": false,
+                        "private_objects_verified": false,
+                        "private_objects_closed": null,
+                        "cleanup_confirmed": null,
+                        "native_exit_code": null,
+                        "failure": private_desktop_failure_summary(&failure),
+                    })
+                );
+                panic!("私有桌面对照环境未建立，创建失败证据已保留");
+            }
+        }
     } else {
-        AppContainerProbe::spawn_package_suspended_with_execution_cwd
+        // 新模式仅由本对照显式选择；正式 npm 调用及其他来源继续使用原默认入口。
+        let spawn = if hidden_console {
+            AppContainerProbe::spawn_package_suspended_with_hidden_console
+        } else {
+            AppContainerProbe::spawn_package_suspended_with_execution_cwd
+        };
+        spawn(
+            lease.execution_path(),
+            arguments.as_ref(),
+            cwd.execution_path(),
+            &execution_cwd,
+            &environment,
+            &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+            &[runtime, script, child],
+        )
+        .unwrap()
     };
-    let mut process = spawn(
-        lease.execution_path(),
-        arguments.as_ref(),
-        cwd.execution_path(),
-        &execution_cwd,
-        &environment,
-        &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
-        &[runtime, script, child],
-    )
-    .unwrap();
+    let mut private_objects_verified = false;
+    let mut private_desktop_phase = "resume";
     let cancellation = Arc::new(AtomicBool::new(false));
     debugger.bind_cancellation(cancellation.clone());
     let (completed, completion) = mpsc::channel();
@@ -1076,7 +1244,16 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     });
     let result = (|| -> io::Result<u32> {
         process.resume()?;
+        if private_desktop {
+            private_desktop_phase = "root_initial_image_verification";
+        }
         debugger.verify_package_initial_image_in_container(&process)?;
+        if private_desktop {
+            private_desktop_phase = "private_object_verification";
+            process.verify_private_desktop()?;
+            private_objects_verified = true;
+            private_desktop_phase = "node_execution";
+        }
         debugger.drain_package_in_container_until_exit(&process)?;
         process.exit_code()
     })();
@@ -1144,6 +1321,35 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
             "watchdog_completed": watchdog_completed,
         })
     );
+    if private_desktop {
+        // 此核验针对持有的新对象；不声称直接观察了子线程实际 desktop 或最低权限合同。
+        eprintln!(
+            "atomic_windows_private_desktop_control={}",
+            serde_json::json!({
+                "case": case,
+                "phase": private_desktop_phase,
+                "console_mode": "no_window",
+                "shim_executed": false,
+                "environment_control_established": private_objects_verified,
+                "private_objects_verified": private_objects_verified,
+                "object_verification_scope": "retained_private_object_handles",
+                "private_objects_closed_scope": "owned_handles",
+                "private_objects_closed": cleanup.is_ok().then_some(true),
+                "cleanup_confirmed": cleanup.is_ok(),
+                "receipt_matches": receipt_matches,
+                "native_exit_code": result.as_ref().ok().copied(),
+                "failure": result.as_ref().err().map(private_desktop_failure_summary),
+                "cleanup_failure": cleanup.as_ref().err().map(private_desktop_failure_summary),
+            })
+        );
+        // 在常规断言前保存失败证据；不能把环境建立失败归因为 Node 自然初始化失败。
+        assert!(cleanup.is_ok(), "私有桌面对照未确认完整清理，证据已保留");
+        assert!(
+            private_objects_verified,
+            "私有桌面对照环境未建立，证据已保留"
+        );
+        assert!(result.is_ok(), "私有桌面对照运行失败，证据已保留");
+    }
     cleanup.expect("标准流对照必须恢复 ACL、删除 profile 并清空 Job");
     assert_eq!(result.unwrap(), 0);
     if hidden_console {

@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [features]
-test-util = []
+test-util = ["windows/Win32_System_StationsAndDesktops", "windows/Win32_Graphics_Gdi"]
 
 [dependencies]
 warp_errors.workspace = true
@@ -14,6 +14,9 @@ log.workspace = true
 
 [dev-dependencies]
 tempfile = "3.8.0"
+
+[target.'cfg(windows)'.dev-dependencies]
+windows = { workspace = true, features = ["Win32_System_StationsAndDesktops", "Win32_Graphics_Gdi"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-process = { workspace = true }

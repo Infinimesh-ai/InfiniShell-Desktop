@@ -253,6 +253,10 @@ impl Drop for Attributes {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
+#[path = "windows_appcontainer_desktop.rs"]
+mod desktop;
+
 /// 除固定 --version 外不接受其他参数；进程在 token 与严格 Job 核对前始终挂起。
 pub struct AppContainerProbe {
     profile_name: Vec<u16>,
@@ -263,6 +267,14 @@ pub struct AppContainerProbe {
     thread: Option<OwnedHandle>,
     process_id: u32,
     cleaned: bool,
+    #[cfg(any(test, feature = "test-util"))]
+    private_desktop: Option<desktop::PrivateDesktop>,
+}
+
+enum ProbeDesktopMode {
+    Inherited,
+    #[cfg(any(test, feature = "test-util"))]
+    Private,
 }
 
 enum ProbeConsoleMode {
@@ -300,6 +312,7 @@ impl AppContainerProbe {
             name,
             None,
             ProbeConsoleMode::NoWindow,
+            ProbeDesktopMode::Inherited,
         )
     }
 
@@ -342,6 +355,7 @@ impl AppContainerProbe {
             name,
             readonly,
             ProbeConsoleMode::NoWindow,
+            ProbeDesktopMode::Inherited,
         )
     }
 
@@ -364,7 +378,40 @@ impl AppContainerProbe {
             name,
             readonly,
             ProbeConsoleMode::HiddenNewConsole,
+            ProbeDesktopMode::Inherited,
         )
+    }
+
+    /// 仅供独立测试 driver 的固定 Node 根 --version 对照；不接受任意桌面名称。
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn spawn_package_suspended_with_private_desktop(
+        program: &Path,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+    ) -> io::Result<Self> {
+        Self::spawn_package_internal(
+            program,
+            std::ffi::OsStr::new("--version"),
+            cwd,
+            execution_cwd,
+            environment,
+            name,
+            readonly,
+            ProbeConsoleMode::NoWindow,
+            ProbeDesktopMode::Private,
+        )
+    }
+
+    /// 只读复核本次持有的私有对象；不重新打开名称，也不修改既有对象权限。
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn verify_private_desktop(&self) -> io::Result<()> {
+        self.private_desktop
+            .as_ref()
+            .ok_or_else(|| io::Error::other("版本探针未选择私有桌面"))?
+            .verify()
     }
 
     fn spawn_package_internal(
@@ -376,6 +423,7 @@ impl AppContainerProbe {
         name: &str,
         readonly: &[std::path::PathBuf],
         console_mode: ProbeConsoleMode,
+        desktop_mode: ProbeDesktopMode,
     ) -> io::Result<Self> {
         if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
             return Err(io::Error::other("版本探针执行目录不匹配"));
@@ -397,6 +445,7 @@ impl AppContainerProbe {
             name,
             Some(readonly),
             console_mode,
+            desktop_mode,
         )
     }
 
@@ -409,6 +458,7 @@ impl AppContainerProbe {
         name: &str,
         readonly: Option<&[std::path::PathBuf]>,
         console_mode: ProbeConsoleMode,
+        desktop_mode: ProbeDesktopMode,
     ) -> io::Result<Self> {
         if !name.starts_with("InfiniShell.Version.")
             || name.len() != "InfiniShell.Version.".len() + 36
@@ -446,7 +496,16 @@ impl AppContainerProbe {
             thread: None,
             process_id: 0,
             cleaned: false,
+            #[cfg(any(test, feature = "test-util"))]
+            private_desktop: None,
         };
+        match desktop_mode {
+            ProbeDesktopMode::Inherited => {}
+            #[cfg(any(test, feature = "test-util"))]
+            ProbeDesktopMode::Private => {
+                result.private_desktop = Some(desktop::PrivateDesktop::create(name, result.sid)?);
+            }
+        }
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         unsafe {
@@ -530,6 +589,10 @@ impl AppContainerProbe {
         startup.StartupInfo.hStdOutput = handles[1];
         startup.StartupInfo.hStdError = handles[2];
         startup.lpAttributeList = attributes.list;
+        #[cfg(any(test, feature = "test-util"))]
+        if let Some(desktop) = &mut result.private_desktop {
+            desktop.configure_startup(&mut startup.StartupInfo)?;
+        }
         let console_flags = console_mode.configure_startup(&mut startup.StartupInfo);
         let program_wide = wide(program.as_os_str())?;
         if program_wide.contains(&(b'"' as u16)) {
@@ -747,6 +810,12 @@ impl AppContainerProbe {
         }
         if self.process.is_some() {
             self.exit_code()?;
+        }
+        #[cfg(any(test, feature = "test-util"))]
+        if let Some(desktop) = &mut self.private_desktop {
+            // 只有进程与严格 Job 均已确认退出，才关闭本次私有对象。
+            desktop.close()?;
+            self.private_desktop = None;
         }
         for grant in self.grants.iter_mut().rev() {
             grant.restore()?;

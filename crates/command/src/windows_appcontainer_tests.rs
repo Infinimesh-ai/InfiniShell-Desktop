@@ -36,6 +36,7 @@ fn cleanup_receipt_rejects_external_acl_change_without_overwriting_it() {
         thread: None,
         process_id: 0,
         cleaned: false,
+        private_desktop: None,
     };
     let receipt = directory.path().join("appcontainer-cleanup-v1");
     let grant = &probe.grants[0];

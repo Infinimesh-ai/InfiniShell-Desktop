@@ -20,6 +20,7 @@ fn no_window_mode_preserves_redirected_standard_handles_without_show_flags() {
     assert_eq!(flags, CREATE_NO_WINDOW);
     assert_eq!(flags & CREATE_NEW_CONSOLE, PROCESS_CREATION_FLAGS(0));
     assert_eq!(startup.dwFlags, STARTF_USESTDHANDLES);
+    assert!(startup.lpDesktop.is_null());
     assert_eq!(startup.wShowWindow, 0);
     assert_eq!(startup.hStdInput, HANDLE(11_usize as *mut c_void));
     assert_eq!(startup.hStdOutput, HANDLE(12_usize as *mut c_void));
@@ -155,6 +156,7 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             thread: None,
             process_id: 0,
             cleaned: false,
+            private_desktop: None,
         },
     )
 }
@@ -198,4 +200,81 @@ fn package_token_rejects_the_uncontained_test_process() {
     let failure = probe.verify_token_for(handle(&current)).unwrap_err();
 
     assert_eq!(failure.to_string(), "版本探针不是 AppContainer");
+}
+
+#[test]
+fn private_desktop_rejects_a_different_execution_directory_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_private_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        other.path(),
+        &[],
+        "unused-profile",
+        &[],
+    );
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
+#[test]
+fn private_desktop_rejects_readonly_objects_outside_the_candidate_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_private_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        &cwd,
+        &[],
+        "unused-profile",
+        &[other.path().canonicalize().unwrap()],
+    );
+    assert_eq!(
+        result.err().unwrap().to_string(),
+        "包探针的只读对象范围无效"
+    );
+}
+
+// 私有对象断言由既有 console_tests 入口运行，保持远程定向过滤有效。
+
+#[test]
+fn private_descriptor_binds_exact_owner_container_and_low_label() {
+    super::desktop::test_cases::private_descriptor_binds_exact_owner_container_and_low_label();
+}
+
+#[test]
+fn private_descriptor_rejects_broader_container_rights() {
+    super::desktop::test_cases::private_descriptor_rejects_broader_container_rights();
+}
+
+#[test]
+fn private_descriptor_rejects_a_different_container() {
+    super::desktop::test_cases::private_descriptor_rejects_a_different_container();
+}
+
+#[test]
+fn private_descriptor_rejects_medium_integrity_or_missing_protection() {
+    super::desktop::test_cases::private_descriptor_rejects_medium_integrity_or_missing_protection();
+}
+
+#[test]
+fn private_descriptor_rejects_out_of_bounds_relative_offsets_and_ace_sizes() {
+    super::desktop::test_cases::private_descriptor_rejects_out_of_bounds_relative_offsets_and_ace_sizes();
+}
+
+#[test]
+fn private_desktop_rejects_unbound_names_before_reading_sid_or_creating_objects() {
+    super::desktop::test_cases::private_desktop_rejects_unbound_names_before_reading_sid_or_creating_objects();
+}
+
+#[test]
+fn private_descriptor_rejects_label_bytes_without_a_present_sacl() {
+    super::desktop::test_cases::private_descriptor_rejects_label_bytes_without_a_present_sacl();
+}
+
+#[test]
+fn private_desktop_never_publishes_a_route_for_missing_objects() {
+    super::desktop::test_cases::private_desktop_never_publishes_a_route_for_missing_objects();
 }
