@@ -136,6 +136,8 @@
 
 - **Windows 命名站前提实测 `eb2b271e3`**：同提交CI36344378073编译及504/22/14项通过，原生仍16通过/7失败。创建调用线程的CheckTokenMembership(NULL, BuiltinAdministrators)成功返回member=false，随后CreateWindowStation仍0x80070005；未建立私有环境或执行Node，内层清理未知、外层Job清理确认。这只确认该对照的必要成员前提未满足，不解释原Node DLL失败。等待独立管理员验收runner信息，当前不提权/改全局权限；继续Mac独立工作，G09仍开放。
 
+- **Mac Grok 486330824增量**：外置卷显式策略及17份worker源码绑定完成，Python41、check、i18n11通过。新worker与bb78监督程序15份等价源码组合的run-01首个正常更新被SanDisk卷根0775祖先门禁拒绝；Grok候选未exec，子worker退出1及Job/coalition清理确认。单独run-02候选篡改拒绝通过，实际公开入口仍1.0.40、完整旧树/用户镜像/配置保留，候选未启动。原失败保留；正常更新与两项冷恢复仍欠验，待独立私有映像环境授权，不改原卷权限或放宽门禁。不是当前SHA整包四场景通过，G09仍开放；无需本地化变更。
+
 - **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
 
 ### G10 — Claude／Grok 子任务限固定权限策略
