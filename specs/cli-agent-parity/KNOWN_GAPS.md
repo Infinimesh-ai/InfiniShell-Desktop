@@ -131,7 +131,8 @@
 - **源码／证据**：[npm 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1330)、[Homebrew 手动计划](../../app/src/terminal/cli_agent_updates/sources.rs#L1438)、[WinGet 未识别边界](../../app/src/terminal/cli_agent_updates/sources.rs#L1105)、[自动升级记录](CLI_AUTOUPDATE.md)。
 - **关闭条件**：按包管理器分别完成来源／入口／依赖身份绑定、渠道解析、忙碌延期、实际升级与降级、失败回滚和应用重启后的中断恢复；验证不修改其他前缀或用户安装，并覆盖对应平台真实事务。
 - Mac ARM Codex npm 补验：`e3a2e5654` 的 run-01 候选改写在启动前拒绝；`bb78f3ac5` 的 run-03 两项冷恢复通过：缺收据后实际 inspect 为旧版 0.155.1 且完整树回滚，外部改动分支返回 RecoveryRequired 并保留 marker、旧备份和 journal。两项交换前候选 Node→codex.js 探针均原生 exit 0、cleanup true；external 的结果版本 0.156.1 为固定字段，非恢复后再次执行。历史正常升级仍单独属于 `2b59c8c6`，未形成同 SHA 四场景验收。证据：`macos-codex-npm-recovery/run-01-review.safe.json`、`run-03/summary.safe.json`、`run-03-index.safe.json`。G09 保持未关闭，14 项必要缺口及消费者发现/GUI/模型/其它平台边界不变。
-- **Windows 私有对象测试增量（本地门禁通过）**：新增固定 Node 根进程的私有窗口站／桌面对照，验证新对象的精确 SID DACL、低完整性标签与清理；本地编译、command Windows 测试目标编译、i18n 11 项及 actionlint 已通过，本机不计 Windows 原生运行。保留原隔离与断言，待同提交 CI，真实 npm 未重跑。无需本地化变更，G09 不关闭。
+- **Mac 同冻结产物追加回归 run-04**：复用bb78的worker和签名监督程序，在干净14fb检出下补正常更新与候选篡改拒绝，19份相关源码均与bb78字节相同。公开入口实际分别为0.156.1/0.155.1，正常完整新树与候选清理通过，篡改场景保留完整旧树且无候选启动；独立复核通过。与run-03共同形成同冻结产物的四场景分批证据，不外推14fb重建或整SHA全验收，G09仍开放。
+- **Windows 私有对象对照 `14fb66d99`**：同提交 [CI 36342378730](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36342378730) 编译、504项普通回归、command21项及诊断13项通过；原生16通过/7失败，不重试。新增对照在创建窗口站时被拒（0x80070005），尚未验证对象或启动Node，私有/AppContainer清理未获完整收据，外层Job清理确认；原六项失败保持，六组已有对象对照清理确认。runner另清理conhost PID22732但归属未知。下一步只读核验失败调用线程的有效管理员成员前提，不改全局ACL或提权；真实npm未重跑，G09及14项必要缺口保持开放。无需本地化变更。
 
 - **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
 

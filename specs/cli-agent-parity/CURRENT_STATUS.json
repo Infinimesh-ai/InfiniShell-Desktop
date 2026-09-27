@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac bb78f3ac5 两项冷恢复补验及独立证据复核已通过，历史正常升级与候选篡改拒绝仍分源码记录。Windows 私有窗口站／桌面测试对照已实现，本地 check、Windows command 测试目标编译、i18n 11 项及 actionlint 通过，待同提交 Windows 原生执行；保留固定 Node、零 capability、严格 Job、映像绑定及原成功断言，不改现有全局 ACL 或生产默认。真实 Windows npm 尚未重跑；G09 及 14 项必要缺项保持开放。"
+    "next_work_order": "Mac bb78 冻结产物的两项恢复已通过；追加正常升级/候选篡改拒绝run-04退出0且独立复核通过，明确14fb检出与19相关源码等价边界。Windows 14fb编译、504/21/13项通过，原生16通过/7失败：新私有窗口站创建0x80070005，尚未执行Node。下一步仅补失败调用点有效管理员成员的只读诊断，先验证必要前提；真实npm及G09/14项缺口仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "g09_macos_codex_npm_recovery_increment",
+  "latest_increment": "windows_npm_create_timing_increment.private_desktop_control",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -2597,8 +2597,7 @@
       "evidence_index_sha256": "1ce433396c569428ac1d5e4f839a5d836d75f302a12a8d54e221c4a71f7954d5"
     },
     "private_desktop_control": {
-      "status": "implemented_local_gates_passed_windows_execution_pending",
-      "source_binding": "本次提交中的 8 份测试源码/工作流冻结摘要；提交后由 CI headSha 精确绑定",
+      "status": "windows_private_station_creation_denied",
       "base_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
       "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-private-desktop",
       "local_gates": {
@@ -2619,13 +2618,80 @@
         "旧失败和成功断言",
         "生产默认路径及既有全局 ACL"
       ],
-      "windows_runtime_verified": false,
       "g09_closed": false,
-      "localization": "无需本地化变更"
+      "localization": "无需本地化变更",
+      "source_commit": "14fb66d99358929520428308b9abf81a0c8f6f1b",
+      "remote_run": {
+        "id": 36342378730,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36342378730",
+        "head_sha": "14fb66d99358929520428308b9abf81a0c8f6f1b",
+        "conclusion": "failure",
+        "cargo_check": "passed",
+        "ordinary_tests_passed": 504,
+        "command_tests_passed": 21,
+        "diagnostic_tests_passed": 13,
+        "native_tests": {
+          "passed": 16,
+          "failed": 7,
+          "retries": 0
+        }
+      },
+      "new_control": {
+        "phase": "spawn_private_desktop_failed",
+        "private_object_api_stage": "create_station",
+        "hresult": "0x80070005",
+        "environment_control_established": false,
+        "private_objects_verified": false,
+        "native_exit_code": null,
+        "appcontainer_cleanup_confirmed": null,
+        "private_objects_closed": null,
+        "outer_job_cleanup_confirmed": true,
+        "driver_exit_code": 101,
+        "interpretation": "私有窗口站创建被拒，尚未到达对象读回、候选CREATE或Node执行；不得归为Node自然DLL失败，也不把外层Job收尾当作私有对象/AppContainer完整清理。"
+      },
+      "previous_controls": {
+        "native_failures_preserved": 6,
+        "bound_cmd": "native exit 0、单次marker、清理确认",
+        "node_no_window": "子/根均初始断点后0xc0000142，DLL事件分别29/28",
+        "hidden_console": "三个root均3条DLL、首断点前0xc0000142，CMD launcher未进入shim",
+        "six_inner_and_outer_cleanups_confirmed": true,
+        "dacl": "原6组14次观察的56次runner对象DACL模拟仍全部拒绝；目标对象身份和MIC仍未建立"
+      },
+      "runner_orphan_cleanup": {
+        "conhost_pid": 22732,
+        "attribution": "无可关联身份，不分配到任何case，不声明机器级无残留",
+        "other": [
+          "sccache 18052",
+          "vctip 29940"
+        ]
+      },
+      "artifact": {
+        "id": 10939901816,
+        "zip_bytes": 21171,
+        "member_count": 21,
+        "full_zip_sha256_verified": true,
+        "zip_sha256": "4f7976394c7366fbc8029be813b664047222fb3fbf53345702f608c8d37ffa2b",
+        "all_members_crc_and_sha256_verified": true
+      },
+      "summary_sha256": "fdb940c3e1d36bebef18b2ff4e38825a4d56c216328d29a92c582e8f7d8304fd",
+      "full_job_log": {
+        "path": "raw-logs/1_Windows x64.txt",
+        "sha256": "9d4307bb618a66b15f14cfe82a680823837627fcf4b88ea41e1556dc33cd9940",
+        "note": "gh run --log 组合遗漏独立38步骤日志；以GitHub原始run ZIP内完整合并日志核504项，不将缺步骤文件误记为跳过。"
+      },
+      "private_environment_runtime_verified": false,
+      "real_npm_rerun": false,
+      "next": "仅在失败调用线程只读核验BuiltinAdministrators有效组成员前提；无确定生产修复结论，不提权或改全局权限。",
+      "windows_runtime_executed": true,
+      "independent_review": {
+        "path": "independent-review.safe.json",
+        "sha256": "75a3ed74e8e87eae762a0b6d99bb8817b58bf90047c21220943946cd3168a369",
+        "result": "evidence_boundaries_confirmed_no_deterministic_fix_identified"
+      }
     }
   },
   "g09_macos_codex_npm_recovery_increment": {
-    "status": "macos_recovery_supplement_passed_with_source_cohorts",
+    "status": "frozen_macos_artifact_four_cases_passed_across_documented_runs",
     "platform": "macOS arm64",
     "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-codex-npm-recovery",
     "execution_policy": {
@@ -2759,8 +2825,8 @@
       "scope": "仅 headless 监督测试；不替换 current_macos_joint_test_bundle 中 e2eba GUI 联测包记录",
       "evidence": "stdio-fix-02/artifact-ready.safe.json"
     },
-    "interpretation": "三项缺失恢复/拒绝场景已有分源码证据；本轮 bb78 仅两项恢复通过，不声称四场景同 SHA 全验收。两项原生 exit 0 与 cleanup true 都属于交换前候选 Node 公开入口探针，其原收据在冷恢复时重验。",
-    "independent_review_scope": "run-03-swap-review.safe.json 与 run-03-external-review.safe.json 分别独立复核两项；后者也核对总摘要，均通过。未重运行代次、读取私有 manifest 或将固定版本字段误作恢复后执行结果。",
+    "interpretation": "历史2b正常和e3拒绝证据保留。bb78冻结产物run-03两项冷恢复通过，run-04复用相同产物补正常更新/篡改拒绝；后者执行检出14fb，19相关源码与bb78逐字节相等，不声明整提交同SHA全验收。run-03原生exit/cleanup属于交换前候选，external版本字段不是恢复后实测；run-04正常与拒绝分支分别确实执行公开入口得到0.156.1/0.155.1。",
+    "independent_review_scope": "run-03-swap-review.safe.json 与 run-03-external-review.safe.json 分别独立复核两项；后者也核对总摘要，均通过。未重运行代次、读取私有 manifest 或将固定版本字段误作恢复后执行结果。 run-04-review.safe.json 独立复核追加两项、现场完整树、官方包和公开版本。",
     "model_inputs_sent": 0,
     "gui_covered": false,
     "global_installation_changed": false,
@@ -2789,6 +2855,42 @@
       "path": "run-03-index.safe.json",
       "safe_receipts_and_captured_logs": 59,
       "scope": "仅安全收据与捕获 stdout/stderr；二进制/源码/官方包身份另见 source.safe.json、artifact-ready 和 archive checks，不声称索引包含全部二进制"
+    },
+    "post_fix_normal_and_rejection_regression": {
+      "run": "run-04",
+      "artifact_source_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+      "execution_checkout_commit": "14fb66d99358929520428308b9abf81a0c8f6f1b",
+      "related_source_files_byte_equal": 19,
+      "checkout_clean_before_and_after": true,
+      "runner_returncode": 0,
+      "elapsed_seconds": 526.171,
+      "cases": {
+        "updated": {
+          "accepted": true,
+          "actual_public_version": "0.156.1",
+          "after_tree_matches_prepared_complete_official_tree": true,
+          "tree_nodes": 63,
+          "regular_files": 47,
+          "candidate_native_exit_code": 0,
+          "candidate_cleanup_confirmed": true
+        },
+        "candidate_changed_preserved": {
+          "accepted": true,
+          "actual_public_version": "0.155.1",
+          "old_tree_byte_equal": true,
+          "candidate_probe": null,
+          "managed_generation_created": false,
+          "outcome": "RecoveryRequired",
+          "journal_and_tampered_candidate_preserved": true
+        }
+      },
+      "independent_review": "run-04-review.safe.json",
+      "independent_review_sha256": "5a638607ad57175e6a9296a51175d9644e8a76113345f1927b68a3fb1ce49d03",
+      "summary_sha256": "5a2494e6c12b720196c575ec61612a711e3340c5a47a11f2129a925abab940f6",
+      "evidence_index": "run-04-index.safe.json",
+      "evidence_index_sha256": "3b8117a4f5ce093c0d120a02dd5ff84efd2e821acca35e4db869bf1a32bb2301",
+      "indexed_safe_receipts_and_logs": 35,
+      "scope": "run-03与run-04共同覆盖bb78冻结worker/监督程序的四类场景；run-04由14fb干净检出执行，仅19相关源码等价，不声称14fb重建或整提交同SHA全验收。"
     }
   }
 }
