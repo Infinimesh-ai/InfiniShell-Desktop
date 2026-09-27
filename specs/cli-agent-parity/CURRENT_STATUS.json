@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。"
+    "next_work_order": "Mac外置盘托管服务配置修复054ed457e已推送，真实恢复复验仍因launchd打开外置debug stdout而失败；正在修复诊断输出归档。Windows后续：f7e0801f1 六组14次实际token观察中，窗口站／桌面固定掩码与MAXIMUM_ALLOWED共56次DACL模拟均拒绝，成功CMD基线也相同；MIC未评估，目标对象身份和Node具体DLL根因仍未建立。下一步仅计划在独立监督测试worker中，以同一固定Node根进程、NoWindow和原标准流，对照私有窗口站／桌面；先审核新对象安全描述符、完整性标签、权限前提和完整清理，保持零capability、严格Job和映像绑定，不改现有全局ACL或生产默认。该对照尚未实现或执行，真实npm未重跑，G09及14项必要缺项不关闭。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -2261,7 +2261,7 @@
     "summary_sha256": "a32b7fa8584370a68d6ce7ce22799e8bce7363bea5e6fdaf552a8dbbbc8d2183",
     "job_log_sha256": "68576a58b78ebd4626071d8587c5160410abdbf6d02adae5ced65978608568ea",
     "artifact_scope": "462436948 字节 npm ZIP 仅提取 38 个小成员，逐成员核 CRC；未核整 ZIP 摘要。",
-    "next": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。",
+    "next": "f7e0801f1 六组14次实际token观察中，窗口站／桌面固定掩码与MAXIMUM_ALLOWED共56次DACL模拟均拒绝，成功CMD基线也相同；MIC未评估，目标对象身份和Node具体DLL根因仍未建立。下一步仅计划在独立监督测试worker中，以同一固定Node根进程、NoWindow和原标准流，对照私有窗口站／桌面；先审核新对象安全描述符、完整性标签、权限前提和完整清理，保持零capability、严格Job和映像绑定，不改现有全局ACL或生产默认。该对照尚未实现或执行，真实npm未重跑，G09及14项必要缺项不关闭。",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "cmd_shim_matrix": {
@@ -2447,6 +2447,154 @@
       "job_log_sha256": "27f3dde2a6e480569234a51e1f8429e6cb7a37378c22bd98f009938aea3e7110",
       "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-environment",
       "next": "同提交5ea环境观察确认runner与候选均在Session0，runner使用不可见非WinSta0窗口站；候选为低完整性AppContainer，Win32k禁用策略为0，桌面查询未取得有效值。下一步只用原CREATE句柄的实际token对runner对象描述符作有界DACL模拟，区分查询失败与拒绝；不修改ACL、隔离或生产控制台模式。Node具体DLL和真实npm超时根因仍未知，14项必要缺项开放。"
+    },
+    "desktop_access_control": {
+      "source_commit": "f7e0801f1f54cf646f22b4cc8c762349400ccf82",
+      "run_id": 36335721288,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36335721288",
+      "result": "failure",
+      "windows_cargo_check": "passed",
+      "ordinary_passed": 504,
+      "command_units_passed": 11,
+      "diagnostic_units_passed": 10,
+      "atomic_total": 22,
+      "atomic_passed": 16,
+      "atomic_failed": 6,
+      "case_count": 6,
+      "observation_count": 14,
+      "observation_role_counts": {
+        "root": 6,
+        "console": 6,
+        "child": 2
+      },
+      "child_role_note": "两条child观察分别来自绑定CMD副本和真实Node；role=node不单独证明真实Node身份。",
+      "observations_equivalent_excluding_process_identity": true,
+      "dacl_simulation": {
+        "scope": "bound_token_against_runner_current_objects",
+        "token_source": "已验证CREATE事件的实际hProcess；SecurityIdentification副本；不安装模拟令牌",
+        "window_station_fixed_mask": "0x23",
+        "desktop_fixed_mask": "0x83",
+        "maximum_allowed_mask": "0x02000000",
+        "checks_per_observation": 4,
+        "checks_total": 56,
+        "denied": 56,
+        "allowed": 0,
+        "query_failed": 0,
+        "granted_access_all": 0,
+        "successful_cmd_baseline_also_denied": true,
+        "mandatory_integrity": "mic_not_evaluated",
+        "bound_target_object_identity": "not_established",
+        "full_runtime_access": "not_established",
+        "fixed_masks_are_dll_minimum_access_contract": false
+      },
+      "runner": {
+        "session_id": 0,
+        "integrity": "high",
+        "elevated": true,
+        "is_appcontainer": false,
+        "window_station_class": "other",
+        "window_station_visible": false,
+        "desktop_class": "default",
+        "win32k_disable_flags": 0,
+        "strict_handle_flags": 0
+      },
+      "bound_processes": {
+        "session_id": 0,
+        "integrity": "low",
+        "elevated": false,
+        "is_appcontainer": true,
+        "win32k_disable_flags": 0,
+        "strict_handle_flags": 3,
+        "thread_desktop_query": {
+          "count": 14,
+          "status": "query_failed",
+          "hresult": 0,
+          "os_code": null,
+          "access_denied_established": false
+        }
+      },
+      "case_results": {
+        "no_window_bound_cmd": {
+          "passed": true,
+          "native_exit_code": 0,
+          "expected_stdout_line_count": 1
+        },
+        "no_window_fixed_node_child_and_root": {
+          "case_count": 2,
+          "passed": false,
+          "native_exit_code": "0xc0000142",
+          "initial_breakpoint_observed": true,
+          "node_dll_event_counts": {
+            "child": 28,
+            "root": 29
+          }
+        },
+        "hidden_console_cmd_node_child_node_root": {
+          "case_count": 3,
+          "passed": false,
+          "native_exit_code": "0xc0000142",
+          "root_initial_breakpoint_observed": false,
+          "root_dll_events_per_case": 3,
+          "cmd_launchers_reached_shim": false,
+          "cmd_launchers_created_node": false
+        },
+        "original_nul_control": {
+          "passed": false,
+          "failure": "nul_marker缺失，plain与after marker匹配；原失败断言保留",
+          "native_exit_code": 0,
+          "inner_cleanup_confirmed": true,
+          "outer_job_cleanup_confirmed": true
+        }
+      },
+      "cleanup": {
+        "case_count": 6,
+        "appcontainer_confirmed": 6,
+        "outer_job_confirmed": 6,
+        "normal_bound_console_exit_events_per_case": 1,
+        "cancellations": 0,
+        "timeouts": 0,
+        "output_truncations": 0,
+        "loader_dropped_events": 0,
+        "failed_driver_receipt_boundary": "五个stdio失败case的driver退出101、外层native_receipt_matches=false；内部原生退出收据匹配且清理已确认，不能将成功断言失败改写为清理失败。",
+        "machine_wide_no_residue_established": false
+      },
+      "orphan_conhost": {
+        "pid": 31528,
+        "job_log_line": 5498,
+        "attribution": "unknown",
+        "only_occurrence_in_job_log": true,
+        "matches_recorded_event_or_driver_pids": false,
+        "process_creation_identity_available": false
+      },
+      "interpretation": "DACL拒绝是实际token针对runner当前对象的模拟结果；成功CMD基线亦拒绝，不证明这些对象就是候选实际目标，不证明CMD具备GUI对象访问权，也未定位Node初始化失败或真实npm超时根因。",
+      "real_npm_rerun": false,
+      "codex_js_run": false,
+      "production_default_changed": false,
+      "global_acl_changed": false,
+      "isolation_weakened": false,
+      "g09_closed": false,
+      "required_gaps_remaining_open": 14,
+      "localization": "无需本地化变更",
+      "artifact_id": 10938406465,
+      "artifact_members": 18,
+      "artifact_zip_bytes": 19151,
+      "full_zip_sha256_verified": true,
+      "member_crc32_and_sha256_verified": true,
+      "artifact_zip_sha256": "f8b1000693fa150300b110ffd682e6302b852eee6b69b9551ee37810a895fe6e",
+      "artifact_manifest_sha256": "ff88b94ebed92d6b63f2a485e671168d18caff2f7afc96ec0dc43b85e769d83b",
+      "summary_sha256": "ca1de6a2de63d004c0e6028c8405901abd15a35f2f13c3afee158df21048fa97",
+      "job_log_sha256": "6163600269ef53492b0bb2c9dcf6648a24814eb3dade589db686d0be5f84989e",
+      "commit_binding_sha256": "702ffe5ad8a0766c715eba5bc55e1818574080de32f8268245681c4ce87fe7e1",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-desktop-access",
+      "next_plan": {
+        "status": "planned_not_implemented_or_run",
+        "description": "f7e0801f1 六组14次实际token观察中，窗口站／桌面固定掩码与MAXIMUM_ALLOWED共56次DACL模拟均拒绝，成功CMD基线也相同；MIC未评估，目标对象身份和Node具体DLL根因仍未建立。下一步仅计划在独立监督测试worker中，以同一固定Node根进程、NoWindow和原标准流，对照私有窗口站／桌面；先审核新对象安全描述符、完整性标签、权限前提和完整清理，保持零capability、严格Job和映像绑定，不改现有全局ACL或生产默认。该对照尚未实现或执行，真实npm未重跑，G09及14项必要缺项不关闭。"
+      },
+      "local_cargo_check": "passed",
+      "local_i18n_passed": 11,
+      "atomic_retries": 0,
+      "evidence_index_files": 43,
+      "evidence_index_sha256": "1ce433396c569428ac1d5e4f839a5d836d75f302a12a8d54e221c4a71f7954d5"
     }
   }
 }

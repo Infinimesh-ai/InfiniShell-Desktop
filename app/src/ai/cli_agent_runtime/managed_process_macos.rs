@@ -7,6 +7,8 @@ use std::net::{Shutdown, TcpListener};
 use std::os::fd::OwnedFd;
 use std::os::unix::ffi::{OsStrExt as _, OsStringExt as _};
 use std::os::unix::fs::PermissionsExt as _;
+#[cfg(any(test, debug_assertions))]
+use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::os::unix::process::ExitStatusExt as _;
 use std::path::{Path, PathBuf};
@@ -41,6 +43,8 @@ const NATIVE_FILE: &str = "macos-native.json";
 const PROOF_FILE: &str = "macos-cleanup.json";
 const MAX_FRAME_BYTES: usize = 1024 * 1024;
 const LAUNCHCTL_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(any(test, debug_assertions))]
+const JOB_DIAGNOSTICS: [&str; 2] = ["macos-job.stdout", "macos-job.stderr"];
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct SavedIdentity {
@@ -155,6 +159,49 @@ fn persist_job_definition(
     let path = control_directory.path().join("macos-job.plist");
     persist_record(&path, bytes)?;
     Ok(path)
+}
+
+#[cfg(any(test, debug_assertions))]
+fn prepare_job_diagnostics(control_directory: &Path) -> io::Result<[PathBuf; 2]> {
+    let paths = JOB_DIAGNOSTICS.map(|name| control_directory.join(name));
+    for path in &paths {
+        persist_record(path, b"")?;
+    }
+    Ok(paths)
+}
+
+#[cfg(any(test, debug_assertions))]
+fn archive_job_diagnostics(directory: &Path, control_directory: &Path) -> io::Result<()> {
+    let mut failure = None;
+    for name in JOB_DIAGNOSTICS {
+        let result = (|| {
+            let mut source = match fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                .open(control_directory.join(name))
+            {
+                Ok(source) => source,
+                Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error),
+            };
+            let metadata = source.metadata()?;
+            if !metadata.is_file() || metadata.nlink() != 1 || metadata.mode() & 0o077 != 0 {
+                return Err(io::Error::other("托管服务诊断不是私有普通文件"));
+            }
+            let mut temporary = NamedTempFile::new_in(directory)?;
+            io::copy(&mut source, &mut temporary)?;
+            temporary.as_file().sync_all()?;
+            temporary
+                .persist_noclobber(directory.join(name))
+                .map_err(|error| error.error)?;
+            fs::File::open(directory)?.sync_all()
+        })();
+        // 两份诊断分别归档；一份失败不能阻止另一份保存，也不覆盖既有证据。
+        if let Err(error) = result {
+            failure.get_or_insert(error);
+        }
+    }
+    failure.map_or(Ok(()), Err)
 }
 
 fn frame_write<T: Serialize>(stream: &mut UnixStream, value: &T) -> io::Result<()> {
@@ -355,10 +402,10 @@ impl Job {
             plist::Value::Dictionary(routing),
         );
         #[cfg(any(test, debug_assertions))]
-        let (standard_output, standard_error) = (
-            text_path(&directory.join("macos-job.stdout"))?,
-            text_path(&directory.join("macos-job.stderr"))?,
-        );
+        let (standard_output, standard_error) = {
+            let [output, error] = prepare_job_diagnostics(socket_directory.path())?;
+            (text_path(&output)?, text_path(&error)?)
+        };
         #[cfg(not(any(test, debug_assertions)))]
         let (standard_output, standard_error) = ("/dev/null".to_owned(), "/dev/null".to_owned());
         config.insert(
@@ -490,7 +537,19 @@ impl Job {
 
     fn finish_cleanup(&mut self, result: io::Result<()>) -> io::Result<()> {
         // 服务或资源域尚未确认清理时，保留描述文件及控制目录供后续诊断。
-        self.control_directory.disable_cleanup(result.is_err());
+        let preserve_control = result.is_err();
+        #[cfg(any(test, debug_assertions))]
+        let preserve_control = preserve_control
+            || archive_job_diagnostics(&self.directory, self.control_directory.path())
+                .inspect_err(|_| {
+                    // 调试材料保存失败不改变已确认的资源清理结果。
+                    let _ = writeln!(
+                        io::stderr().lock(),
+                        "托管服务诊断归档失败，私有控制目录已保留"
+                    );
+                })
+                .is_err();
+        self.control_directory.disable_cleanup(preserve_control);
         result
     }
 

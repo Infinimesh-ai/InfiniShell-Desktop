@@ -1,4 +1,5 @@
-use std::os::unix::fs::MetadataExt as _;
+use std::ffi::CString;
+use std::os::unix::fs::{MetadataExt as _, symlink};
 
 use super::super::{confirmed_exit, create_generation_directory, write_new_record};
 use super::*;
@@ -504,5 +505,135 @@ fn unregistered_job_drop_cleans_control_files_without_touching_persistent_eviden
     assert_eq!(
         fs::read(state.path().join("macos-job.plist")).unwrap(),
         b"definition"
+    );
+}
+
+#[test]
+fn launchd_diagnostics_are_private_and_archived_after_confirmed_cleanup() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let [output, error] = prepare_job_diagnostics(&control_path).unwrap();
+    assert_eq!(output.parent(), Some(control_path.as_path()));
+    for path in [&output, &error] {
+        assert_eq!(fs::metadata(path).unwrap().mode() & 0o777, 0o600);
+    }
+    // 调试输出使用流式归档，不受结构化证明文件的大小上限约束。
+    let output_bytes = vec![b'x'; MAX_RECORD_BYTES as usize + 1];
+    fs::write(&output, &output_bytes).unwrap();
+    fs::write(&error, b"fixed stderr").unwrap();
+    job.cleanup().unwrap();
+    drop(job);
+
+    assert!(!control_path.exists());
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[0])).unwrap(),
+        output_bytes
+    );
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[1])).unwrap(),
+        b"fixed stderr"
+    );
+    for name in JOB_DIAGNOSTICS {
+        assert_eq!(
+            fs::metadata(state.path().join(name)).unwrap().mode() & 0o777,
+            0o600
+        );
+    }
+}
+
+#[test]
+fn diagnostic_conflict_preserves_originals_and_does_not_change_cleanup_success() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let [output, error] = prepare_job_diagnostics(&control_path).unwrap();
+    fs::write(&output, b"new stdout").unwrap();
+    fs::write(&error, b"new stderr").unwrap();
+    persist_record(&state.path().join(JOB_DIAGNOSTICS[0]), b"prior evidence").unwrap();
+
+    job.cleanup().unwrap();
+    assert!(job.cleanup_attempted);
+    drop(job);
+
+    assert_eq!(fs::read(output).unwrap(), b"new stdout");
+    assert_eq!(fs::read(error).unwrap(), b"new stderr");
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[0])).unwrap(),
+        b"prior evidence"
+    );
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[1])).unwrap(),
+        b"new stderr"
+    );
+}
+
+#[test]
+fn diagnostic_symlink_is_not_followed_and_other_stream_is_archived() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let [output, error] = prepare_job_diagnostics(&control_path).unwrap();
+    fs::remove_file(&output).unwrap();
+    symlink(state.path().join("macos-job.plist"), &output).unwrap();
+    fs::write(&error, b"fixed stderr").unwrap();
+
+    job.cleanup().unwrap();
+    drop(job);
+
+    assert!(control_path.exists());
+    assert!(!state.path().join(JOB_DIAGNOSTICS[0]).exists());
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[1])).unwrap(),
+        b"fixed stderr"
+    );
+    assert_eq!(
+        fs::read(state.path().join("macos-job.plist")).unwrap(),
+        b"definition"
+    );
+}
+
+#[test]
+fn unconfirmed_resource_cleanup_keeps_diagnostics_without_archiving_live_streams() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let [output, error] = prepare_job_diagnostics(&control_path).unwrap();
+    fs::write(&output, b"still live stdout").unwrap();
+    fs::write(&error, b"still live stderr").unwrap();
+    job.cleanup_attempted = true;
+
+    let failure = job
+        .finish_cleanup(Err(io::Error::other("固定域清理失败")))
+        .unwrap_err();
+    assert_eq!(failure.to_string(), "固定域清理失败");
+    drop(job);
+
+    assert_eq!(fs::read(output).unwrap(), b"still live stdout");
+    assert_eq!(fs::read(error).unwrap(), b"still live stderr");
+    for name in JOB_DIAGNOSTICS {
+        assert!(!state.path().join(name).exists());
+    }
+}
+
+#[test]
+fn diagnostic_fifo_is_rejected_without_waiting_for_a_writer() {
+    let state = tempfile::tempdir().unwrap();
+    let mut job = unregistered_job(state.path());
+    let control_path = job.control_directory.path().to_owned();
+    let [output, error] = prepare_job_diagnostics(&control_path).unwrap();
+    fs::remove_file(&output).unwrap();
+    let output_c = CString::new(output.as_os_str().as_bytes()).unwrap();
+    assert_eq!(unsafe { libc::mkfifo(output_c.as_ptr(), 0o600) }, 0);
+    fs::write(&error, b"fixed stderr").unwrap();
+
+    job.cleanup().unwrap();
+    drop(job);
+
+    assert!(control_path.exists());
+    assert!(!state.path().join(JOB_DIAGNOSTICS[0]).exists());
+    assert_eq!(
+        fs::read(state.path().join(JOB_DIAGNOSTICS[1])).unwrap(),
+        b"fixed stderr"
     );
 }
