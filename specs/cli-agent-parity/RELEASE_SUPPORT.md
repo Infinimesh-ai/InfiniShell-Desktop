@@ -30,7 +30,7 @@ Windows npm 工作目录后续增量已在 `05b0b8faa` 提交（基线 `6408131e
 
 Homebrew 范围仅为已登记默认前缀的固定 cask（Mac ARM `/opt/homebrew`、Linux x64 `/home/linuxbrew/.linuxbrew`）；当前没有可据以开放 formula 的固定官方合同。`unshare` 缺失与 `WinGet.exe` 不在 PATH 均不能代替内核能力或 portable 来源事务验证。
 
-Mac ARM64 的 `2b59c8c62` 联测包已在内置盘准备，英文／简体中文资源内嵌、独立测试 profile、签名及摘要已核验；尚未启动，不作为 GUI／模型验收。构建与原始失败范围见[验证结论](VALIDATION_REPORT.md)，路径和摘要见 `CURRENT_STATUS.json.g09_isolation_preflight_increment.prepared_macos_bundle`。
+Mac ARM64 当前联测包为内置盘 `InfiniShellParity-2d159360a.app`，产品源码与 `ae4279e48` 一致；英文／简体中文资源内嵌、独立测试 profile、签名及摘要已核验。应用尚未启动，不作为 GUI／模型验收。构建、缓存归档与原始失败范围见[验证结论](VALIDATION_REPORT.md)，路径和摘要见 `CURRENT_STATUS.json.current_macos_joint_test_bundle`。
 
 2026-09-27 `ba73c4df3` 的 Grok 图片与技能组合已接线：固定 `1.0.41/grok-4.7`、Inherit 根会话、私有独占 leader，按当前会话目录核验所选技能；排队及刷新后再次核对并保留失败草稿。Mac ARM64 原生两轮仅证明单技能＋PNG及冷加载同历史后的双技能＋PNG，图片原字节、技能读取与识色分别通过；适配器、GUI、热新增组合、权限交互及 Linux／Windows 仍待验。英中说明同步，布局后置。
 

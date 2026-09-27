@@ -917,7 +917,7 @@
       "existing_profiles_modified": false,
       "scope": "内置盘联测应用包；资源逐文件核对，显式临时签名未查询开发者证书。未启动、未认证或完成GUI验收。",
       "later_bundle_record": "g09_isolation_preflight_increment.prepared_macos_bundle",
-      "retired_cache": "2026-09-27经停用缓存清单核验后清理未执行的旧.app；原始准备收据/资源账本保留，当前待联测包见g09_isolation_preflight_increment.prepared_macos_bundle之后的8876fa3c5记录。"
+      "retired_cache": "历史未执行缓存已退休，原始准备收据和资源账本保留；当前联测包见current_macos_joint_test_bundle。"
     },
     "latest_code_path_review": {
       "source_commit": "43c9709d2a1000ebccd3820e386022babba34599",
@@ -1504,7 +1504,7 @@
       "scope": "仅两份停用Cargo测试链接缓存；摘要/身份/无占用均核验，原始归档程序、日志、当前程序与工作树保留",
       "logical_bytes_removed": 1604934608
     },
-    "joint_test_app": "旧2b59c8c62联测包保留且未启动，不含本批UI修正；后续联测需制作包含本增量的新包。",
+    "joint_test_app": "历史2b59c8c62未执行缓存已退休；本批UI修正已包含在current_macos_joint_test_bundle所指的2d159360a准备包中，仍未启动或验收。",
     "goal_complete": false
   },
   "latest_implementation_commit": "ae4279e480fc34068934b46d7227cd64b3edc610",
@@ -1582,7 +1582,8 @@
       "embedded_ftl_files": 4,
       "signature_verified": true,
       "executed": false,
-      "scope": "仅新版交付app编译/资源/签名通过；复用相同产品源码默认feature的check与i18n11，未运行新版GUI或debug-embed feature测试，不另建默认后端程序。旧应用与原始证据保留。"
+      "scope": "仅新版交付app编译/资源/签名通过；复用相同产品源码默认feature的check与i18n11，未运行新版GUI或debug-embed feature测试，不另建默认后端程序。旧应用与原始证据保留。",
+      "retired_cache": "2026-09-27已完整归档并核196条目原字节及属性清单后退休缓存；原路径现已失效，恢复档案见current_macos_joint_test_bundle.retired_887_cache。"
     },
     "closed_gaps": [],
     "goal_complete": false,
@@ -2063,5 +2064,43 @@
         "documentation_gate": "本轮仅现有状态文档更新，cargo check -p warp通过（1.93秒），无需本地化变更；原产品i18n及同提交CI按上列独立收据复用。"
       }
     }
+  },
+  "current_macos_joint_test_bundle": {
+    "source_commit": "2d159360ad76c8edc60e16b86dba1170b578a665",
+    "product_implementation_commit": "ae4279e480fc34068934b46d7227cd64b3edc610",
+    "product_source_equivalent": true,
+    "app": "/Users/zhishi/Library/Caches/InfiniShell-Desktop/cli-parity-apps/2d159360a/InfiniShellParity-2d159360a.app",
+    "architecture": "arm64",
+    "profile": "parity-code-2d159360a",
+    "build": "debug-embed、局部strip=none；180.45秒通过，构建前后工作区干净",
+    "build_receipt_sha256": "09bdccf13b85f9d84fcd66a011cb38dc99145b1cb0dc2aa0ec9ac050a3bf4ed0",
+    "source_binary_sha256": "ea22928a5a9daff0df5c33e67be9336ae81b3a48df9e6e03d7532a48b742a743",
+    "signed_binary_sha256": "47acf18de7594c3b3383c489efa2d61f1b1ef239f1fdde7901ddfc0e31390b55",
+    "receipt_sha256": "760fba9d10e255364bd8023718c9354ecb3b44a9073453e72670a286dfa1f767",
+    "archive_index_sha256": "4f890da7f41b23ff0e1fe3b0cc94ccb6dea5ed020cb4c57dcb73813755d9c511",
+    "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/code-checkpoint-app-2d159360a-20260927/prepared-app-2d159360a",
+    "resource_files": 131,
+    "embedded_ftl_files": 4,
+    "signature_verified": true,
+    "executed": false,
+    "authentication_checked": false,
+    "gui_or_model_verified": false,
+    "default_feature_gate_reuse": "ae4279e48真实check与i18n11项；经完整产品源码/资源/workflow等价核对后复用，不冒充新应用的GUI或debug-embed运行测试",
+    "scope": "仅准备当前产品源码的内置盘ARM64联测包，等待用户在场后进行界面、输入法、模型及恢复验收；既有G09失败保留",
+    "rebuild_policy": "后续仅文档提交不重新构建此相同产品源码包；如产品源码或构建输入改变，则另绑定新构建与受影响门禁。",
+    "localization": "无新增产品文案；已核目标提交四份英中FTL完整字节和131项资源，实际双语布局待验。",
+    "previous_43_bundle_preserved": true,
+    "retired_887_cache": {
+      "source_commit": "8876fa3c5a3950154c8569ea1344507f38f964eb",
+      "reason": "已被43与本包取代的旧准备缓存；按用户授权完整归档后退休副本，原验收收据不变",
+      "archive": "/Users/zhishi/Documents/InfiniShell-Archives/cli-agent-parity/resume-20260925/validation/code-checkpoint-app-2d159360a-20260927/retired-unexecuted-8876fa3c5.app.tar.gz",
+      "archive_bytes": 201528616,
+      "archive_sha256": "6e0825fbebb671f88bec6f53d0dca0071e20b247ae7eac099a8067356bb458f5",
+      "verified_entries": 196,
+      "sidecars": "retired-887-inventory-01.safe.json、retired-887-metadata-01.safe.json、retired-887-xattrs-01.raw.txt",
+      "cleanup_receipt_sha256": "a65d93e38d4c1f09eba80f7a0d0b5a45ce04ee12bb872b8af09256a7daf7c655"
+    },
+    "retired_link_cache": "仅退休已完成链接且无占用的786037736字节rlib及169792292字节rmeta，保留主程序和两当前应用；retired-linked-lib-01.safe.json。",
+    "documentation_gate": "cargo check -p warp通过，0.94秒；docs-check-01.safe.json。独立只读审查核主程序、43旧包、887归档及29项打包索引一致；未启动或新增功能测试。"
   }
 }
