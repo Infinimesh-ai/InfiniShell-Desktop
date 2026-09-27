@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 
 use super::*;
@@ -196,6 +198,127 @@ fn npm_console_host_runs_bound_child_and_confirms_cleanup() {
         fs::read(&fixture.receipt).unwrap(),
         b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n"
     );
+    record_debug_native_exit(name);
+}
+
+#[test]
+#[ignore = "Windows npm 公共 shim 的 NUL 重定向须在真实 AppContainer 中与普通写入对照"]
+fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
+    let name = "console_binding::npm_cmd_nul_redirection_runs_between_builtin_controls";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    for relative in ["home", "config", "cache", "data", "tmp"] {
+        fs::create_dir(root.join(relative)).unwrap();
+    }
+    let script = root.join("nul-control.cmd");
+    // 同一 CMD、目录与 token 只改变 stderr 的 NUL 重定向；脚本不启动外部命令。
+    fs::write(
+        &script,
+        concat!(
+            "@echo off\r\n",
+            ">tmp\\plain.txt echo builtin-control\r\n",
+            ">tmp\\plain-status.txt echo %errorlevel%\r\n",
+            ">tmp\\nul.txt 2>NUL echo builtin-control\r\n",
+            ">tmp\\nul-status.txt echo %errorlevel%\r\n",
+            ">tmp\\after.txt echo builtin-control\r\n",
+            "exit /b 0\r\n",
+        ),
+    )
+    .unwrap();
+    let script_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&script)
+        .unwrap();
+    let system = prepare_system_directory().unwrap();
+    let program = final_path_from_handle(&system.file)
+        .unwrap()
+        .join("cmd.exe");
+    let expected = ExpectedFileIdentity::capture(&program).unwrap();
+    let mut lease = prepare(&expected).unwrap();
+    lease.set_package_images(vec![expected]).unwrap();
+    lease.enable_npm_console_host().unwrap();
+    let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
+    let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
+    assert_eq!(execution_cwd.canonicalize().unwrap(), root);
+    let mut debugger = lease.prepare_image_debug_session().unwrap();
+    let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        lease.execution_path(),
+        r#"/d /v:off /s /c "nul-control.cmd""#.as_ref(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &super::super::super::version_probe::resolved_environment(&root).unwrap(),
+        &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+        &[script],
+    )
+    .unwrap();
+    let cancellation = Arc::new(AtomicBool::new(false));
+    debugger.bind_cancellation(cancellation.clone());
+    let (completed, completion) = mpsc::channel();
+    // 对照本身挂起时仍给原调试线程留下清理时间，不直接依赖外层 Job 强杀。
+    let watchdog = thread::spawn(move || {
+        if completion.recv_timeout(Duration::from_secs(15)).is_err() {
+            cancellation.store(true, Ordering::Release);
+        }
+    });
+    let result = (|| -> io::Result<u32> {
+        process.resume()?;
+        debugger.verify_package_initial_image_in_container(&process)?;
+        debugger.drain_package_in_container_until_exit(&process)?;
+        process.exit_code()
+    })();
+    let _ = completed.send(());
+    watchdog.join().unwrap();
+    let termination = if result.is_err() {
+        process
+            .terminate_job()
+            .and_then(|()| debugger.drain_terminated_package_in_container(&process))
+    } else {
+        Ok(())
+    };
+    drop(cwd);
+    let receipt = root.join("appcontainer-cleanup-v1");
+    let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
+    drop(script_handle);
+    cleanup.expect("NUL 对照无论成功或拒绝，都必须恢复 ACL、删除 profile 并清空 Job");
+    assert_eq!(
+        fs::read(&receipt).unwrap(),
+        b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n"
+    );
+    assert_eq!(result.unwrap(), 0);
+    let plain_status = fs::read_to_string(root.join("tmp/plain-status.txt")).unwrap();
+    let nul_status = fs::read_to_string(root.join("tmp/nul-status.txt")).unwrap();
+    let plain = fs::read(root.join("tmp/plain.txt")).unwrap();
+    let redirected = fs::read(root.join("tmp/nul.txt")).unwrap();
+    let after = fs::read(root.join("tmp/after.txt")).unwrap();
+    let expected: &[u8] = b"builtin-control\r\n";
+    eprintln!(
+        "atomic_windows_nul_control={}",
+        serde_json::json!({
+            "plain_errorlevel": plain_status.trim().parse::<u32>().unwrap(),
+            "nul_errorlevel": nul_status.trim().parse::<u32>().unwrap(),
+            "plain_marker_matches": plain == expected,
+            "nul_marker_matches": redirected == expected,
+            "after_marker_matches": after == expected,
+            "cleanup_confirmed": true,
+        })
+    );
+    assert_eq!(plain_status.trim(), "0");
+    assert_eq!(plain, expected);
+    assert_eq!(after, expected);
+    // 此断言失败只证明公共 shim 所需 NUL 重定向不可用，不把它当成 npm 挂起的唯一根因。
+    assert_eq!(
+        nul_status.trim(),
+        "0",
+        "同一 AppContainer 中的 NUL 重定向失败"
+    );
+    assert_eq!(redirected, expected);
     record_debug_native_exit(name);
 }
 

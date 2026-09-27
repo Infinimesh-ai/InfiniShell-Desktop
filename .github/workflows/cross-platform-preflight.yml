@@ -1475,7 +1475,8 @@ jobs:
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && (!cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success') }}
+        # 原生调试可独立运行，不必为定位隔离失败重复下载和执行完整升级事务。
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         run: |
