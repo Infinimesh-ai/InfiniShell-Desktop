@@ -14,13 +14,16 @@ use std::os::windows::fs::OpenOptionsExt as _;
 use std::os::windows::io::{AsHandle as _, AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ExitStatus};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use command::blocking::Command;
 use command::windows::AppContainerProbe;
 use windows::Win32::Foundation::{
     DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
-    EXCEPTION_BREAKPOINT, GENERIC_READ, HANDLE, HLOCAL, LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
+    WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authorization::{GetSecurityInfo, SE_FILE_OBJECT};
 use windows::Win32::Security::{
@@ -41,6 +44,7 @@ use windows::Win32::System::Diagnostics::Debug::{
 };
 use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
 use windows::Win32::System::Threading::{GetCurrentProcess, TerminateProcess, WaitForSingleObject};
+use windows::core::HRESULT;
 
 use super::{
     AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, WindowsChildImage, sha256_file,
@@ -166,6 +170,7 @@ pub(super) struct WindowsImageDebugSession {
     initial_breakpoints: HashSet<u32>,
     pending_event: Option<(u32, u32, DEBUG_EVENT_CODE)>,
     root_exit_observed: bool,
+    cancellation: Option<Arc<AtomicBool>>,
 }
 
 impl WindowsDirectoryLease {
@@ -343,11 +348,16 @@ impl WindowsReplacementLease {
             initial_breakpoints: HashSet::new(),
             pending_event: None,
             root_exit_observed: false,
+            cancellation: None,
         })
     }
 }
 
 impl WindowsImageDebugSession {
+    pub(super) fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
+        self.cancellation = Some(cancellation);
+    }
+
     fn next_event(
         &mut self,
         deadline: Instant,
@@ -358,7 +368,12 @@ impl WindowsImageDebugSession {
                 "managed_process.atomic_windows_debug_event_still_pending",
             ));
         }
-        let event = wait_for_debug_event_until(deadline, timeout_message)?;
+        let event = match self.cancellation.as_deref() {
+            Some(cancellation) => {
+                wait_for_cancellable_debug_event(deadline, timeout_message, cancellation)?
+            }
+            None => wait_for_debug_event_until(deadline, timeout_message)?,
+        };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
         Ok(event)
     }
@@ -508,9 +523,10 @@ impl WindowsImageDebugSession {
                 let remaining = self.processes.len();
                 let held = self.held_package_processes.len();
                 let elapsed_ms = started.elapsed().as_millis();
+                let native_exit_code = unsafe { event.u.ExitProcess.dwExitCode };
                 warp_core::safe_eprintln!(
-                    safe: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held}"),
-                    full: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held}")
+                    safe: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code}"),
+                    full: ("managed_process.windows_npm_phase phase=root_exit_continued elapsed_ms={elapsed_ms} remaining_debug_processes={remaining} held_process_count={held} native_exit_code={native_exit_code}")
                 );
             }
             if self.root_exit_observed && self.processes.is_empty() {
@@ -805,6 +821,8 @@ impl WindowsImageDebugSession {
             ));
         }
         self.root_process_id = root_process_id;
+        // 调用方已经终止精确 Job；停止请求不能再次打断原线程的事件收敛。
+        self.cancellation = None;
         if let Some(container) = container {
             for process in self.processes.values() {
                 request_debugged_process_termination(container, process)?;
@@ -1621,6 +1639,33 @@ fn wait_for_debug_event(timeout_ms: u32) -> io::Result<DEBUG_EVENT> {
     let mut event = DEBUG_EVENT::default();
     unsafe { WaitForDebugEvent(&mut event, timeout_ms) }.map_err(io::Error::other)?;
     Ok(event)
+}
+
+fn wait_for_cancellable_debug_event(
+    deadline: Instant,
+    timeout_message: &'static str,
+    cancellation: &AtomicBool,
+) -> io::Result<DEBUG_EVENT> {
+    loop {
+        if cancellation.load(Ordering::Acquire) {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "managed_process.atomic_windows_probe_cancelled",
+            ));
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
+        }
+        // Windows 调试接口必须留在创建进程的线程；控制监听只设置停止标记。
+        let interval = remaining.min(Duration::from_millis(100));
+        let mut event = DEBUG_EVENT::default();
+        match unsafe { WaitForDebugEvent(&mut event, interval.as_millis().max(1) as u32) } {
+            Ok(()) => return Ok(event),
+            Err(failure) if failure.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => {}
+            Err(failure) => return Err(io::Error::other(failure)),
+        }
+    }
 }
 
 fn wait_for_debug_event_until(

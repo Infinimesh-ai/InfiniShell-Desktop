@@ -1172,6 +1172,7 @@ fn repeated_root_image_requires_same_file_identity_and_contents() {
         initial_breakpoints: HashSet::new(),
         pending_event: None,
         root_exit_observed: false,
+        cancellation: None,
     };
     assert!(session.verify_root_image(&file).is_ok());
     let copy = fixture.bin.join("same-name-copy.exe");

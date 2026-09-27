@@ -2507,6 +2507,21 @@ pub(crate) fn run_worker(path: &Path, execute: bool) -> io::Result<()> {
 #[cfg(not(target_os = "macos"))]
 fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io::Result<()> {
     prepare_supervisor()?;
+    #[cfg(windows)]
+    let cooperative_probe =
+        if manifest.atomic_launch_kind == Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) {
+            read_worker_launch_binding(
+                path.parent()
+                    .ok_or_else(|| io::Error::other("缺少托管记录目录"))?,
+                manifest,
+                bytes,
+            )?
+            .is_some_and(|binding| {
+                binding.kind == Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
+            })
+        } else {
+            false
+        };
     let mut control = connect_authorized(manifest.parent_control, manifest)?;
     control.set_read_timeout(None)?;
     let child_listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))?;
@@ -2523,6 +2538,14 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
     let mut tree = ManagedTree::claim(command.spawn()?)?;
     // 严格 Job/进程组已经就绪后才发送授权，内部 worker 此前不能派生真实 CLI。
     let execution_control = accept_authorized(&child_listener, manifest)?;
+    #[cfg(windows)]
+    let mut execution_control = if cooperative_probe {
+        Some(execution_control)
+    } else {
+        drop(execution_control);
+        None
+    };
+    #[cfg(not(windows))]
     drop(execution_control);
     let mut child_input = tree
         .child_mut()
@@ -2567,8 +2590,19 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
             Err(mpsc::RecvTimeoutError::Disconnected) => break ExitReason::HostDisconnected,
         }
     };
-    // 给 stdin EOF 一个有界的原生收尾窗口；不以该窗口或空闲状态代替最终组/Job 验证。
-    let graceful_deadline = Instant::now() + GRACEFUL_EXIT_TIMEOUT;
+    let graceful_timeout = GRACEFUL_EXIT_TIMEOUT;
+    #[cfg(windows)]
+    let graceful_timeout = if reason != ExitReason::NativeExit
+        && let Some(control) = execution_control.as_mut()
+    {
+        // 仅此已验证探针通过原认证流请求清理；0.1s 写入 + 8s 协作 + 10s Job 确认小于外层 20s。
+        let _ = probe_control::request_stop(control);
+        probe_control::COOPERATIVE_EXIT_TIMEOUT
+    } else {
+        graceful_timeout
+    };
+    // 收尾窗口不证明清理完成，后面仍须原进程树及候选 ACL/profile 清理核验。
+    let graceful_deadline = Instant::now() + graceful_timeout;
     while !tree.root_exited()? && Instant::now() < graceful_deadline {
         thread::sleep(Duration::from_millis(10));
     }
@@ -2769,11 +2803,25 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
         .map_err(io::Error::other)?
         .parse::<SocketAddr>()
         .map_err(io::Error::other)?;
-    drop(connect_authorized(address, manifest)?);
+    let execution_control = connect_authorized(address, manifest)?;
     let directory = path
         .parent()
         .ok_or_else(|| io::Error::other("缺少托管记录目录"))?;
-    if let Some(binding) = read_worker_launch_binding(directory, manifest, manifest_bytes)? {
+    let binding = read_worker_launch_binding(directory, manifest, manifest_bytes)?;
+    #[cfg(windows)]
+    let cancellation = if binding.as_ref().is_some_and(|binding| {
+        binding.kind == Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1)
+    }) {
+        Some(probe_control::CancellationListener::start(
+            execution_control,
+        )?)
+    } else {
+        drop(execution_control);
+        None
+    };
+    #[cfg(not(windows))]
+    drop(execution_control);
+    if let Some(binding) = binding {
         match binding.kind {
             Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) => {
                 #[cfg(unix)]
@@ -2815,7 +2863,16 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
             }
             Some(AtomicLaunchKind::CodexWindowsNpmVersionProbeV1) => {
                 #[cfg(windows)]
-                return npm_windows_probe::execute(manifest, directory);
+                return npm_windows_probe::execute(
+                    manifest,
+                    directory,
+                    cancellation
+                        .as_ref()
+                        .ok_or_else(|| {
+                            io::Error::other("managed_process.npm_probe_control_missing")
+                        })?
+                        .token(),
+                );
                 #[cfg(not(windows))]
                 return Err(io::Error::other("Windows Codex npm 探针不能在其他平台执行"));
             }
@@ -3233,6 +3290,9 @@ mod npm_probe;
 #[cfg(windows)]
 #[path = "managed_process_npm_probe_windows.rs"]
 mod npm_windows_probe;
+#[cfg(any(windows, test))]
+#[path = "managed_process_probe_control.rs"]
+mod probe_control;
 #[path = "managed_process_version_probe.rs"]
 mod version_probe;
 

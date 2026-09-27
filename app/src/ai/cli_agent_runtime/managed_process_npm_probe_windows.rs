@@ -7,6 +7,8 @@ use std::io::{self, Read as _, Seek as _, Write as _};
 use std::os::windows::ffi::OsStringExt as _;
 use std::os::windows::fs::OpenOptionsExt as _;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
@@ -332,7 +334,11 @@ fn dos_directory_path(lease: &WindowsDirectoryLease) -> io::Result<PathBuf> {
     Ok(normalized)
 }
 
-pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Result<()> {
+pub(super) fn execute(
+    manifest: &Manifest,
+    record_directory: &Path,
+    cancellation: Arc<AtomicBool>,
+) -> io::Result<()> {
     let input = ProbeInputs {
         program: manifest.executable.clone(),
         arguments: manifest.arguments.clone(),
@@ -429,6 +435,7 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
     executable.verify_for_spawn()?;
     cwd.verify_for_spawn()?;
     let mut debugger = executable.prepare_image_debug_session()?;
+    debugger.bind_cancellation(cancellation);
     let mut process =
         command::windows::AppContainerProbe::spawn_package_suspended_with_execution_cwd(
             executable.execution_path(),

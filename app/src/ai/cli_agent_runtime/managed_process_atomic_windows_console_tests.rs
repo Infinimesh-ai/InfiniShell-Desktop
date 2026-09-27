@@ -3,6 +3,62 @@ use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 use super::*;
 
 #[test]
+#[ignore = "取消后必须在严格 Job 中收敛真实调试事件和 AppContainer"]
+fn npm_cancel_before_initial_event_confirms_cleanup_without_running_child() {
+    let name =
+        "console_binding::npm_cancel_before_initial_event_confirms_cleanup_without_running_child";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let mut fixture = PackageProbeFixture::with_bound_child(true);
+    fixture
+        .debugger
+        .bind_cancellation(Arc::new(AtomicBool::new(true)));
+    fixture.process.resume().unwrap();
+
+    let failure = fixture
+        .debugger
+        .verify_package_initial_image_in_container(&fixture.process)
+        .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    fixture.finish();
+    record_debug_native_exit(name);
+}
+
+#[test]
+#[ignore = "根进程已获准后取消仍须逐句柄确认退出并恢复 ACL"]
+fn npm_cancel_after_initial_event_confirms_cleanup_without_running_child() {
+    let name =
+        "console_binding::npm_cancel_after_initial_event_confirms_cleanup_without_running_child";
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let mut fixture = PackageProbeFixture::with_bound_child(true);
+    let cancellation = Arc::new(AtomicBool::new(false));
+    fixture.debugger.bind_cancellation(cancellation.clone());
+    fixture.process.resume().unwrap();
+    fixture
+        .debugger
+        .verify_package_initial_image_in_container(&fixture.process)
+        .unwrap();
+    cancellation.store(true, Ordering::Release);
+
+    let failure = fixture
+        .debugger
+        .drain_package_in_container_until_exit(&fixture.process)
+        .unwrap_err();
+
+    assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
+    fixture.finish();
+    record_debug_native_exit(name);
+}
+
+#[test]
 fn npm_console_binding_requires_explicit_package_mode() {
     let fixture = Fixture::new();
     let mut lease = prepare(&fixture.expected()).unwrap();
