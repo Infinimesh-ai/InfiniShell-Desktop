@@ -31,16 +31,14 @@ fn idle_connection_outlives_its_handshake_timeout() {
         .set_read_timeout(Some(Duration::from_millis(1)))
         .unwrap();
     let mut listener = CancellationListener::start(control).unwrap();
-    assert_eq!(listener.control.read_timeout().unwrap(), None);
-    peer.set_read_timeout(Some(Duration::from_millis(30)))
-        .unwrap();
+    let (clock_sender, clock) = mpsc::channel::<()>();
 
-    // 用一次有界真实读取跨过缩短的旧握手期限，不用 sleep 猜测线程调度。
-    let failure = peer.read(&mut [0_u8; 1]).unwrap_err();
-    assert!(matches!(
-        failure.kind(),
-        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
-    ));
+    // 独立计时跨过旧握手期限及多个轮询片，不让控制 socket 经历接收超时。
+    assert_eq!(
+        clock.recv_timeout(Duration::from_millis(350)),
+        Err(mpsc::RecvTimeoutError::Timeout)
+    );
+    drop(clock_sender);
     assert!(!listener.token().load(Ordering::Acquire));
     request_stop(&mut peer).unwrap();
     wait_for_reader(&mut listener);

@@ -9,6 +9,7 @@ use std::time::Duration;
 
 pub(super) const COOPERATIVE_EXIT_TIMEOUT: Duration = Duration::from_secs(8);
 const STOP_WRITE_TIMEOUT: Duration = Duration::from_millis(100);
+const CANCELLATION_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 pub(super) fn request_stop(stream: &mut TcpStream) -> io::Result<()> {
     let result = stream
@@ -20,7 +21,6 @@ pub(super) fn request_stop(stream: &mut TcpStream) -> io::Result<()> {
 }
 
 pub(super) struct CancellationListener {
-    control: TcpStream,
     cancelled: Arc<AtomicBool>,
     reader: Option<JoinHandle<()>>,
 }
@@ -28,21 +28,30 @@ pub(super) struct CancellationListener {
 impl CancellationListener {
     /// 调用方必须先核对原握手和完整 launch binding，不能接受其他来源的连接。
     pub(super) fn start(control: TcpStream) -> io::Result<Self> {
-        // 握手的十秒期限不是任务时限；空闲探针必须继续等待真实停止或连接断开。
+        // Windows 接收超时后的连接不能继续复用；改用非阻塞读取及可唤醒的短等待。
         control.set_read_timeout(None)?;
-        let mut reader_control = control.try_clone()?;
+        control.set_nonblocking(true)?;
+        let mut reader_control = control;
         let cancelled = Arc::new(AtomicBool::new(false));
         let reader_cancelled = Arc::clone(&cancelled);
         let reader = thread::Builder::new()
             .name("cli-npm-cancel".to_owned())
             .spawn(move || {
                 let mut request = [0_u8; 1];
-                // 协议只允许一次停止。停止、EOF、读取错误或其他字节均取消，不输出内容。
-                let _ = reader_control.read(&mut request);
-                reader_cancelled.store(true, Ordering::Release);
+                while !reader_cancelled.load(Ordering::Acquire) {
+                    match reader_control.read(&mut request) {
+                        Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                            thread::park_timeout(CANCELLATION_POLL_INTERVAL);
+                        }
+                        // 停止、EOF、其他错误或非预期字节均取消，不输出控制内容。
+                        Ok(_) | Err(_) => {
+                            reader_cancelled.store(true, Ordering::Release);
+                            break;
+                        }
+                    }
+                }
             })?;
         Ok(Self {
-            control,
             cancelled,
             reader: Some(reader),
         })
@@ -55,9 +64,10 @@ impl CancellationListener {
 
 impl Drop for CancellationListener {
     fn drop(&mut self) {
-        // 即使正常执行没有收到停止字节，也须唤醒阻塞读取并回收本次监听线程。
-        let _ = self.control.shutdown(Shutdown::Both);
+        // 先发布取消再唤醒；unpark 令牌会保留，覆盖读取结束但尚未 park 的竞态。
+        self.cancelled.store(true, Ordering::Release);
         if let Some(reader) = self.reader.take() {
+            reader.thread().unpark();
             let _ = reader.join();
         }
     }
