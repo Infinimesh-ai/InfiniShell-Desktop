@@ -373,8 +373,8 @@
     "interrupted_parallel_batch": "三代理按不重叠写入域继续安装来源事务、受审命令、远程原生图片消费者；主代理整合共享RPC/插件/GUI/状态。",
     "localization_review": "固定技能、受审命令及命令+技能组合、远程Codex/Grok菜单/帮助/失败、Claude原图消费和未知状态说明均同步英中。Grok npm/Homebrew无需新增文案，复用更新状态。本地 cargo check 与 i18n 11 项通过；真实双语布局后置。",
     "remaining_code_scope": [
-      "主要G01–G10入口已接线，Claude图片多技能已提交，Grok图片技能本增量已接；不能称代码存在即全部功能可用。",
-      "Windows真实npm候选探针仍拒绝系统conhost子映像，保持拒绝并单独定位；失败清理本轮已确认。其它安装布局/原生策略限制和真实平台链仍按缺项保留，未获用户范围删减。"
+      "G01–G10主要产品入口已接线；P0–P5限定调用链复核未发现缺项清单之外的确定接线缺口，但代码存在不等于原功能全部可用或已验收。",
+      "Windows Codex npm真实事务仍未成功：精确conhost依赖已接入，不再将旧的未绑定conhost拒绝写作当前唯一阻断。49ea本轮失败清理已确认，但原生拒绝访问对象未定；最新ae427诊断结果按其同提交收据另记。其它安装布局、原生限制与真实平台链仍保留。"
     ],
     "g08_grok_remote_in_progress": "远端ticket/专属leader服务、有界RPC、真实PTY wrapper及固定1.0.41 exec已接线；同连接/终端/代次门禁、同步撤销、查询恢复、GUI caller、重启关联与收起输入框的native事件入口已整合。当前Mac ARM64/Linuxx64远端、Mac ARM64/Linuxx64/Windowsx64客户端，未验收。",
     "g09_codex_npm_code": {
@@ -934,7 +934,8 @@
       "result": "两项独立只读复核未发现确定的产品入口漏接；不把固定父权限/版本限制或未验原生能力改写为已完成。",
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
-    }
+    },
+    "next_work_order": "遵循用户先完成代码、修复和测试后置的安排：收口已启动的ae4279e48同提交Windows运行并封存原件，不因猜测拒绝对象继续追加诊断或自动重跑功能矩阵。完整GUI、中文输入法、认证模型及已知功能失败的联测修复留待用户在场；Goal仍active且完成条件未缩减。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1991,10 +1992,10 @@
       "diagnostics_followup": {
         "date": "2026-09-27",
         "implementation_commit": "ae4279e480fc34068934b46d7227cd64b3edc610",
-        "status": "ae4279e48已提交推送；本地门禁通过，同提交Windows定向CI进行中，G09不关闭",
+        "status": "ae4279e48已提交推送；本地及同提交Windows编译/定向回归通过，真实npm首updated仍ProbeFailed；按用户要求封存后留待联测修复，G09不关闭",
         "scope": "仅Windows Codex npm诊断：四下载角色区分request/response/body失败；已验证进程映像的CREATE/EXIT在Continue成功后记录固定角色、原生退出码、剩余角色及normal/cleanup；不新增授权或放宽隔离/清理/下载判定。",
-        "clock": "新增事件及root_exit_continued统一session创建时起算；旧drain时钟收据不回填。normal并不证明自然退出。",
-        "tests": "新增3项Windows普通回归，扩展既有Continue失败状态保留断言；Windows执行待同提交验证。",
+        "clock": "新增CREATE/EXIT及root_exit_continued统一session创建时起算；probe固定阶段仍用spawn后自身起点，两个时钟不能直接相减。旧drain时钟收据不回填；normal并不证明自然退出。",
+        "tests": "新增3项Windows普通诊断回归及既有Continue失败状态保留断言，在本轮同提交首次通过。",
         "archive": "validation/windows-npm-event-diagnostics-20260927",
         "local_gates": {
           "platform": "macos-arm64",
@@ -2014,7 +2015,7 @@
           "run_id": 36285301933,
           "head_sha": "ae4279e480fc34068934b46d7227cd64b3edc610",
           "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36285301933",
-          "status": "in_progress",
+          "status": "completed",
           "platforms": [
             "windows-x64"
           ],
@@ -2022,8 +2023,44 @@
           "linux_unchanged": true,
           "full_workspace": false,
           "gui_or_model": false,
-          "scope": "Windows编译、角色/退出码诊断回归、原生取消边界及固定Codex npm事务；不继承49ea旧结果。"
-        }
+          "scope": "Windows编译、主组990项、command7项及原生atomic9项通过；真实Codex npm更新首个CMD候选失败，清理确认成功。",
+          "conclusion": "failure",
+          "job_id": 108524816750,
+          "ordinary": "主组990项全部通过，6832项跳过；control6项首次通过，Drop0.121秒。",
+          "native": "command7项和显式atomic9项通过；Continue失败保留pending与原生取消边界通过，未以其他提交结果代替。",
+          "npm": {
+            "scenario": "updated",
+            "entry": "cmd",
+            "result": "ProbeFailed",
+            "generation": "8f49df68-14c0-4564-938d-7f18665ac12c",
+            "normal_events": "CREATE root@246ms、console@279ms，cancel_observed=false；未记录已验证node/codex CREATE。",
+            "cleanup_events": "probe时钟240020ms Interrupted；event时钟240126ms root EXIT1，240127ms unknown CREATE及console EXIT1，240128ms unknown EXIT3221225738；均标记cleanup且cancel_observed=true。",
+            "cleanup_confirmed": true,
+            "appcontainer_cleanup_receipt_present": true,
+            "exit_reason": "stop_requested",
+            "outer_worker_exit_code": 1,
+            "interpretation": "退出码仅按原事件角色和cleanup模式记录；未知进程不能推定为Node/Codex。正常未记录相应CREATE不证明从未启动。原拒绝访问字节保留，具体拒绝对象未定。",
+            "not_reached": [
+              "PowerShell候选",
+              "版本发布",
+              "独立恢复场景"
+            ],
+            "libtest_exit_code": 101,
+            "test_duration_seconds": 612.26,
+            "download_failure_diagnostic_present": false
+          },
+          "evidence_archive": "validation/windows-npm-event-diagnostics-20260927/ci-36285301933",
+          "job_log_sha256": "ebb87e37bec75b6be2189235af32fdc3b54b7f43c5fa2d361b8d3bb90f31b291",
+          "original_stderr_sha256": "a7a0d4f99f41e31118ad3114c400c12cb97d98a3cf376fc12a9e1581631edb2b",
+          "original_exit_receipt_sha256": "d1fc9ad42abe6cbc407bfda629d5f540345b3c7c9dee6e8f1efb58fbf50b39ba",
+          "collection": "保存39个原小成员；npm完整44成员目录选取37个，462436958字节大ZIP仅Range215552字节/成员CRC，未核完整ZIP摘要；另2个小ZIP核官方摘要。",
+          "diagnosis": "validation/windows-npm-event-diagnostics-20260927/ci-36285301933/review-summary-01.safe.json",
+          "diagnosis_sha256": "db26756d2cadd5632fc722cfb2150cdeabab72cc7966394ba6a72d9f33d20fec",
+          "recovery_boundary": "prepared-journal为执行前Prepared且probes=[]快照；完整44成员目录无发布后/恢复后版本收据。不能用最终journal缺失替代独立回滚与重启恢复正例。"
+        },
+        "next_work_order": "遵循用户先完成代码、修复和测试后置的安排：收口已启动的ae4279e48同提交Windows运行并封存原件，不因猜测拒绝对象继续追加诊断或自动重跑功能矩阵。完整GUI、中文输入法、认证模型及已知功能失败的联测修复留待用户在场；Goal仍active且完成条件未缩减。",
+        "cache_cleanup_after_gates": "复核摘要、文件身份与lsof无占用后，仅清理本轮已完成的829336552字节可再生libtest缓存，空闲921821184→1751445504字节；应用和全部证据保留。cache-cleanup-02.safe.json。",
+        "documentation_gate": "本轮仅现有状态文档更新，cargo check -p warp通过（1.93秒），无需本地化变更；原产品i18n及同提交CI按上列独立收据复用。"
       }
     }
   }
