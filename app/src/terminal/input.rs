@@ -2716,6 +2716,7 @@ impl Input {
             me.update_cli_agent_editor_text_colors(ctx);
             // Re-sync enter_settings whenever the rich input opens or closes.
             me.update_cli_agent_enter_settings(ctx);
+            me.update_image_context_options(ctx);
             me.set_zero_state_hint_text(ctx);
             ctx.notify();
         });
@@ -3345,7 +3346,10 @@ impl Input {
                     .any(|c| matches!(c.attachment_type, AttachmentType::Image));
                 let vision_supported =
                     LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(me.terminal_view_id));
-                if has_image_chips && !vision_supported {
+                if has_image_chips
+                    && !vision_supported
+                    && !CLIAgentSessionsModel::as_ref(ctx).is_input_open(me.terminal_view_id)
+                {
                     let window_id = ctx.window_id();
                     ToastStack::handle(ctx).update(ctx, |ts, ctx| {
                         ts.add_ephemeral_toast(
@@ -5754,14 +5758,17 @@ impl Input {
 
     pub fn update_image_context_options(&mut self, ctx: &mut ViewContext<Self>) {
         let ai_input_model = self.ai_input_model.as_ref(ctx);
-
-        let llm_prefs = LLMPreferences::as_ref(ctx);
-
-        let vision_supported = llm_prefs.vision_supported(ctx, Some(self.terminal_view_id));
+        let is_cli_agent_input_open =
+            CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.terminal_view_id);
+        // CLI 图片先进入草稿，提交时仍由各 CLI 的身份、版本和格式规则校验。
+        let vision_supported = is_cli_agent_input_open
+            || LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(self.terminal_view_id));
 
         let num_images_attached = self.ai_context_model.as_ref(ctx).pending_images().len();
 
-        let conversation = self.ai_context_model.as_ref(ctx).selected_conversation(ctx);
+        let conversation = (!is_cli_agent_input_open)
+            .then(|| self.ai_context_model.as_ref(ctx).selected_conversation(ctx))
+            .flatten();
 
         let num_images_in_conversation = conversation
             .and_then(|conversation| conversation.get_root_task())
@@ -5772,10 +5779,9 @@ impl Input {
             })
             .count();
 
-        // Image context is available whenever the feature flag is enabled and we're in AI input
-        // mode, including ambient-agent mode
+        // CLI 草稿不受内置 Agent 模型或输入模式锁定影响，仍保留附件数量和处理状态门禁。
         let image_context_options = if FeatureFlag::ImageAsContext.is_enabled()
-            && matches!(ai_input_model.input_type(), InputType::AI)
+            && (is_cli_agent_input_open || matches!(ai_input_model.input_type(), InputType::AI))
         {
             ImageContextOptions::Enabled {
                 unsupported_model: !vision_supported,

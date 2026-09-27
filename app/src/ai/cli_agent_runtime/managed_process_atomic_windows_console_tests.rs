@@ -323,6 +323,153 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
 }
 
 #[test]
+#[ignore = "Windows npm 的 TITLE 后续派生须在真实 AppContainer 中显式验证"]
+fn npm_cmd_title_runs_bound_child_and_confirms_cleanup() {
+    run_cmd_tail_control(
+        "console_binding::npm_cmd_title_runs_bound_child_and_confirms_cleanup",
+        false,
+    );
+}
+
+#[test]
+#[ignore = "Windows npm 的 GOTO/NUL/TITLE 后续派生须在真实 AppContainer 中显式验证"]
+fn npm_cmd_goto_nul_title_runs_bound_child_and_confirms_cleanup() {
+    run_cmd_tail_control(
+        "console_binding::npm_cmd_goto_nul_title_runs_bound_child_and_confirms_cleanup",
+        true,
+    );
+}
+
+fn run_cmd_tail_control(name: &str, with_goto: bool) {
+    if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
+        run_debug_fixture_in_strict_job(name, DEBUG_DRIVER_TIMEOUT);
+        return;
+    }
+    await_debug_driver_authorization();
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    for relative in ["home", "config", "cache", "data", "tmp"] {
+        fs::create_dir(root.join(relative)).unwrap();
+    }
+    let system = prepare_system_directory().unwrap();
+    let program = final_path_from_handle(&system.file)
+        .unwrap()
+        .join("cmd.exe");
+    let child = root.join("bound-child.exe");
+    fs::copy(&program, &child).unwrap();
+    let script = root.join("tail-control.cmd");
+    // 单独的诊断脚本只复现公共入口末行控制流；绑定子映像是 CMD，不替代真实 npm 验收。
+    let tail = if with_goto {
+        r#"endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%" /d /v:off /s /c "echo control-child>tmp\child.txt""#
+    } else {
+        r#"endLocal & title %COMSPEC% & >tmp\title-after.txt echo control-title& "%_prog%" /d /v:off /s /c "echo control-child>tmp\child.txt""#
+    };
+    let contents = format!(
+        "@echo off\r\nsetlocal\r\nset \"_prog=.\\bound-child.exe\"\r\n>tmp\\before.txt echo control-before\r\n{tail}\r\n"
+    );
+    fs::write(&script, contents).unwrap();
+    let script_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&script)
+        .unwrap();
+    let mut lease = prepare(&ExpectedFileIdentity::capture(&program).unwrap()).unwrap();
+    lease
+        .set_package_images(vec![ExpectedFileIdentity::capture(&child).unwrap()])
+        .unwrap();
+    lease.enable_npm_console_host().unwrap();
+    let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
+    let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
+    assert_eq!(execution_cwd.canonicalize().unwrap(), root);
+    let mut environment = super::super::super::version_probe::resolved_environment(&root).unwrap();
+    environment.push(("COMSPEC".into(), program.into_os_string()));
+    let mut debugger = lease.prepare_image_debug_session().unwrap();
+    let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
+        lease.execution_path(),
+        r#"/d /v:off /s /c "tail-control.cmd""#.as_ref(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &environment,
+        &format!("InfiniShell.Version.{}", uuid::Uuid::new_v4()),
+        &[script, child],
+    )
+    .unwrap();
+    let cancellation = Arc::new(AtomicBool::new(false));
+    debugger.bind_cancellation(cancellation.clone());
+    let (completed, completion) = mpsc::channel();
+    // 看门狗只发取消；全部调试事件与清理仍由创建进程的同一线程处理。
+    let watchdog = thread::spawn(move || {
+        if completion.recv_timeout(Duration::from_secs(15)).is_err() {
+            cancellation.store(true, Ordering::Release);
+        }
+    });
+    let result = (|| -> io::Result<u32> {
+        process.resume()?;
+        debugger.verify_package_initial_image_in_container(&process)?;
+        debugger.drain_package_in_container_until_exit(&process)?;
+        process.exit_code()
+    })();
+    let _ = completed.send(());
+    watchdog.join().unwrap();
+    let termination = if result.is_err() {
+        process
+            .terminate_job()
+            .and_then(|()| debugger.drain_terminated_package_in_container(&process))
+    } else {
+        Ok(())
+    };
+    drop(cwd);
+    let receipt = root.join("appcontainer-cleanup-v1");
+    let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
+    drop(script_handle);
+    cleanup.expect("CMD 末行对照无论成功或失败，都必须恢复 ACL、删除 profile 并清空 Job");
+    assert_eq!(
+        fs::read(&receipt).unwrap(),
+        b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n"
+    );
+    // 先记录缺失标记或原生失败，再断言；NUL 对照已证明 errorlevel 可能保持为零。
+    let before = fs::read(root.join("tmp/before.txt"));
+    let child = fs::read(root.join("tmp/child.txt"));
+    let before_matches = before
+        .as_deref()
+        .is_ok_and(|bytes| bytes == b"control-before\r\n");
+    let child_matches = child
+        .as_deref()
+        .is_ok_and(|bytes| bytes == b"control-child\r\n");
+    let title_matches = (!with_goto).then(|| {
+        fs::read(root.join("tmp/title-after.txt")).is_ok_and(|bytes| bytes == b"control-title\r\n")
+    });
+    let native_exit_code = result.as_ref().ok().copied();
+    let failure_kind = result
+        .as_ref()
+        .err()
+        .map(|failure| format!("{:?}", failure.kind()));
+    let os_code = result.as_ref().err().and_then(io::Error::raw_os_error);
+    let case = if with_goto { "goto_nul_title" } else { "title" };
+    eprintln!(
+        "atomic_windows_cmd_tail_control={}",
+        serde_json::json!({
+            "case": case,
+            "native_exit_code": native_exit_code,
+            "failure_kind": failure_kind,
+            "os_code": os_code,
+            "before_marker_matches": before_matches,
+            "title_marker_matches": title_matches,
+            "child_marker_matches": child_matches,
+            "cleanup_confirmed": true,
+        })
+    );
+    assert_eq!(result.unwrap(), 0);
+    assert_eq!(before.unwrap(), b"control-before\r\n");
+    if let Some(title_matches) = title_matches {
+        assert!(title_matches, "TITLE 返回后必须写入精确标记");
+    }
+    assert_eq!(child.unwrap(), b"control-child\r\n");
+    record_debug_native_exit(name);
+}
+
+#[test]
 #[ignore = "Windows npm 缺少进程隔离核验时必须在首事件前停止"]
 fn npm_console_host_rejects_missing_container_guard() {
     let name = "console_binding::npm_console_host_rejects_missing_container_guard";

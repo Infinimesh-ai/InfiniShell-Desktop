@@ -12,16 +12,19 @@ use futures::channel::oneshot;
 use futures::future::{Either, select};
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use warpui::r#async::Timer;
-use warpui::{App, ViewHandle};
+use warpui::{App, TypedActionView, ViewHandle};
 
 use super::*;
 use crate::ai::blocklist::{PendingAttachment, PendingFile};
+use crate::ai::llms::{LLMInfo, LLMPreferences};
 use crate::features::FeatureFlag;
 use crate::persistence::{ModelEvent as PersistenceEvent, WriterHandles};
 use crate::terminal::Event;
+use crate::terminal::cli_agent_sessions::CLIAgentInputEntrypoint;
 use crate::terminal::cli_agent_sessions::event::parse_event;
 use crate::terminal::cli_agent_sessions::grok_leader_input::GrokLeaderInputError;
 use crate::terminal::cli_agent_sessions::listener::CLIAgentSessionListener;
+use crate::terminal::input::InputAction;
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use crate::workspace::{ToastStack, ToastStackEvent};
@@ -186,6 +189,104 @@ async fn received_event(receiver: oneshot::Receiver<()>) {
         Either::Left((result, _)) => result.unwrap(),
         Either::Right((_, _)) => panic!("owned 输入测试未收到预期事件"),
     }
+}
+
+#[test]
+fn owned_grok_image_picker_ignores_builtin_text_only_model() {
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                preferences.add_agent_mode_model_for_test(LLMInfo::new_for_test("text-only"));
+                preferences.set_agent_mode_llm_override(view.view_id, "text-only".into(), ctx);
+            });
+            assert!(!LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(view.view_id)));
+            assert!(view.owned_grok_identity_matches());
+            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+        });
+        terminal.update(&mut app, |view, ctx| {
+            let generation = CLIAgentSessionsModel::as_ref(ctx)
+                .input_generation(view.view_id)
+                .unwrap();
+            view.input.update(ctx, |input, ctx| {
+                input.handle_action(&InputAction::SelectCLIAttachment { generation }, ctx);
+                let options = &input.editor().as_ref(ctx).image_context_options;
+                assert!(options.is_enabled());
+                assert!(!options.is_unsupported_model());
+                // 文件选择与异步图片处理之间的刷新同样不能重新套用内置模型门禁。
+                input.set_is_processing_attached_images(true, ctx);
+                assert!(
+                    !input
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
+                input.set_is_processing_attached_images(false, ctx);
+                assert!(
+                    input
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
+            });
+        });
+    });
+}
+
+#[test]
+fn closing_owned_grok_rich_input_restores_builtin_image_gate() {
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                preferences.add_agent_mode_model_for_test(LLMInfo::new_for_test("text-only"));
+                preferences.set_agent_mode_llm_override(view.view_id, "text-only".into(), ctx);
+            });
+            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+        });
+        terminal.read(&app, |view, ctx| {
+            assert!(
+                view.input
+                    .as_ref(ctx)
+                    .editor()
+                    .as_ref(ctx)
+                    .image_context_options
+                    .is_enabled()
+            );
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.close_cli_agent_rich_input_and_disable_auto_toggle(ctx);
+        });
+        terminal.read(&app, |view, ctx| {
+            let options = &view
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .image_context_options;
+            assert!(!options.is_enabled());
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.set_input_mode_agent(true, ctx);
+            });
+        });
+        terminal.read(&app, |view, ctx| {
+            let options = &view
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .image_context_options;
+            assert!(options.is_unsupported_model());
+        });
+    });
 }
 
 #[test]

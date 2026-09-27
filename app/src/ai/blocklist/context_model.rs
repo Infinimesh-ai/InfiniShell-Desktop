@@ -28,6 +28,7 @@ use crate::ai::document::ai_document_model::AIDocumentId;
 use crate::ai::llms::{LLMPreferences, LLMPreferencesEvent};
 use crate::code_review::github_repo_model::GitHubRepoModel;
 use crate::terminal::TerminalModel;
+use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::event::{BlockCompletedEvent, BlockType};
 use crate::terminal::model::block::{BlockId, BlockMetadata};
 use crate::terminal::model::session::Sessions;
@@ -450,7 +451,9 @@ impl BlocklistAIContextModel {
         );
 
         ctx.subscribe_to_model(&LLMPreferences::handle(ctx), |me, _, event, ctx| {
-            if let LLMPreferencesEvent::UpdatedActiveAgentModeLLM = event {
+            if let LLMPreferencesEvent::UpdatedActiveAgentModeLLM = event
+                && !CLIAgentSessionsModel::as_ref(ctx).is_input_open(me.terminal_surface_id)
+            {
                 let llm_prefs = LLMPreferences::as_ref(ctx);
                 let vision_supported =
                     llm_prefs.vision_supported(ctx, Some(me.terminal_surface_id));

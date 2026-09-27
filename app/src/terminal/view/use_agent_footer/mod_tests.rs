@@ -16,8 +16,10 @@ use crate::ai::blocklist::block::cli_controller::UserTakeOverReason;
 use crate::ai::blocklist::model::{
     AIBlockModel, AIBlockOutputStatus, AIRequestType, OutputStatusUpdateCallback,
 };
-use crate::ai::blocklist::{AIBlock, ClientIdentifiers, InputConfig, InputType};
-use crate::ai::llms::LLMId;
+use crate::ai::blocklist::{
+    AIBlock, ClientIdentifiers, InputConfig, InputType, PendingAttachment, PendingFile,
+};
+use crate::ai::llms::{LLMId, LLMInfo, LLMPreferences};
 use crate::features::FeatureFlag;
 use crate::settings::AISettings;
 use crate::terminal::cli_agent_sessions::{
@@ -29,6 +31,7 @@ use crate::terminal::shared_session::SharedSessionSource;
 use crate::terminal::{CLIAgent, Event};
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
+use crate::workspace::{ToastStack, ToastStackEvent};
 
 #[test]
 fn deepseek_uses_bracketed_paste_submission() {
@@ -696,6 +699,129 @@ fn test_image(data: &str, filename: &str) -> ImageContext {
 }
 
 #[test]
+fn grok_rich_input_keeps_images_when_another_pane_changes_builtin_model() {
+    App::test((), |mut app| async move {
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let other = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                preferences.add_agent_mode_model_for_test(LLMInfo::new_for_test("text-only"));
+                preferences.add_agent_mode_model_for_test(LLMInfo::new_for_test("other-text-only"));
+                preferences.set_agent_mode_llm_override(view.view_id, "text-only".into(), ctx);
+            });
+        });
+        let revision = terminal.update(&mut app, |view, ctx| {
+            assert!(!LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(view.view_id)));
+            view.input.update(ctx, |input, ctx| {
+                input.insert_into_cli_agent_rich_input("保留 Grok 图片草稿", ctx);
+            });
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_images(vec![test_image("aGVsbG8=", "grok.png")], ctx);
+                model.pending_attachments_revision()
+            })
+        });
+        let toasts = Rc::new(RefCell::new(Vec::new()));
+        let captured = toasts.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event {
+                    captured.borrow_mut().push(toast.main_text().to_owned());
+                }
+            });
+        });
+
+        other.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                preferences.set_agent_mode_llm_override(
+                    view.view_id,
+                    "other-text-only".into(),
+                    ctx,
+                );
+            });
+        });
+
+        terminal.read(&app, |view, ctx| {
+            let context = view.ai_context_model.as_ref(ctx);
+            assert_eq!(
+                context.pending_images(),
+                vec![&test_image("aGVsbG8=", "grok.png")]
+            );
+            assert_eq!(context.pending_attachments_revision(), revision);
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                "保留 Grok 图片草稿"
+            );
+        });
+        assert!(toasts.borrow().is_empty());
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn builtin_text_only_model_still_removes_images_and_preserves_files() {
+    App::test((), |mut app| async move {
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let terminal = add_window_with_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                let mut vision_model = LLMInfo::new_for_test("vision");
+                vision_model.vision_supported = true;
+                preferences.add_agent_mode_model_for_test(vision_model);
+                preferences.add_agent_mode_model_for_test(LLMInfo::new_for_test("text-only"));
+                preferences.set_agent_mode_llm_override(view.view_id, "vision".into(), ctx);
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            assert!(!view.has_active_cli_agent_input_session(ctx));
+            assert!(LLMPreferences::as_ref(ctx).vision_supported(ctx, Some(view.view_id)));
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_attachments(
+                    vec![
+                        PendingAttachment::Image(test_image("aGVsbG8=", "builtin.png")),
+                        PendingAttachment::File(PendingFile {
+                            file_name: "keep.txt".into(),
+                            file_path: "keep.txt".into(),
+                            mime_type: "text/plain".into(),
+                        }),
+                    ],
+                    ctx,
+                );
+            });
+        });
+        let toasts = Rc::new(RefCell::new(Vec::new()));
+        let captured = toasts.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event {
+                    captured.borrow_mut().push(toast.main_text().to_owned());
+                }
+            });
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            LLMPreferences::handle(ctx).update(ctx, |preferences, ctx| {
+                preferences.set_agent_mode_llm_override(view.view_id, "text-only".into(), ctx);
+            });
+        });
+
+        terminal.read(&app, |view, ctx| {
+            let context = view.ai_context_model.as_ref(ctx);
+            assert!(context.pending_images().is_empty());
+            assert_eq!(context.pending_files().len(), 1);
+            assert_eq!(context.pending_files()[0].file_name, "keep.txt");
+        });
+        assert_eq!(
+            *toasts.borrow(),
+            vec![crate::t!("editor-images-removed-model-unsupported")]
+        );
+    });
+}
+
+#[test]
 fn grok_rich_input_keeps_multiline_utf8_without_injecting_paste_or_enter() {
     App::test((), |mut app| async move {
         let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
@@ -971,9 +1097,20 @@ fn voice_transcription_producer_preserves_multiline_and_drops_stale_results() {
 #[test]
 fn grok_clipboard_and_rich_images_are_gated_without_clearing_draft() {
     App::test((), |mut app| async move {
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
         let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
         let writes = collect_cli_test_writes(&mut app, &terminal);
         terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.update_image_context_options(ctx);
+                assert!(
+                    input
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
+            });
             view.ai_context_model.update(ctx, |model, ctx| {
                 model.append_pending_images(vec![test_image("aGVsbG8=", "grok.png")], ctx)
             });
@@ -1188,6 +1325,7 @@ mod file_submission_tests;
 fn rich_cli_picker_without_plugin_uses_attachment_flow_and_preserves_shell_lock() {
     for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
         App::test((), move |mut app| async move {
+            let _images = FeatureFlag::ImageAsContext.override_enabled(true);
             let terminal = prepare_rich_cli_test(&mut app, agent);
             let writes = collect_cli_test_writes(&mut app, &terminal);
             let selected = Rc::new(RefCell::new(0));
@@ -1235,6 +1373,13 @@ fn rich_cli_picker_without_plugin_uses_attachment_flow_and_preserves_shell_lock(
                 assert_eq!(input.buffer_text(ctx), "保留草稿");
                 assert!(!input.ai_input_model().as_ref(ctx).input_type().is_ai());
                 assert!(input.ai_input_model().as_ref(ctx).is_input_type_locked());
+                assert!(
+                    input
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
                 assert!(view.ai_context_model.as_ref(ctx).pending_files().is_empty());
             });
         });
