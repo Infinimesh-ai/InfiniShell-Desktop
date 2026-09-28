@@ -4,6 +4,38 @@
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
 
+**2026-09-28 Homebrew 回滚预检增量 `91fa953f882d54952d81067903e769d42821927e` 与整合提交 `7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8`**：在首次回滚写入前一并检查主树、公共入口、补全与别名的当前/暂存状态，拒绝预先存在的外部修改；已恢复、已领取或合法清理阶段仍可恢复并重复调用。新增六项真实文件系统回归在旧实现上1通过/5失败，修复后6通过；本机更新模块213项、i18n11项、`cargo check --locked -p warp`通过，nextest零重试。此修复只保证在回滚开始前拒绝已存在的不一致，不保证并发写入下跨文件原子性；真实消费者Homebrew来源发现、brew升级、GUI及原生官方映像事务未重验。无需本地化变更，未新增双语布局结论。
+
+专项 [run36417868874](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36417868874) 因后续整合矩阵覆盖其范围而主动取消：Linux六项新回归逐名通过，主套件1395项、IPC2项、Node只读绑定1项、command1项通过，无重试；取消时正在构建监督worker。Windows未执行nextest，不能计作双平台通过。原日志与两份官方工件保留于 `resume-20260928/brew-rollback-preflight/remote-01`，summary SHA `e0645c8a4b2d628f57bdfe9b0c41a50ed5a21ba64248482e7263932f84ed854a`，104文件索引SHA `2e8df160691b66f2d96c43928f963c76f378b948c819a852071b110de1c3a204`。
+
+`7dd68cc9b` 另将不需重绑定的OAuth回调用例移到系统分配端口，避免与取消测试共用低位端口池；取消测试保持100轮立即同址单次重绑定，并增加轮次/地址诊断，生产OAuth逻辑未改。本机OAuth6项及cargo check通过。原Windows10048现场没有端口持有者证据，因此只确认夹具竞争窗口被消除，不认定原失败唯一根因。普通双平台整合验证 [run36419778583](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36419778583) 正在进行，main仍待门禁；四份Homebrew源码与91fa逐字节一致。本轮临时目录在证据归档、退出及身份核验后全部删除，固定根保留说明与逐轮记录。G09、14项必要缺口及原Windows Node/npm失败均保持开放。
+
+**2026-09-28 main 基线整合 `e5f50d9fcfcc03344b5bfe02360bdf91e11cfd96`**：保留父提交 `7ec006739` 与 `693172a26` 的历史，整合主线8项提交及CLI Agent分支。MCP 2.2迁移、Vim行对象、POSIX `--`补全、Bash取消和GUI焦点修复保留；合并调整仅为7个新增CI步骤继承普通/专项门禁、Bash模板局部SC2157说明和本地化计数。同提交远验已出现Windows失败，main尚未更新；不把阶段合并解释为完整Goal验收。
+
+本地 `cargo check --locked`、`cargo check --locked -p warp`、ShellCheck和两种Bash取消回归通过；MCP/AI/Vim/补全602项、补全v2 128项、i18n11项，以及短内盘临时目录的GUI/TUI/CLI联合回归2484项通过。另3项真实多进程用例使用已有 `rust-embed/debug-embed` 嵌入资源后串行通过，分别55.582/54.575/55.244秒；测试运行器总预算180秒包含825MB副本复制与摘要，产品30秒握手不变。不同套件与feature组合不相加为唯一总数。首轮24失败/3超时、第二轮3超时及后续诊断失败与中断均保留：短内盘路径修正0775祖先拒绝、SUN_LEN和EXDEV；launchd helper曾在外置源码本地化文件open阻塞数分钟后自行解除，底层原因未确定，不声明TCC已确诊。旧6个专有服务已精确撤销。原件见 `resume-20260928/main-baseline-merge`，本地摘要SHA `e96fdc2e2174acfd17b352745fc48037a0f8d448692914ad89911dc2dbc50d83`。
+
+远端普通Linux/Windows验证 [run36411332886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36411332886) 最终 **failure**：Linux成功，Windows失败，两平台 `cargo check` 均通过。新增7个上游步骤均实际执行；Windows AI套件失败后，v2与desktop/TUI仍继续执行并通过。实际套件分别计数如下，不相加为唯一测试总数，跳过不计通过。
+
+| 套件 | Linux x64 | Windows x64 |
+|---|---|---|
+| 主agent/CLI回归 | 3239通过 | 3063通过 |
+| IPC帧限制 | 2通过 | 2通过 |
+| Node glibc只读绑定（不执行Node） | 1通过 | 未设此步骤 |
+| remote image合同 | 5通过 | 5通过 |
+| shared CLI合同 | 76通过 | 76通过 |
+| CLI harness | 129通过 | 129通过 |
+| 双语TUI消息 | 9通过 | 9通过 |
+| command进程归属 | 1通过 | 22通过 |
+| 宿主崩溃清理 | 5通过 | 5通过 |
+| MCP/AI/Vim/补全 | 602通过、4跳过 | 595选中：594通过、1失败；另7跳过 |
+| completion v2 | 128通过、4跳过 | 116通过、7跳过 |
+| desktop/TUI输入 | 660通过 | 660通过 |
+| rust-genai | 81通过 | 81通过 |
+
+Windows唯一失败为 `ai grok_subscription::oauth::tests::cancelling_loopback_wait_releases_listener`，在 `crates/ai/src/grok_subscription/oauth_tests.rs:126:36` 取消回调监听后重绑端口返回 `10048 / AddrInUse`；不是MCP迁移断言失败，底层原因待查，不能仅凭此认定TIME_WAIT。两平台完整nextest日志未见TRY/RETRY/FLAKY，未重试失败；Windows主回归运行680.774秒、desktop/TUI运行159.744秒，其余步骤时间包含编译。Linux Bash取消、两平台通知/安装器与原生恢复清理边界通过，详细脚本计数和范围见摘要。Grok监督四场景均确认清理；ACP私有leader未随stdio EOF自然退出，Linux清理码-9、Windows1，不称全部自然退出。Windows收尾另清理vctip2776、sccache26488、conhost31388，无法归属case，不声明整机零残留。Windows Codex生产安装器使用0.147.0夹具，私有根已删除，其收据不宣称原生hook、GUI或监督进程树清理；固定0.156.1 hook/ConPTY另有独立步骤。
+
+原件 `resume-20260928/main-baseline-merge/remote-01`：summary SHA `89568e89ab470e021ccc876d995bd6cdd2ea2cc357e9160f2c9ec01947532b79`，253文件索引（不含索引自身）SHA `24494b6d1a9a9254236807324f42437a31e0beb7ec9c33544bbd8d518faf6bee`。完整run/jobs日志、12个官方artifact ZIP/47成员已归档，官方digest、ZIP CRC和成员SHA逐项核验；独立job日志与run ZIP全量成员一致。该结果只绑定e5提交，不含后续Homebrew修复；main仍待处理此次失败。Mac Intel、全workspace、真实npm/Homebrew更新、Windows NUL/Node已知失败对照及GUI/模型未选。无需新增本地化文案，两语各6080键及变量一致；不扩大历史双语布局通过范围。按用户指示采用[固定内盘临时目录与即时/每日清理约定](../../docs/local-test-storage.zh-CN.md)。G09和14项必要缺口继续开放，Windows原Node/npm失败不因基线整合关闭。
+
 **2026-09-28 Mac Claude Homebrew恢复增量 `ae37daf19d86005883b8f64b3bb71f57b336843c`**：修复非Committed事务恢复先回退公共入口、再发现新树或旧backup被外改而留下断链的顺序缺陷。生产路径在任何回滚写入前预检两树及公共链接/link-stage，保留交换前后复核与既有来源/prefix/锁门禁。新增新树外改拒绝、旧backup外改拒绝和正常恢复三项回归；不将其外推为completion/alias等任意跨artifact改动的原子保证。本地Python15项、i18n11项、更新模块207项、cargo check/build、定向格式和diffcheck通过；7923项未选测试不计通过。无需本地化变更，既有状态语义未改，本轮没有新双语布局结论。
 
 本轮新编译worker `0034a2b9d1ba0b600e43f191735c58e4ccf404f9bb3408dfa644008c27d855c9`、新签名supervisor `cbde99a96246d6c7ed5f10ed7e28700f7a41b8c259811c6b125c26609df37efb`，16份绑定文件与该提交Git blob一致；130项资源沿用已核模板，ARM64/ad-hoc严格签名通过。在新私有APFS卷中，固定Claude `2.1.278→2.1.280`、`claude-code@latest`四场景983.931秒退出0：正常更新实际入口2.1.280；交换后缺少完成记录由不同PID冷恢复完整旧树/link身份，实际2.1.278；外部改动恢复拒绝且保持新树/link、marker、旧backup与原journal，实际2.1.280；Prepared候选改动在启动前拒绝，完整旧树及2.1.278入口保持，probe=null且零generation。三条候选原生exit0、退出绑定及job/coalition清理链独立通过；最后一项仅未启动、无候选需清理，不算第四次清理实测。执行开始/结束工作区干净，源码、输入及产物摘要保持，零模型输入。

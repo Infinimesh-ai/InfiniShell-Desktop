@@ -1507,8 +1507,8 @@
     "joint_test_app": "本批UI修正已包含在当前外置盘联测包，路径见current_macos_joint_test_bundle。旧2d159360a准备包仅作为historical_macos_joint_test_bundle_2d159360a历史记录，不保证旧路径可用。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "ae37daf19d86005883b8f64b3bb71f57b336843c",
-  "latest_increment": "macos_claude_brew_recovery_increment",
+  "latest_implementation_commit": "7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8",
+  "latest_increment": "oauth_loopback_test_isolation_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -3734,5 +3734,211 @@
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "required_gaps_remaining_open": 14
+  },
+  "main_baseline_merge_increment": {
+    "updated_at": "2026-09-28",
+    "implementation_commit": "e5f50d9fcfcc03344b5bfe02360bdf91e11cfd96",
+    "parents": [
+      "7ec006739b62611a5dc202b12f5d1eb67411f621",
+      "693172a260547e216164cd545430608dd2a19fd9"
+    ],
+    "status": "local_passed_cross_platform_failed",
+    "scope": "保留两条历史，整合main的8项提交与CLI Agent分支；MCP 2.2安全/API迁移、Vim行对象、POSIX --补全、Bash取消与GUI焦点修复保留。",
+    "merge_resolutions": [
+      "7个新增远端测试步骤沿用对应平台普通/专项门禁",
+      "Bash路径模板只加局部SC2157说明，运行语义与校验不变",
+      "两语资源重计6080，不扩大历史布局验收"
+    ],
+    "local_gates": {
+      "cargo_check": "passed",
+      "shellcheck": "passed",
+      "bash_generator_system_and_homebrew": "passed",
+      "mcp_ai_vim_completer_passed": 602,
+      "completion_v2_passed": 128,
+      "i18n_passed": 11,
+      "gui_tui_cli_short_internal_tmp_passed": 2484,
+      "runtime_host_embedded_serial_passed": 3,
+      "test_counts_scope": "不同套件与feature组合分别计数，不相加为唯一测试总数。",
+      "environment_corrections": "首轮24项因外置盘0775祖先/路径长度/跨盘而失败，短内盘TMPDIR修正。3项真实多进程测试另受825MB副本准备约50秒与外置资源读取阻塞影响；最终使用已有debug-embed资源内嵌、串行、180秒测试运行器预算通过，产品30秒握手不改，原失败完整保留。",
+      "receipt_sha256": "e96fdc2e2174acfd17b352745fc48037a0f8d448692914ad89911dc2dbc50d83"
+    },
+    "cross_platform": {
+      "run_id": 36411332886,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36411332886",
+      "status": "failure",
+      "source_commit": "e5f50d9fcfcc03344b5bfe02360bdf91e11cfd96",
+      "linux_conclusion": "success",
+      "windows_conclusion": "failure",
+      "cargo_check": "Linux/Windows均通过",
+      "linux_nextest_passed": {
+        "main": 3239,
+        "ipc": 2,
+        "glibc_binding_without_execution": 1,
+        "remote_image": 5,
+        "shared_contracts": 76,
+        "cli_harness": 129,
+        "bilingual_tui": 9,
+        "command_ownership": 1,
+        "host_crash_cleanup": 5,
+        "mcp_ai_vim_completion": 602,
+        "completion_v2": 128,
+        "desktop_tui": 660
+      },
+      "windows_nextest_passed": {
+        "main": 3063,
+        "ipc": 2,
+        "remote_image": 5,
+        "shared_contracts": 76,
+        "cli_harness": 129,
+        "bilingual_tui": 9,
+        "command_ownership": 22,
+        "host_crash_cleanup": 5,
+        "completion_v2": 116,
+        "desktop_tui": 660
+      },
+      "windows_mcp_ai_vim_completion": {
+        "tests_run": 595,
+        "passed": 594,
+        "failed": 1,
+        "skipped": 7
+      },
+      "rust_genai_passed": {
+        "linux": 81,
+        "windows": 81
+      },
+      "linux_bash_generator_cancellation": "passed",
+      "all_seven_added_upstream_steps_executed": true,
+      "failure": {
+        "test": "ai grok_subscription::oauth::tests::cancelling_loopback_wait_releases_listener",
+        "source": "crates/ai/src/grok_subscription/oauth_tests.rs:126:36",
+        "error": "取消回调监听后重新绑定端口返回Windows 10048 AddrInUse；底层原因未由本轮证据确定。"
+      },
+      "retry_flaky": "两平台完整nextest日志未见TRY/RETRY/FLAKY；Windows失败未重试。",
+      "test_counts_scope": "按套件分别计数，不合并为唯一测试总数；跳过不计通过，nextest失败子进程的libtest摘要不另计套件。",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/main-baseline-merge/remote-01",
+      "summary_sha256": "89568e89ab470e021ccc876d995bd6cdd2ea2cc357e9160f2c9ec01947532b79",
+      "index_sha256": "24494b6d1a9a9254236807324f42437a31e0beb7ec9c33544bbd8d518faf6bee",
+      "indexed_files_excluding_index": 253,
+      "artifact_zip_count": 12,
+      "artifact_member_count": 47,
+      "archive_validation": "完整run/jobs日志与12个artifact ZIP已归档；artifact官方digest、全部ZIP CRC/成员SHA、253索引文件逐项复核；两份独立job日志与run ZIP全量成员一致。",
+      "native_cleanup_boundary": "两平台Grok监督四场景清理确认；ACP私有leader未随stdio EOF自然退出，Linux清理码-9、Windows1。Windows收尾另清理vctip2776/sccache26488/conhost31388，无法归属case，不宣称整机零残留。Codex生产安装器fixture为0.147.0、私有根已删除，不承诺该fixture验证原生hook、GUI或监督树清理；固定0.156.1原生hook/ConPTY由独立步骤验证。",
+      "excluded_scope": "Mac Intel、全workspace、真实npm/Homebrew更新、Windows NUL/Node已知失败对照、GUI/模型未选；不包含后续Homebrew修复。"
+    },
+    "main_update": "pending_cross_platform_gates",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/main-baseline-merge",
+    "localization": "无需新增本地化文案；i18n11项通过，英文/简体中文各6080键及变量一致。没有新增双语布局验收。",
+    "temporary_storage": "按用户指示固定/Users/zhishi/InfiniShell-Tests，短目录逐轮登记；归档并确认退出后即时清理，每日04:00补查。详见docs/local-test-storage.zh-CN.md。",
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false,
+    "required_gaps_remaining_open": 14,
+    "temporary_cleanup": {
+      "status": "completed",
+      "old_temporary_roots_deleted": 5,
+      "old_service_control_directories_deleted": 6,
+      "deleted_regular_logical_bytes": 5775648552,
+      "small_evidence_files_archived": 104,
+      "cleanup_receipt_sha256": "0bb60b3ab639b59283ffc3ca43c49046a5ac3e609ad71c8275899ed43daad719",
+      "scope": "仅本轮旧临时根/精确已撤销服务控制目录；新固定根、源码、Cargo缓存和外置证据保留。字节数不等于APFS物理回收。"
+    }
+  },
+  "brew_rollback_preflight_increment": {
+    "status": "local_gates_passed_integrated_cross_platform_running",
+    "implementation_commit": "91fa953f882d54952d81067903e769d42821927e",
+    "source_base": "e5f50d9fcfcc03344b5bfe02360bdf91e11cfd96",
+    "behavior": "在首次回滚写入前验证主树、公共入口、补全和别名当前/暂存状态；拒绝开始前已存在的外部改动，保留中断恢复和重复调用语义。",
+    "local": {
+      "red": {
+        "selected": 6,
+        "passed": 1,
+        "failed": 5,
+        "exit_code": 100
+      },
+      "green": {
+        "selected": 6,
+        "passed": 6,
+        "exit_code": 0
+      },
+      "updates": {
+        "passed": 213,
+        "skipped": 7939
+      },
+      "i18n": {
+        "passed": 11,
+        "filtered": 8141
+      },
+      "cargo_check": "passed",
+      "rustfmt": "passed",
+      "diff_check": "passed",
+      "nextest_retries": 0
+    },
+    "localization": "无需本地化变更；沿用既有恢复/来源错误文案，两语资源门禁通过，无新增布局结论。",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/brew-rollback-preflight",
+    "scope_limits": [
+      "仅拒绝回滚开始前已存在的外部改动，不保证并发写入下跨文件原子性。",
+      "真实消费者Homebrew来源发现、brew升级、GUI和原生官方映像事务未在本轮复验。",
+      "Windows无此brew执行路径，既有Node/npm失败仍开放。"
+    ],
+    "g09_closed": false,
+    "required_gaps_remaining_open": 14,
+    "all_required_acceptance_satisfied": false,
+    "temporary_cleanup": {
+      "status": "completed",
+      "fixed_root": "/Users/zhishi/InfiniShell-Tests",
+      "run_directories_deleted": 3,
+      "remaining_run_directories": 0,
+      "receipts": {
+        "red": "64c5fa2842c936a71c26d20f7999e1ef758ff7bd0692a9550f1edf755ecfafae",
+        "green": "b4a49519bf1b9eb7dc323f701f89ac76f575150566b2bb3c6ef432ab8c477e09",
+        "gates": "4ff3801fd16718cf5562b2396d781d041ad1f7f22345c12168bccb84930a6435"
+      }
+    },
+    "superseded_cross_platform": {
+      "status": "cancelled",
+      "run_id": 36417868874,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36417868874",
+      "ref": "codex/brew-rollback-preflight",
+      "head_sha": "91fa953f882d54952d81067903e769d42821927e",
+      "scope": "Linux native_acceptance_only + Windows grok_installer_only；Windows排队等待基线结束；不同ref不互相取消。",
+      "reason": "整合提交的普通双平台矩阵覆盖此专项，保留已完成的Linux六项回归及其他结果；Windows无nextest执行，不计通过。",
+      "linux_new_regressions_passed": 6,
+      "linux_main_suite_passed": 1395,
+      "windows_test_suites_executed": 0,
+      "summary_sha256": "e0645c8a4b2d628f57bdfe9b0c41a50ed5a21ba64248482e7263932f84ed854a",
+      "index_sha256": "2e8df160691b66f2d96c43928f963c76f378b948c819a852071b110de1c3a204"
+    },
+    "cross_platform": {
+      "status": "in_progress",
+      "run_id": 36419778583,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36419778583",
+      "head_sha": "7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8",
+      "scope": "普通双平台矩阵；四份Homebrew文件与实现提交91fa完全一致，另含测试存储说明与OAuth测试端口隔离。"
+    }
+  },
+  "oauth_loopback_test_isolation_increment": {
+    "implementation_commit": "7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8",
+    "status": "local_passed_cross_platform_running",
+    "failure_run": 36411332886,
+    "failure_head": "e5f50d9fcfcc03344b5bfe02360bdf91e11cfd96",
+    "failure_test": "grok_subscription::oauth::tests::cancelling_loopback_wait_releases_listener",
+    "failure": "Windows 10048 AddrInUse，同套件595执行/594通过/1失败/7跳过。",
+    "change": "仅隔离测试端口池：不需重绑定的callback交付测试使用port0；取消测试保留100轮立即同址单次重绑定，增加cycle/address诊断。",
+    "cause_scope": "确认存在并行争用窗口，但原失败没有端口持有者证据，不认定已证明10048唯一根因。",
+    "production_oauth_changed": false,
+    "local_gates": {
+      "oauth_passed": 6,
+      "oauth_skipped": 290,
+      "retries": 0,
+      "cargo_check_warp": "passed"
+    },
+    "cross_platform_run_id": 36419778583,
+    "localization": "无需本地化变更；只改测试夹具及断言诊断。",
+    "temporary_cleanup": {
+      "status": "cleaned",
+      "run_id": "r-dw1fc8pt",
+      "cleanup_sha256": "2d0835b1f065cfc03eb4c89828886836a0eafa55a39be05300bae69cbc3cbdfd"
+    },
+    "required_gaps_remaining_open": 14,
+    "g09_closed": false
   }
 }
