@@ -500,6 +500,49 @@ fn invalidated_owned_grok_context_keeps_saved_draft_closed() {
 }
 
 #[test]
+fn lost_owned_grok_session_reports_unavailable_and_keeps_draft() {
+    App::test((), |mut app| async move {
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let (reported, notification) = oneshot::channel();
+        let mut reported = Some(reported);
+        let unavailable = crate::t!("cli-agent-grok-owned-input-unavailable");
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event
+                    && toast.main_text() == unavailable
+                {
+                    if let Some(reported) = reported.take() {
+                        reported.send(()).unwrap();
+                    }
+                }
+            });
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if matches!(event, Event::WriteBytesToPty { .. }) {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            CLIAgentSessionsModel::handle(ctx)
+                .update(ctx, |model, ctx| model.remove_session(view.view_id, ctx));
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("会话消失后保留草稿", ctx)
+            });
+            view.submit_owned_grok_input("会话消失后保留草稿".into(), ctx);
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                "会话消失后保留草稿"
+            );
+            assert!(!view.grok_owned_input.as_ref().unwrap().sending);
+        });
+        received_event(notification).await;
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
 fn forwarded_ctrl_c_revokes_pending_owned_input_even_without_cancel_observation() {
     App::test((), |mut app| async move {
         let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(false);

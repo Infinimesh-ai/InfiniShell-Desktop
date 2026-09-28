@@ -836,6 +836,14 @@ impl TerminalView {
                 );
                 return;
             }
+            if agent.supports_bash_mode() && text.starts_with('!') {
+                // 文件路径说明不能跟随原生 bash 前缀进入 CLI 的命令模式。
+                self.show_error_toast(
+                    crate::t!("cli-agent-input-file-attachment-unavailable"),
+                    ctx,
+                );
+                return;
+            }
         }
         let remote_images = !images.is_empty()
             && CLIAgentSessionsModel::as_ref(ctx)

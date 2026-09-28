@@ -122,6 +122,7 @@ impl TerminalView {
             return;
         }
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
             return;
         };
         let GrokPermissionEvidence::Observed(observation) =
@@ -152,6 +153,7 @@ impl TerminalView {
         if !CLIAgentSessionsModel::handle(ctx).update(ctx, |model, _| {
             model.register_owned_grok_input(self.view_id, observation.clone(), lease.clone())
         }) {
+            self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
             return;
         }
         let files = self

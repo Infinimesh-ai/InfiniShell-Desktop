@@ -127,6 +127,57 @@ fn missing_file_keeps_entire_composer_without_a_partial_pty_write() {
     });
 }
 
+#[test]
+fn shell_mode_with_file_cards_keeps_bilingual_paths_and_draft_out_of_pty() {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude] {
+        App::test((), move |mut app| async move {
+            let terminal = prepare_rich_cli_test(&mut app, agent);
+            let root = tempfile::tempdir().unwrap();
+            let chinese = root.path().join("中文 空格.txt");
+            let english = root.path().join("English spaced.txt");
+            std::fs::write(&chinese, "first").unwrap();
+            std::fs::write(&english, "second").unwrap();
+            add_file(&terminal, &mut app, &chinese);
+            add_file(&terminal, &mut app, &english);
+            terminal.update(&mut app, |view, ctx| {
+                view.input.update(ctx, |input, ctx| {
+                    input.ai_input_model().update(ctx, |model, ctx| {
+                        model.set_input_config(
+                            InputConfig {
+                                input_type: InputType::Shell,
+                                is_locked: true,
+                            },
+                            false,
+                            None,
+                            ctx,
+                        );
+                    });
+                });
+            });
+            let writes = collect_cli_test_writes(&mut app, &terminal);
+            let rejected = wait_for_rejection(&mut app);
+
+            submit_cli_test_input(&terminal, &mut app, "cat 中文 空格.txt English spaced.txt");
+            await_submission_event(rejected).await;
+
+            assert!(writes.borrow().is_empty());
+            terminal.read(&app, |view, ctx| {
+                let input = view.input.as_ref(ctx);
+                assert_eq!(
+                    input.buffer_text(ctx),
+                    "cat 中文 空格.txt English spaced.txt"
+                );
+                assert!(!input.ai_input_model().as_ref(ctx).input_type().is_ai());
+                assert!(input.ai_input_model().as_ref(ctx).is_input_type_locked());
+                let files = view.ai_context_model.as_ref(ctx).pending_files();
+                assert_eq!(files.len(), 2);
+                assert_eq!(files[0].file_path, chinese);
+                assert_eq!(files[1].file_path, english);
+            });
+        });
+    }
+}
+
 #[cfg(unix)]
 #[test]
 fn unreadable_file_keeps_draft_and_cards_without_writing_to_pty() {
