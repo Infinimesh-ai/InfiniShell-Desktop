@@ -11,7 +11,7 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "2383428dac785fc34ed44120226b596d592ad191",
+  "latest_related_verified_source_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
@@ -111,13 +111,65 @@
     "claude_gui": "同签名Mac GUI新建任务的一轮PNG原字节+两项技能独立Allow once：原生两次Skill调用/结果顺序、持久化结果及清理确认。仓外receipt摘要b18f344a865ed39e74ac8a75cb75e4cbcb4e8fc1ed2f21ee8d4698c68d697c80；GUI冷恢复因同bundle ID旧实例无法精确绑定而在发送前停止，G04-G06不关闭",
     "current_branch_cloud_run": 36467106568,
     "current_branch_cloud_source_commit": "12adb9f2eceb155d9e9c32312bdd3c6f428a4c57",
-    "current_branch_cloud_status": "Linux/Windows普通门禁运行中；不预记结果，未选G09已知失败专项诊断"
+    "current_branch_cloud_status": "run36467106568已结束且整体success：Linux/Windows普通门禁通过，Windows主回归3069/3069、桌面/TUI 660/660、rust-genai 81/81；Windows监督清理组5项通过但其中1项标LEAK，不能称无泄漏。未选G09已知失败专项诊断，且不覆盖后续未提交Grok结果落盘改动。完整官方日志和12个工件归档于仓外cloud-run-36467106568，日志索引SHA-256 afa1de7d8aa4066a8f3bce8b3fad17c0a640d938dd037eb80c096aafe953026d"
   },
   "g01_g07_guard_followup": {
     "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
     "status": "已提交推送；本机定向及本地化门禁通过，跨平台同提交验收待执行",
     "scope": "专属 Grok 会话或输入租约失败显示既有提示并保留草稿；Codex／Claude 锁定 Shell 模式文件卡于 PTY 写入前拒绝",
     "local_gates": "macOS 定向 2 项、i18n 11 项、cargo check -p warp 通过；中文与英文空格路径双卡、草稿及卡片保持和 PTY 零写入已测试；无需本地化变更，未新增 GUI 双语布局验收",
+    "closed_gaps": []
+  },
+  "g01_verified_result_followup": {
+    "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "status": "当前分支结果持久化与只读冷补写已实现；本机专属 Grok 原生双回合及应用侧退出后的同会话冷补写通过，G01 整项仍开放",
+    "fixed_native": "Grok 1.0.41 / grok-4.7，macOS arm64 专属 TUI/leader",
+    "evidence": "正常双回合 ACK 后结果保存并由独立进程重读；冷链两轮 ACK 后首个应用侧进程退出、同一原生 TUI/leader 仍存活，第二进程只读补写两代各 44 字节，消息与原生用户输入 2→2，第三进程在原生退出后重读两代结果；零旧输入重投",
+    "cold_archive_index_sha256": "6264fbdc909f5c25392e33211abd7a1114187f33bc570b5a3808f5f220335bd7",
+    "normal_archive_index_sha256": "f34756cb075b4901ae981cd87f3ea92251b7bc36867a935abbc07c3b3e3e6677",
+    "local_gates": "定向 nextest 44/44、i18n 11/11、cargo check -p warp 通过；真实英中 GUI 新提示布局和同提交 Linux/Windows 门禁待验",
+    "remaining": "普通未绑定 PTY 的可信自动提交、图片、审批、真实 GUI 新提示及 Linux/Windows 功能链未闭合",
+    "closed_gaps": []
+  },
+  "g03_owned_image_drop_followup": {
+    "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "status": "专属 Grok 富输入拖放的图片顺序与失配零 PTY 写入修复已通过定向测试；Mac GUI 粘贴双图原生消费与结果落盘通过，G03 整项仍开放",
+    "pre_fix_failure": "已打开富输入但 owned 身份失效时，旧路径把拖入图片路径写入 PTY，定向回归捕获 WriteBytesToPty 1 次并失败",
+    "post_fix": "同一用例两图有序附加、混合及纯非图整批拒绝、owned 失效零 PTY 写入 1/1 通过；cargo check -p warp 通过",
+    "gui_boundary": "首轮私有 Mac GUI 因人工提前按 Return 启动普通未绑定 Grok；任务仍 queued、消息数为零、派发记录为 false，提交由保护分支拒绝。后续重新签名私有 GUI 确认专属 dispatched/exec/bound 身份一致，再粘贴两张不同图片并只提交一次，原生文字+图片+图片字节与产品持久附件及原生资产两两相等，模型精确回复 RED BLUE GREEN YELLOW；任务与消息结果及完成水位落盘",
+    "gui_archive_index_sha256": "1ae3c40a655b6842d1f7e0ed34aa2f81479348855182f6d1f400ceef08d092a7",
+    "gui_evidence_sha256": "213d0b126e395bf3c5f46e07ea0155c5e9c99f73501f25d149065105d65857e1",
+    "cleanup": "成功轮五个私有 PID/launchd 标签及打开文件核验无残留，短目录 cleaned；旧负例轮仍被系统 tccd 只读占用，cleanup_ready=false，保留目录",
+    "localization": "新增英中拖放拒绝文案已同步；真实双语布局待验",
+    "remaining": "真实 GUI 拖放事件、普通未绑定 PTY 图片、审批状态变化、双语拒绝提示布局和 Linux/Windows 仍待验",
+    "closed_gaps": []
+  },
+  "g09_windows_stdio_control_followup": {
+    "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "status": "同 CMD/目录/令牌新增普通文件 stderr 正对照并保留原 NUL 失败断言；Windows 同提交专项待运行，G09 仍开放",
+    "prior_failure": "run36453314472 的 NUL 输出为空；固定 Node 20.9.0 根进程首断点后自然退出 0xc0000142，无版本输出，两者不能据此归为同一根因",
+    "next_gate": "在 exact HEAD Windows runner 上以 stdio 范围运行正对照、原 NUL 负例及固定 Node 对照，保留失败和清理收据，不改全局 ACL 或降低隔离",
+    "localization": "测试诊断无用户界面文案变化，无需本地化变更",
+    "closed_gaps": []
+  },
+  "g10_v2_pending_write_cancel_followup": {
+    "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "status": "Mac 固定 Claude V2 父子待审批 Write 取消真实链通过；G10 整项仍开放",
+    "fixed_native": "Claude 2.1.280 / claude-opus-5-5，macOS arm64 生产适配器",
+    "evidence": "父 run_agents 单次允许、子精确 Write 待审批、取消 ACK、同审批迟到 AllowOnce 拒绝、目标文件始终未创建、持久父子身份与权限上限核对、父子原生退出和各自 Job/资源域清理确认",
+    "cleaned_safe_receipt_sha256": "7735444452dbf08991f748653ee7455703a3a30bf7194c94a82ee93e2b375386",
+    "startup_boundary": "外置盘 worker 的无模型 dyld 装载超时和外置盘 Claude CLI 初始化超时原件保留；同 SHA/签名/版本的内置盘无模型对照及在线目标通过，产品超时未改",
+    "remaining": "其它受审工具/技能权限、GUI、冷恢复及 Linux/Windows 原生链未完整验收",
+    "closed_gaps": []
+  },
+  "g07_collapsed_file_picker_gui_followup": {
+    "status": "Mac 私有 GUI 收起态文件选择器与 Shell 模式拒绝范围通过；G07 整项开放",
+    "native_cli": "Codex 0.155.1，不计固定 0.156.1 原生文件读取正例",
+    "evidence": "中文路径及英文空格路径形成双文件卡；Shell !printf 被拒，草稿和双卡保留；GUI 未记录精确 PTY 字节计数，截图仅留在 CUA 回执而未归档原图",
+    "safe_receipt_sha256": "71d082c6866d8c0e8b5a9b317939863054b946ad10da0dc30bbf6e86356b2a5b",
+    "cleanup": "本轮私有 GUI 精确 PID、文件占用和短临时目录已核验清理",
+    "remaining": "固定 0.156.1 原生读取、Claude 首次向导、Grok 文件卡投递、GUI 精确 PTY 计数及 Linux/Windows",
+    "localization": "无产品文案变化；本轮无可归档原图，不能作为新的双语布局通过记录",
     "closed_gaps": []
   },
   "v03_codex_tmux_loopback_followup": {
@@ -4060,5 +4112,17 @@
       "native_cleanup_boundary": "runner收尾清理vctip22748/sccache9648/conhost22140，不能归属到LEAK用例或宣称整机零残留。",
       "excluded_scope": "Mac Intel、全workspace、真实npm/Homebrew消费者更新、Windows NUL/Node失败对照、真实OAuth登录、GUI及已认证模型未选。"
     }
+  },
+  "g08_loopback_staging_followup": {
+    "tooling_commit": "eaee5261e",
+    "signed_product_source_commit": "2383428dac785fc34ed44120226b596d592ad191",
+    "status": "macOS 私有回环 SSH 产品远端图片暂存/恢复/释放通过；无 GUI、PTY、原生 CLI 消费或模型回合，G08 不关闭",
+    "receipt_sha256": "8d34f00bfdefbdb357b8a25f5fc4bbe441a8ba3930a8d82a779d8450ffbdae19",
+    "archive_index_sha256": "ef31df669e74e99598c0402ec84ca283e44f21a36ae11d54b2145f6fce6ba408",
+    "source_and_remote_read_sha256": "4ff6ab670a58c14270e034e2090d9a432caa263a14e0a25785386b0c12f880b5",
+    "scope": "70 字节 PNG 经私有 SSH stdio；Verify/远端读取一致、并发连接隔离、半图断连清理、同 host 恢复、旧 epoch/错误 key 拒绝、显式释放；三 SSH 代理及私有 sshd/daemon 退出",
+    "focused_python_tests": "4/4；五轮实测加两轮离线测试 TMPDIR 均归档后按身份和开放文件核验清理",
+    "source_binding": "执行时工作树含未提交产品改动；仅对签名 2383428 二进制的限定传输链计证",
+    "closed_gaps": []
   }
 }
