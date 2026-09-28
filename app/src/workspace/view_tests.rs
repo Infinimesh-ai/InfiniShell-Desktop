@@ -40,6 +40,7 @@ use crate::cloud_object::update_manager::UpdateManager;
 use crate::context_chips::prompt::Prompt;
 use crate::editor::{Event, ReplicaId};
 use crate::gpu_state::GPUState;
+use crate::menu::MenuAction;
 use crate::network::NetworkStatus;
 use crate::notebooks::editor::keys::NotebookKeybindings;
 use crate::notebooks::notebook::NotebookView;
@@ -3735,6 +3736,152 @@ fn tab_group_rename_blur_does_not_commit_unfinished_name() {
             assert_eq!(
                 workspace.tab_groups[&group_id].name, None,
                 "terminal focus changes must not commit a partial group name"
+            );
+        });
+    });
+}
+
+#[test]
+fn test_save_current_tab_as_new_config_ignores_stale_tab_index() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let workspace = mock_workspace(&mut app);
+
+        workspace.update(&mut app, |workspace, ctx| {
+            for _ in 1..6 {
+                workspace.add_terminal_tab(false, ctx);
+            }
+
+            workspace.close_other_tabs(5, true, ctx);
+            workspace.handle_action(&WorkspaceAction::SaveCurrentTabAsNewConfig(5), ctx);
+
+            assert_eq!(workspace.tab_count(), 1);
+        });
+    });
+}
+
+#[test]
+fn test_closing_tab_context_menu_restores_active_tab_focus() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+
+        let workspace = mock_workspace(&mut app);
+        let (window_id, menu_id) = workspace.update(&mut app, |workspace, ctx| {
+            workspace.show_tab_right_click_menu =
+                Some((0, TabContextMenuAnchor::Pointer(Vector2F::zero())));
+            ctx.focus(&workspace.tab_right_click_menu);
+            (ctx.window_id(), workspace.tab_right_click_menu.id())
+        });
+        assert_eq!(app.focused_view_id(window_id), Some(menu_id));
+
+        workspace.update(&mut app, |workspace, ctx| {
+            workspace.handle_tab_right_click_menu_event(
+                &MenuEvent::Close {
+                    via_select_item: true,
+                },
+                ctx,
+            );
+        });
+
+        assert_ne!(app.focused_view_id(window_id), Some(menu_id));
+        workspace.update(&mut app, |workspace, ctx| {
+            assert!(
+                workspace
+                    .active_tab_pane_group()
+                    .is_self_or_child_focused(ctx)
+            );
+        });
+    });
+}
+
+#[test]
+fn tab_context_menu_rename_preserves_editor_focus() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+        let (window_id, menu, editor_id) = workspace.update(&mut app, |workspace, ctx| {
+            workspace.toggle_tab_right_click_menu(
+                0,
+                TabContextMenuAnchor::Pointer(Vector2F::zero()),
+                ctx,
+            );
+            (
+                ctx.window_id(),
+                workspace.tab_right_click_menu.clone(),
+                workspace.tab_rename_editor.id(),
+            )
+        });
+
+        menu.update(&mut app, |menu, ctx| {
+            let rename_index = menu
+                .items()
+                .iter()
+                .position(|item| {
+                    matches!(item, MenuItem::Item(fields)
+                        if matches!(fields.on_select_action(), Some(WorkspaceAction::RenameTab(0))))
+                })
+                .expect("标签菜单应包含重命名项");
+            menu.set_selected_by_index(rename_index, ctx);
+            menu.handle_action(&MenuAction::Enter, ctx);
+        });
+
+        assert_eq!(app.focused_view_id(window_id), Some(editor_id));
+        workspace.read(&app, |workspace, _| {
+            assert!(workspace.show_tab_right_click_menu.is_none());
+            assert_eq!(
+                workspace.current_workspace_state.tab_being_renamed(),
+                Some(0)
+            );
+        });
+    });
+}
+
+#[test]
+fn tab_group_context_menu_rename_preserves_editor_focus() {
+    let _grouped_tabs_guard = FeatureFlag::GroupedTabs.override_enabled(true);
+
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let workspace = mock_workspace(&mut app);
+        let (window_id, menu, editor_id, group_id) =
+            workspace.update(&mut app, |workspace, ctx| {
+                let group = TabGroup::new();
+                let group_id = group.id;
+                workspace.tab_groups.insert(group_id, group);
+                workspace.tabs[0].group_id = Some(group_id);
+                workspace.toggle_tab_group_right_click_menu(
+                    group_id,
+                    TabContextMenuAnchor::Pointer(Vector2F::zero()),
+                    ctx,
+                );
+                (
+                    ctx.window_id(),
+                    workspace.tab_right_click_menu.clone(),
+                    workspace.tab_group_rename_editor.id(),
+                    group_id,
+                )
+            });
+
+        menu.update(&mut app, |menu, ctx| {
+            let rename_index = menu
+                .items()
+                .iter()
+                .position(|item| {
+                    matches!(item, MenuItem::Item(fields)
+                        if matches!(fields.on_select_action(), Some(WorkspaceAction::RenameTabGroup(id)) if *id == group_id))
+                })
+                .expect("标签组菜单应包含重命名项");
+            menu.set_selected_by_index(rename_index, ctx);
+            menu.handle_action(&MenuAction::Enter, ctx);
+        });
+
+        assert_eq!(app.focused_view_id(window_id), Some(editor_id));
+        workspace.read(&app, |workspace, _| {
+            assert!(workspace.show_tab_group_right_click_menu.is_none());
+            assert_eq!(
+                workspace.current_workspace_state.tab_group_being_renamed(),
+                Some(group_id)
             );
         });
     });

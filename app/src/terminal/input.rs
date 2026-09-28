@@ -4975,6 +4975,9 @@ impl Input {
         initial_tab: InlineModelSelectorTab,
         ctx: &mut ViewContext<Self>,
     ) {
+        if !ctx.is_window_open(self.inline_model_selector_view.window_id(ctx)) {
+            return;
+        }
         self.close_overlays(false, ctx);
         let has_input = !self.editor.as_ref(ctx).buffer_text(ctx).is_empty();
         let should_clear_prompt_for_search =
