@@ -27,6 +27,13 @@ class RemoteCodexSshTmuxTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "不支持的 Codex 固定版本"):
             PROBE.validate_case("tmux-off", {}, {}, "token", "0.154.0")
 
+    def test_trust_prompt_accepts_both_fixed_native_tui_wordings(self):
+        self.assertTrue(PROBE.trust_prompt_visible(
+            "Doyoutrustthecontentsofthisdirectory?Yes,continue"))
+        self.assertTrue(PROBE.trust_prompt_visible(
+            "Trustthisfolder?Trustandcontinue"))
+        self.assertFalse(PROBE.trust_prompt_visible("Trustthisfolder?Quit"))
+
     def test_safe_root_rejects_parent_traversal_and_accepts_private_cache(self):
         self.assertIsNotNone(PROBE.SAFE_REMOTE_ROOT.fullmatch(
             "/root/.cache/infinishell-parity-ssh-tmux.example_1"))

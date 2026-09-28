@@ -336,6 +336,12 @@ def authorize(ssh, remote_root, command, report):
     require(recorder.process.returncode == 0, "远端原生授权进程没有正常退出")
 
 
+def trust_prompt_visible(compact):
+    old = "Doyoutrustthecontentsofthisdirectory?" in compact and "Yes,continue" in compact
+    current = "Trustthisfolder?" in compact and "Trustandcontinue" in compact
+    return old or current
+
+
 def capture_case(command, token, timeout=40):
     master, slave = os.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 140, 0, 0))
@@ -385,8 +391,7 @@ def capture_case(command, token, timeout=40):
             plain = re.sub(rb"\x1b\[[0-?]*[ -/]*[@-~]", b"", raw).decode(
                 "utf-8", errors="replace")
             compact = re.sub(r"\s+", "", plain)
-            if not trusted and "Doyoutrustthecontentsofthisdirectory?" in compact \
-                    and "Yes,continue" in compact:
+            if not trusted and trust_prompt_visible(compact):
                 os.write(master, b"1\r"); trusted = True
             if not kept_existing_model and "isnolongeravailable" in compact \
                     and "Useexistingmodel" in compact:
