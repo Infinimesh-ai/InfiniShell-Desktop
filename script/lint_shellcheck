@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+cd "$(dirname "$0")/.."
+
+CI_MODE=false
+while (( "$#" )); do
+  case "$1" in
+    -ci|--ci)
+      CI_MODE=true
+      shift
+      ;;
+    *)
+      echo "未知参数：$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "未检测到 ShellCheck。"
+  if [[ "$CI_MODE" == true || "${GITHUB_ACTIONS:-}" == true ]]; then
+    echo "CI 必须安装 ShellCheck，检查已终止。" >&2
+    exit 1
+  fi
+  echo "跳过 ShellCheck；macOS 可运行 brew install shellcheck，Debian/Ubuntu 可运行 sudo apt install shellcheck。"
+  exit 0
+fi
+
+shellcheck \
+  --shell=bash \
+  --severity=warning \
+  app/assets/bundled/bootstrap/bash_body.sh

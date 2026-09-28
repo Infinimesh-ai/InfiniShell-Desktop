@@ -43,6 +43,10 @@ echo "Running wgslfmt..."
 # However, the default bash version in MacOS is too old to support that, so we use `find` instead.
 find . -name "*.wgsl" -exec wgslfmt --check {} +
 echo "wgslfmt succeeded..."
+echo "检查 Bash bootstrap 的 ShellCheck 诊断..."
+./script/lint_shellcheck
+echo "验证 Bash 后台生成器取消行为..."
+./script/test_bash_generator_cancellation
 
 # check to see if we can run powershell on the device
 if command -v pwsh /dev/null 2>&1; then
