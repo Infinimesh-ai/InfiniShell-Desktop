@@ -136,6 +136,8 @@
 
 - **Windows 命名站前提实测 `eb2b271e3`**：同提交CI36344378073编译及504/22/14项通过，原生仍16通过/7失败。创建调用线程的CheckTokenMembership(NULL, BuiltinAdministrators)成功返回member=false，随后CreateWindowStation仍0x80070005；未建立私有环境或执行Node，内层清理未知、外层Job清理确认。这只确认该对照的必要成员前提未满足，不解释原Node DLL失败。等待独立管理员验收runner信息，当前不提权/改全局权限；继续Mac独立工作，G09仍开放。
 
+- **Windows 服务stdio三项复验 `730b63b6a`**：修正stdout保留名为redirected.txt后，[CI36384245535](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36384245535)编译及504/22/14项通过，原生1通过/2失败；CMD通过，NUL仍为空文件，固定Node根仍0xc0000142，清理确认不等于功能通过。实际runner trace为Session0/high/TokenIsElevated=1，不能称未提升普通交互用户；也不据此推断管理员成员。RDP未启用、回环选择读回All，普通交互会话仍待用户确认。下一步仅测试的实际令牌NUL DACL观察尚无运行结论，不改ACL/capability或官方shim；历史原件、G09及14项必要缺口保留，详见验证报告，无需本地化变更。
+
 - **Windows 管理员对照身份已解决（2026-09-28）**：用户授权后临时以Administrator复用原runner领取一次同提交61d0747b4的[CI36379989244](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36379989244)。编译及504/22/14项通过，原生17通过/6失败；实际创建线程member=true，私有窗口站/桌面核验通过，固定Node真实输出v20.9.0、原生退出0，内外Job/AppContainer和自有对象句柄清理确认。原NUL及五个普通/隐藏对照失败保持；同批普通对象失败而私有对象成功不等于普通用户产品或真实npm修复。原低权限服务已恢复，.runner文件与五个目录根权限保持，缓存/工作目录读写已核验；无需继续等待管理员凭据信息。后续定位普通身份实现与正式npm链，G09及14项必要缺口仍开放，详见验证报告。
 
 - **Mac Grok 486330824增量**：外置卷显式策略及17份worker源码绑定完成，Python41、check、i18n11通过。新worker与bb78监督程序15份等价源码组合的run-01首个正常更新被SanDisk卷根0775祖先门禁拒绝；Grok候选未exec，子worker退出1及Job/coalition清理确认。单独run-02候选篡改拒绝通过，实际公开入口仍1.0.40、完整旧树/用户镜像/配置保留，候选未启动。原失败保留；正常更新与两项冷恢复仍欠验，待独立私有映像环境授权，不改原卷权限或放宽门禁。不是当前SHA整包四场景通过，G09仍开放；无需本地化变更。

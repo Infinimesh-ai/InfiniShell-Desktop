@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac Codex和Grok冻结产物的四场景证据保持。Windows已通过用户授权的cloud SSH临时管理员runner完成私有窗口站对照：调用线程member=true、固定Node v20.9.0原生退出0且完整清理；原低权限服务已恢复。整套原生仍17通过/6失败，普通身份、正式npm链和真实更新未验证；后续依据同一管理员批次的普通/私有对象差异继续定位，不能将临时管理员依赖直接加入产品。G09及14项必要缺口保持开放。"
+    "next_work_order": "Mac Codex/Grok冻结产物四场景及Windows管理员私有Node成功对照保留。730b63b6a服务上下文stdio三项复验已收口：CMD通过，改用普通stdout文件名后NUL仍空，Node仍0xc0000142；实际runner trace为Session0/high/TokenIsElevated=1，不是未提升普通交互验收。下一步准备仅测试的实际AppContainer令牌NUL DACL观察，尚无新根因结论；普通交互会话仍等用户确认，RDP未启用且回环选择未成立。正式npm链、真实更新与14项必要缺口仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "windows_admin_private_desktop_increment",
+  "latest_increment": "windows_service_stdio_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -3352,5 +3352,173 @@
       "sha256": "5259b08ecca58e77039b9a1154b0116c7d7b1144e58c852cedcf1119930d0019",
       "result": "身份、私有Node成功、剩余失败和恢复范围独立复核通过；不等于整套CI通过。"
     }
+  },
+  "windows_service_stdio_increment": {
+    "updated_at": "2026-09-28",
+    "source_commit": "730b63b6a3d4d4e6c565709755dd599498af1055",
+    "status": "stdio_subset_completed_nul_and_node_failures_preserved_interactive_context_not_established",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-interactive-context/service-stdio",
+    "change": "仅将NUL对照stdout及读回从保留名nul.txt改为redirected.txt并解释命名规则；workflow新增stdio三项精确选择，默认all、14项诊断及零重试保留。未改官方shim、产品默认、capability、严格Job或映像绑定。",
+    "dispatch": {
+      "scope": "stdio",
+      "runner_id": 22,
+      "declared_identity": "原infinishell-build服务；本轮未改身份或登录配置",
+      "receipt_sha256": "fb93ac9162bcd982ef90f2a20e4b77b9816e5eb46f104c910886197bbbd347a2"
+    },
+    "run": {
+      "id": 36384245535,
+      "job_id": 108806177281,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36384245535",
+      "conclusion": "failure",
+      "cargo_check": "passed",
+      "ordinary_tests_passed": 504,
+      "command_tests_passed": 22,
+      "diagnostic_tests_passed": 14,
+      "native_tests": {
+        "selected": 3,
+        "passed": 1,
+        "failed": 2,
+        "retries": 0
+      },
+      "grok_production_installer": "passed",
+      "real_npm_updates_executed": false,
+      "gui_or_model_acceptance_executed": false,
+      "other_platforms": "skipped"
+    },
+    "native_cases": {
+      "bound_cmd": {
+        "passed": true,
+        "native_exit_code": 0,
+        "driver_exit_code": 0,
+        "expected_routing_child_lines": 1,
+        "real_node": false,
+        "inner_cleanup_confirmed": true,
+        "outer_job_cleanup_confirmed": true
+      },
+      "nul_redirection": {
+        "passed": false,
+        "stdout_fixture": "tmp/redirected.txt",
+        "stderr_redirection": "2>NUL",
+        "redirected_contents": "empty",
+        "plain_and_after_contents_match": true,
+        "plain_errorlevel": 0,
+        "nul_errorlevel": 0,
+        "cmd_native_exit_code": 0,
+        "failure": "redirected完整内容相等断言失败",
+        "inner_cleanup_confirmed": true,
+        "outer_job_cleanup_confirmed": true,
+        "success_native_receipt_reached": false,
+        "numeric_stderr_error_code": "not_established",
+        "evidence_scope": "仅完整作业日志；不在6成员stdio artifact内",
+        "boundary": "消除了旧stdout设备名混淆，但未修复NUL；errorlevel0和CMD exit0不证明重定向成功，也不证明NUL是Node或npm唯一根因。"
+      },
+      "node_20_9_0_root": {
+        "passed": false,
+        "native_exit_code": "0xc0000142",
+        "driver_exit_code": 101,
+        "version_line_count": 0,
+        "root_dll_events": 28,
+        "initial_breakpoint_observed": true,
+        "shim_executed": false,
+        "inner_cleanup_confirmed": true,
+        "outer_job_cleanup_confirmed": true,
+        "timed_out": false,
+        "boundary": "stdout含测试框架输出，但无v20.9.0行；driver101是断言失败，不替代原生退出码。"
+      }
+    },
+    "environment_trace": {
+      "record_count": 5,
+      "scope": "CMD/Node的root/console/node CREATE观察；NUL未启用该trace，不能外推到NUL逐项字段",
+      "runner": {
+        "session_id": 0,
+        "integrity": "high",
+        "token_is_elevated": 1,
+        "token_field": "TokenElevation / TOKEN_ELEVATION.TokenIsElevated",
+        "appcontainer": 0,
+        "window_station_visible": false
+      },
+      "bound": {
+        "session_id": 0,
+        "integrity": "low",
+        "token_is_elevated": 0,
+        "appcontainer": 1,
+        "strict_handle_flags": 3
+      },
+      "runner_object_dacl": {
+        "denied": 20,
+        "total": 20,
+        "includes_successful_cmd": true,
+        "mic_evaluated": false
+      },
+      "boundary": "不是普通交互或未提升用户验收；本轮没有worker所有者或Administrators成员独立实测，不能仅凭high/elevation1推断管理员成员。DACL模拟包含成功CMD，不能作为根因证明。"
+    },
+    "post_run_environment": {
+      "receipt_sha256": "daa54037cf6dcc252b3ca98acb9254134c840ec1f2889aee330f88f44f48611e",
+      "observer": "Administrator只读观察",
+      "runner_service": "Running/Auto/.\\infinishell-build",
+      "listener_owner": "infinishell-build",
+      "listener_session_id": 0,
+      "registration_sha256": "3192839ca3bbd035553f763787a85f30c9587c3a6a8420ce972e7c2c539109be",
+      "rdp_denied": 1,
+      "term_service": "Stopped/Manual",
+      "adapter_selection": "All",
+      "nul_security_descriptor_readable_by_observer": true,
+      "boundary": "宿主管理员读NUL/\\\\.\\NUL的SD不是实际AppContainer访问测试；06:46:41Z使用ErrorAction Stop查询且脚本成功退出，确认该时点TCP/UDP3389无监听，不外推全机或永久无端点。旧回环选择器的空数组仍不足以独立证明枚举成功。",
+      "endpoint_query_utc": "2026-09-28T06:46:41.4519567Z",
+      "tcp_3389_listeners": 0,
+      "udp_3389_endpoints": 0
+    },
+    "interactive_preparation": {
+      "loopback_selector_api_return": 0,
+      "selector_readback": "All before/during/after",
+      "loopback_environment_established": false,
+      "rdp_started": false,
+      "interactive_user_session_established": false,
+      "user_console_login_answer": "pending",
+      "loopback_assessment_sha256": "a518575af2539fc2d043c9f22917e32afb1ce8158e3db6986a2251ba9243a829",
+      "runner_plan": "仓外交互任务草稿未执行；需用户已有真实登录，--once目标作业竞态和故障恢复限制保留",
+      "cloud_xvfb_probe": {
+        "private_namespace_started_seconds": 3,
+        "processes_and_namespace_exited": true,
+        "host_mount_namespace_unchanged": true,
+        "windows_connected": false,
+        "receipt_sha256": "de54cd9f6a648cd1dafcf41dfea766f2f67f18685381309be55aec1565efaaf7",
+        "boundary": "仅工具启动准备，不证明RDP登录可用；未来客户端须在同一namespace。"
+      }
+    },
+    "runner_orphan_cleanup": {
+      "conhost_pid": 23980,
+      "sccache_pid": 31808,
+      "vctip_pid": 27044,
+      "attribution": "未建立case归属，不外推机器级无残留。"
+    },
+    "artifact": {
+      "id": 10954873806,
+      "zip_bytes": 6035,
+      "zip_sha256": "ac3c232a98ebefcd0baa523ff98f3d5609420a67e8806f64ed6cbc8a0b7d290f",
+      "official_digest_and_full_zip_verified": true,
+      "member_count": 6,
+      "member_crc_verified": true,
+      "scope": "两组stdio的safe/stdout/stderr；NUL证据另在完整作业日志"
+    },
+    "summary_sha256": "419f4c67a3755459a5a0303b657eb013b9f4c7e65517916019a8c8e58d8c650f",
+    "job_log_sha256": "08fc5738fdc070c941658c37acc0858cfa9851023ca93addc729db20fca5dc3d",
+    "independent_review": {
+      "path": "independent-review.safe.json",
+      "sha256": "f1ddedf29a0adc8494d63325f7a1e570a75f7465e8c92f2644c0c199efd3a0e0",
+      "status": "evidence_confirmed_nul_and_node_failures_preserved"
+    },
+    "evidence_index": {
+      "path": "index.safe.json",
+      "file_count": 34,
+      "sha256": "176ccf39e3a5c2ce6b3d205ba2e20346310077731f9e294f20e7b8a7df8f5dd2",
+      "scope": "本轮现存证据含post-run-environment；索引自身、独立审查及交付收据另列"
+    },
+    "next_diagnostic": "仅测试的实际AppContainer令牌NUL DACL观察正在准备，尚无运行结果；不改设备ACL、不加capability、不安装线程模拟token、不修改官方shim，不将DACL模拟当成实际CreateFile或MIC/驱动检查证明。",
+    "local_gates": "730b63b6a提交的本地cargo check、定向rustfmt/diffcheck及限定actionlint通过，Windows cargo check再次通过；不把前轮Mac Python/i18n计为本轮执行。",
+    "localization": "无需本地化变更",
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false,
+    "required_gaps_remaining_open": 14
   }
 }

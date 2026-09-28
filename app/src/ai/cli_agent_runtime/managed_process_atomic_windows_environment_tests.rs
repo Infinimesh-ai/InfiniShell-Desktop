@@ -8,7 +8,8 @@ use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
 
 use serde::Serialize;
 use serde_json::{Value, json};
-use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::{HANDLE, HLOCAL};
+use windows::Win32::Security::Authorization::{GetSecurityInfo, SE_FILE_OBJECT};
 use windows::Win32::Security::{
     AccessCheck, DACL_SECURITY_INFORMATION, DuplicateTokenEx, GENERIC_MAPPING,
     GROUP_SECURITY_INFORMATION, GetSecurityDescriptorControl, GetSecurityDescriptorLength,
@@ -19,6 +20,8 @@ use windows::Win32::Security::{
     TokenIsAppContainer, TokenSessionId,
 };
 use windows::Win32::Storage::FileSystem::{
+    CreateFileW, FILE_ALL_ACCESS, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_EXECUTE, FILE_GENERIC_READ,
+    FILE_GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING, READ_CONTROL,
     STANDARD_RIGHTS_EXECUTE, STANDARD_RIGHTS_READ, STANDARD_RIGHTS_REQUIRED, STANDARD_RIGHTS_WRITE,
 };
 use windows::Win32::System::Diagnostics::Debug::{CREATE_PROCESS_DEBUG_EVENT, DEBUG_EVENT};
@@ -42,7 +45,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     WINSTA_ENUMERATE, WINSTA_EXITWINDOWS, WINSTA_READATTRIBUTES, WINSTA_READSCREEN,
     WINSTA_WRITEATTRIBUTES, WSF_VISIBLE,
 };
-use windows::core::{BOOL, Error as WindowsError};
+use windows::core::{BOOL, Error as WindowsError, HRESULT, w};
+
+use super::SecurityDescriptor;
 
 const NAME_UNITS: usize = 512;
 const TOKEN_WORDS: usize = 64;
@@ -496,6 +501,94 @@ fn dacl_simulation(
     }))
 }
 
+fn nul_token_access(
+    process: HANDLE,
+    descriptor: PSECURITY_DESCRIPTOR,
+    mapping: &GENERIC_MAPPING,
+) -> Result<Value, Value> {
+    let duplicate = duplicate_identification_token(process)?;
+    let token = HANDLE(duplicate.as_raw_handle());
+    Ok(json!({
+        "file_generic_read": check_access(descriptor, token, mapping, FILE_GENERIC_READ.0),
+        "file_generic_write": check_access(descriptor, token, mapping, FILE_GENERIC_WRITE.0),
+        "maximum_allowed": check_access(descriptor, token, mapping, MAXIMUM_ALLOWED),
+    }))
+}
+
+fn nul_security(handle: HANDLE) -> Result<SecurityDescriptor, Value> {
+    let mut descriptor = PSECURITY_DESCRIPTOR::default();
+    let status = unsafe {
+        GetSecurityInfo(
+            handle,
+            SE_FILE_OBJECT,
+            OWNER_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+            None,
+            None,
+            None,
+            None,
+            Some(&mut descriptor),
+        )
+    };
+    if status.0 != 0 {
+        return Err(api_error(WindowsError::from_hresult(HRESULT::from_win32(
+            status.0,
+        ))));
+    }
+    let security = SecurityDescriptor(HLOCAL(descriptor.0));
+    if descriptor.0.is_null() || !unsafe { IsValidSecurityDescriptor(descriptor) }.as_bool() {
+        return Err(unavailable("security_descriptor_invalid"));
+    }
+    let mut control = 0;
+    let mut revision = 0;
+    unsafe { GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) }
+        .map_err(api_error)?;
+    if control & SE_SELF_RELATIVE.0 == 0 {
+        return Err(unavailable("security_descriptor_invalid"));
+    }
+    validate_sd_length(unsafe { GetSecurityDescriptorLength(descriptor) })?;
+    Ok(security)
+}
+
+fn nul_dacl_simulation(process: HANDLE) -> Result<Value, Value> {
+    // 仅由监督进程打开固定设备并读取 SD；无继承、无写入、无线程 token 安装。
+    let device = unsafe {
+        CreateFileW(
+            w!(r"\\.\NUL"),
+            READ_CONTROL.0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            None,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
+            None,
+        )
+    }
+    .map_err(|error| json!({ "stage": "open_nul_read_control", "error": api_error(error) }))?;
+    let device = unsafe { OwnedHandle::from_raw_handle(device.0) };
+    // SD 与设备句柄保持至两份 token 对照结束，再分别由 LocalFree 与 CloseHandle 释放。
+    let security = nul_security(HANDLE(device.as_raw_handle()))
+        .map_err(|error| json!({ "stage": "read_nul_security", "error": error }))?;
+    let descriptor = PSECURITY_DESCRIPTOR(security.0.0);
+    let mapping = GENERIC_MAPPING {
+        GenericRead: FILE_GENERIC_READ.0,
+        GenericWrite: FILE_GENERIC_WRITE.0,
+        GenericExecute: FILE_GENERIC_EXECUTE.0,
+        GenericAll: FILE_ALL_ACCESS.0,
+    };
+    // 两份实际进程 token 使用同一 SD；文件掩码不是 CMD 真实打开设备的权限合同。
+    Ok(json!({
+        "scope": "bound_and_driver_tokens_against_observer_opened_nul",
+        "token_level": "identification",
+        "mandatory_integrity": "mic_not_evaluated",
+        "runtime_device_open": "not_established",
+        "generic_mapping": {
+            "read": mapping.GenericRead, "write": mapping.GenericWrite,
+            "execute": mapping.GenericExecute, "all": mapping.GenericAll,
+        },
+        "bound_process": reported(nul_token_access(process, descriptor, &mapping)),
+        "driver_process": reported(nul_token_access(unsafe { GetCurrentProcess() }, descriptor, &mapping)),
+    }))
+}
+
 fn environment(event: &DEBUG_EVENT) -> Result<Value, Value> {
     if event.dwDebugEventCode != CREATE_PROCESS_DEBUG_EVENT {
         return Err(unavailable("not_create_process_event"));
@@ -551,6 +644,7 @@ fn environment(event: &DEBUG_EVENT) -> Result<Value, Value> {
         "desktop_same_name_exact": same_name_exact,
         "desktop_same_object": "not_established",
         "dacl_simulation": reported(dacl_simulation(information.hProcess, station_handle, current_desktop_handle)),
+        "nul_dacl_simulation": reported(nul_dacl_simulation(information.hProcess)),
         "full_runtime_access": "not_established",
     }))
 }

@@ -414,6 +414,8 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
     let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
     assert_eq!(execution_cwd.canonicalize().unwrap(), root);
     let mut debugger = lease.prepare_image_debug_session().unwrap();
+    // 仅启用已有核验后只读环境钩子；不改变 NUL 对照的派生、清理与成功断言。
+    debugger.loader_trace = Some(loader_tests::LoaderTrace::default());
     let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
         lease.execution_path(),
         r#"/d /v:off /s /c "nul-control.cmd""#.as_ref(),
