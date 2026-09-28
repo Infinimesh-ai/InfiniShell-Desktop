@@ -1,4 +1,4 @@
-//! 固定版本诊断专用私有窗口站与桌面；不修改运行器既有对象，不启用任何特权。
+//! 固定版本诊断专用私有桌面；不修改运行器既有对象，不启用任何特权。
 
 use std::ffi::c_void;
 use std::io;
@@ -20,7 +20,7 @@ use windows::Win32::Security::{
 use windows::Win32::System::StationsAndDesktops::{
     CloseDesktop, CloseWindowStation, CreateDesktopW, CreateWindowStationW, DESKTOP_CONTROL_FLAGS,
     GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW, HDESK, HWINSTA,
-    SetProcessWindowStation, SetThreadDesktop, UOI_FLAGS, USEROBJECTFLAGS,
+    SetProcessWindowStation, SetThreadDesktop, UOI_FLAGS, UOI_NAME, USEROBJECTFLAGS,
 };
 use windows::Win32::System::Threading::{
     GetCurrentProcess, GetCurrentThreadId, OpenProcessToken, STARTUPINFOW,
@@ -303,6 +303,242 @@ fn verify_object(object: HANDLE, expected: &Descriptor, station: bool) -> io::Re
         return Err(invalid("私有桌面继承或可见状态不匹配"));
     }
     Ok(())
+}
+
+fn object_name(object: HANDLE, stage: &'static str) -> io::Result<Vec<u16>> {
+    let mut name = [0u16; 256];
+    let mut used = 0;
+    unsafe {
+        GetUserObjectInformationW(
+            object,
+            UOI_NAME,
+            Some(name.as_mut_ptr().cast()),
+            size_of_val(&name) as u32,
+            Some(&mut used),
+        )
+    }
+    .map_err(|error| api_error(stage, error))?;
+    if used as usize % size_of::<u16>() != 0 {
+        return Err(invalid("私有桌面对象名称长度无效"));
+    }
+    let units = used as usize / size_of::<u16>();
+    if !(2..=name.len()).contains(&units)
+        || name[units - 1] != 0
+        || name[..units - 1]
+            .iter()
+            .any(|unit| *unit == 0 || *unit == b'\\' as u16)
+    {
+        return Err(invalid("私有桌面对象名称无效"));
+    }
+    Ok(name[..units - 1].to_vec())
+}
+
+fn station_is_noninteractive(station: HWINSTA) -> io::Result<bool> {
+    let mut flags = USEROBJECTFLAGS::default();
+    let mut used = 0;
+    unsafe {
+        GetUserObjectInformationW(
+            HANDLE(station.0),
+            UOI_FLAGS,
+            Some((&mut flags as *mut USEROBJECTFLAGS).cast::<c_void>()),
+            size_of_val(&flags) as u32,
+            Some(&mut used),
+        )
+    }
+    .map_err(|error| api_error("read_existing_station_flags", error))?;
+    if used as usize != size_of_val(&flags) {
+        return Err(invalid("现有窗口站标志长度无效"));
+    }
+    Ok(flags.dwFlags & WSF_VISIBLE as u32 == 0)
+}
+
+pub(super) enum ProbeDesktop {
+    NewStation(PrivateDesktop),
+    ExistingStation(ExistingStationDesktop),
+}
+
+impl ProbeDesktop {
+    pub(super) fn verify(&self) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.verify(),
+            Self::ExistingStation(desktop) => desktop.verify(),
+        }
+    }
+
+    pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.configure_startup(startup),
+            Self::ExistingStation(desktop) => desktop.configure_startup(startup),
+        }
+    }
+
+    pub(super) fn close(&mut self) -> io::Result<()> {
+        match self {
+            Self::NewStation(desktop) => desktop.close(),
+            Self::ExistingStation(desktop) => desktop.close(),
+        }
+    }
+}
+
+pub(super) struct ExistingStationDesktop {
+    station: HWINSTA,
+    station_name: Vec<u16>,
+    original_desktop: HDESK,
+    desktop: Option<HDESK>,
+    desktop_name: Vec<u16>,
+    startup_name: Vec<u16>,
+    descriptor: Descriptor,
+    restored: bool,
+}
+
+impl ExistingStationDesktop {
+    pub(super) fn create(profile_name: &str, sid: PSID) -> io::Result<Self> {
+        let suffix = profile_name
+            .strip_prefix("InfiniShell.Version.")
+            .filter(|value| {
+                value.len() == 36
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() || byte == b'-')
+            })
+            .ok_or_else(|| invalid("私有桌面代次名称无效"))?;
+        let _creation = CREATION_LOCK
+            .lock()
+            .map_err(|_| invalid("私有桌面创建锁已损坏"))?;
+        let station = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("existing_station", error))?;
+        let station_name = object_name(HANDLE(station.0), "read_existing_station_name")?;
+        if !station_is_noninteractive(station)?
+            || station_name.len() == 7
+                && station_name
+                    .iter()
+                    .zip("WinSta0".encode_utf16())
+                    .all(|(actual, expected)| {
+                        u8::try_from(*actual)
+                            .is_ok_and(|actual| actual.eq_ignore_ascii_case(&(expected as u8)))
+                    })
+        {
+            return Err(invalid("私有桌面拒绝交互窗口站"));
+        }
+        let original_desktop = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+            .map_err(|error| api_error("original_desktop", error))?;
+        let desktop_name = wide(format!("InfiniShell.Probe.{suffix}").as_ref())?;
+        let mut startup_name = station_name.clone();
+        startup_name.push(b'\\' as u16);
+        startup_name.extend_from_slice(&desktop_name);
+        let owner = current_user_sid()?;
+        let container = sid_text(sid)?;
+        if owner == container {
+            return Err(invalid("私有桌面用户与容器 SID 相同"));
+        }
+        let descriptor = Descriptor::new(
+            &owner,
+            &container,
+            DESKTOP_OWNER_ACCESS,
+            DESKTOP_CONTAINER_ACCESS,
+        )?;
+        let mut result = Self {
+            station,
+            station_name,
+            original_desktop,
+            desktop: None,
+            desktop_name,
+            startup_name,
+            descriptor,
+            restored: false,
+        };
+        let created = (|| -> io::Result<()> {
+            let attributes = result.descriptor.attributes();
+            result.desktop = Some(
+                unsafe {
+                    CreateDesktopW(
+                        PCWSTR(result.desktop_name.as_ptr()),
+                        None,
+                        None,
+                        DESKTOP_CONTROL_FLAGS(0),
+                        DESKTOP_OWNER_ACCESS,
+                        Some(&attributes),
+                    )
+                }
+                .map_err(|error| api_error("create_existing_station_desktop", error))?,
+            );
+            result.verify()?;
+            result.restore()
+        })();
+        if let Err(error) = created {
+            let cleanup = result.close();
+            eprintln!(
+                "atomic_windows_existing_station_private_object_cleanup={{\"confirmed\":{}}}",
+                cleanup.is_ok()
+            );
+            return Err(match cleanup {
+                Ok(()) => error,
+                Err(cleanup) => io::Error::other(format!("{error}；私有对象清理失败：{cleanup}")),
+            });
+        }
+        Ok(result)
+    }
+
+    fn restore(&mut self) -> io::Result<()> {
+        if !self.restored {
+            let current = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+                .map_err(|error| api_error("read_current_desktop", error))?;
+            if current != self.original_desktop {
+                unsafe { SetThreadDesktop(self.original_desktop) }
+                    .map_err(|error| api_error("restore_desktop", error))?;
+            }
+            let restored = unsafe { GetThreadDesktop(GetCurrentThreadId()) }
+                .map_err(|error| api_error("verify_restored_desktop", error))?;
+            if restored != self.original_desktop {
+                return Err(invalid("私有桌面原始桌面恢复未确认"));
+            }
+            self.restored = true;
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify(&self) -> io::Result<()> {
+        let current = unsafe { GetProcessWindowStation() }
+            .map_err(|error| api_error("verify_existing_station", error))?;
+        if current != self.station
+            || object_name(HANDLE(current.0), "read_existing_station_name")? != self.station_name
+            || !station_is_noninteractive(current)?
+        {
+            return Err(invalid("私有桌面现有窗口站身份不匹配"));
+        }
+        let desktop = self.desktop.ok_or_else(|| invalid("私有桌面已关闭"))?;
+        if object_name(HANDLE(desktop.0), "read_existing_desktop_name")?.as_slice()
+            != &self.desktop_name[..self.desktop_name.len() - 1]
+        {
+            return Err(invalid("私有桌面对象名称不匹配"));
+        }
+        verify_object(HANDLE(desktop.0), &self.descriptor, false)
+    }
+
+    pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
+        if !self.restored {
+            return Err(invalid("私有桌面原始桌面尚未恢复"));
+        }
+        self.verify()?;
+        startup.lpDesktop = PWSTR(self.startup_name.as_mut_ptr());
+        Ok(())
+    }
+
+    pub(super) fn close(&mut self) -> io::Result<()> {
+        self.restore()?;
+        if let Some(desktop) = self.desktop {
+            unsafe { CloseDesktop(desktop) }.map_err(|error| api_error("close_desktop", error))?;
+            self.desktop = None;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for ExistingStationDesktop {
+    fn drop(&mut self) {
+        // 仅关闭本轮创建的桌面；现有窗口站与原桌面句柄均由系统持有。
+        let _ = self.close();
+    }
 }
 
 struct OriginalObjects {

@@ -268,13 +268,15 @@ pub struct AppContainerProbe {
     process_id: u32,
     cleaned: bool,
     #[cfg(any(test, feature = "test-util"))]
-    private_desktop: Option<desktop::PrivateDesktop>,
+    private_desktop: Option<desktop::ProbeDesktop>,
 }
 
 enum ProbeDesktopMode {
     Inherited,
     #[cfg(any(test, feature = "test-util"))]
     Private,
+    #[cfg(any(test, feature = "test-util"))]
+    ExistingStationPrivate,
 }
 
 enum ProbeConsoleMode {
@@ -405,6 +407,29 @@ impl AppContainerProbe {
         )
     }
 
+    /// 测试专用：只在调用方已有的非交互窗口站中创建本轮桌面，不修改该窗口站。
+    #[cfg(any(test, feature = "test-util"))]
+    pub fn spawn_package_suspended_with_existing_station_desktop(
+        program: &Path,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+    ) -> io::Result<Self> {
+        Self::spawn_package_internal(
+            program,
+            std::ffi::OsStr::new("--version"),
+            cwd,
+            execution_cwd,
+            environment,
+            name,
+            readonly,
+            ProbeConsoleMode::NoWindow,
+            ProbeDesktopMode::ExistingStationPrivate,
+        )
+    }
+
     /// 只读复核本次持有的私有对象；不重新打开名称，也不修改既有对象权限。
     #[cfg(any(test, feature = "test-util"))]
     pub fn verify_private_desktop(&self) -> io::Result<()> {
@@ -503,7 +528,32 @@ impl AppContainerProbe {
             ProbeDesktopMode::Inherited => {}
             #[cfg(any(test, feature = "test-util"))]
             ProbeDesktopMode::Private => {
-                result.private_desktop = Some(desktop::PrivateDesktop::create(name, result.sid)?);
+                result.private_desktop = Some(desktop::ProbeDesktop::NewStation(
+                    desktop::PrivateDesktop::create(name, result.sid)?,
+                ));
+            }
+            #[cfg(any(test, feature = "test-util"))]
+            ProbeDesktopMode::ExistingStationPrivate => {
+                match desktop::ExistingStationDesktop::create(name, result.sid) {
+                    Ok(private) => {
+                        result.private_desktop =
+                            Some(desktop::ProbeDesktop::ExistingStation(private));
+                    }
+                    Err(failure) => {
+                        // 根进程尚未创建；显式删除本轮 profile 后才报告环境建立失败。
+                        let cleanup = result.cleanup();
+                        eprintln!(
+                            "atomic_windows_existing_station_setup={{\"profile_cleanup_confirmed\":{}}}",
+                            cleanup.is_ok()
+                        );
+                        return Err(match cleanup {
+                            Ok(()) => failure,
+                            Err(_) => io::Error::other(format!(
+                                "{failure}；AppContainer profile 清理未确认"
+                            )),
+                        });
+                    }
+                }
             }
         }
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();

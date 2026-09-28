@@ -237,6 +237,42 @@ fn private_desktop_rejects_readonly_objects_outside_the_candidate_before_creatin
     );
 }
 
+#[test]
+fn existing_station_desktop_rejects_a_different_execution_directory_before_creating_profile() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_existing_station_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        other.path(),
+        &[],
+        "unused-profile",
+        &[],
+    );
+    assert_eq!(result.err().unwrap().to_string(), "版本探针执行目录不匹配");
+}
+
+#[test]
+fn existing_station_desktop_rejects_readonly_objects_outside_the_candidate_before_creating_profile()
+{
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let result = AppContainerProbe::spawn_package_suspended_with_existing_station_desktop(
+        Path::new("unused.exe"),
+        &cwd,
+        &cwd,
+        &[],
+        "unused-profile",
+        &[other.path().canonicalize().unwrap()],
+    );
+    assert_eq!(
+        result.err().unwrap().to_string(),
+        "包探针的只读对象范围无效"
+    );
+}
+
 // 私有对象断言由既有 console_tests 入口运行，保持远程定向过滤有效。
 
 #[test]

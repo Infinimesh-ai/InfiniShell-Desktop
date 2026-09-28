@@ -1119,6 +1119,15 @@ fn npm_fixed_node_root_with_private_desktop() {
     );
 }
 
+#[test]
+#[ignore = "现有非交互窗口站内的私有桌面须由固定 Node 根进程和完整清理原生对照"]
+fn npm_fixed_node_root_with_existing_station_desktop() {
+    run_cmd_worker_stdio_control(
+        "console_binding::npm_fixed_node_root_with_existing_station_desktop",
+        WorkerStdioControl::NodeRootExistingStationDesktop,
+    );
+}
+
 #[derive(Clone, Copy)]
 enum WorkerStdioControl {
     BoundCmd,
@@ -1128,6 +1137,7 @@ enum WorkerStdioControl {
     HiddenNodeChild,
     HiddenNodeRoot,
     NodeRootPrivateDesktop,
+    NodeRootExistingStationDesktop,
 }
 
 // 只回显固定 API 阶段和数值；不输出错误正文、对象名称、SID 或路径。
@@ -1147,9 +1157,16 @@ fn private_desktop_failure_summary(failure: &io::Error) -> serde_json::Value {
                 "read_object_flags",
                 "original_station",
                 "original_desktop",
+                "existing_station",
+                "read_existing_station_name",
+                "read_existing_station_flags",
+                "read_existing_desktop_name",
+                "read_current_desktop",
+                "verify_existing_station",
                 "create_station",
                 "select_station",
                 "create_desktop",
+                "create_existing_station_desktop",
                 "restore_station",
                 "restore_desktop",
                 "verify_restored_station",
@@ -1227,6 +1244,13 @@ fn private_desktop_failure_keeps_only_fixed_stage_and_numeric_hresult() {
             "private_object_api_stage": null,
             "hresult": 2147942405_u32,
         })
+    );
+
+    let existing_station =
+        io::Error::other("私有桌面 create_existing_station_desktop 失败：HRESULT=0x80070005");
+    assert_eq!(
+        private_desktop_failure_summary(&existing_station)["private_object_api_stage"],
+        "create_existing_station_desktop"
     );
 }
 
@@ -1326,8 +1350,15 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         WorkerStdioControl::NodeRoot
             | WorkerStdioControl::HiddenNodeRoot
             | WorkerStdioControl::NodeRootPrivateDesktop
+            | WorkerStdioControl::NodeRootExistingStationDesktop
     );
-    let private_desktop = matches!(mode, WorkerStdioControl::NodeRootPrivateDesktop);
+    let private_desktop = matches!(
+        mode,
+        WorkerStdioControl::NodeRootPrivateDesktop
+            | WorkerStdioControl::NodeRootExistingStationDesktop
+    );
+    let existing_station_desktop =
+        matches!(mode, WorkerStdioControl::NodeRootExistingStationDesktop);
     let hidden_console = matches!(
         mode,
         WorkerStdioControl::HiddenBoundCmd
@@ -1356,6 +1387,11 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
         WorkerStdioControl::NodeRootPrivateDesktop => {
             ("node_20_9_0_root_private_desktop", "v20.9.0", "--version")
         }
+        WorkerStdioControl::NodeRootExistingStationDesktop => (
+            "node_20_9_0_root_existing_station_desktop",
+            "v20.9.0",
+            "--version",
+        ),
     };
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_stdio_fixture_in_strict_job(name, case, expected_line);
@@ -1478,7 +1514,12 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
     };
     // 私有桌面只在独立 driver 中创建；此入口固定 --version 与 NoWindow。
     let mut process = if private_desktop {
-        match AppContainerProbe::spawn_package_suspended_with_private_desktop(
+        let spawn = if existing_station_desktop {
+            AppContainerProbe::spawn_package_suspended_with_existing_station_desktop
+        } else {
+            AppContainerProbe::spawn_package_suspended_with_private_desktop
+        };
+        match spawn(
             lease.execution_path(),
             cwd.execution_path(),
             &execution_cwd,
@@ -1493,7 +1534,7 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
                     "atomic_windows_private_desktop_control={}",
                     serde_json::json!({
                         "case": case,
-                        "phase": "spawn_private_desktop_failed",
+                        "phase": if existing_station_desktop { "spawn_existing_station_desktop_failed" } else { "spawn_private_desktop_failed" },
                         "environment_control_established": false,
                         "private_objects_verified": false,
                         "private_objects_closed": null,
@@ -1619,12 +1660,13 @@ fn run_cmd_worker_stdio_control(name: &str, mode: WorkerStdioControl) {
             serde_json::json!({
                 "case": case,
                 "phase": private_desktop_phase,
+                "desktop_mode": if existing_station_desktop { "existing_noninteractive_station" } else { "new_private_station" },
                 "console_mode": "no_window",
                 "shim_executed": false,
                 "environment_control_established": private_objects_verified,
                 "private_objects_verified": private_objects_verified,
-                "object_verification_scope": "retained_private_object_handles",
-                "private_objects_closed_scope": "owned_handles",
+                "object_verification_scope": if existing_station_desktop { "retained_private_desktop_and_borrowed_station_identity" } else { "retained_private_object_handles" },
+                "private_objects_closed_scope": if existing_station_desktop { "owned_private_desktop_only" } else { "owned_handles" },
                 "private_objects_closed": cleanup.is_ok().then_some(true),
                 "cleanup_confirmed": cleanup.is_ok(),
                 "receipt_matches": receipt_matches,

@@ -15,6 +15,13 @@ slow-timeout = { period = "150s", terminate-after = 1 }
 retries = 0
 
 [[profile.default.overrides]]
+# 原生受限令牌诊断会复制大型测试二进制；由用例内的严格 Job 先完成有界清理。
+filter = 'package(warp) and test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular)'
+platform = { host = 'cfg(target_os = "windows")' }
+slow-timeout = { period = "150s", terminate-after = 1 }
+retries = 0
+
+[[profile.default.overrides]]
 filter = 'package(warp)'
 platform = { host = 'cfg(target_os = "windows")' }
 test-group = 'windows-warp-tests'
