@@ -32,6 +32,9 @@
 - **未验证代码增量**：macOS arm64 与 Linux x86_64 的 GUI 启动、原生侧车输入、精确回执、恢复占用及菜单已合入主工作区。Linux 通过真实 PTY、pidfd 和 SO_PEERPIDFD 绑定进程，缺少内核能力时不使用裸 PID 替代；不能声明全部 Linux 版本可用。Windows 已合入原始 ConPTY shell 句柄、创建时原子 Job 归属、命名管道侧车、PowerShell 启动及恢复接线；原生 Job／控制台／管道链仍须真实校准。任务列表历史继续也已接同UUID --resume、新generation CAS及活跃原PTY只读关联；最后实机链仍欠。之前“GUI 尚未接线”描述对应已提交基线。
 - **上下文补接**：`debed8c51` 已将有效本地／远端专属 Grok 的代码／评审／diff 上下文接入恢复后的同代草稿队列，已打开会话也保持连续追加顺序；新增四项回归本地通过，英中操作提示已同步。普通未绑定 PTY 的拒绝不变，三平台真实发送与双语布局待验，G01 不关闭。
 - **2026-09-27 `e2eba8596` 实际 GUI 增量**：Mac ARM64 固定 `1.0.41/grok-4.7/default` 专属入口已通过中文加单图一次发送、原生同 prompt ACK/end_turn、精确图片字节与识色回答；ACK 清草稿、应用重启不自动重投及局部英中布局通过。普通未绑定 PTY 拒绝保持；多行长文本、审批、活跃／冷恢复和其他平台仍待验，不关闭本项。
+- **2026-09-29 `2383428da` 当前 GUI 增量**：Mac 独立签名版专属 TUI 真实完成英文与中文两行文本各一轮，原文进入同一原生会话、取得回执及回复；普通未绑定 TUI 拒绝并保留草稿。重启后从任务面板继续同一原生 ID，历史两条各一次，新 run 2 第三条回答 `4`。第二轮模型精确标记答错；旧会话关闭的 hook 警告和任务面板未保存最终结果保持未解。图片粘贴、权限审批、Linux／Windows 和普通未绑定 PTY 安全自动提交仍待验，G01 不关闭。
+- **2026-09-29 `bd4612887` 失败提示修复**：专属会话消失或输入租约登记失败时，提交不再静默返回，复用既有双语提示并保留草稿；会话消失与 PTY 零写入的定向回归通过。普通未绑定 PTY 的可信提交与旧 run 结果持久化没有因此完成，G01 不关闭。
+- **旧 run 结果落盘诊断**：私有 profile 中第 1 代两条、第 2 代一条输入均已获 `NativeProtocol/end_turn` ACK，但 task `result` 仍为 `None`。专属 TUI 从 TerminalView 直接建任务，未经过常规 pane 的 `bind_local_task`；现有 ACK 只保存投递状态，不含模型正文。直接补绑定还会与逐次输入 checkpoint 争用 revision。安全修复需对同一已认证 leader 的 `_x.ai/session/updates` 做完整回放和 `turn_completed` 水位校验，再按 task/generation/launch/binding/session/message/prompt 身份执行旧代结果 CAS；应用退出后仅重读恢复，不能重投。当前无单点修复，未写入半成品，旧 run 结果仍缺失。
 - **当前替代方式**：保留草稿，明确点击复制，关闭富输入后由用户粘贴到原生 CLI；也可使用已验证的托管文本输入。
 - **源码／证据**：[普通终端提交与拒绝路径](../../app/src/terminal/view/use_agent_footer/mod.rs#L1153)、[历史明确复制验收](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/OFFICIAL_40_RECOVERY_AND_INPUT_GUARDS.md)。
 - **关闭条件**：固定版本的真实普通 PTY 能在可信输入就绪时自动发送中文、多行和长文本；审批、旧会话、重连与重复点击不得误批准、丢失或重投。取得实际回合接收与结果证据后，才可移除无条件拒绝。
@@ -74,7 +77,7 @@
 
 ### G06 — Claude／Grok 多技能与会话内新增的实现及验收
 
-- **2026-09-29 同提交在线正例 `2383428da`**：Claude `2.1.280/claude-opus-5-5` macOS 生产适配器图片加双技能新建和同原生会话冷恢复均通过；两张不同 PNG 的原生字节和结果、每轮两个 Skill 的精确审批及执行、自然退出与清理按收据分别计证。证据见[验证结论](VALIDATION_REPORT.md)。此正例不覆盖实际 GUI、其他平台、父权限上限或会话内热新增，不关闭 G06。
+- **2026-09-29 同提交在线正例 `2383428da`**：Claude `2.1.280/claude-opus-5-5` macOS 生产适配器图片加双技能新建和同原生会话冷恢复均通过；两张不同 PNG 的原生字节和结果、每轮两个 Skill 的精确审批及执行、自然退出与清理按收据分别计证。随后同一签名二进制的 Mac GUI 新建任务也验证一张 PNG 加 alpha/beta 两技能独立审批、原生执行顺序与结果；GUI 冷恢复因同 bundle ID 的归属不明旧实例无法精确绑定而在发送前停止。证据见[验证结论](VALIDATION_REPORT.md)。这些正例不覆盖其他平台、父权限上限或这一构建的 GUI 会话内热新增／冷恢复，不关闭 G06。
 
 - **2026-09-27 Grok 组合增量 `ba73c4df3`**：图片与技能已接同一类型化输入帧，单技能 slash 在图片前，多技能按所选顺序保留独立引用；首技能原生展开、其余原生文件读取的真实语义不改变。新增十项适配器回归，原无技能图片范围不收紧。原生两轮合同不能代替产品组合及跨平台验收，固定策略未扩权。
 
@@ -90,6 +93,7 @@
 
 - **状态／优先级／范围**：功能缺项，高；P1 附件和文件上下文。
 - **实际情况与影响**：本次输入增量把本地文件卡片转为明确路径引用：整批校验绝对路径、普通文件及当前账号可读性，以 JSON 保留中文/空格/引号边界，交由 CLI 原生读取与审批，失败保留草稿；不发送任意二进制内容，远程文件卡仍拒绝。三款 macOS 原生 PTY 手动路径投递均有读取独立标记正例，Claude 另有原生拒绝；此前 GUI 入口只插入正文路径的负例已保留，后续四文件增量已接通选择器 PendingFile 卡片并保留 CLI 锁定输入模式与旧回调校验。macOS Codex `0.156.1/gpt-6-luna` 真实 GUI 两卡片一次发送，原生 shell 实际读取中文/空格路径的两份文件并返回独立标记；英文和简体中文布局可读。中文首轮模型转向 TextEdit、审批被拒的读取失败仍保留，不冒充正例。Grok `1.0.41` 两卡片可创建，发送仍受 G01 阻止并完整保留草稿；Claude 认证有效但普通终端首次向导未完成，本轮 GUI 链待补。失效文件、拒绝链和 Linux/Windows 完整验收仍欠。
+- **2026-09-29 `bd4612887` Shell 模式防护**：Codex／Claude 锁定 Shell 模式与本地文件卡片组合时，`!` 前缀会把路径说明带入原生命令模式；现于写入 PTY 前拒绝并保留草稿及卡片。含中文、英文空格路径的双卡片零写入回归通过。实际 GUI 的收起入口、Claude 首次向导和三平台原生读取仍待验，G07 不关闭。
 - **当前替代方式**：使用 CLI 可访问的文件路径或现有文件上下文入口，明确确认引用的文件；不承诺二进制文件由模型直接理解。
 - **源码／证据**：[文件附件投递](../../app/src/terminal/view/use_agent_footer/mod.rs#L694)。
 - **关闭条件**：界定支持的文件种类和投递语义，完成三款普通 PTY 的附件转换、正确路径／字节接收、空格与中文路径、失效文件和权限拒绝验收；不能只删除拒绝分支。
@@ -152,7 +156,7 @@
 
 - **Mac Grok 私有APFS补验 run-03**：复用冻结worker与bb78监督程序，在318c干净检出的17/15关联源码等价边界下，正常更新、缺失完成记录冷回滚、外部变更保留、候选篡改拒绝四项同批通过，实际公开版本依次1.0.41/1.0.40/1.0.41/1.0.40，独立复核全部通过。新卷0700、原SanDisk0775保持，noowners未改，不声称原布局修复或多用户隔离。172份收据/日志及完整映像已留存，普通卸载确认；本轮cargo check通过，无需本地化变更。原失败保留，G09/14项必要缺口仍开放。
 
-- **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。 后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。定向套件一项伪句柄夹具错误另修，未据此关闭缺项。
+- **最新实测**：`bd80cc9ed` 的 Windows 真实 npm 登记与固定三入口模板通过；首个 CMD 候选探针因未绑定子映像被拒，`cleanup_confirmed:false`，尚未进入 PowerShell／发布／恢复。Linux 与 Windows 编译及定向回归结果见[最新门禁](VALIDATION_REPORT.md)，不据此关闭 G09。后续 `ca37b9cbf` 已补脱敏诊断及失败清理证明，本地门禁通过；Windows 在事件码字段类型编译错误处失败，原生场景未运行，字段在 `3dbe79e58` 修正且编译通过。新日志定位System32 conhost，实际更新仍拒绝；本轮清理确认成功，旧未知不回填。`2383428da` 的 [Windows CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36453314472) 原子进程专项 3 项中 2 项仍失败：NUL 重定向输出为空但前后普通命令成功，固定 Node 根进程在首断点后以 `0xc0000142` 退出，均确认严格 Job 清理；未命名窗口站探针 `created=false`，未建立对象。现有 NUL DACL 仿真不能证明真实 CreateFile 或 Node 根因，不能据此改 ACL 或隔离；真实 npm 仍未通过，G09 保持开放。
 
 ### G10 — Claude／Grok 子任务限固定权限策略
 
@@ -210,7 +214,7 @@
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
 
 - **状态／优先级／范围**：验收缺口，高；P2 通知、P4 重连、P5 SSH／tmux。
-- **实际情况与影响**：当前固定版本三款链主要覆盖 Mac 到本机隔离 OpenSSH，并包含 tmux 断连重接；不覆盖远端 Linux、Windows、WSL 等组合。Codex 关闭 tmux 透传补测虽观察到产品接收 0，但未独立证明内层原生 hook 实际发送，不能仅用 Claude／Grok 的公共解析器正例补齐 Codex 原生证据。
+- **实际情况与影响**：当前固定版本三款链主要覆盖 Mac 到本机隔离 OpenSSH，并包含 tmux 断连重接；不覆盖远端 Linux、Windows、WSL 等组合。旧 Codex 关闭 tmux 透传补测仅观察到产品接收 0，缺少内层发送证据。2026-09-29 独立本机回环补测在固定 `0.156.1` 的原生 `SessionStart`／`UserPromptSubmit` hook、私有 tmux `3.7c` 且 `allow-passthrough=off` 下，确认 pane 内两条通知与外层 SSH 输出零通知；该双端负例补齐这一窄范围，不代表远端组合、产品 UI 的双向交互或断连取消验收。
 - **当前替代方式**：按已测 Mac→本机组合说明支持，不把本机 CLI 安装检出当作远端就绪。
 - **源码／证据**：[三款 SSH／tmux 场景表](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)、[Codex 关闭透传原收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/codex-tmux-off-one-input-v2.safe.json)。
 - **关闭条件**：明确后续目标远端组合，在真实目标 CLI、插件与 PTY 上验证通知、双向交互、重复／乱序、断连恢复和取消；Codex 关闭透传须同时独立观察内层原生发送与外层无接收，不能把未触发误判为成功拦截。

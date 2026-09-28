@@ -104,8 +104,30 @@
     "scope": "G01/G03恢复与回调隔离、G04-G06 Claude图片双技能验收、G07文件卡片回归、G08远端图片旧回调隔离、G09 Windows诊断、G10技能入口及V02/V03/V05验收工具、TUI中文占位宽字符修复",
     "local_gates": "macOS定向Rust 8项、i18n 11项、cargo check -p warp、Windows command目标检查、相关Python脚本测试、TUI英中真实PTY布局通过；未新增或变动用户可见文案，无需本地化变更",
     "claude_online": "固定2.1.280/claude-opus-5-5 macOS生产适配器图片加双技能新建与同原生会话冷恢复通过；两轮自然退出0且清理确认。仓外resume-20260929/claude-multi-2383428-05/receipt.json摘要70856b39cc8280b172d02a46ec8bff01ddc02a053dee6d501b12d757255a615a；不覆盖GUI、跨平台或父权限上限",
+    "grok_gui": "同一签名二进制Mac独立GUI：普通未绑定TUI保留草稿且拒绝自动发送；专属TUI同原生会话英文与中文两行各一轮有原生输入及回复，应用重启后同原生ID冷恢复并提交run2第三轮回答4。第二轮模型标记答错，旧会话hook警告及任务面板无最终结果保留。两轮TMPDIR归档后已清理；图片、审批、普通PTY与跨平台未验，G01/G03不关闭",
     "cloud_run": 36453314472,
-    "cloud_status": "运行中；不预记结果",
+    "cloud_status": "run36453314472已结束：Linux成功；Windows编译、桌面/TUI 660项及rust-genai 81项通过，但原子进程诊断3项中2项失败，整体failure。NUL对照预期输出为空，固定Node根进程0xc0000142；清理确认不代表功能通过。原始日志/官方工件已归档；G09不关闭",
+    "closed_gaps": [],
+    "claude_gui": "同签名Mac GUI新建任务的一轮PNG原字节+两项技能独立Allow once：原生两次Skill调用/结果顺序、持久化结果及清理确认。仓外receipt摘要b18f344a865ed39e74ac8a75cb75e4cbcb4e8fc1ed2f21ee8d4698c68d697c80；GUI冷恢复因同bundle ID旧实例无法精确绑定而在发送前停止，G04-G06不关闭",
+    "current_branch_cloud_run": 36467106568,
+    "current_branch_cloud_source_commit": "12adb9f2eceb155d9e9c32312bdd3c6f428a4c57",
+    "current_branch_cloud_status": "Linux/Windows普通门禁运行中；不预记结果，未选G09已知失败专项诊断"
+  },
+  "g01_g07_guard_followup": {
+    "implementation_commit": "bd4612887a864196744721621f29fa5d5c57e3b1",
+    "status": "已提交推送；本机定向及本地化门禁通过，跨平台同提交验收待执行",
+    "scope": "专属 Grok 会话或输入租约失败显示既有提示并保留草稿；Codex／Claude 锁定 Shell 模式文件卡于 PTY 写入前拒绝",
+    "local_gates": "macOS 定向 2 项、i18n 11 项、cargo check -p warp 通过；中文与英文空格路径双卡、草稿及卡片保持和 PTY 零写入已测试；无需本地化变更，未新增 GUI 双语布局验收",
+    "closed_gaps": []
+  },
+  "v03_codex_tmux_loopback_followup": {
+    "tooling_commit": "12adb9f2e",
+    "product_baseline": "bd4612887a864196744721621f29fa5d5c57e3b1",
+    "status": "macOS 本机回环双端负例通过；远端 Linux/Windows/WSL 组合仍开放",
+    "scope": "固定 Codex 0.156.1 原生 SessionStart/UserPromptSubmit hook 各发一条，tmux 3.7c 关闭透传时 pane 内两条、外层 SSH 零通知；无模型请求，进程与临时目录已清理",
+    "archive_index_sha256": "8396e3cda943c939cba7a421e7e11cd3e6405befe2363cf41adcd45047f8aa2b",
+    "focused_python_tests": "3+7+11 项通过；测试脚本执行时工作树有未提交文档与工具，产品基线单独绑定",
+    "localization": "无需本地化变更；未新增产品 UI 文案或布局结论",
     "closed_gaps": []
   },
   "selected_related_gates_scope": "7dd68cc9b 普通Linux x64与Windows x64同提交门禁官方成功；Windows desktop/TUI 660通过包含1 LEAK，保持待查。未覆盖真实npm/Homebrew消费者更新、Windows NUL/Node失败对照、GUI或已认证模型；G09与14项必要缺口仍开放。",
