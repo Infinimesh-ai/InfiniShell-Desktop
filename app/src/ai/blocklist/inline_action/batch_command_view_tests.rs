@@ -168,7 +168,7 @@ fn batch_outcome_maps_error_and_cancelled_variants() {
 #[test]
 fn batch_outcome_parses_success_text_content() {
     let result = CallMCPToolResult::Success {
-        result: rmcp::model::CallToolResult::success(vec![rmcp::model::Content::text(
+        result: rmcp::model::CallToolResult::success(vec![rmcp::model::ContentBlock::text(
             r#"{"status":"ok","results":[{"status":"ok"}]}"#,
         )]),
     };
