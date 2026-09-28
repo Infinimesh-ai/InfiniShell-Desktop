@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::process::Child;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
@@ -176,6 +176,7 @@ fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, OwnedPtyFixture) 
             last_attempt: None,
             sending: false,
             invalidated: false,
+            recovery_blocks_input: Arc::new(AtomicBool::new(false)),
             unconfirmed_drafts: HashMap::new(),
             binding: false,
             launch_command: None,
@@ -218,6 +219,51 @@ fn new_block_in_same_pty_and_session_revokes_old_owned_input() {
             assert!(!view.owned_grok_identity_matches());
             view.invalidate_owned_grok_if_changed(ctx);
             assert!(lease.revoked());
+        });
+    });
+}
+
+#[test]
+fn saved_result_only_updates_matching_owned_task() {
+    App::test((), |mut app| async move {
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.read(&app, |view, _| {
+            let owned = view.grok_owned_input.as_ref().unwrap();
+            let mut saved = owned.task.clone();
+            saved.revision += 1;
+            saved.result = Some("verified".into());
+            assert!(owned.accepts_saved_result(&saved));
+
+            let mut stale = saved.clone();
+            stale.task_id = Uuid::new_v4().to_string();
+            assert!(!owned.accepts_saved_result(&stale));
+            stale = saved.clone();
+            stale.generation += 1;
+            assert!(!owned.accepts_saved_result(&stale));
+            stale = saved.clone();
+            stale.revision = owned.task.revision - 1;
+            assert!(!owned.accepts_saved_result(&stale));
+            stale = saved.clone();
+            stale.native_session_id = Some(Uuid::new_v4().to_string());
+            assert!(!owned.accepts_saved_result(&stale));
+            stale = saved.clone();
+            let mut config: serde_json::Value = serde_json::from_str(&stale.config_json).unwrap();
+            config["launch_sha256"] = json!("other-launch");
+            stale.config_json = config.to_string();
+            assert!(!owned.accepts_saved_result(&stale));
+            for field in [
+                "launch_id",
+                "binding_id",
+                "input_revision",
+                "permission_revision",
+            ] {
+                let mut config: serde_json::Value =
+                    serde_json::from_str(&saved.config_json).unwrap();
+                config["grok_terminal"][field] = json!(Uuid::new_v4());
+                stale = saved.clone();
+                stale.config_json = config.to_string();
+                assert!(!owned.accepts_saved_result(&stale), "{field}");
+            }
         });
     });
 }
@@ -290,6 +336,83 @@ fn owned_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
             assert_eq!(images.len(), 2);
             assert_eq!(images[0].file_name, "clip.png");
             assert_eq!(images[1].file_name, "drop.png");
+        });
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
+fn owned_grok_open_composer_routes_image_drops_without_pty_write() {
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if matches!(event, Event::WriteBytesToPty { .. }) {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        });
+        let root = tempfile::tempdir().unwrap();
+        let png = include_bytes!("../../editor/view/figma_utils/non-figma-export.png");
+        let first = root.path().join("first.png");
+        let second = root.path().join("second.png");
+        let other = root.path().join("other.txt");
+        std::fs::write(&first, png).unwrap();
+        std::fs::write(&second, png).unwrap();
+        std::fs::write(&other, b"not an image").unwrap();
+        let context = terminal.read(&app, |view, _| view.ai_context_model.clone());
+        let (attached, received) = oneshot::channel();
+        let mut attached = Some(attached);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&context, move |model, event, ctx| {
+                if matches!(event, BlocklistAIContextEvent::UpdatedPendingContext { .. })
+                    && model.as_ref(ctx).pending_images().len() == 2
+                {
+                    if let Some(attached) = attached.take() {
+                        attached.send(()).unwrap();
+                    }
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+            view.drag_and_drop_files(
+                &[
+                    first.to_string_lossy().into_owned(),
+                    second.to_string_lossy().into_owned(),
+                ],
+                ctx,
+            );
+        });
+        received_event(received).await;
+        terminal.read(&app, |view, ctx| {
+            let images = view.ai_context_model.as_ref(ctx).pending_images();
+            assert_eq!(images.len(), 2);
+            assert_eq!(images[0].file_name, "first.png");
+            assert_eq!(images[1].file_name, "second.png");
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.drag_and_drop_files(
+                &[
+                    first.to_string_lossy().into_owned(),
+                    other.to_string_lossy().into_owned(),
+                ],
+                ctx,
+            );
+            view.drag_and_drop_files(&[other.to_string_lossy().into_owned()], ctx);
+        });
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 2);
+        });
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+        terminal.update(&mut app, |view, ctx| {
+            view.grok_owned_input.as_mut().unwrap().invalidated = true;
+            view.drag_and_drop_files(&[first.to_string_lossy().into_owned()], ctx);
         });
         assert_eq!(writes.load(Ordering::SeqCst), 0);
     });
@@ -496,6 +619,43 @@ fn invalidated_owned_grok_context_keeps_saved_draft_closed() {
                 Some("保留原草稿")
             );
         });
+    });
+}
+
+#[test]
+fn current_turn_recovery_preserves_draft_until_result_cas_finishes() {
+    App::test((), |mut app| async move {
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let (reported, notification) = oneshot::channel();
+        let mut reported = Some(reported);
+        let unavailable = crate::t!("cli-agent-grok-owned-input-unavailable");
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event
+                    && toast.main_text() == unavailable
+                    && let Some(reported) = reported.take()
+                {
+                    reported.send(()).unwrap();
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            let owned = view.grok_owned_input.as_mut().unwrap();
+            let original_task = owned.task.clone();
+            let original_owner = owned.owner.clone();
+            owned.recovery_blocks_input.store(true, Ordering::SeqCst);
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("补查期间保留草稿", ctx)
+            });
+            view.submit_owned_grok_input("补查期间保留草稿".into(), ctx);
+            let owned = view.grok_owned_input.as_ref().unwrap();
+            assert!(!owned.sending);
+            assert_eq!(owned.task, original_task);
+            assert_eq!(owned.owner, original_owner);
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "补查期间保留草稿");
+            owned.recovery_blocks_input.store(false, Ordering::SeqCst);
+        });
+        received_event(notification).await;
     });
 }
 

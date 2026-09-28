@@ -18,6 +18,7 @@ pub(crate) mod conversation_bridge;
 pub(crate) mod coordinator;
 mod file_search_scope;
 pub(crate) mod grok;
+pub(crate) mod grok_final_history;
 mod grok_profile;
 pub(crate) mod grok_tool_lease;
 pub(crate) mod local_skills;

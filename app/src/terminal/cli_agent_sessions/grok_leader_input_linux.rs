@@ -306,6 +306,35 @@ impl GrokLeaderInput {
         self.tracker.final_response.take()
     }
 
+    /// RPC 终态不含可信正文；只查询同一绑定会话的完整历史与完成水位。
+    pub(crate) fn verified_final_output(
+        &mut self,
+        current_binding_id: Uuid,
+        native_prompt_id: Uuid,
+        outcome: GrokFinalOutcome,
+        deadline: Instant,
+    ) -> Result<Option<(String, String)>, GrokLeaderInputError> {
+        self.tracker.check_binding(current_binding_id)?;
+        self.validate_connection()?;
+        let session_id = self.target.session_id.to_string();
+        let cwd = self.target.cwd.clone();
+        let result = self.rpc_readonly(
+            deadline,
+            "_x.ai/session/updates",
+            json!({"sessionId":session_id,"cwd":cwd,"offset":0,"limit":16_384}),
+        )?;
+        self.validate_connection()?;
+        grok_final_history::verified_final_snapshot(
+            &result,
+            &session_id,
+            &native_prompt_id.to_string(),
+            outcome,
+            16_384,
+            8 * 1024 * 1024,
+        )
+        .map_err(|_| GrokLeaderInputError::Protocol)
+    }
+
     pub(crate) fn disconnect(mut self) -> Option<GrokLeaderDelivery> {
         self.close_connection();
         self.tracker.delivery.take()
@@ -478,6 +507,14 @@ impl GrokLeaderInput {
         method: &str,
         params: Value,
     ) -> Result<Value, GrokLeaderInputError> {
+        let remaining = deadline
+            .checked_duration_since(Instant::now())
+            .filter(|duration| !duration.is_zero())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "原生只读 RPC 超时"))?;
+        self.connection
+            .as_ref()
+            .ok_or(GrokLeaderInputError::Disconnected)?
+            .set_write_timeout(Some(remaining.min(Duration::from_secs(2))))?;
         let id = Uuid::new_v4().to_string();
         self.write_frame(&acp_frame(
             json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),

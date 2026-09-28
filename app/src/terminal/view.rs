@@ -26733,6 +26733,33 @@ impl TerminalView {
 
         let image_filepaths = get_image_filepaths_from_paths(paths);
 
+        // 本地托管 Grok 富输入打开时，拖放必须留在附件流程，不能退回 PTY 路径输入。
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        if self.grok_owned_input.is_some()
+            && CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id)
+        {
+            if !is_in_long_running_command || !self.owned_grok_context_target_matches(ctx) {
+                self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
+                return;
+            }
+            if image_filepaths.len() != paths.len() {
+                self.show_error_toast(crate::t!("cli-agent-input-non-image-drop-unavailable"), ctx);
+                return;
+            }
+            self.input.update(ctx, |input, ctx| {
+                input.handle_pasted_or_dragdropped_image_filepaths(image_filepaths, ctx)
+            });
+            return;
+        }
+
         // CLI-agent paste path: when a CLI agent (e.g. Claude Code) is the
         // foreground long-running process and the user is interacting with its
         // TUI directly (rich input closed), hand image drops to the agent the

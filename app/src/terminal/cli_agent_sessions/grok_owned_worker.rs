@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::SyncSender;
 use std::thread;
+use std::time::{Duration, Instant};
 
 use async_channel::{Receiver, Sender};
 use futures::executor::block_on;
@@ -20,9 +21,11 @@ use uuid::Uuid;
 
 use super::grok_leader_input::{GrokLeaderInput, GrokLeaderInputError, GrokLeaderInputEvent};
 use super::grok_owned_launch::GrokOwnedBinding;
+use crate::ai::cli_agent_runtime::grok_final_history::GrokFinalOutcome;
 use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::grok_terminal::{
-    self, GrokTerminalDelivery, GrokTerminalInputClaim, GrokTerminalInputRecord, GrokTerminalOwner,
+    self, GrokTerminalDelivery, GrokTerminalDeliveryStatus, GrokTerminalInputClaim,
+    GrokTerminalInputRecord, GrokTerminalOutcome, GrokTerminalOwner, GrokTerminalVerifiedResult,
 };
 use crate::persistence::model::{
     LocalCliMessage, LocalCliMessageState, LocalCliTask, LocalCliTaskState,
@@ -90,6 +93,9 @@ pub(crate) enum GrokOwnedWorkerStop {
 
 pub(crate) enum GrokOwnedWorkerEvent {
     Claimed(GrokTerminalInputRecord),
+    Acknowledged(GrokTerminalInputRecord),
+    ResultSaved(LocalCliTask),
+    ResultUnverified,
     Finished(GrokTerminalInputRecord),
     NativePermissionPending {
         tool_call_id: String,
@@ -109,6 +115,98 @@ impl Drop for GrokOwnedWorker {
     fn drop(&mut self) {
         self.disconnected.store(true, Ordering::SeqCst);
     }
+}
+
+/// 冷恢复后的独立只读侧车；仅补写已 ACK 的原生回合，绝不发送旧输入。
+pub(crate) fn recover_historical_results(
+    binding: GrokOwnedBinding,
+    current_task: LocalCliTask,
+    owner: GrokTerminalOwner,
+    database: SyncSender<ModelEvent>,
+    recovery_blocks_input: &AtomicBool,
+) -> Result<Option<LocalCliTask>, GrokOwnedWorkerStop> {
+    let current_generation = current_task.generation;
+    let config: Value = serde_json::from_str(&current_task.config_json)
+        .map_err(|_| GrokOwnedWorkerStop::InvalidBinding)?;
+    if serde_json::from_value::<GrokTerminalOwner>(config["grok_terminal"].clone())
+        .ok()
+        .as_ref()
+        != Some(&owner)
+    {
+        return Err(GrokOwnedWorkerStop::InvalidBinding);
+    }
+    let missing = block_on(
+        grok_terminal::missing_historical_results(&database, current_task)
+            .map_err(|_| GrokOwnedWorkerStop::Persistence)?,
+    )
+    .map_err(|_| GrokOwnedWorkerStop::Persistence)?
+    .map_err(|_| GrokOwnedWorkerStop::Persistence)?;
+    if !missing
+        .iter()
+        .any(|delivery| delivery.task_generation == current_generation)
+    {
+        recovery_blocks_input.store(false, Ordering::SeqCst);
+    }
+    if missing.is_empty() {
+        return Ok(None);
+    }
+    let batch_deadline = Instant::now() + Duration::from_secs(30);
+    let mut bridge = GrokLeaderInput::connect(binding.into_target(), None)
+        .map_err(|_| GrokOwnedWorkerStop::Native)?;
+    let mut refreshed = None;
+    for delivery in missing {
+        if Instant::now() >= batch_deadline {
+            break;
+        }
+        let GrokTerminalDeliveryStatus::Finished {
+            native_prompt_id,
+            outcome: GrokTerminalOutcome::EndTurn,
+        } = &delivery.status
+        else {
+            return Err(GrokOwnedWorkerStop::InvalidBinding);
+        };
+        let native_prompt_id = *native_prompt_id;
+        let deadline = (Instant::now() + Duration::from_secs(8)).min(batch_deadline);
+        while Instant::now() < deadline {
+            match bridge.verified_final_output(
+                owner.binding_id,
+                native_prompt_id,
+                GrokFinalOutcome::Completed,
+                deadline,
+            ) {
+                Ok(Some((output, completion_watermark))) if !output.trim().is_empty() => {
+                    let saved = block_on(
+                        grok_terminal::save_verified_result(
+                            &database,
+                            delivery.clone(),
+                            GrokTerminalVerifiedResult {
+                                native_prompt_id,
+                                completion_watermark,
+                                output,
+                            },
+                        )
+                        .map_err(|_| GrokOwnedWorkerStop::Persistence)?,
+                    )
+                    .map_err(|_| GrokOwnedWorkerStop::Persistence)?
+                    .map_err(|_| GrokOwnedWorkerStop::Persistence)?;
+                    if let Some(task) = saved
+                        && task.generation == current_generation
+                        && refreshed
+                            .as_ref()
+                            .is_none_or(|previous: &LocalCliTask| task.revision > previous.revision)
+                    {
+                        refreshed = Some(task);
+                    }
+                    break;
+                }
+                Ok(Some(_)) => break,
+                Ok(None) => thread::sleep(Duration::from_millis(150)),
+                Err(_) => return Err(GrokOwnedWorkerStop::Native),
+            }
+        }
+    }
+    bridge.disconnect();
+    Ok(refreshed)
 }
 
 impl GrokOwnedWorker {
@@ -317,6 +415,73 @@ fn run(
                 .map_err(|_| GrokOwnedWorkerStop::Persistence)?
                 .ok_or(GrokOwnedWorkerStop::Persistence)?;
                 *recorded = Some(result.clone());
+                let _ = events.send_blocking(GrokOwnedWorkerEvent::Acknowledged(result.clone()));
+                #[cfg(test)]
+                if std::env::var_os("INFINISHELL_GROK_OWNED_PAUSE_AFTER_ACK").is_some() {
+                    let deadline = Instant::now() + Duration::from_secs(8);
+                    while current() && Instant::now() < deadline {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    bridge.disconnect();
+                    return Err(if current() {
+                        GrokOwnedWorkerStop::Native
+                    } else {
+                        GrokOwnedWorkerStop::Revoked
+                    });
+                }
+                if let Some(delivery) = result.grok_terminal_delivery.as_ref()
+                    && let GrokTerminalDeliveryStatus::Finished {
+                        native_prompt_id,
+                        outcome: GrokTerminalOutcome::EndTurn,
+                    } = delivery.status
+                {
+                    let deadline = Instant::now() + Duration::from_secs(8);
+                    let mut result_saved = false;
+                    while current() && Instant::now() < deadline {
+                        match bridge.verified_final_output(
+                            lease.binding_id,
+                            native_prompt_id,
+                            GrokFinalOutcome::Completed,
+                            deadline,
+                        ) {
+                            Ok(Some((output, completion_watermark))) => {
+                                let verified = GrokTerminalVerifiedResult {
+                                    native_prompt_id,
+                                    completion_watermark,
+                                    output,
+                                };
+                                if !verified.output.trim().is_empty() {
+                                    match grok_terminal::save_verified_result(
+                                        database,
+                                        delivery.clone(),
+                                        verified,
+                                    ) {
+                                        Ok(receiver) => match block_on(receiver) {
+                                            Ok(Ok(Some(saved))) => {
+                                                result_saved = true;
+                                                let _ = events.send_blocking(
+                                                    GrokOwnedWorkerEvent::ResultSaved(saved),
+                                                );
+                                            }
+                                            Ok(Ok(None)) => {}
+                                            Ok(Err(_)) => {}
+                                            Err(_) => {}
+                                        },
+                                        Err(_) => {}
+                                    }
+                                }
+                                break;
+                            }
+                            Ok(None) => {
+                                thread::sleep(Duration::from_millis(150));
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                    if !result_saved {
+                        let _ = events.send_blocking(GrokOwnedWorkerEvent::ResultUnverified);
+                    }
+                }
                 let _ = events.send_blocking(GrokOwnedWorkerEvent::Finished(result));
                 bridge.disconnect();
                 return Ok(());

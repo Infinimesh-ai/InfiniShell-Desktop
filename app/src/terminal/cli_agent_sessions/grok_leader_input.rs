@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::ai::agent::ImageContext;
+use crate::ai::cli_agent_runtime::grok_final_history::{self, GrokFinalOutcome};
 use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
 
 const CLI_VERSION: &str = "1.0.41";
@@ -390,6 +391,61 @@ mod native {
 
     use super::*;
 
+    #[cfg(test)]
+    fn record_final_history_shape(result: &Value, prompt_id: Uuid) -> io::Result<()> {
+        let Some(root) = std::env::var_os("INFINISHELL_GROK_OWNED_LIVE_ROOT") else {
+            return Ok(());
+        };
+        let mut chunks = Vec::new();
+        let mut completion = None;
+        let mut previous = None;
+        if let Some(updates) = result["updates"].as_array() {
+            for record in updates {
+                let params = &record["params"];
+                let update = &params["update"];
+                if record["method"] == "session/update"
+                    && update["sessionUpdate"] == "agent_message_chunk"
+                    && params["_meta"]["promptId"].as_str() == Some(prompt_id.to_string().as_str())
+                {
+                    let text = update["content"]["text"].as_str().unwrap_or_default();
+                    chunks.push(json!({
+                        "bytes": text.len(),
+                        "starts_with_previous": previous.is_some_and(|prior: &str| text.starts_with(prior)),
+                        "equals_previous": previous == Some(text)
+                    }));
+                    previous = Some(text);
+                }
+                if record["method"] == "_x.ai/session/update"
+                    && update["sessionUpdate"] == "turn_completed"
+                    && update["prompt_id"].as_str() == Some(prompt_id.to_string().as_str())
+                {
+                    completion = Some(json!({
+                        "method": record["method"],
+                        "params_keys": params.as_object().map(|value| value.keys().collect::<Vec<_>>()),
+                        "meta_keys": params["_meta"].as_object().map(|value| value.keys().collect::<Vec<_>>()),
+                        "update_keys": update.as_object().map(|value| value.keys().collect::<Vec<_>>()),
+                        "stop_reason": update["stop_reason"]
+                    }));
+                }
+            }
+        }
+        let Some(completion) = completion else {
+            return Ok(());
+        };
+        let shape = json!({"version":1,"prompt_id":prompt_id,
+            "updates":result["updates"].as_array().map(Vec::len),
+            "total_count":result["totalCount"],"has_more":result["hasMore"],
+            "chunks":chunks,"completion":completion});
+        let path =
+            Path::new(&root).join(format!("history-shape-{prompt_id}-{}.json", Uuid::new_v4()));
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)?;
+        file.write_all(&serde_json::to_vec_pretty(&shape).map_err(io::Error::other)?)?;
+        file.sync_all()
+    }
+
     const FIXED_BINARY_SHA256: &str =
         "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d";
     const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -660,6 +716,37 @@ mod native {
             self.tracker.final_response.take()
         }
 
+        /// RPC 终态不含可信正文；只查询同一绑定会话的完整历史与完成水位。
+        pub(crate) fn verified_final_output(
+            &mut self,
+            current_binding_id: Uuid,
+            native_prompt_id: Uuid,
+            outcome: GrokFinalOutcome,
+            deadline: Instant,
+        ) -> Result<Option<(String, String)>, GrokLeaderInputError> {
+            self.tracker.check_binding(current_binding_id)?;
+            self.validate_connection()?;
+            let session_id = self.target.session_id.to_string();
+            let cwd = self.target.cwd.clone();
+            let result = self.rpc_readonly(
+                deadline,
+                "_x.ai/session/updates",
+                json!({"sessionId":session_id,"cwd":cwd,"offset":0,"limit":16_384}),
+            )?;
+            self.validate_connection()?;
+            #[cfg(test)]
+            record_final_history_shape(&result, native_prompt_id)?;
+            grok_final_history::verified_final_snapshot(
+                &result,
+                &session_id,
+                &native_prompt_id.to_string(),
+                outcome,
+                16_384,
+                8 * 1024 * 1024,
+            )
+            .map_err(|_| GrokLeaderInputError::Protocol)
+        }
+
         pub(crate) fn disconnect(mut self) -> Option<GrokLeaderDelivery> {
             self.close_connection();
             self.tracker.delivery.take()
@@ -837,6 +924,14 @@ mod native {
             method: &str,
             params: Value,
         ) -> Result<Value, GrokLeaderInputError> {
+            let remaining = deadline
+                .checked_duration_since(Instant::now())
+                .filter(|duration| !duration.is_zero())
+                .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "原生只读 RPC 超时"))?;
+            self.connection
+                .as_ref()
+                .ok_or(GrokLeaderInputError::Disconnected)?
+                .set_write_timeout(Some(remaining.min(Duration::from_secs(2))))?;
             let id = Uuid::new_v4().to_string();
             self.write_frame(&acp_frame(
                 json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),

@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::util::image::MAX_IMAGE_COUNT_FOR_QUERY;
+use super::grok_final_history::{self, GrokFinalOutcome};
 use command::Stdio;
 use command::r#async::Command;
 use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -5458,78 +5459,19 @@ fn verified_final_snapshot(
     turn_id: &str,
     outcome: &TurnOutcome,
 ) -> Result<Option<(String, String)>, &'static str> {
-    let updates = result["updates"]
-        .as_array()
-        .ok_or("native history has no updates")?;
-    if updates.len() > MAX_NATIVE_IDENTITIES
-        || result["hasMore"] != false
-        || result["totalCount"].as_u64() != Some(updates.len() as u64)
-    {
-        return Err("native history is truncated or exceeds the verified limit");
-    }
-    let expected_reason = match outcome {
-        TurnOutcome::Completed => "end_turn",
-        TurnOutcome::Cancelled => "cancelled",
+    let outcome = match outcome {
+        TurnOutcome::Completed => GrokFinalOutcome::Completed,
+        TurnOutcome::Cancelled => GrokFinalOutcome::Cancelled,
         TurnOutcome::Failed { .. } => return Err("invalid native history completion state"),
     };
-    let mut output = String::new();
-    let mut last_sequence = None;
-    let mut last_event_id = None;
-    let mut watermark = None;
-    for record in updates {
-        let params = &record["params"];
-        if params["sessionId"].as_str() != Some(session_id) {
-            return Err("native history changed the session id");
-        }
-        let event_id = params["_meta"]["eventId"]
-            .as_str()
-            .ok_or("native history has no event identity")?;
-        let sequence = event_id
-            .strip_prefix(session_id)
-            .and_then(|id| id.strip_prefix('-'))
-            .and_then(|suffix| {
-                suffix
-                    .parse::<u64>()
-                    .ok()
-                    .filter(|sequence| sequence.to_string() == suffix)
-            })
-            .ok_or("native history has an invalid event identity")?;
-        if last_sequence.is_some_and(|previous| previous >= sequence) {
-            return Err("native history event order is inconsistent");
-        }
-        last_sequence = Some(sequence);
-        last_event_id = Some(event_id);
-        let update = &params["update"];
-        if record["method"] == "session/update"
-            && update["sessionUpdate"] == "agent_message_chunk"
-            && params["_meta"]["promptId"].as_str() == Some(turn_id)
-        {
-            if watermark.is_some() {
-                return Err("native history contains text after its completion watermark");
-            }
-            let text = update["content"]["text"]
-                .as_str()
-                .filter(|_| update["content"]["type"] == "text")
-                .ok_or("native history contains unsupported output")?;
-            if output.len().saturating_add(text.len()) > MAX_LINE_BYTES {
-                return Err("native history output exceeds the verified limit");
-            }
-            output.push_str(text);
-        }
-        if record["method"] == "_x.ai/session/update"
-            && update["sessionUpdate"] == "turn_completed"
-            && update["prompt_id"].as_str() == Some(turn_id)
-        {
-            if watermark.is_some() || update["stop_reason"].as_str() != Some(expected_reason) {
-                return Err("native history completion does not match the RPC result");
-            }
-            watermark = Some(event_id.to_owned());
-        }
-    }
-    if result["lastEventId"].as_str() != last_event_id {
-        return Err("native history last event identity is inconsistent");
-    }
-    Ok(watermark.map(|watermark| (output, watermark)))
+    grok_final_history::verified_final_snapshot(
+        result,
+        session_id,
+        turn_id,
+        outcome,
+        MAX_NATIVE_IDENTITIES,
+        MAX_LINE_BYTES,
+    )
 }
 
 fn verified_latest_read_tool(tool: &Value) -> bool {

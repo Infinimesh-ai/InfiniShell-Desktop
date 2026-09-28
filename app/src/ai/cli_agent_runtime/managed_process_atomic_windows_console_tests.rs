@@ -381,7 +381,7 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
         fs::create_dir(root.join(relative)).unwrap();
     }
     let script = root.join("nul-control.cmd");
-    // 同一 CMD、目录与 token 只改变 stderr 的 NUL 重定向；脚本不启动外部命令。
+    // 同一 CMD、目录与 token 对照普通文件和 NUL 的 stderr 重定向；脚本不启动外部命令。
     // NUL 加扩展名仍是保留设备名，stdout 标记必须使用普通文件名。
     fs::write(
         &script,
@@ -389,6 +389,8 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
             "@echo off\r\n",
             ">tmp\\plain.txt echo builtin-control\r\n",
             ">tmp\\plain-status.txt echo %errorlevel%\r\n",
+            ">tmp\\regular.txt 2>tmp\\regular-stderr.txt echo builtin-control\r\n",
+            ">tmp\\regular-status.txt echo %errorlevel%\r\n",
             ">tmp\\redirected.txt 2>NUL echo builtin-control\r\n",
             ">tmp\\nul-status.txt echo %errorlevel%\r\n",
             ">tmp\\after.txt echo builtin-control\r\n",
@@ -461,24 +463,55 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
     );
     assert_eq!(result.unwrap(), 0);
     let plain_status = fs::read_to_string(root.join("tmp/plain-status.txt")).unwrap();
+    let regular_status = fs::read_to_string(root.join("tmp/regular-status.txt")).unwrap();
     let nul_status = fs::read_to_string(root.join("tmp/nul-status.txt")).unwrap();
     let plain = fs::read(root.join("tmp/plain.txt")).unwrap();
+    let regular = fs::read(root.join("tmp/regular.txt")).unwrap();
+    let regular_stderr = fs::read(root.join("tmp/regular-stderr.txt")).unwrap();
     let redirected = fs::read(root.join("tmp/redirected.txt")).unwrap();
     let after = fs::read(root.join("tmp/after.txt")).unwrap();
+    let file_id = |name: &str| {
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+            .open(root.join("tmp").join(name))
+            .unwrap();
+        inspect_handle(&file).unwrap().id
+    };
+    let distinct_regular_files = {
+        let names = [
+            "plain.txt",
+            "regular.txt",
+            "regular-stderr.txt",
+            "redirected.txt",
+        ];
+        let ids = names.map(file_id);
+        ids.iter()
+            .enumerate()
+            .all(|(index, id)| ids[..index].iter().all(|other| id != other))
+    };
     let expected: &[u8] = b"builtin-control\r\n";
     eprintln!(
         "atomic_windows_nul_control={}",
         serde_json::json!({
             "plain_errorlevel": plain_status.trim().parse::<u32>().unwrap(),
+            "regular_errorlevel": regular_status.trim().parse::<u32>().unwrap(),
             "nul_errorlevel": nul_status.trim().parse::<u32>().unwrap(),
             "plain_marker_matches": plain == expected,
+            "regular_marker_matches": regular == expected,
+            "regular_stderr_empty": regular_stderr.is_empty(),
+            "distinct_regular_files": distinct_regular_files,
             "nul_marker_matches": redirected == expected,
             "after_marker_matches": after == expected,
             "cleanup_confirmed": true,
         })
     );
     assert_eq!(plain_status.trim(), "0");
+    assert!(distinct_regular_files);
     assert_eq!(plain, expected);
+    assert_eq!(regular_status.trim(), "0");
+    assert_eq!(regular, expected);
+    assert!(regular_stderr.is_empty());
     assert_eq!(after, expected);
     // 此断言失败只证明公共 shim 所需 NUL 重定向不可用，不把它当成 npm 挂起的唯一根因。
     assert_eq!(

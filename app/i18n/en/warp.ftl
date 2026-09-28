@@ -5928,6 +5928,7 @@ cli-agent-task-skills-require-managed = Skill delivery requires a managed Codex,
 cli-agent-input-images-processing = Wait for the images to finish processing. Your draft is kept.
 
 cli-agent-input-file-attachment-unavailable = This CLI input cannot send file attachment chips yet. Insert the file path instead; your draft and attachments are kept.
+cli-agent-input-non-image-drop-unavailable = Only image files can be dropped into this Grok input. No paths were sent; your draft is unchanged.
 cli-agent-input-file-unreadable = Cannot attach { $filename }: the file is missing, unreadable, or not a regular file. Your draft and attachments are unchanged.
 cli-agent-input-remote-file-unavailable = Local file attachments cannot be sent to this remote CLI yet. Your draft and attachments are unchanged.
 cli-agent-input-local-file-references = Attached local files (absolute paths encoded as a JSON array): { $paths }. Read the files using your native file tools and permission checks; these references do not contain file contents.
@@ -6109,6 +6110,8 @@ cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be 
 cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 
 cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session identity has changed. Your draft has been kept.
+
+cli-agent-grok-owned-result-unverified = Grok finished, but its task result could not be verified or saved. Check the native session.
 
 cli-agent-grok-owned-input-claimed = This input has already been submitted or its delivery is unconfirmed. Check the native Grok session before sending a new draft.
 

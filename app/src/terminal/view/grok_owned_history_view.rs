@@ -332,6 +332,7 @@ impl TerminalView {
                     last_attempt: None,
                     sending: false,
                     invalidated: false,
+                    recovery_blocks_input: Arc::new(AtomicBool::new(false)),
                     unconfirmed_drafts: HashMap::new(),
                     binding: false,
                     launch_command: command.clone(),

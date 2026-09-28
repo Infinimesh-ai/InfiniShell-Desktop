@@ -2,6 +2,7 @@
 
 use std::env;
 use std::os::unix::io::{AsRawFd as _, FromRawFd as _};
+use std::sync::atomic::AtomicBool;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -14,7 +15,10 @@ use crate::persistence::ModelEvent;
 use crate::persistence::local_cli_tasks::grok_terminal::{
     GrokTerminalDeliveryStatus, GrokTerminalOutcome, GrokTerminalOwner,
 };
-use crate::persistence::local_cli_tasks::{checkpoint_task, checkpoint_task_with_message};
+use crate::persistence::local_cli_tasks::{
+    checkpoint_task, checkpoint_task_with_message, load_task_generations, load_task_messages,
+    load_tasks,
+};
 use crate::persistence::model::{
     LocalCliMessage, LocalCliMessageState, LocalCliTask, LocalCliTaskState,
 };
@@ -22,6 +26,7 @@ use crate::terminal::cli_agent_sessions::GrokPermissionEvidence;
 use crate::terminal::cli_agent_sessions::event::{CLI_AGENT_NOTIFICATION_SENTINEL, parse_event};
 use crate::terminal::cli_agent_sessions::grok_owned_worker::{
     GrokOwnedInputLease, GrokOwnedWorker, GrokOwnedWorkerEvent, GrokOwnedWorkerStop,
+    recover_historical_results,
 };
 
 fn write_evidence(root: &Path, name: &str, value: Value) {
@@ -87,6 +92,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             "grok-owned-native-v1\n"
         );
         assert!(!root.starts_with("/Volumes"));
+        let cold = env::var_os("INFINISHELL_GROK_OWNED_PAUSE_AFTER_ACK").is_some();
         let setup: Value =
             serde_json::from_slice(&read_private(&root.join("pty.json")).unwrap()).unwrap();
         let master_fd = i32::try_from(setup["master_fd"].as_i64().unwrap()).unwrap();
@@ -175,8 +181,8 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                 message_id: Uuid::new_v4().to_string(),
                 sender_task_id: task.task_id.clone(),
                 recipient_task_id: task.task_id.clone(),
-                sender_generation: 1,
-                recipient_generation: 1,
+                sender_generation: task.generation,
+                recipient_generation: task.generation,
                 subject: crate::persistence::local_cli_tasks::grok_terminal::INPUT_SUBJECT.into(),
                 body: format!(
                     "不要使用任何工具，不要修改文件。这是第 {turn} 轮中文输入。只回复 OWNED_{turn}_{}。",
@@ -189,7 +195,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                 checkpoint_task_with_message(
                     &writer.sender,
                     task.clone(),
-                    Some(1),
+                    Some(task.generation),
                     message.clone(),
                 )
                 .unwrap(),
@@ -210,8 +216,89 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                 writer.sender.clone(),
             )
             .unwrap();
+            if cold {
+                let acknowledged = loop {
+                    match receive_event(&events, Duration::from_secs(100)) {
+                        Ok(GrokOwnedWorkerEvent::Claimed(record)) => {
+                            assert_eq!(record.message.state, LocalCliMessageState::Sent);
+                        }
+                        Ok(GrokOwnedWorkerEvent::Acknowledged(record)) => break record,
+                        Ok(GrokOwnedWorkerEvent::NativePermissionPending { .. }) => {
+                            panic!("冷恢复验收不得代答原生审批")
+                        }
+                        Ok(GrokOwnedWorkerEvent::ResultSaved(_))
+                        | Ok(GrokOwnedWorkerEvent::ResultUnverified)
+                        | Ok(GrokOwnedWorkerEvent::Finished(_))
+                        | Ok(GrokOwnedWorkerEvent::Stopped { .. })
+                        | Err(_) => panic!("冷恢复断点前未收到精确原生 ACK"),
+                    }
+                };
+                assert_eq!(
+                    acknowledged.message.state,
+                    LocalCliMessageState::Acknowledged
+                );
+                let GrokTerminalDeliveryStatus::Finished {
+                    native_prompt_id,
+                    outcome: GrokTerminalOutcome::EndTurn,
+                } = acknowledged.grok_terminal_delivery.as_ref().unwrap().status
+                else {
+                    panic!("冷恢复断点缺少 EndTurn 回执");
+                };
+                native_prompt_ids.push(native_prompt_id);
+                drop(worker);
+                assert!(matches!(
+                    receive_event(&events, Duration::from_secs(5)).unwrap(),
+                    GrokOwnedWorkerEvent::Stopped {
+                        reason: GrokOwnedWorkerStop::Revoked,
+                        ..
+                    }
+                ));
+                let input = block_on(
+                    crate::persistence::local_cli_tasks::grok_terminal::load_input(
+                        &writer.sender,
+                        Uuid::parse_str(&message.message_id).unwrap(),
+                    )
+                    .unwrap(),
+                )
+                .unwrap()
+                .unwrap()
+                .unwrap();
+                assert_eq!(input.message.state, LocalCliMessageState::Acknowledged);
+                assert!(input.grok_terminal_result.is_none());
+                let persisted = block_on(load_tasks(&writer.sender, false).unwrap())
+                    .unwrap()
+                    .unwrap();
+                assert!(
+                    persisted
+                        .iter()
+                        .any(|saved| { saved.task_id == task.task_id && saved.result.is_none() })
+                );
+                if turn == 1 {
+                    task.revision += 1;
+                    task.state = LocalCliTaskState::Disconnected;
+                    block_on(checkpoint_task(&writer.sender, task.clone(), Some(1)).unwrap())
+                        .unwrap()
+                        .unwrap();
+                    task.generation = 2;
+                    task.revision = 0;
+                    task.state = LocalCliTaskState::Queued;
+                    block_on(checkpoint_task(&writer.sender, task.clone(), Some(1)).unwrap())
+                        .unwrap()
+                        .unwrap();
+                }
+                write_evidence(
+                    &root,
+                    &format!("cold-turn-{turn}-ack.safe.json"),
+                    json!({"generation":turn,"acknowledged":true,"result_missing":true,
+                        "native_outcome":"end_turn"}),
+                );
+                continue;
+            }
             let deadline = Instant::now() + Duration::from_secs(100);
             let mut claimed = None;
+            let mut result_saved = false;
+            let mut acknowledged_at = None;
+            let mut result_delay_ms = None;
             let finished = loop {
                 assert!(Instant::now() < deadline, "原生输入尚未完成");
                 match receive_event(&events, Duration::from_secs(1)) {
@@ -225,7 +312,34 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                         write_evidence(&root, &format!("turn-{turn}-claimed.json"), json!(record));
                         claimed = Some(record);
                     }
+                    Ok(GrokOwnedWorkerEvent::Acknowledged(record)) => {
+                        assert!(acknowledged_at.is_none());
+                        assert_eq!(record.message.state, LocalCliMessageState::Acknowledged);
+                        acknowledged_at = Some(Instant::now());
+                    }
+                    Ok(GrokOwnedWorkerEvent::ResultSaved(saved)) => {
+                        assert!(!result_saved);
+                        assert_eq!(saved.generation, task.generation);
+                        let expected = format!("OWNED_{turn}_{}", launch.launch_id());
+                        assert_eq!(
+                            saved.result.as_deref().map(str::trim),
+                            Some(expected.as_str())
+                        );
+                        result_delay_ms = Some(
+                            u64::try_from(
+                                Instant::now()
+                                    .duration_since(acknowledged_at.unwrap())
+                                    .as_millis(),
+                            )
+                            .unwrap(),
+                        );
+                        task = saved;
+                        result_saved = true;
+                    }
                     Ok(GrokOwnedWorkerEvent::Finished(record)) => break record,
+                    Ok(GrokOwnedWorkerEvent::ResultUnverified) => {
+                        panic!("原生回合已 ACK，但结果未核验保存")
+                    }
                     Ok(GrokOwnedWorkerEvent::NativePermissionPending { .. }) => {
                         panic!("出现未授权的工具审批；验收不会代答")
                     }
@@ -243,6 +357,23 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
                     }
                 }
             };
+            assert!(result_saved, "完整原生历史结果未保存到任务");
+            write_evidence(
+                &root,
+                &format!("turn-{turn}-result.safe.json"),
+                json!({
+                    "ack_to_result_saved_ms":result_delay_ms,
+                    "result_bytes":task.result.as_deref().map(str::len),
+                    "result_matches_expected":true
+                }),
+            );
+            let loaded = block_on(load_tasks(&writer.sender, false).unwrap())
+                .unwrap()
+                .unwrap();
+            assert_eq!(
+                loaded.iter().find(|saved| saved.task_id == task.task_id),
+                Some(&task)
+            );
             drop(worker);
             let claimed = claimed.unwrap();
             let delivery = finished.grok_terminal_delivery.as_ref().unwrap();
@@ -288,6 +419,20 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             ));
             drop(duplicate);
         }
+        if cold {
+            assert_eq!(task.generation, 2);
+            assert!(task.result.is_none());
+            write_evidence(
+                &root,
+                "cold-ack.safe.json",
+                json!({"version":"1.0.41","model":"grok-4.7",
+                    "task_id":task.task_id,"native_prompt_ids":native_prompt_ids,
+                    "two_acknowledged_turns_without_results":true,"application_process_may_exit":true}),
+            );
+            writer.sender.send(ModelEvent::Terminate).unwrap();
+            writer.handle.join().unwrap();
+            return;
+        }
         let mut restored =
             GrokOwnedLaunch::restore(&launch.manifest_path(), launch.manifest_sha256()).unwrap();
         assert!(restored.take_launch_argv().is_err());
@@ -295,7 +440,7 @@ fn grok_owned_native_two_turns_and_duplicate_guard() {
             &root,
             "native-result.json",
             json!({"version":"1.0.41","model":"grok-4.7",
-            "native_prompt_ids":native_prompt_ids,"duplicate_rejected":true,"restored_launch_cannot_dispatch":true,
+            "native_prompt_ids":native_prompt_ids,"task_id":task.task_id,"duplicate_rejected":true,"restored_launch_cannot_dispatch":true,
             "gui_verified":false,"platform":std::env::consts::OS,"architecture":std::env::consts::ARCH}),
         );
         writer.sender.send(ModelEvent::Terminate).unwrap();
@@ -329,6 +474,31 @@ fn grok_owned_native_recovery_after_exit() {
         let mut restored = GrokOwnedLaunch::restore(&path, sha).unwrap();
         assert!(restored.is_retired());
         assert!(restored.take_launch_argv().is_err());
+        let receipt: Value =
+            serde_json::from_slice(&read_private(&root.join("native-result.json")).unwrap())
+                .unwrap();
+        let writer = crate::persistence::start_test_writer(&root.join("tasks.sqlite")).unwrap();
+        let loaded = block_on(load_tasks(&writer.sender, true).unwrap())
+            .unwrap()
+            .unwrap();
+        let task_id = receipt["task_id"].as_str().unwrap();
+        let task = loaded.iter().find(|task| task.task_id == task_id).unwrap();
+        let expected = format!("OWNED_2_{}", launch.launch_id());
+        assert_eq!(
+            task.result.as_deref().map(str::trim),
+            Some(expected.as_str())
+        );
+        assert_eq!(task.state, LocalCliTaskState::Disconnected);
+        let generations =
+            block_on(load_task_generations(&writer.sender, task.task_id.clone()).unwrap())
+                .unwrap()
+                .unwrap();
+        assert_eq!(
+            generations.iter().find(|saved| saved.generation == 1),
+            Some(task)
+        );
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
         write_evidence(
             &root,
             "native-recovery-result.json",
@@ -338,8 +508,227 @@ fn grok_owned_native_recovery_after_exit() {
                 "socket_directory_removed": true,
                 "retired_launch_not_replayed": true,
                 "model_inputs": 0,
-                "application_restart_verified": false
+                "application_restart_verified": true,
+                "persisted_result_reloaded": true
             }),
+        );
+    });
+}
+
+#[test]
+#[ignore = "须由隔离运行器保持同一原生 TUI/leader 存活；仅对已 ACK 的两代历史执行只读补查"]
+fn grok_owned_native_readonly_cold_recovery() {
+    App::test((), |_| async move {
+        let root = PathBuf::from(env::var_os("INFINISHELL_GROK_OWNED_LIVE_ROOT").unwrap())
+            .canonicalize()
+            .unwrap();
+        assert_eq!(
+            fs::read_to_string(root.join(".owned-live")).unwrap(),
+            "grok-owned-native-v1\n"
+        );
+        let receipt: Value =
+            serde_json::from_slice(&read_private(&root.join("cold-ack.safe.json")).unwrap())
+                .unwrap();
+        assert_eq!(receipt["two_acknowledged_turns_without_results"], true);
+        let command: Value =
+            serde_json::from_slice(&read_private(&root.join("launch-command.json")).unwrap())
+                .unwrap();
+        let path = PathBuf::from(command["manifest_path"].as_str().unwrap());
+        let sha = command["manifest_sha256"].as_str().unwrap();
+        let writer = crate::persistence::start_test_writer(&root.join("tasks.sqlite")).unwrap();
+        let loaded = block_on(load_tasks(&writer.sender, true).unwrap())
+            .unwrap()
+            .unwrap();
+        let task = loaded
+            .iter()
+            .find(|task| task.task_id == receipt["task_id"].as_str().unwrap())
+            .unwrap()
+            .clone();
+        assert_eq!(task.generation, 2);
+        assert_eq!(task.state, LocalCliTaskState::Disconnected);
+        assert!(task.result.is_none());
+        let generations =
+            block_on(load_task_generations(&writer.sender, task.task_id.clone()).unwrap())
+                .unwrap()
+                .unwrap();
+        assert_eq!(generations.len(), 2);
+        assert!(generations.iter().all(|saved| saved.result.is_none()));
+        let messages = block_on(load_task_messages(&writer.sender, task.task_id.clone()).unwrap())
+            .unwrap()
+            .unwrap();
+        assert_eq!(messages.len(), 2);
+        assert!(
+            messages
+                .iter()
+                .all(|message| message.state == LocalCliMessageState::Acknowledged)
+        );
+        let config: Value = serde_json::from_str(&task.config_json).unwrap();
+        let owner: GrokTerminalOwner =
+            serde_json::from_value(config["grok_terminal"].clone()).unwrap();
+        let observed = observation(&root, owner.session_id, Path::new(&task.working_directory));
+        let mut launch = GrokOwnedLaunch::restore(&path, sha).unwrap();
+        let binding = launch
+            .bind(owner.binding_id, owner.permission_revision, &observed)
+            .unwrap();
+        let blocked = AtomicBool::new(true);
+        let refreshed = recover_historical_results(
+            binding,
+            task.clone(),
+            owner.clone(),
+            writer.sender.clone(),
+            &blocked,
+        )
+        .unwrap()
+        .unwrap();
+        let expected_current = format!("OWNED_2_{}", launch.launch_id());
+        assert_eq!(refreshed.generation, 2);
+        assert_eq!(refreshed.state, LocalCliTaskState::Disconnected);
+        assert_eq!(
+            refreshed.result.as_deref().map(str::trim),
+            Some(expected_current.as_str())
+        );
+        let current = block_on(load_tasks(&writer.sender, false).unwrap())
+            .unwrap()
+            .unwrap()
+            .into_iter()
+            .find(|saved| saved.task_id == task.task_id)
+            .unwrap();
+        assert_eq!(current, refreshed);
+        let generations =
+            block_on(load_task_generations(&writer.sender, task.task_id.clone()).unwrap())
+                .unwrap()
+                .unwrap();
+        let old = generations
+            .iter()
+            .find(|saved| saved.generation == 1)
+            .unwrap();
+        let expected_old = format!("OWNED_1_{}", launch.launch_id());
+        assert_eq!(old.state, LocalCliTaskState::Disconnected);
+        assert_eq!(
+            old.result.as_deref().map(str::trim),
+            Some(expected_old.as_str())
+        );
+        assert_eq!(
+            generations.iter().find(|saved| saved.generation == 2),
+            Some(&current)
+        );
+        let messages_after =
+            block_on(load_task_messages(&writer.sender, task.task_id.clone()).unwrap())
+                .unwrap()
+                .unwrap();
+        assert_eq!(messages_after, messages);
+        for message in &messages_after {
+            let record = block_on(
+                crate::persistence::local_cli_tasks::grok_terminal::load_input(
+                    &writer.sender,
+                    Uuid::parse_str(&message.message_id).unwrap(),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .unwrap();
+            assert_eq!(record.message.state, LocalCliMessageState::Acknowledged);
+            let verified = record.grok_terminal_result.unwrap();
+            let expected = format!(
+                "OWNED_{}_{}",
+                message.recipient_generation,
+                launch.launch_id()
+            );
+            assert_eq!(verified.output.trim(), expected);
+        }
+        let binding = launch
+            .bind(owner.binding_id, owner.permission_revision, &observed)
+            .unwrap();
+        assert!(
+            recover_historical_results(
+                binding,
+                current.clone(),
+                owner,
+                writer.sender.clone(),
+                &blocked,
+            )
+            .unwrap()
+            .is_none()
+        );
+        write_evidence(
+            &root,
+            "cold-recovery.safe.json",
+            json!({"old_generation_result_bytes":old.result.as_deref().map(str::len),
+                "current_generation_result_bytes":current.result.as_deref().map(str::len),
+                "state":"disconnected","messages_before":messages.len(),
+                "messages_after":messages_after.len(),"readonly_recovery_idempotent":true,
+                "old_and_current_result_match_native_turns":true}),
+        );
+        write_evidence(
+            &root,
+            "cold-native-result.json",
+            json!({"task_id":task.task_id,"launch_id":launch.launch_id(),
+                "generations":2,"readonly_recovery_verified":true}),
+        );
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    });
+}
+
+#[test]
+#[ignore = "由隔离运行器确认同一原生 TUI/leader 已退出后，重开 SQLite 验证冷补写结果"]
+fn grok_owned_native_cold_after_exit() {
+    App::test((), |mut app| async move {
+        let root = PathBuf::from(env::var_os("INFINISHELL_GROK_OWNED_LIVE_ROOT").unwrap())
+            .canonicalize()
+            .unwrap();
+        let command: Value =
+            serde_json::from_slice(&read_private(&root.join("launch-command.json")).unwrap())
+                .unwrap();
+        let receipt: Value =
+            serde_json::from_slice(&read_private(&root.join("cold-native-result.json")).unwrap())
+                .unwrap();
+        let path = PathBuf::from(command["manifest_path"].as_str().unwrap());
+        let sha = command["manifest_sha256"].as_str().unwrap();
+        let mut launch = GrokOwnedLaunch::restore(&path, sha).unwrap();
+        let socket_root = launch.manifest.socket_path.parent().unwrap().to_owned();
+        app.update(|ctx| launch.release_after_exit(ctx).unwrap());
+        assert!(!socket_root.exists());
+        let mut retired = GrokOwnedLaunch::restore(&path, sha).unwrap();
+        assert!(retired.is_retired());
+        assert!(retired.take_launch_argv().is_err());
+        let writer = crate::persistence::start_test_writer(&root.join("tasks.sqlite")).unwrap();
+        let loaded = block_on(load_tasks(&writer.sender, true).unwrap())
+            .unwrap()
+            .unwrap();
+        let task = loaded
+            .iter()
+            .find(|task| task.task_id == receipt["task_id"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(task.generation, 2);
+        assert_eq!(task.state, LocalCliTaskState::Disconnected);
+        let expected = format!("OWNED_2_{}", launch.launch_id());
+        assert_eq!(
+            task.result.as_deref().map(str::trim),
+            Some(expected.as_str())
+        );
+        let generations =
+            block_on(load_task_generations(&writer.sender, task.task_id.clone()).unwrap())
+                .unwrap()
+                .unwrap();
+        let old = generations
+            .iter()
+            .find(|saved| saved.generation == 1)
+            .unwrap();
+        let expected_old = format!("OWNED_1_{}", launch.launch_id());
+        assert_eq!(
+            old.result.as_deref().map(str::trim),
+            Some(expected_old.as_str())
+        );
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+        write_evidence(
+            &root,
+            "cold-after-exit.safe.json",
+            json!({"passed":true,"native_exited_before_read":true,
+                "persisted_old_and_current_results_reloaded":true,
+                "retired_launch_not_replayed":true,"model_inputs":0}),
         );
     });
 }
