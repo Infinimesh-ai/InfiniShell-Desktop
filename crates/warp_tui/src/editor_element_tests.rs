@@ -493,6 +493,36 @@ fn placeholder_ghost_text_truncates_to_element_width() {
     });
 }
 
+#[test]
+fn placeholder_ghost_text_respects_wide_and_combining_graphemes() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            ctx.add_singleton_model(|_| Appearance::mock());
+            let empty = model(ctx, "");
+            let element = placeholder_element(ctx, &empty, "输入e\u{301}内容", TuiStyle::default());
+            let buffer = render_buffer(ctx, element, 10, 5);
+            assert_eq!(buffer.to_lines()[0].trim_end(), " 输入e\u{301}内容");
+            assert_eq!(buffer[(1, 0)].symbol(), "输");
+            assert_eq!(buffer[(3, 0)].symbol(), "入");
+            assert_eq!(buffer[(5, 0)].symbol(), "e\u{301}");
+            assert_eq!(buffer[(6, 0)].symbol(), "内");
+            assert_eq!(buffer[(8, 0)].symbol(), "容");
+        });
+    });
+}
+
+#[test]
+fn placeholder_ghost_text_drops_wide_grapheme_at_right_edge() {
+    App::test((), |mut app| async move {
+        app.update(|ctx| {
+            ctx.add_singleton_model(|_| Appearance::mock());
+            let empty = model(ctx, "");
+            let element = placeholder_element(ctx, &empty, "abc中", TuiStyle::default());
+            assert_eq!(render_lines(ctx, element, 5, 5), vec![" abc"]);
+        });
+    });
+}
+
 /// Tab-indented diff rows must paint with the correct number of leading blank
 /// columns. A single leading tab at tab-stop 4 should produce four leading
 /// spaces, so the first non-whitespace glyph is at column 4 (0-based).

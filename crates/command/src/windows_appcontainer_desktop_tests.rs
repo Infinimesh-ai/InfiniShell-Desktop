@@ -1,7 +1,91 @@
 use super::*;
+use windows::Win32::System::StationsAndDesktops::UOI_NAME;
 
 const OWNER: &str = "S-1-5-21-111-222-333-1001";
 const CONTAINER: &str = "S-1-15-2-1-2-3-4-5-6-7";
+
+fn station_name(station: HWINSTA) -> io::Result<Vec<u16>> {
+    let mut name = [0u16; 128];
+    let mut used = 0;
+    unsafe {
+        GetUserObjectInformationW(
+            HANDLE(station.0),
+            UOI_NAME,
+            Some(name.as_mut_ptr().cast()),
+            size_of_val(&name) as u32,
+            Some(&mut used),
+        )
+    }
+    .map_err(io::Error::other)?;
+    let units = used as usize / size_of::<u16>();
+    if used as usize != units * size_of::<u16>()
+        || !(2..=name.len()).contains(&units)
+        || name[units - 1] != 0
+        || name[..units - 1].contains(&0)
+    {
+        return Err(invalid("无名窗口站名称读回无效"));
+    }
+    Ok(name[..units - 1].to_vec())
+}
+
+pub(crate) fn unnamed_station_create_only_reports_identity_and_cleanup() {
+    let _creation = CREATION_LOCK.lock().unwrap();
+    let original = unsafe { GetProcessWindowStation() }.unwrap();
+    let owner = current_user_sid().unwrap();
+    let descriptor = Descriptor::new(
+        &owner,
+        CONTAINER,
+        STATION_OWNER_ACCESS,
+        STATION_CONTAINER_ACCESS,
+    )
+    .unwrap();
+    let attributes = descriptor.attributes();
+    let created = unsafe {
+        CreateWindowStationW(
+            PCWSTR::null(),
+            CWF_CREATE_ONLY,
+            STATION_OWNER_ACCESS,
+            Some(&attributes),
+        )
+    };
+    match created {
+        Err(error) => {
+            eprintln!(
+                "atomic_windows_unnamed_station_control={{\"created\":false,\"hresult\":{}}}",
+                error.code().0 as u32
+            );
+            assert!(unsafe { GetProcessWindowStation() }.is_ok_and(|current| current == original));
+        }
+        Ok(station) => {
+            let different_object = station_name(station)
+                .and_then(|name| station_name(original).map(|original_name| name != original_name));
+            let descriptor_matches = verify_object(HANDLE(station.0), &descriptor, true);
+            let selected = unsafe { GetProcessWindowStation() };
+            let original_unchanged = selected.as_ref().is_ok_and(|current| *current == original);
+            let restore = if original_unchanged {
+                Ok(())
+            } else {
+                unsafe { SetProcessWindowStation(original) }.map_err(io::Error::other)
+            };
+            let closed = restore
+                .and_then(|()| unsafe { CloseWindowStation(station) }.map_err(io::Error::other));
+            eprintln!(
+                "atomic_windows_unnamed_station_control={{\"created\":true,\"different_object\":{},\"descriptor_matches\":{},\"original_station_unchanged\":{original_unchanged},\"original_station_restored\":{},\"closed\":{}}}",
+                match different_object.as_ref() {
+                    Ok(value) => value.to_string(),
+                    Err(_) => "null".to_owned(),
+                },
+                descriptor_matches.is_ok(),
+                unsafe { GetProcessWindowStation() }.is_ok_and(|current| current == original),
+                closed.is_ok(),
+            );
+            assert!(different_object.unwrap());
+            descriptor_matches.unwrap();
+            closed.unwrap();
+            assert!(unsafe { GetProcessWindowStation() }.is_ok_and(|current| current == original));
+        }
+    }
+}
 
 pub(crate) fn private_descriptor_binds_exact_owner_container_and_low_label() {
     let descriptor = Descriptor::new(

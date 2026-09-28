@@ -220,6 +220,13 @@ fn restore_known_launches(tasks: &[LocalCliTask]) -> Vec<std::io::Result<GrokOwn
             continue;
         };
         if config["execution_kind"] != "grok_owned_terminal" {
+            if task.harness == "grok"
+                && (config.get("grok_terminal").is_some()
+                    || config.get("launch_manifest").is_some()
+                    || config.get("launch_sha256").is_some())
+            {
+                restored.push(Err(std::io::Error::other("普通 Grok 恢复类型不匹配")));
+            }
             continue;
         }
         restored.push((|| {

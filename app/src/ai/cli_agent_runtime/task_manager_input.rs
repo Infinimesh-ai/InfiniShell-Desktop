@@ -230,7 +230,7 @@ impl LocalCLITaskManagerView {
         let agent = match self.harness {
             Harness::Codex => Some(CLIAgent::Codex),
             Harness::Claude => Some(CLIAgent::Claude),
-            Harness::Grok if self.permission == PermissionPolicy::Inherit => Some(CLIAgent::Grok),
+            Harness::Grok if self.grok_skill_policy_available(ctx) => Some(CLIAgent::Grok),
             Harness::Grok
             | Harness::Oz
             | Harness::OpenCode

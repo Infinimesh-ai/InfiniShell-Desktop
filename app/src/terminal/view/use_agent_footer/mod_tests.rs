@@ -24,7 +24,7 @@ use crate::features::FeatureFlag;
 use crate::settings::AISettings;
 use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSession, CLIAgentSessionContext, CLIAgentSessionStatus,
-    CLIAgentSessionsModel,
+    CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
 use crate::terminal::model::ansi::{BootstrappedValue, Handler as _, InitShellValue};
 use crate::terminal::shared_session::SharedSessionSource;
@@ -1320,6 +1320,89 @@ mod input_approval_guard_tests;
 
 #[path = "file_submission_tests.rs"]
 mod file_submission_tests;
+
+#[test]
+fn collapsed_cli_file_button_opens_composer_and_restores_draft_for_supported_agents() {
+    use futures::channel::oneshot;
+    use futures::future::{Either, select};
+
+    for agent in [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok] {
+        App::test((), move |mut app| async move {
+            initialize_app_for_terminal_view(&mut app);
+            app.add_singleton_model(|_| crate::workspace::ToastStack);
+            let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+            let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+            let terminal = add_window_with_terminal(&mut app, None);
+            let writes = collect_cli_test_writes(&mut app, &terminal);
+            let generation = terminal.update(&mut app, |view, ctx| {
+                let generation = register_cli_input_test_session(view, agent, ctx);
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                    sessions.set_draft(view.view_id, "保留的中文草稿".to_owned());
+                });
+                generation
+            });
+            let footer = terminal.read(&app, |view, ctx| {
+                view.use_agent_footer.as_ref(ctx).agent_input_footer.clone()
+            });
+            let selected = Rc::new(RefCell::new(Vec::new()));
+            let captured = selected.clone();
+            let view_id = terminal.read(&app, |view, _| view.view_id);
+            let (opened_sender, opened_receiver) = oneshot::channel();
+            let mut opened_sender = Some(opened_sender);
+            app.update(|ctx| {
+                ctx.subscribe_to_view(&footer, move |_, event, _| {
+                    if let AgentInputFooterEvent::SelectCLIFile { generation } = event {
+                        captured.borrow_mut().push(*generation);
+                    }
+                });
+                ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), move |_, event, _| {
+                    if let CLIAgentSessionsModelEvent::InputSessionChanged {
+                        terminal_view_id,
+                        new_input_state: CLIAgentInputState::Open { .. },
+                        ..
+                    } = event
+                        && *terminal_view_id == view_id
+                        && let Some(sender) = opened_sender.take()
+                    {
+                        sender.send(()).unwrap();
+                    }
+                });
+            });
+
+            terminal.read(&app, |view, ctx| {
+                assert!(!view.is_cli_agent_rich_input_open(ctx));
+            });
+            footer.update(&mut app, |footer, ctx| {
+                footer.handle_action(&AgentInputFooterAction::SelectFile, ctx);
+            });
+            match select(
+                opened_receiver,
+                Box::pin(Timer::after(Duration::from_secs(5))),
+            )
+            .await
+            {
+                Either::Left((result, _)) => result.unwrap(),
+                Either::Right((_, _)) => panic!("文件选择入口没有打开 CLI 富输入"),
+            }
+
+            assert_eq!(*selected.borrow(), vec![generation]);
+            assert!(writes.borrow().is_empty());
+            terminal.read(&app, |view, ctx| {
+                assert!(view.is_cli_agent_rich_input_open(ctx));
+                assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "保留的中文草稿");
+                assert!(view.ai_context_model.as_ref(ctx).pending_files().is_empty());
+                assert!(
+                    view.input
+                        .as_ref(ctx)
+                        .editor()
+                        .as_ref(ctx)
+                        .image_context_options
+                        .is_enabled()
+                );
+            });
+        });
+    }
+}
 
 #[test]
 fn rich_cli_picker_without_plugin_uses_attachment_flow_and_preserves_shell_lock() {

@@ -15,7 +15,7 @@ use warpui::r#async::Timer;
 use warpui::{App, TypedActionView, ViewHandle};
 
 use super::*;
-use crate::ai::blocklist::{PendingAttachment, PendingFile};
+use crate::ai::blocklist::{BlocklistAIContextEvent, PendingAttachment, PendingFile};
 use crate::ai::llms::{LLMInfo, LLMPreferences};
 use crate::features::FeatureFlag;
 use crate::persistence::{ModelEvent as PersistenceEvent, WriterHandles};
@@ -182,6 +182,117 @@ fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, OwnedPtyFixture) 
         });
     });
     (terminal, pty)
+}
+
+#[test]
+fn new_block_in_same_pty_and_session_revokes_old_owned_input() {
+    App::test((), |mut app| async move {
+        let (terminal, _pty) = owned_terminal(&mut app);
+        terminal.update(&mut app, |view, ctx| {
+            let (old_block, session) = {
+                let owned = view.grok_owned_input.as_mut().unwrap();
+                owned.launch_command = Some("grok".into());
+                (owned.snapshot.block.clone(), owned.snapshot.session)
+            };
+            let lease = view
+                .grok_owned_input
+                .as_ref()
+                .unwrap()
+                .lease
+                .clone()
+                .unwrap();
+            {
+                let mut model = view.model.lock();
+                assert!(view.is_owned_grok_command(&model));
+                model.finish_block();
+                model.simulate_long_running_block("grok", "");
+                model
+                    .block_list_mut()
+                    .active_block_mut()
+                    .set_session_id(session);
+                let block = model.block_list().active_block();
+                assert_ne!(block.id(), &old_block);
+                assert_eq!(block.session_id(), Some(session));
+                assert!(!view.is_owned_grok_command(&model));
+            }
+            assert!(!view.owned_grok_identity_matches());
+            view.invalidate_owned_grok_if_changed(ctx);
+            assert!(lease.revoked());
+        });
+    });
+}
+
+#[test]
+fn owned_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if matches!(event, Event::WriteBytesToPty { .. }) {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        });
+        let png = include_bytes!("../../editor/view/figma_utils/non-figma-export.png");
+        let (first, first_attached) = oneshot::channel();
+        let mut first = Some(first);
+        let context = terminal.read(&app, |view, _| view.ai_context_model.clone());
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&context, move |model, event, ctx| {
+                if matches!(event, BlocklistAIContextEvent::UpdatedPendingContext { .. })
+                    && model.as_ref(ctx).pending_images().len() == 1
+                {
+                    if let Some(first) = first.take() {
+                        first.send(()).unwrap();
+                    }
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            ctx.clipboard().write(warpui::clipboard::ClipboardContent {
+                images: Some(vec![warpui::clipboard::ImageData {
+                    data: png.to_vec(),
+                    mime_type: "image/png".into(),
+                    filename: Some("clip.png".into()),
+                }]),
+                ..Default::default()
+            });
+            assert!(view.paste_clipboard_image_to_cli_agent(ctx));
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+        });
+        received_event(first_attached).await;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("drop.png");
+        std::fs::write(&path, png).unwrap();
+        let (second, second_attached) = oneshot::channel();
+        let mut second = Some(second);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&context, move |model, event, ctx| {
+                if matches!(event, BlocklistAIContextEvent::UpdatedPendingContext { .. })
+                    && model.as_ref(ctx).pending_images().len() == 2
+                {
+                    if let Some(second) = second.take() {
+                        second.send(()).unwrap();
+                    }
+                }
+            });
+        });
+        terminal.update(&mut app, |view, ctx| {
+            view.paste_dropped_images_to_cli_agent(vec![path.to_string_lossy().into_owned()], ctx);
+        });
+        received_event(second_attached).await;
+        terminal.read(&app, |view, ctx| {
+            let images = view.ai_context_model.as_ref(ctx).pending_images();
+            assert_eq!(images.len(), 2);
+            assert_eq!(images[0].file_name, "clip.png");
+            assert_eq!(images[1].file_name, "drop.png");
+        });
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+    });
 }
 
 async fn received_event(receiver: oneshot::Receiver<()>) {

@@ -102,6 +102,23 @@ fn corrupted_grok_configuration_cannot_be_interpreted_as_no_owned_process() {
 }
 
 #[test]
+fn owned_manifest_with_missing_or_changed_kind_keeps_recovery_blocked() {
+    for kind in [None, Some("terminal_hook")] {
+        let mut config = json!({
+            "grok_terminal": {"launch_id": Uuid::new_v4()},
+            "launch_manifest": "/project/launch.json",
+            "launch_sha256": "invalid"
+        });
+        if let Some(kind) = kind {
+            config["execution_kind"] = kind.into();
+        }
+        let recovered = restore_known_launches(&[task(config)]);
+        assert_eq!(recovered.len(), 1);
+        assert!(recovered[0].is_err());
+    }
+}
+
+#[test]
 fn permission_change_and_listener_replacement_revoke_input_before_view_callbacks() {
     use super::super::event::parse_event;
     use super::super::listener::CLIAgentSessionListener;

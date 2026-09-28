@@ -11,7 +11,9 @@ use warpui::{AppContext, EntityId, SingletonEntity, ViewContext};
 
 use super::{CliInputSubmission, TerminalView};
 use crate::remote_server::cli_image_grok_client::{self as remote, Journal, Launch};
-use crate::remote_server::cli_image_grok_protocol::{Action, Input, Observation, Png, Reply};
+use crate::remote_server::cli_image_grok_protocol::{
+    Action, Input, Observation, Png, Reply, Ticket,
+};
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
 use crate::remote_server::proto::CliImageStagingScope;
@@ -23,12 +25,28 @@ use crate::terminal::cli_agent_sessions::{
 
 #[derive(Clone)]
 struct Binding {
+    client: Arc<RemoteServerClient>,
     launch: Launch,
     observed: GrokPermissionObservation,
     listener: EntityId,
     events: EntityId,
     generation: Uuid,
     attempt: Uuid,
+}
+
+fn same_remote_grok_attempt<T>(
+    ticket: &Ticket,
+    attempt: Uuid,
+    client: &Arc<T>,
+    active_ticket: &Ticket,
+    sending_generation: Option<Uuid>,
+    pending: Option<(&Arc<T>, &str)>,
+) -> bool {
+    ticket == active_ticket
+        && sending_generation == Some(attempt)
+        && pending.is_some_and(|(pending_client, generation)| {
+            Arc::ptr_eq(client, pending_client) && generation == attempt.to_string()
+        })
 }
 
 impl TerminalView {
@@ -66,8 +84,9 @@ impl TerminalView {
             .client_for_session(warp_core::SessionId::from(owned.launch.terminal_session))?
             .clone();
         Some((
-            client,
+            client.clone(),
             Binding {
+                client,
                 launch: owned.launch.clone(),
                 observed: observed.clone(),
                 listener: target.listener_id,
@@ -78,10 +97,37 @@ impl TerminalView {
         ))
     }
 
+    fn remote_grok_attempt_matches(&self, binding: &Binding) -> bool {
+        self.grok_remote_owned.as_ref().is_some_and(|owned| {
+            same_remote_grok_attempt(
+                &binding.launch.ticket,
+                binding.attempt,
+                &binding.client,
+                &owned.launch.ticket,
+                owned.sending_generation,
+                owned
+                    .pending
+                    .as_ref()
+                    .map(|(client, scope, _)| (client, scope.input_generation.as_str())),
+            )
+        })
+    }
+
     fn remote_grok_binding_matches(&self, binding: &Binding, ctx: &AppContext) -> bool {
+        if !self.remote_grok_attempt_matches(binding)
+            || !self.grok_remote_owned.as_ref().is_some_and(|owned| {
+                owned
+                    .pending
+                    .as_ref()
+                    .is_some_and(|(_, scope, _)| binding.client.cli_image_scope_is_current(scope))
+            })
+        {
+            return false;
+        }
         self.remote_grok_input_binding(binding.generation, ctx)
-            .is_some_and(|(_, current)| {
-                current.launch.ticket == binding.launch.ticket
+            .is_some_and(|(client, current)| {
+                Arc::ptr_eq(&client, &binding.client)
+                    && current.launch.ticket == binding.launch.ticket
                     && current.observed == binding.observed
                     && current.listener == binding.listener
                     && current.events == binding.events
@@ -241,8 +287,9 @@ impl TerminalView {
                                 view.fail_remote_grok_worker(&binding, ctx);
                                 return;
                             }
-                            view.finish_remote_grok_worker(&binding);
-                            if view.remote_grok_binding_matches(&binding, ctx) {
+                            let current = view.remote_grok_binding_matches(&binding, ctx);
+                            view.finish_remote_grok_worker(&binding, ctx);
+                            if current {
                                 view.fail_cli_agent_text_submit(
                                     binding.generation,
                                     crate::t!("cli-agent-grok-owned-input-not-dispatched"),
@@ -300,8 +347,9 @@ impl TerminalView {
     }
 
     fn fail_remote_grok_worker(&mut self, binding: &Binding, ctx: &mut ViewContext<Self>) {
-        self.finish_remote_grok_worker(binding);
-        if self.remote_grok_binding_matches(binding, ctx) {
+        let current = self.remote_grok_binding_matches(binding, ctx);
+        self.finish_remote_grok_worker(binding, ctx);
+        if current {
             if let Some(owned) = &mut self.grok_remote_owned {
                 owned.sending = false;
                 owned.revoke();
@@ -314,17 +362,17 @@ impl TerminalView {
         }
     }
 
-    /// 只结束本次传输占用；未知草稿仍由持久账本拒绝再次派发。
-    fn finish_remote_grok_worker(&mut self, binding: &Binding) {
-        if let Some(owned) = &mut self.grok_remote_owned {
-            if owned.launch.ticket == binding.launch.ticket
-                && owned.sending_generation == Some(binding.attempt)
-            {
-                owned.sending = false;
-                owned.sending_generation = None;
-                owned.revoke();
-            }
+    /// 只结束本次传输占用与提交租约；未知草稿仍由持久账本拒绝再次派发。
+    fn finish_remote_grok_worker(&mut self, binding: &Binding, ctx: &mut ViewContext<Self>) {
+        if !self.remote_grok_attempt_matches(binding) {
+            return;
         }
+        if let Some(owned) = &mut self.grok_remote_owned {
+            owned.sending = false;
+            owned.sending_generation = None;
+            owned.revoke();
+        }
+        self.release_cli_agent_input_submission(binding.generation, ctx);
     }
 
     fn receive_remote_grok_reply(
@@ -348,8 +396,9 @@ impl TerminalView {
             native_ack_sha256,
         } = &reply
         else {
-            self.finish_remote_grok_worker(&binding);
-            if self.remote_grok_binding_matches(&binding, ctx) {
+            let current = self.remote_grok_binding_matches(&binding, ctx);
+            self.finish_remote_grok_worker(&binding, ctx);
+            if current {
                 if let Some(owned) = &mut self.grok_remote_owned {
                     owned.sending = false;
                 }
@@ -369,17 +418,16 @@ impl TerminalView {
             && native_prompt_id.is_some()
             && native_ack_sha256.is_some()
         {
+            let current = self.remote_grok_binding_matches(&binding, ctx);
             // 精确 ACK 已独立持久化；新 listener/会话/输入代际绝不被旧回调清空。
-            if let Some(owned) = &mut self.grok_remote_owned {
-                if owned.launch.ticket == binding.launch.ticket
-                    && owned.sending_generation == Some(binding.attempt)
-                {
+            if self.remote_grok_attempt_matches(&binding) {
+                if let Some(owned) = &mut self.grok_remote_owned {
                     owned.sending = false;
                     owned.sending_generation = None;
                     owned.pending = None;
                 }
             }
-            if self.remote_grok_binding_matches(&binding, ctx) {
+            if current {
                 self.release_cli_agent_input_submission(binding.generation, ctx);
                 let attachments_unchanged = self
                     .ai_context_model
@@ -439,8 +487,9 @@ impl TerminalView {
                         client, scope, revision, binding, snapshot, message, subject, reply, ctx,
                     );
                 } else {
-                    view.finish_remote_grok_worker(&binding);
-                    if view.remote_grok_binding_matches(&binding, ctx) {
+                    let current = view.remote_grok_binding_matches(&binding, ctx);
+                    view.finish_remote_grok_worker(&binding, ctx);
+                    if current {
                         view.fail_cli_agent_text_submit(
                             binding.generation,
                             crate::t!("cli-agent-grok-owned-input-claimed"),
@@ -452,3 +501,7 @@ impl TerminalView {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "grok_remote_images_tests.rs"]
+mod tests;

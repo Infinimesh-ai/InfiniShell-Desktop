@@ -1504,6 +1504,11 @@ jobs:
         shell: pwsh
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
 
+      - name: Diagnose unnamed Windows station without changing the production probe
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=windows::appcontainer::console_tests::unnamed_station_create_only_reports_identity_and_cleanup)'
+
       - name: Diagnose Windows atomic image-debug exit in a strict Job
         id: atomic_windows_debug
         # 原生调试可独立运行；保留首次失败，不继承服务会话测试的自动重试。

@@ -538,23 +538,40 @@ fn trace_live_protocol_ids(message: &Value, generation: Uuid) {
 #[cfg(test)]
 fn live_native_image_skill_projection(message: &Value) -> Value {
     let command = "infinishell-local-skills:inspect-managed-image";
+    let selected = [
+        command,
+        "infinishell-local-skills:image-alpha",
+        "infinishell-local-skills:image-beta",
+    ];
     let tools = message["message"]["content"]
         .as_array()
         .into_iter()
         .flatten()
         .filter(|block| block["type"] == "tool_use")
         .map(|block| {
+            let selected_command = block["input"]["skill"]
+                .as_str()
+                .filter(|name| block["name"] == "Skill" && selected.contains(name));
             json!({"tool_use_id":live_native_id(&block["id"]),
                 "selected_skill":block["name"] == "Skill" && block["input"] == json!({"skill":command}),
+                "selected_skill_command":selected_command,
                 "input_sha256":format!("{:x}", Sha256::digest(serde_json::to_vec(&block["input"]).expect("原生 JSON 可编码")))})
         })
         .collect::<Vec<_>>();
-    let registered = message["response"]["response"]["commands"]
+    let commands = message["response"]["response"]["commands"]
         .as_array()
-        .map(|commands| commands.iter().any(|entry| entry["name"] == command));
+        .map(|commands| {
+            commands
+                .iter()
+                .filter_map(|entry| entry["name"].as_str())
+                .filter(|name| selected.contains(name))
+                .collect::<Vec<_>>()
+        });
+    let registered = commands.as_ref().map(|names| names.contains(&command));
     let model_verified = (message["type"] == "system" && message["subtype"] == "init")
         .then(|| message["model"] == "claude-opus-5-5");
     json!({"tools":tools,"selected_command_registered":registered,
+        "selected_commands_registered":commands,
         "native_model_matches_fixture":model_verified})
 }
 

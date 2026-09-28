@@ -16,6 +16,8 @@ use crate::persistence::local_cli_tasks::grok_terminal::GrokTerminalOwner;
 use crate::persistence::model::{LocalCliTask, LocalCliTaskState};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::grok_leader_input::calibrated_platform;
+#[cfg(windows)]
+use crate::terminal::cli_agent_sessions::grok_owned_launch::windows_launch_command;
 use crate::terminal::cli_agent_sessions::grok_owned_launch::{GrokOwnedLaunch, GrokOwnedPty};
 use crate::terminal::cli_agent_sessions::grok_owned_worker::{
     GrokOwnedInputLease, GrokOwnedWorker,
@@ -24,8 +26,6 @@ use crate::terminal::cli_agent_sessions::{CLIAgentSessionsModel, GrokPermissionE
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 #[cfg(not(windows))]
 use crate::terminal::model::session::command_executor::shell_quote_arg;
-#[cfg(windows)]
-use crate::terminal::cli_agent_sessions::grok_owned_launch::windows_launch_command;
 
 #[derive(Clone, PartialEq, Eq)]
 struct LaunchSnapshot {
@@ -200,6 +200,7 @@ impl TerminalView {
         self.grok_owned_input.as_ref().is_some_and(|owned| {
             !owned.invalidated
                 && model.local_pty_identity() == Some(owned.snapshot.pty.clone())
+                && model.block_list().active_block().id() == &owned.snapshot.block
                 && model.block_list().active_block().session_id() == Some(owned.snapshot.session)
                 && !model.shared_session_status().is_sharer_or_viewer()
                 && !model.is_conversation_transcript_viewer()
@@ -237,6 +238,7 @@ impl TerminalView {
         };
         let model = self.model.lock();
         model.local_pty_identity() == Some(owned.snapshot.pty.clone())
+            && model.block_list().active_block().id() == &owned.snapshot.block
             && model.block_list().active_block().session_id() == Some(owned.snapshot.session)
             && !model.shared_session_status().is_sharer_or_viewer()
             && !model.is_conversation_transcript_viewer()

@@ -127,6 +127,51 @@ fn missing_file_keeps_entire_composer_without_a_partial_pty_write() {
     });
 }
 
+#[cfg(unix)]
+#[test]
+fn unreadable_file_keeps_draft_and_cards_without_writing_to_pty() {
+    use std::os::unix::fs::PermissionsExt;
+
+    for agent in [CLIAgent::Codex, CLIAgent::Claude] {
+        App::test((), move |mut app| async move {
+            let terminal = prepare_rich_cli_test(&mut app, agent);
+            let root = tempfile::tempdir().unwrap();
+            let readable = root.path().join("readable.txt");
+            let unreadable = root.path().join("unreadable.txt");
+            std::fs::write(&readable, "first").unwrap();
+            std::fs::write(&unreadable, "protected").unwrap();
+            std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000)).unwrap();
+            match std::fs::File::open(&unreadable) {
+                Ok(_) => {
+                    eprintln!("跳过权限拒绝用例：当前测试身份可读取 mode 000 文件");
+                    return;
+                }
+                Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied),
+            }
+            add_file(&terminal, &mut app, &readable);
+            add_file(&terminal, &mut app, &unreadable);
+            let writes = collect_cli_test_writes(&mut app, &terminal);
+            let rejected = wait_for_rejection(&mut app);
+
+            submit_cli_test_input(&terminal, &mut app, "权限拒绝后保留草稿");
+            await_submission_event(rejected).await;
+
+            assert!(writes.borrow().is_empty());
+            terminal.read(&app, |view, ctx| {
+                assert_eq!(
+                    view.input.as_ref(ctx).buffer_text(ctx),
+                    "权限拒绝后保留草稿"
+                );
+                assert_eq!(view.ai_context_model.as_ref(ctx).pending_files().len(), 2);
+            });
+            assert_eq!(
+                std::fs::metadata(&unreadable).unwrap().permissions().mode() & 0o777,
+                0
+            );
+        });
+    }
+}
+
 #[test]
 fn newly_added_file_and_reedited_draft_survive_an_earlier_submission() {
     App::test((), |mut app| async move {

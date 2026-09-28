@@ -283,3 +283,9 @@ fn private_desktop_never_publishes_a_route_for_missing_objects() {
 fn private_desktop_admin_observation_distinguishes_non_member_from_query_failure() {
     super::desktop::test_cases::private_desktop_admin_observation_distinguishes_non_member_from_query_failure();
 }
+
+#[test]
+#[ignore = "无名站创建只在 Windows 服务身份原生对照中显式执行"]
+fn unnamed_station_create_only_reports_identity_and_cleanup() {
+    super::desktop::test_cases::unnamed_station_create_only_reports_identity_and_cleanup();
+}
