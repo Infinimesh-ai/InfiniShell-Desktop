@@ -801,6 +801,319 @@ fn vim_linewise_yanks_handle_eof_blank_and_single_line_buffers() {
     });
 }
 #[test]
+fn vim_inner_line_yank_pastes_charwise() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| {
+                view.set_text("one\n two words \nlast", ctx)
+            });
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2GyilG$p");
+            view
+        });
+
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\n two words \nlasttwo words"));
+    });
+}
+
+#[test]
+fn vim_inner_line_delete_renders_remaining_padding_and_undo_restores_text() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| {
+                view.set_text("one\n two words \nlast", ctx)
+            });
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gdil");
+            view
+        });
+
+        app.read(|ctx| {
+            assert_eq!(text(&view, ctx), "one\n  \nlast");
+            let lines = render_input_buffer(&view, ctx).to_lines();
+            assert_eq!(
+                lines.iter().map(|line| line.trim_end()).collect::<Vec<_>>(),
+                vec!["one", "", "last"]
+            );
+            assert_eq!(cursor_and_height(&view, ctx), (Some((1, 1)), 3));
+        });
+        app.update(|ctx| type_str(&view, ctx, "u"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\n two words \nlast"));
+    });
+}
+
+#[test]
+fn vim_inner_line_delete_keeps_blank_lines_unchanged() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\n \t \nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gdil");
+            view
+        });
+
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\n \t \nlast"));
+    });
+}
+
+#[test]
+fn vim_inner_line_change_renders_wide_replacement_text() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| {
+                view.set_text("one\n two words \nlast", ctx)
+            });
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gcil替换");
+            view
+        });
+
+        app.read(|ctx| {
+            assert_eq!(text(&view, ctx), "one\n 替换 \nlast");
+            assert_eq!(view.as_ref(ctx).vim_mode(ctx), Some(VimMode::Insert));
+            let lines = render_input_buffer(&view, ctx).to_lines();
+            assert_eq!(
+                lines.iter().map(|line| line.trim_end()).collect::<Vec<_>>(),
+                vec!["one", " 替换", "last"]
+            );
+            assert_eq!(cursor_and_height(&view, ctx), (Some((5, 1)), 3));
+        });
+    });
+}
+
+#[test]
+fn vim_all_lines_yank_preserves_leading_and_trailing_empty_lines_when_pasted() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("\nfirst\n", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gyal");
+            view
+        });
+
+        app.read(|ctx| {
+            assert_eq!(view.as_ref(ctx).yank_buffer, "\nfirst\n\n");
+            assert_eq!(
+                view.as_ref(ctx).yank_motion_type,
+                vim::vim::MotionType::Linewise
+            );
+        });
+        app.update(|ctx| type_str(&view, ctx, "Gp"));
+        app.read(|ctx| {
+            assert_eq!(text(&view, ctx), "\nfirst\n\n\nfirst\n");
+            let lines = render_input_buffer(&view, ctx).to_lines();
+            assert_eq!(
+                lines.iter().map(|line| line.trim_end()).collect::<Vec<_>>(),
+                vec!["", "first", "", "", "first", ""]
+            );
+        });
+    });
+}
+
+#[test]
+fn vim_line_yank_does_not_duplicate_an_existing_terminal_newline() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\n", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "ggyy");
+            view
+        });
+        app.read(|ctx| assert_eq!(view.as_ref(ctx).yank_buffer, "one\n"));
+        app.update(|ctx| type_str(&view, ctx, "P"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\none\n"));
+    });
+}
+
+#[test]
+fn vim_line_delete_pastes_back_exactly_one_terminated_line() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\n", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "ggdd");
+            view
+        });
+        app.read(|ctx| {
+            assert_eq!(view.as_ref(ctx).yank_buffer, "one\n");
+            assert_eq!(text(&view, ctx), "");
+        });
+        app.update(|ctx| type_str(&view, ctx, "P"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\n"));
+    });
+}
+
+#[test]
+fn vim_visual_line_yank_does_not_include_the_following_empty_line() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\n", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "ggVy");
+            view
+        });
+        app.read(|ctx| assert_eq!(view.as_ref(ctx).yank_buffer, "one\n"));
+        app.update(|ctx| type_str(&view, ctx, "P"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\none\n"));
+    });
+}
+
+#[test]
+fn vim_yank_to_buffer_end_preserves_a_real_leading_empty_line() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("first\n\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2GyG");
+            view
+        });
+        app.read(|ctx| assert_eq!(view.as_ref(ctx).yank_buffer, "\nlast\n"));
+        app.update(|ctx| type_str(&view, ctx, "Gp"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "first\n\nlast\n\nlast"));
+    });
+}
+
+#[test]
+fn vim_backward_line_delete_preserves_the_real_leading_empty_line() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("\nfirst\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "Gdgg");
+            view
+        });
+        app.read(|ctx| {
+            assert_eq!(view.as_ref(ctx).yank_buffer, "\nfirst\nlast\n");
+            assert_eq!(text(&view, ctx), "");
+        });
+        app.update(|ctx| type_str(&view, ctx, "u"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "\nfirst\nlast"));
+    });
+}
+
+#[test]
+fn vim_last_line_delete_excludes_only_the_borrowed_newline_from_the_register() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "Gdd");
+            view
+        });
+        app.read(|ctx| {
+            assert_eq!(view.as_ref(ctx).yank_buffer, "last\n");
+            assert_eq!(text(&view, ctx), "");
+        });
+        app.update(|ctx| type_str(&view, ctx, "u"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "\nlast"));
+    });
+}
+
+#[test]
+fn vim_last_line_change_preserves_the_preceding_empty_line_and_undo_is_atomic() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "Gcc");
+            view
+        });
+        app.read(|ctx| {
+            assert_eq!(view.as_ref(ctx).yank_buffer, "last\n");
+            assert_eq!(text(&view, ctx), "\n");
+            assert_eq!(view.as_ref(ctx).vim_mode(ctx), Some(VimMode::Insert));
+        });
+        app.update(|ctx| {
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "u");
+        });
+        app.read(|ctx| assert_eq!(text(&view, ctx), "\nlast"));
+    });
+}
+
+#[test]
+fn vim_all_lines_delete_is_atomic_and_undoable() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\ntwo\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gdal");
+            view
+        });
+
+        app.read(|ctx| {
+            assert_eq!(text(&view, ctx), "");
+            assert_eq!(cursor_and_height(&view, ctx), (Some((0, 0)), 1));
+        });
+        app.update(|ctx| type_str(&view, ctx, "u"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\ntwo\nlast"));
+    });
+}
+
+#[test]
+fn vim_all_lines_change_enters_insert_mode_with_an_empty_buffer() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\ntwo\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "2Gcal");
+            view
+        });
+
+        app.read(|ctx| {
+            assert_eq!(text(&view, ctx), "");
+            assert_eq!(view.as_ref(ctx).vim_mode(ctx), Some(VimMode::Insert));
+        });
+        app.update(|ctx| type_str(&view, ctx, "new"));
+        app.read(|ctx| assert_eq!(text(&view, ctx), "new"));
+    });
+}
+
+#[test]
+fn vim_paragraph_yank_pastes_complete_lines() {
+    App::test((), |mut app| async move {
+        enable_vim_mode(&mut app);
+        let view = app.update(|ctx| {
+            let view = build_view(ctx);
+            view.update(ctx, |view, ctx| view.set_text("one\ntwo\n\nlast", ctx));
+            dispatch(&view, ctx, &[TuiInputAction::HandleEscape]);
+            type_str(&view, ctx, "ggyipGp");
+            view
+        });
+
+        app.read(|ctx| assert_eq!(text(&view, ctx), "one\ntwo\n\nlast\none\ntwo"));
+    });
+}
+
+#[test]
 fn vim_o_and_uppercase_o_insert_logical_lines() {
     App::test((), |mut app| async move {
         enable_vim_mode(&mut app);

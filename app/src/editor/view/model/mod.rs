@@ -32,8 +32,9 @@ use vim::vim::{
 };
 use vim::{
     find_next_paragraph_end, find_previous_paragraph_start, vim_a_block, vim_a_paragraph,
-    vim_a_quote, vim_a_word, vim_find_char_on_line, vim_find_matching_bracket, vim_inner_block,
-    vim_inner_paragraph, vim_inner_quote, vim_inner_word, vim_word_iterator_from_offset,
+    vim_a_quote, vim_a_word, vim_all_lines, vim_find_char_on_line, vim_find_matching_bracket,
+    vim_inner_block, vim_inner_line, vim_inner_paragraph, vim_inner_quote, vim_inner_word,
+    vim_word_iterator_from_offset,
 };
 use warp_errors::report_error;
 use warpui::accessibility::{AccessibilityContent, WarpA11yRole};
@@ -1680,6 +1681,24 @@ impl EditorModel {
         );
     }
 
+    /// 在扩展行选择前判断原始可视范围是否覆盖缓冲区的首末行。
+    pub fn vim_visual_selection_covers_all_lines(&self, ctx: &AppContext) -> bool {
+        if self.selections(ctx).len() != 1 || self.vim_visual_tails.len() != 1 {
+            return false;
+        }
+        let buffer = self.buffer(ctx);
+        let Some((head, tail)) = self.selections(ctx)[0]
+            .head()
+            .to_point(buffer)
+            .ok()
+            .zip(self.vim_visual_tails[0].to_point(buffer).ok())
+        else {
+            return false;
+        };
+        let last_row = buffer.max_point().row;
+        (head.row == 0 && tail.row == last_row) || (tail.row == 0 && head.row == last_row)
+    }
+
     /// Expand the selection to the operand for a visual mode command.
     pub fn vim_visual_selection_range(
         &mut self,
@@ -2603,6 +2622,12 @@ impl EditorModel {
                         (TextObjectType::Paragraph, TextObjectInclusion::Inner) => {
                             vim_inner_paragraph(buffer, offset)
                         }
+                        (TextObjectType::Line, TextObjectInclusion::Around) => {
+                            vim_all_lines(buffer)
+                        }
+                        (TextObjectType::Line, TextObjectInclusion::Inner) => {
+                            vim_inner_line(buffer, offset)
+                        }
                         (TextObjectType::Quote(quote_type), TextObjectInclusion::Around) => {
                             vim_a_quote(buffer, offset, *quote_type)
                         }
@@ -2621,7 +2646,10 @@ impl EditorModel {
                 .collect_vec()
         };
         let _ = self.select_ranges_by_offset(new_selections, ctx);
-        if let TextObjectType::Paragraph = object_type {
+        if matches!(
+            (object_type, inclusion),
+            (TextObjectType::Paragraph, _) | (TextObjectType::Line, TextObjectInclusion::Around)
+        ) {
             let include_newline = operator.includes_trailing_newline();
             self.extend_selection_linewise(include_newline, ctx);
         }
@@ -2846,6 +2874,19 @@ impl EditorModel {
     #[cfg(test)]
     pub fn is_cursor_only<C: ModelAsRef>(&self, selection: &LocalSelection, ctx: &C) -> bool {
         selection.is_cursor_only(self.buffer(ctx))
+    }
+
+    pub fn copy_all_lines_to_vim_register(
+        &self,
+        register_name: char,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        // al 的首尾空行属于原文，另补一个行模式寄存器终止换行。
+        let mut text = self.buffer_text(ctx);
+        text.push('\n');
+        VimRegisters::handle(ctx).update(ctx, |registers, ctx| {
+            registers.write_to_register(register_name, text, MotionType::Linewise, ctx);
+        });
     }
 
     pub fn copy_selection_to_vim_register(
