@@ -1,8 +1,12 @@
 # CLI 支持与能力对齐：验证结论
 
-本报告保留截至 2026-09-28 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+本报告保留截至 2026-09-29 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
 目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。历史通过、失败与跳过仍按原提交计证；新增工作区收据也不能外推到最终 SHA、其他版本或全部平台。
+
+**2026-09-29 输入防护与验收门禁提交 `2383428dac785fc34ed44120226b596d592ad191`**：补强 Grok 专属普通终端的回调／恢复身份、远端图片旧回调隔离、Claude 图片双技能在线验收、文件卡片与技能入口回归，并加入 Windows 诊断、SSH／tmux 收据和 Linux／Windows 双语 GUI 验收脚本；修复 TUI 中文占位提示按字宽覆盖时的重叠。macOS arm64 最终源码的定向 Rust 8 项、i18n 11 项、`cargo check -p warp`、Windows command 目标检查、相关 Python 脚本测试和 TUI 英中真实 PTY 画面均通过。源码无新增或变动用户可见文案，无需本地化变更；TUI 英中布局已实看。跨平台工作流 [run36453314472](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36453314472) 尚在运行，本段不预记其结果。
+
+同提交的固定 Claude Code `2.1.280`／`claude-opus-5-5` macOS 生产适配器在线验收通过：新建与同原生会话冷恢复各提交一张不同 PNG，两个已登记技能每轮均取得精确 Skill 审批和执行，原生投递、结果及两代清理收据通过；收据中的源码工作树干净，两个程序摘要和关键源码摘要前后保持。原件在仓外 `resume-20260929/claude-multi-2383428-05`，收据 SHA-256 `70856b39cc8280b172d02a46ec8bff01ddc02a053dee6d501b12d757255a615a`，事件 SHA-256 `90854acb55c75dc5fd3eb836790e096fe5405bc14424d5f225469954e1fc69e7`。前四轮因调试版 launchd helper 读取外置源码本地化资源阻塞而在10秒握手处失败，抽样进程栈保留；按[本机测试存储约定](../../docs/local-test-storage.zh-CN.md)用现有 `warpui/test-util,rust-embed/debug-embed` 特性重建后通过，未调整产品超时。五轮测试临时目录均经专属服务、进程与文件核验并在归档后清理。该正例不覆盖实际 GUI、Linux／Windows 或 Claude 其他格式和权限组合，G04–G06 继续开放。
 
 **2026-09-28 Homebrew 回滚预检增量 `91fa953f882d54952d81067903e769d42821927e` 与整合提交 `7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8`**：在首次回滚写入前一并检查主树、公共入口、补全与别名的当前/暂存状态，拒绝预先存在的外部修改；已恢复、已领取或合法清理阶段仍可恢复并重复调用。新增六项真实文件系统回归在旧实现上1通过/5失败，修复后6通过；本机更新模块213项、i18n11项、`cargo check --locked -p warp`通过，nextest零重试。此修复只保证在回滚开始前拒绝已存在的不一致，不保证并发写入下跨文件原子性；真实消费者Homebrew来源发现、brew升级、GUI及原生官方映像事务未重验。无需本地化变更，未新增双语布局结论。
 

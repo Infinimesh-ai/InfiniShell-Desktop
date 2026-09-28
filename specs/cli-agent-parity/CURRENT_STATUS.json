@@ -11,7 +11,7 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "7dd68cc9beba0ee6d0858d1f861ffdc0bf6a7ff8",
+  "latest_related_verified_source_commit": "2383428dac785fc34ed44120226b596d592ad191",
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
@@ -71,7 +71,7 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
-  "documentation_updated_at": "2026-09-28",
+  "documentation_updated_at": "2026-09-29",
   "documentation_source_commit": "70f65a996e13b405140544f495fc904875259e42",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
@@ -98,6 +98,15 @@
       "claude"
     ],
     "gui_scope": "84102bb1c macOS Claude JPEG及纯PNG真实GUI、活跃重关联与冷恢复分别确认；后续摘要绑定工作区 Grok 双图 GUI、同nativeID冷恢复、同宿主重关联及双语滚动区已通过，旧选择器/握手失败保留。"
+  },
+  "latest_resume": {
+    "source_commit": "2383428dac785fc34ed44120226b596d592ad191",
+    "scope": "G01/G03恢复与回调隔离、G04-G06 Claude图片双技能验收、G07文件卡片回归、G08远端图片旧回调隔离、G09 Windows诊断、G10技能入口及V02/V03/V05验收工具、TUI中文占位宽字符修复",
+    "local_gates": "macOS定向Rust 8项、i18n 11项、cargo check -p warp、Windows command目标检查、相关Python脚本测试、TUI英中真实PTY布局通过；未新增或变动用户可见文案，无需本地化变更",
+    "claude_online": "固定2.1.280/claude-opus-5-5 macOS生产适配器图片加双技能新建与同原生会话冷恢复通过；两轮自然退出0且清理确认。仓外resume-20260929/claude-multi-2383428-05/receipt.json摘要70856b39cc8280b172d02a46ec8bff01ddc02a053dee6d501b12d757255a615a；不覆盖GUI、跨平台或父权限上限",
+    "cloud_run": 36453314472,
+    "cloud_status": "运行中；不预记结果",
+    "closed_gaps": []
   },
   "selected_related_gates_scope": "7dd68cc9b 普通Linux x64与Windows x64同提交门禁官方成功；Windows desktop/TUI 660通过包含1 LEAK，保持待查。未覆盖真实npm/Homebrew消费者更新、Windows NUL/Node失败对照、GUI或已认证模型；G09与14项必要缺口仍开放。",
   "pending_integration": {
