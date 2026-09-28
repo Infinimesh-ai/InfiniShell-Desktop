@@ -136,6 +136,8 @@
 
 - **Windows 命名站前提实测 `eb2b271e3`**：同提交CI36344378073编译及504/22/14项通过，原生仍16通过/7失败。创建调用线程的CheckTokenMembership(NULL, BuiltinAdministrators)成功返回member=false，随后CreateWindowStation仍0x80070005；未建立私有环境或执行Node，内层清理未知、外层Job清理确认。这只确认该对照的必要成员前提未满足，不解释原Node DLL失败。等待独立管理员验收runner信息，当前不提权/改全局权限；继续Mac独立工作，G09仍开放。
 
+- **Windows NUL实际令牌DACL增量 `11f278091`**：[CI36389274428](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36389274428)编译及504/22/14项通过，原生仍1通过/2失败。7条CREATE观察中，同NUL SD的READ/WRITE/MAX模拟为bound 21拒绝、driver 21允许、无查询失败；成功CMD也在拒绝组，不能认定Node/npm唯一根因。NUL仍空文件，Node记录29条DLL并到初始断点后退出0xc0000142，内外清理确认；MIC及真实CreateFile未观测。上游MXC/libuv的设备ACL准备未执行，现有隔离不放宽；普通交互待用户、NULL+CWF_CREATE_ONLY仅方案，RDP未启、14项缺口保留。Mac Claude cask四场景正在准备，固定元数据尚未齐全、尚未执行。主源、索引与独立审查见验证报告，无需本地化变更。
+
 - **Windows 服务stdio三项复验 `730b63b6a`**：修正stdout保留名为redirected.txt后，[CI36384245535](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36384245535)编译及504/22/14项通过，原生1通过/2失败；CMD通过，NUL仍为空文件，固定Node根仍0xc0000142，清理确认不等于功能通过。实际runner trace为Session0/high/TokenIsElevated=1，不能称未提升普通交互用户；也不据此推断管理员成员。RDP未启用、回环选择读回All，普通交互会话仍待用户确认。下一步仅测试的实际令牌NUL DACL观察尚无运行结论，不改ACL/capability或官方shim；历史原件、G09及14项必要缺口保留，详见验证报告，无需本地化变更。
 
 - **Windows 管理员对照身份已解决（2026-09-28）**：用户授权后临时以Administrator复用原runner领取一次同提交61d0747b4的[CI36379989244](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36379989244)。编译及504/22/14项通过，原生17通过/6失败；实际创建线程member=true，私有窗口站/桌面核验通过，固定Node真实输出v20.9.0、原生退出0，内外Job/AppContainer和自有对象句柄清理确认。原NUL及五个普通/隐藏对照失败保持；同批普通对象失败而私有对象成功不等于普通用户产品或真实npm修复。原低权限服务已恢复，.runner文件与五个目录根权限保持，缓存/工作目录读写已核验；无需继续等待管理员凭据信息。后续定位普通身份实现与正式npm链，G09及14项必要缺口仍开放，详见验证报告。

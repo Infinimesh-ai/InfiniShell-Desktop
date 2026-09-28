@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac Codex/Grok冻结产物四场景及Windows管理员私有Node成功对照保留。730b63b6a服务上下文stdio三项复验已收口：CMD通过，改用普通stdout文件名后NUL仍空，Node仍0xc0000142；实际runner trace为Session0/high/TokenIsElevated=1，不是未提升普通交互验收。下一步准备仅测试的实际AppContainer令牌NUL DACL观察，尚无新根因结论；普通交互会话仍等用户确认，RDP未启用且回环选择未成立。正式npm链、真实更新与14项必要缺口仍开放。"
+    "next_work_order": "Mac Codex/Grok冻结产物四场景及Windows管理员私有Node成功对照保留。11f278091实际令牌NUL DACL观察完成：7条CREATE记录的bound 21项拒绝、driver 21项允许，CMD仍通过而NUL空文件/Node 0xc0000142仍失败，不能认定唯一根因或产品修复。继续评估不改全局ACL/capability或官方shim的路径；普通交互会话仍待用户确认，RDP未启用；NULL+CWF_CREATE_ONLY私有站仅待验证方案。Mac Claude cask四场景正在准备，固定元数据尚未齐全，尚未执行；正式npm链、真实更新与14项必要缺口仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "windows_service_stdio_increment",
+  "latest_increment": "windows_nul_dacl_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -3516,6 +3516,102 @@
     },
     "next_diagnostic": "仅测试的实际AppContainer令牌NUL DACL观察正在准备，尚无运行结果；不改设备ACL、不加capability、不安装线程模拟token、不修改官方shim，不将DACL模拟当成实际CreateFile或MIC/驱动检查证明。",
     "local_gates": "730b63b6a提交的本地cargo check、定向rustfmt/diffcheck及限定actionlint通过，Windows cargo check再次通过；不把前轮Mac Python/i18n计为本轮执行。",
+    "localization": "无需本地化变更",
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false,
+    "required_gaps_remaining_open": 14
+  },
+  "windows_nul_dacl_increment": {
+    "updated_at": "2026-09-28",
+    "source_commit": "11f27809154fbd685ca860345e946b69613c1610",
+    "status": "nul_dacl_difference_observed_native_failures_preserved",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-interactive-context/service-nul-dacl",
+    "change": "仅测试诊断：持有CREATE进程句柄取得实际bound及driver令牌的SecurityIdentification副本，对观察者只读打开NUL的同一SD运行AccessCheck；不安装线程模拟token或修改对象ACL。",
+    "run": {
+      "id": 36389274428,
+      "job_id": 108821293774,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36389274428",
+      "conclusion": "failure",
+      "cargo_check": "passed",
+      "ordinary_tests_passed": 504,
+      "command_tests_passed": 22,
+      "diagnostic_tests_passed": 14,
+      "native_tests": {
+        "selected": 3,
+        "passed": 1,
+        "failed": 2,
+        "retries": 0
+      }
+    },
+    "nul_dacl_observation": {
+      "unique_create_records": 7,
+      "case_record_counts": {
+        "bound_cmd": 3,
+        "nul_control": 2,
+        "node_20_9_0_root": 2
+      },
+      "masks": [
+        "FILE_GENERIC_READ",
+        "FILE_GENERIC_WRITE",
+        "MAXIMUM_ALLOWED"
+      ],
+      "bound_denied": 21,
+      "driver_allowed": 21,
+      "query_failed": 0,
+      "token_context": "runner Session0/high/TokenIsElevated=1、非AppContainer；bound Session0/low/TokenIsElevated=0、AppContainer。",
+      "boundary": "计数仅指NUL DACL模拟；成功CMD也被拒绝，不能作为Node/npm唯一根因。MIC及CMD实际CreateFile参数/原生错误码未观测，观察者命名空间不替代目标实际设备访问；bound_cmd的node角色实际为绑定CMD副本。"
+    },
+    "native_results": {
+      "bound_cmd": "通过，routing-child一次、原生0；内外清理确认。",
+      "nul_control": "tmp/redirected.txt仍为空，plain/after匹配、errorlevel0，内容断言失败；内外清理确认。NUL原件在完整作业日志，不在6成员ZIP内。",
+      "node_20_9_0_root": {
+        "native_exit_code": "0xc0000142",
+        "driver_exit_code": 101,
+        "version_line_count": 0,
+        "root_dll_events": 29,
+        "console_dll_events": 37,
+        "initial_breakpoint_observed": true,
+        "dropped_events": 0,
+        "inner_and_outer_cleanup_confirmed": true
+      }
+    },
+    "post_run_environment": {
+      "observed_at_utc": "2026-09-28T07:10:13.3196782Z",
+      "sha256": "0db8f6fca3a8f75e14123ac1a58912d00655f751319ce005391dbe086716cebf",
+      "comparison": "与上一轮06:46:41Z收据除时间外字段相同：原服务/注册/防火墙/RDP/NUL SD保持；RDP禁用、TermService Stopped/Manual、选择All，该时点TCP/UDP3389无监听。",
+      "boundary": "只读定点观察；不声称全系统或永久不变，不等于普通交互验收。"
+    },
+    "upstream_references": {
+      "sources_receipt_sha256": "506e7690fec18bdcd42f4e2a3ca9cfeda1cf57bdc92c43b8f9682962356c360f",
+      "mxc": "https://github.com/microsoft/mxc/blob/311df7b385aeea7f55991a70d324c094f493ca47/docs/host-prep.md",
+      "libuv": "https://github.com/libuv/libuv/blob/2cadaa40167050baf7c6905ac897e6fb57afb2c6/test/appcontainer.c",
+      "boundary": "上游资料支持NUL默认权限兼容问题这一机制线索；其管理员全局ACL准备/测试设备ACE修改未执行，不是当前产品修复或本机实际CreateFile证明。"
+    },
+    "evidence": {
+      "summary_sha256": "e211e982bf3ff33e6ae58329394351c26ad0565054ee011fa87d67b1f0eb1480",
+      "nul_access_assessment_sha256": "a6ba04cef404459a40c17dc2059a16779677ec133cd72cf55fed055808c6b116",
+      "job_log_sha256": "e3cf70c33bd40b387457b5b95cb70cdbf6c6bec394af4b8b99f2db4991c31ee9",
+      "artifact_id": 10956480137,
+      "zip_bytes": 6343,
+      "zip_members": 6,
+      "zip_sha256": "848a2d12abff0d24a95a984ad96a7bb57c58130d225268dd75d3ff788a8e70a1",
+      "zip_full_digest_and_members_verified": true,
+      "index": {
+        "path": "index.safe.json",
+        "file_count": 33,
+        "sha256": "7cb57be7e6bead3647de9aae040ba995616983ccdaee56bdceffb7aa177b6279",
+        "scope": "不含索引自身、independent-review、documentation-review、delivery及final-local-check；独立审查与最后编译门禁另列。"
+      },
+      "independent_review": {
+        "path": "independent-review.safe.json",
+        "sha256": "ad5d1b28d65811c597eb74477c773669d9a6ed1ccaf664364e7a3f8fc2ce61cf",
+        "status": "evidence_review_passed_acceptance_failures_preserved"
+      },
+      "final_local_check_sha256": "f0919f4912c047ff59b681994f138c008135e999ed09a3a6e66f431526598ace"
+    },
+    "local_gates": "首次cargo check误用默认debug缓存后主动SIGINT(-2)，原日志保留，不计通过或编译失败；local-check-02沿用既有缓存通过，1.253秒，定向rustfmt/diffcheck通过。 最终本地cargo check再次通过，见final-local-check.safe.json；不改变原生失败结论。",
+    "next_boundary": "普通交互会话仍awaiting用户，控制台登录即可，不要求开启RDP。CreateWindowStationW(NULL,CWF_CREATE_ONLY,显式SD)候选方案可能与同logon服务站碰撞，未实现或实验，不回退打开既有站。 Mac Claude cask四场景正在准备，固定元数据尚未齐全，尚未执行。",
+    "scope": "未重跑真实npm/GUI/模型或其他平台，生产默认、零capability、严格Job及映像绑定不变；历史原件保留。",
     "localization": "无需本地化变更",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
