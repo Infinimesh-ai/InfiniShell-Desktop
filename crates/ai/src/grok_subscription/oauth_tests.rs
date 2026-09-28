@@ -56,22 +56,14 @@ fn manual_code_exchange_rejects_blank_code() {
     assert!(result.is_err());
 }
 
-/// The loopback ports the tests below bind, chosen to sit below every
-/// platform's ephemeral port range (Linux 32768-60999, macOS/Windows
-/// 49152-65535).
-///
-/// The release assertion in [`cancelling_loopback_wait_releases_listener`]
-/// rebinds the exact port the flow just gave up, so an ephemeral port would let
-/// any concurrently running test that binds port 0 claim it first and fail this
-/// test for a reason that has nothing to do with the race it guards.
+/// 取消测试需要立即重新绑定同一端口，因此使用低于各平台默认临时端口范围的端口池。
+/// 不需要重绑定的回调测试使用系统分配的临时端口，避免抢占取消测试刚释放的端口。
 const TEST_PORT_BASE: u16 = 21121;
 const TEST_PORT_SPAN: u16 = 200;
 
-/// Binds a non-blocking callback listener on a free port from the test range,
-/// mirroring how [`bind_callback_listener`] prepares the real one.
-fn bind_test_listener() -> (TcpListener, std::net::SocketAddr) {
-    // Scanning from a process-dependent offset keeps two test binaries running
-    // side by side off each other's ports.
+/// 为取消测试建立与生产代码相同的非阻塞监听器。
+fn bind_cancellation_test_listener() -> (TcpListener, std::net::SocketAddr) {
+    // PID 偏移只分散不同测试进程的起始端口，不保证它们不会相撞。
     let offset = (std::process::id() % u32::from(TEST_PORT_SPAN)) as u16;
     for candidate in 0..TEST_PORT_SPAN {
         let port = TEST_PORT_BASE + (offset + candidate) % TEST_PORT_SPAN;
@@ -104,8 +96,8 @@ fn bind_test_listener() -> (TcpListener, std::net::SocketAddr) {
 fn cancelling_loopback_wait_releases_listener() {
     const CANCEL_CYCLES: usize = 100;
 
-    for _ in 0..CANCEL_CYCLES {
-        let (listener, address) = bind_test_listener();
+    for cycle in 0..CANCEL_CYCLES {
+        let (listener, address) = bind_cancellation_test_listener();
         let cancellation = OauthCancellationHandle {
             cancelled: Arc::new(AtomicBool::new(false)),
         };
@@ -123,7 +115,9 @@ fn cancelling_loopback_wait_releases_listener() {
                 .to_string(),
             "Grok authorization was cancelled"
         );
-        TcpListener::bind(address).expect("cancelled callback listener should release its port");
+        TcpListener::bind(address).unwrap_or_else(|error| {
+            panic!("取消第 {cycle} 轮后无法重新绑定回调端口 {address}: {error}")
+        });
     }
 }
 
@@ -133,7 +127,14 @@ fn cancelling_loopback_wait_releases_listener() {
 /// error is proof the callback made the trip.
 #[test]
 fn loopback_callback_is_delivered_after_the_listener_closes() {
-    let (listener, address) = bind_test_listener();
+    let listener = TcpListener::bind((REDIRECT_HOST, 0))
+        .expect("test callback listener should bind an ephemeral port");
+    listener
+        .set_nonblocking(true)
+        .expect("test callback listener should be non-blocking");
+    let address = listener
+        .local_addr()
+        .expect("test callback listener should have an address");
     let cancellation = OauthCancellationHandle {
         cancelled: Arc::new(AtomicBool::new(false)),
     };
