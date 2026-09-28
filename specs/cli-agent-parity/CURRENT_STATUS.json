@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac Codex/Grok冻结产物四场景及Windows管理员私有Node成功对照保留。11f278091实际令牌NUL DACL观察完成：7条CREATE记录的bound 21项拒绝、driver 21项允许，CMD仍通过而NUL空文件/Node 0xc0000142仍失败，不能认定唯一根因或产品修复。继续评估不改全局ACL/capability或官方shim的路径；普通交互会话仍待用户确认，RDP未启用；NULL+CWF_CREATE_ONLY私有站仅待验证方案。Mac Claude cask四场景正在准备，固定元数据尚未齐全，尚未执行；正式npm链、真实更新与14项必要缺口仍开放。"
+    "next_work_order": "Mac Codex/Grok npm冻结产物四场景保留；ae37daf新增Mac Claude cask后端四场景已全部通过并归档，生产恢复先检新树/旧backup/公共链接，再进行回滚。该结果使用固定官方映像及明确标记的派生cask夹具，不关闭消费者实时来源、真实brew安装、GUI、忙碌/插件或其他平台验收。Windows管理员私有Node成功对照与11f278091实际令牌NUL差异均保留，正式Node/npm失败未修复；普通交互会话仍待用户，RDP未启用，NULL+CWF_CREATE_ONLY仅待验证方案。继续真实消费者更新验收，G09与14项必要缺口保持开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1507,8 +1507,8 @@
     "joint_test_app": "本批UI修正已包含在当前外置盘联测包，路径见current_macos_joint_test_bundle。旧2d159360a准备包仅作为historical_macos_joint_test_bundle_2d159360a历史记录，不保证旧路径可用。",
     "goal_complete": false
   },
-  "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "windows_nul_dacl_increment",
+  "latest_implementation_commit": "ae37daf19d86005883b8f64b3bb71f57b336843c",
+  "latest_increment": "macos_claude_brew_recovery_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -3610,9 +3610,127 @@
       "final_local_check_sha256": "f0919f4912c047ff59b681994f138c008135e999ed09a3a6e66f431526598ace"
     },
     "local_gates": "首次cargo check误用默认debug缓存后主动SIGINT(-2)，原日志保留，不计通过或编译失败；local-check-02沿用既有缓存通过，1.253秒，定向rustfmt/diffcheck通过。 最终本地cargo check再次通过，见final-local-check.safe.json；不改变原生失败结论。",
-    "next_boundary": "普通交互会话仍awaiting用户，控制台登录即可，不要求开启RDP。CreateWindowStationW(NULL,CWF_CREATE_ONLY,显式SD)候选方案可能与同logon服务站碰撞，未实现或实验，不回退打开既有站。 Mac Claude cask四场景正在准备，固定元数据尚未齐全，尚未执行。",
+    "next_boundary": "普通交互会话仍awaiting用户，控制台登录即可，不要求开启RDP。CreateWindowStationW(NULL,CWF_CREATE_ONLY,显式SD)候选方案可能与同logon服务站碰撞，未实现或实验，不回退打开既有站。 该诊断轮Mac Claude cask当时尚未执行；后续四场景结果见macos_claude_brew_recovery_increment。",
     "scope": "未重跑真实npm/GUI/模型或其他平台，生产默认、零capability、严格Job及映像绑定不变；历史原件保留。",
     "localization": "无需本地化变更",
+    "g09_closed": false,
+    "all_required_acceptance_satisfied": false,
+    "required_gaps_remaining_open": 14
+  },
+  "macos_claude_brew_recovery_increment": {
+    "updated_at": "2026-09-28",
+    "implementation_commit": "ae37daf19d86005883b8f64b3bb71f57b336843c",
+    "status": "macos_four_backend_scenarios_and_cross_platform_gates_passed_g09_open",
+    "change": "修复未提交Homebrew事务恢复时先改公共入口、后发现新树或旧backup不匹配而留下断链的顺序问题。回滚写入前预检完整两树及公共链接/link-stage；交换前后复核和既有来源/prefix/锁门禁保留。",
+    "regression_scope": "三项普通文件系统回归：新树外改拒绝、旧backup外改拒绝、正常回滚。未据此声称completion/alias等任意跨artifact外改均具原子拒绝保证。",
+    "scope": {
+      "platform": "macOS arm64",
+      "old_version": "2.1.278",
+      "target_version": "2.1.280",
+      "token": "claude-code@latest",
+      "registration": "synthetic_private_fixture",
+      "metadata_kind": "derived_fixture",
+      "official_cask_commit": "ef1bb0b080bda4075f4a8992bb6b10a0f0bc5bf7",
+      "official_cask_sha256": "c4173c146d619ef3902640d853af310b4ea8748add84e8ec518de61eb5781555",
+      "derived_metadata_sha256": "95f16664adcbd9d74544db71e9d953f3ffd1dc1f39db53a93c41ee1b9cda8fc3",
+      "boundary": "固定官方Ruby字段与两版官方Mach-O/manifest；没有历史API JSON原件，明确派生夹具且不执行brew/Ruby。真实消费者来源发现、实时渠道、brew安装升级、GUI、忙碌/插件及其他平台Homebrew事务仍未覆盖。"
+    },
+    "local_gates": {
+      "cargo_check": "passed",
+      "python_tests_passed": 15,
+      "i18n_tests_passed": 11,
+      "updates_tests_passed": 207,
+      "updates_tests_skipped": 7923,
+      "cargo_build": "passed",
+      "targeted_rustfmt": "passed",
+      "git_diff_check": "passed",
+      "final_cargo_check_sha256": "675399da7dff508367b68044b992350cf9658ebb694e1541e99ed0c1858366e1"
+    },
+    "source_binding": {
+      "freeze_sha256": "e8c6a2191cea2aef29f5a979c5d6c48af02e5a0305178a3328cfe827006b4721",
+      "commit_binding_sha256": "1f9aa30d2e27a70ae2f4f8089682dc08842812a8d83fba0d99f6c570c4030856",
+      "bound_files": 16,
+      "worker_sha256": "0034a2b9d1ba0b600e43f191735c58e4ccf404f9bb3408dfa644008c27d855c9",
+      "supervisor_sha256": "cbde99a96246d6c7ed5f10ed7e28700f7a41b8c259811c6b125c26609df37efb",
+      "scope": "本轮新编译worker和supervisor，130项资源沿用已核模板；arm64/ad-hoc严格签名通过，构建源码与提交Git blob一致，执行开始/结束工作区干净，输入/源码/二进制摘要保持。"
+    },
+    "live": {
+      "run": "run-01",
+      "returncode": 0,
+      "elapsed_seconds": 983.931,
+      "cases": {
+        "updated": "通过：完整新树和public入口2.1.280，journal/stage清除。",
+        "swap_receipt_missing": "通过：交换后ExchangeIntent中断，不同PID冷恢复完整旧树/link身份；实际2.1.278，未新增候选。",
+        "external_change_preserved": "通过：冷恢复拒绝覆盖，新树/link、外部marker、旧backup及原journal保持；实际2.1.280。",
+        "candidate_changed_preserved": "通过：Prepared候选被改后拒绝，完整旧树/link及实际2.1.278保持，probe=null且零generation。"
+      },
+      "candidate_native_cleanups_verified": 3,
+      "candidate_not_started_cases": 1,
+      "candidate_not_started_cleanup_scope": "未启动且无候选需清理，不算第四次清理实测。",
+      "model_inputs_sent": 0,
+      "summary_sha256": "c682230a37598543ff7ad191394def31088bb3a1a6e88619edae21f412b56164",
+      "independent_review_sha256": "a735d548a6e43775c70d68f80502dc185c6eb73a92cc1c5476783b8021d7fb5a"
+    },
+    "private_apfs": {
+      "virtual_capacity_bytes": 17179869184,
+      "first_preparation_failure": "首次创建/attach成功，但v1错误假设image UUID跨首次attach不变，验证停止；失败原件保留，没有重建或重挂。",
+      "v2_identity": "绑定首次attach后的image UUID、同backing inode/device/owner、volume/container/store UUID及实时完整设备链；原SanDisk和/Volumes属性复核不变。",
+      "permission_scope": "只将本次新卷root从0755改为0700，noowners保持；仅本账户mode/uid门禁，不代表强多用户隔离或原SanDisk布局修复。",
+      "normal_eject": "passed",
+      "cleanup_sha256": "fefb0799a24e60adfba1c6dd63777b18ea43b97900a8d7af08be15f87d3bf7b6",
+      "small_archive_files": 205,
+      "small_archive_index_sha256": "c6c51151afa8c38c5f8ba01885346a6ca33932fefd628a2011c1e8ae35ae5055",
+      "image_retained": true,
+      "image_files": 124,
+      "image_bands": 60,
+      "image_total_file_bytes": 3985339510,
+      "image_index_sha256": "673bf4c667c5980b2b4d158a4f8c31c0a77e8553abfb23b638721f07fcd69299",
+      "force_or_original_permissions_changes": false,
+      "finalization_review_sha256": "b629210ca3e3db77142c04580e05a7df09d9407e4c48a6b81c858d27547f4a9d",
+      "finalization_review_scope": "205小原件逐字节复核；映像124普通成员集合/长度及小元数据独立核对，不重复哈希band；finalizer完整映像摘要另保留。",
+      "small_archive_bytes": 248035
+    },
+    "cross_platform": {
+      "run_id": 36403642011,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36403642011",
+      "status": "success",
+      "scope": "仅既有cross-platform-preflight工作流，Linux/Windows定向；Mac Intel、完整workspace、真实npm/Homebrew更新、Windows已知NUL/Node失败、GUI/模型均未选择。",
+      "linux": {
+        "job_id": 108867113708,
+        "cargo_check": "passed",
+        "main_nextest_passed": 1389,
+        "ipc_nextest_passed": 2,
+        "host_crash_cleanup_nextest_passed": 5,
+        "new_brew_regressions_passed": 3,
+        "rust_genai_passed": 81,
+        "supervisor_build": "passed",
+        "glibc_dependency_binding_tests_passed": 1,
+        "glibc_binding_scope": "只核绑定，不执行Node。",
+        "command_ownership_tests_passed": 1,
+        "updates_tests_passed_in_main_suite": 201,
+        "i18n_tests_passed_in_main_suite": 11
+      },
+      "windows": {
+        "job_id": 108867113955,
+        "cargo_check": "passed",
+        "main_nextest_passed": 504,
+        "grok_production_installer": "passed",
+        "brew_regressions_compiled_or_run": false,
+        "updates_tests_run": false
+      },
+      "summary_sha256": "bb3966ad492fb36119664adef30c105324a6c8a02623615c1a75ae7f6aa3b71e",
+      "archive_index_sha256": "0af2613da00ebc3d1718f837d248d80a610abb5a0b45db73b2afbf5e9c4ba6e3",
+      "archive_file_count": 68,
+      "artifact_count": 5,
+      "test_count_scope": "逐套件执行次数分别列，不当作跨套件去重的唯一测试总数。Windows不编译/执行Unix brew三项；既有NUL/Node失败不在本轮范围。",
+      "artifact_zip_member_count": 18,
+      "summary_parser_correction": "初版派生汇总漏列两条test单数摘要；初版保留，原始日志不变，最终分别列glibc绑定1项和command所有权1项。",
+      "native_cleanup_scope": "Grok监督四场景cleanup确认，两平台installer私有根已删；Linux Grok ACP私有leader通过SIGKILL退出(-9)，owned_process_exited=true，不宣称全进程自然退出。"
+    },
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-claude-brew-recovery",
+    "production_review_sha256": "b508080dc2fc68a10a4f02f3f09d5901271f47ec3e7a6c7b5986bd164bcd0695",
+    "harness_review_sha256": "9d2a6088dbccd8c55a3900ef3533a549d2056b94f9c1a515380d9246a6216f0a",
+    "localization": "无需本地化变更；复用既有状态/错误语义，本轮i18n11项通过，无新双语布局声明。",
     "g09_closed": false,
     "all_required_acceptance_satisfied": false,
     "required_gaps_remaining_open": 14

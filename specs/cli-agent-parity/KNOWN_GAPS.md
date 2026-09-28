@@ -104,6 +104,8 @@
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-09-28 Mac Claude cask后端恢复 `ae37daf19`**：修复非Committed恢复先回退入口、后发现目录外改而断链；回滚写前检查新树/旧backup和公共链接，三项回归通过。本地Python15/i18n11/更新207及check/build通过，新worker和supervisor执行固定`2.1.278→2.1.280`四场景均独立通过：正常更新、跨PID冷恢复、外部改动保留、候选改动启动前拒绝；三次真实候选清理、一项零generation分别计证。官方Ruby字段派生且明确标记的元数据与人工私有登记不等于真实消费者来源或brew安装验收；实时渠道、GUI、忙碌/插件、其他平台及Windows正式npm失败仍欠。205份小原件和完整APFS映像保留并正常卸载；无需本地化变更。同提交CI36403642011的Linux/Windows定向门禁均通过；Linux新brew三项逐项通过，Windows本轮不编译/运行这些Unix测试。本项及14项必要缺口不关闭。
+
 - **状态／优先级／范围**：功能缺项，高；CLI_AUTOUPDATE、P0 来源识别、P5 平台维护。
 - **实际情况与影响**：提交 `b6f93f6627738fb83b6be776dd225666a900ac90` 已把 Codex/Claude 的 npm 管理器包清单、CLI 包登记、真实命令入口和安装前缀进行绑定，拒绝同名伪入口；该来源识别提交的 npm 执行为 `ManualOnly`。后续工作区已接入 Claude 目标 `2.1.280` 的 Unix 官方单包事务：完整归档/成员核验、原子目录交换、私有无网络版本探针、POSIX 权限及中断 journal；不执行 npm install 或 lifecycle script。本地门禁和英中错误布局已过；macOS 官方包私有安装的真实更新、交换后冷恢复、外部改动保留、候选改动拒绝及未审核降级拒绝五场景通过，原失败保留。同提交 Linux/Windows 待验；不是 GUI 更新或模型生命周期验收。Codex Node/launcher 闭包、Windows npm、musl、额外 ACL、合法降级、Homebrew 和 WinGet 均未完成；此增量不关闭包管理器自动升级。
 - **未验证代码增量**：Homebrew Claude 固定 cask、WinGet portable 和 Codex Homebrew macOS ARM64 的来源绑定、候选探针、发布及恢复已写入；Codex 三种 shell 补全纳入交换和回滚。Codex npm macOS ARM64／Linux x64 已补官方 wrapper、完整平台资源、实际 Node 公共入口、依赖快照及恢复身份绑定；Homebrew Node 使用私有 dylib 副本，不改原安装，Linux 探针要求 Landlock ABI 3。Windows x64 Codex npm 的 cmd/PowerShell → Node → 完整平台包、AppContainer 双探针、两步无覆盖发布及恢复已合入；Claude Windows npm 的精确包内硬链接和双入口探针已接；Grok 三平台 npm 的完整三包/原生解压、包目录与用户 bin 多位置事务，以及 Mac ARM Homebrew 双别名/三补全也已接。Codex WinGet完整目录/登记/依赖事务也已接入；Claude Unix npm 2.1.280→2.1.278受限主动降级合同也已接，但要求显式Stable且官方实时指针恰为2.1.278；当前2.1.274仍拒绝，不算当前渠道可降级。三款 Linux x64 Homebrew cask 和 Grok WinGet 固定来源事务现也已接入，Linux 来源发现与执行总入口已接；Claude 三探针、Codex 完整 musl 包及补全、Grok 双别名及补全分别绑定。macOS Intel 已按用户明确范围排除。用户安装未运行升级；实际公共入口、隔离、回滚与恢复仍待验，未知版本门禁保留。
@@ -136,7 +138,7 @@
 
 - **Windows 命名站前提实测 `eb2b271e3`**：同提交CI36344378073编译及504/22/14项通过，原生仍16通过/7失败。创建调用线程的CheckTokenMembership(NULL, BuiltinAdministrators)成功返回member=false，随后CreateWindowStation仍0x80070005；未建立私有环境或执行Node，内层清理未知、外层Job清理确认。这只确认该对照的必要成员前提未满足，不解释原Node DLL失败。等待独立管理员验收runner信息，当前不提权/改全局权限；继续Mac独立工作，G09仍开放。
 
-- **Windows NUL实际令牌DACL增量 `11f278091`**：[CI36389274428](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36389274428)编译及504/22/14项通过，原生仍1通过/2失败。7条CREATE观察中，同NUL SD的READ/WRITE/MAX模拟为bound 21拒绝、driver 21允许、无查询失败；成功CMD也在拒绝组，不能认定Node/npm唯一根因。NUL仍空文件，Node记录29条DLL并到初始断点后退出0xc0000142，内外清理确认；MIC及真实CreateFile未观测。上游MXC/libuv的设备ACL准备未执行，现有隔离不放宽；普通交互待用户、NULL+CWF_CREATE_ONLY仅方案，RDP未启、14项缺口保留。Mac Claude cask四场景正在准备，固定元数据尚未齐全、尚未执行。主源、索引与独立审查见验证报告，无需本地化变更。
+- **Windows NUL实际令牌DACL增量 `11f278091`**：[CI36389274428](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36389274428)编译及504/22/14项通过，原生仍1通过/2失败。7条CREATE观察中，同NUL SD的READ/WRITE/MAX模拟为bound 21拒绝、driver 21允许、无查询失败；成功CMD也在拒绝组，不能认定Node/npm唯一根因。NUL仍空文件，Node记录29条DLL并到初始断点后退出0xc0000142，内外清理确认；MIC及真实CreateFile未观测。上游MXC/libuv的设备ACL准备未执行，现有隔离不放宽；普通交互待用户、NULL+CWF_CREATE_ONLY仅方案，RDP未启、14项缺口保留。该诊断轮Mac Claude cask当时尚未执行，后续四场景结果见本项ae37daf19增量。主源、索引与独立审查见验证报告，无需本地化变更。
 
 - **Windows 服务stdio三项复验 `730b63b6a`**：修正stdout保留名为redirected.txt后，[CI36384245535](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36384245535)编译及504/22/14项通过，原生1通过/2失败；CMD通过，NUL仍为空文件，固定Node根仍0xc0000142，清理确认不等于功能通过。实际runner trace为Session0/high/TokenIsElevated=1，不能称未提升普通交互用户；也不据此推断管理员成员。RDP未启用、回环选择读回All，普通交互会话仍待用户确认。下一步仅测试的实际令牌NUL DACL观察尚无运行结论，不改ACL/capability或官方shim；历史原件、G09及14项必要缺口保留，详见验证报告，无需本地化变更。
 
