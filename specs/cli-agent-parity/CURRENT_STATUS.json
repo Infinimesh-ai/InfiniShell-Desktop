@@ -131,6 +131,13 @@
     "remaining": "普通未绑定 PTY 的可信自动提交、图片、审批、真实 GUI 新提示及 Linux/Windows 功能链未闭合",
     "closed_gaps": []
   },
+  "g01_unbound_pty_feasibility_followup": {
+    "status": "固定 Grok 1.0.41 已运行普通未绑定 TUI 缺少可信自动提交接口；只读复核后保留拒绝，G01 仍开放",
+    "evidence_boundary": "idle_prompt 曾在帮助模态、未提交草稿和后台工具期间出现，空会话也可能超过 66 秒不出现；permission_prompt 不证明 Enter 安全",
+    "native_requirement": "原生可认证接入既有会话，原子核对编辑器修订、模态与审批状态的 submit_if_idle，以及单次消费回执",
+    "scope": "未改源码或发送模型输入；专属 TUI 的已通过回合不外推普通未绑定 PTY",
+    "closed_gaps": []
+  },
   "g03_owned_image_drop_followup": {
     "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
     "status": "专属 Grok 富输入拖放的图片顺序与失配零 PTY 写入修复已通过定向测试；Mac GUI 粘贴双图原生消费与结果落盘通过，G03 整项仍开放",
@@ -144,11 +151,25 @@
     "remaining": "真实 GUI 拖放事件、普通未绑定 PTY 图片、审批状态变化、双语拒绝提示布局和 Linux/Windows 仍待验",
     "closed_gaps": []
   },
+  "g03_finder_drop_delivery_boundary_followup": {
+    "status": "Mac 私有签名 GUI 和固定 Grok 1.0.41 专属会话精确绑定；两次 CUA Finder 跨应用拖动未交付可观察 drop event，G03 仍开放",
+    "evidence": "富输入已打开；Finder 选择移动但应用无图片卡或 toast，SQLite queued/revision 0/messages 0，未发送模型请求；不据此判产品拖放成功或失败",
+    "evidence_sha256": "4524907fdd592b8d8c4cdc3561d6bae2e75f6fbe8ad80e5d985219d012f5e820",
+    "archive_index_sha256": "c870674c58bfe26b5e0067591db47f82178928782d95f4b17825b316fdcda5d6",
+    "cleanup": "私有进程、launchd 与打开文件清空，记录 cleanup_ready=true/status=cleaned，短目录删除；旧 tccd 占用轮次继续保留",
+    "localization": "英中拒绝文案只作静态核对；真实 GUI 提示布局未触发，不能计通过",
+    "closed_gaps": []
+  },
   "g09_windows_stdio_control_followup": {
     "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
-    "status": "同 CMD/目录/令牌新增普通文件 stderr 正对照并保留原 NUL 失败断言；Windows 同提交专项待运行，G09 仍开放",
+    "status": "同 HEAD Windows 专项三项 1 通过/2 失败；普通文件 stderr 正对照通过，NUL 与固定 Node 仍失败，G09 开放",
     "prior_failure": "run36453314472 的 NUL 输出为空；固定 Node 20.9.0 根进程首断点后自然退出 0xc0000142，无版本输出，两者不能据此归为同一根因",
-    "next_gate": "在 exact HEAD Windows runner 上以 stdio 范围运行正对照、原 NUL 负例及固定 Node 对照，保留失败和清理收据，不改全局 ACL 或降低隔离",
+    "diagnostic_run_id": 36497300508,
+    "diagnostic_source_commit": "2cbebd204bdd6ff76e6f9d0aed7540884539eb4e",
+    "positive": "同 CMD/cwd/token 的普通 stderr 文件、前后输出、四个独立 FileID 均通过；bound CMD 正例通过",
+    "negative": "2>NUL 后输出仍空、errorlevel 0；固定 Node 20.9.0 根首断点后自然退出 0xc0000142、无版本输出，未执行 shim；各自清理确认",
+    "archive_log_manifest_sha256": "8b27d5d445d95f5ceda69133f0bae4ed74b18057d15f3054ccc2902e4e11e966",
+    "next_gate": "分别取得受限进程实际 NUL CreateFile 和目标 desktop 访问结果；旧 AccessCheck 模拟不证明根因，不改全局 ACL 或降低隔离",
     "localization": "测试诊断无用户界面文案变化，无需本地化变更",
     "closed_gaps": []
   },
@@ -170,6 +191,50 @@
     "cleanup": "本轮私有 GUI 精确 PID、文件占用和短临时目录已核验清理",
     "remaining": "固定 0.156.1 原生读取、Claude 首次向导、Grok 文件卡投递、GUI 精确 PTY 计数及 Linux/Windows",
     "localization": "无产品文案变化；本轮无可归档原图，不能作为新的双语布局通过记录",
+    "closed_gaps": []
+  },
+  "g07_fixed_codex_gui_followup": {
+    "source_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "status": "Mac 签名 GUI 收起态双文件卡与固定 Codex 0.156.1 原生读取正例、同会话 Shell 拒绝负例通过；G07 整项开放",
+    "fixed_codex_binary_sha256": "0196e89fe5a7598f816ee54232c3d7c26d75e502ab5cfe2c9240e81d90f7255a",
+    "positive": "英文空格和中文路径双卡一次提交；原生同一 exec 调用内两条独立 tools.exec_command 分别读取文件，两个工具结果和最终回答逐项匹配合成标记，草稿与卡片清空",
+    "positive_safe_sha256": "ea732f8c52e6b277b5b6a45b5c09ffae00dd3310e053545c4be828b72932b062",
+    "negative": "同会话锁定 Shell !printf 与双卡被 GUI 拒绝，草稿及卡片保留；原生 rollout 哈希及消息、工具、任务计数均不增加",
+    "negative_safe_sha256": "b3ab89b9a16ddac5f4666f6e18d2c0661e78aca6ca5ccd3072e555fdbe18aee2",
+    "safe_index_sha256": "139bf593d75de9bdf57e8340721f702689d72e77f9ab58ab2524b541e78ef95a",
+    "cleanup": "四个私有 PID 精确退出，launchd/lsof 无占用；记录 r-fdZbGmBG.json 为 cleaned/cleanup_ready=true，短目录已删除；原生 raw session 含其他上下文未归档，CUA 截图仅在工具回执",
+    "remaining": "Claude 首次向导、Grok 真实文件卡投递、失效文件与权限拒绝、GUI 精确 PTY 字节数和 Linux/Windows 仍待验",
+    "localization": "无产品文案变化，无需本地化变更；本轮未形成新的英中双语 GUI 布局原图",
+    "closed_gaps": []
+  },
+  "g07_claude_private_gui_login_boundary_followup": {
+    "status": "Mac 签名 GUI 已启动固定 Claude 2.1.280 并到达首次向导登录方式选择；独立配置未登录，G07 仍开放",
+    "evidence": "核对官方签名 CLI 路径和版本；未选择登录方式，未创建文件卡或发送模型输入",
+    "blocker_safe_sha256": "30226efd0f11c055988735fd7f965531acbb7bcfa2f75477b0367eedad6b3ed9",
+    "safe_index_sha256": "d95d5da8e32099fb27df77fd383965735ca34b245b00428a5cd9a4f11ecebf1f",
+    "cleanup": "精确 GUI、原生及观察进程退出，launchd/lsof 无占用，记录 cleaned_blocked_at_login/cleanup_ready=true，短目录删除；日常配置大小与修改时间不变",
+    "remaining": "私有配置登录后的 Claude 双文件读取及拒绝链、Grok 文件卡投递、失效文件与权限拒绝、Linux/Windows",
+    "localization": "无产品文案变化，无需本地化变更；首次向导截图仅保留在 CUA 回执",
+    "closed_gaps": []
+  },
+  "g08_private_auth_boundary_followup": {
+    "status": "固定 Claude 2.1.280 的隔离私有配置未登录，远端原生图片消费验收尚未开始；G08 仍开放",
+    "scope": "全新私有 HOME／CLAUDE_CONFIG_DIR、不继承 API 环境；仅原生 auth status --json，退出码 1，未发送模型输入",
+    "safe_receipt_sha256": "95caa3053bbef37785a2bebe466cc23701912d1b728b2364eb9ab42f765062db",
+    "cleanup": "进程组及打开文件清空，记录 cleanup_ready=true/status=cleaned，短目录已删除",
+    "next_prerequisite": "专用私有测试配置完成原生登录后，再核对远端同 TTY 会话、Read 工具后代和历史 typed image 原字节",
+    "closed_gaps": []
+  },
+  "current_exact_head_regular_cloud_followup": {
+    "source_commit": "2cbebd204bdd6ff76e6f9d0aed7540884539eb4e",
+    "product_source_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+    "run_id": 36490470344,
+    "status": "普通 Linux x64 和 Windows x64 官方 job 均成功；不含 G09 原生失败专项或已认证模型链",
+    "linux": "主回归 3266/3266、桌面/TUI 660/660、rust-genai 81/81、cargo check 通过",
+    "windows": "主回归 3077/3077、桌面/TUI 660/660、rust-genai 81/81、cargo check 通过；GUI 系统剪贴板步骤按输入跳过",
+    "log_markers": "两平台原始日志未见 LEAK/RETRY/FLAKY；跳过项不计通过",
+    "archive": "仓外 cloud-run-36490470344；完整 job/step 日志和 12 个官方工件按摘要及 CRC 归档",
+    "log_manifest_sha256": "cf46b930ee29d735ec6670602e2f15a892cb2f73d1db7950224f5a7904bad3a7",
     "closed_gaps": []
   },
   "v03_codex_tmux_loopback_followup": {
