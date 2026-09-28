@@ -319,6 +319,12 @@ app/  (主二进制:装配、入口、平台粘合、持久化迁移、UI 视图
 - 提交前必须运行 `cargo test -p warp --lib i18n::tests` 和 `cargo check -p warp`;涉及 TUI 资源时还应运行对应 TUI 测试。任何门禁失败都不得视为功能完成。
 - 文案可能影响布局时,必须分别在英文和简体中文界面检查截断、换行和控件尺寸;检查结果应在交付说明中记录。
 
+### 5.10 本机 macOS 测试临时目录
+- 用户本机固定根为 `/Users/zhishi/InfiniShell-Tests`（`0700`）；每轮新建短名称 `r-<随机值>` 子目录，仅为该轮命令设置 `TMPDIR`，不改 `HOME` / `CODEX_HOME`。开始前核实真实路径、owner、device/inode、与 `/Users` 同设备及祖先无组/其他用户写权限，不能靠修改既有目录权限绕过安全测试。
+- 每轮在 `records/<run-id>.json` 记录状态、目录/进程身份、归档位置及默认 `false` 的 `cleanup_ready`。仅在命令、后代和 launchd 服务均退出、打开文件已释放、小证据已归档后设为 `true` 并即时清理；每日北京时间 `04:00` 补查超过 `24` 小时的已完成、明确可清理目录。
+- 活动、归属不明、挂载点、符号链接或清理证据不足的目录保留；不删除源码、`target`、缓存、凭据、外置归档或唯一证据。删除前重新核对记录身份，不追随链接、不跨设备、不按宽泛进程名结束进程。
+- 本机真实 launchd/多进程测试沿用短 `TMPDIR` 和 `--features warpui/test-util,rust-embed/debug-embed`，避免已观察到的外置源码本地化资源读取阻塞；不为此启用 `release_bundle` 或改动产品超时。此规则只适用于用户这台 Mac，不把路径或功能开关硬编码进产品及 Linux/Windows runner。详见 [本机测试存储约定](docs/local-test-storage.zh-CN.md)。
+
 ---
 
 ## 6. 常用入口速查
