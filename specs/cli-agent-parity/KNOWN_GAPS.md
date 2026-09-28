@@ -6,7 +6,7 @@
 
 本表集中记录已确认的边界。目录精简后，历史原始通过、失败、截图与摘要由固定 Git 提交链接追溯，当前树只保留验证结论和必要夹具。功能证据见[验证结论](VALIDATION_REPORT.md)，平台与源码对应见[验证结论](VALIDATION_REPORT.md)，当前用户可用范围见[支持说明](RELEASE_SUPPORT.md)。当前状态和后续工作以本表为准，历史报告中的阶段性“完成”不关闭这些条目。
 
-2026-09-28 主线整合提交 `e5f50d9fc` 已保留main与CLI Agent分支历史；同提交CI36411332886为Linux成功、Windows失败（AI OAuth取消监听后重绑端口返回10048），main尚未更新，实际计数与证据见[验收结论](VALIDATION_REPORT.md)。该阶段整合及固定临时目录清理约定均不关闭下列14项必要缺口，也不改变G09或Windows Node/npm既有失败结论。
+2026-09-28 主线整合提交 `e5f50d9fc` 已保留main与CLI Agent分支历史；同提交CI36411332886为Linux成功、Windows失败（AI OAuth取消监听后重绑端口返回10048），历史失败保留。后续7dd68cc9b整合Homebrew回滚预检与OAuth测试端口隔离，CI36419778583两平台官方成功；Windows desktop/TUI组660通过含1条LEAK（上下文菜单引用用例），句柄来源仍待查，不称全体普通PASS。main已从693172a26快进至70f65a996；测试精确绑定7dd68，之后仅三份验收文档变化。实际计数、推广及证据见[验收结论](VALIDATION_REPORT.md)。该阶段整合及固定临时目录清理约定均不关闭下列14项必要缺口，也不改变G09或Windows Node/npm既有失败结论。
 
 ## 记录规则与优先顺序
 
