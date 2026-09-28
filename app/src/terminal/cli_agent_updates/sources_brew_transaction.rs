@@ -898,17 +898,39 @@ fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Err
         }
     }
     // 先验证可回滚的两棵树，外部变更不得在公共链接或附属 artifact 已改写后才被发现。
-    if actual != journal.original
-        && (Some(&actual) != journal.prepared.as_ref()
-            || parent.child(&journal.stage_name())?.snapshot()? != journal.original)
+    if actual == journal.original {
+        if parent.has_child(&journal.stage_name())? {
+            let staged = parent.child(&journal.stage_name())?.snapshot()?;
+            if Some(&staged) != journal.prepared.as_ref() {
+                return Err(Error::RecoveryRequired);
+            }
+        }
+    } else if Some(&actual) != journal.prepared.as_ref()
+        || parent.child(&journal.stage_name())?.snapshot()? != journal.original
     {
         return Err(Error::RecoveryRequired);
     }
-    if current_link != journal.original_link
-        && (Some(&current_link) != journal.prepared_link.as_ref()
-            || link(&journal.link_stage())? != journal.original_link)
+    if current_link == journal.original_link {
+        match fs::symlink_metadata(journal.link_stage()) {
+            Ok(_) => {
+                if Some(&link(&journal.link_stage())?) != journal.prepared_link.as_ref() {
+                    return Err(Error::RecoveryRequired);
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(Error::RecoveryRequired),
+        }
+    } else if Some(&current_link) != journal.prepared_link.as_ref()
+        || link(&journal.link_stage())? != journal.original_link
     {
         return Err(Error::RecoveryRequired);
+    }
+    // 在任何回滚写入前检查全部附属项，拒绝恢复开始前已经存在的外部改动。
+    for completion in &journal.completions {
+        completion.verify_rollback()?;
+    }
+    for alias in &journal.aliases {
+        alias.verify_rollback()?;
     }
     for completion in journal.completions.iter().rev() {
         completion.rollback()?;

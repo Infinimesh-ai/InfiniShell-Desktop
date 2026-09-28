@@ -182,7 +182,30 @@ impl Alias {
         )
     }
 
+    pub(super) fn verify_rollback(&self) -> Result<(), Error> {
+        self.verify_parent()?;
+        let current = link(&self.path)?;
+        let expected_stage = if current == self.original {
+            self.prepared.as_ref()
+        } else if Some(&current) == self.prepared.as_ref() {
+            Some(&self.original)
+        } else {
+            return Err(Error::SourceChanged);
+        };
+        match fs::symlink_metadata(&self.stage) {
+            Ok(_) if Some(&link(&self.stage)?) == expected_stage => Ok(()),
+            Ok(_) => Err(Error::SourceChanged),
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound && current == self.original =>
+            {
+                Ok(())
+            }
+            Err(_) => Err(Error::SourceChanged),
+        }
+    }
+
     pub(super) fn rollback(&self) -> Result<(), Error> {
+        self.verify_rollback()?;
         self.verify_parent()?;
         let current = link(&self.path)?;
         if current == self.original {

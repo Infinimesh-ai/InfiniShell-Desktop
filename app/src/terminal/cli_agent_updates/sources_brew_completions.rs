@@ -177,7 +177,47 @@ impl Completion {
         Ok(())
     }
 
+    pub(super) fn verify_rollback(&self) -> Result<(), Error> {
+        self.validate(&self.forward.path)?;
+        super::plain_ancestors(&self.forward.path)?;
+        let forward_claimed = verify_claimed(&self.forward)?;
+        let reverse_claimed = verify_claimed(&self.reverse)?;
+        let actual = super::read_optional_config(&self.forward.path)?;
+        if actual == self.forward.before {
+            return Ok(());
+        }
+        if self.forward.before == self.reverse.after
+            || self.reverse.restore_stage.is_none()
+            || self.reverse.before_mode.is_some_and(|mode| mode > 0o777)
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        if actual == self.reverse.after {
+            // 逆向认领后原路径再次出现，即使字节相同也不能覆盖该文件。
+            return if reverse_claimed.is_none() {
+                Ok(())
+            } else {
+                Err(Error::RecoveryRequired)
+            };
+        }
+        if actual.is_some() {
+            return Err(Error::SourceChanged);
+        }
+        if reverse_claimed == self.reverse.after {
+            return Ok(());
+        }
+        // 正向认领后尚未发布：原文件必须仍在账本指定的 claimed 中。
+        if self.forward.restore_stage.is_some()
+            && forward_claimed.is_some()
+            && forward_claimed == self.forward.after
+        {
+            return Ok(());
+        }
+        Err(Error::RecoveryRequired)
+    }
+
     pub(super) fn rollback(&self) -> Result<(), Error> {
+        self.verify_rollback()?;
         let actual = super::read_optional_config(&self.forward.path)?;
         if actual == self.forward.before {
             return Ok(());
@@ -206,4 +246,27 @@ impl Completion {
         super::cleanup_config_restore(&self.forward)?;
         super::cleanup_config_restore(&self.reverse)
     }
+}
+
+// 只读取两份既有发布账本；未知暂存内容不能等其他 artifact 已回滚后才发现。
+fn verify_claimed(config: &ConfigBackup) -> Result<Option<Vec<u8>>, Error> {
+    let Some(stage) = super::config_restore_stage(config)? else {
+        return Ok(None);
+    };
+    match fs::symlink_metadata(stage) {
+        Ok(metadata) if !metadata.is_dir() => return Err(Error::RecoveryRequired),
+        Ok(_) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(_) => return Err(Error::RecoveryRequired),
+    }
+    for entry in fs::read_dir(stage).map_err(|_| Error::RecoveryRequired)? {
+        if entry.map_err(|_| Error::RecoveryRequired)?.file_name() != "claimed" {
+            return Err(Error::RecoveryRequired);
+        }
+    }
+    let claimed = super::read_optional_config(&stage.join("claimed"))?;
+    if claimed.is_some() && claimed != config.after {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(claimed)
 }
