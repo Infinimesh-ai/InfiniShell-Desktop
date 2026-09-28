@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "scope": "claude_brew_backend_no_model_v1",
+  "platform": "darwin-arm64",
+  "old": "2.1.278",
+  "target": "2.1.280",
+  "token": "claude-code@latest",
+  "official_inputs": {
+    "https://downloads.claude.ai/claude-code-releases/2.1.278/darwin-arm64/claude": {
+      "file": "claude-2.1.278-darwin-arm64",
+      "length": 217695408,
+      "sha256": "bd245662fb8a0e321b3bf133e930371d6563c387527885f30b2613aef3ba14d6"
+    },
+    "https://downloads.claude.ai/claude-code-releases/2.1.278/manifest.json": {
+      "file": "claude-2.1.278.manifest.json",
+      "length": 2161,
+      "sha256": "d1bf63d94621d6aa6fb84297b235ddb8f5aaadc9252cef8020d170ef661b2f28"
+    },
+    "https://downloads.claude.ai/claude-code-releases/2.1.280/darwin-arm64/claude": {
+      "file": "claude-2.1.280-darwin-arm64",
+      "length": 217254576,
+      "sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d"
+    },
+    "https://downloads.claude.ai/claude-code-releases/2.1.280/manifest.json": {
+      "file": "claude-2.1.280.manifest.json",
+      "length": 2161,
+      "sha256": "6d9840c779f76b2a7e974aa3476be24d1ea477f5dc96abd0096be28a58cb7120"
+    },
+    "https://raw.githubusercontent.com/Homebrew/homebrew-cask/ef1bb0b080bda4075f4a8992bb6b10a0f0bc5bf7/Casks/c/claude-code@latest.rb": {
+      "file": "claude-code-latest-2.1.280.rb",
+      "length": 1149,
+      "sha256": "c4173c146d619ef3902640d853af310b4ea8748add84e8ec518de61eb5781555"
+    }
+  },
+  "metadata": {
+    "url": "https://formulae.brew.sh/api/cask/claude-code@latest.json",
+    "kind": "derived_fixture",
+    "length": 604,
+    "sha256": "95f16664adcbd9d74544db71e9d953f3ffd1dc1f39db53a93c41ee1b9cda8fc3",
+    "value": {
+      "token": "claude-code@latest",
+      "tap": "homebrew/cask",
+      "version": "2.1.280",
+      "tap_git_head": "ef1bb0b080bda4075f4a8992bb6b10a0f0bc5bf7",
+      "disabled": false,
+      "depends_on": {},
+      "url": "https://downloads.claude.ai/claude-code-releases/2.1.280/darwin-arm64/claude",
+      "sha256": "387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d",
+      "artifacts": [
+        {
+          "binary": [
+            "claude"
+          ],
+          "target": "$HOMEBREW_PREFIX/bin/claude"
+        },
+        {
+          "zap": [
+            {
+              "trash": [
+                "~/.cache/claude",
+                "~/.claude.json*",
+                "~/.config/claude",
+                "~/.local/bin/claude",
+                "~/.local/share/claude",
+                "~/.local/state/claude",
+                "~/Library/Caches/claude-cli-nodejs"
+              ],
+              "rmdir": "~/.claude"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "boundary": "固定官方映像及固定官方 cask 字段的人工私有登记后端事务；不执行 Ruby，不计历史 API 原件、实时渠道、真实 Homebrew 安装来源或完整 G09 验收。"
+}

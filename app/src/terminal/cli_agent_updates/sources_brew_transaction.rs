@@ -209,6 +209,10 @@ fn lock_cask(prefix: &Path, token: &str) -> Result<File, Error> {
 }
 
 async fn download(url: &str, output: &mut File, limit: u64) -> Result<(), Error> {
+    #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+    if let Some(result) = live_tests::copy_fixed_download(url, output, limit) {
+        return result;
+    }
     let response = http_client::Client::new()
         .get(url)
         .timeout(UPDATE_TIMEOUT)
@@ -472,6 +476,8 @@ pub(super) async fn execute(
         super::sync_config_directory(&prefix.join("bin"))?;
         journal.phase = Phase::Prepared;
         save(&path, &journal)?;
+        #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+        live_tests::checkpoint(live_tests::Point::Prepared, &path).await;
         let program = journal
             .parent()
             .join(journal.stage_name())
@@ -545,6 +551,8 @@ pub(super) async fn execute(
         save(&path, &journal)?;
         parent.exchange(token.as_ref(), &journal.stage_name())?;
         exchange_links(&journal)?;
+        #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+        live_tests::checkpoint(live_tests::Point::Exchanged, &path).await;
         for alias in &journal.aliases {
             alias.publish()?;
         }
@@ -688,6 +696,8 @@ async fn probe(
         Ok(Err(_)) => return Err(Error::ProbeFailed),
         Err(_) => return Err(Error::TimedOut),
     }
+    #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+    live_tests::preserve_stdout(generation, &bytes);
     if receipt.exit_code != Some(0) || bytes.len() as u64 > MAX_OUTPUT {
         return Err(Error::ProbeFailed);
     }
@@ -857,6 +867,85 @@ fn finish(root: &Path, path: &Path, journal: &Journal) -> Result<(), Error> {
     super::sync_config_directory(root)
 }
 
+// 仅拆分恢复主体以复用实际交换路径；来源前缀、探针退出和 cask 锁仍由 recover 检查。
+fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Error> {
+    let actual = parent.child(journal.token.as_ref())?.snapshot()?;
+    let current_link = link(&journal.entry)?;
+    #[cfg(target_os = "linux")]
+    if is_linux_claude(journal.cli()?) {
+        if actual == journal.original {
+            super::brew_claude_linux::verify_tree(
+                &journal.parent().join(&journal.token),
+                &journal.old_version,
+            )?;
+            if journal.prepared.is_some() && parent.has_child(&journal.stage_name())? {
+                super::brew_claude_linux::verify_tree(
+                    &journal.parent().join(journal.stage_name()),
+                    &journal.target_version,
+                )?;
+            }
+        } else if Some(&actual) == journal.prepared.as_ref() {
+            super::brew_claude_linux::verify_tree(
+                &journal.parent().join(&journal.token),
+                &journal.target_version,
+            )?;
+            super::brew_claude_linux::verify_tree(
+                &journal.parent().join(journal.stage_name()),
+                &journal.old_version,
+            )?;
+        } else {
+            return Err(Error::RecoveryRequired);
+        }
+    }
+    // 先验证可回滚的两棵树，外部变更不得在公共链接或附属 artifact 已改写后才被发现。
+    if actual != journal.original
+        && (Some(&actual) != journal.prepared.as_ref()
+            || parent.child(&journal.stage_name())?.snapshot()? != journal.original)
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    if current_link != journal.original_link
+        && (Some(&current_link) != journal.prepared_link.as_ref()
+            || link(&journal.link_stage())? != journal.original_link)
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    for completion in journal.completions.iter().rev() {
+        completion.rollback()?;
+    }
+    for alias in journal.aliases.iter().rev() {
+        alias.rollback()?;
+    }
+    // 链接、目录各自可能在提交前后，恢复由完整身份决定，不根据 phase 猜测是否交换。
+    if current_link != journal.original_link {
+        if Some(&current_link) != journal.prepared_link.as_ref()
+            || link(&journal.entry)? != current_link
+            || link(&journal.link_stage())? != journal.original_link
+            || parent.child(journal.token.as_ref())?.snapshot()? != actual
+            || actual != journal.original
+                && parent.child(&journal.stage_name())?.snapshot()? != journal.original
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        exchange_links(journal)?;
+    }
+    if actual != journal.original {
+        if Some(&actual) != journal.prepared.as_ref()
+            || parent.child(journal.token.as_ref())?.snapshot()? != actual
+            || parent.child(&journal.stage_name())?.snapshot()? != journal.original
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        parent.exchange(journal.token.as_ref(), &journal.stage_name())?;
+    }
+    if parent.child(journal.token.as_ref())?.snapshot()? != journal.original
+        || link(&journal.entry)? != journal.original_link
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
 pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Option<String>, Error> {
     let path = journal_path(root, agent);
     if !path.try_exists().map_err(|_| Error::RecoveryRequired)? {
@@ -886,6 +975,12 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         .join(&journal.token)
         .join(&journal.old_version)
         .join(old_entry);
+    let allowed_prefix = journal
+        .prefix
+        .to_str()
+        .is_some_and(|prefix| super::brew_prefixes().contains(&prefix));
+    #[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+    let allowed_prefix = allowed_prefix || live_tests::allows_private_prefix(&journal.prefix, root);
     if journal.schema != 1
         || journal.agent != agent.command_prefix()
         || journal.id.is_nil()
@@ -895,10 +990,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
                 && matches!(journal.token.as_str(), "claude-code" | "claude-code@latest"))
         || journal.entry != entry
         || journal.entry != journal.prefix.join("bin").join(agent.command_prefix())
-        || journal
-            .prefix
-            .to_str()
-            .is_none_or(|prefix| !super::brew_prefixes().contains(&prefix))
+        || !allowed_prefix
         || journal.probe.as_ref().is_some_and(|probe| {
             probe.program != candidate_program || probe.arguments != [OsString::from("--version")]
         })
@@ -973,62 +1065,7 @@ pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Opti
         return Ok(Some(journal.target_version));
     }
     let parent = journal.verify_external()?;
-    let actual = parent.child(journal.token.as_ref())?.snapshot()?;
-    let current_link = link(&journal.entry)?;
-    #[cfg(target_os = "linux")]
-    if is_linux_claude(agent) {
-        if actual == journal.original {
-            super::brew_claude_linux::verify_tree(
-                &journal.parent().join(&journal.token),
-                &journal.old_version,
-            )?;
-            if journal.prepared.is_some() && parent.has_child(&journal.stage_name())? {
-                super::brew_claude_linux::verify_tree(
-                    &journal.parent().join(journal.stage_name()),
-                    &journal.target_version,
-                )?;
-            }
-        } else if Some(&actual) == journal.prepared.as_ref() {
-            super::brew_claude_linux::verify_tree(
-                &journal.parent().join(&journal.token),
-                &journal.target_version,
-            )?;
-            super::brew_claude_linux::verify_tree(
-                &journal.parent().join(journal.stage_name()),
-                &journal.old_version,
-            )?;
-        } else {
-            return Err(Error::RecoveryRequired);
-        }
-    }
-    for completion in journal.completions.iter().rev() {
-        completion.rollback()?;
-    }
-    for alias in journal.aliases.iter().rev() {
-        alias.rollback()?;
-    }
-    // 链接、目录各自可能在提交前后，恢复由完整身份决定，不根据 phase 猜测是否交换。
-    if current_link != journal.original_link {
-        if Some(&current_link) != journal.prepared_link.as_ref()
-            || link(&journal.link_stage())? != journal.original_link
-        {
-            return Err(Error::RecoveryRequired);
-        }
-        exchange_links(&journal)?;
-    }
-    if actual != journal.original {
-        if Some(&actual) != journal.prepared.as_ref()
-            || parent.child(&journal.stage_name())?.snapshot()? != journal.original
-        {
-            return Err(Error::RecoveryRequired);
-        }
-        parent.exchange(journal.token.as_ref(), &journal.stage_name())?;
-    }
-    if parent.child(journal.token.as_ref())?.snapshot()? != journal.original
-        || link(&journal.entry)? != journal.original_link
-    {
-        return Err(Error::RecoveryRequired);
-    }
+    rollback_publication(&journal, &parent)?;
     if parent.has_child(&journal.stage_name())? {
         // 构造尚未完成时没有完整删除清单，保留现场与 journal 等待明确恢复。
         parent.remove_matching(
@@ -1116,3 +1153,11 @@ fn completion_paths(agent: CLIAgent, prefix: &Path) -> [(&'static str, PathBuf);
         super::brew_codex::completion_paths(prefix)
     }
 }
+
+#[cfg(test)]
+#[path = "sources_brew_transaction_tests.rs"]
+mod tests;
+
+#[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+#[path = "sources_claude_brew_live_tests.rs"]
+mod live_tests;
