@@ -77,13 +77,14 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 原生调试范围；stdio 仅跑普通 CMD 标准流正例、固定 Node 根标准流与 NUL 重定向三项
+        description: Windows 原生调试范围；stdio 跑既有三项，nul_token 单跑实际受限令牌 CreateFile 对照
         required: true
         default: all
         type: choice
         options:
           - all
           - stdio
+          - nul_token
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -1523,6 +1524,7 @@ jobs:
           switch -CaseSensitive ($env:ATOMIC_WINDOWS_DEBUG_SCOPE) {
             'all' { $atomicDebugFilter = 'test(managed_process::atomic_windows::tests::debug_session_runs_system_only_process_to_native_exit) | test(managed_process::atomic_windows::tests::debug_session_rejects_non_system_dynamic_image_before_continue) | test(managed_process::atomic_windows::tests::package_probe_rejects_unbound_child_and_confirms_cleanup) | test(managed_process::atomic_windows::tests::package_probe_cleans_up_before_initial_debug_event) | test(managed_process::atomic_windows::tests::package_probe_continue_failure_preserves_pending_cleanup) | test(managed_process::atomic_windows::tests::console_binding::)' }
             'stdio' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_cmd_full_shim_bound_cmd_with_worker_stdio) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_fixed_node_root_with_worker_stdio) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_cmd_nul_redirection_runs_between_builtin_controls)' }
+            'nul_token' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular)' }
             default { throw 'Windows 原生调试范围无效' }
           }
           # 只向显式原生对照传入已安装的固定 Node；候选仍复制到私有目录并核摘要。
