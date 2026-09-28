@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac Codex冻结产物四场景分批通过。Mac Grok 486330824已完成外置卷与17源码绑定，正常场景因SanDisk卷根0775被原安全门禁拒绝，候选未exec且清理确认；单独候选篡改拒绝已通过，完整旧树/镜像和实际公开入口1.0.40保留。等待独立私有APFS映像环境授权后再做正常/两项冷恢复；不改原卷权限或放宽门禁。Windows eb2私有站对照仍等待管理员验收runner信息，不能外推Node根因。G09及14项必要缺口保持开放。"
+    "next_work_order": "Mac Codex冻结产物四场景分批通过；Mac Grok相同冻结worker/bb78监督程序在独立APFS新卷的run-03四场景及独立复核全部通过，证据封存且普通卸载确认，不外推原SanDisk0775布局修复或整提交重建。Windows runner在线但仍缺独立管理员验收身份信息，私有窗口站对照与真实npm待续；消费者渠道、实际忙碌插件、其他安装来源及14项必要缺口仍开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "macos_grok_npm_recovery_increment",
+  "latest_increment": "macos_grok_npm_recovery_increment.private_apfs_followup",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -2963,7 +2963,7 @@
   "macos_grok_npm_recovery_increment": {
     "updated_at": "2026-09-28",
     "source_commit": "48633082453dc38aef8dd11573bbd839482939f1",
-    "status": "candidate_tamper_rejection_passed_normal_blocked_by_existing_volume_permissions",
+    "status": "all_four_cases_passed_in_private_apfs_followup_original_failures_preserved",
     "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-grok-npm-recovery",
     "change": "仅私有验收runner新增显式Darwin外置卷路径/真实挂载/设备/祖先/执行前后复核，默认拒绝不变；Python/Rust绑定补managed_process_macos.rs至17项；原事务与隔离门禁未改。",
     "local_gates": {
@@ -3068,18 +3068,156 @@
       "user_installation_updated": false,
       "existing_volume_permissions_or_settings_changed": false,
       "private_image_created_or_mounted": false,
-      "localization": "无需本地化变更"
+      "localization": "无需本地化变更",
+      "scope": "仅原SanDisk上的run-01/run-02；后续独立映像见private_apfs_followup。"
     },
-    "remaining": "当前产物正常升级、swap_receipt_missing、external_change_preserved仍未通过；历史Mac正常升级和Linux四场景独立保留。私有APFS映像仅提出方案，等待用户明确授权；G09不关闭。",
+    "remaining": "新APFS环境run-03四场景与独立复核通过；原SanDisk0775失败和此前拒绝单场景保留。消费者渠道、实际忙碌插件、其他安装来源及平台仍待验，G09不关闭。",
     "g09_closed": false,
     "environment_proposal": {
-      "status": "awaiting_explicit_user_authorization",
+      "status": "executed_after_user_continuation",
       "backing_volume": "SanDisk",
       "sparse_image_upper_bound_gib": 16,
       "mount_scope": "独立临时APFS卷，仅新卷根0700初始化，结束卸载；现有SanDisk/ACL/TCC不改",
       "review_sha256": "17539099f6467cd0106aaed13fc7d5c0b500180f8571f30e5dbab6d4b2ceae2e",
-      "image_created": false,
-      "image_mounted": false
+      "image_created": true,
+      "image_mounted": false,
+      "cleanup": "正常卸载已确认，完整映像保留"
+    },
+    "private_apfs_followup": {
+      "updated_at": "2026-09-28",
+      "status": "all_four_cases_passed_in_dedicated_apfs_image",
+      "execution_checkout": "318c5d93f083c226eb8ed49f316fc6f84d2ad330",
+      "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/macos-grok-npm-recovery/private-apfs",
+      "authorization_context": "用户在具体私有APFS方案及等待确认说明后回复继续，按所述16GiB新映像/独立挂载/仅新卷0700/结束卸载范围推进；Windows身份未据此假定已提供。",
+      "environment": {
+        "backing": "grok-recovery.sparsebundle",
+        "capacity_upper_bound_gib": 16,
+        "runtime_mount": "/Volumes/InfiniShellGrok-20260928",
+        "runtime_device": 16777244,
+        "root_mode": "0700",
+        "volume_uuid": "BB305EFE-90E8-4E96-BD82-CB8B3F9760C5",
+        "noowners_retained": true,
+        "ownership_setting_changed": false,
+        "original_sandisk_mode": "0775",
+        "original_sandisk_permissions_and_mount_properties_unchanged": true,
+        "boundary": "满足当前账户下既有mode/uid门禁的任务专用新卷；不声称强多用户权限隔离，也不表示原SanDisk0775布局已修复。"
+      },
+      "artifacts": {
+        "worker_sha256": "6f75c417cacd423a86e3887c30db5a0491ac1a52f68041d46c7e86e8e7cfbd1d",
+        "worker_source_commit": "48633082453dc38aef8dd11573bbd839482939f1",
+        "worker_related_sources": 17,
+        "supervisor_sha256": "63ccfe421e182f4eeb9fa7d2fa1969e1a91c299d12b1af0c6a1d51166878353f",
+        "supervisor_source_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
+        "supervisor_related_sources": 15,
+        "copied_app_files_equal": 132,
+        "copied_binary_and_app_signatures_verified": true,
+        "rebuilt": false,
+        "scope": "冻结worker和bb78监督程序复制后原SHA/源码绑定/签名一致；17/15相关源码与318c检出等价，不是318c整包重建或全工作区验收。"
+      },
+      "run": {
+        "returncode": 0,
+        "elapsed_seconds": 1007.746,
+        "working_tree_clean_before_and_after": true,
+        "sources_binaries_and_official_inputs_unchanged": true,
+        "summary_sha256": "1a81329c0518fcd2bafa0d73a69e5978a3ba58b4eadc336d8f5344d962d3c2a4",
+        "cases": {
+          "updated": {
+            "accepted": true,
+            "actual_public_version": "1.0.41",
+            "published_tree_nodes": 37,
+            "published_regular_files": 29,
+            "candidate_native_exit": 0,
+            "cleanup_confirmed": true
+          },
+          "swap_receipt_missing": {
+            "accepted": true,
+            "actual_public_version": "1.0.40",
+            "fresh_recovery_process": true,
+            "complete_old_tree_restored": true,
+            "mirror_config_and_public_link_preserved": true,
+            "journal_and_stage_removed": true,
+            "cold_exit_receipt_is_original_candidate_exit": true
+          },
+          "external_change_preserved": {
+            "accepted": true,
+            "actual_public_version": "1.0.41",
+            "fresh_recovery_process": true,
+            "outcome": "RecoveryRequired",
+            "external_marker_and_new_tree_preserved": true,
+            "old_backup_preserved": true,
+            "journal_bytes_preserved": true,
+            "cold_exit_receipt_is_original_candidate_exit": true
+          },
+          "candidate_changed_preserved": {
+            "accepted": true,
+            "actual_public_version": "1.0.40",
+            "outcome": "RecoveryRequired",
+            "complete_old_tree_mirror_and_config_preserved": true,
+            "candidate_started": false,
+            "managed_generation_created": false,
+            "tampered_candidate_and_original_journal_preserved": true
+          }
+        },
+        "candidate_cleanup_scope": "三组实际候选原生退出0且资源清理确认；拒绝场景未创建候选代，不把null cleanup当作候选清理证明。"
+      },
+      "independent_reviews": {
+        "updated": {
+          "path": "run-03-updated-review.safe.json",
+          "sha256": "8799cca957e19fa1e54c094f9aea6901b2983fc4382b06e774f7066693e97fc2"
+        },
+        "swap": {
+          "path": "run-03-swap-review.safe.json",
+          "sha256": "a5c2568af803009642c16e406add8d4e68e67dc2ffd97c12899fb3140b7c922c"
+        },
+        "external": {
+          "path": "run-03-external-review.safe.json",
+          "sha256": "6f84251e0f09aea76073fdf5ef0ec16331ebc6c1de659b50bb50281a25da95b4"
+        },
+        "candidate": {
+          "path": "run-03-candidate-review.safe.json",
+          "sha256": "32801073f9d64c135f580034c476a0a50d5e549835382459a21b424b54425964"
+        },
+        "final": {
+          "path": "run-03-final-review.safe.json",
+          "sha256": "b98361dcee870bc76685cf7dc18917085eb968d9a67925ae8252847f7348a771"
+        }
+      },
+      "archive": {
+        "receipts_and_logs": 172,
+        "receipt_index_sha256": "3dcfd077f93125219e09b36058d3ba52f58756a3836fcb8b64dc37f94e7682c4",
+        "full_payload_retained_in_image": true,
+        "image_index_sha256": "71fa1bdd74bffaa16d87209fcd240641cadcfc1f9d227f2067aa49e629eabb89",
+        "image_file_count": 110,
+        "image_total_file_bytes": 3541318774,
+        "image_index_frozen_after_eject": true
+      },
+      "cleanup": {
+        "ordinary_eject_returncode": 0,
+        "forced": false,
+        "new_mount_absent": true,
+        "image_retained": true,
+        "original_volume_attributes_unchanged": true,
+        "lsof_scope": "当前账户可观察的新挂载文件系统，stdout/stderr为空；不外推全机所有用户无句柄",
+        "receipt_sha256": "97ee5a7a0459a828d71cd879621d199f026ab926f6ba2374d50a4c7c84168758"
+      },
+      "local_gates": {
+        "cargo_check": "passed_this_followup",
+        "shared_build_lock_wait_preserved": true,
+        "prior_python_41_and_i18n_11": "同源冻结产物前轮通过，不重复计为本轮执行",
+        "product_source_changed": false,
+        "localization": "无需本地化变更"
+      },
+      "remaining_boundary": {
+        "g09_closed": false,
+        "model_inputs_sent": 0,
+        "gui_executed": false,
+        "user_installation_updated": false,
+        "npm_install_or_lifecycle_executed": false,
+        "consumer_channel_resolution_covered": false,
+        "actual_busy_plugin_recheck_covered": false,
+        "other_platforms_or_install_sources_retested": false
+      },
+      "windows_followup": "现有Windows runner已核在线空闲；没有新的管理员身份信息，未重复已知失败的私有站对照或真实npm。"
     }
   }
 }
