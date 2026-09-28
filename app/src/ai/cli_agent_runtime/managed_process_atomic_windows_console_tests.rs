@@ -382,13 +382,14 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
     }
     let script = root.join("nul-control.cmd");
     // 同一 CMD、目录与 token 只改变 stderr 的 NUL 重定向；脚本不启动外部命令。
+    // NUL 加扩展名仍是保留设备名，stdout 标记必须使用普通文件名。
     fs::write(
         &script,
         concat!(
             "@echo off\r\n",
             ">tmp\\plain.txt echo builtin-control\r\n",
             ">tmp\\plain-status.txt echo %errorlevel%\r\n",
-            ">tmp\\nul.txt 2>NUL echo builtin-control\r\n",
+            ">tmp\\redirected.txt 2>NUL echo builtin-control\r\n",
             ">tmp\\nul-status.txt echo %errorlevel%\r\n",
             ">tmp\\after.txt echo builtin-control\r\n",
             "exit /b 0\r\n",
@@ -460,7 +461,7 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
     let plain_status = fs::read_to_string(root.join("tmp/plain-status.txt")).unwrap();
     let nul_status = fs::read_to_string(root.join("tmp/nul-status.txt")).unwrap();
     let plain = fs::read(root.join("tmp/plain.txt")).unwrap();
-    let redirected = fs::read(root.join("tmp/nul.txt")).unwrap();
+    let redirected = fs::read(root.join("tmp/redirected.txt")).unwrap();
     let after = fs::read(root.join("tmp/after.txt")).unwrap();
     let expected: &[u8] = b"builtin-control\r\n";
     eprintln!(
