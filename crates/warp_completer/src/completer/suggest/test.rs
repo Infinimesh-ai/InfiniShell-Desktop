@@ -1851,6 +1851,29 @@ fn test_completes_with_multiple_generators() {
     );
 }
 
+#[cfg(not(feature = "v2"))]
+#[test]
+fn completes_positionals_after_end_of_options() {
+    let ctx = FakeCompletionContext::new(create_test_command_registry([git_signature()]));
+
+    assert_eq!(
+        complete_at_end_of_line_with_options(
+            "ls -la; git -- ",
+            MatchStrategy::CaseInsensitive,
+            &ctx
+        ),
+        vec!["add", "branch", "checkout", "clone"]
+    );
+    assert_eq!(
+        complete_at_end_of_line_with_options(
+            "ls -la; git -- branch -",
+            MatchStrategy::CaseInsensitive,
+            &ctx
+        ),
+        Vec::<String>::new()
+    );
+}
+
 #[test]
 fn test_completes_flags() {
     let registry = create_test_command_registry([git_signature()]);
@@ -2350,6 +2373,14 @@ fn test_powershell_parser_directives_for_flags() {
             &ctx
         ),
         vec!["-Encoding"]
+    );
+    assert_eq!(
+        complete_at_end_of_line_with_options(
+            "Add-Content -- ",
+            MatchStrategy::CaseInsensitive,
+            &ctx
+        ),
+        vec!["bar", "foo/", "-Encoding", "-Exclude", "-Force"]
     );
     assert_eq!(
         complete_at_end_of_line("Add-Content -Force -Encoding ", &ctx),
