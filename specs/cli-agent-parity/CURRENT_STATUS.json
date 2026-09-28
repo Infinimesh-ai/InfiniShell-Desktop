@@ -935,7 +935,7 @@
       "remaining_focus": "Windows npm真实执行与原列产品验收；代码接线复核不能关闭功能或验收缺项。",
       "macos_intel": "按用户明确要求排除，包括Codex"
     },
-    "next_work_order": "Mac Codex冻结产物四场景分批通过；Mac Grok相同冻结worker/bb78监督程序在独立APFS新卷的run-03四场景及独立复核全部通过，证据封存且普通卸载确认，不外推原SanDisk0775布局修复或整提交重建。Windows runner在线但仍缺独立管理员验收身份信息，私有窗口站对照与真实npm待续；消费者渠道、实际忙碌插件、其他安装来源及14项必要缺口仍开放。"
+    "next_work_order": "Mac Codex和Grok冻结产物的四场景证据保持。Windows已通过用户授权的cloud SSH临时管理员runner完成私有窗口站对照：调用线程member=true、固定Node v20.9.0原生退出0且完整清理；原低权限服务已恢复。整套原生仍17通过/6失败，普通身份、正式npm链和真实更新未验证；后续依据同一管理员批次的普通/私有对象差异继续定位，不能将临时管理员依赖直接加入产品。G09及14项必要缺口保持开放。"
   },
   "g09_npm_live_increment": {
     "updated_at": "2026-09-27",
@@ -1508,7 +1508,7 @@
     "goal_complete": false
   },
   "latest_implementation_commit": "bb78f3ac5636d9630db0d704d9ea04268594fae5",
-  "latest_increment": "macos_grok_npm_recovery_increment.private_apfs_followup",
+  "latest_increment": "windows_admin_private_desktop_increment",
   "supported_platforms": [
     "macos-arm64",
     "linux-x64",
@@ -3217,7 +3217,140 @@
         "actual_busy_plugin_recheck_covered": false,
         "other_platforms_or_install_sources_retested": false
       },
-      "windows_followup": "现有Windows runner已核在线空闲；没有新的管理员身份信息，未重复已知失败的私有站对照或真实npm。"
+      "windows_followup": "Mac run-03结束时现有Windows runner在线但尚无管理员身份信息；后续用户提供cloud上的管理员凭据并授权连接，已完成临时管理员私有窗口站对照及原服务恢复，详见windows_admin_private_desktop_increment。"
+    }
+  },
+  "windows_admin_private_desktop_increment": {
+    "source_commit": "61d0747b4162110babcccd598f262fc22c56136f",
+    "status": "administrator_identity_block_resolved_private_node_control_passed_six_baseline_failures_remain",
+    "evidence_root": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928/windows-admin-identity",
+    "authorization": "用户明确授权通过SSH cloud使用既有Windows Administrator凭据；只用于本次临时诊断，不修改原服务账号、管理员组或全局ACL。密码由既有ASKPASS读取，未写入仓库或证据输出。",
+    "host": "WIN-E000APDGSNS",
+    "execution": {
+      "runner_id": 22,
+      "runner_name": "infinishell-windows-x64",
+      "temporary_account": "Administrator",
+      "session_id": 0,
+      "listener_pid": 30148,
+      "worker_pid": 10176,
+      "original_service_account": ".\\infinishell-build",
+      "original_service_stopped_during_job": true,
+      "registration_reused_unchanged": true,
+      "single_job_arguments": [
+        "run",
+        "--once",
+        "--startuptype",
+        "manual"
+      ],
+      "toolchain": "仅临时进程环境指定原profile的CARGO_HOME/RUSTUP_HOME/PATH/PROTOC；共享Cargo/sccache保持，Git全局配置定向本次诊断目录。",
+      "identity_receipt_sha256": "fa544ed1c037170986d74ea28abf4e736f7f9bc5a06287942d819dc0c6020332"
+    },
+    "run": {
+      "id": 36379989244,
+      "job_id": 108793580908,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36379989244",
+      "conclusion": "failure",
+      "cargo_check": "passed",
+      "ordinary_tests_passed": 504,
+      "command_tests_passed": 22,
+      "diagnostic_tests_passed": 14,
+      "native_tests": {
+        "passed": 17,
+        "failed": 6,
+        "retries": 0
+      },
+      "grok_production_installer": "passed",
+      "real_npm_updates_executed": false,
+      "gui_or_model_acceptance_executed": false,
+      "other_platforms": "skipped"
+    },
+    "private_desktop": {
+      "case": "node_20_9_0_root_private_desktop",
+      "administrator_membership": {
+        "scope": "create_station_calling_thread",
+        "status": "ok",
+        "member": true,
+        "hresult": null
+      },
+      "environment_control_established": true,
+      "private_objects_verified": true,
+      "object_verification_scope": "retained_private_object_handles",
+      "console_mode": "no_window",
+      "shim_executed": false,
+      "fixed_node_version": "v20.9.0",
+      "source_sha256": "538140015da83597ea7e7ef5e108ebac8a2dc4784b2a4134222b6c27c39f90ad",
+      "actual_expected_stdout_line_count": 1,
+      "native_exit_code": 0,
+      "driver_exit_code": 0,
+      "native_receipt_matches": true,
+      "inner_cleanup_confirmed": true,
+      "outer_job_cleanup_confirmed": true,
+      "private_objects_closed": true,
+      "private_objects_closed_scope": "owned_handles",
+      "timed_out": false,
+      "output_truncated": false,
+      "root_dll_events": 32,
+      "loader_dropped_events": 0
+    },
+    "remaining_failures": {
+      "count": 6,
+      "nul_redirection_control": "原NUL marker对照仍失败",
+      "five_other_controls": "Node子进程/根进程的NoWindow与三组hidden-console仍原生退出0xc0000142；隐藏组root首断点前仅3条DLL，NoWindow Node子/根分别29/28条DLL且已见首断点。",
+      "cleanup": "七个归档场景的内层AppContainer与外层严格Job均确认清理；五个失败driver101来自断言失败，不替代原生码。",
+      "runner_orphan_cleanup": {
+        "conhost_pid": 13384,
+        "sccache_pid": 28760,
+        "attribution": "无可关联创建句柄/身份，不分配到具体case，不声明机器级无残留。"
+      }
+    },
+    "comparison_boundary": "私有对象实现/测试/工作流与eb2b271e3逐字节相同；执行检出为61d0747b4。管理员身份同时改变账号环境；同批普通对象仍失败而私有对象成功，支持继续定位窗口站/桌面相关差异，但不独自证明具体DLL根因、最小权限合同或普通用户产品修复。",
+    "restoration": {
+      "completed": true,
+      "service_state": "Running",
+      "service_account": ".\\infinishell-build",
+      "start_mode": "Auto",
+      "service_pid": 27300,
+      "listener_pid": 6356,
+      "listener_account": "infinishell-build",
+      "registration_sha256": "3192839ca3bbd035553f763787a85f30c9587c3a6a8420ce972e7c2c539109be",
+      "registration_unchanged": true,
+      "five_directory_root_owner_sddl_unchanged": true,
+      "original_non_admin_account_verified": true,
+      "low_privilege_cargo_available": true,
+      "cache_and_work_directory_read_write_remove_passed": true,
+      "temporary_administrator_listener_worker_absent": true,
+      "scope": "精确服务、所列进程名和五个目录根；不宣称遍历全部缓存成员或全机进程。",
+      "receipt_sha256": "ee7c79b0fdd63b4897d36a4ecbcfa1e07d89883b39e9b416389f5115d2f484f1",
+      "registration_file": "C:\\actions-runner\\.runner",
+      "registration_scope": "仅.runner注册文件摘要与runner ID；未读取或逐字节核验凭据文件。",
+      "runner_online_idle": true,
+      "runner_online_receipt_sha256": "934c4615ed4225d7b3cf8071d282812a65ba9c7cf72a69dcfc27b132ed052be1"
+    },
+    "artifact": {
+      "id": 10952670637,
+      "zip_bytes": 22097,
+      "zip_sha256": "923f79f4c5322120411050e72b778d9acea8fa8ccca10d753b0f08358c489efe",
+      "full_official_sha256_verified": true,
+      "member_count": 21,
+      "members_crc_and_sha256_verified": true
+    },
+    "summary_sha256": "9a1227c3e99bd1a79ecb8177e5febcbf863a52fce4ee1c5118106e3e9f2526bd",
+    "job_log_sha256": "f7b92214f3e7c6ffd462ee5a0b9bdc75310d5b930c13b8666908059cc435a6e3",
+    "local_gate": "沿用前轮同源Mac cargo check成功收据；本轮Windows cargo check再次通过。无产品代码变化，不重复执行Mac Python/i18n套件。",
+    "localization": "无需本地化变更",
+    "g09_closed": false,
+    "required_gaps_remaining_open": 14,
+    "next": "从已建立的私有对象成功对照继续定位普通身份可用的实现方式及剩余原生失败；保持严格Job、AppContainer零capability与精确映像绑定，正式npm链和真实更新尚需独立验收。",
+    "evidence_index": {
+      "path": "index.safe.json",
+      "file_count": 76,
+      "sha256": "54cd4c0a699be82af41f1f40bbda87b80523563cd38d127f1c551057baea1a8b",
+      "scope": "执行/恢复记录、任务脚本、完整小ZIP和成员；独立审查、文档审查与最终交付收据单独留存。"
+    },
+    "independent_review": {
+      "path": "independent-review.safe.json",
+      "sha256": "5259b08ecca58e77039b9a1154b0116c7d7b1144e58c852cedcf1119930d0019",
+      "result": "身份、私有Node成功、剩余失败和恢复范围独立复核通过；不等于整套CI通过。"
     }
   }
 }
