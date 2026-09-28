@@ -1,6 +1,31 @@
 use super::*;
 
 #[test]
+fn mcp_tool_result_preserves_embedded_resource_contents() {
+    let result = convert_mcp_tool_call_result(rmcp::model::CallToolResult::success(vec![
+        rmcp::model::ContentBlock::resource(rmcp::model::ResourceContents::text(
+            "资源正文",
+            "file:///report.txt",
+        )),
+    ]));
+
+    let api::call_mcp_tool_result::Result::Success(success) = result else {
+        panic!("成功的 MCP 工具结果应保留为成功");
+    };
+    assert_eq!(success.results.len(), 1);
+    let Some(api::call_mcp_tool_result::success::result::Result::Resource(resource)) =
+        &success.results[0].result
+    else {
+        panic!("内嵌资源应保留为资源内容");
+    };
+    assert_eq!(resource.uri, "file:///report.txt");
+    let Some(api::mcp_resource_content::ContentType::Text(text)) = &resource.content_type else {
+        panic!("文本资源应保留文本内容");
+    };
+    assert_eq!(text.content, "资源正文");
+}
+
+#[test]
 fn read_files_partial_success_converts_failed_files() {
     let result =
         api::request::input::tool_call_result::Result::try_from(ReadFilesResult::Success {

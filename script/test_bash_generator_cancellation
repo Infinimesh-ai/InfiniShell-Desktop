@@ -1,0 +1,70 @@
+#!/bin/bash
+
+set -e
+cd "$(dirname "$0")/.."
+
+# 只加载被测函数，避免执行交互式 bootstrap 或触碰用户 shell 配置。
+bootstrap_script="${1:-app/assets/bundled/bootstrap/bash_body.sh}"
+preexec_source=$(awk '
+  /^    warp_preexec \(\) \{/ { copying = 1 }
+  copying { print }
+  copying && /^    }/ { exit }
+' "$bootstrap_script")
+[[ -n "$preexec_source" ]] || { echo "未找到 warp_preexec" >&2; exit 1; }
+eval "$preexec_source"
+
+# OSC 输出与此回归无关；PID 筛选与取消仍执行生产函数的真实代码。
+warp_escape_json() { printf '%s' "$1"; }
+warp_send_json_message() { :; }
+warp_maybe_send_reset_grid_osc() { :; }
+
+# 这些变量由上方动态加载的生产函数读取。
+# shellcheck disable=SC2034
+WARP_IN_MSYS2=false WARP_SESSION_ID=1
+
+test_dir=$(mktemp -d)
+_WARP_GENERATOR_PIDS_STARTED_TMP_FILE="$test_dir/started"
+_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE="$test_dir/completed"
+cleanup() {
+  # jobs 仅列出本测试仍存活的子进程，避免向已回收或无关的 PID 发信号。
+  for child_pid in $(jobs -pr); do
+    kill "$child_pid" 2>/dev/null || true
+  done
+  wait 2>/dev/null || true
+  rm -f "$test_dir/started" "$test_dir/completed"
+  rmdir "$test_dir"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# sleep 模拟未完成的真实后台工作；wait 确认退出状态，不靠延时同步。
+sleep 5 &
+first_pid=$!
+sleep 5 &
+second_pid=$!
+sleep 30 &
+completed_pid=$!
+printf '%s\n' "$first_pid" "$completed_pid" "$second_pid" > "$_WARP_GENERATOR_PIDS_STARTED_TMP_FILE"
+printf '%s\n' "$completed_pid" > "$_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE"
+
+warp_preexec
+first_status=0
+wait "$first_pid" 2>/dev/null || first_status=$?
+second_status=0
+wait "$second_pid" 2>/dev/null || second_status=$?
+[[ "$first_status" == 137 && "$second_status" == 137 ]] || {
+  echo "两个未完成生成器都应被 SIGKILL 取消，实际状态：$first_status / $second_status" >&2
+  exit 1
+}
+kill -0 "$completed_pid"
+
+# 已完成列表中的 PID 和空列表均不应触发额外取消。
+printf '%s\n' "$completed_pid" > "$_WARP_GENERATOR_PIDS_STARTED_TMP_FILE"
+warp_preexec
+kill -0 "$completed_pid"
+: > "$_WARP_GENERATOR_PIDS_STARTED_TMP_FILE"
+: > "$_WARP_GENERATOR_PIDS_COMPLETED_TMP_FILE"
+warp_preexec
+kill -0 "$completed_pid"
+echo "Bash 多生成器取消、已完成排除与空列表检查通过。"

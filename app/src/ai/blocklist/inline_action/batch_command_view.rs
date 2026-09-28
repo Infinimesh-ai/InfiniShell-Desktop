@@ -194,7 +194,7 @@ pub(crate) fn batch_outcome(result: &CallMCPToolResult) -> BatchOutcome {
                 .content
                 .iter()
                 .filter_map(|content| {
-                    if let rmcp::model::RawContent::Text(text_content) = &content.raw {
+                    if let rmcp::model::ContentBlock::Text(text_content) = content {
                         Some(text_content.text.as_str())
                     } else {
                         None

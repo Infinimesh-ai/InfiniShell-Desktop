@@ -149,6 +149,8 @@ async fn protected_resource_metadata(
     State(state): State<FakeOAuthState>,
 ) -> Json<serde_json::Value> {
     Json(serde_json::json!({
+        // RFC 9728 要求资源标识与当前认证的 URL 一致。
+        "resource": format!("{}/mcp", state.origin),
         "authorization_servers": [state.origin],
         "scopes_supported": ["mcp"]
     }))
@@ -194,6 +196,58 @@ async fn exchange_token() -> Json<serde_json::Value> {
         "expires_in": 3600,
         "refresh_token": "test-loopback-refresh-token"
     }))
+}
+
+#[tokio::test]
+async fn oauth_rejects_mismatched_resource_before_requesting_credentials() {
+    crate::install_test_crypto_provider();
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("本地测试端口应可用");
+    let origin = format!("http://{}", listener.local_addr().unwrap());
+    let app = Router::new()
+        .route(
+            "/.well-known/oauth-protected-resource/mcp",
+            get(|State(state): State<FakeOAuthState>| async move {
+                Json(serde_json::json!({
+                    "resource": format!("{}/other-resource", state.origin),
+                    "authorization_servers": [state.origin],
+                    "scopes_supported": ["mcp"]
+                }))
+            }),
+        )
+        .with_state(FakeOAuthState {
+            origin: origin.clone(),
+            ..Default::default()
+        });
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    let context = AuthContext {
+        callback_mode: OAuthCallbackMode::Loopback,
+        uuid: Uuid::new_v4(),
+        persisted_credentials: None,
+        is_headless: false,
+        is_file_based: true,
+        persist_credentials: Box::new(|_, _| {
+            Box::pin(async { panic!("资源标识不符时不得持久化凭据") })
+        }),
+        requires_authentication: Box::new(|_, _, _| {
+            Box::pin(async { panic!("资源标识不符时不得发起交互式认证") })
+        }),
+        authenticated: None,
+    };
+
+    let result =
+        make_authenticated_client(&format!("{origin}/mcp"), reqwest::Client::new(), context).await;
+    server.abort();
+
+    let error = result.err().expect("资源标识不符应拒绝认证");
+    assert!(matches!(
+        error,
+        McpAuthenticationError::OAuth(AuthError::MetadataError(message))
+            if message.contains("resource mismatch")
+    ));
 }
 
 #[tokio::test]

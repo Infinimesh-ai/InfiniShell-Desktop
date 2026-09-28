@@ -4703,6 +4703,164 @@ fn test_vim_operators_on_word_text_objects() {
 }
 
 #[test]
+fn test_vim_line_text_objects() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let editor = add_editor_vim_normal_mode("one\n two words \nthree", &mut app);
+
+        editor.update(&mut app, |view, ctx| {
+            view.select_ranges(vec![DisplayPoint::new(1, 4)..DisplayPoint::new(1, 4)], ctx)
+                .unwrap();
+            view.vim_user_insert("yil", ctx);
+        });
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            let register = registers.read_from_register('"', ctx).unwrap();
+            assert_eq!(register.text, "two words");
+            assert_eq!(register.motion_type, MotionType::Charwise);
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.select_ranges(vec![DisplayPoint::new(1, 4)..DisplayPoint::new(1, 4)], ctx)
+                .unwrap();
+            view.vim_user_insert("dil", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "one\n  \nthree");
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.set_buffer_text("one\n \t \nthree", ctx);
+            view.select_ranges(vec![DisplayPoint::new(1, 1)..DisplayPoint::new(1, 1)], ctx)
+                .unwrap();
+            view.vim_user_insert("dil", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "one\n \t \nthree");
+        });
+        editor.update(&mut app, |view, ctx| {
+            view.set_buffer_text("one\n two words \nthree", ctx);
+            view.select_ranges(vec![DisplayPoint::new(1, 4)..DisplayPoint::new(1, 4)], ctx)
+                .unwrap();
+            view.vim_user_insert("cil", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "one\n  \nthree");
+            assert_eq!(view.vim_mode(ctx), Some(VimMode::Insert));
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+            view.set_buffer_text(" αβ \n \nlast", ctx);
+            view.select_ranges(vec![DisplayPoint::new(2, 0)..DisplayPoint::new(2, 0)], ctx)
+                .unwrap();
+            view.vim_user_insert("yal", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(
+                view.selected_ranges(ctx),
+                vec![DisplayPoint::new(2, 0)..DisplayPoint::new(2, 0)]
+            );
+        });
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            let register = registers.read_from_register('"', ctx).unwrap();
+            assert_eq!(register.text, " αβ \n \nlast\n");
+            assert_eq!(register.motion_type, MotionType::Linewise);
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_user_insert("Vily", ctx);
+        });
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            let register = registers.read_from_register('"', ctx).unwrap();
+            assert_eq!(register.text, "last");
+            assert_eq!(register.motion_type, MotionType::Charwise);
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_user_insert("valy", ctx);
+        });
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            let register = registers.read_from_register('"', ctx).unwrap();
+            assert_eq!(register.text, " αβ \n \nlast\n");
+            assert_eq!(register.motion_type, MotionType::Linewise);
+        });
+
+        editor.update(&mut app, |view, ctx| {
+            view.vim_user_insert("cal", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "");
+            assert_eq!(view.vim_mode(ctx), Some(VimMode::Insert));
+        });
+    });
+}
+
+#[test]
+fn test_vim_all_lines_preserves_empty_lines_in_register_and_paste() {
+    App::test((), |mut app| async move {
+        initialize_app(&mut app);
+        let (_, editor) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
+            let mut view = EditorView::new_with_base_text(
+                "\nfirst\n",
+                EditorOptions {
+                    supports_vim_mode: true,
+                    ..Default::default()
+                },
+                ctx,
+            );
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+            view
+        });
+        editor.update(&mut app, |view, ctx| view.vim_user_insert("2Gyal", ctx));
+
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            let register = registers.read_from_register('"', ctx).unwrap();
+            assert_eq!(register.text, "\nfirst\n\n");
+            assert_eq!(register.motion_type, MotionType::Linewise);
+        });
+        editor.update(&mut app, |view, ctx| view.vim_user_insert("Gp", ctx));
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "\nfirst\n\n\nfirst\n");
+        });
+
+        for operator in ["valy", "dal", "cal", "vald", "valc"] {
+            editor.update(&mut app, |view, ctx| {
+                view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+                view.set_buffer_text("\nfirst\n", ctx);
+                view.vim_user_insert(operator, ctx);
+            });
+            editor.read(&app, |view, ctx| {
+                let expected = if operator == "valy" { "\nfirst\n" } else { "" };
+                assert_eq!(view.buffer_text(ctx), expected, "{operator}");
+            });
+            VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+                let register = registers.read_from_register('"', ctx).unwrap();
+                assert_eq!(register.text, "\nfirst\n\n", "{operator}");
+                assert_eq!(register.motion_type, MotionType::Linewise);
+            });
+        }
+
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            registers.write_to_register('a', "replacement\n".to_owned(), MotionType::Linewise, ctx);
+        });
+        editor.update(&mut app, |view, ctx| {
+            view.vim_keystroke(&Keystroke::parse("escape").unwrap(), ctx);
+            view.set_buffer_text("\nfirst\n", ctx);
+            view.vim_user_insert("val\"ap", ctx);
+        });
+        editor.read(&app, |view, ctx| {
+            assert_eq!(view.buffer_text(ctx), "replacement\n")
+        });
+        VimRegisters::handle(&app).update(&mut app, |registers, ctx| {
+            assert_eq!(
+                registers.read_from_register('a', ctx).unwrap().text,
+                "\nfirst\n\n"
+            );
+        });
+    });
+}
+
+#[test]
 fn test_vim_operators_on_quote_text_objects() {
     App::test((), |mut app| async move {
         initialize_app(&mut app);

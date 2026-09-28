@@ -14,10 +14,11 @@
 //! - Scroll helpers (`center_cursor_vertically`, `scroll_half_page_*`) — no-op.
 //!
 
+use string_offset::CharOffset;
 use vim::vim::{
     BracketChar, CharacterMotion, Direction, FindCharMotion, FirstNonWhitespaceMotion,
-    InsertPosition, LineMotion, ModeTransition, MotionType, VimHandler, VimMode, VimMotion,
-    VimOperand, VimOperator, VimTextObject, WordMotion,
+    InsertPosition, LineMotion, ModeTransition, MotionType, TextObjectInclusion, TextObjectType,
+    VimHandler, VimMode, VimMotion, VimOperand, VimOperator, VimTextObject, WordMotion,
 };
 use warp::editor::{CodeEditorModel, LineBound};
 use warp_editor::content::buffer::AutoScrollBehavior;
@@ -199,17 +200,38 @@ impl VimHandler for TuiInputView {
         let motion_type = vim_operand_motion_type(operand);
         let yanked = self.model.update(ctx, |model, ctx| {
             let existing_selections = model.selections(ctx).clone();
-            select_vim_operand(model, operator, operand_count, operand, ctx);
-
-            let selected_text = model
-                .content()
-                .as_ref(ctx)
-                .selected_text_as_plain_text(model.buffer_selection_model().clone(), ctx)
-                .into_string();
+            let selects_all_lines = matches!(
+                operand,
+                VimOperand::TextObject(VimTextObject {
+                    object_type: TextObjectType::Line,
+                    inclusion: TextObjectInclusion::Around,
+                })
+            );
+            let copy_operator = if motion_type == MotionType::Linewise {
+                &VimOperator::Yank
+            } else {
+                operator
+            };
+            // 先按复制语义取行，避免删除末行时借用的前置换行混入寄存器。
+            select_vim_operand(model, copy_operator, operand_count, operand, ctx);
+            let selected_text =
+                selected_text_for_vim_register(model, motion_type, selects_all_lines, ctx);
+            if copy_operator != operator {
+                model.vim_set_selections(
+                    existing_selections.clone(),
+                    AutoScrollBehavior::None,
+                    ctx,
+                );
+                select_vim_operand(model, operator, operand_count, operand, ctx);
+            }
+            let has_nonempty_selection = model
+                .selections(ctx)
+                .iter()
+                .any(|selection| selection.head != selection.tail);
 
             match operator {
-                VimOperator::Delete | VimOperator::Change if !selected_text.is_empty() => {
-                    if *operator == VimOperator::Change && matches!(operand, VimOperand::Line) {
+                VimOperator::Delete | VimOperator::Change if has_nonempty_selection => {
+                    if *operator == VimOperator::Change && motion_type == MotionType::Linewise {
                         model.vim_change_line_with_smart_indent(ctx);
                     } else {
                         model.delete(TextDirection::Forwards, TextUnit::Character, false, ctx);
@@ -230,11 +252,7 @@ impl VimHandler for TuiInputView {
                 | VimOperator::Indent
                 | VimOperator::Dedent => {}
             }
-            if selected_text.is_empty() && motion_type == MotionType::Linewise {
-                "\n".to_owned()
-            } else {
-                selected_text
-            }
+            selected_text
         });
         if !yanked.is_empty() {
             self.yank_buffer = yanked;
@@ -299,16 +317,28 @@ impl VimHandler for TuiInputView {
         ctx: &mut ViewContext<Self>,
     ) {
         let yanked = self.model.update(ctx, |model, ctx| {
+            let linewise_text = (motion_type == MotionType::Linewise).then(|| {
+                let buffer = model.content().as_ref(ctx);
+                // 扩展删除选区前的范围只含真实内容，不含借用的前置换行。
+                model
+                    .vim_visual_selection_ranges(motion_type, ctx)
+                    .into_iter()
+                    .map(|range| {
+                        let mut text = buffer
+                            .text_in_range(range.start.max(CharOffset::from(1))..range.end)
+                            .into_string();
+                        text.push('\n');
+                        text
+                    })
+                    .collect::<String>()
+            });
             model.vim_visual_selection_range(
                 motion_type,
                 operator.includes_trailing_newline(),
                 ctx,
             );
-            let selected_text = model
-                .content()
-                .as_ref(ctx)
-                .selected_text_as_plain_text(model.buffer_selection_model().clone(), ctx)
-                .into_string();
+            let selected_text = linewise_text
+                .unwrap_or_else(|| selected_text_for_vim_register(model, motion_type, false, ctx));
             match operator {
                 VimOperator::Delete | VimOperator::Change => {
                     model.delete(TextDirection::Forwards, TextUnit::Character, false, ctx);
@@ -399,7 +429,8 @@ impl VimHandler for TuiInputView {
         }
         let text = bounded_repeated_text(&self.yank_buffer, count);
         if self.yank_motion_type == MotionType::Linewise {
-            let text = text.trim_matches('\n');
+            // 行模式寄存器只多存一个终止换行，其余空行都属于被复制的内容。
+            let text = text.strip_suffix('\n').unwrap_or(&text);
             let insertion = match direction {
                 Direction::Forward => format!("\n{text}"),
                 Direction::Backward => format!("{text}\n"),
@@ -545,11 +576,27 @@ impl VimHandler for TuiInputView {
     }
 }
 
+fn selected_text_for_vim_register(
+    model: &CodeEditorModel,
+    motion_type: MotionType,
+    selects_all_lines: bool,
+    ctx: &ModelContext<CodeEditorModel>,
+) -> String {
+    let buffer = model.content().as_ref(ctx);
+    let mut text = buffer
+        .selected_text_as_plain_text(model.buffer_selection_model().clone(), ctx)
+        .into_string();
+    if motion_type == MotionType::Linewise && (selects_all_lines || !text.ends_with('\n')) {
+        text.push('\n');
+    }
+    text
+}
+
 fn vim_operand_motion_type(operand: &VimOperand) -> MotionType {
     match operand {
         VimOperand::Motion { motion_type, .. } => *motion_type,
         VimOperand::Line => MotionType::Linewise,
-        VimOperand::TextObject(_) => MotionType::Charwise,
+        VimOperand::TextObject(text_object) => text_object.motion_type(),
     }
 }
 fn bounded_repeated_text(text: &str, count: u32) -> String {

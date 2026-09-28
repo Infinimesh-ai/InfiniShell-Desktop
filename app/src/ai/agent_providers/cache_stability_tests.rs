@@ -255,7 +255,7 @@ fn full_tools_array_serialization_is_stable() {
 fn full_tools_array_with_mcp_is_stable() {
     use std::sync::Arc;
 
-    use rmcp::model::{AnnotateAble, RawResource, Tool as McpTool};
+    use rmcp::model::{Resource, Tool as McpTool};
     use serde_json::json;
 
     let schema_obj = json!({
@@ -270,7 +270,7 @@ fn full_tools_array_with_mcp_is_stable() {
         id: "id-a".to_owned(),
         name: "server-a".to_owned(),
         description: String::new(),
-        resources: vec![RawResource::new("file:///x.txt", "X").no_annotation()],
+        resources: vec![Resource::new("file:///x.txt", "X")],
         tools: vec![
             McpTool::new("zeta", "Z desc", Arc::new(schema_obj.clone())),
             McpTool::new("alpha", "A desc", Arc::new(schema_obj.clone())),

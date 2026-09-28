@@ -49,8 +49,9 @@ use vim::vim::{
     VimTextObject, WordBound, WordMotion, WordType,
 };
 use vim::{
-    vim_a_block, vim_a_paragraph, vim_a_quote, vim_a_word, vim_inner_block, vim_inner_paragraph,
-    vim_inner_quote, vim_inner_word, vim_word_iterator_from_offset,
+    vim_a_block, vim_a_paragraph, vim_a_quote, vim_a_word, vim_all_lines, vim_inner_block,
+    vim_inner_line, vim_inner_paragraph, vim_inner_quote, vim_inner_word,
+    vim_word_iterator_from_offset,
 };
 use warp_completer::completer::Description;
 use warp_core::semantic_selection::SemanticSelection;
@@ -2407,14 +2408,22 @@ impl VimHandler for EditorView {
 
         let motion_type = match operand {
             VimOperand::Motion { motion_type, .. } => *motion_type,
-            VimOperand::TextObject(text_object) => match text_object {
-                VimTextObject {
-                    object_type: TextObjectType::Paragraph,
-                    ..
-                } => MotionType::Linewise,
-                _ => MotionType::Charwise,
-            },
+            VimOperand::TextObject(text_object) => text_object.motion_type(),
             VimOperand::Line => MotionType::Linewise,
+        };
+
+        let copy_to_register = |editor_model: &EditorModel, ctx: &mut ModelContext<EditorModel>| {
+            if matches!(
+                operand,
+                VimOperand::TextObject(VimTextObject {
+                    object_type: TextObjectType::Line,
+                    inclusion: TextObjectInclusion::Around,
+                })
+            ) {
+                editor_model.copy_all_lines_to_vim_register(register_name, ctx);
+            } else {
+                editor_model.copy_selection_to_vim_register(register_name, motion_type, ctx);
+            }
         };
 
         // Depending on the operator, we may or may not want a new Edit on the UndoStack.
@@ -2431,13 +2440,7 @@ impl VimHandler for EditorView {
                             },
                         )
                         .with_change_selections(selection_change)
-                        .with_before_buffer_edit(|editor_model, ctx| {
-                            editor_model.copy_selection_to_vim_register(
-                                register_name,
-                                motion_type,
-                                ctx,
-                            );
-                        })
+                        .with_before_buffer_edit(copy_to_register)
                         .with_post_buffer_edit_change_selections(|editor_model, ctx| {
                             if motion_type == MotionType::Linewise {
                                 editor_model.cursor_line_start(false, ctx);
@@ -2469,7 +2472,7 @@ impl VimHandler for EditorView {
                 self.change_selections(ctx, |editor_model, ctx| {
                     let existing_selections = editor_model.selections(ctx).clone();
                     selection_change(editor_model, ctx);
-                    editor_model.copy_selection_to_vim_register(register_name, motion_type, ctx);
+                    copy_to_register(editor_model, ctx);
                     // Linewise motions don't alter the cursor position after the yank, but
                     // charwise motions do.
                     if motion_type == MotionType::Linewise {
@@ -2763,6 +2766,18 @@ impl VimHandler for EditorView {
         register_name: char,
         ctx: &mut ViewContext<Self>,
     ) {
+        let selects_all_lines = motion_type == MotionType::Linewise
+            && self
+                .editor_model
+                .as_ref(ctx)
+                .vim_visual_selection_covers_all_lines(ctx);
+        let copy_to_register = |editor_model: &EditorModel, ctx: &mut ModelContext<EditorModel>| {
+            if selects_all_lines {
+                editor_model.copy_all_lines_to_vim_register(register_name, ctx);
+            } else {
+                editor_model.copy_selection_to_vim_register(register_name, motion_type, ctx);
+            }
+        };
         let selection_change =
             |editor_model: &mut EditorModel, ctx: &mut ModelContext<EditorModel>| {
                 let include_newline = operator.includes_trailing_newline();
@@ -2781,13 +2796,7 @@ impl VimHandler for EditorView {
                             },
                         )
                         .with_change_selections(selection_change)
-                        .with_before_buffer_edit(|editor_model, ctx| {
-                            editor_model.copy_selection_to_vim_register(
-                                register_name,
-                                motion_type,
-                                ctx,
-                            );
-                        })
+                        .with_before_buffer_edit(copy_to_register)
                         .with_post_buffer_edit_change_selections(|editor_model, ctx| {
                             if motion_type == MotionType::Linewise {
                                 editor_model.cursor_line_start(false, ctx);
@@ -2818,7 +2827,7 @@ impl VimHandler for EditorView {
             VimOperator::Yank => {
                 self.change_selections(ctx, |editor_model, ctx| {
                     selection_change(editor_model, ctx);
-                    editor_model.copy_selection_to_vim_register(register_name, motion_type, ctx);
+                    copy_to_register(editor_model, ctx);
                     editor_model.deselect(ctx);
                 });
             }
@@ -2845,6 +2854,11 @@ impl VimHandler for EditorView {
         else {
             return;
         };
+        let selects_all_lines = motion_type == MotionType::Linewise
+            && self
+                .editor_model
+                .as_ref(ctx)
+                .vim_visual_selection_covers_all_lines(ctx);
         self.edit(
             ctx,
             Edits::new()
@@ -2863,11 +2877,15 @@ impl VimHandler for EditorView {
                     },
                 )
                 .with_before_buffer_edit(|editor_model, ctx| {
-                    editor_model.copy_selection_to_vim_register(
-                        write_register_name,
-                        motion_type,
-                        ctx,
-                    );
+                    if selects_all_lines {
+                        editor_model.copy_all_lines_to_vim_register(write_register_name, ctx);
+                    } else {
+                        editor_model.copy_selection_to_vim_register(
+                            write_register_name,
+                            motion_type,
+                            ctx,
+                        );
+                    }
                 })
                 .with_post_buffer_edit_change_selections(|editor_model, ctx| {
                     if motion_type == MotionType::Linewise {
@@ -2910,6 +2928,10 @@ impl VimHandler for EditorView {
                     (TextObjectType::Paragraph, TextObjectInclusion::Inner) => {
                         vim_inner_paragraph(buffer, offset).map(|range| range.start..range.end + 1)
                     }
+                    (TextObjectType::Line, TextObjectInclusion::Around) => vim_all_lines(buffer),
+                    (TextObjectType::Line, TextObjectInclusion::Inner) => {
+                        vim_inner_line(buffer, offset)
+                    }
                     (TextObjectType::Quote(quote_type), TextObjectInclusion::Around) => {
                         vim_a_quote(buffer, offset, *quote_type)
                     }
@@ -2926,14 +2948,22 @@ impl VimHandler for EditorView {
                 let Some(Range { start, mut end }) = selection_range else {
                     continue;
                 };
-                if end > start {
+                if end > start
+                    && !matches!(
+                        (object_type, inclusion),
+                        (TextObjectType::Line, TextObjectInclusion::Around)
+                    )
+                {
                     end -= 1;
                 }
                 let Ok(mut end_point) = buffer.point_for_offset(end) else {
                     continue;
                 };
-                // Cursor always snaps to column 0 on paragraph text objects.
-                if let TextObjectType::Paragraph = text_object.object_type {
+                if matches!(
+                    (&text_object.object_type, text_object.inclusion),
+                    (TextObjectType::Paragraph, _)
+                        | (TextObjectType::Line, TextObjectInclusion::Around)
+                ) {
                     end_point.column = 0;
                 }
                 let Ok(new_head) = buffer.anchor_at(end_point, AnchorBias::Left) else {

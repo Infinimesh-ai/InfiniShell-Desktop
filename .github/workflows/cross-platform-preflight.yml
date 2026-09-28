@@ -663,6 +663,28 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Test Bash generator cancellation
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: bash
+        run: ./script/test_bash_generator_cancellation
+
+      - name: Test MCP, Vim, and POSIX completion
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: bash
+        run: cargo nextest run --locked --no-fail-fast -p mcp -p ai -p vim -p warp_completer
+
+      - name: Test completion v2 compatibility
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: bash
+        run: cargo nextest run --locked --no-fail-fast -p warp_completer --features v2
+
+      - name: Test desktop and TUI input regressions
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: bash
+        run: >-
+          cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
+
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
@@ -1697,6 +1719,23 @@ jobs:
             ${{ runner.temp }}/grok-supervised-exit.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Test MCP, Vim, and POSIX completion
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast -p mcp -p ai -p vim -p warp_completer
+
+      - name: Test completion v2 compatibility
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: pwsh
+        run: cargo nextest run --locked --no-fail-fast -p warp_completer --features v2
+
+      - name: Test desktop and TUI input regressions
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests) }}
+        shell: pwsh
+        run: >-
+          cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}
