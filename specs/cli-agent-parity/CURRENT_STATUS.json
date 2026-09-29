@@ -11,7 +11,7 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+  "latest_related_verified_source_commit": "79bfce90fb1b87be40743ee8b67211e9dd1ff7ae",
   "latest_branch_cross_platform": {
     "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
     "run_id": 36561236364,
@@ -24,6 +24,17 @@
     "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
     "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
     "boundary": "同源码 Linux/Windows 选定离线门禁；Mac Intel 按条件跳过。不含两平台已认证模型、真实 GUI 或全部必要缺口验收。"
+  },
+  "windows_file_submission_flaky_followup": {
+    "source_commit": "79bfce90fb1b87be40743ee8b67211e9dd1ff7ae",
+    "run_id": 36572437241,
+    "conclusion": "Windows x64 作业 success；Linux 与 Mac Intel 按选择条件跳过",
+    "file_submission_test": "file_only_submission_delivers_exact_path_once_and_clears_accepted_cards 首次 PASS，0.730 秒；此前 Windows 间歇失败在本次未复现",
+    "windows_main_tests": "最终 3080/3080；另有 history_model 的 test_initialize_output_for_response_stream_persists_updated_conversation_state 首次失败、重试 2/3 通过，标记 1 FLAKY；4814 项跳过",
+    "desktop_tui_tests": "660/660 首次通过；rust-genai 81/81",
+    "archive_log_sha256": "f5661f206a8728549becec6bae5a671a0e4efb28f4d2ed4fc63f61dd98a73dc5",
+    "archive_run_json_sha256": "850e0e442d43438f9c5dbeb155dfc0b2f8850a5753f78291e84756d4acb85e3f",
+    "boundary": "仅证实本次 Windows 离线门禁与文件提交用例的一次首次通过，不证明间歇问题永久消失；不含真实 GUI、原生 CLI 文件读取、Linux 在线链或 G07 整项验收。仅测试改动，无需本地化变更。"
   },
   "g07_windows_invalidation_followup": {
     "source_commit": "e745a1a9dec1b8ad38ea7afb764bc251aeaecdc8",
@@ -101,7 +112,18 @@
     "local_gate": "cargo check -p warp --tests；cargo check -p warp；i18n 11/11；嵌入资源配置的 libtest 构建；真实隔离链通过",
     "safe_receipt_sha256": "b9a5c304db9380c882f9b3cb5f2b846111cd8fde87d55ceb293d4e5c3dffe4b7",
     "cleanup_manifest_sha256": "cd205861ba73ce6c2b380e33226ecb411792a65d16341cb8b512ad97d8d71b78",
-    "boundary": "只覆盖 Mac 固定 Claude 的原生越界派发拒绝；GUI、冷恢复、其它受审工具、Grok 与 Linux/Windows 在线链未完成，G10 开放；无用户可见文案变化，无需本地化变更。"
+    "boundary": "该轮只覆盖 Mac 固定 Claude 的原生越界派发拒绝，未覆盖冷恢复；后续 Mac 冷恢复见 g10_native_cold_recovery_mac_positive。GUI、其它受审工具、Grok 与 Linux/Windows 在线链未完成，G10 开放；无用户可见文案变化，无需本地化变更。"
+  },
+  "g10_native_cold_recovery_mac_positive": {
+    "source_commit": "79bfce90fb1b87be40743ee8b67211e9dd1ff7ae",
+    "run_id": "r-b60b042f",
+    "fixed_native": "Mac 官方 Claude 2.1.280 / claude-opus-5-5，已认证默认账号；签名监督程序沿用 282f5c4a8 的未变产品源码",
+    "conclusion": "两独立测试进程在子 Skill 待审批点冷重接父子宿主；原生 ID、父上限、同一审批及用户输入未重投核对通过，允许后技能标记落盘，两份原生退出与清理回执有效",
+    "local_gate": "文件提交目标测试 1/1；i18n 11/11；cargo check -p warp；嵌入资源 libtest 构建；差异检查通过",
+    "safe_receipt_sha256": "705f26cbf0b89f7ad32a7fdd5d5f949404f0254d81a7aff8849ea93f7d6630e2",
+    "cleanup_index_sha256": "8a2ad15d14ba8749507f3e61dcc7299cdd282ace815a6992c8f02d1d3d427a63",
+    "preflight_rejected_first_run_sha256": "e7eebed2ffe573eb8a236a90d36621554ebe35779f958f413eee59bcad6681f5",
+    "boundary": "首次运行只因重复逐轮记录被前置拒绝，未启动测试或模型；正例不含 GUI、其它受审命令、Grok 或 Linux/Windows 在线链，G10 开放；仅测试改动，无需本地化变更。"
   },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
@@ -327,7 +349,7 @@
     "evidence": "父 run_agents 单次允许、子精确 Write 待审批、取消 ACK、同审批迟到 AllowOnce 拒绝、目标文件始终未创建、持久父子身份与权限上限核对、父子原生退出和各自 Job/资源域清理确认",
     "cleaned_safe_receipt_sha256": "7735444452dbf08991f748653ee7455703a3a30bf7194c94a82ee93e2b375386",
     "startup_boundary": "外置盘 worker 的无模型 dyld 装载超时和外置盘 Claude CLI 初始化超时原件保留；同 SHA/签名/版本的内置盘无模型对照及在线目标通过，产品超时未改",
-    "remaining": "其它受审工具/技能权限、GUI、冷恢复及 Linux/Windows 原生链未完整验收",
+    "remaining": "该 V2 Write 取消链未覆盖冷恢复；后续 Mac Skill 待审批冷恢复见 g10_native_cold_recovery_mac_positive。其它受审工具/技能权限、GUI 及 Linux/Windows 原生链未完整验收",
     "closed_gaps": []
   },
   "g07_collapsed_file_picker_gui_followup": {
