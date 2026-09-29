@@ -368,6 +368,14 @@ async fn drive(
                 }
             }
         }
+        if let Some(error) = coordinator.read(app, |model, _| {
+            model
+                .snapshots()
+                .find_map(|snapshot| snapshot.error.clone())
+        }) {
+            evidence.record(json!({"event":"coordinator_error","reason":error}))?;
+            return Err("G10 协调器报告启动或原生连接失败".into());
+        }
         if !(parent_spawn_approved
             && first_denied
             && second_allowed
