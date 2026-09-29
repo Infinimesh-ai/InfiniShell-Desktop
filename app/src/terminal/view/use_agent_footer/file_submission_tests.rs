@@ -81,10 +81,29 @@ fn file_only_submission_delivers_exact_path_once_and_clears_accepted_cards() {
             add_file(&terminal, &mut app, &path);
             let writes = collect_cli_test_writes(&mut app, &terminal);
             let submitted = wait_for_submit(&mut app, &terminal);
+            let toasts = Rc::new(RefCell::new(Vec::new()));
+            let captured = toasts.clone();
+            let stack = ToastStack::handle(&app);
+            app.update(|ctx| {
+                ctx.subscribe_to_model(&stack, move |_, event, _| {
+                    if let ToastStackEvent::AddEphemeralToast { toast, .. } = event {
+                        captured.borrow_mut().push(toast.main_text().to_owned());
+                    }
+                });
+            });
 
             submit_cli_test_input(&terminal, &mut app, "");
             submit_cli_test_input(&terminal, &mut app, "");
-            await_submission_event(submitted).await;
+            match select(submitted, Box::pin(Timer::after(Duration::from_secs(20)))).await {
+                Either::Left((result, _)) => result.unwrap(),
+                Either::Right((_, _)) => {
+                    let write_count = writes.borrow().len();
+                    let toast_texts = toasts.borrow().clone();
+                    panic!(
+                        "文件提交未在 20 秒内完成：agent={agent:?}, PTY 写入次数={write_count}, 提示={toast_texts:?}"
+                    );
+                }
+            }
 
             let delivered = String::from_utf8(writes.borrow().concat()).unwrap();
             // 原生输入约定为 JSON 路径数组，Windows 反斜杠必须保留转义边界。
