@@ -369,14 +369,16 @@ jobs:
       - name: Test Claude image acceptance runner on Linux
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: bash
-        run: python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+        run: |
+          python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+          python3 -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
 
       - name: Test Claude image and skill regressions on Linux
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: bash
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::)'
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::) | test(ai::cli_agent_runtime::claude::live_tests::managed_image_live_tests::tests::)'
 
       # GUI 专项包含字体行为修正，仍保留用户功能的双语资源门禁。
       - name: Test bilingual resources for Linux GUI verification
@@ -1460,14 +1462,17 @@ jobs:
       - name: Test Claude image acceptance runner on Windows
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: pwsh
-        run: python -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+        run: |
+          python -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -B script/cli-agent-parity/claude_managed_image_runner_tests.py -v
 
       - name: Test Claude image and skill regressions on Windows
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::)'
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::) | test(ai::cli_agent_runtime::claude::live_tests::managed_image_live_tests::tests::)'
 
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；直接覆盖超大帧后的恢复路径。
       - name: Test IPC frame-limit recovery

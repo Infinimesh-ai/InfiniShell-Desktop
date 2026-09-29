@@ -2,6 +2,7 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use warp_cli::agent::Harness;
 
@@ -30,12 +31,84 @@ fn sha(bytes: &[u8]) -> String {
 struct CachedNativeAck {
     generation: Uuid,
     message_id: Uuid,
-    native_session_id: String,
+    native_session_id: Option<String>,
     replayed: bool,
+}
+
+fn verify_native_pairing(
+    expected_version: &str,
+    version: Option<&str>,
+    native: Option<&str>,
+    previous: Option<&str>,
+) -> Result<(), String> {
+    if let Some(version) = version {
+        if version != expected_version
+            || native.is_none()
+            || previous.is_some_and(|previous| native != Some(previous))
+        {
+            return Err("native_version_or_session_pairing_failed".into());
+        }
+    } else if native.is_some() || previous.is_some() {
+        return Err("native_version_or_session_pairing_failed".into());
+    }
+    Ok(())
+}
+
+async fn ready_image_session(
+    session: &mut LiveSession,
+    expected_version: &str,
+    evidence: &mut Evidence,
+) -> Result<(), String> {
+    let event = session.next().await?;
+    let RuntimeEventKind::SessionReady {
+        verified_cli_version,
+        effective_permissions,
+    } = event.kind
+    else {
+        return Err("production_ready_failed".into());
+    };
+    verify_native_pairing(
+        expected_version,
+        verified_cli_version.as_deref(),
+        event.native_session_id.as_deref(),
+        None,
+    )?;
+    record_permissions(
+        evidence,
+        &effective_permissions,
+        session.native_id.as_deref(),
+    )
+}
+
+fn bind_native_receipts(
+    pending: &mut Vec<Value>,
+    native: Option<&str>,
+) -> Result<Vec<Value>, String> {
+    let Some(native) = native else {
+        return Ok(Vec::new());
+    };
+    if pending.iter().any(|receipt| {
+        receipt["native_session_id"]
+            .as_str()
+            .is_some_and(|previous| previous != native)
+    }) {
+        return Err("native_receipt_session_changed".into());
+    }
+    // 这是配对后生成的验收收据；原生 queued 的实际先后和原始身份仍由协议投影留证。
+    Ok(pending
+        .drain(..)
+        .map(|mut receipt| {
+            receipt["native_session_id_at_observation"] = receipt["native_session_id"].clone();
+            receipt["identity_bound_after_pairing"] = json!(receipt["native_session_id"].is_null());
+            receipt["native_session_id"] = json!(native);
+            receipt
+        })
+        .collect())
 }
 
 async fn turn(
     session: &mut LiveSession,
+    expected_version: &str,
     phase: &str,
     input: Vec<InputContent>,
     expected: &str,
@@ -65,6 +138,8 @@ async fn turn(
     }
     let mut accepted = false;
     let mut started = false;
+    let mut paired_native_id = session.native_id.clone();
+    let mut pending_receipts = Vec::new();
     let deadline = tokio::time::Instant::now() + Duration::from_secs(180);
     loop {
         let event = tokio::time::timeout_at(deadline, session.next())
@@ -74,9 +149,16 @@ async fn turn(
         let native = event.native_session_id;
         match event.kind {
             RuntimeEventKind::SessionReady {
+                verified_cli_version,
                 effective_permissions,
-                ..
             } => {
+                verify_native_pairing(
+                    expected_version,
+                    verified_cli_version.as_deref(),
+                    native.as_deref(),
+                    paired_native_id.as_deref(),
+                )?;
+                paired_native_id = native.clone();
                 record_permissions(evidence, &effective_permissions, native.as_deref())
                     .map_err(|_| "permission_mode_changed")?;
             }
@@ -90,46 +172,49 @@ async fn turn(
                 {
                     if cached.replayed
                         || session.generation != cached.generation
-                        || native.as_deref() != Some(cached.native_session_id.as_str())
+                        || cached
+                            .native_session_id
+                            .as_ref()
+                            .is_some_and(|previous| native.as_ref() != Some(previous))
                         || turn_id.as_deref() != Some(cached.message_id.to_string().as_str())
                         || !matches!(phase, "image" | "multiline")
                     {
                         return Err("wrong_or_repeated_cached_native_ack".into());
                     }
                     cached.replayed = true;
-                    evidence.record(json!({"event":"cached_native_ack_replayed","phase":"image",
+                    pending_receipts.push(json!({"event":"cached_native_ack_replayed","phase":"image",
                         "observed_phase":phase,"generation":session.generation,"message_id":message_id,
                         "turn_id":turn_id,"native_session_id":native,
-                        "receipt_source":"CachedNativeProtocol","native_input_added":false}))?;
-                    continue;
+                        "receipt_source":"CachedNativeProtocol","native_input_added":false}));
+                } else {
+                    if accepted
+                        || message_id != id
+                        || turn_id.as_deref() != Some(id.to_string().as_str())
+                    {
+                        return Err("wrong_or_duplicate_native_ack".into());
+                    }
+                    accepted = true;
+                    if duplicate {
+                        *cached_ack = Some(CachedNativeAck {
+                            generation: session.generation,
+                            message_id: id,
+                            native_session_id: native.clone(),
+                            replayed: false,
+                        });
+                    }
+                    // queued 可以先于 system/init；只暂存精确 ACK，不提前宣称会话已配对。
+                    pending_receipts.push(json!({"event":"message_accepted","phase":phase,
+                        "generation":session.generation,"message_id":id,"turn_id":turn_id,
+                        "native_session_id":native,"receipt_source":"NativeProtocol"}));
                 }
-                if accepted
-                    || native.is_none()
-                    || message_id != id
-                    || turn_id.as_deref() != Some(id.to_string().as_str())
-                {
-                    return Err("wrong_or_duplicate_native_ack".into());
-                }
-                accepted = true;
-                if duplicate {
-                    *cached_ack = Some(CachedNativeAck {
-                        generation: session.generation,
-                        message_id: id,
-                        native_session_id: native.clone().ok_or("native_ack_identity_missing")?,
-                        replayed: false,
-                    });
-                }
-                evidence.record(json!({"event":"message_accepted","phase":phase,
-                    "generation":session.generation,"message_id":id,"turn_id":turn_id,
-                    "native_session_id":native,"receipt_source":"NativeProtocol"}))?;
             }
             RuntimeEventKind::TurnStarted { turn_id } => {
                 if !accepted || started || turn_id != id.to_string() {
                     return Err("wrong_or_duplicate_started".into());
                 }
                 started = true;
-                evidence.record(json!({"event":"turn_started","phase":phase,
-                    "generation":session.generation,"turn_id":turn_id,"native_session_id":native}))?;
+                pending_receipts.push(json!({"event":"turn_started","phase":phase,
+                    "generation":session.generation,"turn_id":turn_id,"native_session_id":native}));
             }
             RuntimeEventKind::TextDelta { turn_id, .. }
             | RuntimeEventKind::Progress { turn_id, .. } => {
@@ -142,8 +227,13 @@ async fn turn(
                 outcome,
                 output,
             } => {
+                if paired_native_id.is_none() {
+                    return Err("completion_before_native_pairing".into());
+                }
                 if !accepted
                     || !started
+                    || native != paired_native_id
+                    || !pending_receipts.is_empty()
                     || turn_id != id.to_string()
                     || outcome != TurnOutcome::Completed
                     || output.trim() != expected
@@ -193,6 +283,15 @@ async fn turn(
                 return Err("unexpected_runtime_event".into());
             }
         }
+        if let Some(cached) = cached_ack.as_mut()
+            && cached.generation == session.generation
+            && cached.native_session_id.is_none()
+        {
+            cached.native_session_id = paired_native_id.clone();
+        }
+        for receipt in bind_native_receipts(&mut pending_receipts, paired_native_id.as_deref())? {
+            evidence.record(receipt)?;
+        }
     }
 }
 
@@ -227,6 +326,8 @@ async fn close(
 }
 
 async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
+    let expected_version = env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION")
+        .map_err(|_| "fixed_version_missing")?;
     let (png, expected) = quadrant_png(Uuid::new_v4());
     let image_sha = sha(&png);
     let store = root.join("local-cli-attachments");
@@ -302,10 +403,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     };
     let mut session =
         LiveSession::start(options.clone()).map_err(|_| "production_connect_failed")?;
-    session
-        .ready(evidence)
-        .await
-        .map_err(|_| "production_ready_failed")?;
+    ready_image_session(&mut session, &expected_version, evidence).await?;
     evidence.record(json!({"event":"managed_connection_ready","phase":"new",
         "generation":session.generation,"native_session_id":session.native_id,
         "requested_native_session_id":null,"native_session_association_confirmed":session.native_id.is_some(),
@@ -313,6 +411,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     let mut cached_ack = None;
     turn(
         &mut session,
+        &expected_version,
         "image",
         input,
         &expected,
@@ -326,6 +425,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         .map_err(|_| "multiline_preparation_failed")?;
     turn(
         &mut session,
+        &expected_version,
         "multiline",
         text,
         TEXT_REPLY,
@@ -363,10 +463,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
         native_session_id: native_id.clone(),
     };
     let mut resumed = LiveSession::start(options).map_err(|_| "resume_connect_failed")?;
-    resumed
-        .ready(evidence)
-        .await
-        .map_err(|_| "resume_ready_failed")?;
+    ready_image_session(&mut resumed, &expected_version, evidence).await?;
     // initialize 尚无原生ID；先校验显式历史目标，后续原生回放再逐帧确认同一会话。
     if resumed.expected_native_id.as_ref() != Some(&native_id)
         || resumed
@@ -390,6 +487,7 @@ async fn exercise(root: &Path, evidence: &mut Evidence) -> Result<(), String> {
     .map_err(|_| "recall_preparation_failed")?;
     turn(
         &mut resumed,
+        &expected_version,
         "recall",
         recall,
         &expected,
@@ -469,6 +567,8 @@ async fn exercise_rich_image(
     pure: bool,
     evidence: &mut Evidence,
 ) -> Result<(), String> {
+    let expected_version = env::var("INFINISHELL_CLAUDE_LIVE_EXPECTED_VERSION")
+        .map_err(|_| "fixed_version_missing")?;
     let (png, expected) = quadrant_png(Uuid::new_v4());
     let decoded = image::load_from_memory(&png).map_err(|_| "fixture_decode_failed")?;
     let mut encoded = std::io::Cursor::new(Vec::new());
@@ -526,11 +626,12 @@ async fn exercise_rich_image(
         selected_skills: Vec::new(),
     };
     let mut session = LiveSession::start(options.clone())?;
-    session.ready(evidence).await?;
+    ready_image_session(&mut session, &expected_version, evidence).await?;
     let mut cached_ack = None;
     if pure {
         turn(
             &mut session,
+            &expected_version,
             "pure_image_instructions",
             vec![InputContent::Text(format!(
                 "For the next image only: {IMAGE_PROMPT} For this text turn, reply exactly READY."
@@ -544,6 +645,7 @@ async fn exercise_rich_image(
     }
     turn(
         &mut session,
+        &expected_version,
         "image",
         input,
         &expected,
@@ -574,12 +676,13 @@ async fn exercise_rich_image(
         native_session_id: native_id.clone(),
     };
     let mut resumed = LiveSession::start(options)?;
-    resumed.ready(evidence).await?;
+    ready_image_session(&mut resumed, &expected_version, evidence).await?;
     if resumed.expected_native_id.as_ref() != Some(&native_id) {
         return Err("resume_target_changed".into());
     }
     turn(
         &mut resumed,
+        &expected_version,
         "recall",
         vec![InputContent::Text(RECALL_PROMPT.into())],
         &expected,
@@ -647,3 +750,7 @@ async fn real_claude_managed_rich_image_lifecycle() {
         "生产 Claude 富图片验收未通过；检查安全证据"
     );
 }
+
+#[cfg(test)]
+#[path = "claude_managed_image_live_tests_tests.rs"]
+mod tests;

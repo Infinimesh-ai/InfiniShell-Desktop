@@ -20,15 +20,17 @@ TRACE_KEYS = (image_probe.BASE_NATIVE_KEYS - {"direction"}) | {
     "runtime_generation", "image_content_projection", "result_text_sha256",
 }
 PHASES = ("image", "multiline", "recall")
+IDENTITY_OBSERVATION_KEYS = {"native_session_id_at_observation", "identity_bound_after_pairing"}
+IDENTITY_OBSERVATION_EVENTS = {"message_accepted", "cached_native_ack_replayed", "turn_started"}
 EVENT_KEYS = {
     "acceptance_started": {"event", "scope", "max_native_inputs", "production_adapter", "credential_files_read_by_probe", "real_gui_verified", "sqlite_verified", "parent_permission_ceiling_verified", "http_request_count_verified"},
     "attachment_prepared": {"event", "image_sha256", "image_bytes", "prompt_sha256", "prompt_bytes", "block_types", "media_type", "replay_array_sha256", "attachment_hash_name", "reference_persisted", "expected_reply_sha256"},
     "session_ready": {"event", "native_session_id", "permission_mode", "native_session_association_confirmed", "filesystem_sandbox_verified", "parent_permission_ceiling_verified"},
     "managed_connection_ready": {"event", "phase", "generation", "native_session_id", "requested_native_session_id", "native_session_association_confirmed", "inputs_replayed"},
     "input_submitted": {"event", "phase", "generation", "message_id", "typed_input", "controller_send_count", "identical_message_retransmitted", "expected_reply_sha256"},
-    "message_accepted": {"event", "phase", "generation", "message_id", "turn_id", "native_session_id", "receipt_source"},
-    "cached_native_ack_replayed": {"event", "phase", "observed_phase", "generation", "message_id", "turn_id", "native_session_id", "receipt_source", "native_input_added"},
-    "turn_started": {"event", "phase", "generation", "turn_id", "native_session_id"},
+    "message_accepted": {"event", "phase", "generation", "message_id", "turn_id", "native_session_id", "receipt_source"} | IDENTITY_OBSERVATION_KEYS,
+    "cached_native_ack_replayed": {"event", "phase", "observed_phase", "generation", "message_id", "turn_id", "native_session_id", "receipt_source", "native_input_added"} | IDENTITY_OBSERVATION_KEYS,
+    "turn_started": {"event", "phase", "generation", "turn_id", "native_session_id"} | IDENTITY_OBSERVATION_KEYS,
     "turn_finished": {"event", "phase", "generation", "turn_id", "native_session_id", "outcome", "full_output_sha256", "trimmed_output_sha256", "output_bytes"},
     "connection_shutdown": {"event", "native_session_id"},
     "cleanup_checked": {"event", "generation", "native_session_id", "transport_closed", "cleanup_receipt_read", "cleanup_confirmed", "normal_exit", "receipt"},
@@ -86,7 +88,11 @@ def audit_events(events):
     _require(isinstance(events, list) and 25 <= len(events) <= 560)
     _require(all(isinstance(e, dict) and e.get("event") in EVENT_KEYS for e in events))
     for event in events:
-        image_probe._keys(event, EVENT_KEYS[event["event"]])
+        expected_keys = EVENT_KEYS[event["event"]]
+        # 旧收据不补写观察时身份；新收据必须同时提供两项，仍拒绝未知字段。
+        if event["event"] in IDENTITY_OBSERVATION_EVENTS and not IDENTITY_OBSERVATION_KEYS.intersection(event):
+            expected_keys = expected_keys - IDENTITY_OBSERVATION_KEYS
+        image_probe._keys(event, expected_keys)
     def selected(kind, **fields):
         return [e for e in events if e["event"] == kind and all(e.get(k) == v for k, v in fields.items())]
     def one(kind, **fields):
@@ -104,6 +110,12 @@ def audit_events(events):
                        "production_adapter_verified"), false=("native_framing_only", "app_restart_and_ui_verified",
                        "sqlite_verified", "parent_permission_ceiling_verified", "http_request_count_verified"))
     native_id = _uuid(ending["native_session_id"])
+    identity_events = [event for event in events if event["event"] in IDENTITY_OBSERVATION_EVENTS]
+    observed_identity_events = [event for event in identity_events if "native_session_id_at_observation" in event]
+    for event in observed_identity_events:
+        observed_id = event["native_session_id_at_observation"]
+        _require(event["native_session_id"] == native_id and observed_id in (None, native_id)
+                 and event["identity_bound_after_pairing"] is (observed_id is None))
     original, resumed = one("managed_connection_ready", phase="new"), one("managed_connection_ready", phase="resume")
     generations = [_uuid(original["generation"]), _uuid(resumed["generation"])]
     _require(generations[0] != generations[1] and type(original["inputs_replayed"]) is int
@@ -254,6 +266,9 @@ def audit_events(events):
             next(row["image_content_projection"]["array_sha256"] for _, row in ledger
                  if row["type"] == "user" and row["uuid"] == input_ids[0]),
             "cached_native_ack_replay_count": len(cached), "same_id_deduplication_verified": True, "durable_attachment_restore_verified": True,
+            "native_identity_observations_complete": len(observed_identity_events) == len(identity_events),
+            "identity_bound_after_pairing_count": sum(event["identity_bound_after_pairing"] for event in observed_identity_events)
+            if observed_identity_events else None,
             "production_adapter_verified": True, "app_restart_and_ui_verified": False, "sqlite_verified": False}
 
 
