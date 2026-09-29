@@ -182,13 +182,27 @@ async fn drive(
         result: None,
         terminal_evidence: None,
     };
-    coordinator.update(app, |model, ctx| model.start(task, options, None, ctx))?;
+    coordinator.update(app, |model, ctx| {
+        model.start_with_input(
+            task,
+            options,
+            None,
+            Uuid::new_v4(),
+            vec![
+                InputContent::Text(prompt),
+                InputContent::Skill {
+                    name: alpha.name.clone(),
+                    path: alpha.path.clone(),
+                },
+            ],
+            ctx,
+        )
+    })?;
     evidence.record(json!({"event":"parent_started","scope":SCOPE,
         "parent_task_id":parent_id,"selected_skill":"alpha",
         "skill_body_marker_sha256":format!("{:x}", Sha256::digest(MARKER))}))?;
 
     let deadline = Instant::now() + Duration::from_secs(450);
-    let mut submitted = false;
     let mut parent_spawn_approved = false;
     let mut child_id = None;
     let mut child_turn = None;
@@ -231,23 +245,6 @@ async fn drive(
                     return Err("出现父上限之外或重复的子任务".into());
                 }
                 child_id = Some(task.task_id.clone());
-            }
-            if is_parent
-                && !submitted
-                && matches!(event.kind, RuntimeEventKind::SessionReady { .. })
-            {
-                submitted = true;
-                control(
-                    app,
-                    coordinator,
-                    &task,
-                    RuntimeAction::Submit {
-                        input: vec![InputContent::Text(prompt.clone())],
-                    },
-                )
-                .await?;
-                evidence.record(json!({"event":"parent_input_submitted",
-                    "parent_task_id":parent_id}))?;
             }
             if !is_parent {
                 if let RuntimeEventKind::TurnStarted { turn_id } = &event.kind {
@@ -371,8 +368,7 @@ async fn drive(
                 }
             }
         }
-        if !(submitted
-            && parent_spawn_approved
+        if !(parent_spawn_approved
             && first_denied
             && second_allowed
             && resolved_denial
