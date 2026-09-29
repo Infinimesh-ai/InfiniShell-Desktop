@@ -19,7 +19,6 @@ use crate::ai::cli_agent_runtime::permissions::ceiling_from_parent;
 use crate::ai::cli_agent_runtime::runtime_host::{NativeProcessCompletion, confirmed_exit};
 use crate::ai::cli_agent_runtime::{ApprovalDecision, current_state_dir};
 use crate::ai::skills::SkillManager;
-use crate::settings::AISettings;
 use crate::terminal::cli_agent::{
     CLIAgentInstallModel, CLIAgentInstallation, CLIAgentVersionStatus,
 };
@@ -597,7 +596,6 @@ fn real_claude_g10_fixed_skill_parent_child() {
         let _enabled = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
         let _bundled = FeatureFlag::BundledSkills.override_enabled(false);
         app.add_singleton_model(DirectoryWatcher::new);
-        app.add_singleton_model(AISettings::new_with_defaults);
         app.add_singleton_model(|_| DetectedRepositories::default());
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
