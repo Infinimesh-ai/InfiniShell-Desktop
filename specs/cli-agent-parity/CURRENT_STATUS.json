@@ -260,6 +260,17 @@
     "next_prerequisite": "专用私有原生登录和可交互 SSH／tmux 环境，用于真实 Read／typed image、模型回答、断连及旧回调验收",
     "closed_gaps": []
   },
+  "g07_card_invalidated_before_submission_followup": {
+    "implementation_commit": "611aac0a408d4dd5c7d3d3dc4998257abaffd8c8",
+    "status": "Codex 与 Claude 的本地文件卡先成功成卡，再删除第二文件或撤销读取权限的整批拒绝回归已补；G07 仍开放",
+    "local_test": "Mac 定向 file_submission_tests 6/6 通过；成卡后删除及 mode000 权限用例保留草稿和双卡，WriteBytesToPty 零事件；cargo check -p warp 通过",
+    "safe_receipt_sha256": "9eaec29c252d67428dbeb0a84eea77cb321e1f4004c5b44baae56fe78a80ffbf",
+    "test_log_sha256": "5764ee7e7d6947aed36c6ff6c67643b106bb3ffc8884b04a87bd4579db09b315",
+    "boundary": "验证只保证提交前已失效文件整批拒绝；路径引用在验证后至原生 CLI 读取前仍可被外部修改，真实三平台 CLI 读文件及其它 G07 条件未因此通过",
+    "localization": "仅测试时序变化，无需本地化变更",
+    "cleanup": "Mac 短 TMPDIR 按身份、进程及文件占用核对后清理",
+    "closed_gaps": []
+  },
   "current_exact_head_regular_cloud_followup": {
     "source_commit": "2cbebd204bdd6ff76e6f9d0aed7540884539eb4e",
     "product_source_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
