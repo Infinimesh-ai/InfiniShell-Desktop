@@ -57,9 +57,18 @@
   },
   "g10_fixed_skill_live_test_preparation": {
     "source_commit": "1b6eefb890b34381a8211b9bb2d474dd3ee1d4b8",
-    "mac_check": "cargo check -p warp --tests 通过，测试尚未运行",
+    "mac_check": "cargo check -p warp --tests 通过；后续运行结果见 g10_fixed_skill_live_test_followup",
     "signed_app_build_receipt_sha256": "e9def26722818a1bbe2540c14beb7966232c43b1f754b67c13271e3a114f5bc7",
-    "boundary": "仅测试准备和构建；无模型输入、无原生 Skill 权限正反链；构建记录未取得进程 OS PID，G10 仍开放。"
+    "boundary": "该提交只准备测试和签名构建；构建记录未取得编译进程 OS PID，不是完整进程身份验收。"
+  },
+  "g10_fixed_skill_live_test_followup": {
+    "source_commit": "e79152da90db6e7810e1ccce76ed03610502e5e3",
+    "run_id": "g10-skill-live-4432e831",
+    "conclusion": "Mac 原生宿主报告 OwnerClaimed 和 SessionReady，但测试侧未收到协调器事件；父输入保持 queued，450 秒等待和 60 秒清理超时，真实父子 Skill 权限链未通过",
+    "cleanup": "四个精确遗留 PID 和专属 launchd 标签已退出，打开文件核空；本轮短目录、应用状态和原生临时目录按身份归档后清理",
+    "cleanup_manifest_sha256": "c46bf00ed7888cd5adcdefbf03c6294e7bf24c227bbfb29f30c54a3cd657a07c",
+    "next_diagnostic_commit": "34167fe3e",
+    "boundary": "诊断提交的协调器错误早读尚未运行；没有父子 Skill 原生审批和结果证据，G10 仍开放；测试诊断无用户可见文案变化，无需本地化变更。"
   },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
