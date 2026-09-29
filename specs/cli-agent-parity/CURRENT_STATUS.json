@@ -215,7 +215,7 @@
     "third_log_manifest_sha256": "1b84e9652376a3c5270be33f57b195cc1737100b51137a0bd2006bdced922fa7",
     "fourth_run": "run36502343517: 精确 2d3297089 Windows job success，主回归 508/508、command 24/24、未命名站 1/1、环境 14/14、原生 CreateFile 1/1；helper 基线及受限执行均正常，两掩码普通文件 opened=true/file_type=disk，NUL 与设备路径均 opened=false/win32_error=5；原生退出 0、Job/profile 清理与收据有效。此为直接 NUL 访问结果，不代表真实 npm 更新通过",
     "fourth_log_manifest_sha256": "d6e57a4c32313b37cf913407ce328194c5b9fe251df807f59ed304e4810890f8",
-    "next_gate": "依据实际 NUL 访问拒绝证据设计不修改机器全局 ACL、不降低默认隔离的受控 npm 运行修复；并独立定位固定 Node 的 DLL 初始化失败，随后跑真实发布、回滚和冷恢复",
+    "next_gate": "先在已登录普通用户的 Windows 交互会话分别复核零 capability Node 根进程和官方 CMD/NUL；标准 Session0 runner 的现有站私有 desktop 无法修复 Node 初始化，非管理员未命名新站对照返回对象已存在。按交互结果设计不修改机器全局 ACL、不降低默认隔离的修复，再验真实发布、回滚和冷恢复",
     "localization": "仅测试和诊断，无需本地化变更",
     "closed_gaps": []
   },
@@ -4243,6 +4243,19 @@
       "native_cleanup_boundary": "runner收尾清理vctip22748/sccache9648/conhost22140，不能归属到LEAK用例或宣称整机零残留。",
       "excluded_scope": "Mac Intel、全workspace、真实npm/Homebrew消费者更新、Windows NUL/Node失败对照、真实OAuth登录、GUI及已认证模型未选。"
     }
+  },
+  "g07_windows_sharing_denial_followup": {
+    "failed_acl_run": 36522975704,
+    "failed_acl_source_commit": "4cde8d8c31e3e8953da21939cfeb7ce52e0e883e",
+    "failed_acl_result": "Windows cargo check 通过；空 DACL 夹具后的 File::open 仍成功，定向 508/509，唯一失败重试三次均止于夹具前提；不能计 ACL 或产品拒绝正例",
+    "failed_acl_log_manifest_sha256": "d3d7506afb5fc4d89eae35037fa8dcfc2f6225a5c0995b9abd16539dda5d49a4",
+    "passing_sharing_run": 36523921149,
+    "passing_sharing_source_commit": "5b3246c6f15d28f532b4d6f140b9c12f6ccd04be",
+    "passing_sharing_result": "Windows cargo check 和定向 509/509 通过；临时文件独占句柄先验证 ERROR_SHARING_VIOLATION=32，再由 Codex/Claude 双卡提交触发整批拒绝、草稿及两卡保留、PTY 零写入；释放句柄后文件仍可读；原始日志无 LEAK/RETRY/FLAKY",
+    "passing_sharing_log_manifest_sha256": "f15bb52a05ddc76dbfe7157e6d1dd6d11d6db5b669e4eae222db962224a1af8b",
+    "scope_boundary": "仅 Windows 文件共享冲突的提交前拒绝；ACL、真实 GUI/原生 CLI 读取与 Linux 未验，G07 仍开放",
+    "localization": "仅测试变动，无需本地化变更",
+    "closed_gaps": []
   },
   "g08_loopback_staging_followup": {
     "tooling_commit": "eaee5261e",
