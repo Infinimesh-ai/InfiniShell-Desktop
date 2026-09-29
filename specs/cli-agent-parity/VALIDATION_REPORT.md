@@ -1,6 +1,32 @@
 # CLI 支持与能力对齐：验证结论
 
-本报告保留截至 2026-09-29 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+本报告保留截至 2026-09-30 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+
+## 2026-09-30：G04 当前源码复验与环境阻塞
+
+本轮关闭 **0／14** 项。起点 `c2140a8736eff3e8d67e9ca6d1645d12541072cd` 的分支、工作区和 PR #22 HEAD 一致，工作区干净、PR 为草稿。先比较 G04／G05／G06 剩余条件，选择范围最小的 G04；14 项全部满足前不合并，也不以验收运行器、离线门禁或安全拒绝计完成。
+
+`50dd59b09` 让图片运行器用同一授权默认账户环境检查认证并启动原生 CLI，同时要求 Mac 短临时目录与逐轮记录匹配。真实 JPEG 首轮 `r-m9e_v1r3` 收到固定 CLI 的配对前 queued ACK 后被旧验收判为 `wrong_or_duplicate_native_ack`，没有取得图片答案；退出清理确认成立，但原生 wait status 为 9，不能当作自然 exit 0。原失败、原生退出文件和后续精确清理证据均保留。
+
+`47ac3a79ea5ba738c01338eaf09a68e155637748` 仅修正验收合同：先暂存配对前 ACK，在固定版本与原生 ID 配对后确认；保留观察时 ID 为 null 的事实，仍拒绝错消息、错回合、错代次、身份变化和超过一次缓存重放。旧 PNG 收据不补造新字段。Mac 本地 `cargo check -p warp`、10 项回执回归、Python 15＋24 项及 actionlint 通过；英中资源门禁 11／11 已通过。本轮无用户可见文案或界面语义变化，**无需本地化变更**；静态资源审计不替代目标平台双语布局。
+
+第一批修正 `50dd59b09444cc15a3feae805b70293938ea4da4` 的 [run36599403575](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36599403575) 在 Linux x64／Windows x64 均成功：图片与技能离线组 37／37、36／36，Python 各 15 项；Windows 关联组 509／509，Linux 双语资源 11／11。跳过项不计通过，没有已认证模型图片输入；工作流附带的 Linux 零模型剪贴板检查不计真实 IME 或 G04 GUI 识图。4 份官方工件与 41 个日志成员已核摘要及 ZIP CRC，清单 `resume-20260930/cloud-run-36599403575/manifest.safe.json` SHA-256 `fd17c7fd891aa4da59f63d829a5da23dae4b6847162c4fdbc90915a0832be1ee`。
+
+后续验收时序修正的 [run36602515307](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36602515307) 精确绑定 `47ac3a79ea5ba738c01338eaf09a68e155637748`，Linux x64／Windows x64 作业均 success，两平台 `cargo check` 通过。图片与回执组分别 47／47、46／46，新增 10 项回执时序回归在两平台逐名 PASS；每平台 Python 15＋24 项，Windows 关联组 509／509，Linux i18n 11／11。所选回归未见 FLAKY／LEAK／RETRY 标记；跳过项不计通过，Mac Intel 按条件跳过。Linux 工作流附加零模型剪贴板步骤成功，不计已认证图片、真实 IME 或目标双语识图布局。4 份官方工件和 41 个日志成员已核摘要、CRC 及成员 SHA-256，清单 `resume-20260930/cloud-run-36602515307/manifest.safe.json` SHA-256 `a2ad8f8c5629b852a514ad3228a7419452c2f3387514f616ac27acc18546224a`。这是本轮同提交的定向门禁，仍非 14 项全部关闭后的最终源码门禁。
+
+同一干净提交的三次独立真实链如下；固定官方 Claude `2.1.280` SHA-256 `387a5c5dcdbb815085edf0baf79591f9d8894efe922bceaf3d75b1b08055229d`，默认账户认证状态由原生 CLI 确认。监督程序复用 `282f5c4a8` 签名二进制 SHA-256 `59cadfddd26e17ac32510b69e8daa16735b409b0463cf1d763ade7e9d3308c44`，其后至本次仅测试／运行器／文档变化，不称重新构建当前提交产品。
+
+| 格式 | 独立运行 | 原生图片 SHA-256 | 实际结果 |
+| --- | --- | --- | --- |
+| JPEG | `r-ee684g78` | `e2313adfb465e828166bc715cdf08e4d80656b08c784f81f76b67dff861165fc` | 图片回答与冷恢复答案精确匹配 |
+| WebP | `r-qkxpl7je` | `c23780513cab9fc2dd5ed002e97243e6777e74d17c781bd7543ba15fdbf8f1c5` | 图片回答与冷恢复答案精确匹配 |
+| 静态 GIF | `r-bjrl2akb` | `ea0bf2267e2eaf1e12851dbaa9121608040e9c88d0dca2043d8d56833921f748` | 图片回答与冷恢复答案精确匹配 |
+
+精确原生会话历史另证实际模型均为 `claude-opus-5-5`，声明 MIME 与准备的格式／字节一致，两个产品输入 UUID 各出现一次；每条历史额外有一个明确标记 `isMeta/turnCompanion` 的图片元数据项，单独列证，不误算重复输入。六代原生进程均 `stdio_closed/exit 0/cleanup_confirmed`。已核精确进程、launchd 标签和打开文件，短目录及本轮精确原生图片缓存已归档清理，原生会话历史保留。93 件小证据索引位于仓外 `resume-20260930/g04-readiness/index.safe.json`，SHA-256 `adf6a7b4cddc2e2c65ac89defd3f8489e87a24a50d0e5f9d7d658148d0879916`。不包含应用重启、SQLite 或 GUI 验收。
+
+两平台 runner 在线，但本轮只读盘点没有取得 Linux／Windows 固定 Claude `2.1.280` 的可用认证；Windows 在 Session 0、没有交互登录用户，RDP 未启用，仅找到的旧 `2.1.273` 报告未登录。需要用户提供专用已登录账户／配置及可用 `claude-opus-5-5` 的交互环境，才能完成两平台逐格式原生消费、识图、恢复和英中 GUI 检查。G01 普通未绑定 PTY 仍缺可信原子提交能力；G09 仍缺适用 Windows 交互环境，本轮未重跑已有硬阻塞探针。14 项继续开放。
+
+## 此前证据（保留原提交和边界）
 
 精确源码 `79bfce90fb1b87be40743ee8b67211e9dd1ff7ae` 的 [Windows 复验 run36572437241](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36572437241) 已整体 success；只选 Windows x64，Linux 与 Mac Intel 作业按条件跳过。文件提交目标用例在扩展异步等待和超时诊断后首次 PASS（0.730 秒）。Windows 主回归最终 3080／3080，4814 项跳过；另一项 `history_model::test_initialize_output_for_response_stream_persists_updated_conversation_state` 首次失败、重试 2／3 通过，日志标记 1 FLAKY。桌面／TUI 660／660 首次通过，rust-genai 81／81。Windows 完整 job 日志和官方 run／jobs 状态记录已归档于仓外 `resume-20260929/cloud-run-36572437241`，SHA-256 分别为 `f5661f206a8728549becec6bae5a671a0e4efb28f4d2ed4fc63f61dd98a73dc5` 和 `850e0e442d43438f9c5dbeb155dfc0b2f8850a5753f78291e84756d4acb85e3f`。这只证明当前 Windows 离线选定门禁成功和文件提交用例的一次首次通过，不能消除历史间歇风险，也不覆盖已认证原生文件读取或 G07 整体验收；仅测试改动，无需本地化变更。
 

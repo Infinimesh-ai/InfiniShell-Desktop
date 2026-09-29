@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "status": "stage_delivery_original_goal_incomplete",
-  "status_zh": "固定版本阶段交付；原 Goal 完整验收尚未满足",
+  "status": "required_gaps_open_pr_draft",
+  "status_zh": "14 项必要缺口未关闭；PR #22 保持草稿",
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
   "assessed_branch": "codex/cli-agent-parity",
   "assessment_baseline": "3c5910678b4e38844bcb6bd161766a8d6040cf98",
@@ -11,19 +11,18 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "79bfce90fb1b87be40743ee8b67211e9dd1ff7ae",
+  "latest_related_verified_source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
   "latest_branch_cross_platform": {
-    "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
-    "run_id": 36561236364,
+    "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
+    "run_id": 36602515307,
     "conclusion": "success",
-    "linux_main_tests": "3269/3269；rust-genai 81/81",
-    "windows_main_tests": "3080/3080；rust-genai 81/81；文件提交用例首次失败、重试通过，1 FLAKY",
-    "desktop_tui_tests": "Linux 660/660; Windows 660/660",
-    "windows_desktop_tui_caveat": "上下文菜单引用用例 1 LEAK 标记；不能称全部普通通过或无泄漏标记",
-    "native_id_regression": "新增未配对 Claude 原生会话 ID 回归在 Linux/Windows 逐名 PASS",
-    "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
-    "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
-    "boundary": "同源码 Linux/Windows 选定离线门禁；Mac Intel 按条件跳过。不含两平台已认证模型、真实 GUI 或全部必要缺口验收。"
+    "linux_focused_tests": "图片与回执 47/47；Python 15+24；i18n 11/11",
+    "windows_focused_tests": "图片与回执 46/46；Python 15+24；关联组 509/509",
+    "new_ack_tests": "两平台新增 10 项逐名 PASS",
+    "cargo_check": "Linux/Windows 通过",
+    "selected_test_caveats": "所选回归未见 FLAKY/LEAK/RETRY；跳过项不计通过；Mac Intel 按条件跳过",
+    "archive_manifest_sha256": "a2ad8f8c5629b852a514ad3228a7419452c2f3387514f616ac27acc18546224a",
+    "boundary": "本轮定向源码门禁；Linux 附加零模型剪贴板步骤成功，不计两平台已认证图片、真实 IME 或目标双语识图布局。14 项仍开放；不是完整 Goal 的最终门禁。"
   },
   "windows_file_submission_flaky_followup": {
     "source_commit": "79bfce90fb1b87be40743ee8b67211e9dd1ff7ae",
@@ -327,8 +326,18 @@
     "closed_gaps": []
   },
   "g09_actual_token_and_existing_station_followup": {
-    "implementation_commits": ["97a647351fb54493adb86aab6fa76aea456d4b0f", "c31d61fa70a2d23b5ecafd4ae2a2d28a3fb01be7", "10f99d6df9b8720548c0611c780b07e08d9ae1bb", "2d3297089b550e665423d011c82f8bb2b0c2ebdf"],
-    "runs": [36498757238, 36499906695, 36501584604, 36502343517],
+    "implementation_commits": [
+      "97a647351fb54493adb86aab6fa76aea456d4b0f",
+      "c31d61fa70a2d23b5ecafd4ae2a2d28a3fb01be7",
+      "10f99d6df9b8720548c0611c780b07e08d9ae1bb",
+      "2d3297089b550e665423d011c82f8bb2b0c2ebdf"
+    ],
+    "runs": [
+      36498757238,
+      36499906695,
+      36501584604,
+      36502343517
+    ],
     "status": "Windows 实际零 capability AppContainer 令牌已直接证实 NUL 两种路径及两种写掩码均返回 Win32 error 5，同目录普通文件成功；现有非交互站私有 desktop 不足以使固定 Node 初始化，G09 开放",
     "first_run": "run36498757238: warp libtest helper 启动后 0xc0000142，helper_report_present=false，cleanup/receipt=true；nextest 60 秒 TIMEOUT 遮住原生 FAIL；额外 stdio 工件未生成，完整日志及两个其他工件已归档",
     "second_run": "run36499906695: Windows cargo check 和 508/24/1/14 前置检查通过；两项原生均 FAIL、零重试。helper 仍 0xc0000142、无 CreateFile 收据；现有非交互站内私有 desktop 名称/描述符/低完整性标签核验通过，Node 仍 0xc0000142、无版本输出；两项 Job/profile 清理确认",
@@ -4391,5 +4400,63 @@
     "focused_python_tests": "4/4；五轮实测加两轮离线测试 TMPDIR 均归档后按身份和开放文件核验清理",
     "source_binding": "执行时工作树含未提交产品改动；仅对签名 2383428 二进制的限定传输链计证",
     "closed_gaps": []
+  },
+  "required_goal_merge_gate": {
+    "starting_commit": "c2140a8736eff3e8d67e9ca6d1645d12541072cd",
+    "pr": 22,
+    "draft_required": true,
+    "closed_items": [],
+    "remaining_count": 14,
+    "merge_allowed": false,
+    "requirement": "14 项完整关闭且最终源码门禁通过后，才可合并 main"
+  },
+  "g04_current_source_macos_followup": {
+    "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
+    "cases": {
+      "jpeg": "r-ee684g78",
+      "webp": "r-qkxpl7je",
+      "static_gif": "r-bjrl2akb"
+    },
+    "native_version": "2.1.280",
+    "actual_model": "claude-opus-5-5",
+    "product_inputs": 6,
+    "results": "各格式图片原字节、声明 MIME、实际回答和同原生会话进程冷恢复通过；六代自然 exit 0 并清理确认",
+    "supervisor_reused_from": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+    "supervisor_rebuilt": false,
+    "local_gate": "cargo check -p warp；回执回归 10/10；Python 15+24；i18n 11/11；actionlint",
+    "archive_index_sha256": "adf6a7b4cddc2e2c65ac89defd3f8489e87a24a50d0e5f9d7d658148d0879916",
+    "first_failure": "r-m9e_v1r3 配对前 ACK 被旧验收误拒；原失败和非自然退出保留",
+    "boundary": "不含应用重启／SQLite、GUI 或 Linux/Windows 已认证链；G04 开放；无需本地化变更"
+  },
+  "g04_target_environment_blockers": {
+    "linux": "runner 在线；只读盘点未发现固定 Claude 2.1.280 可用认证",
+    "windows": "runner 在线；Session 0，无交互登录用户，RDP 未启用；仅发现的旧 Claude 2.1.273 报告未登录",
+    "unblock": "专用已认证固定 CLI、可用 claude-opus-5-5 与 Linux/Windows 交互式 GUI；已向用户请求，不复制本机凭据",
+    "other_hard_blockers": "G01 普通未绑定 PTY 缺原生可信原子提交；G09 缺 Windows 交互环境；不重复相近探针"
+  },
+  "g04_auth_runner_cross_platform_followup": {
+    "source_commit": "50dd59b09444cc15a3feae805b70293938ea4da4",
+    "run_id": 36599403575,
+    "conclusion": "success",
+    "linux_image_tests": "37/37",
+    "windows_image_tests": "36/36",
+    "python_tests_per_platform": "15/15",
+    "windows_related_tests": "509/509",
+    "linux_i18n": "11/11",
+    "archive_manifest_sha256": "fd17c7fd891aa4da59f63d829a5da23dae4b6847162c4fdbc90915a0832be1ee",
+    "boundary": "无已认证图片模型链；Linux 附加零模型剪贴板检查不等于真实 IME 或 G04 GUI 识图；G04 开放"
+  },
+  "historical_branch_cross_platform_282f5c4a8": {
+    "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+    "run_id": 36561236364,
+    "conclusion": "success",
+    "linux_main_tests": "3269/3269；rust-genai 81/81",
+    "windows_main_tests": "3080/3080；rust-genai 81/81；文件提交用例首次失败、重试通过，1 FLAKY",
+    "desktop_tui_tests": "Linux 660/660; Windows 660/660",
+    "windows_desktop_tui_caveat": "上下文菜单引用用例 1 LEAK 标记；不能称全部普通通过或无泄漏标记",
+    "native_id_regression": "新增未配对 Claude 原生会话 ID 回归在 Linux/Windows 逐名 PASS",
+    "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
+    "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
+    "boundary": "同源码 Linux/Windows 选定离线门禁；Mac Intel 按条件跳过。不含两平台已认证模型、真实 GUI 或全部必要缺口验收。"
   }
 }
