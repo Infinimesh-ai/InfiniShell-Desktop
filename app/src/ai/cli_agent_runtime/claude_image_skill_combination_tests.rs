@@ -175,6 +175,36 @@ fn missing_image_skill_registration_keeps_images_and_sends_no_partial_turn() {
 }
 
 #[test]
+fn image_removed_while_skills_reload_sends_no_partial_turn() {
+    let (directory, path) = image_scope(ImageFormat::Png);
+    let alpha = selected_skill(&directory, "alpha");
+    let mut protocol = with_skills(&directory, &[]);
+    let id = Uuid::from_u128(709);
+    let pending = protocol.command(command(
+        id,
+        RuntimeAction::Submit {
+            input: vec![InputContent::LocalImage(path.clone()), skill_input(&alpha)],
+        },
+    ));
+    assert_eq!(pending.writes.len(), 1);
+    assert_eq!(pending.writes[0]["request"]["subtype"], "reload_plugins");
+    fs::remove_file(&path).unwrap();
+
+    let ack = reload_reply(
+        &protocol,
+        &pending.writes[0],
+        &["infinishell-local-skills:alpha"],
+    );
+    let result = protocol.receive(ack).unwrap();
+
+    assert!(result.writes.is_empty());
+    assert!(
+        matches!(result.events.as_slice(), [RuntimeEventKind::RequestFailed { message_id, .. }] if *message_id == id)
+    );
+    assert!(protocol.turns.is_empty());
+}
+
+#[test]
 fn image_multi_skill_rejects_an_unverified_claude_version() {
     let (directory, path) = image_scope(ImageFormat::Png);
     let alpha = selected_skill(&directory, "alpha");
