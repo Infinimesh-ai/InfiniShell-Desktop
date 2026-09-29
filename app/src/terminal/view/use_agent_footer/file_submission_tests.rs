@@ -1,24 +1,10 @@
 #[cfg(windows)]
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 #[cfg(windows)]
 use std::os::windows::fs::OpenOptionsExt as _;
-#[cfg(windows)]
-use std::os::windows::io::AsRawHandle as _;
 
 use futures::channel::oneshot;
 use futures::future::{Either, select};
-#[cfg(windows)]
-use windows::Win32::Foundation::{HANDLE, HLOCAL, LocalFree};
-#[cfg(windows)]
-use windows::Win32::Security::Authorization::{GetSecurityInfo, SE_FILE_OBJECT, SetSecurityInfo};
-#[cfg(windows)]
-use windows::Win32::Security::{
-    ACL, ACL_REVISION, DACL_SECURITY_INFORMATION, InitializeAcl, PSECURITY_DESCRIPTOR,
-};
-#[cfg(windows)]
-use windows::Win32::Storage::FileSystem::{
-    FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, READ_CONTROL, WRITE_DAC,
-};
 
 use super::*;
 use crate::ai::blocklist::{PendingAttachment, PendingFile};
@@ -76,108 +62,6 @@ async fn await_submission_event(receiver: oneshot::Receiver<()>) {
     match select(receiver, Box::pin(Timer::after(Duration::from_secs(5)))).await {
         Either::Left((result, _)) => result.unwrap(),
         Either::Right((_, _)) => panic!("文件提交没有产生完成或拒绝事件"),
-    }
-}
-
-#[cfg(windows)]
-struct ReadDeniedFile {
-    file: File,
-    descriptor: PSECURITY_DESCRIPTOR,
-    original_acl: *mut ACL,
-    restored: bool,
-}
-
-#[cfg(windows)]
-impl ReadDeniedFile {
-    fn deny(path: &Path) -> Self {
-        let file = OpenOptions::new()
-            .access_mode((READ_CONTROL | WRITE_DAC).0)
-            .share_mode((FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE).0)
-            .open(path)
-            .unwrap();
-        // 保留这个具备 WRITE_DAC 的句柄，测试结束后只恢复本轮私有文件的原 ACL。
-        let mut descriptor = PSECURITY_DESCRIPTOR::default();
-        let mut original_acl = std::ptr::null_mut();
-        let status = unsafe {
-            GetSecurityInfo(
-                HANDLE(file.as_raw_handle()),
-                SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION,
-                None,
-                None,
-                Some(&mut original_acl),
-                None,
-                Some(&mut descriptor),
-            )
-        };
-        assert_eq!(status.0, 0);
-
-        let mut empty_acl = ACL::default();
-        unsafe {
-            InitializeAcl(
-                &mut empty_acl,
-                std::mem::size_of::<ACL>() as u32,
-                ACL_REVISION,
-            )
-        }
-        .unwrap();
-        let denied = Self {
-            file,
-            descriptor,
-            original_acl,
-            restored: false,
-        };
-        let status = unsafe {
-            SetSecurityInfo(
-                HANDLE(denied.file.as_raw_handle()),
-                SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION,
-                None,
-                None,
-                Some(&empty_acl),
-                None,
-            )
-        };
-        assert_eq!(status.0, 0);
-        denied
-    }
-
-    fn restore(&mut self) {
-        let status = unsafe {
-            SetSecurityInfo(
-                HANDLE(self.file.as_raw_handle()),
-                SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION,
-                None,
-                None,
-                Some(self.original_acl),
-                None,
-            )
-        };
-        assert_eq!(status.0, 0);
-        self.restored = true;
-    }
-}
-
-#[cfg(windows)]
-impl Drop for ReadDeniedFile {
-    fn drop(&mut self) {
-        if !self.restored {
-            let _ = unsafe {
-                SetSecurityInfo(
-                    HANDLE(self.file.as_raw_handle()),
-                    SE_FILE_OBJECT,
-                    DACL_SECURITY_INFORMATION,
-                    None,
-                    None,
-                    Some(self.original_acl),
-                    None,
-                )
-            };
-        }
-        if !self.descriptor.0.is_null() {
-            unsafe { LocalFree(Some(HLOCAL(self.descriptor.0))) };
-        }
     }
 }
 
@@ -354,7 +238,7 @@ fn unreadable_file_keeps_draft_and_cards_without_writing_to_pty() {
 
 #[cfg(windows)]
 #[test]
-fn file_denied_after_card_creation_keeps_entire_composer_without_a_partial_pty_write() {
+fn file_read_denied_by_sharing_after_card_creation_keeps_entire_composer() {
     for agent in [CLIAgent::Codex, CLIAgent::Claude] {
         App::test((), move |mut app| async move {
             let terminal = prepare_rich_cli_test(&mut app, agent);
@@ -365,10 +249,17 @@ fn file_denied_after_card_creation_keeps_entire_composer_without_a_partial_pty_w
             std::fs::write(&denied_path, "protected").unwrap();
             add_file(&terminal, &mut app, &readable);
             add_file(&terminal, &mut app, &denied_path);
-            let mut denied = ReadDeniedFile::deny(&denied_path);
+            // 独占句柄只锁定本轮私有文件；提交后释放，不改运行器 ACL。
+            let held = OpenOptions::new()
+                .read(true)
+                .share_mode(0)
+                .open(&denied_path)
+                .unwrap();
             assert_eq!(
-                std::fs::File::open(&denied_path).unwrap_err().kind(),
-                std::io::ErrorKind::PermissionDenied
+                std::fs::File::open(&denied_path)
+                    .unwrap_err()
+                    .raw_os_error(),
+                Some(32)
             );
             let writes = collect_cli_test_writes(&mut app, &terminal);
             let rejected = wait_for_rejection(&mut app);
@@ -384,7 +275,7 @@ fn file_denied_after_card_creation_keeps_entire_composer_without_a_partial_pty_w
                 );
                 assert_eq!(view.ai_context_model.as_ref(ctx).pending_files().len(), 2);
             });
-            denied.restore();
+            drop(held);
             assert_eq!(std::fs::read(&denied_path).unwrap(), b"protected");
         });
     }
