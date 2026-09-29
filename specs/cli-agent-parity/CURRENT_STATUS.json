@@ -38,6 +38,29 @@
     "receipt_sha256": "2c1b63abca706e77905052952acf45253ef1ce380852c60dc412d08d834159a4",
     "boundary": "只覆盖插件刷新与输入修改竞态；在线组合、GUI 冷恢复及 Linux／Windows 尚未验，G05／G06 开放；无需本地化变更。"
   },
+  "claude_image_cross_platform_offline_followup": {
+    "source_commit": "38f66c88e7e8559f1007cea7d48acb89221ad2a0",
+    "run_id": 36542534412,
+    "conclusion": "Linux 和 Windows 作业成功；固定 Claude 图片与技能离线定向组分别 37/37、36/36",
+    "archive_manifest_sha256": "87b768067d99a9ace4938aacefd91b9a5d2693ee0cf84fdb16cbc647d4c186e0",
+    "boundary": "没有已认证 Claude 原生图片消费、识图、Skill 执行或冷恢复；G04/G05/G06 仍开放；仅测试与工作流变化，无需本地化变更。"
+  },
+  "v05_synthetic_approval_viewport_followup": {
+    "source_commit": "38f66c88e7e8559f1007cea7d48acb89221ad2a0",
+    "run_id": 36542534412,
+    "conclusion": "Linux 和 Windows 作业成功；各平台英中两语与 800x600/1280x800 四组真实窗口模拟审批卡，32 张原始 PNG；八组关键画面已目视复核",
+    "click_result": "AllowOnce/DenyOnce 对应 task、generation、approval ID 入队且按钮禁用",
+    "windows_desktop_tui_caveat": "最终 660/660，但一个上下文菜单用例首次超时，第二次通过，日志标记 1 FLAKY",
+    "archive_manifest_sha256": "87b768067d99a9ace4938aacefd91b9a5d2693ee0cf84fdb16cbc647d4c186e0",
+    "log_manifest_sha256": "1a87098a91418270f1aca6bfc0b6db2f9c8d894172a0708f1e4b1dd8fa7306fc",
+    "boundary": "model_inputs=0，native_approval_requested=false，native_approval_resolved=false，v05_complete=false；仍缺真实模型审批，V05 开放；无用户可见文案变更。"
+  },
+  "g10_fixed_skill_live_test_preparation": {
+    "source_commit": "1b6eefb890b34381a8211b9bb2d474dd3ee1d4b8",
+    "mac_check": "cargo check -p warp --tests 通过，测试尚未运行",
+    "signed_app_build_receipt_sha256": "e9def26722818a1bbe2540c14beb7966232c43b1f754b67c13271e3a114f5bc7",
+    "boundary": "仅测试准备和构建；无模型输入、无原生 Skill 权限正反链；构建记录未取得进程 OS PID，G10 仍开放。"
+  },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
     "run_id": 36525713293,

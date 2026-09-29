@@ -67,6 +67,7 @@
 
 ### G04 — Claude 托管图片格式扩展及验收
 
+- **双平台离线编码回归**：精确提交 `38f66c88e` 的 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 在 Linux／Windows 均成功；固定 Claude 图片与技能定向组分别通过 37／37、36／36（平台条件编译造成计数不同），覆盖格式、纯图片、组合及刷新竞态。该组没有原生 CLI 或在线模型输入，不代替两平台识图、字节消费和恢复验收；G04 保持开放。
 - **状态／优先级／范围**：模式限制，中；P1 附件、P5 验收。
 - **实际情况与影响**：本次输入增量已扩展固定 `2.1.280` 的 PNG、JPEG（含 jpg MIME 归一化）、静态 GIF、WebP，校验真实格式、字节、像素、整批原生帧预算及持久文件。macOS、`claude-opus-5-5` 的生产适配器 JPEG/WebP/静态 GIF 识图与冷恢复回忆已通过。随后补严 Claude 单帧 GIF 首次/恢复校验，保留 Codex 原行为；该后续修正在 `84102bb1c` 的本地门禁及静态 GIF 在线窄复验通过，另有此提交 GUI JPEG 原字节与识色正例；Linux／Windows 对应在线链仍待补，旧 WIP 收据不重标。
 - **当前替代方式**：使用本次已接通的明确格式；其他格式仍须先转换，跨平台通过范围不外推。
@@ -75,6 +76,7 @@
 
 ### G05 — Claude 托管纯图片及图片与技能混用
 
+- **双平台离线组合回归**：上述 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 的 Linux 37／37、Windows 36／36 包含纯图片、图片加技能和刷新竞态；无原生图片理解或 Skill 执行，G05 不关闭。
 - **2026-09-29 插件刷新竞态回归 `074cbb5fb`**：图片加单技能提交在等待 `reload_plugins` 回执时，先移除附件，再收到成功注册回执；测试确认整轮以 `RequestFailed` 拒绝，用户帧、原生写入与任务轮次均未产生。本机 Mac 定向 1／1 通过。它只证明输入变更后的失败原子性，不替代真实在线组合、GUI 冷恢复或 Linux／Windows 验收；无需本地化变更。
 - **状态／优先级／范围**：模式限制，中；P1 组合输入、P4 继续与恢复。
 - **实际情况与影响**：本次输入增量已接通纯图片，以及精确注册单技能加图片的原生 Skill 工具指令，不注入任意技能正文或绕审批。macOS `2.1.280/claude-opus-5-5` 生产适配器纯 PNG（零文字图片块）识图与冷恢复回忆通过；同轮图片加单技能已有本次整合工作区生产适配器新建与同会话冷恢复正例，两次精确 Skill AllowOnce、图片原始字节、独立识色及自然退出清理分别计证；后续 Mac GUI 已有 PNG加单技能及修复后应用重启重关联正例，三条消息和原生历史未重投；不同构建分别绑定，跨平台仍待补。更早原生 stream-json 正例的审批次数未单独计证，不被新收据回填。原先裸 slash 数组未执行技能的失败及探针指令冲突失败仍保留。
@@ -84,6 +86,7 @@
 
 ### G06 — Claude／Grok 多技能与会话内新增的实现及验收
 
+- **Claude 双平台定向回归**：同一 [run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 验证图片／技能组合和注册期间输入变更的离线边界；Linux 37／37、Windows 36／36。没有在两平台启动已认证 Claude 或检查原生多技能调用，G06 不关闭。
 - **2026-09-29 同提交在线正例 `2383428da`**：Claude `2.1.280/claude-opus-5-5` macOS 生产适配器图片加双技能新建和同原生会话冷恢复均通过；两张不同 PNG 的原生字节和结果、每轮两个 Skill 的精确审批及执行、自然退出与清理按收据分别计证。随后同一签名二进制的 Mac GUI 新建任务也验证一张 PNG 加 alpha/beta 两技能独立审批、原生执行顺序与结果；GUI 冷恢复因同 bundle ID 的归属不明旧实例无法精确绑定而在发送前停止。证据见[验证结论](VALIDATION_REPORT.md)。这些正例不覆盖其他平台、父权限上限或这一构建的 GUI 会话内热新增／冷恢复，不关闭 G06。
 
 - **2026-09-27 Grok 组合增量 `ba73c4df3`**：图片与技能已接同一类型化输入帧，单技能 slash 在图片前，多技能按所选顺序保留独立引用；首技能原生展开、其余原生文件读取的真实语义不改变。新增十项适配器回归，原无技能图片范围不收紧。原生两轮合同不能代替产品组合及跨平台验收，固定策略未扩权。
@@ -182,6 +185,7 @@
 
 ### G10 — Claude／Grok 子任务限固定权限策略
 
+- **待运行的 Mac 真实链测试**：提交 `1b6eefb89` 增加固定 Claude `2.1.280` 父子 Skill 权限、拒绝后允许及原生结果的忽略测试；`cargo check -p warp --tests` 通过。测试尚未启动，父集合扩大仅有派生拒绝断言，不能计作真实 `run_agents` 越权拒绝，更不能关闭 G10。
 - **2026-09-29 V2 Write 待审批取消正例**：固定 Claude `2.1.280/claude-opus-5-5` 的 Mac 生产父子链在父 `run_agents` 单次允许后，子原生精确 `Write` 停在待审批且目标文件不存在；子回合 `Interrupt` ACK 后审批撤销，同一审批 ID 的迟到 `AllowOnce` 被拒，目标始终未创建。持久父子身份及权限上限核对通过，父子原生进程分别退出，Job／资源域清理均确认。最初从外置盘启动的监督 worker 在 dyld 装载阶段超过握手预算，后续从外置盘启动的 Claude CLI 也出现初始化超时；将同 SHA、签名和固定版本的测试程序、worker、CLI 放到内置私有测试盘后，本链独立通过。原失败及无模型正对照保留，不因环境对照修改产品超时。此正例仅关闭 V2 待审批取消这一子项；G10 其余工具／技能权限、GUI、冷恢复及 Linux／Windows 仍未完整在线验收。
 
 - **状态／优先级／范围**：模式限制，高；P3 权限、P4 子任务与双向消息。
@@ -253,6 +257,7 @@
 
 ### V05 — Linux／Windows Grok 专属双语视口
 
+- **双平台模拟审批卡交互**：[run36542534412](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36542534412) 精确绑定 `38f66c88e`，Linux／Windows 各在英文与简体中文、800×600 与 1280×800 真窗口运行；每组原始 PNG 记录审批前、AllowOnce 后、DenyOnce 前后，共 32 张。测试注入两张同代审批卡并真实点击，核对 task／generation／approval ID、命令入队和按钮禁用；八组关键画面已目视复核，文字和控件可读、无明显重叠。收据明确 `model_inputs=0`、`native_approval_requested=false`、`native_approval_resolved=false`、`v05_complete=false`。官方工件及日志清单 SHA-256 分别为 `87b768067d99a9ace4938aacefd91b9a5d2693ee0cf84fdb16cbc647d4c186e0`／`1a87098a91418270f1aca6bfc0b6db2f9c8d894172a0708f1e4b1dd8fa7306fc`。真实模型审批仍待验，V05 不关闭；测试没有用户可见文案变化，无需本地化变更。
 - **双平台静态视口子项**：精确提交 `7f847473f` 的 [run36530752934](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36530752934) Linux／Windows 作业均成功；固定 Grok `1.0.41` 的真实窗口在各平台英中两语、800×600 与 1280×800 各采 7 张原图，八组实际滚动范围均大于零。原图目视复核了固定权限说明、技能禁用、滚动顶部和底部：文案可读、换行与按钮未发现重叠，底部操作可滚动到达。Linux／Windows 原图官方工件 SHA-256 分别为 `fd81ab5664f88cf27fc29ca1c9e7fff0402059ce89fe02a6b763611d6ae88e9f`／`e9be5a5d9baf7d3ebda74f6c2a86c2389b5f1864bbd34035cb7e74bbf1a95d53`；日志与工件完整归档索引 SHA-256 `3904682a1a6e3077ea97d6a6d32c1dad0e0a17863ea4f1a8ba20bc2f0c365cca`。测试无模型输入、未触发原生审批，收据 `v05_complete=false`；真实审批交互仍待验，V05 整项不关闭。仅测试代码变动，无需本地化变更。
 - **2026-09-29 静态视口验收工具补正**：首轮 [run36525713293](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36525713293) 的 Windows 测试将同一路径的 `grok.EXE`／`grok.exe` 按大小写比较，在截图前失败；第二轮 [run36527383544](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36527383544) 产生英文紧凑视口四张策略原图，但远超内容高度的滚动目标被框架重置到 0，未完成底部或其他三组截图；第三轮 [run36529053069](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36529053069) 的 Windows 509 项前置回归通过，GUI 集成测试编译因新增分段滚动 helper 未从平台模块导出而失败，Linux 在同一已知缺陷的编译阶段主动取消。三轮均不计完整布局通过；原失败、取消和四张原图已归档。导出修正 `7f847473f` 已推送，双平台新 run 结果另计；仅测试代码变化，无需本地化变更。
 - **状态／优先级／范围**：验收缺口，中；P1 入口、P3 权限、P5 本地化布局。
