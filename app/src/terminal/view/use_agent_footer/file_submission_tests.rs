@@ -105,26 +105,34 @@ fn file_only_submission_delivers_exact_path_once_and_clears_accepted_cards() {
 }
 
 #[test]
-fn missing_file_keeps_entire_composer_without_a_partial_pty_write() {
-    App::test((), |mut app| async move {
-        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Codex);
-        let root = tempfile::tempdir().unwrap();
-        let first = root.path().join("first.txt");
-        std::fs::write(&first, "first").unwrap();
-        add_file(&terminal, &mut app, &first);
-        add_file(&terminal, &mut app, &root.path().join("missing.txt"));
-        let writes = collect_cli_test_writes(&mut app, &terminal);
-        let rejected = wait_for_rejection(&mut app);
+fn file_removed_after_card_creation_keeps_entire_composer_without_a_partial_pty_write() {
+    for agent in [CLIAgent::Codex, CLIAgent::Claude] {
+        App::test((), move |mut app| async move {
+            let terminal = prepare_rich_cli_test(&mut app, agent);
+            let root = tempfile::tempdir().unwrap();
+            let first = root.path().join("first.txt");
+            let removed = root.path().join("removed.txt");
+            std::fs::write(&first, "first").unwrap();
+            std::fs::write(&removed, "second").unwrap();
+            add_file(&terminal, &mut app, &first);
+            add_file(&terminal, &mut app, &removed);
+            std::fs::remove_file(&removed).unwrap();
+            let writes = collect_cli_test_writes(&mut app, &terminal);
+            let rejected = wait_for_rejection(&mut app);
 
-        submit_cli_test_input(&terminal, &mut app, "保留这份草稿");
-        await_submission_event(rejected).await;
+            submit_cli_test_input(&terminal, &mut app, "保留这份草稿");
+            await_submission_event(rejected).await;
 
-        assert!(writes.borrow().is_empty());
-        terminal.read(&app, |view, ctx| {
-            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "保留这份草稿");
-            assert_eq!(view.ai_context_model.as_ref(ctx).pending_files().len(), 2);
+            assert!(writes.borrow().is_empty());
+            terminal.read(&app, |view, ctx| {
+                assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), "保留这份草稿");
+                let files = view.ai_context_model.as_ref(ctx).pending_files();
+                assert_eq!(files.len(), 2);
+                assert_eq!(files[0].file_path, first);
+                assert_eq!(files[1].file_path, removed);
+            });
         });
-    });
+    }
 }
 
 #[test]
@@ -191,6 +199,8 @@ fn unreadable_file_keeps_draft_and_cards_without_writing_to_pty() {
             let unreadable = root.path().join("unreadable.txt");
             std::fs::write(&readable, "first").unwrap();
             std::fs::write(&unreadable, "protected").unwrap();
+            add_file(&terminal, &mut app, &readable);
+            add_file(&terminal, &mut app, &unreadable);
             std::fs::set_permissions(&unreadable, std::fs::Permissions::from_mode(0o000)).unwrap();
             match std::fs::File::open(&unreadable) {
                 Ok(_) => {
@@ -199,8 +209,6 @@ fn unreadable_file_keeps_draft_and_cards_without_writing_to_pty() {
                 }
                 Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::PermissionDenied),
             }
-            add_file(&terminal, &mut app, &readable);
-            add_file(&terminal, &mut app, &unreadable);
             let writes = collect_cli_test_writes(&mut app, &terminal);
             let rejected = wait_for_rejection(&mut app);
 
