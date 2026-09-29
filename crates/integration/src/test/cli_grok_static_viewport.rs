@@ -4,8 +4,9 @@ use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::vector::vec2f;
 use warp::i18n;
 use warp::integration_testing::clipboard::{
-    PermissionPolicy, finish_v05_static_evidence, open_cli_clipboard_composer, scroll_v05_grok,
-    select_v05_grok_policy, setup_cli_system_clipboard, wait_until_cli_clipboard_bootstrapped,
+    PermissionPolicy, advance_v05_grok_scroll, finish_v05_static_evidence,
+    open_cli_clipboard_composer, scroll_v05_grok, select_v05_grok_policy,
+    setup_cli_system_clipboard, wait_until_cli_clipboard_bootstrapped,
     wait_v05_fixed_grok_installation,
 };
 use warpui_core::integration::TestStep;
@@ -24,7 +25,7 @@ pub fn test_cli_grok_static_viewport() -> Builder {
     i18n::init(Some(&locale));
     i18n::set_locale(&locale);
 
-    Builder::new()
+    let mut builder = Builder::new()
         .with_real_display()
         .with_setup(setup_cli_system_clipboard)
         .with_step(wait_until_cli_clipboard_bootstrapped())
@@ -54,7 +55,11 @@ pub fn test_cli_grok_static_viewport() -> Builder {
         .with_step(select_v05_grok_policy(
             PermissionPolicy::GrokRestrictedFilesV2,
         ))
-        .with_step(TestStep::new("技能禁用说明原图").with_take_screenshot("skill-disabled.png"))
+        .with_step(TestStep::new("技能禁用说明原图").with_take_screenshot("skill-disabled.png"));
+    for _ in 0..12 {
+        builder = builder.with_step(advance_v05_grok_scroll());
+    }
+    builder
         .with_step(scroll_v05_grok("bottom"))
         .with_step(TestStep::new("滚动区底部原图").with_take_screenshot("scroll-bottom.png"))
         .with_step(scroll_v05_grok("middle"))

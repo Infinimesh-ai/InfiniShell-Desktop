@@ -43,6 +43,7 @@ pub const V05_STATIC_TEST_NAME: &str = "test_cli_grok_static_viewport";
 const IMAGE_ENV: &str = "WARP_TEST_COMPOSER_CLIPBOARD_IMAGE";
 const PRODUCER_KEY: &str = "cli-composer-system-clipboard-producer";
 const V05_BOTTOM_SCROLL_KEY: &str = "v05-bottom-scroll-px";
+const V05_PREVIOUS_SCROLL_KEY: &str = "v05-previous-scroll-px";
 
 struct ClipboardProducer(Child);
 
@@ -539,7 +540,7 @@ pub fn select_v05_grok_policy(policy: PermissionPolicy) -> TestStep {
                 view.handle_action(&TaskManagerAction::SelectHarness(Harness::Grok), ctx);
                 view.handle_action(&TaskManagerAction::SelectPermission(policy), ctx);
                 // 策略按钮与说明位于安装信息之后，截图时滚入可见区域。
-                view.body_scroll.scroll_to(Pixels::new(220.0));
+                view.body_scroll.scroll_to(Pixels::new(450.0));
                 ctx.notify();
             });
         })
@@ -559,6 +560,20 @@ pub fn select_v05_grok_policy(policy: PermissionPolicy) -> TestStep {
         )
 }
 
+pub fn advance_v05_grok_scroll() -> TestStep {
+    TestStep::new("逐段滚动 Grok 策略视口").with_action(|app, window_id, data| {
+        composer(app, window_id).update(app, |view, ctx| {
+            data.insert(
+                V05_PREVIOUS_SCROLL_KEY,
+                view.body_scroll.scroll_start().as_f32(),
+            );
+            // 裁剪滚动容器对远超内容高度的目标会重置到顶部，逐段推进才可抵达底部。
+            view.body_scroll.scroll_by(Pixels::new(250.0));
+            ctx.notify();
+        });
+    })
+}
+
 pub fn scroll_v05_grok(position: &'static str) -> TestStep {
     TestStep::new("滚动 Grok 策略视口")
         .with_action(move |app, window_id, data| {
@@ -571,7 +586,14 @@ pub fn scroll_v05_grok(position: &'static str) -> TestStep {
                         data.insert(V05_BOTTOM_SCROLL_KEY, bottom);
                         bottom / 2.0
                     }
-                    "bottom" => 100_000.0,
+                    "bottom" => {
+                        let bottom = view.body_scroll.scroll_start().as_f32();
+                        let previous = *data
+                            .get::<_, f32>(V05_PREVIOUS_SCROLL_KEY)
+                            .expect("必须先逐段滚动");
+                        assert_eq!(bottom, previous, "滚动尚未抵达底部");
+                        bottom
+                    }
                     other => panic!("未知滚动位置：{other}"),
                 };
                 view.body_scroll.scroll_to(Pixels::new(pixels));
@@ -583,8 +605,7 @@ pub fn scroll_v05_grok(position: &'static str) -> TestStep {
             move |app, window_id| {
                 composer(app, window_id).read(app, |view, ctx| {
                     let offset = view.body_scroll.scroll_start().as_f32();
-                    let normal_fully_visible = position == "middle"
-                        && offset == 0.0
+                    let normal_fully_visible = offset == 0.0
                         && std::env::var("WARP_TEST_GUI_SIZE").as_deref() == Ok("normal");
                     async_assert!(
                         view.tasks(ctx).is_empty()
