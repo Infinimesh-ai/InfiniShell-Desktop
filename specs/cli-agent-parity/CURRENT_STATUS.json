@@ -11,7 +11,18 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
+  "latest_related_verified_source_commit": "64bb5f6c3988a9ca463d2d8a6d79a81eb543b447",
+  "latest_branch_cross_platform": {
+    "source_commit": "301040fe3c18c3ffc806f1b048f2e448bdc81ca5",
+    "run_id": 36503995096,
+    "conclusion": "success",
+    "linux_main_tests": "3267/3267",
+    "windows_main_tests": "3077/3077",
+    "desktop_tui_tests": "Linux 660/660; Windows 660/660",
+    "g03_drop_event_test": "Linux PASS; Unix PTY 测试未在 Windows 执行",
+    "archive_manifest_sha256": "6a447d8bfaf0b198cfca988fb14d67b800e45b41a9979e932b83d74c5bdc3c55",
+    "boundary": "普通源码门禁；不含在线模型、真实 Finder/Windows 文件拖放、G09 失败专项或交互式双语 GUI。晚于此提交的 G07 测试仅有 Mac 定向证据。"
+  },
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",

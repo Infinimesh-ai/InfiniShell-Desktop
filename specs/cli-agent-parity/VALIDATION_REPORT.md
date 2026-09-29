@@ -2,7 +2,9 @@
 
 本报告保留截至 2026-09-29 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
-目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。最新相关源码提交为 `97ea46905f098174e799f6edf65e54e54dbfaf91`，本机定向收据对应提交前相同源码内容；含该源码的精确分支提交 `2cbebd204bdd6ff76e6f9d0aed7540884539eb4e` 已通过下述 Linux／Windows 普通门禁。历史通过、失败与跳过仍按原提交计证；新增工作区收据不能外推到其他版本或全部平台。
+目录整理本身没有修改产品或重跑历史测试；此后继续实现的输入增量及新证据单列如下。最新相关产品源码提交为 `64bb5f6c3988a9ca463d2d8a6d79a81eb543b447`；含该源码的精确分支提交 `301040fe3c18c3ffc806f1b048f2e448bdc81ca5` 已通过下述 Linux／Windows 普通门禁。历史通过、失败与跳过仍按原提交计证；新增工作区收据不能外推到其他版本或全部平台。
+
+[run36503995096](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36503995096) 精确绑定 `301040fe3c18c3ffc806f1b048f2e448bdc81ca5`，Linux x64、Windows x64 作业均 success，两平台 `cargo check -p warp --lib` 与选定回归通过。Linux 主回归 3267／3267、桌面／TUI 660／660、rust-genai 81／81；Windows 主回归 3077／3077、桌面／TUI 660／660、rust-genai 81／81。两平台日志未见 `LEAK`／`RETRY`／`FLAKY`，跳过项不计通过。G03 新增的 `owned_grok_file_drop_event_reaches_batch_guard_before_editor` 在 Linux 主回归逐名 PASS；该测试使用 Unix PTY，Windows 本轮是源码编译与选定回归通过，不计真实拖放事件。12 份官方工件与 107 个完整日志成员已按官方摘要、ZIP CRC 和成员 SHA-256 归档于仓外 `resume-20260929/cloud-run-36503995096`，日志清单 SHA-256 `6a447d8bfaf0b198cfca988fb14d67b800e45b41a9979e932b83d74c5bdc3c55`。G07 成卡后失效文件回归提交 `611aac0a408d4dd5c7d3d3dc4998257abaffd8c8` 晚于本轮源码，只有上文的 Mac 定向收据；本轮未运行真实 Finder 拖放、G09 原生失败专项、已认证模型或交互式双语 GUI，14 项必要缺口继续开放。新产品代码复用既有英中提示，无需本地化变更；真实拒绝提示布局仍待验。
 
 同提交普通跨平台 [run36490470344](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36490470344) 已结束为 success，Linux x64 与 Windows x64 job 均成功、两平台 `cargo check` 通过。Linux 主回归 3266/3266、桌面／TUI 660/660、`rust-genai` 81/81；Windows 主回归 3077/3077、桌面／TUI 660/660、`rust-genai` 81/81，另含 CLI 与相关固定边界定向组。两平台原始日志未见 `LEAK`／`RETRY`／`FLAKY` 标记，跳过项不计通过；Windows GUI 系统剪贴板步骤本轮按输入被跳过。12 个官方工件与完整 job／step 日志已按官方摘要及 ZIP CRC 归档于仓外 `resume-20260929/cloud-run-36490470344`，日志清单 SHA-256 `cf46b930ee29d735ec6670602e2f15a892cb2f73d1db7950224f5a7904bad3a7`。本轮未运行 Windows G09 的 NUL／固定 Node 专项，也不含两平台已认证模型、物理中文输入法或 Grok 专属双语视口验收，14 项必要缺口不据此关闭。
 
