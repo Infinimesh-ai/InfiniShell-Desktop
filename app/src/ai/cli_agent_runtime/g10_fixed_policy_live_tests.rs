@@ -220,6 +220,14 @@ async fn drive(
         if Instant::now() >= deadline {
             return Err("G10 父子技能整链超过 450 秒".into());
         }
+        if let Some(error) = coordinator.read(app, |model, _| {
+            model
+                .snapshots()
+                .find_map(|snapshot| snapshot.error.clone())
+        }) {
+            evidence.record(json!({"event":"coordinator_error","reason":error}))?;
+            return Err("G10 协调器报告启动或原生连接失败".into());
+        }
         let wake = receiver
             .recv()
             .with_timeout(
@@ -367,14 +375,6 @@ async fn drive(
                     return Err("子任务请求了非技能本地工具".into());
                 }
             }
-        }
-        if let Some(error) = coordinator.read(app, |model, _| {
-            model
-                .snapshots()
-                .find_map(|snapshot| snapshot.error.clone())
-        }) {
-            evidence.record(json!({"event":"coordinator_error","reason":error}))?;
-            return Err("G10 协调器报告启动或原生连接失败".into());
         }
         if !(parent_spawn_approved
             && first_denied

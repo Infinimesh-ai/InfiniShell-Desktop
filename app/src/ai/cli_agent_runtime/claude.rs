@@ -1216,7 +1216,10 @@ impl ClaudeProtocol {
     fn event(&self, kind: RuntimeEventKind) -> RuntimeEvent {
         RuntimeEvent {
             generation: self.options.generation,
-            native_session_id: self.session_id.clone(),
+            native_session_id: self
+                .paired_version
+                .and(self.session_id.as_deref())
+                .map(str::to_owned),
             kind,
         }
     }

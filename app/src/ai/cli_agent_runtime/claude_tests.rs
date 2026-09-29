@@ -2012,6 +2012,33 @@ fn ready_observation(effects: &Effects) -> &Value {
 }
 
 #[test]
+fn unpaired_claude_session_does_not_expose_native_id() {
+    let mut protocol = ClaudeProtocol::new(options());
+    protocol.session_id = Some("native-before-init".into());
+
+    let early = protocol.event(protocol.ready_event());
+    assert_eq!(early.native_session_id, None);
+    assert!(matches!(
+        early.kind,
+        RuntimeEventKind::SessionReady {
+            verified_cli_version: None,
+            ..
+        }
+    ));
+
+    protocol.paired_version = Some("2.1.280");
+    let paired = protocol.event(protocol.ready_event());
+    assert_eq!(paired.native_session_id.as_deref(), Some("native-before-init"));
+    assert!(matches!(
+        paired.kind,
+        RuntimeEventKind::SessionReady {
+            verified_cli_version: Some(version),
+            ..
+        } if version == "2.1.280"
+    ));
+}
+
+#[test]
 fn permission_queries_finish_before_first_ready_without_authorizing_dispatch() {
     let mut protocol = ClaudeProtocol::new(options());
     let first = start_observation(&mut protocol);
