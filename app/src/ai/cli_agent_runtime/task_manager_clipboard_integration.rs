@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 
 use base64::Engine;
@@ -485,13 +485,30 @@ pub fn wait_v05_fixed_grok_installation() -> TestStep {
                 async_assert!(
                     installation.is_some_and(|installation| {
                         installation.version == CLIAgentVersionStatus::Detected("1.0.41".into())
-                            && installation.executable.as_deref() == Some(expected.as_path())
+                            && installation
+                                .executable
+                                .as_deref()
+                                .is_some_and(|actual| v05_same_executable(actual, &expected))
                     }),
                     "必须扫描到固定 Grok 1.0.41；当前安装={installation:?}"
                 )
             })
         },
     )
+}
+
+fn v05_same_executable(actual: &Path, expected: &Path) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 的扫描器会把同一 grok.exe 路径返回为 grok.EXE。
+        actual
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&expected.to_string_lossy())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        actual == expected
+    }
 }
 
 pub fn assert_v05_fixed_grok() -> AssertionCallback {
@@ -504,7 +521,10 @@ pub fn assert_v05_fixed_grok() -> AssertionCallback {
                 view.harness == Harness::Grok
                     && installation.is_some_and(|installation| {
                         installation.version == CLIAgentVersionStatus::Detected("1.0.41".into())
-                            && installation.executable.as_deref() == Some(expected.as_path())
+                            && installation
+                                .executable
+                                .as_deref()
+                                .is_some_and(|actual| v05_same_executable(actual, &expected))
                     }),
                 "必须在真实界面选中扫描到的固定 Grok 1.0.41；当前安装={installation:?}"
             )
