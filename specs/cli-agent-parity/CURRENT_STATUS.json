@@ -32,6 +32,42 @@
     "archive_manifest_sha256": "6552bf404d7c4e5d6e636e1705347271d44086b7b4b46106408339b335d613f5",
     "boundary": "Linux 未选；不含 Windows GUI、原生 CLI 读取或权限 ACL 测试，G07 整项仍开放。"
   },
+  "claude_reload_race_followup": {
+    "source_commit": "074cbb5fb",
+    "mac_focused_test": "1/1；图片加单技能在 reload_plugins 等待期间移除附件，原生成功 ACK 后整轮 RequestFailed、零用户帧／原生写入／任务轮次",
+    "receipt_sha256": "2c1b63abca706e77905052952acf45253ef1ce380852c60dc412d08d834159a4",
+    "boundary": "只覆盖插件刷新与输入修改竞态；在线组合、GUI 冷恢复及 Linux／Windows 尚未验，G05／G06 开放；无需本地化变更。"
+  },
+  "v05_static_viewport_initial": {
+    "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
+    "run_id": 36525713293,
+    "conclusion": "cancelled",
+    "windows": "集成窗口已启动，扫描固定 Grok 1.0.41 后因 grok.EXE 与 grok.exe 的测试断言大小写比较失败；首张截图前停止",
+    "linux": "双语资源和集成编译通过；同分支修正工作流启动后被并发取消，未进入 Grok 视口",
+    "archive_manifest_sha256": "4f69df44e42d14dde58132648e1ac8201b587d22a8bff1d8a6e5a931ed27e400",
+    "followup_source_commit": "15e329fcf54e5fb987ca30bb4ad6fe8c1f9c9d77",
+    "windows_followup_run_id": 36527383544,
+    "windows_followup_conclusion": "failure；英文紧凑视口四张策略 PNG 已产生，但 100000 像素滚动目标被框架重置为 0，未完成底部断言、中文和常规视口",
+    "windows_followup_archive_manifest_sha256": "a4db571fb4f53172cad87f17c7de18c6358b4b23eb7201fb4b028464d3a8b9c2",
+    "bounded_scroll_source_commit": "bed8c1276ff950b6fa09ba1767c015363a9655b1",
+    "bounded_scroll_run_id": 36529053069,
+    "bounded_scroll_run_conclusion": "cancelled；Windows 前置 509/509 通过但 GUI 集成编译缺少平台模块导出，Linux 双语资源通过后在已知缺陷编译阶段主动取消",
+    "bounded_scroll_archive_manifest_sha256": "874f4214b46411c7d1fe94d4dee2e1494e775d93112b337a664d49973231bb50",
+    "export_fix_source_commit": "7f847473ff9a02b73334316d5014f3d8af75ce00",
+    "export_fix_run_id": 36530752934,
+    "boundary": "首轮未产生原图，第二轮仅有英文紧凑视口四张原图，第三轮未进入截图；第四轮双平台静态布局通过，结果见下项；前三轮失败／取消原件保留。"
+  },
+  "v05_cross_platform_static_viewport_followup": {
+    "source_commit": "7f847473ff9a02b73334316d5014f3d8af75ce00",
+    "run_id": 36530752934,
+    "run_conclusion": "success",
+    "linux_job": "success；en/zh-CN × 800x600/1280x800 各 7 张真实窗口 PNG，四组实际滚动偏移均大于零；已目视检查策略、技能禁用及滚动顶部/底部",
+    "windows_job": "success；en/zh-CN × 800x600/1280x800 各 7 张真实窗口 PNG，四组实际滚动偏移均大于零；已目视检查策略、技能禁用及滚动顶部/底部",
+    "linux_artifact_sha256": "fd81ab5664f88cf27fc29ca1c9e7fff0402059ce89fe02a6b763611d6ae88e9f",
+    "windows_artifact_sha256": "e9be5a5d9baf7d3ebda74f6c2a86c2389b5f1864bbd34035cb7e74bbf1a95d53",
+    "archive_manifest_sha256": "3904682a1a6e3077ea97d6a6d32c1dad0e0a17863ea4f1a8ba20bc2f0c365cca",
+    "boundary": "仅两平台固定 Grok 静态策略布局；无模型输入和原生审批，V05 仍开放；无需本地化变更。"
+  },
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
