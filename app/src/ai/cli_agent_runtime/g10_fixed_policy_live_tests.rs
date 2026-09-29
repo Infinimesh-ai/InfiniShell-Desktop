@@ -110,6 +110,176 @@ async fn control(
         .map_err(|_| "真实控制确认已关闭".to_owned())?
 }
 
+async fn verify_overbound_spawn(
+    app: &mut App,
+    coordinator: &ModelHandle<LocalCLITaskCoordinator>,
+    sender: &SyncSender<ModelEvent>,
+    receiver: &mut mpsc::UnboundedReceiver<Wake>,
+    parent: &LocalCliTask,
+    known_child_id: &str,
+    beta: &SelectedLocalSkill,
+    model: &str,
+    evidence: &mut Evidence,
+) -> Result<(), String> {
+    let spawn = json!({"summary":"isolated G10 parent ceiling rejection",
+        "base_prompt":"", "harness":"claude", "model_id":model,
+        "skills":[beta.path],
+        "agent_run_configs":[{"name":"overbound-skill",
+            "prompt":"Reply without using skills, commands, or other tools."}]});
+    let prompt = format!(
+        "Call run_agents exactly once with these arguments: {spawn}. This is an isolated \
+         parent permission-ceiling rejection test. Approve the host tool request, then read \
+         its rejection and reply only G10_OVERBOUND_REJECTED. Do not call another tool."
+    );
+    control(
+        app,
+        coordinator,
+        parent,
+        RuntimeAction::Submit {
+            input: vec![InputContent::Text(prompt)],
+        },
+    )
+    .await?;
+    let generation = parent.generation + 1;
+    evidence.record(json!({"event":"overbound_native_submit_accepted",
+        "parent_task_id":parent.task_id,"generation":generation,
+        "unselected_skill":"beta"}))?;
+
+    let deadline = Instant::now() + Duration::from_secs(180);
+    let mut approval_id = None;
+    let mut requested = None;
+    let mut finished = false;
+    loop {
+        if Instant::now() >= deadline {
+            return Err("G10 原生越界工具拒绝超过 180 秒".into());
+        }
+        if let Some(error) = coordinator.read(app, |model, _| {
+            model
+                .snapshots()
+                .find_map(|snapshot| snapshot.error.clone())
+        }) {
+            evidence.record(json!({"event":"coordinator_error","reason":error}))?;
+            return Err("G10 越界验证时协调器报告错误".into());
+        }
+        let wake = receiver
+            .recv()
+            .with_timeout(
+                Duration::from_secs(2).min(deadline.saturating_duration_since(Instant::now())),
+            )
+            .await;
+        if let Ok(Some(Some((task, event)))) = wake {
+            record_runtime(evidence, &task, &event)?;
+            if task.task_id != parent.task_id || task.generation != generation {
+                if task.task_id != parent.task_id && task.task_id != known_child_id {
+                    return Err("越界调用启动了新子任务".into());
+                }
+                continue;
+            }
+            if let RuntimeEventKind::ApprovalRequested {
+                approval_id: id,
+                method,
+                details,
+                ..
+            } = &event.kind
+            {
+                if approval_id.is_some()
+                    || method != "can_use_tool"
+                    || details["tool_name"] != "mcp__infinishell-local-tasks__run_agents"
+                    || details["input"] != spawn
+                {
+                    return Err("原生越界工具请求与固定参数不符".into());
+                }
+                approval_id = Some(id.clone());
+                control(
+                    app,
+                    coordinator,
+                    &task,
+                    RuntimeAction::RespondApproval {
+                        approval_id: id.clone(),
+                        decision: ApprovalDecision::AllowOnce,
+                    },
+                )
+                .await?;
+                evidence.record(json!({"event":"overbound_native_approval_allowed",
+                    "approval_id_sha256":digest(id),"exact_scope_verified":true}))?;
+            }
+            if let RuntimeEventKind::LocalToolRequested { request } = &event.kind {
+                if approval_id.is_none()
+                    || requested.is_some()
+                    || request.tool != "run_agents"
+                    || request.arguments != spawn
+                {
+                    return Err("原生越界工具没有交付唯一固定请求".into());
+                }
+                requested = Some(request.clone());
+                evidence.record(json!({"event":"overbound_native_tool_requested",
+                    "call_id_sha256":digest(&request.call_id),
+                    "turn_id_sha256":digest(&request.turn_id),
+                    "arguments_sha256":digest(&request.arguments.to_string())}))?;
+            }
+            if let RuntimeEventKind::TurnFinished {
+                outcome, output, ..
+            } = &event.kind
+            {
+                if *outcome != TurnOutcome::Completed || !output.contains("G10_OVERBOUND_REJECTED")
+                {
+                    return Err("父任务没有完成原生越界拒绝回合".into());
+                }
+                finished = true;
+            }
+        } else if matches!(wake, Ok(None)) {
+            return Err("G10 越界验证事件通道已关闭".into());
+        }
+        let Some(request) = requested.as_ref() else {
+            continue;
+        };
+        if !finished {
+            continue;
+        }
+        let messages = load_messages(sender, parent.task_id.clone(), generation)?
+            .await
+            .map_err(|_| "G10 越界工具记录读取已关闭")??;
+        let calls = messages
+            .iter()
+            .filter(|message| message.subject == "native_tool_call")
+            .collect::<Vec<_>>();
+        let results = messages
+            .iter()
+            .filter(|message| message.subject == "native_tool_result")
+            .collect::<Vec<_>>();
+        let tasks = load_tasks(sender, false)?
+            .await
+            .map_err(|_| "G10 越界任务读取已关闭")??;
+        if calls.len() != 1
+            || results.len() != 1
+            || serde_json::from_str::<NativeLocalToolRequest>(&calls[0].body)
+                .map_err(|error| error.to_string())?
+                != *request
+            || tasks.len() != 2
+            || !tasks.iter().any(|task| task.task_id == known_child_id)
+            || tasks
+                .iter()
+                .find(|task| task.task_id == parent.task_id)
+                .is_none_or(|task| task.generation != generation)
+        {
+            return Err("原生越界调用记录、任务代次或无子任务断言不符".into());
+        }
+        let result: Result<Value, String> =
+            serde_json::from_str(&results[0].body).map_err(|error| error.to_string())?;
+        let Err(reason) = result else {
+            return Err("父上限意外允许了原生越界工具请求".into());
+        };
+        if reason.is_empty() {
+            return Err("原生越界拒绝缺少原因".into());
+        }
+        evidence.record(json!({"event":"overbound_native_rejection_verified",
+            "parent_task_id":parent.task_id,"generation":generation,
+            "native_request_verified":true,"persisted_error_verified":true,
+            "new_child_count":0,"rejection_sha256":digest(&reason)}))?;
+        return Ok(());
+    }
+}
+
 async fn drive(
     app: &mut App,
     coordinator: &ModelHandle<LocalCLITaskCoordinator>,
@@ -447,6 +617,18 @@ async fn drive(
             "skill_deny_resolved":true,"skill_allow_resolved":true,
             "child_result_contains_marker":true,"parent_ceiling_derive_rejected":true,
             "parent_ceiling_rejection_reason":evidence_overbound["reason"]}))?;
+        verify_overbound_spawn(
+            app,
+            coordinator,
+            sender,
+            receiver,
+            parent,
+            &child.task_id,
+            beta,
+            &model,
+            evidence,
+        )
+        .await?;
         return Ok(());
     }
 }
@@ -655,6 +837,7 @@ fn real_claude_g10_fixed_skill_parent_child() {
                 .record(json!({"event":"acceptance_passed","scope":SCOPE,
                 "parent_child_ceiling_verified":true,"native_skill_deny_verified":true,
                 "native_skill_allow_verified":true,"parent_ceiling_derive_rejected":true,
+                "real_parent_overbound_run_agents_verified":true,
                 "all_runtime_hosts_cleaned":true,"real_gui_verified":false}))
                 .unwrap(),
             Err(error) => {
