@@ -577,8 +577,8 @@ fn parse_createfile_receipt(bytes: &[u8]) -> Option<serde_json::Value> {
     Some(serde_json::json!({
         "share_mode": words[4],
         "creation_disposition": words[5],
-        "generic_write": compare(0),
-        "file_generic_write": compare(1),
+        "generic_write": compare(0usize),
+        "file_generic_write": compare(1usize),
     }))
 }
 
