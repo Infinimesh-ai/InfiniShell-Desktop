@@ -68,7 +68,17 @@
     "cleanup": "四个精确遗留 PID 和专属 launchd 标签已退出，打开文件核空；本轮短目录、应用状态和原生临时目录按身份归档后清理",
     "cleanup_manifest_sha256": "c46bf00ed7888cd5adcdefbf03c6294e7bf24c227bbfb29f30c54a3cd657a07c",
     "next_diagnostic_commit": "34167fe3e",
-    "boundary": "诊断提交的协调器错误早读尚未运行；没有父子 Skill 原生审批和结果证据，G10 仍开放；测试诊断无用户可见文案变化，无需本地化变更。"
+    "boundary": "该失败轮没有父子 Skill 原生审批和结果证据；后续正例见 g10_fixed_skill_parent_child_positive，G10 整项仍开放。"
+  },
+  "g10_fixed_skill_parent_child_positive": {
+    "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+    "run_id": "g10-skill-live-fixed-3b1f82a0",
+    "fixed_native": "Mac 官方 Claude 2.1.280 / claude-opus-5-5，已认证默认账号，同源码签名监督程序",
+    "conclusion": "父 run_agents AllowOnce；子 Skill DenyOnce 后 AllowOnce，原生两次解决确认；父子持久身份、独立原生会话、子结果技能标记及保存的父权限上限核对通过；两份原生退出与清理回执有效",
+    "local_gate": "cargo check -p warp；Claude 协议测试 137/137；i18n 11/11；同源码应用构建与签名验证；差异检查通过",
+    "signed_app_receipt_sha256": "9c09f907cc509229a79a40859cb4cd46c2550acd9e35cfdec4148eb33a8e4a31",
+    "cleanup_manifest_sha256": "527e27a081190e56478052a31061cf5e14db27973ea95163f55706d37b9e1d90",
+    "boundary": "父集合外技能只作派生拒绝，未真实派发越界 run_agents；GUI、冷恢复、受审命令、Grok 和 Linux/Windows 在线模型未验；G10 不关闭；无用户可见文案变化，无需本地化变更。"
   },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
