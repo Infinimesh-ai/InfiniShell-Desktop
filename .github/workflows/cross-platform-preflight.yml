@@ -41,6 +41,16 @@ on:
         required: true
         default: false
         type: boolean
+      run_grok_viewport_approval_synthetic:
+        description: 采集 Linux/Windows 固定 Grok 英中合成审批视口与按钮动作，原生审批另验
+        required: true
+        default: false
+        type: boolean
+      run_claude_image_regression:
+        description: Linux/Windows 定向运行 Claude 图片格式、纯图及图片加技能离线回归
+        required: true
+        default: false
+        type: boolean
       linux_gui_only:
         description: 仅补验 Linux 真实 GUI 系统剪贴板；全量模式优先
         required: true
@@ -282,7 +292,7 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static || inputs.run_grok_viewport_approval_synthetic) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_grok
         shell: bash
         timeout-minutes: 5
@@ -355,6 +365,13 @@ jobs:
         id: check_app
         shell: bash
         run: cargo check -p warp --lib
+
+      - name: Test Claude image and skill regressions on Linux
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: bash
+        run: >-
+          cargo nextest run --no-fail-fast -p warp --lib
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::)'
 
       # GUI 专项包含字体行为修正，仍保留用户功能的双语资源门禁。
       - name: Test bilingual resources for Linux GUI verification
@@ -798,6 +815,29 @@ jobs:
         with:
           name: cli-linux-grok-static-viewport-${{ github.sha }}
           path: ${{ runner.temp }}/gui-grok-view-evidence/linux
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Verify Linux fixed Grok bilingual synthetic approval viewport
+        id: grok_approval_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_approval_synthetic }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-approval-evidence/linux
+        run: |
+          set -euo pipefail
+          cargo build -p integration --bin integration
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          bash script/cli-agent-parity/run_linux_grok_approval_viewport.sh "$target_dir/debug/integration"
+
+      - name: Preserve Linux fixed Grok synthetic approval viewport evidence
+        if: ${{ !cancelled() && (steps.grok_approval_viewport.outcome == 'success' || steps.grok_approval_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-grok-approval-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-approval-evidence/linux
           if-no-files-found: warn
           retention-days: 14
 
@@ -1412,6 +1452,13 @@ jobs:
         shell: pwsh
         run: cargo check -p warp --lib
 
+      - name: Test Claude image and skill regressions on Windows
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: >-
+          cargo nextest run --no-fail-fast -p warp --lib
+          -E 'test(ai::cli_agent_runtime::claude::tests::image_tests::)'
+
       # Windows named-pipe stream 与创建它的 Tokio reactor 绑定；直接覆盖超大帧后的恢复路径。
       - name: Test IPC frame-limit recovery
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success') }}
@@ -1890,6 +1937,32 @@ jobs:
         with:
           name: cli-windows-grok-static-viewport-${{ github.sha }}
           path: ${{ runner.temp }}/gui-grok-view-evidence/windows
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Verify Windows fixed Grok bilingual synthetic approval viewport
+        id: grok_approval_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_approval_synthetic }}
+        shell: pwsh
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-approval-evidence/windows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build -p integration --bin integration
+          if ($LASTEXITCODE -ne 0) { throw 'Grok synthetic approval GUI integration binary compilation failed' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Grok synthetic approval GUI integration binary discovery failed' }
+          $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
+          ./script/cli-agent-parity/run_windows_grok_approval_viewport.ps1 -Binary $binary
+
+      - name: Preserve Windows fixed Grok synthetic approval viewport evidence
+        if: ${{ !cancelled() && (steps.grok_approval_viewport.outcome == 'success' || steps.grok_approval_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-grok-approval-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-approval-evidence/windows
           if-no-files-found: warn
           retention-days: 14
 

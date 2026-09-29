@@ -399,6 +399,55 @@ struct ManagedRequest {
     reply: oneshot::Sender<Result<(), String>>,
 }
 
+#[cfg(feature = "integration_tests")]
+pub(crate) struct V05ApprovalFixtureInbox {
+    receiver: mpsc::Receiver<ManagedRequest>,
+    observed: Vec<ManagedRequest>,
+}
+
+#[cfg(feature = "integration_tests")]
+impl V05ApprovalFixtureInbox {
+    pub(crate) fn observe(
+        &mut self,
+        approval_id: &str,
+        decision: super::ApprovalDecision,
+    ) -> Result<bool, String> {
+        let request = match self.receiver.try_recv() {
+            Ok(request) => request,
+            Err(mpsc::error::TryRecvError::Empty) => return Ok(false),
+            Err(mpsc::error::TryRecvError::Disconnected) => {
+                return Err("V05 夹具命令队列意外断开".into());
+            }
+        };
+        if request.expected_generation != 1
+            || request.from_mailbox
+            || request.message_id.is_nil()
+            || !matches!(
+                &request.action,
+                RuntimeAction::RespondApproval {
+                    approval_id: actual_id,
+                    decision: actual_decision,
+                } if actual_id == approval_id && *actual_decision == decision
+            )
+        {
+            return Err(format!(
+                "V05 审批动作不匹配：预期 {approval_id}/{decision:?}/第 1 代，实际 {:?}/第 {} 代，mailbox={}",
+                request.action, request.expected_generation, request.from_mailbox
+            ));
+        }
+        self.observed.push(request);
+        Ok(true)
+    }
+
+    pub(crate) fn observed_count(&self) -> usize {
+        self.observed.len()
+    }
+
+    pub(crate) fn has_unexpected_request(&mut self) -> bool {
+        self.receiver.try_recv().is_ok()
+    }
+}
+
 struct RecoveredHost {
     snapshot: ManagedTaskSnapshot,
     options: SessionOptions,
@@ -493,6 +542,33 @@ impl LocalCLITaskCoordinator {
         let mut coordinator = Self::new(None);
         coordinator.restored = records;
         coordinator
+    }
+
+    #[cfg(feature = "integration_tests")]
+    pub(crate) fn install_v05_approval_fixture(
+        &mut self,
+        snapshot: ManagedTaskSnapshot,
+        ctx: &mut ModelContext<Self>,
+    ) -> V05ApprovalFixtureInbox {
+        assert_eq!(snapshot.task.harness, "grok");
+        assert_eq!(snapshot.approvals.len(), 2);
+        assert!(snapshot.ready && snapshot.connected);
+        let (commands, receiver) = mpsc::channel(4);
+        self.entries.insert(
+            snapshot.task.task_id.clone(),
+            ManagedTaskEntry {
+                token: Uuid::new_v4(),
+                snapshot,
+                commands,
+                pending_tool_calls: HashSet::new(),
+            },
+        );
+        ctx.emit(LocalCLITaskCoordinatorEvent::Changed);
+        ctx.notify();
+        V05ApprovalFixtureInbox {
+            receiver,
+            observed: Vec::new(),
+        }
     }
 
     pub(crate) fn endpoint(&self, task_id: &str) -> Option<ManagedTaskEndpoint> {

@@ -11,6 +11,8 @@ mod bootstrapping;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod cli_composer_system_clipboard;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
+mod cli_grok_approval_viewport;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 mod cli_grok_static_viewport;
 mod code_review;
 mod context_error_text_layout;
@@ -64,6 +66,8 @@ pub use block_filtering::*;
 pub use bootstrapping::*;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub use cli_composer_system_clipboard::*;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+pub use cli_grok_approval_viewport::*;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub use cli_grok_static_viewport::*;
 pub use code_review::*;

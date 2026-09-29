@@ -405,6 +405,10 @@ integration_tests! {
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[ignore]
     test_cli_grok_static_viewport,
+    // 合成审批真实窗口同样需要固定 Grok 和专用图形 workflow。
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[ignore]
+    test_cli_grok_approval_viewport,
     test_rich_input_toggle_on_enter_inserts_newline_and_ctrl_enter_submits,
     // Regression: Enter must accept inline menus (not insert newline) when toggle=true
     test_rich_input_enter_accepts_menu_item_when_toggle_is_true,

@@ -9,6 +9,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use command::blocking::Command;
 use image::{ImageFormat, Rgba, RgbaImage};
+use serde_json::json;
 use sha2::{Digest, Sha256};
 use warpui::clipboard::ClipboardContent;
 use warpui::elements::{ScrollTarget, ScrollToPositionMode, get_rich_content_position_id};
@@ -24,26 +25,36 @@ use warpui::text_layout::{ClipConfig, DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont, Te
 use warpui::units::Pixels;
 use warpui::{App, SingletonEntity, TypedActionView, ViewHandle, WindowId, async_assert};
 
-use super::{LocalCLITaskManagerView, TaskManagerAction};
-use crate::ai::cli_agent_runtime::PermissionPolicy;
+use super::{LocalCLITaskManagerView, SavedLaunchOptions, TaskManagerAction};
+use crate::ai::cli_agent_runtime::coordinator::{
+    LocalCLITaskCoordinator, ManagedApproval, ManagedTaskSnapshot, V05ApprovalFixtureInbox,
+};
+use crate::ai::cli_agent_runtime::{ApprovalDecision, PermissionPolicy};
 #[cfg(target_os = "linux")]
 use crate::appearance::Appearance;
 use crate::features::FeatureFlag;
 use crate::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use crate::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
+use crate::persistence::model::{LocalCliTask, LocalCliTaskState};
 use crate::terminal::History;
 use crate::terminal::cli_agent::{CLIAgent, CLIAgentInstallModel, CLIAgentVersionStatus};
 use crate::workspace::WorkspaceAction;
+use uuid::Uuid;
 use warp_cli::agent::Harness;
 
 pub const CLI_CLIPBOARD_TEST_NAME: &str = "test_cli_composer_system_clipboard_multiline_and_image";
 pub const CLI_CLIPBOARD_TEXT: &str = "中文第一行 ASCII\n第二行 123";
 pub const V05_STATIC_TEST_NAME: &str = "test_cli_grok_static_viewport";
+pub const V05_APPROVAL_TEST_NAME: &str = "test_cli_grok_approval_viewport";
 
 const IMAGE_ENV: &str = "WARP_TEST_COMPOSER_CLIPBOARD_IMAGE";
 const PRODUCER_KEY: &str = "cli-composer-system-clipboard-producer";
 const V05_BOTTOM_SCROLL_KEY: &str = "v05-bottom-scroll-px";
 const V05_PREVIOUS_SCROLL_KEY: &str = "v05-previous-scroll-px";
+const V05_APPROVAL_INBOX_KEY: &str = "v05-approval-fixture-inbox";
+const V05_TASK_ID: &str = "00000000-0000-0000-0000-000000000005";
+const V05_ALLOW_ID: &str = "v05-synthetic-allow";
+const V05_DENY_ID: &str = "v05-synthetic-deny";
 
 struct ClipboardProducer(Child);
 
@@ -712,5 +723,239 @@ pub fn finish_v05_static_evidence() -> TestStep {
             serde_json::to_vec_pretty(&receipt).expect("序列化收据"),
         )
         .expect("保存部分收据");
+    })
+}
+
+pub fn prepare_v05_approval_fixture() -> TestStep {
+    TestStep::new("在真实 Grok 窗口放入合成审批卡片")
+        .with_action(|app, window_id, data| {
+            assert!(matches!(assert_v05_fixed_grok()(app, window_id), AssertionOutcome::Success));
+            let cwd = std::env::current_dir().expect("夹具工作目录");
+            let config = SavedLaunchOptions {
+                permission_policy: PermissionPolicy::GrokRestrictedFilesV1,
+                permission_ceiling: None,
+                claude_profile: None,
+                grok_profile: None,
+                model: Some("grok-4.7".into()),
+                local_tools: None,
+                selected_skills: Vec::new(),
+            };
+            let snapshot = ManagedTaskSnapshot {
+                task: LocalCliTask {
+                    version: 1,
+                    task_id: V05_TASK_ID.into(),
+                    parent_task_id: None,
+                    parent_generation: None,
+                    harness: "grok".into(),
+                    working_directory: cwd.to_string_lossy().into_owned(),
+                    config_json: serde_json::to_string(&config).expect("夹具配置序列化"),
+                    native_session_id: Some("v05-synthetic-session".into()),
+                    generation: 1,
+                    revision: 0,
+                    state: LocalCliTaskState::WaitingForUser,
+                    result: None,
+                    terminal_evidence: None,
+                },
+                ready: true,
+                connected: true,
+                active_turn_id: Some("v05-synthetic-turn".into()),
+                approvals: vec![
+                    ManagedApproval {
+                        approval_id: V05_ALLOW_ID.into(),
+                        turn_id: "v05-synthetic-turn".into(),
+                        method: "session/request_permission".into(),
+                        details: json!({
+                            "sessionId": "v05-synthetic-session",
+                            "toolCall": {
+                                "toolCallId": "v05-read-file",
+                                "toolName": "GrokBuild:read_file",
+                                "input": {"file_path": cwd.join("src/main.rs")}
+                            }
+                        }),
+                    },
+                    ManagedApproval {
+                        approval_id: V05_DENY_ID.into(),
+                        turn_id: "v05-synthetic-turn".into(),
+                        method: "session/request_permission".into(),
+                        details: json!({
+                            "sessionId": "v05-synthetic-session",
+                            "toolCall": {
+                                "toolCallId": "v05-write-file",
+                                "toolName": "GrokBuild:write_file",
+                                "input": {
+                                    "file_path": cwd.join("src/long-name-for-approval-layout.rs"),
+                                    "content": "A fixed synthetic approval payload for viewport layout"
+                                }
+                            }
+                        }),
+                    },
+                ],
+                output: String::new(),
+                error: None,
+            };
+            let inbox = app.update(|ctx| {
+                LocalCLITaskCoordinator::handle(ctx)
+                    .update(ctx, |model, ctx| model.install_v05_approval_fixture(snapshot, ctx))
+            });
+            data.insert(V05_APPROVAL_INBOX_KEY, inbox);
+            composer(app, window_id).update(app, |view, ctx| {
+                view.handle_action(&TaskManagerAction::SelectTask(V05_TASK_ID.into()), ctx);
+            });
+        })
+        .add_named_assertion("合成审批仅在固定 Grok 面板展示", |app, window_id| {
+            composer(app, window_id).read(app, |view, ctx| {
+                let snapshot = view.selected_snapshot(ctx);
+                async_assert!(
+                    view.harness == Harness::Grok
+                        && view.permission == PermissionPolicy::GrokRestrictedFilesV1
+                        && view.selected_task.as_deref() == Some(V05_TASK_ID)
+                        && snapshot.as_ref().is_some_and(|snapshot| snapshot.approvals.len() == 2)
+                        && view.approval_buttons.len() == 2,
+                    "合成审批快照未显示于真实 Grok 面板"
+                )
+            })
+        })
+}
+
+pub fn reveal_v05_approval(index: usize, decision: ApprovalDecision) -> TestStep {
+    let position_id = match decision {
+        ApprovalDecision::AllowOnce => format!("v05-approval-allow-{index}"),
+        ApprovalDecision::DenyOnce => format!("v05-approval-deny-{index}"),
+    };
+    TestStep::new("将 Grok 审批按钮滚入真实视口")
+        .with_action(move |app, window_id, _| {
+            composer(app, window_id).update(app, |view, ctx| {
+                view.body_scroll.scroll_to_position(ScrollTarget {
+                    position_id: position_id.clone(),
+                    mode: ScrollToPositionMode::FullyIntoView,
+                });
+                ctx.notify();
+            });
+        })
+        .add_named_assertion(
+            "审批卡片保持在同一任务和代次",
+            |app, window_id| {
+                composer(app, window_id).read(app, |view, ctx| {
+                    async_assert!(
+                        view.selected_snapshot(ctx).is_some_and(|snapshot| {
+                            snapshot.task.task_id == V05_TASK_ID
+                                && snapshot.task.generation == 1
+                                && snapshot.approvals.len() == 2
+                        }),
+                        "审批卡片切换了任务或代次"
+                    )
+                })
+            },
+        )
+}
+
+pub fn click_v05_approval(index: usize, decision: ApprovalDecision) -> TestStep {
+    let (approval_id, position_id) = match (index, decision) {
+        (0, ApprovalDecision::AllowOnce) => (V05_ALLOW_ID, "v05-approval-allow-0"),
+        (1, ApprovalDecision::DenyOnce) => (V05_DENY_ID, "v05-approval-deny-1"),
+        _ => panic!("未知合成审批按钮：{index}/{decision:?}"),
+    };
+    TestStep::new("鼠标点击真实 Grok 审批按钮")
+        .with_click_on_saved_position(position_id)
+        .add_named_assertion_with_data_from_prior_step(
+            "审批动作按原任务、代次和决策进入应用队列且按钮禁用",
+            move |app, window_id, data| {
+                let inbox = data
+                    .get_mut::<_, V05ApprovalFixtureInbox>(V05_APPROVAL_INBOX_KEY)
+                    .expect("合成审批接收器");
+                let observed = match inbox.observe(approval_id, decision) {
+                    Ok(observed) => observed,
+                    Err(error) => return AssertionOutcome::failure(error),
+                };
+                composer(app, window_id).read(app, |view, ctx| {
+                    let buttons = &view.approval_buttons[index];
+                    let disabled = buttons.allow.as_ref(ctx).is_disabled()
+                        && buttons.deny.as_ref(ctx).is_disabled();
+                    async_assert!(
+                        observed
+                            && disabled
+                            && buttons.task_id == V05_TASK_ID
+                            && buttons.task_generation == 1,
+                        "审批点击未进入夹具队列或按钮仍可重复点击：observed={observed}，disabled={disabled}"
+                    )
+                })
+            },
+        )
+}
+
+pub fn finish_v05_approval_evidence() -> TestStep {
+    TestStep::new("核对合成审批 GUI 截图和动作收据").with_action(|app, window_id, data| {
+        let inbox = data
+            .get_mut::<_, V05ApprovalFixtureInbox>(V05_APPROVAL_INBOX_KEY)
+            .expect("合成审批接收器");
+        assert_eq!(inbox.observed_count(), 2, "必须观察到允许和拒绝两次点击");
+        assert!(!inbox.has_unexpected_request(), "出现额外审批动作");
+        assert!(matches!(assert_v05_fixed_grok()(app, window_id), AssertionOutcome::Success));
+        let locale = std::env::var("WARP_TEST_GUI_LOCALE").expect("界面语言");
+        assert!(matches!(locale.as_str(), "en" | "zh-CN"));
+        assert_eq!(
+            crate::i18n::loader().expect("本地化加载器").current_languages()[0].to_string(),
+            locale
+        );
+        let size = std::env::var("WARP_TEST_GUI_SIZE").expect("视口尺寸");
+        let expected = match size.as_str() {
+            "compact" => (800.0, 600.0),
+            "normal" => (1280.0, 800.0),
+            _ => panic!("未知视口尺寸：{size}"),
+        };
+        let bounds = app.window_bounds(&window_id).expect("真实窗口边界");
+        assert_eq!((bounds.width(), bounds.height()), expected);
+        let root = PathBuf::from(std::env::var_os(ARTIFACTS_DIR_ENV_VAR).expect("截图根目录"))
+            .join(V05_APPROVAL_TEST_NAME);
+        let runs = fs::read_dir(&root)
+            .expect("截图目录")
+            .map(|entry| entry.expect("截图目录项").path())
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1, "只允许本轮真实窗口截图");
+        let mut screenshots = Vec::new();
+        for name in [
+            "allow-ready.png", "allow-pending.png", "deny-ready.png", "deny-pending.png",
+        ] {
+            let bytes = fs::read(runs[0].join(name)).expect("真实窗口截图");
+            let image = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
+                .expect("截图必须是 PNG")
+                .to_rgba8();
+            assert!(image.width() >= 640 && image.height() >= 400, "截图尺寸不足");
+            let first = image.get_pixel(0, 0);
+            assert!(image.pixels().any(|pixel| pixel != first), "截图不能是空白帧");
+            screenshots.push(json!({
+                "file": name,
+                "sha256": format!("{:x}", Sha256::digest(&bytes)),
+                "width": image.width(),
+                "height": image.height()
+            }));
+        }
+        let receipt = json!({
+            "schema": 1,
+            "test": V05_APPROVAL_TEST_NAME,
+            "platform": std::env::consts::OS,
+            "ui_locale": locale,
+            "requested_size": size,
+            "window_width": bounds.width(),
+            "window_height": bounds.height(),
+            "source_commit": std::env::var("WARP_TEST_GUI_SOURCE_COMMIT").expect("源码提交"),
+            "binary_sha256": v05_file_sha256(std::env::current_exe().expect("当前 GUI 测试程序")),
+            "grok_sha256": v05_file_sha256(PathBuf::from(std::env::var_os("INFINISHELL_TEST_GROK_EXE").expect("固定 Grok 路径"))),
+            "native_version": "1.0.41",
+            "model_inputs": 0,
+            "synthetic_approval_cards": 2,
+            "app_approval_actions": ["AllowOnce", "DenyOnce"],
+            "native_approval_requested": false,
+            "native_approval_resolved": false,
+            "visual_review_required": true,
+            "v05_complete": false,
+            "screenshots": screenshots
+        });
+        fs::write(
+            runs[0].join("receipt.safe.json"),
+            serde_json::to_vec_pretty(&receipt).expect("序列化收据"),
+        )
+        .expect("保存合成审批收据");
     })
 }
