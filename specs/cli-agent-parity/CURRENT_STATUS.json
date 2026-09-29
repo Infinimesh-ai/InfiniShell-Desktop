@@ -11,17 +11,19 @@
     "grok": "1.0.41"
   },
   "product_behavior_freeze": "e2eba85962bc6709d1ddce85bd9fadfa6e087df0",
-  "latest_related_verified_source_commit": "64bb5f6c3988a9ca463d2d8a6d79a81eb543b447",
+  "latest_related_verified_source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
   "latest_branch_cross_platform": {
-    "source_commit": "301040fe3c18c3ffc806f1b048f2e448bdc81ca5",
-    "run_id": 36503995096,
+    "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+    "run_id": 36561236364,
     "conclusion": "success",
-    "linux_main_tests": "3267/3267",
-    "windows_main_tests": "3077/3077",
+    "linux_main_tests": "3269/3269；rust-genai 81/81",
+    "windows_main_tests": "3080/3080；rust-genai 81/81；文件提交用例首次失败、重试通过，1 FLAKY",
     "desktop_tui_tests": "Linux 660/660; Windows 660/660",
-    "g03_drop_event_test": "Linux PASS; Unix PTY 测试未在 Windows 执行",
-    "archive_manifest_sha256": "6a447d8bfaf0b198cfca988fb14d67b800e45b41a9979e932b83d74c5bdc3c55",
-    "boundary": "普通源码门禁；不含在线模型、真实 Finder/Windows 文件拖放、G09 失败专项或交互式双语 GUI。晚于此提交的 G07 测试仅有 Mac 定向证据。"
+    "windows_desktop_tui_caveat": "上下文菜单引用用例 1 LEAK 标记；不能称全部普通通过或无泄漏标记",
+    "native_id_regression": "新增未配对 Claude 原生会话 ID 回归在 Linux/Windows 逐名 PASS",
+    "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
+    "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
+    "boundary": "同源码 Linux/Windows 选定离线门禁；Mac Intel 按条件跳过。不含两平台已认证模型、真实 GUI 或全部必要缺口验收。"
   },
   "g07_windows_invalidation_followup": {
     "source_commit": "e745a1a9dec1b8ad38ea7afb764bc251aeaecdc8",
@@ -79,6 +81,16 @@
     "signed_app_receipt_sha256": "9c09f907cc509229a79a40859cb4cd46c2550acd9e35cfdec4148eb33a8e4a31",
     "cleanup_manifest_sha256": "527e27a081190e56478052a31061cf5e14db27973ea95163f55706d37b9e1d90",
     "boundary": "父集合外技能只作派生拒绝，未真实派发越界 run_agents；GUI、冷恢复、受审命令、Grok 和 Linux/Windows 在线模型未验；G10 不关闭；无用户可见文案变化，无需本地化变更。"
+  },
+  "g10_native_id_cross_platform_offline_followup": {
+    "source_commit": "282f5c4a8261747a642c57f70f6aed85d7fa9846",
+    "run_id": 36561236364,
+    "conclusion": "Linux/Windows 作业成功，cargo check 及选定离线回归通过；未配对原生 ID 回归两平台逐名 PASS",
+    "windows_main_caveat": "文件提交用例首次未取得完成或拒绝事件，第二次通过，1 FLAKY",
+    "windows_desktop_tui_caveat": "上下文菜单引用用例 1 LEAK 标记",
+    "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
+    "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
+    "boundary": "无两平台已认证父子 Skill、GUI 或冷恢复；G10 仍开放；本轮无用户可见文案变化，无需本地化变更。"
   },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
