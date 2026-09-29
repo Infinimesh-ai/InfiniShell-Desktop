@@ -160,6 +160,16 @@
     "localization": "英中拒绝文案只作静态核对；真实 GUI 提示布局未触发，不能计通过",
     "closed_gaps": []
   },
+  "g03_rendered_event_batch_guard_followup": {
+    "implementation_commit": "64bb5f6c3988a9ca463d2d8a6d79a81eb543b447",
+    "status": "富输入编辑器会先消费文件 drop 并分拆混合批次；owned Grok 富输入打开时现由顶层先接收完整批次，再进入原有会话身份与整批拒绝守卫；G03 仍开放",
+    "local_test": "Mac arm64 真实渲染树模拟 DragAndDropFiles 1/1，通过 editor 焦点与 SavePosition 坐标触发：混合批次拒绝提示且附件/草稿不变、纯图片附加一张、owned 身份失配拒绝提示且无新图，PTY 写入零；原有 owned drop 测试 1/1、i18n 11/11、cargo check -p warp 通过",
+    "safe_receipt_sha256": "66786d39135ed3a2a09fde8c947e6e0204cc4b42020644e839eeb95d62e28560",
+    "evidence_boundary": "这是模拟的窗口 Event 路由，不是 Finder 到应用的原生跨应用拖放；英文和简体中文 toast 实际布局、Linux/Windows 及普通未绑定 PTY 尚待验",
+    "localization": "两条既有英文/简体中文拒绝提示语义和变量已复核，未变动用户文案，无需本地化变更",
+    "cleanup": "本轮短 TMPDIR 按 records 核对进程、launchd、打开文件后清理",
+    "closed_gaps": []
+  },
   "g09_windows_stdio_control_followup": {
     "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
     "status": "同 HEAD Windows 专项三项 1 通过/2 失败；普通文件 stderr 正对照通过，NUL 与固定 Node 仍失败，G09 开放",
@@ -171,6 +181,22 @@
     "archive_log_manifest_sha256": "8b27d5d445d95f5ceda69133f0bae4ed74b18057d15f3054ccc2902e4e11e966",
     "next_gate": "分别取得受限进程实际 NUL CreateFile 和目标 desktop 访问结果；旧 AccessCheck 模拟不证明根因，不改全局 ACL 或降低隔离",
     "localization": "测试诊断无用户界面文案变化，无需本地化变更",
+    "closed_gaps": []
+  },
+  "g09_actual_token_and_existing_station_followup": {
+    "implementation_commits": ["97a647351fb54493adb86aab6fa76aea456d4b0f", "c31d61fa70a2d23b5ecafd4ae2a2d28a3fb01be7", "10f99d6df9b8720548c0611c780b07e08d9ae1bb", "2d3297089b550e665423d011c82f8bb2b0c2ebdf"],
+    "runs": [36498757238, 36499906695, 36501584604, 36502343517],
+    "status": "Windows 实际零 capability AppContainer 令牌已直接证实 NUL 两种路径及两种写掩码均返回 Win32 error 5，同目录普通文件成功；现有非交互站私有 desktop 不足以使固定 Node 初始化，G09 开放",
+    "first_run": "run36498757238: warp libtest helper 启动后 0xc0000142，helper_report_present=false，cleanup/receipt=true；nextest 60 秒 TIMEOUT 遮住原生 FAIL；额外 stdio 工件未生成，完整日志及两个其他工件已归档",
+    "second_run": "run36499906695: Windows cargo check 和 508/24/1/14 前置检查通过；两项原生均 FAIL、零重试。helper 仍 0xc0000142、无 CreateFile 收据；现有非交互站内私有 desktop 名称/描述符/低完整性标签核验通过，Node 仍 0xc0000142、无版本输出；两项 Job/profile 清理确认",
+    "third_run": "run36501584604: 小型 Kernel32 C helper 由本提交 MSVC 编译，普通 runner token 基线启动并验证 120 字节收据；warp libtest 在新增解析闭包中以 E0277 编译失败，未进入 AppContainer。Agent 生命周期和 Grok 安装用例也因同一编译错误失败，额外 Grok 工件未生成；不能推断受限 NUL 访问。已在后续 2d3297089 修正 usize 索引并启动同提交复验",
+    "first_log_manifest_sha256": "df8d021420a14d971e44a3e7be090821628490c45f0f20e515d1c8962bf5d30f",
+    "second_log_manifest_sha256": "bdd5d3509e7b37c7e67eb5433bedfb92b9931eda61532a981899225949508544",
+    "third_log_manifest_sha256": "1b84e9652376a3c5270be33f57b195cc1737100b51137a0bd2006bdced922fa7",
+    "fourth_run": "run36502343517: 精确 2d3297089 Windows job success，主回归 508/508、command 24/24、未命名站 1/1、环境 14/14、原生 CreateFile 1/1；helper 基线及受限执行均正常，两掩码普通文件 opened=true/file_type=disk，NUL 与设备路径均 opened=false/win32_error=5；原生退出 0、Job/profile 清理与收据有效。此为直接 NUL 访问结果，不代表真实 npm 更新通过",
+    "fourth_log_manifest_sha256": "d6e57a4c32313b37cf913407ce328194c5b9fe251df807f59ed304e4810890f8",
+    "next_gate": "依据实际 NUL 访问拒绝证据设计不修改机器全局 ACL、不降低默认隔离的受控 npm 运行修复；并独立定位固定 Node 的 DLL 初始化失败，随后跑真实发布、回滚和冷恢复",
+    "localization": "仅测试和诊断，无需本地化变更",
     "closed_gaps": []
   },
   "g10_v2_pending_write_cancel_followup": {
@@ -223,6 +249,15 @@
     "safe_receipt_sha256": "95caa3053bbef37785a2bebe466cc23701912d1b728b2364eb9ab42f765062db",
     "cleanup": "进程组及打开文件清空，记录 cleanup_ready=true/status=cleaned，短目录已删除",
     "next_prerequisite": "专用私有测试配置完成原生登录后，再核对远端同 TTY 会话、Read 工具后代和历史 typed image 原字节",
+    "closed_gaps": []
+  },
+  "g08_private_grok_auth_boundary_followup": {
+    "status": "固定 Grok 1.0.41 的隔离配置未认证，未发送图片或取得模型回答；G08 仍开放",
+    "scope": "新私有 HOME／GROK_HOME、独立 leader socket、不继承认证环境；单轮模型标记探针退出 1、无标记和 auth.json",
+    "safe_receipt_sha256": "f640ca4ad9bded5aad4ca880cb3959869f3e8e1ad847950c50f41bfdb6ba5e76",
+    "cleanup": "私有进程退出，短 TMPDIR 记录 cleanup_ready=true 后经身份核验清理",
+    "code_review": "离线审查未发现可在无认证条件下确定复现的远端原生消费缺陷；已有 SSH 回环仅证明暂存传输",
+    "next_prerequisite": "专用私有原生登录和可交互 SSH／tmux 环境，用于真实 Read／typed image、模型回答、断连及旧回调验收",
     "closed_gaps": []
   },
   "current_exact_head_regular_cloud_followup": {
