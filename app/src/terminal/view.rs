@@ -29070,6 +29070,23 @@ impl View for TerminalView {
             element
         };
 
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        let final_element = if self.grok_owned_input.is_some()
+            && CLIAgentSessionsModel::as_ref(app).is_input_open(self.view_id)
+        {
+            TerminalSizeElement::new_owned_grok_file_drop_guard(final_element).finish()
+        } else {
+            final_element
+        };
+
         final_element
     }
 

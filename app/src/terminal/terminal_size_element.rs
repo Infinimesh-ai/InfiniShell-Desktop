@@ -14,12 +14,25 @@ use super::view::TerminalAction;
 
 pub struct TerminalSizeElement {
     child: Box<dyn Element>,
-    resize_tx: Sender<Vector2F>,
+    resize_tx: Option<Sender<Vector2F>>,
+    intercept_file_drop: bool,
 }
 
 impl TerminalSizeElement {
     pub fn new(resize_tx: Sender<Vector2F>, child: Box<dyn Element>) -> Self {
-        TerminalSizeElement { child, resize_tx }
+        TerminalSizeElement {
+            child,
+            resize_tx: Some(resize_tx),
+            intercept_file_drop: false,
+        }
+    }
+
+    pub fn new_owned_grok_file_drop_guard(child: Box<dyn Element>) -> Self {
+        TerminalSizeElement {
+            child,
+            resize_tx: None,
+            intercept_file_drop: true,
+        }
     }
 }
 
@@ -41,7 +54,9 @@ impl Element for TerminalSizeElement {
         // but we're showing a read-only terminal view, in which case, the
         // channel will be closed.  If we're unable to send a resize through
         // the channel, that's fine, just ignore the error.
-        let _ = self.resize_tx.try_send(terminal_size);
+        if let Some(resize_tx) = &self.resize_tx {
+            let _ = resize_tx.try_send(terminal_size);
+        }
     }
 
     fn paint(&mut self, origin: Vector2F, ctx: &mut PaintContext, app: &AppContext) {
@@ -70,6 +85,17 @@ impl Element for TerminalSizeElement {
         ctx: &mut EventContext,
         app: &AppContext,
     ) -> bool {
+        if self.intercept_file_drop
+            && let Some(z_index) = self.z_index()
+            && let Some(Event::DragAndDropFiles { paths, location }) =
+                event.at_z_index(z_index, ctx)
+            && self.mouse_position_is_in_bounds(*location)
+            && !paths.is_empty()
+        {
+            ctx.dispatch_typed_action(TerminalAction::DragAndDropFiles(paths.clone()));
+            return true;
+        }
+
         let handled_by_child = self.child.dispatch_event(event, ctx, app);
         let Some(z_index) = self.z_index() else {
             return false;

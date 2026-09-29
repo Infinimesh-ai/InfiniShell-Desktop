@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::process::Child;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
@@ -12,7 +14,8 @@ use futures::channel::oneshot;
 use futures::future::{Either, select};
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use warpui::r#async::Timer;
-use warpui::{App, TypedActionView, ViewHandle};
+use warpui::geometry::vector::vec2f;
+use warpui::{App, EntityIdSet, Presenter, TypedActionView, ViewHandle, WindowInvalidation};
 
 use super::*;
 use crate::ai::blocklist::{BlocklistAIContextEvent, PendingAttachment, PendingFile};
@@ -413,6 +416,155 @@ fn owned_grok_open_composer_routes_image_drops_without_pty_write() {
         terminal.update(&mut app, |view, ctx| {
             view.grok_owned_input.as_mut().unwrap().invalidated = true;
             view.drag_and_drop_files(&[first.to_string_lossy().into_owned()], ctx);
+        });
+        assert_eq!(writes.load(Ordering::SeqCst), 0);
+    });
+}
+
+#[test]
+fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
+    App::test((), |mut app| async move {
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let _images = FeatureFlag::ImageAsContext.override_enabled(true);
+        let (terminal, _pty) = owned_terminal(&mut app);
+        let window_id = app.window_ids()[0];
+        let writes = Arc::new(AtomicUsize::new(0));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if matches!(event, Event::WriteBytesToPty { .. }) {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        });
+        let root = tempfile::tempdir().unwrap();
+        let png = include_bytes!("../../editor/view/figma_utils/non-figma-export.png");
+        let first = root.path().join("first.png");
+        let second = root.path().join("second.png");
+        let other = root.path().join("other.txt");
+        std::fs::write(&first, png).unwrap();
+        std::fs::write(&second, png).unwrap();
+        std::fs::write(&other, b"not an image").unwrap();
+
+        let editor_position_id = terminal.update(&mut app, |view, ctx| {
+            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::FooterButton, ctx);
+            let editor = view.input.as_ref(ctx).editor().clone();
+            ctx.focus(&editor);
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+            view.input.as_ref(ctx).editor_save_position_id()
+        });
+        terminal.read(&app, |view, ctx| {
+            assert!(view.input.as_ref(ctx).editor().is_focused(ctx));
+        });
+
+        let (mixed_reported, mixed_notification) = oneshot::channel();
+        let (unavailable_reported, unavailable_notification) = oneshot::channel();
+        let mut mixed_reported = Some(mixed_reported);
+        let mut unavailable_reported = Some(unavailable_reported);
+        let non_image = crate::t!("cli-agent-input-non-image-drop-unavailable");
+        let unavailable = crate::t!("cli-agent-grok-owned-input-unavailable");
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event {
+                    if toast.main_text() == non_image
+                        && let Some(reported) = mixed_reported.take()
+                    {
+                        reported.send(()).unwrap();
+                    }
+                    if toast.main_text() == unavailable
+                        && let Some(reported) = unavailable_reported.take()
+                    {
+                        reported.send(()).unwrap();
+                    }
+                }
+            });
+        });
+
+        let mut updated = EntityIdSet::default();
+        for view_id in app.update(|ctx| ctx.view_ids_for_window(window_id)) {
+            updated.insert(view_id);
+        }
+        let presenter = Rc::new(RefCell::new(Presenter::new(window_id)));
+        app.update(|ctx| {
+            presenter.borrow_mut().invalidate(
+                WindowInvalidation {
+                    updated,
+                    ..Default::default()
+                },
+                ctx,
+            );
+            presenter
+                .borrow_mut()
+                .build_scene(vec2f(1024., 768.), 1., None, ctx);
+        });
+        let editor_bounds = presenter
+            .borrow()
+            .position_cache()
+            .get_position(&editor_position_id)
+            .unwrap();
+        let location = editor_bounds.origin() + vec2f(8., 8.);
+        assert!(editor_bounds.contains_point(location));
+        let original_draft =
+            terminal.read(&app, |view, ctx| view.input.as_ref(ctx).buffer_text(ctx));
+
+        let drop_files = |app: &mut App, paths: Vec<String>| {
+            app.update(|ctx| {
+                ctx.simulate_window_event(
+                    warpui::Event::DragAndDropFiles { paths, location },
+                    window_id,
+                    presenter.clone(),
+                );
+            });
+        };
+        drop_files(
+            &mut app,
+            vec![
+                first.to_string_lossy().into_owned(),
+                other.to_string_lossy().into_owned(),
+            ],
+        );
+        received_event(mixed_notification).await;
+        terminal.read(&app, |view, ctx| {
+            assert!(
+                view.ai_context_model
+                    .as_ref(ctx)
+                    .pending_images()
+                    .is_empty()
+            );
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
+        });
+
+        let context = terminal.read(&app, |view, _| view.ai_context_model.clone());
+        let (attached, received) = oneshot::channel();
+        let mut attached = Some(attached);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&context, move |model, event, ctx| {
+                if matches!(event, BlocklistAIContextEvent::UpdatedPendingContext { .. })
+                    && model.as_ref(ctx).pending_images().len() == 1
+                {
+                    if let Some(attached) = attached.take() {
+                        attached.send(()).unwrap();
+                    }
+                }
+            });
+        });
+        drop_files(&mut app, vec![first.to_string_lossy().into_owned()]);
+        received_event(received).await;
+        terminal.read(&app, |view, ctx| {
+            let images = view.ai_context_model.as_ref(ctx).pending_images();
+            assert_eq!(images.len(), 1);
+            assert_eq!(images[0].file_name, "first.png");
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
+        });
+
+        terminal.update(&mut app, |view, _| {
+            view.grok_owned_input.as_mut().unwrap().invalidated = true;
+        });
+        drop_files(&mut app, vec![second.to_string_lossy().into_owned()]);
+        received_event(unavailable_notification).await;
+        terminal.read(&app, |view, ctx| {
+            assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
+            assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
         });
         assert_eq!(writes.load(Ordering::SeqCst), 0);
     });
