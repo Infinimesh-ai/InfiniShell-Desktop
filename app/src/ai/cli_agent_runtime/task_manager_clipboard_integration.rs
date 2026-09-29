@@ -1,4 +1,4 @@
-//! 仅用于真实窗口与系统剪贴板验收，不启动原生任务或提交模型输入。
+//! 仅用于真实窗口的系统剪贴板与静态视口验收，不启动原生任务或提交模型输入。
 
 use std::fs;
 use std::io::Read;
@@ -21,22 +21,28 @@ use warpui::integration::{
 use warpui::platform::LineStyle;
 #[cfg(target_os = "linux")]
 use warpui::text_layout::{ClipConfig, DEFAULT_TOP_BOTTOM_RATIO, StyleAndFont, TextStyle};
-use warpui::{App, SingletonEntity, ViewHandle, WindowId, async_assert};
+use warpui::units::Pixels;
+use warpui::{App, SingletonEntity, TypedActionView, ViewHandle, WindowId, async_assert};
 
-use super::LocalCLITaskManagerView;
+use super::{LocalCLITaskManagerView, TaskManagerAction};
+use crate::ai::cli_agent_runtime::PermissionPolicy;
 #[cfg(target_os = "linux")]
 use crate::appearance::Appearance;
 use crate::features::FeatureFlag;
 use crate::integration_testing::terminal::wait_until_bootstrapped_single_pane_for_tab;
 use crate::integration_testing::view_getters::{single_terminal_view_for_tab, workspace_view};
 use crate::terminal::History;
+use crate::terminal::cli_agent::{CLIAgent, CLIAgentInstallModel, CLIAgentVersionStatus};
 use crate::workspace::WorkspaceAction;
+use warp_cli::agent::Harness;
 
 pub const CLI_CLIPBOARD_TEST_NAME: &str = "test_cli_composer_system_clipboard_multiline_and_image";
 pub const CLI_CLIPBOARD_TEXT: &str = "中文第一行 ASCII\n第二行 123";
+pub const V05_STATIC_TEST_NAME: &str = "test_cli_grok_static_viewport";
 
 const IMAGE_ENV: &str = "WARP_TEST_COMPOSER_CLIPBOARD_IMAGE";
 const PRODUCER_KEY: &str = "cli-composer-system-clipboard-producer";
+const V05_BOTTOM_SCROLL_KEY: &str = "v05-bottom-scroll-px";
 
 struct ClipboardProducer(Child);
 
@@ -465,4 +471,205 @@ pub fn finish_cli_clipboard_evidence() -> TestStep {
             .expect("保存安全收据");
         })
         .add_named_assertion("验收结束时草稿仍未提交", assert_cli_clipboard_draft(1))
+}
+
+pub fn wait_v05_fixed_grok_installation() -> TestStep {
+    TestStep::new("等待真实安装扫描识别固定 Grok").add_named_assertion(
+        "扫描结果绑定 Grok 1.0.41",
+        |app, _| {
+            let expected = PathBuf::from(
+                std::env::var_os("INFINISHELL_TEST_GROK_EXE").expect("固定 Grok 路径"),
+            );
+            app.update(|ctx| {
+                let installation = CLIAgentInstallModel::as_ref(ctx).installation(CLIAgent::Grok);
+                async_assert!(
+                    installation.is_some_and(|installation| {
+                        installation.version == CLIAgentVersionStatus::Detected("1.0.41".into())
+                            && installation.executable.as_deref() == Some(expected.as_path())
+                    }),
+                    "必须扫描到固定 Grok 1.0.41；当前安装={installation:?}"
+                )
+            })
+        },
+    )
+}
+
+pub fn assert_v05_fixed_grok() -> AssertionCallback {
+    Box::new(|app, window_id| {
+        let expected =
+            PathBuf::from(std::env::var_os("INFINISHELL_TEST_GROK_EXE").expect("固定 Grok 路径"));
+        composer(app, window_id).read(app, |view, ctx| {
+            let installation = CLIAgentInstallModel::as_ref(ctx).installation(CLIAgent::Grok);
+            async_assert!(
+                view.harness == Harness::Grok
+                    && installation.is_some_and(|installation| {
+                        installation.version == CLIAgentVersionStatus::Detected("1.0.41".into())
+                            && installation.executable.as_deref() == Some(expected.as_path())
+                    }),
+                "必须在真实界面选中扫描到的固定 Grok 1.0.41；当前安装={installation:?}"
+            )
+        })
+    })
+}
+
+pub fn select_v05_grok_policy(policy: PermissionPolicy) -> TestStep {
+    TestStep::new("选择固定 Grok 策略")
+        .with_action(move |app, window_id, _| {
+            composer(app, window_id).update(app, |view, ctx| {
+                view.handle_action(&TaskManagerAction::SelectHarness(Harness::Grok), ctx);
+                view.handle_action(&TaskManagerAction::SelectPermission(policy), ctx);
+                // 策略按钮与说明位于安装信息之后，截图时滚入可见区域。
+                view.body_scroll.scroll_to(Pixels::new(220.0));
+                ctx.notify();
+            });
+        })
+        .add_named_assertion(
+            "Grok 固定版本与所选策略均生效",
+            move |app, window_id| {
+                if !matches!(
+                    assert_v05_fixed_grok()(app, window_id),
+                    AssertionOutcome::Success
+                ) {
+                    return AssertionOutcome::failure("未扫描到固定 Grok 1.0.41".into());
+                }
+                composer(app, window_id).read(app, |view, ctx| {
+                    async_assert!(view.permission == policy, "策略未被界面接受：{policy:?}")
+                })
+            },
+        )
+}
+
+pub fn scroll_v05_grok(position: &'static str) -> TestStep {
+    TestStep::new("滚动 Grok 策略视口")
+        .with_action(move |app, window_id, data| {
+            composer(app, window_id).update(app, |view, ctx| {
+                let pixels = match position {
+                    "top" => 0.0,
+                    // 底部截图完成布局后，当前偏移就是裁剪后的真实最大值。
+                    "middle" => {
+                        let bottom = view.body_scroll.scroll_start().as_f32();
+                        data.insert(V05_BOTTOM_SCROLL_KEY, bottom);
+                        bottom / 2.0
+                    }
+                    "bottom" => 100_000.0,
+                    other => panic!("未知滚动位置：{other}"),
+                };
+                view.body_scroll.scroll_to(Pixels::new(pixels));
+                ctx.notify();
+            });
+        })
+        .add_named_assertion(
+            "滚动位置已改变且没有启动模型任务",
+            move |app, window_id| {
+                composer(app, window_id).read(app, |view, ctx| {
+                    let offset = view.body_scroll.scroll_start().as_f32();
+                    let normal_fully_visible = position == "middle"
+                        && offset == 0.0
+                        && std::env::var("WARP_TEST_GUI_SIZE").as_deref() == Ok("normal");
+                    async_assert!(
+                        view.tasks(ctx).is_empty()
+                            && (position == "top" || offset > 0.0 || normal_fully_visible),
+                        "滚动位置或任务数错误：{position}，offset={offset}，tasks={}",
+                        view.tasks(ctx).len()
+                    )
+                })
+            },
+        )
+}
+
+fn v05_file_sha256(path: PathBuf) -> String {
+    let mut file = fs::File::open(path).expect("读取本轮可执行文件");
+    let mut digest = Sha256::new();
+    let mut buffer = [0_u8; 65536];
+    loop {
+        let count = file.read(&mut buffer).expect("读取可执行文件摘要");
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+    }
+    format!("{:x}", digest.finalize())
+}
+
+pub fn finish_v05_static_evidence() -> TestStep {
+    TestStep::new("核对 Grok 静态截图并保存部分收据").with_action(|app, window_id, data| {
+        assert!(matches!(assert_v05_fixed_grok()(app, window_id), AssertionOutcome::Success));
+        let locale = std::env::var("WARP_TEST_GUI_LOCALE").expect("界面语言");
+        assert!(matches!(locale.as_str(), "en" | "zh-CN"));
+        assert_eq!(
+            crate::i18n::loader().expect("本地化加载器").current_languages()[0].to_string(),
+            locale
+        );
+        let requested_size = std::env::var("WARP_TEST_GUI_SIZE").expect("视口尺寸");
+        let bottom_scroll_px = *data
+            .get::<_, f32>(V05_BOTTOM_SCROLL_KEY)
+            .expect("必须在底部截图后记录实际滚动范围");
+        assert!(bottom_scroll_px.is_finite() && bottom_scroll_px >= 0.0);
+        if requested_size == "compact" {
+            assert!(bottom_scroll_px > 0.0, "紧凑视口必须覆盖真实滚动区域");
+        }
+        let expected = match requested_size.as_str() {
+            "compact" => (800.0, 600.0),
+            "normal" => (1280.0, 800.0),
+            _ => panic!("未知视口尺寸：{requested_size}"),
+        };
+        let bounds = app.window_bounds(&window_id).expect("真实窗口边界");
+        assert_eq!(
+            (bounds.width(), bounds.height()),
+            expected,
+            "真实窗口尺寸必须匹配本轮视口"
+        );
+        let root = PathBuf::from(std::env::var_os(ARTIFACTS_DIR_ENV_VAR).expect("截图根目录"))
+            .join(V05_STATIC_TEST_NAME);
+        let runs = fs::read_dir(&root)
+            .expect("截图目录")
+            .map(|entry| entry.expect("截图目录项").path())
+            .filter(|path| path.is_dir())
+            .collect::<Vec<_>>();
+        assert_eq!(runs.len(), 1, "只允许本轮真实窗口截图");
+        let mut screenshots = Vec::new();
+        for name in [
+            "inherit.png", "fixed-read.png", "fixed-files.png", "skill-disabled.png",
+            "scroll-top.png", "scroll-middle.png", "scroll-bottom.png",
+        ] {
+            let bytes = fs::read(runs[0].join(name)).expect("真实窗口截图");
+            let image = image::load_from_memory_with_format(&bytes, ImageFormat::Png)
+                .expect("截图必须是 PNG")
+                .to_rgba8();
+            assert!(image.width() >= 640 && image.height() >= 400, "截图尺寸不足");
+            let first = image.get_pixel(0, 0);
+            assert!(image.pixels().any(|pixel| pixel != first), "截图不能是空白帧");
+            screenshots.push(serde_json::json!({
+                "file": name,
+                "sha256": format!("{:x}", Sha256::digest(&bytes)),
+                "width": image.width(),
+                "height": image.height()
+            }));
+        }
+        let receipt = serde_json::json!({
+            "schema": 1,
+            "test": V05_STATIC_TEST_NAME,
+            "platform": std::env::consts::OS,
+            "ui_locale": locale,
+            "requested_size": requested_size,
+            "window_width": bounds.width(),
+            "window_height": bounds.height(),
+            "bottom_scroll_px": bottom_scroll_px,
+            "scroll_mode": if bottom_scroll_px > 0.0 { "scrollable" } else { "fully_visible" },
+            "source_commit": std::env::var("WARP_TEST_GUI_SOURCE_COMMIT").expect("源码提交"),
+            "binary_sha256": v05_file_sha256(std::env::current_exe().expect("当前 GUI 测试程序")),
+            "grok_sha256": v05_file_sha256(PathBuf::from(std::env::var_os("INFINISHELL_TEST_GROK_EXE").expect("固定 Grok 路径"))),
+            "native_version": "1.0.41",
+            "model_inputs": 0,
+            "approval_states_exercised": false,
+            "visual_review_required": true,
+            "v05_complete": false,
+            "screenshots": screenshots
+        });
+        fs::write(
+            runs[0].join("receipt.safe.json"),
+            serde_json::to_vec_pretty(&receipt).expect("序列化收据"),
+        )
+        .expect("保存部分收据");
+    })
 }

@@ -42,9 +42,13 @@ pub fn main() -> Result<()> {
             mcp_static_config: None,
         },
     );
-    if args.integration_test_name.as_deref()
-        == Some("test_cli_composer_system_clipboard_multiline_and_image")
-    {
+    if matches!(
+        args.integration_test_name.as_deref(),
+        Some(
+            "test_cli_composer_system_clipboard_multiline_and_image"
+                | "test_cli_grok_static_viewport"
+        )
+    ) {
         // 使用正式桌面入口的默认配置，不能由用例单独强开托管功能。
         state = state.with_additional_features(warp::features::INFINISHELL_DESKTOP_FLAGS);
     }
@@ -524,6 +528,8 @@ fn register_tests() -> HashMap<&'static str, BoxedBuilderFn> {
     // Full-stack wiring guard: toggle ON → Enter inserts newline, Ctrl+Enter submits.
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     register_test!(test_cli_composer_system_clipboard_multiline_and_image);
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    register_test!(test_cli_grok_static_viewport);
     register_test!(test_rich_input_toggle_on_enter_inserts_newline_and_ctrl_enter_submits);
     // Regression: Enter must accept inline menus (not insert newline) when toggle=true (PR #11723)
     register_test!(test_rich_input_enter_accepts_menu_item_when_toggle_is_true);

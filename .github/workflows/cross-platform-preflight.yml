@@ -36,6 +36,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_grok_viewport_static:
+        description: 单独采集 Linux/Windows 固定 Grok 英中静态视口，审批仍待在线验收
+        required: true
+        default: false
+        type: boolean
       linux_gui_only:
         description: 仅补验 Linux 真实 GUI 系统剪贴板；全量模式优先
         required: true
@@ -277,7 +282,7 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
         id: fixed_grok
         shell: bash
         timeout-minutes: 5
@@ -771,6 +776,29 @@ jobs:
           name: cli-linux-gui-system-clipboard-${{ github.sha }}
           path: ${{ runner.temp }}/gui-input-evidence/linux
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify Linux fixed Grok bilingual static viewport
+        id: grok_static_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_static }}
+        shell: bash
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-view-evidence/linux
+        run: |
+          set -euo pipefail
+          cargo build -p integration --bin integration
+          target_dir="$(cargo metadata --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          bash script/cli-agent-parity/run_linux_grok_static_viewport.sh "$target_dir/debug/integration"
+
+      - name: Preserve Linux fixed Grok static viewport evidence
+        if: ${{ !cancelled() && (steps.grok_static_viewport.outcome == 'success' || steps.grok_static_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-linux-grok-static-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-view-evidence/linux
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Run desktop workspace unit tests
@@ -1837,6 +1865,32 @@ jobs:
           name: cli-windows-gui-system-clipboard-${{ github.sha }}
           path: ${{ runner.temp }}/gui-input-evidence/windows
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Verify Windows fixed Grok bilingual static viewport
+        id: grok_static_viewport
+        if: ${{ !cancelled() && steps.check_app.outcome == 'success' && steps.fixed_grok.outcome == 'success' && github.event_name == 'workflow_dispatch' && inputs.run_grok_viewport_static }}
+        shell: pwsh
+        timeout-minutes: 30
+        env:
+          WARP_TEST_GUI_SOURCE_COMMIT: ${{ github.sha }}
+          WARP_INTEGRATION_TEST_ARTIFACTS_DIR: ${{ runner.temp }}/gui-grok-view-evidence/windows
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build -p integration --bin integration
+          if ($LASTEXITCODE -ne 0) { throw 'Grok GUI integration binary compilation failed' }
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Grok GUI integration binary discovery failed' }
+          $binary = Join-Path $metadata.target_directory 'debug\integration.exe'
+          ./script/cli-agent-parity/run_windows_grok_static_viewport.ps1 -Binary $binary
+
+      - name: Preserve Windows fixed Grok static viewport evidence
+        if: ${{ !cancelled() && (steps.grok_static_viewport.outcome == 'success' || steps.grok_static_viewport.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cli-windows-grok-static-viewport-${{ github.sha }}
+          path: ${{ runner.temp }}/gui-grok-view-evidence/windows
+          if-no-files-found: warn
           retention-days: 14
 
       - name: Run desktop workspace unit tests
