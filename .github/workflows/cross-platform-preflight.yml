@@ -366,6 +366,11 @@ jobs:
         shell: bash
         run: cargo check -p warp --lib
 
+      - name: Test Claude image acceptance runner on Linux
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: bash
+        run: python3 -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
+
       - name: Test Claude image and skill regressions on Linux
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: bash
@@ -1451,6 +1456,11 @@ jobs:
         if: ${{ !cancelled() && steps.windows_toolchain.outcome == 'success' }}
         shell: pwsh
         run: cargo check -p warp --lib
+
+      - name: Test Claude image acceptance runner on Windows
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        run: python -B script/cli-agent-parity/claude_rich_image_runner_portability_tests.py -v
 
       - name: Test Claude image and skill regressions on Windows
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
