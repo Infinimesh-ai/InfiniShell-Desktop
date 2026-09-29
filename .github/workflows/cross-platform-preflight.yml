@@ -1529,6 +1529,59 @@ jobs:
             'g09_tokens' { $atomicDebugFilter = 'test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_appcontainer_token_createfile_nul_vs_regular) | test(=ai::cli_agent_runtime::managed_process::atomic_windows::tests::console_binding::npm_fixed_node_root_with_existing_station_desktop)' }
             default { throw 'Windows 原生调试范围无效' }
           }
+          if ($env:ATOMIC_WINDOWS_DEBUG_SCOPE -in @('all', 'nul_token', 'g09_tokens')) {
+            # 小型测试映像仅由本次 checkout 的 C 源编译；缺 MSVC/SDK 时在诊断前停止。
+            $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+            if (-not (Test-Path -LiteralPath $vswhere)) { throw 'MSVC discovery tool is missing' }
+            $vsInstall = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+            if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($vsInstall)) { throw 'MSVC x64 toolset is unavailable' }
+            $vcvars = Join-Path $vsInstall.Trim() 'VC\Auxiliary\Build\vcvars64.bat'
+            if (-not (Test-Path -LiteralPath $vcvars)) { throw 'MSVC x64 environment is missing' }
+            $helperDirectory = Join-Path $env:RUNNER_TEMP ('infinishell-nul-helper-' + [guid]::NewGuid().ToString())
+            New-Item -ItemType Directory -Path $helperDirectory | Out-Null
+            $helperSource = (Resolve-Path -LiteralPath 'app/src/ai/cli_agent_runtime/fixtures/windows_nul_createfile_helper.c').Path
+            $helperObject = Join-Path $helperDirectory 'nul-createfile.obj'
+            $helperExecutable = Join-Path $helperDirectory 'nul-createfile.exe'
+            $buildScript = Join-Path $helperDirectory 'build-helper.cmd'
+            foreach ($boundPath in @($vcvars, $helperDirectory, $helperSource)) {
+              if ($boundPath -match '[%!"&|<>^]') { throw 'Win32 helper build path contains CMD metacharacters' }
+            }
+            @(
+              '@echo off'
+              "call `"$vcvars`" >nul || exit /b 1"
+              "cl.exe /nologo /std:c11 /utf-8 /W4 /WX /GS- /Zl /c /Fo`"$helperObject`" `"$helperSource`" || exit /b 1"
+              "link.exe /nologo /NODEFAULTLIB /ENTRY:ProbeMain /SUBSYSTEM:WINDOWS /MACHINE:X64 /OUT:`"$helperExecutable`" `"$helperObject`" kernel32.lib || exit /b 1"
+            ) | Set-Content -LiteralPath $buildScript -Encoding ascii
+            & cmd.exe /d /v:off /c "`"$buildScript`""
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $helperExecutable)) { throw 'Fixed Win32 CreateFile helper build failed' }
+            $baselineDirectory = Join-Path $helperDirectory 'baseline'
+            New-Item -ItemType Directory -Path $baselineDirectory | Out-Null
+            $baselineOrdinary = Join-Path $baselineDirectory 'ordinary.txt'
+            $baselineReport = Join-Path $baselineDirectory 'receipt.bin'
+            [IO.File]::WriteAllBytes($baselineOrdinary, [byte[]](1))
+            $previousReport = $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT
+            $previousOrdinary = $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY
+            try {
+              $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT = $baselineReport
+              $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY = $baselineOrdinary
+              $baselineProcess = Start-Process -FilePath $helperExecutable -WorkingDirectory $baselineDirectory -Wait -PassThru
+              if ($baselineProcess.ExitCode -ne 0) { throw 'Fixed Win32 CreateFile helper baseline exited abnormally' }
+              $baselineBytes = [IO.File]::ReadAllBytes($baselineReport)
+              if ($baselineBytes.Length -ne 120 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 0) -ne 0x4e554c31 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 24) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 36) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 72) -ne 1 -or
+                  [BitConverter]::ToUInt32($baselineBytes, 84) -ne 1) { throw 'Fixed Win32 CreateFile helper baseline receipt is invalid' }
+            } finally {
+              [Environment]::SetEnvironmentVariable('INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT', $previousReport, 'Process')
+              [Environment]::SetEnvironmentVariable('INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY', $previousOrdinary, 'Process')
+            }
+            $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER = $helperExecutable
+            $env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256 = (Get-FileHash -LiteralPath $helperExecutable -Algorithm SHA256).Hash.ToLowerInvariant()
+            $helperSourceSha256 = (Get-FileHash -LiteralPath $helperSource -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Output "atomic_windows_createfile_helper_baseline=true source_sha256=$helperSourceSha256 helper_sha256=$env:INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256"
+          }
           # 只向显式原生对照传入已安装的固定 Node；候选仍复制到私有目录并核摘要。
           $nodeControl = (Get-Command node.exe -CommandType Application).Source
           $nodeControlVersion = & $nodeControl --version
@@ -1545,7 +1598,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Preserve Windows Node stdio control evidence
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.atomic_windows_debug.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT != '' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'nul_token' && steps.atomic_windows_debug.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NODE_CONTROL_OUTPUT != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: windows-node-stdio-controls-${{ github.sha }}

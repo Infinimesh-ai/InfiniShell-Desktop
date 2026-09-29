@@ -1,11 +1,8 @@
-use std::os::windows::ffi::OsStrExt as _;
-use std::os::windows::io::FromRawHandle as _;
 use std::sync::mpsc;
 
 use windows::Win32::Foundation::GENERIC_WRITE;
 use windows::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_WRITE, FILE_SHARE_DELETE, FILE_SHARE_WRITE,
-    OPEN_EXISTING,
+    FILE_GENERIC_WRITE, FILE_SHARE_DELETE, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 
@@ -531,66 +528,63 @@ fn npm_cmd_nul_redirection_runs_between_builtin_controls() {
 }
 
 const NUL_CREATEFILE_REPORT_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_REPORT";
+const NUL_CREATEFILE_ORDINARY_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_ORDINARY";
+const NUL_CREATEFILE_HELPER_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER";
+const NUL_CREATEFILE_HELPER_SHA256_ENV: &str = "INFINISHELL_WINDOWS_NUL_CREATEFILE_HELPER_SHA256";
 
-fn createfile_write_result(path: &Path, desired_access: u32) -> serde_json::Value {
-    let mut wide: Vec<u16> = path.as_os_str().encode_wide().collect();
-    wide.push(0);
-    let opened = unsafe {
-        CreateFileW(
-            PCWSTR(wide.as_ptr()),
-            desired_access,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            None,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            None,
-        )
-    };
-    match opened {
-        Ok(handle) => {
-            let file_type = unsafe { GetFileType(handle) };
-            drop(unsafe { File::from_raw_handle(handle.0) });
-            serde_json::json!({
-                "opened": true,
-                "win32_error": 0,
-                "file_type": file_type.0,
-            })
-        }
-        Err(error) => {
-            let hresult = error.code().0 as u32;
-            serde_json::json!({
-                "opened": false,
-                "hresult": hresult,
-                "win32_error": (hresult & 0xffff_0000 == 0x8007_0000)
-                    .then_some(hresult & 0xffff),
-            })
+fn parse_createfile_receipt(bytes: &[u8]) -> Option<serde_json::Value> {
+    if bytes.len() != 120 {
+        return None;
+    }
+    let words: Vec<u32> = bytes
+        .chunks_exact(4)
+        .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
+        .collect();
+    if words[..6]
+        != [
+            0x4e55_4c31,
+            1,
+            GENERIC_WRITE.0,
+            FILE_GENERIC_WRITE.0,
+            (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE).0,
+            OPEN_EXISTING.0,
+        ]
+    {
+        return None;
+    }
+    for result in words[6..].chunks_exact(4) {
+        if result[0] > 1 || result[3] > 1 || result[0] == 0 && result[3] != 0 {
+            return None;
         }
     }
+    let result = |access_index, target_index| {
+        let offset = 6 + (access_index * 3 + target_index) * 4;
+        serde_json::json!({
+            "opened": words[offset] == 1,
+            "win32_error": words[offset + 1],
+            "file_type": words[offset + 2],
+            "close_confirmed": words[offset + 3] == 1,
+        })
+    };
+    let compare = |access_index| {
+        serde_json::json!({
+            "desired_access": words[2 + access_index],
+            "regular": result(access_index, 0),
+            "nul": result(access_index, 1),
+            "device_nul": result(access_index, 2),
+        })
+    };
+    Some(serde_json::json!({
+        "share_mode": words[4],
+        "creation_disposition": words[5],
+        "generic_write": compare(0),
+        "file_generic_write": compare(1),
+    }))
 }
 
 #[test]
 #[ignore = "实际受限 AppContainer 令牌须直接打开 NUL 和同目录普通文件"]
 fn npm_appcontainer_token_createfile_nul_vs_regular() {
-    if let Some(report) = std::env::var_os(NUL_CREATEFILE_REPORT_ENV) {
-        let report = PathBuf::from(report);
-        let compare = |desired_access| {
-            serde_json::json!({
-                "desired_access": desired_access,
-                "regular": createfile_write_result(&report.parent().unwrap().join("ordinary.txt"), desired_access),
-                "nul": createfile_write_result(Path::new("NUL"), desired_access),
-                "device_nul": createfile_write_result(Path::new(r"\\.\NUL"), desired_access),
-            })
-        };
-        let observation = serde_json::json!({
-            "share_mode": (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE).0,
-            "creation_disposition": OPEN_EXISTING.0,
-            "generic_write": compare(GENERIC_WRITE.0),
-            "file_generic_write": compare(FILE_GENERIC_WRITE.0),
-        });
-        fs::write(&report, serde_json::to_vec(&observation).unwrap()).unwrap();
-        return;
-    }
-
     let name = "console_binding::npm_appcontainer_token_createfile_nul_vs_regular";
     if std::env::var_os(DEBUG_DRIVER_ENV).is_none() {
         run_debug_fixture_in_strict_job(name, DEBUG_LARGE_IMAGE_TIMEOUT);
@@ -602,8 +596,15 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
     for relative in ["home", "config", "cache", "data", "tmp"] {
         fs::create_dir(root.join(relative)).unwrap();
     }
-    let source = std::env::current_exe().unwrap().canonicalize().unwrap();
+    let source = PathBuf::from(std::env::var_os(NUL_CREATEFILE_HELPER_ENV).unwrap())
+        .canonicalize()
+        .unwrap();
     let expected_source = ExpectedFileIdentity::capture(&source).unwrap();
+    assert_eq!(
+        expected_source.sha256,
+        std::env::var(NUL_CREATEFILE_HELPER_SHA256_ENV).unwrap(),
+        "固定 Win32 helper 摘要不匹配"
+    );
     let source_lease = prepare(&expected_source).unwrap();
     let mut source_file = source_lease.program.try_clone().unwrap();
     source_file.rewind().unwrap();
@@ -626,23 +627,24 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
     lease
         .set_package_images(vec![expected_helper.clone()])
         .unwrap();
-    lease.enable_npm_console_host().unwrap();
     let cwd = prepare_directory(&AtomicDirectoryIdentity::capture(&root).unwrap()).unwrap();
     let execution_cwd = PathBuf::from(root.to_str().unwrap().strip_prefix(r"\\?\").unwrap());
     assert_eq!(execution_cwd.canonicalize().unwrap(), root);
-    let (_, test_module) = module_path!().split_once("::").unwrap();
-    let exact_name = format!("{test_module}::npm_appcontainer_token_createfile_nul_vs_regular");
-    let arguments = format!("--ignored --exact {exact_name} --nocapture --test-threads=1");
     let report = root.join("tmp/createfile-actual.json");
+    let ordinary = root.join("tmp/ordinary.txt");
     let mut environment = super::super::super::version_probe::resolved_environment(&root).unwrap();
     environment.push((
         NUL_CREATEFILE_REPORT_ENV.into(),
         report.clone().into_os_string(),
     ));
+    environment.push((
+        NUL_CREATEFILE_ORDINARY_ENV.into(),
+        ordinary.clone().into_os_string(),
+    ));
     let mut debugger = lease.prepare_image_debug_session().unwrap();
     let mut process = AppContainerProbe::spawn_package_suspended_with_execution_cwd(
         lease.execution_path(),
-        arguments.as_ref(),
+        "--createfile-control".as_ref(),
         cwd.execution_path(),
         &execution_cwd,
         &environment,
@@ -651,7 +653,7 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
     )
     .unwrap();
     // 授权后创建，令普通文件继承私有 tmp 的 AppContainer ACE；两个目标均以 OPEN_EXISTING 打开。
-    fs::write(root.join("tmp/ordinary.txt"), b"ordinary-control").unwrap();
+    fs::write(&ordinary, b"ordinary-control").unwrap();
     let cancellation = Arc::new(AtomicBool::new(false));
     debugger.bind_cancellation(cancellation.clone());
     let (completed, completion) = mpsc::channel();
@@ -680,9 +682,8 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
     let cleanup = termination.and_then(|()| process.write_cleanup_receipt(&receipt));
     let receipt_matches = fs::read(&receipt)
         .is_ok_and(|bytes| bytes == b"appcontainer-no-capabilities-job-empty-profile-deleted-v1\n");
-    let observation = fs::read(&report)
-        .ok()
-        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    let report_bytes = fs::read(&report).ok();
+    let observation = report_bytes.as_deref().and_then(parse_createfile_receipt);
     eprintln!(
         "atomic_windows_actual_createfile_control={}",
         serde_json::json!({
@@ -690,7 +691,8 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
             "native_exit_code": result.as_ref().ok().copied(),
             "failure_kind": result.as_ref().err().map(|failure| format!("{:?}", failure.kind())),
             "os_code": result.as_ref().err().and_then(io::Error::raw_os_error),
-            "helper_report_present": observation.is_some(),
+            "helper_report_present": report_bytes.is_some(),
+            "helper_receipt_valid": observation.is_some(),
             "observation": observation,
             "cleanup_confirmed": cleanup.is_ok(),
             "receipt_matches": receipt_matches,
@@ -707,6 +709,12 @@ fn npm_appcontainer_token_createfile_nul_vs_regular() {
         assert_eq!(observation[name]["desired_access"], mask);
         assert_eq!(observation[name]["regular"]["opened"], true);
         assert_eq!(observation[name]["regular"]["file_type"], FILE_TYPE_DISK.0);
+        assert_eq!(observation[name]["regular"]["close_confirmed"], true);
+        for target in ["nul", "device_nul"] {
+            if observation[name][target]["opened"] == true {
+                assert_eq!(observation[name][target]["close_confirmed"], true);
+            }
+        }
     }
     record_debug_native_exit(name);
 }
