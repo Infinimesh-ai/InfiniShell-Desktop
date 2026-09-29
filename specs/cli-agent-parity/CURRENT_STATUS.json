@@ -92,6 +92,17 @@
     "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
     "boundary": "无两平台已认证父子 Skill、GUI 或冷恢复；G10 仍开放；本轮无用户可见文案变化，无需本地化变更。"
   },
+  "g10_native_overbound_mac_positive": {
+    "source_commit": "9ddca1e92d510c51dcad04b246c74afac253de03",
+    "run_id": "g10-overbound-live-00e35a04",
+    "fixed_native": "Mac 官方 Claude 2.1.280 / claude-opus-5-5，已认证默认账号",
+    "conclusion": "同一父任务第二回合真实请求包含未选 beta 技能的 run_agents；原生审批及工具请求到达，当前代持久工具结果为错误，父回合完成且未创建新子任务；原父子 Skill 正例再次通过",
+    "source_boundary": "签名监督程序为 282f5c4a8 的产品二进制；此后到测试提交 9ddca1e92 只有测试和验收文档改动，没有非测试产品源码变化",
+    "local_gate": "cargo check -p warp --tests；cargo check -p warp；i18n 11/11；嵌入资源配置的 libtest 构建；真实隔离链通过",
+    "safe_receipt_sha256": "b9a5c304db9380c882f9b3cb5f2b846111cd8fde87d55ceb293d4e5c3dffe4b7",
+    "cleanup_manifest_sha256": "cd205861ba73ce6c2b380e33226ecb411792a65d16341cb8b512ad97d8d71b78",
+    "boundary": "只覆盖 Mac 固定 Claude 的原生越界派发拒绝；GUI、冷恢复、其它受审工具、Grok 与 Linux/Windows 在线链未完成，G10 开放；无用户可见文案变化，无需本地化变更。"
+  },
   "v05_static_viewport_initial": {
     "source_commit": "b705868bf2b61d2d186691ced1273a2d8a3525fc",
     "run_id": 36525713293,
