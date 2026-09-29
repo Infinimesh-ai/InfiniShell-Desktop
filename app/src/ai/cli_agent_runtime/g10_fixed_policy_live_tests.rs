@@ -5,9 +5,12 @@ use std::fs::{self, File};
 use std::io::Write as _;
 
 use ai::skills::parse_skill;
+use repo_metadata::repositories::DetectedRepositories;
+use repo_metadata::{DirectoryWatcher, RepoMetadataModel};
 use serde_json::{Value, json};
 use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
+use watcher::HomeDirectoryWatcher;
 
 use super::*;
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
@@ -16,9 +19,11 @@ use crate::ai::cli_agent_runtime::permissions::ceiling_from_parent;
 use crate::ai::cli_agent_runtime::runtime_host::{NativeProcessCompletion, confirmed_exit};
 use crate::ai::cli_agent_runtime::{ApprovalDecision, current_state_dir};
 use crate::ai::skills::SkillManager;
+use crate::settings::AISettings;
 use crate::terminal::cli_agent::{
     CLIAgentInstallModel, CLIAgentInstallation, CLIAgentVersionStatus,
 };
+use crate::warp_managed_paths_watcher::WarpManagedPathsWatcher;
 
 const SCOPE: &str = "real_claude_g10_fixed_skill_parent_child";
 const MARKER: &str = "G10_SKILL_BODY_7f3b8e24";
@@ -590,6 +595,13 @@ fn real_claude_g10_fixed_skill_parent_child() {
     App::test((), |mut app| async move {
         crate::test_util::settings::initialize_settings_for_tests(&mut app);
         let _enabled = FeatureFlag::LocalCLIManagedTasks.override_enabled(true);
+        let _bundled = FeatureFlag::BundledSkills.override_enabled(false);
+        app.add_singleton_model(DirectoryWatcher::new);
+        app.add_singleton_model(AISettings::new_with_defaults);
+        app.add_singleton_model(|_| DetectedRepositories::default());
+        app.add_singleton_model(RepoMetadataModel::new);
+        app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
+        app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
         let executable = PathBuf::from(env::var_os("INFINISHELL_CLAUDE_LIVE_EXECUTABLE").unwrap());
         app.add_singleton_model(|_| {
             CLIAgentInstallModel::with_installation_for_test(
