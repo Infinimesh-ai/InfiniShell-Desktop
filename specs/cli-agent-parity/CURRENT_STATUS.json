@@ -23,6 +23,15 @@
     "archive_manifest_sha256": "6a447d8bfaf0b198cfca988fb14d67b800e45b41a9979e932b83d74c5bdc3c55",
     "boundary": "普通源码门禁；不含在线模型、真实 Finder/Windows 文件拖放、G09 失败专项或交互式双语 GUI。晚于此提交的 G07 测试仅有 Mac 定向证据。"
   },
+  "g07_windows_invalidation_followup": {
+    "source_commit": "e745a1a9dec1b8ad38ea7afb764bc251aeaecdc8",
+    "run_id": 36521497826,
+    "conclusion": "success",
+    "windows_focused_tests": "508/508",
+    "deleted_file_after_card_creation": "Codex/Claude 共用用例逐名 PASS；草稿及双卡保留，PTY 零写入",
+    "archive_manifest_sha256": "6552bf404d7c4e5d6e636e1705347271d44086b7b4b46106408339b335d613f5",
+    "boundary": "Linux 未选；不含 Windows GUI、原生 CLI 读取或权限 ACL 测试，G07 整项仍开放。"
+  },
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
