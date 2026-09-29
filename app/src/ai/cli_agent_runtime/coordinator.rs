@@ -4725,6 +4725,10 @@ mod cli_update_launch_tests;
 mod claude_live_tests;
 
 #[cfg(all(test, target_os = "macos"))]
+#[path = "g10_fixed_policy_live_tests.rs"]
+mod g10_fixed_policy_live_tests;
+
+#[cfg(all(test, target_os = "macos"))]
 #[path = "codex_coordinator_live_tests.rs"]
 mod codex_live_tests;
 
