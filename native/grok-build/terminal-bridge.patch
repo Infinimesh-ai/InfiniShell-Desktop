@@ -7761,6 +7761,39 @@ index 3dcd339..6d75864 100644
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+diff --git a/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs b/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs
+index 1f60a95..b3c415a 100644
+--- a/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs
++++ b/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs
+@@ -1,3 +1,7 @@
++#[cfg(unix)]
++use std::os::unix::fs::{symlink as symlink_dir, symlink as symlink_file};
++#[cfg(windows)]
++use std::os::windows::fs::{symlink_dir, symlink_file};
+ use std::path::Path;
+ 
+ use super::{MAX_COMPACTION_IMAGE_PATHS, retain_session_asset_files};
+@@ -54,9 +58,9 @@ async fn keeps_only_regular_files_inside_the_assets_dir() {
+     let outside = elsewhere.path().join("image-2.png");
+     std::fs::write(&outside, b"png").unwrap();
+     let link_inside = assets.path().join("link-inside.png");
+-    std::os::unix::fs::symlink(&inside, &link_inside).unwrap();
++    symlink_file(&inside, &link_inside).unwrap();
+     let link_outside = assets.path().join("link-outside.png");
+-    std::os::unix::fs::symlink(&outside, &link_outside).unwrap();
++    symlink_file(&outside, &link_outside).unwrap();
+     let directory = assets.path().join("nested");
+     std::fs::create_dir(&directory).unwrap();
+     let missing = assets.path().join("gone.png");
+@@ -66,7 +70,7 @@ async fn keeps_only_regular_files_inside_the_assets_dir() {
+     std::fs::write(&nested, b"png").unwrap();
+     // A symlinked subdirectory would make an outside file look like it sits under `assets/`.
+     let link_dir = assets.path().join("link");
+-    std::os::unix::fs::symlink(elsewhere.path(), &link_dir).unwrap();
++    symlink_dir(elsewhere.path(), &link_dir).unwrap();
+     let through_link_dir = link_dir.join("image-2.png");
+     // Resolves into the assets dir, but only through `..`.
+     let assets_name = assets.path().file_name().expect("tempdir has a file name");
 diff --git a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs b/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
 index 1fa947b..752b806 100644
 --- a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
@@ -7822,7 +7855,7 @@ index ecb99a1..97215dc 100644
      /// [`ReportedTaskCompletions`] to prevent duplicate reminders from [`TaskCompletionReminder`].
      /// Reserved IDs stay unreported for a later genuine user turn.
 diff --git a/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs b/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
-index 962aa28..0422a05 100644
+index 962aa28..8243b38 100644
 --- a/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
 +++ b/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
 @@ -2648,6 +2648,18 @@ impl TerminalBackend for LocalTerminalBackend {
@@ -7844,6 +7877,25 @@ index 962aa28..0422a05 100644
      async fn get_shell_cwd(&self) -> Option<PathBuf> {
          let (reply_tx, reply_rx) = oneshot::channel();
          self.cmd_tx
+@@ -3081,7 +3093,8 @@ fn login_env_capture_enabled() -> bool {
+     )
+ }
+ 
+-#[cfg(unix)]
++// 纯解析辅助也供 Windows 单元测试使用；真实登录 shell 捕获仍仅在 Unix 启用。
++#[cfg(any(unix, test))]
+ fn login_env_var_excluded(key: &str) -> bool {
+     matches!(
+         key,
+@@ -3103,7 +3116,7 @@ fn login_env_var_excluded(key: &str) -> bool {
+         || key.starts_with("GROK_SANDBOX")
+ }
+ 
+-#[cfg(unix)]
++#[cfg(any(unix, test))]
+ fn parse_login_env_capture(stdout: &str) -> (Option<String>, HashMap<String, String>) {
+     let parts: Vec<&str> = stdout.split('\x01').collect();
+     let login_path = parts
 diff --git a/crates/codegen/xai-grok-tools/src/computer/types.rs b/crates/codegen/xai-grok-tools/src/computer/types.rs
 index f9dc325..1dd53bb 100644
 --- a/crates/codegen/xai-grok-tools/src/computer/types.rs

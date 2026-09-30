@@ -105,8 +105,8 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "完成Linux .6目标构建及宿主pidfd回归；Windows宿主目录保护及原生.7构建/测试复验",
-        "Linux/Windows实际工件摘要绑定和最终源码门禁；其他平台实机验收由用户后续执行"
+        "Windows .8测试可移植性修复的实际构建与回归、Windows固定工件摘要绑定",
+        "Linux/Windows工件绑定后的最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
       "paste_gui_evidence": {
@@ -218,12 +218,104 @@
       "current_source_build_followup": {
         "source_commit": "9f7962626836cea000c93da43656d47480c18ebf",
         "run_id": 36752136629,
-        "status": "running_with_windows_native_failure",
+        "status": "completed_with_windows_native_failure",
         "failure_summary_sha256": "d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3",
         "native_fix_commit": "d3986df9c7155d7a0f83e82afe3a094bee2b6640",
         "native_version": "1.0.41+infinishell.terminal-bridge.7",
         "local_gates": "真实protoc 6项、完整native check、host check通过；运行时代码未变。",
-        "target_validation": "pending",
+        "target_validation": "Windows .7的protobuf6项和完整native check已通过；库测试编译另因Unix cfg失败，未产出工件。",
+        "gap_closed": false
+      },
+      "completed_cross_platform_source_increment": {
+        "run_id": 36752136629,
+        "source_commit": "9f7962626836cea000c93da43656d47480c18ebf",
+        "conclusion": "cancelled",
+        "linux_native": {
+          "passed": 78,
+          "failed": 0,
+          "kernel_release": "5.15.0-187-generic"
+        },
+        "linux_host": {
+          "passed": 1469,
+          "failed": 0
+        },
+        "windows_host": {
+          "passed": 1308,
+          "failed": 0
+        },
+        "linux_command": {
+          "passed": 14,
+          "failed": 0
+        },
+        "windows_command": {
+          "passed": 36,
+          "failed": 0
+        },
+        "windows_real_conpty": "passed",
+        "native_windows": "failed_protobuf_unix_device_paths",
+        "results_summary_sha256": "dd304bdf3573ce4e26c05a17d565d39553a2a007e07ced722e7d1eb102506b61",
+        "logs_zip_sha256": "c1374379f5c7687c89135179a456b7b6d4414b72d953e015b3679eff12eb1331",
+        "boundary": "没有通过整轮；修复相关回归已结束，因已知Windows原生失败停止剩余通用构建。"
+      },
+      "linux_artifact_binding": {
+        "native_version": "1.0.41+infinishell.terminal-bridge.6",
+        "artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+        "status": "bound_in_source_final_source_gate_pending",
+        "summary_sha256": "173d261abcb1ad1de321a795334039a68911aad76336561f834a4e0f9911fdba"
+      },
+      "windows_native_bridge_7_followup": {
+        "run_id": 36756854606,
+        "source_commit": "668cb9fcba293391513275844d0658001eeb20d5",
+        "platform": "windows-x64",
+        "native_version": "1.0.41+infinishell.terminal-bridge.7",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "native_check": "passed",
+        "protobuf_tests_passed": 6,
+        "native_tests": "compile_failed_parse_login_env_capture_unix_cfg",
+        "failure_summary_sha256": "1b2e5d350dd31a76fdc31cd36404d3a7730195d568e87c28a18b1041c86d2432",
+        "archive_summary_sha256": "6660a594b6b07576a25840da1ae3c1ccd5273e74e09e6f2d86dcddb39d3ec4ec",
+        "logs_zip_sha256": "fba238b802e2107c84a8ab31ca3d9ecc2e9bd8a06f094a16b84af9b04cdd17d3",
+        "cancelled_step": "Build InfiniShell SSH worker"
+      },
+      "windows_library_test_portability_fix": {
+        "native_commit": "6230c83eed629901b2a713643208d97f9daadf54",
+        "native_tree": "3226eb05d5a899db90215676c1ed8ecaa5c903cf",
+        "version": "1.0.41+infinishell.terminal-bridge.8",
+        "gates": {
+          "login_parser": {
+            "run_id": "r-jhhv50tx",
+            "exit_code": 0,
+            "status": "cleaned",
+            "log_sha256": "dfc4bab9e529215de631548719aed274e8cbb446c71e118b1ed2d7f7118b05cf"
+          },
+          "session_asset_files": {
+            "run_id": "r-nrzw1sgl",
+            "exit_code": 0,
+            "status": "cleaned",
+            "log_sha256": "2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8"
+          },
+          "native_check": {
+            "run_id": "r-sd6a2y5f",
+            "exit_code": 0,
+            "status": "cleaned",
+            "log_sha256": "06360788658b34581e35cc5a7c6c9ec856820ab7e3ff03c60c6a82245aeab1d2"
+          },
+          "host_check": {
+            "run_id": "r-kfxlggxy",
+            "exit_code": 0,
+            "status": "cleaned",
+            "log_sha256": "2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27"
+          },
+          "i18n": {
+            "run_id": "r-jesnwmuf",
+            "exit_code": 0,
+            "status": "cleaned",
+            "log_sha256": "ada32a48e05cdff71ea1eea3bd7ba03f3271ea0cbceeb921e08675157f826bca",
+            "passed": 11
+          }
+        },
+        "target_status": "pending",
         "gap_closed": false
       }
     },

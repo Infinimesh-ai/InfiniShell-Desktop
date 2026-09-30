@@ -10,8 +10,9 @@ use sha2::{Digest as _, Sha256};
 
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
-// 只能填入唯一构建工作流产出的定制 Linux ELF 摘要；空值拒绝所有映像。
-pub(super) const ARTIFACT_SHA256: &str = "";
+// 固定工作流构建的 Linux x64 .6 工件；按真实映像 FD 核验，不能继承其他构建。
+pub(super) const ARTIFACT_SHA256: &str =
+    "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

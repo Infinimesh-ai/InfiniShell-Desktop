@@ -796,3 +796,17 @@ Linux `.4` 的 15 份命令日志与 607,932,184 字节 ELF 已逐项核对收�
 Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，复制前后完整 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`、CDHash `356fe77c29f339fcaa90e48094fc7af7e0571ec5` 与代码签名验证一致；归档收据 `791a420f10db76e805bfc1ab90b089dcf4c328fb19ac8383681cd19aa30ba2fe`。README 已说明各平台应使用绑定工件、复制命名 `grok[.exe]`，并从 InfiniShell 普通 shell 直接启动。Linux 构建及其他宿主回归仍在运行，Windows `.7` 实际构建及两平台固定摘要绑定仍待完成；不关闭 G01、不计新的模型或 GUI 验收，PR 保持草稿。
 
 提交前独立 i18n 门禁 `r-_omolrwm` 的 11 项全部通过，日志 SHA-256 `319d29668b22d74a38ac7779563e92db270fa39e4e614e85131aa216bbc561d4`；短目录已清理。
+
+## 2026-10-01：G01 Linux 工件绑定与 Windows 库测试修复，尚未关闭
+
+`.6` 门禁 `36752136629` 的结果已完整归档：Linux 原生 78 项及实际构建通过，宿主 Linux 1469 项／Windows 1308 项、command Linux 14 项／Windows 36 项均通过，Windows 原 ConPTY 辅助验证通过。Linux ELF 为 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，独立副本见 `g01-cross-platform/linux-terminal-bridge.6/grok`，权限 0700；主仓 Linux 普通桥已绑定该实际摘要。结果摘要 SHA-256 `dd304bdf3573ce4e26c05a17d565d39553a2a007e07ced722e7d1eb102506b61`。Linux 原生清理记录因其他 UID 进程的 FD 可见性不足而保留目录，不宣称零残留；两平台余下通用构建被取消，不计整轮通过。
+
+`.7` 的 [Windows 门禁 36756854606](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36756854606) 实际通过 protobuf 6 项和完整原生 check，日志摘要分别为 `8fe225859941f6bc4ed9970cc4fca1935afb3b846fbaf9fd219f41ffc7bcad17`、`444aadc227bfeb0ea3b5def60401360555e05c7190d44371b64e16ad2f151ec9`。随后四库回归在测试编译阶段失败：两个无条件测试调用了仅在 Unix 编译的 `parse_login_env_capture`；没有执行桥测试，也没有 Windows 二进制。已停止剩余第 40 步 `Build InfiniShell SSH worker`。完整日志 ZIP 的 41 项校验通过，摘要 `fba238b802e2107c84a8ab31ca3d9ecc2e9bd8a06f094a16b84af9b04cdd17d3`；归档汇总 `6660a594b6b07576a25840da1ae3c1ccd5273e74e09e6f2d86dcddb39d3ec4ec`。
+
+`.8` 仅将两个纯解析函数向测试编译开放；真实登录 shell 捕获仍仅 Unix。只读审计同时发现资源路径测试直接引用 Unix `symlink`，现按平台选择原生 `symlink_file/symlink_dir`，不跳过 Windows 测试或删减断言。构建脚本显式运行两项解析和三项资源路径测试，再执行完整原生 check、四库桥回归及构建。本机解析 2 项 `r-jhhv50tx` 通过，日志 `dfc4bab9e529215de631548719aed274e8cbb446c71e118b1ed2d7f7118b05cf`；资源 3 项 `r-nrzw1sgl` 通过，日志 `2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8`。首次资源筛选 `r-fsil26_g` 命中零项，作为历史保留、不计有效测试。已完成测试的短目录均清理。
+
+无需本地化变更：上述修复仅涉及原生测试可移植性和已验 Linux 映像绑定，没有用户可见文案或布局变化。Mac 继续使用独立 `.3` 的真实普通 GUI 与双语证据，不把 Linux `.6` 或 Windows候选当作新模型正例。Windows 工件及最终源码门禁仍待完成；本轮新增关闭 0 项，累计 4 关闭／7 开放／3 移交，PR #22 保持草稿。
+
+原生 `.8` 提交 `6230c83eed629901b2a713643208d97f9daadf54`，补丁独立重建 tree `3226eb05d5a899db90215676c1ed8ecaa5c903cf`，72 份变动文件一致；补丁 SHA-256 `560e00b60a499e305fb2cbc308f5225fef63240d5c736cbd09a2874740838bbd`，重建收据 `99b27d9120b3cf32a8b54dbb6000aa8789b624ac9d2c018cc7fa74283270cda2`。完整原生 check `r-sd6a2y5f` 通过，日志 `06360788658b34581e35cc5a7c6c9ec856820ab7e3ff03c60c6a82245aeab1d2`；Linux 摘要绑定后的 Mac 宿主 check `r-kfxlggxy` 通过，日志 `2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27`，不替代 Linux 编译。短目录均清理。
+
+本次提交前 i18n `r-jesnwmuf` 的 11 项全部通过，日志 SHA-256 `ada32a48e05cdff71ea1eea3bd7ba03f3271ea0cbceeb921e08675157f826bca`；短目录已清理。

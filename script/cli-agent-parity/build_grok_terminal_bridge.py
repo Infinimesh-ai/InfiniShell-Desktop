@@ -37,7 +37,7 @@ def main():
     patch_digest = digest(PATCH)
     if patch_digest != build["patch_sha256"] or not build["native_tree"]:
         raise RuntimeError("补丁摘要或预期源码树未冻结")
-    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.7":
+    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.8":
         raise RuntimeError("定制构建版本不匹配")
     output = args.output.absolute()
     output.mkdir(parents=True, exist_ok=False)
@@ -91,6 +91,10 @@ def main():
             raise RuntimeError("补丁重建源码树不匹配")
         run(["rustup", "toolchain", "install", TOOLCHAIN, "--profile", "minimal", "--no-self-update"])
         run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-proto-build", "--lib"])
+        run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-tools", "--lib",
+             "test_parse_login_env_capture", "--", "--test-threads=1"])
+        run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell", "--lib",
+             "retain_session_asset_files_tests", "--", "--test-threads=1"])
         run(["cargo", "+" + TOOLCHAIN, "check", "--locked", "-p", "xai-grok-pager-bin"])
         run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-pager", "-p", "xai-grok-shell",
              "-p", "xai-grok-tools", "-p", "xai-grok-shell-terminal", "--lib", "terminal_bridge", "--", "--test-threads=1"])
