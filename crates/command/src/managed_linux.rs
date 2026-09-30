@@ -9,6 +9,10 @@ use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _};
 use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
+#[path = "managed_linux_socket_identity.rs"]
+mod socket_identity;
+pub use socket_identity::linux_receive_peer_handle;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LinuxProcessIdentity {
     pub pid: i32,

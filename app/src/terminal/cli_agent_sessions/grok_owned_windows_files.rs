@@ -26,7 +26,7 @@ use windows::Win32::Security::{
 use windows::Win32::Storage::FileSystem::{
     BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateDirectoryW, CreateFileW, FILE_ALL_ACCESS,
     FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-    FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+    FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_LIST_DIRECTORY, FILE_SHARE_READ, FILE_SHARE_WRITE,
     GetFileInformationByHandle, OPEN_EXISTING, READ_CONTROL,
 };
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
@@ -232,7 +232,8 @@ pub(super) fn directory(path: &Path) -> io::Result<File> {
     let handle = unsafe {
         CreateFileW(
             PCWSTR(wide.as_ptr()),
-            READ_CONTROL.0,
+            // 读取目录使不共享 DELETE 的句柄真正固定目录项；仅 READ_CONTROL 不形成该约束。
+            READ_CONTROL.0 | FILE_LIST_DIRECTORY.0,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             None,
             OPEN_EXISTING,

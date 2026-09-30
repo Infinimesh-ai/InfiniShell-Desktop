@@ -28,7 +28,7 @@ mod linux;
 pub use linux::{
     LinuxProcessHandle, LinuxProcessIdentity, LinuxProcessSnapshot, linux_boot_session,
     linux_peer_handle, linux_peer_identity, linux_process_exited, linux_process_identity,
-    linux_signal_owned_process, linux_verify_identity_support,
+    linux_receive_peer_handle, linux_signal_owned_process, linux_verify_identity_support,
 };
 
 #[cfg(target_os = "linux")]

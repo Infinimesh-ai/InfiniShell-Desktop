@@ -37,7 +37,7 @@ def main():
     patch_digest = digest(PATCH)
     if patch_digest != build["patch_sha256"] or not build["native_tree"]:
         raise RuntimeError("补丁摘要或预期源码树未冻结")
-    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.5":
+    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.6":
         raise RuntimeError("定制构建版本不匹配")
     output = args.output.absolute()
     output.mkdir(parents=True, exist_ok=False)
@@ -50,6 +50,7 @@ def main():
     environment = dict(os.environ, CARGO_TARGET_DIR=str(target),
                        GROK_VERSION=build["custom_version"], CARGO_TERM_COLOR="never")
     receipt = {"schema_version": 1, "status": "running", "platform": system,
+               "kernel_release": platform.release(),
                "host_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True).strip(),
                "upstream": UPSTREAM, "base_commit": BASE, "native_tree": build["native_tree"],
                "patch_sha256": patch_digest, "metadata_sha256": digest(SOURCE_METADATA),

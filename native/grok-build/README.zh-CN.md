@@ -7,7 +7,7 @@
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制源码：`732b0e1ee435f265d6e98a51668afb2e214a1a08`，版本 `1.0.41+infinishell.terminal-bridge.5`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
+- 当前定制源码：`373ab736296cbe4cd9fc60f7a77016f19bba324d`，版本 `1.0.41+infinishell.terminal-bridge.6`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -15,22 +15,24 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.5 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.5 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.5 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.6 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.6 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.6 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
 
 ## 当前跨平台实现边界
 
+`.6` 已修正 Linux 连接身份握手和 Windows 目录句柄；Mac 原生编译及共享库 74 项、宿主编译及 55 项定向回归、i18n 11 项通过。新增平台路径和固定工件仍待 Linux／Windows 源码门禁，不计 G01 关闭。
+
 2026-10-01：`9fdce3e3e` 的两平台宿主 check 与 Windows 真实原 ConPTY 辅助程序步骤通过；Linux `.4` 原生构建通过，Windows 原生在上游 `cc 1.2.48`／`find-msvc-tools 0.1.13` 常量类型不兼容处失败。`.5` 仅将后者精确锁到 `0.1.10`，并修复 Windows 日志失败测试的 Unix `File` 注入；Mac `--locked` check 与 74 项原生回归通过，目标复验仍待完成。原始失败不覆盖或改写。
 
 `.4` 源码加入 Windows 命名管道及私有持久回执。Windows 响应帧读完后，宿主发送单字节 `1`，服务端在同一有界期限内等待该字节再关闭；它只确认传输读取完成，不是输入 ACK。避免使用会等待客户端读取而无界阻塞的 `FlushFileBuffers`，亦不依赖断开后仍保留未读缓冲。[Windows 官方管道合同](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-disconnectnamedpipe)
 
-Linux 宿主保留 socket 原 pidfd 和实际 `/proc/<pid>/exe` FD。Windows 宿主通过关闭 kill-on-exit 后的短调试观察取得实际映像 `hFile`；原 ConPTY 的专属只读辅助程序从真实 HPCON 派生，GUI 自身不切换控制台。两平台只接受由现有 `cross-platform-preflight.yml` 从公开固定基线加补丁构建、经过审核后绑定的摘要；当前仍待构建与目标门禁，G01 保持开放。
+Linux `.6` 原生在每条连接读取正式请求前，同次 `sendmsg` 发送一字节 `0x01`、自有 pidfd 与 `SCM_CREDENTIALS`。宿主连接前设置 `SO_PASSCRED`，单字节 `recvmsg` 核对内核发送凭据与 `SO_PEERCRED`、pidfd 类型／活性及进程代际，保留收到的原 pidfd 和实际 `/proc/<pid>/exe` FD；不再要求普通桥使用本轮 runner 缺失的 `SO_PEERPIDFD`，也不按数字 PID 重开授权。多余 FD、缺失凭据、截断与超时均拒绝；身份前导不构成输入 ACK。Windows `.6` 同步修复宿主与原生目录句柄：增加实际目录读取权限，使不共享 DELETE 的句柄真正阻止重命名；保留 DACL、reparse、对象身份和原拒绝断言。Windows 宿主通过关闭 kill-on-exit 后的短调试观察取得实际映像 `hFile`；原 ConPTY 的专属只读辅助程序从真实 HPCON 派生，GUI 自身不切换控制台。两平台只接受由现有 `cross-platform-preflight.yml` 从公开固定基线加补丁构建、经过审核后绑定的摘要；当前仍待构建与目标门禁，G01 保持开放。
 
-Mac 继续绑定 `.3` 的原工件和既有功能／双语证据。本轮只验证公共协议及 Unix 接线未回归，没有生成新的 Mac 功能验收。`source.json.previous_native_artifacts` 保留原 `.3` 源码与工件身份，不能把其结果移植给新的 `.4` 二进制。
+Mac 继续绑定 `.3` 的原工件和既有功能／双语证据。本轮只验证公共协议及 Unix 接线未回归，没有生成新的 Mac 功能验收。`source.json.previous_native_artifacts` 保留原 `.3` 源码与工件身份，不能把其结果移植给新的跨平台二进制。
 
 ## 接入合同
 
@@ -53,7 +55,7 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 
 纯显示动画只有在前后目标身份不变、输入／ACP／后台任务队列均无待处理事件且所有可能改变输入的恢复、搜索、拖选等路径均不可达时，才保留 `input_epoch`。首页预创建会话的命令同步代际 `0/1` 差异允许留待原生揭示会话流程处理；进入 Agent 视图仍要求命令同步代际一致。审批、待发送、待恢复、未确认回合、会话加载及其他危险待处理状态的守卫继续生效。
 
-定制构建使用独立 leader 名称和精确客户端登记标记，拒绝旧客户端混入；旧 leader 不支持专用能力时不发输入，重连撤销旧租约。构建时必须显式设置上列 `GROK_VERSION`，使版本输出表明这不是官方发行二进制。Linux 宿主与 Windows 原生／宿主桥实现已补；定制 .5 工件与目标门禁仍待完成，不能将空摘要下的安全拒绝记作可用能力。其他平台实机验收按用户指令后置，不记为通过，也不豁免实现。
+定制构建使用独立 leader 名称和精确客户端登记标记，拒绝旧客户端混入；旧 leader 不支持专用能力时不发输入，重连撤销旧租约。构建时必须显式设置上列 `GROK_VERSION`，使版本输出表明这不是官方发行二进制。Linux 宿主与 Windows 原生／宿主桥实现已补；定制 .6 工件与目标门禁仍待完成，不能将空摘要下的安全拒绝记作可用能力。其他平台实机验收按用户指令后置，不记为通过，也不豁免实现。
 
 独立运行验收必须使用私有 `GROK_HOME`、`--no-auto-update` 和该私有配置中的 `[cli].auto_update = false`。上游未实现 `GROK_DISABLE_AUTOUPDATER` 环境变量，不能用它代替上述关闭方式；不修改用户默认配置。
 

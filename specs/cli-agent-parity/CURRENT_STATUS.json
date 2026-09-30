@@ -105,9 +105,8 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
-        "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
-        "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
+        "Linux自有pidfd与内核凭据握手的真实目标回归；Windows宿主及原生目录改名/删除保护目标回归",
+        "Linux/Windows .6实际构建、固定工件摘要绑定及最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
       "paste_gui_evidence": {
@@ -164,6 +163,57 @@
         "windows": "官方调试API提供实际映像hFile。专用线程须先连接私有helper并确认关闭kill-on-exit，再附加用户CLI；保持helper到目标脱离，NULL hFile拒绝。不复用会终止所有debuggee的owned控制器。该方案为文档支持的合同推导，尚未实现或实机验证。",
         "native_transport": "原生1491桥仅Unix；Windows须补named pipe及事件循环接线，不能用自报SHA代替宿主映像核验。",
         "gap_closed": false
+      },
+      "current_source_gate_failure": {
+        "run_id": 36741541617,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617",
+        "source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+        "status": "completed",
+        "known_failure": "Linux SO_PEERPIDFD errno92；Windows目录已存在HRESULT与属性句柄不能阻止重命名；Windows原生公开锁文件类型不匹配",
+        "host_checks": {
+          "linux": "passed",
+          "windows": "passed"
+        },
+        "windows_real_conpty": "passed",
+        "boundary": "仅覆盖9fdce3e3e和.4；已有失败触发停止后续作业，取消不计通过。Linux普通桥将改为原生发送自有pidfd及内核凭据，Windows宿主与原生目录句柄须同步修复；新源门禁待运行。",
+        "conclusion": "cancelled",
+        "host_regressions": {
+          "linux": {
+            "passed": 3346,
+            "failed": 1,
+            "failure": "terminal_bridge_same_owner_socket_does_not_authorize_an_unlisted_image：ENOPROTOOPT"
+          },
+          "windows": {
+            "passed": 3151,
+            "failed": 2,
+            "failures": [
+              "native_bridge_root_windows_is_private_and_stable：0x800700B7",
+              "native_bridge_root_windows_pins_ancestor_directories_against_rename：rename实际成功"
+            ],
+            "attempts_per_failure": 3
+          }
+        },
+        "command_regressions": {
+          "linux": {
+            "passed": 5,
+            "failed": 1,
+            "failure": "terminal_bridge_connected_pidfd_survives_socket_close_without_pid_fallback：ENOPROTOOPT"
+          },
+          "windows": {
+            "passed": 36,
+            "failed": 0
+          }
+        },
+        "linux_desktop_tui": {
+          "passed": 660,
+          "failed": 0
+        },
+        "failure_summary_sha256": "3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f",
+        "logs_zip_sha256": "923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2",
+        "cancelled_remaining_steps": {
+          "linux": "Test rust-genai",
+          "windows": "Build CLI process supervisor"
+        }
       }
     },
     "g06_progress": {
@@ -907,52 +957,87 @@
     },
     "cross_platform_implementation": {
       "source_baseline": "41c8d2e307ff5850c73c2b3eecea37c6ed2ee151",
-      "native_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08",
-      "native_tree": "86f266f0067130525e3dac7b08b78178dad85637",
-      "patch_sha256": "c4f1a024f9d2f0a2ca5fc8f6be7ea2fc2a48f94f12e9d1bd89f1797ffb3c8b1a",
-      "status": "implemented_target_gates_and_artifact_binding_pending",
-      "linux": "SO_PEERPIDFD原句柄、实际exe FD、原PTY/前台进程组、独立持久身份；共享原子提交与恢复入口",
+      "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+      "native_tree": "be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9",
+      "patch_sha256": "6e378a1ebd7214e502d17ae0476a482d6f04e2e35e3a62cab7499e0091248912",
+      "status": "identity_and_directory_fixes_target_validation_pending",
+      "linux": "原生同次传递自有pidfd与内核SCM_CREDENTIALS，宿主接管FD核凭据、生存期、实际exe与原PTY；普通桥不再依赖SO_PEERPIDFD或裸PID重开",
       "windows": "原生私有named pipe/回执；宿主实际映像hFile、kill-on-exit关闭后观察、原HPCON派生控制台helper核验；不终止用户CLI",
       "artifact_binding": "Linux/Windows摘要当前为空并拒绝；必须从唯一workflow真实构建后绑定，尚不可记可用",
       "mac_regression": {
-        "run": "r-7a_zxhlb",
+        "run": "r-0ivgf3ax",
         "passed": 55,
-        "log_sha256": "d522be8c1969d659ec655ba9d0b667e3abf805fd1bfe64a4616c61ed9f09f570",
-        "native_run": "r-kikrupx3",
+        "log_sha256": "229ba74b9dd91ed7ff28599e35154a726183850ac57c3de6426ec96ba49a610e",
+        "native_run": "r-lww6dm8k",
         "native_passed": 74,
-        "native_log_sha256": "d07e55df10a505a3b81f3856e95f59aae3de47c504c9e95b87e4a340d55387fa"
+        "native_log_sha256": "0c381a5f3a6ca37336dbcd9177632eb9d9fb01822917ca45a78d91fb8558b4f2"
       },
       "i18n": {
-        "run": "r-noe0exyo",
+        "run": "r-47_aku1y",
         "passed": 11,
-        "log_sha256": "37afa9723aef72936a08971d477ea773794e91bf432146e66fb0c2f557810272",
+        "log_sha256": "fa59f1686024cb09a222793bc299a0ff0f8b81b54d20d56c95467d3ac04f5b08",
         "audit": "复核普通提交、未知/未发送/重复接收及失败保稿的现有英中文案，语义一致；无需本地化变更。本轮无新增界面或布局变化，原Mac双语证据按原工件保留。"
       },
       "closed_gaps": [],
-      "remaining": "Linux/Windows .5定制工件、摘要绑定与最终同源码目标门禁；Windows真实原ConPTY步骤已过。后置实机验收不计通过。",
+      "remaining": "Linux/Windows .6定制工件、新增握手及目录反例、摘要绑定与最终同源码目标门禁；后置实机验收不计通过。",
       "cargo_check": {
-        "run": "r-4dw1o4g2",
+        "run": "r-c3k6m7t_",
         "status": "passed",
-        "log_sha256": "62364d90a096d8fa7389b051d048f7386962ce91674a2edcc7030a899fd554c6",
+        "log_sha256": "59da48234f02b9448e5682a99eaddfcb50b416f663b1cec2e0009eb4dd07b01b",
         "features": "warpui/test-util,rust-embed/debug-embed",
         "cleanup": "cleaned"
       },
       "implementation_source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
       "target_attempt": {
         "run_id": 36741541617,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617",
         "source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
-        "status": "in_progress_with_native_windows_failure",
-        "host_cargo_check": {
+        "status": "completed",
+        "known_failure": "Linux SO_PEERPIDFD errno92；Windows目录已存在HRESULT与属性句柄不能阻止重命名；Windows原生公开锁文件类型不匹配",
+        "host_checks": {
           "linux": "passed",
           "windows": "passed"
         },
         "windows_real_conpty": "passed",
-        "native_build": {
-          "linux": "passed_version_4",
-          "windows": "failed_cc_find_msvc_tools_type_mismatch"
+        "boundary": "仅覆盖9fdce3e3e和.4；已有失败触发停止后续作业，取消不计通过。Linux普通桥将改为原生发送自有pidfd及内核凭据，Windows宿主与原生目录句柄须同步修复；新源门禁待运行。",
+        "conclusion": "cancelled",
+        "host_regressions": {
+          "linux": {
+            "passed": 3346,
+            "failed": 1,
+            "failure": "terminal_bridge_same_owner_socket_does_not_authorize_an_unlisted_image：ENOPROTOOPT"
+          },
+          "windows": {
+            "passed": 3151,
+            "failed": 2,
+            "failures": [
+              "native_bridge_root_windows_is_private_and_stable：0x800700B7",
+              "native_bridge_root_windows_pins_ancestor_directories_against_rename：rename实际成功"
+            ],
+            "attempts_per_failure": 3
+          }
         },
-        "remaining_host_tests": "in_progress",
-        "boundary": "只覆盖9fdce3e3e和原生.4，不继承给修复后.5。"
+        "command_regressions": {
+          "linux": {
+            "passed": 5,
+            "failed": 1,
+            "failure": "terminal_bridge_connected_pidfd_survives_socket_close_without_pid_fallback：ENOPROTOOPT"
+          },
+          "windows": {
+            "passed": 36,
+            "failed": 0
+          }
+        },
+        "linux_desktop_tui": {
+          "passed": 660,
+          "failed": 0
+        },
+        "failure_summary_sha256": "3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f",
+        "logs_zip_sha256": "923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2",
+        "cancelled_remaining_steps": {
+          "linux": "Test rust-genai",
+          "windows": "Build CLI process supervisor"
+        }
       },
       "dependency_correction": {
         "custom_version": "1.0.41+infinishell.terminal-bridge.5",
@@ -960,6 +1045,59 @@
         "windows_test": "生产Journal权限变更失败，保留Unknown/零派发/同ID拒重断言",
         "local_receipt_sha256": "b55627f26b7e5eb2dd36ab241f3d3203f891ccd2722aa2bde9d1f9664b26b868",
         "target_validation": "pending"
+      },
+      "previous_increment": {
+        "native_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08",
+        "native_tree": "86f266f0067130525e3dac7b08b78178dad85637",
+        "patch_sha256": "c4f1a024f9d2f0a2ca5fc8f6be7ea2fc2a48f94f12e9d1bd89f1797ffb3c8b1a",
+        "mac_regression": {
+          "run": "r-7a_zxhlb",
+          "passed": 55,
+          "log_sha256": "d522be8c1969d659ec655ba9d0b667e3abf805fd1bfe64a4616c61ed9f09f570",
+          "native_run": "r-kikrupx3",
+          "native_passed": 74,
+          "native_log_sha256": "d07e55df10a505a3b81f3856e95f59aae3de47c504c9e95b87e4a340d55387fa"
+        },
+        "i18n": {
+          "run": "r-noe0exyo",
+          "passed": 11,
+          "log_sha256": "37afa9723aef72936a08971d477ea773794e91bf432146e66fb0c2f557810272",
+          "audit": "复核普通提交、未知/未发送/重复接收及失败保稿的现有英中文案，语义一致；无需本地化变更。本轮无新增界面或布局变化，原Mac双语证据按原工件保留。"
+        },
+        "cargo_check": {
+          "run": "r-4dw1o4g2",
+          "status": "passed",
+          "log_sha256": "62364d90a096d8fa7389b051d048f7386962ce91674a2edcc7030a899fd554c6",
+          "features": "warpui/test-util,rust-embed/debug-embed",
+          "cleanup": "cleaned"
+        },
+        "target_attempt": {
+          "run_id": 36741541617,
+          "source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+          "status": "in_progress_with_native_windows_failure",
+          "host_cargo_check": {
+            "linux": "passed",
+            "windows": "passed"
+          },
+          "windows_real_conpty": "passed",
+          "native_build": {
+            "linux": "passed_version_4",
+            "windows": "failed_cc_find_msvc_tools_type_mismatch"
+          },
+          "remaining_host_tests": "in_progress",
+          "boundary": "只覆盖9fdce3e3e和原生.4，不继承给修复后.5。"
+        }
+      },
+      "identity_directory_correction": {
+        "version": "1.0.41+infinishell.terminal-bridge.6",
+        "native_commit": "373ab736296cbe4cd9fc60f7a77016f19bba324d",
+        "host_base_commit": "3a107b676cf2d60794db51595fa07c7d3af0ff6a",
+        "host_source_freeze_sha256": "b1316c2b3e82da14d1fe45f48fc28d59f0e8885aa1b3f07b072a028b67320450",
+        "native_source_freeze_sha256": "532143fdb09fb24da2ee7c6f024077c507daf5b11347c45e51d297f37a74a0b3",
+        "independent_review_sha256": "b0ec5229630e810fcbac8dfc5475d12bea6b61d0fcc9359599e60857ce7e74b5",
+        "source_reconstruction_sha256": "b6ee47b1bd5ac4730a32240333e229b9958bac17ae2e755b929bab7191f71dc3",
+        "gap_closed": false,
+        "local_completion_sha256": "1f71332b09761c6ad11f4e8ef3180aefbe4210f6419b04568ef4bd3c9d0d8ec4"
       }
     }
   },

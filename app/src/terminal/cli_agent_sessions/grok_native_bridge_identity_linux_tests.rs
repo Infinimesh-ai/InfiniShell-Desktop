@@ -1,9 +1,7 @@
 use super::*;
-use command::managed::linux_peer_handle;
 use std::fs::{self, OpenOptions};
 use std::io::{Seek as _, SeekFrom, Write as _};
 use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _, symlink};
-use std::os::unix::net::UnixStream;
 use std::path::PathBuf;
 
 fn snapshot() -> LinuxProcessSnapshot {
@@ -91,9 +89,8 @@ fn terminal_bridge_linux_snapshot_cannot_impersonate_a_macos_snapshot() {
 }
 
 #[test]
-fn terminal_bridge_same_owner_socket_does_not_authorize_an_unlisted_image() {
-    let (stream, _server) = UnixStream::pair().unwrap();
-    let peer = linux_peer_handle(&stream).unwrap();
+fn terminal_bridge_retained_process_does_not_authorize_an_unlisted_image() {
+    let peer = LinuxProcessHandle::capture(std::process::id() as i32).unwrap();
     assert_eq!(peer.identity().pid as u32, std::process::id());
     assert!(
         matches!(Artifact::capture(&peer), Err(error) if error.kind() == io::ErrorKind::PermissionDenied)

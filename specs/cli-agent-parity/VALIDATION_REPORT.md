@@ -769,3 +769,17 @@ Linux／Windows 摘要仍为空并拒绝，不能声明能力可用。待唯一 
 此修复没有改变用户文案，无需本地化变更；既有 Mac `.3` 功能／双语证据按原工件保留。`.5` 目标构建、真实工件摘要绑定和最终门禁尚待完成，本轮关闭 0 项；累计仍为 4 项关闭、7 项开放、3 项移交，PR 保持草稿。
 
 Linux `.4` 的 15 份命令日志与 607,932,184 字节 ELF 已逐项核对收据；实际 SHA-256 `d36be84fc25eb726e51456e644c18ee98f886e99bb5fda8361d828de59a33615`，原生 74 项回归全部通过。此工件只归属旧 `.4`，不能填入修复后 `.5` 的摘要。主仓修复提交前 `cargo check` 在 `r-4dw1o4g2` 通过并清理，日志 SHA-256 `62364d90a096d8fa7389b051d048f7386962ce91674a2edcc7030a899fd554c6`。
+
+
+## 2026-10-01：G01 首轮目标源码失败及身份／目录修复
+
+- 本轮未关闭新缺口，仍为 4 项关闭、7 项开放、3 项平台验收移交；PR #22 保持草稿。
+- [CI 36741541617](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 精确对应 `9fdce3e3e661a0429264c1cb26b2b8eedbf554ff`、原生 `.4`。两平台宿主编译通过；Linux 原生 74 项及独立构建通过，Windows 原生依赖错误按前节保留。确定失败后主动停止后续通用作业：Linux rust-genai、Windows supervisor 构建记 cancelled，不能记整轮通过。
+- Linux 宿主 3347 项中 3346 通过、1 失败；command 6 项中 5 通过、1 失败。两项都在 `linux_peer_handle` 取得 `SO_PEERPIDFD` 时收到 errno 92 `ENOPROTOOPT`。保持原 pidfd、映像、退出和 exec 回归通过；桌面／TUI 660 项通过。本轮未采集内核版本，不能仅凭 runner 的发行版名称断言具体内核。
+- Windows 宿主 3153 项中 3151 通过、2 失败，配置内各重试两次仍失败：已有私有目录的 Windows 错误以 HRESULT `0x800700B7` 传入，未命中 `AlreadyExists`；只读属性句柄不能执行预期的禁止 DELETE／重命名共享约束。修复同时覆盖宿主及原生目录句柄，保留身份、DACL、reparse 和原失败断言，追加持有时拒绝、释放后真实成功的回归。
+- Windows command 36 项独立通过，包括实际映像句柄返回、helper 异常退出不杀用户进程；实际原 ConPTY 辅助程序正例／跨控制台和错误生存期拒绝 1 项通过。它们不是交互式桌面或模型验收。
+- Linux 改为原生同一次 `sendmsg` 传递一字节身份前导、自有 pidfd 与 `SCM_CREDENTIALS`。宿主连接前启用 `SO_PASSCRED`，直接接管内核传递的 FD，核发送者、连接凭据、存活及原映像／PTY；不按收到的数字 PID 重开授权句柄。此实现由公开 [Linux 5.15 凭据／FD 检查](https://raw.githubusercontent.com/torvalds/linux/v5.15/net/core/scm.c) 与 [Unix socket 传递语义](https://raw.githubusercontent.com/torvalds/linux/v5.15/net/unix/af_unix.c) 支持，仍须目标门禁证明。契约针对普通非提权进程，不声称抵御具备伪造内核凭据权限的进程。
+- 归档：`resume-20260930/g01-cross-platform/ci-36741541617`；原始完整日志 ZIP SHA-256 `923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2`，失败摘要 SHA-256 `3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f`。原生工件及各日志按此前收据分别校验。
+- 本轮身份及目录修复没有用户界面／文案变化，英中审计结论为“无需本地化变更”；宿主本机编译／55 项定向回归／11 项 i18n、原生 `.6` 编译／74 项共享库回归已通过，五个短目录均归档清理；目标源码门禁、固定工件摘要绑定尚待完成，G01 仍开放。
+
+- 修复后原生提交 `373ab736296cbe4cd9fc60f7a77016f19bba324d`、tree `be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9`；69 文件补丁从公开基线独立重建完全一致，补丁 SHA-256 `6e378a1ebd7214e502d17ae0476a482d6f04e2e35e3a62cab7499e0091248912`。本机五门禁摘要 SHA-256 `1f71332b09761c6ad11f4e8ef3180aefbe4210f6419b04568ef4bd3c9d0d8ec4`；Linux 新测试和 Windows 目录反例仍须目标执行，不以 Mac 编译替代。

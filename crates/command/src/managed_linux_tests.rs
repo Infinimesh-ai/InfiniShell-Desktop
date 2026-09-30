@@ -6,6 +6,9 @@ use std::process::{Child, Stdio};
 const EXEC_FIXTURE_ENV: &str = "INFINISHELL_COMMAND_NATIVE_BRIDGE_EXEC_FIXTURE";
 const EXEC_FIXTURE: &str = "managed::linux::tests::terminal_bridge_exec_fixture";
 
+#[path = "managed_linux_socket_identity_tests.rs"]
+mod socket_identity;
+
 // 夹具只等待 stdin；失败路径也先关闭管道，随后回收自己的子进程，不发送信号。
 struct WaitingChild(Child);
 
@@ -48,27 +51,6 @@ fn terminal_bridge_cannot_open_an_executable_from_a_forged_snapshot() {
     handle.identity = original;
     handle.identity.proc_inode = original.proc_inode.wrapping_add(1);
     assert!(handle.executable_file().is_err());
-}
-
-#[test]
-fn terminal_bridge_connected_pidfd_survives_socket_close_without_pid_fallback() {
-    let (mut client, mut server) = UnixStream::pair().unwrap();
-    let peer = linux_peer_handle(&client).unwrap();
-    let expected = LinuxProcessHandle::capture(std::process::id() as i32)
-        .unwrap()
-        .identity();
-    server.write_all(b"response").unwrap();
-    drop(server);
-    let mut response = Vec::new();
-    client.read_to_end(&mut response).unwrap();
-    drop(client);
-
-    assert_eq!(response, b"response");
-    assert_eq!(peer.snapshot().unwrap().identity, expected);
-    assert_eq!(
-        peer.executable_file().unwrap().metadata().unwrap().ino(),
-        expected.executable_inode
-    );
 }
 
 #[test]

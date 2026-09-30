@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 #[cfg(target_os = "linux")]
 use command::managed::{
     LinuxProcessHandle as PeerHandle, LinuxProcessIdentity as ProcessIdentity,
-    linux_boot_session as boot_session, linux_peer_handle as peer_handle,
+    linux_boot_session as boot_session, linux_receive_peer_handle,
 };
 #[cfg(target_os = "macos")]
 use command::managed::{
@@ -256,6 +256,11 @@ fn verify_peer_terminal(peer: &PeerHandle, pty: LocalPtyIdentity) -> io::Result<
     }
 }
 
+#[cfg(target_os = "linux")]
+fn peer_handle(stream: &UnixStream) -> io::Result<PeerHandle> {
+    linux_receive_peer_handle(stream, Instant::now() + IO_TIMEOUT)
+}
+
 impl Locator {
     fn read(root: &Path, root_stamp: NodeStamp, directory: PathBuf) -> io::Result<Option<Self>> {
         let metadata = fs::symlink_metadata(&directory)?;
@@ -352,6 +357,9 @@ impl Locator {
 
 fn connect(path: &Path) -> io::Result<UnixStream> {
     let socket = Socket::new(Domain::UNIX, Type::STREAM, None)?;
+    // 连接前启用凭证接收，不能让抢先发来的身份前导丢失内核认证的 ucred。
+    #[cfg(target_os = "linux")]
+    socket.set_passcred(true)?;
     socket.connect_timeout(&SockAddr::unix(path)?, IO_TIMEOUT)?;
     Ok(socket.into())
 }

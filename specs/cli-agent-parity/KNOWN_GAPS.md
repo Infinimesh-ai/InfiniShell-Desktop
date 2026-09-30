@@ -45,6 +45,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G01 — Grok 普通终端富输入自动提交
 
+- **2026-10-01 首轮目标失败已定位**：`9fdce3e3e` 的 [CI 36741541617](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 已停止剩余通用作业，整体为 cancelled，不计通过。Linux 宿主 3346 过／1 失败、command 5 过／1 失败，两处均为 `SO_PEERPIDFD` 返回 `ENOPROTOOPT`；没有实测内核版本，不据发行版名称推断。Windows 宿主 3151 过／2 失败：已有目录返回 HRESULT `0x800700B7`，以及仅属性权限的目录句柄不能阻止重命名；原生也发现相同句柄缺陷，须同步修复。Windows 36 项 command、真实原 ConPTY 和 Linux 660 项桌面／TUI 回归独立通过。Linux 已补原生自有 pidfd 与内核凭据的同包握手，不按数字 PID 重开句柄或跳过反例；Windows 宿主及原生均保留原断言并修正目录访问权。定制 `.6` 原生 Mac 编译／74 项共享回归与宿主编译通过，新增平台路径尚待真实执行。完整日志 ZIP SHA-256 `923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2`，失败摘要 `3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f`。修复后工件与门禁仍待完成，G01 不关闭。
+
 - **2026-10-01 目标构建与精确修复**：`9fdce3e3e` 的两平台宿主 `cargo check`、Windows 真实原 ConPTY 步骤及 Linux `.4` 原生构建通过；Windows 原生卡在公开锁文件 `cc 1.2.48` 与 `find-msvc-tools 0.1.13` 的常量类型不兼容。修复仅锁回后者 `0.1.10`，并将 Windows 日志失败夹具改为生产 Journal 的真实权限变化；定制 `.5` 的 Mac check 与 74 项原生回归通过，Windows 修复及最终工件绑定待验。[本轮 CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 其余宿主回归仍在运行，不记整套通过；G01 仍开放。
 
 - **当前跨平台实现增量，尚未关闭**：公开原生源码已提交 `3d1886b11120`，Windows 私有命名管道、响应读取握手及回执沿用既有原子事务；宿主已补 Linux pidfd／实际映像及 Windows 实际映像／原 HPCON 核验，共享持久账本保留旧 Mac task ID。Mac 55 项宿主回归、74 项原生库回归和 11 项 i18n 已过，无需本地化变更；初次拆分漏测试 import 的编译失败已修并保留记录。Linux／Windows 固定工件摘要目前为空，目标门禁尚未运行，不能把拒绝算作可用或关闭。Windows 真实 ConPTY 正例／跨控制台拒绝将通过实际控制台辅助程序验证；两平台工件均须从唯一既有 workflow 构建后绑定。当前仍为 **4 关闭、7 开放、3 移交**，PR 保持草稿。

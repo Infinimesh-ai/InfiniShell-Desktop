@@ -151,6 +151,30 @@ fn locator(root: &Path, directory: PathBuf) -> io::Result<Locator> {
     .ok_or_else(invalid)
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_connect_enables_kernel_credentials_for_the_identity_prelude() {
+    let (_root, directory, listener) = fixture();
+    let stream = connect(&directory.join("control.sock")).unwrap();
+    let (_peer, _address) = listener.accept().unwrap();
+    let mut enabled = 0i32;
+    let mut length = std::mem::size_of::<i32>() as libc::socklen_t;
+    assert_eq!(
+        unsafe {
+            libc::getsockopt(
+                stream.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_PASSCRED,
+                (&mut enabled as *mut i32).cast(),
+                &mut length,
+            )
+        },
+        0
+    );
+    assert_eq!(length as usize, std::mem::size_of::<i32>());
+    assert_eq!(enabled, 1);
+}
+
 #[test]
 fn manifest_and_socket_identity_changes_invalidate_the_locator() {
     let (root, directory, _listener) = fixture();

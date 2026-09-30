@@ -13,15 +13,15 @@ use std::path::{Component, Path, PathBuf, Prefix};
 
 use sha2::{Digest as _, Sha256};
 use warp_core::channel::{Channel, ChannelState};
-use windows::Win32::Foundation::HANDLE;
+use windows::Win32::Foundation::{ERROR_ALREADY_EXISTS, HANDLE};
 use windows::Win32::Security::TOKEN_QUERY;
 use windows::Win32::Storage::FileSystem::{
-    FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES,
-    FILE_SHARE_READ, FILE_SHARE_WRITE,
+    FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_LIST_DIRECTORY,
+    FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
 };
 use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::UI::Shell::GetUserProfileDirectoryW;
-use windows::core::PWSTR;
+use windows::core::{HRESULT, PWSTR};
 
 pub(crate) fn root() -> io::Result<PathBuf> {
     prepare_root(
@@ -92,7 +92,13 @@ fn prepare_root(home: &Path, name: &str) -> io::Result<PathBuf> {
     }
     let directory = match files::create_directory(&root) {
         Ok(directory) => directory,
-        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => files::directory(&root)?,
+        // Windows 绑定保留 HRESULT；只识别精确的“已存在”，随后仍验证私有权限和目录身份。
+        Err(error)
+            if error.kind() == io::ErrorKind::AlreadyExists
+                || error.raw_os_error() == Some(HRESULT::from_win32(ERROR_ALREADY_EXISTS.0).0) =>
+        {
+            files::directory(&root)?
+        }
         Err(error) => return Err(error),
     };
     let original = files::file_identity(&directory)?;
@@ -119,8 +125,9 @@ pub(crate) fn pin_ancestors(path: &Path) -> io::Result<Vec<File>> {
     files::plain_path(path)?;
     let mut pinned = Vec::new();
     for ancestor in path.ancestors().collect::<Vec<_>>().into_iter().rev() {
+        // 仅查询属性的句柄不参与共享访问检查；必须请求目录读取才能阻止 DELETE/重命名。
         let file = File::options()
-            .access_mode(FILE_READ_ATTRIBUTES.0)
+            .access_mode(FILE_LIST_DIRECTORY.0 | FILE_READ_ATTRIBUTES.0)
             .share_mode(FILE_SHARE_READ.0 | FILE_SHARE_WRITE.0)
             .custom_flags(FILE_FLAG_BACKUP_SEMANTICS.0 | FILE_FLAG_OPEN_REPARSE_POINT.0)
             .open(ancestor)?;
