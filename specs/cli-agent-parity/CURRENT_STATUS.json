@@ -812,8 +812,10 @@
         "sha256": "e70e0e66e7487a5c12d8183a26c8ee5b4561d8773ab5d10e5fa7d71bfdea6528"
       },
       "localization": {
-        "status": "toast_truncation_fix_pending_new_build_verification",
-        "finding": "当前文件错误Toast被截断；英中提示已改为短两行，须新构建分别验证完整内容与布局，本轮不记双语整体通过。"
+        "status": "toast_render_fix_pending_bilingual_verification",
+        "finding": "8f860ed43新Mac构建的r-0zfrzk4y英文07图仍将两行提示拼为单行并截断文件名，布局失败；14项计数及增量均为0，稿卡保留。已修正没有展开入口的短提示高度约束，待新英中实窗复验。",
+        "failed_layout_index_sha256": "8b113f8a550e2dd491dc4c45dbd4a1cba5bf7ed99bd883e9b0b985688faac04e",
+        "failed_layout_cleanup": "GUI及原生自然退出；finish在认证副本身份门禁拒绝，launcher中断后外层exit -2、cleanup_ready=false，私有短目录保留，不记已清理。"
       },
       "cleanup": {
         "outer_record": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2.json",

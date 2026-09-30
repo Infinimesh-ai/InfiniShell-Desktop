@@ -2,6 +2,16 @@
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
+## 2026-10-01：G07 短两行提示实窗仍裁切，修正高度约束待复验
+
+**新增关闭 0 项，仍为 4／7／3。** `8f860ed43506f02b1cd713acc1f5c0233fc148ec` 的实际新 Mac 构建源映像 SHA-256 `462b03876135ef2c44526ca3a348ea57758d60eed3467913236685621d47817d`、构建绑定 `1a052d73354e1ff34021450d59d4485afb060f60b6ad6292b4f741a405a184f1`。`r-0zfrzk4y` 通过真实选择器建立两卡，再删除长文件名目标；68 字节草稿及两卡保留，原生／宿主 14 项计数与增量均为 0，历史／桥账本字节与宿主逻辑行不变。英文第 07 图仍将两行文本拼为单行，文件名被渐隐裁切，**布局失败，未继续计中文通过**。
+
+根因定位到 Toast 对未提供展开入口的短文本也施加两行高度上限；macOS 排版在剩余高度不足时将剩余文本交给单行排版并渐隐。仅对真正需要折叠的消息保留高度上限，让短提示按自然高度换行；长消息折叠／展开与共用配色不变。英中 Fluent 文案语义复核保持，仍需新构建英中实窗审核，不能用字符数或纯单测代替。
+
+仓外 `g07-preparation/r-0zfrzk4y-grok-gui` 的 after 收据 SHA-256 `217b76b44db738e643845d2b6921615eb88f9b20cf604fb113f90ba46e498c9f`，失败证据索引 `8b113f8a550e2dd491dc4c45dbd4a1cba5bf7ed99bd883e9b0b985688faac04e`。GUI／原生自然退出、stdout EOF、无自有存活进程；finish 在认证副本身份门禁拒绝，停止本轮待机 launcher 后外层 exit -2、`cleanup_ready=false`，私有现场保留。外层日志 `c18b79f2305e34c4851b2a055560cb9f267c8d1958fda3e61f28d31541918914`，不称清理通过。旧 Grok 正例和原生拒绝证据不重复运行。
+
+本次渲染修复本地门禁已通过：check `r-6kzgj8ye` 日志 SHA-256 `fff1543a1e69a9c09369563a0b95bf7d7349bb2bd3ea46e006f15d36d0f9e5bd`；i18n 11／11，`r-4c9b5yoe` 日志 `408c5b0265648f2099ef9ada974b114557c08f9108d0b675af7c87e7e2b389e9`；Toast 10、附件 5、提交 6 共 21／21，`r-iovr_hyv` 日志 `d4b2c6fe62f72dc24b93920ef50126f3bcca4ed08a008b9494f8b729deb0eb34`，retries 0。三轮 exit 0、短目录已清理。现有 Linux／Windows desktop 门禁加入 Toast 同组，actionlint 通过（仅忽略既有 `infinishell-ci` 标签声明告警）。无需新增本地化文案，英中内容保留；实际布局仍待复验。
+
 ## 2026-10-01：G01 Windows `.11` 可用工件绑定，最终宿主门禁待验
 
 **新增关闭 0 项，保持 4 关闭／7 开放／3 移交，PR #22 草稿。** [运行 36780256382](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382) 精确绑定宿主 `8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66`。Windows 原生 check／build 与全部 21 条命令通过，四库 53／20／4／4 共 81 项真实执行；protobuf 6 项、登录解析 2 项、资源整理 2 项及管道名称上界 1 项通过。此前被 Unix cfg 排除的四个终端守卫测试本次在 Windows 真实执行，不能追记旧 `.10` 为 81 项。PE 栈 reserve 为 8 MiB、commit 为 4 KiB，实际 `--version`、`--help` 及进入异步初始化的 `completions bash` 均成功，零模型输入。

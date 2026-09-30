@@ -768,7 +768,7 @@ jobs:
         shell: bash
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
@@ -1983,7 +1983,7 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --locked --no-fail-fast -p warp -p warp_tui --lib --features warpui/test-util
-          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(i18n::tests)'
+          -E 'test(vim) | test(model_selector_keybinding_ignores_closed_selector_window) | test(context_menu) | test(stale_tab_index) | test(mcp) | test(batch_command_view) | test(json_tree) | test(cache_stability) | test(view_components::dismissible_toast::tests::) | test(i18n::tests)'
 
       - name: Test rust-genai
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.windows_toolchain.outcome == 'success') }}
