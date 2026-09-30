@@ -829,3 +829,12 @@ Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，�
 该资源测试不是 G01 文本原子桥测试，且相同测试源码已在 Mac `r-nrzw1sgl` 实际三项通过。按用户已授权的外平台实机验收后置范围，仅这一项移交至具有符号链接权限的 Windows 环境，构建收据明确记 `deferred_not_passed`。原测试源码及拒绝断言不改；脚本固定文件 SHA-256 `abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e`，源码变化时必须重新审计。其他两项及全部原生桥、管道上界、完整 check／build 仍为必过项，不可据此跳过原生能力失败。
 
 本轮宿主 `cargo check` 和 11 项 i18n 在短目录 `r-f_e0vaas` 通过，日志 SHA-256 `dfa9df27ffba8f47b6451f305ee0114a013e0e30f7d72293dfebaeabb3b1bfff`；完成退出、证据归档及目录清理。无需本地化变更。G01 仍待 Windows 实际工件、摘要绑定与最终源码门禁，本轮关闭 0 项；累计 4 项关闭、7 项开放、3 项移交，PR 保持草稿。
+
+
+## 2026-10-01：G01 最终宿主门禁与原生构建分离，尚未运行
+
+现有工作流把 Grok 工件构建与 Windows 生产 ConPTY 辅助验证绑在同一个开关下，且原生定向模式跳过含历史 LEAK 的 Windows 桌面／TUI 组。新增默认关闭的 `run_grok_native_bridge_host` 只解开验收耦合：继续完整筛选 `local_tty`、普通桥及账本回归，构建 Windows 主程序和 SSH 辅助程序、执行真实原 ConPTY ignored 用例，并执行 Windows 桌面／TUI 组。原生构建仍只由 `run_grok_native_bridge_source` 控制；仅 GUI／仅安装器冲突检查前移，完整工作区模式仍优先。最终绑定提交的门禁尚未派发，不计通过。
+
+`r-xaxm00n1` 的 actionlint 与本机 `cargo check` 通过，日志 SHA-256 `7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6`，短目录已清理。首次 actionlint 只报告未登记的既有自托管标签；补用仓外配置明确声明 `infinishell-ci` 后通过，未忽略语法／表达式错误。无用户功能或文案变化，无需本地化变更。
+
+此时 [CI 36770502561](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561) 仍在运行，对应 `582596a090f9b0042ccc349fc9568e3fe072e6d1`。一个独立前置步骤失败：固定 Codex 0.156.1 的两个 hook 场景均通过、零模型请求，但清理 Git 临时 pack 文件收到 WinError32。八份关闭收据确认根退出0、输出EOF和Job为空；最后一次强制回收三个后代，不称全部自然退出。占用者尚未确定，不能归因Grok或忽略失败；诊断摘要 SHA-256 `60e63bdb64ac8160508ede66aff8f2867034f7c333bae7adeb03b8ee7af73c67`，原始归档保留。Grok 原生源码步骤仍继续，不记本轮整体通过。本轮关闭0项，累计4项关闭、7项开放、3项移交；PR仍为草稿。

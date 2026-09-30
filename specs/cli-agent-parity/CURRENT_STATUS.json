@@ -405,6 +405,34 @@
         },
         "localization": "无需本地化变更",
         "gap_closed": false
+      },
+      "final_host_gate_preparation": {
+        "status": "implemented_not_run",
+        "workflow": ".github/workflows/cross-platform-preflight.yml",
+        "input": "run_grok_native_bridge_host",
+        "scope": "不重建Grok原生工件，必验完整local_tty/普通桥、Windows主程序与SSH辅助二进制、真实原ConPTY及含历史LEAK的桌面/TUI组。",
+        "local_gate": {
+          "run_id": "r-xaxm00n1",
+          "actionlint": "passed_with_existing_self_hosted_label_config",
+          "host_check": "passed",
+          "log_sha256": "7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6",
+          "status": "cleaned"
+        },
+        "localization": "无需本地化变更",
+        "gap_closed": false
+      },
+      "windows_native_bridge_9_build_attempt": {
+        "run_id": 36770502561,
+        "source_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
+        "status": "in_progress",
+        "native_bridge_build": "in_progress",
+        "other_step_failure": {
+          "step": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
+          "functional_cases_passed": 2,
+          "failure": "private_directory_cleanup: Git临时pack文件占用，WinError32。占用者未知；八份Job关闭收据已空，最后一次强制回收三个后代，不称全部自然退出。",
+          "diagnosis_sha256": "60e63bdb64ac8160508ede66aff8f2867034f7c333bae7adeb03b8ee7af73c67"
+        },
+        "gap_closed": false
       }
     },
     "g06_progress": {
