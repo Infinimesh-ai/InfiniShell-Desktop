@@ -24,6 +24,7 @@ fn fixture() -> (tempfile::TempDir, Manifest) {
         token: Uuid::new_v4(),
         parent_control: "127.0.0.1:1234".parse().unwrap(),
         expected_files: vec![ExpectedFileIdentity::capture(&executable).unwrap()],
+        grok_stdio_eof: None,
         executable,
         arguments: vec!["--version".into()],
         atomic_cwd: Some(AtomicDirectoryIdentity::capture(&cwd).unwrap()),

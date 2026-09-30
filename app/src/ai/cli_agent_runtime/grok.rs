@@ -466,11 +466,10 @@ async fn run_process(
         .as_ref()
         .map(|launch| launch.home.join("startup"))
         .unwrap_or_else(|| protocol.options.cwd.clone());
-    #[cfg(all(windows, target_arch = "x86_64"))]
-    use super::managed_process::spawn_with_grok_npm_source as spawn_native;
-    #[cfg(not(all(windows, target_arch = "x86_64")))]
-    use super::managed_process::spawn_with_isolated_home as spawn_native;
-    let mut child = spawn_native(
+    let fixed_stdio = launch.is_some()
+        && protocol.probed_version == Some(ROOT_VERSION)
+        && protocol.production_fixed_verified();
+    let mut child = super::managed_process::spawn_grok(
         &protocol.options.state_dir,
         protocol.options.generation,
         &executable,
@@ -481,6 +480,7 @@ async fn run_process(
             (protocol.profile_state_dir != protocol.options.state_dir)
                 .then_some(protocol.profile_state_dir.as_path())
         }),
+        fixed_stdio,
         #[cfg(all(windows, target_arch = "x86_64"))]
         npm_source,
     )
@@ -533,6 +533,13 @@ async fn run_process(
         }
     };
     let graceful = result.is_ok() && !protocol.reviewed_commands.has_command();
+    let drain_timeout = if graceful {
+        child
+            .exit_confirmation_timeout()
+            .max(Duration::from_secs(30))
+    } else {
+        Duration::from_secs(30)
+    };
     let finish = async move {
         if graceful {
             child.finish_after_stdin_close().await
@@ -540,7 +547,7 @@ async fn run_process(
             child.finish().await
         }
     };
-    let (finished, drained) = futures::join!(finish, drain.with_timeout(Duration::from_secs(30)));
+    let (finished, drained) = futures::join!(finish, drain.with_timeout(drain_timeout));
     // 清理和读取均结束后保留原传输失败；正常成功还必须具有可信回执及预算内 EOF。
     host_cleanup?;
     result?;
@@ -2252,6 +2259,15 @@ impl GrokProtocol {
         let version = self.paired_version.ok_or_else(|| {
             RuntimeError::Protocol("Grok session has no paired CLI version".into())
         })?;
+        #[cfg(test)]
+        if let (Some(native), Some(catalog)) = (&self.session_id, &self.skill_catalog) {
+            multi_skill_live_tests::trace_user_skill_refresh(
+                self.options.generation,
+                native,
+                "ready_catalog",
+                &json!({"commands": catalog.native_commands()}),
+            );
+        }
         Ok(RuntimeEventKind::SessionReady {
             verified_cli_version: Some(version.to_owned()),
             effective_permissions,
@@ -4249,6 +4265,13 @@ impl GrokProtocol {
                 {
                     return Err(RuntimeError::Protocol(skills::unavailable()));
                 }
+                #[cfg(test)]
+                multi_skill_live_tests::trace_user_skill_refresh(
+                    self.options.generation,
+                    &session_id,
+                    "reload",
+                    result,
+                );
                 // reload 会刷新整个 leader；此通道已证明独占且仅一个会话。
                 // 计数只限制作用域，真正可调用性仍由后续关联目录的逐路径核对决定。
                 effects.writes.push(self.request(
@@ -4282,6 +4305,13 @@ impl GrokProtocol {
                 if let Err(error) = catalog.verify_root_selection(&queued.skills) {
                     return Ok(rejected_command(queued.message_id, error));
                 }
+                #[cfg(test)]
+                multi_skill_live_tests::trace_user_skill_refresh(
+                    self.options.generation,
+                    &session_id,
+                    "refreshed_catalog",
+                    result,
+                );
                 let selected = queued
                     .skills
                     .iter()
@@ -6127,6 +6157,10 @@ mod native_skill_live_tests;
 #[cfg(all(test, unix))]
 #[path = "grok_fixed_policy_live_tests.rs"]
 mod fixed_policy_live_tests;
+
+#[cfg(all(test, unix))]
+#[path = "grok_fixed_skill_live_tests.rs"]
+mod fixed_skill_live_tests;
 
 #[path = "grok_skills.rs"]
 mod skills;

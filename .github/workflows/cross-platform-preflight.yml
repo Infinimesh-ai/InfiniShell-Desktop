@@ -246,6 +246,9 @@ jobs:
           # 仅运行合成证据与准备边界回归，不启动真实 CLI 或模型。
           python3 -B script/cli-agent-parity/grok_native_skill_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_fixed_policy_runner_tests.py -v
+          python3 -B script/cli-agent-parity/grok_user_skill_runner_tests.py -v
+          python3 -B script/cli-agent-parity/run_grok_fixed_skill_live_tests.py -v
+          python3 -B script/cli-agent-parity/grok_image_skill_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_child_coordinator_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_files_policy_runner_tests.py -v
           python3 -B script/cli-agent-parity/grok_selected_skill_runner_tests.py -v
@@ -1149,6 +1152,9 @@ jobs:
             'grok_policy_preflight_runner_tests.py',
             'grok_native_skill_runner_tests.py',
             'grok_fixed_policy_runner_tests.py',
+            'grok_user_skill_runner_tests.py',
+            'run_grok_fixed_skill_live_tests.py',
+            'grok_image_skill_runner_tests.py',
             'grok_child_coordinator_runner_tests.py',
             'grok_files_policy_runner_tests.py',
             'grok_selected_skill_runner_tests.py',

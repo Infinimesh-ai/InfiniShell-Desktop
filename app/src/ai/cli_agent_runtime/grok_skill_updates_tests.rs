@@ -6,7 +6,8 @@ use tempfile::TempDir;
 use uuid::Uuid;
 
 use super::{
-    Effects, GrokProtocol, ROOT_VERSION, ROOT_VERSION_OUTPUT, ReportedModels, skills::SkillCatalog,
+    Effects, GrokProtocol, ROOT_VERSION, ROOT_VERSION_OUTPUT, ReportedModels,
+    skills::{SelectedSkill, SkillCatalog},
     tests::options,
 };
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
@@ -94,11 +95,101 @@ fn two_initial_skills_keep_native_blocks_and_user_text_without_injecting_bodies(
     assert_eq!(
         effects.writes[0]["params"]["prompt"],
         json!([
-            {"type":"text","text":"/alpha"},{"type":"text","text":"/beta"},{"type":"text","text":"中文完整输入"}
+            {"type":"text","text":"/alpha"},{"type":"text","text":"/beta"},{"type":"text","text":"中文完整输入"},
+            {"type":"text","text":json!({"selected_skills":[
+                {"qualifiedName":"local:alpha","path":alpha.path},
+                {"qualifiedName":"local:beta","path":beta.path}
+            ]}).to_string()}
         ])
     );
+    assert!(!effects.writes[0].to_string().contains("只读验收正文"));
     assert!(effects.events.is_empty());
     assert!(protocol.refreshing_skill_prompt.is_none());
+}
+
+#[test]
+fn mixed_user_and_local_skills_append_only_verified_references_in_selected_order() {
+    let root = TempDir::new().unwrap();
+    let alpha = skill(&root.path().join("项目"), "alpha");
+    let beta = skill(&root.path().join("用户"), "beta");
+    let unselected = skill(root.path(), "unselected");
+    let native_user_path = beta.path.parent().unwrap().join(".").join("SKILL.md");
+    let mut user_entry = entry(&beta);
+    user_entry["name"] = json!("user:beta");
+    user_entry["_meta"]["scope"] = json!("user");
+    user_entry["_meta"]["qualifiedName"] = json!("user:beta");
+    user_entry["_meta"]["path"] = json!(native_user_path);
+    let catalog =
+        SkillCatalog::from_native(&json!([entry(&alpha), user_entry, entry(&unselected)])).unwrap();
+    let selected = [
+        SelectedSkill::new(beta.name.clone(), beta.path.clone()).unwrap(),
+        SelectedSkill::new(alpha.name.clone(), alpha.path.clone()).unwrap(),
+    ];
+    let content = catalog
+        .encode_selected(
+            vec![
+                InputContent::Text("中文第一段".into()),
+                input(&beta),
+                InputContent::Text("second paragraph".into()),
+                input(&alpha),
+            ],
+            &selected,
+            root.path(),
+        )
+        .unwrap();
+    assert_eq!(
+        content,
+        vec![
+            json!({"type":"text","text":"/user:beta"}),
+            json!({"type":"text","text":"/alpha"}),
+            json!({"type":"text","text":"中文第一段"}),
+            json!({"type":"text","text":"second paragraph"}),
+            json!({"type":"text","text":json!({"selected_skills":[
+                {"qualifiedName":"user:beta","path":native_user_path},
+                {"qualifiedName":"local:alpha","path":alpha.path}
+            ]}).to_string()}),
+        ]
+    );
+    let encoded = serde_json::to_string(&content).unwrap();
+    assert!(!encoded.contains("只读验收正文"));
+    assert!(!encoded.contains("unselected"));
+}
+
+#[test]
+fn multiple_skill_encoding_rejects_mismatched_source_or_changed_file() {
+    let root = TempDir::new().unwrap();
+    let alpha = skill(root.path(), "alpha");
+    let beta = skill(root.path(), "beta");
+    let other = skill(&root.path().join("其他来源"), "beta");
+    let selected = [
+        SelectedSkill::new(alpha.name.clone(), alpha.path.clone()).unwrap(),
+        SelectedSkill::new(beta.name.clone(), beta.path.clone()).unwrap(),
+    ];
+    for (field, value) in [
+        ("qualifiedName", json!("user:beta")),
+        ("scope", json!("user")),
+        ("path", json!(other.path)),
+    ] {
+        let mut changed = entry(&beta);
+        changed["_meta"][field] = value;
+        let catalog = SkillCatalog::from_native(&json!([entry(&alpha), changed])).unwrap();
+        assert!(
+            catalog
+                .encode_selected(Vec::new(), &selected, root.path())
+                .is_err()
+        );
+    }
+    let catalog = SkillCatalog::from_native(&json!([entry(&alpha), entry(&beta)])).unwrap();
+    fs::write(
+        &beta.path,
+        "---\nname: beta\ndescription: 修改后内容\nuser-invocable: true\n---\n更改正文\n",
+    )
+    .unwrap();
+    assert!(
+        catalog
+            .encode_selected(Vec::new(), &selected, root.path())
+            .is_err()
+    );
 }
 
 #[test]

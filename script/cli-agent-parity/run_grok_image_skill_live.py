@@ -207,6 +207,10 @@ def audit_turns(root, evidence, events, fixtures, history, projections):
         expected_blocks.append({"type": "image", "mimeType": "image/png", "data": base64.b64encode(data).decode()})
         require(image["native_content_digest"] == previous.sha(json.dumps(expected_blocks[-1], sort_keys=True,
                     separators=(",", ":")).encode()), "原图 typed 编码摘要错误")
+        if len(keys) > 1:
+            expected_blocks.append({"type": "text", "text": json.dumps({"selected_skills": [
+                {"qualifiedName": "local:" + fixtures[key]["name"], "path": fixtures[key]["path"]}
+                for key in keys]}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))})
         require([row["content"] for row in original] == expected_blocks, "原生 typed 图片或技能输入与提交不一致")
         matched = [row for row in projections if row.get("session_id") == native and row.get("turn_id") == end["turn_id"]
                    and row.get("runtime_generation") == end["generation"]]

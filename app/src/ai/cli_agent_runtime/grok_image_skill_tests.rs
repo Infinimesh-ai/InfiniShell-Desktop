@@ -103,7 +103,7 @@ fn multiple_skills_keep_selected_order_before_text_and_original_image() {
     let beta = skill(root.path(), "beta");
     let (mut input, data) = png_input(&root.path().join("local-cli-attachments"));
     input.extend([skill_input(&beta), skill_input(&alpha)]);
-    let mut protocol = protocol(&root, &[alpha, beta]);
+    let mut protocol = protocol(&root, &[alpha.clone(), beta.clone()]);
     let command = request(&protocol, Uuid::new_v4(), input);
 
     let effects = protocol.command(command);
@@ -113,7 +113,11 @@ fn multiple_skills_keep_selected_order_before_text_and_original_image() {
         json!([
             {"type":"text","text":"/beta"},{"type":"text","text":"/alpha"},
             {"type":"text","text":"图片\n第二行"},
-            {"type":"image","mimeType":"image/png","data":data}
+            {"type":"image","mimeType":"image/png","data":data},
+            {"type":"text","text":json!({"selected_skills":[
+                {"qualifiedName":"local:beta","path":beta.path},
+                {"qualifiedName":"local:alpha","path":alpha.path}
+            ]}).to_string()}
         ])
     );
     assert!(!effects.writes[0].to_string().contains("PRIVATE_SKILL_BODY"));
@@ -368,5 +372,40 @@ fn full_image_skill_frame_budget_counts_slash_prefix_and_all_images() {
         catalog
             .encode_selected(too_many, &selected, &store)
             .is_err()
+    );
+}
+
+#[test]
+fn multiple_skill_references_count_toward_the_original_image_frame_budget() {
+    let root = TempDir::new().unwrap();
+    let alpha = skill(root.path(), "alpha");
+    let beta = skill(root.path(), "beta");
+    let store = root.path().join("local-cli-attachments");
+    let (input, _) = png_input(&store);
+    let image = input[1].clone();
+    let original = encode_prompt_content(
+        vec![
+            InputContent::Text("/alpha".into()),
+            InputContent::Text("/beta".into()),
+            InputContent::Text(String::new()),
+            image.clone(),
+        ],
+        &store,
+    )
+    .unwrap();
+    let available = MAX_LINE_BYTES - 64 * 1024 - serde_json::to_vec(&original).unwrap().len();
+    let selected = [
+        skills::SelectedSkill::new(alpha.name.clone(), alpha.path.clone()).unwrap(),
+        skills::SelectedSkill::new(beta.name.clone(), beta.path.clone()).unwrap(),
+    ];
+    let catalog = skills::SkillCatalog::from_native(&json!([entry(&alpha), entry(&beta)])).unwrap();
+    // 原 slash、文字和图片恰好占满旧预算时，新增引用不能绕过完整 JSON 帧上限。
+    assert_eq!(
+        catalog.encode_selected(
+            vec![InputContent::Text("x".repeat(available)), image],
+            &selected,
+            &store,
+        ),
+        Err(crate::t!("cli-agent-runtime-data-too-large"))
     );
 }

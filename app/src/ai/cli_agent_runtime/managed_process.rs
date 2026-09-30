@@ -30,6 +30,9 @@ const EXEC_CONTROL_ENV: &str = "INFINISHELL_CLI_EXEC_CONTROL";
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 const CLEANUP_TIMEOUT: Duration = Duration::from_secs(10);
 const GRACEFUL_EXIT_TIMEOUT: Duration = Duration::from_secs(2);
+// 固定 Grok stdio 的 EOF 合同包含 100ms 等待、上传/遥测收尾及两段各 2s 的退出等待。
+const GROK_STDIO_EOF_TIMEOUT: Duration = Duration::from_secs(8);
+const GROK_STDIO_CONFIRM_TIMEOUT: Duration = Duration::from_secs(40);
 const MAX_RECORD_BYTES: u64 = 64 * 1024;
 const SPAWN_ATTEMPT_RECORD: &str = "spawn-attempt.json";
 const SPAWN_REJECTED_RECORD: &str = "spawn-rejected.json";
@@ -705,6 +708,8 @@ struct Manifest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     expected_files: Vec<ExpectedFileIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    grok_stdio_eof: Option<ExpectedFileIdentity>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     atomic_launch_kind: Option<AtomicLaunchKind>,
     #[cfg(windows)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -714,6 +719,49 @@ struct Manifest {
     grok_npm_source: Option<NpmGrokSource>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     atomic_cwd: Option<AtomicDirectoryIdentity>,
+}
+
+fn validate_grok_stdio_eof(manifest: &Manifest) -> io::Result<()> {
+    let Some(expected) = &manifest.grok_stdio_eof else {
+        return Ok(());
+    };
+    let home = manifest
+        .isolated_home
+        .as_ref()
+        .ok_or_else(|| io::Error::other("Grok stdio 退出合同缺少私有目录"))?;
+    if !manifest.launch_allowed
+        || manifest.environment.is_some()
+        || manifest.atomic_launch_kind.is_some()
+        || !home.is_absolute()
+        || manifest.cwd != home.join("startup")
+        || manifest.arguments
+            != [
+                OsString::from("agent"),
+                OsString::from("--no-leader"),
+                OsString::from("--agent-profile"),
+                home.join("profile.md").into_os_string(),
+                OsString::from("stdio"),
+            ]
+        || expected.path != manifest.executable
+        || !expected.canonical_path.is_absolute()
+        || expected.file_id.is_none()
+        || expected.size == 0
+        || !super::grok_profile::fixed_stdio_executable_digest(&expected.sha256)
+    {
+        return Err(io::Error::other("Grok stdio 退出合同与固定启动材料不匹配"));
+    }
+    Ok(())
+}
+
+fn graceful_exit_timeout(manifest: &Manifest, reason: ExitReason) -> Duration {
+    if reason == ExitReason::StdioClosed
+        && manifest.grok_stdio_eof.is_some()
+        && validate_grok_stdio_eof(manifest).is_ok()
+    {
+        GROK_STDIO_EOF_TIMEOUT
+    } else {
+        GRACEFUL_EXIT_TIMEOUT
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -874,6 +922,7 @@ pub(crate) struct ManagedChild {
     control: Option<TcpStream>,
     state_dir: PathBuf,
     generation: Uuid,
+    exit_confirmation_timeout: Duration,
 }
 
 impl ManagedChild {
@@ -886,6 +935,7 @@ impl ManagedChild {
             let _ = control.shutdown(Shutdown::Both);
         }
         self.control.take();
+        self.exit_confirmation_timeout = CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT;
         self.wait_for_exit().await
     }
 
@@ -895,13 +945,17 @@ impl ManagedChild {
         self.wait_for_exit().await
     }
 
+    pub(super) fn exit_confirmation_timeout(&self) -> Duration {
+        self.exit_confirmation_timeout
+    }
+
     async fn wait_for_exit(mut self) -> io::Result<ExitReceipt> {
         let mut child = self
             .process
             .take()
             .ok_or_else(|| io::Error::other("监督进程已被回收"))?;
-        self.wait_for_confirmed_exit(child.status(), CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT)
-            .await
+        let timeout = self.exit_confirmation_timeout;
+        self.wait_for_confirmed_exit(child.status(), timeout).await
     }
 
     async fn wait_for_confirmed_exit(
@@ -1578,15 +1632,15 @@ async fn spawn_configured(
         environment,
         expected_files,
         binding,
+        None,
         #[cfg(all(windows, target_arch = "x86_64"))]
         None,
     )
     .await
 }
 
-/// 保留 npm 公开入口的完整来源合同，固定策略仍使用自己的私有 GROK_HOME。
-#[cfg(all(windows, target_arch = "x86_64"))]
-pub(crate) async fn spawn_with_grok_npm_source(
+/// 固定 stdio 的宽限必须绑定官方映像和私有 profile，不能仅凭命令参数开启。
+pub(super) async fn spawn_grok(
     state_dir: &Path,
     generation: Uuid,
     executable: &Path,
@@ -1594,18 +1648,24 @@ pub(crate) async fn spawn_with_grok_npm_source(
     cwd: &Path,
     isolated_home: Option<&Path>,
     isolated_state_dir: Option<&Path>,
-    source: Option<NpmGrokSource>,
+    fixed_stdio: bool,
+    #[cfg(all(windows, target_arch = "x86_64"))] source: Option<NpmGrokSource>,
 ) -> io::Result<ManagedChild> {
+    #[cfg(all(windows, target_arch = "x86_64"))]
     let _source_files = source
         .as_ref()
         .map(NpmGrokSource::validate_and_hold)
         .transpose()?;
+    #[cfg(all(windows, target_arch = "x86_64"))]
     if source
         .as_ref()
         .is_some_and(|source| source.executable != executable)
     {
         return Err(io::Error::other("Grok npm 启动程序与来源不一致"));
     }
+    let grok_stdio_eof = fixed_stdio
+        .then(|| ExpectedFileIdentity::capture(executable))
+        .transpose()?;
     spawn_configured_inner(
         state_dir,
         generation,
@@ -1617,6 +1677,8 @@ pub(crate) async fn spawn_with_grok_npm_source(
         None,
         Vec::new(),
         None,
+        grok_stdio_eof,
+        #[cfg(all(windows, target_arch = "x86_64"))]
         source,
     )
     .await
@@ -1633,6 +1695,7 @@ async fn spawn_configured_inner(
     environment: Option<ManagedEnvironment>,
     expected_files: Vec<ExpectedFileIdentity>,
     binding: Option<&PreparedLaunchBinding>,
+    grok_stdio_eof: Option<ExpectedFileIdentity>,
     #[cfg(all(windows, target_arch = "x86_64"))] grok_npm_source: Option<NpmGrokSource>,
 ) -> io::Result<ManagedChild> {
     let worker = supervisor_executable()?;
@@ -1654,6 +1717,7 @@ async fn spawn_configured_inner(
         isolated_state_dir: isolated_state_dir.map(Path::canonicalize).transpose()?,
         environment,
         expected_files,
+        grok_stdio_eof,
         atomic_launch_kind,
         #[cfg(windows)]
         child_image: binding.and_then(|binding| binding.child_image.clone()),
@@ -1661,6 +1725,7 @@ async fn spawn_configured_inner(
         grok_npm_source,
         atomic_cwd,
     };
+    validate_grok_stdio_eof(&manifest)?;
     if version_probe::is_probe(atomic_launch_kind) {
         version_probe::validate(&manifest, state_dir)?;
     }
@@ -1712,6 +1777,11 @@ async fn spawn_configured_inner(
                 control: Some(control),
                 state_dir,
                 generation,
+                exit_confirmation_timeout: if manifest.grok_stdio_eof.is_some() {
+                    GROK_STDIO_CONFIRM_TIMEOUT
+                } else {
+                    CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT
+                },
             })
         })();
         // 接收方已取消时，销毁结果会通过 ManagedChild::drop 通知真实监督者清理。
@@ -1744,6 +1814,7 @@ pub(crate) fn record_not_started(
         isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
@@ -1779,6 +1850,7 @@ pub(crate) fn record_not_started_with_binding(
         isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: binding.kind,
         #[cfg(windows)]
         child_image: binding.child_image.clone(),
@@ -2144,6 +2216,7 @@ fn read_manifest(path: &Path) -> io::Result<(Manifest, Vec<u8>)> {
         return Err(io::Error::other("托管进程启动契约不匹配"));
     }
     validate_expected_files_contract(&manifest.executable, &manifest.expected_files)?;
+    validate_grok_stdio_eof(&manifest)?;
     if manifest.atomic_launch_kind == Some(AtomicLaunchKind::UnixReviewedProjectCommandV1) {
         #[cfg(unix)]
         reviewed_unix::validate(&manifest)?;
@@ -2590,7 +2663,7 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
             Err(mpsc::RecvTimeoutError::Disconnected) => break ExitReason::HostDisconnected,
         }
     };
-    let graceful_timeout = GRACEFUL_EXIT_TIMEOUT;
+    let graceful_timeout = graceful_exit_timeout(manifest, reason);
     #[cfg(windows)]
     let graceful_timeout = if reason != ExitReason::NativeExit
         && let Some(control) = execution_control.as_mut()
@@ -2602,9 +2675,19 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
         graceful_timeout
     };
     // 收尾窗口不证明清理完成，后面仍须原进程树及候选 ACL/profile 清理核验。
-    let graceful_deadline = Instant::now() + graceful_timeout;
+    let mut graceful_deadline = Instant::now() + graceful_timeout;
     while !tree.root_exited()? && Instant::now() < graceful_deadline {
-        thread::sleep(Duration::from_millis(10));
+        match receiver.recv_timeout(Duration::from_millis(10)) {
+            Ok(ExitReason::HostDisconnected | ExitReason::StopRequested) => {
+                if manifest.grok_stdio_eof.is_some() {
+                    graceful_deadline =
+                        graceful_deadline.min(Instant::now() + GRACEFUL_EXIT_TIMEOUT);
+                }
+            }
+            Ok(ExitReason::NativeExit | ExitReason::StdioClosed)
+            | Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => thread::sleep(Duration::from_millis(10)),
+        }
     }
     let containment = match tree.containment() {
         Containment::LinuxSubtree => "linux_subtree",
@@ -3155,6 +3238,9 @@ fn run_path_exec_worker(
     // 此核对必须尽量贴近最终 exec/status，不能只信 GUI 写 manifest 前的哈希。
     if verify_original_files {
         verify_expected_files(&manifest.expected_files)?;
+        if let Some(expected) = &manifest.grok_stdio_eof {
+            verify_expected_files(std::slice::from_ref(expected))?;
+        }
     }
     #[cfg(unix)]
     {

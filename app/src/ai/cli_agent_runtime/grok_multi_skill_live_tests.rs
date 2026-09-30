@@ -35,22 +35,84 @@ const IMAGE_PROMPT: &str = "请按本轮所选技能的顺序执行。只读取�
 enum Scenario {
     MultiSkill,
     ImageSkill,
+    UserSkill,
 }
 
 impl Scenario {
     fn prompt(self) -> &'static str {
         match self {
-            Self::MultiSkill => PROMPT,
+            Self::MultiSkill | Self::UserSkill => PROMPT,
             Self::ImageSkill => IMAGE_PROMPT,
         }
     }
 
     fn marker_prefix(self) -> &'static str {
         match self {
-            Self::MultiSkill => "G06_",
+            Self::MultiSkill | Self::UserSkill => "G06_",
             Self::ImageSkill => "G02_",
         }
     }
+
+    fn skill_root(self, root: &Path, key: &str) -> PathBuf {
+        match self {
+            Self::UserSkill if key != "alpha" => root.join("home/.grok/skills"),
+            Self::MultiSkill | Self::ImageSkill | Self::UserSkill => {
+                root.join("project/.grok/skills")
+            }
+        }
+    }
+}
+
+/// 仅为显式隔离场景保存已通过生产守卫的原生目录，不输出正文、工具定义或凭据。
+pub(super) fn trace_user_skill_refresh(
+    generation: Uuid,
+    native: &str,
+    phase: &str,
+    result: &Value,
+) {
+    if env::var("INFINISHELL_GROK_USER_SKILL_TRACE").as_deref() != Ok("1") {
+        return;
+    }
+    let Some(root) = env::var_os("INFINISHELL_GROK_LIVE_ROOT") else {
+        return;
+    };
+    if fs::read_to_string(PathBuf::from(root).join(".infinishell-grok-user-skill-probe"))
+        .ok()
+        .as_deref()
+        != Some("isolated Grok user skill verification\n")
+    {
+        return;
+    }
+    let proof = match phase {
+        "reload" => json!({"reloaded":result["result"]["reloaded"]}),
+        "ready_catalog" | "refreshed_catalog" => {
+            let commands = result["commands"].as_array().map(|commands| {
+                commands
+                    .iter()
+                    .filter(|command| {
+                        matches!(
+                            command["_meta"]["bareName"].as_str(),
+                            Some("isp-g06-alpha" | "isp-g06-beta" | "isp-g06-gamma")
+                        )
+                    })
+                    .map(|command| {
+                        json!({"name":command["name"],"input":command["input"],
+                    "_meta":{"bareName":command["_meta"]["bareName"],
+                        "scope":command["_meta"]["scope"],
+                        "qualifiedName":command["_meta"]["qualifiedName"],
+                        "path":command["_meta"]["path"]}})
+                    })
+                    .collect::<Vec<_>>()
+            });
+            json!({"commands":commands})
+        }
+        _ => return,
+    };
+    eprintln!(
+        "GROK_USER_SKILL_CATALOG {}",
+        json!({"generation":generation,
+        "native_session_id":native,"phase":phase,"proof":proof})
+    );
 }
 
 struct AbortOnDrop(JoinHandle<Result<(), RuntimeError>>);
@@ -67,14 +129,15 @@ fn record(file: &mut File, value: Value) -> Result<(), String> {
         .map_err(|_| "技能证据写入失败".into())
 }
 
-fn selection(root: &Path, keys: &[&str]) -> Result<Vec<SelectedLocalSkill>, String> {
+fn selection(
+    root: &Path,
+    keys: &[&str],
+    scenario: Scenario,
+) -> Result<Vec<SelectedLocalSkill>, String> {
     keys.iter()
         .map(|key| {
             let name = format!("isp-g06-{key}");
-            let path = root
-                .join("project/.grok/skills")
-                .join(&name)
-                .join("SKILL.md");
+            let path = scenario.skill_root(root, key).join(&name).join("SKILL.md");
             Ok(SelectedLocalSkill {
                 name,
                 path: dunce::canonicalize(path).map_err(|_| "选中技能路径不可解析")?,
@@ -84,7 +147,7 @@ fn selection(root: &Path, keys: &[&str]) -> Result<Vec<SelectedLocalSkill>, Stri
 }
 
 fn expected(root: &Path, keys: &[&str], scenario: Scenario) -> Result<String, String> {
-    selection(root, keys)?
+    selection(root, keys, scenario)?
         .iter()
         .map(|skill| {
             let bytes = fs::read_to_string(&skill.path).map_err(|_| "技能夹具不可读")?;
@@ -211,13 +274,13 @@ async fn exercise_turn(
     events: &mut mpsc::Receiver<RuntimeEvent>,
     file: &mut File,
 ) -> Result<(), String> {
-    let skills = selection(root, keys)?;
+    let skills = selection(root, keys, scenario)?;
     let parsed = skills
         .iter()
         .map(|skill| ai::skills::parse_skill(&skill.path).map_err(|_| "技能解析失败".to_owned()))
         .collect::<Result<Vec<_>, _>>()?;
     let input = match scenario {
-        Scenario::MultiSkill => prepare_managed_input(
+        Scenario::MultiSkill | Scenario::UserSkill => prepare_managed_input(
             Harness::Grok,
             PROMPT.into(),
             &[],
@@ -316,12 +379,12 @@ async fn exercise_turn(
                 details,
             } => {
                 approval_count += 1;
+                let permission_root = match scenario {
+                    Scenario::UserSkill => root.to_path_buf(),
+                    Scenario::MultiSkill | Scenario::ImageSkill => root.join("project"),
+                };
                 let matched = skills.iter().find(|skill| {
-                    exact_skill_read_permission(
-                        &details["toolCall"],
-                        &root.join("project"),
-                        &skill.path,
-                    )
+                    exact_skill_read_permission(&details["toolCall"], &permission_root, &skill.path)
                 });
                 let allowed = approval_count <= 8
                     && turn.as_ref() == Some(&turn_id)
@@ -455,11 +518,13 @@ async fn exercise_connection(
     let generation = Uuid::new_v4();
     let resumed = previous.is_some();
     let selected = match (scenario, resumed) {
-        (Scenario::MultiSkill, true) => selection(root, &["alpha", "beta", "gamma"]),
-        (Scenario::MultiSkill, false) | (Scenario::ImageSkill, true) => {
-            selection(root, &["alpha", "beta"])
+        (Scenario::MultiSkill | Scenario::UserSkill, true) => {
+            selection(root, &["alpha", "beta", "gamma"], scenario)
         }
-        (Scenario::ImageSkill, false) => selection(root, &["alpha"]),
+        (Scenario::MultiSkill | Scenario::UserSkill, false) | (Scenario::ImageSkill, true) => {
+            selection(root, &["alpha", "beta"], scenario)
+        }
+        (Scenario::ImageSkill, false) => selection(root, &["alpha"], scenario),
     }?;
     let state_dir = root.join("state");
     let options = SessionOptions {
@@ -518,15 +583,17 @@ async fn exercise_connection(
             let keys = match scenario {
                 Scenario::MultiSkill => &["gamma", "beta"],
                 Scenario::ImageSkill => &["beta", "alpha"],
+                Scenario::UserSkill => &["gamma", "alpha"],
             };
             exercise_turn(root, "cold", keys, scenario, generation, &native, &controller, &mut events, file).await?;
         } else {
-            let (initial, hot, added): (&[&str], &[&str], &str) = match scenario {
-                Scenario::MultiSkill => (&["alpha", "beta"], &["gamma"], "isp-g06-gamma"),
-                Scenario::ImageSkill => (&["alpha"], &["alpha", "beta"], "isp-g06-beta"),
+            let (initial, hot, added_key): (&[&str], &[&str], &str) = match scenario {
+                Scenario::MultiSkill | Scenario::UserSkill => (&["alpha", "beta"], &["gamma"], "gamma"),
+                Scenario::ImageSkill => (&["alpha"], &["alpha", "beta"], "beta"),
             };
             exercise_turn(root, "initial", initial, scenario, generation, &native, &controller, &mut events, file).await?;
-            let target = root.join("project/.grok/skills").join(added);
+            let added = format!("isp-g06-{added_key}");
+            let target = scenario.skill_root(root, added_key).join(&added);
             if target.exists() { return Err("热新增技能在首轮前已经发布".into()); }
             fs::rename(root.join("unpublished").join(added), &target).map_err(|_| "热新增技能发布失败")?;
             record(file, json!({"event":"skill_published","generation":generation,"native_session_id":native,
@@ -651,4 +718,50 @@ async fn real_grok_image_skill_hot_add_and_resume() {
         result.is_ok(),
         "Grok 生产图片与技能流程失败，原始证据已保留"
     );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "需要固定且已认证的 Grok、生产监督者和三次模型输入；用户技能目录、原生字节及自然清理须由配套运行器审核"]
+async fn real_grok_user_skill_hot_add_and_resume() {
+    let root = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").unwrap())
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-grok-user-skill-probe")).unwrap(),
+        "isolated Grok user skill verification\n"
+    );
+    assert_eq!(
+        env::var("INFINISHELL_GROK_USER_SKILL_TRACE").as_deref(),
+        Ok("1")
+    );
+    assert_eq!(
+        PathBuf::from(env::var_os("GROK_HOME").unwrap())
+            .canonicalize()
+            .unwrap(),
+        root.join("home/.grok")
+    );
+    let mut file = File::create(root.join("events.ndjson")).unwrap();
+    record(
+        &mut file,
+        json!({"event":"started","scope":"grok_user_skill_hot_add_and_resume",
+        "max_native_inputs":3,"production_connect":true,"candidate_flags_used":false,
+        "coordinator_persistence_verified":false,"gui_verified":false}),
+    )
+    .unwrap();
+    let result = async {
+        let first = exercise_connection(&root, None, Scenario::UserSkill, &mut file).await?;
+        let resumed = exercise_connection(&root, Some(first.clone()), Scenario::UserSkill, &mut file).await?;
+        if resumed != first { return Err("用户技能冷恢复更换了原生会话".to_owned()); }
+        record(&mut file, json!({"event":"adapter_flow_passed","scope":"grok_user_skill_hot_add_and_resume",
+            "native_session_id":first,"native_inputs":3,"native_byte_audit_pending":true,"runtime_generations":2,
+            "coordinator_persistence_verified":false,"gui_verified":false}))
+    }.await;
+    if let Err(reason) = &result {
+        record(
+            &mut file,
+            json!({"event":"acceptance_failed","reason":reason}),
+        )
+        .unwrap();
+    }
+    assert!(result.is_ok(), "Grok 用户技能流程失败，原始证据已保留");
 }

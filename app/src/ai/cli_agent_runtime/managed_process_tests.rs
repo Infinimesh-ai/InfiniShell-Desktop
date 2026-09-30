@@ -5,6 +5,144 @@ use futures::executor::block_on;
 use futures::task::noop_waker_ref;
 
 #[test]
+fn legacy_manifest_keeps_default_eof_budget_without_a_fixed_grok_contract() {
+    let root = tempfile::tempdir().unwrap();
+    let (_, manifest, bytes, _) = attempted_fixture(root.path(), Uuid::new_v4());
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert!(value.get("grok_stdio_eof").is_none());
+    let restored: Manifest = serde_json::from_value(value).unwrap();
+    assert!(restored.grok_stdio_eof.is_none());
+    assert_eq!(serde_json::to_vec(&restored).unwrap(), bytes);
+    assert_eq!(
+        graceful_exit_timeout(&manifest, ExitReason::StdioClosed),
+        Duration::from_secs(2)
+    );
+}
+
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(any(target_os = "linux", windows), target_arch = "x86_64")
+))]
+fn fixed_grok_eof_manifest(state: &Path) -> Manifest {
+    let (_, mut manifest, _, _) = attempted_fixture(state, Uuid::new_v4());
+    let home = state.join("grok-managed").join(Uuid::new_v4().to_string());
+    manifest.arguments = vec![
+        "agent".into(),
+        "--no-leader".into(),
+        "--agent-profile".into(),
+        home.join("profile.md").into_os_string(),
+        "stdio".into(),
+    ];
+    manifest.cwd = home.join("startup");
+    manifest.isolated_home = Some(home);
+    // 这里只构造通过工件校验后的合同；真正派生仍必须重新核对文件身份和 SHA。
+    #[cfg(target_os = "macos")]
+    let digest = "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d";
+    #[cfg(target_os = "linux")]
+    let digest = "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407";
+    #[cfg(windows)]
+    let digest = "ab5d2a424f08281798acbdbb06076166fe000d7995ede94a673417b805210a25";
+    manifest.grok_stdio_eof = Some(ExpectedFileIdentity {
+        path: manifest.executable.clone(),
+        canonical_path: manifest.executable.clone(),
+        sha256: digest.into(),
+        size: 1,
+        file_id: Some(ExpectedFileId {
+            volume: 1,
+            index: 2,
+        }),
+    });
+    manifest
+}
+
+#[test]
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(any(target_os = "linux", windows), target_arch = "x86_64")
+))]
+fn fixed_grok_eof_budget_does_not_extend_stop_or_disconnect() {
+    let root = tempfile::tempdir().unwrap();
+    let manifest = fixed_grok_eof_manifest(root.path());
+    validate_grok_stdio_eof(&manifest).unwrap();
+    assert_eq!(
+        graceful_exit_timeout(&manifest, ExitReason::StdioClosed),
+        Duration::from_secs(8)
+    );
+    assert_eq!(
+        graceful_exit_timeout(&manifest, ExitReason::StopRequested),
+        Duration::from_secs(2)
+    );
+    assert_eq!(
+        graceful_exit_timeout(&manifest, ExitReason::HostDisconnected),
+        Duration::from_secs(2)
+    );
+    assert_eq!(
+        graceful_exit_timeout(&manifest, ExitReason::NativeExit),
+        Duration::from_secs(2)
+    );
+    let mut only_arguments = manifest.clone();
+    only_arguments.grok_stdio_eof = None;
+    assert_eq!(
+        graceful_exit_timeout(&only_arguments, ExitReason::StdioClosed),
+        Duration::from_secs(2)
+    );
+    assert_eq!(GROK_STDIO_CONFIRM_TIMEOUT, Duration::from_secs(40));
+    // 最坏收尾为 8s + 原生 wait 10s + bootout 5s + 清理 10s + 输出 5s。
+    assert!(GROK_STDIO_CONFIRM_TIMEOUT > Duration::from_secs(38));
+}
+
+#[test]
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(any(target_os = "linux", windows), target_arch = "x86_64")
+))]
+fn fixed_grok_eof_contract_rejects_other_artifacts_profiles_and_unbounded_options() {
+    let root = tempfile::tempdir().unwrap();
+    let manifest = fixed_grok_eof_manifest(root.path());
+    let mut artifact = manifest.clone();
+    artifact.grok_stdio_eof.as_mut().unwrap().sha256 = "0".repeat(64);
+    let mut profile = manifest.clone();
+    profile.arguments[3] = root.path().join("other-profile.md").into_os_string();
+    let mut command = manifest.clone();
+    command.arguments[1] = "--leader".into();
+    let mut executable = manifest.clone();
+    executable.executable = root.path().join("different-binary");
+    for changed in [artifact, profile, command, executable] {
+        assert!(validate_grok_stdio_eof(&changed).is_err());
+        assert_eq!(
+            graceful_exit_timeout(&changed, ExitReason::StdioClosed),
+            Duration::from_secs(2)
+        );
+    }
+    let mut encoded = serde_json::to_value(&manifest).unwrap();
+    encoded["grok_stdio_eof"]["timeout_seconds"] = serde_json::json!(999999);
+    assert!(serde_json::from_value::<Manifest>(encoded).is_err());
+}
+
+#[test]
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(any(target_os = "linux", windows), target_arch = "x86_64")
+))]
+fn fixed_grok_eof_declared_digest_does_not_replace_final_executable_verification() {
+    let root = tempfile::tempdir().unwrap();
+    let mut manifest = fixed_grok_eof_manifest(root.path());
+    let replacement = root.path().join("changed-grok");
+    fs::write(&replacement, b"changed fixed executable").unwrap();
+    manifest.executable = replacement.clone();
+    let expected = manifest.grok_stdio_eof.as_mut().unwrap();
+    expected.path = replacement.clone();
+    expected.canonical_path = replacement;
+    validate_grok_stdio_eof(&manifest).unwrap();
+    assert!(
+        verify_expected_files(std::slice::from_ref(
+            manifest.grok_stdio_eof.as_ref().unwrap()
+        ))
+        .is_err()
+    );
+}
+
+#[test]
 fn stdout_bridge_flushes_ack_before_the_long_lived_source_reaches_eof() {
     struct BlockingReader {
         chunks: std::sync::mpsc::Receiver<Option<Vec<u8>>>,
@@ -312,6 +450,7 @@ fn legacy_manifest_without_expected_files_stays_compatible() {
         isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
@@ -347,6 +486,7 @@ fn atomic_manifest_never_downgrades_when_binding_record_is_missing() {
         isolated_state_dir: None,
         environment: None,
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: Some(AtomicLaunchKind::NativeFile),
         #[cfg(windows)]
         child_image: None,
@@ -394,6 +534,7 @@ fn child_with_tcp_control(state: &Path) -> (ManagedChild, TcpStream) {
             control: Some(control),
             state_dir: state.to_owned(),
             generation: Uuid::new_v4(),
+            exit_confirmation_timeout: CLEANUP_TIMEOUT + HANDSHAKE_TIMEOUT,
         },
         peer,
     )
@@ -485,6 +626,7 @@ fn fixture(state: &Path, generation: Uuid) -> (PathBuf, ExitReceipt) {
         arguments: Vec::new(),
         cwd: state.to_owned(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
@@ -520,6 +662,7 @@ fn attempted_fixture(state: &Path, generation: Uuid) -> (PathBuf, Manifest, Vec<
         arguments: Vec::new(),
         cwd: state.to_owned(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,
@@ -606,6 +749,7 @@ fn spawn_rejection_removes_isolated_auth_before_becoming_recoverable() {
         arguments: Vec::new(),
         cwd: state_path.clone(),
         expected_files: Vec::new(),
+        grok_stdio_eof: None,
         atomic_launch_kind: None,
         #[cfg(windows)]
         child_image: None,

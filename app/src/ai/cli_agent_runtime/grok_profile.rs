@@ -1113,6 +1113,17 @@ fn immutable_file(path: &Path, contents: &[u8]) -> Result<(), RuntimeError> {
     Ok(())
 }
 
+pub(super) fn fixed_stdio_executable_digest(digest: &str) -> bool {
+    VERIFIED_EXECUTABLES
+        .iter()
+        .any(|(os, arch, version, expected)| {
+            *os == std::env::consts::OS
+                && *arch == std::env::consts::ARCH
+                && *version == FIXED_SCOPE_VERSION
+                && *expected == digest
+        })
+}
+
 fn verified_executable_digest(path: &Path) -> Result<(&'static str, String), RuntimeError> {
     if !VERIFIED_EXECUTABLES
         .iter()

@@ -213,7 +213,7 @@ impl GrokSkillCeilingV1 {
         input: Vec<InputContent>,
     ) -> Result<Vec<Value>, RuntimeError> {
         self.verify_catalog(home, commands)?;
-        let mut names = BTreeSet::new();
+        let mut names = Vec::new();
         let mut text = Vec::new();
         for part in input {
             match part {
@@ -226,9 +226,11 @@ impl GrokSkillCeilingV1 {
                     text.push(value);
                 }
                 InputContent::Skill { name, path } => {
-                    if !self.contains(&name, &path) || !names.insert(name) {
+                    if !self.contains(&name, &path) || names.contains(&name) {
                         return Err(reject("grok_skills_parent_ceiling"));
                     }
+                    // 权限集合仍规范排序，实际调用按用户本轮选择顺序编码。
+                    names.push(name);
                 }
                 InputContent::LocalImage(_) => {
                     return Err(reject("grok_skills_image_scope_unverified"));
@@ -313,3 +315,7 @@ fn has_slash_skill_token(text: &str, commands: &Value) -> bool {
                 }))
     })
 }
+
+#[cfg(test)]
+#[path = "grok_profile_skills_tests.rs"]
+mod tests;

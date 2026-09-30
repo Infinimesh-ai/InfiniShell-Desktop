@@ -55,7 +55,12 @@ class ImageSkillAuditTests(unittest.TestCase):
             self.events.append({"event": "finished", **identity, "turn_id": turn, "output": answer, "outcome": "Completed"})
             wire = (["/" + self.fixtures[keys[0]]["name"] + " " + text] if len(keys) == 1
                     else ["/" + self.fixtures[key]["name"] for key in keys] + [text])
-            for item in [{"type": "text", "text": value} for value in wire] + [content]:
+            blocks = [{"type": "text", "text": value} for value in wire] + [content]
+            if len(keys) > 1:
+                blocks.append({"type": "text", "text": json.dumps({"selected_skills": [
+                    {"qualifiedName": "local:" + self.fixtures[key]["name"], "path": self.fixtures[key]["path"]}
+                    for key in keys]}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))})
+            for item in blocks:
                 self.update({"sessionUpdate": "user_message_chunk", "content": item,
                              "_meta": {"promptIndex": index, "modelId": "grok-4.7"}}, turn)
             first = self.fixtures[keys[0]]
