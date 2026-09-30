@@ -5836,7 +5836,7 @@ cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
 cli-agent-grok-input-manual-copy-required = 未发送。复制草稿，关闭富输入，再到 Grok 粘贴提交。
 cli-agent-input-copy-unsent-text = 复制未发送文本
-terminal-input-grok-draft-delivery-hint = Grok 富输入会话可从此提交；普通会话需复制后粘贴
+terminal-input-grok-draft-delivery-hint = 受支持的 Grok 会话可从此提交；否则请复制后粘贴
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = 已保存的会话尚不能使用这个较旧的 CLI 版本继续。
@@ -5922,6 +5922,8 @@ cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需�
 cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
 
 cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份已变化，已保留草稿。
+cli-agent-grok-native-images-unavailable = 此 Grok 连接支持文本和文件路径，已保留草稿与图片。
+cli-agent-grok-native-already-received = Grok 已接收过这段文本，草稿已保留。点击此提示可再次发送，开启新一轮。
 
 cli-agent-grok-owned-result-unverified = Grok 已结束本轮，但任务结果未能核验保存。请查看原生会话。
 

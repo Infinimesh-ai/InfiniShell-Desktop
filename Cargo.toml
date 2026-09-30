@@ -27,6 +27,7 @@ license = "AGPL-3.0-only"
 publish = false
 
 [workspace.dependencies]
+blake3 = "=1.8.2"
 # Local workspace crates. This lets us reference them in other crates without specifying a path.
 ai = { path = "crates/ai" }
 app-installation-detection = { path = "crates/app-installation-detection" }

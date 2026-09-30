@@ -20,6 +20,8 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod file_attachments;
+#[cfg(all(feature = "local_fs", feature = "local_tty", target_os = "macos", target_arch = "aarch64"))]
+mod grok_native;
 #[cfg(all(
     feature = "local_fs",
     feature = "local_tty",
@@ -818,6 +820,11 @@ impl TerminalView {
             self.submit_owned_grok_input(text, ctx);
             return;
         }
+        #[cfg(all(feature = "local_fs", feature = "local_tty", target_os = "macos", target_arch = "aarch64"))]
+        if agent == CLIAgent::Grok {
+            self.submit_native_grok_input(text, generation, ctx);
+            return;
+        }
         if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
             return;
         }
@@ -1485,7 +1492,7 @@ impl TerminalView {
                 query: Some(snapshot.query.clone()),
                 ..Default::default()
             },
-            // 仅确认向 PTY 转交输入，不伪装成插件 ACK 或真实任务完成。
+            // 仅更新输入提交的界面状态，不伪装成插件事件或真实任务完成。
             source: CLIAgentEventSource::LocalRichInput,
         };
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {

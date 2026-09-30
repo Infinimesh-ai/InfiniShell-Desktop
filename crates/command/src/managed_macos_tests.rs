@@ -1,4 +1,53 @@
 use super::*;
+use std::os::unix::net::UnixListener;
+
+#[test]
+fn peer_handle_preserves_connected_kernel_credentials() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("peer.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let client = UnixStream::connect(&path).unwrap();
+    let (server, _) = listener.accept().unwrap();
+    let expected = macos_process_identity(std::process::id() as i32).unwrap();
+
+    let peer = macos_peer_handle(&server).unwrap();
+    assert_eq!(peer.identity(), expected);
+    assert_eq!(peer.audit_token()[1], unsafe { libc::geteuid() });
+    assert_eq!(peer.audit_token()[5], std::process::id());
+    assert_eq!(peer.audit_token()[7], expected.pid_version);
+    assert_eq!(macos_peer_identity(&server).unwrap(), expected);
+    assert_eq!(macos_peer_handle(&client).unwrap().identity(), expected);
+}
+
+#[test]
+fn terminal_snapshot_reports_current_kernel_process_group() {
+    let identity = macos_process_identity(std::process::id() as i32).unwrap();
+
+    let terminal = macos_process_terminal(identity).unwrap();
+    assert_eq!(terminal.identity, identity);
+    assert_eq!(terminal.uid, unsafe { libc::geteuid() });
+    assert_eq!(terminal.process_group, unsafe { libc::getpgrp() });
+}
+
+#[test]
+fn terminal_snapshot_rejects_changed_process_generation() {
+    let identity = macos_process_identity(std::process::id() as i32).unwrap();
+
+    assert!(
+        macos_process_terminal(MacosProcessIdentity {
+            unique_id: identity.unique_id.wrapping_add(1),
+            ..identity
+        })
+        .is_err()
+    );
+    assert!(
+        macos_process_terminal(MacosProcessIdentity {
+            pid_version: identity.pid_version.wrapping_add(1),
+            ..identity
+        })
+        .is_err()
+    );
+}
 
 #[test]
 fn shared_caller_coalition_cannot_be_claimed() {

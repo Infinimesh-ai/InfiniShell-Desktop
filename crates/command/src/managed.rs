@@ -16,8 +16,9 @@ pub use windows_identity::{WindowsProcessIdentity, WindowsProcessLease, windows_
 mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::{
-    MacosCoalition, MacosProcessIdentity, macos_boot_session, macos_peer_identity,
-    macos_process_identity, macos_signal_owned_process,
+    MacosCoalition, MacosPeerHandle, MacosProcessIdentity, MacosTerminalSnapshot,
+    macos_boot_session, macos_peer_handle, macos_peer_identity, macos_process_identity,
+    macos_process_terminal, macos_signal_owned_process,
 };
 
 #[cfg(target_os = "linux")]

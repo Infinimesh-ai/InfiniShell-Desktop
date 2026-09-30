@@ -364,7 +364,7 @@
     "closed_gaps": []
   },
   "g01_unbound_pty_feasibility_followup": {
-    "status": "官方 Grok 源码的普通 TUI 原子输入桥已完成独立 Mac 编译及 61 项定向回归；InfiniShell 普通终端接入与真实功能验收未完成，G01 仍开放",
+    "status": "官方 Grok 原生原子桥已取得 Mac 普通 PTY 中文长文本、审批和恢复正例；宿主接线已写入，联合门禁与 GUI 验收仍待完成，G01 仍开放",
     "evidence_boundary": "idle_prompt 曾在帮助模态、未提交草稿和后台工具期间出现，空会话也可能超过 66 秒不出现；permission_prompt 不证明 Enter 安全",
     "native_requirement": "原生可认证接入既有会话，原子核对编辑器修订、模态与审批状态的 submit_if_idle，以及单次消费回执",
     "scope": "旧探针及发行包检查事实保留；已确认可从官方源码补齐原生能力，不能继续将缺源码列为等待上游的阻塞。专属 TUI 的已通过回合不外推普通未绑定 PTY，定制构建不继承固定发行版验收。",
@@ -385,7 +385,7 @@
       "build_boundary": "公开快照 SOURCE_REV 与已验发行版标识不同；定制构建须单独绑定源码、二进制及验收证据，不能冒充原发行二进制。",
       "native_worktree": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native",
       "native_branch": "codex/infinishell-atomic-input",
-      "remaining": "原生补丁和独立构建已形成；继续接入 InfiniShell 普通终端，核对内核 peer、真实 PTY 与固定工件，完成 Mac 中文、多行长文本、审批、旧会话、重连和重复点击真实验收。"
+      "remaining": "宿主内核身份、一次输入账本、只读恢复和普通终端接线已写入；完成联合门禁、真实 InfiniShell 普通 PTY 发送、旧回调/重复点击及英中布局验收。"
     },
     "closed_gaps": [],
     "native_patch": {
@@ -408,6 +408,101 @@
         "定制构建不继承官方发行版 1.0.41 (4220f3b224a6) 的验收"
       ],
       "closed_gaps": []
+    },
+    "ordinary_pty_validation": {
+      "platform": "macOS arm64",
+      "native_commit": "2a13b48618b93dea773953e835e74f4fd7a31429",
+      "run_id": "r-7j9xe_3c",
+      "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/ordinary-pty-validation.safe.json",
+      "sha256": "fdfb486c7a14088b7db28d92184c77144300fb6d90ec1f7a537213b5af3c441f",
+      "accepted": "普通未绑定 TUI 三条真实用户输入：中文长文本 26,597 字节精确一次、原生审批明确拒绝且零目标文件、同原生会话重启后新输入及精确答案；原文/回执/原生结果分别核验，两代自然退出并清理。",
+      "not_accepted": "英文首次立即断连请求 Unknown 且原生输入零次；恢复后的旧 query Unknown。不覆盖 InfiniShell GUI、ACP 运行中断线及英中布局。",
+      "gap_closed": false
+    },
+    "host_implementation": {
+      "status": "implementation_gated_gui_delivery_unconfirmed",
+      "scope": "系统账号私有 root 与普通 shell 环境；内核 peer/前台 PTY/固定工件签名核验；SQLite 一次领取与跨实例去重；原生 ACK 后按编辑器修订清稿；未知只查，证明未发送与显式同文再次发送分开。",
+      "localization": "两条英中提示同步；复用既有未就绪、未知投递和未发送提示；实际布局待验。",
+      "closed_gaps": [],
+      "standard_home_followup": {
+        "status": "implementation_gated_gui_delivery_unconfirmed",
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-8fh747ei-gui/acceptance-failed.safe.json",
+        "sha256": "e8978af44a79234a84db5b3b770c45d40737c0dc55fe4471b3febd9a2809d973",
+        "home_reason": "no_active_agent",
+        "host_messages": 0,
+        "native_receipts": 0,
+        "model_reply_boundary": "英文回合未经过桥账本，不能计宿主发送正例；后续输入驱动及运行中设置混合，不推断产品成功。",
+        "fix": "显式用户提交触发首页准备；State只读；固定agent/session/binding后再领取与原子提交；保留原生确认和输入守卫。",
+        "localization": "更新英中富输入提示，去掉普通会话一律需复制的旧表述；新构建双语布局待验。",
+        "cleanup": "测试App与原生退出；认证副本删除，原输入法及剪贴板恢复；系统自动化基础服务核明不持有本轮目录，短TMPDIR已清理。",
+        "gap_closed": false,
+        "native_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+        "native_focused_tests_passed": 68,
+        "latest_gui": {
+          "status": "failed_no_host_delivery",
+          "native_commit": "8948fc8c2c15318f7025f55fda5a9f1e01d390e3",
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-_b9gy4r4-gui/acceptance-failed.safe.json",
+          "sha256": "f24705326cf58863ed81ec300f0229d182d917f23bc71443b8ddd771feb68c13",
+          "host_messages": 0,
+          "native_receipts": 0,
+          "input": "英文171字节两行已完整粘贴到富输入；Return及ABC对照未观察到投递，原拼音与剪贴板已恢复。",
+          "native_state": "标准首页no_active_agent，闲置input_epoch持续递增；尚不认定其为本次GUI失败唯一原因。",
+          "localization": "新版英文placeholder无遮挡；中文布局待验。",
+          "cleanup": "App及原生自然退出，认证副本删除，证据归档；Apple基础服务核明未持有本轮目录后短TMPDIR已清理。",
+          "gap_closed": false
+        }
+      },
+      "previous_validation": {
+        "status": "source_gates_passed_gui_pending",
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-e8nhc_09-host-suite.safe.json",
+        "sha256": "c7e69cac0551f3f48b39b8cc90d5497972413dcb205a7a83fb2b96bf935c302f",
+        "log_sha256": "2e0bc3567c46ac8b13ea266c3a9d477617e0d41cdb0e00d7ca98f3ba6daa0652",
+        "binary": {
+          "path": "/Volumes/SanDisk/github/InfiniShell-Desktop/target/debug/infinishell",
+          "sha256": "2fb24a98590be124b5dc932cd353d7dea3fdcca68feea96d7cf34afa1539aa07"
+        },
+        "counts": {
+          "grok_native_bridge": 39,
+          "persistence_without_new_bridge": 82,
+          "cli_sessions_without_new_bridge": 441,
+          "cli_sessions_ignored": 9,
+          "use_agent_footer": 54,
+          "i18n": 11
+        },
+        "command_tests": {
+          "passed": 20,
+          "ignored": 3,
+          "log_sha256": "ddd996f8382ee0f45d391ec2301d9e5cd53ce150fc7e7994e7fda5376e2d5c3b"
+        },
+        "source_unchanged": true,
+        "cleanup_ready": true,
+        "gap_closed": false,
+        "failures_preserved": [
+          "r-xv5b05z8 test compile Cow type inference",
+          "r-8134qlrn same-session restarted-instance unique ownership collision; fixed by keeping ledger session binding outside task ownership field"
+        ]
+      },
+      "validation": {
+        "status": "source_gates_passed_gui_delivery_not_confirmed",
+        "source_commit": "60c4719d9b0e381196074b06d8593b30a3e85336",
+        "source_binding": "基线加收据逐文件摘要冻结的未提交源码；不冒称干净HEAD构建。",
+        "suite": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-9t4medj5-host-suite.safe.json",
+        "suite_sha256": "70c425b96d38fab4ef525c586c3c1f14330326ec6e4cf51386efce227df62c48",
+        "log_sha256": "bf5c5f3e1e6abed778474a002015cda0e07c84223afc6e5a19ecbd11c1095b69",
+        "binary_sha256": "2a49869cf177d429795e49ccd196d3997c970dd4a1e1ef52c7ad3a1a4a6d6c30",
+        "cargo_check": true,
+        "native_bridge_tests_passed": 45,
+        "persistence_tests_passed": 82,
+        "session_tests_passed": 441,
+        "session_tests_ignored": 9,
+        "rich_input_tests_passed": 54,
+        "i18n_tests_passed": 11,
+        "build_passed": true,
+        "source_unchanged": true,
+        "cleanup_ready": true,
+        "cross_platform": "新源码Linux/Windows门禁待运行；实机验收移交不替代源码门禁。",
+        "gap_closed": false
+      }
     }
   },
   "g03_owned_image_drop_followup": {

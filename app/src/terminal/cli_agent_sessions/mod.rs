@@ -1,6 +1,14 @@
 pub mod event;
 mod event_cursor;
 pub(crate) mod grok_leader_input;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub(crate) mod grok_native_bridge;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+mod grok_native_bridge_identity;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+pub(crate) mod grok_native_bridge_root;
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+pub(crate) mod grok_native_bridge_submission;
 pub(crate) mod grok_owned_launch;
 #[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64")))]
 pub(crate) mod grok_owned_history;
@@ -458,6 +466,8 @@ pub struct CLIAgentSessionsModel {
     event_cursors: HashMap<EntityId, EventCursor>,
     input_generations: HashMap<EntityId, Uuid>,
     input_submissions: HashMap<EntityId, Uuid>,
+    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    native_grok_submissions: HashMap<EntityId, grok_native_bridge_submission::SubmissionRegistration>,
     #[cfg(feature = "local_fs")]
     local_task_bindings: HashMap<EntityId, local_tasks::TaskBinding>,
     #[cfg(feature = "local_fs")]
@@ -491,6 +501,8 @@ impl CLIAgentSessionsModel {
             event_cursors: HashMap::new(),
             input_generations: HashMap::new(),
             input_submissions: HashMap::new(),
+            #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+            native_grok_submissions: HashMap::new(),
             #[cfg(feature = "local_fs")]
             local_task_bindings: HashMap::new(),
             #[cfg(feature = "local_fs")]
@@ -563,6 +575,8 @@ impl CLIAgentSessionsModel {
     pub(crate) fn finish_input_submission(&mut self, terminal_view_id: EntityId, generation: Uuid) {
         if self.input_submissions.get(&terminal_view_id) == Some(&generation) {
             self.input_submissions.remove(&terminal_view_id);
+            #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+            self.revoke_native_grok_submission(terminal_view_id);
         }
     }
 
@@ -597,6 +611,8 @@ impl CLIAgentSessionsModel {
         listener: ModelHandle<CLIAgentSessionListener>,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
         crate::remote_server::cli_image_submission::revoke(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
@@ -673,6 +689,8 @@ impl CLIAgentSessionsModel {
     }
 
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
         crate::remote_server::cli_image_submission::revoke(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
@@ -817,6 +835,8 @@ impl CLIAgentSessionsModel {
             )
         ))]
         self.revoke_stale_owned_grok_input(terminal_view_id);
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_stale_native_grok_submission(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
         crate::remote_server::cli_image_grok_client::revoke_unless(
             terminal_view_id,
@@ -972,6 +992,8 @@ impl CLIAgentSessionsModel {
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
         crate::remote_server::cli_image_submission::revoke(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
@@ -1149,6 +1171,8 @@ impl CLIAgentSessionsModel {
         should_auto_toggle_input: bool,
         ctx: &mut ModelContext<Self>,
     ) {
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
         crate::remote_server::cli_image_submission::revoke(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
@@ -1191,6 +1215,8 @@ impl CLIAgentSessionsModel {
         // 新注册、恢复和克隆上下文都必须重新观察本次监听器的原生进程候选。
         session.session_context.codex_process_evidence = None;
         session.session_context.claude_image_evidence = None;
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
         crate::remote_server::cli_image_submission::revoke(terminal_view_id);
         #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]

@@ -38,6 +38,8 @@ use super::{ChildEvent, EventedPty, EventedReadWrite, PtyOptions, SizeInfo};
 use crate::ASSETS;
 use crate::terminal::bootstrap::raw_init_shell_script_for_shell;
 use crate::terminal::cli_agent_sessions::event::current_protocol_version;
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+use crate::terminal::cli_agent_sessions::grok_native_bridge_root;
 use crate::terminal::local_tty::docker_sandbox::{
     DOCKER_SANDBOX_HOME_DIR, DockerSandboxShellStarter,
 };
@@ -457,6 +459,15 @@ fn build_host_shell_command(
     // Apply any caller-provided environment overrides last, so they win.
     for (key, value) in env_vars {
         builder.env(key, value);
+    }
+
+    // 普通本地 shell 只接受宿主验证的发现目录，不能继承其他会话或环境提供的位置。
+    builder.env_remove("GROK_TERMINAL_BRIDGE_DIR");
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    if FeatureFlag::HOANotifications.is_enabled()
+        && let Ok(root) = grok_native_bridge_root::root()
+    {
+        builder.env("GROK_TERMINAL_BRIDGE_DIR", root);
     }
 
     // 通知发送者绑定本次宿主，不能使用继承或调用者提供的旧平台路径。
@@ -966,6 +977,9 @@ fn build_docker_sandbox_command(
     for (key, value) in env_vars {
         builder.env(key, value);
     }
+
+    // 容器入口不能继承宿主普通 PTY 的 Grok 桥接发现位置。
+    builder.env_remove("GROK_TERMINAL_BRIDGE_DIR");
 
     // 容器尚未部署同平台 worker，不能把宿主可执行路径误当成容器能力。
     builder.env_remove(WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV);

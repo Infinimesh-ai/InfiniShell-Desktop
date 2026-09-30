@@ -6024,7 +6024,7 @@ cli-agent-grok-skill-unavailable = The selected Grok skill changed or is not uni
 cli-agent-input-waiting-for-native-response = Submission stopped because the CLI is waiting for a response. Handle the prompt in the terminal first. Your draft and attachments are kept.
 cli-agent-grok-input-manual-copy-required = Not sent. Copy this draft, close rich input, and paste it into Grok.
 cli-agent-input-copy-unsent-text = Copy unsent text
-terminal-input-grok-draft-delivery-hint = Grok rich input sessions can submit here; other sessions require copy and paste
+terminal-input-grok-draft-delivery-hint = Supported Grok sessions can submit here; otherwise copy and paste
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = Saved sessions cannot yet resume with this older CLI version.
@@ -6110,6 +6110,8 @@ cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be 
 cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 
 cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session identity has changed. Your draft has been kept.
+cli-agent-grok-native-images-unavailable = This Grok connection supports text and file paths. Your draft and images have been kept.
+cli-agent-grok-native-already-received = Grok already received this text. Your draft is kept. Click this notification to send it again as a new turn.
 
 cli-agent-grok-owned-result-unverified = Grok finished, but its task result could not be verified or saved. Check the native session.
 

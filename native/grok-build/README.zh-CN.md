@@ -1,6 +1,6 @@
 # Grok 普通 TUI 原生输入桥
 
-这是 G01 的原生能力补丁，尚未完成 InfiniShell 普通终端接入和真实功能验收。G01 保持开放，PR #22 保持草稿。已有官方发行版的验收不能用于这个独立构建。
+这是 G01 的原生能力补丁。旧定制构建 `.1` 在 `--minimal` 普通未绑定 TUI 取得中文长文本、审批拒绝和恢复正例，但标准首页 GUI 验收发现无法准备首轮会话。当前 `.2` 已补显式首页准备并通过原生编译及 68 项回归，宿主最终构建、编译和 633 项定向测试已通过，但标准首页 GUI 尚未形成桥投递回执，中文布局仍待验收。G01 保持开放，PR #22 保持草稿。旧定制构建和官方发行版的验收均不能直接用于当前工件。
 
 ## 固定来源与构建
 
@@ -14,9 +14,9 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.1 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.1 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.1 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.2 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.2 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.2 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
@@ -25,11 +25,14 @@ Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿�
 
 仅普通 TUI 进程显式设置 `GROK_TERMINAL_BRIDGE_DIR` 时开启 Unix socket。该根必须预先创建，属于当前用户、权限 `0700`，真实绝对路径及祖先不可由组或其他用户写入。每次 TUI 启动产生独立 `t-<UUID>` 目录，包含私有 `control.sock` 和 `manifest.json`；清单控制令牌不进入日志或验收归档。退出清理 socket/清单，保留仅含身份、摘要与状态的 `receipts.jsonl`。
 
-调用方必须将 socket 对端的内核进程身份、UID、实际二进制及当前终端 PTY 对应核验；清单里的 PID、进程名或存活检查不能独立证明身份。InfiniShell 的生产调用方尚未接入，不能仅凭清单放开普通入口。
+调用方必须将 socket 对端的内核进程身份、UID、实际二进制及当前终端 PTY 对应核验；清单里的 PID、进程名或存活检查不能独立证明身份。Mac 宿主接线使用内核 audit token、真实前台 PTY、固定 SHA-256 及动态 CDHash 核验，只接受 `source.json` 中的独立工件。自行重建所得二进制必须重新审核身份及验收，不能仅改版本号沿用信任。
+
+启用通知的本地 Mac shell 从系统账号主目录取得按渠道／profile 隔离的短 `0700` 发现目录；调用者传入的旧路径会清除，Docker 不继承该变量。用户仍从普通 shell 启动定制 Grok，无需 owned 包装进程。发送先持久领取一次，只有原生精确 ACK 才清除对应编辑器快照；未知只查询，不自动重投。确定尚未发送的尝试允许下次用户提交；已确认的相同文本须明确点击提示作为新一轮发送。新编辑和附件不被旧回调清除。
 
 帧为四字节大端 JSON 长度及 UTF-8 JSON；请求外层为 `{"token":"<private>","request":{...}}`。响应使用相同帧格式。`request.operation` 支持：
 
-- `state`：传 `instance_id`，返回可信可用状态及短期一次性租约。
+- `state`：传 `instance_id`，只读返回可信可用状态及绑定 agent／会话／代际的短期一次性租约；不创建或切换会话。
+- `prepare_session_if_idle`：仅由用户本次提交在标准首页触发，传 `instance_id/input_epoch`，复用原生首页 Enter 的创建／工作区确认流程，不携正文。返回固定 agent、预期会话及首次绑定代际；宿主之后仅查询该目标，取得新租约后才领取正文。拒绝或响应丢失不重试创建，也不代用户回答确认。
 - `submit_if_idle`：传当前租约的 `lease_id/session_id/binding_epoch/input_epoch`、`instance_id`、相同且规范的非空 UUID `message_id/prompt_id` 以及字面 `text`。
 - `query_receipt`：传 `instance_id/message_id`，仅查询原事务。处于未确认状态时可向原生 actor 补查持久收据，绝不重发输入。
 

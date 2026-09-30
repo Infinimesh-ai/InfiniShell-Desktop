@@ -21,6 +21,8 @@ use super::schema::{local_cli_messages, local_cli_task_generations, local_cli_ta
 
 #[path = "local_cli_tasks_grok_terminal.rs"]
 pub(crate) mod grok_terminal;
+#[path = "local_cli_tasks_grok_native_bridge.rs"]
+pub(crate) mod grok_native_bridge;
 
 const TASK_RESULT_SUBJECT: &str = "local_task_result";
 
@@ -35,6 +37,7 @@ pub enum LocalCliEnqueueOutcome {
 #[derive(Debug)]
 pub enum LocalCliPersistenceRequest {
     GrokTerminal(grok_terminal::GrokTerminalPersistenceRequest),
+    GrokNativeBridge(grok_native_bridge::NativeBridgePersistenceRequest),
     CheckpointTask {
         task: LocalCliTask,
         expected_generation: Option<i64>,
@@ -359,6 +362,9 @@ pub(super) fn handle_request(
         LocalCliPersistenceRequest::GrokTerminal(request) => {
             grok_terminal::handle_request(request, connection)
         }
+        LocalCliPersistenceRequest::GrokNativeBridge(request) => {
+            grok_native_bridge::handle_request(request, connection)
+        }
         LocalCliPersistenceRequest::CheckpointTask {
             task,
             expected_generation,
@@ -460,6 +466,9 @@ pub(super) fn reject_request(request: LocalCliPersistenceRequest) {
     match request {
         LocalCliPersistenceRequest::GrokTerminal(request) => {
             grok_terminal::reject_request(request, error);
+        }
+        LocalCliPersistenceRequest::GrokNativeBridge(request) => {
+            grok_native_bridge::reject_request(request, error);
         }
         LocalCliPersistenceRequest::CheckpointTask { completion, .. }
         | LocalCliPersistenceRequest::AcknowledgeApplicationHistory { completion, .. }
@@ -569,6 +578,11 @@ fn checkpoint(
     validate_task(&task)?;
     connection.transaction(|connection| {
         let previous = read_task(connection, &task.task_id)?;
+        if grok_native_bridge::is_task(&task)
+            || previous.as_ref().is_some_and(grok_native_bridge::is_task)
+        {
+            bail!("普通 Grok 原生桥账本不能使用通用任务状态写入");
+        }
         if let Some(previous) = previous.as_ref() {
             if previous.version != 1
                 || expected_generation != Some(previous.generation)
@@ -746,6 +760,7 @@ fn read_tasks(
             for task in &mut tasks {
                 if task.version == 1
                     && task.state.is_active()
+                    && !grok_native_bridge::is_task(task)
                     && task.parent_task_id.is_some() == task.parent_generation.is_some()
                 {
                     task.state = LocalCliTaskState::Disconnected;
@@ -757,6 +772,8 @@ fn read_tasks(
                 }
             }
         }
+        // 普通 PTY 的输入账本不是可调度任务，不能进入任务面板或通用恢复入口。
+        tasks.retain(|task| !grok_native_bridge::is_task(task));
         Ok(tasks)
     })
 }
@@ -810,6 +827,9 @@ fn insert_message_with_origin(
     message: LocalCliMessage,
     is_task_result: bool,
 ) -> Result<LocalCliEnqueueOutcome> {
+    if message.subject == grok_native_bridge::INPUT_SUBJECT {
+        bail!("普通 Grok 原生桥输入只能使用专用领取事务");
+    }
     if message.version != 1
         || message.message_id.trim().is_empty()
         || message.state != LocalCliMessageState::Queued
@@ -842,6 +862,9 @@ fn insert_message_with_origin(
             read_task(connection, &message.recipient_task_id)?
         }
         .context("消息接收运行不存在")?;
+        if grok_native_bridge::is_task(&sender) || grok_native_bridge::is_task(&recipient) {
+            bail!("普通 Grok 原生桥账本不能使用通用消息队列");
+        }
         if sender.version != 1
             || recipient.version != 1
             || sender.generation != message.sender_generation
@@ -1472,7 +1495,9 @@ fn update_message_state_with_receipt(
     connection.transaction(|connection| {
         let mut message = read_message(connection, message_id)?.context("本地消息不存在")?;
         // 普通 Grok 侧车只能由绑定 RPC/session/prompt 的专用事务确认，不能退回通用 ACK。
-        if grok_terminal::is_input_subject(&message.subject) {
+        if grok_terminal::is_input_subject(&message.subject)
+            || message.subject == grok_native_bridge::INPUT_SUBJECT
+        {
             bail!("普通 Grok 输入必须使用原生精确回执");
         }
         let recipient = read_task(connection, task_id)?.context("本地任务不存在")?;
@@ -1574,6 +1599,9 @@ fn update_message_state_with_receipt(
 }
 
 fn write_message_state(connection: &mut SqliteConnection, message: &LocalCliMessage) -> Result<()> {
+    if message.subject == grok_native_bridge::INPUT_SUBJECT {
+        bail!("普通 Grok 原生桥输入只能使用专用精确回执事务");
+    }
     // 保留专用领取扩展；通用队列清理仅可取消尚未派发、没有投递记录的消息。
     if grok_terminal::is_input_subject(&message.subject) {
         grok_terminal::validate_unclaimed_cancellation(connection, message)?;

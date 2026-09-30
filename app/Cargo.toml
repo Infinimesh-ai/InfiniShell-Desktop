@@ -178,6 +178,7 @@ serde_yaml.workspace = true
 settings.workspace = true
 settings_value = { workspace = true, features = ["derive"] }
 sha2.workspace = true
+blake3.workspace = true
 shellexpand.workspace = true
 shell-words = "1.1.0"
 socket2.workspace = true

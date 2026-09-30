@@ -446,7 +446,7 @@ index 2b2cc56..a82c205 100644
              agent_id,
              session_id,
 diff --git a/crates/codegen/xai-grok-pager/src/app/event_loop.rs b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
-index ceaf021..787a50a 100644
+index ceaf021..2e4787a 100644
 --- a/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 @@ -23,6 +23,9 @@ use std::time::Duration;
@@ -473,11 +473,34 @@ index ceaf021..787a50a 100644
              }
          };
 +        #[cfg(unix)]
-+        let mut bridge_selected = false;
++        let mut bridge_input_unchanged = false;
          tokio::select! {
              biased;
  
-@@ -2231,6 +2238,10 @@ pub(crate) async fn run(
+@@ -2130,6 +2137,11 @@ pub(crate) async fn run(
+             }
+ 
+             writer_event = writer_event_rx.recv() => {
++                #[cfg(unix)]
++                {
++                    // 输出 ACK 只推进绘制状态，不修改输入，也不证明活动会话空闲。
++                    bridge_input_unchanged = true;
++                }
+                 let Some(writer_event) = writer_event else {
+                     app.finish_startup(xai_grok_telemetry::startup::StartupOutcome::Error);
+                     flush_pending_stall(&mut stall_rollup);
+@@ -2157,6 +2169,10 @@ pub(crate) async fn run(
+             // reading the pty. Field diagnosis for the mid-turn freeze family (loop alive,
+             // screen frozen). Above the ACP arm so a mid-turn token firehose cannot starve it.
+             _ = writer_blocked_report => {
++                #[cfg(unix)]
++                {
++                    bridge_input_unchanged = true;
++                }
+                 let blocked_for = presenter.mark_blocked_reported();
+                 crate::unified_log::warn(
+                     "term.writer.blocked",
+@@ -2231,6 +2247,10 @@ pub(crate) async fn run(
              Some(join_result) = tasks.join_next() => {
                  match join_result {
                      Ok(result) => {
@@ -488,7 +511,39 @@ index ceaf021..787a50a 100644
                          let agent_loading = session_load_agent_id(&result)
                              .is_some_and(|id| {
                                  app.agents
-@@ -2596,6 +2607,10 @@ pub(crate) async fn run(
+@@ -2376,10 +2396,19 @@ pub(crate) async fn run(
+                 sync_appearance_watcher(&mut appearance_watcher);
+             }
+ 
+-            _ = stall_flush => {}
++            _ = stall_flush => {
++                #[cfg(unix)]
++                {
++                    bridge_input_unchanged = true;
++                }
++            }
+ 
+             // Debounced resize: draw once the terminal size has stabilized.
+             _ = resize_debounce => {
++                #[cfg(unix)]
++                {
++                    bridge_input_unchanged = true;
++                }
+                 resize_debounce_at = None;
+                 presenter.request(false);
+                 schedule_tick(&mut animation_tick_at, &app, tick_interval);
+@@ -2387,6 +2416,10 @@ pub(crate) async fn run(
+ 
+             // Deferred draw: fires when an ACP-triggered draw was throttled.
+             _ = deferred_draw => {
++                #[cfg(unix)]
++                {
++                    bridge_input_unchanged = true;
++                }
+                 presenter.draw_scheduled_at = None;
+                 presenter.request(false);
+             }
+@@ -2596,6 +2629,10 @@ pub(crate) async fn run(
                  let status = rx.borrow_and_update().clone();
                  match status {
                      ConnectionStatus::Reconnecting { attempt } => {
@@ -499,7 +554,7 @@ index ceaf021..787a50a 100644
                          // Unified-log marker: an IPC reconnect mints a new leader-side ClientId
                          // Without this marker the reconnect is invisible in the unified log
                          // It only surfaced as ghost `session loaded` replays with no matching `session.load.start`
-@@ -2628,6 +2643,10 @@ pub(crate) async fn run(
+@@ -2628,6 +2665,10 @@ pub(crate) async fn run(
                          );
                          last_leader_generation = generation;
                          app.reconnect_pending = true;
@@ -510,7 +565,7 @@ index ceaf021..787a50a 100644
                          // Connection-scoped: a re-elected shell reseeds its push gen from wall clock
                          // A surviving higher watermark would silently drop its fresh pushes
                          app.announcements_last_gen = 0;
-@@ -2796,6 +2815,10 @@ pub(crate) async fn run(
+@@ -2796,6 +2837,10 @@ pub(crate) async fn run(
                          presenter.request(false);
                      }
                      ConnectionStatus::Failed { ref error } => {
@@ -521,7 +576,7 @@ index ceaf021..787a50a 100644
                          app.show_toast(&format!("Connection failed: {error}"));
                          presenter.request(false);
                      }
-@@ -2890,6 +2913,35 @@ pub(crate) async fn run(
+@@ -2890,6 +2935,35 @@ pub(crate) async fn run(
                  presenter.request(false);
              }
  
@@ -538,7 +593,7 @@ index ceaf021..787a50a 100644
 +            }, if input_rx.is_empty() => {
 +                #[cfg(unix)]
 +                {
-+                    bridge_selected = true;
++                    bridge_input_unchanged = true;
 +                    if let Some(request) = request {
 +                        if let Some(bridge) = terminal_bridge.as_mut() {
 +                            let effects = bridge.handle(request, &mut app);
@@ -557,13 +612,13 @@ index ceaf021..787a50a 100644
              // A burst can backlog the 128-slot channel, so `voice_rx` is effectively always-ready
              // Kept last, it can never starve cancellation, ACP, task/progress completions, keyboard input, or the render/animation/poll timers
              // Voice is only serviced when nothing else is pending
-@@ -2931,6 +2983,11 @@ pub(crate) async fn run(
+@@ -2931,6 +3005,11 @@ pub(crate) async fn run(
                  }
              }
          }
-+        // 任一原生事件使旧观察失效，连同同一批输入中的“编辑后清空”一起撤销。
++        // 纯输出、重绘和桥接自身处理之外的事件均撤销旧观察，覆盖同批输入的“编辑后清空”。
 +        #[cfg(unix)]
-+        if !bridge_selected && let Some(bridge) = terminal_bridge.as_mut() {
++        if !bridge_input_unchanged && let Some(bridge) = terminal_bridge.as_mut() {
 +            bridge.state.invalidate();
 +        }
          if let Some(window) = stall_rollup.take_if_elapsed(std::time::Instant::now()) {
@@ -587,10 +642,10 @@ index 7fbb597..224c3a1 100644
  #[cfg(test)]
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 new file mode 100644
-index 0000000..711d296
+index 0000000..b2980e1
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
-@@ -0,0 +1,494 @@
+@@ -0,0 +1,632 @@
 +//! 普通 TUI 的外部输入事务；所有状态检查与提交均由原生事件循环串行调用。
 +
 +use std::collections::HashMap;
@@ -602,11 +657,11 @@ index 0000000..711d296
 +
 +use serde::{Deserialize, Serialize};
 +
-+use super::actions::Effect;
++use super::actions::{Action, Effect};
 +use super::agent::{BgTaskStatus, GoalDisplayStatus};
-+use super::agent_view::ExternalPromptEditorAccess;
++use super::agent_view::{AgentView, ExternalPromptEditorAccess};
 +use super::app_view::{ActiveView, AppView, VoiceState};
-+use super::dispatch::dispatch_terminal_bridge_prompt;
++use super::dispatch::{dispatch, dispatch_terminal_bridge_prompt};
 +
 +const LEASE_LIFETIME: Duration = Duration::from_secs(5);
 +const MAX_TEXT_BYTES: usize = 128 * 1024;
@@ -617,6 +672,10 @@ index 0000000..711d296
 +pub(crate) enum Request {
 +    State {
 +        instance_id: String,
++    },
++    PrepareSessionIfIdle {
++        instance_id: String,
++        input_epoch: u64,
 +    },
 +    SubmitIfIdle {
 +        instance_id: String,
@@ -637,6 +696,7 @@ index 0000000..711d296
 +#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 +pub(crate) struct Lease {
 +    pub lease_id: String,
++    pub agent_id: usize,
 +    pub session_id: String,
 +    pub binding_epoch: u32,
 +    pub input_epoch: u64,
@@ -670,6 +730,16 @@ index 0000000..711d296
 +        ready: bool,
 +        reason: Option<String>,
 +        lease: Option<Lease>,
++    },
++    Prepared {
++        instance_id: String,
++        input_epoch: u64,
++        agent_id: usize,
++        expected_binding_epoch: u32,
++        expected_session_id: String,
++    },
++    NotReady {
++        reason: String,
 +    },
 +    Receipt {
 +        receipt: Receipt,
@@ -740,6 +810,78 @@ index 0000000..711d296
 +        app: &mut AppView,
 +    ) -> (Response, Vec<Effect>) {
 +        match request {
++            Request::PrepareSessionIfIdle {
++                instance_id,
++                input_epoch,
++            } => {
++                if instance_id != self.instance_id {
++                    return rejected("instance_mismatch");
++                }
++                if input_epoch != self.input_epoch || input_epoch == u64::MAX {
++                    return rejected("stale_epoch");
++                }
++                if !matches!(app.active_view, ActiveView::Welcome) {
++                    return rejected("not_on_home");
++                }
++                if let Err(reason) = self.home_ready(app) {
++                    return (
++                        Response::NotReady {
++                            reason: reason.into(),
++                        },
++                        vec![],
++                    );
++                }
++                // 明确准备请求只消费首页状态并走原生 Enter 路径；不领取正文、不生成 ACK。
++                // 先推进 epoch，同一请求断连重试也不能第二次创建或切换会话。
++                self.invalidate();
++                let effects = dispatch(Action::LeaveHome, app);
++                let Some(agent) = app.active_agent() else {
++                    // 官方路径可能打开工作区确认；保留其正常交互，绝不代用户回答。
++                    return (
++                        Response::NotReady {
++                            reason: "session_not_prepared".into(),
++                        },
++                        effects,
++                    );
++                };
++                let expected_binding_epoch = if agent.session.session_id.is_some() {
++                    agent.session_binding_epoch
++                } else {
++                    let Some(epoch) = agent.session_binding_epoch.checked_add(1) else {
++                        return (
++                            Response::NotReady {
++                                reason: "binding_epoch_exhausted".into(),
++                            },
++                            effects,
++                        );
++                    };
++                    // 新建会话仅允许 SessionCreated 首次绑定的那一次 epoch 变化。
++                    epoch
++                };
++                let Some(expected_session_id) = agent
++                    .session
++                    .session_id
++                    .as_ref()
++                    .or(agent.pending_session_id.as_ref())
++                else {
++                    return (
++                        Response::NotReady {
++                            reason: "session_unbound".into(),
++                        },
++                        effects,
++                    );
++                };
++                (
++                    Response::Prepared {
++                        instance_id: self.instance_id.clone(),
++                        input_epoch: self.input_epoch,
++                        agent_id: agent.session.id.0,
++                        expected_binding_epoch,
++                        expected_session_id: expected_session_id.0.to_string(),
++                    },
++                    effects,
++                )
++            }
 +            Request::State { instance_id } => {
 +                if instance_id != self.instance_id {
 +                    return rejected("instance_mismatch");
@@ -749,6 +891,7 @@ index 0000000..711d296
 +                    let agent = app.active_agent().expect("已通过活动会话守卫");
 +                    Some(Lease {
 +                        lease_id: uuid::Uuid::new_v4().to_string(),
++                        agent_id: agent.session.id.0,
 +                        session_id: agent
 +                            .session
 +                            .session_id
@@ -829,14 +972,11 @@ index 0000000..711d296
 +                if self.receipts.len() >= MAX_RECEIPTS {
 +                    return rejected("receipt_capacity");
 +                }
-+                let expected = Lease {
-+                    lease_id,
-+                    session_id: session_id.clone(),
-+                    binding_epoch,
-+                    input_epoch,
-+                };
 +                let valid_lease = self.lease.as_ref().is_some_and(|(lease, issued)| {
-+                    lease == &expected
++                    lease.lease_id == lease_id
++                        && lease.session_id == session_id
++                        && lease.binding_epoch == binding_epoch
++                        && lease.input_epoch == input_epoch
 +                        && issued.elapsed() <= LEASE_LIFETIME
 +                        && input_epoch == self.input_epoch
 +                });
@@ -848,7 +988,8 @@ index 0000000..711d296
 +                    return rejected(reason);
 +                }
 +                let agent = app.active_agent().expect("已通过活动会话守卫");
-+                if agent.session_binding_epoch != binding_epoch
++                if self.lease.as_ref().map(|(lease, _)| lease.agent_id) != Some(agent.session.id.0)
++                    || agent.session_binding_epoch != binding_epoch
 +                    || agent.session.session_id.as_ref().map(|id| id.0.as_ref())
 +                        != Some(session_id.as_str())
 +                {
@@ -951,7 +1092,7 @@ index 0000000..711d296
 +        result
 +    }
 +
-+    fn ready(&self, app: &AppView) -> Result<(), &'static str> {
++    fn application_ready(&self, app: &AppView) -> Result<(), &'static str> {
 +        if !self.native_available {
 +            return Err("native_bridge_unavailable");
 +        }
@@ -963,9 +1104,6 @@ index 0000000..711d296
 +        }
 +        if app.reconnect_pending || app.relaunch.is_some() || app.quit_for_update {
 +            return Err("connection_transition");
-+        }
-+        if !matches!(app.active_view, ActiveView::Agent(_)) {
-+            return Err("no_active_agent");
 +        }
 +        if app.tutorial.is_some()
 +            || app.import_claude_modal.is_some()
@@ -981,7 +1119,62 @@ index 0000000..711d296
 +        {
 +            return Err("application_owns_input");
 +        }
++        Ok(())
++    }
++
++    fn home_ready(&self, app: &AppView) -> Result<(), &'static str> {
++        self.application_ready(app)?;
++        if !app.only_unused_home_or_empty() || !app.deferred_startup.is_empty() {
++            return Err("home_session_transition");
++        }
++        if app.new_worktree_dialog.is_some()
++            || app.session_picker_entries.is_some()
++            || app.session_picker_loading
++            || app.session_picker_content_loading
++            || app.session_picker_pending_delete.is_some()
++        {
++            return Err("application_owns_input");
++        }
++        #[cfg(feature = "local-workspace")]
++        if app.welcome_local_workspace_ack_pending {
++            return Err("application_owns_input");
++        }
++        if !app.welcome_prompt_focused
++            || app.welcome_menu_index.is_some()
++            || app.welcome_on_auth_url
++            || app.welcome_on_changelog_cta
++            || app.welcome_on_privacy_banner
++            || app.welcome_on_upgrade_cta
++            || app.welcome_consent_hover_link.is_some()
++            || !app.welcome_prompt.text().is_empty()
++            || !app.welcome_prompt.is_effectively_empty()
++            || !app.welcome_prompt.textarea.elements().is_empty()
++            || !app.welcome_prompt.images.is_empty()
++            || app.welcome_prompt.textarea.selection_range().is_some()
++            || app.welcome_prompt.any_dropdown_open()
++            || app.welcome_prompt.history_search.is_active()
++            || app.welcome_prompt.pending_viewer_request.is_some()
++        {
++            return Err("editor_not_ready");
++        }
++        #[cfg(feature = "local-workspace")]
++        if app.welcome_on_workspace_mode {
++            return Err("editor_not_ready");
++        }
++        // 只允许首页自己预创建的空闲会话；其他隐藏会话不能借准备请求获得焦点。
++        if let Some(agent) = app.home_session() {
++            self.agent_ready(app, agent)?;
++        }
++        Ok(())
++    }
++
++    fn ready(&self, app: &AppView) -> Result<(), &'static str> {
++        self.application_ready(app)?;
 +        let agent = app.active_agent().ok_or("no_active_agent")?;
++        self.agent_ready(app, agent)
++    }
++
++    fn agent_ready(&self, app: &AppView, agent: &AgentView) -> Result<(), &'static str> {
 +        let session_id = agent.session.session_id.as_ref().ok_or("session_unbound")?;
 +        if agent.session.loading_replay
 +            || agent.session.prompt_history_loading
@@ -1432,10 +1625,10 @@ index 0000000..2c8b429
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs
 new file mode 100644
-index 0000000..95cd2f0
+index 0000000..ce730b9
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,159 @@
 +use super::*;
 +
 +use serde_json::json;
@@ -1486,7 +1679,9 @@ index 0000000..95cd2f0
 +    let call = bridge.requests.recv().await.unwrap();
 +    match call.request {
 +        Request::State { instance_id } => assert_eq!(instance_id, bridge.instance_id),
-+        Request::SubmitIfIdle { .. } | Request::QueryReceipt { .. } => panic!("错误事务类型"),
++        Request::PrepareSessionIfIdle { .. }
++        | Request::SubmitIfIdle { .. }
++        | Request::QueryReceipt { .. } => panic!("错误事务类型"),
 +    }
 +    call.reply
 +        .send(Response::Rejected {
@@ -1595,10 +1790,10 @@ index 0000000..95cd2f0
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
 new file mode 100644
-index 0000000..68b58f2
+index 0000000..8febbe3
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,258 @@
 +//! 将私有 IPC 事务串行接入普通 TUI，不把本地派发升级为原生回执。
 +
 +use super::super::actions::{Effect, TaskResult};
@@ -1796,9 +1991,11 @@ index 0000000..68b58f2
 +        let recover = if query_receipt && self.state.native_available() {
 +            match &response {
 +                Response::Receipt { receipt } => Some(receipt.clone()),
-+                Response::State { .. } | Response::Unknown { .. } | Response::Rejected { .. } => {
-+                    None
-+                }
++                Response::State { .. }
++                | Response::Prepared { .. }
++                | Response::NotReady { .. }
++                | Response::Unknown { .. }
++                | Response::Rejected { .. } => None,
 +            }
 +        } else {
 +            None
@@ -2330,16 +2527,18 @@ index 0000000..7ec9119
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000..a6c9dc6
+index 0000000..0f42cb5
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
-@@ -0,0 +1,382 @@
+@@ -0,0 +1,695 @@
 +use super::*;
++use crate::app::actions::TaskResult;
 +use crate::app::agent::{AgentId, AgentState};
 +use crate::app::agent_view::test_fixtures::{
 +    make_followup_permission_state, make_plan_approval_view_state,
 +};
-+use crate::app::app_view::tests::test_app_with_agent;
++use crate::app::app_view::tests::{test_app, test_app_with_agent};
++use crate::app::app_view::{NewWorktreeDialogState, WorktreeMode};
 +use crate::views::agent::ActivePane;
 +use std::os::unix::fs::PermissionsExt;
 +
@@ -2388,6 +2587,317 @@ index 0000000..a6c9dc6
 +        Response::Receipt { receipt } => receipt,
 +        other => panic!("应返回回执：{other:?}"),
 +    }
++}
++
++fn home_setup(precreated: bool) -> (tempfile::TempDir, TerminalBridge, AppView) {
++    let (directory, bridge, mut app) = setup();
++    if precreated {
++        app.active_view = ActiveView::Welcome;
++        app.home_session_agent = Some(AgentId(0));
++        app.optimistic_home_husk = Some(AgentId(0));
++        app.next_agent_id = 1;
++    } else {
++        app = test_app();
++    }
++    app.welcome_prompt_focused = true;
++    (directory, bridge, app)
++}
++
++fn prepare(bridge: &TerminalBridge) -> Request {
++    Request::PrepareSessionIfIdle {
++        instance_id: "test-instance".into(),
++        input_epoch: bridge.input_epoch,
++    }
++}
++
++#[test]
++fn terminal_bridge_home_state_never_creates_or_reveals_a_session() {
++    for precreated in [false, true] {
++        let (_directory, mut bridge, mut app) = home_setup(precreated);
++        let epoch = bridge.input_epoch;
++        let count = app.agents.len();
++        let home = app.home_session_agent;
++        let (response, effects) = bridge.handle(
++            Request::State {
++                instance_id: "test-instance".into(),
++            },
++            &mut app,
++        );
++        assert!(matches!(response, Response::State {
++            ready: false, reason: Some(reason), lease: None, ..
++        } if reason == "no_active_agent"));
++        assert!(effects.is_empty());
++        assert_eq!(bridge.input_epoch, epoch);
++        assert_eq!(app.agents.len(), count);
++        assert_eq!(app.home_session_agent, home);
++        assert!(matches!(app.active_view, ActiveView::Welcome));
++        assert!(bridge.receipts.is_empty());
++    }
++}
++
++#[test]
++fn terminal_bridge_prepare_reveals_only_the_bound_home_and_consumes_epoch_once() {
++    let (directory, mut bridge, mut app) = home_setup(true);
++    let request = prepare(&bridge);
++    let old_epoch = bridge.input_epoch;
++    let (response, effects) = bridge.handle(request.clone(), &mut app);
++    assert!(matches!(response, Response::Prepared {
++        instance_id, input_epoch, agent_id: 0, expected_binding_epoch: 0, expected_session_id,
++    } if instance_id == "test-instance" && input_epoch == old_epoch + 1 && expected_session_id == "test-session"));
++    assert!(effects.is_empty());
++    assert!(matches!(app.active_view, ActiveView::Agent(AgentId(0))));
++    assert_eq!(app.agents.len(), 1);
++    assert!(app.home_session_agent.is_none());
++    let agent = app.active_agent().unwrap();
++    assert!(agent.session.current_prompt_id.is_none());
++    assert!(agent.session.in_flight_prompt.is_none());
++    assert!(agent.session.pending_prompts.is_empty());
++    assert!(agent.session.state.is_idle());
++    assert!(bridge.receipts.is_empty());
++    assert_eq!(
++        std::fs::metadata(directory.path().join("receipts.jsonl"))
++            .unwrap()
++            .len(),
++        0
++    );
++    let (response, effects) = bridge.handle(request, &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "stale_epoch"));
++    assert!(effects.is_empty());
++    assert_eq!(app.agents.len(), 1);
++    let lease = lease(&mut bridge, &mut app);
++    assert_eq!(lease.agent_id, 0);
++    assert_eq!(lease.session_id, "test-session");
++}
++
++#[test]
++fn terminal_bridge_prepare_creates_without_a_prompt_and_pins_the_first_binding() {
++    let (_directory, mut bridge, mut app) = home_setup(false);
++    let request = prepare(&bridge);
++    let (response, effects) = bridge.handle(request.clone(), &mut app);
++    let Response::Prepared {
++        agent_id,
++        expected_binding_epoch,
++        expected_session_id,
++        ..
++    } = response
++    else {
++        panic!("应准备新会话：{response:?}");
++    };
++    assert_eq!(expected_binding_epoch, 1);
++    assert!(matches!(effects.as_slice(), [Effect::CreateSession {
++        agent_id: created, preferred_session_id: Some(session_id), ..
++    }] if created.0 == agent_id && session_id == &expected_session_id));
++    let agent = app.active_agent().unwrap();
++    assert!(agent.session.session_id.is_none());
++    assert!(agent.session.current_prompt_id.is_none());
++    assert!(agent.session.in_flight_prompt.is_none());
++    assert!(agent.session.pending_prompts.is_empty());
++    assert!(bridge.receipts.is_empty());
++    let (response, effects) = bridge.handle(request, &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "stale_epoch"));
++    assert!(effects.is_empty());
++    let (response, effects) = bridge.handle(
++        Request::State {
++            instance_id: "test-instance".into(),
++        },
++        &mut app,
++    );
++    assert!(matches!(
++        response,
++        Response::State {
++            ready: false,
++            lease: None,
++            ..
++        }
++    ));
++    assert!(effects.is_empty());
++
++    // 使用真正的 SessionCreated 分发，核对新建会话只有一次合法绑定变化。
++    let effects = dispatch(
++        Action::TaskComplete(TaskResult::SessionCreated {
++            agent_id: AgentId(agent_id),
++            session_id: expected_session_id.clone().into(),
++            models: None,
++            modes: None,
++        }),
++        &mut app,
++    );
++    assert!(!effects.iter().any(|effect| matches!(
++        effect,
++        Effect::SendPrompt { .. } | Effect::SendTerminalBridgePrompt { .. }
++    )));
++    let agent = app.active_agent().unwrap();
++    assert_eq!(agent.session_binding_epoch, expected_binding_epoch);
++    assert_eq!(
++        agent.session.session_id.as_ref().unwrap().0.as_ref(),
++        expected_session_id
++    );
++    assert!(bridge.receipts.is_empty());
++}
++
++#[test]
++fn terminal_bridge_prepare_rejects_native_guards_without_changing_home() {
++    for mode in [
++        "draft",
++        "whitespace",
++        "focus",
++        "menu",
++        "picker",
++        "worktree_dialog",
++        "auth",
++        "trust",
++        "consent",
++        "capability",
++        "reconnect",
++        "deferred",
++        "home_draft",
++        "home_permission",
++        "home_running",
++        "home_loading",
++    ] {
++        let (_directory, mut bridge, mut app) = home_setup(true);
++        match mode {
++            "draft" => app.welcome_prompt.set_text("首页草稿必须保留"),
++            "whitespace" => app.welcome_prompt.set_text("  \n"),
++            "focus" => app.welcome_prompt_focused = false,
++            "menu" => app.welcome_menu_index = Some(0),
++            "picker" => app.session_picker_entries = Some(vec![]),
++            "worktree_dialog" => app.new_worktree_dialog = Some(NewWorktreeDialogState::new()),
++            "auth" => app.auth_state = crate::app::app_view::AuthState::Pending { error: None },
++            "trust" => {
++                app.trust_state = crate::app::app_view::TrustState::Pending {
++                    workspace: app.cwd.clone(),
++                }
++            }
++            "consent" => {
++                app.consent_state = crate::app::consent::ConsentState::Pending {
++                    notice: crate::app::consent::ConsentNotice {
++                        id: "test".into(),
++                        version: 1,
++                        title: "test".into(),
++                        segments: vec![],
++                        links: vec![],
++                        accept_label: "test".into(),
++                    },
++                    legibility: Default::default(),
++                    painted_at: None,
++                }
++            }
++            "capability" => bridge.set_native_capability(false),
++            "reconnect" => app.reconnect_pending = true,
++            "deferred" => app.deferred_startup.prompt = Some("原生命令行正文".into()),
++            "home_draft" => app
++                .agents
++                .get_mut(&AgentId(0))
++                .unwrap()
++                .prompt
++                .set_text("预创建会话草稿"),
++            "home_permission" => app
++                .agents
++                .get_mut(&AgentId(0))
++                .unwrap()
++                .permission_queue
++                .push_back(make_followup_permission_state()),
++            "home_running" => {
++                app.agents.get_mut(&AgentId(0)).unwrap().session.state = AgentState::TurnRunning
++            }
++            "home_loading" => {
++                app.agents
++                    .get_mut(&AgentId(0))
++                    .unwrap()
++                    .session
++                    .prompt_history_loading = true
++            }
++            other => panic!("未知测试情形：{other}"),
++        }
++        let request = prepare(&bridge);
++        let epoch = bridge.input_epoch;
++        let original_draft = app.welcome_prompt.text().to_string();
++        let (response, effects) = bridge.handle(request, &mut app);
++        assert!(
++            matches!(response, Response::NotReady { .. }),
++            "{mode}: {response:?}"
++        );
++        assert!(effects.is_empty(), "{mode}");
++        assert!(matches!(app.active_view, ActiveView::Welcome), "{mode}");
++        assert_eq!(app.home_session_agent, Some(AgentId(0)), "{mode}");
++        assert_eq!(app.welcome_prompt.text(), original_draft, "{mode}");
++        assert_eq!(bridge.input_epoch, epoch, "{mode}");
++        assert!(bridge.receipts.is_empty(), "{mode}");
++    }
++}
++
++#[test]
++fn terminal_bridge_prepare_rejects_stale_epoch_and_unrelated_hidden_sessions() {
++    for mode in ["epoch", "instance", "hidden", "active", "dashboard"] {
++        let (_directory, mut bridge, mut app) = home_setup(true);
++        let mut request = prepare(&bridge);
++        match mode {
++            "epoch" => bridge.invalidate(),
++            "instance" => {
++                if let Request::PrepareSessionIfIdle { instance_id, .. } = &mut request {
++                    *instance_id = "other-instance".into();
++                }
++            }
++            "hidden" => app.home_session_agent = None,
++            "active" => app.active_view = ActiveView::Agent(AgentId(0)),
++            "dashboard" => app.active_view = ActiveView::AgentDashboard,
++            other => panic!("未知测试情形：{other}"),
++        }
++        let (response, effects) = bridge.handle(request, &mut app);
++        assert!(matches!(
++            response,
++            Response::Rejected { .. } | Response::NotReady { .. }
++        ));
++        assert!(effects.is_empty());
++        assert_eq!(app.agents.len(), 1);
++        assert!(bridge.receipts.is_empty());
++    }
++}
++
++#[test]
++fn terminal_bridge_prepare_preserves_the_native_always_worktree_policy() {
++    let (_directory, mut bridge, mut app) = home_setup(false);
++    app.cwd_has_git_ancestor = true;
++    app.new_session_worktree_mode = WorktreeMode::Always;
++    let (response, effects) = bridge.handle(prepare(&bridge), &mut app);
++    let Response::Prepared {
++        agent_id,
++        expected_binding_epoch,
++        expected_session_id,
++        ..
++    } = response
++    else {
++        panic!("应通过原生路径准备 worktree：{response:?}");
++    };
++    assert_eq!(expected_binding_epoch, 1);
++    assert!(
++        matches!(effects.as_slice(), [Effect::CreateWorktreeSession {
++        agent_id: created, minted_session_id: Some(session_id), load_session_id: None, ..
++    }] if created.0 == agent_id && session_id == &expected_session_id)
++    );
++    assert!(bridge.receipts.is_empty());
++    assert!(
++        app.active_agent()
++            .unwrap()
++            .session
++            .current_prompt_id
++            .is_none()
++    );
++}
++
++#[test]
++fn terminal_bridge_lease_rejects_another_agent_even_with_matching_session_identity() {
++    let (_directory, mut bridge, mut app) = setup();
++    let lease = lease(&mut bridge, &mut app);
++    let mut agent = app.agents.swap_remove(&AgentId(0)).unwrap();
++    agent.session.id = AgentId(1);
++    app.agents.insert(AgentId(1), agent);
++    app.active_view = ActiveView::Agent(AgentId(1));
++    let (response, effects) = bridge.handle(submission(&lease, "不得转投另一原生视图"), &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "session_mismatch"));
++    assert!(effects.is_empty());
++    assert!(bridge.receipts.is_empty());
 +}
 +
 +#[test]
