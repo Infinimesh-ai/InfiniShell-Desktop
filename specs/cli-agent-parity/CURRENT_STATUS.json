@@ -1,13 +1,14 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G04/G05；3 项外平台验收移交，9 项仍开放；PR #22 保持草稿",
+  "status_zh": "本次 Mac 范围关闭 G02/G04/G05；3 项外平台验收移交，8 项仍开放；PR #22 保持草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
     "acceptance_platform": "macos-arm64",
     "implementation_scope": "继续补齐原生能力与应用实现；仅后置其他平台实机验收，不删除普通未绑定 PTY 等功能条件。",
     "closed_items": [
+      "G02",
       "G04",
       "G05"
     ],
@@ -18,7 +19,6 @@
     ],
     "remaining_items": [
       "G01",
-      "G02",
       "G03",
       "G06",
       "G07",
@@ -27,8 +27,8 @@
       "G10",
       "V03"
     ],
-    "remaining_count": 9,
-    "closure_basis": "既有实现与 Mac 真实验收满足本次范围；本轮核对来源及英中语义，不计文档调整为新增实现。",
+    "remaining_count": 8,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -76,7 +76,27 @@
       "V03",
       "V05"
     ],
-    "historical_interpretation": "其余逐轮 closed_gaps/14 项开放等字段保留当时范围，当前 Goal 以本对象为准。"
+    "historical_interpretation": "其余逐轮 closed_gaps/14 项开放等字段保留当时范围，当前 Goal 以本对象为准。",
+    "g02": {
+      "source_commit": "d290fd7137165223de8d762cf65a257117c6bf9a",
+      "native": "Grok 1.0.41 / grok-4.7 / Inherit 根任务、生产私有独占 leader",
+      "run_id": "r-58hxh5i1",
+      "accepted": "PNG+alpha 新建；同连接发布 beta 后 PNG+alpha,beta；自然停机后同原生 ID 冷恢复 PNG+beta,alpha。三轮原图原字节、技能展开/原生 read_file 字节、实际答案、单次 ACK 与持久引用恢复通过；原生历史恰好三次输入，两代 exit 0 且清理确认。",
+      "receipt_sha256": "de37c2de73bfc2e1f3a2e1475ed8753d925134fc40e8077caf09f0faba9c2ee4",
+      "native_audit_sha256": "035ffb8f9fc46b6bef7f95e6abae457f26a72b68232c13fe35778b7050238f24",
+      "archive_index_sha256": "3d9a3911dca8e3d88bdf16cb81e06656239024eac129943d242baf15caf6799e",
+      "source_binding": "构建 r-ka7i1qap；关键源码修改时间均早于构建开始且逐文件匹配 d290fd713。监督程序复用 282f5c4a8 等价产品源码签名二进制，不称本轮重建。",
+      "local_gate": "cargo check；i18n 11/11；managed_input 29/29；Grok 图片技能和任务入口 24/24；Python 审计 14/14",
+      "localization": "复核 Inherit、固定版本/模型、PNG 与目录确认的英中说明；本轮仅验收工具变化，无需本地化变更。",
+      "cleanup": "默认认证与设置未变，私有认证副本已删除；原始身份/清理收据和小证据已归档，短目录已按进程/launchd/打开文件/目录身份清理。",
+      "boundary": "新链不含真实 GUI、应用重启或协调器 SQLite；基础 PNG GUI/重关联按历史独立证据，组合入口由现有回归覆盖。固定权限、用户级技能来源与其他平台不外推。",
+      "final_source_gate": {
+        "run_id": "r-893a9hmp",
+        "cargo_check": "passed",
+        "temporary_directory": "cleaned",
+        "log_sha256": "226acf9bdc4deb0a34a5f8efad5aefda11e24e61bd6c91f745cefc6f1068778c"
+      }
+    }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
   "assessed_branch": "codex/cli-agent-parity",
@@ -233,7 +253,6 @@
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G01",
-    "G02",
     "G03",
     "G06",
     "G07",
@@ -285,7 +304,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-09-30",
-  "documentation_source_commit": "b7039efb834c1f8f156a230cdfb2993861a88963",
+  "documentation_source_commit": "d290fd7137165223de8d762cf65a257117c6bf9a",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -4477,10 +4496,11 @@
     "pr": 22,
     "draft_required": true,
     "closed_items": [
+      "G02",
       "G04",
       "G05"
     ],
-    "remaining_count": 9,
+    "remaining_count": 8,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [
