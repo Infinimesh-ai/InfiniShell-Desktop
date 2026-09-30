@@ -783,3 +783,16 @@ Linux `.4` 的 15 份命令日志与 607,932,184 字节 ELF 已逐项核对收�
 - 本轮身份及目录修复没有用户界面／文案变化，英中审计结论为“无需本地化变更”；宿主本机编译／55 项定向回归／11 项 i18n、原生 `.6` 编译／74 项共享库回归已通过，五个短目录均归档清理；目标源码门禁、固定工件摘要绑定尚待完成，G01 仍开放。
 
 - 修复后原生提交 `373ab736296cbe4cd9fc60f7a77016f19bba324d`、tree `be01e4d0710cf41d5ad354d9ff31d2fe5800e6e9`；69 文件补丁从公开基线独立重建完全一致，补丁 SHA-256 `6e378a1ebd7214e502d17ae0476a482d6f04e2e35e3a62cab7499e0091248912`。本机五门禁摘要 SHA-256 `1f71332b09761c6ad11f4e8ef3180aefbe4210f6419b04568ef4bd3c9d0d8ec4`；Linux 新测试和 Windows 目录反例仍须目标执行，不以 Mac 编译替代。
+
+
+## 2026-10-01：G01 Windows protobuf 构建修复，尚未关闭
+
+`9f7962626836cea000c93da43656d47480c18ebf` 的 [CI 36752136629](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36752136629) 已通过两平台宿主 check。Windows `.6` 原生在第 10 步失败：上游 `xai-proto-build` 使用 `/dev/stdout` 写依赖、`/dev/null` 写 descriptor，并据后者解析目标；Windows 不存在这两个 Unix 路径。该轮已经越过先前 `cc`／`find-msvc-tools` 类型错误。原始收据及 10 份日志逐份验 SHA 后归档至 `g01-cross-platform/ci-36752136629/windows-native`；失败日志 SHA-256 `ee50ae82a4c51fb6ad2d8365b861c4931c8aa7a899f76970a43196fe36cb5fe5`，摘要 `d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3`。
+
+原生 `.7` 提交 `d3986df9c7155d7a0f83e82afe3a094bee2b6640` 只修改构建辅助及测试：改用临时实体文件，按 protoc 写入的精确目标前缀解析依赖，保留盘符、内部空格、反斜杠、CRLF 和逐项存在性检查；不改变普通桥运行时合同。71 份变动文件的补丁独立重建 tree 为 `db881bc5b8ccb171deb7421e133d978090ca93de`，补丁 SHA-256 `fa4d55c487c8b106022ef198d45ca2155b4797c7265718e10700b2999bceb130`，重建收据摘要 `95b2872e04ee56d8e86eb48905439e86f595fee3de5abb898f09b519a11669be`。
+
+本机 `r-z0k806ej` 的 6 项真实 protobuf 回归通过，包括含空格目录、跨文件导入成功和删除导入后的明确失败；日志 SHA-256 `a6732643c306ef40f51418638e619171ff638d558f3172d06ffa6dc33e27a58c`。`r-vxzrj508` 的完整 `pager-bin` check 通过，日志 `400779ca56f8eecfe98261729e09054fe4fe4a8137e0de2886d0c7a3c560aeb7`；`r-ombzj5vv` 宿主 check 通过，日志 `57eec8d565eb482f20c5187fc9a286e473c7662a683a0e4f2a25803bcab9f602`。短目录均已按身份及退出证据清理。无需本地化变更；原 `.6` 共享运行时 74 项与宿主 55 项按原工件／源码轮次计证，不虚构 `.7` 重新执行。
+
+Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，复制前后完整 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`、CDHash `356fe77c29f339fcaa90e48094fc7af7e0571ec5` 与代码签名验证一致；归档收据 `791a420f10db76e805bfc1ab90b089dcf4c328fb19ac8383681cd19aa30ba2fe`。README 已说明各平台应使用绑定工件、复制命名 `grok[.exe]`，并从 InfiniShell 普通 shell 直接启动。Linux 构建及其他宿主回归仍在运行，Windows `.7` 实际构建及两平台固定摘要绑定仍待完成；不关闭 G01、不计新的模型或 GUI 验收，PR 保持草稿。
+
+提交前独立 i18n 门禁 `r-_omolrwm` 的 11 项全部通过，日志 SHA-256 `319d29668b22d74a38ac7779563e92db270fa39e4e614e85131aa216bbc561d4`；短目录已清理。

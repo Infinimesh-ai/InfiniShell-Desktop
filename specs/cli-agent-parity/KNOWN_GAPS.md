@@ -45,6 +45,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G01 — Grok 普通终端富输入自动提交
 
+- **2026-10-01 Windows 原生构建后续修复**：`9f7962626` 的 [门禁 36752136629](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36752136629) 两平台宿主 check 通过；Windows 原生越过旧 `cc` 锁文件错误后，在公开 `xai-proto-build` 的 `/dev/stdout`／`/dev/null` 硬编码处失败，尚未产出 Windows 工件。原生 `.7`／`d3986df9` 仅修复构建辅助并保留依赖存在性检查，Mac 真实 protobuf 6 项和完整原生 check 通过；宿主 check 通过，运行时代码未变。Linux `.6` 构建及两平台其余回归仍在运行，Windows `.7` 目标复验及最终工件绑定待完成。失败摘要 SHA-256 `d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3`；Mac 原 `.3` 工件已独立归档、摘要与签名复核通过。G01 仍开放，无需本地化变更。
+
 - **2026-10-01 首轮目标失败已定位**：`9fdce3e3e` 的 [CI 36741541617](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 已停止剩余通用作业，整体为 cancelled，不计通过。Linux 宿主 3346 过／1 失败、command 5 过／1 失败，两处均为 `SO_PEERPIDFD` 返回 `ENOPROTOOPT`；没有实测内核版本，不据发行版名称推断。Windows 宿主 3151 过／2 失败：已有目录返回 HRESULT `0x800700B7`，以及仅属性权限的目录句柄不能阻止重命名；原生也发现相同句柄缺陷，须同步修复。Windows 36 项 command、真实原 ConPTY 和 Linux 660 项桌面／TUI 回归独立通过。Linux 已补原生自有 pidfd 与内核凭据的同包握手，不按数字 PID 重开句柄或跳过反例；Windows 宿主及原生均保留原断言并修正目录访问权。定制 `.6` 原生 Mac 编译／74 项共享回归与宿主编译通过，新增平台路径尚待真实执行。完整日志 ZIP SHA-256 `923a61ed63941a39b0dd8be06fe21f7db5af7041132a2b25e1cfb448598cf8e2`，失败摘要 `3fbbfaef0236db13cb31c4440c7eeac834e7ba599417ccb0bfc2607b44d9ee6f`。修复后工件与门禁仍待完成，G01 不关闭。
 
 - **2026-10-01 目标构建与精确修复**：`9fdce3e3e` 的两平台宿主 `cargo check`、Windows 真实原 ConPTY 步骤及 Linux `.4` 原生构建通过；Windows 原生卡在公开锁文件 `cc 1.2.48` 与 `find-msvc-tools 0.1.13` 的常量类型不兼容。修复仅锁回后者 `0.1.10`，并将 Windows 日志失败夹具改为生产 Journal 的真实权限变化；定制 `.5` 的 Mac check 与 74 项原生回归通过，Windows 修复及最终工件绑定待验。[本轮 CI](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 其余宿主回归仍在运行，不记整套通过；G01 仍开放。

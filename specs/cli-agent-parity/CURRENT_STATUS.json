@@ -105,8 +105,8 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Linux自有pidfd与内核凭据握手的真实目标回归；Windows宿主及原生目录改名/删除保护目标回归",
-        "Linux/Windows .6实际构建、固定工件摘要绑定及最终源码门禁；其他平台实机验收由用户后续执行"
+        "完成Linux .6目标构建及宿主pidfd回归；Windows宿主目录保护及原生.7构建/测试复验",
+        "Linux/Windows实际工件摘要绑定和最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
       "paste_gui_evidence": {
@@ -214,6 +214,17 @@
           "linux": "Test rust-genai",
           "windows": "Build CLI process supervisor"
         }
+      },
+      "current_source_build_followup": {
+        "source_commit": "9f7962626836cea000c93da43656d47480c18ebf",
+        "run_id": 36752136629,
+        "status": "running_with_windows_native_failure",
+        "failure_summary_sha256": "d2160647e20df2b07b86d7004f9c1f58ccbfddf066b593948b2431bd42b97ca3",
+        "native_fix_commit": "d3986df9c7155d7a0f83e82afe3a094bee2b6640",
+        "native_version": "1.0.41+infinishell.terminal-bridge.7",
+        "local_gates": "真实protoc 6项、完整native check、host check通过；运行时代码未变。",
+        "target_validation": "pending",
+        "gap_closed": false
       }
     },
     "g06_progress": {

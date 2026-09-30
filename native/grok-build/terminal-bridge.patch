@@ -1,5 +1,5 @@
 diff --git a/Cargo.lock b/Cargo.lock
-index adc226224c1deac807e85de23fff71083aa7409c..9fcd59e4998087cc029df942fdf51403ff5eac2e 100644
+index adc2262..9fcd59e 100644
 --- a/Cargo.lock
 +++ b/Cargo.lock
 @@ -3425,9 +3425,9 @@ dependencies = [
@@ -14,8 +14,205 @@ index adc226224c1deac807e85de23fff71083aa7409c..9fcd59e4998087cc029df942fdf51403
  
  [[package]]
  name = "findshlibs"
+diff --git a/crates/build/xai-proto-build/src/lib.rs b/crates/build/xai-proto-build/src/lib.rs
+index 60fbc0a..c3aa525 100644
+--- a/crates/build/xai-proto-build/src/lib.rs
++++ b/crates/build/xai-proto-build/src/lib.rs
+@@ -2,9 +2,9 @@ mod debug_redact;
+ pub mod find_protoc;
+ 
+ use anyhow::Context;
++use std::fs;
+ use std::path::{Path, PathBuf};
+ use std::process::{Command, Stdio};
+-use std::{fs, iter};
+ 
+ /// Find the protoc well-known types include directory.
+ ///
+@@ -150,12 +150,19 @@ impl XaiProtoBuilder {
+             );
+         }
+ 
++        // 使用普通临时文件，避免依赖 Windows 不存在的 Unix 设备路径。
++        let output_dir = tempfile::TempDir::new()?;
++        let dependency_path = output_dir.path().join("dependencies.d");
++        let descriptor_path = output_dir.path().join("dependencies.pbbin");
++
+         // Can only process one input file when using --dependency_out=FILE.
+         for proto in protos {
+             let mut command = Command::new(protoc.unwrap_or(Path::new("protoc")));
+             command
+-                .arg("--dependency_out=/dev/stdout")
+-                .arg("--descriptor_set_out=/dev/null");
++                .arg("--dependency_out")
++                .arg(&dependency_path)
++                .arg("--descriptor_set_out")
++                .arg(&descriptor_path);
+ 
+             // Add protoc's well-known types include directory first (if found).
+             // This is needed for Bazel sandboxed builds where protoc and its
+@@ -176,27 +183,21 @@ impl XaiProtoBuilder {
+             command.stdin(Stdio::null());
+             command.stderr(Stdio::inherit());
+ 
+-            let output = command.output().context("protoc command failed")?;
+-            if !output.status.success() {
++            let status = command.status().context("protoc command failed")?;
++            if !status.success() {
+                 return Err(anyhow::anyhow!("protoc command failed"));
+             }
+ 
+-            let output =
+-                String::from_utf8(output.stdout).context("protoc command output not UTF-8")?;
+-
+-            let mut lines = output.lines();
+-            let first_line = lines.next().context("protoc command output is empty")?;
+-            let prefix = "/dev/null:";
+-            let rem = first_line.strip_prefix(prefix).with_context(|| {
+-                format!("protoc command output must start with /dev/null: {output:?}")
+-            })?;
+-            for line in iter::once(rem).chain(lines) {
+-                let line = line.trim();
+-                let line = line.strip_suffix("\\").unwrap_or(line);
++            let output = fs::read_to_string(&dependency_path)
++                .context("failed to read protoc dependency manifest")?;
++            for line in parse_dependency_paths(&output, &descriptor_path)? {
+                 // Depending on absolute paths like
+                 // /Users/user/homebrew/Cellar/protobuf/29.1/include/google/protobuf/timestamp.proto
+                 // is valid, but we want to have output more deterministic.
+-                if line.contains("/include/google/protobuf/") {
++                if line
++                    .replace('\\', "/")
++                    .contains("/include/google/protobuf/")
++                {
+                     continue;
+                 }
+ 
+@@ -344,6 +345,33 @@ impl XaiProtoBuilder {
+     }
+ }
+ 
++fn parse_dependency_paths<'a>(
++    output: &'a str,
++    descriptor_path: &Path,
++) -> anyhow::Result<Vec<&'a str>> {
++    let descriptor_path = descriptor_path
++        .to_str()
++        .context("descriptor path not UTF-8")?;
++    let prefix = format!("{descriptor_path}:");
++    // protoc 原样写出唯一目标；精确剥离前缀，不能按盘符冒号或路径空格分词。
++    let dependencies = output.strip_prefix(&prefix).with_context(|| {
++        format!("protoc dependency manifest must start with {prefix:?}: {output:?}")
++    })?;
++    anyhow::ensure!(
++        !dependencies.is_empty(),
++        "protoc dependency manifest is empty"
++    );
++    dependencies
++        .lines()
++        .map(|line| {
++            let line = line.trim();
++            let line = line.strip_suffix('\\').unwrap_or(line).trim_end();
++            anyhow::ensure!(!line.is_empty(), "protoc dependency path is empty");
++            Ok(line)
++        })
++        .collect()
++}
++
+ pub fn configure() -> XaiProtoBuilder {
+     let builder = tonic_prost_build::configure()
+         .compile_well_known_types(true)
+@@ -361,3 +389,7 @@ pub fn configure() -> XaiProtoBuilder {
+         btree_map_paths: Vec::new(),
+     }
+ }
++
++#[cfg(test)]
++#[path = "lib_tests.rs"]
++mod tests;
+diff --git a/crates/build/xai-proto-build/src/lib_tests.rs b/crates/build/xai-proto-build/src/lib_tests.rs
+new file mode 100644
+index 0000000..64da658
+--- /dev/null
++++ b/crates/build/xai-proto-build/src/lib_tests.rs
+@@ -0,0 +1,75 @@
++use super::*;
++
++#[test]
++fn dependency_paths_preserve_windows_drive_spaces_and_crlf() {
++    let target = Path::new(r"C:\build temp\dependencies.pbbin");
++    let manifest = concat!(
++        "C:\\build temp\\dependencies.pbbin: C:\\source dir\\child.proto\\\r\n",
++        " C:\\source dir\\root.proto\r\n",
++    );
++    assert_eq!(
++        parse_dependency_paths(manifest, target).unwrap(),
++        [r"C:\source dir\child.proto", r"C:\source dir\root.proto"]
++    );
++}
++
++#[test]
++fn dependency_paths_preserve_unix_spaces_and_continuations() {
++    let target = Path::new("/build temp/dependencies.pbbin");
++    let manifest = concat!(
++        "/build temp/dependencies.pbbin: /source dir/child.proto\\\n",
++        " /source dir/root.proto",
++    );
++    assert_eq!(
++        parse_dependency_paths(manifest, target).unwrap(),
++        ["/source dir/child.proto", "/source dir/root.proto"]
++    );
++}
++
++#[test]
++fn dependency_paths_reject_different_target_or_empty_path() {
++    let target = Path::new("dependencies.pbbin");
++    assert!(parse_dependency_paths("other.pbbin: root.proto", target).is_err());
++    assert!(parse_dependency_paths("dependencies.pbbin:", target).is_err());
++    assert!(parse_dependency_paths("dependencies.pbbin: ", target).is_err());
++    assert!(parse_dependency_paths("", target).is_err());
++}
++
++#[test]
++fn dependency_manifest_supports_real_protoc_imports_and_paths_with_spaces() {
++    let source_dir = tempfile::TempDir::new().unwrap();
++    let include_dir = source_dir.path().join("proto sources");
++    fs::create_dir(&include_dir).unwrap();
++    let child = include_dir.join("child.proto");
++    fs::write(
++        &child,
++        "syntax = \"proto3\"; package build_test; message Child {}",
++    )
++    .unwrap();
++    let root = include_dir.join("root.proto");
++    fs::write(
++        &root,
++        "syntax = \"proto3\"; package build_test; import \"child.proto\"; message Root { Child child = 1; }",
++    )
++    .unwrap();
++    let protoc = find_protoc::find_protoc().unwrap();
++    XaiProtoBuilder::emit_rerun_if_changed(
++        protoc.as_deref(),
++        None,
++        [root.as_path()],
++        [include_dir.as_path()],
++    )
++    .unwrap();
++
++    // 缺失导入必须继续失败，不能为了跨平台构建绕过依赖验证。
++    fs::remove_file(&child).unwrap();
++    assert!(
++        XaiProtoBuilder::emit_rerun_if_changed(
++            protoc.as_deref(),
++            None,
++            [root.as_path()],
++            [include_dir.as_path()],
++        )
++        .is_err()
++    );
++}
 diff --git a/crates/codegen/xai-grok-pager/Cargo.toml b/crates/codegen/xai-grok-pager/Cargo.toml
-index b67850c5ab186ce4cc2cdd3f5056c6baf522744c..f6ccd11d2a7a339a99c6c96d77c5e09356296572 100644
+index b67850c..f6ccd11 100644
 --- a/crates/codegen/xai-grok-pager/Cargo.toml
 +++ b/crates/codegen/xai-grok-pager/Cargo.toml
 @@ -184,7 +184,7 @@ core-foundation = { workspace = true }
@@ -28,7 +225,7 @@ index b67850c5ab186ce4cc2cdd3f5056c6baf522744c..f6ccd11d2a7a339a99c6c96d77c5e093
  [dev-dependencies]
  tokio = { workspace = true, features = ["test-util"] }
 diff --git a/crates/codegen/xai-grok-pager/src/app/actions.rs b/crates/codegen/xai-grok-pager/src/app/actions.rs
-index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..cbf72fa7eb3a7e341002523921031f53b5a16630 100644
+index 1e1f1d5..cbf72fa 100644
 --- a/crates/codegen/xai-grok-pager/src/app/actions.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/actions.rs
 @@ -1553,6 +1553,14 @@ pub enum Effect {
@@ -64,7 +261,7 @@ index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..cbf72fa7eb3a7e341002523921031f53
      /// Carries the payload so dispatch can requeue it locally.
      /// The producer already consumed the composer/queue row, so dropping it would silently lose the message.
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
-index a57df79bcb4d819ee5e25964c0b02eba003ab579..53aa8669135cfff2fe791a3f86a3d3e57591be16 100644
+index a57df79..53aa866 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
 @@ -47,6 +47,8 @@ pub(crate) use notes::FEEDBACK_TRACE_UPLOAD_TIMEOUT_MS;
@@ -77,7 +274,7 @@ index a57df79bcb4d819ee5e25964c0b02eba003ab579..53aa8669135cfff2fe791a3f86a3d3e5
      present_export_copy_tip, show_small_screen_tip, show_ssh_wrap_tip,
  };
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
-index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fbfa636282 100644
+index 0323cae..8beb943 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
 @@ -63,6 +63,36 @@ pub(crate) fn dispatch_initial_prompt(app: &mut AppView, prompt: String) -> Vec<
@@ -118,7 +315,7 @@ index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fb
      app: &AppView,
      agent_id: AgentId,
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs
-index eaf1f2997f6c3c5edfff51782ab690a1eb413929..c77482b3182057375ff97d41757914d8dbc6e933 100644
+index eaf1f29..c77482b 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs
 @@ -935,6 +935,8 @@ pub(crate) fn apply_turn_start_shim(
@@ -131,7 +328,7 @@ index eaf1f2997f6c3c5edfff51782ab690a1eb413929..c77482b3182057375ff97d41757914d8
          _ => (text.as_deref().map(RenderBlock::user_prompt), true),
      };
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs
-index a96c078d8184ffc6d4503d421cb8b44e93fc1967..ec3b584754b02e5b3dffa64426bdfef8a5080121 100644
+index a96c078..ec3b584 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs
 @@ -851,6 +851,13 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
@@ -149,7 +346,7 @@ index a96c078d8184ffc6d4503d421cb8b44e93fc1967..ec3b584754b02e5b3dffa64426bdfef8
              let effects = handle_prompt_response(app, agent_id, result, http_status, prompt_id);
              app.refresh_status_line_for(agent_id);
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
-index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..7752ac5d07851e08d0de653456b491d0d8aecaed 100644
+index 94636a6..7752ac5 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 @@ -19,6 +19,8 @@ mod settings;
@@ -163,7 +360,7 @@ index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..7752ac5d07851e08d0de653456b491d0
  mod voice;
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..f2cfafe5c1e6e1767ce45178cd7aae61a3cb0ada
+index 0000000..f2cfafe
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs
 @@ -0,0 +1,246 @@
@@ -414,7 +611,7 @@ index 0000000000000000000000000000000000000000..f2cfafe5c1e6e1767ce45178cd7aae61
 +    }
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/effects/mod.rs b/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
-index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..a82c2052c581e18297e9ea11d3f069257e69b563 100644
+index 2b2cc56..a82c205 100644
 --- a/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
 @@ -1240,6 +1240,56 @@ pub(crate) fn execute(
@@ -475,7 +672,7 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..a82c2052c581e18297e9ea11d3f06925
              agent_id,
              session_id,
 diff --git a/crates/codegen/xai-grok-pager/src/app/event_loop.rs b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
-index ceaf021a276edb59da392b47fee89f4b45b384b8..998b1ec591f5dd4248085478f6ee33da2e285cc7 100644
+index ceaf021..998b1ec 100644
 --- a/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 @@ -23,6 +23,9 @@ use std::time::Duration;
@@ -701,7 +898,7 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..998b1ec591f5dd4248085478f6ee33da
              emit_event_loop_stall(window);
          }
 diff --git a/crates/codegen/xai-grok-pager/src/app/mod.rs b/crates/codegen/xai-grok-pager/src/app/mod.rs
-index 7fbb597d14e7773da896b198a7e4abce23f52794..50423ba3577940d87e0adb4f51e72bed87f17e46 100644
+index 7fbb597..50423ba 100644
 --- a/crates/codegen/xai-grok-pager/src/app/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/mod.rs
 @@ -70,6 +70,14 @@ mod startup_failure;
@@ -720,7 +917,7 @@ index 7fbb597d14e7773da896b198a7e4abce23f52794..50423ba3577940d87e0adb4f51e72bed
  use terminal_restore::{emit_terminal_teardown_sequences, restore_terminal, set_panic_hook};
  #[cfg(test)]
 diff --git a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
-index e1077eb31a632e49b9c0effb632ec1f79364cf66..6f8d12638be1f2adb4275ea2d232eec5283ff3c8 100644
+index e1077eb..6f8d126 100644
 --- a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
 @@ -48,6 +48,20 @@ impl AppView {
@@ -746,7 +943,7 @@ index e1077eb31a632e49b9c0effb632ec1f79364cf66..6f8d12638be1f2adb4275ea2d232eec5
          status_line_tick_demand(TickInputs {
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d202360514
+index 0000000..ee07a11
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 @@ -0,0 +1,741 @@
@@ -1493,7 +1690,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e62d9b809aaa8c922cab96d0f9949bb76caee00c
+index 0000000..e62d9b8
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs
 @@ -0,0 +1,348 @@
@@ -1847,7 +2044,7 @@ index 0000000000000000000000000000000000000000..e62d9b809aaa8c922cab96d0f9949bb7
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..0f6bed34c8c770603d7b0b6445dbd1e514a074bf
+index 0000000..0f6bed3
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs
 @@ -0,0 +1,174 @@
@@ -2027,7 +2224,7 @@ index 0000000000000000000000000000000000000000..0f6bed34c8c770603d7b0b6445dbd1e5
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..d095097c60e60d20c9dce75472c92b1201b5c9da
+index 0000000..d095097
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs
 @@ -0,0 +1,289 @@
@@ -2322,7 +2519,7 @@ index 0000000000000000000000000000000000000000..d095097c60e60d20c9dce75472c92b12
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..81010a1a488e0efc82bc478f0bc11f9cfa82158d
+index 0000000..81010a1
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs
 @@ -0,0 +1,200 @@
@@ -2528,7 +2725,7 @@ index 0000000000000000000000000000000000000000..81010a1a488e0efc82bc478f0bc11f9c
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b92a91494
+index 0000000..8febbe3
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
 @@ -0,0 +1,258 @@
@@ -2792,7 +2989,7 @@ index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..3aa1bfb2d06ee8be5889c0ac1834cab406492212
+index 0000000..3aa1bfb
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
 @@ -0,0 +1,234 @@
@@ -3032,7 +3229,7 @@ index 0000000000000000000000000000000000000000..3aa1bfb2d06ee8be5889c0ac1834cab4
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..ecc8bedd0bc0f859478856c014346e4f77bd8f2f
+index 0000000..ecc8bed
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux.rs
 @@ -0,0 +1,98 @@
@@ -3136,7 +3333,7 @@ index 0000000000000000000000000000000000000000..ecc8bedd0bc0f859478856c014346e4f
 +pub(super) mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..ba56149cb9de103f9d829b4a7d204f8aad3d8e9e
+index 0000000..ba56149
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_peer_linux_tests.rs
 @@ -0,0 +1,193 @@
@@ -3335,7 +3532,7 @@ index 0000000000000000000000000000000000000000..ba56149cb9de103f9d829b4a7d204f8a
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e1d80357ce428856ee9ff4d7fd0fc7370dcc25db
+index 0000000..e1d8035
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs
 @@ -0,0 +1,73 @@
@@ -3414,7 +3611,7 @@ index 0000000000000000000000000000000000000000..e1d80357ce428856ee9ff4d7fd0fc737
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..7ec9119da0f342fd8d0db61e6811060040bbfe1f
+index 0000000..7ec9119
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs
 @@ -0,0 +1,156 @@
@@ -3576,7 +3773,7 @@ index 0000000000000000000000000000000000000000..7ec9119da0f342fd8d0db61e68110600
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..82ccf663ddad8d86230606a695f3427e69c624e7
+index 0000000..82ccf66
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 @@ -0,0 +1,1027 @@
@@ -4609,7 +4806,7 @@ index 0000000000000000000000000000000000000000..82ccf663ddad8d86230606a695f3427e
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..b72b6c1dcdbde3426ff455ff693bdaf0671cfef9
+index 0000000..b72b6c1
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs
 @@ -0,0 +1,610 @@
@@ -5225,7 +5422,7 @@ index 0000000000000000000000000000000000000000..b72b6c1dcdbde3426ff455ff693bdaf0
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e2d2576918a049de7d94ac26eddd6b6f24f5cbb7
+index 0000000..e2d2576
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs
 @@ -0,0 +1,233 @@
@@ -5463,7 +5660,7 @@ index 0000000000000000000000000000000000000000..e2d2576918a049de7d94ac26eddd6b6f
 +    owner.verify_pipe_client(server.as_raw_handle()).unwrap();
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/client_identity.rs b/crates/codegen/xai-grok-pager/src/client_identity.rs
-index f8371239e2d5fce431406ada9d93e8206e8458b0..4ca9802c1841c084cd6830178d980d4025ee4aeb 100644
+index f837123..4ca9802 100644
 --- a/crates/codegen/xai-grok-pager/src/client_identity.rs
 +++ b/crates/codegen/xai-grok-pager/src/client_identity.rs
 @@ -1,7 +1,7 @@
@@ -5476,7 +5673,7 @@ index f8371239e2d5fce431406ada9d93e8206e8458b0..4ca9802c1841c084cd6830178d980d40
  /// `User-Agent` for the pager's own HTTP clients that call `api.x.ai` directly (voice STT).
  ///
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/adapter.rs b/crates/codegen/xai-grok-shell-terminal/src/adapter.rs
-index 93ed9160fed9ff0f22d33b214e15505c43063446..bd259868e3cc7b01c5d8af29ceea927b5921a3f9 100644
+index 93ed916..bd25986 100644
 --- a/crates/codegen/xai-grok-shell-terminal/src/adapter.rs
 +++ b/crates/codegen/xai-grok-shell-terminal/src/adapter.rs
 @@ -674,6 +674,10 @@ impl TerminalBackend for AcpTerminalAdapter {
@@ -5491,7 +5688,7 @@ index 93ed9160fed9ff0f22d33b214e15505c43063446..bd259868e3cc7b01c5d8af29ceea927b
          let task_ids: Vec<String> = {
              let tasks = self.tasks.lock().unwrap();
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/lib.rs b/crates/codegen/xai-grok-shell-terminal/src/lib.rs
-index 6314c1f3221a5a59994a9053f2a11c80ea40db72..0cba7f44cdfb48c08995bfa468af919abc4adfc4 100644
+index 6314c1f..0cba7f4 100644
 --- a/crates/codegen/xai-grok-shell-terminal/src/lib.rs
 +++ b/crates/codegen/xai-grok-shell-terminal/src/lib.rs
 @@ -32,9 +32,9 @@ pub mod pty_session;
@@ -5508,7 +5705,7 @@ index 6314c1f3221a5a59994a9053f2a11c80ea40db72..0cba7f44cdfb48c08995bfa468af919a
  
  pub const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs b/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
-index 51024fda7b00fb2866f96208f6e1aeaf4d2d2d86..b4db7a557935cdfa6a0bde5a28e08076a7ccbdaa 100644
+index 51024fd..b4db7a5 100644
 --- a/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
 +++ b/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
 @@ -1,14 +1,14 @@
@@ -5744,7 +5941,7 @@ index 51024fda7b00fb2866f96208f6e1aeaf4d2d2d86..b4db7a557935cdfa6a0bde5a28e08076
              let session_id = session_id_str.clone();
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..08ddf58a2210ef1fe92024d1da757d457675a212
+index 0000000..08ddf58
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs
 @@ -0,0 +1,172 @@
@@ -5921,7 +6118,7 @@ index 0000000000000000000000000000000000000000..08ddf58a2210ef1fe92024d1da757d45
 +        .await;
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-index 094085e49711c48227827fa1d4dd44447f301d58..6de0afe8bad57c919fc4789efeb04545b6d8ee32 100644
+index 094085e..6de0afe 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 @@ -999,6 +999,7 @@ impl acp::Agent for MvpAgent {
@@ -6016,7 +6213,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..6de0afe8bad57c919fc4789efeb04545
                  crate::extensions::auth::handle(self, &args).await
              }
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/mod.rs b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
-index 063a4934d6979db4c93e5c1a7ff45df060c7c121..8cb19411ab4c4e6ac8347dcee897e4257c36f614 100644
+index 063a493..8cb1941 100644
 --- a/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 +++ b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 @@ -45,6 +45,7 @@ pub mod subagent_message;
@@ -6029,7 +6226,7 @@ index 063a4934d6979db4c93e5c1a7ff45df060c7c121..8cb19411ab4c4e6ac8347dcee897e425
  pub(crate) mod worktree_seed;
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da54284d902a5a
+index 0000000..82a1fa4
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs
 @@ -0,0 +1,200 @@
@@ -6235,7 +6432,7 @@ index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da5428
 +mod tests;
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..1e4183c88acde0b93950676dbbf29fe22440530c
+index 0000000..1e4183c
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs
 @@ -0,0 +1,219 @@
@@ -6459,7 +6656,7 @@ index 0000000000000000000000000000000000000000..1e4183c88acde0b93950676dbbf29fe2
 +    assert_eq!(proof, receipt("session", MESSAGE_ID, false));
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/leader/client.rs b/crates/codegen/xai-grok-shell/src/leader/client.rs
-index eabc29448ca275b88136bae5c8a1c940112e134e..41bcea76ef46c5205c51370ec762334d3aff0d31 100644
+index eabc294..41bcea7 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/client.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/client.rs
 @@ -317,9 +317,14 @@ async fn register(
@@ -6478,7 +6675,7 @@ index eabc29448ca275b88136bae5c8a1c940112e134e..41bcea76ef46c5205c51370ec762334d
              mode,
              capabilities,
 diff --git a/crates/codegen/xai-grok-shell/src/leader/lock.rs b/crates/codegen/xai-grok-shell/src/leader/lock.rs
-index 46ac126a731abd3f7201e800af6745c24c2138f8..d9ca531c73167a073e8f1bd3ad5c672b947c88fb 100644
+index 46ac126..d9ca531 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/lock.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/lock.rs
 @@ -5,6 +5,7 @@ use std::time::Duration;
@@ -6544,7 +6741,7 @@ index 46ac126a731abd3f7201e800af6745c24c2138f8..d9ca531c73167a073e8f1bd3ad5c672b
  
      #[test]
 diff --git a/crates/codegen/xai-grok-shell/src/leader/mod.rs b/crates/codegen/xai-grok-shell/src/leader/mod.rs
-index 363d0983bc4219215efa941d3d46fead9a7db80a..a8a7f050a50c17882549e861dc48a83bd52e341a 100644
+index 363d098..a8a7f05 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/mod.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/mod.rs
 @@ -88,6 +88,7 @@ use tokio::sync::{mpsc, watch};
@@ -6613,7 +6810,7 @@ index 363d0983bc4219215efa941d3d46fead9a7db80a..a8a7f050a50c17882549e861dc48a83b
      #[test]
      fn zombie_decision_clears_when_no_holder() {
 diff --git a/crates/codegen/xai-grok-shell/src/leader/protocol.rs b/crates/codegen/xai-grok-shell/src/leader/protocol.rs
-index 1476d6b0f6b1d9d84ab3dd8d217faa8942875610..2fb05feb261586a03a3dd999843592bca4243b61 100644
+index 1476d6b..2fb05fe 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/protocol.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/protocol.rs
 @@ -428,6 +428,9 @@ pub enum ClientMessage {
@@ -6635,7 +6832,7 @@ index 1476d6b0f6b1d9d84ab3dd8d217faa8942875610..2fb05feb261586a03a3dd999843592bc
              mode: ClientMode::Stdio,
              capabilities: ClientCapabilities::default(),
 diff --git a/crates/codegen/xai-grok-shell/src/leader/server.rs b/crates/codegen/xai-grok-shell/src/leader/server.rs
-index de463e0ee19412e660ce24a4a9085cf3e357dcbd..1c2d718eb1ff03d77b19b7843c0d42cfc7616a8d 100644
+index de463e0..1c2d718 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/server.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/server.rs
 @@ -2392,7 +2392,20 @@ async fn run_client_session(
@@ -6660,7 +6857,7 @@ index de463e0ee19412e660ce24a4a9085cf3e357dcbd..1c2d718eb1ff03d77b19b7843c0d42cf
              write_message(
                  &mut writer,
 diff --git a/crates/codegen/xai-grok-shell/src/leader/server_tests.rs b/crates/codegen/xai-grok-shell/src/leader/server_tests.rs
-index 91f9489b504bbf425f6efbf5d0752ffd977fe91e..13bae85b7739d925e6102016aece2ba495d53c84 100644
+index 91f9489..13bae85 100644
 --- a/crates/codegen/xai-grok-shell/src/leader/server_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/leader/server_tests.rs
 @@ -1,7 +1,9 @@
@@ -6901,7 +7098,7 @@ index 91f9489b504bbf425f6efbf5d0752ffd977fe91e..13bae85b7739d925e6102016aece2ba4
              mode: ClientMode::Stdio,
              capabilities: ClientCapabilities::default(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session.rs b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
-index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d8bbf010b 100644
+index 973157c..7dec463 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 @@ -141,6 +141,8 @@ use queue_mutation::{InputOrigin, QueueMutationPolicy};
@@ -6933,7 +7130,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d
  #[cfg(test)]
  #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
-index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..525211b6a1d76598e7eed48c7161fa8a54197aa7 100644
+index ab7e4d1..525211b 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 @@ -722,6 +722,18 @@ pub(super) async fn run_session(
@@ -6956,7 +7153,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..525211b6a1d76598e7eed48c7161fa8a
                              let origin = super::PromptOrigin::from_prompt_id(&prompt_id);
                              let (actor_admitted, task_wake_fallback) = match admission {
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
-index 380683fa095ec19e8cded8cf8b61ff7e86856b07..deaa809d8f9624bee96ccead15f64a676ac8c4d5 100644
+index 380683f..deaa809 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
 @@ -659,6 +659,7 @@ pub(crate) async fn spawn_session_actor(
@@ -6969,7 +7166,7 @@ index 380683fa095ec19e8cded8cf8b61ff7e86856b07..deaa809d8f9624bee96ccead15f64a67
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97e33e3785
+index 0000000..e0ff187
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
 @@ -0,0 +1,189 @@
@@ -7163,7 +7360,7 @@ index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97
 +    }
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
-index a071e7abbe45338eb45d361bbd0f1280ad1052f2..6deebb20133fa37a1a2e108f027bf7afb56cb30a 100644
+index a071e7a..6deebb2 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
 @@ -1253,6 +1253,7 @@ impl SessionActor {
@@ -7175,7 +7372,7 @@ index a071e7abbe45338eb45d361bbd0f1280ad1052f2..6deebb20133fa37a1a2e108f027bf7af
                          let _ = ack.send(());
                      }
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs
-index 8bfce957a4ce877af1e1ac59997fe0b37c1b960c..499c14f0d3a2de1cc63b840551f6dab7bcd56153 100644
+index 8bfce95..499c14f 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs
 @@ -157,6 +157,7 @@ fn pending_notification_cap_keeps_newest_entries() {
@@ -7187,7 +7384,7 @@ index 8bfce957a4ce877af1e1ac59997fe0b37c1b960c..499c14f0d3a2de1cc63b840551f6dab7
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
-index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602cda730a4 100644
+index 01985cf..5c15631 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
 @@ -101,6 +101,7 @@ async fn persist_ack_waits_for_disk_flush_before_success() {
@@ -7223,7 +7420,7 @@ index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602
                  edit_holds: HashMap::new(),
                  pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
-index 4ce3f3c554083cbc054269192ccbe8928366f1e3..42ba0d0b47b389076969d829a26b78d9da1b1eb3 100644
+index 4ce3f3c..42ba0d0 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
 @@ -89,6 +89,7 @@ async fn test_e2e_idle_resume_refreshes_model_metadata() {
@@ -7235,7 +7432,7 @@ index 4ce3f3c554083cbc054269192ccbe8928366f1e3..42ba0d0b47b389076969d829a26b78d9
                  edit_holds: HashMap::new(),
                  pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
-index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..8190bb1aa211fbf52b640472ed48b39da4724c4e 100644
+index 19fddfa..8190bb1 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
 @@ -38,6 +38,7 @@ async fn create_test_actor(
@@ -7255,7 +7452,7 @@ index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..8190bb1aa211fbf52b640472ed48b39d
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
-index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4dcd46608 100644
+index 9cd511a..494c6be 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
 @@ -105,6 +105,7 @@ pub(super) async fn create_test_actor_with_memory(
@@ -7267,7 +7464,7 @@ index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
-index 78e5d0eb80c820a86562faa8933b02ed60c2c273..90ac58039c222e7360bb9974e98002ed66514718 100644
+index 78e5d0e..90ac580 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 @@ -66,6 +66,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
@@ -7279,7 +7476,7 @@ index 78e5d0eb80c820a86562faa8933b02ed60c2c273..90ac58039c222e7360bb9974e98002ed
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
-index fa11f50caa83041f8fa681e919b95d7f21d59265..9381c1b19c3595549b48ee04eeec621a11097f0c 100644
+index fa11f50..9381c1b 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 @@ -306,6 +306,7 @@ async fn create_test_actor_inner(
@@ -7292,7 +7489,7 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..9381c1b19c3595549b48ee04eeec621a
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46deb4f844
+index 0000000..2d21b6a
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
 @@ -0,0 +1,221 @@
@@ -7518,7 +7715,7 @@ index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46
 +        .await;
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs
-index 8faa60bf9c3b1507c3af6bf803f208367c52b5a3..884167303b76a5095ee719ad22601ce9072c92f2 100644
+index 8faa60b..8841673 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs
 @@ -1,6 +1,7 @@
@@ -7530,7 +7727,7 @@ index 8faa60bf9c3b1507c3af6bf803f208367c52b5a3..884167303b76a5095ee719ad22601ce9
  use xai_grok_tools::types::output::{MCPOutput, ToolOutput, ToolRunResult};
  use xai_grok_tools::util::base64_images::{ExtractedImage, IMAGE_CONTENT_PLACEHOLDER};
 diff --git a/crates/codegen/xai-grok-shell/src/session/commands.rs b/crates/codegen/xai-grok-shell/src/session/commands.rs
-index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..bdd48fdaa4bb7a44ddf6a2ac62d8f012111708a0 100644
+index 49dd0f3..bdd48fd 100644
 --- a/crates/codegen/xai-grok-shell/src/session/commands.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/commands.rs
 @@ -362,6 +362,18 @@ pub enum SessionCommand {
@@ -7553,7 +7750,7 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..bdd48fdaa4bb7a44ddf6a2ac62d8f012
          prompt_id: String,
          prompt_blocks: Vec<acp::ContentBlock>,
 diff --git a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
-index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..6d758646da8b43b6e798ccd56b853eeab1463d8e 100644
+index 3dcd339..6d75864 100644
 --- a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
 @@ -47,6 +47,7 @@ async fn create_test_actor(
@@ -7565,7 +7762,7 @@ index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..6d758646da8b43b6e798ccd56b853eea
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs b/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
-index 1fa947b413d32967c761713ad78e3863614110ef..752b8064e90369d3de69b3d80cc457d67ed47902 100644
+index 1fa947b..752b806 100644
 --- a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
 +++ b/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
 @@ -411,6 +411,7 @@ async fn test_stdio_client_disconnect() {
@@ -7609,7 +7806,7 @@ index 1fa947b413d32967c761713ad78e3863614110ef..752b8064e90369d3de69b3d80cc457d6
              mode: ClientMode::Stdio,
              capabilities: ClientCapabilities::default(),
 diff --git a/crates/codegen/xai-grok-tools/src/bridge.rs b/crates/codegen/xai-grok-tools/src/bridge.rs
-index ecb99a1d34f3fb658e0836efa2471d7a22302479..97215dc204f7adc27c261acaed90118e9bb4ccb1 100644
+index ecb99a1..97215dc 100644
 --- a/crates/codegen/xai-grok-tools/src/bridge.rs
 +++ b/crates/codegen/xai-grok-tools/src/bridge.rs
 @@ -687,6 +687,11 @@ impl ToolBridge {
@@ -7625,7 +7822,7 @@ index ecb99a1d34f3fb658e0836efa2471d7a22302479..97215dc204f7adc27c261acaed90118e
      /// [`ReportedTaskCompletions`] to prevent duplicate reminders from [`TaskCompletionReminder`].
      /// Reserved IDs stay unreported for a later genuine user turn.
 diff --git a/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs b/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
-index 962aa282129d53efe077edd59918651f68dd3909..0422a05f62c0ff7f996010f3770e35943ec02983 100644
+index 962aa28..0422a05 100644
 --- a/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
 +++ b/crates/codegen/xai-grok-tools/src/computer/local/terminal.rs
 @@ -2648,6 +2648,18 @@ impl TerminalBackend for LocalTerminalBackend {
@@ -7648,7 +7845,7 @@ index 962aa282129d53efe077edd59918651f68dd3909..0422a05f62c0ff7f996010f3770e3594
          let (reply_tx, reply_rx) = oneshot::channel();
          self.cmd_tx
 diff --git a/crates/codegen/xai-grok-tools/src/computer/types.rs b/crates/codegen/xai-grok-tools/src/computer/types.rs
-index f9dc3251da50555faa51446c6584679ce75343a7..1dd53bb12b1f1c13735b5bfdc3b808ee1e22adb9 100644
+index f9dc325..1dd53bb 100644
 --- a/crates/codegen/xai-grok-tools/src/computer/types.rs
 +++ b/crates/codegen/xai-grok-tools/src/computer/types.rs
 @@ -429,6 +429,11 @@ pub trait TerminalBackend: Send + Sync {
@@ -7664,7 +7861,7 @@ index f9dc3251da50555faa51446c6584679ce75343a7..1dd53bb12b1f1c13735b5bfdc3b808ee
      /// shell state is enabled. Returns `None` when persistence is off or the
      /// backend doesn't support it (e.g. ACP/remote).
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs
-index 849f7ef7eaadadd9fd4d3013174b4ea96c318c41..8bbb9ca2509df053dcc4943d4265888ea944f750 100644
+index 849f7ef..8bbb9ca 100644
 --- a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs
 @@ -14,6 +14,7 @@ mod agent_quotas;
@@ -7721,7 +7918,7 @@ index 849f7ef7eaadadd9fd4d3013174b4ea96c318c41..8bbb9ca2509df053dcc4943d4265888e
                  let (drained, kept): (Vec<_>, Vec<_>) =
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..1eca78d141a5644e5a33b7622b112d3f132f41dc
+index 0000000..1eca78d
 --- /dev/null
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs
 @@ -0,0 +1,142 @@
@@ -7869,7 +8066,7 @@ index 0000000000000000000000000000000000000000..1eca78d141a5644e5a33b7622b112d3f
 +mod tests;
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..a407146fdee09a268e590c73b1b97dc353313ce7
+index 0000000..a407146
 --- /dev/null
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs
 @@ -0,0 +1,128 @@
@@ -8002,7 +8199,7 @@ index 0000000000000000000000000000000000000000..a407146fdee09a268e590c73b1b97dc3
 +    assert!(coordinator.pending.contains_key("grandchild"));
 +}
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs
-index 94bcb89ebc56c7720fad4bcfd7c6ba2940d4af7d..e3bb4b434af0889755d295dff70c630c9e08d0ca 100644
+index 94bcb89..e3bb4b4 100644
 --- a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs
 @@ -14,6 +14,11 @@ use super::{
@@ -8018,7 +8215,7 @@ index 94bcb89ebc56c7720fad4bcfd7c6ba2940d4af7d..e3bb4b434af0889755d295dff70c630c
              mut request,
              result_tx,
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs
-index ba16b478da688ea8c7239b41cfceb3722190f3f4..37a27226757e1439d164da9c29dd851728c45a2e 100644
+index ba16b47..37a2722 100644
 --- a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs
 @@ -60,6 +60,13 @@ impl<R: ChildRunner> SubagentCoordinator<R> {
@@ -8036,7 +8233,7 @@ index ba16b478da688ea8c7239b41cfceb3722190f3f4..37a27226757e1439d164da9c29dd8517
              let _ = ingress.request.respond_to.send(outcome);
              return;
 diff --git a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs
-index eb5bfb69d4dcf83b2147b5ddac87bea7771e4bdb..41272a9b13f438cd7478d387b5b4651aadeb27e1 100644
+index eb5bfb6..41272a9 100644
 --- a/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs
 +++ b/crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs
 @@ -959,6 +959,26 @@ pub struct SubagentDescribeRequest {
@@ -8079,7 +8276,7 @@ index eb5bfb69d4dcf83b2147b5ddac87bea7771e4bdb..41272a9b13f438cd7478d387b5b4651a
      /// `Completions` without draining; the requester's ledger discards the copies at a later drain. `suppress_ids` is ignored.
      PeekCompletions(SubagentCompletionsRequest),
 diff --git a/crates/codegen/xai-grok-version/src/lib.rs b/crates/codegen/xai-grok-version/src/lib.rs
-index d78baa06c11a48083c390aa578f7094d3da0d2a3..8861c4c15f482c7ca30b050422e86ddf605072ac 100644
+index d78baa0..8861c4c 100644
 --- a/crates/codegen/xai-grok-version/src/lib.rs
 +++ b/crates/codegen/xai-grok-version/src/lib.rs
 @@ -8,6 +8,13 @@ use semver::Version;
