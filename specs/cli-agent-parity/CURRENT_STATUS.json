@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G02/G04/G05；G01 的 Mac 功能与双语完成但 Linux/Windows 实现仍缺；3 项外平台验收移交，8 项仍开放；PR #22 保持草稿",
+  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 的 Mac 功能与双语完成但 Linux/Windows 实现仍缺；3 项外平台验收移交，7 项仍开放；PR #22 保持草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -10,7 +10,8 @@
     "closed_items": [
       "G02",
       "G04",
-      "G05"
+      "G05",
+      "G06"
     ],
     "deferred_platform_acceptance_items": [
       "V01",
@@ -20,15 +21,14 @@
     "remaining_items": [
       "G01",
       "G03",
-      "G06",
       "G07",
       "G08",
       "G09",
       "G10",
       "V03"
     ],
-    "remaining_count": 8,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。",
+    "remaining_count": 7,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -53,11 +53,12 @@
     },
     "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。",
     "source_gate": {
-      "command": "cargo check -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
-      "run_id": "r-oeigx2ze",
-      "log_sha256": "9637fb0320c0aeb335014989a99cc682bdb891dd518aa79ddf7de9f4cdf285be",
-      "temporary_directory": "cleaned"
+      "run_id": "r-syzne9y1",
+      "log_sha256": "68aae46269cf9baff3c2f127263c64f487e1d1e0f00b39f0e1d4d7d03889c3d7",
+      "temporary_directory": "cleaned",
+      "scope": "G06 关闭文档提交前检查；625ffcb98 后仅审计文档变化，84 份冻结源码仍一致。"
     },
     "original_all_platform_acceptance_satisfied": false,
     "original_all_platform_remaining_items": [
@@ -166,8 +167,8 @@
       }
     },
     "g06_progress": {
-      "status": "open",
-      "gap_closed": false,
+      "status": "closed_in_current_mac_scope",
+      "gap_closed": true,
       "mac_function_and_bilingual_satisfied": true,
       "baseline_commit": "e36adfd6c272c7533a2f600b259e754e5a507f47",
       "baseline_only": false,
@@ -225,9 +226,7 @@
         "cargo_build": "passed",
         "actionlint": "passed；仅忽略既有自托管 infinishell-ci 标签未登记告警"
       },
-      "remaining": [
-        "Linux x64／Windows x64 最终源码编译及相关定向门禁"
-      ],
+      "remaining": [],
       "archive_followup": [],
       "preserved_failures": [
         "r-ph4ikgm5 未选路径读取严格审计失败",
@@ -242,10 +241,28 @@
         "commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
         "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615",
         "ref": "codex/cli-agent-parity-g06-ci-625ffcb98",
-        "result": "pending",
-        "scope": "Linux x64 与 Windows x64 源码门禁；临时同提交 ref 避免取消前轮门禁，非其他平台已认证实机验收。"
+        "result": "success",
+        "scope": "Linux x64 与 Windows x64 源码门禁；临时同提交 ref 避免取消前轮门禁，非其他平台已认证实机验收。",
+        "status": "completed",
+        "linux": "success",
+        "windows": "success",
+        "macos_intel": "skipped",
+        "required_new_tests_all_ran_and_passed": true,
+        "summary_sha256": "a4dd47d503c26fb8a5b6d36b82127eac74ab620a108ed8afc7622cec16a4cd57",
+        "archive_index_sha256": "786dd1b4259d909e367265d96618318cb3b9df132342d937074a4057388fc4be",
+        "logs_zip_sha256": "0b4b7db366bedb81a6de25f3eca509caaec81611a7f504e49d4ec3a58bbe995d",
+        "warning": {
+          "platform": "windows-x64",
+          "status": "LEAK",
+          "test": "terminal::input::tests::test_ai_context_menu_keeps_workflow_reference_in_ai_input",
+          "group_summary": "660 passed (1 leaky)",
+          "root_cause": "未确认；不能认定与历史相邻用例同根因或整机零残留。",
+          "boundary": "新增技能顺序及四项 EOF 合同回归两平台均普通 PASS；本警告不计为 G06 功能失败，也不能在最终整体验收中省略。"
+        }
       },
-      "independent_review_sha256": "d06e2c7b1ad89c78097978f3e60773de9ba9104589854f01fa9254e183bfb58e"
+      "independent_review_sha256": "d06e2c7b1ad89c78097978f3e60773de9ba9104589854f01fa9254e183bfb58e",
+      "closed_on": "2026-09-30",
+      "closure_basis": "原条件逐项核对：多技能及选择顺序、会话内新增、路径／权限、准确注册确认、历史恢复和失败原子性均有实现及实际证据；Grok 不承诺工具严格串行。各轮源码独立绑定，其他平台实机后置，G10 父子链不外推。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -404,7 +421,6 @@
   "remaining_required_items": [
     "G01",
     "G03",
-    "G06",
     "G07",
     "G08",
     "G09",

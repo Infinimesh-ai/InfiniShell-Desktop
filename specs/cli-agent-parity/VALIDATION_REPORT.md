@@ -2,9 +2,9 @@
 
 本报告保留截至 2026-09-30 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
-## 2026-09-30：G06 Mac 功能条件满足，最终跨平台源码门禁待验
+## 2026-09-30：G06 本次 Mac 范围关闭
 
-**本轮尚不关闭 G06：当前仍为 3 项关闭、8 项开放、3 项其他平台验收移交，PR #22 保持草稿。** 既有 Claude 多技能、热新增、原生注册确认、恢复、权限上限及 GUI 证据按原构建保留；本轮补齐 Grok 用户来源与固定技能剩余 Mac 条件。既有证据重新索引见仓外 `resume-20260930/g06-closure/existing-evidence-index.safe.json`（SHA-256 `1246eda3e5795065ff6fc8c9862c4b84922fd6c146d038252a279ab6bd3f6d5a`）；旧 GUI 结论按固定 Git 及记载索引复核，没有声称重新打开旧图或重跑模型。
+**本轮关闭 G06：当前为 4 项关闭、7 项开放、3 项其他平台验收移交，PR #22 保持草稿。** 既有 Claude 多技能、热新增、原生注册确认、恢复、权限上限及 GUI 证据按原构建保留；本轮补齐 Grok 用户来源与固定技能剩余 Mac 条件。既有证据重新索引见仓外 `resume-20260930/g06-closure/existing-evidence-index.safe.json`（SHA-256 `1246eda3e5795065ff6fc8c9862c4b84922fd6c146d038252a279ab6bd3f6d5a`）；旧 GUI 结论按固定 Git 及记载索引复核，没有声称重新打开旧图或重跑模型。
 
 | 原关闭条件 | 本轮证据与边界 |
 | --- | --- |
@@ -24,7 +24,9 @@
 
 最终 Mac `r-y_b99yo6` 七步通过：cargo check、libtest 编译、564 项 Grok／固定策略／托管进程定向 nextest、11 项 i18n、34 项 Python 审计回归、actionlint（仅忽略既有 `infinishell-ci` 自托管标签未登记告警）、应用构建；7695 项未选／跳过不计通过。套件收据 SHA-256 `80f1538419ae7a40112de80bd71075495705ec82ec5b5a5cbc325e6ffb2a6232`，未签名应用 `cd82decbde36c94bbd026c9fa003960e64e73bbdb8ad104c606e3f520869e416`。它绑定 `e36adfd6c272c7533a2f600b259e754e5a507f47` 基线加冻结工作区逐文件摘要，不能称干净 HEAD 构建。用户链与 GUI 保留其原工件；与上一套件共有文件有 8 个变化，技能编码、目录逻辑及两种 FTL 摘要未变，不称最终程序重跑旧链。
 
-实现提交 `625ffcb98b09d0ecbefa9e21356ecb8401a7407c` 已推送，84 份冻结源码逐文件匹配，绑定收据 SHA-256 `7c6cc80dee08e07d3af09510eaf7b7b1eebdcfbb2243001ad1ac5fb6325a2280`。[本轮 Linux／Windows 源码门禁 36726214615](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615) 的 headSha 已核对；使用同提交临时 ref 保留前轮仍在运行的门禁，结果待定。G06 仅剩该源码门禁，仍开放。其他平台已认证模型及 GUI 实机按用户新范围移交，不计通过，也不删除三目标平台实现条件。新固定轮独立清理已归档。G10 的父子任务、命令与邮箱整项范围没有随本轮缩减或关闭。
+实现提交 `625ffcb98b09d0ecbefa9e21356ecb8401a7407c` 已推送，84 份冻结源码逐文件匹配，绑定收据 SHA-256 `7c6cc80dee08e07d3af09510eaf7b7b1eebdcfbb2243001ad1ac5fb6325a2280`。[本轮 Linux／Windows 源码门禁 36726214615](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615) 的 headSha 已核对，两平台官方作业均已成功，Mac Intel 按范围跳过；临时 ref 仅用于避免取消前轮门禁。完整 job 日志分别确认 Linux 12 个 nextest 命令组 4927 次 passed、Windows 11 组 4739 次 passed，两平台 rust-genai 各 81 次；次数不是跨命令去重测试总数。新增技能选择顺序及四项 EOF 合同回归在两平台各实际普通 PASS 一次，Grok profile 组分别 30／29 PASS。未见 FAIL、FLAKY 或重试状态行。Windows 桌面／TUI 组为 660 passed（1 leaky），用例 `terminal::input::tests::test_ai_context_menu_keeps_workflow_reference_in_ai_input` 明确标记 LEAK；根因未确认，不能当作无句柄／后代残留，也不能认定与历史相邻用例同根因。该警告保留为整体验收限制，不改写为 G06 新回归失败；G06 的功能、恢复与自然退出另有上述实际证据，现按原条件在本次范围关闭。其他平台已认证模型及 GUI 实机按用户新范围移交，不计通过，也不删除三目标平台实现条件。新固定轮独立清理已归档。G10 的父子任务、命令与邮箱整项范围没有随本轮缩减或关闭。
+
+本轮完整原始日志 ZIP 的 SHA-256 为 `0b4b7db366bedb81a6de25f3eca509caaec81611a7f504e49d4ec3a58bbe995d`；仓外 `g06-closure/ci-36726214615/verified-summary-v2.safe.json` 为 `a4dd47d503c26fb8a5b6d36b82127eac74ab620a108ed8afc7622cec16a4cd57`，最终索引 `786dd1b4259d909e367265d96618318cb3b9df132342d937074a4057388fc4be`。12 项官方工件仅保留索引，不宣称已下载原件。v1 分析器漏识别带序号的 nextest 行，原错误汇总保留，v2 重新逐名核对原日志；原日志未变。提交前文档门禁 `r-syzne9y1` 的 cargo check 通过，日志摘要 `68aae46269cf9baff3c2f127263c64f487e1d1e0f00b39f0e1d4d7d03889c3d7`，短目录已核验清理；当前 84 份冻结源码与 `625ffcb98` 逐文件一致。关闭文档同时纠正当前能力表中的过期策略／图片组合概括，未修改产品或历史失败记录，无需本地化变更。
 
 ## 2026-09-30：G01 旧源码门禁通过，外平台接入仍待实现
 
