@@ -211,6 +211,20 @@ index 0000000..64da658
 +        .is_err()
 +    );
 +}
+diff --git a/crates/codegen/xai-grok-pager-bin/build.rs b/crates/codegen/xai-grok-pager-bin/build.rs
+index b821aa7..203cd2c 100644
+--- a/crates/codegen/xai-grok-pager-bin/build.rs
++++ b/crates/codegen/xai-grok-pager-bin/build.rs
+@@ -43,6 +43,9 @@ fn main() {
+     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+         && std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+     {
++        // Windows 默认主线程仅预留 1 MiB，调试构建在 --version 启动时已实际栈溢出。
++        // 只扩大正式 CLI 映像的预留空间，保留按需提交，不改变运行时工作线程。
++        println!("cargo:rustc-link-arg-bin=xai-grok-pager=/STACK:8388608");
+         println!("cargo:rustc-link-arg=/DELAYLOAD:ProjectedFSLib.dll");
+         println!("cargo:rustc-link-arg=delayimp.lib");
+     }
 diff --git a/crates/codegen/xai-grok-pager/Cargo.toml b/crates/codegen/xai-grok-pager/Cargo.toml
 index b67850c..f6ccd11 100644
 --- a/crates/codegen/xai-grok-pager/Cargo.toml
@@ -5705,7 +5719,7 @@ index 6314c1f..0cba7f4 100644
  
  pub const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs b/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
-index 51024fd..b4db7a5 100644
+index 51024fd..14f3ef0 100644
 --- a/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
 +++ b/crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs
 @@ -1,14 +1,14 @@
@@ -5729,7 +5743,7 @@ index 51024fd..b4db7a5 100644
  /// Teardown runs on the session actor's cancel path, and on the leader every session shares one `LocalSet` thread, so the wait must be bounded. The child is already SIGKILL'd with `KillOnDrop` set, so the OS still tears it down after we stop waiting.
  const KILL_REAP_TIMEOUT: Duration = Duration::from_secs(2);
  
-+#[cfg(all(test, unix))]
++#[cfg(test)]
 +#[path = "streaming_terminal_bridge_tests.rs"]
 +mod terminal_bridge_tests;
 +
@@ -5941,14 +5955,23 @@ index 51024fd..b4db7a5 100644
              let session_id = session_id_str.clone();
 diff --git a/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs
 new file mode 100644
-index 0000000..08ddf58
+index 0000000..c27d04e
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs
-@@ -0,0 +1,172 @@
+@@ -0,0 +1,265 @@
 +use super::*;
++use futures::FutureExt;
++use std::future::Future;
++use std::panic::AssertUnwindSafe;
++use std::path::Path;
 +use std::task::Poll;
 +use tokio::sync::mpsc;
 +use xai_grok_paths::AbsPathBuf;
++
++#[cfg(windows)]
++const SPAWN_READY_TIMEOUT: Duration = Duration::from_secs(10);
++#[cfg(unix)]
++const SPAWN_READY_TIMEOUT: Duration = Duration::from_secs(2);
 +
 +struct ReadyNotifier(mpsc::UnboundedSender<()>);
 +
@@ -5969,12 +5992,84 @@ index 0000000..08ddf58
 +    format!("bridge-{}", uuid::Uuid::now_v7())
 +}
 +
-+fn request(tool_call_id: &str, command: String) -> TerminalRunRequest {
++fn marker_env(marker: Option<&Path>) -> HashMap<String, String> {
++    marker
++        .map(|path| {
++            let path = path.to_str().unwrap().to_owned();
++            #[cfg(windows)]
++            let path = path.replace('\\', "/");
++            ("GROK_BRIDGE_TEST_MARKER".to_owned(), path)
++        })
++        .into_iter()
++        .collect()
++}
++
++fn direct_command(marker: Option<&Path>) -> (&'static str, Vec<String>, HashMap<String, String>) {
++    #[cfg(unix)]
++    let (program, args) = match marker {
++        Some(_) => (
++            "sh",
++            vec![
++                "-c".to_owned(),
++                "printf started > \"$GROK_BRIDGE_TEST_MARKER\"; sleep 30".to_owned(),
++            ],
++        ),
++        None => ("sleep", vec!["30".to_owned()]),
++    };
++    #[cfg(windows)]
++    let (program, args) = {
++        let script = match marker {
++            Some(_) => {
++                "[System.IO.File]::WriteAllText($env:GROK_BRIDGE_TEST_MARKER, 'started'); Start-Sleep -Seconds 30"
++            }
++            None => "Start-Sleep -Seconds 30",
++        };
++        (
++            "powershell.exe",
++            [
++                "-NoLogo",
++                "-NoProfile",
++                "-NonInteractive",
++                "-Command",
++                script,
++            ]
++            .map(str::to_owned)
++            .to_vec(),
++        )
++    };
++    (program, args, marker_env(marker))
++}
++
++fn request(tool_call_id: &str, marker: Option<&Path>) -> TerminalRunRequest {
++    #[cfg(unix)]
++    let command = match marker {
++        Some(_) => "printf started > \"$GROK_BRIDGE_TEST_MARKER\"",
++        None => "sleep 30",
++    };
++    #[cfg(windows)]
++    let command = {
++        use xai_grok_config::shell::{WindowsShell, detect_windows_shell};
++        // 不覆盖真实 shell 检测；路径通过环境传入，不把空格或单引号拼成命令。
++        match (detect_windows_shell(), marker.is_some()) {
++            (WindowsShell::Pwsh | WindowsShell::PowerShell, true) => {
++                "[System.IO.File]::WriteAllText($env:GROK_BRIDGE_TEST_MARKER, 'started')"
++            }
++            (WindowsShell::Pwsh | WindowsShell::PowerShell, false) => "Start-Sleep -Seconds 30",
++            (WindowsShell::GitBash(_), true) => "printf started > \"$GROK_BRIDGE_TEST_MARKER\"",
++            (WindowsShell::GitBash(_), false) => "sleep 30",
++            (WindowsShell::Cmd, true) => {
++                "powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"[System.IO.File]::WriteAllText($env:GROK_BRIDGE_TEST_MARKER, 'started')\""
++            }
++            (WindowsShell::Cmd, false) => {
++                "powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"Start-Sleep -Seconds 30\""
++            }
++        }
++    };
 +    TerminalRunRequest {
 +        tool_call_id: acp::ToolCallId::new(tool_call_id),
-+        command,
++        command: command.to_owned(),
 +        cwd: AbsPathBuf::new(std::env::current_dir().unwrap()).unwrap(),
-+        env: HashMap::new(),
++        env: marker_env(marker),
 +        timeout: Duration::from_secs(30),
 +        output_byte_limit: 1024,
 +        stream: true,
@@ -5982,140 +6077,152 @@ index 0000000..08ddf58
 +    }
 +}
 +
-+#[tokio::test]
-+async fn terminal_bridge_backgrounded_bash_command_stays_busy_after_turn_returns() {
++async fn run_with_session<F: Future<Output = ()>>(run: impl FnOnce(String) -> F) {
 +    tokio::task::LocalSet::new()
 +        .run_until(async {
 +            let session = session_id();
-+            let tool_id = "bash-mode-background";
-+            let (notify, mut ready) = mpsc::unbounded_channel();
-+            let runner = StreamingLocalTerminalRunner {
-+                notifier: Arc::new(ReadyNotifier(notify)),
-+                session_id: acp::SessionId::new(session.clone()),
-+            };
-+            let running = tokio::task::spawn_local(async move {
-+                runner.run(request(tool_id, "sleep 30".to_owned())).await
-+            });
-+            tokio::time::timeout(Duration::from_secs(2), ready.recv())
-+                .await
-+                .unwrap()
-+                .unwrap();
-+            background_terminal(&session, tool_id).await;
-+            let result = tokio::time::timeout(Duration::from_secs(2), running)
-+                .await
-+                .unwrap()
-+                .unwrap()
-+                .unwrap();
-+            assert_eq!(result.signal.as_deref(), Some("backgrounded"));
-+            assert!(acquire_piped_command_idle(&session).await.is_none());
-+            release_terminal(&session, tool_id).await;
-+            assert!(acquire_piped_command_idle(&session).await.is_some());
++            let result = AssertUnwindSafe(run(session.clone())).catch_unwind().await;
++            // 注册表持有子进程，断言展开不会触发 KillOnDrop；只回收本用例精确登记的句柄。
++            let cleanup = tokio::time::timeout(Duration::from_secs(10), async {
++                let mut entries: Vec<_> = registry()
++                    .lock()
++                    .await
++                    .iter()
++                    .filter(|((sid, _), _)| sid == &session)
++                    .map(|(key, entry)| (key.clone(), entry.clone()))
++                    .collect();
++                entries.extend(
++                    retiring_terminals()
++                        .lock()
++                        .await
++                        .iter()
++                        .filter(|((sid, _), _)| sid == &session)
++                        .map(|(key, entry)| (key.clone(), entry.clone())),
++                );
++                for (key, entry) in entries {
++                    let mut child = entry.child.lock().await;
++                    if child.try_wait().unwrap().is_none() {
++                        child.start_kill().unwrap();
++                        child.wait().await.unwrap();
++                    }
++                    assert!(child.try_wait().unwrap().is_some());
++                    registry().lock().await.remove(&key);
++                    retiring_terminals().lock().await.remove(&key);
++                }
++            })
++            .await;
++            assert!(cleanup.is_ok(), "本用例子进程必须在期限内确认退出");
++            if let Err(panic) = result {
++                std::panic::resume_unwind(panic);
++            }
 +        })
 +        .await;
++}
++
++#[tokio::test]
++async fn terminal_bridge_backgrounded_bash_command_stays_busy_after_turn_returns() {
++    run_with_session(|session| async move {
++        let tool_id = "bash-mode-background";
++        let (notify, mut ready) = mpsc::unbounded_channel();
++        let runner = StreamingLocalTerminalRunner {
++            notifier: Arc::new(ReadyNotifier(notify)),
++            session_id: acp::SessionId::new(session.clone()),
++        };
++        let running =
++            tokio::task::spawn_local(async move { runner.run(request(tool_id, None)).await });
++        tokio::time::timeout(SPAWN_READY_TIMEOUT, ready.recv())
++            .await
++            .unwrap()
++            .unwrap();
++        background_terminal(&session, tool_id).await;
++        let result = tokio::time::timeout(Duration::from_secs(2), running)
++            .await
++            .unwrap()
++            .unwrap()
++            .unwrap();
++        assert_eq!(result.signal.as_deref(), Some("backgrounded"));
++        assert!(acquire_piped_command_idle(&session).await.is_none());
++        release_terminal(&session, tool_id).await;
++        assert!(acquire_piped_command_idle(&session).await.is_some());
++    })
++    .await;
 +}
 +
 +#[tokio::test]
 +async fn terminal_bridge_idle_guard_blocks_external_create_before_process_spawn() {
-+    tokio::task::LocalSet::new()
-+        .run_until(async {
-+            let session = session_id();
-+            let directory = tempfile::tempdir().unwrap();
-+            let marker = directory.path().join("started");
-+            let lease = acquire_piped_command_idle(&session).await.unwrap();
-+            let args = vec![
-+                "-c".to_owned(),
-+                "printf started > \"$1\"; sleep 30".to_owned(),
-+                "bridge".to_owned(),
-+                marker.to_string_lossy().into_owned(),
-+            ];
-+            let mut creating = Box::pin(create_terminal(
-+                &session,
-+                "sh",
-+                &args,
-+                HashMap::new(),
-+                None,
-+                None,
-+            ));
-+            assert!(matches!(futures::poll!(&mut creating), Poll::Pending));
-+            tokio::time::sleep(Duration::from_millis(50)).await;
-+            assert!(!marker.exists());
-+            drop(lease);
-+            let terminal = creating.await.unwrap();
-+            tokio::time::timeout(Duration::from_secs(2), async {
-+                while !marker.exists() {
-+                    tokio::time::sleep(Duration::from_millis(5)).await;
-+                }
-+            })
-+            .await
-+            .unwrap();
-+            assert!(acquire_piped_command_idle(&session).await.is_none());
-+            release_terminal(&session, &terminal).await;
++    run_with_session(|session| async move {
++        let directory = tempfile::tempdir().unwrap();
++        let marker = directory.path().join("started with 'quote'");
++        let lease = acquire_piped_command_idle(&session).await.unwrap();
++        let (program, args, env) = direct_command(Some(&marker));
++        let mut creating = Box::pin(create_terminal(&session, program, &args, env, None, None));
++        assert!(matches!(futures::poll!(&mut creating), Poll::Pending));
++        tokio::time::sleep(Duration::from_millis(50)).await;
++        assert!(!marker.exists());
++        drop(lease);
++        let terminal = creating.await.unwrap();
++        tokio::time::timeout(SPAWN_READY_TIMEOUT, async {
++            while !marker.exists() {
++                tokio::time::sleep(Duration::from_millis(5)).await;
++            }
 +        })
-+        .await;
++        .await
++        .unwrap();
++        assert!(acquire_piped_command_idle(&session).await.is_none());
++        release_terminal(&session, &terminal).await;
++        assert!(acquire_piped_command_idle(&session).await.is_some());
++    })
++    .await;
 +}
 +
 +#[tokio::test]
 +async fn terminal_bridge_idle_guard_blocks_streaming_bash_before_process_spawn() {
-+    tokio::task::LocalSet::new()
-+        .run_until(async {
-+            let session = session_id();
-+            let directory = tempfile::tempdir().unwrap();
-+            let marker = directory.path().join("started");
-+            let command = format!(
-+                "printf started > {}",
-+                shlex::try_quote(marker.to_str().unwrap()).unwrap()
-+            );
-+            let lease = acquire_piped_command_idle(&session).await.unwrap();
-+            let (notify, _ready) = mpsc::unbounded_channel();
-+            let runner = StreamingLocalTerminalRunner {
-+                notifier: Arc::new(ReadyNotifier(notify)),
-+                session_id: acp::SessionId::new(session.clone()),
-+            };
-+            let mut running = Box::pin(runner.run(request("bash-mode-guard", command)));
-+            assert!(matches!(futures::poll!(&mut running), Poll::Pending));
-+            tokio::time::sleep(Duration::from_millis(50)).await;
-+            assert!(!marker.exists());
-+            drop(lease);
-+            assert_eq!(running.await.unwrap().exit_code, Some(0));
-+            assert!(marker.exists());
-+            assert!(acquire_piped_command_idle(&session).await.is_some());
-+        })
-+        .await;
++    run_with_session(|session| async move {
++        let directory = tempfile::tempdir().unwrap();
++        let marker = directory.path().join("started with 'quote'");
++        let lease = acquire_piped_command_idle(&session).await.unwrap();
++        let (notify, _ready) = mpsc::unbounded_channel();
++        let runner = StreamingLocalTerminalRunner {
++            notifier: Arc::new(ReadyNotifier(notify)),
++            session_id: acp::SessionId::new(session.clone()),
++        };
++        let mut running = Box::pin(runner.run(request("bash-mode-guard", Some(&marker))));
++        assert!(matches!(futures::poll!(&mut running), Poll::Pending));
++        tokio::time::sleep(Duration::from_millis(50)).await;
++        assert!(!marker.exists());
++        drop(lease);
++        assert_eq!(running.await.unwrap().exit_code, Some(0));
++        assert!(marker.exists());
++        assert!(acquire_piped_command_idle(&session).await.is_some());
++    })
++    .await;
 +}
 +
 +#[tokio::test]
 +async fn terminal_bridge_cancelled_release_keeps_live_process_visible_to_guard() {
-+    tokio::task::LocalSet::new()
-+        .run_until(async {
-+            let session = session_id();
-+            let terminal = create_terminal(
-+                &session,
-+                "sleep",
-+                &["30".to_owned()],
-+                HashMap::new(),
-+                None,
-+                None,
-+            )
++    run_with_session(|session| async move {
++        let (program, args, env) = direct_command(None);
++        let terminal = create_terminal(&session, program, &args, env, None, None)
 +            .await
 +            .unwrap();
-+            let entry = get_entry(&session, &terminal).await.unwrap();
-+            let child = entry.child.lock().await;
-+            let mut releasing = Box::pin(release_terminal(&session, &terminal));
-+            assert!(matches!(futures::poll!(&mut releasing), Poll::Pending));
-+            drop(releasing);
-+            drop(child);
-+            assert!(get_entry(&session, &terminal).await.is_none());
-+            assert!(acquire_piped_command_idle(&session).await.is_none());
-+            let mut child = entry.child.lock().await;
-+            child.start_kill().unwrap();
-+            tokio::time::timeout(Duration::from_secs(2), child.wait())
-+                .await
-+                .unwrap()
-+                .unwrap();
-+            drop(child);
-+            assert!(acquire_piped_command_idle(&session).await.is_some());
-+        })
-+        .await;
++        let entry = get_entry(&session, &terminal).await.unwrap();
++        let child = entry.child.lock().await;
++        let mut releasing = Box::pin(release_terminal(&session, &terminal));
++        assert!(matches!(futures::poll!(&mut releasing), Poll::Pending));
++        drop(releasing);
++        drop(child);
++        assert!(get_entry(&session, &terminal).await.is_none());
++        assert!(acquire_piped_command_idle(&session).await.is_none());
++        let mut child = entry.child.lock().await;
++        child.start_kill().unwrap();
++        tokio::time::timeout(Duration::from_secs(2), child.wait())
++            .await
++            .unwrap()
++            .unwrap();
++        drop(child);
++        assert!(acquire_piped_command_idle(&session).await.is_some());
++    })
++    .await;
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 index 094085e..6de0afe 100644

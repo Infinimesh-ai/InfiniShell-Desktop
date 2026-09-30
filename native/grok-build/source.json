@@ -5,15 +5,16 @@
   "upstream_source_rev": "84745de98b3d3996729aefcefd518890ffb73930",
   "upstream_license": "Apache-2.0",
   "modification_license": "AGPL-3.0-only",
-  "custom_version": "1.0.41+infinishell.terminal-bridge.10",
-  "native_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
-  "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
-  "patch_sha256": "1d93b524f2ff22aa30210b30ee4598c863bef49d1203b2c4955b53b3cd4549a8",
+  "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+  "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+  "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+  "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
   "patch_reconstruction": "公开基线加补丁的独立索引 tree 与已测源码 tree 完全一致",
   "source_files_sha256": {
     "Cargo.lock": "d32a2e89a0c347ed9bbc2f385e3a202b45ac04e17f31f3e8d3e452304ac49df8",
     "crates/build/xai-proto-build/src/lib.rs": "5cbff31f1b351002c68a99ce8c8a54c57bd39d52ba2c1162ae2abff0f7ef4abf",
     "crates/build/xai-proto-build/src/lib_tests.rs": "34bd7d244a235a1379b9bdcd651290be8887040ff866671ec2fa1888a8382bbf",
+    "crates/codegen/xai-grok-pager-bin/build.rs": "21e1204e8e4978d34ddb94c798576f0dd3b3f2cb438391a99b2ade27f7553a6c",
     "crates/codegen/xai-grok-pager/Cargo.toml": "469aead8022b1225a73e23b6c143c6c0cbf6cb324ff984b9a2dbd32015335413",
     "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
     "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "c9955be15224677752c8c8e43e32527312f3ca3e92b025b5831c4f417a32b0a3",
@@ -43,8 +44,8 @@
     "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
     "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
     "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
-    "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "3302db3a3be12af83cdc4eaf48d1ed38e48fc4d7f7ed9bf2d13b16170df17099",
-    "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "4c71cf32ba12c6226cbf3ff5e2d11b2c2451bcfcdfebae5f2d6b1aff2216893d",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "0d5c8fedbe8e1f0513e27cf85ddbf4cf53a62c36cea4747443566ee975b50336",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "beaf1225d996a98500a0b480e704a81bea0293368c19f70e9d8a5a81ca3c38d3",
     "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
     "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
     "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
@@ -85,47 +86,51 @@
     "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
     "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
   },
-  "source_digest": "afa81744a51a41abf7d8b47094c2f5e535a988ffec9e419f780595606e96f120",
+  "source_digest": "1b11691384594a1105ed2e6e06a2b5540116928aea93cb02564209f339376efa",
   "local_validation": {
     "platform": "macOS arm64",
     "rust_toolchain": "1.94.0",
-    "grok_version_environment": "1.0.41+infinishell.terminal-bridge.10",
+    "grok_version_environment": "1.0.41+infinishell.terminal-bridge.11",
     "source_binding": {
-      "final_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
-      "final_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754"
+      "final_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+      "final_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+      "build_base_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f"
     },
-    "native_check": {
-      "run_id": "r-6_g2n_82",
-      "status": "cleaned",
+    "native_suite": {
+      "run_id": "r-pr0y8law",
       "exit_code": 0,
-      "log_sha256": "dc9a0f53f070caec8b361da31c6bc1387abf40eca6da65bdeaf8aa23245c5b7d"
-    },
-    "native_tests": {
-      "run_id": "r-otw97gga",
       "status": "cleaned",
-      "exit_code": 0,
-      "log_sha256": "39a666d45fe6b96a54df8482b7a207a0bb596e401cc6d627b9a4b22d1564dd58",
-      "passed": 74,
+      "cleanup_ready": true,
+      "log_sha256": "52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf",
+      "native_check": "passed",
+      "native_build": "passed",
+      "native_tests_passed": 74,
       "per_library": [
         46,
         20,
         4,
         4
-      ]
+      ],
+      "startup_smoke": [
+        "version",
+        "help",
+        "async_completions"
+      ],
+      "model_inputs": 0
     },
-    "boundary": "只修测试夹具绝对路径，Mac四库74项和完整原生check通过；Windows actor五项及全桥门禁仍须实际通过。",
     "host_check_and_i18n": {
-      "run_id": "r-xh0t_gjl",
+      "run_id": "r-e2coze3m",
       "exit_code": 0,
       "status": "cleaned",
       "cleanup_ready": true,
-      "log_sha256": "6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316",
+      "log_sha256": "be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d",
       "host_check": "passed",
       "i18n_tests_passed": 11
-    }
+    },
+    "boundary": "提交前工作区完整check、四库74项、build及3项零模型启动检查通过；最终源码与提交逐文件匹配。Mac正式信任工件仍为原.3，不将本轮Mac .11构建记为GUI验收；Windows栈与子进程回归待目标执行。"
   },
   "limitations": [
-    "Mac G01原.3功能与双语审计已满足；Linux宿主和Windows原生/宿主已实现。Windows原生构建辅助.7修复待目标验证；两平台固定工件摘要及最终源码门禁仍待完成。",
+    "Mac G01原.3功能与双语审计已满足；Linux宿主和Windows原生/宿主已实现。Linux已绑定.6；Windows .11启动与四项终端守卫回归、可用工件摘要绑定及最终源码门禁仍待完成。",
     "普通 GUI、粘贴增量与最终中文布局分别绑定 r-wudipm8z、r-g91qynam、r-ni936aln；最后仅 zh-CN FTL 变化已核验，历史模型输入不重跑或重计。",
     "旧 .1 英文立即断连 Unknown／零输入及恢复后旧 query Unknown 保留失败；.3 不声称旧 Unknown 跨原生实例自动转 ACK。",
     "其他平台实机验收移交用户；Linux／Windows 实现缺项没有移交，源码 CI 也不代替实现。",
@@ -1044,61 +1049,36 @@
     "bytes": 3014
   },
   "current_cross_platform_ci": {
-    "run_id": 36770502561,
-    "source_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
-    "custom_version": "1.0.41+infinishell.terminal-bridge.9",
-    "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
-    "patch_sha256": "1b626e3fc1ef6e008b1d9993a9fe0056acb04dce4172aceeec8d85f648bd583b",
-    "artifact_id": 11123644065,
-    "artifact_bytes": 145431,
-    "build_receipt_sha256": "b4c18392d473a6c1a407fde8e5579bda990c0ed2783f88de6413a8bdde8a8284",
-    "steps_verified": 15,
-    "native_check": "passed",
-    "protobuf_passed": 6,
-    "login_parser_passed": 2,
-    "resource_tests_passed": 2,
-    "resource_deferred": [
-      {
-        "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
-        "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
-        "status": "deferred_not_passed",
-        "prior_run_id": 36766846873,
-        "win32_error": 1314,
-        "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
-        "scope": "额外资源整理测试；Mac三项已通过。Windows真实符号链接验证移交后续环境，不属于G01文本原子桥验收。"
-      }
-    ],
-    "pipe_name_bound_passed": 1,
-    "native_bridge_results": {
-      "pager": {
-        "passed": 53,
-        "failed": 0
-      },
-      "shell": {
-        "passed": 15,
-        "failed": 5
-      },
-      "tools": "not_executed_after_shell_failure",
-      "shell_terminal": "not_executed_after_shell_failure"
-    },
-    "failed_cases": [
-      "session::acp_session::terminal_bridge_tests::child_work_and_unavailable_coordinator_cannot_look_idle",
-      "session::acp_session::terminal_bridge_tests::competing_bridge_requests_admit_exactly_one_and_remain_uncommitted",
-      "session::acp_session::terminal_bridge_tests::duplicate_after_queue_removal_is_unknown_and_cannot_be_resubmitted",
-      "session::acp_session::terminal_bridge_tests::ordinary_queue_running_turn_and_edit_hold_are_never_displaced",
-      "session::acp_session::terminal_bridge_tests::pending_permission_and_work_block_without_recording_a_message"
-    ],
-    "failure": "actor测试夹具 support.rs:287 硬编码/tmp，Windows AbsPathBuf返回NotAbsolute；五项在入口断言前共同失败。",
-    "failure_log_sha256": "29e8939c615e0a6694a8db4795746126dcee6bd179555174bb4dbbddd5e8ed6a",
-    "binary": null,
-    "boundary": "实际Windows桥53+15通过，五项失败，不能记桥全验收或工件构建通过。",
+    "run_id": 36774428641,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641",
+    "source_commit": "08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8",
+    "custom_version": "1.0.41+infinishell.terminal-bridge.10",
     "status": "completed",
     "conclusion": "cancelled",
-    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561",
-    "archive_summary_sha256": "f315e5d86408d41c61b2a8974611a38b296571c92f20a14e12e02361525f7b11",
-    "logs_zip_sha256": "b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a",
     "cancelled_step": "Build InfiniShell SSH worker",
-    "failure_summary_sha256": "8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3"
+    "native_check": "passed",
+    "native_build": "passed",
+    "bridge_passed": 77,
+    "bridge_per_library": [
+      53,
+      20,
+      0,
+      4
+    ],
+    "zero_test_library": "shell-terminal: Unix cfg excluded 4 tests",
+    "failure": "--version main stack overflow",
+    "failure_exit_code": 3221225725,
+    "failure_log_sha256": "65b2e49c9379bd4ccd37808b115a6af2eb8a80eb7c66a64423d87aa308c3a564",
+    "binary": {
+      "file": "xai-grok-pager.exe",
+      "bytes": 245529600,
+      "sha256": "3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2"
+    },
+    "binary_usable": false,
+    "failure_summary_sha256": "962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278",
+    "archive_summary_sha256": "85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268",
+    "logs_zip_sha256": "eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2",
+    "boundary": "实际PE存在但启动失败，不绑定；零命中不计通过。取消不计整轮成功。"
   },
   "cross_platform_implementation_feasibility": {
     "product_commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
@@ -1112,14 +1092,14 @@
     "gap_closed": false
   },
   "cross_platform_build": {
-    "custom_version": "1.0.41+infinishell.terminal-bridge.10",
-    "native_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
-    "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
-    "patch_sha256": "1d93b524f2ff22aa30210b30ee4598c863bef49d1203b2c4955b53b3cd4549a8",
+    "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+    "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+    "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+    "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
     "status": "linux_artifact_bound_windows_build_and_final_gate_pending",
     "linux_artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
     "windows_artifact_sha256": null,
-    "boundary": "Linux绑定已验.6，Mac继续绑定已验.3；最新.10仅修复Windows actor测试夹具绝对路径，实际Windows工件与最终绑定源码门禁仍待完成。",
+    "boundary": "Mac继续绑定已验.3，Linux绑定已验.6；.10 Windows实际PE栈溢出不可用，.11启动栈及四项终端守卫目标复验、工件绑定与最终宿主门禁待完成。",
     "linux_artifact_binding": {
       "platform": "Linux x64",
       "custom_version": "1.0.41+infinishell.terminal-bridge.6",
@@ -1323,6 +1303,63 @@
       "boundary": "shell库测试已编译并执行；额外符号链接场景缺权限失败。管道上界、完整native check、桥回归和构建未执行。余下通用构建主动停止，取消不计整轮通过。",
       "archive_summary_sha256": "1dedf0748fca213835390999832efbca4666dd64ac192ca0db8fb5154f6e190f",
       "logs_zip_sha256": "a356d0fcc5db2d0446910675f6a256511aa4c898ed7fa7511885fed84807ba54"
+    },
+    {
+      "run_id": 36770502561,
+      "source_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.9",
+      "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
+      "patch_sha256": "1b626e3fc1ef6e008b1d9993a9fe0056acb04dce4172aceeec8d85f648bd583b",
+      "artifact_id": 11123644065,
+      "artifact_bytes": 145431,
+      "build_receipt_sha256": "b4c18392d473a6c1a407fde8e5579bda990c0ed2783f88de6413a8bdde8a8284",
+      "steps_verified": 15,
+      "native_check": "passed",
+      "protobuf_passed": 6,
+      "login_parser_passed": 2,
+      "resource_tests_passed": 2,
+      "resource_deferred": [
+        {
+          "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
+          "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+          "status": "deferred_not_passed",
+          "prior_run_id": 36766846873,
+          "win32_error": 1314,
+          "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+          "scope": "额外资源整理测试；Mac三项已通过。Windows真实符号链接验证移交后续环境，不属于G01文本原子桥验收。"
+        }
+      ],
+      "pipe_name_bound_passed": 1,
+      "native_bridge_results": {
+        "pager": {
+          "passed": 53,
+          "failed": 0
+        },
+        "shell": {
+          "passed": 15,
+          "failed": 5
+        },
+        "tools": "not_executed_after_shell_failure",
+        "shell_terminal": "not_executed_after_shell_failure"
+      },
+      "failed_cases": [
+        "session::acp_session::terminal_bridge_tests::child_work_and_unavailable_coordinator_cannot_look_idle",
+        "session::acp_session::terminal_bridge_tests::competing_bridge_requests_admit_exactly_one_and_remain_uncommitted",
+        "session::acp_session::terminal_bridge_tests::duplicate_after_queue_removal_is_unknown_and_cannot_be_resubmitted",
+        "session::acp_session::terminal_bridge_tests::ordinary_queue_running_turn_and_edit_hold_are_never_displaced",
+        "session::acp_session::terminal_bridge_tests::pending_permission_and_work_block_without_recording_a_message"
+      ],
+      "failure": "actor测试夹具 support.rs:287 硬编码/tmp，Windows AbsPathBuf返回NotAbsolute；五项在入口断言前共同失败。",
+      "failure_log_sha256": "29e8939c615e0a6694a8db4795746126dcee6bd179555174bb4dbbddd5e8ed6a",
+      "binary": null,
+      "boundary": "实际Windows桥53+15通过，五项失败，不能记桥全验收或工件构建通过。",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561",
+      "archive_summary_sha256": "f315e5d86408d41c61b2a8974611a38b296571c92f20a14e12e02361525f7b11",
+      "logs_zip_sha256": "b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "failure_summary_sha256": "8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3"
     }
   ],
   "linux_pidfd_identity_handshake": {
@@ -1496,6 +1533,44 @@
         "host_check": "passed",
         "i18n_tests_passed": 11
       }
+    },
+    {
+      "platform": "macOS arm64",
+      "rust_toolchain": "1.94.0",
+      "grok_version_environment": "1.0.41+infinishell.terminal-bridge.10",
+      "source_binding": {
+        "final_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
+        "final_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754"
+      },
+      "native_check": {
+        "run_id": "r-6_g2n_82",
+        "status": "cleaned",
+        "exit_code": 0,
+        "log_sha256": "dc9a0f53f070caec8b361da31c6bc1387abf40eca6da65bdeaf8aa23245c5b7d"
+      },
+      "native_tests": {
+        "run_id": "r-otw97gga",
+        "status": "cleaned",
+        "exit_code": 0,
+        "log_sha256": "39a666d45fe6b96a54df8482b7a207a0bb596e401cc6d627b9a4b22d1564dd58",
+        "passed": 74,
+        "per_library": [
+          46,
+          20,
+          4,
+          4
+        ]
+      },
+      "boundary": "只修测试夹具绝对路径，Mac四库74项和完整原生check通过；Windows actor五项及全桥门禁仍须实际通过。",
+      "host_check_and_i18n": {
+        "run_id": "r-xh0t_gjl",
+        "exit_code": 0,
+        "status": "cleaned",
+        "cleanup_ready": true,
+        "log_sha256": "6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316",
+        "host_check": "passed",
+        "i18n_tests_passed": 11
+      }
     }
   ],
   "windows_library_test_portability_fix": {
@@ -1590,7 +1665,7 @@
     "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
     "version": "1.0.41+infinishell.terminal-bridge.10",
     "change": "将共享actor测试夹具cwd由硬编码/tmp改用系统临时目录，保留AbsPathBuf验证及全部原子准入、队列/审批保护和防重断言；仅测试代码变化。",
-    "target_status": "pending",
+    "target_status": "Windows 36774428641 shell桥20项通过，原5项夹具失败不再出现；独立启动失败另列。",
     "source_reconstruction_sha256": "64d160d02e6ad4f38f8a32965831706eeb55c9dd37249a567ab7def63f33cb89",
     "localization": "无需本地化变更",
     "local_gate": {
@@ -1602,5 +1677,47 @@
       "host_check": "passed",
       "i18n_tests_passed": 11
     }
+  },
+  "windows_startup_stack_and_terminal_guard_fix": {
+    "version": "1.0.41+infinishell.terminal-bridge.11",
+    "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+    "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+    "change": "Windows正式CLI映像主线程预留8MiB，保留按需提交；终端守卫四项测试移植真实Windows子进程，不改生产事务或原断言。构建要求四库分别命中并实际通过版本、帮助及异步补全入口。",
+    "target_status": "pending",
+    "source_reconstruction_sha256": "beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a",
+    "native_local_gate": {
+      "run_id": "r-pr0y8law",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf",
+      "native_check": "passed",
+      "native_build": "passed",
+      "native_tests_passed": 74,
+      "per_library": [
+        46,
+        20,
+        4,
+        4
+      ],
+      "startup_smoke": [
+        "version",
+        "help",
+        "async_completions"
+      ],
+      "model_inputs": 0
+    },
+    "host_local_gate": {
+      "run_id": "r-e2coze3m",
+      "exit_code": 0,
+      "status": "cleaned",
+      "cleanup_ready": true,
+      "log_sha256": "be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d",
+      "host_check": "passed",
+      "i18n_tests_passed": 11
+    },
+    "failure_run": 36774428641,
+    "localization": "无需本地化变更",
+    "gap_closed": false
   }
 }

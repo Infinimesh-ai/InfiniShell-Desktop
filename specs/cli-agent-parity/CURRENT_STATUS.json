@@ -105,7 +105,7 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Windows .10原生完整回归与构建、Windows固定工件摘要绑定",
+        "Windows .11启动与四项终端子进程守卫目标回归、可用工件摘要绑定",
         "Linux/Windows工件绑定后的最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
@@ -489,7 +489,7 @@
         "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
         "version": "1.0.41+infinishell.terminal-bridge.10",
         "change": "将共享actor测试夹具cwd由硬编码/tmp改用系统临时目录，保留AbsPathBuf验证及全部原子准入、队列/审批保护和防重断言；仅测试代码变化。",
-        "target_status": "pending",
+        "target_status": "Windows 36774428641 shell桥20项通过，原5项夹具失败不再出现；独立启动失败另列。",
         "source_reconstruction_sha256": "64d160d02e6ad4f38f8a32965831706eeb55c9dd37249a567ab7def63f33cb89",
         "localization": "无需本地化变更",
         "local_gate": {
@@ -525,6 +525,80 @@
           }
         },
         "cleanup": "三轮短目录均已归档和清理",
+        "localization": "无需本地化变更",
+        "gap_closed": false
+      },
+      "windows_native_bridge_10_build_attempt": {
+        "run_id": 36774428641,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641",
+        "source_commit": "08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.10",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "cancelled_step": "Build InfiniShell SSH worker",
+        "native_check": "passed",
+        "native_build": "passed",
+        "bridge_passed": 77,
+        "bridge_per_library": [
+          53,
+          20,
+          0,
+          4
+        ],
+        "zero_test_library": "shell-terminal: Unix cfg excluded 4 tests",
+        "failure": "--version main stack overflow",
+        "failure_exit_code": 3221225725,
+        "failure_log_sha256": "65b2e49c9379bd4ccd37808b115a6af2eb8a80eb7c66a64423d87aa308c3a564",
+        "binary": {
+          "file": "xai-grok-pager.exe",
+          "bytes": 245529600,
+          "sha256": "3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2"
+        },
+        "binary_usable": false,
+        "failure_summary_sha256": "962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278",
+        "archive_summary_sha256": "85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268",
+        "logs_zip_sha256": "eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2",
+        "boundary": "实际PE存在但启动失败，不绑定；零命中不计通过。取消不计整轮成功。"
+      },
+      "windows_startup_stack_and_terminal_guard_fix": {
+        "version": "1.0.41+infinishell.terminal-bridge.11",
+        "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+        "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+        "change": "Windows正式CLI映像主线程预留8MiB，保留按需提交；终端守卫四项测试移植真实Windows子进程，不改生产事务或原断言。构建要求四库分别命中并实际通过版本、帮助及异步补全入口。",
+        "target_status": "pending",
+        "source_reconstruction_sha256": "beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a",
+        "native_local_gate": {
+          "run_id": "r-pr0y8law",
+          "exit_code": 0,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "log_sha256": "52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf",
+          "native_check": "passed",
+          "native_build": "passed",
+          "native_tests_passed": 74,
+          "per_library": [
+            46,
+            20,
+            4,
+            4
+          ],
+          "startup_smoke": [
+            "version",
+            "help",
+            "async_completions"
+          ],
+          "model_inputs": 0
+        },
+        "host_local_gate": {
+          "run_id": "r-e2coze3m",
+          "exit_code": 0,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "log_sha256": "be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d",
+          "host_check": "passed",
+          "i18n_tests_passed": 11
+        },
+        "failure_run": 36774428641,
         "localization": "无需本地化变更",
         "gap_closed": false
       }

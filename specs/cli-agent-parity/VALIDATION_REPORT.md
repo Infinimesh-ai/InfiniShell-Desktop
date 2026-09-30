@@ -860,3 +860,18 @@ Mac `r-otw97gga` 四库 46＋20＋4＋4＝74 项通过，日志 `39a666d45fe6b96
 该改动没有改变WinError32处理：文件占用继续失败并保留现场，不增加重试或修改权限。根因仍未知，也不据此关闭G01或其他缺口。原生hook和ConPTY脚本共享此入口，实际Windows验证待最终源码门禁，不继承正在运行的旧源码 `08f2fff8d` 的结果。
 
 本机 `r-vih3onyz` 共50项hook测试中48通过、2项Windows原生限定跳过；包含formal阶段缺证、Job归属／非空／未关闭拒绝、已确认后代回收正例及文件占用继续失败。日志SHA-256 `86495b5e49c42876ad59596aa721fde08cc577f948574b3360b6f13dc4f810f6`。共享ConPTY回归 `r-6yxlzc4d` 通过，日志 `0b7216c5a0d4fee137b9f3cabec50a1f1d1d5bf1472e65214d54bb38da4ceb20`；宿主check `r-2lyor01q` 通过，日志 `ced779af54b0177965a73360381e6be3a44f3e1149b04ec31993a7e382029ef2`。三轮短目录已归档清理；只有验收脚本及收据语义变化，无需本地化变更。关闭数仍为4，开放7、移交3，PR保持草稿。
+
+
+## 2026-10-01：G01 Windows 启动栈与零命中门禁修复
+
+[CI 36774428641](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641) 绑定 `08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8`，已结束为 cancelled；原生构建步骤失败后停止余下重复 SSH worker 构建，取消不计整轮通过。19 份日志、公开基线加补丁、73 份源码摘要与实际 PE 均已独立核验。`.10` protobuf 6、登录解析 2、资源整理 2、管道上界 1、完整 native check/build 通过；四库实际为 pager 53、shell 20、shell-terminal 0、tools 4，共 77。先前口头按预期称 81 不准确：终端子进程四项被 Unix cfg 排除，未执行。
+
+实际 PE 大小 245,529,600 字节，SHA-256 `3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2`；第19步 `--version` 返回 `3221225725 / 0xC00000FD`，日志明确 main 栈溢出，不能绑定为可用工件。只读 PE 核实主线程栈预留 1,048,576、提交 4,096 字节；沿 CRT 至 Rust main 的反汇编核实 main 单帧 186,280 字节，不能据此断言某个 future 是唯一根因。分析收据 SHA-256 `1b7c3fc9e98acb5d2275db3c9243f03e4fdaa0e75b2d42721b3a80ca24d9158f`。`.11` 仅为 Windows MSVC 的实际 CLI 映像设置 8 MiB 栈预留，采用 [MSVC 的正式链接参数](https://learn.microsoft.com/en-us/cpp/build/reference/stack-stack-allocations?view=msvc-170)，不改变工作线程设置或强制预提交；是否解除启动失败仍须目标执行。
+
+同轮补齐四项终端守卫测试的 Windows 真实子进程路径：direct 调用固定 PowerShell，streaming 沿用生产 shell 检测，含空格与单引号的路径通过环境传递。后台忙碌、持租约时零提前派生、释放取消时仍可见及实际退出后的空闲断言保留；异常收尾只操作本会话登记的真实句柄，不吞断言。构建脚本要求四库分别实际命中且零失败／忽略，并检查 PE 的真实栈预留、`--version`、`--help` 及经过正式运行时和 `async_main` 的 `completions bash`。这些启动检查使用私有 GROK_HOME、零模型输入，不冒充 stdio 初始化、交互 TUI 或模型验收。
+
+失败收据 SHA-256 `962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278`；41 项完整日志 ZIP `eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2`，归档摘要 `85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268`。本轮 Codex 0.156.1 hook 清理未复现旧 WinError32，八份关闭原件独立满足 Job 退出条件；该轮尚未包含后来的清理脚本修复，不记作修复后验收或旧占用根因已解决。
+
+Windows `.11` 启动与四项子进程回归、可用工件摘要绑定、绑定后最终 Linux／Windows 宿主门禁仍待完成。Mac 原 `.3` 功能证据与 Linux 原 `.6` 工件独立保留；无用户界面文案变化，无需本地化变更。本轮关闭0项，累计4项关闭、7项开放、3项移交，PR保持草稿。
+
+本轮原生提交 `77d8004b18b5d7c7f7ced42f084dbe5a54048a23`，tree `52afcf3ebad44daaef887cbe2cfe3ed003d6d44e`；74 文件补丁独立索引重建一致，补丁 SHA-256 `7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408`，重建收据 `beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a`。Mac `r-pr0y8law` 的完整 native check、四库74项、build、版本／帮助／异步补全启动检查通过，日志 `52c0d97d4ceafaf73314c2b4bb8b6aa152a203fc97904b0a5c9020af63243dcf`；宿主 `r-e2coze3m` 的 cargo check 与11项 i18n通过，日志 `be16cab5a35a093d8633fec60473ddef27032ffdaf37c7a2818cb2675020850d`。均已核验退出和归档，短目录已清理。Mac 本轮程序来自提交前工作区，不替换既有正式 `.3` 工件或冒称新增 GUI 验收。

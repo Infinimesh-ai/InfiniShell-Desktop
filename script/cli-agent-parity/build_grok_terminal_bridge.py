@@ -5,7 +5,9 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
+import struct
 import subprocess
 import time
 
@@ -37,7 +39,7 @@ def main():
     patch_digest = digest(PATCH)
     if patch_digest != build["patch_sha256"] or not build["native_tree"]:
         raise RuntimeError("补丁摘要或预期源码树未冻结")
-    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.10":
+    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.11":
         raise RuntimeError("定制构建版本不匹配")
     output = args.output.absolute()
     output.mkdir(parents=True, exist_ok=False)
@@ -115,8 +117,13 @@ def main():
             run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell", "--lib",
                  "leader::transport::windows_impl::tests::pipe_name_is_bounded", "--", "--exact"])
         run(["cargo", "+" + TOOLCHAIN, "check", "--locked", "-p", "xai-grok-pager-bin"])
-        run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "--no-fail-fast", "-p", "xai-grok-pager", "-p", "xai-grok-shell",
-             "-p", "xai-grok-tools", "-p", "xai-grok-shell-terminal", "--lib", "terminal_bridge", "--", "--test-threads=1"])
+        bridge_tests = run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "--no-fail-fast", "-p", "xai-grok-pager", "-p", "xai-grok-shell",
+                            "-p", "xai-grok-tools", "-p", "xai-grok-shell-terminal", "--lib", "terminal_bridge", "--", "--test-threads=1"], True)
+        results = [tuple(map(int, values)) for values in re.findall(
+            r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", bridge_tests)]
+        if len(results) != 4 or any(passed == 0 or failed or ignored for passed, failed, ignored in results):
+            raise RuntimeError("原子桥四库必须分别实际执行并零失败，不能将 cfg 排除后的零命中记为通过")
+        receipt["bridge_library_results"] = results
         run(["cargo", "+" + TOOLCHAIN, "build", "--locked", "-p", "xai-grok-pager-bin"])
         if run(["git", "write-tree"], True) != build["native_tree"]:
             raise RuntimeError("构建期间源码索引改变")
@@ -126,10 +133,37 @@ def main():
         shutil.copy2(executable, destination)
         receipt["binary"] = {"file": destination.name, "bytes": destination.stat().st_size,
                              "sha256": digest(destination)}
+        if system == "Windows":
+            with destination.open("rb") as stream:
+                header = stream.read(64)
+                if header[:2] != b"MZ":
+                    raise RuntimeError("Windows 工件不是 PE 映像")
+                stream.seek(struct.unpack_from("<I", header, 60)[0])
+                pe = stream.read(112)
+            if pe[:4] != b"PE\0\0" or struct.unpack_from("<H", pe, 4)[0] != 0x8664 or struct.unpack_from("<H", pe, 24)[0] != 0x20B:
+                raise RuntimeError("Windows 工件不是 x64 PE32+ 映像")
+            reserve, commit = struct.unpack_from("<QQ", pe, 96)
+            receipt["windows_stack"] = {"reserve_bytes": reserve, "commit_bytes": commit}
+            if reserve != 8 * 1024 * 1024:
+                raise RuntimeError("Windows 主线程栈预留未按固定源码生效")
+        # 启动验收使用独立配置目录，禁止更新、遥测和错误上传；不复制任何用户凭据。
+        smoke_home = output / "smoke-home"
+        smoke_home.mkdir(mode=0o700)
+        environment.update(GROK_HOME=str(smoke_home), GROK_DISABLE_AUTOUPDATER="1",
+                           DISABLE_TELEMETRY="1", GROK_ERROR_REPORTING="false")
         # --version 不初始化用户会话；结果保留真实公开基线 stamp，补丁源码树另有独立核验。
         receipt["version_output"] = run([str(destination), "--version"], True)
         if build["custom_version"] not in receipt["version_output"]:
             raise RuntimeError("定制版本标记缺失")
+        help_output = run([str(destination), "--help"], True)
+        if "--version" not in help_output or "completions" not in help_output:
+            raise RuntimeError("真实 CLI 帮助输出不完整")
+        # 此公开命令经过正式运行时和 async_main，再于任何模型或 leader 分派前返回。
+        completions = run([str(destination), "--no-auto-update", "completions", "bash"], True)
+        if "_grok()" not in completions or "complete -F _grok" not in completions:
+            raise RuntimeError("真实异步入口未生成 Bash 补全脚本")
+        receipt["startup_smoke"] = {"version": "passed", "help": "passed",
+                                    "async_completions": "passed", "model_inputs": 0}
         receipt["status"] = "passed"
     except Exception as error:
         receipt["status"] = "failed"

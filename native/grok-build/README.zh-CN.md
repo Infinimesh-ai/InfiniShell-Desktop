@@ -7,7 +7,7 @@
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制源码：`3e9796a80e5f99a1a2e170d893aa6ac0b492383f`，版本 `1.0.41+infinishell.terminal-bridge.10`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
+- 当前定制源码：`77d8004b18b5d7c7f7ced42f084dbe5a54048a23`，版本 `1.0.41+infinishell.terminal-bridge.11`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -15,25 +15,27 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo test --locked --no-fail-fast -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.11 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.11 cargo test --locked --no-fail-fast -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.11 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
 
 ## 已验工件的使用方式
 
-Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要，绑定后源码门禁尚未完成；Windows `.9` 待实际构建复验，不宣称 G01 完成。
+Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要，绑定后源码门禁尚未完成；Windows `.11` 待实际启动与完整回归复验，不宣称 G01 完成。
 
 1. 取得对应平台、版本和摘要的独立工件，复制到自己的独立目录；Linux／Mac 将副本设为 `0700`（CI 下载可能丢失可执行位），并重新核对完整 SHA-256。Mac 还须核对代码签名及上述 CDHash。不要覆盖系统安装，也不要给重建文件直接套用旧摘要。
 2. 产物 `xai-grok-pager` 必须复制命名为 **`grok`**；Windows 对应为 **`grok.exe`**。宿主按这个文件名识别普通 CLI，直接运行原产物名不会进入 Grok 富输入。
 3. 在 InfiniShell 启用 CLI 通知后，新建普通本地 shell，让宿主设置本次发现目录。使用独立私有 `GROK_HOME`，按正常登录流程授权，并在该配置中设置 `[cli].auto_update = false`。不要手工复用其他终端的 `GROK_TERMINAL_BRIDGE_DIR`。
 4. 从该普通 shell 以绝对路径运行 `GROK_HOME="<私有配置目录绝对路径>" "<独立工件目录>/grok" --no-auto-update`（占位路径须替换；Windows 使用等价的环境设置及 `.exe` 路径）。无需 owned、leader 或 `--minimal` 参数；富输入仅在原生空闲且身份验证通过时提交，审批与原生草稿仍受保护。
 
-上述源码重建命令面向最新 `.9`，不是取得 Mac 已验 `.3` 身份的方法；新的构建须独立审核绑定后才能使用。
+上述源码重建命令面向最新 `.11`，不是取得 Mac 已验 `.3` 身份的方法；新的构建须独立审核绑定后才能使用。
 
 ## 当前跨平台实现边界
+
+2026-10-01：`.10` 在 Windows 完整 check/build 通过，实际桥测试为 53＋20＋0＋4＝77 项；shell-terminal 四项被 Unix cfg 排除，不能计通过。实际 PE 的 `--version` 主线程栈溢出，尚不可用。当前 `.11` 只为 Windows 正式 CLI 映像扩大栈预留至 8 MiB，并将四项真实子进程守卫测试移植 Windows；构建门禁拒绝任何库零命中，核实际 PE 栈值并执行版本、帮助和经过异步入口的补全命令。Mac check、74项、build及三项零模型启动检查通过；Windows目标、工件绑定及最终源码门禁仍待完成。无界面文案变化，无需本地化变更。
 
 2026-10-01：`.8` 在 Windows 已通过 protobuf 6 项与登录环境解析 2 项；资源测试在编译时被上游 Windows 管道测试的 `String + &String` 类型错误阻断，没有二进制。`.9` 仅将该一行改为显式格式化相同长路径，保留原断言，并在 Windows 构建中显式运行该边界测试。Mac 完整原生 check 通过；Windows `.9` 目标复验、工件绑定及最终源码门禁待完成。
 
