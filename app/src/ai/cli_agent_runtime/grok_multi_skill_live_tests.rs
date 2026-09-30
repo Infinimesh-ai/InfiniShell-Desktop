@@ -3,26 +3,55 @@
 use std::collections::HashSet;
 use std::env;
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use ai::skills::ParsedSkill;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use image::{DynamicImage, ImageFormat, Rgb, RgbImage};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 use warp_cli::agent::Harness;
 
-use super::connect;
+use super::{connect, encode_prompt_content};
+use crate::ai::agent::ImageContext;
 use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
-use crate::ai::cli_agent_runtime::managed_input::prepare_managed_input;
+use crate::ai::cli_agent_runtime::managed_input::{prepare_managed_input, restore_managed_images};
 use crate::ai::cli_agent_runtime::{
-    ApprovalDecision, PermissionPolicy, RuntimeAction, RuntimeCommand, RuntimeController,
-    RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget, TurnOutcome,
-    managed_process,
+    ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
+    RuntimeController, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
+    TurnOutcome, managed_process,
 };
 
 const PROMPT: &str = "请按本轮所选技能的顺序执行。只读取本轮选中技能的 SKILL.md；没有在本回合展开的技能必须重新 read_file，不能使用历史记忆。最终每个技能只输出其独立标记，每行一个，不解释。不执行命令、不修改文件、不访问网络。";
+const IMAGE_PROMPT: &str = "请按本轮所选技能的顺序执行。只读取本轮选中技能的 SKILL.md；没有在本回合展开的技能必须重新 read_file，不能使用历史记忆。同时只观察本轮附图的左右纯色，不参考历史图片。最终先按技能顺序输出各自独立标记，每行一个，最后一行输出左右两个大写英文色名，以一个空格分隔。不解释，不执行命令、不修改文件、不访问网络。";
+
+#[derive(Clone, Copy)]
+enum Scenario {
+    MultiSkill,
+    ImageSkill,
+}
+
+impl Scenario {
+    fn prompt(self) -> &'static str {
+        match self {
+            Self::MultiSkill => PROMPT,
+            Self::ImageSkill => IMAGE_PROMPT,
+        }
+    }
+
+    fn marker_prefix(self) -> &'static str {
+        match self {
+            Self::MultiSkill => "G06_",
+            Self::ImageSkill => "G02_",
+        }
+    }
+}
 
 struct AbortOnDrop(JoinHandle<Result<(), RuntimeError>>);
 
@@ -54,22 +83,102 @@ fn selection(root: &Path, keys: &[&str]) -> Result<Vec<SelectedLocalSkill>, Stri
         .collect()
 }
 
-fn expected(root: &Path, keys: &[&str]) -> Result<String, String> {
+fn expected(root: &Path, keys: &[&str], scenario: Scenario) -> Result<String, String> {
     selection(root, keys)?
         .iter()
         .map(|skill| {
             let bytes = fs::read_to_string(&skill.path).map_err(|_| "技能夹具不可读")?;
             let markers: Vec<_> = bytes
                 .lines()
-                .filter(|line| line.starts_with("G06_"))
+                .filter(|line| line.starts_with(scenario.marker_prefix()))
                 .collect();
-            if markers.len() != 1 || PROMPT.contains(markers[0]) {
+            if markers.len() != 1 || scenario.prompt().contains(markers[0]) {
                 return Err("技能隐藏标记数量异常或泄漏到输入".into());
             }
             Ok(markers[0].to_owned())
         })
         .collect::<Result<Vec<_>, _>>()
         .map(|markers| markers.join("\n"))
+}
+
+fn image_input(
+    root: &Path,
+    case: &str,
+    skills: Vec<ParsedSkill>,
+    file: &mut File,
+) -> Result<Vec<InputContent>, String> {
+    let colors = match case {
+        "initial" => [[255, 0, 0], [0, 0, 255]],
+        "hot" => [[0, 255, 0], [255, 255, 0]],
+        "cold" => [[0, 0, 255], [255, 0, 0]],
+        _ => return Err("未知图片技能验收回合".into()),
+    };
+    let mut picture = RgbImage::new(256, 128);
+    for (x, _, pixel) in picture.enumerate_pixels_mut() {
+        *pixel = Rgb(colors[usize::from(x >= 128)]);
+    }
+    let mut encoded = Cursor::new(Vec::new());
+    DynamicImage::ImageRgb8(picture)
+        .write_to(&mut encoded, ImageFormat::Png)
+        .map_err(|_| "PNG 夹具生成失败")?;
+    let bytes = encoded.into_inner();
+    let store = root.join("state/local-cli-attachments");
+    let image = ImageContext {
+        data: STANDARD.encode(&bytes),
+        mime_type: "image/png".into(),
+        file_name: "本轮图片.png".into(),
+        is_figma: false,
+    };
+    let input = prepare_managed_input(
+        Harness::Grok,
+        IMAGE_PROMPT.into(),
+        &[image],
+        skills.clone(),
+        &store,
+    )?;
+    let paths = input
+        .iter()
+        .filter_map(|part| match part {
+            InputContent::LocalImage(path) => Some(path.clone()),
+            InputContent::Text(_) | InputContent::Skill { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if paths.len() != 1 {
+        return Err("图片技能输入缺少唯一持久图片引用".into());
+    }
+    let path = paths[0].clone();
+    let checkpoint = root.join(format!("{case}-input.json"));
+    fs::write(
+        &checkpoint,
+        serde_json::to_vec(&input).map_err(|_| "图片技能引用编码失败")?,
+    )
+    .map_err(|_| "图片技能引用保存失败")?;
+    let restored: Vec<InputContent> =
+        serde_json::from_slice(&fs::read(checkpoint).map_err(|_| "图片技能引用读取失败")?)
+            .map_err(|_| "图片技能引用恢复失败")?;
+    let images = restore_managed_images(paths, &store)?;
+    let rebuilt =
+        prepare_managed_input(Harness::Grok, IMAGE_PROMPT.into(), &images, skills, &store)?;
+    if restored != input || rebuilt != input || images[0].data != STANDARD.encode(&bytes) {
+        return Err("图片与技能持久引用恢复后改变".into());
+    }
+    // 技能由生产目录校验后编码；这里只提前核对相同图片编码器，不合成原生技能正文。
+    let native = encode_prompt_content(vec![InputContent::LocalImage(path.clone())], &store)?;
+    if native.len() != 1
+        || native[0]["data"] != STANDARD.encode(&bytes)
+        || native[0]["mimeType"] != "image/png"
+    {
+        return Err("生产 ACP 编码未保留图片字节".into());
+    }
+    let native_bytes = serde_json::to_vec(&native[0]).map_err(|_| "ACP 图片编码失败")?;
+    record(
+        file,
+        json!({"event":"attachment_prepared","case":case,"mime_type":"image/png",
+        "byte_count":bytes.len(),"sha256":format!("{:x}",Sha256::digest(&bytes)),
+        "native_content_digest":format!("{:x}",Sha256::digest(&native_bytes)),
+        "source_path":path,"persistent_reference_restored":true}),
+    )?;
+    Ok(restored)
 }
 
 fn exact_skill_read_permission(call: &Value, cwd: &Path, skill: &Path) -> bool {
@@ -95,6 +204,7 @@ async fn exercise_turn(
     root: &Path,
     case: &str,
     keys: &[&str],
+    scenario: Scenario,
     generation: Uuid,
     native: &str,
     controller: &RuntimeController,
@@ -106,20 +216,33 @@ async fn exercise_turn(
         .iter()
         .map(|skill| ai::skills::parse_skill(&skill.path).map_err(|_| "技能解析失败".to_owned()))
         .collect::<Result<Vec<_>, _>>()?;
-    let input = prepare_managed_input(
-        Harness::Grok,
-        PROMPT.into(),
-        &[],
-        parsed,
-        &root.join("attachments"),
-    )?;
+    let input = match scenario {
+        Scenario::MultiSkill => prepare_managed_input(
+            Harness::Grok,
+            PROMPT.into(),
+            &[],
+            parsed,
+            &root.join("attachments"),
+        )?,
+        Scenario::ImageSkill => image_input(root, case, parsed, file)?,
+    };
     let message = Uuid::new_v4();
     let command = RuntimeCommand {
         generation,
         message_id: message,
         action: RuntimeAction::Submit { input },
     };
-    let answer = expected(root, keys)?;
+    let mut answer = expected(root, keys, scenario)?;
+    if let Scenario::ImageSkill = scenario {
+        let colors = match case {
+            "initial" => "RED BLUE",
+            "hot" => "GREEN YELLOW",
+            "cold" => "BLUE RED",
+            _ => return Err("未知图片技能验收回合".into()),
+        };
+        answer.push('\n');
+        answer.push_str(colors);
+    }
     let serialized = serde_json::to_string(&command).map_err(|_| "技能输入序列化失败")?;
     if answer.lines().any(|marker| serialized.contains(marker)) {
         return Err("技能秘密正文进入提交参数".into());
@@ -326,15 +449,18 @@ async fn exercise_turn(
 async fn exercise_connection(
     root: &Path,
     previous: Option<String>,
+    scenario: Scenario,
     file: &mut File,
 ) -> Result<String, String> {
     let generation = Uuid::new_v4();
     let resumed = previous.is_some();
-    let selected = if resumed {
-        selection(root, &["alpha", "beta", "gamma"])?
-    } else {
-        selection(root, &["alpha", "beta"])?
-    };
+    let selected = match (scenario, resumed) {
+        (Scenario::MultiSkill, true) => selection(root, &["alpha", "beta", "gamma"]),
+        (Scenario::MultiSkill, false) | (Scenario::ImageSkill, true) => {
+            selection(root, &["alpha", "beta"])
+        }
+        (Scenario::ImageSkill, false) => selection(root, &["alpha"]),
+    }?;
     let state_dir = root.join("state");
     let options = SessionOptions {
         executable: PathBuf::from(
@@ -389,15 +515,23 @@ async fn exercise_connection(
                 Ok(None) => return Err("冷恢复空闲连接关闭".into()),
             }
             record(file, json!({"event":"resume_idle_without_replay","generation":generation,"native_session_id":native}))?;
-            exercise_turn(root, "cold", &["gamma", "beta"], generation, &native, &controller, &mut events, file).await?;
+            let keys = match scenario {
+                Scenario::MultiSkill => &["gamma", "beta"],
+                Scenario::ImageSkill => &["beta", "alpha"],
+            };
+            exercise_turn(root, "cold", keys, scenario, generation, &native, &controller, &mut events, file).await?;
         } else {
-            exercise_turn(root, "initial", &["alpha", "beta"], generation, &native, &controller, &mut events, file).await?;
-            let target = root.join("project/.grok/skills/isp-g06-gamma");
+            let (initial, hot, added): (&[&str], &[&str], &str) = match scenario {
+                Scenario::MultiSkill => (&["alpha", "beta"], &["gamma"], "isp-g06-gamma"),
+                Scenario::ImageSkill => (&["alpha"], &["alpha", "beta"], "isp-g06-beta"),
+            };
+            exercise_turn(root, "initial", initial, scenario, generation, &native, &controller, &mut events, file).await?;
+            let target = root.join("project/.grok/skills").join(added);
             if target.exists() { return Err("热新增技能在首轮前已经发布".into()); }
-            fs::rename(root.join("unpublished/isp-g06-gamma"), &target).map_err(|_| "第三技能发布失败")?;
+            fs::rename(root.join("unpublished").join(added), &target).map_err(|_| "热新增技能发布失败")?;
             record(file, json!({"event":"skill_published","generation":generation,"native_session_id":native,
                 "path":target.join("SKILL.md"),"after_case":"initial","same_connection":true}))?;
-            exercise_turn(root, "hot", &["gamma"], generation, &native, &controller, &mut events, file).await?;
+            exercise_turn(root, "hot", hot, scenario, generation, &native, &controller, &mut events, file).await?;
         }
         Ok(native)
     }.await;
@@ -459,8 +593,8 @@ async fn real_grok_multi_skill_hot_add_and_resume() {
     record(&mut file, json!({"event":"started","max_native_inputs":3,"production_connect":true,
         "candidate_flags_used":false,"coordinator_persistence_verified":false,"gui_verified":false})).unwrap();
     let result = async {
-        let first = exercise_connection(&root, None, &mut file).await?;
-        let resumed = exercise_connection(&root, Some(first.clone()), &mut file).await?;
+        let first = exercise_connection(&root, None, Scenario::MultiSkill, &mut file).await?;
+        let resumed = exercise_connection(&root, Some(first.clone()), Scenario::MultiSkill, &mut file).await?;
         if resumed != first { return Err("冷恢复更换了原生会话".to_owned()); }
         record(&mut file, json!({"event":"adapter_flow_passed","native_session_id":first,"native_inputs":3,
             "native_byte_audit_pending":true,"runtime_generations":2,"coordinator_persistence_verified":false}))
@@ -473,4 +607,48 @@ async fn real_grok_multi_skill_hot_add_and_resume() {
         .unwrap();
     }
     assert!(result.is_ok(), "Grok 生产技能流程失败，原始证据已保留");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "需要固定且已认证的 Grok、生产监督者和三次图片加技能模型输入；原生图片与技能源须由配套运行器审核"]
+async fn real_grok_image_skill_hot_add_and_resume() {
+    let root = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_ROOT").unwrap())
+        .canonicalize()
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(root.join(".infinishell-grok-image-skill-probe")).unwrap(),
+        "isolated Grok image skill verification\n"
+    );
+    // 必须启用既有原生终态历史投影；适配器的发送摘要不能替代原生消费证明。
+    assert_eq!(
+        env::var("INFINISHELL_GROK_MANAGED_IMAGE_TRACE").as_deref(),
+        Ok("1")
+    );
+    let mut file = File::create(root.join("events.ndjson")).unwrap();
+    record(
+        &mut file,
+        json!({"event":"started","scope":"grok_image_skill_hot_add_and_resume",
+        "max_native_inputs":3,"production_connect":true,"candidate_flags_used":false,
+        "coordinator_persistence_verified":false,"gui_verified":false}),
+    )
+    .unwrap();
+    let result = async {
+        let first = exercise_connection(&root, None, Scenario::ImageSkill, &mut file).await?;
+        let resumed = exercise_connection(&root, Some(first.clone()), Scenario::ImageSkill, &mut file).await?;
+        if resumed != first { return Err("图片技能冷恢复更换了原生会话".to_owned()); }
+        record(&mut file, json!({"event":"adapter_flow_passed","scope":"grok_image_skill_hot_add_and_resume",
+            "native_session_id":first,"native_inputs":3,"native_byte_audit_pending":true,"runtime_generations":2,
+            "coordinator_persistence_verified":false,"gui_verified":false}))
+    }.await;
+    if let Err(reason) = &result {
+        record(
+            &mut file,
+            json!({"event":"acceptance_failed","reason":reason}),
+        )
+        .unwrap();
+    }
+    assert!(
+        result.is_ok(),
+        "Grok 生产图片与技能流程失败，原始证据已保留"
+    );
 }
