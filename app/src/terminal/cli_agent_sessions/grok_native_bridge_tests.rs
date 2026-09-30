@@ -265,6 +265,39 @@ fn strict_protocol_rejects_extra_fields_invalid_states_and_noncanonical_ids() {
 }
 
 #[test]
+fn complete_response_remains_readable_after_peer_closes() {
+    let (mut client, mut server) = UnixStream::pair().unwrap();
+    write_frame(&mut server, b"{}", Instant::now() + IO_TIMEOUT).unwrap();
+    drop(server);
+
+    assert_eq!(
+        read_frame(&mut client, Instant::now() + IO_TIMEOUT).unwrap(),
+        b"{}"
+    );
+}
+
+#[test]
+fn response_read_keeps_one_deadline_for_buffered_header_and_missing_body() {
+    let (mut client, mut server) = UnixStream::pair().unwrap();
+    write_frame(&mut server, b"{}", Instant::now() + IO_TIMEOUT).unwrap();
+    assert_eq!(
+        read_frame(&mut client, Instant::now() - Duration::from_secs(1))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::TimedOut
+    );
+
+    let (mut client, mut server) = UnixStream::pair().unwrap();
+    server.write_all(&10u32.to_be_bytes()).unwrap();
+    assert_eq!(
+        read_frame(&mut client, Instant::now() + Duration::from_millis(30))
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::TimedOut
+    );
+}
+
+#[test]
 fn frames_are_bounded_and_truncated_response_is_not_acknowledged() {
     for length in [0u32, MAX_FRAME_BYTES as u32 + 1] {
         let (mut client, mut server) = UnixStream::pair().unwrap();

@@ -16927,6 +16927,40 @@ impl TerminalView {
             if let Some(generation) =
                 CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
             {
+                if FeatureFlag::CLIAgentRichInput.is_enabled()
+                    && !self.has_active_cli_agent_input_session(ctx)
+                    && CLIAgentSessionsModel::as_ref(ctx)
+                        .session(self.view_id)
+                        .is_some_and(|session| session.agent == CLIAgent::Grok)
+                {
+                    if copied.is_empty() {
+                        return;
+                    }
+                    if !self.cli_agent_input_target_matches(generation, ctx) {
+                        self.show_error_toast(crate::t!("cli-agent-input-target-changed"), ctx);
+                        return;
+                    }
+                    // 只追加本地草稿，再由开框事件恢复；不写原生 PTY、不提交或回答审批。
+                    let view_id = self.view_id;
+                    CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                        let mut draft = sessions
+                            .session(view_id)
+                            .and_then(|session| session.draft_text.clone())
+                            .unwrap_or_default();
+                        draft.push_str(&copied);
+                        sessions.set_draft(view_id, draft);
+                    });
+                    self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+                    let window_id = ctx.window_id();
+                    ToastStack::handle(ctx).update(ctx, |stack, ctx| {
+                        stack.add_ephemeral_toast(
+                            DismissibleToast::default(crate::t!("cli-agent-grok-pasted-to-draft")),
+                            window_id,
+                            ctx,
+                        );
+                    });
+                    return;
+                }
                 self.insert_text_into_cli_agent_pty(&copied, generation, ctx);
             }
             return;

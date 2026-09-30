@@ -446,7 +446,7 @@ index 2b2cc56..a82c205 100644
              agent_id,
              session_id,
 diff --git a/crates/codegen/xai-grok-pager/src/app/event_loop.rs b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
-index ceaf021..2e4787a 100644
+index ceaf021..e3ca82c 100644
 --- a/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 @@ -23,6 +23,9 @@ use std::time::Duration;
@@ -543,7 +543,54 @@ index ceaf021..2e4787a 100644
                  presenter.draw_scheduled_at = None;
                  presenter.request(false);
              }
-@@ -2596,6 +2629,10 @@ pub(crate) async fn run(
+@@ -2408,6 +2441,22 @@ pub(crate) async fn run(
+             }
+ 
+             _ = animation_tick => {
++                #[cfg(unix)]
++                let bridge_animation_identity = if input_rx.is_empty()
++                    && acp_peek.is_none()
++                    && acp_rx.is_empty()
++                    && progress_rx.is_empty()
++                    && voice_rx.as_ref().is_none_or(|rx| rx.is_empty())
++                    && tasks.is_empty()
++                    && session_load_barrier.is_empty()
++                    && reconnect_reinit.is_none()
++                {
++                    terminal_bridge.as_ref().and_then(|bridge| {
++                        bridge.state.display_only_animation_identity(&app)
++                    })
++                } else {
++                    None
++                };
+                 animation_tick_at = None;
+                 // Lost-cancel recovery: re-send cancels for panes still cancelling past the grace (`dispatch::reconcile_overdue_cancels`)
+                 // `needs_animation()` keeps ticks alive while either recovery is armed, so these checks cannot be starved
+@@ -2443,6 +2492,23 @@ pub(crate) async fn run(
+                 }
+                 // Keep ticking as long as there are running animations or pending actions waiting to expire
+                 schedule_tick(&mut animation_tick_at, &app, tick_interval);
++                #[cfg(unix)]
++                if bridge_animation_identity.is_some()
++                    && input_rx.is_empty()
++                    && acp_peek.is_none()
++                    && acp_rx.is_empty()
++                    && progress_rx.is_empty()
++                    && voice_rx.as_ref().is_none_or(|rx| rx.is_empty())
++                    && tasks.is_empty()
++                    && session_load_barrier.is_empty()
++                    && reconnect_reinit.is_none()
++                    && terminal_bridge.as_ref().and_then(|bridge| {
++                        bridge.state.display_only_animation_identity(&app)
++                    }) == bridge_animation_identity
++                {
++                    // 前后都证明仅走显示路径且目标未变；输入批次从不走此豁免。
++                    bridge_input_unchanged = true;
++                }
+             }
+ 
+             _ = billing_poll => {
+@@ -2596,6 +2662,10 @@ pub(crate) async fn run(
                  let status = rx.borrow_and_update().clone();
                  match status {
                      ConnectionStatus::Reconnecting { attempt } => {
@@ -554,7 +601,7 @@ index ceaf021..2e4787a 100644
                          // Unified-log marker: an IPC reconnect mints a new leader-side ClientId
                          // Without this marker the reconnect is invisible in the unified log
                          // It only surfaced as ghost `session loaded` replays with no matching `session.load.start`
-@@ -2628,6 +2665,10 @@ pub(crate) async fn run(
+@@ -2628,6 +2698,10 @@ pub(crate) async fn run(
                          );
                          last_leader_generation = generation;
                          app.reconnect_pending = true;
@@ -565,7 +612,7 @@ index ceaf021..2e4787a 100644
                          // Connection-scoped: a re-elected shell reseeds its push gen from wall clock
                          // A surviving higher watermark would silently drop its fresh pushes
                          app.announcements_last_gen = 0;
-@@ -2796,6 +2837,10 @@ pub(crate) async fn run(
+@@ -2796,6 +2870,10 @@ pub(crate) async fn run(
                          presenter.request(false);
                      }
                      ConnectionStatus::Failed { ref error } => {
@@ -576,7 +623,7 @@ index ceaf021..2e4787a 100644
                          app.show_toast(&format!("Connection failed: {error}"));
                          presenter.request(false);
                      }
-@@ -2890,6 +2935,35 @@ pub(crate) async fn run(
+@@ -2890,6 +2968,35 @@ pub(crate) async fn run(
                  presenter.request(false);
              }
  
@@ -612,7 +659,7 @@ index ceaf021..2e4787a 100644
              // A burst can backlog the 128-slot channel, so `voice_rx` is effectively always-ready
              // Kept last, it can never starve cancellation, ACP, task/progress completions, keyboard input, or the render/animation/poll timers
              // Voice is only serviced when nothing else is pending
-@@ -2931,6 +3005,11 @@ pub(crate) async fn run(
+@@ -2931,6 +3038,11 @@ pub(crate) async fn run(
                  }
              }
          }
@@ -640,12 +687,37 @@ index 7fbb597..224c3a1 100644
  mod terminal_restore;
  use terminal_restore::{emit_terminal_teardown_sequences, restore_terminal, set_panic_hook};
  #[cfg(test)]
+diff --git a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
+index e1077eb..fe1724d 100644
+--- a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
++++ b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
+@@ -48,6 +48,20 @@ impl AppView {
+         self.status_line_tick_demand_at(Instant::now())
+     }
+ 
++    /// 桥接只豁免不会启动或回收外部命令的状态栏 tick；内置行只改变显示缓存。
++    #[cfg(unix)]
++    pub(crate) fn terminal_bridge_status_tick_is_passive(&self) -> bool {
++        if self.status_line.run_slot(Instant::now()) != RunSlot::Free {
++            return false;
++        }
++        // 首页沿用 update_status_line 的无来源早返回，不执行隐藏会话的命令。
++        self.status_line_source_agent().is_none()
++            || !matches!(
++                self.current_ui.status_line.resolve(),
++                Some(ResolvedStatusLine::Command { .. })
++            )
++    }
++
+     pub(crate) fn status_line_tick_demand_at(&self, now: Instant) -> TickDemand {
+         let source = self.status_line_source_agent();
+         status_line_tick_demand(TickInputs {
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 new file mode 100644
-index 0000000..b2980e1
+index 0000000..b948207
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
-@@ -0,0 +1,632 @@
+@@ -0,0 +1,730 @@
 +//! 普通 TUI 的外部输入事务；所有状态检查与提交均由原生事件循环串行调用。
 +
 +use std::collections::HashMap;
@@ -658,7 +730,7 @@ index 0000000..b2980e1
 +use serde::{Deserialize, Serialize};
 +
 +use super::actions::{Action, Effect};
-+use super::agent::{BgTaskStatus, GoalDisplayStatus};
++use super::agent::{AgentId, BgTaskStatus, GoalDisplayStatus};
 +use super::agent_view::{AgentView, ExternalPromptEditorAccess};
 +use super::app_view::{ActiveView, AppView, VoiceState};
 +use super::dispatch::{dispatch, dispatch_terminal_bridge_prompt};
@@ -762,6 +834,15 @@ index 0000000..b2980e1
 +    native_available: bool,
 +}
 +
++/// 只证明同一次纯显示 tick 前后的目标身份；不能用最终空草稿替代输入事件撤销。
++#[derive(Debug, PartialEq, Eq)]
++pub(crate) struct AnimationInputIdentity {
++    input_epoch: u64,
++    active_view: ActiveView,
++    home_agent: Option<AgentId>,
++    binding: Option<(AgentId, u32, String)>,
++}
++
 +impl TerminalBridge {
 +    pub(crate) fn new(instance_id: String, instance_dir: PathBuf) -> io::Result<Self> {
 +        // 每次 TUI 启动使用新实例目录；旧账本只读保留，绝不载入为可重发队列。
@@ -793,6 +874,95 @@ index 0000000..b2980e1
 +
 +    pub(crate) fn native_available(&self) -> bool {
 +        self.native_available
++    }
++
++    /// 仅在所有可能改输入的 tick 路径都不可达时，允许显示动画保留观察代际。
++    pub(crate) fn display_only_animation_identity(
++        &self,
++        app: &AppView,
++    ) -> Option<AnimationInputIdentity> {
++        let target = match app.active_view {
++            ActiveView::Welcome => {
++                self.home_ready(app).ok()?;
++                app.home_session()
++            }
++            ActiveView::Agent(_) => {
++                self.ready(app).ok()?;
++                app.active_agent()
++            }
++            ActiveView::AgentDashboard => return None,
++        };
++        if app.scroll_state.has_active_stream()
++            || !app.pending_image_notices.is_empty()
++            || app.deferred_notification.is_some()
++            || !app.pending_running_adoptions.is_empty()
++            || !app.terminal_bridge_status_tick_is_passive()
++        {
++            return None;
++        }
++        // 恢复函数即使返回 None 也可能清理旧标记；必须在调用前排除全部根会话。
++        if app.agents.values().any(|agent| {
++            agent.pending_cancel_resend.is_some()
++                || agent.prompt_ack.is_some()
++                || agent.pending_turn_end_reconcile.is_some()
++                || !agent.subagent_views.is_empty()
++                || !agent.pending_effects.is_empty()
++                || agent.edit_hl_needs_tick()
++        }) {
++            return None;
++        }
++        if let Some(agent) = target {
++            // 这些轮询可能打开输入视图、替换选择或同步命令；不能当作动画放行。
++            if agent.prompt.file_search.context().is_some()
++                || agent.prompt.history_search.is_active()
++                || agent.scrollback_search.is_some()
++                // 首页 tick 不同步隐藏会话命令；官方 reveal 才消费这个代际差异。
++                || (matches!(app.active_view, ActiveView::Agent(_))
++                    && agent.acp_synced_generation != agent.session.available_commands_generation)
++                || agent.prompt.pending_viewer_request.is_some()
++                || agent.prompt.textarea.selection_range().is_some()
++                || agent.image_load_rx.is_some()
++                || agent.video_load_rx.is_some()
++                || agent.image_viewer.is_some()
++                || agent.video_viewer.is_some()
++                || agent.inline_video.is_some()
++                || agent.block_viewer.is_some()
++                || agent.gboom.is_some()
++                || agent.mermaid_needs_tick()
++                || agent.pending_text_drag.is_some()
++                || agent.pending_block_drag.is_some()
++                || agent.drag_selection.is_some()
++                || agent.block_drag_selection.is_some()
++                || agent.deferred_text_press.is_some()
++                || agent.persistent_text_selection.is_some()
++                || agent.selection_created_at.is_some()
++                || agent.has_drag_autoscroll()
++                || agent.left_mouse_down
++                || agent.plan_prompt_mouse_drag
++                || agent.wake_turn_active()
++            {
++                return None;
++            }
++        }
++        // 余下只有 shimmer、toast、提示淡出、完成闪光、计数、链接高亮和通知输出。
++        Some(AnimationInputIdentity {
++            input_epoch: self.input_epoch,
++            active_view: app.active_view,
++            home_agent: app.home_session_agent,
++            binding: target.map(|agent| {
++                (
++                    agent.session.id,
++                    agent.session_binding_epoch,
++                    agent
++                        .session
++                        .session_id
++                        .as_ref()
++                        .expect("已通过会话守卫")
++                        .0
++                        .to_string(),
++                )
++            }),
++        })
 +    }
 +
 +    /// 事件循环须在每次输入、ACP、任务、进度或配置状态变化前调用，防止编辑后还原的 ABA。
@@ -2527,10 +2697,10 @@ index 0000000..7ec9119
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000..0f42cb5
+index 0000000..f77be77
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
-@@ -0,0 +1,695 @@
+@@ -0,0 +1,968 @@
 +use super::*;
 +use crate::app::actions::TaskResult;
 +use crate::app::agent::{AgentId, AgentState};
@@ -2608,6 +2778,279 @@ index 0000000..0f42cb5
 +        instance_id: "test-instance".into(),
 +        input_epoch: bridge.input_epoch,
 +    }
++}
++
++fn run_animation_tick(bridge: &mut TerminalBridge, app: &mut AppView) -> bool {
++    // 测试不读取系统剪贴板；仍执行生产恢复函数与完整 AppView::tick。
++    app.contextual_hints.image_input = false;
++    let before = bridge.display_only_animation_identity(app);
++    assert!(crate::app::dispatch::reconcile_overdue_cancels(app).is_none());
++    assert!(
++        crate::app::dispatch::reconcile_overdue_prompt_acks(
++            app,
++            &crate::app::prompt_ack::PromptAckDeadlines::from_env(None),
++        )
++        .is_none()
++    );
++    assert!(crate::app::dispatch::reconcile_overdue_turn_ends(app).is_none());
++    app.flush_image_notices_if_root();
++    app.tick();
++    let unchanged = before.is_some() && before == bridge.display_only_animation_identity(app);
++    if !unchanged {
++        bridge.invalidate();
++    }
++    unchanged
++}
++
++#[test]
++fn terminal_bridge_home_shimmer_keeps_prepare_epoch_valid() {
++    for precreated in [false, true] {
++        let (_directory, mut bridge, mut app) = home_setup(false);
++        if precreated {
++            // 走生产预创建和绑定路径，保留真实首页的 0/1 命令代际差异。
++            let effects = crate::app::dispatch::maybe_create_home_session(&mut app);
++            let [
++                Effect::CreateSession {
++                    agent_id,
++                    preferred_session_id: Some(session_id),
++                    ..
++                },
++            ] = effects.as_slice()
++            else {
++                panic!("应仅预创建首页会话：{effects:?}");
++            };
++            let agent_id = *agent_id;
++            let effects = dispatch(
++                Action::TaskComplete(TaskResult::SessionCreated {
++                    agent_id,
++                    session_id: session_id.clone().into(),
++                    models: None,
++                    modes: None,
++                }),
++                &mut app,
++            );
++            assert!(!effects.iter().any(|effect| matches!(
++                effect,
++                Effect::SendPrompt { .. } | Effect::SendTerminalBridgePrompt { .. }
++            )));
++            let effects = dispatch(
++                Action::TaskComplete(TaskResult::PromptHistoryLoaded {
++                    agent_id,
++                    prompts: vec![],
++                }),
++                &mut app,
++            );
++            assert!(effects.is_empty());
++            let agent = app.home_session().unwrap();
++            assert_eq!(agent.acp_synced_generation, 0);
++            assert_eq!(agent.session.available_commands_generation, 1);
++        }
++        let request = prepare(&bridge);
++        let epoch = bridge.input_epoch;
++        let original_tick = app.welcome_tick;
++        for _ in 0..120 {
++            assert!(run_animation_tick(&mut bridge, &mut app));
++        }
++        assert_eq!(app.welcome_tick, original_tick + 120);
++        assert_eq!(bridge.input_epoch, epoch);
++        if precreated {
++            let agent = app.home_session().unwrap();
++            assert_eq!(agent.acp_synced_generation, 0);
++            assert_eq!(agent.session.available_commands_generation, 1);
++        }
++        let (response, effects) = bridge.handle(request, &mut app);
++        assert!(matches!(response, Response::Prepared { .. }));
++        assert!(!effects.iter().any(|effect| matches!(
++            effect,
++            Effect::SendPrompt { .. } | Effect::SendTerminalBridgePrompt { .. }
++        )));
++        assert!(bridge.receipts.is_empty());
++        if precreated {
++            let agent = app.active_agent().unwrap();
++            assert_eq!(agent.acp_synced_generation, 1);
++            assert_eq!(agent.session.available_commands_generation, 1);
++            assert!(bridge.display_only_animation_identity(&app).is_some());
++        }
++    }
++}
++
++#[test]
++fn terminal_bridge_agent_visual_timers_keep_literal_submission_lease_valid() {
++    let (_directory, mut bridge, mut app) = setup();
++    let agent = app.agents.get_mut(&AgentId(0)).unwrap();
++    agent.show_toast_ticks("纯显示提示", 3);
++    agent.mode_switch_banner = Some(("纯显示模式提示".into(), 3));
++    let lease = lease(&mut bridge, &mut app);
++    for _ in 0..120 {
++        assert!(run_animation_tick(&mut bridge, &mut app));
++    }
++    let agent = app.active_agent().unwrap();
++    assert!(agent.toast.is_none());
++    assert!(agent.mode_switch_banner.is_none());
++    assert_eq!(bridge.input_epoch, lease.input_epoch);
++    let (response, effects) =
++        bridge.handle(submission(&lease, "动画之后仍精确提交\n中文正文"), &mut app);
++    assert_eq!(receipt(response).state, ReceiptState::Dispatched);
++    assert!(
++        matches!(effects.as_slice(), [Effect::SendTerminalBridgePrompt { text, .. }]
++        if text == "动画之后仍精确提交\n中文正文")
++    );
++}
++
++#[test]
++fn terminal_bridge_animation_rejects_pending_input_sources_and_other_targets() {
++    for mode in [
++        "draft",
++        "permission",
++        "commands",
++        "file_search",
++        "video_result",
++        "image_result",
++        "selection",
++        "mouse_down",
++        "child",
++        "pending_effect",
++        "image_notice",
++        "status_command",
++        "scroll_stream",
++        "other_view",
++    ] {
++        let (_directory, bridge, mut app) = setup();
++        assert!(bridge.display_only_animation_identity(&app).is_some());
++        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
++        match mode {
++            "draft" => agent.prompt.set_text("不能覆盖"),
++            "permission" => agent
++                .permission_queue
++                .push_back(make_followup_permission_state()),
++            "commands" => agent.session.available_commands_generation += 1,
++            "file_search" => {
++                let context = crate::views::file_search::context::detect("@pending", 8).unwrap();
++                agent.prompt.file_search.set_test_state(context, vec![], 0);
++                assert!(!agent.prompt.file_search.is_visible());
++            }
++            "video_result" => agent.video_load_rx = Some(std::sync::mpsc::channel().1),
++            "image_result" => agent.image_load_rx = Some(std::sync::mpsc::channel().1),
++            "selection" => agent.selection_created_at = Some(Instant::now()),
++            "mouse_down" => agent.left_mouse_down = true,
++            "child" => {
++                let mut other = test_app_with_agent();
++                agent.subagent_views.insert(
++                    "child".into(),
++                    Box::new(other.agents.swap_remove(&AgentId(0)).unwrap()),
++                );
++            }
++            "pending_effect" => app.pending_effects.push(Effect::FetchPromptHistory {
++                agent_id: AgentId(0),
++                cwd: app.cwd.clone(),
++                session_id: "test-session".into(),
++            }),
++            "image_notice" => app.pending_image_notices.push("待显示图片状态".into()),
++            "status_command" => {
++                app.current_ui.status_line = serde_json::from_value(serde_json::json!({
++                    "type": "command", "command": "unused-test-command",
++                }))
++                .unwrap()
++            }
++            "scroll_stream" => {
++                app.scroll_state.on_scroll_event(
++                    crate::input::mouse::ScrollDirection::Up,
++                    crate::input::mouse::ScrollConfig::default(),
++                );
++            }
++            "other_view" => app.active_view = ActiveView::AgentDashboard,
++            other => panic!("未知测试情形：{other}"),
++        }
++        assert!(
++            bridge.display_only_animation_identity(&app).is_none(),
++            "{mode}"
++        );
++    }
++}
++
++#[test]
++fn terminal_bridge_stale_recovery_markers_revoke_even_when_tick_returns_to_ready() {
++    for mode in ["cancel", "ack", "turn_end"] {
++        let (_directory, mut bridge, mut app) = setup();
++        let lease = lease(&mut bridge, &mut app);
++        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
++        match mode {
++            "cancel" => {
++                agent.pending_cancel_resend = Some(crate::app::agent_view::PendingCancelResend {
++                    prompt_id: None,
++                    sent_at: Instant::now(),
++                    attempts: 3,
++                    confirmed: true,
++                    cancel_subagents: false,
++                    trigger: crate::app::actions::CancelTrigger::DashboardStop,
++                })
++            }
++            "ack" => {
++                agent.prompt_ack = Some(crate::app::prompt_ack::PromptAckWatch::new(
++                    "stale",
++                    Instant::now(),
++                ))
++            }
++            "turn_end" => {
++                agent.pending_turn_end_reconcile = Some(crate::app::agent_view::PendingTurnEnd {
++                    prompt_id: "stale".into(),
++                    stop_reason: None,
++                    agent_result: None,
++                    cancellation_category: None,
++                    cancellation_context: None,
++                    cancel_trigger: None,
++                    error_kind: None,
++                    received_at: Instant::now()
++                        - crate::app::dispatch::TURN_END_RECONCILE_GRACE
++                        - Duration::from_secs(1),
++                })
++            }
++            other => panic!("未知测试情形：{other}"),
++        }
++        assert!(!run_animation_tick(&mut bridge, &mut app));
++        assert!(bridge.display_only_animation_identity(&app).is_some());
++        let (response, effects) = bridge.handle(submission(&lease, "旧观察不得恢复有效"), &mut app);
++        assert!(matches!(response, Response::Rejected { reason } if reason == "stale_lease"));
++        assert!(effects.is_empty());
++        assert!(bridge.receipts.is_empty());
++    }
++}
++
++#[test]
++fn terminal_bridge_visual_tick_never_restores_an_input_aba_lease() {
++    let (_directory, mut bridge, mut app) = setup();
++    let lease = lease(&mut bridge, &mut app);
++    let before = bridge.display_only_animation_identity(&app).unwrap();
++    app.agents
++        .get_mut(&AgentId(0))
++        .unwrap()
++        .prompt
++        .set_text("输入后清空");
++    app.agents.get_mut(&AgentId(0)).unwrap().prompt.set_text("");
++    // 与事件循环相同：输入批次无条件撤销，不以批次结束时草稿为空作判断。
++    bridge.invalidate();
++    assert_ne!(Some(before), bridge.display_only_animation_identity(&app));
++    assert!(run_animation_tick(&mut bridge, &mut app));
++    let (response, effects) = bridge.handle(submission(&lease, "旧观察不得提交"), &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "stale_lease"));
++    assert!(effects.is_empty());
++}
++
++#[test]
++fn terminal_bridge_visual_tick_proof_pins_agent_and_binding_identity() {
++    let (_directory, bridge, mut app) = setup();
++    let before = bridge.display_only_animation_identity(&app).unwrap();
++    app.agents
++        .get_mut(&AgentId(0))
++        .unwrap()
++        .bind_session_id("another-session".into());
++    assert_ne!(Some(before), bridge.display_only_animation_identity(&app));
++    let before = bridge.display_only_animation_identity(&app).unwrap();
++    let mut agent = app.agents.swap_remove(&AgentId(0)).unwrap();
++    agent.session.id = AgentId(1);
++    app.agents.insert(AgentId(1), agent);
++    app.active_view = ActiveView::Agent(AgentId(1));
++    assert_ne!(Some(before), bridge.display_only_animation_identity(&app));
 +}
 +
 +#[test]

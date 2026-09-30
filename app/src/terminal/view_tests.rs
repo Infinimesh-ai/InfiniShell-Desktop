@@ -44,7 +44,7 @@ use crate::code_review::comments::{
     AttachedReviewComment, AttachedReviewCommentTarget, CommentOrigin,
 };
 use crate::context_chips::prompt::Prompt;
-use crate::editor::{AutosuggestionLocation, AutosuggestionType};
+use crate::editor::{AutosuggestionLocation, AutosuggestionType, EnterAction};
 use crate::features::FeatureFlag;
 use crate::pane_group::focus_state::PaneGroupFocusState;
 use crate::pane_group::{BackingView, TerminalPaneId};
@@ -8064,6 +8064,135 @@ fn open_cli_agent_rich_input_for_agent_with_window_id(
         assert!(view.has_active_cli_agent_input_session(ctx));
     });
     (window_id, terminal)
+}
+
+#[test]
+fn grok_native_bridge_rich_input_enter_keydown_submits_multiline_text() {
+    App::test((), |mut app| async move {
+        let _cli_rich = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        app.add_singleton_model(ImportedConfigModel::new);
+        app.update(|ctx| {
+            crate::terminal::init(ctx);
+            crate::terminal::input::init(ctx);
+            crate::editor::init(ctx);
+        });
+        assert!(
+            !AISettings::handle(&app).read(&app, |settings, _| *settings.submit_on_ctrl_enter),
+            "默认 Enter 应提交富输入"
+        );
+
+        let (window_id, terminal) = add_window_with_id_and_terminal(&mut app, None);
+        terminal.update(&mut app, |view, ctx| {
+            {
+                let mut model = view.model.lock();
+                model.simulate_long_running_block(CLIAgent::Grok.command_prefix(), "");
+                model.set_mode(ansi::Mode::SwapScreen {
+                    save_cursor_and_clear_screen: true,
+                });
+                assert!(model.is_alt_screen_active());
+            }
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                sessions.set_session(
+                    view.view_id,
+                    CLIAgentSession {
+                        agent: CLIAgent::Grok,
+                        status: CLIAgentSessionStatus::InProgress,
+                        session_context: CLIAgentSessionContext::default(),
+                        input_state: CLIAgentInputState::Closed,
+                        should_auto_toggle_input: false,
+                        listener: None,
+                        remote_host: None,
+                        plugin_version: None,
+                        draft_text: None,
+                        custom_command_prefix: None,
+                        received_rich_notification: false,
+                    },
+                    ctx,
+                );
+            });
+            // 只建立用户正在操作原生终端的前置状态；开框后不强设编辑器焦点。
+            view.focus_terminal(ctx);
+        });
+        assert_eq!(app.focused_view_id(window_id), Some(terminal.id()));
+        terminal.update(&mut app, |view, ctx| {
+            view.open_cli_agent_rich_input(CLIAgentInputEntrypoint::CtrlG, ctx);
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+        });
+        let (input, editor) = terminal.read(&app, |view, ctx| {
+            let input = view.input.clone();
+            let editor = input.as_ref(ctx).editor().clone();
+            (input, editor)
+        });
+
+        let text = "原生富输入回归：第一行保持中文原文。\n第二行只提交一次，完整保留多行正文。";
+        editor.update(&mut app, |editor, ctx| editor.user_insert(text, ctx));
+
+        let presenter = app.presenter(window_id).unwrap();
+        app.update(|ctx| {
+            let updated = ctx.view_ids_for_window(window_id).into_iter().collect();
+            presenter.borrow_mut().invalidate(
+                WindowInvalidation {
+                    updated,
+                    ..Default::default()
+                },
+                ctx,
+            );
+            presenter
+                .borrow_mut()
+                .build_scene(vec2f(1024., 768.), 1., None, ctx);
+            assert!(ctx.key_bindings_enabled(window_id), "窗口按键绑定必须启用");
+            assert_eq!(
+                ctx.focused_view_id(window_id),
+                Some(editor.id()),
+                "生产开框流程必须将焦点交给富输入编辑器"
+            );
+            let ancestors = ctx.view_ancestors(window_id, editor.id());
+            assert!(ancestors.contains(&terminal.id()), "焦点链必须经过终端");
+            assert!(ancestors.contains(&input.id()), "焦点链必须经过输入视图");
+        });
+        editor.read(&app, |editor, ctx| {
+            assert!(editor.is_focused(), "编辑器必须收到焦点事件");
+            assert!(editor.can_edit(ctx), "编辑状态不得静默吞掉 Enter");
+            assert!(matches!(editor.enter_settings().enter, EnterAction::Emit));
+            assert_eq!(editor.buffer_text(ctx), text);
+        });
+
+        let editor_enters = Rc::new(RefCell::new(0));
+        let submitted = Rc::new(RefCell::new(Vec::new()));
+        app.update(|ctx| {
+            let observed = editor_enters.clone();
+            ctx.subscribe_to_view(&editor, move |_, event, _| {
+                if matches!(event, EditorEvent::Enter) {
+                    *observed.borrow_mut() += 1;
+                }
+            });
+            let observed = submitted.clone();
+            ctx.subscribe_to_view(&input, move |_, event, _| {
+                if let InputEvent::SubmitCLIAgentInput { text } = event {
+                    observed.borrow_mut().push(text.clone());
+                }
+            });
+        });
+
+        // 从窗口事件入口使用实际焦点链与生产 keymap，不能直接调用 input_enter。
+        let handled = app.update(|ctx| {
+            ctx.simulate_window_event(
+                warpui::Event::KeyDown {
+                    keystroke: Keystroke::parse("enter").unwrap(),
+                    chars: "\r".into(),
+                    details: Default::default(),
+                    is_composing: false,
+                },
+                window_id,
+                presenter,
+            )
+        });
+        assert!(handled, "Enter 必须由当前焦点链处理");
+        assert_eq!(*editor_enters.borrow(), 1, "编辑器必须发出一次 Enter");
+        assert_eq!(submitted.borrow().as_slice(), &[text.to_owned()]);
+    });
 }
 
 /// Verifies that Ctrl-G closes CLI agent rich input when dispatched from the

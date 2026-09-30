@@ -6022,9 +6022,10 @@ cli-agent-grok-skill-policy-required = Grok skills require the inherit policy or
 cli-agent-grok-skill-unavailable = The selected Grok skill changed or is not uniquely available at its original path in this session. Refresh skills and select it again.
 
 cli-agent-input-waiting-for-native-response = Submission stopped because the CLI is waiting for a response. Handle the prompt in the terminal first. Your draft and attachments are kept.
-cli-agent-grok-input-manual-copy-required = Not sent. Copy this draft, close rich input, and paste it into Grok.
+cli-agent-grok-input-manual-copy-required = Not sent. Your draft is kept. You can close rich input and type directly in Grok.
+cli-agent-grok-pasted-to-draft = Pasted into rich input. Nothing has been sent to Grok.
 cli-agent-input-copy-unsent-text = Copy unsent text
-terminal-input-grok-draft-delivery-hint = Supported Grok sessions can submit here; otherwise copy and paste
+terminal-input-grok-draft-delivery-hint = Supported Grok sessions can submit here; otherwise type directly in Grok
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = Saved sessions cannot yet resume with this older CLI version.

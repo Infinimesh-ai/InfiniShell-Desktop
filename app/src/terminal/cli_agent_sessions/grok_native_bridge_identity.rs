@@ -26,8 +26,8 @@ use sha2::{Digest as _, Sha256};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 pub(super) const ARTIFACT_SHA256: &str =
-    "51c152147fe4c611010e37c798a82165a5997a461d9f7672911a580014a6e28b";
-const ARTIFACT_CDHASH: &str = "6114b8e47a0bb2aad742ed04c4916bac25031e0d";
+    "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1";
+const ARTIFACT_CDHASH: &str = "356fe77c29f339fcaa90e48094fc7af7e0571ec5";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

@@ -26,7 +26,8 @@ use crate::terminal::cli_agent_sessions::{
     CLIAgentInputState, CLIAgentSession, CLIAgentSessionContext, CLIAgentSessionStatus,
     CLIAgentSessionsModel, CLIAgentSessionsModelEvent,
 };
-use crate::terminal::model::ansi::{BootstrappedValue, Handler as _, InitShellValue};
+use crate::terminal::input::Event as InputEvent;
+use crate::terminal::model::ansi::{BootstrappedValue, Handler as _, InitShellValue, Mode};
 use crate::terminal::shared_session::SharedSessionSource;
 use crate::terminal::{CLIAgent, Event};
 use crate::test_util::add_window_with_terminal;
@@ -817,6 +818,196 @@ fn builtin_text_only_model_still_removes_images_and_preserves_files() {
         assert_eq!(
             *toasts.borrow(),
             vec![crate::t!("editor-images-removed-model-unsupported")]
+        );
+    });
+}
+
+#[test]
+fn grok_native_bridge_closed_paste_restores_draft_without_submitting() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Grok, ctx);
+            view.model.lock().set_mode(Mode::SwapScreen {
+                save_cursor_and_clear_screen: true,
+            });
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+                let mut session = sessions.session(view.view_id).unwrap().clone();
+                session.status = CLIAgentSessionStatus::Blocked { message: None };
+                session.draft_text = Some("原草稿\n".into());
+                sessions.set_session(view.view_id, session, ctx);
+            });
+            view.focus_terminal(ctx);
+        });
+        let input = terminal.read(&app, |view, _| view.input.clone());
+        let submitted = Rc::new(RefCell::new(Vec::new()));
+        let toasts = Rc::new(RefCell::new(Vec::new()));
+        app.update(|ctx| {
+            let captured = submitted.clone();
+            ctx.subscribe_to_view(&input, move |_, event, _| {
+                if let InputEvent::SubmitCLIAgentInput { text } = event {
+                    captured.borrow_mut().push(text.clone());
+                }
+            });
+            let captured = toasts.clone();
+            ctx.subscribe_to_model(&ToastStack::handle(ctx), move |_, event, _| {
+                if let ToastStackEvent::AddEphemeralToast { toast, .. } = event {
+                    captured.borrow_mut().push(toast.main_text().to_owned());
+                }
+            });
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            ctx.clipboard()
+                .write(ClipboardContent::plain_text("中文粘贴\n第二行".into()));
+            view.handle_action(&TerminalAction::Paste, ctx);
+        });
+
+        terminal.read(&app, |view, ctx| {
+            assert!(view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                view.input.as_ref(ctx).buffer_text(ctx),
+                "原草稿\n中文粘贴\n第二行"
+            );
+            let session = CLIAgentSessionsModel::as_ref(ctx)
+                .session(view.view_id)
+                .unwrap();
+            assert_eq!(
+                session.status,
+                CLIAgentSessionStatus::Blocked { message: None }
+            );
+            assert!(session.session_context.query.is_none());
+        });
+        assert!(writes.borrow().is_empty());
+        assert!(submitted.borrow().is_empty());
+        assert_eq!(
+            *toasts.borrow(),
+            vec![crate::t!("cli-agent-grok-pasted-to-draft")]
+        );
+    });
+}
+
+#[test]
+fn grok_native_bridge_closed_paste_rejects_replaced_command() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Grok, ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                sessions.set_draft(view.view_id, "原会话草稿".into());
+            });
+            {
+                let mut model = view.model.lock();
+                model.finish_block();
+                model.simulate_long_running_block("less", "");
+                model.set_mode(Mode::SwapScreen {
+                    save_cursor_and_clear_screen: true,
+                });
+            }
+            view.focus_terminal(ctx);
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            ctx.clipboard()
+                .write(ClipboardContent::plain_text("不得插入其他命令".into()));
+            view.handle_action(&TerminalAction::Paste, ctx);
+        });
+
+        terminal.read(&app, |view, ctx| {
+            assert!(!view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .draft_text
+                    .as_deref(),
+                Some("原会话草稿")
+            );
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn grok_native_bridge_closed_paste_does_not_open_when_disabled() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(false);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Grok, ctx);
+            view.model.lock().set_mode(Mode::SwapScreen {
+                save_cursor_and_clear_screen: true,
+            });
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                sessions.set_draft(view.view_id, "保持原稿".into());
+            });
+            view.focus_terminal(ctx);
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            ctx.clipboard()
+                .write(ClipboardContent::plain_text("尚未粘贴".into()));
+            view.handle_action(&TerminalAction::Paste, ctx);
+        });
+
+        terminal.read(&app, |view, ctx| {
+            assert!(!view.is_cli_agent_rich_input_open(ctx));
+            assert_eq!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .draft_text
+                    .as_deref(),
+                Some("保持原稿")
+            );
+        });
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn grok_native_bridge_closed_paste_keeps_codex_native_insertion() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        app.add_singleton_model(|_| ToastStack);
+        let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            register_cli_input_test_session(view, CLIAgent::Codex, ctx);
+            {
+                let mut model = view.model.lock();
+                model.set_mode(Mode::SwapScreen {
+                    save_cursor_and_clear_screen: true,
+                });
+                model.set_mode(Mode::BracketedPaste);
+            }
+            view.focus_terminal(ctx);
+        });
+
+        terminal.update(&mut app, |view, ctx| {
+            ctx.clipboard()
+                .write(ClipboardContent::plain_text("普通粘贴\n第二行".into()));
+            view.handle_action(&TerminalAction::Paste, ctx);
+        });
+
+        terminal.read(&app, |view, ctx| {
+            assert!(!view.is_cli_agent_rich_input_open(ctx));
+        });
+        assert_eq!(
+            *writes.borrow(),
+            vec!["\x1b[200~普通粘贴\n第二行\x1b[201~".as_bytes().to_vec()]
         );
     });
 }

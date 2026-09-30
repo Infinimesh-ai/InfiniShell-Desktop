@@ -1,4 +1,5 @@
 use super::*;
+use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixListener;
 
 #[test]
@@ -17,6 +18,35 @@ fn peer_handle_preserves_connected_kernel_credentials() {
     assert_eq!(peer.audit_token()[7], expected.pid_version);
     assert_eq!(macos_peer_identity(&server).unwrap(), expected);
     assert_eq!(macos_peer_handle(&client).unwrap().identity(), expected);
+}
+
+#[test]
+fn peer_handle_remains_verifiable_after_response_peer_closes() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("reply.sock");
+    let listener = UnixListener::bind(&path).unwrap();
+    let mut client = UnixStream::connect(&path).unwrap();
+    let (mut server, _) = listener.accept().unwrap();
+    let peer = macos_peer_handle(&client).unwrap();
+    let expected_token = *peer.audit_token();
+
+    let response = std::thread::spawn(move || {
+        server.write_all(b"response").unwrap();
+        // 等待线程结束，确保完整关闭而非仅写半关闭，避免重新读取凭据的断言发生竞态。
+        drop(server);
+    });
+    response.join().unwrap();
+    let mut bytes = Vec::new();
+    client.read_to_end(&mut bytes).unwrap();
+
+    assert_eq!(bytes, b"response");
+    assert!(macos_peer_handle(&client).is_err());
+    assert_eq!(
+        macos_process_identity(peer.identity().pid).unwrap(),
+        peer.identity()
+    );
+    assert_eq!(*peer.audit_token(), expected_token);
+    assert_eq!(peer.audit_token()[7], peer.identity().pid_version);
 }
 
 #[test]

@@ -198,7 +198,7 @@ pub struct MacosProcessIdentity {
     pub resource_cid: u64,
 }
 
-/// 连接建立时的内核对端凭据；应用可用完整 token 核对运行映像，不从 PID 重建 token。
+/// 从已连接 socket 首次读取的内核凭据快照；后续仍须核对进程代际与映像，不从 PID 重建 token。
 #[derive(Clone, Copy)]
 pub struct MacosPeerHandle {
     identity: MacosProcessIdentity,
@@ -258,7 +258,7 @@ pub fn macos_peer_identity(stream: &UnixStream) -> io::Result<MacosProcessIdenti
 pub fn macos_peer_handle(stream: &UnixStream) -> io::Result<MacosPeerHandle> {
     let mut token = [0u32; 8];
     let mut size = mem::size_of_val(&token) as libc::socklen_t;
-    // LOCAL_PEERTOKEN 在连接建立时由内核固定，不能相信握手中自报的 PID。
+    // LOCAL_PEERTOKEN 读取当前连接对端的内核凭据；断连后不可重读，不能相信握手中自报的 PID。
     let result = unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),

@@ -5834,9 +5834,10 @@ cli-agent-grok-skill-policy-required = Grok 技能需要继承策略或已选技
 cli-agent-grok-skill-unavailable = 所选 Grok 技能已变更，或当前会话中无法唯一匹配其原始路径。请刷新技能并重新选择。
 
 cli-agent-input-waiting-for-native-response = CLI 正在等待回应，已停止提交。请先在原生终端处理提示，草稿和附件已保留。
-cli-agent-grok-input-manual-copy-required = 未发送。复制草稿，关闭富输入，再到 Grok 粘贴提交。
+cli-agent-grok-input-manual-copy-required = 未发送，草稿已保留。关闭富输入后可在 Grok 中键入。
+cli-agent-grok-pasted-to-draft = 已粘贴到富输入，尚未发送给 Grok。
 cli-agent-input-copy-unsent-text = 复制未发送文本
-terminal-input-grok-draft-delivery-hint = 受支持的 Grok 会话可从此提交；否则请复制后粘贴
+terminal-input-grok-draft-delivery-hint = 受支持的 Grok 会话可从此提交；否则请在 Grok 中直接键入
 
 # 三方 CLI 自动升级与官方渠道选择
 settings-cli-updates-resume-incompatible = 已保存的会话尚不能使用这个较旧的 CLI 版本继续。

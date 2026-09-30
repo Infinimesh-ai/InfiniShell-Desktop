@@ -5,6 +5,7 @@
 
 use std::fs::{self, Metadata, OpenOptions};
 use std::io::{self, Read as _, Write as _};
+use std::os::fd::AsRawFd as _;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _};
 use std::os::unix::net::UnixStream;
 use std::path::{Component, Path, PathBuf};
@@ -359,7 +360,7 @@ impl NativeBridge {
                 artifact,
                 binding,
             };
-            bridge.verify(&stream)?;
+            bridge.verify(&peer)?;
             found = Some(bridge);
         }
         if macos_boot_session()? != boot_session
@@ -452,22 +453,21 @@ impl NativeBridge {
         parse_receipt(response, expected)
     }
 
-    fn verify(&self, stream: &UnixStream) -> io::Result<MacosPeerHandle> {
+    fn verify(&self, peer: &MacosPeerHandle) -> io::Result<()> {
         self.locator.validate()?;
         if macos_boot_session()? != self.binding.boot_session {
             return Err(invalid());
         }
-        let peer = macos_peer_handle(stream)?;
         if peer.identity() != self.peer
             || peer.identity().pid as u32 != self.locator.manifest.native_pid
         {
             return Err(invalid());
         }
         verify_terminal(peer.identity(), self.pty)?;
-        self.artifact.verify(&peer)?;
+        self.artifact.verify(peer)?;
         verify_terminal(peer.identity(), self.pty)?;
         self.locator.validate()?;
-        Ok(peer)
+        Ok(())
     }
 
     fn exchange(
@@ -486,11 +486,13 @@ impl NativeBridge {
         }
         self.locator.validate()?;
         let mut stream = connect(&self.locator.manifest.socket)?;
-        self.verify(&stream)?;
+        // 对端正常回包后会关闭连接；只在本连接首次取得内核凭据，之后仍复核活进程和映像。
+        let peer = macos_peer_handle(&stream)?;
+        self.verify(&peer)?;
         write_admitted_frame(&mut stream, &bytes, lease_deadline, admit)?;
-        self.verify(&stream)?;
+        self.verify(&peer)?;
         let bytes = read_frame(&mut stream, Instant::now() + IO_TIMEOUT)?;
-        self.verify(&stream)?;
+        self.verify(&peer)?;
         serde_json::from_slice(&bytes).map_err(|_| invalid())
     }
 }
@@ -744,6 +746,9 @@ fn write_frame(stream: &mut UnixStream, bytes: &[u8], deadline: Instant) -> io::
 }
 
 fn read_frame(stream: &mut UnixStream, deadline: Instant) -> io::Result<Vec<u8>> {
+    // macOS 在对端完整关闭后拒绝修改 SO_RCVTIMEO，但缓冲中仍可能有完整响应。
+    // 单次请求写完后改用非阻塞读取，并以同一绝对期限等待帧头和正文。
+    stream.set_nonblocking(true)?;
     let mut prefix = [0u8; 4];
     read_exact(stream, &mut prefix, deadline)?;
     let length = u32::from_be_bytes(prefix) as usize;
@@ -757,11 +762,37 @@ fn read_frame(stream: &mut UnixStream, deadline: Instant) -> io::Result<Vec<u8>>
 
 fn read_exact(stream: &mut UnixStream, mut bytes: &mut [u8], deadline: Instant) -> io::Result<()> {
     while !bytes.is_empty() {
-        stream.set_read_timeout(Some(time_left(deadline)?))?;
+        let remaining = time_left(deadline)?;
+        let timeout = remaining.as_millis().saturating_add(1).min(i32::MAX as u128) as i32;
+        let mut descriptor = libc::pollfd {
+            fd: stream.as_raw_fd(),
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let result = unsafe { libc::poll(&mut descriptor, 1, timeout) };
+        if result < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(error);
+        }
+        time_left(deadline)?;
+        if result == 0 {
+            continue;
+        }
+        // POLLHUP 也须读取剩余字节；完整帧可以随关闭到达，截断只由实际 EOF 判定。
         match stream.read(bytes) {
             Ok(0) => return Err(io::Error::from(io::ErrorKind::UnexpectedEof)),
             Ok(count) => bytes = &mut bytes[count..],
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::Interrupted | io::ErrorKind::WouldBlock
+                ) =>
+            {
+                continue;
+            }
             Err(error) => return Err(error),
         }
     }
