@@ -139,6 +139,88 @@
         "bytes": 3851
       },
       "implementation_complete_across_targets": false
+    },
+    "g06_progress": {
+      "status": "open",
+      "gap_closed": false,
+      "mac_function_and_bilingual_satisfied": true,
+      "baseline_commit": "e36adfd6c272c7533a2f600b259e754e5a507f47",
+      "baseline_only": false,
+      "source_binding": "84 份冻结源码逐文件匹配最终实现提交；用户链与 GUI 按各自原工件计证，未声称全部旧链由最终程序重跑。",
+      "user_live": {
+        "run_id": "r-z26hw4l7",
+        "passed": true,
+        "native_inputs": 3,
+        "natural_cleanup_generations": 2,
+        "receipt_sha256": "b2f6db4f0c8789dbbff5ec832a7279c2ea8bf5c94d5c19cc3ef782f05a239a55",
+        "native_audit_sha256": "dd7de44bb5b3064ce179177399683f09b35100e71420892a059427a2cdc56535",
+        "cleanup_completion_sha256": "904ab0af99f7382ab2d6e4d8ab08e983036f681658b994a72ff82ce3bb94fc5e",
+        "outer_failure_preserved": true
+      },
+      "fixed_live": {
+        "run_id": "r-j2y3ivom",
+        "passed": true,
+        "native_inputs": 3,
+        "cases": [
+          "deny",
+          "allow",
+          "cold_allow"
+        ],
+        "native_session_id": "01a0f29b-598c-7f61-8162-6cc52aa3ae9b",
+        "natural_cleanup_generations": 2,
+        "native_wait_statuses": [
+          0,
+          0
+        ],
+        "receipt_sha256": "b22d69f670c19b83aa0f0b1da7746883b771eccb606ce40de74ef31cc93470f6",
+        "native_audit_sha256": "249b4d3cac5d25ac25937e0b2f6d2c63206570d66881d979a55cd2a42f03e0df",
+        "supervisor_binding_sha256": "a03a9ce241d6c21bdd0354bf87b0dc5f5606718a4d60ef0d95f9ee9c75d83055",
+        "child_spawn_verified": false,
+        "gui_verified": false,
+        "independent_outer_cleanup": "completed",
+        "cleanup_completion_sha256": "8c8845e767fd1d2eb9b95f1ef4118d4398c586418bbc441e1cedd5370c7d1371",
+        "cleanup_final_index_sha256": "b9a12f1bd393edbfd503857bc1c8b3fa7320c804e3004b0f453fb9376bb87845"
+      },
+      "localization": {
+        "run_id": "r-vjchihj0",
+        "passed": true,
+        "model_inputs": 0,
+        "review_sha256": "c9015fec93497668073c8c546ff6ffae3aa173d313b5ec5f6260c865b4a05368",
+        "scope": "英中总说明限定读取／文件策略；独立所选技能帮助与四图布局通过。EOF 收尾自身无需本地化变更。"
+      },
+      "local_gates": {
+        "run_id": "r-y_b99yo6",
+        "all_seven_steps_passed": true,
+        "suite_sha256": "80f1538419ae7a40112de80bd71075495705ec82ec5b5a5cbc325e6ffb2a6232",
+        "nextest_passed": 564,
+        "nextest_not_selected_or_skipped": 7695,
+        "i18n_passed": 11,
+        "python_passed": 34,
+        "cargo_check": "passed",
+        "cargo_build": "passed",
+        "actionlint": "passed；仅忽略既有自托管 infinishell-ci 标签未登记告警"
+      },
+      "remaining": [
+        "Linux x64／Windows x64 最终源码编译及相关定向门禁"
+      ],
+      "archive_followup": [],
+      "preserved_failures": [
+        "r-ph4ikgm5 未选路径读取严格审计失败",
+        "r-spl5ejar 原正文／答案审计失败及两代 SIGKILL，不是自然退出",
+        "r-4fii2p5z 监督程序 bundle ID 初始化失败，零原生输入"
+      ],
+      "boundary": "其他平台实机移交不计通过；G06 权限子集校验不等于 G10 真实父子模型链。",
+      "implementation_commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
+      "source_binding_sha256": "7c6cc80dee08e07d3af09510eaf7b7b1eebdcfbb2243001ad1ac5fb6325a2280",
+      "cross_platform_source_gate": {
+        "run_id": 36726214615,
+        "commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615",
+        "ref": "codex/cli-agent-parity-g06-ci-625ffcb98",
+        "result": "pending",
+        "scope": "Linux x64 与 Windows x64 源码门禁；临时同提交 ref 避免取消前轮门禁，非其他平台已认证实机验收。"
+      },
+      "independent_review_sha256": "d06e2c7b1ad89c78097978f3e60773de9ba9104589854f01fa9254e183bfb58e"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

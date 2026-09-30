@@ -2,6 +2,30 @@
 
 本报告保留截至 2026-09-30 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
+## 2026-09-30：G06 Mac 功能条件满足，最终跨平台源码门禁待验
+
+**本轮尚不关闭 G06：当前仍为 3 项关闭、8 项开放、3 项其他平台验收移交，PR #22 保持草稿。** 既有 Claude 多技能、热新增、原生注册确认、恢复、权限上限及 GUI 证据按原构建保留；本轮补齐 Grok 用户来源与固定技能剩余 Mac 条件。既有证据重新索引见仓外 `resume-20260930/g06-closure/existing-evidence-index.safe.json`（SHA-256 `1246eda3e5795065ff6fc8c9862c4b84922fd6c146d038252a279ab6bd3f6d5a`）；旧 GUI 结论按固定 Git 及记载索引复核，没有声称重新打开旧图或重跑模型。
+
+| 原关闭条件 | 本轮证据与边界 |
+| --- | --- |
+| 多技能真实接口及调用顺序 | `r-z26hw4l7` 官方 `1.0.41 (4220f3b224a6)/grok-4.7`、Inherit 私有 leader：local alpha＋user beta → 热新增 user gamma → 冷恢复 user gamma＋local alpha；首技能原生展开、其余精确 read_file 原字节和实际答案分别核对。Grok 工具执行不保证严格串行。固定策略改为保留用户选择顺序，权限集合仍规范排序；原有 Claude 顺序审批／执行证据保持。 |
+| 会话内新增、准确注册确认 | 用户链核实原生 `reloaded:1`，并按同会话目录中的 scope、qualifiedName、原绝对路径与字节核验。新增前不可见，确认后模型真正使用；不是仅凭目录有文件计成功。 |
+| 路径与权限边界 | Inherit 多技能在原有独立 slash 块和文本／图片之后追加已核目录引用 JSON，仅含所选 qualifiedName/path，正文与隐藏标记不进入用户输入。`r-j2y3ivom` 固定技能三轮真实 Skill 拒绝／允许／冷恢复允许；两代未选 beta 均经真实生产控制器拒绝，原生历史无额外输入。固定来源副本、策略快照及合法／非法子集合按生产函数校验；没有创建真实子任务，不是 G10 父子全链成功。 |
+| 历史恢复与失败原子性 | 用户链同原生 ID `01a0f27c-a1b6-72a3-be76-5076c80f9e18` 三次输入、三次精确接收、零重投；固定链同 ID `01a0f29b-598c-7f61-8162-6cc52aa3ae9b` 三次输入，两代快照不扩张。两条链各两代自然 `stdio_closed/exit 0`；固定链另核原生 wait status 0。既有注册失败回滚、回执与清单落盘顺序及历史重放回归继续按原来源计证。 |
+| 用户功能英中审计及目标源码门禁 | 英文总说明改为 “These read and file policies…”，简中同步限定读取／文件工具策略，独立已选技能帮助保持准确。`r-vjchihj0` 四张真实 GUI 图在 1280×800 逻辑窗口逐张审阅，目标说明换行及控件可见；滚动边缘不是文案截断，零模型输入。最终 Mac 门禁通过；最终提交 Linux／Windows 门禁仍待验。 |
+
+用户链收据 SHA-256 `b2f6db4f0c8789dbbff5ec832a7279c2ea8bf5c94d5c19cc3ef782f05a239a55`，原生审计 `dd7de44bb5b3064ce179177399683f09b35100e71420892a059427a2cdc56535`。其模型运行通过、外层封装因清理判据曾返回 1；随后精确归属、进程／资源组／launchd／打开文件与认证副本复核完成清理，独立完成收据 `904ab0af99f7382ab2d6e4d8ab08e983036f681658b994a72ff82ce3bb94fc5e`。原外层失败未覆盖。用户链不证明 GUI 或协调器 SQLite。
+
+固定链 `r-j2y3ivom` 收据 SHA-256 `b22d69f670c19b83aa0f0b1da7746883b771eccb606ce40de74ef31cc93470f6`，原生审计 `249b4d3cac5d25ac25937e0b2f6d2c63206570d66881d979a55cd2a42f03e0df`；监督程序 `r-b0dvdqb5` 签名后映像 `f676cea8bf4af97d17a70615aed7df481d9e35c0b32e0decd9fa2dd7b3f16915`，构建绑定 `a03a9ce241d6c21bdd0354bf87b0dc5f5606718a4d60ef0d95f9ee9c75d83055`。原生两代清理确认、认证副本已删除；外层曾因 16 个系统 mdworker 新标签保守保留短目录；这些服务自行退出，未由验收脚本停止。随后精确核实两代原生 wait status 0、资源组／job／PID／PGID 均退出、打开文件与认证副本为零后完成清理；独立完成收据 SHA-256 `8c8845e767fd1d2eb9b95f1ef4118d4398c586418bbc441e1cedd5370c7d1371`，清理最终索引 `b9a12f1bd393edbfd503857bc1c8b3fa7320c804e3004b0f453fb9376bb87845`。该保守保留不是产品失败。独立复核三轮原生回放与两代进程原件，保持严格正文、最终答案、未选权限和退出规则；审查收据 SHA-256 `d06e2c7b1ad89c78097978f3e60773de9ba9104589854f01fa9254e183bfb58e`。本链不证明 GUI、协调器重启、真实子任务或 OS 沙箱。
+
+旧用户轮 `r-ph4ikgm5` 先尝试未选 local beta 路径并得到 FileNotFound，之后正确读取 user beta；原严格审计仍失败，没有放宽额外工具／路径限制。旧固定轮 `r-spl5ejar` 原收据的“技能完整正文或实际最终答案不匹配”保留；后续检查又确认两代 `exit_code:null`、native wait status 9，不能把清理 SIGKILL 当自然退出。`r-4fii2p5z` 在监督程序四段 bundle ID 初始化时失败，原生 session 为空、零模型输入；只修正仓外三段 ID 封装后复验，不改写旧收据。
+
+退出修复只适用于固定受审 Grok `.41 --no-leader --agent-profile … stdio` 的已拥有进程：启动时核固定平台工件、文件身份与精确参数；仅 StdioClosed 提供 8 秒有界收尾／40 秒退出确认，普通进程及取消、宿主断连沿用原期限。公开 1.0.41 源码的 EOF 至少有 100ms＋2 秒固定等待，已列有界排空合计约 7.1 秒，旧 2 秒宽限存在冲突；公开 SOURCE_REV 与官方 stock 工件不同，不声称两者二进制等价。源码审查 `fixed-stdio-eof-source-review.safe.json` SHA-256 `af6ecfd48d0be90e2b8cca3aa759c635303d532fde0fce3c2b407dea56d1cfa8`。这项收尾修复本身无需本地化变更；本轮技能策略说明的双语变化与 GUI 审计另行计证，独立布局收据 `c9015fec93497668073c8c546ff6ffae3aa173d313b5ec5f6260c865b4a05368`。
+
+最终 Mac `r-y_b99yo6` 七步通过：cargo check、libtest 编译、564 项 Grok／固定策略／托管进程定向 nextest、11 项 i18n、34 项 Python 审计回归、actionlint（仅忽略既有 `infinishell-ci` 自托管标签未登记告警）、应用构建；7695 项未选／跳过不计通过。套件收据 SHA-256 `80f1538419ae7a40112de80bd71075495705ec82ec5b5a5cbc325e6ffb2a6232`，未签名应用 `cd82decbde36c94bbd026c9fa003960e64e73bbdb8ad104c606e3f520869e416`。它绑定 `e36adfd6c272c7533a2f600b259e754e5a507f47` 基线加冻结工作区逐文件摘要，不能称干净 HEAD 构建。用户链与 GUI 保留其原工件；与上一套件共有文件有 8 个变化，技能编码、目录逻辑及两种 FTL 摘要未变，不称最终程序重跑旧链。
+
+实现提交 `625ffcb98b09d0ecbefa9e21356ecb8401a7407c` 已推送，84 份冻结源码逐文件匹配，绑定收据 SHA-256 `7c6cc80dee08e07d3af09510eaf7b7b1eebdcfbb2243001ad1ac5fb6325a2280`。[本轮 Linux／Windows 源码门禁 36726214615](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615) 的 headSha 已核对；使用同提交临时 ref 保留前轮仍在运行的门禁，结果待定。G06 仅剩该源码门禁，仍开放。其他平台已认证模型及 GUI 实机按用户新范围移交，不计通过，也不删除三目标平台实现条件。新固定轮独立清理已归档。G10 的父子任务、命令与邮箱整项范围没有随本轮缩减或关闭。
+
 ## 2026-09-30：G01 Mac 功能与双语审计满足，外平台实现仍开放
 
 **Mac G01 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入仍未实现，G01 必要缺口保持开放。** 原生 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd` 的 check、74 项库回归及构建通过，映像 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`。纯显示动画不再无条件撤销输入 epoch，首页预创建允许命令同步代际 0/1；Agent 代际与审批／后台任务等危险待处理守卫保留。宿主每连接先捕获内核对端凭据，再持续核验进程、签名与 PTY；完整 SHA-256 校验保留，开发配置仅提高 `sha2` 优化级别。响应读取改为 nonblocking＋poll 的绝对截止时间，修正对端关闭后再次设置 `SO_RCVTIMEO` 返回 `EINVAL` 的回包丢失。
