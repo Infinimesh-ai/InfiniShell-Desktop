@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G02/G04/G05；G01 功能与双语审计已满足、待精确提交 CI；3 项外平台验收移交，8 项仍开放；PR #22 保持草稿",
+  "status_zh": "本次 Mac 范围关闭 G02/G04/G05；G01 的 Mac 功能与双语完成但 Linux/Windows 实现仍缺；3 项外平台验收移交，8 项仍开放；PR #22 保持草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -104,8 +104,9 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "最终提交精确 SHA 的 Linux／Windows 源码 CI",
-        "将最终提交与已核验冻结源码／工件／分轮验收对应后正式评估关闭"
+        "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
+        "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
+        "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
       ],
       "gap_closed": false,
       "paste_gui_evidence": {
@@ -131,7 +132,13 @@
         "scope": "仅中文一条文案缩短，提示含句号及占位文本完整；两轮模型正例按原工件计证，不重复执行或计数。",
         "cleanup": "App 1912 自然退出 0，本轮进程与打开文件清理确认，认证副本删除，小证据归档后短目录已清理。",
         "gap_closed": false
-      }
+      },
+      "scope_correction": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/scope-correction.safe.json",
+        "sha256": "33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863",
+        "bytes": 3851
+      },
+      "implementation_complete_across_targets": false
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -400,7 +407,7 @@
     "closed_gaps": []
   },
   "g01_unbound_pty_feasibility_followup": {
-    "status": "Mac G01 原生功能、普通 GUI 与双语审计已满足；暂待最终提交精确 SHA Linux/Windows 源码 CI，G01 仍开放",
+    "status": "Mac G01 功能与双语审计完成；Linux 宿主普通桥、Windows 原生传输及宿主接入仍缺实现，G01 必要缺口开放",
     "evidence_boundary": "idle_prompt 曾在帮助模态、未提交草稿和后台工具期间出现，空会话也可能超过 66 秒不出现；permission_prompt 不证明 Enter 安全",
     "native_requirement": "原生可认证接入既有会话，原子核对编辑器修订、模态与审批状态的 submit_if_idle，以及单次消费回执",
     "scope": "旧探针及发行包检查事实保留；已确认可从官方源码补齐原生能力，不能继续将缺源码列为等待上游的阻塞。专属 TUI 的已通过回合不外推普通未绑定 PTY，定制构建不继承固定发行版验收。",
@@ -421,7 +428,7 @@
       "build_boundary": "公开快照 SOURCE_REV 与已验发行版标识不同；定制构建须单独绑定源码、二进制及验收证据，不能冒充原发行二进制。",
       "native_worktree": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native",
       "native_branch": "codex/infinishell-atomic-input",
-      "remaining": "完成最终提交精确 SHA Linux/Windows 源码 CI 与分轮源码／工件证据绑定；Mac 功能及双语条件已满足。"
+      "remaining": "继续实现 Linux 宿主普通桥接入与 Windows 原生传输／宿主接入并通过源码门禁；仅其他平台实机验收由用户后续执行。"
     },
     "closed_gaps": [],
     "ordinary_pty_validation": {
@@ -435,7 +442,7 @@
       "gap_closed": false
     },
     "host_implementation": {
-      "status": "mac_function_and_bilingual_passed_exact_commit_ci_pending",
+      "status": "mac_function_and_bilingual_passed_cross_platform_implementation_open",
       "scope": "系统账号私有 root 与普通 shell 环境；内核 peer/前台 PTY/固定工件签名核验；SQLite 一次领取与跨实例去重；原生 ACK 后按编辑器修订清稿；未知只查，证明未发送与显式同文再次发送分开。",
       "localization": "普通 GUI 与英中粘贴实测按原工件计证；中文手动回退单行缩短后 r-ni936aln 完整显示含句号，占位提示完整，Mac 双语审计已满足。",
       "closed_gaps": [],
@@ -498,7 +505,7 @@
         ]
       },
       "validation": {
-        "status": "mac_function_and_bilingual_passed_exact_commit_ci_pending",
+        "status": "mac_function_and_bilingual_passed_cross_platform_implementation_open",
         "source_commit": "c3b509622542efb529fd92af2645ebc938e55bcb",
         "source_binding": "c3b509622 基线加冻结源码摘要；较 r-zxk8iqk7 仅中文一条回退文案改变，已对照资源差异，不冒称干净 HEAD 构建。",
         "run_id": "r-fdaad6hh",
@@ -514,7 +521,7 @@
         "build_passed": true,
         "source_unchanged": true,
         "cleanup_ready": true,
-        "cross_platform": "暂待最终提交精确 SHA Linux/Windows 源码 CI；旧 c3b509622 CI 不继承。",
+        "cross_platform": "5629588b7 的 CI 36714435483 运行中；Linux 宿主接入／Windows 原生传输和宿主接入仍缺，CI 通过不能替代实现。",
         "gap_closed": false
       },
       "historical_validations": [
@@ -632,14 +639,15 @@
         "gap_closed": false
       },
       "paste_followup": {
-        "status": "mac_function_and_bilingual_passed_exact_commit_ci_pending",
+        "status": "mac_function_and_bilingual_passed_cross_platform_implementation_open",
         "patch_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/grok-paste-local-draft.patch",
         "patch_sha256": "07ada51a7aada94a218320eb52949c221f70b6d7d312ecb53bda553078bd22f4",
         "scope": "关闭富输入后的 Grok 文本粘贴只打开并恢复／追加本地草稿，不写 PTY/socket、不自动提交；旧目标守卫、图片及其他 CLI 路径不变。",
         "localization": "英中粘贴仅存草稿与英文回退提示通过；中文回退单行缩短后 r-ni936aln 显示完整含句号，占位提示完整，Mac 双语审计满足。",
         "remaining": [
-          "最终提交精确 SHA 的 Linux／Windows 源码 CI",
-          "将最终提交与已核验冻结源码／工件／分轮验收对应后正式评估关闭"
+          "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
+          "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
+          "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
         ],
         "gap_closed": false,
         "validation_run": "r-fdaad6hh",
@@ -739,8 +747,9 @@
       "local_gates": "原生 cargo check、四包 terminal_bridge 库回归 74/74 与独立构建通过；最终二进制绑定 1491b486。",
       "suite_sha256": "481ad27382ac47df7f1e3d52d6a085273c427ea9d43ae62e5c4ac0fa04d949f1",
       "remaining": [
-        "最终提交精确 SHA 的 Linux／Windows 源码 CI",
-        "将最终提交与已核验冻结源码／工件／分轮验收对应后正式评估关闭"
+        "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
+        "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
+        "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
       ],
       "closed_gaps": []
     },
@@ -750,6 +759,28 @@
       "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-wudipm8z-gui/acceptance-summary.safe.json",
       "sha256": "3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa",
       "gap_closed": false
+    },
+    "scope_correction": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/scope-correction.safe.json",
+      "sha256": "33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863",
+      "bytes": 3851
+    },
+    "remaining_implementation": [
+      "Linux 宿主普通 Grok 原生桥发现、可信进程／PTY 绑定与提交／恢复接入实现",
+      "Windows Grok 原生桥传输及宿主发现、可信进程／ConPTY 绑定与提交／恢复接入实现",
+      "上述实现的目标平台源码门禁；其他平台实机功能验收仍由用户后续执行"
+    ],
+    "commit_binding": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/commit-5629588b7-binding.safe.json",
+      "sha256": "812edfc3c49188b00b5edce62cfa4af1e463ec762755a3686271a4cbedf4daf6",
+      "bytes": 3014
+    },
+    "current_cross_platform_ci": {
+      "run_id": 36714435483,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483",
+      "source_commit": "5629588b77b15e27c9e046cc6326171370297dc6",
+      "status": "in_progress",
+      "boundary": "仅当前已编译路径的源码门禁；不代替 cfg 排除的 Linux／Windows 普通桥实现或实机验收。"
     }
   },
   "g03_owned_image_drop_followup": {
