@@ -130,7 +130,7 @@
     "boundary": "提交前工作区完整check、四库74项、build及3项零模型启动检查通过；最终源码与提交逐文件匹配。Mac正式信任工件仍为原.3，不将本轮Mac .11构建记为GUI验收；Windows栈与子进程回归待目标执行。"
   },
   "limitations": [
-    "Mac G01原.3功能与双语审计已满足；Linux宿主和Windows原生/宿主已实现。Linux已绑定.6；Windows .11启动与四项终端守卫回归、可用工件摘要绑定及最终源码门禁仍待完成。",
+    "Mac G01原.3功能与双语审计已满足；Linux宿主和Windows原生/宿主已实现，分别绑定.6与实际可用的.11工件。绑定后的精确最终宿主源码门禁待验，G01仍开放。",
     "普通 GUI、粘贴增量与最终中文布局分别绑定 r-wudipm8z、r-g91qynam、r-ni936aln；最后仅 zh-CN FTL 变化已核验，历史模型输入不重跑或重计。",
     "旧 .1 英文立即断连 Unknown／零输入及恢复后旧 query Unknown 保留失败；.3 不声称旧 Unknown 跨原生实例自动转 ACK。",
     "其他平台实机验收移交用户；Linux／Windows 实现缺项没有移交，源码 CI 也不代替实现。",
@@ -1040,7 +1040,7 @@
     "bytes": 3851
   },
   "remaining_implementation": [
-    "Linux/Windows .6实际构建、目标平台新身份/目录回归、宿主固定工件摘要绑定及最终同源码门禁",
+    "三平台工件摘要已绑定；Linux/Windows绑定后的精确最终宿主源码门禁仍待验",
     "其他平台实机验收仍由用户后续执行；旧Mac .3功能及双语证据不改写"
   ],
   "commit_binding": {
@@ -1049,36 +1049,41 @@
     "bytes": 3014
   },
   "current_cross_platform_ci": {
-    "run_id": 36774428641,
-    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641",
-    "source_commit": "08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8",
-    "custom_version": "1.0.41+infinishell.terminal-bridge.10",
+    "run_id": 36780256382,
+    "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382",
+    "source_commit": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+    "custom_version": "1.0.41+infinishell.terminal-bridge.11",
     "status": "completed",
     "conclusion": "cancelled",
-    "cancelled_step": "Build InfiniShell SSH worker",
     "native_check": "passed",
     "native_build": "passed",
-    "bridge_passed": 77,
+    "bridge_passed": 81,
     "bridge_per_library": [
       53,
       20,
-      0,
+      4,
       4
     ],
-    "zero_test_library": "shell-terminal: Unix cfg excluded 4 tests",
-    "failure": "--version main stack overflow",
-    "failure_exit_code": 3221225725,
-    "failure_log_sha256": "65b2e49c9379bd4ccd37808b115a6af2eb8a80eb7c66a64423d87aa308c3a564",
+    "startup_smoke": {
+      "version": "passed",
+      "help": "passed",
+      "async_completions": "passed",
+      "model_inputs": 0
+    },
+    "windows_stack": {
+      "reserve_bytes": 8388608,
+      "commit_bytes": 4096
+    },
     "binary": {
       "file": "xai-grok-pager.exe",
       "bytes": 245529600,
-      "sha256": "3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2"
+      "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"
     },
-    "binary_usable": false,
-    "failure_summary_sha256": "962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278",
-    "archive_summary_sha256": "85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268",
-    "logs_zip_sha256": "eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2",
-    "boundary": "实际PE存在但启动失败，不绑定；零命中不计通过。取消不计整轮成功。"
+    "binary_usable": true,
+    "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+    "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
+    "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
+    "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
   },
   "cross_platform_implementation_feasibility": {
     "product_commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
@@ -1096,10 +1101,10 @@
     "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
     "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
     "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
-    "status": "linux_artifact_bound_windows_build_and_final_gate_pending",
+    "status": "platform_artifacts_bound_final_host_source_gate_pending",
     "linux_artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
-    "windows_artifact_sha256": null,
-    "boundary": "Mac继续绑定已验.3，Linux绑定已验.6；.10 Windows实际PE栈溢出不可用，.11启动栈及四项终端守卫目标复验、工件绑定与最终宿主门禁待完成。",
+    "windows_artifact_sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+    "boundary": "Mac继续绑定已验.3，Linux绑定已验.6，Windows绑定实际启动与81项桥回归通过的.11；保留.10栈溢出及旧失败，绑定后的最终两平台宿主源码门禁待完成。",
     "linux_artifact_binding": {
       "platform": "Linux x64",
       "custom_version": "1.0.41+infinishell.terminal-bridge.6",
@@ -1117,6 +1122,24 @@
       "archive_receipt_sha256": "b2035f23213f7b2c428d5a780559cf9501dfa7f0cba62e52109e5994387cf71c",
       "post_binding_source_gate": "pending",
       "boundary": "绑定独立Linux .6工件，不冒充当前.9源码构建；绑定后源码门禁待与Windows工件统一完成。"
+    },
+    "windows_artifact_binding": {
+      "platform": "Windows x64",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+      "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+      "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+      "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
+      "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+      "bytes": 245529600,
+      "archive_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/windows-terminal-bridge.11/grok.exe",
+      "ci_run_id": 36780256382,
+      "artifact_id": 11128666865,
+      "verification_summary": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36780256382/windows-native-verified.safe.json",
+      "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+      "build_receipt_sha256": "c27e5f47743c5051c1b1c5715e693abb069f39581c9e52a0204611093e0b7bfb",
+      "version_output": "grok 1.0.41+infinishell.terminal-bridge.11 (07e35a3dfeed)",
+      "post_binding_source_gate": "pending",
+      "boundary": "绑定已独立核验的 Windows .11 工件；构建与上传步骤成功，整轮主动取消而非通过，不计其他平台模型或交互桌面验收。"
     }
   },
   "windows_build_dependency_fix": {
@@ -1360,6 +1383,38 @@
       "logs_zip_sha256": "b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a",
       "cancelled_step": "Build InfiniShell SSH worker",
       "failure_summary_sha256": "8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3"
+    },
+    {
+      "run_id": 36774428641,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36774428641",
+      "source_commit": "08f2fff8dc5a1b8502b0cfb7750a0a1a5c064ba8",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.10",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "cancelled_step": "Build InfiniShell SSH worker",
+      "native_check": "passed",
+      "native_build": "passed",
+      "bridge_passed": 77,
+      "bridge_per_library": [
+        53,
+        20,
+        0,
+        4
+      ],
+      "zero_test_library": "shell-terminal: Unix cfg excluded 4 tests",
+      "failure": "--version main stack overflow",
+      "failure_exit_code": 3221225725,
+      "failure_log_sha256": "65b2e49c9379bd4ccd37808b115a6af2eb8a80eb7c66a64423d87aa308c3a564",
+      "binary": {
+        "file": "xai-grok-pager.exe",
+        "bytes": 245529600,
+        "sha256": "3bec46f7f0941f3b5070600ae19605d53ce5043273ae705074963306ab3164f2"
+      },
+      "binary_usable": false,
+      "failure_summary_sha256": "962579e3bb012abd053df6d1c0c2cbc2a1e35200b3bd66434b58cdf68f052278",
+      "archive_summary_sha256": "85712d16f225a5cc338b8186f282b58b2ca5d8f57fca6356a13559aeed075268",
+      "logs_zip_sha256": "eba7f1c433b03f38cdbbb6372222011eb48c2fcc1e22adc35dadaafd6597c7e2",
+      "boundary": "实际PE存在但启动失败，不绑定；零命中不计通过。取消不计整轮成功。"
     }
   ],
   "linux_pidfd_identity_handshake": {
@@ -1683,7 +1738,7 @@
     "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
     "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
     "change": "Windows正式CLI映像主线程预留8MiB，保留按需提交；终端守卫四项测试移植真实Windows子进程，不改生产事务或原断言。构建要求四库分别命中并实际通过版本、帮助及异步补全入口。",
-    "target_status": "pending",
+    "target_status": "passed_windows_81_bridge_tests_and_real_startup_final_host_gate_pending",
     "source_reconstruction_sha256": "beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a",
     "native_local_gate": {
       "run_id": "r-pr0y8law",
@@ -1718,6 +1773,43 @@
     },
     "failure_run": 36774428641,
     "localization": "无需本地化变更",
-    "gap_closed": false
+    "gap_closed": false,
+    "target_validation": {
+      "run_id": 36780256382,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382",
+      "source_commit": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "native_check": "passed",
+      "native_build": "passed",
+      "bridge_passed": 81,
+      "bridge_per_library": [
+        53,
+        20,
+        4,
+        4
+      ],
+      "startup_smoke": {
+        "version": "passed",
+        "help": "passed",
+        "async_completions": "passed",
+        "model_inputs": 0
+      },
+      "windows_stack": {
+        "reserve_bytes": 8388608,
+        "commit_bytes": 4096
+      },
+      "binary": {
+        "file": "xai-grok-pager.exe",
+        "bytes": 245529600,
+        "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"
+      },
+      "binary_usable": true,
+      "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+      "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
+      "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
+      "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
+    }
   }
 }

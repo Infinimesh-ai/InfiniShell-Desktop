@@ -1,6 +1,35 @@
 # CLI 支持与能力对齐：验证结论
 
-本报告保留截至 2026-09-30 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+
+## 2026-10-01：G01 Windows `.11` 可用工件绑定，最终宿主门禁待验
+
+**新增关闭 0 项，保持 4 关闭／7 开放／3 移交，PR #22 草稿。** [运行 36780256382](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382) 精确绑定宿主 `8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66`。Windows 原生 check／build 与全部 21 条命令通过，四库 53／20／4／4 共 81 项真实执行；protobuf 6 项、登录解析 2 项、资源整理 2 项及管道名称上界 1 项通过。此前被 Unix cfg 排除的四个终端守卫测试本次在 Windows 真实执行，不能追记旧 `.10` 为 81 项。PE 栈 reserve 为 8 MiB、commit 为 4 KiB，实际 `--version`、`--help` 及进入异步初始化的 `completions bash` 均成功，零模型输入。
+
+受审来源为 native commit `77d8004b18b5d7c7f7ced42f084dbe5a54048a23`，tree `52afcf3ebad44daaef887cbe2cfe3ed003d6d44e`，补丁 SHA-256 `7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408`。原生版本输出 `grok 1.0.41+infinishell.terminal-bridge.11 (07e35a3dfeed)` 的括号保留公开基线标识，不冒充 native commit。Windows 映像 245,529,600 字节、SHA-256 `acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc`，已绑定宿主身份校验；独立命名副本位于仓外 `g01-cross-platform/windows-terminal-bridge.11/grok.exe`。原 ZIP 与 GitHub 元数据摘要 `3e02067603835a136644cac4c3ef302db9f3042dbd59fcf0f996660173a1f06a` 相同，独立逐日志／源码／PE 核验收据 `windows-native-verified.safe.json` SHA-256 `01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061`，原构建收据 `c27e5f47743c5051c1b1c5715e693abb069f39581c9e52a0204611093e0b7bfb`。
+
+构建和上传步骤成功、工件独立归档后主动取消剩余重复验证；**整轮为 completed／cancelled，不能称 workflow PASS**。终态收据 `ci-36780256382/terminal-final-audit/run-final.safe.json` SHA-256 `90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062`，整轮原始日志 ZIP `4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703`。额外符号链接资源测试仍是 Win32 1314 的 `deferred_not_passed`，旧 `.10` 栈溢出与此前失败不改写。
+
+同轮固定 Codex Hook／ConPTY 原件各有 8 条关闭记录，共 16 条，根均自然 exit 0、stdout／stderr 真实 EOF、创建即严格 Job 归属、Job 清空且关闭；Hook 一代在宽限后有界回收 5 个自有后代，不称所有后代自然退出。ConPTY 8 代均无强制后代，4 条真实 OSC 与原始 RPC 中 LF／CRLF、路径和正文逐字相符。Hook 私有根与 ConPTY cases 清理完成，加载 DLL 的宿主目录明确保留；不推断旧 WinError32 根因已解决。独立审计 `fixed-codex-cleanup-independent-review.safe.json` SHA-256 `9b7aa445275da7638e41d6a152d5c92931f6e1c03d137949291370459f770e81`。
+
+Mac 保留已验 `.3`、Linux 保留已验 `.6`，本次 Windows 摘要绑定无需本地化变更。G01 的 Mac 功能与双语条件已满足，三平台实现及工件已补；剩余为绑定后的精确提交 Linux／Windows host 门禁。既有 `run_grok_native_bridge_host=true`、`run_grok_native_bridge_source=false` 可复用原生工件；须设 `native_acceptance_only=false` 覆盖 Linux 桌面／TUI，并实际核对完整 local_tty、Windows stale environment 回归、同提交主程序／SSH helper 及原 ConPTY 验证。源码门禁与其他平台实机边界继续分开，当前不关闭 G01。
+
+本轮绑定与英中文案修改后的 Mac `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed` 已通过（`r-4ezwcxsq`，日志 SHA-256 `95a2caaa02e8f26804a3c06d61cfe55bb30365a8eec778cbf490a7e174d3aea9`），i18n 11／11 通过（`r-2igyr7c_`，日志 `6fc879c83db7f04c7967ef11e4ccd831147e6e2d4a72ed850b3dd318f51f9314`）；两轮 exit 0、`cleanup_ready=true` 且短目录已清理。普通桥与持久化 55 项、文件附件 5 项在 `r-xcknnh99` 共 60／60 首次通过（日志 `75c3599fd2fd1cc3ba075ed84d1bb13a46296acefa0ed513573f7d45b035d895`）；首个筛选未覆盖带中间 tests 模块的提交测试，另用精确筛选在 `r-gjgn894d` 补齐 6／6（日志 `a0555d0fe32dec8cb7354f7aa5ac8229ab7c0b7fe6c8b5788bd6be6487b57ce6`），均 retries 0、exit 0 并清理；新 GUI 构建／布局和最终跨平台源码门禁待完成。
+
+## 2026-10-01：G07 普通 Grok 双文件与拒绝通过，Toast 新布局及 Claude／Codex 剩余链待验
+
+Mac 独立签名 GUI `r-i4txg6p2` 使用构建提交 `582596a090f9b0042ccc349fc9568e3fe072e6d1`，源二进制 SHA-256 `255fd673d78ab939d55a9156c22b2eb597a1605ec1725e5770af01000cde7206`，签名后二进制 `15cef3f5b4ad66d7932a6dc1de8935dec8f6144bd8f823217885c376cbea316c`。后续 `8e1f1fcaf` 为只读改动审查，**没有在该 HEAD 重建 GUI**；绑定收据 `e7cfb6839f3a4ae76b3618adb185f26e0002f7ea08216fa5b7e3dc353e6cef65`，后续审查归档 `a301433cce743a5d25e8eb05db077c2cabaf371c365460e7c87616561bbfab86`。普通 shell 启动固定 Mac `.3` 映像，不使用 owned 入口。
+
+| 场景 | 真实结果与边界 |
+| --- | --- |
+| 收起入口双文件正例 | 系统选择器形成英文空格名、中文空格名双卡；单次提交的原路径 JSON 顺序与可见卡片一致，输入无隐藏标记。宿主原文、原生原文、两账本摘要和 ACK 对齐；两次真实 `ReadFile` 的 typed 路径和原字节输出分别核对，答案精确两行、`end_turn`，稿卡清空。不是仅匹配 prompt 中的路径。 |
+| 原生读取权限拒绝 | 同 SID `01a0f448-713b-79b3-8aa2-5ff84b3a3562` 的后续一次 `read_file` 尝试，由用户明确拒绝，零成功读取／零替代工具／零拒绝文件标记进入历史。终态 `permission_rejected/cancelled`，没有模型 `READ_DENIED` 回复；已 ACK 输入不重新恢复为未发草稿。 |
+| 成卡后删除／mode 000 | 双卡先建立，再删除第二文件得 ENOENT；另恢复原字节后设 mode 000，实际 open 得 EACCES。提交后本地稿和双卡保留，宿主消息、原生回合／工具、桥回执均零新增，历史和账本不变。未测精确 PTY 字节；早期驱动截短 20 字节的尝试不计拒绝验收。第 27 图真正提交前已恢复完整 69 字节中文稿，对应 d0bb 审计；第 28 图为 mode 000 独立拒绝。 |
+| 双语与布局 | 当前错误 Toast 存在截断，不计完整双语通过。英中提示已改为短两行，须新构建分别核验全文、换行与控件布局；旧模型正例按旧工件保留，不冒称新 FTL 已验。 |
+
+仓外目录 `resume-20260930/g07-preparation/r-i4txg6p2-grok-gui`：正例 `positive.safe.json` SHA-256 `e2240262d915d4dc03092a9d665442aad36c6ff88d42bd505932bb649722e12e`；拒绝 `refusal.safe.json` 为 `cf4f3a8e67e69521181606ceeeb2a8da3b201983d42aa31ce4e2b92aa5c012ec`；删除后比较 `d0bb1740acd59b8ab2adc0fd446bf78de18b2e25a407ad96099736f771c682ec`；mode 000 后比较 `45b1d74454e9529df7579808084e88ae5db9067175f3f529385a1e28fefe0f95`；白名单索引 `acceptance-index.safe.json` 为 `e70e0e66e7487a5c12d8183a26c8ee5b4561d8773ab5d10e5fa7d71bfdea6528`。未读取拒绝文件正文作审计，也未导出完整原生 system／reasoning／history 或认证数据。
+
+`finish` 确认 App 与已拥有进程退出、私有认证副本删除，profile／数据库保留；小证据归档后外层 exit 0、`cleanup_ready=true`，短目录状态 `cleaned`，日志 SHA-256 `9b8996c38bdb44f6901ccd0856273ce994f904a7f7d81fe55aeec65312aeaf5e`。本轮仍缺新 Toast 英中布局、Claude 普通 GUI 双文件／必要失败拒绝链，以及固定 Codex 0.156.1 的原生读取审批拒绝；旧 Shell 模式保护不代替原生拒绝，旧 TextEdit 拒绝原件未复核，不作为本轮关闭依据。G01 绑定后的最终源码门禁也待完成。**G07 不关闭，计数仍为 4／7／3。**
 
 ## 2026-09-30：G06 本次 Mac 范围关闭
 

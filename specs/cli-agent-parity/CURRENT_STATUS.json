@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 的 Mac 功能与双语完成但 Linux/Windows 实现仍缺；3 项外平台验收移交，7 项仍开放；PR #22 保持草稿",
+  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 三平台实现与工件绑定已补，最终宿主源码门禁待验；G07 Grok普通双文件及拒绝链取得真实证据，双语提示、Claude链及Codex原生拒绝待验；4项关闭、7项开放、3项移交，PR #22草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -105,8 +105,7 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Windows .11启动与四项终端子进程守卫目标回归、可用工件摘要绑定",
-        "Linux/Windows工件绑定后的最终源码门禁；其他平台实机验收由用户后续执行"
+        "Linux/Windows工件绑定后的精确最终宿主源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
       "paste_gui_evidence": {
@@ -138,7 +137,7 @@
         "sha256": "33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863",
         "bytes": 3851
       },
-      "implementation_complete_across_targets": false,
+      "implementation_complete_across_targets": true,
       "source_gate": {
         "run_id": 36714435483,
         "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483",
@@ -407,7 +406,7 @@
         "gap_closed": false
       },
       "final_host_gate_preparation": {
-        "status": "implemented_not_run",
+        "status": "windows_artifact_bound_exact_post_binding_commit_pending",
         "workflow": ".github/workflows/cross-platform-preflight.yml",
         "input": "run_grok_native_bridge_host",
         "scope": "不重建Grok原生工件，必验完整local_tty/普通桥、Windows主程序与SSH辅助二进制、真实原ConPTY及含历史LEAK的桌面/TUI组。",
@@ -419,7 +418,17 @@
           "status": "cleaned"
         },
         "localization": "无需本地化变更",
-        "gap_closed": false
+        "gap_closed": false,
+        "inputs": {
+          "run_linux": true,
+          "run_windows": true,
+          "run_grok_native_bridge_host": true,
+          "run_grok_native_bridge_source": false,
+          "native_acceptance_only": false,
+          "full_workspace_tests": false,
+          "linux_gui_only": false,
+          "windows_grok_installer_only": false
+        }
       },
       "windows_native_bridge_9_build_attempt": {
         "run_id": 36770502561,
@@ -503,7 +512,7 @@
         }
       },
       "source_gate_cleanup_evidence_fix": {
-        "status": "local_passed_windows_pending",
+        "status": "windows_real_evidence_passed_with_explicit_forced_descendant_boundary",
         "change": "Windows hook/ConPTY共用私有目录清理入口核验每个formal/candidate阶段全部关闭收据的暂停归属、Job为空及关闭证明；缺证保留现场。descendants_job_verified仅在全部通过后置true。",
         "preserved_failure": "WinError32共享占用仍传播且保留现场；不延长等待、不改ACL或忽略错误，不声称解决此前文件占用。",
         "local_gates": {
@@ -526,7 +535,17 @@
         },
         "cleanup": "三轮短目录均已归档和清理",
         "localization": "无需本地化变更",
-        "gap_closed": false
+        "gap_closed": false,
+        "windows_validation": {
+          "run_id": 36780256382,
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36780256382/fixed-codex-cleanup-independent-review.safe.json",
+          "sha256": "9b7aa445275da7638e41d6a152d5c92931f6e1c03d137949291370459f770e81",
+          "process_closes": {
+            "hooks": 8,
+            "conpty": 8
+          },
+          "boundary": "全部根自然exit0、双EOF、创建时严格Job归属/清空/关闭；Hook一代宽限后回收5个自有后代，不称全后代自然退出。ConPTY仅cases清理，DLL宿主目录明确保留。不推断旧WinError32根因已解决。"
+        }
       },
       "windows_native_bridge_10_build_attempt": {
         "run_id": 36774428641,
@@ -565,7 +584,7 @@
         "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
         "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
         "change": "Windows正式CLI映像主线程预留8MiB，保留按需提交；终端守卫四项测试移植真实Windows子进程，不改生产事务或原断言。构建要求四库分别命中并实际通过版本、帮助及异步补全入口。",
-        "target_status": "pending",
+        "target_status": "passed_windows_81_bridge_tests_and_real_startup_final_host_gate_pending",
         "source_reconstruction_sha256": "beaf4ae673a15573d79c80cf8c06578e99ffaef1ce3bffc22988f264e00c566a",
         "native_local_gate": {
           "run_id": "r-pr0y8law",
@@ -601,6 +620,61 @@
         "failure_run": 36774428641,
         "localization": "无需本地化变更",
         "gap_closed": false
+      },
+      "windows_artifact_binding": {
+        "platform": "Windows x64",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+        "native_commit": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+        "native_tree": "52afcf3ebad44daaef887cbe2cfe3ed003d6d44e",
+        "patch_sha256": "7690e16a7bd42fcdd591d453acb6434571c92b45561139b87eb31cb2d20fa408",
+        "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+        "bytes": 245529600,
+        "archive_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/windows-terminal-bridge.11/grok.exe",
+        "ci_run_id": 36780256382,
+        "artifact_id": 11128666865,
+        "verification_summary": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36780256382/windows-native-verified.safe.json",
+        "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+        "build_receipt_sha256": "c27e5f47743c5051c1b1c5715e693abb069f39581c9e52a0204611093e0b7bfb",
+        "version_output": "grok 1.0.41+infinishell.terminal-bridge.11 (07e35a3dfeed)",
+        "post_binding_source_gate": "pending",
+        "boundary": "绑定已独立核验的 Windows .11 工件；构建与上传步骤成功，整轮主动取消而非通过，不计其他平台模型或交互桌面验收。"
+      },
+      "windows_native_bridge_11_build_attempt": {
+        "run_id": 36780256382,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36780256382",
+        "source_commit": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.11",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "native_check": "passed",
+        "native_build": "passed",
+        "bridge_passed": 81,
+        "bridge_per_library": [
+          53,
+          20,
+          4,
+          4
+        ],
+        "startup_smoke": {
+          "version": "passed",
+          "help": "passed",
+          "async_completions": "passed",
+          "model_inputs": 0
+        },
+        "windows_stack": {
+          "reserve_bytes": 8388608,
+          "commit_bytes": 4096
+        },
+        "binary": {
+          "file": "xai-grok-pager.exe",
+          "bytes": 245529600,
+          "sha256": "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"
+        },
+        "binary_usable": true,
+        "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
+        "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
+        "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
+        "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
       }
     },
     "g06_progress": {
@@ -700,6 +774,63 @@
       "independent_review_sha256": "d06e2c7b1ad89c78097978f3e60773de9ba9104589854f01fa9254e183bfb58e",
       "closed_on": "2026-09-30",
       "closure_basis": "原条件逐项核对：多技能及选择顺序、会话内新增、路径／权限、准确注册确认、历史恢复和失败原子性均有实现及实际证据；Grok 不承诺工具严格串行。各轮源码独立绑定，其他平台实机后置，G10 父子链不外推。"
+    },
+    "g07_progress": {
+      "status": "open",
+      "run_id": "r-i4txg6p2",
+      "platform": "macos-arm64",
+      "agent": "普通 Grok .3 / grok-4.7",
+      "owned_entry_used": false,
+      "source_build_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
+      "reviewed_head": "8e1f1fcaf5a07500c5cbd19c4ee37fa8fcbbed66",
+      "rebuilt_at_reviewed_head": false,
+      "raw_binary_sha256": "255fd673d78ab939d55a9156c22b2eb597a1605ec1725e5770af01000cde7206",
+      "signed_binary_sha256": "15cef3f5b4ad66d7932a6dc1de8935dec8f6144bd8f823217885c376cbea316c",
+      "native_binary_sha256": "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+      "binding_sha256": "e7cfb6839f3a4ae76b3618adb185f26e0002f7ea08216fa5b7e3dc353e6cef65",
+      "post_build_review_sha256": "a301433cce743a5d25e8eb05db077c2cabaf371c365460e7c87616561bbfab86",
+      "native_session_id": "01a0f448-713b-79b3-8aa2-5ff84b3a3562",
+      "positive": {
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2-grok-gui/positive.safe.json",
+        "sha256": "e2240262d915d4dc03092a9d665442aad36c6ff88d42bd505932bb649722e12e",
+        "accepted": "普通收起态文件选择器生成英文空格名与中文空格名双卡；单次提交的原路径JSON顺序、宿主/原生原文和两账本digest一致。两次真实ReadFile输入/原字节结果、独立标记两行答案与end_turn通过，标记未进入prompt，ACK后清稿清卡。"
+      },
+      "native_refusal": {
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2-grok-gui/refusal.safe.json",
+        "sha256": "cf4f3a8e67e69521181606ceeeb2a8da3b201983d42aa31ce4e2b92aa5c012ec",
+        "accepted": "同原生SID独立原生Read审批明确拒绝；仅一次read_file尝试、零成功结果、零替代工具、拒绝文件标记未进入历史，终态permission_rejected/cancelled。",
+        "boundary": "没有READ_DENIED模型回答；输入已ACK，不恢复已交付草稿。"
+      },
+      "invalid_after_card_creation": {
+        "delete_audit_sha256": "d0bb1740acd59b8ab2adc0fd446bf78de18b2e25a407ad96099736f771c682ec",
+        "mode000_audit_sha256": "45b1d74454e9529df7579808084e88ae5db9067175f3f529385a1e28fefe0f95",
+        "accepted": "双卡建立后删除第二文件（ENOENT），以及恢复原字节后设mode000（EACCES）；提交均保留本地稿和双卡，宿主消息/原生回合/工具/桥回执零新增，历史与账本不变。",
+        "boundary": "未取得精确PTY写入字节数；早期驱动截短20字节的尝试不计拒绝验收。第27图真正提交前已恢复完整69字节中文稿，对应d0bb审计；第28图为mode000独立拒绝。"
+      },
+      "evidence_index": {
+        "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2-grok-gui/acceptance-index.safe.json",
+        "sha256": "e70e0e66e7487a5c12d8183a26c8ee5b4561d8773ab5d10e5fa7d71bfdea6528"
+      },
+      "localization": {
+        "status": "toast_truncation_fix_pending_new_build_verification",
+        "finding": "当前文件错误Toast被截断；英中提示已改为短两行，须新构建分别验证完整内容与布局，本轮不记双语整体通过。"
+      },
+      "cleanup": {
+        "outer_record": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2.json",
+        "status": "cleaned",
+        "exit_code": 0,
+        "cleanup_ready": true,
+        "log_sha256": "9b8996c38bdb44f6901ccd0856273ce994f904a7f7d81fe55aeec65312aeaf5e",
+        "finish_sha256": "0a1322d85cdb14ebbb0bba904993811f6b69c2215bb3e8bba5328da22310ca90",
+        "boundary": "App与已拥有进程退出、认证副本删除，白名单小证据归档后短TMPDIR已清理；profile/DB保留，完整原生system/reasoning/history未导出。"
+      },
+      "remaining": [
+        "新构建的文件错误Toast英文与简体中文完整布局验收",
+        "Claude独立已认证普通GUI的双文件读取与必要失败/拒绝链",
+        "固定Codex0.156.1原生文件读取审批拒绝；旧Shell模式保护不代替原生拒绝，旧TextEdit拒绝原件尚未复核",
+        "G01平台工件绑定后的最终源码门禁；其他平台实机按用户授权后置"
+      ],
+      "gap_closed": false
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

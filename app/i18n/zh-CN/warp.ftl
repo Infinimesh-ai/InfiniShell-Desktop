@@ -5741,7 +5741,9 @@ cli-agent-input-images-processing = 请等待图片处理完成。草稿已保�
 
 cli-agent-input-file-attachment-unavailable = 此 CLI 输入暂不支持发送文件附件卡片。请改为插入文件路径；草稿和附件已保留。
 cli-agent-input-non-image-drop-unavailable = 此 Grok 输入只接受拖入图片文件。未发送任何路径，草稿未改动。
-cli-agent-input-file-unreadable = 无法附加 { $filename }：文件不存在、不可读取或不是普通文件。草稿和附件已保留。
+cli-agent-input-file-unreadable =
+    文件不可用，草稿和附件已保留。
+    { $filename }
 cli-agent-input-remote-file-unavailable = 暂时无法将本地文件附件发送给此远程 CLI。草稿和附件已保留。
 cli-agent-input-local-file-references = 附加的本地文件（以 JSON 数组编码的绝对路径）：{ $paths }。请使用原生文件工具读取，并遵守权限检查；这些引用不包含文件内容。
 
