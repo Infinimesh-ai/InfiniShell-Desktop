@@ -1,5 +1,7 @@
 # CLI 集成的支持与回退说明
 
+**2026-09-30 当前 Goal 范围**：用户将其他平台实机验收移交后续执行，继续补齐原生能力和 Mac 未验项。G04／G05 已按固定 Claude `2.1.280/claude-opus-5-5`、Inherit 的既有真实 Mac 证据关闭；其他平台未改记为通过。G04 支持 PNG、JPEG、静态 GIF、WebP；G05 已验纯 PNG 与 PNG＋单技能语义，不外推所有格式排列或固定策略。其余状态见 [当前范围](KNOWN_GAPS.md#2026-09-30-当前范围)；以下早期记录保留各自源码和边界。
+
 2026-09-26 用户明确目标平台为 macOS Apple Silicon、Linux x64 和 Windows x64；macOS Intel（包括 Codex CLI）不属于当前开发或验收范围。历史 Intel 记录保留原范围。
 
 > **2026-09-25 完成结论更正：阶段交付，完整 Goal 尚未完成。** 已通过的固定版本功能、三平台相关回归及原始收据按固定 Git 提交追溯；功能缺项、模式限制与未覆盖验收不计为完成。统一待办见[已知缺项](KNOWN_GAPS.md)，当前机器可读状态见[CURRENT_STATUS](CURRENT_STATUS.json)，阶段合并范围见[当前状态](CURRENT_STATUS.json)。本说明依据固定基线的实际支持范围，不因目录精简扩大能力，也不表示已经合并或发布。

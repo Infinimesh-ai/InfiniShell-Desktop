@@ -1,5 +1,7 @@
 # CLI 能力矩阵
 
+**2026-09-30 当前 Goal 范围**：用户将其他平台实机验收移交后续执行，继续补齐原生能力和 Mac 未验项。G04／G05 已按固定 Claude `2.1.280/claude-opus-5-5`、Inherit 的既有真实 Mac 证据关闭；其他平台未改记为通过。G04 支持 PNG、JPEG、静态 GIF、WebP；G05 已验纯 PNG 与 PNG＋单技能语义，不外推所有格式排列或固定策略。其余状态见 [当前范围](KNOWN_GAPS.md#2026-09-30-当前范围)；以下早期记录保留各自源码和边界。
+
 2026-09-26 用户明确目标平台为 macOS Apple Silicon、Linux x64 和 Windows x64；macOS Intel（包括 Codex CLI）不属于当前开发或验收范围。历史 Intel 记录保留原范围。
 
 **阶段交付，完整 Goal 尚未完成。** 本表记录固定历史基线及输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`，npm 来源绑定提交为 `b6f93f662`。早期在线收据按 WIP 摘要计证；`84102bb1c` 后续已有静态 GIF、GUI JPEG／纯 PNG 窄复验，当前技能／权限工作区增量已有内置门禁、G10 两条生产协调器链和 Grok 双图 GUI 正例，最终提交与相关平台验证仍待补。它说明当前产品能力及限制，不将代码路径存在等同于全平台验收；具体通过范围见[验证结论](VALIDATION_REPORT.md)，剩余项见[已知缺项](KNOWN_GAPS.md)，整体状态见 [CURRENT_STATUS](CURRENT_STATUS.json)。

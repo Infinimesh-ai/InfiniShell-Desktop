@@ -1,7 +1,83 @@
 {
   "schema": 1,
-  "status": "required_gaps_open_pr_draft",
-  "status_zh": "14 项必要缺口未关闭；PR #22 保持草稿",
+  "status": "mac_scope_in_progress_pr_draft",
+  "status_zh": "本次 Mac 范围关闭 G04/G05；3 项外平台验收移交，9 项仍开放；PR #22 保持草稿",
+  "current_goal_scope": {
+    "authorized_on": "2026-09-30",
+    "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
+    "acceptance_platform": "macos-arm64",
+    "implementation_scope": "继续补齐原生能力与应用实现；仅后置其他平台实机验收，不删除普通未绑定 PTY 等功能条件。",
+    "closed_items": [
+      "G04",
+      "G05"
+    ],
+    "deferred_platform_acceptance_items": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "remaining_items": [
+      "G01",
+      "G02",
+      "G03",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "V03"
+    ],
+    "remaining_count": 9,
+    "closure_basis": "既有实现与 Mac 真实验收满足本次范围；本轮核对来源及英中语义，不计文档调整为新增实现。",
+    "g04": {
+      "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
+      "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
+      "accepted": "JPEG、WebP、静态 GIF 原生 MIME、原字节、回答、进程冷恢复；PNG 和 GUI 按原构建另证",
+      "evidence_index_sha256": "adf6a7b4cddc2e2c65ac89defd3f8489e87a24a50d0e5f9d7d658148d0879916",
+      "boundary": "该三格式新收据不是 GUI、应用重启或 SQLite 证据；复用等价产品源码的 282f5c4a8 监督程序。"
+    },
+    "g05": {
+      "implementation_commit": "6790b185a0c0bc581f804edf975960047df85db7",
+      "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit 根任务",
+      "accepted": "纯 PNG 及 PNG 加单技能生产适配器新建与冷恢复；GUI 原生 Skill/图片、重关联和零重投按各自构建计证",
+      "source_binding_sha256": "613cb19968667392a08829f4f831030af6da4a2fca7d9fa58ef538e4e6b80060",
+      "boundary": "不外推所有格式组合、固定策略、父权限或多技能；模型轮次与恢复应用分别绑定，不称当前构建重跑。"
+    },
+    "other_platforms": {
+      "owner": "用户后续运行验收",
+      "status": "未完成；历史通过、失败及 Windows Node/npm 问题保留，不计为本轮修复",
+      "platforms": [
+        "linux-x64",
+        "windows-x64"
+      ]
+    },
+    "localization": "已复核英中格式、版本、静态 GIF 及图片与技能提示；保留既有 Mac 双语布局范围。本次无用户功能变化，无需本地化变更。",
+    "source_gate": {
+      "command": "cargo check -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "result": "passed",
+      "run_id": "r-oeigx2ze",
+      "log_sha256": "9637fb0320c0aeb335014989a99cc682bdb891dd518aa79ddf7de9f4cdf285be",
+      "temporary_directory": "cleaned"
+    },
+    "original_all_platform_acceptance_satisfied": false,
+    "original_all_platform_remaining_items": [
+      "G01",
+      "G02",
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "V01",
+      "V02",
+      "V03",
+      "V05"
+    ],
+    "historical_interpretation": "其余逐轮 closed_gaps/14 项开放等字段保留当时范围，当前 Goal 以本对象为准。"
+  },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
   "assessed_branch": "codex/cli-agent-parity",
   "assessment_baseline": "3c5910678b4e38844bcb6bd161766a8d6040cf98",
@@ -159,19 +235,14 @@
     "G01",
     "G02",
     "G03",
-    "G04",
-    "G05",
     "G06",
     "G07",
     "G08",
     "G09",
     "G10",
-    "V01",
-    "V02",
-    "V03",
-    "V05"
+    "V03"
   ],
-  "remaining_items_interpretation": "已确认功能或验收不足，不能由可靠拒绝或有限模式通过推定完成；按统一清单补实现、补验或取得明确范围决定。",
+  "remaining_items_interpretation": "本次 Mac 范围仍开放项；其他平台移交不计通过，全平台原始清单见 current_goal_scope。",
   "tracked_native_semantic_boundaries": [
     "G11",
     "G12"
@@ -185,7 +256,7 @@
   "tracked_items_total": 18,
   "gap_register": "KNOWN_GAPS.md",
   "partial_merge_is_goal_waiver": false,
-  "source_behavior_changed_in_this_revision": true,
+  "source_behavior_changed_in_this_revision": false,
   "supersedes_overall_completion_conclusions": [
     {
       "sha256": "1abf5f02fb6e9d751f0824b717cd175ad751d05de7358a335bdd557b6fac16ba",
@@ -212,9 +283,9 @@
   "localization": "图片/文件及 Claude V2 说明已同步英文与简体中文；整合工作区 i18n 11 项通过。macOS Grok 实际双语权限、附件、技能限制、消息与历史结果完整滚动区可读；Claude GUI 双技能及同会话热新增实际 Skill 逐次允许通过；图片加技能、恢复后的中文说明/技能列表/消息/历史结果已目视；V2仅检查说明和技能禁用，没有V2 GUI在线链。Linux/Windows Grok 专属布局仍未验；本次状态文档更新无需本地化变更。 2b59c8c62新增Linux候选隔离不可用原因已同步英文/简体中文，i18n11项通过；真实双语布局仍后置，不继承历史错误布局通过。 Claude图片多技能说明本轮同步英中，新文案真实布局未验。",
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
-  "scope_interpretation": "目录精简不关闭缺项。原 Goal 要求仍须逐项实现、验证；真实上游限制需证据和用户明确范围决定。",
-  "documentation_updated_at": "2026-09-29",
-  "documentation_source_commit": "70f65a996e13b405140544f495fc904875259e42",
+  "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
+  "documentation_updated_at": "2026-09-30",
+  "documentation_source_commit": "b7039efb834c1f8f156a230cdfb2993861a88963",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -4405,10 +4476,18 @@
     "starting_commit": "c2140a8736eff3e8d67e9ca6d1645d12541072cd",
     "pr": 22,
     "draft_required": true,
-    "closed_items": [],
-    "remaining_count": 14,
+    "closed_items": [
+      "G04",
+      "G05"
+    ],
+    "remaining_count": 9,
     "merge_allowed": false,
-    "requirement": "14 项完整关闭且最终源码门禁通过后，才可合并 main"
+    "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
+    "deferred_items": [
+      "V01",
+      "V02",
+      "V05"
+    ]
   },
   "g04_current_source_macos_followup": {
     "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
