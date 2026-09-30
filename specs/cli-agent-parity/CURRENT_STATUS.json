@@ -105,7 +105,7 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Windows .8测试可移植性修复的实际构建与回归、Windows固定工件摘要绑定",
+        "Windows .9原生构建与定向回归、Windows固定工件摘要绑定",
         "Linux/Windows工件绑定后的最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
@@ -315,8 +315,49 @@
             "passed": 11
           }
         },
-        "target_status": "pending",
+        "target_status": "Windows .8 登录解析2项通过；shell库因另一Windows测试E0277而编译失败，资源路径测试尚未执行。",
         "gap_closed": false
+      },
+      "windows_native_bridge_8_followup": {
+        "run_id": 36763693789,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789",
+        "source_commit": "8f0b956b2dc729374dc852c47de7ca20ccee75fc",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.8",
+        "platform": "windows-x64",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "host_check": "passed",
+        "protobuf_tests_passed": 6,
+        "login_parser_tests_passed": 2,
+        "session_asset_tests": "not_executed_library_compile_failed",
+        "native_artifact": null,
+        "failure": "Windows leader/transport.rs:256 测试 String + &String 不满足 Add，E0277",
+        "failure_summary_sha256": "f5145810fba5cbf60cfdabe0f695cef5edcfd256fdf73f0ed5ea59f83b045ada",
+        "archive_summary_sha256": "3fcb1aa9fc9cf910a4706c2648bbb7b13e7ce199ecdfa8781130a060da0ab1d7",
+        "cancelled_step": "Build InfiniShell SSH worker",
+        "boundary": "资源测试未执行，native check/桥回归/构建未执行；已停止余下重复通用构建，整轮取消不计通过。"
+      },
+      "windows_pipe_test_fixture_fix": {
+        "native_commit": "a5d1e2449179bae2f2c51d05120f212f92fa4d03",
+        "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
+        "source_reconstruction_sha256": "dd3368743fd05340d233de02f041ed41c2c6d57b06a3ea9eca6bddb6a23d19d8",
+        "change": "仅用format构造相同501字节长路径，保留原管道名称上界断言；运行时代码未变。",
+        "target_status": "pending",
+        "localization": "无需本地化变更",
+        "native_check": {
+          "run_id": "r-917s8602",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "c32d62165890f16189abcf8173518be3f8ba75d6b0dbaefda5066b2d95cdb0b6"
+        },
+        "host_check_and_i18n": {
+          "run_id": "r-9inj6l5n",
+          "exit_code": 0,
+          "status": "cleaned",
+          "log_sha256": "289f3865ed327a78e1a5e177900e184eb856cf6eff5c79c43c08892fd7f480dc",
+          "host_check": "passed",
+          "i18n_tests_passed": 11
+        }
       }
     },
     "g06_progress": {

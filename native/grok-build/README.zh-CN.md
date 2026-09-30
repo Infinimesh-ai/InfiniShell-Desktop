@@ -7,7 +7,7 @@
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制源码：`6230c83eed629901b2a713643208d97f9daadf54`，版本 `1.0.41+infinishell.terminal-bridge.8`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
+- 当前定制源码：`a5d1e2449179bae2f2c51d05120f212f92fa4d03`，版本 `1.0.41+infinishell.terminal-bridge.9`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -15,25 +15,27 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.8 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.8 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.8 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
 
 ## 已验工件的使用方式
 
-Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要，绑定后源码门禁尚未完成；Windows `.8` 待实际构建复验，不宣称 G01 完成。
+Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要，绑定后源码门禁尚未完成；Windows `.9` 待实际构建复验，不宣称 G01 完成。
 
 1. 取得对应平台、版本和摘要的独立工件，复制到自己的独立目录；Linux／Mac 将副本设为 `0700`（CI 下载可能丢失可执行位），并重新核对完整 SHA-256。Mac 还须核对代码签名及上述 CDHash。不要覆盖系统安装，也不要给重建文件直接套用旧摘要。
 2. 产物 `xai-grok-pager` 必须复制命名为 **`grok`**；Windows 对应为 **`grok.exe`**。宿主按这个文件名识别普通 CLI，直接运行原产物名不会进入 Grok 富输入。
 3. 在 InfiniShell 启用 CLI 通知后，新建普通本地 shell，让宿主设置本次发现目录。使用独立私有 `GROK_HOME`，按正常登录流程授权，并在该配置中设置 `[cli].auto_update = false`。不要手工复用其他终端的 `GROK_TERMINAL_BRIDGE_DIR`。
 4. 从该普通 shell 以绝对路径运行 `GROK_HOME="<私有配置目录绝对路径>" "<独立工件目录>/grok" --no-auto-update`（占位路径须替换；Windows 使用等价的环境设置及 `.exe` 路径）。无需 owned、leader 或 `--minimal` 参数；富输入仅在原生空闲且身份验证通过时提交，审批与原生草稿仍受保护。
 
-上述源码重建命令面向最新 `.8`，不是取得 Mac 已验 `.3` 身份的方法；新的构建须独立审核绑定后才能使用。
+上述源码重建命令面向最新 `.9`，不是取得 Mac 已验 `.3` 身份的方法；新的构建须独立审核绑定后才能使用。
 
 ## 当前跨平台实现边界
+
+2026-10-01：`.8` 在 Windows 已通过 protobuf 6 项与登录环境解析 2 项；资源测试在编译时被上游 Windows 管道测试的 `String + &String` 类型错误阻断，没有二进制。`.9` 仅将该一行改为显式格式化相同长路径，保留原断言，并在 Windows 构建中显式运行该边界测试。Mac 完整原生 check 通过；Windows `.9` 目标复验、工件绑定及最终源码门禁待完成。
 
 2026-10-01：`.7` 在 Windows 已通过 protobuf 6 项和完整原生 check，随后库测试因 Unix-only 解析辅助函数缺失而编译失败，未生成工件。当前 `.8` 仅向测试开放纯解析函数，并让资源路径测试使用各平台原生符号链接 API，保留全部断言；真实登录 shell 捕获仍仅 Unix。本机解析 2 项、资源路径 3 项和完整原生 check 已通过。Linux `.6` 的实际构建、78 项原生回归、宿主 1469 项和 command 14 项通过；Windows `.6` 宿主 1308 项、command 36 项及原 ConPTY 辅助验证通过。具体摘要与取消范围见 `source.json`；Windows `.8` 及绑定后源码门禁仍待完成，G01 保持开放。
 

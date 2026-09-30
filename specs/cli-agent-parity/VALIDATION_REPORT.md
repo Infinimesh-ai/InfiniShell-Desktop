@@ -810,3 +810,13 @@ Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，�
 原生 `.8` 提交 `6230c83eed629901b2a713643208d97f9daadf54`，补丁独立重建 tree `3226eb05d5a899db90215676c1ed8ecaa5c903cf`，72 份变动文件一致；补丁 SHA-256 `560e00b60a499e305fb2cbc308f5225fef63240d5c736cbd09a2874740838bbd`，重建收据 `99b27d9120b3cf32a8b54dbb6000aa8789b624ac9d2c018cc7fa74283270cda2`。完整原生 check `r-sd6a2y5f` 通过，日志 `06360788658b34581e35cc5a7c6c9ec856820ab7e3ff03c60c6a82245aeab1d2`；Linux 摘要绑定后的 Mac 宿主 check `r-kfxlggxy` 通过，日志 `2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27`，不替代 Linux 编译。短目录均清理。
 
 本次提交前 i18n `r-jesnwmuf` 的 11 项全部通过，日志 SHA-256 `ada32a48e05cdff71ea1eea3bd7ba03f3271ea0cbceeb921e08675157f826bca`；短目录已清理。
+
+## 2026-10-01：G01 Windows 管道测试的类型修复，尚未关闭
+
+[Windows 门禁 36763693789](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789) 绑定宿主 `8f0b956b2dc729374dc852c47de7ca20ccee75fc`、原生 `.8`。宿主 check 通过，原生 protobuf 6 项及登录解析 2 项实际通过，日志 SHA-256 分别为 `cd460ffa6963407c945e2cb6d9a1741655b7bba82ca35665f2966e8a6c4ae4c1`、`030751b3ae9aa1ef687a3c84749230b4c59f2d78f4078b0c763b55b094f49eac`。第 12 步 shell 库编译在 Windows 独有管道边界测试的 `String + &String` 处报 E0277，日志 `882328a7939b2759f46be3eb5dee1c1df85a65ba667d4dcd1812752f87ab9b7d`；资源 3 项尚未运行，native check、桥回归及二进制构建尚未执行。12 份步骤日志和精确源码元数据均复核 SHA。失败摘要 `f5145810fba5cbf60cfdabe0f695cef5edcfd256fdf73f0ed5ea59f83b045ada`，完整归档摘要 `3fcb1aa9fc9cf910a4706c2648bbb7b13e7ce199ecdfa8781130a060da0ab1d7`；已停止第 40 步 SSH worker 通用构建，整轮 cancelled，不计通过。
+
+原生 `.9` 提交 `a5d1e2449179bae2f2c51d05120f212f92fa4d03` 仅修改上述一行测试字符串构造，仍为斜杠加 500 个字母，原管道名称上界断言保留；不修改运行时。现有构建脚本另在 Windows 明确执行该一项，Mac 不跑零命中平台筛选。独立重建 73 份变动文件，tree `3ed485f624e84a0268ab6e4be8e4eeacf938987f`；补丁 SHA-256 `1b626e3fc1ef6e008b1d9993a9fe0056acb04dce4172aceeec8d85f648bd583b`，重建收据 `dd3368743fd05340d233de02f041ed41c2c6d57b06a3ea9eca6bddb6a23d19d8`。本机原生 check `r-917s8602` 通过，日志 `c32d62165890f16189abcf8173518be3f8ba75d6b0dbaefda5066b2d95cdb0b6`；它不编译 Windows 独有测试，不能替代目标门禁。短目录已按记录清理。
+
+无需本地化变更。Windows `.9` 实际构建、工件绑定和最终源码门禁仍待完成；新增关闭 0 项，累计 4 关闭／7 开放／3 移交，PR #22 保持草稿。
+
+提交前本机同一短目录的宿主 check 与 i18n 11 项 `r-9inj6l5n` 均通过，日志 SHA-256 `289f3865ed327a78e1a5e177900e184eb856cf6eff5c79c43c08892fd7f480dc`；退出证据核实后已清理。
