@@ -759,3 +759,13 @@ Linux／Windows 摘要仍为空并拒绝，不能声明能力可用。待唯一 
 同轮冻结源码的 `r-20_7d2or` 已通过 `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed`，日志 SHA-256 `9abbaf94ea9f9414f342772adde5731f9c7bac6b70263d2a5a6b526f1a3d42da`，短目录已清理。公开基线加完整补丁在独立 Git 索引重建得到相同 `3796aaf2…` 源码树；不将该检查当作目标平台编译。
 
 本轮 Linux 私有短临时目录包装器的 11 项离线合同回归在 Mac `r-sz2rmvsi` 通过并清理，日志 SHA-256 `2849fe6a59e7ffbc9f0283a66b647a2c4ed5e33f71d07246adf146a4c8b799bf`。此结果只覆盖目录／取证逻辑的离线合同，Linux `/proc` 与后代收尾将在既有跨平台 workflow 执行；不计作 Linux 实机验收。普通桥源码开关与仅 GUI／仅安装器模式的冲突组合会明确失败，避免省略宿主门禁后误报通过。
+
+## 2026-10-01：G01 目标构建发现依赖不兼容，精确修复仍待复验
+
+源码 `9fdce3e3e661a0429264c1cb26b2b8eedbf554ff` 已推送，[CI 36741541617](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36741541617) 两平台宿主 check、Windows 实际生产辅助程序的原 ConPTY 正例／跨控制台拒绝步骤及 Linux `.4` 原生构建通过；其余宿主回归仍在运行。Windows 原生在 `cc 1.2.48` 调用 `find-msvc-tools 0.1.13::FILE_ATTRIBUTE_TEMPORARY` 处出现 `i32/u32` 类型不兼容，尚未编译到本轮桥。已下载并逐项核对 10 份命令日志，失败日志 SHA-256 `69df4222e816fdd6d948eac7c5c250ae5359323f17c75e1ffa77b8a33f3f76ae`。
+
+修复 native 提交 `732b0e1ee435f265d6e98a51668afb2e214a1a08`／tree `86f266f0067130525e3dac7b08b78178dad85637`，相对前轮仅 Cargo.lock 的 `find-msvc-tools 0.1.13→0.1.10` 版本／校验和两行，以及 Windows 日志失败测试从 Unix File 注入改为真实生产 Journal 权限变化；保留 Unknown、零派发、同 ID 拒重断言。新 `.5` 补丁 SHA-256 `c4f1a024f9d2f0a2ca5fc8f6be7ea2fc2a48f94f12e9d1bd89f1797ffb3c8b1a`，公开基线加补丁的独立索引已重建为同一 tree。Mac 两次 --locked check 与 74 项回归通过，汇总收据 SHA-256 `b55627f26b7e5eb2dd36ab241f3d3203f891ccd2722aa2bde9d1f9664b26b868`，四轮短目录均已清理。
+
+此修复没有改变用户文案，无需本地化变更；既有 Mac `.3` 功能／双语证据按原工件保留。`.5` 目标构建、真实工件摘要绑定和最终门禁尚待完成，本轮关闭 0 项；累计仍为 4 项关闭、7 项开放、3 项移交，PR 保持草稿。
+
+Linux `.4` 的 15 份命令日志与 607,932,184 字节 ELF 已逐项核对收据；实际 SHA-256 `d36be84fc25eb726e51456e644c18ee98f886e99bb5fda8361d828de59a33615`，原生 74 项回归全部通过。此工件只归属旧 `.4`，不能填入修复后 `.5` 的摘要。主仓修复提交前 `cargo check` 在 `r-4dw1o4g2` 通过并清理，日志 SHA-256 `62364d90a096d8fa7389b051d048f7386962ce91674a2edcc7030a899fd554c6`。

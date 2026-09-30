@@ -37,7 +37,7 @@ def main():
     patch_digest = digest(PATCH)
     if patch_digest != build["patch_sha256"] or not build["native_tree"]:
         raise RuntimeError("补丁摘要或预期源码树未冻结")
-    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.4":
+    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.5":
         raise RuntimeError("定制构建版本不匹配")
     output = args.output.absolute()
     output.mkdir(parents=True, exist_ok=False)

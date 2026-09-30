@@ -907,9 +907,9 @@
     },
     "cross_platform_implementation": {
       "source_baseline": "41c8d2e307ff5850c73c2b3eecea37c6ed2ee151",
-      "native_commit": "3d1886b111202215ecfef5d6e41c76b75f0daf36",
-      "native_tree": "3796aaf2ffebab4fe06703025ae8d256c221535d",
-      "patch_sha256": "53953bfd738d279ba0991c0cdc2fc4db18415aaa6b13253a1b0967196de9b04c",
+      "native_commit": "732b0e1ee435f265d6e98a51668afb2e214a1a08",
+      "native_tree": "86f266f0067130525e3dac7b08b78178dad85637",
+      "patch_sha256": "c4f1a024f9d2f0a2ca5fc8f6be7ea2fc2a48f94f12e9d1bd89f1797ffb3c8b1a",
       "status": "implemented_target_gates_and_artifact_binding_pending",
       "linux": "SO_PEERPIDFD原句柄、实际exe FD、原PTY/前台进程组、独立持久身份；共享原子提交与恢复入口",
       "windows": "原生私有named pipe/回执；宿主实际映像hFile、kill-on-exit关闭后观察、原HPCON派生控制台helper核验；不终止用户CLI",
@@ -918,9 +918,9 @@
         "run": "r-7a_zxhlb",
         "passed": 55,
         "log_sha256": "d522be8c1969d659ec655ba9d0b667e3abf805fd1bfe64a4616c61ed9f09f570",
-        "native_run": "r-fhslz7cj",
+        "native_run": "r-kikrupx3",
         "native_passed": 74,
-        "native_log_sha256": "c4ffd7aa36fc4cd06e4bf0e81b6e016effc931795daf4212b62dd0e24657e208"
+        "native_log_sha256": "d07e55df10a505a3b81f3856e95f59aae3de47c504c9e95b87e4a340d55387fa"
       },
       "i18n": {
         "run": "r-noe0exyo",
@@ -929,13 +929,37 @@
         "audit": "复核普通提交、未知/未发送/重复接收及失败保稿的现有英中文案，语义一致；无需本地化变更。本轮无新增界面或布局变化，原Mac双语证据按原工件保留。"
       },
       "closed_gaps": [],
-      "remaining": "Linux/Windows定制工件、真实ConPTY测试与同源码目标门禁；后置的其他平台实机验收不计通过。",
+      "remaining": "Linux/Windows .5定制工件、摘要绑定与最终同源码目标门禁；Windows真实原ConPTY步骤已过。后置实机验收不计通过。",
       "cargo_check": {
-        "run": "r-20_7d2or",
+        "run": "r-4dw1o4g2",
         "status": "passed",
-        "log_sha256": "9abbaf94ea9f9414f342772adde5731f9c7bac6b70263d2a5a6b526f1a3d42da",
+        "log_sha256": "62364d90a096d8fa7389b051d048f7386962ce91674a2edcc7030a899fd554c6",
         "features": "warpui/test-util,rust-embed/debug-embed",
         "cleanup": "cleaned"
+      },
+      "implementation_source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+      "target_attempt": {
+        "run_id": 36741541617,
+        "source_commit": "9fdce3e3e661a0429264c1cb26b2b8eedbf554ff",
+        "status": "in_progress_with_native_windows_failure",
+        "host_cargo_check": {
+          "linux": "passed",
+          "windows": "passed"
+        },
+        "windows_real_conpty": "passed",
+        "native_build": {
+          "linux": "passed_version_4",
+          "windows": "failed_cc_find_msvc_tools_type_mismatch"
+        },
+        "remaining_host_tests": "in_progress",
+        "boundary": "只覆盖9fdce3e3e和原生.4，不继承给修复后.5。"
+      },
+      "dependency_correction": {
+        "custom_version": "1.0.41+infinishell.terminal-bridge.5",
+        "find_msvc_tools": "0.1.13→0.1.10，仅版本和checksum",
+        "windows_test": "生产Journal权限变更失败，保留Unknown/零派发/同ID拒重断言",
+        "local_receipt_sha256": "b55627f26b7e5eb2dd36ab241f3d3203f891ccd2722aa2bde9d1f9664b26b868",
+        "target_validation": "pending"
       }
     }
   },

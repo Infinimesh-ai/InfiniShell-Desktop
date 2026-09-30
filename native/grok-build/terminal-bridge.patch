@@ -1,3 +1,19 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index adc2262..9fcd59e 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -3425,9 +3425,9 @@ dependencies = [
+ 
+ [[package]]
+ name = "find-msvc-tools"
+-version = "0.1.13"
++version = "0.1.10"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "ef25905e51abafe4dcea6c15fec58c57b601cdbd0ee53d22ea1d3016c587d39b"
++checksum = "26b73573e6edcd2af0cdf47bd6cb58f0b3839491263c314eaad1ccf24430e1de"
+ 
+ [[package]]
+ name = "findshlibs"
 diff --git a/crates/codegen/xai-grok-pager/Cargo.toml b/crates/codegen/xai-grok-pager/Cargo.toml
 index b67850c..f6ccd11 100644
 --- a/crates/codegen/xai-grok-pager/Cargo.toml
@@ -3233,10 +3249,10 @@ index 0000000..7ec9119
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000..a92d3cd
+index 0000000..82ccf66
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
-@@ -0,0 +1,981 @@
+@@ -0,0 +1,1027 @@
 +use super::*;
 +
 +use crate::app::actions::TaskResult;
@@ -4186,7 +4202,51 @@ index 0000000..a92d3cd
 +fn journal_failure_never_sends_and_keeps_unknown_id_claimed() {
 +    let (directory, mut bridge, mut app) = setup();
 +    let lease = lease(&mut bridge, &mut app);
-+    bridge.journal = File::open(directory.path().join("receipts.jsonl")).unwrap();
++    #[cfg(unix)]
++    {
++        bridge.journal = File::open(directory.path().join("receipts.jsonl")).unwrap();
++    }
++    #[cfg(windows)]
++    let restore_directory_acl = {
++        use crate::app::terminal_bridge_windows::UserIdentity;
++        use std::os::windows::ffi::OsStrExt;
++        use windows_sys::Win32::Security::{
++            DACL_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION, SetFileSecurityW,
++        };
++
++        let owner = UserIdentity::current().unwrap();
++        let invalid_acl = owner.security(false).unwrap();
++        let restore = owner.security(true).unwrap();
++        let path: Vec<u16> = directory
++            .path()
++            .as_os_str()
++            .encode_wide()
++            .chain(Some(0))
++            .collect();
++        // 只撤销本测试私有目录的继承标记，让生产 Journal 在真实写入前拒绝权限变化。
++        assert_ne!(
++            unsafe {
++                SetFileSecurityW(
++                    path.as_ptr(),
++                    DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
++                    invalid_acl.attributes().lpSecurityDescriptor,
++                )
++            },
++            0
++        );
++        move || {
++            assert_ne!(
++                unsafe {
++                    SetFileSecurityW(
++                        path.as_ptr(),
++                        DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
++                        restore.attributes().lpSecurityDescriptor,
++                    )
++                },
++                0
++            );
++        }
++    };
 +    let request = submission(&lease, "不得发送");
 +    let (response, effects) = bridge.handle(request.clone(), &mut app);
 +    assert_eq!(receipt(response).state, ReceiptState::Unknown);
@@ -4195,6 +4255,8 @@ index 0000000..a92d3cd
 +    assert_eq!(receipt(response).state, ReceiptState::Unknown);
 +    assert!(effects.is_empty());
 +    assert!(bridge.journal_failed);
++    #[cfg(windows)]
++    restore_directory_acl();
 +}
 +
 +#[test]
