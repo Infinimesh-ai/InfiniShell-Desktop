@@ -820,3 +820,12 @@ Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，�
 无需本地化变更。Windows `.9` 实际构建、工件绑定和最终源码门禁仍待完成；新增关闭 0 项，累计 4 关闭／7 开放／3 移交，PR #22 保持草稿。
 
 提交前本机同一短目录的宿主 check 与 i18n 11 项 `r-9inj6l5n` 均通过，日志 SHA-256 `289f3865ed327a78e1a5e177900e184eb856cf6eff5c79c43c08892fd7f480dc`；退出证据核实后已清理。
+
+
+## 2026-10-01：G01 Windows 额外符号链接测试移交，原生桥继续必验
+
+[CI 36766846873](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873) 精确对应 `c0a3c705c6dfcf4c1aac42c97639a820c8e7f136`、原生 `.9`。宿主 check、protobuf 6 项、登录解析 2 项通过；shell 库测试编译成功，资源整理测试真实执行 2 过／1 失败。失败位于 `keeps_only_regular_files_inside_the_assets_dir` 首次创建文件符号链接，Win32 `1314` 表示该 runner 缺少所需特权。失败日志 SHA-256 `e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2`；独立核验摘要 `7182a475d2b9d0b2cf1c684b04ee63e94ef74856a096bfcc7d55685a97e95e31`。余下 SSH worker 通用构建主动停止，整轮 cancelled，不计通过；管道上界、原生 check、桥回归和构建尚未执行，没有 Windows 工件。
+
+该资源测试不是 G01 文本原子桥测试，且相同测试源码已在 Mac `r-nrzw1sgl` 实际三项通过。按用户已授权的外平台实机验收后置范围，仅这一项移交至具有符号链接权限的 Windows 环境，构建收据明确记 `deferred_not_passed`。原测试源码及拒绝断言不改；脚本固定文件 SHA-256 `abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e`，源码变化时必须重新审计。其他两项及全部原生桥、管道上界、完整 check／build 仍为必过项，不可据此跳过原生能力失败。
+
+本轮宿主 `cargo check` 和 11 项 i18n 在短目录 `r-f_e0vaas` 通过，日志 SHA-256 `dfa9df27ffba8f47b6451f305ee0114a013e0e30f7d72293dfebaeabb3b1bfff`；完成退出、证据归档及目录清理。无需本地化变更。G01 仍待 Windows 实际工件、摘要绑定与最终源码门禁，本轮关闭 0 项；累计 4 项关闭、7 项开放、3 项移交，PR 保持草稿。

@@ -45,6 +45,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G01 — Grok 普通终端富输入自动提交
 
+- **2026-10-01 Windows 额外资源测试环境移交**：`.9`／`c0a3c705c` 的 [门禁 36766846873](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873) 已通过宿主 check、protobuf 6 项、登录解析 2 项；资源整理测试实际 2 过／1 失败，创建符号链接返回 Win32 `1314`（无所需特权）。该三项已在 Mac 全过，按用户已授权的外平台实机验收后置范围移交这一项，明确记 `deferred_not_passed`；保留测试源码与全部断言，并固定测试文件摘要防止误扩范围。其余两项、全部原子桥回归、管道上界测试及完整构建继续必验。失败日志摘要 `e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2`；取消不计通过，Windows 工件仍未生成，G01 不关闭。无需本地化变更。
+
 - **2026-10-01 Windows 管道测试编译修复**：`.8`／`8f0b956b2` 的 [门禁 36763693789](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789) 已通过 Windows 宿主 check、protobuf 6 项和登录解析 2 项；下一库在上游 `leader/transport.rs:256` 的字符串拼接处报 E0277，资源测试未运行且没有工件。`.9` 仅改为构造相同长路径的 `format!`，保留原上界断言；Mac 完整原生 check 已过，Windows 定向执行及最终绑定仍待完成。已停止余下通用构建，取消不计通过；G01 保持开放，无需本地化变更。
 
 - **2026-10-01 Windows 库测试可移植性修复**：`.7` 的 [门禁 36756854606](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36756854606) 已实际通过 protobuf 6 项和完整原生 check；随后库测试因 Unix-only 解析辅助函数缺失而编译失败，未产出 Windows 工件。`.8` 向测试开放两个纯解析函数，并将资源路径测试改用各平台原生文件／目录符号链接 API，保留全部拒绝断言；真实登录 shell 捕获仍仅在 Unix 编译。Linux `.6` 已通过 78 项原生回归与构建，以及宿主 1469 项／command 14 项；Windows `.6` 宿主 1308 项／command 36 项及真实 ConPTY 辅助验证通过。Linux 实际 ELF 摘要已绑定，Windows `.8` 实际构建、摘要绑定及绑定后最终源码门禁待完成。两次取消不计整轮通过。G01 仍开放，无需本地化变更。

@@ -78,6 +78,8 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 
 ## 验收边界
 
+Windows `.9` 的额外资源整理测试已实际执行：两项通过，一项在创建符号链接时因系统特权不足（Win32 `1314`）失败。对应三项 Mac 测试已通过；按用户已授权的其他平台实机验收后置范围，仅这一项移交并在构建收据中记 `deferred_not_passed`，不计通过。脚本校验该测试文件的固定摘要，Rust 断言保持；管道上界、完整原生 check、全部 `terminal_bridge` 回归及二进制构建继续必验。失败证据与边界见 `source.json.windows_symlink_environment_deferral`。
+
 历史：`5629588b7` 的 [Linux／Windows 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 已成功；归档索引 SHA-256 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`。它不覆盖后续 G06，也不代表 Linux／Windows 普通桥已实现。两平台接入的只读可行性核对见 `source.json.cross_platform_implementation_feasibility`；当时 Windows 方案仍为官方 API 合同推导；本轮实现边界见上文。以下各轮保留当时的来源与状态。
 
 宿主 `r-hgmsd_pn` 的 `cargo check`、48 项桥回归、11 项 i18n 及构建通过；最初 peer 过滤器命中零项，另由 `r-joflf1h5` 的两项有效 peer 回归补齐。真实 GUI `r-wudipm8z` 绑定 `c3b509622` 基线加冻结源码摘要，签名宿主 SHA-256 `d52e438de1cd2790ab0f38a33b38562c21ff502b26b9d637f86c19c6ce587958`，原生 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`；并非干净 HEAD 构建。

@@ -358,6 +358,53 @@
           "host_check": "passed",
           "i18n_tests_passed": 11
         }
+      },
+      "windows_native_bridge_9_followup": {
+        "run_id": 36766846873,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873",
+        "source_commit": "c0a3c705c6dfcf4c1aac42c97639a820c8e7f136",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.9",
+        "platform": "windows-x64",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "host_check": "passed",
+        "protobuf_tests_passed": 6,
+        "login_parser_tests_passed": 2,
+        "session_asset_tests": {
+          "passed": 2,
+          "failed": 1,
+          "win32_error": 1314
+        },
+        "native_artifact": null,
+        "failure_summary_sha256": "7182a475d2b9d0b2cf1c684b04ee63e94ef74856a096bfcc7d55685a97e95e31",
+        "cancelled_step": "Build InfiniShell SSH worker",
+        "boundary": "shell库测试已编译并执行；额外符号链接场景缺权限失败。管道上界、完整native check、桥回归和构建未执行。余下通用构建主动停止，取消不计整轮通过。",
+        "archive_summary_sha256": "1dedf0748fca213835390999832efbca4666dd64ac192ca0db8fb5154f6e190f",
+        "logs_zip_sha256": "a356d0fcc5db2d0446910675f6a256511aa4c898ed7fa7511885fed84807ba54"
+      },
+      "windows_symlink_environment_deferral": {
+        "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
+        "status": "deferred_not_passed",
+        "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+        "reason": "Windows runner 创建符号链接返回 Win32 1314，未满足系统特权；该额外资源整理测试的 Mac 三项已全部通过。",
+        "scope": "按用户已授权的外平台实机验收后置范围移交这一项；原生桥全部定向测试、完整 check、管道上界测试和二进制构建仍须通过。保留原测试源码及全部断言，不以跳过计通过。",
+        "prior_run_id": 36766846873,
+        "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+        "mac_evidence": {
+          "run_id": "r-nrzw1sgl",
+          "passed": 3,
+          "log_sha256": "2f90cf1840b7b693a8b33148a684d68d07acc16c61a8ab04607749ba6bea94a8"
+        },
+        "local_gate": {
+          "run_id": "r-f_e0vaas",
+          "host_check": "passed",
+          "i18n_passed": 11,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "log_sha256": "dfa9df27ffba8f47b6451f305ee0114a013e0e30f7d72293dfebaeabb3b1bfff"
+        },
+        "localization": "无需本地化变更",
+        "gap_closed": false
       }
     },
     "g06_progress": {

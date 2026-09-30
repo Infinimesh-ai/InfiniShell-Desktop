@@ -93,8 +93,24 @@ def main():
         run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-proto-build", "--lib"])
         run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-tools", "--lib",
              "test_parse_login_env_capture", "--", "--test-threads=1"])
-        run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell", "--lib",
-             "retain_session_asset_files_tests", "--", "--test-threads=1"])
+        asset_tests = ["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell", "--lib",
+                       "retain_session_asset_files_tests", "--", "--test-threads=1"]
+        if system == "Windows":
+            # 用户已将外平台实机验收后置；此额外资源测试缺少符号链接特权，保留失败而不重跑拒绝。
+            fixture = "crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs"
+            fixture_sha = "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e"
+            if digest(source / fixture) != fixture_sha:
+                raise RuntimeError("Windows 符号链接测试源码已变化，必须重新审计验收范围")
+            deferred = "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir"
+            asset_tests += ["--skip", deferred]
+            receipt["deferred_environment_checks"] = [{
+                "test": deferred, "source_sha256": fixture_sha, "status": "deferred_not_passed",
+                "prior_run_id": 36766846873, "win32_error": 1314,
+                "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+                "scope": "额外资源整理测试；Mac三项已通过。Windows真实符号链接验证移交后续环境，不属于G01文本原子桥验收。",
+            }]
+            save()
+        run(asset_tests)
         if system == "Windows":
             run(["cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell", "--lib",
                  "leader::transport::windows_impl::tests::pipe_name_is_bounded", "--", "--exact"])
