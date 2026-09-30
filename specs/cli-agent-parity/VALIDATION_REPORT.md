@@ -13,6 +13,26 @@
 
 以下“0／14”“仍开放”是范围调整前的逐轮判断，不能覆盖当前用户授权；原始通过、失败及未验事实继续保留。
 
+## 2026-09-30：G01 原生源码判断更正
+
+官方 [xai-org/grok-build](https://github.com/xai-org/grok-build) 已公开 CLI／TUI／agent runtime 源码。[README](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/README.md) 提供本地构建入口，源码采用 [Apache-2.0](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/LICENSE)；[CONTRIBUTING](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/CONTRIBUTING.md) 不接外部 PR，但允许按许可证本地构建。此前从 npm 发行包没有源码推导“缺少可修改原生源码、必须等待上游”的结论错误，现予更正。旧 `idle_prompt`／审批／草稿探针及发行包内容事实保留。
+
+原生工作树已固定公开 `1.0.41` 快照 `07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，其 [SOURCE_REV](https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/SOURCE_REV) 为 `84745de98b3d3996729aefcefd518890ffb73930`；已验官方发行版是 `1.0.41 (4220f3b224a6)`、SHA-256 `9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d`。两者没有相同源码／二进制身份依据，后续定制构建必须独立绑定与验收，不回填既有发行版结果。
+
+该次判断更正时尚需实现可认证的普通 TUI 接入、原子核对编辑器修订／模态／审批状态并提交的一次性事务，以及应用接入、独立构建和 Mac 普通 PTY 真实验收。后续原生实现和门禁见下一节，普通入口拒绝继续保留。该次判断更正本身没有改变用户功能或文案，**无需本地化变更**；随后源码补丁与门禁单列记录，不能把本段当作整轮未执行代码的结论。新增关闭 0 项；当前仍为 G02／G04／G05 关闭、8 项开放、3 项移交，PR #22 保持草稿。
+
+## 2026-09-30：G01 官方源码原生输入桥检查点
+
+原生修改保存在 [可重建补丁](../../native/grok-build/terminal-bridge.patch) 与 [来源清单](../../native/grok-build/source.json)，不是通知探针。公开基线 `07e35a3dfeed2f200d319ef6c893b5ea286d9a51` 上的独立源码提交为 `2a13b48618b93dea773953e835e74f4fd7a31429`，补丁 SHA-256 `2d06b640fe3b7f66f8df0ea690388cd8231c89abc88eb4ddbf282fffea26138c`。使用独立索引从基线应用补丁后，所得 tree 与冻结验收源码一致。上游 Apache-2.0 及本仓新增修改的 AGPL-3.0-only 声明均保留；没有向上游推送或覆盖用户默认 Grok 安装。
+
+普通 TUI 显式启用私有 IPC 后，在自身事件循环核对草稿、附件、模态、审批、会话代际与一次租约，再由原生 actor 同锁检查队列、后台 Bash 和子任务并接收。用户消息进入原生历史且持久化屏障成功才确认；未知结果只读查询，登录、额度恢复、Hook 拒绝和其他订阅 TUI 均不得自动重投。定制版本 `1.0.41+infinishell.terminal-bridge.1` 使用独立 leader 命名空间，并拒绝旧客户端注册。
+
+最终原生门禁 `r-cidusm0v`：`cargo check --locked -p xai-grok-pager-bin`、四包 `--lib terminal_bridge` 定向回归 **61/61** 和独立 `cargo build` 全部通过。逐文件源码摘要在门禁前后相同；二进制 SHA-256 `1da3cf195aa3ed2778fa2efe05fa211f21d6520514ef776fc5a6e6b53739568f`。原始日志 SHA-256 `9ccca3c90a55898ad781c3c2b66ecbd952cb0a4e6204152e1df0b84e4145fabd`。本机短 TMPDIR 的身份、进程退出、打开文件释放及归档均有记录，已清理。主仓同产品源码的 `cargo check -p warp` 与 i18n **11/11** 通过，实际使用 `warpui/test-util,rust-embed/debug-embed`，不冒称发布构建。
+
+失败边界保留：初版 coordinator 的 Box 引用不匹配已修；上游库测试缺 `base64::Engine` trait，补丁只补必要导入；上游完整 `--tests` 仍因未公开的 `docs/internal/25-enterprise.md`、`22-environment-variables.md` 缺失而失败，本轮没有伪造内部文档，定向库测试不等于上游全测试通过。错误文案审计中发现的三条新增内部错误已复用既有通用错误；协议原因码不直接当作 InfiniShell 文案，**无需本地化变更**，未声称新增英中布局通过。
+
+**新增关闭 0 项。** 原生代码和离线门禁不替代 InfiniShell 普通终端的生产接入、可信 peer/PTY/映像核验，以及中文、多行长文本、审批、旧会话、重连与重复点击的实际回合验收。G01 保持开放；Linux/Windows 实机验收按用户范围后置，Windows 原生桥传输尚未实现。PR #22 保持草稿。
+
 ## 2026-09-30：G02 Mac 图片与技能组合关闭
 
 干净源码 `d290fd7137165223de8d762cf65a257117c6bf9a` 在 `r-58hxh5i1` 第一次真实运行通过。固定官方 Grok `1.0.41` 的 SHA-256 为 `9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d`，实际模型 `grok-4.7`，Inherit 根任务使用生产私有独占 leader。本次只扩展既有真实验收用例和审计运行器，没有修改生产权限或图片合同。
@@ -103,7 +123,7 @@ G10 忽略测试随后在私有 Mac 环境运行。前三轮在签名包复制�
 
 当前分支随后加入完整原生历史核验与任务代次 CAS，修复该窄范围结果持久化：固定 Grok `1.0.41/grok-4.7` 的 Mac 专属 PTY 双回合逐次取得原生 ACK、最终正文及完成水位，已核验结果落入 SQLite 并可由退出后的独立进程读取。另一轮在两次 ACK 后使首个应用侧测试进程退出，保留同一 TUI/leader，再由第二进程重开 SQLite 并仅通过只读历史补写旧代和当前代各 44 字节；消息数及原生用户输入均为 2→2，第二次补查幂等。原生退出后第三进程重新读取两代结果，退役启动记录拒绝重投。此轮 `g01-native-cold/r-G5hcBT9a` 索引 SHA-256 `6264fbdc909f5c25392e33211abd7a1114187f33bc570b5a3808f5f220335bd7`；另有正常双回合原件 `g01-native-live/r-0JKMVTFy` 索引 SHA-256 `f34756cb075b4901ae981cd87f3ea92251b7bc36867a935abbc07c3b3e3e6677`。定向 nextest 44/44、i18n 11/11、`cargo check -p warp` 通过。新英中结果未核验提示已同步，但未做两语 GUI 截断检查；普通未绑定 PTY、图片、审批与 Linux／Windows 尚未验证，G01 仍开放。本段绑定执行时未提交的工作树，不外推为后续提交的 GUI 或跨平台结论。
 
-G01 普通未绑定 PTY 的只读可行性复核显示，固定 Grok `1.0.41` 的 `idle_prompt` 可在帮助模态、未提交草稿或后台工具期间出现，空会话超过 66 秒也可能不出现；权限提示不能保证自动 Enter 安全。已运行的普通 TUI 不提供可认证的 leader socket 接入、编辑器修订或模态／审批状态原子提交接口；当前代码 `app/src/terminal/view/use_agent_footer/mod.rs` 的拒绝分支应保留。若不调整目标范围，后续需要上游提供原生会话身份接入与 `submit_if_idle` 单次回执，再实测审批、重复点击、断连及三平台回合。此复核未改源码、未发送模型输入，不计 G01 关闭。
+G01 普通未绑定 PTY 的历史只读可行性复核显示，固定 Grok `1.0.41` 的 `idle_prompt` 可在帮助模态、未提交草稿或后台工具期间出现，空会话超过 66 秒也可能不出现；权限提示不能保证自动 Enter 安全。当时未取得普通 TUI 可认证的 leader socket 接入、编辑器修订或模态／审批状态原子提交合同；当前代码 `app/src/terminal/view/use_agent_footer/mod.rs` 的拒绝分支应保留。此前将后续工作归为“等待上游提供接口”的判断已由本报告的 2026-09-30 官方源码更正取代：现在可以在公开源码实现事务，但仍须独立构建和真实普通 PTY 验收。此历史复核未改源码、未发送模型输入，不计 G01 关闭。
 
 G03 当前分支修复专属 Grok 富输入的文件拖放：两张图片按原顺序形成附件，含非图片的整批拒绝；已打开富输入但 owned 身份失效时也必须在 PTY 前返回。新增测试先在旧路径捕获 1 次 `WriteBytesToPty`（exit 101），修复后同一用例的双图、混合、纯非图和失配零写入 1/1 通过，`cargo check -p warp` 通过。英中拖放拒绝文案已同步。首次私有 GUI 用 Preview 粘贴出两张卡后，因人工提前按 Return 先运行了普通未绑定 Grok，提交触发原有“未发送”保护提示；任务仍 queued／revision 0、消息数为零，`retired.json` 标记未派发。该负例保留，不作为专属图片模型正例。
 

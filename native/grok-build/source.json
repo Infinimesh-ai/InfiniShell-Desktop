@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "upstream": "https://github.com/xai-org/grok-build",
+  "base_commit": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
+  "upstream_source_rev": "84745de98b3d3996729aefcefd518890ffb73930",
+  "upstream_license": "Apache-2.0",
+  "modification_license": "AGPL-3.0-only",
+  "custom_version": "1.0.41+infinishell.terminal-bridge.1",
+  "native_commit": "2a13b48618b93dea773953e835e74f4fd7a31429",
+  "native_tree": "c3b5294dea04615c69c2ae62c7346016f096264a",
+  "patch_sha256": "2d06b640fe3b7f66f8df0ea690388cd8231c89abc88eb4ddbf282fffea26138c",
+  "patch_reconstruction": "公开基线加补丁的独立索引 tree 与已测源码 tree 完全一致",
+  "source_files_sha256": {
+    "crates/codegen/xai-grok-pager/src/app/actions.rs": "a2352630ee814d17f55919b6a707a05b411908a6df86f378d17348a84b69b20a",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs": "4bab42c2386d2fc9dc33271295991f557e0ab7f327c4f4210fd390f73b7e3c5a",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs": "34866c59e2e69e2aecd8e05ed11da9aa62260f78cf34ed3fd47ee4376126f861",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs": "70ab3efa5e6678dc1abce5097bc64d79670900b8ce1fd0b73e25f68f1618cdee",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs": "8bf68c39b54091089953d92b18dd8a09d9d4345d05f9baa98ae55d0c6136a0dc",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs": "5038ba3822c93886b12aacfecc37f749086208a223a8c4350136a06a2b9ca36c",
+    "crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs": "49500738d266903b272079501cec095a8ee07ffa69a9fa727e4bd6cb25bd65f7",
+    "crates/codegen/xai-grok-pager/src/app/effects/mod.rs": "3d56f4538bfbab440fe8a4ec90d3c0156518770b353bd8af785da53c10e53424",
+    "crates/codegen/xai-grok-pager/src/app/event_loop.rs": "95a3962552d4f63103bc5d8e2cec8d81b13cbc88635158543574aa69d622e401",
+    "crates/codegen/xai-grok-pager/src/app/mod.rs": "02bc1288d8b99a4007c8033317d262c730c85154392954579381547216210113",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs": "c908d8073f5e654e798ef366055b177cbef24d5be50ee03521e4da5f96ec4659",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io.rs": "b96a5c40cbfff76621daeac60511c3d0684ea58cbab071f2a875d81a2d75de8a",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_tests.rs": "ca9e22e11c3ef3166871768c1bc4cc8e62c8ed0cd46638b6e8a0bacd6c921af6",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs": "66e41afa5d26e91b2c949d820621189a8566f7beb72fcd7ba137366a577e1d5e",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs": "85f29006b6b0aa084c960bc5e69a8924b76b33ca0e9489914b9b5205c2d39d6f",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt.rs": "e6cdae95ca723cd65fa8aea39a930b88038ce2ca2514fb9d48e00eeedd38de52",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_receipt_tests.rs": "f3cadbb69c7683c741212db63e759727782c3f42ad547914e26444e986fb502f",
+    "crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs": "80e398ba82aee519c3fd807cf331c93af7cfdafef53c81fa7e7097ce7002be1a",
+    "crates/codegen/xai-grok-pager/src/client_identity.rs": "ce54c9b3181b637dad9490ad28f14d55409101ec9ec2ffe08014c04dce90e8df",
+    "crates/codegen/xai-grok-shell-terminal/src/adapter.rs": "556eca3a8e06b2d74d08f92af6b1a09ee0aba0fca3a7c289611dd8eac164efe9",
+    "crates/codegen/xai-grok-shell-terminal/src/lib.rs": "444bac0011ca6158bc03cd07d9881f34bed33761b7ca61c6c1dc4a9b94a49613",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_local_terminal.rs": "3302db3a3be12af83cdc4eaf48d1ed38e48fc4d7f7ed9bf2d13b16170df17099",
+    "crates/codegen/xai-grok-shell-terminal/src/streaming_terminal_bridge_tests.rs": "4c71cf32ba12c6226cbf3ff5e2d11b2c2451bcfcdfebae5f2d6b1aff2216893d",
+    "crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs": "4fcf53df3fd41951668eb06d3da8780accd14a9cb5cb8addc11aa2db831c3c78",
+    "crates/codegen/xai-grok-shell/src/extensions/mod.rs": "dad3a008be51b6343a4095c60140a35d7f8c79c91e024f19f38873451614015a",
+    "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs": "acc73086c476fd9f51c2284bb6e88b8293e6d2823bb6a27e26ee6f8a49615ad1",
+    "crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs": "65fdc9584a68156540efb0dfdd12d4bc89d42d368777c9ad50c383383dab8da9",
+    "crates/codegen/xai-grok-shell/src/leader/client.rs": "0ec461cbdc2c646c11ba12e7f7c2567d25c66e317dba742377f046cb3011aae8",
+    "crates/codegen/xai-grok-shell/src/leader/lock.rs": "424c4124ca1f1d989db971d3b303edf4161bb42fe58ff60846ffb83c60e1700c",
+    "crates/codegen/xai-grok-shell/src/leader/mod.rs": "b00c634d94f129e03042551348bdeda4918496b5ee6a0f4682d13c9e177783ef",
+    "crates/codegen/xai-grok-shell/src/leader/protocol.rs": "03f84a141fba28a99bd5e234f1d04e1b23090eff74055fc8983ed53edc9c0081",
+    "crates/codegen/xai-grok-shell/src/leader/server.rs": "e1acd2d8dfaabc6878d550b774e3438a906d7051d6cffa129f0e15301be5c55a",
+    "crates/codegen/xai-grok-shell/src/leader/server_tests.rs": "60ce1e2d6e525f21ce1adb2e5ea0d5a39728c47cdd8e30a222fdeecfa2c00492",
+    "crates/codegen/xai-grok-shell/src/session/acp_session.rs": "9c25f28e352d206859d77a58f3793cc5ae734558fa30357fa9ab0bef456b32de",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs": "aae845d873cb2c5c9a6c9839e765cd8d7b6fb9d7a3c996f1c12f2f14c4574e4a",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs": "64c026080dfda5ba3468a231a7f3ea2cc978192bca94cb9ffc3313c9f76619f8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs": "2cba092cbaa381131bdaa4fae58f1cd88611a97377db1ea520e2116643828a3c",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs": "225f962bd52c548189b9a314bb1b8e847b1fadb540be61e2c9cd8c1e6b367ea7",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/auto_wake_suppression_tests.rs": "93b9bfc85d33e102b24627a1550ae3df298b6d2493562482db2d324c2fd1b1cd",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs": "91093677566edd9bea8005d4a20e680cc6a6bd66410f8b7c20d35c21424e9ab1",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs": "bdbc9c28433cf335af8be4c4ac8ee7da6e450080fe0cefccd5a1da060afe27a8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs": "1630ec09ad6d3d3ee5df0628ca36cc98fe4865131e3cacb58188f7ddb43b8bf8",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "b86307116033c86f94a34dedabee32c200516515319699de865e176ba2e775e4",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "77e60ffefe8152da795bb12e14f5c35b15c8e4ffa46d7330c169868ddb0625d2",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "c36be93342cda8177d9aa64606e21cc37afcfa593425bbee4a52ba61f84fa442",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "aa950a21d5d6593c5df0c723a02e7d91c3585817f3ebc89a3e76ca2783655892",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
+    "crates/codegen/xai-grok-shell/src/session/commands.rs": "b5a261c8744dd1842224493ca51260bb6a4d487ca5a88df45b4320c0f4389a00",
+    "crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs": "918fa6dab1c5e980890a592b257e2b89b708942ac6799b004d4bbc6f95a5608f",
+    "crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs": "4bc69f54cf74390d8fa2c2a1daa5f368dae7c478e2e9a80bc88ffb69bce9ff77",
+    "crates/codegen/xai-grok-tools/src/bridge.rs": "48100e6c902cac75f033004e335eb30053ee0165f814f6ba25a833ce6a7e3808",
+    "crates/codegen/xai-grok-tools/src/computer/local/terminal.rs": "b56e65a0a1a87f109493da4971d13ef9c86fe0f02519f437ad398e5f7d200c7a",
+    "crates/codegen/xai-grok-tools/src/computer/types.rs": "6ec9e816533dd83172fcee97a1fa77f897066f8cffd283af9319290546c28522",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator.rs": "506177584765643bb8a10913e1963d30b4e93ddb54a0ef1a02c8ed5889d80efe",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission.rs": "29753dd8087831bfa3c807eb55f98bb61e141115f901fc8fb24eae0d4ebca036",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/idle_admission_tests.rs": "e56cfed9c12eba1f31dbb886ac0c47a8f6b2cc73dc9f13f025b74e62e589fecc",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/spawn.rs": "49f384bb0530fe7b741d8ae225087e89d1807a663c91b63e85900d70d49d7271",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/coordinator/wake.rs": "1a223cc7d8b1d8fdac2123e665db00017149518b2271d094013c9b86b6cbf05e",
+    "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
+    "crates/codegen/xai-grok-version/src/lib.rs": "004debf4180bbe8d36b10fc981c188c8002d5cb7f6ad56de40b08f22f2627e35"
+  },
+  "source_digest": "e796697dd079dd4c8c0766847944ba28938f7ff20e147624d9a9c17a4a4e7682",
+  "local_validation": {
+    "platform": "macOS arm64",
+    "rust_toolchain": "1.94.0",
+    "grok_version_environment": "1.0.41+infinishell.terminal-bridge.1",
+    "suite_archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-cidusm0v-suite.safe.json",
+    "suite_sha256": "d9a98515714cadbabfd5216cdd1232d08338cbf75cfe9ca5825776790c0a7e98",
+    "log_sha256": "9ccca3c90a55898ad781c3c2b66ecbd952cb0a4e6204152e1df0b84e4145fabd",
+    "run_record_sha256": "9d5db8b07a09edf742a0a5e44a480759122e1af616e0e94f2e9c70eec9dded76",
+    "commands": [
+      {
+        "command": [
+          "cargo",
+          "check",
+          "--locked",
+          "-p",
+          "xai-grok-pager-bin"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 45.966
+      },
+      {
+        "command": [
+          "cargo",
+          "test",
+          "--locked",
+          "-p",
+          "xai-grok-pager",
+          "-p",
+          "xai-grok-shell",
+          "-p",
+          "xai-grok-tools",
+          "-p",
+          "xai-grok-shell-terminal",
+          "--lib",
+          "terminal_bridge",
+          "--",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 122.677
+      },
+      {
+        "command": [
+          "cargo",
+          "build",
+          "--locked",
+          "-p",
+          "xai-grok-pager-bin"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 74.462
+      }
+    ],
+    "binary": {
+      "path": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native/target/debug/xai-grok-pager",
+      "sha256": "1da3cf195aa3ed2778fa2efe05fa211f21d6520514ef776fc5a6e6b53739568f"
+    },
+    "focused_library_tests": {
+      "passed": 61,
+      "failed": 0,
+      "module_counts": [
+        33,
+        20,
+        4,
+        4
+      ]
+    },
+    "boundary": "离线源码门禁与独立构建，不代表普通 PTY、模型、GUI 或跨平台验收"
+  },
+  "limitations": [
+    "InfiniShell 普通终端生产调用方尚未接入，G01 保持开放",
+    "未覆盖真实普通 PTY 中文、多行长文本、审批、重连和双语界面",
+    "Windows 原生桥传输尚未实现；Linux/Windows 实机验收移交用户",
+    "上游完整 --tests 因未公开的两份 docs/internal 文件缺失而失败，未伪造文档",
+    "定制构建不继承官方发行版 1.0.41 (4220f3b224a6) 的验收"
+  ]
+}

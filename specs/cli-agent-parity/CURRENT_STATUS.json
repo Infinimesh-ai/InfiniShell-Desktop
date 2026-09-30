@@ -364,11 +364,51 @@
     "closed_gaps": []
   },
   "g01_unbound_pty_feasibility_followup": {
-    "status": "固定 Grok 1.0.41 已运行普通未绑定 TUI 缺少可信自动提交接口；只读复核后保留拒绝，G01 仍开放",
+    "status": "官方 Grok 源码的普通 TUI 原子输入桥已完成独立 Mac 编译及 61 项定向回归；InfiniShell 普通终端接入与真实功能验收未完成，G01 仍开放",
     "evidence_boundary": "idle_prompt 曾在帮助模态、未提交草稿和后台工具期间出现，空会话也可能超过 66 秒不出现；permission_prompt 不证明 Enter 安全",
     "native_requirement": "原生可认证接入既有会话，原子核对编辑器修订、模态与审批状态的 submit_if_idle，以及单次消费回执",
-    "scope": "未改源码或发送模型输入；专属 TUI 的已通过回合不外推普通未绑定 PTY",
-    "closed_gaps": []
+    "scope": "旧探针及发行包检查事实保留；已确认可从官方源码补齐原生能力，不能继续将缺源码列为等待上游的阻塞。专属 TUI 的已通过回合不外推普通未绑定 PTY，定制构建不继承固定发行版验收。",
+    "source_correction": {
+      "verified_on": "2026-09-30",
+      "previous_error": "从 npm 发行包不含原生编辑器源码推导没有可修改源码、需等待上游提供，该判断错误。",
+      "official_repository": "https://github.com/xai-org/grok-build",
+      "readme": "https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/README.md",
+      "license": "https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/LICENSE",
+      "contributing": "https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/CONTRIBUTING.md",
+      "source_availability": "CLI/TUI/agent runtime 源码按 Apache-2.0 公开并支持本地构建；不接外部 PR 不阻止本地修改。",
+      "public_snapshot": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
+      "snapshot_version": "1.0.41",
+      "source_rev": "84745de98b3d3996729aefcefd518890ffb73930",
+      "source_rev_url": "https://github.com/xai-org/grok-build/blob/07e35a3dfeed2f200d319ef6c893b5ea286d9a51/SOURCE_REV",
+      "previously_verified_release": "1.0.41 (4220f3b224a6)",
+      "previously_verified_release_sha256": "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d",
+      "build_boundary": "公开快照 SOURCE_REV 与已验发行版标识不同；定制构建须单独绑定源码、二进制及验收证据，不能冒充原发行二进制。",
+      "native_worktree": "/Volumes/SanDisk/github/grok-build/.worktrees/g01-native",
+      "native_branch": "codex/infinishell-atomic-input",
+      "remaining": "原生补丁和独立构建已形成；继续接入 InfiniShell 普通终端，核对内核 peer、真实 PTY 与固定工件，完成 Mac 中文、多行长文本、审批、旧会话、重连和重复点击真实验收。"
+    },
+    "closed_gaps": [],
+    "native_patch": {
+      "manifest": "native/grok-build/source.json",
+      "native_commit": "2a13b48618b93dea773953e835e74f4fd7a31429",
+      "patch_sha256": "2d06b640fe3b7f66f8df0ea690388cd8231c89abc88eb4ddbf282fffea26138c",
+      "custom_version": "1.0.41+infinishell.terminal-bridge.1",
+      "binary_sha256": "1da3cf195aa3ed2778fa2efe05fa211f21d6520514ef776fc5a6e6b53739568f",
+      "implementation": "显式启用私有 IPC；TUI 状态租约与 actor 原子准入；审批、后台 Bash 和子任务守卫；持久化确认、只读回执恢复及禁止自动重投；独立 leader 命名空间和严格客户端登记",
+      "local_gates": "固定 Rust 1.94.0 的 cargo check、四包定向库测试 61/61、独立 cargo build 通过，源码逐文件摘要全程不变；公开基线应用补丁所得 tree 与已测 tree 一致",
+      "archive_run": "r-cidusm0v",
+      "archive_log_sha256": "9ccca3c90a55898ad781c3c2b66ecbd952cb0a4e6204152e1df0b84e4145fabd",
+      "host_gates": "主仓 cargo check -p warp 与 i18n 11/11 通过，均使用 warpui/test-util,rust-embed/debug-embed；本轮主仓 Rust 产品源码未变",
+      "localization_audit": "新增协议字段与错误码不作为 InfiniShell 文案；三条可能显示在原生界面的新增内部错误已改为复用既有通用错误。无需本地化变更；尚无新增英中 GUI 布局验收",
+      "remaining": [
+        "InfiniShell 普通终端生产调用方尚未接入，G01 保持开放",
+        "未覆盖真实普通 PTY 中文、多行长文本、审批、重连和双语界面",
+        "Windows 原生桥传输尚未实现；Linux/Windows 实机验收移交用户",
+        "上游完整 --tests 因未公开的两份 docs/internal 文件缺失而失败，未伪造文档",
+        "定制构建不继承官方发行版 1.0.41 (4220f3b224a6) 的验收"
+      ],
+      "closed_gaps": []
+    }
   },
   "g03_owned_image_drop_followup": {
     "implementation_commit": "97ea46905f098174e799f6edf65e54e54dbfaf91",
