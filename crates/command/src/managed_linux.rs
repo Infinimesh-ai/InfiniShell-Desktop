@@ -78,6 +78,37 @@ impl LinuxProcessHandle {
         Ok(snapshot)
     }
 
+    /// 复制原 pidfd，不能靠重新打开同一个数字 PID 延长旧进程的授权。
+    pub fn try_clone(&self) -> io::Result<Self> {
+        self.snapshot()?;
+        let handle = Self {
+            descriptor: self.descriptor.try_clone()?,
+            identity: self.identity,
+        };
+        handle.snapshot()?;
+        Ok(handle)
+    }
+
+    /// 打开内核报告的实际运行映像；调用者可保留 FD 做摘要与元数据核验。
+    pub fn executable_file(&self) -> io::Result<File> {
+        self.snapshot()?;
+        let directory = open_proc_directory(self.identity.pid)?;
+        if directory.metadata()?.ino() != self.identity.proc_inode {
+            return Err(io::Error::other("Linux 进程目录身份已改变"));
+        }
+        // exe 是已验证 procfs 的内核链接，必须打开它指向的映像而非重开 argv 路径。
+        let file = open_at(&directory, "exe")?;
+        let image = file.metadata()?;
+        if !image.is_file()
+            || image.dev() != self.identity.executable_device
+            || image.ino() != self.identity.executable_inode
+        {
+            return Err(io::Error::other("Linux 实际运行映像身份已改变"));
+        }
+        self.snapshot()?;
+        Ok(file)
+    }
+
     pub fn exited(&self) -> io::Result<bool> {
         pidfd_exited(&self.descriptor)
     }
@@ -277,13 +308,10 @@ fn read_at(directory: &File, name: &str, limit: usize) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn snapshot_with_pidfd(descriptor: &OwnedFd, pid: i32) -> io::Result<LinuxProcessSnapshot> {
-    if pidfd_exited(descriptor)? || pidfd_pid(descriptor)? != pid {
-        return Err(io::Error::other("Linux 进程已退出"));
-    }
+fn open_proc_directory(pid: i32) -> io::Result<File> {
     let directory = OpenOptions::new()
         .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(format!("/proc/{pid}"))?;
     let metadata = directory.metadata()?;
     let mut filesystem = std::mem::MaybeUninit::<libc::statfs>::uninit();
@@ -295,6 +323,15 @@ fn snapshot_with_pidfd(descriptor: &OwnedFd, pid: i32) -> io::Result<LinuxProces
     {
         return Err(io::Error::other("Linux procfs 类型或进程用户无效"));
     }
+    Ok(directory)
+}
+
+fn snapshot_with_pidfd(descriptor: &OwnedFd, pid: i32) -> io::Result<LinuxProcessSnapshot> {
+    if pidfd_exited(descriptor)? || pidfd_pid(descriptor)? != pid {
+        return Err(io::Error::other("Linux 进程已退出"));
+    }
+    let directory = open_proc_directory(pid)?;
+    let metadata = directory.metadata()?;
     let stat = read_at(&directory, "stat", 64 * 1024)?;
     let end = stat
         .iter()
@@ -349,3 +386,7 @@ fn snapshot_with_pidfd(descriptor: &OwnedFd, pid: i32) -> io::Result<LinuxProces
     }
     Ok(snapshot)
 }
+
+#[cfg(test)]
+#[path = "managed_linux_tests.rs"]
+mod tests;

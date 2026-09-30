@@ -530,7 +530,7 @@
     "closed_gaps": []
   },
   "g01_unbound_pty_feasibility_followup": {
-    "status": "Mac G01 功能与双语审计完成；Linux 宿主普通桥、Windows 原生传输及宿主接入仍缺实现，G01 必要缺口开放",
+    "status": "Mac既有功能与双语审计保留；Linux宿主及Windows原生/宿主桥实现已补，待实际工件绑定与目标门禁，G01开放",
     "evidence_boundary": "idle_prompt 曾在帮助模态、未提交草稿和后台工具期间出现，空会话也可能超过 66 秒不出现；permission_prompt 不证明 Enter 安全",
     "native_requirement": "原生可认证接入既有会话，原子核对编辑器修订、模态与审批状态的 submit_if_idle，以及单次消费回执",
     "scope": "旧探针及发行包检查事实保留；已确认可从官方源码补齐原生能力，不能继续将缺源码列为等待上游的阻塞。专属 TUI 的已通过回合不外推普通未绑定 PTY，定制构建不继承固定发行版验收。",
@@ -904,6 +904,39 @@
       "source_commit": "5629588b77b15e27c9e046cc6326171370297dc6",
       "status": "in_progress",
       "boundary": "仅当前已编译路径的源码门禁；不代替 cfg 排除的 Linux／Windows 普通桥实现或实机验收。"
+    },
+    "cross_platform_implementation": {
+      "source_baseline": "41c8d2e307ff5850c73c2b3eecea37c6ed2ee151",
+      "native_commit": "3d1886b111202215ecfef5d6e41c76b75f0daf36",
+      "native_tree": "3796aaf2ffebab4fe06703025ae8d256c221535d",
+      "patch_sha256": "53953bfd738d279ba0991c0cdc2fc4db18415aaa6b13253a1b0967196de9b04c",
+      "status": "implemented_target_gates_and_artifact_binding_pending",
+      "linux": "SO_PEERPIDFD原句柄、实际exe FD、原PTY/前台进程组、独立持久身份；共享原子提交与恢复入口",
+      "windows": "原生私有named pipe/回执；宿主实际映像hFile、kill-on-exit关闭后观察、原HPCON派生控制台helper核验；不终止用户CLI",
+      "artifact_binding": "Linux/Windows摘要当前为空并拒绝；必须从唯一workflow真实构建后绑定，尚不可记可用",
+      "mac_regression": {
+        "run": "r-7a_zxhlb",
+        "passed": 55,
+        "log_sha256": "d522be8c1969d659ec655ba9d0b667e3abf805fd1bfe64a4616c61ed9f09f570",
+        "native_run": "r-fhslz7cj",
+        "native_passed": 74,
+        "native_log_sha256": "c4ffd7aa36fc4cd06e4bf0e81b6e016effc931795daf4212b62dd0e24657e208"
+      },
+      "i18n": {
+        "run": "r-noe0exyo",
+        "passed": 11,
+        "log_sha256": "37afa9723aef72936a08971d477ea773794e91bf432146e66fb0c2f557810272",
+        "audit": "复核普通提交、未知/未发送/重复接收及失败保稿的现有英中文案，语义一致；无需本地化变更。本轮无新增界面或布局变化，原Mac双语证据按原工件保留。"
+      },
+      "closed_gaps": [],
+      "remaining": "Linux/Windows定制工件、真实ConPTY测试与同源码目标门禁；后置的其他平台实机验收不计通过。",
+      "cargo_check": {
+        "run": "r-20_7d2or",
+        "status": "passed",
+        "log_sha256": "9abbaf94ea9f9414f342772adde5731f9c7bac6b70263d2a5a6b526f1a3d42da",
+        "features": "warpui/test-util,rust-embed/debug-embed",
+        "cleanup": "cleaned"
+      }
     }
   },
   "g03_owned_image_drop_followup": {
@@ -5034,9 +5067,10 @@
     "closed_items": [
       "G02",
       "G04",
-      "G05"
+      "G05",
+      "G06"
     ],
-    "remaining_count": 8,
+    "remaining_count": 7,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [

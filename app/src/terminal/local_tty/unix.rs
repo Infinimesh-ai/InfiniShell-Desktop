@@ -38,7 +38,7 @@ use super::{ChildEvent, EventedPty, EventedReadWrite, PtyOptions, SizeInfo};
 use crate::ASSETS;
 use crate::terminal::bootstrap::raw_init_shell_script_for_shell;
 use crate::terminal::cli_agent_sessions::event::current_protocol_version;
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64")))]
 use crate::terminal::cli_agent_sessions::grok_native_bridge_root;
 use crate::terminal::local_tty::docker_sandbox::{
     DOCKER_SANDBOX_HOME_DIR, DockerSandboxShellStarter,
@@ -463,7 +463,7 @@ fn build_host_shell_command(
 
     // 普通本地 shell 只接受宿主验证的发现目录，不能继承其他会话或环境提供的位置。
     builder.env_remove("GROK_TERMINAL_BRIDGE_DIR");
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64")))]
     if FeatureFlag::HOANotifications.is_enabled()
         && let Ok(root) = grok_native_bridge_root::root()
     {

@@ -27,6 +27,18 @@ pub static AmdPowerXpressRequestHighPerformance: u32 = 1;
 
 // Zap OSS 构建的入口,简单包一层 warp::run()。
 fn main() -> Result<()> {
+    #[cfg(windows)]
+    if std::env::args_os().nth(1).as_deref()
+        == Some(std::ffi::OsStr::new("--grok-image-observer-bootstrap"))
+    {
+        anyhow::ensure!(
+            std::env::args_os().count() == 2,
+            "映像观察辅助进程不接受其他参数"
+        );
+        // 观察器保持 stdin，先确认用户进程已脱离调试，再关闭本辅助进程。
+        std::io::copy(&mut std::io::stdin().lock(), &mut std::io::sink())?;
+        return Ok(());
+    }
     if let Some(result) = warp::run_remote_owned_codex_from_args() {
         result?;
         return Ok(());

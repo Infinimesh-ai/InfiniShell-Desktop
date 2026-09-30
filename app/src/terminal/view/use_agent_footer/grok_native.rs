@@ -342,7 +342,7 @@ fn prepare_input(
 ) -> Result<Option<PreparedInput>, String> {
     let unavailable = || crate::t!("cli-agent-grok-owned-input-unavailable");
     let root = grok_native_bridge_root::root().map_err(|_| unavailable())?;
-    let Some(bridge) = NativeBridge::discover(&root, target.pty).map_err(|_| unavailable())? else {
+    let Some(bridge) = NativeBridge::discover(&root, target.pty.clone()).map_err(|_| unavailable())? else {
         return Ok(None);
     };
     let observed_session = observed_session

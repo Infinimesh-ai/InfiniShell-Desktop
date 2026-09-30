@@ -597,11 +597,148 @@ fn identity_snapshot_rejects_credentials_and_cannot_restore_authority() {
     assert!(native_records(&mut connection).unwrap().is_empty());
     assert!(read_tasks(&mut connection, false).unwrap().is_empty());
     let record = claimed(&mut connection, input());
-    assert_eq!(record.delivery.binding.native_process.resource_cid, 0);
+    let NativeBridgeProcessSnapshot::Macos(process) = &record.delivery.binding.native_process
+    else {
+        panic!("旧 Mac 身份必须按原形状读取");
+    };
+    assert_eq!(process.resource_cid, 0);
     assert_eq!(
-        record.delivery.binding.boot_session,
-        "ABCDEFAB-1234-5678-9012-ABCDEF123456"
+        record.delivery.binding.boot_session.as_deref(),
+        Some("ABCDEFAB-1234-5678-9012-ABCDEF123456")
     );
+}
+
+#[test]
+fn legacy_macos_task_identity_keeps_exact_serialized_bytes() {
+    // 这是平台分型前实际使用的字段顺序；持久 task_id 必须继续绑定同一字节序列。
+    let old = r#"[{"instance_id":"00000000-0000-0000-0000-000000000001","native_process":{"pid":101,"pid_version":2,"unique_id":3,"resource_cid":0},"boot_session":"ABCDEFAB-1234-5678-9012-ABCDEF123456","shell":{"pid":102,"pid_version":4,"unique_id":5,"resource_cid":0},"slave_device":6,"artifact_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"},"00000000-0000-0000-0000-000000000002"]"#;
+    let input = input();
+    let binding: NativeBridgeBindingSnapshot = serde_json::from_value(input.binding).unwrap();
+    binding.validate().unwrap();
+    assert_eq!(
+        serde_json::to_string(&(&binding, input.session_id)).unwrap(),
+        old
+    );
+    assert_eq!(
+        task_id(&binding, input.session_id).unwrap(),
+        format!(
+            "grok-native-terminal:{}",
+            blake3::hash(old.as_bytes()).to_hex()
+        )
+    );
+}
+
+fn linux_binding() -> Value {
+    let mut binding = input().binding;
+    let process = json!({"platform":"linux", "pid":101, "start_time_ticks":12,
+        "proc_inode":13, "pid_namespace_device":14, "pid_namespace_inode":15,
+        "uid":1000, "executable_device":16, "executable_inode":17});
+    binding["native_process"] = process.clone();
+    binding["shell"] = process;
+    binding["shell"]["pid"] = json!(102);
+    binding["shell"]["proc_inode"] = json!(18);
+    binding
+}
+
+fn windows_binding() -> Value {
+    let mut binding = input().binding;
+    binding.as_object_mut().unwrap().remove("boot_session");
+    binding.as_object_mut().unwrap().remove("slave_device");
+    binding["terminal_generation"] = json!(Uuid::from_u128(25));
+    let process = json!({"platform":"windows", "pid":101, "created_at":12,
+        "logon_low":14, "logon_high":0, "session_id":1});
+    binding["native_process"] = process.clone();
+    binding["shell"] = process;
+    binding["shell"]["pid"] = json!(102);
+    binding["shell"]["created_at"] = json!(13);
+    binding
+}
+
+fn valid_binding(value: Value) -> bool {
+    serde_json::from_value::<NativeBridgeBindingSnapshot>(value)
+        .is_ok_and(|binding| binding.validate().is_ok())
+}
+
+#[test]
+fn platform_bindings_reject_mixed_or_incomplete_terminal_identity() {
+    for original in [linux_binding(), windows_binding()] {
+        assert!(valid_binding(original.clone()));
+        for (pointer, value) in [
+            ("/native_process/pid", json!(0)),
+            ("/shell/pid", json!(0)),
+            ("/native_process/platform", json!("macos")),
+        ] {
+            let mut binding = original.clone();
+            *binding.pointer_mut(pointer).unwrap() = value;
+            assert!(!valid_binding(binding));
+        }
+        let mut mixed = original.clone();
+        mixed["shell"] = input().binding["shell"].clone();
+        assert!(!valid_binding(mixed));
+        let mut authority = original;
+        authority["native_process"]["token"] = json!("不得恢复授权");
+        assert!(!valid_binding(authority));
+    }
+    for field in ["uid", "pid_namespace_device", "pid_namespace_inode"] {
+        let mut value = linux_binding();
+        value["shell"][field] = json!(9999);
+        assert!(!valid_binding(value));
+    }
+    for field in ["logon_low", "logon_high", "session_id"] {
+        let mut value = windows_binding();
+        value["shell"][field] = json!(9999);
+        assert!(!valid_binding(value));
+    }
+    for field in ["boot_session", "slave_device"] {
+        let mut linux = linux_binding();
+        linux.as_object_mut().unwrap().remove(field);
+        assert!(!valid_binding(linux));
+        let mut windows = windows_binding();
+        windows[field] = input().binding[field].clone();
+        assert!(!valid_binding(windows));
+    }
+    let mut windows = windows_binding();
+    windows["terminal_generation"] = json!(Uuid::nil());
+    assert!(!valid_binding(windows));
+    let mut linux = linux_binding();
+    linux["terminal_generation"] = json!(Uuid::new_v4());
+    assert!(!valid_binding(linux));
+}
+
+#[test]
+fn linux_and_windows_ledger_recovery_never_regrants_transport() {
+    for binding in [linux_binding(), windows_binding()] {
+        let mut connection = fixture();
+        let input = NativeBridgeInput { binding, ..input() };
+        let record = claimed(&mut connection, input.clone());
+        assert_eq!(record.delivery.state, NativeBridgeDeliveryState::Unknown);
+        assert_eq!(
+            claim_once(
+                &mut connection,
+                NativeBridgeInput {
+                    input_revision: Uuid::new_v4(),
+                    message_id: Uuid::new_v4(),
+                    ..input.clone()
+                }
+            )
+            .unwrap(),
+            NativeBridgeClaimOutcome::Existing(record.clone())
+        );
+        assert_eq!(
+            lookup_exact(
+                &mut connection,
+                input.binding,
+                Some(input.session_id),
+                &input.body
+            )
+            .unwrap(),
+            Some(record.clone())
+        );
+        assert_eq!(
+            acknowledge(&mut connection, &record).delivery.state,
+            NativeBridgeDeliveryState::NativeAcknowledged
+        );
+    }
 }
 
 #[test]

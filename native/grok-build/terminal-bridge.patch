@@ -1,3 +1,16 @@
+diff --git a/crates/codegen/xai-grok-pager/Cargo.toml b/crates/codegen/xai-grok-pager/Cargo.toml
+index b67850c..f6ccd11 100644
+--- a/crates/codegen/xai-grok-pager/Cargo.toml
++++ b/crates/codegen/xai-grok-pager/Cargo.toml
+@@ -184,7 +184,7 @@ core-foundation = { workspace = true }
+ # events so only the relaunched child handles them. Version matches the other
+ # in-repo consumers (xai-crash-handler, xai-system-power).
+ [target.'cfg(windows)'.dependencies]
+-windows-sys = { version = "0.59", features = ["Win32_System_Console"] }
++windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Console", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Pipes", "Win32_System_Threading", "Win32_System_IO"] }
+ 
+ [dev-dependencies]
+ tokio = { workspace = true, features = ["test-util"] }
 diff --git a/crates/codegen/xai-grok-pager/src/app/actions.rs b/crates/codegen/xai-grok-pager/src/app/actions.rs
 index 1e1f1d5..cbf72fa 100644
 --- a/crates/codegen/xai-grok-pager/src/app/actions.rs
@@ -35,20 +48,20 @@ index 1e1f1d5..cbf72fa 100644
      /// Carries the payload so dispatch can requeue it locally.
      /// The producer already consumed the composer/queue row, so dropping it would silently lose the message.
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
-index a57df79..f9d4184 100644
+index a57df79..53aa866 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/mod.rs
 @@ -47,6 +47,8 @@ pub(crate) use notes::FEEDBACK_TRACE_UPLOAD_TIMEOUT_MS;
  pub(crate) use notes::{recap_unavailable_toast, scrollback_has_user_messages};
  pub(crate) use permissions::resolve_permission_queue_transition;
  pub(crate) use prompt::dispatch_initial_prompt;
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
 +pub(crate) use prompt::dispatch_terminal_bridge_prompt;
  pub(in crate::app) use prompt::{
      present_export_copy_tip, show_small_screen_tip, show_ssh_wrap_tip,
  };
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
-index 0323cae..d610d01 100644
+index 0323cae..8beb943 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
 @@ -63,6 +63,36 @@ pub(crate) fn dispatch_initial_prompt(app: &mut AppView, prompt: String) -> Vec<
@@ -56,7 +69,7 @@ index 0323cae..d610d01 100644
  }
  
 +/// 外部事务已在同一事件循环完成守卫与持久领取；不经过按键、斜杠命令或审批处理。
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
 +pub(crate) fn dispatch_terminal_bridge_prompt(
 +    app: &mut AppView,
 +    text: String,
@@ -120,14 +133,14 @@ index a96c078..ec3b584 100644
              let effects = handle_prompt_response(app, agent_id, result, http_status, prompt_id);
              app.refresh_status_line_for(agent_id);
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
-index 94636a6..5568ae4 100644
+index 94636a6..7752ac5 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 @@ -19,6 +19,8 @@ mod settings;
  mod status;
  mod status_line;
  mod task_result;
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
 +mod terminal_bridge;
  mod transcript;
  mod turn;
@@ -446,14 +459,14 @@ index 2b2cc56..a82c205 100644
              agent_id,
              session_id,
 diff --git a/crates/codegen/xai-grok-pager/src/app/event_loop.rs b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
-index ceaf021..e3ca82c 100644
+index ceaf021..998b1ec 100644
 --- a/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 @@ -23,6 +23,9 @@ use std::time::Duration;
  use tokio::task::JoinSet;
  use tokio::time::{Instant, sleep_until};
  use xai_acp_lib::{AcpClientMessage, acp_send};
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
 +#[path = "terminal_bridge_loop.rs"]
 +mod terminal_bridge_loop;
  /// During a continuous terminal drag, dozens of resize events fire per second, and each would rebuild the layout of every entry.
@@ -463,7 +476,7 @@ index ceaf021..e3ca82c 100644
      let mut xt_filter = super::xt_filter::XtversionFilter::new();
      let mut bg_update_rx = bg_update_rx;
      debug_assert_eq!(term_state.initial_theme, theme_cache::current_kind());
-+    #[cfg(unix)]
++    #[cfg(any(unix, windows))]
 +    let mut terminal_bridge = terminal_bridge_loop::open(&app.acp_tx);
      let mut appearance_watcher =
          SystemAppearanceWatcher::start_if_auto(theme_cache::is_auto_mode());
@@ -472,7 +485,7 @@ index ceaf021..e3ca82c 100644
                  None => std::future::pending().await,
              }
          };
-+        #[cfg(unix)]
++        #[cfg(any(unix, windows))]
 +        let mut bridge_input_unchanged = false;
          tokio::select! {
              biased;
@@ -481,7 +494,7 @@ index ceaf021..e3ca82c 100644
              }
  
              writer_event = writer_event_rx.recv() => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    // 输出 ACK 只推进绘制状态，不修改输入，也不证明活动会话空闲。
 +                    bridge_input_unchanged = true;
@@ -493,7 +506,7 @@ index ceaf021..e3ca82c 100644
              // reading the pty. Field diagnosis for the mid-turn freeze family (loop alive,
              // screen frozen). Above the ACP arm so a mid-turn token firehose cannot starve it.
              _ = writer_blocked_report => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    bridge_input_unchanged = true;
 +                }
@@ -504,7 +517,7 @@ index ceaf021..e3ca82c 100644
              Some(join_result) = tasks.join_next() => {
                  match join_result {
                      Ok(result) => {
-+                        #[cfg(unix)]
++                        #[cfg(any(unix, windows))]
 +                        if let Some(bridge) = terminal_bridge.as_mut() {
 +                            bridge.observe_result(&result);
 +                        }
@@ -517,7 +530,7 @@ index ceaf021..e3ca82c 100644
  
 -            _ = stall_flush => {}
 +            _ = stall_flush => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    bridge_input_unchanged = true;
 +                }
@@ -525,7 +538,7 @@ index ceaf021..e3ca82c 100644
  
              // Debounced resize: draw once the terminal size has stabilized.
              _ = resize_debounce => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    bridge_input_unchanged = true;
 +                }
@@ -536,7 +549,7 @@ index ceaf021..e3ca82c 100644
  
              // Deferred draw: fires when an ACP-triggered draw was throttled.
              _ = deferred_draw => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    bridge_input_unchanged = true;
 +                }
@@ -547,7 +560,7 @@ index ceaf021..e3ca82c 100644
              }
  
              _ = animation_tick => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                let bridge_animation_identity = if input_rx.is_empty()
 +                    && acp_peek.is_none()
 +                    && acp_rx.is_empty()
@@ -570,7 +583,7 @@ index ceaf021..e3ca82c 100644
                  }
                  // Keep ticking as long as there are running animations or pending actions waiting to expire
                  schedule_tick(&mut animation_tick_at, &app, tick_interval);
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                if bridge_animation_identity.is_some()
 +                    && input_rx.is_empty()
 +                    && acp_peek.is_none()
@@ -594,7 +607,7 @@ index ceaf021..e3ca82c 100644
                  let status = rx.borrow_and_update().clone();
                  match status {
                      ConnectionStatus::Reconnecting { attempt } => {
-+                        #[cfg(unix)]
++                        #[cfg(any(unix, windows))]
 +                        if let Some(bridge) = terminal_bridge.as_mut() {
 +                            bridge.suspend();
 +                        }
@@ -605,7 +618,7 @@ index ceaf021..e3ca82c 100644
                          );
                          last_leader_generation = generation;
                          app.reconnect_pending = true;
-+                        #[cfg(unix)]
++                        #[cfg(any(unix, windows))]
 +                        if let Some(bridge) = terminal_bridge.as_mut() {
 +                            bridge.check_capability(&app.acp_tx);
 +                        }
@@ -616,7 +629,7 @@ index ceaf021..e3ca82c 100644
                          presenter.request(false);
                      }
                      ConnectionStatus::Failed { ref error } => {
-+                        #[cfg(unix)]
++                        #[cfg(any(unix, windows))]
 +                        if let Some(bridge) = terminal_bridge.as_mut() {
 +                            bridge.suspend();
 +                        }
@@ -628,17 +641,17 @@ index ceaf021..e3ca82c 100644
              }
  
 +            request = async {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    match terminal_bridge.as_mut() {
 +                        Some(bridge) => bridge.io.requests.recv().await,
 +                        None => std::future::pending().await,
 +                    }
 +                }
-+                #[cfg(not(unix))]
++                #[cfg(not(any(unix, windows)))]
 +                std::future::pending::<std::convert::Infallible>().await
 +            }, if input_rx.is_empty() => {
-+                #[cfg(unix)]
++                #[cfg(any(unix, windows))]
 +                {
 +                    bridge_input_unchanged = true;
 +                    if let Some(request) = request {
@@ -652,7 +665,7 @@ index ceaf021..e3ca82c 100644
 +                        terminal_bridge = None;
 +                    }
 +                }
-+                #[cfg(not(unix))]
++                #[cfg(not(any(unix, windows)))]
 +                match request {}
 +            }
 +
@@ -664,7 +677,7 @@ index ceaf021..e3ca82c 100644
              }
          }
 +        // 纯输出、重绘和桥接自身处理之外的事件均撤销旧观察，覆盖同批输入的“编辑后清空”。
-+        #[cfg(unix)]
++        #[cfg(any(unix, windows))]
 +        if !bridge_input_unchanged && let Some(bridge) = terminal_bridge.as_mut() {
 +            bridge.state.invalidate();
 +        }
@@ -672,23 +685,26 @@ index ceaf021..e3ca82c 100644
              emit_event_loop_stall(window);
          }
 diff --git a/crates/codegen/xai-grok-pager/src/app/mod.rs b/crates/codegen/xai-grok-pager/src/app/mod.rs
-index 7fbb597..224c3a1 100644
+index 7fbb597..50423ba 100644
 --- a/crates/codegen/xai-grok-pager/src/app/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/mod.rs
-@@ -70,6 +70,11 @@ mod startup_failure;
+@@ -70,6 +70,14 @@ mod startup_failure;
  use reader_thread::ReaderThread;
  pub mod signal_handler;
  mod teardown_fence;
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
 +pub(crate) mod terminal_bridge;
-+#[cfg(unix)]
++#[cfg(any(unix, windows))]
++#[cfg_attr(windows, path = "terminal_bridge_io_windows.rs")]
 +pub(crate) mod terminal_bridge_io;
++#[cfg(windows)]
++mod terminal_bridge_windows;
 +pub(crate) mod terminal_bridge_receipt;
  mod terminal_restore;
  use terminal_restore::{emit_terminal_teardown_sequences, restore_terminal, set_panic_hook};
  #[cfg(test)]
 diff --git a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
-index e1077eb..fe1724d 100644
+index e1077eb..6f8d126 100644
 --- a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
 @@ -48,6 +48,20 @@ impl AppView {
@@ -696,7 +712,7 @@ index e1077eb..fe1724d 100644
      }
  
 +    /// 桥接只豁免不会启动或回收外部命令的状态栏 tick；内置行只改变显示缓存。
-+    #[cfg(unix)]
++    #[cfg(any(unix, windows))]
 +    pub(crate) fn terminal_bridge_status_tick_is_passive(&self) -> bool {
 +        if self.status_line.run_slot(Instant::now()) != RunSlot::Free {
 +            return false;
@@ -714,15 +730,17 @@ index e1077eb..fe1724d 100644
          status_line_tick_demand(TickInputs {
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 new file mode 100644
-index 0000000..b948207
+index 0000000..ee07a11
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
-@@ -0,0 +1,730 @@
+@@ -0,0 +1,741 @@
 +//! 普通 TUI 的外部输入事务；所有状态检查与提交均由原生事件循环串行调用。
 +
 +use std::collections::HashMap;
++#[cfg(unix)]
 +use std::fs::{File, OpenOptions};
 +use std::io::{self, Write};
++#[cfg(unix)]
 +use std::os::unix::fs::OpenOptionsExt;
 +use std::path::PathBuf;
 +use std::time::{Duration, Instant};
@@ -829,7 +847,10 @@ index 0000000..b948207
 +    input_epoch: u64,
 +    lease: Option<(Lease, Instant)>,
 +    receipts: HashMap<String, Receipt>,
++    #[cfg(unix)]
 +    journal: File,
++    #[cfg(windows)]
++    journal: super::terminal_bridge_windows::Journal,
 +    journal_failed: bool,
 +    native_available: bool,
 +}
@@ -846,13 +867,19 @@ index 0000000..b948207
 +impl TerminalBridge {
 +    pub(crate) fn new(instance_id: String, instance_dir: PathBuf) -> io::Result<Self> {
 +        // 每次 TUI 启动使用新实例目录；旧账本只读保留，绝不载入为可重发队列。
-+        let journal = OpenOptions::new()
-+            .write(true)
-+            .create_new(true)
-+            .mode(0o600)
-+            .open(instance_dir.join("receipts.jsonl"))?;
-+        journal.sync_all()?;
-+        File::open(instance_dir)?.sync_all()?;
++        #[cfg(unix)]
++        let journal = {
++            let journal = OpenOptions::new()
++                .write(true)
++                .create_new(true)
++                .mode(0o600)
++                .open(instance_dir.join("receipts.jsonl"))?;
++            journal.sync_all()?;
++            File::open(instance_dir)?.sync_all()?;
++            journal
++        };
++        #[cfg(windows)]
++        let journal = super::terminal_bridge_windows::Journal::new(&instance_dir)?;
 +        Ok(Self {
 +            instance_id,
 +            input_epoch: 0,
@@ -1958,6 +1985,507 @@ index 0000000..ce730b9
 +    assert!(!token_matches("abcdef", "abcdeg"));
 +    assert!(!token_matches("abcdef", "abcde"));
 +}
+diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs
+new file mode 100644
+index 0000000..d095097
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows.rs
+@@ -0,0 +1,289 @@
++//! 普通 Windows TUI 的私有 named pipe；事务仍由同一个事件循环串行处理。
++
++use std::fs::File;
++use std::io::{self, Read, Write};
++use std::os::windows::io::AsRawHandle;
++use std::path::{Path, PathBuf};
++use std::sync::Arc;
++use std::time::Duration;
++
++use serde::{Deserialize, Serialize};
++use tokio::io::{AsyncReadExt, AsyncWriteExt};
++use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
++use tokio::sync::{Semaphore, mpsc, oneshot};
++use tokio::task::{JoinHandle, JoinSet};
++use uuid::Uuid;
++
++use super::terminal_bridge::{Request, Response};
++use super::terminal_bridge_windows::{Directory, FileIdentity, UserIdentity, identity, invalid};
++
++pub(crate) const BRIDGE_DIR_ENV: &str = "GROK_TERMINAL_BRIDGE_DIR";
++const MAX_FRAME_BYTES: usize = 256 * 1024;
++const MAX_CONNECTIONS: usize = 8;
++const READ_TIMEOUT: Duration = Duration::from_secs(5);
++const REPLY_TIMEOUT: Duration = Duration::from_secs(30);
++
++pub(crate) struct BridgeRequest {
++    pub(crate) request: Request,
++    pub(crate) reply: oneshot::Sender<Response>,
++}
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Envelope {
++    token: String,
++    request: Request,
++}
++
++#[derive(Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Manifest {
++    protocol_version: u32,
++    native_pid: u32,
++    instance_id: String,
++    socket: PathBuf,
++    token: String,
++}
++
++struct Endpoint {
++    owner: UserIdentity,
++    root: Directory,
++    directory: Directory,
++    manifest: Option<File>,
++    manifest_identity: FileIdentity,
++    manifest_bytes: Vec<u8>,
++    pipe: PathBuf,
++}
++
++impl Endpoint {
++    fn validate(&self) -> io::Result<()> {
++        self.root.validate()?;
++        self.directory.validate()?;
++        let file = self.manifest.as_ref().ok_or_else(invalid)?;
++        if self.directory.validate_file(file)? != self.manifest_identity {
++            return Err(invalid());
++        }
++        let reopened = self.directory.read_file("manifest.json")?;
++        if identity(&reopened, false)? != self.manifest_identity
++            || reopened.metadata()?.len() != self.manifest_bytes.len() as u64
++        {
++            return Err(invalid());
++        }
++        let mut bytes = Vec::new();
++        reopened
++            .take(self.manifest_bytes.len() as u64 + 1)
++            .read_to_end(&mut bytes)?;
++        if bytes != self.manifest_bytes {
++            return Err(invalid());
++        }
++        Ok(())
++    }
++
++    fn listener(&self, first: bool) -> io::Result<NamedPipeServer> {
++        self.validate()?;
++        let security = self.owner.security(false)?;
++        let mut attributes = security.attributes();
++        // 新 listener 在旧连接释放之前建立，名称不会出现无服务器的可抢占窗口。
++        unsafe {
++            ServerOptions::new()
++                .first_pipe_instance(first)
++                .reject_remote_clients(true)
++                // 新旧 listener 短暂并存；超过八条连接仍立即拒绝，不关闭整个入口。
++                .max_instances(MAX_CONNECTIONS + 2)
++                .create_with_security_attributes_raw(
++                    &self.pipe,
++                    std::ptr::addr_of_mut!(attributes).cast(),
++                )
++        }
++    }
++}
++
++impl Drop for Endpoint {
++    fn drop(&mut self) {
++        // 先核身份，再通过同一文件句柄删除；占用、替换或 ACL 变化时保守保留。
++        // receipts.jsonl 与实例目录始终保留，不把退出解释为可以丢弃未知投递。
++        if self.validate().is_err() {
++            return;
++        }
++        drop(self.manifest.take());
++        let _ = self.directory.remove_manifest(self.manifest_identity);
++    }
++}
++
++pub(crate) struct BridgeIo {
++    pub(crate) instance_id: String,
++    pub(crate) instance_dir: PathBuf,
++    pub(crate) requests: mpsc::Receiver<BridgeRequest>,
++    listener_task: JoinHandle<()>,
++}
++
++impl BridgeIo {
++    pub(crate) fn start_from_env() -> io::Result<Option<Self>> {
++        let Some(root) = std::env::var_os(BRIDGE_DIR_ENV) else {
++            return Ok(None);
++        };
++        Self::start(Path::new(&root)).map(Some)
++    }
++
++    fn start(root: &Path) -> io::Result<Self> {
++        let owner = UserIdentity::current()?;
++        let root = Directory::open(root, &owner)?;
++        let instance = Uuid::new_v4();
++        let instance_id = instance.to_string();
++        let directory = root.create_child(&format!("t-{}", instance.simple()))?;
++        let instance_dir = directory.path().to_owned();
++        let pipe = PathBuf::from(format!(
++            r"\\.\pipe\infinishell-grok-terminal-bridge-v1-{}",
++            instance.simple()
++        ));
++        let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
++        let manifest = Manifest {
++            protocol_version: 1,
++            native_pid: std::process::id(),
++            instance_id: instance_id.clone(),
++            socket: pipe.clone(),
++            token: token.clone(),
++        };
++        let manifest_bytes = serde_json::to_vec(&manifest)?;
++        let mut output = directory.create_file("manifest.json")?;
++        let manifest_identity = identity(&output, false)?;
++        output.write_all(&manifest_bytes)?;
++        output.sync_all()?;
++        drop(output);
++        // 发布后只持有读句柄，允许宿主只读发现，但阻止并发写入、改名或替换。
++        let file = directory.read_file("manifest.json")?;
++        if identity(&file, false)? != manifest_identity {
++            return Err(invalid());
++        }
++        let endpoint = Arc::new(Endpoint {
++            owner,
++            root,
++            directory,
++            manifest: Some(file),
++            manifest_identity,
++            manifest_bytes,
++            pipe,
++        });
++        let listener = endpoint.listener(true)?;
++        let (sender, requests) = mpsc::channel(MAX_CONNECTIONS);
++        let listener_task = tokio::spawn(serve(listener, endpoint, token, sender));
++        Ok(Self {
++            instance_id,
++            instance_dir,
++            requests,
++            listener_task,
++        })
++    }
++}
++
++impl Drop for BridgeIo {
++    fn drop(&mut self) {
++        self.listener_task.abort();
++    }
++}
++
++async fn serve(
++    mut listener: NamedPipeServer,
++    endpoint: Arc<Endpoint>,
++    token: String,
++    sender: mpsc::Sender<BridgeRequest>,
++) {
++    let permits = Arc::new(Semaphore::new(MAX_CONNECTIONS));
++    let mut connections = JoinSet::new();
++    loop {
++        tokio::select! {
++            result = listener.connect() => {
++                if result.is_err() { break; }
++                let next = match endpoint.listener(false) { Ok(next) => next, Err(_) => break };
++                let stream = std::mem::replace(&mut listener, next);
++                let Ok(permit) = permits.clone().try_acquire_owned() else { continue; };
++                let endpoint = endpoint.clone();
++                let token = token.clone();
++                let sender = sender.clone();
++                connections.spawn(async move {
++                    let _permit = permit;
++                    // 错误不输出 token、正文或认证材料。
++                    let _ = exchange(stream, endpoint, token, sender).await;
++                });
++            }
++            _ = connections.join_next(), if !connections.is_empty() => {}
++        }
++    }
++}
++
++async fn exchange(
++    mut stream: NamedPipeServer,
++    endpoint: Arc<Endpoint>,
++    token: String,
++    sender: mpsc::Sender<BridgeRequest>,
++) -> io::Result<()> {
++    endpoint.validate()?;
++    let envelope = tokio::time::timeout(READ_TIMEOUT, read_envelope(&mut stream))
++        .await
++        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "bridge frame timed out"))??;
++    endpoint.owner.verify_pipe_client(stream.as_raw_handle())?;
++    if !token_matches(&token, &envelope.token) {
++        return Err(invalid());
++    }
++    endpoint.validate()?;
++    let (reply, response) = oneshot::channel();
++    sender
++        .try_send(BridgeRequest {
++            request: envelope.request,
++            reply,
++        })
++        .map_err(|_| invalid())?;
++    // 断连或超时都不能让宿主生成第二个消息 ID；原事务只能查询。
++    let response = tokio::time::timeout(REPLY_TIMEOUT, response)
++        .await
++        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "bridge reply timed out"))?
++        .map_err(|_| invalid())?;
++    endpoint.validate()?;
++    let bytes = serde_json::to_vec(&response)?;
++    if bytes.is_empty() || bytes.len() > MAX_FRAME_BYTES {
++        return Err(invalid());
++    }
++    write_response(&mut stream, &bytes, READ_TIMEOUT).await
++}
++
++async fn write_response(
++    stream: &mut NamedPipeServer,
++    bytes: &[u8],
++    timeout: Duration,
++) -> io::Result<()> {
++    tokio::time::timeout(timeout, async {
++        stream.write_u32(bytes.len() as u32).await?;
++        stream.write_all(bytes).await?;
++        // Windows 关闭服务端管道会丢弃未读响应。等待宿主读完整帧后的单字节确认，
++        // 仍受同一期限约束；此确认只管传输收尾，不能作为事务或原生提示词的 ACK。
++        if stream.read_u8().await? != 1 {
++            return Err(invalid());
++        }
++        Ok(())
++    })
++    .await
++    .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "bridge response timed out"))?
++}
++
++async fn read_envelope(stream: &mut NamedPipeServer) -> io::Result<Envelope> {
++    let length = stream.read_u32().await? as usize;
++    if length == 0 || length > MAX_FRAME_BYTES {
++        return Err(invalid());
++    }
++    let mut bytes = vec![0; length];
++    stream.read_exact(&mut bytes).await?;
++    serde_json::from_slice(&bytes).map_err(|_| invalid())
++}
++
++fn token_matches(expected: &str, actual: &str) -> bool {
++    expected.len() == actual.len()
++        && expected
++            .bytes()
++            .zip(actual.bytes())
++            .fold(0, |difference, (left, right)| difference | (left ^ right))
++            == 0
++}
++
++#[cfg(test)]
++#[path = "terminal_bridge_io_windows_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs
+new file mode 100644
+index 0000000..81010a1
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_io_windows_tests.rs
+@@ -0,0 +1,200 @@
++use super::*;
++
++use serde_json::json;
++use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
++
++use crate::app::terminal_bridge_windows::private_test_directory;
++
++fn manifest(bridge: &BridgeIo) -> Manifest {
++    serde_json::from_slice(&std::fs::read(bridge.instance_dir.join("manifest.json")).unwrap())
++        .unwrap()
++}
++
++async fn send(client: &mut NamedPipeClient, value: serde_json::Value) {
++    let bytes = serde_json::to_vec(&value).unwrap();
++    client.write_u32(bytes.len() as u32).await.unwrap();
++    client.write_all(&bytes).await.unwrap();
++}
++
++fn state(manifest: &Manifest, token: &str) -> serde_json::Value {
++    json!({"token":token,"request":{"operation":"state","instance_id":manifest.instance_id}})
++}
++
++async fn assert_no_delivery(bridge: &mut BridgeIo) {
++    assert!(
++        tokio::time::timeout(Duration::from_millis(150), bridge.requests.recv())
++            .await
++            .is_err()
++    );
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_authenticated_pipe_waits_for_complete_response_confirmation() {
++    let root = private_test_directory();
++    let mut bridge = BridgeIo::start(root.path()).unwrap();
++    let manifest = manifest(&bridge);
++    assert_eq!(manifest.protocol_version, 1);
++    assert_eq!(manifest.native_pid, std::process::id());
++    assert_eq!(manifest.instance_id, bridge.instance_id);
++    assert_eq!(
++        manifest.socket,
++        PathBuf::from(format!(
++            r"\\.\pipe\infinishell-grok-terminal-bridge-v1-{}",
++            Uuid::parse_str(&manifest.instance_id).unwrap().simple()
++        ))
++    );
++    let mut client = ClientOptions::new().open(&manifest.socket).unwrap();
++    send(&mut client, state(&manifest, &manifest.token)).await;
++    let call = tokio::time::timeout(Duration::from_secs(2), bridge.requests.recv())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(
++        matches!(call.request, Request::State { instance_id } if instance_id == bridge.instance_id)
++    );
++    call.reply
++        .send(Response::Rejected {
++            reason: "fixture".into(),
++        })
++        .unwrap();
++    // 客户端延迟读取时，服务端必须保留响应，收到完整帧确认后才关闭。
++    tokio::time::sleep(Duration::from_millis(100)).await;
++    let length = client.read_u32().await.unwrap();
++    let mut bytes = vec![0; length as usize];
++    client.read_exact(&mut bytes).await.unwrap();
++    assert!(
++        matches!(serde_json::from_slice::<Response>(&bytes).unwrap(), Response::Rejected { reason } if reason == "fixture")
++    );
++    assert!(
++        tokio::time::timeout(Duration::from_millis(20), client.read_u8())
++            .await
++            .is_err()
++    );
++    client.write_all(&[1]).await.unwrap();
++    assert!(
++        tokio::time::timeout(Duration::from_secs(2), client.read_u8())
++            .await
++            .unwrap()
++            .is_err()
++    );
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_missing_response_confirmation_has_bounded_shutdown() {
++    let pipe = format!(
++        r"\\.\pipe\infinishell-grok-terminal-bridge-test-{}",
++        Uuid::new_v4().simple()
++    );
++    let mut server = ServerOptions::new()
++        .first_pipe_instance(true)
++        .reject_remote_clients(true)
++        .create(&pipe)
++        .unwrap();
++    let mut client = ClientOptions::new().open(&pipe).unwrap();
++    server.connect().await.unwrap();
++    let response = tokio::spawn(async move {
++        write_response(&mut server, b"response", Duration::from_millis(100)).await
++    });
++    assert_eq!(client.read_u32().await.unwrap(), 8);
++    let mut bytes = [0; 8];
++    client.read_exact(&mut bytes).await.unwrap();
++    assert_eq!(&bytes, b"response");
++    // 不发送确认；服务端必须自行按同一期限返回，不能无界 FlushFileBuffers。
++    let error = tokio::time::timeout(Duration::from_secs(2), response)
++        .await
++        .unwrap()
++        .unwrap()
++        .unwrap_err();
++    assert_eq!(error.kind(), io::ErrorKind::TimedOut);
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_token_and_strict_envelope_fail_before_event_loop() {
++    let root = private_test_directory();
++    let mut bridge = BridgeIo::start(root.path()).unwrap();
++    let manifest = manifest(&bridge);
++    let mut client = ClientOptions::new().open(&manifest.socket).unwrap();
++    send(&mut client, state(&manifest, "wrong-token")).await;
++    assert_no_delivery(&mut bridge).await;
++    let mut client = ClientOptions::new().open(&manifest.socket).unwrap();
++    let mut value = state(&manifest, &manifest.token);
++    value["pid"] = json!(std::process::id());
++    send(&mut client, value).await;
++    assert_no_delivery(&mut bridge).await;
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_oversize_or_truncated_frame_never_enters_event_loop() {
++    let root = private_test_directory();
++    let mut bridge = BridgeIo::start(root.path()).unwrap();
++    let manifest = manifest(&bridge);
++    let mut client = ClientOptions::new().open(&manifest.socket).unwrap();
++    client.write_u32(MAX_FRAME_BYTES as u32 + 1).await.unwrap();
++    drop(client);
++    assert_no_delivery(&mut bridge).await;
++    let mut client = ClientOptions::new().open(&manifest.socket).unwrap();
++    client.write_u32(42).await.unwrap();
++    client.write_all(b"{}").await.unwrap();
++    drop(client);
++    assert_no_delivery(&mut bridge).await;
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_concurrent_instances_are_independent_and_names_cannot_be_taken() {
++    let root = private_test_directory();
++    let mut first = BridgeIo::start(root.path()).unwrap();
++    let mut second = BridgeIo::start(root.path()).unwrap();
++    let first_manifest = manifest(&first);
++    let second_manifest = manifest(&second);
++    assert_ne!(first_manifest.socket, second_manifest.socket);
++    assert!(
++        ServerOptions::new()
++            .first_pipe_instance(true)
++            .create(&first_manifest.socket)
++            .is_err()
++    );
++    let mut client = ClientOptions::new().open(&first_manifest.socket).unwrap();
++    send(&mut client, state(&first_manifest, &second_manifest.token)).await;
++    assert_no_delivery(&mut first).await;
++    let mut client = ClientOptions::new().open(&second_manifest.socket).unwrap();
++    send(&mut client, state(&second_manifest, &second_manifest.token)).await;
++    let call = tokio::time::timeout(Duration::from_secs(2), second.requests.recv())
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(
++        matches!(call.request, Request::State { instance_id } if instance_id == second.instance_id)
++    );
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_manifest_is_readable_but_cannot_be_replaced_while_live() {
++    let root = private_test_directory();
++    let bridge = BridgeIo::start(root.path()).unwrap();
++    let path = bridge.instance_dir.join("manifest.json");
++    let before = std::fs::read(&path).unwrap();
++    assert!(std::fs::write(&path, b"{}").is_err());
++    assert!(std::fs::rename(&path, bridge.instance_dir.join("old.json")).is_err());
++    assert_eq!(std::fs::read(&path).unwrap(), before);
++    let directory = bridge.instance_dir.clone();
++    std::fs::write(
++        directory.join("receipts.jsonl"),
++        b"preserve unknown receipt",
++    )
++    .unwrap();
++    drop(bridge);
++    tokio::time::sleep(Duration::from_millis(50)).await;
++    assert!(!path.exists());
++    assert_eq!(
++        std::fs::read(directory.join("receipts.jsonl")).unwrap(),
++        b"preserve unknown receipt"
++    );
++}
++
++#[test]
++fn terminal_bridge_windows_token_comparison_is_exact() {
++    assert!(token_matches("abc", "abc"));
++    for value in ["", "ab", "abcd", "abd"] {
++        assert!(!token_matches("abc", value));
++    }
++}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
 new file mode 100644
 index 0000000..8febbe3
@@ -2224,11 +2752,16 @@ index 0000000..8febbe3
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
 new file mode 100644
-index 0000000..1e4f7a1
+index 0000000..3aa1bfb
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
-@@ -0,0 +1,226 @@
+@@ -0,0 +1,234 @@
 +use super::*;
++
++#[cfg(windows)]
++use crate::app::terminal_bridge_windows::TestDirectory;
++#[cfg(unix)]
++use tempfile::TempDir as TestDirectory;
 +
 +use crate::app::agent::AgentId;
 +use crate::app::app_view::tests::test_app_with_agent;
@@ -2237,8 +2770,11 @@ index 0000000..1e4f7a1
 +use tokio::sync::mpsc;
 +use xai_acp_lib::{AcpAgentMessage, AcpAgentRx, AcpArgs};
 +
-+fn dispatched() -> (tempfile::TempDir, TerminalBridge, AppView, Request, Receipt) {
++fn dispatched() -> (TestDirectory, TerminalBridge, AppView, Request, Receipt) {
++    #[cfg(unix)]
 +    let directory = tempfile::tempdir().unwrap();
++    #[cfg(windows)]
++    let directory = crate::app::terminal_bridge_windows::private_test_directory();
 +    let mut state =
 +        TerminalBridge::new("fixture-instance".into(), directory.path().into()).unwrap();
 +    state.set_native_capability(true);
@@ -2697,11 +3233,12 @@ index 0000000..7ec9119
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000..f77be77
+index 0000000..a92d3cd
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
-@@ -0,0 +1,968 @@
+@@ -0,0 +1,981 @@
 +use super::*;
++
 +use crate::app::actions::TaskResult;
 +use crate::app::agent::{AgentId, AgentState};
 +use crate::app::agent_view::test_fixtures::{
@@ -2709,11 +3246,19 @@ index 0000000..f77be77
 +};
 +use crate::app::app_view::tests::{test_app, test_app_with_agent};
 +use crate::app::app_view::{NewWorktreeDialogState, WorktreeMode};
++#[cfg(windows)]
++use crate::app::terminal_bridge_windows::TestDirectory;
 +use crate::views::agent::ActivePane;
++#[cfg(unix)]
 +use std::os::unix::fs::PermissionsExt;
++#[cfg(unix)]
++use tempfile::TempDir as TestDirectory;
 +
-+fn setup() -> (tempfile::TempDir, TerminalBridge, AppView) {
++fn setup() -> (TestDirectory, TerminalBridge, AppView) {
++    #[cfg(unix)]
 +    let directory = tempfile::tempdir().unwrap();
++    #[cfg(windows)]
++    let directory = crate::app::terminal_bridge_windows::private_test_directory();
 +    let mut bridge = TerminalBridge::new("test-instance".into(), directory.path().into()).unwrap();
 +    bridge.set_native_capability(true);
 +    let mut app = test_app_with_agent();
@@ -2759,7 +3304,7 @@ index 0000000..f77be77
 +    }
 +}
 +
-+fn home_setup(precreated: bool) -> (tempfile::TempDir, TerminalBridge, AppView) {
++fn home_setup(precreated: bool) -> (TestDirectory, TerminalBridge, AppView) {
 +    let (directory, bridge, mut app) = setup();
 +    if precreated {
 +        app.active_view = ActiveView::Welcome;
@@ -3345,7 +3890,10 @@ index 0000000..f77be77
 +
 +#[test]
 +fn native_capability_is_required_before_a_lease_or_claim() {
++    #[cfg(unix)]
 +    let directory = tempfile::tempdir().unwrap();
++    #[cfg(windows)]
++    let directory = crate::app::terminal_bridge_windows::private_test_directory();
 +    let mut bridge = TerminalBridge::new("test-instance".into(), directory.path().into()).unwrap();
 +    let mut app = test_app_with_agent();
 +    app.agents.get_mut(&AgentId(0)).unwrap().active_pane = ActivePane::Prompt;
@@ -3433,6 +3981,7 @@ index 0000000..f77be77
 +            .iter()
 +            .any(|entry| entry.payload_digest.contains("中文"))
 +    );
++    #[cfg(unix)]
 +    assert_eq!(
 +        std::fs::metadata(directory.path().join("receipts.jsonl"))
 +            .unwrap()
@@ -3668,6 +4217,831 @@ index 0000000..f77be77
 +    let (response, effects) = bridge.handle(request, &mut app);
 +    assert!(matches!(response, Response::Rejected { reason } if reason == "instance_mismatch"));
 +    assert!(effects.is_empty());
++}
+diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs
+new file mode 100644
+index 0000000..194e9a5
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs
+@@ -0,0 +1,609 @@
++//! Windows 桥的内核身份和私有文件合同；不读取界面，也不执行输入。
++
++use std::ffi::c_void;
++use std::fs::File;
++use std::io::{self, Write};
++use std::mem::{self, size_of};
++use std::os::windows::ffi::OsStrExt;
++use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
++use std::path::{Component, Path, PathBuf, Prefix};
++use std::ptr;
++
++use windows_sys::Win32::Foundation::{HANDLE, INVALID_HANDLE_VALUE, LocalFree};
++use windows_sys::Win32::Security::Authorization::{
++    ConvertSidToStringSidW, ConvertStringSecurityDescriptorToSecurityDescriptorW, GetSecurityInfo,
++    SE_FILE_OBJECT,
++};
++use windows_sys::Win32::Security::{
++    ACCESS_ALLOWED_ACE, ACE_HEADER, ACL, CopySid, DACL_SECURITY_INFORMATION, EqualSid, GetAce,
++    GetLengthSid, GetSecurityDescriptorControl, GetTokenInformation, IsValidSid, IsWellKnownSid,
++    OWNER_SECURITY_INFORMATION, RevertToSelf, SE_DACL_PROTECTED, SECURITY_ATTRIBUTES, TOKEN_QUERY,
++    TOKEN_STATISTICS, TOKEN_USER, TokenSessionId, TokenStatistics, TokenUser, WinLocalSystemSid,
++};
++use windows_sys::Win32::Storage::FileSystem::{
++    BY_HANDLE_FILE_INFORMATION, CREATE_NEW, CreateDirectoryW, CreateFileW, DELETE, FILE_ALL_ACCESS,
++    FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_INFO,
++    FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ,
++    FILE_GENERIC_WRITE, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_SHARE_WRITE,
++    FileDispositionInfo, GetDriveTypeW, GetFileInformationByHandle, OPEN_EXISTING, READ_CONTROL,
++    SetFileInformationByHandle,
++};
++use windows_sys::Win32::System::Pipes::{
++    GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, ImpersonateNamedPipeClient,
++};
++use windows_sys::Win32::System::Threading::{
++    GetCurrentProcess, GetCurrentThread, OpenProcessToken, OpenThreadToken,
++};
++
++pub(super) fn invalid() -> io::Error {
++    io::Error::new(
++        io::ErrorKind::PermissionDenied,
++        "terminal bridge Windows identity invalid",
++    )
++}
++
++struct LocalMemory(*mut c_void);
++
++impl Drop for LocalMemory {
++    fn drop(&mut self) {
++        if !self.0.is_null() {
++            unsafe {
++                LocalFree(self.0);
++            }
++        }
++    }
++}
++
++/// SID 使用独立对齐存储，不保留指向 TokenUser 临时缓冲区的指针。
++#[derive(Clone, Debug, PartialEq, Eq)]
++pub(super) struct UserIdentity {
++    sid: Vec<u32>,
++    session: u32,
++    authentication: (u32, i32),
++}
++
++fn token_buffer(token: HANDLE, class: i32) -> io::Result<Vec<usize>> {
++    let mut length = 0;
++    unsafe {
++        GetTokenInformation(token, class, ptr::null_mut(), 0, &mut length);
++    }
++    if length == 0 || length > 65536 {
++        return Err(invalid());
++    }
++    let mut buffer = vec![0usize; (length as usize).div_ceil(size_of::<usize>())];
++    if unsafe {
++        GetTokenInformation(
++            token,
++            class,
++            buffer.as_mut_ptr().cast(),
++            length,
++            &mut length,
++        )
++    } == 0
++    {
++        return Err(io::Error::last_os_error());
++    }
++    Ok(buffer)
++}
++
++impl UserIdentity {
++    pub(super) fn current() -> io::Result<Self> {
++        let mut token = ptr::null_mut();
++        if unsafe { OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token) } == 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let token = unsafe { OwnedHandle::from_raw_handle(token) };
++        Self::from_token(token.as_raw_handle())
++    }
++
++    fn from_token(token: HANDLE) -> io::Result<Self> {
++        let user = token_buffer(token, TokenUser)?;
++        if user.len() * size_of::<usize>() < size_of::<TOKEN_USER>() {
++            return Err(invalid());
++        }
++        let source = unsafe { (*(user.as_ptr().cast::<TOKEN_USER>())).User.Sid };
++        if unsafe { IsValidSid(source) } == 0 {
++            return Err(invalid());
++        }
++        let length = unsafe { GetLengthSid(source) };
++        let mut sid = vec![0u32; (length as usize).div_ceil(size_of::<u32>())];
++        if unsafe { CopySid(length, sid.as_mut_ptr().cast(), source) } == 0 {
++            return Err(invalid());
++        }
++        let session = token_buffer(token, TokenSessionId)?;
++        let statistics = token_buffer(token, TokenStatistics)?;
++        if session.len() * size_of::<usize>() < size_of::<u32>()
++            || statistics.len() * size_of::<usize>() < size_of::<TOKEN_STATISTICS>()
++        {
++            return Err(invalid());
++        }
++        let session = unsafe { *session.as_ptr().cast::<u32>() };
++        let authentication =
++            unsafe { (*statistics.as_ptr().cast::<TOKEN_STATISTICS>()).AuthenticationId };
++        Ok(Self {
++            sid,
++            session,
++            authentication: (authentication.LowPart, authentication.HighPart),
++        })
++    }
++
++    fn sid(&self) -> *mut c_void {
++        self.sid.as_ptr().cast_mut().cast()
++    }
++
++    /// 必须先读到该连接的消息；模拟令牌只在本同步函数的当前线程生效，不跨 await。
++    pub(super) fn verify_pipe_client(&self, pipe: HANDLE) -> io::Result<()> {
++        let mut pid = 0;
++        let mut session = 0;
++        if unsafe { GetNamedPipeClientProcessId(pipe, &mut pid) } == 0
++            || pid == 0
++            || unsafe { GetNamedPipeClientSessionId(pipe, &mut session) } == 0
++            || session != self.session
++        {
++            return Err(invalid());
++        }
++        if unsafe { ImpersonateNamedPipeClient(pipe) } == 0 {
++            return Err(io::Error::last_os_error());
++        }
++        struct Revert;
++        impl Drop for Revert {
++            fn drop(&mut self) {
++                // 不允许运行时工作线程带着客户端模拟身份继续执行任何任务。
++                if unsafe { RevertToSelf() } == 0 {
++                    std::process::abort();
++                }
++            }
++        }
++        let revert = Revert;
++        let mut token = ptr::null_mut();
++        if unsafe { OpenThreadToken(GetCurrentThread(), TOKEN_QUERY, 1, &mut token) } == 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let token = unsafe { OwnedHandle::from_raw_handle(token) };
++        let peer = Self::from_token(token.as_raw_handle())?;
++        drop(revert);
++        if &peer != self {
++            return Err(invalid());
++        }
++        Ok(())
++    }
++
++    pub(super) fn security(&self, directory: bool) -> io::Result<Security> {
++        let mut text = ptr::null_mut();
++        if unsafe { ConvertSidToStringSidW(self.sid(), &mut text) } == 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let text_memory = LocalMemory(text.cast());
++        let mut length = 0;
++        while length < 256 && unsafe { *text.add(length) } != 0 {
++            length += 1;
++        }
++        if length == 256 {
++            return Err(invalid());
++        }
++        let sid = String::from_utf16(unsafe { std::slice::from_raw_parts(text, length) })
++            .map_err(|_| invalid())?;
++        drop(text_memory);
++        let flags = if directory { "OICI" } else { "" };
++        let sddl = format!("O:{sid}D:P(A;{flags};FA;;;{sid})(A;{flags};FA;;;SY)");
++        let wide: Vec<u16> = sddl.encode_utf16().chain(Some(0)).collect();
++        let mut descriptor = ptr::null_mut();
++        if unsafe {
++            ConvertStringSecurityDescriptorToSecurityDescriptorW(
++                wide.as_ptr(),
++                1,
++                &mut descriptor,
++                ptr::null_mut(),
++            )
++        } == 0
++        {
++            return Err(io::Error::last_os_error());
++        }
++        Ok(Security(LocalMemory(descriptor)))
++    }
++
++    pub(super) fn verify_acl(&self, file: &File, directory: bool) -> io::Result<()> {
++        let mut owner = ptr::null_mut();
++        let mut dacl: *mut ACL = ptr::null_mut();
++        let mut descriptor = ptr::null_mut();
++        let error = unsafe {
++            GetSecurityInfo(
++                file.as_raw_handle(),
++                SE_FILE_OBJECT,
++                OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
++                &mut owner,
++                ptr::null_mut(),
++                &mut dacl,
++                ptr::null_mut(),
++                &mut descriptor,
++            )
++        };
++        let _memory = LocalMemory(descriptor);
++        if error != 0
++            || owner.is_null()
++            || dacl.is_null()
++            || unsafe { EqualSid(owner, self.sid()) } == 0
++        {
++            return Err(invalid());
++        }
++        let mut control = 0;
++        let mut revision = 0;
++        if unsafe { GetSecurityDescriptorControl(descriptor, &mut control, &mut revision) } == 0
++            || control & SE_DACL_PROTECTED == 0
++            || unsafe { (*dacl).AceCount } != 2
++        {
++            return Err(invalid());
++        }
++        let flags = if directory { 3 } else { 0 };
++        let mut user_seen = false;
++        let mut system_seen = false;
++        for index in 0..2 {
++            let mut raw = ptr::null_mut();
++            if unsafe { GetAce(dacl, index, &mut raw) } == 0 || raw.is_null() {
++                return Err(invalid());
++            }
++            let header = unsafe { &*raw.cast::<ACE_HEADER>() };
++            if header.AceType != 0 || header.AceFlags != flags || header.AceSize < 16 {
++                return Err(invalid());
++            }
++            let ace = unsafe { &*raw.cast::<ACCESS_ALLOWED_ACE>() };
++            if ace.Mask != FILE_ALL_ACCESS {
++                return Err(invalid());
++            }
++            let sid = ptr::addr_of!(ace.SidStart).cast_mut().cast();
++            if unsafe { IsValidSid(sid) } == 0
++                || unsafe { GetLengthSid(sid) } as usize + 8 > usize::from(header.AceSize)
++            {
++                return Err(invalid());
++            }
++            if unsafe { EqualSid(sid, self.sid()) } != 0 && !user_seen {
++                user_seen = true;
++            } else if unsafe { IsWellKnownSid(sid, WinLocalSystemSid) } != 0 && !system_seen {
++                system_seen = true;
++            } else {
++                return Err(invalid());
++            }
++        }
++        if !user_seen || !system_seen {
++            return Err(invalid());
++        }
++        Ok(())
++    }
++}
++
++pub(super) struct Security(LocalMemory);
++
++impl Security {
++    pub(super) fn attributes(&self) -> SECURITY_ATTRIBUTES {
++        SECURITY_ATTRIBUTES {
++            nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
++            lpSecurityDescriptor: self.0.0,
++            bInheritHandle: 0,
++        }
++    }
++}
++
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub(super) struct FileIdentity {
++    pub(super) volume: u32,
++    index: u64,
++}
++
++pub(super) fn identity(file: &File, directory: bool) -> io::Result<FileIdentity> {
++    let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { mem::zeroed() };
++    if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
++        return Err(io::Error::last_os_error());
++    }
++    if info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0
++        || (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0) != directory
++        || (!directory && info.nNumberOfLinks != 1)
++    {
++        return Err(invalid());
++    }
++    Ok(FileIdentity {
++        volume: info.dwVolumeSerialNumber,
++        index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
++    })
++}
++
++fn wide(path: &Path) -> io::Result<Vec<u16>> {
++    let mut result: Vec<u16> = path.as_os_str().encode_wide().collect();
++    if result.contains(&0) {
++        return Err(invalid());
++    }
++    result.push(0);
++    Ok(result)
++}
++
++fn open(path: &Path, directory: bool, access: u32, share: u32) -> io::Result<File> {
++    let path = wide(path)?;
++    let handle = unsafe {
++        CreateFileW(
++            path.as_ptr(),
++            access,
++            share,
++            ptr::null(),
++            OPEN_EXISTING,
++            FILE_FLAG_OPEN_REPARSE_POINT
++                | if directory {
++                    FILE_FLAG_BACKUP_SEMANTICS
++                } else {
++                    0
++                },
++            ptr::null_mut(),
++        )
++    };
++    if handle == INVALID_HANDLE_VALUE {
++        return Err(io::Error::last_os_error());
++    }
++    let file = unsafe { File::from_raw_handle(handle) };
++    identity(&file, directory)?;
++    Ok(file)
++}
++
++/// 保持所有祖先句柄不共享 DELETE，防止在路径核验和后续打开之间替换目录。
++pub(super) struct Directory {
++    path: PathBuf,
++    ancestors: Vec<(PathBuf, File, FileIdentity)>,
++    owner: UserIdentity,
++}
++
++impl Directory {
++    pub(super) fn open(path: &Path, owner: &UserIdentity) -> io::Result<Self> {
++        let mut components = path.components();
++        let drive = match components.next() {
++            Some(Component::Prefix(prefix)) => match prefix.kind() {
++                Prefix::Disk(drive) | Prefix::VerbatimDisk(drive) => drive,
++                _ => return Err(invalid()),
++            },
++            _ => return Err(invalid()),
++        };
++        if !path.is_absolute()
++            || components.any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
++        {
++            return Err(invalid());
++        }
++        let drive_root = [u16::from(drive), b':' as u16, b'\\' as u16, 0];
++        // GetDriveTypeW 的 DRIVE_FIXED 值为 3；UNC、映射网络盘和可移动盘均不作私有桥根。
++        if unsafe { GetDriveTypeW(drive_root.as_ptr()) } != 3 {
++            return Err(invalid());
++        }
++        let mut ancestors = Vec::new();
++        for path in path.ancestors().collect::<Vec<_>>().into_iter().rev() {
++            let file = open(
++                path,
++                true,
++                READ_CONTROL | FILE_READ_ATTRIBUTES,
++                FILE_SHARE_READ | FILE_SHARE_WRITE,
++            )?;
++            let id = identity(&file, true)?;
++            ancestors.push((path.to_owned(), file, id));
++        }
++        let result = Self {
++            path: path.to_owned(),
++            ancestors,
++            owner: owner.clone(),
++        };
++        result.validate()?;
++        Ok(result)
++    }
++
++    pub(super) fn identity(&self) -> FileIdentity {
++        self.ancestors.last().expect("目录含根句柄").2
++    }
++
++    pub(super) fn validate(&self) -> io::Result<()> {
++        for (path, file, expected) in &self.ancestors {
++            let reopened = open(
++                path,
++                true,
++                READ_CONTROL | FILE_READ_ATTRIBUTES,
++                FILE_SHARE_READ | FILE_SHARE_WRITE,
++            )?;
++            if identity(file, true)? != *expected || identity(&reopened, true)? != *expected {
++                return Err(invalid());
++            }
++        }
++        self.owner
++            .verify_acl(&self.ancestors.last().ok_or_else(invalid)?.1, true)
++    }
++
++    pub(super) fn create_child(&self, name: &str) -> io::Result<Self> {
++        if name.is_empty() || name.contains(['/', '\\', ':']) || name == "." || name == ".." {
++            return Err(invalid());
++        }
++        self.validate()?;
++        let path = self.path.join(name);
++        let security = self.owner.security(true)?;
++        let attributes = security.attributes();
++        let wide = wide(&path)?;
++        if unsafe { CreateDirectoryW(wide.as_ptr(), &attributes) } == 0 {
++            return Err(io::Error::last_os_error());
++        }
++        let child = Self::open(&path, &self.owner)?;
++        self.validate()?;
++        if child.identity().volume != self.identity().volume {
++            return Err(invalid());
++        }
++        Ok(child)
++    }
++
++    pub(super) fn path(&self) -> &Path {
++        &self.path
++    }
++
++    pub(super) fn create_file(&self, name: &str) -> io::Result<File> {
++        if !matches!(name, "manifest.json" | "receipts.jsonl") {
++            return Err(invalid());
++        }
++        self.validate()?;
++        let security = self.owner.security(false)?;
++        let attributes = security.attributes();
++        let path = wide(&self.path.join(name))?;
++        let handle = unsafe {
++            CreateFileW(
++                path.as_ptr(),
++                FILE_GENERIC_READ | FILE_GENERIC_WRITE | READ_CONTROL,
++                FILE_SHARE_READ,
++                &attributes,
++                CREATE_NEW,
++                FILE_FLAG_OPEN_REPARSE_POINT,
++                ptr::null_mut(),
++            )
++        };
++        if handle == INVALID_HANDLE_VALUE {
++            return Err(io::Error::last_os_error());
++        }
++        let file = unsafe { File::from_raw_handle(handle) };
++        self.validate_file(&file)?;
++        Ok(file)
++    }
++
++    pub(super) fn read_file(&self, name: &str) -> io::Result<File> {
++        self.validate()?;
++        let file = open(
++            &self.path.join(name),
++            false,
++            FILE_GENERIC_READ | READ_CONTROL,
++            FILE_SHARE_READ,
++        )?;
++        self.validate_file(&file)?;
++        Ok(file)
++    }
++
++    pub(super) fn validate_file(&self, file: &File) -> io::Result<FileIdentity> {
++        self.validate()?;
++        let id = identity(file, false)?;
++        if id.volume != self.identity().volume {
++            return Err(invalid());
++        }
++        self.owner.verify_acl(file, false)?;
++        Ok(id)
++    }
++
++    pub(super) fn remove_manifest(&self, expected: FileIdentity) -> io::Result<()> {
++        self.validate()?;
++        let file = open(
++            &self.path.join("manifest.json"),
++            false,
++            DELETE | READ_CONTROL | FILE_READ_ATTRIBUTES,
++            FILE_SHARE_READ,
++        )?;
++        if self.validate_file(&file)? != expected {
++            return Err(invalid());
++        }
++        let disposition = FILE_DISPOSITION_INFO { DeleteFile: 1 };
++        if unsafe {
++            SetFileInformationByHandle(
++                file.as_raw_handle(),
++                FileDispositionInfo,
++                ptr::addr_of!(disposition).cast(),
++                size_of::<FILE_DISPOSITION_INFO>() as u32,
++            )
++        } == 0
++        {
++            return Err(io::Error::last_os_error());
++        }
++        Ok(())
++    }
++}
++
++pub(super) struct Journal {
++    file: File,
++    directory: Directory,
++    root: Directory,
++    identity: FileIdentity,
++}
++
++impl Journal {
++    pub(super) fn new(path: &Path) -> io::Result<Self> {
++        let owner = UserIdentity::current()?;
++        let root = Directory::open(path.parent().ok_or_else(invalid)?, &owner)?;
++        let directory = Directory::open(path, &owner)?;
++        let file = directory.create_file("receipts.jsonl")?;
++        let identity = directory.validate_file(&file)?;
++        let journal = Self {
++            file,
++            directory,
++            root,
++            identity,
++        };
++        journal.sync_all()?;
++        Ok(journal)
++    }
++
++    pub(super) fn sync_all(&self) -> io::Result<()> {
++        self.root.validate()?;
++        if self.directory.validate_file(&self.file)? != self.identity {
++            return Err(invalid());
++        }
++        self.file.sync_all()
++    }
++}
++
++impl Write for Journal {
++    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
++        self.root.validate()?;
++        if self.directory.validate_file(&self.file)? != self.identity {
++            return Err(invalid());
++        }
++        self.file.write(bytes)
++    }
++    fn flush(&mut self) -> io::Result<()> {
++        self.file.flush()
++    }
++}
++
++#[cfg(test)]
++pub(super) struct TestDirectory {
++    parent: tempfile::TempDir,
++    path: PathBuf,
++}
++
++#[cfg(test)]
++impl TestDirectory {
++    pub(super) fn path(&self) -> &Path {
++        &self.path
++    }
++}
++
++#[cfg(test)]
++impl Drop for TestDirectory {
++    fn drop(&mut self) {
++        // 显式保有父目录生命周期；由 TempDir 清理本次私有夹具。
++        let _ = self.parent.path();
++    }
++}
++
++#[cfg(test)]
++pub(super) fn private_test_directory() -> TestDirectory {
++    use windows_sys::Win32::Security::{PROTECTED_DACL_SECURITY_INFORMATION, SetFileSecurityW};
++    let directory = tempfile::tempdir().unwrap();
++    let security = UserIdentity::current().unwrap().security(true).unwrap();
++    let path = wide(directory.path()).unwrap();
++    // 只设置本测试刚创建且独占的临时目录，生产入口从不修正既有目录权限。
++    assert_ne!(
++        unsafe {
++            SetFileSecurityW(
++                path.as_ptr(),
++                OWNER_SECURITY_INFORMATION
++                    | DACL_SECURITY_INFORMATION
++                    | PROTECTED_DACL_SECURITY_INFORMATION,
++                security.0.0,
++            )
++        },
++        0
++    );
++    let owner = UserIdentity::current().unwrap();
++    let parent = Directory::open(directory.path(), &owner).unwrap();
++    let child = parent.create_child("private").unwrap();
++    let path = child.path().to_owned();
++    TestDirectory {
++        parent: directory,
++        path,
++    }
++}
++
++#[cfg(test)]
++#[path = "terminal_bridge_windows_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs
+new file mode 100644
+index 0000000..5ce41b6
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows_tests.rs
+@@ -0,0 +1,204 @@
++use super::*;
++
++use std::fs;
++use windows_sys::Win32::Security::{PROTECTED_DACL_SECURITY_INFORMATION, SetFileSecurityW};
++
++#[test]
++fn terminal_bridge_windows_private_acl_file_identity_and_journal_are_enforced() {
++    let temporary = private_test_directory();
++    let owner = UserIdentity::current().unwrap();
++    let root = Directory::open(temporary.path(), &owner).unwrap();
++    let child = root.create_child("t-fixture").unwrap();
++    let mut journal = Journal::new(child.path()).unwrap();
++    journal.write_all(b"{\"state\":\"claimed\"}\n").unwrap();
++    journal.sync_all().unwrap();
++    owner.verify_acl(&journal.file, false).unwrap();
++    assert!(root.identity().volume == identity(&journal.file, false).unwrap().volume);
++    assert!(Journal::new(child.path()).is_err());
++    assert!(fs::rename(child.path(), temporary.path().join("replaced")).is_err());
++    assert!(
++        fs::OpenOptions::new()
++            .write(true)
++            .open(child.path().join("receipts.jsonl"))
++            .is_err()
++    );
++}
++
++#[test]
++fn terminal_bridge_windows_root_acl_change_revokes_a_previously_open_journal() {
++    let temporary = private_test_directory();
++    let owner = UserIdentity::current().unwrap();
++    let root = Directory::open(temporary.path(), &owner).unwrap();
++    let child = root.create_child("t-fixture").unwrap();
++    let mut journal = Journal::new(child.path()).unwrap();
++    let path = wide(temporary.path()).unwrap();
++    // 同一个文件身份上的权限替换也必须拒绝；不只检测目录改名。
++    let file_security = owner.security(false).unwrap();
++    assert_ne!(
++        unsafe {
++            SetFileSecurityW(
++                path.as_ptr(),
++                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
++                file_security.0.0,
++            )
++        },
++        0
++    );
++    assert!(root.validate().is_err());
++    assert!(journal.write_all(b"cannot dispatch").is_err());
++    let restore = owner.security(true).unwrap();
++    assert_ne!(
++        unsafe {
++            SetFileSecurityW(
++                path.as_ptr(),
++                DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
++                restore.0.0,
++            )
++        },
++        0
++    );
++}
++
++#[test]
++fn terminal_bridge_windows_same_user_does_not_equal_same_logon() {
++    let owner = UserIdentity::current().unwrap();
++    let mut other_session = owner.clone();
++    other_session.session = owner.session.wrapping_add(1);
++    assert_ne!(owner, other_session);
++    let mut other_logon = owner.clone();
++    other_logon.authentication.0 = owner.authentication.0.wrapping_add(1);
++    assert_ne!(owner, other_logon);
++    let mut other_user = owner.clone();
++    other_user.sid.push(0);
++    assert_ne!(owner, other_user);
++}
++
++#[test]
++fn terminal_bridge_windows_rejects_network_and_relative_roots() {
++    let owner = UserIdentity::current().unwrap();
++    for path in [
++        r"relative\bridge",
++        r"\\server\share\bridge",
++        r"\\?\UNC\server\share\bridge",
++    ] {
++        assert!(Directory::open(Path::new(path), &owner).is_err());
++    }
++}
++
++#[test]
++fn terminal_bridge_windows_reparse_directory_and_its_descendant_are_rejected() {
++    use windows_sys::Win32::System::IO::DeviceIoControl;
++    let temporary = private_test_directory();
++    let owner = UserIdentity::current().unwrap();
++    let root = Directory::open(temporary.path(), &owner).unwrap();
++    let target = root.create_child("target").unwrap();
++    let nested = target.create_child("nested").unwrap();
++    let alias = root.create_child("junction").unwrap();
++    let canonical = target.path().canonicalize().unwrap();
++    let target_text = canonical.to_string_lossy();
++    let target_text = target_text.strip_prefix(r"\\?\").unwrap_or(&target_text);
++    let substitute: Vec<u16> = format!(r"\??\{target_text}").encode_utf16().collect();
++    let display: Vec<u16> = target_text.encode_utf16().collect();
++    let substitute_bytes = (substitute.len() * 2) as u16;
++    let display_bytes = (display.len() * 2) as u16;
++    let mut buffer = Vec::new();
++    // Mount-point reparse buffer；只指向本次夹具内的普通目录，不需要符号链接特权。
++    buffer.extend_from_slice(&0xa000_0003u32.to_le_bytes());
++    buffer.extend_from_slice(&(8 + substitute_bytes + 2 + display_bytes + 2).to_le_bytes());
++    buffer.extend_from_slice(&0u16.to_le_bytes());
++    for value in [0, substitute_bytes, substitute_bytes + 2, display_bytes] {
++        buffer.extend_from_slice(&value.to_le_bytes());
++    }
++    for value in substitute
++        .into_iter()
++        .chain(Some(0))
++        .chain(display)
++        .chain(Some(0))
++    {
++        buffer.extend_from_slice(&value.to_le_bytes());
++    }
++    let file = open(
++        alias.path(),
++        true,
++        FILE_GENERIC_WRITE,
++        FILE_SHARE_READ | FILE_SHARE_WRITE,
++    )
++    .unwrap();
++    let mut returned = 0;
++    assert_ne!(
++        unsafe {
++            DeviceIoControl(
++                file.as_raw_handle(),
++                0x0009_00a4,
++                buffer.as_ptr().cast(),
++                buffer.len() as u32,
++                ptr::null_mut(),
++                0,
++                &mut returned,
++                ptr::null_mut(),
++            )
++        },
++        0,
++        "{}",
++        io::Error::last_os_error()
++    );
++    assert!(Directory::open(alias.path(), &owner).is_err());
++    assert!(Directory::open(&alias.path().join("nested"), &owner).is_err());
++    assert!(alias.validate().is_err());
++    nested.validate().unwrap();
++}
++
++#[test]
++fn terminal_bridge_windows_manifest_requires_one_link_and_exact_file_identity() {
++    let temporary = private_test_directory();
++    let owner = UserIdentity::current().unwrap();
++    let root = Directory::open(temporary.path(), &owner).unwrap();
++    let manifest = root.create_file("manifest.json").unwrap();
++    drop(manifest);
++    fs::hard_link(
++        temporary.path().join("manifest.json"),
++        temporary.path().join("alias.json"),
++    )
++    .unwrap();
++    assert!(root.read_file("manifest.json").is_err());
++    fs::remove_file(temporary.path().join("alias.json")).unwrap();
++    let original = root.read_file("manifest.json").unwrap();
++    let second = identity(&original, false).unwrap();
++    drop(original);
++    let wrong = FileIdentity {
++        volume: second.volume,
++        index: second.index ^ 1,
++    };
++    assert!(root.remove_manifest(wrong).is_err());
++    assert!(temporary.path().join("manifest.json").exists());
++}
++
++#[tokio::test]
++async fn terminal_bridge_windows_kernel_pipe_token_must_match_the_exact_logon() {
++    use tokio::io::{AsyncReadExt, AsyncWriteExt};
++    use tokio::net::windows::named_pipe::{ClientOptions, ServerOptions};
++    let pipe = format!(
++        r"\\.\pipe\infinishell-bridge-token-test-{}",
++        uuid::Uuid::new_v4()
++    );
++    let mut server = ServerOptions::new()
++        .first_pipe_instance(true)
++        .reject_remote_clients(true)
++        .create(&pipe)
++        .unwrap();
++    let mut client = ClientOptions::new().open(&pipe).unwrap();
++    server.connect().await.unwrap();
++    client.write_all(b"authenticate").await.unwrap();
++    let mut bytes = [0u8; 12];
++    server.read_exact(&mut bytes).await.unwrap();
++    let owner = UserIdentity::current().unwrap();
++    owner.verify_pipe_client(server.as_raw_handle()).unwrap();
++    let mut other = owner.clone();
++    other.authentication.0 = other.authentication.0.wrapping_add(1);
++    assert!(other.verify_pipe_client(server.as_raw_handle()).is_err());
++    other = owner.clone();
++    other.session = other.session.wrapping_add(1);
++    assert!(other.verify_pipe_client(server.as_raw_handle()).is_err());
++    // 两次失败后当前线程必须已恢复自身令牌，不能把模拟身份留给后续任务。
++    owner.verify_pipe_client(server.as_raw_handle()).unwrap();
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/client_identity.rs b/crates/codegen/xai-grok-pager/src/client_identity.rs
 index f837123..4ca9802 100644

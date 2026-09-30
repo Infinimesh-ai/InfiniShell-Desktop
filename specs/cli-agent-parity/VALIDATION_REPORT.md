@@ -743,3 +743,19 @@ v1 应用 SHA-256 `e0bbfaa089f795ff92573a2a3b2735540730d350dceddbe73febc53c2f19e
 生产验收不再要求 `/private/tmp` 或 Pillow；明确 UTF-8 管道、原始文本收据与仓库工作目录。新增八项离线回归覆盖 Windows 旧编码、中文失败/超时原字节、缺少临时目录及 Git 来源绑定，并加入 Linux/Windows 定向工作流。与关联回归合计 75 项通过，主仓 `cargo check -p warp`、脚本语法、工作流检查通过。工作流初次 actionlint 的既有自托管标签未知告警与登记标签后的通过均保留。
 
 原字节归档 `validation/claude-image-runner-portability-20260926`，索引 SHA-256 `89b652a8f47b67cd6e33e9c739c5b35f3c1a4cd62ea3a47b447dca4f93dc4e0f`。本增量零在线模型输入，无需本地化变更；不补记 Linux/Windows 图片理解、恢复或 GUI 验收，G04/G05 保持原边界。同提交云验待与下一实现增量整合后执行。
+
+## G01 跨平台普通桥实现：目标门禁待执行
+
+本轮从 `41c8d2e307ff5850c73c2b3eecea37c6ed2ee151` 干净分支开始。定制原生 `3d1886b111202215ecfef5d6e41c76b75f0daf36` 的树为 `3796aaf2ffebab4fe06703025ae8d256c221535d`，全补丁 SHA-256 `53953bfd738d279ba0991c0cdc2fc4db18415aaa6b13253a1b0967196de9b04c`。Mac 保持原 `.3` 固定工件；新 `.4` 只为 Linux／Windows 独立构建，不继承旧二进制证据。
+
+本机归档 `resume-20260930/g01-cross-platform`：`r-7a_zxhlb` 的 55 项宿主回归通过，含旧 Mac 账本序列化字节／task ID 与新平台拒绝重投；日志 SHA-256 `d522be8c1969d659ec655ba9d0b667e3abf805fd1bfe64a4616c61ed9f09f570`。此前 `r-8wxq2mx1` 拆分测试漏 `Value` 导入导致编译失败，原记录保留。`r-fhslz7cj` 的原生定向库 74 项通过（46／20／4／4），日志 `c4ffd7aa36fc4cd06e4bf0e81b6e016effc931795daf4212b62dd0e24657e208`；Windows 专有用例不在 Mac 执行范围。
+
+`r-noe0exyo` 的 11 项 i18n 通过，日志 `37afa9723aef72936a08971d477ea773794e91bf432146e66fb0c2f557810272`。复核普通提交、未确认、未发送和同文新一轮的英中提示，无需本地化变更；本轮未新增布局，不重复旧 Mac 模型回合。上述短目录均已按进程、launchd、打开文件和归档证明清理。
+
+实现包括 Linux 原 socket pidfd／实际 exe FD／原 PTY，Windows 实际调试映像 hFile（先确认关闭 kill-on-exit）及从原 HPCON 派生的只读控制台核验。用户 CLI 不纳入辅助进程的终止范围。Windows 传输读完完整帧后发送单字节 `1`，它不是投递 ACK；原子领取和持久 native_acknowledged 合同保持。
+
+Linux／Windows 摘要仍为空并拒绝，不能声明能力可用。待唯一 `cross-platform-preflight.yml` 构建实际定制工件、运行新增身份／管道与真实 ConPTY 回归，再绑定摘要并通过最终源码门禁。G01 仍开放，计数仍为 4 关闭、7 开放、3 移交，PR 保持草稿。
+
+同轮冻结源码的 `r-20_7d2or` 已通过 `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed`，日志 SHA-256 `9abbaf94ea9f9414f342772adde5731f9c7bac6b70263d2a5a6b526f1a3d42da`，短目录已清理。公开基线加完整补丁在独立 Git 索引重建得到相同 `3796aaf2…` 源码树；不将该检查当作目标平台编译。
+
+本轮 Linux 私有短临时目录包装器的 11 项离线合同回归在 Mac `r-sz2rmvsi` 通过并清理，日志 SHA-256 `2849fe6a59e7ffbc9f0283a66b647a2c4ed5e33f71d07246adf146a4c8b799bf`。此结果只覆盖目录／取证逻辑的离线合同，Linux `/proc` 与后代收尾将在既有跨平台 workflow 执行；不计作 Linux 实机验收。普通桥源码开关与仅 GUI／仅安装器模式的冲突组合会明确失败，避免省略宿主门禁后误报通过。

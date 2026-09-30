@@ -277,9 +277,13 @@ pub(super) fn spawn(
     };
     // 原始创建句柄与此 ConPTY 的伪控制台属性来自同一次 CreateProcessW。
     #[cfg(target_arch = "x86_64")]
-    let local_identity = LocalPtyIdentity::from_spawned_conpty(
-        &unsafe { BorrowedHandle::borrow_raw(process_information.hProcess.0) },
-    ).ok();
+    let local_identity = unsafe {
+        LocalPtyIdentity::from_spawned_conpty(
+            &BorrowedHandle::borrow_raw(process_information.hProcess.0),
+            pty_handle,
+        )
+    }
+    .ok();
     let result = PtySpawnResult {
         #[cfg(target_arch = "x86_64")]
         local_identity,

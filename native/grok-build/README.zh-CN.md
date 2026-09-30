@@ -1,13 +1,13 @@
 # Grok 普通 TUI 原生输入桥
 
-这是 G01 的原生能力补丁。当前 `.3` 的原生编译、74 项定向回归及独立构建已通过；Mac 标准首页普通 TUI 的 InfiniShell GUI 已取得八条真实原生输入、精确回执与结果，包含中文长文本、审批保护和同会话冷恢复。随后文本粘贴已修为本地草稿路由，七门禁及英中各一条真实输入通过；中文手动回退提示截断已由单行缩短及新工件布局复验解决。Mac 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入仍是实现缺项，G01 保持开放，PR #22 保持草稿。各轮源码与二进制分别绑定，不继承旧定制构建或官方发行版的验收。
+这是 G01 的原生能力补丁。当前 `.3` 的原生编译、74 项定向回归及独立构建已通过；Mac 标准首页普通 TUI 的 InfiniShell GUI 已取得八条真实原生输入、精确回执与结果，包含中文长文本、审批保护和同会话冷恢复。随后文本粘贴已修为本地草稿路由，七门禁及英中各一条真实输入通过；中文手动回退提示截断已由单行缩短及新工件布局复验解决。Mac 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入已补入本轮源码，仍待目标平台源码门禁与实际工件绑定，G01 保持开放，PR #22 保持草稿。各轮源码与二进制分别绑定，不继承旧定制构建或官方发行版的验收。
 
 ## 固定来源与构建
 
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制提交：`1491b486fbaa4bff3b124db2893a413c7019e2fd`，版本 `1.0.41+infinishell.terminal-bridge.3`。
+- 当前定制源码：`3d1886b111202215ecfef5d6e41c76b75f0daf36`，版本 `1.0.41+infinishell.terminal-bridge.4`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -15,12 +15,20 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.3 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.3 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.3 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.4 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.4 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.4 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
+
+## 当前跨平台实现边界
+
+`.4` 源码加入 Windows 命名管道及私有持久回执。Windows 响应帧读完后，宿主发送单字节 `1`，服务端在同一有界期限内等待该字节再关闭；它只确认传输读取完成，不是输入 ACK。避免使用会等待客户端读取而无界阻塞的 `FlushFileBuffers`，亦不依赖断开后仍保留未读缓冲。[Windows 官方管道合同](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-disconnectnamedpipe)
+
+Linux 宿主保留 socket 原 pidfd 和实际 `/proc/<pid>/exe` FD。Windows 宿主通过关闭 kill-on-exit 后的短调试观察取得实际映像 `hFile`；原 ConPTY 的专属只读辅助程序从真实 HPCON 派生，GUI 自身不切换控制台。两平台只接受由现有 `cross-platform-preflight.yml` 从公开固定基线加补丁构建、经过审核后绑定的摘要；当前仍待构建与目标门禁，G01 保持开放。
+
+Mac 继续绑定 `.3` 的原工件和既有功能／双语证据。本轮只验证公共协议及 Unix 接线未回归，没有生成新的 Mac 功能验收。`source.json.previous_native_artifacts` 保留原 `.3` 源码与工件身份，不能把其结果移植给新的 `.4` 二进制。
 
 ## 接入合同
 
@@ -43,13 +51,13 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 
 纯显示动画只有在前后目标身份不变、输入／ACP／后台任务队列均无待处理事件且所有可能改变输入的恢复、搜索、拖选等路径均不可达时，才保留 `input_epoch`。首页预创建会话的命令同步代际 `0/1` 差异允许留待原生揭示会话流程处理；进入 Agent 视图仍要求命令同步代际一致。审批、待发送、待恢复、未确认回合、会话加载及其他危险待处理状态的守卫继续生效。
 
-定制构建使用独立 leader 名称和精确客户端登记标记，拒绝旧客户端混入；旧 leader 不支持专用能力时不发输入，重连撤销旧租约。构建时必须显式设置上列 `GROK_VERSION`，使版本输出表明这不是官方发行二进制。Linux 宿主普通桥接入及 Windows 原生传输／宿主接入尚未实现；这些实现仍在本 Goal 范围内。其他平台实机验收按用户指令后置，不记为通过，也不豁免实现。
+定制构建使用独立 leader 名称和精确客户端登记标记，拒绝旧客户端混入；旧 leader 不支持专用能力时不发输入，重连撤销旧租约。构建时必须显式设置上列 `GROK_VERSION`，使版本输出表明这不是官方发行二进制。Linux 宿主与 Windows 原生／宿主桥实现已补；定制 .4 工件与目标门禁仍待完成，不能将空摘要下的安全拒绝记作可用能力。其他平台实机验收按用户指令后置，不记为通过，也不豁免实现。
 
 独立运行验收必须使用私有 `GROK_HOME`、`--no-auto-update` 和该私有配置中的 `[cli].auto_update = false`。上游未实现 `GROK_DISABLE_AUTOUPDATER` 环境变量，不能用它代替上述关闭方式；不修改用户默认配置。
 
 ## 验收边界
 
-最新：`5629588b7` 的 [Linux／Windows 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 已成功；归档索引 SHA-256 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`。它不覆盖后续 G06，也不代表 Linux／Windows 普通桥已实现。两平台接入的只读可行性核对见 `source.json.cross_platform_implementation_feasibility`；Windows 方案仍为官方 API 合同推导，尚未实现或实机验证。以下各轮保留当时的来源与状态。
+历史：`5629588b7` 的 [Linux／Windows 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 已成功；归档索引 SHA-256 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`。它不覆盖后续 G06，也不代表 Linux／Windows 普通桥已实现。两平台接入的只读可行性核对见 `source.json.cross_platform_implementation_feasibility`；当时 Windows 方案仍为官方 API 合同推导；本轮实现边界见上文。以下各轮保留当时的来源与状态。
 
 宿主 `r-hgmsd_pn` 的 `cargo check`、48 项桥回归、11 项 i18n 及构建通过；最初 peer 过滤器命中零项，另由 `r-joflf1h5` 的两项有效 peer 回归补齐。真实 GUI `r-wudipm8z` 绑定 `c3b509622` 基线加冻结源码摘要，签名宿主 SHA-256 `d52e438de1cd2790ab0f38a33b38562c21ff502b26b9d637f86c19c6ce587958`，原生 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`；并非干净 HEAD 构建。
 

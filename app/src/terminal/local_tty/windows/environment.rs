@@ -35,6 +35,7 @@ const RUST_SSH_EXECUTABLE_NAME: &str = "WARP_RUST_SSH_EXECUTABLE";
 const REMOTE_SSH_EXECUTABLE_RELATIVE_PATH_NAME: &str = "WARP_REMOTE_SSH_EXECUTABLE_RELATIVE_PATH";
 const WSLENV: &str = "WSLENV";
 const HISTIGNORE: &str = "HISTIGNORE";
+const GROK_TERMINAL_BRIDGE_DIR: &str = "GROK_TERMINAL_BRIDGE_DIR";
 
 /// Wraps the value of an env var plus its key with preferred casing.
 #[derive(Clone, Debug)]
@@ -247,6 +248,25 @@ pub(super) fn get_shell_environment_variables(options: &PtyOptions) -> Vec<u16> 
             EnvEntry {
                 preferred_key: WARP_CLI_AGENT_NOTIFY_EXECUTABLE_ENV.into(),
                 value: executable.into_os_string(),
+            },
+        );
+    }
+
+    // 普通桥仅由本次宿主选择；配置和父环境不能替换发现目录，也不能传入 WSL。
+    env.remove(&map_key(GROK_TERMINAL_BRIDGE_DIR.into()));
+    #[cfg(target_arch = "x86_64")]
+    if FeatureFlag::HOANotifications.is_enabled()
+        && matches!(
+            &options.shell_starter,
+            ShellStarter::Direct(_) | ShellStarter::MSYS2(_)
+        )
+        && let Ok(root) = crate::terminal::cli_agent_sessions::grok_native_bridge_root::root()
+    {
+        env.insert(
+            map_key(GROK_TERMINAL_BRIDGE_DIR.into()),
+            EnvEntry {
+                preferred_key: GROK_TERMINAL_BRIDGE_DIR.into(),
+                value: root.into_os_string(),
             },
         );
     }

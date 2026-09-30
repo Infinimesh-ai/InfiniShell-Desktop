@@ -12,6 +12,10 @@ pub mod blocking;
 #[cfg(any(target_os = "linux", target_os = "macos", windows))]
 pub mod managed;
 #[cfg(windows)]
+pub mod managed_windows_image_observer;
+#[cfg(windows)]
+pub mod managed_windows_console_probe;
+#[cfg(windows)]
 pub mod owned_console_windows;
 #[cfg(unix)]
 pub mod reviewed_unix;

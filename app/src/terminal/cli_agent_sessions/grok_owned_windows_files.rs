@@ -250,7 +250,7 @@ pub(super) fn directory(path: &Path) -> io::Result<File> {
     Ok(file)
 }
 
-fn create_directory(path: &Path) -> io::Result<File> {
+pub(crate) fn create_directory(path: &Path) -> io::Result<File> {
     plain_path(path.parent().ok_or_else(private_error)?)?;
     let security = PrivateSecurity::new(true)?;
     let attributes = security.attributes();
@@ -301,7 +301,7 @@ pub(super) fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()
 }
 
-pub(super) fn read_private(path: &Path) -> io::Result<Vec<u8>> {
+pub(super) fn open_private(path: &Path) -> io::Result<File> {
     let _parent = directory(path.parent().ok_or_else(private_error)?)?;
     let wide = wide_path(path)?;
     let handle = unsafe {
@@ -325,6 +325,11 @@ pub(super) fn read_private(path: &Path) -> io::Result<Vec<u8>> {
     if !file.metadata()?.is_file() || info.nNumberOfLinks != 1 || file.metadata()?.len() > 65536 {
         return Err(private_error());
     }
+    Ok(file)
+}
+
+pub(super) fn read_private(path: &Path) -> io::Result<Vec<u8>> {
+    let file = open_private(path)?;
     let mut bytes = Vec::new();
     file.take(65537).read_to_end(&mut bytes)?;
     if bytes.len() > 65536 {

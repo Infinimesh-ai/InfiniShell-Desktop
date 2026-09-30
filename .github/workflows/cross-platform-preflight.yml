@@ -46,6 +46,11 @@ on:
         required: true
         default: false
         type: boolean
+      run_grok_native_bridge_source:
+        description: 从受审公开源码构建 Linux/Windows 普通 Grok 原子桥并保存独立工件
+        required: true
+        default: false
+        type: boolean
       run_claude_image_regression:
         description: Linux/Windows 定向运行 Claude 图片格式、纯图及图片加技能离线回归
         required: true
@@ -369,6 +374,34 @@ jobs:
         shell: bash
         run: cargo check -p warp --lib
 
+      - name: Build fixed Grok terminal bridge from public source on Linux
+        id: grok_native_bridge_source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_grok_native_bridge_source && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 90
+        env:
+          SOURCE_SCOPE_CONFLICT: ${{ inputs.linux_gui_only && !inputs.full_workspace_tests }}
+        run: |
+          set -euo pipefail
+          if [[ "$SOURCE_SCOPE_CONFLICT" == true ]]; then
+            echo '普通桥源码门禁不能与仅 GUI 模式同时启用' >&2
+            exit 1
+          fi
+          python3 -B script/cli-agent-parity/run_private_linux_tmp_tests.py -v
+          python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py --receipt "$RUNNER_TEMP/grok-native-tmp.safe.json" -- python3 -I -B script/cli-agent-parity/build_grok_terminal_bridge.py --output "$RUNNER_TEMP/grok-terminal-bridge-source" --target-dir "$GITHUB_WORKSPACE/target/grok-terminal-bridge"
+
+      - name: Preserve Linux Grok terminal bridge source build
+        if: ${{ always() && (steps.grok_native_bridge_source.outcome == 'success' || steps.grok_native_bridge_source.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-terminal-bridge-linux-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/grok-terminal-bridge-source/artifacts
+            ${{ runner.temp }}/grok-native-tmp.safe.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
       - name: Test Claude image acceptance runner on Linux
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: bash
@@ -402,8 +435,19 @@ jobs:
         id: test_app
         shell: bash
         run: >-
+          python3 -I -B script/cli-agent-parity/run_private_linux_tmp.py
+          --receipt "$RUNNER_TEMP/grok-host-tmp.safe.json" --
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(local_cli_tasks_grok_native_bridge) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+
+      - name: Preserve Linux host test temporary directory evidence
+        if: ${{ always() && (steps.test_app.outcome == 'success' || steps.test_app.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-host-tmp-linux-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-host-tmp.safe.json
+          if-no-files-found: error
+          retention-days: 14
 
       # 客户端图片 RPC 合同属于 remote_server crate，warp 的筛选不会执行这些用例。
       # 只读解析固定 Node 与系统 loader/cache/依赖，不启动候选或绕过 Landlock。
@@ -443,7 +487,7 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.check_app.outcome == 'success' }}
         shell: bash
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::)'
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed::linux::tests::)'
 
       # 使用同一提交构建的真实 worker；内部夹具和模型网络验收不混入此筛选。
       - name: Build CLI process supervisor
@@ -1465,6 +1509,29 @@ jobs:
         shell: pwsh
         run: cargo check -p warp --lib
 
+      - name: Build fixed Grok terminal bridge from public source on Windows
+        id: grok_native_bridge_source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_grok_native_bridge_source && !cancelled() && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 90
+        env:
+          SOURCE_SCOPE_CONFLICT: ${{ inputs.windows_grok_installer_only && !inputs.full_workspace_tests }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:SOURCE_SCOPE_CONFLICT -eq 'true') { throw '普通桥源码门禁不能与仅安装器模式同时启用' }
+          python -I -B script/cli-agent-parity/build_grok_terminal_bridge.py --output "$env:RUNNER_TEMP/grok-terminal-bridge-source" --target-dir "$env:CARGO_TARGET_DIR-grok-terminal-bridge"
+          if ($LASTEXITCODE -ne 0) { throw 'Grok source build failed' }
+
+      - name: Preserve Windows Grok terminal bridge source build
+        if: ${{ always() && (steps.grok_native_bridge_source.outcome == 'success' || steps.grok_native_bridge_source.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: grok-terminal-bridge-windows-${{ github.sha }}
+          path: ${{ runner.temp }}/grok-terminal-bridge-source/artifacts
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
       - name: Test Claude image acceptance runner on Windows
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && inputs.run_claude_image_regression && steps.check_app.outcome == 'success' }}
         shell: pwsh
@@ -1490,9 +1557,22 @@ jobs:
 
       - name: Build InfiniShell SSH worker
         id: ssh_worker
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
+        if: ${{ inputs.run_grok_native_bridge_source && !cancelled() && steps.check_app.outcome == 'success' || (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.check_app.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
         shell: pwsh
-        run: cargo build -p warp --bin infinishell-ssh --features "release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $buildArgs = @('build', '-p', 'warp', '--bin', 'infinishell-ssh', '--features', 'release_bundle,gui,autoupdate,nld_classifier_v3,nld_heuristic_v2,rust_ssh_worker')
+          if ('${{ inputs.run_grok_native_bridge_source }}' -eq 'true') { $buildArgs += @('--bin', 'infinishell') }
+          cargo @buildArgs
+          if ($LASTEXITCODE -ne 0) { throw 'Console worker build failed' }
+
+      - name: Verify original ConPTY membership through the production console helper
+        if: ${{ inputs.run_grok_native_bridge_source && !cancelled() && steps.ssh_worker.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 10
+        env:
+          INFINISHELL_TEST_CONSOLE_PROBE_EXECUTABLE: '${{ env.CARGO_TARGET_DIR }}\debug\infinishell-ssh.exe'
+        run: cargo nextest run --locked --no-fail-fast --no-tests fail --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=managed_windows_console_probe::tests::real_conpty_probe_binds_original_console)'
 
       - name: Test Windows PowerShell SSH worker arguments
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.ssh_worker.outcome == 'success' && (github.event_name != 'workflow_dispatch' || !inputs.native_acceptance_only || inputs.full_workspace_tests)) }}
@@ -1507,7 +1587,7 @@ jobs:
         shell: pwsh
         run: >-
           cargo nextest run --no-fail-fast -p warp --lib
-          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
+          -E '${{ github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && (inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates) && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.windows_grok_installer_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(terminal::cli_agent_sessions::plugin_manager::grok::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(i18n::tests)' || github.event_name == 'workflow_dispatch' && inputs.native_acceptance_only && !inputs.full_workspace_tests && 'test(ai::cli_agent_runtime::grok::) | test(ai::cli_agent_runtime::claude) | test(ai::cli_agent_runtime::managed_input::) | test(ai::cli_agent_runtime::task_manager_view::) | test(terminal::cli_agent_sessions::plugin_manager::) | test(terminal::cli_agent_sessions::grok_native_bridge) | test(local_cli_tasks_grok_native_bridge) | test(terminal::cli_agent_updates::) | test(ai::cli_agent_runtime::managed_process::) | test(terminal::local_tty::) | test(terminal::view::grok_owned_input::) | test(terminal::view::use_agent_footer::) | test(remote_server::cli_image) | test(i18n::tests)' || 'test(responses) | test(ai::agent_providers::) | test(ai::api_error::tests) | test(ai::byop_compaction::) | test(ai::blocklist::controller) | test(ai::agent::tests::format_for_copy) | test(terminal::view::tests::stop_task_) | test(terminal::view::tests::failed_conversation_interrupts_command_without_overwriting_error) | test(ai::blocklist::action_model::tests::) | test(ai::blocklist::action_model::preprocess::tests::) | test(ai::blocklist::action_model::execute::) | test(terminal::view::tests::stopped_command_) | test(completed_user_controlled_lrc_) | test(inline_agent_view_persists_across_transfer_takeover_for_monitored_long_running_command) | test(terminal::local_tty::event_loop::tests::) | test(terminal::local_tty::windows::event_loop_tests::) | test(synchronized_output) | test(ai::agent::conversation::) | test(ai::agent::task::) | test(ai::skills::) | test(ai::blocklist::history_model) | test(persistence::sqlite::checkpoint_tests) | test(i18n::tests) | test(cli_agent) | test(specific_cli_launch) | test(cli_draft) | test(terminal::model::session::test::) | test(terminal::model::ansi::dcs_hooks::tests::) | test(ai::agent_sdk::driver::harness::) | test(terminal::view::use_agent_footer::) | test(terminal::view::grok_owned_input::) | test(remote_server::cli_image) | test(editor::view::image_input::tests) | test(local_cli_review_import) | test(local_harness) | test(harness_availability) | test(local_cli_tasks) | test(local_cli_mailbox) | test(terminal::input::skills::) | test(terminal::input::slash_commands::data_source::) | test(ai::orchestration::)' }}'
 
       # 与较早的原生注册/缓存探针分开，实际走同提交的 Rust 通知安装入口。
       - name: Verify Windows Codex production notification installer without credentials
@@ -1602,7 +1682,7 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
 
       - name: Diagnose unnamed Windows station without changing the production probe
         if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}

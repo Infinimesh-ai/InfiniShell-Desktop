@@ -20,7 +20,7 @@ use crate::terminal::cli_agent_sessions::{
 };
 use crate::util::image::{MAX_IMAGE_SIZE_BYTES_FOR_CLI_AGENT, MIME_SNIFF_BYTES, infer_mime_type};
 mod file_attachments;
-#[cfg(all(feature = "local_fs", feature = "local_tty", target_os = "macos", target_arch = "aarch64"))]
+#[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
 mod grok_native;
 #[cfg(all(
     feature = "local_fs",
@@ -820,7 +820,7 @@ impl TerminalView {
             self.submit_owned_grok_input(text, ctx);
             return;
         }
-        #[cfg(all(feature = "local_fs", feature = "local_tty", target_os = "macos", target_arch = "aarch64"))]
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
         if agent == CLIAgent::Grok {
             self.submit_native_grok_input(text, generation, ctx);
             return;

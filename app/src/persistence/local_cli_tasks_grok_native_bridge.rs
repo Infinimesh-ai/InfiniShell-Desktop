@@ -11,8 +11,16 @@ const EXECUTION_KIND: &str = INPUT_SUBJECT;
 const MAX_TEXT_BYTES: usize = 128 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NativeBridgeProcessSnapshot {
+    // 旧 Mac 对象保持原字段顺序，避免改变已经持久化的 task_id。
+    Macos(MacosBridgeProcessSnapshot),
+    Platform(PlatformBridgeProcessSnapshot),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct NativeBridgeProcessSnapshot {
+pub struct MacosBridgeProcessSnapshot {
     pub pid: i32,
     pub pid_version: u32,
     pub unique_id: u64,
@@ -20,26 +28,141 @@ pub struct NativeBridgeProcessSnapshot {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "platform", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PlatformBridgeProcessSnapshot {
+    Linux {
+        pid: i32,
+        start_time_ticks: u64,
+        proc_inode: u64,
+        pid_namespace_device: u64,
+        pid_namespace_inode: u64,
+        uid: u32,
+        executable_device: u64,
+        executable_inode: u64,
+    },
+    Windows {
+        pid: u32,
+        created_at: u64,
+        logon_low: u32,
+        logon_high: i32,
+        session_id: u32,
+    },
+}
+
+impl NativeBridgeProcessSnapshot {
+    fn valid(&self) -> bool {
+        match self {
+            Self::Macos(process) => {
+                process.pid > 0 && process.pid_version > 0 && process.unique_id > 0
+            }
+            Self::Platform(PlatformBridgeProcessSnapshot::Linux {
+                pid,
+                start_time_ticks,
+                proc_inode,
+                pid_namespace_inode,
+                executable_inode,
+                ..
+            }) => {
+                *pid > 0
+                    && *start_time_ticks > 0
+                    && *proc_inode > 0
+                    && *pid_namespace_inode > 0
+                    && *executable_inode > 0
+            }
+            Self::Platform(PlatformBridgeProcessSnapshot::Windows {
+                pid,
+                created_at,
+                logon_low,
+                logon_high,
+                ..
+            }) => *pid > 0 && *created_at > 0 && (*logon_low != 0 || *logon_high != 0),
+        }
+    }
+
+    fn same_terminal_scope(&self, shell: &Self) -> bool {
+        match (self, shell) {
+            (Self::Macos(_), Self::Macos(_)) => true,
+            (
+                Self::Platform(PlatformBridgeProcessSnapshot::Linux {
+                    pid_namespace_device,
+                    pid_namespace_inode,
+                    uid,
+                    ..
+                }),
+                Self::Platform(PlatformBridgeProcessSnapshot::Linux {
+                    pid_namespace_device: shell_device,
+                    pid_namespace_inode: shell_inode,
+                    uid: shell_uid,
+                    ..
+                }),
+            ) => {
+                pid_namespace_device == shell_device
+                    && pid_namespace_inode == shell_inode
+                    && uid == shell_uid
+            }
+            (
+                Self::Platform(PlatformBridgeProcessSnapshot::Windows {
+                    logon_low,
+                    logon_high,
+                    session_id,
+                    ..
+                }),
+                Self::Platform(PlatformBridgeProcessSnapshot::Windows {
+                    logon_low: shell_low,
+                    logon_high: shell_high,
+                    session_id: shell_session,
+                    ..
+                }),
+            ) => logon_low == shell_low && logon_high == shell_high && session_id == shell_session,
+            // 不同平台身份不能拼接成同一终端的绑定。
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NativeBridgeBindingSnapshot {
     pub instance_id: Uuid,
     pub native_process: NativeBridgeProcessSnapshot,
-    pub boot_session: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot_session: Option<String>,
     pub shell: NativeBridgeProcessSnapshot,
-    pub slave_device: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slave_device: Option<u64>,
     pub artifact_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_generation: Option<Uuid>,
 }
 
 impl NativeBridgeBindingSnapshot {
     fn validate(&self) -> Result<()> {
-        let process_valid = |process: &NativeBridgeProcessSnapshot| {
-            process.pid > 0 && process.pid_version > 0 && process.unique_id > 0
+        let terminal_valid = match &self.native_process {
+            NativeBridgeProcessSnapshot::Macos(_)
+            | NativeBridgeProcessSnapshot::Platform(PlatformBridgeProcessSnapshot::Linux {
+                ..
+            }) => {
+                self.boot_session
+                    .as_deref()
+                    .is_some_and(|boot| Uuid::parse_str(boot).is_ok())
+                    && self.slave_device.is_some_and(|device| device != 0)
+                    && self.terminal_generation.is_none()
+            }
+            NativeBridgeProcessSnapshot::Platform(PlatformBridgeProcessSnapshot::Windows {
+                ..
+            }) => {
+                self.boot_session.is_none()
+                    && self.slave_device.is_none()
+                    && self
+                        .terminal_generation
+                        .is_some_and(|generation| !generation.is_nil())
+            }
         };
         if self.instance_id.is_nil()
-            || !process_valid(&self.native_process)
-            || !process_valid(&self.shell)
-            || self.slave_device == 0
-            || Uuid::parse_str(&self.boot_session).is_err()
+            || !self.native_process.valid()
+            || !self.shell.valid()
+            || !self.native_process.same_terminal_scope(&self.shell)
+            || !terminal_valid
             || self.artifact_sha256.len() != 64
             || !self
                 .artifact_sha256
