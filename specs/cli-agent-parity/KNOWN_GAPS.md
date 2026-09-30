@@ -45,6 +45,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G01 — Grok 普通终端富输入自动提交
 
+- **2026-10-01 Windows actor 测试夹具修复**：[门禁 36770502561](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561) 的 `.9` 完整原生 check、管道上界 1 项、底层桥 53 项通过；shell 桥 15 过／5 失败，五项均在上游 actor 夹具把 `/tmp` 转为绝对路径时失败，后二库和最终构建未执行。`.10` 仅将该夹具工作目录改用系统临时目录，保留全部原子准入、队列／审批保护及防重断言；Mac 四库 74 项与完整原生 check 已过。后续四库命令使用 `--no-fail-fast` 保留全部结果，仍要求零失败。原始失败、独立 Codex 文件占用清理失败及整轮取消均保留；Windows `.10` 验证、工件绑定和最终门禁待完成，G01 不关闭。无需本地化变更。
+
 - **2026-10-01 Windows 额外资源测试环境移交**：`.9`／`c0a3c705c` 的 [门禁 36766846873](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36766846873) 已通过宿主 check、protobuf 6 项、登录解析 2 项；资源整理测试实际 2 过／1 失败，创建符号链接返回 Win32 `1314`（无所需特权）。该三项已在 Mac 全过，按用户已授权的外平台实机验收后置范围移交这一项，明确记 `deferred_not_passed`；保留测试源码与全部断言，并固定测试文件摘要防止误扩范围。其余两项、全部原子桥回归、管道上界测试及完整构建继续必验。失败日志摘要 `e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2`；取消不计通过，Windows 工件仍未生成，G01 不关闭。无需本地化变更。
 
 - **2026-10-01 Windows 管道测试编译修复**：`.8`／`8f0b956b2` 的 [门禁 36763693789](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36763693789) 已通过 Windows 宿主 check、protobuf 6 项和登录解析 2 项；下一库在上游 `leader/transport.rs:256` 的字符串拼接处报 E0277，资源测试未运行且没有工件。`.9` 仅改为构造相同长路径的 `format!`，保留原上界断言；Mac 完整原生 check 已过，Windows 定向执行及最终绑定仍待完成。已停止余下通用构建，取消不计通过；G01 保持开放，无需本地化变更。

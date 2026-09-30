@@ -7,7 +7,7 @@
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制源码：`a5d1e2449179bae2f2c51d05120f212f92fa4d03`，版本 `1.0.41+infinishell.terminal-bridge.9`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
+- 当前定制源码：`3e9796a80e5f99a1a2e170d893aa6ac0b492383f`，版本 `1.0.41+infinishell.terminal-bridge.10`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -15,9 +15,9 @@
 ```sh
 git apply --check /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
 git apply /absolute/path/to/InfiniShell-Desktop/native/grok-build/terminal-bridge.patch
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo check --locked -p xai-grok-pager-bin
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo test --locked -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
-GROK_VERSION=1.0.41+infinishell.terminal-bridge.9 cargo build --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo check --locked -p xai-grok-pager-bin
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo test --locked --no-fail-fast -p xai-grok-pager -p xai-grok-shell -p xai-grok-tools -p xai-grok-shell-terminal --lib terminal_bridge -- --test-threads=1
+GROK_VERSION=1.0.41+infinishell.terminal-bridge.10 cargo build --locked -p xai-grok-pager-bin
 ```
 
 Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿用上游查找方式。用户本机执行时必须遵守仓库 `docs/local-test-storage.zh-CN.md`：每轮短 `TMPDIR`、身份记录、原件归档与退出后清理；不修改 `HOME` 或 `CODEX_HOME`。
@@ -77,6 +77,8 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 独立运行验收必须使用私有 `GROK_HOME`、`--no-auto-update` 和该私有配置中的 `[cli].auto_update = false`。上游未实现 `GROK_DISABLE_AUTOUPDATER` 环境变量，不能用它代替上述关闭方式；不修改用户默认配置。
 
 ## 验收边界
+
+`.9` 的 Windows 完整原生 check、管道上界及 pager 桥 53 项已过；shell 桥 15 过／5 失败均来自共享 actor 测试夹具硬编码 `/tmp`。当前 `.10` 只将夹具工作目录改用系统临时目录，不改生产路径、原子事务或任何断言；Mac 四库 74 项和完整 check 已过。Windows 目标、二进制及最终绑定门禁仍待完成。四库命令在失败时继续收集其他库结果，失败仍阻止构建通过。
 
 Windows `.9` 的额外资源整理测试已实际执行：两项通过，一项在创建符号链接时因系统特权不足（Win32 `1314`）失败。对应三项 Mac 测试已通过；按用户已授权的其他平台实机验收后置范围，仅这一项移交并在构建收据中记 `deferred_not_passed`，不计通过。脚本校验该测试文件的固定摘要，Rust 断言保持；管道上界、完整原生 check、全部 `terminal_bridge` 回归及二进制构建继续必验。失败证据与边界见 `source.json.windows_symlink_environment_deferral`。
 

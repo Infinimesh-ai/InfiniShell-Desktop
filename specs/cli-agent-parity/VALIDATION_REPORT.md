@@ -838,3 +838,16 @@ Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，�
 `r-xaxm00n1` 的 actionlint 与本机 `cargo check` 通过，日志 SHA-256 `7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6`，短目录已清理。首次 actionlint 只报告未登记的既有自托管标签；补用仓外配置明确声明 `infinishell-ci` 后通过，未忽略语法／表达式错误。无用户功能或文案变化，无需本地化变更。
 
 此时 [CI 36770502561](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561) 仍在运行，对应 `582596a090f9b0042ccc349fc9568e3fe072e6d1`。一个独立前置步骤失败：固定 Codex 0.156.1 的两个 hook 场景均通过、零模型请求，但清理 Git 临时 pack 文件收到 WinError32。八份关闭收据确认根退出0、输出EOF和Job为空；最后一次强制回收三个后代，不称全部自然退出。占用者尚未确定，不能归因Grok或忽略失败；诊断摘要 SHA-256 `60e63bdb64ac8160508ede66aff8f2867034f7c333bae7adeb03b8ee7af73c67`，原始归档保留。Grok 原生源码步骤仍继续，不记本轮整体通过。本轮关闭0项，累计4项关闭、7项开放、3项移交；PR仍为草稿。
+
+
+## 2026-10-01：G01 Windows 会话 actor 绝对路径夹具修复
+
+[CI 36770502561](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561) 的原生 `.9` 结果已逐份核对 15 步日志及源码元数据：protobuf 6、登录解析 2、资源测试 2、管道上界 1 项通过，额外符号链接项仍按前节移交而非通过；完整 `xai-grok-pager-bin` check 通过。四库桥门禁实际执行 pager 53 项通过、shell 15 项通过／5 项失败，后续构建和版本检查未执行，没有 Windows 二进制。五项都在 `acp_session_tests/support.rs:287` 的 `/tmp` 转换收到 `NotAbsolute`，尚未到事务断言；tools／shell-terminal 两库在该轮也未执行，不虚构全组计数。失败日志 SHA-256 `29e8939c615e0a6694a8db4795746126dcee6bd179555174bb4dbbddd5e8ed6a`，失败摘要 `8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3`。
+
+确认失败后停止第40步 `Build InfiniShell SSH worker`，整轮 cancelled；独立 Codex hook 清理 WinError32 原件保留，不与 Grok 路径错误合并。完整日志 ZIP 的41项完整性检查及 Windows 聚合日志逐字节核对通过，ZIP SHA-256 `b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a`，归档摘要 `f315e5d86408d41c61b2a8974611a38b296571c92f20a14e12e02361525f7b11`。
+
+修复仅一行测试工作目录：使用系统临时目录，经原 `AbsPathBuf` 验证；不修改生产代码、审批与原子准入或防重断言。原生 `.10` 提交 `3e9796a80e5f99a1a2e170d893aa6ac0b492383f`，tree `ce1d2efa7f57d1a54e8d818203c8b7d9c0722754`。73文件补丁从公开基线独立重建相同 tree，补丁 SHA-256 `1d93b524f2ff22aa30210b30ee4598c863bef49d1203b2c4955b53b3cd4549a8`，重建收据摘要 `64d160d02e6ad4f38f8a32965831706eeb55c9dd37249a567ab7def63f33cb89`。四库命令加入 `--no-fail-fast` 以收集所有库的实际结果，仍要求每库命中且零失败。
+
+Mac `r-otw97gga` 四库 46＋20＋4＋4＝74 项通过，日志 `39a666d45fe6b96a54df8482b7a207a0bb596e401cc6d627b9a4b22d1564dd58`；`r-6_g2n_82` 完整原生 check 通过，日志 `dc9a0f53f070caec8b361da31c6bc1387abf40eca6da65bdeaf8aa23245c5b7d`。两短目录均已归档清理。Windows `.10` 目标复验、工件绑定及绑定后最终源码门禁待完成；无需本地化变更，本轮关闭0项，累计4项关闭、7项开放、3项移交，PR保持草稿。
+
+本轮提交前宿主 `r-xh0t_gjl` 的 `cargo check` 和11项i18n通过，日志 SHA-256 `6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316`，短目录已归档清理；该门禁不替代Windows目标执行。

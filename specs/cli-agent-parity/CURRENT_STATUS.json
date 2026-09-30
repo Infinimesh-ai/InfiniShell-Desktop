@@ -105,7 +105,7 @@
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
       "remaining": [
-        "Windows .9原生构建与定向回归、Windows固定工件摘要绑定",
+        "Windows .10原生完整回归与构建、Windows固定工件摘要绑定",
         "Linux/Windows工件绑定后的最终源码门禁；其他平台实机验收由用户后续执行"
       ],
       "gap_closed": false,
@@ -424,15 +424,83 @@
       "windows_native_bridge_9_build_attempt": {
         "run_id": 36770502561,
         "source_commit": "582596a090f9b0042ccc349fc9568e3fe072e6d1",
-        "status": "in_progress",
-        "native_bridge_build": "in_progress",
+        "custom_version": "1.0.41+infinishell.terminal-bridge.9",
+        "native_tree": "3ed485f624e84a0268ab6e4be8e4eeacf938987f",
+        "patch_sha256": "1b626e3fc1ef6e008b1d9993a9fe0056acb04dce4172aceeec8d85f648bd583b",
+        "artifact_id": 11123644065,
+        "artifact_bytes": 145431,
+        "build_receipt_sha256": "b4c18392d473a6c1a407fde8e5579bda990c0ed2783f88de6413a8bdde8a8284",
+        "steps_verified": 15,
+        "native_check": "passed",
+        "protobuf_passed": 6,
+        "login_parser_passed": 2,
+        "resource_tests_passed": 2,
+        "resource_deferred": [
+          {
+            "test": "session::helpers::session_compact::retain_session_asset_files_tests::keeps_only_regular_files_inside_the_assets_dir",
+            "source_sha256": "abb12e06f3d233c794c054d6b80e434efe2f926fd46b29c8eb7b9070e728717e",
+            "status": "deferred_not_passed",
+            "prior_run_id": 36766846873,
+            "win32_error": 1314,
+            "prior_log_sha256": "e9f551f19e5a7f23ba20d0cd025281f314c8263c72d7302c52890f1e4b90f2b2",
+            "scope": "额外资源整理测试；Mac三项已通过。Windows真实符号链接验证移交后续环境，不属于G01文本原子桥验收。"
+          }
+        ],
+        "pipe_name_bound_passed": 1,
+        "native_bridge_results": {
+          "pager": {
+            "passed": 53,
+            "failed": 0
+          },
+          "shell": {
+            "passed": 15,
+            "failed": 5
+          },
+          "tools": "not_executed_after_shell_failure",
+          "shell_terminal": "not_executed_after_shell_failure"
+        },
+        "failed_cases": [
+          "session::acp_session::terminal_bridge_tests::child_work_and_unavailable_coordinator_cannot_look_idle",
+          "session::acp_session::terminal_bridge_tests::competing_bridge_requests_admit_exactly_one_and_remain_uncommitted",
+          "session::acp_session::terminal_bridge_tests::duplicate_after_queue_removal_is_unknown_and_cannot_be_resubmitted",
+          "session::acp_session::terminal_bridge_tests::ordinary_queue_running_turn_and_edit_hold_are_never_displaced",
+          "session::acp_session::terminal_bridge_tests::pending_permission_and_work_block_without_recording_a_message"
+        ],
+        "failure": "actor测试夹具 support.rs:287 硬编码/tmp，Windows AbsPathBuf返回NotAbsolute；五项在入口断言前共同失败。",
+        "failure_log_sha256": "29e8939c615e0a6694a8db4795746126dcee6bd179555174bb4dbbddd5e8ed6a",
+        "binary": null,
+        "boundary": "实际Windows桥53+15通过，五项失败，不能记桥全验收或工件构建通过。",
+        "status": "completed",
+        "conclusion": "cancelled",
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36770502561",
+        "archive_summary_sha256": "f315e5d86408d41c61b2a8974611a38b296571c92f20a14e12e02361525f7b11",
+        "logs_zip_sha256": "b69d5bf8e3f8d6ca352d0fb0a00e3dcc58f356af294ed3d68a5934e13214162a",
+        "cancelled_step": "Build InfiniShell SSH worker",
+        "failure_summary_sha256": "8647c7fc4871b2a88c53755f7ccf9a3d9cb4e464e8531fe27785f45c8c5a9da3",
         "other_step_failure": {
           "step": "Verify fixed Codex 0.156.1 Windows native hooks without model requests",
           "functional_cases_passed": 2,
-          "failure": "private_directory_cleanup: Git临时pack文件占用，WinError32。占用者未知；八份Job关闭收据已空，最后一次强制回收三个后代，不称全部自然退出。",
+          "failure": "Git临时pack文件清理WinError32；占用者未知。八份Job关闭收据已空，最后一次强制回收三个后代。",
           "diagnosis_sha256": "60e63bdb64ac8160508ede66aff8f2867034f7c333bae7adeb03b8ee7af73c67"
-        },
-        "gap_closed": false
+        }
+      },
+      "windows_actor_test_path_fix": {
+        "native_commit": "3e9796a80e5f99a1a2e170d893aa6ac0b492383f",
+        "native_tree": "ce1d2efa7f57d1a54e8d818203c8b7d9c0722754",
+        "version": "1.0.41+infinishell.terminal-bridge.10",
+        "change": "将共享actor测试夹具cwd由硬编码/tmp改用系统临时目录，保留AbsPathBuf验证及全部原子准入、队列/审批保护和防重断言；仅测试代码变化。",
+        "target_status": "pending",
+        "source_reconstruction_sha256": "64d160d02e6ad4f38f8a32965831706eeb55c9dd37249a567ab7def63f33cb89",
+        "localization": "无需本地化变更",
+        "local_gate": {
+          "run_id": "r-xh0t_gjl",
+          "exit_code": 0,
+          "status": "cleaned",
+          "cleanup_ready": true,
+          "log_sha256": "6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316",
+          "host_check": "passed",
+          "i18n_tests_passed": 11
+        }
       }
     },
     "g06_progress": {

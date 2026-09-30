@@ -7489,9 +7489,18 @@ index 78e5d0e..90ac580 100644
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
-index fa11f50..9381c1b 100644
+index fa11f50..4bbf121 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
+@@ -284,7 +284,7 @@ async fn create_test_actor_inner(
+     SessionActor,
+     tokio::sync::mpsc::UnboundedReceiver<SessionEvent>,
+ ) {
+-    let cwd = xai_grok_paths::AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap();
++    let cwd = xai_grok_paths::AbsPathBuf::new(std::env::temp_dir()).unwrap();
+     let fs = Arc::new(xai_grok_workspace::file_system::MockFs::new(
+         cwd.to_path_buf(),
+     ));
 @@ -306,6 +306,7 @@ async fn create_test_actor_inner(
          running_task: None,
          finalization_gate: Default::default(),
