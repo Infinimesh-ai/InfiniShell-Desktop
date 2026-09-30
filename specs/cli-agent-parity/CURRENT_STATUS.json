@@ -138,7 +138,32 @@
         "sha256": "33411686223414380743cc838f1d1179cc578d315c740a75ef486476449ae863",
         "bytes": 3851
       },
-      "implementation_complete_across_targets": false
+      "implementation_complete_across_targets": false,
+      "source_gate": {
+        "run_id": 36714435483,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483",
+        "source_commit": "5629588b77b15e27c9e046cc6326171370297dc6",
+        "status": "completed",
+        "conclusion": "success",
+        "linux": "success",
+        "windows": "success",
+        "macos_intel": "skipped",
+        "summary_sha256": "f98ece1d688d03a39a9c00eac056258c65440dde36a9002894b75b80f5ebef62",
+        "archive_index_sha256": "91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622",
+        "logs_zip_sha256": "1ee16db7f9fa7cfe5b5113d69f78372a47d947771ce0311c7e85a0d43d077ad0",
+        "boundary": "只覆盖5629588b7已编译路径；不覆盖后续G06源码、其他平台实机或被cfg排除的普通桥实现。Windows部分步骤元数据滞后，原件保留并按完整日志核验。"
+      },
+      "implementation_feasibility": {
+        "product_commit": "625ffcb98b09d0ecbefa9e21356ecb8401a7407c",
+        "native_commit": "1491b486fbaa4bff3b124db2893a413c7019e2fd",
+        "status": "read_only_contract_review_not_implementation",
+        "linux_receipt_sha256": "d470d2733a1def2773f09e27d0d53785affca42695bb93a2883c7731736b583d",
+        "windows_receipt_sha256": "f0ba319f35014a1cfe080bf14e99693e65e8e29681d14414e23851e2d72fa223",
+        "linux": "现有SO_PEERPIDFD、运行映像dev/inode及TIOCGPTPEER可复用；须补Linux映像FD绑定、独立持久身份形状、宿主接线和定制ELF工件。旧Mac序列化及task_id必须兼容。",
+        "windows": "官方调试API提供实际映像hFile。专用线程须先连接私有helper并确认关闭kill-on-exit，再附加用户CLI；保持helper到目标脱离，NULL hFile拒绝。不复用会终止所有debuggee的owned控制器。该方案为文档支持的合同推导，尚未实现或实机验证。",
+        "native_transport": "原生1491桥仅Unix；Windows须补named pipe及事件循环接线，不能用自报SHA代替宿主映像核验。",
+        "gap_closed": false
+      }
     },
     "g06_progress": {
       "status": "open",

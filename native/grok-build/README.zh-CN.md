@@ -49,6 +49,8 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 
 ## 验收边界
 
+最新：`5629588b7` 的 [Linux／Windows 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 已成功；归档索引 SHA-256 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`。它不覆盖后续 G06，也不代表 Linux／Windows 普通桥已实现。两平台接入的只读可行性核对见 `source.json.cross_platform_implementation_feasibility`；Windows 方案仍为官方 API 合同推导，尚未实现或实机验证。以下各轮保留当时的来源与状态。
+
 宿主 `r-hgmsd_pn` 的 `cargo check`、48 项桥回归、11 项 i18n 及构建通过；最初 peer 过滤器命中零项，另由 `r-joflf1h5` 的两项有效 peer 回归补齐。真实 GUI `r-wudipm8z` 绑定 `c3b509622` 基线加冻结源码摘要，签名宿主 SHA-256 `d52e438de1cd2790ab0f38a33b38562c21ff502b26b9d637f86c19c6ce587958`，原生 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`；并非干净 HEAD 构建。
 
 该 GUI 从普通 shell 启动标准首页，未使用 `--minimal` 或 owned leader 参数；英文两行、41,751 字节中文 400 行、非空原生草稿保护、真实审批拒绝后保留稿发送、重复点击与明确同文新一轮、发送期间编辑取消及双重重启同会话的新输入均有原文／回执／结果证据。共八个唯一输入和 ACK，七个 `end_turn`、一个用户拒绝审批后的 `cancelled`；审批文件未创建。英文及简体中文局部提示和结果可读，两代自然退出，私有认证副本删除并完成短目录清理。摘要 `r-wudipm8z-gui/acceptance-summary.safe.json` 的 SHA-256 为 `3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa`；其中保留第 39 张截图误点、旧 Unknown 不自动恢复为 ACK 等边界。

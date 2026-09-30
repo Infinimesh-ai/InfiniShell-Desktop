@@ -26,6 +26,16 @@
 
 实现提交 `625ffcb98b09d0ecbefa9e21356ecb8401a7407c` 已推送，84 份冻结源码逐文件匹配，绑定收据 SHA-256 `7c6cc80dee08e07d3af09510eaf7b7b1eebdcfbb2243001ad1ac5fb6325a2280`。[本轮 Linux／Windows 源码门禁 36726214615](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36726214615) 的 headSha 已核对；使用同提交临时 ref 保留前轮仍在运行的门禁，结果待定。G06 仅剩该源码门禁，仍开放。其他平台已认证模型及 GUI 实机按用户新范围移交，不计通过，也不删除三目标平台实现条件。新固定轮独立清理已归档。G10 的父子任务、命令与邮箱整项范围没有随本轮缩减或关闭。
 
+## 2026-09-30：G01 旧源码门禁通过，外平台接入仍待实现
+
+[源码门禁 36714435483](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36714435483) 精确绑定 `5629588b77b15e27c9e046cc6326171370297dc6`，Linux／Windows 官方作业均成功，Mac Intel 按范围跳过。完整 job 日志按每平台一份统计：Linux 12 个 nextest 命令组共 4917 次通过及 rust-genai 81 次，Windows 11 组共 4731 次通过及 rust-genai 81 次；这是命令调用计数，不是去重后的测试数量。两平台未见 FAIL／FLAKY／LEAK／重试状态行。Windows 终态 run/job 均为 success，但部分步骤元数据仍旧 in_progress/pending；原件保留，完整桌面／TUI 日志另证 660/660、rust-genai 81/81。仓外 `g01-native-source/ci-36714435483/verified-summary.safe.json` SHA-256 `f98ece1d688d03a39a9c00eac056258c65440dde36a9002894b75b80f5ebef62`，归档索引 `91fdefb1fd244752fd2fe1079422ae6f7d56b139d4a51e3918c1541768a46622`，完整日志 zip `1ee16db7f9fa7cfe5b5113d69f78372a47d947771ce0311c7e85a0d43d077ad0`。12 项官方工件仅保存索引，未宣称已下载原件。此结果不继承到后续 G06，也不证明被平台条件排除的普通桥已实现。
+
+实现前置只读核对绑定产品 `625ffcb98` 与原生 `1491b486`。Linux 已有 `LinuxProcessHandle` 的 SO_PEERPIDFD／SO_PEERCRED、真实运行映像 dev/inode 及 TIOCGPTPEER；仍需读取并保留实际映像 FD、接入普通桥、构建定制 Linux ELF，以及为账本增加平台身份形状并兼容旧 Mac JSON／task_id。不能把 Linux starttime 填入 Mac unique_id，不能复用官方 stock ELF 摘要；内核能力缺失时不得降级裸 PID。收据 `g01-linux-feasibility-625ffcb98.safe.json` SHA-256 `d470d2733a1def2773f09e27d0d53785affca42695bb93a2883c7731736b583d`。
+
+Windows 的 [DebugSetProcessKillOnExit](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-debugsetprocesskillonexit) 文档要求先建立调试连接，且设置影响同线程当前及未来调试目标。据此推导：专用 OS 线程先调试私有 helper、确认 FALSE 成功，再附加用户 CLI，并保持 helper 到目标脱离；避免在用户 CLI 已附加后才关闭默认终止行为。[CREATE_PROCESS_DEBUG_INFO.hFile](https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-create_process_debug_info) 可提供真实主映像文件句柄，NULL 或无法核验时拒绝，不退回 pathname／自报 SHA。现有 Windows 进程 lease、SID／登录会话、pipe peer 及映像句柄哈希可参考；现有 owned 调试控制器会终止 debuggee，不能直接复用。原生桥仍须新增 Windows named pipe 和事件循环接线。收据 `g01-windows-feasibility-625ffcb98.safe.json` SHA-256 `f0ba319f35014a1cfe080bf14e99693e65e8e29681d14414e23851e2d72fa223`。这是官方合同推导，尚未实现或实机验证；不证明所有运行内存未被修改。
+
+本段只记录已完成源码门禁及下一步可实现的原生合同，没有新增模型／相近拒绝探针。G01 仍开放，当前计数不变；没有用户功能变更，无需本地化变更。
+
 ## 2026-09-30：G01 Mac 功能与双语审计满足，外平台实现仍开放
 
 **Mac G01 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入仍未实现，G01 必要缺口保持开放。** 原生 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd` 的 check、74 项库回归及构建通过，映像 SHA-256 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`。纯显示动画不再无条件撤销输入 epoch，首页预创建允许命令同步代际 0/1；Agent 代际与审批／后台任务等危险待处理守卫保留。宿主每连接先捕获内核对端凭据，再持续核验进程、签名与 PTY；完整 SHA-256 校验保留，开发配置仅提高 `sha2` 优化级别。响应读取改为 nonblocking＋poll 的绝对截止时间，修正对端关闭后再次设置 `SO_RCVTIMEO` 返回 `EINVAL` 的回包丢失。
