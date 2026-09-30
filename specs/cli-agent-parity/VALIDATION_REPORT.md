@@ -851,3 +851,12 @@ Mac `.3` 已验工件另存 `g01-cross-platform/mac-terminal-bridge.3/grok`，�
 Mac `r-otw97gga` 四库 46＋20＋4＋4＝74 项通过，日志 `39a666d45fe6b96a54df8482b7a207a0bb596e401cc6d627b9a4b22d1564dd58`；`r-6_g2n_82` 完整原生 check 通过，日志 `dc9a0f53f070caec8b361da31c6bc1387abf40eca6da65bdeaf8aa23245c5b7d`。两短目录均已归档清理。Windows `.10` 目标复验、工件绑定及绑定后最终源码门禁待完成；无需本地化变更，本轮关闭0项，累计4项关闭、7项开放、3项移交，PR保持草稿。
 
 本轮提交前宿主 `r-xh0t_gjl` 的 `cargo check` 和11项i18n通过，日志 SHA-256 `6ca82e59adcab9e18716231adfaafa1d4bc61093219f76c9c0f85243ee7c1316`，短目录已归档清理；该门禁不替代Windows目标执行。
+
+
+## 2026-10-01：Windows hook 清理收据核验补齐
+
+复核前述 WinError32 失败发现独立缺陷：私有目录清理入口只核验根自然退出、EOF及配置回滚，没有读取已经产生的后代Job关闭证明，汇总 `descendants_job_verified` 因而一直为false。现要求formal/candidate各阶段的每份关闭收据同时确认暂停创建时Job归属、全部后代已核验、Job活动数为零及Job句柄关闭，全部满足才设置汇总true并进入原目录身份校验。缺失、false或仍有活动后代均保留现场；根自然退出后已确认回收自己的后代仍可清理，不能把它写成全部自然退出。
+
+该改动没有改变WinError32处理：文件占用继续失败并保留现场，不增加重试或修改权限。根因仍未知，也不据此关闭G01或其他缺口。原生hook和ConPTY脚本共享此入口，实际Windows验证待最终源码门禁，不继承正在运行的旧源码 `08f2fff8d` 的结果。
+
+本机 `r-vih3onyz` 共50项hook测试中48通过、2项Windows原生限定跳过；包含formal阶段缺证、Job归属／非空／未关闭拒绝、已确认后代回收正例及文件占用继续失败。日志SHA-256 `86495b5e49c42876ad59596aa721fde08cc577f948574b3360b6f13dc4f810f6`。共享ConPTY回归 `r-6yxlzc4d` 通过，日志 `0b7216c5a0d4fee137b9f3cabec50a1f1d1d5bf1472e65214d54bb38da4ceb20`；宿主check `r-2lyor01q` 通过，日志 `ced779af54b0177965a73360381e6be3a44f3e1149b04ec31993a7e382029ef2`。三轮短目录已归档清理；只有验收脚本及收据语义变化，无需本地化变更。关闭数仍为4，开放7、移交3，PR保持草稿。

@@ -466,6 +466,13 @@ def cleanup_private_cases(directory, cases, evidence):
             require(len(closes) == 2 and all(close['root_exited_naturally'] and close['root_exit_code'] == 0
                     and close['output_readers_eof'] for close in closes) and not phase.get('close_failure')
                     and phase.get('config_rollback', {}).get('restored'), '缺少退出、EOF 或配置回滚证据，保留现场')
+            require(all(close.get('job_supervision_requested') is True
+                    and close.get('job_assigned_before_resume') is True
+                    and close.get('all_descendants_job_verified') is True
+                    and close.get('job_active_after_cleanup') == 0
+                    and close.get('job_close_confirmed') is True for close in closes),
+                    '缺少完整后代 Job 退出和关闭证据，保留现场')
+    evidence['descendants_job_verified'] = True
     require(directory.is_dir() and not directory.is_symlink(), '私有临时目录已被替换，拒绝清理')
     root_identity = directory.lstat()
     require(not getattr(root_identity, 'st_file_attributes', 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT,

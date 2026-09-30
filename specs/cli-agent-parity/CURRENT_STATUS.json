@@ -501,6 +501,32 @@
           "host_check": "passed",
           "i18n_tests_passed": 11
         }
+      },
+      "source_gate_cleanup_evidence_fix": {
+        "status": "local_passed_windows_pending",
+        "change": "Windows hook/ConPTY共用私有目录清理入口核验每个formal/candidate阶段全部关闭收据的暂停归属、Job为空及关闭证明；缺证保留现场。descendants_job_verified仅在全部通过后置true。",
+        "preserved_failure": "WinError32共享占用仍传播且保留现场；不延长等待、不改ACL或忽略错误，不声称解决此前文件占用。",
+        "local_gates": {
+          "hooks": {
+            "run_id": "r-vih3onyz",
+            "passed": 48,
+            "skipped": 2,
+            "log_sha256": "86495b5e49c42876ad59596aa721fde08cc577f948574b3360b6f13dc4f810f6"
+          },
+          "conpty": {
+            "run_id": "r-6yxlzc4d",
+            "log_sha256": "0b7216c5a0d4fee137b9f3cabec50a1f1d1d5bf1472e65214d54bb38da4ceb20",
+            "passed": 17
+          },
+          "host_check": {
+            "run_id": "r-2lyor01q",
+            "status": "passed",
+            "log_sha256": "ced779af54b0177965a73360381e6be3a44f3e1149b04ec31993a7e382029ef2"
+          }
+        },
+        "cleanup": "三轮短目录均已归档和清理",
+        "localization": "无需本地化变更",
+        "gap_closed": false
       }
     },
     "g06_progress": {

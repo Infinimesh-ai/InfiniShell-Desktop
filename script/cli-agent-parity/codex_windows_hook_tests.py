@@ -214,7 +214,10 @@ class FormalResourceTests(unittest.TestCase):
         def case():
             return {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                     'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                        'output_readers_eof': True} for _ in range(2)]}
+                                        'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             root.mkdir()
@@ -240,15 +243,43 @@ class FormalResourceTests(unittest.TestCase):
             self.assertEqual(receipt['failure']['filename'], str(root / 'fixture'))
             self.assertFalse(receipt['deleted'])
             self.assertTrue(root.is_dir())
+            for field, value in [('job_supervision_requested', False),
+                                 ('job_assigned_before_resume', False),
+                                 ('all_descendants_job_verified', False),
+                                 ('job_active_after_cleanup', 1),
+                                 ('job_close_confirmed', False)]:
+                for formal in (False, True):
+                    changed = case()
+                    phase = case() if formal else changed
+                    if formal:
+                        changed.update(mode='formal', formal_registration=phase)
+                    phase['process_closes'][1][field] = value
+                    receipt = {}
+                    with self.subTest(field=field, formal=formal), self.assertRaisesRegex(ValueError, '后代 Job'):
+                        native_probe.cleanup_private_cases(root, [changed], receipt)
+                    self.assertFalse(receipt['attempted'])
+                    self.assertFalse(receipt['descendants_job_verified'])
+                    self.assertTrue((root / 'fixture').is_file())
+            changed = case()
+            del changed['process_closes'][0]['all_descendants_job_verified']
+            with self.assertRaisesRegex(ValueError, '后代 Job'):
+                native_probe.cleanup_private_cases(root, [changed], {})
             receipt = {}
-            native_probe.cleanup_private_cases(root, [case()], receipt)
+            confirmed = case()
+            # 根自然退出后允许有界回收自己的后代，但必须另有 Job 为空及关闭证明。
+            confirmed['process_closes'][1]['descendants_forced'] = True
+            native_probe.cleanup_private_cases(root, [confirmed], receipt)
+            self.assertTrue(receipt['descendants_job_verified'])
             self.assertTrue(receipt['deleted'])
             self.assertFalse(root.exists())
 
     def test_cleanup_removes_only_confirmed_private_windows_readonly_file(self):
         case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                 'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                    'output_readers_eof': True} for _ in range(2)]}
+                                    'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             target = root / '.git/objects/pack/tmp_idx_test'
@@ -283,7 +314,10 @@ class FormalResourceTests(unittest.TestCase):
     def test_cleanup_readonly_retry_rejects_escape_reparse_hardlink_and_other_errors(self):
         case = {'passed': True, 'mode': 'candidate', 'config_rollback': {'restored': True},
                 'process_closes': [{'root_exited_naturally': True, 'root_exit_code': 0,
-                                    'output_readers_eof': True} for _ in range(2)]}
+                                    'output_readers_eof': True, 'job_supervision_requested': True,
+                                    'job_assigned_before_resume': True, 'all_descendants_job_verified': True,
+                                    'job_active_after_cleanup': 0, 'job_close_confirmed': True}
+                                   for _ in range(2)]}
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / 'owned-private'
             target = root / 'objects/private-file'
