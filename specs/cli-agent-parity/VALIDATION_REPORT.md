@@ -2,7 +2,21 @@
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
-## 2026-10-01：G07 Claude 双语及 Codex 原生拒绝补验，最终门禁仍未满足
+## 2026-10-01：G01／G07 本次 Mac 范围关闭
+
+**本轮关闭 G01、G07，累计 6 关闭／5 开放／3 移交。** 仍开放 G03、G08、G09、G10、V03；V01／V02／V05 的其他平台实机验收移交用户，未改记通过。PR #22 保持草稿，完整 Goal 尚未完成。
+
+G01 按各自原构建合并计证：Mac 定制 `.3` 普通标准首页八条真实输入覆盖中文 400 行长文本、草稿／审批保护、编辑竞态、明确同文新轮及同会话重启不重投；后续英文／中文粘贴各一次明确提交和最终中文提示布局通过。Linux `.6`、Windows `.11` 的原生实现、独立工件及宿主摘要绑定已补齐。G07 的三款固定 CLI 普通 GUI 分别完成中文／英文空格路径卡片、原生实际读取和独立审批拒绝；失效／不可读文件保稿，以及 `142c635412` 共用 Toast 英中完整布局已满足。文件卡语义为本地路径引用，实际模型证据为 UTF-8 文本，不承诺任意二进制解释。各原件、版本与来源见下文和 `CURRENT_STATUS.json.current_goal_scope`，没有重标为本轮重新运行的 GUI。
+
+精确源码 `e3d5e58a05153d4e7fabdc1fc6528c8c96c598d7` 的 [最终门禁 36796894945](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36796894945) 两平台完整成功。独立审计逐名核验账本模块各 19 项，补齐旧筛选漏测；Linux host 1488／1488、command 14／14，Windows host 1327／1327、command 36／36、真实原 ConPTY 1／1、桌面 670／670，均无本轮 FAIL／LEAK／FLAKY／重试。G07 附件 Linux 5／Windows 4、文件提交各 6、i18n 各 11 个唯一用例均通过，Windows Toast 10 项通过；组之间有重叠，不累加为独立总数。Linux 本轮桌面按输入跳过，Toast 10 项沿用 `142c635412` 相同产品源码的原记录，未宣称在 `e3` 重跑。其后 `5569bd99b` 仅三份支持文档变化，本次也只更新验收状态，产品源码、Fluent 及 workflow 与已验来源一致。
+
+最终归档为仓外 `resume-20260930/g01-cross-platform/ci-36796894945/terminal-final-audit/run-final.safe.json`，SHA-256 `8ab217095271a6bebe6f39621a8a0f4b8ac973ccf31128d39aa30d20a3436955`；13 个工件 ZIP 均与 GitHub API 摘要一致，56 份原始日志逐文件建索引。Linux／Windows 逐名审计摘要分别为 `565173db6530bf749a5735bd5c1740e898bff57132324ae4244b661538bc4dbc`、`efb84452ec5813a295777853dd0c004ef5822a2fa66d2458dc3e9f5936bafd75`；完整 job 日志分别为 `7e0bf6a45d3c7890a1130c0b52d8d756d02471965d9ca0080d556dd787801531`、`0efc4150821a628f0638af243d0ff3ee065572096b4dc141dd03d10b8362b1a8`。主代理复核当前测试源码摘要与逐名覆盖，不只依据绿色 job。
+
+本轮 Windows Claude 两个真实 ConPTY 场景分别在 1.747／1.408 秒取得唯一匹配通知，两份原 PTY 已保存，原生 exit 0、Job 空且未强制清理；独立审计摘要 `ba1e433d96154f5dc5474245809e90898559060387d6665ea6b681be1d5ce6a6`。旧 `36789334970` 已终结为失败：首场景 45 秒没有有效匹配通知且原 PTY 缺失，其根因仍不明；旧账本漏测及 Windows `test_vim_escape_with_history_menu` 的 LEAK 均保留，不能由新一轮成功改写。固定 Codex Hook／ConPTY 各 8 条关闭记录通过，Hook 一代有界回收后代，不称全部自然退出。
+
+Linux TMP 因 `/proc` 可见性不足、Claude Mac 现场因共享服务归属不明继续 `cleanup_ready=false` 并保留；未终止共享服务或宣称目录已删除。这些保守留存不改变已有功能结论。此次状态收口无需本地化变更；功能变更的英中审计与 i18n 门禁已按上述来源完成。以下逐轮记录保留当时判断，当前关闭状态以本节为准。
+
+## 2026-10-01 历史：G07 Claude 双语及 Codex 原生拒绝补验，最终门禁当时未满足
 
 **新增关闭 0 项：4 关闭／7 开放／3 移交，G01／G07 仍开放，PR #22 保持草稿。** 新 Mac GUI 实际构建来源 `142c635412a21e92161111fba5148b6583c8334a`，源二进制 SHA-256 `afd13b4b69e596a51b5fbd52c630e9b05cb012e4993e4616db3ec48eb40f5f48`，构建绑定 `1fc0d81765fb28a83dd0c488330bd6332cae2a2b46d93e1f23e6e873a838c03f`。下述新证据位于仓外 `resume-20260930/g07-preparation`；旧 Grok `.3` 与固定 Codex 双卡正例继续按原构建计证，不重标为本次重跑。
 

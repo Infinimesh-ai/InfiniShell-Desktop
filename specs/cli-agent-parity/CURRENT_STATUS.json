@@ -1,17 +1,19 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 三平台实现与工件已补，最终门禁仍欠账本精确筛选覆盖及 Windows Claude 通知失败诊断；G07 已补 Claude 双语、双文件读取/拒绝与 Codex 原生拒绝，最终源码门禁未完，Claude 现场保留待安全清理；4项关闭、7项开放、3项移交，PR #22草稿",
+  "status_zh": "本次 Mac 范围关闭 G01/G02/G04/G05/G06/G07；G01三平台原生实现与工件齐备、Mac功能/英中已验，G07三CLI普通文件卡读取/拒绝及双语布局已验；e3精确两平台源码门禁逐名通过；6项关闭、5项开放、3项移交，PR #22草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
     "acceptance_platform": "macos-arm64",
     "implementation_scope": "继续补齐原生能力与应用实现；仅后置其他平台实机验收，不删除普通未绑定 PTY 等功能条件。",
     "closed_items": [
+      "G01",
       "G02",
       "G04",
       "G05",
-      "G06"
+      "G06",
+      "G07"
     ],
     "deferred_platform_acceptance_items": [
       "V01",
@@ -19,16 +21,14 @@
       "V05"
     ],
     "remaining_items": [
-      "G01",
       "G03",
-      "G07",
       "G08",
       "G09",
       "G10",
       "V03"
     ],
-    "remaining_count": 7,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。",
+    "remaining_count": 5,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -51,7 +51,7 @@
         "windows-x64"
       ]
     },
-    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。",
+    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。",
     "source_gate": {
       "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
@@ -77,7 +77,7 @@
       "V03",
       "V05"
     ],
-    "historical_interpretation": "其余逐轮 closed_gaps/14 项开放等字段保留当时范围，当前 Goal 以本对象为准。",
+    "historical_interpretation": "其余逐轮 closed_gaps、gap_closed:false、14项开放或当时待验字段保留各轮范围；当前 Goal 关闭与剩余以本对象 closed_items/remaining_items 及各项最新 closure 为准，旧失败不改写为通过。",
     "g02": {
       "source_commit": "d290fd7137165223de8d762cf65a257117c6bf9a",
       "native": "Grok 1.0.41 / grok-4.7 / Inherit 根任务、生产私有独占 leader",
@@ -99,15 +99,13 @@
       }
     },
     "g01_progress": {
-      "status": "open",
+      "status": "closed_in_current_mac_scope",
       "current_gui_evidence": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-wudipm8z-gui/acceptance-summary.safe.json",
       "sha256": "3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa",
       "native_version": "1.0.41+infinishell.terminal-bridge.3",
       "native_inputs": 8,
-      "remaining": [
-        "Linux/Windows工件绑定后的精确最终宿主源码门禁；其他平台实机验收由用户后续执行"
-      ],
-      "gap_closed": false,
+      "remaining": [],
+      "gap_closed": true,
       "paste_gui_evidence": {
         "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-native-source/r-g91qynam-gui/acceptance-summary.safe.json",
         "sha256": "5576b8c0b7378cbf7556a71b5b758fe70a0aa2da9b5844892b114a719620bd6b",
@@ -259,8 +257,9 @@
       "linux_artifact_binding": {
         "native_version": "1.0.41+infinishell.terminal-bridge.6",
         "artifact_sha256": "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
-        "status": "bound_in_source_final_source_gate_pending",
-        "summary_sha256": "173d261abcb1ad1de321a795334039a68911aad76336561f834a4e0f9911fdba"
+        "status": "bound_in_source_final_source_gate_passed",
+        "summary_sha256": "173d261abcb1ad1de321a795334039a68911aad76336561f834a4e0f9911fdba",
+        "final_source_gate_run_id": 36796894945
       },
       "windows_native_bridge_7_followup": {
         "run_id": 36756854606,
@@ -636,8 +635,9 @@
         "verification_summary_sha256": "01c01f12aff6be766393242f2477c855a55b1afeedc9032e5a3f4f653251d061",
         "build_receipt_sha256": "c27e5f47743c5051c1b1c5715e693abb069f39581c9e52a0204611093e0b7bfb",
         "version_output": "grok 1.0.41+infinishell.terminal-bridge.11 (07e35a3dfeed)",
-        "post_binding_source_gate": "pending",
-        "boundary": "绑定已独立核验的 Windows .11 工件；构建与上传步骤成功，整轮主动取消而非通过，不计其他平台模型或交互桌面验收。"
+        "post_binding_source_gate": "passed",
+        "boundary": "绑定已独立核验的 Windows .11 工件；构建与上传步骤成功，整轮主动取消而非通过，不计其他平台模型或交互桌面验收。",
+        "final_source_gate_run_id": 36796894945
       },
       "windows_native_bridge_11_build_attempt": {
         "run_id": 36780256382,
@@ -679,7 +679,7 @@
       "final_host_gate_followup": {
         "run_id": 36789334970,
         "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36789334970",
-        "status": "in_progress_with_known_failure_and_coverage_gap",
+        "status": "completed_with_known_failure_and_coverage_gap",
         "full_gate_satisfied": false,
         "windows_claude_notification": {
           "case_0": "native已启动，45秒内未有有效匹配SessionStart，forced_cleanup；原PTY未归档且私有目录已删除。",
@@ -732,7 +732,25 @@
           "job_log_sha256": "7e194f1d5aa9c1c7f9bbed4f98276b628f7622dfcd7d8fab201a0b437891fab8",
           "boundary": "作业成功但缺账本模块，不能计精确最终源码门禁通过。"
         },
-        "windows_status": "host_tests_in_progress"
+        "windows_status": "completed_with_notification_failure",
+        "conclusion": "failure",
+        "terminal_run_receipt_sha256": "ff3c542e1bc8fad8c1a3c0264483e4d0c6af80cbd87c69831180a2ca4ff0a00e"
+      },
+      "closure": {
+        "date": "2026-10-01",
+        "scope": "用户授权的Mac真实验收及三平台原生实现/源码门禁",
+        "gap_closed": true,
+        "final_source_gate_run_id": 36796894945,
+        "mac_function_receipt_sha256": "3c72d7d6bd6496ea5537b30e3cda385aa98afbd5875429f477e6b90aa47b63fa",
+        "conditions_satisfied": [
+          "普通标准首页真实PTY自动提交；中文400行/41751字节和英文多行原文、实际ACK与结果一致",
+          "原生非空草稿和真实审批期间不插入/误批准；拒绝后保留稿须显式发送",
+          "双Return不重复；相同正文必须明确新一轮；发送期间编辑不清新稿",
+          "宿主和原生重启恢复同SID，旧ACK输入不重放、新输入一次完成；旧Unknown不伪造ACK",
+          "后续文本粘贴仅恢复/追加本地稿，英中各一次明确发送；最终中文回退布局通过",
+          "Mac.3/Linux.6/Windows.11独立受审工件均绑定；两平台协议/传输/真实身份/PTY/账本19及相关源码门禁齐备"
+        ],
+        "scope_limits": "仅从普通shell启动的已绑定独立定制工件；官方发行版不含该桥。G03普通图片能力不扩大，其他平台模型/GUI实机移交。"
       }
     },
     "g06_progress": {
@@ -834,7 +852,7 @@
       "closure_basis": "原条件逐项核对：多技能及选择顺序、会话内新增、路径／权限、准确注册确认、历史恢复和失败原子性均有实现及实际证据；Grok 不承诺工具严格串行。各轮源码独立绑定，其他平台实机后置，G10 父子链不外推。"
     },
     "g07_progress": {
-      "status": "open",
+      "status": "closed_in_current_mac_scope",
       "run_id": "r-i4txg6p2",
       "platform": "macos-arm64",
       "agent": "普通 Grok .3 / grok-4.7",
@@ -885,10 +903,8 @@
         "finish_sha256": "0a1322d85cdb14ebbb0bba904993811f6b69c2215bb3e8bba5328da22310ca90",
         "boundary": "App与已拥有进程退出、认证副本删除，白名单小证据归档后短TMPDIR已清理；profile/DB保留，完整原生system/reasoning/history未导出。"
       },
-      "remaining": [
-        "精确最终Linux/Windows源码门禁，须包含修正筛选后的普通桥账本19项；当前CI的Windows Claude通知失败不能计通过"
-      ],
-      "gap_closed": false,
+      "remaining": [],
+      "gap_closed": true,
       "current_mac_followup": {
         "source_commit": "142c635412a21e92161111fba5148b6583c8334a",
         "raw_binary_sha256": "afd13b4b69e596a51b5fbd52c630e9b05cb012e4993e4616db3ec48eb40f5f48",
@@ -933,6 +949,122 @@
         },
         "historical_source_boundary": "Grok与旧固定Codex双卡正例仍按各自原构建计证，不重标新构建或重复运行。",
         "gap_closed": false
+      },
+      "closure": {
+        "date": "2026-10-01",
+        "scope": "三款固定CLI的Mac普通文件卡与三平台实现/源码门禁",
+        "gap_closed": true,
+        "final_source_gate_run_id": 36796894945,
+        "file_semantics": "只发送本地绝对路径JSON引用；发送前整批检查普通文件及当前账号可读性，原生工具按自身能力和审批读取。实际模型验收为UTF-8文本，不承诺任意二进制传输或所有格式解释，远程普通文件卡仍拒绝。",
+        "conditions_satisfied": [
+          "三款普通GUI文件卡实际投递、中文与空格路径顺序、原生工具实际读取和独立结果按各自固定构建验收，输入不含文件标记",
+          "Grok/Claude/Codex均有真实原生读取审批拒绝，精确调用/结果/原生终态关联；不以Ran标签或虚构模型终答计成功",
+          "成卡后删除/不可读整批拒绝并保留草稿和卡片；Mac生产回归验证零PTY写入，GUI未声称精确PTY字节计数",
+          "142c Claude普通GUI共用错误Toast英中全文与长文件名完整、双卡和草稿保留；旧Grok布局失败保留",
+          "最终两平台附件/提交/i18n与相关桥账本逐名通过；WindowsToast10通过，Linux142c同源码Toast10原件复用"
+        ],
+        "codex_positive_receipt_sha256": "ea732f8c52e6b277b5b6a45b5c09ffae00dd3310e053545c4be828b72932b062",
+        "scope_limits": "Grok与旧Codex正例仍绑定原构建；新Claude/Codex拒绝绑定142c。Claude短目录cleanup_ready=false保留，不要求终止共享服务，不另增关闭条件；其他平台实机移交。"
+      }
+    },
+    "final_source_gate": {
+      "run_id": 36796894945,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36796894945",
+      "source_commit": "e3d5e58a05153d4e7fabdc1fc6528c8c96c598d7",
+      "status": "completed",
+      "conclusion": "success",
+      "run_receipt_sha256": "be8a02c892146cf5ba72671e68f9ccac13c9c9b5af33fb8d5802c1aa436914e0",
+      "documentation_head": "5569bd99b069e64451ed91d7c9822e92f4650cad",
+      "source_equivalence": "5569bd99b相对e3仅三个支持文档变化；产品、测试与workflow源码相同，不声称在5569重跑CI。",
+      "linux": {
+        "job_id": 110162295336,
+        "cargo_check": "passed",
+        "host_passed": 1488,
+        "command_passed": 14,
+        "groups_passed": {
+          "protocol": 9,
+          "unix_transport": 7,
+          "linux_identity": 8,
+          "root": 6,
+          "submission": 6,
+          "ledger": 19,
+          "linux_process": 4,
+          "linux_received_pidfd": 9,
+          "footer_grok_input": 5,
+          "file_attachments": 5,
+          "file_submission": 6
+        },
+        "i18n_passed": 11,
+        "audit": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36796894945/linux-final/source-gate-independent-review.safe.json",
+        "audit_sha256": "565173db6530bf749a5735bd5c1740e898bff57132324ae4244b661538bc4dbc",
+        "job_log_sha256": "7e0bf6a45d3c7890a1130c0b52d8d756d02471965d9ca0080d556dd787801531",
+        "desktop_boundary": "本轮native_acceptance_only跳过Linux desktop；142c同源码Toast10原件复用，不称e3重跑。"
+      },
+      "windows": {
+        "job_id": 110162295055,
+        "cargo_check": "passed",
+        "host_passed": 1327,
+        "command_passed": 36,
+        "real_conpty_passed": 1,
+        "desktop_passed": 670,
+        "groups_passed": {
+          "protocol": 9,
+          "windows_transport": 8,
+          "windows_identity": 4,
+          "windows_root": 8,
+          "submission": 6,
+          "ledger": 19,
+          "windows_environment": 3,
+          "managed_process": 2,
+          "windows_image_observer": 6,
+          "windows_console_helper": 7,
+          "footer_grok_input": 5,
+          "file_attachments": 4,
+          "file_submission": 6,
+          "dismissible_toast": 10
+        },
+        "i18n_passed_per_suite": 11,
+        "i18n_suites": [
+          "host",
+          "desktop"
+        ],
+        "audit": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36796894945/windows-final/source-gate-independent-review.safe.json",
+        "audit_sha256": "efb84452ec5813a295777853dd0c004ef5822a2fa66d2458dc3e9f5936bafd75",
+        "job_log_sha256": "0efc4150821a628f0638af243d0ff3ee065572096b4dc141dd03d10b8362b1a8"
+      },
+      "this_run_fail_leak_flaky_retry_lines": 0,
+      "windows_claude_notifications": {
+        "status": "passed_two_real_conpty_cases",
+        "audit_sha256": "ba1e433d96154f5dc5474245809e90898559060387d6665ea6b681be1d5ce6a6",
+        "raw_pty_archived": true,
+        "model_inputs": 0,
+        "boundary": "新轮真实通知通过不证明旧首场景根因或永久修复；旧失败和未保存原PTY边界保留，不单凭workflow总结果关闭G07。"
+      },
+      "linux_temporary_directory": {
+        "status": "retained",
+        "command_exit_code": 0,
+        "source_unchanged": true,
+        "cleanup_ready": false,
+        "receipt_sha256": "52d7c19bba0d04498e7285dde7625e85d47353760068d248d7d0bc873861c390",
+        "reason": "/proc可见性不足，不能完整证明进程归属与退出；保留现场，不记已清理，也不另增功能关闭条件。"
+      },
+      "preserved_previous_failure": {
+        "run_id": 36789334970,
+        "conclusion": "failure",
+        "claude_case_0_valid_notice_timeout": true,
+        "ledger_tests_omitted_per_platform": 19,
+        "windows_desktop_leaky_test": "terminal::input::tests::test_vim_escape_with_history_menu",
+        "windows_job_log_sha256": "45c453d9fabe2b5cb56c8f07351ff43a5df5920593341ed3f0ad10a246600360",
+        "leak_readonly_review_sha256": "dbe30042afc35dd40984e74d14ff05d0ac890036f431ef272249d423032fe7d2",
+        "boundary": "旧失败、漏测与LEAK均保留；本轮无异常不倒推旧问题根因或已永久修复。"
+      },
+      "platform_boundary": "三平台实现/固定工件及源码门禁满足；Linux/Windows已认证模型、GUI和实机验收仍按用户授权移交，不计完成。",
+      "archive": {
+        "summary": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/ci-36796894945/terminal-final-audit/run-final.safe.json",
+        "summary_sha256": "8ab217095271a6bebe6f39621a8a0f4b8ac973ccf31128d39aa30d20a3436955",
+        "artifacts_verified_against_api_sha256": 13,
+        "indexed_raw_logs": 56,
+        "logs_zip_sha256": "0b867ff3134639121b7e1c0b5b871d2c9bfb3c9d3b6f2426d1d621c7f7e4680b"
       }
     }
   },
@@ -1090,9 +1222,7 @@
   },
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
-    "G01",
     "G03",
-    "G07",
     "G08",
     "G09",
     "G10",
@@ -5848,12 +5978,14 @@
     "pr": 22,
     "draft_required": true,
     "closed_items": [
+      "G01",
       "G02",
       "G04",
       "G05",
-      "G06"
+      "G06",
+      "G07"
     ],
-    "remaining_count": 7,
+    "remaining_count": 5,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [

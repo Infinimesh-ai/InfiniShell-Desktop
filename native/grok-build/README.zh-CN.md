@@ -1,6 +1,6 @@
 # Grok 普通 TUI 原生输入桥
 
-这是 G01 的原生能力补丁，仅用于从普通 shell 启动的独立受审定制工件；官方发行版不含此桥。Mac `.3` 的原生编译、74 项定向回归及独立构建已通过；Mac 标准首页普通 TUI 的 InfiniShell GUI 已取得八条真实原生输入、精确回执与结果，包含中文长文本、审批保护和同会话冷恢复。随后文本粘贴已修为本地草稿路由，七门禁及英中各一条真实输入通过；中文手动回退提示截断已由单行缩短及新工件布局复验解决。Mac 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入均已实现，三平台已分别绑定 Mac `.3`、Linux `.6`、Windows `.11` 工件。最终两平台宿主源码门禁仍欠精确账本 19 项覆盖，G01 保持开放，PR #22 保持草稿。各轮源码与二进制分别绑定，不继承旧定制构建或官方发行版的验收。
+这是 G01 的原生能力补丁，仅用于从普通 shell 启动的独立受审定制工件；官方发行版不含此桥。Mac `.3` 的原生编译、74 项定向回归及独立构建已通过；Mac 标准首页普通 TUI 的 InfiniShell GUI 已取得八条真实原生输入、精确回执与结果，包含中文长文本、审批保护和同会话冷恢复。随后文本粘贴已修为本地草稿路由，七门禁及英中各一条真实输入通过；中文手动回退提示截断已由单行缩短及新工件布局复验解决。Mac 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入均已实现，三平台已分别绑定 Mac `.3`、Linux `.6`、Windows `.11` 工件。最终两平台宿主源码门禁 `36796894945` 已在精确 `e3d5e58a0` 逐名覆盖账本各 19 项及全部必要桥组，G01 在本次 Mac 范围关闭；其他必要缺口仍开放，PR #22 保持草稿。各轮源码与二进制分别绑定，不继承旧定制构建或官方发行版的验收。
 
 ## 固定来源与构建
 
@@ -24,7 +24,7 @@ Rust 工具链由上游 `rust-toolchain.toml` 固定为 `1.94.0`；`protoc` 沿�
 
 ## 已验工件的使用方式
 
-Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要。Windows x64 `.11` 已通过 81 项原生桥回归及实际版本／帮助／异步补全入口，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/windows-terminal-bridge.11/grok.exe`，SHA-256 `acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc`，宿主已绑定；构建作业的剩余步骤被取消，不计整轮通过。绑定后的最终两平台宿主源码门禁仍欠精确账本 19 项覆盖，G01 未关闭。
+Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/mac-terminal-bridge.3/grok`。SHA-256 为 `edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1`，CDHash 为 `356fe77c29f339fcaa90e48094fc7af7e0571ec5`；复制后的完整摘要和代码签名再次核对通过。此副本不随后续 `target/debug` 构建覆盖。Linux x64 `.6` 已通过 CI 的 78 项原生回归与构建，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/linux-terminal-bridge.6/grok`，SHA-256 `e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb`，权限 `0700`。宿主已写入该摘要。Windows x64 `.11` 已通过 81 项原生桥回归及实际版本／帮助／异步补全入口，独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g01-cross-platform/windows-terminal-bridge.11/grok.exe`，SHA-256 `acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc`，宿主已绑定；构建作业的剩余步骤被取消，不计整轮通过。绑定后的最终两平台宿主源码门禁 `36796894945` 已完整通过；归档索引 SHA-256 `8ab217095271a6bebe6f39621a8a0f4b8ac973ccf31128d39aa30d20a3436955`。结合上述 Mac 实际功能与双语验收，G01 在本次 Mac 范围关闭。
 
 1. 取得对应平台、版本和摘要的独立工件，复制到自己的独立目录；Linux／Mac 将副本设为 `0700`（CI 下载可能丢失可执行位），并重新核对完整 SHA-256。Mac 还须核对代码签名及上述 CDHash。不要覆盖系统安装，也不要给重建文件直接套用旧摘要。
 2. 产物 `xai-grok-pager` 必须复制命名为 **`grok`**；Windows 对应为 **`grok.exe`**。宿主按这个文件名识别普通 CLI，直接运行原产物名不会进入 Grok 富输入。
@@ -35,7 +35,7 @@ Mac arm64 已验 `.3` 工件已独立保存在 `/Volumes/SanDisk/InfiniShell-Arc
 
 ## 当前跨平台实现边界
 
-当前实现及三平台工件绑定以上文为准，精确最终源码门禁仍未完成；其他平台实机验收移交不免除该门禁。下列逐轮记录保留当时的源码、成功／失败及待验范围，不代表当前工件仍未绑定。
+当前实现、三平台工件绑定及已通过的精确最终源码门禁以上文为准；其他平台实机验收仍移交用户，未改记为通过。下列逐轮记录保留当时的源码、成功／失败及待验范围，不代表当前工件仍未绑定。
 
 2026-10-01：`.10` 在 Windows 完整 check/build 通过，实际桥测试为 53＋20＋0＋4＝77 项；shell-terminal 四项被 Unix cfg 排除，不能计通过。实际 PE 的 `--version` 主线程栈溢出，尚不可用。当前 `.11` 只为 Windows 正式 CLI 映像扩大栈预留至 8 MiB，并将四项真实子进程守卫测试移植 Windows；构建门禁拒绝任何库零命中，核实际 PE 栈值并执行版本、帮助和经过异步入口的补全命令。Mac check、74项、build及三项零模型启动检查通过；Windows目标、工件绑定及最终源码门禁仍待完成。无界面文案变化，无需本地化变更。
 
