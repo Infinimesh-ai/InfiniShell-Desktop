@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：真实取消定位宿主按键观察缺项，修复待新构建复验
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `51b0e4aed/r-myk6vj3w` 的签名中文 GUI 经真实 SSH／tmux 产品入口运行固定 Grok `.4`、Codex `0.156.1`、Claude `2.1.280`，人工输入数分别为 1／1／4。
+
+Grok 在真实 shell 工具运行中收到一次 Ctrl-C，同 SID／prompt 的 StopCancelled 和宿主 ANSI `cancelled/user_interrupt` 一致；原生收据 `a5a20d6b668609f8b968ea0852fc8b16efb906e03b7b0b39fd316b810a6e5a29`，接收审计 `9105550791ff482c1c2f4b2f7244da746d5a74f794e6ecf71170652217d331fa`。后台 sleep 自然 exit 0，不声称进程树被按键清理；随后正常 `/exit` 四项结束 hook 成功。
+
+Codex 单次 Escape 取得原生 `turn_aborted/interrupted`，收据 `c3c783454f04e09ebf7a520e250be9ca07cb5c276a347e7c9670f21e51a25bab`；宿主只有启动、输入和迟到 ToolComplete，没有原生取消通知。源码确认旧版只有共享 viewer 观察 Ctrl-C，本地输入未接线；本轮未直接读取宿主内存状态。修复在已通过控制权检查并实际转发的共同边界观察 Ctrl-C／Codex 独立 Escape，仅启动确认等待，不伪造 Cancelled；迟到工具完成不能解除等待或把 Unknown 提升为运行，新输入或明确终态正常解除。
+
+Claude 第四次人工输入在真实生成中 Escape，原生明确 `[Request interrupted by user]`，本次工具为零，收据 `658ae43baad34e6ca751a01fe8a88a212393a01838c8b2f7ef48a573b591035c`。前三次分别为工具已结束、回答已结束及未证明生成中的早停，不计取消正例。旧快照采集到第四条刚入列却标作第三轮，新收据更正而保留旧件。本轮私有配置没有 settings、installed_plugins 或项目插件设置，只有官方 marketplace 注册；helper 未安装通知插件，因此宿主精确 SID 为零。前置审计 `75b6f680f9f41143640b1592e283ebd500bf71af0fa02c3ed360ce562d68deeb`；仅计原生取消，不计完整宿主链。
+
+四文件 nextest 83/83、i18n 11/11、最终 `cargo check -p warp` 全通过，无失败、重试或 LEAK，三短目录均已核验清理。总收据 `v03-interrupt-local-gates-v1.safe.json` 摘要 `3c4a6c3d347dc675adf5645c04f753a676e470104ae6747d9e9cf99f2b68db70`。actionlint 加实际自托管 runner 标签配置后通过；初次未配置标签的错误保留。两平台定向过滤已纳入会话模型及按键回归，尚待新提交实际运行。复核既有英中 Unknown／Cancelled 文案及语义，无新增控件或文案，无需本地化变更。
+
+本次 CLI、tmux、SSH、GUI 正常退出；专属 daemon 及其 defunct 子进程仍按原宽限等待自然退出，现场与唯一历史保留、cleanup_ready=false。新构建真实复验、Claude 正式插件前置及最终源码门禁完成前，V03 不关闭。
+
 ## 2026-10-02：绑定已核验的 Linux 通知原生工件
 
 **本轮新增关闭 0 项；6 关闭／5 开放／3 移交，PR #22 保持草稿。** [51b0 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的 Linux 原生构建产物 `11184345103` 已核官方 ZIP 摘要、公开基线加 125 文件补丁的来源 tree、实际 ELF64 x86_64 字节和三个零模型启动入口。二进制 608,773,152 字节，SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，实际完整版本为 `grok 1.0.41+infinishell.session-notifications.4 (07e35a3dfeed)`；宿主只将这两个已验证值替换此前未绑定的 Linux 常量，Mac 绑定不变。

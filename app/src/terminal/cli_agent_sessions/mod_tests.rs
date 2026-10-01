@@ -1411,12 +1411,12 @@ fn stop_hook_disarms_cancel_timer_without_confirming_completion() {
                 assert!(cancel.armed_token.is_none());
                 assert!(cancel.pending_cancel.is_none());
 
-                // Stop 可要求同回合继续；已经排队的旧取消回调也不能覆盖后续工具事件。
+                // 中断后的 Stop 与后台工具结束都不能确认模型继续；旧计时器也不得重入。
                 m.update_from_event(view_id, &event(CLIAgentEventType::ToolComplete), ctx);
                 m.resolve_pending_cancel(view_id, token, ctx);
                 assert_eq!(
                     m.session(view_id).unwrap().status,
-                    CLIAgentSessionStatus::InProgress
+                    CLIAgentSessionStatus::Unknown
                 );
             });
             views.push(view_id);
@@ -1427,7 +1427,7 @@ fn stop_hook_disarms_cancel_timer_without_confirming_completion() {
             for view_id in views {
                 assert_eq!(
                     m.session(view_id).unwrap().status,
-                    CLIAgentSessionStatus::InProgress
+                    CLIAgentSessionStatus::Unknown
                 );
             }
         });
@@ -1457,10 +1457,132 @@ fn prompt_submit_event_disarms_pending_cancel() {
 }
 
 #[test]
-fn tool_complete_event_disarms_pending_cancel() {
-    // ToolComplete only drives a status transition when the session is
-    // Blocked, but any plugin traffic must still disarm the window.
-    assert_event_disarms_pending_cancel(rich_event(CLIAgentEventType::ToolComplete));
+fn tool_complete_keeps_interrupt_unconfirmed_until_new_prompt() {
+    App::test((), |mut app| async move {
+        let model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+        let view_id = EntityId::new();
+        model.update(&mut app, |m, ctx| {
+            m.set_session(
+                view_id,
+                cli_agent_session(CLIAgentSessionStatus::InProgress, true),
+                ctx,
+            );
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::PromptSubmit), ctx);
+            m.observe_ctrl_c_write_with_window(view_id, TEST_WINDOW, ctx);
+            let token = m.ctrl_c_cancel_state[&view_id].armed_token.unwrap();
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::ToolComplete), ctx);
+            assert_eq!(m.ctrl_c_cancel_state[&view_id].armed_token, Some(token));
+            m.resolve_pending_cancel(view_id, token, ctx);
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::ToolComplete), ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::Unknown
+            );
+
+            let mut next = rich_event(CLIAgentEventType::PromptSubmit);
+            next.payload.prompt_id = Some("prompt-next".to_owned());
+            m.update_from_event(view_id, &next, ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+            next.event = CLIAgentEventType::PermissionRequest;
+            m.update_from_event(view_id, &next, ctx);
+            assert!(matches!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::Blocked { .. }
+            ));
+            next.event = CLIAgentEventType::ToolComplete;
+            m.update_from_event(view_id, &next, ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+        });
+    });
+}
+
+#[test]
+fn codex_escape_waits_for_native_confirmation_and_keeps_late_tool_unknown() {
+    App::test((), |mut app| async move {
+        let model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+        let view_id = EntityId::new();
+        model.update(&mut app, |m, ctx| {
+            let mut session = cli_agent_session(CLIAgentSessionStatus::InProgress, true);
+            session.agent = CLIAgent::Codex;
+            session.session_context.session_id = Some("codex-current".to_owned());
+            m.set_session(view_id, session, ctx);
+            let mut event = rich_event(CLIAgentEventType::PromptSubmit);
+            event.agent = CLIAgent::Codex;
+            event.session_id = Some("codex-current".to_owned());
+            event.payload.turn_id = event.payload.prompt_id.take();
+            m.update_from_event(view_id, &event, ctx);
+            m.observe_codex_escape_write(view_id, ctx);
+            let token = m.ctrl_c_cancel_state[&view_id].armed_token.unwrap();
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+            // 连按 Escape 仍使用同一等待窗口，旧会话输入也不能解除它。
+            m.observe_codex_escape_write(view_id, ctx);
+            assert_eq!(m.ctrl_c_cancel_state[&view_id].armed_token, Some(token));
+            let mut old = event.clone();
+            old.session_id = Some("codex-previous".to_owned());
+            old.payload.turn_id = Some("previous-turn".to_owned());
+            m.update_from_event(view_id, &old, ctx);
+            assert_eq!(m.ctrl_c_cancel_state[&view_id].armed_token, Some(token));
+            m.resolve_pending_cancel(view_id, token, ctx);
+            event.event = CLIAgentEventType::ToolComplete;
+            m.update_from_event(view_id, &event, ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::Unknown
+            );
+            event.event = CLIAgentEventType::Cancelled;
+            m.update_from_event(view_id, &event, ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::Cancelled
+            );
+            assert!(!m.ctrl_c_cancel_state[&view_id].unconfirmed_interrupt);
+        });
+    });
+}
+
+#[test]
+fn new_session_drops_previous_unconfirmed_interrupt_marker() {
+    App::test((), |mut app| async move {
+        let model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+        let view_id = EntityId::new();
+        model.update(&mut app, |m, ctx| {
+            m.set_session(
+                view_id,
+                cli_agent_session(CLIAgentSessionStatus::InProgress, true),
+                ctx,
+            );
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::PromptSubmit), ctx);
+            m.observe_ctrl_c_write_with_window(view_id, TEST_WINDOW, ctx);
+            let token = m.ctrl_c_cancel_state[&view_id].armed_token.unwrap();
+            m.resolve_pending_cancel(view_id, token, ctx);
+            m.set_session(
+                view_id,
+                cli_agent_session(CLIAgentSessionStatus::Unknown, true),
+                ctx,
+            );
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::PromptSubmit), ctx);
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::Stop), ctx);
+            m.update_from_event(view_id, &rich_event(CLIAgentEventType::ToolComplete), ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+            m.resolve_pending_cancel(view_id, token, ctx);
+            assert_eq!(
+                m.session(view_id).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+        });
+    });
 }
 
 #[test]

@@ -462,6 +462,8 @@ struct CtrlCCancelState {
     /// 才生效，已完成计时并排队的回调仍可能执行。回调仅在令牌仍匹配时生效，
     /// 防止过时回调把较新的事件状态覆盖为 `Unknown`。
     armed_token: Option<u64>,
+    /// 本轮已请求中断但没有原生终态；后台工具结束不能证明模型仍在运行。
+    unconfirmed_interrupt: bool,
 }
 
 /// 修订号保留在 UI 线程；写租约仅由代际和提交编号标识，不依赖清稿权限。
@@ -1126,13 +1128,30 @@ impl CLIAgentSessionsModel {
             EventDisposition::Accept => {}
         }
 
-        // 普通广播、未知事件与空闲通知不确认任务仍运行，不能解除取消等待。
+        if matches!(
+            event.event,
+            CLIAgentEventType::SessionStart
+                | CLIAgentEventType::PromptSubmit
+                | CLIAgentEventType::StopFailure
+                | CLIAgentEventType::Cancelled
+        ) && let Some(state) = self.ctrl_c_cancel_state.get_mut(&terminal_view_id)
+        {
+            // 只有已通过会话、回合与重投守卫的新输入或明确终态才能清除中断的不确定性。
+            state.unconfirmed_interrupt = false;
+        }
+        let interrupted_tool_completion = matches!(event.event, CLIAgentEventType::ToolComplete)
+            && self
+                .ctrl_c_cancel_state
+                .get(&terminal_view_id)
+                .is_some_and(|state| state.unconfirmed_interrupt);
+        // 普通广播、未知事件、空闲通知与中断后的后台工具完成都不能解除确认等待。
         if !matches!(
             event.event,
             CLIAgentEventType::IdlePrompt
                 | CLIAgentEventType::Notification
                 | CLIAgentEventType::Unknown(_)
-        ) {
+        ) && !interrupted_tool_completion
+        {
             self.abort_pending_cancel(terminal_view_id);
         }
         if matches!(event.event, CLIAgentEventType::PromptSubmit) {
@@ -1152,7 +1171,9 @@ impl CLIAgentSessionsModel {
         }
 
         let event_type = &event.event;
-        if let Some(new_status) = session.apply_event(event) {
+        let preserve_unconfirmed_status =
+            interrupted_tool_completion && session.status == CLIAgentSessionStatus::Unknown;
+        if !preserve_unconfirmed_status && let Some(new_status) = session.apply_event(event) {
             let agent = session.agent;
             ctx.emit(CLIAgentSessionsModelEvent::StatusChanged {
                 terminal_view_id,
@@ -1222,6 +1243,21 @@ impl CLIAgentSessionsModel {
         self.observe_ctrl_c_write_with_window(terminal_view_id, CTRL_C_CANCEL_WINDOW, ctx);
     }
 
+    /// Codex 的独立 Escape 也只请求确认；此处不改变其他 CLI 的 Escape 接线。
+    pub fn observe_codex_escape_write(
+        &mut self,
+        terminal_view_id: EntityId,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if self
+            .sessions
+            .get(&terminal_view_id)
+            .is_some_and(|session| session.agent == CLIAgent::Codex)
+        {
+            self.observe_ctrl_c_write(terminal_view_id, ctx);
+        }
+    }
+
     fn observe_ctrl_c_write_with_window(
         &mut self,
         terminal_view_id: EntityId,
@@ -1263,6 +1299,7 @@ impl CLIAgentSessionsModel {
         );
         state.pending_cancel = Some(handle);
         state.armed_token = Some(token);
+        state.unconfirmed_interrupt = true;
     }
 
     /// 等待窗口结束且未收到解除等待的插件事件时，将会话标为 `Unknown`。

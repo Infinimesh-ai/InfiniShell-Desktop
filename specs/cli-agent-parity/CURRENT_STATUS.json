@@ -6971,5 +6971,58 @@
       },
       "gap_closed": false
     }
+  },
+  "v03_interrupt_20261002": {
+    "status": "native_cancellation_observed_host_fix_awaiting_gui_and_platform_gates",
+    "gap_closed": false,
+    "gui_source_commit": "51b0e4aed0e790b96e0020f21ce15d658efd61c6",
+    "run_id": "r-myk6vj3w",
+    "manual_inputs": {
+      "grok": 1,
+      "codex": 1,
+      "claude": 4
+    },
+    "evidence": {
+      "grok_native": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-myk6vj3w-tmux-owned-gui/grok-native-cancelled-v1.safe.json",
+        "sha256": "a5a20d6b668609f8b968ea0852fc8b16efb906e03b7b0b39fd316b810a6e5a29"
+      },
+      "grok_receiver": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-myk6vj3w-tmux-owned-gui/grok-gui-cancel-receiver-v1.safe.json",
+        "sha256": "9105550791ff482c1c2f4b2f7244da746d5a74f794e6ecf71170652217d331fa"
+      },
+      "codex_native": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-myk6vj3w-tmux-owned-gui/codex-native-cancelled-v1.safe.json",
+        "sha256": "c3c783454f04e09ebf7a520e250be9ca07cb5c276a347e7c9670f21e51a25bab"
+      },
+      "claude_native": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-myk6vj3w-tmux-owned-gui/claude-native-cancelled-v1.safe.json",
+        "sha256": "658ae43baad34e6ca751a01fe8a88a212393a01838c8b2f7ef48a573b591035c"
+      },
+      "claude_precondition": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-myk6vj3w-tmux-owned-gui/claude-notification-precondition-v1.safe.json",
+        "sha256": "75b6f680f9f41143640b1592e283ebd500bf71af0fa02c3ed360ce562d68deeb"
+      }
+    },
+    "grok": "真实shell运行后单次Ctrl-C；同SID/prompt明确Cancelled和宿主ANSI取消通知；后台sleep自然完成，不声称进程树被中断。",
+    "codex": "原生turn_aborted明确interrupted；宿主仅见启动/输入/迟到ToolComplete，没有原生取消通知。旧构建本地按键未观察，未读到宿主内存状态。",
+    "claude": "第四次人工输入在真实生成中Escape，原生明确Request interrupted by user；前三次不计取消正例。私有config未安装通知插件，宿主精确SID零通知，本轮不计完整宿主链。",
+    "implementation": "普通本地和共享会话实际转发边界观察Ctrl-C，仅Codex观察独立Escape；按键不等于取消，超时Unknown，迟到ToolComplete不提升为运行。",
+    "source_freeze_sha256": "76e632832c05728ac2c621c97ccdf08a73e52e95f816df79ef44974319bb2235",
+    "local_gates": {
+      "receipt_sha256": "3c4a6c3d347dc675adf5645c04f753a676e470104ae6747d9e9cf99f2b68db70",
+      "nextest": 83,
+      "i18n": 11,
+      "cargo_check": "passed",
+      "temporary_directories": "cleaned",
+      "actionlint": "passed with actual self-hosted runner label configuration"
+    },
+    "localization": "既有英中未知/取消文案与语义复核，无新增控件或可见文案，无需本地化变更。",
+    "remaining": [
+      "新构建Codex真实中断状态复验",
+      "具备正式通知插件的Claude真实取消链",
+      "更新后Linux/Windows源码门禁"
+    ],
+    "cleanup": "CLI/tmux/SSH/GUI均正常退出；专属daemon及其defunct子进程等待既有宽限自然退出，现场保留cleanup_ready=false。"
   }
 }

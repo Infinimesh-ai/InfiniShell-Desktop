@@ -1559,13 +1559,13 @@ fn focus_reporting_writes_focus_events_in_normal_screen() {
 /// Registers a rich-status-capable, `InProgress` CLI agent session that has
 /// already observed a `prompt_submit` -- the state a real working third-party
 /// harness turn is in -- so `observe_ctrl_c_write` is able to arm.
-fn register_armable_cli_agent_session(app: &mut App, view_id: EntityId) {
+fn register_armable_cli_agent_session(app: &mut App, view_id: EntityId, agent: CLIAgent) {
     let cli_sessions = CLIAgentSessionsModel::handle(app);
     cli_sessions.update(app, |sessions, ctx| {
         sessions.set_session(
             view_id,
             CLIAgentSession {
-                agent: CLIAgent::Claude,
+                agent,
                 status: CLIAgentSessionStatus::InProgress,
                 session_context: CLIAgentSessionContext::default(),
                 input_state: CLIAgentInputState::Closed,
@@ -1585,7 +1585,7 @@ fn register_armable_cli_agent_session(app: &mut App, view_id: EntityId) {
             view_id,
             &CLIAgentEvent {
                 v: 1,
-                agent: CLIAgent::Claude,
+                agent,
                 event: CLIAgentEventType::PromptSubmit,
                 session_id: None,
                 cwd: None,
@@ -1615,7 +1615,7 @@ fn ctrl_c_from_shared_viewer_forwards_and_arms_cancel_window() {
             });
         });
 
-        register_armable_cli_agent_session(&mut app, view_id);
+        register_armable_cli_agent_session(&mut app, view_id, CLIAgent::Claude);
         terminal.update(&mut app, |view, ctx| {
             view.model.lock().simulate_long_running_block("claude", "");
             view.write_viewer_bytes_to_pty(vec![0x03], ctx);
@@ -1653,7 +1653,7 @@ fn ctrl_c_from_shared_viewer_rejected_by_agent_in_control_does_not_arm_cancel_wi
             });
         });
 
-        register_armable_cli_agent_session(&mut app, view_id);
+        register_armable_cli_agent_session(&mut app, view_id, CLIAgent::Claude);
         terminal.update(&mut app, |view, ctx| {
             {
                 let mut model = view.model.lock();
@@ -1690,6 +1690,142 @@ fn ctrl_c_from_shared_viewer_rejected_by_agent_in_control_does_not_arm_cancel_wi
             "a Ctrl-C that never reached the pty must not arm the cancel window"
         );
     })
+}
+
+#[test]
+fn local_ctrl_c_forwards_once_and_arms_unconfirmed_interrupt() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = Rc::new(RefCell::new(Vec::new()));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    observed.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        register_armable_cli_agent_session(&mut app, terminal.id(), CLIAgent::Claude);
+        terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("claude", "");
+            view.handle_action(&TerminalAction::CtrlC, ctx);
+        });
+        assert_eq!(*writes.borrow(), vec![vec![0x03]]);
+        CLIAgentSessionsModel::handle(&app).read(&app, |sessions, _| {
+            assert!(sessions.has_pending_or_resolved_ctrl_c_cancel(terminal.id()));
+            assert_eq!(
+                sessions.session(terminal.id()).unwrap().status,
+                CLIAgentSessionStatus::InProgress
+            );
+        });
+    });
+}
+
+fn assert_terminal_key_interrupt(
+    agent: CLIAgent,
+    characters: &'static str,
+    enabled: bool,
+    expected_armed: bool,
+) {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(enabled);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = Rc::new(RefCell::new(Vec::new()));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    observed.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        register_armable_cli_agent_session(&mut app, terminal.id(), agent);
+        terminal.update(&mut app, |view, ctx| {
+            view.model.lock().simulate_long_running_block("cli", "");
+            view.keydown_on_terminal(characters, ctx);
+        });
+        assert_eq!(*writes.borrow(), vec![characters.as_bytes().to_vec()]);
+        CLIAgentSessionsModel::handle(&app).read(&app, |sessions, _| {
+            assert_eq!(
+                sessions.has_pending_or_resolved_ctrl_c_cancel(terminal.id()),
+                expected_armed,
+                "agent={agent:?}, characters={characters:?}, enabled={enabled}"
+            );
+            assert_eq!(
+                sessions.session(terminal.id()).unwrap().status,
+                CLIAgentSessionStatus::InProgress,
+                "按键不能证明取消成功"
+            );
+        });
+    });
+}
+
+#[test]
+fn codex_lone_escape_forwards_and_arms_unconfirmed_interrupt() {
+    assert_terminal_key_interrupt(CLIAgent::Codex, "\u{1b}", true, true);
+}
+
+#[test]
+fn grok_escape_forwards_without_arming_interrupt() {
+    assert_terminal_key_interrupt(CLIAgent::Grok, "\u{1b}", true, false);
+}
+
+#[test]
+fn claude_escape_forwards_without_arming_codex_interrupt() {
+    assert_terminal_key_interrupt(CLIAgent::Claude, "\u{1b}", true, false);
+}
+
+#[test]
+fn codex_escape_sequence_does_not_arm_interrupt() {
+    assert_terminal_key_interrupt(CLIAgent::Codex, "\u{1b}[A", true, false);
+}
+
+#[test]
+fn codex_escape_with_disabled_flag_does_not_arm_interrupt() {
+    assert_terminal_key_interrupt(CLIAgent::Codex, "\u{1b}", false, false);
+}
+
+#[test]
+fn agent_control_rejects_codex_escape_before_interrupt_observation() {
+    App::test((), |mut app| async move {
+        initialize_app_for_terminal_view(&mut app);
+        let _flag = FeatureFlag::CtrlCCancelsThirdPartyHarness.override_enabled(true);
+        let terminal = add_window_with_terminal(&mut app, None);
+        let writes = Rc::new(RefCell::new(Vec::new()));
+        let observed = writes.clone();
+        app.update(|ctx| {
+            ctx.subscribe_to_view(&terminal, move |_, event, _| {
+                if let Event::WriteBytesToPty { bytes } = event {
+                    observed.borrow_mut().push(bytes.to_vec());
+                }
+            });
+        });
+        register_armable_cli_agent_session(&mut app, terminal.id(), CLIAgent::Codex);
+        terminal.update(&mut app, |view, ctx| {
+            {
+                let mut model = view.model.lock();
+                model.simulate_long_running_block("codex", "");
+                model
+                    .block_list_mut()
+                    .active_block_mut()
+                    .set_agent_interaction_mode_for_agent_monitored_command(
+                        &TaskId::new("test-task".to_owned()),
+                        AIConversationId::new(),
+                    )
+                    .unwrap();
+            }
+            view.keydown_on_terminal("\u{1b}", ctx);
+        });
+        assert!(writes.borrow().is_empty());
+        assert!(
+            !CLIAgentSessionsModel::handle(&app).read(&app, |sessions, _| {
+                sessions.has_pending_or_resolved_ctrl_c_cancel(terminal.id())
+            })
+        );
+    });
 }
 
 fn exchange_with_inputs(inputs: Vec<AIAgentInput>) -> AIAgentExchange {
