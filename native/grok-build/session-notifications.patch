@@ -570,10 +570,10 @@ index 4b54f19e9c29d8dbd4ff6185be2553a89dfe3a95..a788fc06c1d3e6d372027bcb2d8452e0
  }
 diff --git a/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows.rs b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b625ba066
+index 0000000000000000000000000000000000000000..d699a566f868f73abc9df5ae92bfa25f9dba8379
 --- /dev/null
 +++ b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows.rs
-@@ -0,0 +1,526 @@
+@@ -0,0 +1,559 @@
 +//! 通知专用短命 broker 接入真实 peer 控制台；leader 与普通 hook 保持分离。
 +
 +use std::ffi::{OsStr, OsString};
@@ -603,7 +603,7 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +    GetNamedPipeClientProcessId, GetNamedPipeClientSessionId, ImpersonateNamedPipeClient,
 +};
 +use windows::Win32::System::Threading::{
-+    CREATE_NO_WINDOW, GetCurrentProcess, GetCurrentThread, GetProcessId, GetProcessTimes,
++    DETACHED_PROCESS, GetCurrentProcess, GetCurrentThread, GetProcessId, GetProcessTimes,
 +    OpenProcess, OpenProcessToken, OpenThreadToken, PROCESS_QUERY_LIMITED_INFORMATION,
 +    PROCESS_SYNCHRONIZE, WaitForSingleObject,
 +};
@@ -938,7 +938,7 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +    let mut broker = tokio::process::Command::new(std::env::current_exe()?);
 +    broker
 +        .arg(BROKER_ARGUMENT)
-+        .creation_flags(CREATE_NO_WINDOW.0)
++        .creation_flags(DETACHED_PROCESS.0)
 +        .stdin(Stdio::piped())
 +        .stdout(Stdio::piped())
 +        .stderr(Stdio::piped())
@@ -1056,15 +1056,41 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +    Err(denied("notification console membership did not stabilize"))
 +}
 +
++#[derive(Debug, thiserror::Error)]
++#[error("notification broker stage={stage} code={code:?}: {source}")]
++struct BrokerStageError {
++    stage: &'static str,
++    code: Option<i32>,
++    #[source]
++    source: io::Error,
++}
++
++// 只补充固定阶段和系统错误码，保留原始错误链，不记录命令、环境或启动帧。
++fn broker_error(stage: &'static str, source: io::Error) -> io::Error {
++    io::Error::new(
++        source.kind(),
++        BrokerStageError {
++            stage,
++            code: source.raw_os_error(),
++            source,
++        },
++    )
++}
++
 +/// 只能由固定隐藏参数在主程序最早入口调用，早于运行时、配置、认证和 leader 初始化。
 +pub fn run_broker() -> io::Result<i32> {
 +    // 保存原管道，AttachConsole 不得让 hook 的普通输出或 envelope 混进终端输入。
-+    let mut input = duplicate_standard_handle(STD_INPUT_HANDLE)?;
-+    let output = duplicate_standard_handle(STD_OUTPUT_HANDLE)?;
-+    let error = duplicate_standard_handle(STD_ERROR_HANDLE)?;
++    let mut input = duplicate_standard_handle(STD_INPUT_HANDLE)
++        .map_err(|error| broker_error("duplicate_stdin", error))?;
++    let output = duplicate_standard_handle(STD_OUTPUT_HANDLE)
++        .map_err(|error| broker_error("duplicate_stdout", error))?;
++    let error = duplicate_standard_handle(STD_ERROR_HANDLE)
++        .map_err(|error| broker_error("duplicate_stderr", error))?;
 +    let frame = read_frame(&mut input)?;
-+    let peer = ConsolePeer::from_transferred_handle(frame.peer_handle, frame.peer)?;
-+    unsafe { AttachConsole(peer.identity.pid) }?;
++    let peer = ConsolePeer::from_transferred_handle(frame.peer_handle, frame.peer)
++        .map_err(|error| broker_error("verify_transferred_peer", error))?;
++    unsafe { AttachConsole(peer.identity.pid) }
++        .map_err(|error| broker_error("AttachConsole", error.into()))?;
 +    struct Console;
 +    impl Drop for Console {
 +        fn drop(&mut self) {
@@ -1072,24 +1098,31 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +        }
 +    }
 +    let console = Console;
-+    peer.verify_console()?;
++    peer.verify_console()
++        .map_err(|error| broker_error("verify_attached_console", error))?;
 +    let mut command = frame.command.command()?;
 +    command
 +        .stdin(Stdio::from(input))
 +        .stdout(Stdio::from(output))
 +        .stderr(Stdio::from(error));
 +    // 此子进程继承 broker 已核控制台与外层 Job，绝不 detach 或突破 Job。
-+    peer.verify_console()?;
-+    let mut child = command.spawn()?;
++    peer.verify_console()
++        .map_err(|error| broker_error("verify_console_before_spawn", error))?;
++    let mut child = command
++        .spawn()
++        .map_err(|error| broker_error("spawn_hook", error))?;
 +    let result = loop {
-+        if let Some(status) = child.try_wait()? {
++        if let Some(status) = child
++            .try_wait()
++            .map_err(|error| broker_error("wait_hook", error))?
++        {
 +            break Ok(status.code().unwrap_or(1));
 +        }
 +        if let Err(error) = peer.verify_console() {
 +            // 只回收刚派生的 hook；用户 peer 句柄没有终止权限。
 +            let _ = child.kill();
 +            let _ = child.wait();
-+            break Err(error);
++            break Err(broker_error("verify_running_console", error));
 +        }
 +        std::thread::sleep(Duration::from_millis(25));
 +    };
@@ -1102,15 +1135,16 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +mod tests;
 diff --git a/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..f3cb013a33a445b22a20774fb6acb52dc90ca42a
+index 0000000000000000000000000000000000000000..77b2c152c379e85094e0e2917a9dc5b1572c9911
 --- /dev/null
 +++ b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
-@@ -0,0 +1,381 @@
+@@ -0,0 +1,388 @@
 +use super::*;
 +
 +use std::io::Write;
 +
 +use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
++use windows::Win32::Foundation::{ERROR_INVALID_HANDLE, GetLastError};
 +use windows::Win32::System::Threading::CREATE_NEW_CONSOLE;
 +use xai_grok_tools::util::{ProcessGroup, ProcessScope};
 +
@@ -1327,7 +1361,7 @@ index 0000000000000000000000000000000000000000..f3cb013a33a445b22a20774fb6acb52d
 +    .current_dir(std::env::temp_dir());
 +    let mut broker =
 +        fixture_command("runner::notification_console_windows::tests::console_broker_fixture");
-+    broker.creation_flags(CREATE_NO_WINDOW.0);
++    broker.creation_flags(DETACHED_PROCESS.0);
 +    prepare_child(
 +        broker.spawn().unwrap(),
 +        CommandPlan::capture(&hook).unwrap(),
@@ -1457,6 +1491,12 @@ index 0000000000000000000000000000000000000000..f3cb013a33a445b22a20774fb6acb52d
 +    if std::env::var(FIXTURE_ENV).as_deref() != Ok("1") {
 +        return;
 +    }
++    // 无窗口不等于未附着；必须从真实内核状态证明 broker 尚无控制台。
++    let mut members = [0u32; 1];
++    let count = unsafe { GetConsoleProcessList(&mut members) };
++    let error = unsafe { GetLastError() };
++    assert_eq!(count, 0, "broker 启动时已附着到控制台");
++    assert_eq!(error, ERROR_INVALID_HANDLE, "无法确认 broker 未附着状态");
 +    // AttachConsole/FreeConsole 可改变标准句柄；诊断必须保留原父测试管道。
 +    let mut diagnostic = duplicate_standard_handle(STD_ERROR_HANDLE).unwrap();
 +    let code = match run_broker() {
@@ -1715,7 +1755,7 @@ index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..cbf72fa7eb3a7e341002523921031f53
      /// Carries the payload so dispatch can requeue it locally.
      /// The producer already consumed the composer/queue row, so dropping it would silently lose the message.
 diff --git a/crates/codegen/xai-grok-pager/src/app/app_view.rs b/crates/codegen/xai-grok-pager/src/app/app_view.rs
-index 96a2dc0f1db36d9bc9b07e61fef971284eab7fac..709c44f78b73af0d3ed4de4e76ac90ac2916bf39 100644
+index 96a2dc0f1db36d9bc9b07e61fef971284eab7fac..5ea2e96d5ea66cd5172065150c70e62a036139b5 100644
 --- a/crates/codegen/xai-grok-pager/src/app/app_view.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/app_view.rs
 @@ -975,6 +975,9 @@ pub struct AppView {
@@ -1728,7 +1768,16 @@ index 96a2dc0f1db36d9bc9b07e61fef971284eab7fac..709c44f78b73af0d3ed4de4e76ac90ac
      pub agent_override: Option<serde_json::Value>,
      /// Autocomplete thus has shell builtins and skills before any runtime `AvailableCommandsUpdate` arrives.
      /// Initially populated from `InitializeResponse.meta.availableCommands` (AlwaysOn builtins only).
-@@ -1530,6 +1533,8 @@ impl AppView {
+@@ -1079,6 +1082,8 @@ pub struct AppView {
+     /// Set when a newer version is detected; rendered as a notification on the welcome screen.
+     pub pending_update_version: Option<String>,
+     /// When true, the event loop should exit so the user can relaunch to pick up the downloaded update.
++    /// 只有用户确认退出才请求 owned 原生会话正常收尾。
++    pub owned_exit_requested: bool,
+     pub quit_for_update: bool,
+     /// Printed to stderr after terminal restore when Welcome yes could not save trust.
+     pub trust_quit_error: Option<String>,
+@@ -1530,6 +1535,8 @@ impl AppView {
              restore_code: None,
              suppress_code_restore_once: None,
              resume_local_miss: None,
@@ -1737,8 +1786,16 @@ index 96a2dc0f1db36d9bc9b07e61fef971284eab7fac..709c44f78b73af0d3ed4de4e76ac90ac
              agent_override: None,
              bootstrap_acp_commands,
              auth_methods: Vec::new(),
+@@ -1580,6 +1587,7 @@ impl AppView {
+             pending_update_version: None,
+             foreign_resume_launch_generation: 0,
+             foreign_resume_launch: None,
++            owned_exit_requested: false,
+             quit_for_update: false,
+             trust_quit_error: None,
+             relaunch: None,
 diff --git a/crates/codegen/xai-grok-pager/src/app/app_view_tests.rs b/crates/codegen/xai-grok-pager/src/app/app_view_tests.rs
-index 805be467926b93a75770c7c0c0c158a716b9be5a..8653818e439bb2e081b15bc9f92a38e07fb00362 100644
+index 805be467926b93a75770c7c0c0c158a716b9be5a..7097306f358dddba75641db66725a1883dc7a9e0 100644
 --- a/crates/codegen/xai-grok-pager/src/app/app_view_tests.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/app_view_tests.rs
 @@ -151,6 +151,8 @@ pub(crate) fn test_app() -> AppView {
@@ -1750,6 +1807,14 @@ index 805be467926b93a75770c7c0c0c158a716b9be5a..8653818e439bb2e081b15bc9f92a38e0
          agent_override: None,
          bootstrap_acp_commands: Vec::new(),
          auth_methods: Vec::new(),
+@@ -270,6 +272,7 @@ pub(crate) fn test_app() -> AppView {
+         pending_update_version: None,
+         foreign_resume_launch_generation: 0,
+         foreign_resume_launch: None,
++        owned_exit_requested: false,
+         quit_for_update: false,
+         trust_quit_error: None,
+         relaunch: None,
 diff --git a/crates/codegen/xai-grok-pager/src/app/cli.rs b/crates/codegen/xai-grok-pager/src/app/cli.rs
 index 87f63aef9443ec272ef9a37dfd774b6114d08d8f..599da84e892544743584b496edaf4a711a97b75f 100644
 --- a/crates/codegen/xai-grok-pager/src/app/cli.rs
@@ -1835,6 +1900,18 @@ index eaf1f2997f6c3c5edfff51782ab690a1eb413929..c77482b3182057375ff97d41757914d8
          _ if multi_segments.is_some() => (None, true),
          _ => (text.as_deref().map(RenderBlock::user_prompt), true),
      };
+diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/router.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/router.rs
+index 5eb1d193ef5d08281c247f07513ab90789eb4cae..1bc4b9bc02e6b4ceb54fd865e96aaba5a0be5163 100644
+--- a/crates/codegen/xai-grok-pager/src/app/dispatch/router.rs
++++ b/crates/codegen/xai-grok-pager/src/app/dispatch/router.rs
+@@ -143,6 +143,7 @@ pub(super) fn dispatch_copy_auth_url(
+ /// The returned `Vec<Effect>` may be empty (pure state mutation) or contain async work that the event loop should spawn.
+ /// Do not extract a returning arm into a handler: as a delegation its `return`s become plain arm values and start flowing through the tail.
+ pub(in crate::app::dispatch) fn confirmed_quit(app: &mut AppView) -> Vec<Effect> {
++    app.owned_exit_requested = true;
+     if let Some(tx) = &app.voice_cmd_tx {
+         let _ = tx.try_send(xai_grok_voice::VoiceCommand::Shutdown);
+     }
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs
 index a96c078d8184ffc6d4503d421cb8b44e93fc1967..ec3b584754b02e5b3dffa64426bdfef8a5080121 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/task_result.rs
@@ -1854,7 +1931,7 @@ index a96c078d8184ffc6d4503d421cb8b44e93fc1967..ec3b584754b02e5b3dffa64426bdfef8
              let effects = handle_prompt_response(app, agent_id, result, http_status, prompt_id);
              app.refresh_status_line_for(agent_id);
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
-index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..a2d9aba564492cd21991e37c6e778866f42524ce 100644
+index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..8a1f48f66f6f2dd6a165bc3c3c5cb1761a0d10a1 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/mod.rs
 @@ -19,6 +19,8 @@ mod settings;
@@ -1875,6 +1952,14 @@ index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..a2d9aba564492cd21991e37c6e778866
          agent_override: None,
          bootstrap_acp_commands: Vec::new(),
          auth_methods: vec![acp::AuthMethod::Agent(acp::AuthMethodAgent::new(
+@@ -283,6 +287,7 @@ fn test_app() -> AppView {
+         pending_update_version: None,
+         foreign_resume_launch_generation: 0,
+         foreign_resume_launch: None,
++        owned_exit_requested: false,
+         quit_for_update: false,
+         trust_quit_error: None,
+         relaunch: None,
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..f2cfafe5c1e6e1767ce45178cd7aae61a3cb0ada
@@ -2271,7 +2356,7 @@ index 89063c5ae04de7ac346de0bb3302b2c21628b13f..1d4483dbd16f1d57002be3842ef43bb6
 +    assert_eq!(meta.get("yoloMode"), Some(&serde_json::json!(false)));
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/event_loop.rs b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
-index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc77bf6eac 100644
+index ceaf021a276edb59da392b47fee89f4b45b384b8..44522c76ceec86242f558604b50df134a8c815e9 100644
 --- a/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/event_loop.rs
 @@ -23,6 +23,9 @@ use std::time::Duration;
@@ -2293,6 +2378,98 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc
      #[cfg(feature = "local-workspace")]
      {
          let stamp = crate::app::session_startup::active_local_workspace()
+@@ -1672,17 +1677,17 @@ pub(crate) async fn run(
+     if matches!(app.auth_state, AuthState::Done) {
+         let effs = dispatch::dispatch(Action::RequestBundleStatus, &mut app);
+         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-            return Ok(finish_run(&mut app));
++            return Ok(finish_owned_run(&mut app).await);
+         }
+         if app.usage_visible {
+             let effs = vec![super::actions::Effect::FetchAppBilling { nonce: 0 }];
+             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-                return Ok(finish_run(&mut app));
++                return Ok(finish_owned_run(&mut app).await);
+             }
+         }
+         let effs = vec![super::actions::Effect::FetchChangelog];
+         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-            return Ok(finish_run(&mut app));
++            return Ok(finish_owned_run(&mut app).await);
+         }
+         if !app.has_access() {
+             gate_poll_at = Some(Instant::now() + GATE_POLL_INTERVAL);
+@@ -1691,7 +1696,7 @@ pub(crate) async fn run(
+     if !post_render_effects.is_empty()
+         && process_effects(post_render_effects, &mut tasks, &mut app, &progress_tx)
+     {
+-        return Ok(finish_run(&mut app));
++        return Ok(finish_owned_run(&mut app).await);
+     }
+     use crate::app::session_startup::MaterializedStartup;
+     let startup_action = match &materialized {
+@@ -1769,7 +1774,7 @@ pub(crate) async fn run(
+     if let Some(action) = startup_action {
+         let effs = dispatch::dispatch(action, &mut app);
+         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-            return Ok(finish_run(&mut app));
++            return Ok(finish_owned_run(&mut app).await);
+         }
+         presenter.request_presentation(&mut app, terminal, false);
+     } else if args.worktree.is_some() {
+@@ -1782,7 +1787,7 @@ pub(crate) async fn run(
+             &mut app,
+         );
+         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-            return Ok(finish_run(&mut app));
++            return Ok(finish_owned_run(&mut app).await);
+         }
+         presenter.request_presentation(&mut app, terminal, false);
+     } else if args.initial_prompt().is_none() && !minimal_will_open_session(&term_state, &app) {
+@@ -1794,7 +1799,7 @@ pub(crate) async fn run(
+         } else if !app.is_zdr_blocked() {
+             let effs = dispatch::dispatch_initial_prompt(&mut app, initial_prompt.to_string());
+             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-                return Ok(finish_run(&mut app));
++                return Ok(finish_owned_run(&mut app).await);
+             }
+             presenter.request_presentation(&mut app, terminal, false);
+         } else {
+@@ -1806,7 +1811,7 @@ pub(crate) async fn run(
+         if app.session_startup_allowed() {
+             let effs = dispatch::dispatch(Action::OpenDashboard, &mut app);
+             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-                return Ok(finish_run(&mut app));
++                return Ok(finish_owned_run(&mut app).await);
+             }
+             presenter.request_presentation(&mut app, terminal, false);
+         } else {
+@@ -1817,7 +1822,7 @@ pub(crate) async fn run(
+         if app.session_startup_allowed() {
+             let effs = dispatch::dispatch(Action::NewSession, &mut app);
+             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-                return Ok(finish_run(&mut app));
++                return Ok(finish_owned_run(&mut app).await);
+             }
+             presenter.request_presentation(&mut app, terminal, false);
+         } else {
+@@ -1827,14 +1832,14 @@ pub(crate) async fn run(
+     if should_create_home_on_authenticated_startup(&app) {
+         let effs = dispatch::maybe_create_home_session(&mut app);
+         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-            return Ok(finish_run(&mut app));
++            return Ok(finish_owned_run(&mut app).await);
+         }
+         presenter.request_presentation(&mut app, terminal, false);
+     }
+     if let Some(effect) = app.begin_foreign_resume_detection()
+         && process_effects(vec![effect], &mut tasks, &mut app, &progress_tx)
+     {
+-        return Ok(finish_run(&mut app));
++        return Ok(finish_owned_run(&mut app).await);
+     }
+     schedule_tick(&mut animation_tick_at, &app, tick_interval);
+     let mut resize_debounce_at: Option<Instant> = None;
 @@ -1848,6 +1853,8 @@ pub(crate) async fn run(
      let mut xt_filter = super::xt_filter::XtversionFilter::new();
      let mut bg_update_rx = bg_update_rx;
@@ -2334,6 +2511,15 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc
                  let blocked_for = presenter.mark_blocked_reported();
                  crate::unified_log::warn(
                      "term.writer.blocked",
+@@ -2206,7 +2224,7 @@ pub(crate) async fn run(
+                     if !app.pending_effects.is_empty() {
+                         let effs = std::mem::take(&mut app.pending_effects);
+                         if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+-                            return Ok(finish_run_with_stall_flush(&mut app, &mut stall_rollup));
++                            return Ok(finish_run_with_stall_flush(&mut app, &mut stall_rollup).await);
+                         }
+                     }
+                 }
 @@ -2231,6 +2249,10 @@ pub(crate) async fn run(
              Some(join_result) = tasks.join_next() => {
                  match join_result {
@@ -2457,7 +2643,15 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc
                          app.show_toast(&format!("Connection failed: {error}"));
                          presenter.request(false);
                      }
-@@ -2890,6 +2970,35 @@ pub(crate) async fn run(
+@@ -2883,13 +2963,42 @@ pub(crate) async fn run(
+                 if active_restored {
+                     let drain_effects = dispatch::dispatch(Action::DrainQueue, &mut app);
+                     if process_effects(drain_effects, &mut tasks, &mut app, &progress_tx) {
+-                        return Ok(finish_run_with_stall_flush(&mut app, &mut stall_rollup));
++                        return Ok(finish_run_with_stall_flush(&mut app, &mut stall_rollup).await);
+                     }
+                 }
+ 
                  presenter.request(false);
              }
  
@@ -2505,7 +2699,33 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc
          if let Some(window) = stall_rollup.take_if_elapsed(std::time::Instant::now()) {
              emit_event_loop_stall(window);
          }
-@@ -3906,6 +4020,8 @@ pub(crate) fn session_flags_for_effects(
+@@ -2945,7 +3059,7 @@ pub(crate) async fn run(
+     }
+     flush_pending_stall(&mut stall_rollup);
+     app.notification_service.shutdown();
+-    Ok(finish_run(&mut app))
++    Ok(finish_owned_run(&mut app).await)
+ }
+ /// `[ui]` as it was on disk at startup, or the default if it could not be read.
+ /// Read once for the process: the status line capability is advertised from this at connect and the row is rendered from it later.
+@@ -3088,11 +3202,15 @@ fn flush_pending_stall(stall_rollup: &mut super::event_loop_stall::StallRollup)
+         emit_event_loop_stall(window);
+     }
+ }
+-fn finish_run_with_stall_flush(
++async fn finish_run_with_stall_flush(
+     app: &mut AppView,
+     stall_rollup: &mut super::event_loop_stall::StallRollup,
+ ) -> RunResult {
+     flush_pending_stall(stall_rollup);
++    finish_owned_run(app).await
++}
++async fn finish_owned_run(app: &mut AppView) -> RunResult {
++    super::owned_exit::drain(app).await;
+     finish_run(app)
+ }
+ /// Exit funnel: releases the startup obligation and builds [`ExitInfo`].
+@@ -3906,6 +4024,8 @@ pub(crate) fn session_flags_for_effects(
          screen_mode_label: Some(app.screen_mode.meta_label()),
          is_api_key_auth: app.is_api_key_auth,
          resume_local_miss: app.resume_local_miss.clone(),
@@ -2515,10 +2735,18 @@ index ceaf021a276edb59da392b47fee89f4b45b384b8..9f29135ccb0c64d89802b7e2dfde55fc
  }
  /// Dispatch `action`, re-process `event` through the updated view, return one combined effect list.
 diff --git a/crates/codegen/xai-grok-pager/src/app/mod.rs b/crates/codegen/xai-grok-pager/src/app/mod.rs
-index 7fbb597d14e7773da896b198a7e4abce23f52794..16f2e32a3786edf6de836d98d8da40c4c52996f3 100644
+index 7fbb597d14e7773da896b198a7e4abce23f52794..188f24342cd1b93828739813d90d39ae26529f92 100644
 --- a/crates/codegen/xai-grok-pager/src/app/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/mod.rs
-@@ -70,6 +70,14 @@ mod startup_failure;
+@@ -62,6 +62,7 @@ mod leader_cluster;
+ mod modals;
+ pub(crate) mod mode_switch;
+ mod mouse;
++mod owned_exit;
+ mod queue_edit;
+ mod reader_thread;
+ pub(crate) mod screen_mode_relaunch;
+@@ -70,6 +71,14 @@ mod startup_failure;
  use reader_thread::ReaderThread;
  pub mod signal_handler;
  mod teardown_fence;
@@ -2533,7 +2761,7 @@ index 7fbb597d14e7773da896b198a7e4abce23f52794..16f2e32a3786edf6de836d98d8da40c4
  mod terminal_restore;
  use terminal_restore::{emit_terminal_teardown_sequences, restore_terminal, set_panic_hook};
  #[cfg(test)]
-@@ -824,6 +832,19 @@ pub async fn run(
+@@ -824,6 +833,19 @@ pub async fn run(
      materialize_ctx.restore_progress_on_stdout =
          std::io::IsTerminal::is_terminal(&std::io::stdout());
      let materialized = session_startup::materialize_startup(materialize_ctx, intent).await?;
@@ -2553,7 +2781,7 @@ index 7fbb597d14e7773da896b198a7e4abce23f52794..16f2e32a3786edf6de836d98d8da40c4
      if args.chat()
          && let session_startup::MaterializedStartup::Resume { session_id, .. } = &materialized
      {
-@@ -1125,6 +1146,11 @@ pub async fn run(
+@@ -1125,6 +1147,11 @@ pub async fn run(
      };
      let agent_guard =
          crate::acp::spawn::AgentShutdownGuard::new(cancel.clone(), connection.agent_thread.take());
@@ -2565,6 +2793,206 @@ index 7fbb597d14e7773da896b198a7e4abce23f52794..16f2e32a3786edf6de836d98d8da40c4
      let effective_args = PagerArgs {
          resume_session: None,
          load_session: None,
+diff --git a/crates/codegen/xai-grok-pager/src/app/owned_exit.rs b/crates/codegen/xai-grok-pager/src/app/owned_exit.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..253b1057bffe81aec5b007713be15a4200ce9f0f
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/owned_exit.rs
+@@ -0,0 +1,84 @@
++//! 正常 owned 退出在 IPC 和终端仍附着时等待原生结束通知，不向宿主伪造事件。
++use super::app_view::AppView;
++use agent_client_protocol as acp;
++use anyhow::{Context, Result, ensure};
++use std::time::Duration;
++use xai_acp_lib::{AcpAgentTx, acp_send};
++use xai_grok_shell::session::notification_route::{
++    OWNED_EXIT_BUDGET, OWNED_EXIT_METHOD, OwnedExitRequest,
++};
++
++pub(super) async fn drain(app: &AppView) {
++    let Some(binding) = app.notification_plugin.as_ref() else {
++        return;
++    };
++    if !app.owned_exit_requested
++        || app.quit_for_update
++        || app.relaunch.is_some()
++        || app.reconnect_pending
++    {
++        return;
++    }
++    if app
++        .active_agent()
++        .and_then(|agent| agent.session.session_id.as_ref())
++        .is_none_or(|session| session.0.as_ref() != binding.session_id)
++    {
++        return;
++    }
++    let request = OwnedExitRequest {
++        protocol_version: 1,
++        session_id: binding.session_id.clone(),
++        notification_binding: binding.clone(),
++        meta: None,
++    };
++    if let Err(error) = request_exit(
++        &app.acp_tx,
++        request,
++        OWNED_EXIT_BUDGET + Duration::from_secs(2),
++    )
++    .await
++    {
++        // 失败或超时只结束本地退出等待；连接随后正常关闭并立即撤销旧路由，不重试。
++        tracing::warn!(%error, "owned session exit was not acknowledged");
++    }
++}
++
++async fn request_exit(tx: &AcpAgentTx, request: OwnedExitRequest, budget: Duration) -> Result<()> {
++    let session_id = request.session_id.clone();
++    let params = serde_json::value::to_raw_value(&request)?;
++    // SDK 为扩展方法添加 wire 下划线；不能把内部方法名直接写入原始 JSON-RPC。
++    let request = acp::ExtRequest::new(OWNED_EXIT_METHOD, params.into());
++    let response = tokio::time::timeout(budget, acp_send(request, tx))
++        .await
++        .context("owned exit acknowledgement timed out")??;
++    let response: serde_json::Value = serde_json::from_str(response.0.get())?;
++    ensure!(
++        response.get("error").is_none_or(serde_json::Value::is_null),
++        "owned exit failed"
++    );
++    let result = response
++        .get("result")
++        .context("owned exit result missing")?;
++    ensure!(
++        result
++            .get("protocolVersion")
++            .and_then(serde_json::Value::as_u64)
++            == Some(1)
++            && result.get("sessionId").and_then(serde_json::Value::as_str)
++                == Some(session_id.as_str()),
++        "owned exit identity mismatch"
++    );
++    ensure!(
++        matches!(
++            result.get("outcome").and_then(serde_json::Value::as_str),
++            Some("closed" | "busy")
++        ),
++        "owned exit outcome unavailable"
++    );
++    Ok(())
++}
++
++#[cfg(test)]
++#[path = "owned_exit_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-pager/src/app/owned_exit_tests.rs b/crates/codegen/xai-grok-pager/src/app/owned_exit_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4e1fd2e8adc7014f7de2dbfe1ddc9b2e5e387007
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/owned_exit_tests.rs
+@@ -0,0 +1,104 @@
++use super::*;
++use std::future::{Future, poll_fn};
++use std::pin::Pin;
++use std::task::Poll;
++use xai_acp_lib::AcpAgentMessage;
++use xai_grok_shell::session::notification_plugin::NotificationPlugin;
++
++async fn poll_once<F: Future>(mut future: Pin<&mut F>) -> Poll<F::Output> {
++    poll_fn(|ctx| Poll::Ready(future.as_mut().poll(ctx))).await
++}
++
++fn request() -> OwnedExitRequest {
++    let sid = uuid::Uuid::new_v4().to_string();
++    OwnedExitRequest {
++        protocol_version: 1,
++        session_id: sid.clone(),
++        meta: None,
++        notification_binding: NotificationPlugin {
++            version: 1,
++            session_id: sid,
++            cwd: std::env::temp_dir(),
++            plugin_dir: std::env::temp_dir().join("synthetic-plugin"),
++            files: Default::default(),
++        },
++    }
++}
++
++fn response(sid: &str, outcome: &str) -> acp::ExtResponse {
++    acp::ExtResponse::new(
++        serde_json::value::to_raw_value(&serde_json::json!({
++            "result":{"protocolVersion":1,"sessionId":sid,"outcome":outcome}
++        }))
++        .unwrap()
++        .into(),
++    )
++}
++
++#[tokio::test]
++async fn owned_exit_waits_for_exact_native_ack_before_returning() {
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let req = request();
++    let sid = req.session_id.clone();
++    let mut exit = std::pin::pin!(request_exit(&tx, req, Duration::from_secs(1)));
++    assert!(matches!(poll_once(exit.as_mut()).await, Poll::Pending));
++    let Some(AcpAgentMessage::ExtMethod(call)) = rx.recv().await else {
++        panic!("必须使用原生扩展请求");
++    };
++    assert_eq!(call.request.method.as_ref(), OWNED_EXIT_METHOD);
++    let params: OwnedExitRequest = serde_json::from_str(call.request.params.get()).unwrap();
++    assert_eq!(params.session_id, sid);
++    assert!(params.meta.is_none());
++    assert!(matches!(poll_once(exit.as_mut()).await, Poll::Pending));
++    call.response_tx.send(Ok(response(&sid, "closed"))).unwrap();
++    exit.await.unwrap();
++    assert!(rx.try_recv().is_err(), "退出不得重试或提交输入");
++}
++
++#[tokio::test]
++async fn owned_exit_busy_ack_keeps_detach_semantics() {
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let req = request();
++    let sid = req.session_id.clone();
++    let mut exit = std::pin::pin!(request_exit(&tx, req, Duration::from_secs(1)));
++    assert!(matches!(poll_once(exit.as_mut()).await, Poll::Pending));
++    let Some(AcpAgentMessage::ExtMethod(call)) = rx.recv().await else {
++        panic!("缺少退出请求");
++    };
++    call.response_tx.send(Ok(response(&sid, "busy"))).unwrap();
++    exit.await.unwrap();
++    assert!(rx.try_recv().is_err());
++}
++
++#[tokio::test]
++async fn owned_exit_wrong_session_and_unsupported_leader_are_not_success() {
++    for unsupported in [false, true] {
++        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++        let mut exit = std::pin::pin!(request_exit(&tx, request(), Duration::from_secs(1)));
++        assert!(matches!(poll_once(exit.as_mut()).await, Poll::Pending));
++        let Some(AcpAgentMessage::ExtMethod(call)) = rx.recv().await else {
++            panic!("缺少退出请求");
++        };
++        let reply = if unsupported {
++            Err(acp::Error::method_not_found())
++        } else {
++            Ok(response("wrong", "closed"))
++        };
++        call.response_tx.send(reply).unwrap();
++        assert!(exit.await.is_err());
++        assert!(rx.try_recv().is_err());
++    }
++}
++
++#[tokio::test]
++async fn owned_exit_missing_ack_is_bounded_without_retry() {
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let mut exit = std::pin::pin!(request_exit(&tx, request(), Duration::from_millis(20)));
++    assert!(matches!(poll_once(exit.as_mut()).await, Poll::Pending));
++    let Some(AcpAgentMessage::ExtMethod(call)) = rx.recv().await else {
++        panic!("缺少退出请求");
++    };
++    assert!(exit.await.is_err());
++    assert!(call.response_tx.is_closed());
++    assert!(rx.try_recv().is_err());
++}
 diff --git a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs b/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
 index e1077eb31a632e49b9c0effb632ec1f79364cf66..6f8d12638be1f2adb4275ea2d232eec5283ff3c8 100644
 --- a/crates/codegen/xai-grok-pager/src/app/status_line_policy.rs
@@ -7884,10 +8312,20 @@ index 7c3d22881ad4741ad387853d5dacd10e5ac1b8d2..5e57ce92d682275b51a7097b414cb1f3
  name = "test_startup_prefetch_fallback"
  required-features = ["test-support"]
 diff --git a/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs b/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
-index dc0ceefe97afa923ab05d662159047653c0e5d94..c37093d54bff484a9e60dc0281af6230ae00fc64 100644
+index dc0ceefe97afa923ab05d662159047653c0e5d94..11984af3f67fa290b30b465a6003051c227639c0 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
-@@ -56,6 +56,8 @@ async fn handle_roster_list(
+@@ -30,6 +30,9 @@ pub(crate) async fn handle(
+     match args.method.as_ref() {
+         "x.ai/session/info" => handle_session_info(agent, args).await,
+         "x.ai/session/close" => handle_session_close(agent, args).await,
++        crate::session::notification_route::OWNED_EXIT_METHOD => {
++            handle_owned_exit(agent, args).await
++        }
+         "x.ai/session/list" => handle_session_list(agent, args).await,
+         "x.ai/sessions/list" => handle_roster_list(agent, args).await,
+         m if m.starts_with("x.ai/session_summaries/") => {
+@@ -56,6 +59,8 @@ async fn handle_roster_list(
  #[serde(rename_all = "camelCase")]
  struct SessionInfoRequest {
      session_id: Option<String>,
@@ -7896,7 +8334,7 @@ index dc0ceefe97afa923ab05d662159047653c0e5d94..c37093d54bff484a9e60dc0281af6230
  }
  
  #[derive(Deserialize)]
-@@ -70,6 +72,24 @@ async fn handle_session_info(
+@@ -70,6 +75,24 @@ async fn handle_session_info(
      let req: SessionInfoRequest = serde_json::from_str(args.params.get())
          .map_err(|e| acp::Error::invalid_params().data(format!("invalid params: {e}")))?;
  
@@ -7921,21 +8359,41 @@ index dc0ceefe97afa923ab05d662159047653c0e5d94..c37093d54bff484a9e60dc0281af6230
      let session_id = req.session_id.or_else(|| {
          agent
              .resident_ids()
+@@ -330,3 +353,18 @@ pub(crate) async fn handle_list_sessions(
+         .next_cursor(result.next_cursor)
+         .meta(meta))
+ }
++
++/// 该请求必须已经由 leader 的真实通知连接写入内部授权代际。
++async fn handle_owned_exit(
++    agent: &MvpAgent,
++    args: &acp::ExtRequest,
++) -> Result<acp::ExtResponse, acp::Error> {
++    let request: crate::session::notification_route::OwnedExitRequest =
++        serde_json::from_str(args.params.get()).map_err(|_| acp::Error::invalid_params())?;
++    let outcome = agent.finish_owned_exit(&request).await?;
++    ExtMethodResult::success(
++        serde_json::json!({"protocolVersion":1,"sessionId":request.session_id,"outcome":outcome}),
++    )
++    .to_ext_response()
++    .map_err(|_| acp::Error::internal_error())
++}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-index 094085e49711c48227827fa1d4dd44447f301d58..142122b053e48943aee6a47336ea17eefa83a5a2 100644
+index 094085e49711c48227827fa1d4dd44447f301d58..4e3d37f57bcaa47663f06c26a5ca2c401bd6c70f 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-@@ -573,6 +573,9 @@ impl acp::Agent for MvpAgent {
+@@ -573,6 +573,10 @@ impl acp::Agent for MvpAgent {
                      // `session/new` / `session/load` accept per-session plugin roots in `_meta.pluginDirs`
                      // The SDKs gate `GrokOptions.plugins` on this
                      (SESSION_PLUGIN_DIRS_CAPABILITY_KEY): true,
 +                    (crate::session::notification_plugin::META_KEY): 1,
 +                    "infinishell/ownedSessionIdentity": 1,
++                    "infinishell/ownedSessionExit": 1,
 +                    "infinishell/ownedInputPrecondition": 1,
                      "currentWorkingDirectory": current_working_directory.to_string_lossy().to_string(),
                      "agentVersion": xai_grok_version::VERSION,
                      "agentId": agent_id(),
-@@ -999,6 +1002,8 @@ impl acp::Agent for MvpAgent {
+@@ -999,6 +1003,8 @@ impl acp::Agent for MvpAgent {
          mut arguments: acp::PromptRequest,
      ) -> Result<acp::PromptResponse, acp::Error> {
          use crate::session::plan_mode::PromptMode;
@@ -7944,7 +8402,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..142122b053e48943aee6a47336ea17ee
          if let Some(meta) = arguments.meta.as_ref() {
              xai_grok_otel::link_current_span_to_meta(
                  &serde_json::Value::Object(meta.clone()),
-@@ -1355,7 +1360,55 @@ impl acp::Agent for MvpAgent {
+@@ -1355,7 +1361,55 @@ impl acp::Agent for MvpAgent {
              .as_ref()
              .map(|ctx| ctx.artifact_upload_context());
          let traceparent = xai_grok_otel::current_traceparent();
@@ -8001,7 +8459,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..142122b053e48943aee6a47336ea17ee
              handle
                  .cmd_tx
                  .send(SessionCommand::Prompt {
-@@ -1969,6 +2022,42 @@ impl acp::Agent for MvpAgent {
+@@ -1969,11 +2023,48 @@ impl acp::Agent for MvpAgent {
          let mut backend_no_bridge_err: Option<acp::Error> = None;
          let method = args.method.clone();
          let result = match method.as_ref() {
@@ -8044,6 +8502,13 @@ index 094085e49711c48227827fa1d4dd44447f301d58..142122b053e48943aee6a47336ea17ee
              "x.ai/getApiKey" | "x.ai/setApiKey" => {
                  crate::extensions::auth::handle(self, &args).await
              }
+             "x.ai/session/info" | "x.ai/session/close" | "x.ai/session/list"
+-            | "x.ai/sessions/list" => {
++            | "x.ai/sessions/list"
++            | crate::session::notification_route::OWNED_EXIT_METHOD => {
+                 crate::agent::handlers::session::handle(self, &args).await
+             }
+             "x.ai/workspaces/list" => {
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs
 index f3a0e56386cc814e2d130e4c56d2aa6305648260..1b170dbb4f56316ed79a7f0a37c778252a454ee5 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/agent_ops.rs
@@ -8056,6 +8521,139 @@ index f3a0e56386cc814e2d130e4c56d2aa6305648260..1b170dbb4f56316ed79a7f0a37c77825
                  source: source.to_string(),
              });
          self.notify_session_cwd_for_watch(std::path::Path::new(&session_info.cwd));
+diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_exit_tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_exit_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..85ef1574f5858170a3c9ca3529f227bfc64a5463
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_exit_tests.rs
+@@ -0,0 +1,127 @@
++//! handler 必须等待原 actor 线程退出，之后才关闭工具 scope；busy 不触发 Shutdown。
++use super::*;
++use crate::session::notification_route::owned_identity_fixture::Fixture;
++use futures::poll;
++use std::task::Poll;
++
++async fn close_owned(
++    agent: &MvpAgent,
++    request: &crate::session::notification_route::OwnedExitRequest,
++) -> acp::Result<String> {
++    use acp::Agent as _;
++    let response = agent
++        .ext_method(acp::ExtRequest::new(
++            crate::session::notification_route::OWNED_EXIT_METHOD,
++            serde_json::value::to_raw_value(request).unwrap().into(),
++        ))
++        .await?;
++    let reply: serde_json::Value = serde_json::from_str(response.0.get()).unwrap();
++    assert_eq!(reply["result"]["sessionId"], request.session_id);
++    assert_eq!(reply["result"]["protocolVersion"], 1);
++    Ok(reply["result"]["outcome"].as_str().unwrap().to_owned())
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_handler_waits_for_original_thread_before_closing_scope() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let sid = acp::SessionId::new(request.session_id.clone());
++    let agent = build_minimal_agent_for_tests();
++    let (mut handle, _, mut rx) = make_live_session_handle(&sid, None);
++    let scope = xai_grok_tools::util::ProcessScope::new();
++    handle.tool_context.process_scope = Some(scope.clone());
++    agent.insert_resident(&sid, handle);
++    let (release, wait) = std::sync::mpsc::channel::<()>();
++    agent.session_registry.set_thread(
++        &sid,
++        crate::session::SessionThread::from_handle(std::thread::spawn(move || {
++            let _ = wait.recv_timeout(std::time::Duration::from_secs(5));
++        })),
++    );
++    let mut close = std::pin::pin!(close_owned(&agent, &request));
++    assert!(matches!(poll!(&mut close), Poll::Pending));
++    let Some(TestSessionCommand::PrepareOwnedExit { respond_to, .. }) = rx.recv().await else {
++        panic!("只应派发 idle 原子接收，不应取消正在运行的回合");
++    };
++    rx.close();
++    respond_to.send(Ok(true)).unwrap();
++    assert!(matches!(poll!(&mut close), Poll::Pending));
++    agent.sweep_dead_sessions();
++    assert!(!scope.is_closed());
++    assert!(agent.is_resident(&sid));
++    assert!(
++        crate::session::notification_route::provider(&sid.0)
++            .environment(fixture.binding().plugin_dir.to_str().unwrap())
++            .is_some()
++    );
++    release.send(()).unwrap();
++    assert_eq!(
++        tokio::time::timeout(std::time::Duration::from_secs(2), close)
++            .await
++            .unwrap()
++            .unwrap(),
++        "closed"
++    );
++    assert!(scope.is_closed());
++    assert!(!agent.is_resident(&sid));
++    agent.sweep_dead_sessions();
++    assert!(!agent.session_registry.has_thread(&sid));
++    fixture.close().await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_handler_busy_preserves_original_scope_and_residency() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let sid = acp::SessionId::new(request.session_id.clone());
++    let agent = build_minimal_agent_for_tests();
++    let (mut handle, _, mut rx) = make_live_session_handle(&sid, Some("live-turn"));
++    let scope = xai_grok_tools::util::ProcessScope::new();
++    handle.tool_context.process_scope = Some(scope.clone());
++    agent.insert_resident(&sid, handle);
++    let mut close = std::pin::pin!(close_owned(&agent, &request));
++    assert!(matches!(poll!(&mut close), Poll::Pending));
++    let Some(TestSessionCommand::PrepareOwnedExit { respond_to, .. }) = rx.recv().await else {
++        panic!("缺少原子接收请求");
++    };
++    respond_to.send(Ok(false)).unwrap();
++    assert_eq!(close.await.unwrap(), "busy");
++    assert!(!scope.is_closed());
++    assert!(agent.is_resident(&sid));
++    assert!(rx.try_recv().is_err(), "busy 不应收到 Cancel 或 Shutdown");
++    assert!(
++        crate::session::notification_route::owned_binding(&sid.0, &fixture.binding().cwd).is_ok()
++    );
++    agent.take_session(&sid);
++    fixture.close().await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_old_handler_cannot_close_replacement_actor() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let sid = acp::SessionId::new(request.session_id.clone());
++    let agent = build_minimal_agent_for_tests();
++    let (mut original, _, mut rx) = make_live_session_handle(&sid, None);
++    let original_scope = xai_grok_tools::util::ProcessScope::new();
++    original.tool_context.process_scope = Some(original_scope.clone());
++    agent.insert_resident(&sid, original);
++    let mut close = std::pin::pin!(close_owned(&agent, &request));
++    assert!(matches!(poll!(&mut close), Poll::Pending));
++    let Some(TestSessionCommand::PrepareOwnedExit { respond_to, .. }) = rx.recv().await else {
++        panic!("缺少退出请求");
++    };
++    rx.close();
++    respond_to.send(Ok(true)).unwrap();
++    let (mut replacement, _, replacement_rx) = make_live_session_handle(&sid, None);
++    let replacement_scope = xai_grok_tools::util::ProcessScope::new();
++    replacement.tool_context.process_scope = Some(replacement_scope.clone());
++    agent.insert_resident(&sid, replacement);
++    assert!(close.await.is_err());
++    assert!(original_scope.is_closed());
++    assert!(!replacement_scope.is_closed());
++    assert!(agent.is_resident(&sid));
++    assert!(!replacement_rx.is_closed());
++    agent.take_session(&sid);
++    fixture.close().await;
++}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_identity_tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_identity_tests.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..a4fd006e4fd4a63adefef9c4defae46e7bf03ee7
@@ -8157,8 +8755,104 @@ index 0000000000000000000000000000000000000000..a4fd006e4fd4a63adefef9c4defae46e
 +    assert!(rx.try_recv().is_err());
 +    assert_eq!(agent.resident_ids(), vec![sid]);
 +}
+diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_lifecycle.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_lifecycle.rs
+index 56bbc944835f1a58aeef1b4cc3631a290540e76d..e46af0868f29a79804e90db568d3fbe79e18f4eb 100644
+--- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_lifecycle.rs
++++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_lifecycle.rs
+@@ -63,6 +63,80 @@ impl MvpAgent {
+                 .send(SessionCommand::Shutdown(ShutdownKind::Graceful));
+         }
+     }
++    /// 正常 owned 退出先排空 actor，再关闭原 scope；通用 close 和异常断连不走此分支。
++    pub(crate) async fn finish_owned_exit(
++        &self,
++        request: &crate::session::notification_route::OwnedExitRequest,
++    ) -> Result<&'static str, acp::Error> {
++        use crate::session::notification_route::{OWNED_EXIT_BUDGET, OwnedExitGuard};
++        let mut exit = OwnedExitGuard::claim(request).map_err(|_| acp::Error::invalid_params())?;
++        let id = acp::SessionId::new(request.session_id.clone());
++        let deadline = tokio::time::Instant::now() + OWNED_EXIT_BUDGET;
++        self.wait_for_load_to_settle(&id, stage_budget(deadline, CLOSE_ATTACH_SETTLE_WAIT))
++            .await;
++        if self.session_registry.is_attaching(&id) {
++            return Err(acp::Error::invalid_params());
++        }
++        let intake = self.dispatch_lock(&id);
++        let _intake = tokio::time::timeout_at(deadline, intake.lock())
++            .await
++            .map_err(|_| acp::Error::internal_error())?;
++        let handle = self
++            .resident_handle(&id)
++            .ok_or_else(acp::Error::invalid_params)?;
++        let target = handle.cmd_tx.clone();
++        let scope = handle.tool_context.process_scope.clone();
++        let (tx, rx) = tokio::sync::oneshot::channel();
++        target
++            .send(SessionCommand::PrepareOwnedExit {
++                token: exit.token(),
++                respond_to: tx,
++            })
++            .map_err(|_| acp::Error::invalid_params())?;
++        let result = tokio::time::timeout_at(deadline, async {
++            let accepted = rx.await.map_err(|_| acp::Error::invalid_params())??;
++            if !accepted {
++                return Ok(false);
++            }
++            loop {
++                if !self
++                    .resident_handle(&id)
++                    .is_some_and(|current| current.cmd_tx.same_channel(&target))
++                {
++                    return Err(acp::Error::invalid_params());
++                }
++                match self.session_registry.thread_is_finished(&id) {
++                    Some(true) => return Ok(true),
++                    Some(false) => tokio::time::sleep(std::time::Duration::from_millis(10)).await,
++                    None => return Err(acp::Error::internal_error()),
++                }
++            }
++        })
++        .await
++        .unwrap_or_else(|_| Err(acp::Error::internal_error()));
++        if matches!(result, Ok(false)) {
++            exit.detach_busy();
++            return Ok("busy");
++        }
++        // 接收后邮箱已封闭；超时也只回收原 actor 的 scope，不取消 busy 分支的回合。
++        if target.is_closed() {
++            if let Some(scope) = scope {
++                scope.kill_all();
++            }
++            if self
++                .resident_handle(&id)
++                .is_some_and(|current| current.cmd_tx.same_channel(&target))
++                && !self.session_registry.is_attaching(&id)
++            {
++                self.retire_root_session(&id);
++                self.take_session(&id);
++                self.session_registry.remove_retired_root(&id);
++                self.session_registry.clear_resident(&id);
++                self.set_session_live_state(&id, SessionLiveState::Dormant);
++            }
++        }
++        result.map(|_| "closed")
++    }
+     /// ACP `session/close` and its pre-ACP spelling.
+     /// Close waits its turn behind prompt intake; every wait spends from [`CLOSE_TOTAL_BUDGET`].
+     pub(crate) async fn close_active_session(&self, id: &acp::SessionId) -> CloseOutcome {
+@@ -514,6 +588,10 @@ impl MvpAgent {
+         self.session_registry.reap_retired_threads();
+         let dead = self.session_registry.finished_threads();
+         for id in dead {
++            if crate::session::notification_route::exit_pending(&id.0) {
++                // 正常 owned 退出的请求持有有界回收责任；不能在 hook 完成前当作崩溃抢收。
++                continue;
++            }
+             if self.session_registry.live(&id) == Some(SessionLiveState::Attaching)
+                 && !self.is_resident(&id)
+             {
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs
-index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed84545eac16d 100644
+index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..a9d50d7737503d5844d46f1f32802dead6e7c84a 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs
 @@ -473,12 +473,19 @@ impl MvpAgent {
@@ -8190,7 +8884,22 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
          Ok(acp::NewSessionResponse::new(session_id)
              .models(Some(models))
              .config_options(Some(config_options))
-@@ -960,9 +968,15 @@ impl MvpAgent {
+@@ -931,7 +939,13 @@ impl MvpAgent {
+         op: AttachOperation,
+     ) -> Result<acp::LoadSessionResponse, acp::Error> {
+         let attach_started_at = std::time::Instant::now();
+-        let load_guard = self.begin_session_load(&arguments.session_id);
++        let load_guard = {
++            // 与 leader 的退出 fence 同锁发布 attach；退出不能错关后来装载的同 SID。
++            let _open =
++                crate::session::notification_route::session_open_guard(&arguments.session_id.0)
++                    .map_err(|_| acp::Error::invalid_params())?;
++            self.begin_session_load(&arguments.session_id)
++        };
+         reject_chat_kind_without_feature(arguments.meta.as_ref())?;
+         let live_cwd = AbsPathBuf::new(arguments.cwd.clone())
+             .map_err(|e| acp::Error::invalid_params().data(e.to_string()))?;
+@@ -960,9 +974,15 @@ impl MvpAgent {
              session_id,
              cwd,
              mcp_servers: client_mcp_servers,
@@ -8207,7 +8916,7 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
          let policy = AttachPolicy::resolve(op, request_meta.as_ref(), self.restore_code);
          let SessionWorkspace {
              cwd,
-@@ -1191,6 +1205,11 @@ impl MvpAgent {
+@@ -1191,6 +1211,11 @@ impl MvpAgent {
              .map(|s| s.to_string())
              .or_else(|| summary.prompt_display_cwd.clone());
          let restored_from_disk = if !self.is_resident(&session_id) {
@@ -8219,7 +8928,7 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
              tracing::info!(
                  session_id = %session_id.0,
                  "load_session: spawning new session actor (session not in memory)"
-@@ -1416,8 +1435,23 @@ impl MvpAgent {
+@@ -1416,8 +1441,23 @@ impl MvpAgent {
              attach_started_at.elapsed(),
              restored_from_disk,
          );
@@ -8244,7 +8953,7 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
      async fn restore_session_code(
          &self,
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
-index 31676cc8adb8fefe81a76ba015de81de5685d244..0ecbf7f713603ef6feb56cd49afdfa053c8e3583 100644
+index 31676cc8adb8fefe81a76ba015de81de5685d244..862162f2da442e2898f75306a71a7711ea213e6d 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
 @@ -1189,7 +1189,7 @@ fn make_test_handle(
@@ -8286,13 +8995,17 @@ index 31676cc8adb8fefe81a76ba015de81de5685d244..0ecbf7f713603ef6feb56cd49afdfa05
          )),
          force_compact: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
          permission_handle: xai_grok_workspace::permission::PermissionHandle::allow_all(),
-@@ -8885,3 +8885,6 @@ fn user_message_echo_session_meta_outranks_the_client_that_started_the_process()
+@@ -8885,3 +8885,10 @@ fn user_message_echo_session_meta_outranks_the_client_that_started_the_process()
      assert!(!wanted(Some(acp::Meta::new()), says_nothing()));
      assert!(!wanted(None, says_nothing()));
  }
 +
 +#[path = "owned_identity_tests.rs"]
 +mod owned_identity_tests;
++
++#[cfg(unix)]
++#[path = "owned_exit_tests.rs"]
++mod owned_exit_tests;
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/mod.rs b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 index 063a4934d6979db4c93e5c1a7ff45df060c7c121..30b72bd3d90de306abcb8e736405c4cb1ebc1555 100644
 --- a/crates/codegen/xai-grok-shell/src/extensions/mod.rs
@@ -9503,7 +10216,7 @@ index 56ce8c0172a5f0d057f1535232c6a3160fe1e7c7..a3760f7fdc18bba0c37c37d0ada3730c
              // \\.\pipe\grok-leader- (20 chars) + 16 hex chars = 36 total
              assert!(name.len() <= 256, "pipe name too long: {}", name.len());
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session.rs b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
-index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345ec547c17 100644
+index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc3e0e8f7e 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 @@ -141,6 +141,8 @@ use queue_mutation::{InputOrigin, QueueMutationPolicy};
@@ -9533,7 +10246,16 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345
      pub(crate) pending_notifications: Vec<PendingNotification>,
      /// Prompt ids under composer edit, stamped (and re-stamped) by `hold_edit`.
      /// Held followers are skipped by combine; a live held front blocks promote.
-@@ -1743,6 +1749,9 @@ mod prompt_mode_transition_tests;
+@@ -1066,6 +1072,8 @@ pub(crate) struct SessionActor {
+     /// Set once by [`turn_end_hooks::TurnEndQueue::spawn`]; `None` before the loop starts.
+     pub(crate) turn_end_tx:
+         std::cell::RefCell<Option<tokio::sync::mpsc::UnboundedSender<turn_end_hooks::QueueItem>>>,
++    /// 退出通知只可使用接收关闭请求时的原生路由代际。
++    pub(crate) owned_exit_token: std::cell::RefCell<Option<super::notification_route::OwnedExitToken>>,
+     /// Client hooks from `session/new` `_meta["x.ai/hooks"]`; gated in [`crate::session::acp_session::hooks`].
+     /// `RefCell` so `load_session` reconnect can replace the set on the live actor (see `SessionCommand::SetClientHooks`).
+     pub(crate) client_hooks: std::cell::RefCell<crate::extensions::hooks::ClientHooks>,
+@@ -1743,6 +1751,9 @@ mod prompt_mode_transition_tests;
  #[cfg(test)]
  #[path = "acp_session_tests/prompt_queue_actor_tests.rs"]
  mod prompt_queue_actor_tests;
@@ -9543,7 +10265,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345
  /// Regression coverage for the per-turn `record_token_usage` path.
  #[cfg(test)]
  #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
-@@ -1868,6 +1877,7 @@ mod tool_meta_stamp_tests {
+@@ -1868,6 +1879,7 @@ mod tool_meta_stamp_tests {
                      cmd_tx: perm_tx,
                      yolo_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                      auto_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -9551,7 +10273,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345
                      side_query_wired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                      yolo_pin: None,
                      deny_read_globs: Arc::new(vec![]),
-@@ -2281,3 +2291,7 @@ mod recap_display_only_tests;
+@@ -2281,3 +2293,11 @@ mod recap_display_only_tests;
  #[cfg(test)]
  #[path = "acp_session_tests/reminder_policy_tests.rs"]
  mod reminder_policy_tests;
@@ -9559,15 +10281,22 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345
 +#[cfg(all(test, unix))]
 +#[path = "acp_session_tests/owned_identity_tests.rs"]
 +mod owned_identity_tests;
++
++#[cfg(all(test, unix))]
++#[path = "acp_session_tests/owned_exit_tests.rs"]
++mod owned_exit_tests;
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs
-index 55150bdb00654f2e04b722d86c371ae0a1ef4f96..0a7a9f0c677bb2c03b98d2c1831fffa9575c1a72 100644
+index 55150bdb00654f2e04b722d86c371ae0a1ef4f96..fdb95eebbd43c3faa573c238bc60c9d51de5a0df 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs
-@@ -107,6 +107,7 @@ impl SessionActor {
+@@ -107,6 +107,10 @@ impl SessionActor {
      /// One context per dispatch; the announced count and the run loop filter on the same disabled-hooks snapshot.
      pub(super) fn hook_run_ctx(&self) -> xai_grok_hooks::runner::RunContext<'_> {
          xai_grok_hooks::runner::RunContext {
-+            notification_route: Some(crate::session::notification_route::provider(&self.session_info.id.0)),
++            notification_route: Some(self.owned_exit_token.borrow().as_ref().map_or_else(
++                || crate::session::notification_route::provider(&self.session_info.id.0),
++                crate::session::notification_route::provider_for_exit,
++            )),
              session_id: &self.session_info.id.0,
              workspace_root: &self.hook_resolved_workspace_root,
              process_scope: self.tool_context.process_scope.clone(),
@@ -9791,10 +10520,10 @@ index 2033b2b8bf4762201b6a6586065ffe2823bf159f..d0f6bfa4d744aee420124fa7d6785da5
          self.events
              .emit(crate::session::events::Event::Interjected {
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
-index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667ce44e9279 100644
+index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..f2aad21852e0971cacc0ee16bf498fa726b737fb 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
-@@ -46,33 +46,43 @@ const DEFERRED_START_CANCEL_JOIN: std::time::Duration = std::time::Duration::fro
+@@ -46,33 +46,65 @@ const DEFERRED_START_CANCEL_JOIN: std::time::Duration = std::time::Duration::fro
  pub(super) struct DeferredStart {
      cancel: tokio_util::sync::CancellationToken,
      task: Option<tokio_util::task::AbortOnDropHandle<()>>,
@@ -9844,10 +10573,54 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667c
 +#[cfg(test)]
 +#[path = "run_loop_notification_tests.rs"]
 +mod notification_tests;
++/// 与队列接收共用 state→route 顺序；锁内无 await，也不重开已关闭的工具 scope。
++async fn admit_owned_exit(
++    session: &SessionActor,
++    token: &crate::session::notification_route::OwnedExitToken,
++) -> Result<bool, acp::Error> {
++    let state = session.state.lock().await;
++    let _route = crate::session::notification_route::verify_exit(
++        token,
++        &session.session_info.id.0,
++        std::path::Path::new(&session.session_info.cwd),
++    )
++    .map_err(|_| acp::Error::invalid_params())?;
++    Ok(!state_is_busy(&state)
++        && session
++            .active_work
++            .load(std::sync::atomic::Ordering::Acquire)
++            == 0
++        && !crate::session::pending_interaction::has_parked_plan_approval(
++            &session.pending_interactions,
++        ))
++}
++
  /// SessionEnd hooks and stop dispatch.
  /// Shared so the channel-closed and Shutdown paths cannot drift on hook ordering (memory save still runs after this).
  pub(super) async fn fire_session_end_hooks(
-@@ -722,6 +732,47 @@ pub(super) async fn run_session(
+@@ -685,7 +717,21 @@ pub(super) async fn run_session(
+                         return;
+                     };
+ 
++                    let cmd = if let SessionCommand::PrepareOwnedExit { token, respond_to } = cmd {
++                        let result = admit_owned_exit(&session, &token).await;
++                        let accepted = matches!(result, Ok(true));
++                        if respond_to.send(result).is_err() || !accepted {
++                            continue;
++                        }
++                        *session.owned_exit_token.borrow_mut() = Some(token);
++                        // 原子闲置判定后不再处理后续输入；已排队输入已使判定返回 busy。
++                        cmd_rx.close();
++                        SessionCommand::Shutdown(crate::session::ShutdownKind::Graceful)
++                    } else { cmd };
+                     match cmd {
++                        SessionCommand::PrepareOwnedExit { respond_to, .. } => {
++                            let _ = respond_to.send(Err(acp::Error::internal_error()));
++                        }
+                         SessionCommand::Initialize { system_prompt } => {
+                             session.initialize(system_prompt).await;
+                             let s = session.clone();
+@@ -722,6 +768,47 @@ pub(super) async fn run_session(
                          SessionCommand::SetToolOverrides { overrides } => {
                              session.set_tool_overrides(overrides);
                          }
@@ -9895,7 +10668,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667c
                          SessionCommand::Prompt { prompt_id, prompt_blocks, prompt_mode, artifact_upload_ctx, client_identifier, screen_mode, verbatim, traceparent, json_schema, send_now, admission, tool_overrides_update, respond_to, prompt_admitted, persist_ack, parsed_prompt_tx } => {
                              let origin = super::PromptOrigin::from_prompt_id(&prompt_id);
                              let (actor_admitted, task_wake_fallback) = match admission {
-@@ -907,6 +958,9 @@ pub(super) async fn run_session(
+@@ -907,6 +994,9 @@ pub(super) async fn run_session(
                              let info = session.build_session_info().await;
                              let _ = responds_to.send(info);
                          }
@@ -9905,7 +10678,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667c
                          SessionCommand::BackgroundForegroundCommand { tool_call_id, respond_to } => {
                              let result = session.agent.borrow().tool_bridge()
                                  .background_foreground_command(&tool_call_id)
-@@ -1915,7 +1969,7 @@ pub(super) async fn run_session(
+@@ -1915,7 +2005,7 @@ pub(super) async fn run_session(
                                  s.reload_skills_from_disk().await;
                              });
                          }
@@ -9914,7 +10687,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667c
                              // Observe hooks cannot gate; don't hold session/new on the command loop.
                              if !deferred_start.cancel.is_cancelled() {
                                  let s = session.clone();
-@@ -1926,19 +1980,27 @@ pub(super) async fn run_session(
+@@ -1926,19 +2016,27 @@ pub(super) async fn run_session(
                                              if cancel.is_cancelled() {
                                                  return;
                                              }
@@ -9951,7 +10724,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667c
                                              let ctx = s.hook_run_ctx();
                                              let results =
                                                  xai_grok_hooks::dispatcher::dispatch_non_blocking(
-@@ -1965,7 +2027,7 @@ pub(super) async fn run_session(
+@@ -1965,7 +2063,7 @@ pub(super) async fn run_session(
                                      })
                                      .await;
                                  });
@@ -10024,7 +10797,7 @@ index 0000000000000000000000000000000000000000..16bcca9661b0785888ac30c4e75d5604
 +    assert!(start.notification_task.is_none());
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
-index 380683fa095ec19e8cded8cf8b61ff7e86856b07..12c6f0c6639d5929a026c2b0200a79fe3ca0ee14 100644
+index 380683fa095ec19e8cded8cf8b61ff7e86856b07..b9cc11f5c04b3da564a4b04ebc40fa2cc3769de4 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
 @@ -9,6 +9,9 @@ use crate::agent::remote_config::task_model_policy::{
@@ -10109,6 +10882,14 @@ index 380683fa095ec19e8cded8cf8b61ff7e86856b07..12c6f0c6639d5929a026c2b0200a79fe
      let upload_queue = Arc::new(std::sync::OnceLock::new());
      let (goal_update_tx, goal_update_rx) = tokio::sync::mpsc::unbounded_channel::<
          xai_grok_tools::implementations::grok_build::update_goal::UpdateGoalEnvelope,
+@@ -2028,6 +2069,7 @@ pub(crate) async fn spawn_session_actor(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: std::cell::RefCell::new(client_hooks),
+         hook_resolved_workspace_root: resolved_workspace_root,
+         hook_load_errors: std::cell::RefCell::new(_hook_load_errors),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97e33e3785
@@ -10329,7 +11110,7 @@ index 8bfce957a4ce877af1e1ac59997fe0b37c1b960c..499c14f0d3a2de1cc63b840551f6dab7
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
-index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602cda730a4 100644
+index 01985cf0871d2b7b153201236f5e408bdd146357..daf69d51b8c9f597cff837e5541e2e4befd4eee0 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/cancel_running_task_tests.rs
 @@ -101,6 +101,7 @@ async fn persist_ack_waits_for_disk_flush_before_success() {
@@ -10340,7 +11121,15 @@ index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602
                      pending_inputs: VecDeque::new(),
                      edit_holds: HashMap::new(),
                      pending_notifications: Vec::new(),
-@@ -648,6 +649,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
+@@ -295,6 +296,7 @@ async fn persist_ack_waits_for_disk_flush_before_success() {
+                 turn_report: Default::default(),
+                 turn_abort: Default::default(),
+                 turn_end_tx: Default::default(),
++                owned_exit_token: Default::default(),
+                 client_hooks: Default::default(),
+                 hook_resolved_workspace_root: String::new(),
+                 hook_load_errors: std::cell::RefCell::new(Vec::new()),
+@@ -648,6 +650,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
                      running_task: None,
                      finalization_gate: Default::default(),
                      message_delivery: Default::default(),
@@ -10348,7 +11137,15 @@ index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602
                      pending_inputs: VecDeque::new(),
                      edit_holds: HashMap::new(),
                      pending_notifications: Vec::new(),
-@@ -960,6 +962,7 @@ async fn cancel_running_task_teardown_clears_running_and_pending_work() {
+@@ -845,6 +848,7 @@ async fn first_turn_memory_injection_disabled_does_not_persist_to_chat_history()
+                 turn_report: Default::default(),
+                 turn_abort: Default::default(),
+                 turn_end_tx: Default::default(),
++                owned_exit_token: Default::default(),
+                 client_hooks: Default::default(),
+                 hook_resolved_workspace_root: String::new(),
+                 hook_load_errors: std::cell::RefCell::new(Vec::new()),
+@@ -960,6 +964,7 @@ async fn cancel_running_task_teardown_clears_running_and_pending_work() {
                  running_task: None,
                  finalization_gate: Default::default(),
                  message_delivery: Default::default(),
@@ -10356,7 +11153,15 @@ index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602
                  pending_inputs: VecDeque::new(),
                  edit_holds: HashMap::new(),
                  pending_notifications: Vec::new(),
-@@ -2532,6 +2535,7 @@ async fn cancel_propagates_to_sampler_handle_so_no_further_emission() {
+@@ -1205,6 +1210,7 @@ async fn cancel_running_task_teardown_clears_running_and_pending_work() {
+                 turn_report: Default::default(),
+                 turn_abort: Default::default(),
+                 turn_end_tx: Default::default(),
++                owned_exit_token: Default::default(),
+                 client_hooks: Default::default(),
+                 hook_resolved_workspace_root: String::new(),
+                 hook_load_errors: std::cell::RefCell::new(Vec::new()),
+@@ -2532,6 +2538,7 @@ async fn cancel_propagates_to_sampler_handle_so_no_further_emission() {
                  running_task: None,
                  finalization_gate: Default::default(),
                  message_delivery: Default::default(),
@@ -10364,8 +11169,16 @@ index 01985cf0871d2b7b153201236f5e408bdd146357..5c156318c936563403d5d2df9df82602
                  pending_inputs: VecDeque::new(),
                  edit_holds: HashMap::new(),
                  pending_notifications: Vec::new(),
+@@ -2777,6 +2784,7 @@ async fn cancel_propagates_to_sampler_handle_so_no_further_emission() {
+                 turn_report: Default::default(),
+                 turn_abort: Default::default(),
+                 turn_end_tx: Default::default(),
++                owned_exit_token: Default::default(),
+                 client_hooks: Default::default(),
+                 hook_resolved_workspace_root: String::new(),
+                 hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
-index 4ce3f3c554083cbc054269192ccbe8928366f1e3..42ba0d0b47b389076969d829a26b78d9da1b1eb3 100644
+index 4ce3f3c554083cbc054269192ccbe8928366f1e3..550aeabab3cd893ff99197de700c8806a6a0065d 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/idle_resume_tests.rs
 @@ -89,6 +89,7 @@ async fn test_e2e_idle_resume_refreshes_model_metadata() {
@@ -10376,8 +11189,16 @@ index 4ce3f3c554083cbc054269192ccbe8928366f1e3..42ba0d0b47b389076969d829a26b78d9
                  pending_inputs: VecDeque::new(),
                  edit_holds: HashMap::new(),
                  pending_notifications: Vec::new(),
+@@ -335,6 +336,7 @@ async fn test_e2e_idle_resume_refreshes_model_metadata() {
+                 turn_report: Default::default(),
+                 turn_abort: Default::default(),
+                 turn_end_tx: Default::default(),
++                owned_exit_token: Default::default(),
+                 client_hooks: Default::default(),
+                 hook_resolved_workspace_root: String::new(),
+                 hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
-index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..8190bb1aa211fbf52b640472ed48b39da4724c4e 100644
+index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..f9570645e50d1dff01d475ad87c4146b94e039ce 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/inline_auto_compact_flow_tests.rs
 @@ -38,6 +38,7 @@ async fn create_test_actor(
@@ -10388,7 +11209,15 @@ index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..8190bb1aa211fbf52b640472ed48b39d
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
-@@ -465,6 +466,7 @@ async fn create_test_actor_with_memory(
+@@ -257,6 +258,7 @@ async fn create_test_actor(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
+@@ -465,6 +467,7 @@ async fn create_test_actor_with_memory(
          running_task: None,
          finalization_gate: Default::default(),
          message_delivery: Default::default(),
@@ -10396,8 +11225,16 @@ index 19fddfae0ae10cea455e4d1572f57891fbbcd8fc..8190bb1aa211fbf52b640472ed48b39d
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -700,6 +703,7 @@ async fn create_test_actor_with_memory(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
-index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4dcd46608 100644
+index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..2105eb80b330ec52aa488220a2810f1f2a2aa422 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs
 @@ -105,6 +105,7 @@ pub(super) async fn create_test_actor_with_memory(
@@ -10408,9 +11245,264 @@ index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -372,6 +373,7 @@ pub(super) async fn create_test_actor_with_memory(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_exit_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_exit_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..940f44a96af82865ccb5731f89435f00a119578f
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_exit_tests.rs
+@@ -0,0 +1,241 @@
++//! 自有 PTY、真实 actor 和实际 hook 子进程验证正常退出顺序；不调用模型。
++use super::support::*;
++use super::*;
++use crate::session::notification_route::{OwnedExitGuard, owned_identity_fixture::Fixture};
++use std::path::PathBuf;
++use std::sync::atomic::Ordering;
++use xai_grok_hooks::config::{HandlerType, HookProvenance, HookSpec};
++use xai_grok_hooks::event::HookEventName;
++
++async fn actor(
++    fixture: &Fixture,
++) -> (
++    Arc<SessionActor>,
++    mpsc::UnboundedReceiver<SessionEvent>,
++    Arc<std::sync::Mutex<Vec<serde_json::Value>>>,
++) {
++    let (gateway_tx, gateway_rx) = mpsc::unbounded_channel();
++    let (_, updates) = spawn_capturing_gateway_loop(gateway_rx);
++    let (persistence_tx, persistence_rx) = mpsc::unbounded_channel();
++    drain_persistence(persistence_rx);
++    let (mut actor, events) =
++        create_test_actor_ex(0, 256_000, 85, gateway_tx, persistence_tx).await;
++    actor.session_info.id = acp::SessionId::new(fixture.binding().session_id.clone());
++    actor.session_info.cwd = fixture.binding().cwd.to_string_lossy().into_owned();
++    actor.hook_resolved_workspace_root = actor.session_info.cwd.clone();
++    actor.tool_context.process_scope = Some(xai_grok_tools::util::ProcessScope::new());
++    let mut registry = xai_grok_hooks::discovery::HookRegistry::default();
++    let (specs, warnings) = xai_grok_agent::plugins::hooks_adapter::parse_plugin_hooks(
++        &fixture.binding().plugin_dir.join("hooks/hooks.json"),
++        "infinishell-grok",
++        fixture.binding().plugin_dir.to_str().unwrap(),
++        fixture.binding().cwd.to_str().unwrap(),
++    );
++    assert!(warnings.is_empty());
++    registry.append_specs(
++        specs
++            .into_iter()
++            .filter(|spec| matches!(spec.event, HookEventName::SessionEnd | HookEventName::Stop))
++            .collect(),
++    );
++    for event in [HookEventName::SessionEnd, HookEventName::Stop] {
++        registry.append_specs(vec![HookSpec {
++            name: format!("owned-exit/global-{event}"),
++            event,
++            handler_type: HandlerType::Command,
++            configured_matcher: None,
++            matcher: None,
++            enabled: true,
++            command: Some("/usr/bin/true".into()),
++            command_raw: Some("/usr/bin/true".into()),
++            url: None,
++            url_raw: None,
++            timeout_ms: 5000,
++            source_dir: fixture.binding().cwd.clone(),
++            extra_env: Default::default(),
++            layer: HookProvenance::File,
++        }]);
++    }
++    *actor.hook_registry.borrow_mut() = Some(Arc::new(registry));
++    (Arc::new(actor), events, updates)
++}
++
++fn start(
++    actor: Arc<SessionActor>,
++    events: mpsc::UnboundedReceiver<SessionEvent>,
++) -> (
++    mpsc::UnboundedSender<SessionCommand>,
++    mpsc::UnboundedSender<xai_chat_state::ChatStateEvent>,
++    tokio::task::JoinHandle<()>,
++) {
++    let (tx, rx) = mpsc::unbounded_channel();
++    let (chat_tx, chat_rx) = mpsc::unbounded_channel();
++    let cwd = PathBuf::from(&actor.session_info.cwd);
++    let task = tokio::task::spawn_local(super::run_session(
++        actor,
++        rx,
++        chat_rx,
++        events,
++        None,
++        Arc::new(parking_lot::Mutex::new(
++            xai_grok_workspace::file_system::CodebaseIndexManager::new(),
++        )),
++        cwd,
++        crate::session::fs_watch::FsWatchCapabilities::none(),
++    ));
++    (tx, chat_tx, task)
++}
++
++async fn request(
++    tx: &mpsc::UnboundedSender<SessionCommand>,
++    guard: &OwnedExitGuard,
++) -> acp::Result<bool> {
++    let (reply, rx) = oneshot::channel();
++    tx.send(SessionCommand::PrepareOwnedExit {
++        token: guard.token(),
++        respond_to: reply,
++    })
++    .unwrap();
++    tokio::time::timeout(std::time::Duration::from_secs(5), rx)
++        .await
++        .unwrap()
++        .unwrap()
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_idle_actor_finishes_global_and_plugin_hooks_before_scope_closes() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let (actor, events, updates) = actor(&fixture).await;
++            let scope = actor.tool_context.process_scope.as_ref().unwrap().clone();
++            let (tx, _chat, task) = start(actor, events);
++            // 产品对已驻留 actor 退出；夹具初始化不应预先消耗退出握手的预算。
++            let (ready_tx, ready_rx) = oneshot::channel();
++            tx.send(SessionCommand::IsBusy {
++                respond_to: ready_tx,
++            })
++            .unwrap();
++            assert!(
++                !tokio::time::timeout(std::time::Duration::from_secs(8), ready_rx)
++                    .await
++                    .unwrap()
++                    .unwrap()
++            );
++            let guard = OwnedExitGuard::claim(&fixture.reserve_exit()).unwrap();
++            assert!(
++                crate::session::notification_route::verify_exit(
++                    &guard.token(),
++                    &fixture.binding().session_id,
++                    &fixture.binding().cwd
++                )
++                .is_ok()
++            );
++            assert!(request(&tx, &guard).await.unwrap());
++            tokio::time::timeout(std::time::Duration::from_secs(7), task)
++                .await
++                .unwrap()
++                .unwrap();
++            assert!(tx.is_closed());
++            assert!(
++                !scope.is_closed(),
++                "正常 actor 收尾不应提前关闭普通 hook scope"
++            );
++            let batches: Vec<_> = updates
++                .lock()
++                .unwrap()
++                .iter()
++                .filter(|update| update["sessionUpdate"] == "hook_execution")
++                .cloned()
++                .collect();
++            assert_eq!(batches.len(), 2, "{batches:?}");
++            assert_eq!(batches[0]["event_name"], "session_end");
++            assert_eq!(batches[1]["event_name"], "stop");
++            for batch in batches {
++                let runs = batch["runs"].as_array().unwrap();
++                assert_eq!(runs.len(), 2, "原全局 hook 和冻结插件均须真正执行");
++                for run in runs {
++                    assert_eq!(run["status"]["status"], "success", "{run:?}");
++                }
++            }
++            scope.kill_all();
++            drop(guard);
++            fixture.close().await;
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_busy_actor_keeps_work_and_mailbox_then_can_exit_when_idle() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let (actor, events, _) = actor(&fixture).await;
++            actor.active_work.store(1, Ordering::Release);
++            let scope = actor.tool_context.process_scope.as_ref().unwrap().clone();
++            let (tx, _chat, task) = start(actor.clone(), events);
++            let mut guard = OwnedExitGuard::claim(&fixture.reserve_exit()).unwrap();
++            assert!(!request(&tx, &guard).await.unwrap());
++            assert!(!tx.is_closed());
++            assert!(!scope.is_closed());
++            assert_eq!(actor.active_work.load(Ordering::Acquire), 1);
++            assert!(actor.owned_exit_token.borrow().is_none());
++            guard.detach_busy();
++            drop(guard);
++            assert!(
++                crate::session::notification_route::owned_binding(
++                    &fixture.binding().session_id,
++                    &fixture.binding().cwd
++                )
++                .is_ok()
++            );
++            actor.active_work.store(0, Ordering::Release);
++            let guard = OwnedExitGuard::claim(&fixture.reserve_exit()).unwrap();
++            assert!(request(&tx, &guard).await.unwrap());
++            tokio::time::timeout(std::time::Duration::from_secs(7), task)
++                .await
++                .unwrap()
++                .unwrap();
++            scope.kill_all();
++            drop(guard);
++            fixture.close().await;
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_exit_fence_rejects_new_typed_input_before_queueing() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let guard = OwnedExitGuard::claim(&fixture.reserve_exit()).unwrap();
++            let actor = super::owned_identity_tests::actor(&fixture).await;
++            let (reply, rx) = oneshot::channel();
++            let input = QueueInputRequest::from_legacy_prompt_id(
++                vec![
++                    acp::ContentBlock::Text(acp::TextContent::new("退出后的新输入")),
++                    acp::ContentBlock::Image(acp::ImageContent::new("AA==", "image/png")),
++                ],
++                "after-exit".into(),
++                PromptMode::Agent,
++                reply,
++            );
++            let condition = OwnedInputPrecondition {
++                protocol_version: 1,
++                require_default_permissions: true,
++                request_id: uuid::Uuid::new_v4().to_string(),
++                notification_binding: fixture.binding().clone(),
++            };
++            let before = actor.user_input_generation.load(Ordering::Acquire);
++            assert_eq!(actor.queue_owned_input(input, &condition).await, None);
++            assert_eq!(
++                serde_json::to_value(rx.await.unwrap().unwrap_err().code).unwrap(),
++                -32073
++            );
++            assert!(actor.state.lock().await.pending_inputs.is_empty());
++            assert_eq!(actor.user_input_generation.load(Ordering::Acquire), before);
++            drop(guard);
++            fixture.close().await;
++        })
++        .await;
++}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..597090f121e5a11f4f7087234241d16fdc0f78b5
+index 0000000000000000000000000000000000000000..c4ce3814e208e8bd1c31258c41b6523348b79159
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs
 @@ -0,0 +1,197 @@
@@ -10419,7 +11511,7 @@ index 0000000000000000000000000000000000000000..597090f121e5a11f4f7087234241d16f
 +use crate::session::notification_route::owned_identity_fixture::Fixture;
 +use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 +
-+async fn actor(fixture: &Fixture) -> SessionActor {
++pub(super) async fn actor(fixture: &Fixture) -> SessionActor {
 +    let mut actor = plain_actor().await;
 +    actor.session_info.id = acp::SessionId::new(fixture.binding().session_id.clone());
 +    actor.session_info.cwd = fixture.binding().cwd.to_string_lossy().into_owned();
@@ -10612,7 +11704,7 @@ index 0000000000000000000000000000000000000000..597090f121e5a11f4f7087234241d16f
 +        .await;
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
-index 78e5d0eb80c820a86562faa8933b02ed60c2c273..fe59c27c861cf70fc12a7e564d3fcbbb343899de 100644
+index 78e5d0eb80c820a86562faa8933b02ed60c2c273..66a7a0dd6d9bbb374628f93b687020fc754ef4bb 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 @@ -50,7 +50,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
@@ -10632,8 +11724,16 @@ index 78e5d0eb80c820a86562faa8933b02ed60c2c273..fe59c27c861cf70fc12a7e564d3fcbbb
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -274,6 +275,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
-index fa11f50caa83041f8fa681e919b95d7f21d59265..a092722e59921bd5fdd2e9532b65b2b48b03f79a 100644
+index fa11f50caa83041f8fa681e919b95d7f21d59265..df504ed00d572f7851e72d8fea1c27c1177741ff 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 @@ -284,7 +284,7 @@ async fn create_test_actor_inner(
@@ -10653,7 +11753,15 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..a092722e59921bd5fdd2e9532b65b2b4
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
-@@ -844,7 +845,7 @@ pub(crate) fn pre_tool_use_spec(
+@@ -522,6 +523,7 @@ async fn create_test_actor_inner(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
+@@ -844,7 +846,7 @@ pub(crate) fn pre_tool_use_spec(
          url: None,
          url_raw: None,
          timeout_ms: 5000,
@@ -10662,7 +11770,7 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..a092722e59921bd5fdd2e9532b65b2b4
          extra_env: std::collections::HashMap::new(),
          layer: xai_grok_hooks::config::HookProvenance::File,
      }
-@@ -878,7 +879,7 @@ pub(crate) fn install_pre_tool_use_hooks(
+@@ -878,7 +880,7 @@ pub(crate) fn install_pre_tool_use_hooks(
  ) {
      let (mut registry, _) = xai_grok_hooks::discovery::load_hooks(None, None);
      registry.append_specs(specs);
@@ -10961,7 +12069,7 @@ index 6b4ef6323d69233f7def8a844bcea95b6acc4eed..839186a6da8cc332f10b7a77ae030c43
  
  /// Context gathered from a session to enrich feedback notifications.
 diff --git a/crates/codegen/xai-grok-shell/src/session/commands.rs b/crates/codegen/xai-grok-shell/src/session/commands.rs
-index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..f741dd59695402bd65d8321464d276955afbd6d6 100644
+index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..a00700a78f22fa8d1d71008f775bc6e9c041fa7d 100644
 --- a/crates/codegen/xai-grok-shell/src/session/commands.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/commands.rs
 @@ -362,6 +362,26 @@ pub enum SessionCommand {
@@ -11002,7 +12110,19 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..f741dd59695402bd65d8321464d27695
      CompactSession {
          user_context: Option<String>,
          respond_to: oneshot::Sender<acp::Result<()>>,
-@@ -843,6 +867,7 @@ pub enum SessionCommand {
+@@ -816,6 +840,11 @@ pub enum SessionCommand {
+         new_text: Option<String>,
+     },
+     Cancel(CancelOptions),
++    /// 正常 owned 退出只在同 actor 空闲时封闭邮箱并进入 Graceful shutdown。
++    PrepareOwnedExit {
++        token: super::notification_route::OwnedExitToken,
++        respond_to: oneshot::Sender<Result<bool, acp::Error>>,
++    },
+     Shutdown(ShutdownKind),
+     PersistResumeStatus {
+         respond_to: oneshot::Sender<()>,
+@@ -843,6 +872,7 @@ pub enum SessionCommand {
      ReloadSkills,
      /// Dispatch session_start hook using the actor's loaded HookRegistry.
      DispatchSessionStartHook {
@@ -11011,7 +12131,7 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..f741dd59695402bd65d8321464d27695
          source: String,
      },
 diff --git a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
-index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..e9e632ab557e0258e5a54d1df90804f9cc78fb4a 100644
+index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..83056cfa065a4c3f05634644bb760ca66a445d3a 100644
 --- a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
 @@ -31,7 +31,7 @@ async fn create_test_actor(
@@ -11031,6 +12151,14 @@ index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..e9e632ab557e0258e5a54d1df90804f9
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -264,6 +265,7 @@ async fn create_test_actor(
+         turn_report: Default::default(),
+         turn_abort: Default::default(),
+         turn_end_tx: Default::default(),
++        owned_exit_token: Default::default(),
+         client_hooks: Default::default(),
+         hook_resolved_workspace_root: String::new(),
+         hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs b/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs
 index 1f60a954835bd47da0eed19230f6927b3f7054de..b3c415a15182027c22c066ea59c01d72d4d6fab5 100644
 --- a/crates/codegen/xai-grok-shell/src/session/helpers/session_compact_retain_session_asset_files_tests.rs
@@ -11087,6 +12215,454 @@ index 8400649d81c8b1633c0e4b436edeea31a32d3263..f11bf8bf68bc2572bd80d97cb1b969cb
 +
 +#[cfg(windows)]
 +mod notification_plugin_windows;
+diff --git a/crates/codegen/xai-grok-shell/src/session/notification_exit.rs b/crates/codegen/xai-grok-shell/src/session/notification_exit.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..7b2b5c6ad3ece92a25b0a4def0828c0105b3ed7d
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/notification_exit.rs
+@@ -0,0 +1,275 @@
++//! 正常 owned 退出在原连接仍存活时结束闲置 actor；断连仍立即撤销路由。
++use super::*;
++
++pub const OWNED_EXIT_METHOD: &str = "x.ai/session/owned_exit";
++pub(super) const OWNED_EXIT_WIRE_METHOD: &str = "_x.ai/session/owned_exit";
++pub const OWNED_EXIT_BUDGET: Duration = Duration::from_secs(8);
++const EXIT_KEY: &str = "infinishell/verifiedOwnedExit";
++
++#[derive(Clone, Serialize, Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct OwnedExitRequest {
++    pub protocol_version: u32,
++    pub session_id: String,
++    pub notification_binding: NotificationPlugin,
++    #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
++    pub meta: Option<acp::Meta>,
++}
++
++#[derive(Clone, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct OwnedExitToken {
++    session_id: String,
++    generation: String,
++    nonce: String,
++}
++
++#[derive(Clone)]
++pub(super) struct ExitReservation {
++    token: OwnedExitToken,
++    deadline: std::time::Instant,
++}
++
++pub(super) fn reserve_exit(
++    json: &mut serde_json::Value,
++    client: u64,
++    peer: Option<&PeerIdentity>,
++) -> Result<bool> {
++    let params = json.get("params").context("missing owned exit params")?;
++    let request: OwnedExitRequest = serde_json::from_value(params.clone())?;
++    ensure!(
++        request.protocol_version == 1 && request.meta.is_none(),
++        "invalid owned exit request"
++    );
++    ensure!(
++        request.session_id == request.notification_binding.session_id,
++        "owned exit session mismatch"
++    );
++    let peer = peer.context("owned exit requires a verified peer")?;
++    let mut routes = routes()
++        .lock()
++        .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    expire_exit(&mut routes, &request.session_id);
++    let state = routes
++        .get_mut(&request.session_id)
++        .context("notification route unavailable")?;
++    ensure!(state.pending.is_none(), "notification attach is pending");
++    let route = state
++        .active
++        .as_mut()
++        .context("notification route unavailable")?;
++    ensure!(
++        route.client == client && route.exit.is_none(),
++        "owned exit is not current or is already pending"
++    );
++    ensure!(
++        route.binding == request.notification_binding,
++        "owned exit descriptor mismatch"
++    );
++    route
++        .binding
++        .validate_target(&request.session_id, &route.binding.cwd)?;
++    route.peer.verify(&route.candidate)?;
++    peer.verify(&route.candidate)?;
++    let token = OwnedExitToken {
++        session_id: request.session_id,
++        generation: route.generation.clone(),
++        nonce: uuid::Uuid::new_v4().to_string(),
++    };
++    let meta = serde_json::json!({EXIT_KEY: token});
++    json.get_mut("params")
++        .and_then(serde_json::Value::as_object_mut)
++        .context("invalid owned exit params")?
++        .insert("_meta".into(), meta);
++    // 同一锁内禁止新 owned 输入和新 attach；只有 actor 的闲置分支能领取关闭权。
++    route.exit = Some(ExitReservation {
++        token,
++        deadline: std::time::Instant::now() + OWNED_EXIT_BUDGET,
++    });
++    Ok(true)
++}
++
++/// 所有使用点都在同一锁内回收过期代际；分发前取消不能留下永久 fence。
++pub(super) fn expire_exit(routes: &mut HashMap<String, SessionRoute>, session_id: &str) {
++    if let Some(state) = routes.get_mut(session_id)
++        && state.active.as_ref().is_some_and(|route| {
++            route
++                .exit
++                .as_ref()
++                .is_some_and(|exit| std::time::Instant::now() >= exit.deadline)
++        })
++        && let Some(route) = state.active.take()
++    {
++        route.process_scope.kill_all();
++    }
++    routes.retain(|_, state| state.active.is_some() || state.pending.is_some());
++}
++
++fn matching(route: &Route, token: &OwnedExitToken) -> bool {
++    route.binding.session_id == token.session_id
++        && route.generation == token.generation
++        && route
++            .exit
++            .as_ref()
++            .is_some_and(|exit| exit.token.nonce == token.nonce)
++}
++
++pub(crate) struct OwnedExitGuard {
++    token: OwnedExitToken,
++    detach_busy: bool,
++}
++
++impl OwnedExitGuard {
++    pub(crate) fn claim(request: &OwnedExitRequest) -> Result<Self> {
++        ensure!(
++            request.protocol_version == 1
++                && request.session_id == request.notification_binding.session_id,
++            "invalid owned exit identity"
++        );
++        let token: OwnedExitToken = serde_json::from_value(
++            request
++                .meta
++                .as_ref()
++                .and_then(|meta| meta.get(EXIT_KEY))
++                .context("owned exit was not authorized by the leader")?
++                .clone(),
++        )?;
++        ensure!(
++            token.session_id == request.session_id,
++            "owned exit session mismatch"
++        );
++        {
++            let mut routes = routes()
++                .lock()
++                .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++            expire_exit(&mut routes, &token.session_id);
++            let route = routes
++                .get(&token.session_id)
++                .and_then(|state| state.active.as_ref())
++                .context("notification route unavailable")?;
++            ensure!(
++                matching(route, &token) && route.binding == request.notification_binding,
++                "stale owned exit"
++            );
++        }
++        Ok(Self {
++            token,
++            detach_busy: false,
++        })
++    }
++
++    pub(crate) fn token(&self) -> OwnedExitToken {
++        self.token.clone()
++    }
++    pub(crate) fn detach_busy(&mut self) {
++        self.detach_busy = true;
++    }
++}
++
++impl Drop for OwnedExitGuard {
++    fn drop(&mut self) {
++        let Ok(mut routes) = routes().lock() else {
++            return;
++        };
++        let Some(state) = routes.get_mut(&self.token.session_id) else {
++            return;
++        };
++        if !state
++            .active
++            .as_ref()
++            .is_some_and(|route| matching(route, &self.token))
++        {
++            return;
++        }
++        if self.detach_busy {
++            if let Some(route) = state.active.as_mut() {
++                route.exit = None;
++            }
++        } else if let Some(route) = state.active.take() {
++            // 完成、超时、取消均只撤销请求携带的原代际，不接触后来附着的路由。
++            route.process_scope.kill_all();
++        }
++        routes.retain(|_, state| state.active.is_some() || state.pending.is_some());
++    }
++}
++
++pub(crate) fn verify_exit(
++    token: &OwnedExitToken,
++    session_id: &str,
++    cwd: &Path,
++) -> Result<OwnedBindingGuard> {
++    let mut routes = routes()
++        .lock()
++        .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    ensure!(
++        token.session_id == session_id,
++        "owned exit session mismatch"
++    );
++    expire_exit(&mut routes, session_id);
++    let route = routes
++        .get(session_id)
++        .and_then(|state| state.active.as_ref())
++        .context("notification route unavailable")?;
++    ensure!(matching(route, token), "stale owned exit");
++    ensure!(
++        route
++            .exit
++            .as_ref()
++            .is_some_and(|exit| std::time::Instant::now() < exit.deadline),
++        "owned exit expired"
++    );
++    ensure!(
++        !route.process_scope.is_closed(),
++        "notification route closed"
++    );
++    route.binding.validate_target(session_id, cwd)?;
++    route.peer.verify(&route.candidate)?;
++    Ok(OwnedBindingGuard { _routes: routes })
++}
++
++pub(crate) fn exit_pending(session_id: &str) -> bool {
++    let Ok(mut routes) = routes().lock() else {
++        return false;
++    };
++    expire_exit(&mut routes, session_id);
++    routes
++        .get(session_id)
++        .and_then(|state| state.active.as_ref())
++        .is_some_and(|route| route.exit.is_some())
++}
++
++pub(crate) fn session_open_guard(session_id: &str) -> Result<OwnedBindingGuard> {
++    let mut routes = routes()
++        .lock()
++        .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    expire_exit(&mut routes, session_id);
++    ensure!(
++        routes
++            .get(session_id)
++            .and_then(|state| state.active.as_ref())
++            .is_none_or(|route| route.exit.is_none()),
++        "notification owner is exiting"
++    );
++    Ok(OwnedBindingGuard { _routes: routes })
++}
++
++pub(crate) fn provider_for_exit(token: &OwnedExitToken) -> Arc<dyn SessionNotificationRoute> {
++    Arc::new(ExitProvider(token.clone()))
++}
++
++struct ExitProvider(OwnedExitToken);
++impl SessionNotificationRoute for ExitProvider {
++    fn environment(&self, plugin_root: &str) -> Option<NotificationEnvironment> {
++        let mut routes = routes().lock().ok()?;
++        expire_exit(&mut routes, &self.0.session_id);
++        let route = routes.get(&self.0.session_id)?.active.as_ref()?;
++        if !matching(route, &self.0) {
++            return None;
++        }
++        environment_for_route(route, plugin_root)
++    }
++}
++
++#[cfg(test)]
++#[path = "notification_exit_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-shell/src/session/notification_exit_tests.rs b/crates/codegen/xai-grok-shell/src/session/notification_exit_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..b80176f22466be9ed681b702cfabf8dfa60b3c9a
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/notification_exit_tests.rs
+@@ -0,0 +1,161 @@
++use super::*;
++
++#[cfg(unix)]
++use super::super::owned_identity_fixture::Fixture;
++
++#[cfg(unix)]
++#[tokio::test]
++async fn owned_exit_fences_input_and_attach_but_keeps_verified_hook_route() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let guard = OwnedExitGuard::claim(&request).unwrap();
++    let binding = fixture.binding();
++    assert!(owned_binding(&binding.session_id, &binding.cwd).is_err());
++    assert!(session_open_guard(&binding.session_id).is_err());
++    assert!(verify_exit(&guard.token(), &binding.session_id, &binding.cwd).is_ok());
++    assert!(
++        provider(&binding.session_id)
++            .environment(binding.plugin_dir.to_str().unwrap())
++            .is_some()
++    );
++    drop(guard);
++    assert!(
++        provider(&binding.session_id)
++            .environment(binding.plugin_dir.to_str().unwrap())
++            .is_none()
++    );
++    fixture.close().await;
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn owned_exit_busy_releases_only_exit_fence_and_preserves_route() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let mut guard = OwnedExitGuard::claim(&request).unwrap();
++    guard.detach_busy();
++    drop(guard);
++    let binding = fixture.binding();
++    assert_eq!(
++        owned_binding(&binding.session_id, &binding.cwd).unwrap(),
++        *binding
++    );
++    assert!(session_open_guard(&binding.session_id).is_ok());
++    fixture.close().await;
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn owned_exit_disconnect_revokes_immediately_and_stale_cleanup_cannot_close_replacement() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let guard = OwnedExitGuard::claim(&request).unwrap();
++    let binding = fixture.binding();
++    let mut replacement = {
++        let routes = routes().lock().unwrap();
++        routes
++            .get(&binding.session_id)
++            .unwrap()
++            .active
++            .as_ref()
++            .unwrap()
++            .clone()
++    };
++    let old_provider = provider_for_exit(&guard.token());
++    disconnect(replacement.client);
++    assert!(verify_exit(&guard.token(), &binding.session_id, &binding.cwd).is_err());
++    assert!(
++        provider(&binding.session_id)
++            .environment(binding.plugin_dir.to_str().unwrap())
++            .is_none()
++    );
++    replacement.generation = uuid::Uuid::new_v4().to_string();
++    replacement.exit = None;
++    replacement.process_scope = xai_grok_tools::util::ProcessScope::new();
++    let replacement_scope = replacement.process_scope.clone();
++    routes().lock().unwrap().insert(
++        binding.session_id.clone(),
++        SessionRoute {
++            active: Some(replacement),
++            pending: None,
++        },
++    );
++    drop(guard);
++    assert!(!replacement_scope.is_closed());
++    assert!(
++        old_provider
++            .environment(binding.plugin_dir.to_str().unwrap())
++            .is_none()
++    );
++    assert_eq!(
++        owned_binding(&binding.session_id, &binding.cwd).unwrap(),
++        *binding
++    );
++    fixture.close().await;
++}
++
++#[test]
++fn owned_exit_client_cannot_supply_internal_authorization() {
++    let binding = NotificationPlugin {
++        version: 1,
++        session_id: uuid::Uuid::new_v4().to_string(),
++        cwd: PathBuf::from("/unused"),
++        plugin_dir: PathBuf::from("/unused/plugin"),
++        files: Default::default(),
++    };
++    let mut frame = serde_json::json!({"params":{
++        "protocolVersion":1,"sessionId":binding.session_id,"notificationBinding":binding,
++        "_meta":{EXIT_KEY:{"session_id":"foreign","generation":"foreign","nonce":"foreign"}}
++    }});
++    assert!(reserve_exit(&mut frame, 1, None).is_err());
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn owned_exit_rejects_duplicate_and_changed_descriptor_before_shutdown() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let guard = OwnedExitGuard::claim(&request).unwrap();
++    let mut changed = request.clone();
++    changed.notification_binding.cwd.push("different");
++    assert!(OwnedExitGuard::claim(&changed).is_err());
++    let (client, peer) = {
++        let routes = routes().lock().unwrap();
++        let route = routes
++            .get(&request.session_id)
++            .unwrap()
++            .active
++            .as_ref()
++            .unwrap();
++        (route.client, route.peer.clone())
++    };
++    let mut clean_request = request;
++    clean_request.meta = None;
++    let mut frame = serde_json::json!({"params": clean_request});
++    assert!(reserve_exit(&mut frame, client, Some(&peer)).is_err());
++    drop(guard);
++    fixture.close().await;
++}
++
++#[cfg(unix)]
++#[tokio::test]
++async fn owned_exit_expired_undispatched_request_revokes_original_without_permanent_fence() {
++    let fixture = Fixture::new().await;
++    let request = fixture.reserve_exit();
++    let original_scope = {
++        let mut routes = routes().lock().unwrap();
++        let route = routes
++            .get_mut(&request.session_id)
++            .unwrap()
++            .active
++            .as_mut()
++            .unwrap();
++        route.exit.as_mut().unwrap().deadline = std::time::Instant::now();
++        route.process_scope.clone()
++    };
++    assert!(session_open_guard(&request.session_id).is_ok());
++    assert!(original_scope.is_closed());
++    assert!(!exit_pending(&request.session_id));
++    assert!(OwnedExitGuard::claim(&request).is_err());
++    fixture.close().await;
++}
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_plugin.rs b/crates/codegen/xai-grok-shell/src/session/notification_plugin.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..0aca181c0ed67bc2ef0bb42ff4c67b1574cc90f6
@@ -12203,10 +13779,10 @@ index 0000000000000000000000000000000000000000..8154b62ac316bfa50ded4747d4dda717
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_route.rs b/crates/codegen/xai-grok-shell/src/session/notification_route.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce794aaf60
+index 0000000000000000000000000000000000000000..6eba821161ee51fa2fe93c0264cbea68c3a234ca
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_route.rs
-@@ -0,0 +1,631 @@
+@@ -0,0 +1,672 @@
 +//! 通知路由由 leader 的连接身份建立；不持久化，也不信任客户端指定的任意终端。
 +
 +use std::collections::HashMap;
@@ -12223,6 +13799,13 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +
 +pub const ROUTE_KEY: &str = "infinishell/notificationRoute";
 +pub const ROUTE_REQUIRED_ENV: &str = "WARP_CLI_AGENT_SESSION_ROUTE";
++
++#[path = "notification_exit.rs"]
++mod owned_exit;
++pub use owned_exit::{OWNED_EXIT_BUDGET, OWNED_EXIT_METHOD, OwnedExitRequest, OwnedExitToken};
++pub(crate) use owned_exit::{
++    OwnedExitGuard, exit_pending, provider_for_exit, session_open_guard, verify_exit,
++};
 +
 +#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 +#[serde(deny_unknown_fields)]
@@ -12425,6 +14008,7 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +
 +#[derive(Clone)]
 +struct Route {
++    exit: Option<owned_exit::ExitReservation>,
 +    process_scope: xai_grok_tools::util::ProcessScope,
 +    client: u64,
 +    generation: String,
@@ -12451,6 +14035,11 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +    client: u64,
 +    peer: Option<&PeerIdentity>,
 +) -> Result<bool> {
++    if json.get("method").and_then(|value| value.as_str())
++        == Some(owned_exit::OWNED_EXIT_WIRE_METHOD)
++    {
++        return owned_exit::reserve_exit(json, client, peer);
++    }
 +    let Some(meta) = json
 +        .get("params")
 +        .and_then(|params| params.get("_meta"))
@@ -12503,6 +14092,7 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +        .context("notification route requires request id")?
 +        .clone();
 +    let route = Route {
++        exit: None,
 +        process_scope: xai_grok_tools::util::ProcessScope::new(),
 +        client,
 +        generation: generation.clone(),
@@ -12513,6 +14103,7 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +    };
 +    {
 +        let mut routes = routes().lock().expect("通知路由锁被污染");
++        owned_exit::expire_exit(&mut routes, &binding.session_id);
 +        let state = routes.entry(binding.session_id).or_default();
 +        reserve_verified(state, route)?;
 +    }
@@ -12571,6 +14162,13 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +}
 +
 +fn reserve_verified(state: &mut SessionRoute, route: Route) -> Result<()> {
++    ensure!(
++        state
++            .active
++            .as_ref()
++            .is_none_or(|active| active.exit.is_none()),
++        "notification owner is exiting"
++    );
 +    ensure!(
 +        state
 +            .active
@@ -12664,8 +14262,13 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +
 +/// 返回真实活动路由冻结的描述符；请求者不能用查询参数替换绑定或领取通知路由。
 +pub(crate) fn owned_binding(session_id: &str, cwd: &Path) -> Result<NotificationPlugin> {
-+    let routes = routes().lock().map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
-+    let state = routes.get(session_id).context("notification route unavailable")?;
++    let mut routes = routes()
++        .lock()
++        .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    owned_exit::expire_exit(&mut routes, session_id);
++    let state = routes
++        .get(session_id)
++        .context("notification route unavailable")?;
 +    owned_binding_from_state(state, session_id, cwd, |route| {
 +        route.binding.validate_target(session_id, cwd)?;
 +        route.peer.verify(&route.candidate)
@@ -12682,8 +14285,13 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +    cwd: &Path,
 +    expected: &NotificationPlugin,
 +) -> Result<OwnedBindingGuard> {
-+    let routes = routes().lock().map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
-+    let state = routes.get(session_id).context("notification route unavailable")?;
++    let mut routes = routes()
++        .lock()
++        .map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    owned_exit::expire_exit(&mut routes, session_id);
++    let state = routes
++        .get(session_id)
++        .context("notification route unavailable")?;
 +    let binding = owned_binding_from_state(state, session_id, cwd, |route| {
 +        route.binding.validate_target(session_id, cwd)?;
 +        route.peer.verify(&route.candidate)
@@ -12698,7 +14306,11 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +    cwd: &Path,
 +    verify: impl FnOnce(&Route) -> Result<()>,
 +) -> Result<NotificationPlugin> {
-+    let route = state.active.as_ref().context("notification route is not active")?;
++    let route = state
++        .active
++        .as_ref()
++        .context("notification route is not active")?;
++    ensure!(route.exit.is_none(), "notification owner is exiting");
 +    ensure!(
 +        route.binding.session_id == session_id && route.binding.cwd == cwd,
 +        "notification identity target mismatch"
@@ -12715,23 +14327,28 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +struct SessionProvider(String);
 +impl SessionNotificationRoute for SessionProvider {
 +    fn environment(&self, plugin_root: &str) -> Option<NotificationEnvironment> {
-+        let routes = routes().lock().ok()?;
++        let mut routes = routes().lock().ok()?;
++        owned_exit::expire_exit(&mut routes, &self.0);
 +        let route = routes.get(&self.0)?.active.as_ref()?;
-+        if route.binding.plugin_dir != Path::new(plugin_root)
-+            || route.binding.validate().is_err()
-+            || route.peer.verify(&route.candidate).is_err()
-+        {
-+            return None;
-+        }
-+        Some(NotificationEnvironment {
-+            #[cfg(windows)]
-+            console_peer: route.peer.peer.as_ref()?.console_peer(),
-+            process_scope: route.process_scope.clone(),
-+            tty: route.candidate.tty.to_string_lossy().into_owned(),
-+            tmux: route.candidate.tmux.clone().unwrap_or_default(),
-+            tmux_pane: route.candidate.tmux_pane.clone().unwrap_or_default(),
-+        })
++        environment_for_route(route, plugin_root)
 +    }
++}
++
++fn environment_for_route(route: &Route, plugin_root: &str) -> Option<NotificationEnvironment> {
++    if route.binding.plugin_dir != Path::new(plugin_root)
++        || route.binding.validate().is_err()
++        || route.peer.verify(&route.candidate).is_err()
++    {
++        return None;
++    }
++    Some(NotificationEnvironment {
++        #[cfg(windows)]
++        console_peer: route.peer.peer.as_ref()?.console_peer(),
++        process_scope: route.process_scope.clone(),
++        tty: route.candidate.tty.to_string_lossy().into_owned(),
++        tmux: route.candidate.tmux.clone().unwrap_or_default(),
++        tmux_pane: route.candidate.tmux_pane.clone().unwrap_or_default(),
++    })
 +}
 +
 +async fn verify_tmux(candidate: &RouteCandidate) -> Result<()> {
@@ -12840,10 +14457,10 @@ index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce
 +pub(crate) mod owned_identity_fixture;
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs b/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..517ff6b85e8973038c07d0adcf38557f8e3915cd
+index 0000000000000000000000000000000000000000..7b71a4a4258f990be3d26fcaec7861a1e5d82281
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs
-@@ -0,0 +1,459 @@
+@@ -0,0 +1,460 @@
 +use super::*;
 +use crate::session::SessionCommand;
 +
@@ -12859,6 +14476,7 @@ index 0000000000000000000000000000000000000000..517ff6b85e8973038c07d0adcf38557f
 +
 +fn route(client: u64, generation: &str) -> Route {
 +    Route {
++        exit: None,
 +        process_scope: xai_grok_tools::util::ProcessScope::new(),
 +        client,
 +        generation: generation.into(),
@@ -13455,10 +15073,10 @@ index 0000000000000000000000000000000000000000..6cccdfa12f083995e3ff7d7bdfb0c2b6
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs b/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..fd3c5e556f2817767a2d92a4777f62327837e699
+index 0000000000000000000000000000000000000000..59e16acf14cae1acb1f6b0ca9d8c719094c0a00f
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,151 @@
 +//! 只在自有 PTY 上构造真实通知 peer；不替换产品的身份校验。
 +
 +use super::*;
@@ -13537,6 +15155,7 @@ index 0000000000000000000000000000000000000000..fd3c5e556f2817767a2d92a4777f6232
 +        };
 +        peer.verify(&candidate).unwrap();
 +        let route = Route {
++            exit: None,
 +            process_scope: xai_grok_tools::util::ProcessScope::new(),
 +            client: u64::from(pid as u32),
 +            generation: uuid::Uuid::new_v4().to_string(),
@@ -13563,6 +15182,28 @@ index 0000000000000000000000000000000000000000..fd3c5e556f2817767a2d92a4777f6232
 +            master: Some(master),
 +            child,
 +        }
++    }
++
++    pub(crate) fn reserve_exit(&self) -> super::OwnedExitRequest {
++        let (client, peer) = {
++            let routes = routes().lock().unwrap();
++            let route = routes
++                .get(&self.plugin.binding.session_id)
++                .unwrap()
++                .active
++                .as_ref()
++                .unwrap();
++            (route.client, route.peer.clone())
++        };
++        let mut frame = serde_json::json!({
++            "jsonrpc":"2.0", "id":uuid::Uuid::new_v4().to_string(),
++            "method":"_x.ai/session/owned_exit", "params":{
++                "protocolVersion":1, "sessionId":self.plugin.binding.session_id,
++                "notificationBinding":self.plugin.binding
++            }
++        });
++        super::owned_exit::reserve_exit(&mut frame, client, Some(&peer)).unwrap();
++        serde_json::from_value(frame["params"].clone()).unwrap()
 +    }
 +
 +    pub(crate) fn binding(&self) -> &NotificationPlugin {

@@ -365,6 +365,10 @@ impl Fixture {
         let terminal = add_window_with_terminal(app, None);
         finish_initial_bootstrap(app, &terminal).await;
         let (launch, snapshot, scope) = terminal.update(app, |view, ctx| {
+            // 与真实 bootstrap 一致：先通知 daemon，再让远端元数据触发导航请求。
+            RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
+                manager.notify_session_bootstrapped(remote_session(), "bash", Some("/bin/bash"));
+            });
             let mut info = SessionInfo::new_for_test()
                 .with_session_type(BootstrapSessionType::WarpifiedRemote)
                 .with_shell_type(ShellType::Bash);
@@ -375,9 +379,6 @@ impl Fixture {
                 .lock()
                 .simulate_long_running_block("owned-codex-wrapper", "");
             change_terminal_session(view, remote_session(), ctx);
-            RemoteServerManager::handle(ctx).update(ctx, |manager, _| {
-                manager.notify_session_bootstrapped(remote_session(), "bash", Some("/bin/bash"));
-            });
             let (snapshot, current_client) = view.remote_codex_snapshot(true, ctx).unwrap();
             assert!(Arc::ptr_eq(&client, &current_client));
             let launch = Launch {

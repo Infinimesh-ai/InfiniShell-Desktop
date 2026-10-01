@@ -3,7 +3,8 @@
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read as _, Write as _};
 use std::path::{Component, Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -42,6 +43,10 @@ pub(crate) enum HookWriteError {
     WriteFailed,
     #[error("cli_agent_notify_write_timeout")]
     WriteTimeout,
+    #[error("cli_agent_notify_send_timeout_{0}")]
+    SendTimeout(&'static str),
+    #[error("cli_agent_notify_send_unavailable")]
+    SendUnavailable,
 }
 
 type Result<T> = std::result::Result<T, HookWriteError>;
@@ -194,28 +199,54 @@ pub(crate) fn run_worker(protocol_version: bool) -> Result<()> {
         .map_err(|_| HookWriteError::InputTimeout)??;
     let notification = parse_notification(&bytes)?;
     let (sender, receiver) = mpsc::sync_channel(1);
+    let progress = Arc::new(AtomicU8::new(0));
+    let worker_progress = Arc::clone(&progress);
     thread::spawn(move || {
-        let _ = sender.send(send_notification(notification));
+        let _ = sender.send(send_notification(notification, &worker_progress));
     });
     // Windows 同步控制台写在严重背压下可阻塞；入口总期限仍保证进程退出。
+    // 仅记录固定阶段，区分总期限与帧写入期限，不输出路径、环境或通知内容。
     receiver
         .recv_timeout(SEND_TIMEOUT)
-        .map_err(|_| HookWriteError::WriteTimeout)?
+        .map_err(|error| match error {
+            mpsc::RecvTimeoutError::Disconnected => HookWriteError::SendUnavailable,
+            mpsc::RecvTimeoutError::Timeout => {
+                HookWriteError::SendTimeout(match progress.load(Ordering::Relaxed) {
+                    0 => "prepare",
+                    1 => "terminal",
+                    2 => "cache",
+                    3 => "lock_open",
+                    4 => "lock_wait",
+                    5 => "frame_write",
+                    _ => "unknown",
+                })
+            }
+        })?
 }
 
-fn send_notification(notification: Notification) -> Result<()> {
+fn send_notification(notification: Notification, progress: &AtomicU8) -> Result<()> {
     let tmux = std::env::var_os("TMUX").is_some_and(|value| !value.is_empty());
     let bytes = encode_frame(&notification, tmux)?;
+    progress.store(1, Ordering::Relaxed);
     let mut terminal = open_terminal(tmux)?;
+    progress.store(2, Ordering::Relaxed);
     let cache = dirs::cache_dir().ok_or(HookWriteError::LockUnavailable)?;
     let directory = cache.join("infinishell-cli-agent-notifications-v1");
-    send_frame(&directory, &mut terminal, &bytes)
+    send_frame(&directory, &mut terminal, &bytes, progress)
 }
 
-fn send_frame(directory: &Path, terminal: &mut impl io::Write, bytes: &[u8]) -> Result<()> {
+fn send_frame(
+    directory: &Path,
+    terminal: &mut impl io::Write,
+    bytes: &[u8],
+    progress: &AtomicU8,
+) -> Result<()> {
+    progress.store(3, Ordering::Relaxed);
     let lock = open_lock(directory)?;
+    progress.store(4, Ordering::Relaxed);
     acquire_lock(&lock, IO_TIMEOUT)?;
     // 锁句柄覆盖全部短写；保留空锁文件，进程死亡时仅由内核解除占用。
+    progress.store(5, Ordering::Relaxed);
     write_frame(terminal, bytes, IO_TIMEOUT)
 }
 

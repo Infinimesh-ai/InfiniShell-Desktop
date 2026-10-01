@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：三款真实 tmux 图片、重连与旧请求保护完成，源码门禁仍开放
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `7b7fc36fc41d79be842ecda87e2fc7c7dc521419` 的签名 GUI（SHA-256 `123a4112528cbd2eaee76bdd5d98a56acfc1dbb5153f816be3ada6c3b028728b`）在 `r-hx4at14_` 实际回环 SSH／tmux 中完成三款固定 CLI 首图、完整断连重接和原消费者第二条新内容。Grok `.3/975d815fec8e`、Codex `0.156.1`、Claude `2.1.280` 分别保持原 SID／进程生存期；六条真实请求均有原生 typed PNG、独立请求及两端 ACK／引用释放。137 字节源 PNG 规范化后为 328 字节，上传、原生图片及像素内容分别核对，不称原编码字节不变。索引 `resume-20261001/g08-preparation/r-hx4at14_-tmux-owned-gui/functional-review-v1.safe.json` SHA-256 `a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85`。
+
+Claude 原 Read 审批在 SSH 断开后仍保留。恢复后同内容确实产生新 intent／上传，但没有新 claim、queue 或原生输入；改为新内容后正常消费，证明并非所有重连后输入都被拒绝。先写入新草稿，再仅允许原 Read；旧请求完成及清理没有清掉新稿或附件。此为真实旧请求跨新连接回执证据，不冒称人为强制旧 socket 乱序或 daemon 冷重启；连接替换另由原提交的受控协议回归覆盖。对应重复及消费收据 SHA-256 为 `3f1bca51325222e704f6cec942484ed87ed1aaf8d6ef759f9567615941f4cf57`、`ccd5a8b17e8b0ed5438c18d5096a5deed67ced86fdb7c3a839066364fa259c65`；新内容消费为 `fc5c4a508d8e6f536059cbd17123aaa7fee04261704a05a842cfdd2b896b651a`。本轮两次 Read 都仅允许当前图片，没有授予目录权限。历史 `c3ff/r-u10vfmtu` 的拒绝与退休释放正例仍按原轮计证。
+
+模型结果分开记录：Grok 两轮正确，Claude 两轮正确，Codex 首轮正确；Codex 第二轮收到完整的“右到左”新提示和实际图片，却回答正序“红色，蓝色”。第二轮传输／确认通过，模型语义失败保留，不重跑相近图片掩盖失败。Codex 第二轮收据 SHA-256 `1e2ff884444a89657c4f1ab2d0a7805369c35e9d06e637d60de288715631fe75`。三款消费后富输入自动收起，重开为空稿／零卡，没有手工清稿；Claude 新草稿保护场景另列。菜单和恢复控件的英文／简体中文、中文输入占位及长图片名本轮均可读；热切换语言后旧通知设置提示仍为英文，不外推完整冷启动中文应用。本轮没有新增用户文案，无需本地化变更。
+
+三款均经原生 `/exit` 退出，tmux／SSH／GUI 顺次正常结束，专属 daemon 沿既有宽限自然退出。finish 收据 SHA-256 `ae9a777efe6fdde1f48aa5c63d7ffef23c5e936edf6ac2b25755355952f2175d` 确认全部自有进程退出；本轮 remote slot 核实无打开文件后，同设备无覆盖移入 `r-hx4at14_/remote-server-retained`，收据 `f9a8a6779eb41011ba041d8eb6f3f2620f5747081003569c2499a3151b215f90`。唯一历史与 profiles 保留、cleanup_ready=false，不称整轮目录已删除。Claude 插件安装首轮在写入前因受 Git CRLF 规则影响的文件摘要不符而失败，第二轮同时绑定 Git blob 和工作区字节后完成官方安装、补丁应用及检查，失败原件未覆盖。
+
+Grok `.3` 的 SessionEnd／退出 Stop 在通道撤销后执行而失败，资源退役成功不等于通知成功；该原生缺陷继续在 V03 修复，不新增 G08 图片关闭条件。[7b7 平台门禁 36881884266](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266) 已出现 Linux lifecycle 测试失败和 Windows Claude 权限探针／Grok console broker 失败。Windows Grok 不是编译失败：真实 broker 正例退出 1／`0x80070005`，原始日志未带具体 API 阶段。新源码修复和最终门禁仍待完成，G08 保持开放。
+
+Grok `.4` 原生修复提交 `ba8ce6d346aa36fc7adf67d8e3c3c3130aac250d` 已完成 125 文件公开补丁重建（tree `58b0b69b353d51218043f4c0b6cbd5898a27573d`），Mac 工件 SHA-256 `b196c3a073a37a109af57ddb4d12d45ca40eaa2a99d6b08c5c5a9c88ddab2ad3`。正常 owned 退出等待原 actor 的结束 hook 后再拆除原路由；繁忙时保留后台任务，不补发 Cancel；断连仍立即撤销。真实 actor 的 global/plugin SessionEnd/Stop 四项成功，本机构建与零模型启动通过；旧 pager LEAK 保留。Windows broker 改为创建未附着控制台的进程，仍保留三管道、最小权限句柄及原 Job；待新 Windows 实测。Linux 18 项 lifecycle 失败已定位为夹具 bootstrap/FIFO 顺序，修复后待统一回归；通知 worker 只补充固定超时阶段，保留原预算，尚不声称根因已解决。上述原生及诊断改动无需本地化变更，GUI `/exit` 与最终来源门禁仍待完成。
+
+本轮主仓 11 文件冻结后的 Mac nextest 54/54、i18n 11/11、Python 14 项及 `cargo check -p warp` 全部通过，五轮短目录已核验清理；汇总收据 `g08-build-preparation/owned-exit-host-local-gates-v1.safe.json` SHA-256 `5a2acf28c2ec1d3a7a6ce9ff0b4c23e9bf192a40473b1aa113b3f8ed49a85f39`。这只补齐本机源码门禁，尚未复验原生 GUI 退出与两平台源码，不关闭缺口。
+
 ## 2026-10-01：修复 Grok 原生扩展查询的线上方法名
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `4aeab1a51/r-e2yx7g07` 的真实 tmux 产品菜单单次启动 Grok `.3`，原生 SessionStart 成功；首张图片只提交一次，草稿和卡片保留，无原生问题／typed PNG，也无服务端 claim。持久 pane 结果为 started，客户端 start-unknown 文件只是写前防重标记。源码核验确定 Mac／Linux 将扩展方法裸发为 `x.ai/session/info`，锁定 ACP SDK 仅接受 `_x.ai/session/info`；查询在 claim 创建前失败，临时 input 随后被清理。未捕获现场 RPC 错误码，不将源码推断改称原生零入队回执。根因收据 `resume-20261001/g08-preparation/r-e2yx7g07-tmux-owned-gui/grok-native-wire-root-cause-v1.safe.json` SHA-256 `b60c7088015062f9339895ff3cca86c28955afdb1b6c112208509a5f5ba06a60`。

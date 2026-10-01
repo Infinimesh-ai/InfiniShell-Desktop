@@ -21,7 +21,7 @@ use crate::terminal::event::BlockMetadataReceivedEvent;
 use crate::terminal::model::ansi::Processor;
 use crate::terminal::model::block::BlockMetadata;
 use crate::terminal::model::session::{BootstrapSessionType, SessionInfo};
-use crate::terminal::model_events::ModelEvent;
+use crate::terminal::model_events::{AnsiHandlerEvent, ModelEvent};
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use async_compat::CompatExt;
@@ -297,6 +297,30 @@ pub(in crate::terminal::view) async fn bounded<T>(future: impl Future<Output = T
     }
 }
 
+async fn finish_initial_bootstrap(app: &mut App, terminal: &ViewHandle<TerminalView>) {
+    let events = terminal.read(app, |view, _| view.model_event_dispatcher().clone());
+    let (sender, receiver) = oneshot::channel();
+    let mut sender = Some(sender);
+    app.update(|ctx| {
+        ctx.subscribe_to_model(&events, move |events, event, ctx| {
+            // 初始本地 metadata 与最后一个 precmd 共用 FIFO；先排空再设置远端身份。
+            if matches!(event, ModelEvent::Handler(AnsiHandlerEvent::Precmd))
+                && let Some(sender) = sender.take()
+            {
+                assert_eq!(
+                    events.as_ref(ctx).active_session_id(),
+                    Some(SessionId::from(123))
+                );
+                let _ = sender.send(());
+            }
+        });
+    });
+    bounded(receiver).await.unwrap();
+    terminal.read(app, |view, _| {
+        assert_eq!(view.active_block_session_id(), Some(SessionId::from(123)));
+    });
+}
+
 pub(in crate::terminal::view) fn state_changed(
     app: &mut App,
     terminal: &ViewHandle<TerminalView>,
@@ -384,6 +408,7 @@ impl Fixture {
             manager.client_for_session(session_id()).unwrap().clone()
         });
         let terminal = add_window_with_terminal(app, None);
+        finish_initial_bootstrap(app, &terminal).await;
         terminal.update(app, |view, ctx| {
             let mut info = SessionInfo::new_for_test()
                 .with_session_type(BootstrapSessionType::WarpifiedRemote)
@@ -423,6 +448,8 @@ impl Fixture {
                 }),
                 ctx,
             );
+            assert_eq!(view.active_block_session_id(), Some(session_id()));
+            assert_eq!(view.active_session_is_local(ctx), Some(false));
         });
         Self {
             terminal,

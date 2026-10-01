@@ -6836,5 +6836,70 @@
     "localization": "无需本地化变更",
     "remaining": "修复版真实图片消费、恢复与异常组合、最终两平台源码门禁。",
     "closed_gaps": []
+  },
+  "g08_tmux_real_acceptance_20261002": {
+    "source_commit": "7b7fc36fc41d79be842ecda87e2fc7c7dc521419",
+    "run_id": "r-hx4at14_",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-preparation/r-hx4at14_-tmux-owned-gui",
+    "functional_review_sha256": "a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85",
+    "signed_gui_sha256": "123a4112528cbd2eaee76bdd5d98a56acfc1dbb5153f816be3ada6c3b028728b",
+    "accepted": "三CLI实际SSH/tmux首图及原消费者跨完整SSH断线重连后的第二新请求，共六条typed PNG/两端确认/引用清理；Claude待批重连、实际重复上传零新增入队、旧请求完成保留新草稿及新内容正常消费。",
+    "native_inputs": {
+      "grok": 2,
+      "codex": 2,
+      "claude": 2
+    },
+    "encoding": "137字节源PNG规范化为328字节；原生与上传规范PNG一致，像素内容保持。",
+    "semantic_failure_retained": "Codex第二图要求右到左，但模型仍回答红色，蓝色；新提示与实际图已原生接收，不重跑相近探针。",
+    "permission_denial": "按历史c3ff/r-u10vfmtu真实Read No及retired/release/done计证，不冒称本轮tmux拒绝。",
+    "callback_boundary": "旧请求跨新SSH连接保留新草稿；不是daemon重启或人为强制旧socket乱序。",
+    "localization": "英中菜单/恢复控件、中文输入占位及长图片名已目验；热切换语言后旧通知设置提示仍英文，不扩大至冷启动完整中文应用。无需本地化变更。",
+    "native_notification_open": "Grok .3正常退出SessionEnd/Stop失败；原生.4修复另验，不以进程/引用回收代替通知成功。",
+    "cleanup": {
+      "all_owned_processes_exited": true,
+      "finish_sha256": "ae9a777efe6fdde1f48aa5c63d7ffef23c5e936edf6ac2b25755355952f2175d",
+      "slot_retention_sha256": "f9a8a6779eb41011ba041d8eb6f3f2620f5747081003569c2499a3151b215f90",
+      "unique_history_and_profiles_retained": true,
+      "cleanup_ready": false
+    },
+    "source_gate": {
+      "run_id": 36881884266,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266",
+      "status": "failed_checks_pending_fix",
+      "failures": [
+        "Linux lifecycle夹具18项及installed Grok hook通知写入超时",
+        "Windows Claude权限观察探针",
+        "Windows Grok真实console broker拒绝访问；非编译失败"
+      ]
+    },
+    "gap_closed": false,
+    "newly_closed_items": []
+  },
+  "grok_owned_exit_native_20261002": {
+    "native_commit": "ba8ce6d346aa36fc7adf67d8e3c3c3130aac250d",
+    "native_tree": "58b0b69b353d51218043f4c0b6cbd5898a27573d",
+    "custom_version": "1.0.41+infinishell.session-notifications.4",
+    "patch_sha256": "cddbe766efb0cfe27faed0a06833b223284f2e16833ce5e249b80ff3df742366",
+    "mac_artifact_sha256": "b196c3a073a37a109af57ddb4d12d45ca40eaa2a99d6b08c5c5a9c88ddab2ad3",
+    "source_file_count": 125,
+    "passed": "原生最终check、真实actor SessionEnd/Stop四hook、Mac构建与零模型启动检查",
+    "remaining": [
+      "真实GUI正常退出通知",
+      "Linux/Windows最终源码门禁"
+    ],
+    "historical_failure": "旧.3退出通知失败、旧nextest LEAK及CI失败保留，未被新正例覆盖",
+    "windows_fix": "broker由CREATE_NO_WINDOW改用DETACHED_PROCESS；真实控制台附着尚待新CI",
+    "worker_diagnostic": "固定阶段错误码区分总发送期限与帧写入期限；不更改超时，不声称已修复Linux超时",
+    "localization": "已复核既有英中退出/未知状态语义，无用户可见文案变化，无需本地化变更。",
+    "gap_closed": false,
+    "host_gates": {
+      "receipt_sha256": "5a2acf28c2ec1d3a7a6ce9ff0b4c23e9bf192a40473b1aa113b3f8ed49a85f39",
+      "nextest_passed": 54,
+      "i18n_passed": 11,
+      "python_passed": 14,
+      "cargo_check": "passed",
+      "localization": "无需本地化变更",
+      "temporary_runs": "all cleaned"
+    }
   }
 }

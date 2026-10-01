@@ -2,13 +2,13 @@
 
 use std::io;
 
-pub(crate) const VERSION: &str = "1.0.41+infinishell.session-notifications.3";
+pub(crate) const VERSION: &str = "1.0.41+infinishell.session-notifications.4";
 pub(crate) const BUILD_CONTRACT: &str = "infinishell-terminal-bridge-v1+session-notifications-v1";
 
 // 原生构建及来源审计完成后绑定真实摘要；未绑定期间不能启动此入口。
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 const SHA256: Option<&str> =
-    Some("5c1bdc369735850fe26a6a86544b0fa1457d98788873d49bfd44a8f17b054b00");
+    Some("b196c3a073a37a109af57ddb4d12d45ca40eaa2a99d6b08c5c5a9c88ddab2ad3");
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const SHA256: Option<&str> = None;
 
@@ -19,7 +19,7 @@ pub(crate) fn sha256() -> io::Result<&'static str> {
 // 完整 --version 包含来源提交；与摘要一起在原生构建后绑定。
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 const VERSION_OUTPUT: Option<&str> =
-    Some("grok 1.0.41+infinishell.session-notifications.3 (975d815fec8e)");
+    Some("grok 1.0.41+infinishell.session-notifications.4 (ba8ce6d346aa)");
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const VERSION_OUTPUT: Option<&str> = None;
 

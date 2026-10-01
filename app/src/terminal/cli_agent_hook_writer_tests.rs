@@ -295,7 +295,7 @@ fn failed_write_releases_os_lock_without_replacing_lock_file() {
         errors: VecDeque::new(),
     };
     assert_eq!(
-        send_frame(&directory, &mut broken, b"frame").unwrap_err(),
+        send_frame(&directory, &mut broken, b"frame", &AtomicU8::new(0)).unwrap_err(),
         HookWriteError::WriteFailed
     );
     let before = fs::metadata(directory.join("transport.lock")).unwrap();
@@ -565,7 +565,7 @@ fn concurrent_maximum_short_writes_arrive_as_complete_real_pty_frames() {
                     errors: VecDeque::new(),
                 };
                 barrier.wait();
-                send_frame(&directory, &mut writer, &frame)
+                send_frame(&directory, &mut writer, &frame, &AtomicU8::new(0))
             })
         })
         .collect();
@@ -595,7 +595,7 @@ fn killed_partial_pty_frame_resynchronizes_at_the_next_complete_notification() {
     let frame = encode_frame(&parsed(&value), false).unwrap();
     let expected = 31 + frame.len();
     let mut terminal = open_unix_terminal(&path).unwrap();
-    send_frame(&directory, &mut terminal, &frame).unwrap();
+    send_frame(&directory, &mut terminal, &frame, &AtomicU8::new(0)).unwrap();
     let bytes = read_pty(master, expected);
     assert_eq!(bytes.len(), expected);
     let result = parse_osc(&bytes);

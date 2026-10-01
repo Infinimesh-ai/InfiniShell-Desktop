@@ -736,6 +736,14 @@ fn check_grok_restored_identity(
             );
         });
         bounded(observed).await.unwrap();
+        fixture.terminal.read(&app, |view, ctx| {
+            assert!(
+                CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .unwrap()
+                    .is_remote()
+            );
+        });
         let (ended, ended_receiver) = oneshot::channel();
         let mut ended = Some(ended);
         let view_id = fixture.terminal.read(&app, |view, _| view.view_id);

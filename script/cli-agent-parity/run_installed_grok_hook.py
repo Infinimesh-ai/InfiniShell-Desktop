@@ -17,6 +17,9 @@ NATIVE_ERRORS = (
     "invalid_payload", "frame_too_large", "input_unavailable", "input_timeout",
     "terminal_unavailable", "tmux_unavailable", "lock_unavailable", "lock_timeout",
     "write_failed", "write_timeout",
+    "send_timeout_prepare", "send_timeout_terminal", "send_timeout_cache",
+    "send_timeout_lock_open", "send_timeout_lock_wait", "send_timeout_frame_write",
+    "send_timeout_unknown", "send_unavailable",
 )
 DIAGNOSTIC_ERRORS = {"unknown", "ETIMEDOUT", "ENOENT", "EACCES", "ENOEXEC", "EAGAIN",
                      "ENOMEM", "ENOBUFS", *("cli_agent_notify_" + value for value in NATIVE_ERRORS)}

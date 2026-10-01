@@ -15,7 +15,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 SOURCE_PROFILES = {
     "terminal-bridge": ("source.json", "terminal-bridge.patch", "1.0.41+infinishell.terminal-bridge.11"),
     "session-notifications": ("session-notifications-source.json", "session-notifications.patch",
-                              "1.0.41+infinishell.session-notifications.3"),
+                              "1.0.41+infinishell.session-notifications.4"),
 }
 UPSTREAM = "https://github.com/xai-org/grok-build"
 BASE = "07e35a3dfeed2f200d319ef6c893b5ea286d9a51"
@@ -197,7 +197,26 @@ def main():
                 raise RuntimeError("默认权限与跨线程模式互斥必须实际验证")
             receipt["owned_identity_tests"] = owned_identity_count
             receipt["owned_input_tests"] = 3
+            # 正常退出握手必须独立执行；不能用旧通知组或 cfg 后零命中代证。
+            owned_exit_results = {}
+            for package, expected_count in (("xai-grok-shell", 12 if system == "Linux" else 1),
+                                            ("xai-grok-pager", 4)):
+                owned_exit_tests = run([
+                    "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", package,
+                    "--lib", "owned_exit", "--", "--test-threads=1",
+                ], True)
+                results = [tuple(map(int, values)) for values in re.findall(
+                    r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;",
+                    owned_exit_tests)]
+                if results != [(expected_count, 0, 0)]:
+                    raise RuntimeError(f"{package} 正常退出测试数量或结果不符，不能把零命中记为通过")
+                owned_exit_results[package] = expected_count
+            receipt["owned_exit_tests"] = owned_exit_results
             if system == "Windows":
+                receipt["owned_exit_unix_fixture"] = {
+                    "status": "not_applicable",
+                    "scope": "11项POSIX PTY退出/路由/actor夹具仅在Unix编译；Windows须单独通过1项shell和4项pager，不代表Windows交互式退出已验收。",
+                }
                 receipt["owned_identity_unix_fixture"] = {
                     "status": "not_applicable",
                     "scope": "4项POSIX PTY身份/入队测试仅在Unix编译；不代表Windows原生恢复已验收。",

@@ -30,6 +30,12 @@ class WorkerDiagnosticTests(unittest.TestCase):
                     error_code="cli_agent_notify_terminal_unavailable")]
         self.assertEqual(worker_diagnostics(encode(*rows)), {"status": "captured", "events": rows})
 
+    def test_outer_send_deadline_preserves_its_fixed_phase(self):
+        rows = [row("preload"), row("protocol", exit_code=0, stdout_bytes=41, stderr_bytes=None),
+                row("send", exit_code=1, error_code="cli_agent_notify_send_timeout_lock_open")]
+        self.assertEqual(worker_diagnostics(encode(*rows))["events"][2]["error_code"],
+                         "cli_agent_notify_send_timeout_lock_open")
+
     def test_successful_exec_keeps_unobservable_stderr_count_unknown(self):
         rows = [row("preload"), row("protocol", exit_code=0, stdout_bytes=41, stderr_bytes=None),
                 row("send", exit_code=0, stderr_bytes=None)]
@@ -51,6 +57,7 @@ class WorkerDiagnosticTests(unittest.TestCase):
 
     def test_unknown_error_signal_and_non_scalar_values_are_rejected(self):
         for key, value in (("error_code", "private-sentinel"), ("signal", "private-sentinel"),
+                           ("error_code", "cli_agent_notify_send_timeout_private_sentinel"),
                            ("signal", []), ("error_code", {}), ("stdout_bytes", "private-sentinel")):
             with self.subTest(key=key, value=value):
                 result = worker_diagnostics(encode(row("preload"), row("protocol", **{key: value})))

@@ -198,6 +198,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G08 — 远程 CLI 图片传输
 
+- **2026-10-02 `7b7fc36fc` 三 CLI 真实 tmux 图片与恢复链完成，最终门禁待修**：`r-hx4at14_` 的 Mac 签名 GUI 经实际回环 SSH／tmux 产品入口分别提交 Grok、Codex、Claude 首图；三款均在完整 SSH 断开、重连及恢复原消费者后接收第二条新内容。六条原生请求的 typed PNG 与规范上传字节一致，双方确认及图片引用释放齐备。Claude 在原生 Read 待批时重连，相同内容产生新上传但未产生 claim／queue／原生输入；旧请求获允许并完成后，新草稿与原卡保留，随后不同内容正常消费并自动清稿。权限拒绝沿用 `c3ff/r-u10vfmtu` 的真实 Read No／retired 清理，不伪称本轮重跑。Codex 第二图要求逆序却仍答正序，明确保留模型语义失败，不影响已核实的新请求及图片输送事实。功能证据索引 SHA-256 `a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85`；全部自有进程已退出，唯一历史与 profiles 保留。Grok `.3` 正常退出的 SessionEnd／Stop 通知仍失败，归入 V03 继续修原生；[7b7 平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266) Linux 测试和 Windows 原生门禁失败，尚未取得最终源码通过结论。本轮不关闭 G08，不再重复上述同类模型验收。
+
 - **2026-10-01 首图协议拒绝已定位，仍开放**：`4aeab1a51/r-e2yx7g07` 真实 tmux 单次 Grok 首图未消费。锁定 ACP SDK 要求扩展线上方法带 `_`，宿主 Mac／Linux 漏此前缀；现精准修正，两处权限／身份守卫不变。Mac 54项定向、i18n11项及check通过，收据 `d85565eb09daf8fcc1bea4116e86afdd08bf63a71287fe99100ae5aabfebd110`；另修正Codex测试夹具初始FIFO顺序，Windows原失败仍待目标复验。无需本地化变更；真实修复版三CLI图片／恢复链与最终平台门禁待验，详见验证报告，不关闭缺口。
 
 - **2026-10-01 原生`.3`及tmux恢复接线，仍开放**：Claude/Grok只恢复经当前绑定复核的Unknown／Closed身份；Grok新增驻留actor只读权限/描述符查询与保留busy队列语义的原子接收前置。原生975d815fec8e完整117文件补丁可重建，新Mac工件5c1bdc369735已绑定并通过签名/启动检查；新增17项原生测试/check通过，原并发1项LEAK保留。宿主488项经夹具修正后487通过/1失败，最后两行夹具修正的2项独立PASS，i18n11及最终check通过，分轮收据 `c3573942ccfdfb5abdd348dfd12361b2c8972ac0535c68f896ddaa6b3f5e41f6`，不合称单轮全过。英中新增状态未确认提示已审计，真实布局待验；b38 Linux通过，Windows下载失败、独立Codex等待超时及Vim LEAK保留。新版三CLI真实tmux图片消费、恢复异常链和新平台源码门禁待验，不关闭G08。
@@ -227,7 +229,7 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **固定 Grok 隔离认证复核**：固定 `1.0.41` 在新私有 `HOME`／`GROK_HOME`、独立 leader socket 且不继承认证环境时，单轮模型标记探针退出 1、没有标记或 `auth.json`；没有发送图片。脱敏收据 `resume-20260929/g08-isolated-grok-r-6574681e/receipt.safe.json` SHA-256 `f640ca4ad9bded5aad4ca880cb3959869f3e8e1ad847950c50f41bfdb6ba5e76`，私有进程与短目录已核验清理。离线审查未发现可在无认证条件下确定复现的远端消费缺陷；这只说明本轮认证前置不满足，G08 仍需专用登录及交互式 SSH／tmux 的原生消费验收。
 
 - **状态／优先级／范围**：功能缺项，中；P1 附件、P5 SSH／tmux。
-- **实际情况与影响**：远程图片的上传、会话绑定和三款 CLI 原生消费者均已接线，未满足来源／会话合同的输入仍拒绝；真实 SSH／tmux 投递、消费及恢复验收尚未完成。
+- **实际情况与影响**：三款 CLI 的实际 SSH／tmux 图片消费、完整断连重连、重复投递和旧请求保护已完成限定验收，详见本节 2026-10-02 记录；源码门禁尚有失败，仍保持开放。未满足来源／会话合同的输入继续拒绝。
 - **未验证代码增量**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。Claude 的实际 SSH 首图消费与释放、成功后重开清稿/清卡、拒绝后退出的宿主 retired 回收及退出后重连无新增，已由 c3ff/r-u10vfmtu 在英文 GUI 的限定链复验；367旧缺陷与失败仍按原轮保留。中文布局、Codex／Grok 与 tmux 原生图片消费及其他异常组合仍待实测，不以可靠拒绝或暂存正例代替完成。
 - **恢复补接**：`5aac3f7d0` 增加同会话 Claude 原生事件后的有限只读补查，并在 Grok 确认未进入 Submit 时保存精确未派发终态，允许用户主动重试；未知 RPC 不重投、不清新草稿。新增十项回归本地通过，英中提示同步；真实远程延迟审批／回收及布局待验，G08 不关闭。
 - **当前替代方式**：用户先将图片放到目标环境，再使用该 CLI 已验证的远程文件路径读取方式；本机附件路径不能直接当远程路径。
@@ -348,6 +350,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：在两平台实际输入法中验证 preedit、数字／空格选词、中英文混排、多行和 Enter 不误提交，覆盖普通终端富输入与托管输入并保留真实界面及输入结果。
 
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
+
+- **2026-10-02 原生退出修复待实窗复验**：公开 Grok 源码提交 `ba8ce6d346aa`／`.4` 将正常 owned 退出改为在原 IPC 与终端仍附着时等待闲置 actor 的 SessionEnd／Stop，然后撤销原代际路由；繁忙会话只脱离、不新增取消，意外断连仍立即撤销。Mac check、真实 actor 四 hook 正例及签名构建通过；主仓定向、GUI `/exit` 和新 Windows console broker 门禁待验。旧 `.3` 通知失败与测试 LEAK 保留，不以进程退出代替通知完成，不关闭 V03。
 
 - **状态／优先级／范围**：验收缺口，高；P2 通知、P4 重连、P5 SSH／tmux。
 - **实际情况与影响**：当前固定版本三款链主要覆盖 Mac 到本机隔离 OpenSSH，并包含 tmux 断连重接；不覆盖远端 Linux、Windows、WSL 等组合。旧 Codex 关闭 tmux 透传补测仅观察到产品接收 0，缺少内层发送证据。2026-09-29 独立本机回环补测在固定 `0.156.1` 的原生 `SessionStart`／`UserPromptSubmit` hook、私有 tmux `3.7c` 且 `allow-passthrough=off` 下，确认 pane 内两条通知与外层 SSH 输出零通知；该双端负例补齐这一窄范围，不代表远端组合、产品 UI 的双向交互或断连取消验收。
