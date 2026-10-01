@@ -143,12 +143,19 @@ pub(super) fn recover(
 }
 
 pub(super) fn submit(
+    service: &ImageStagingService,
     staging: &mut RemoteImageStaging,
     connection: &ImageStagingConnection,
     lease: &SubmissionLease,
     scope: &RemoteImageScope,
     request: &CliImageClaudeQueue,
 ) -> Result<CliImageCodexQueueResult, CliImageStagingError> {
+    if service.host_id != scope.host_id {
+        return Err(error(
+            CliImageStagingErrorCode::InvalidScope,
+            "image service host changed",
+        ));
+    }
     let key = parse_scope_uuid(&request.recovery_key)?;
     let subject: [u8; 32] = request.subject_sha256.as_slice().try_into().map_err(|_| {
         error(
@@ -260,16 +267,55 @@ pub(super) fn submit(
         let session = Uuid::parse_str(&scope.cli_session_id)
             .map_err(|_| io::Error::other("invalid Claude session"))?;
         let (binding, stream) = Binding::connect(candidate, session)?;
+        #[cfg(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        ))]
+        let tmux = {
+            let (pid, tty) = binding.terminal_identity();
+            service.claude_tmux_guard(scope, candidate, pid, tty)?
+        };
+        #[cfg(not(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )))]
+        if candidate.tmux_owned.is_some() {
+            return Err(io::Error::other("tmux image platform is unavailable"));
+        }
+        let validate = |stream: &std::os::unix::net::UnixStream| {
+            binding.validate(stream)?;
+            #[cfg(any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            ))]
+            if let Some(tmux) = &tmux {
+                let (pid, tty) = binding.terminal_identity();
+                tmux.validate_process(pid, tty)?;
+            }
+            binding.validate(stream)
+        };
         let lifetime = binding.lifetime(&stream)?;
         let target = binding.target();
-        let native =
-            ClaudeImageInbox::connect(stream, target.clone(), &|stream| binding.validate(stream))?;
+        let native = ClaudeImageInbox::connect(stream, target.clone(), &validate)?;
         native.submit_once(
             scope.submission_id,
             &request.text,
             &images,
             &write_state,
             |attempt| {
+                #[cfg(any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                ))]
+                let tmux_recovery = tmux
+                    .as_ref()
+                    .map(super::super::tmux_owned::ImageGuard::recovery_identity)
+                    .transpose()?;
+                #[cfg(not(any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )))]
+                let tmux_recovery = None;
                 let claude_recovery =
                     serde_json::to_value(Recovery::new(&target, attempt, Some(lifetime)))
                         .map_err(|_| io::Error::other("image attempt unavailable"))?;
@@ -283,12 +329,13 @@ pub(super) fn submit(
                     native_request_sha256: attempt.request_sha256(),
                     references,
                     claude_recovery: Some(claude_recovery),
+                    tmux_recovery,
                 };
                 staging.claim_queue(&claim)?;
                 *saved_claim.borrow_mut() = Some(claim);
                 lease.claim_native(connection)
             },
-            &|stream| binding.validate(stream),
+            &validate,
         )?;
         Ok(())
     })();

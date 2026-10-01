@@ -5,6 +5,18 @@ use std::sync::mpsc::TryRecvError;
 
 use super::*;
 
+#[test]
+fn configured_tmux_service_cannot_fall_back_after_its_owner_disappears() {
+    let fixture = Fixture::new();
+    fixture.service.set_tmux_owned(Weak::new());
+    assert!(
+        fixture
+            .service
+            .ticket_scope(&fixture.scope, &ticket())
+            .is_err()
+    );
+}
+
 struct Fixture {
     root: tempfile::TempDir,
     service: Arc<Service>,
@@ -24,6 +36,7 @@ impl Fixture {
             host: "grok-cleanup-test-host".into(),
             tickets: TicketStore::new(&root.path().canonicalize().unwrap()).unwrap(),
             cleanup,
+            tmux_owned: Mutex::new(None),
         });
         let scope = Scope {
             host: service.host.clone(),

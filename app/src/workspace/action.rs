@@ -317,6 +317,18 @@ pub enum WorkspaceAction {
         )
     ))]
     StartRemoteOwnedCodexInCurrentTerminal,
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+    StartRemoteOwnedInTmux(CLIAgent),
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(windows, target_arch = "x86_64")
+    )))]
+    RestoreRemoteOwnedInTmux,
     /// Add a new tab running a local Docker sandbox via `sbx`.
     AddDockerSandboxTab,
     OpenNewSessionMenu {
@@ -1006,7 +1018,7 @@ impl WorkspaceAction {
                     all(windows, target_arch = "x86_64")
                 )
             ))]
-            AddGrokRichInputTab | StartRemoteOwnedGrokInCurrentTerminal | StartRemoteOwnedCodexInCurrentTerminal => true,
+            AddGrokRichInputTab | StartRemoteOwnedGrokInCurrentTerminal | StartRemoteOwnedCodexInCurrentTerminal | StartRemoteOwnedInTmux(_) | RestoreRemoteOwnedInTmux => true,
             AutoupdateFailureLink
             | ApplyUpdate
             | CopyVersion(_)

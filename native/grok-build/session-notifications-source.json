@@ -23,17 +23,17 @@
   "custom_version": "1.0.41+infinishell.session-notifications.2",
   "build_contract": "infinishell-terminal-bridge-v1+session-notifications-v1",
   "leader_namespace": "leader-isp-sn1",
-  "native_commit": "aa584b262081293d84b6fe78e027df7a3ddd4be0",
-  "native_tree": "f8d2bed3472fa83b9695399d7bf71e05c03f426d",
+  "native_commit": "8855bbe866800bf41a70508e236981cdc98f92ad",
+  "native_tree": "d71b38fcd6036a2692ac4503460711b6ef05b3de",
   "patch_file": "session-notifications.patch",
-  "patch_sha256": "1a31ad1713ec038e46c52ba24aaec5146406a87efea25e1491bea7f93adce893",
+  "patch_sha256": "53446e019b39fe8248e399d05f4b37330cfb454768d4171c98608f2aa3671d59",
   "patch_reconstruction": {
     "status": "passed",
     "base_commit": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
-    "rebuilt_tree": "f8d2bed3472fa83b9695399d7bf71e05c03f426d",
+    "rebuilt_tree": "d71b38fcd6036a2692ac4503460711b6ef05b3de",
     "actual_worktree_index_unchanged": true,
-    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-aa584b262081/reconstruction.safe.json",
-    "receipt_sha256": "9248d0099caec634974557a166723ab4e1cb73147da864946fb5d15c0d123851"
+    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-8855bbe86680/reconstruction.safe.json",
+    "receipt_sha256": "f57794146332dcae04763de5c8b0b1532b0aa3932c9d24a1ba4f17f899bb0c58"
   },
   "source_file_count": 106,
   "source_change_counts": {
@@ -50,7 +50,7 @@
     "crates/codegen/xai-grok-hooks/src/runner/http.rs": "db2141af4af0831079b804fc0661d303efc74f9f22e1e4d4a51f516e4cf8817e",
     "crates/codegen/xai-grok-hooks/src/runner/mod.rs": "c1f743bf55a3e77f278f98b7c4fde9351d929566393b8ae7cfd73d0312e3df94",
     "crates/codegen/xai-grok-hooks/src/runner/notification_console_windows.rs": "5a83b0dc165ef0efc28ebb7bbc0179963e0411d7c9ff2b5da3691690f5d8a8f0",
-    "crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs": "67169c4b720433fd4a0d3db215aaef40ebd492bb06ecf6726875c5d132061511",
+    "crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs": "0de5ce687be1afa2b1f0d93d1ca45f27dfb58c871a26d4620d40f6214c2fedcb",
     "crates/codegen/xai-grok-hooks/tests/integration.rs": "026597535ef4c62856e7d49d0d7470a325eadbb01df5c9b8157c83abbcc3f57a",
     "crates/codegen/xai-grok-pager-bin/build.rs": "78236be5070f9b9384d219cffffd0a62b644bfa58f445d4b75cc531d17779902",
     "crates/codegen/xai-grok-pager-bin/src/main.rs": "c74b4107b3316a22b2c869f52c6c60eb43db406975cc43901d9aa308fcd2f496",
@@ -148,7 +148,7 @@
     "crates/codegen/xai-grok-tools/src/implementations/grok_build/task/types.rs": "211d28b8799c9ad01921935a41d388ade29291d2aba1f2c6bdf4a52a856a99ae",
     "crates/codegen/xai-grok-version/src/lib.rs": "c55cede076c30027e00dd0d7a8475d9f5864023f628a9f05f2801c62981fe0c3"
   },
-  "source_digest": "6c1b4d4a00bde9c8e10c471a4363763f1c5bfca5a147ee672d34583ce2212b07",
+  "source_digest": "4f8668583d5ef4661c2b848e40ff940fb8988f69b9f66282d69eade981b5fdc1",
   "source_digest_encoding": "按路径排序的 source_files_sha256 映射，以 UTF-8 JSON、ensure_ascii=false、分隔符逗号和冒号且无额外空白编码后取 SHA-256。",
   "local_validation": {
     "platform": "macOS arm64",
@@ -584,14 +584,25 @@
         "leak_count": 2,
         "boundary": "原并发轮保持失败；唯一串行定位使用相同源码和退出超时，16项零LEAK。未将并发LEAK归因为已修复。"
       }
+    },
+    "windows_read_method_validation": {
+      "native_commit": "8855bbe866800bf41a70508e236981cdc98f92ad",
+      "native_tree": "d71b38fcd6036a2692ac4503460711b6ef05b3de",
+      "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-8855bbe86680/reconstruction.safe.json",
+      "receipt_sha256": "f57794146332dcae04763de5c8b0b1532b0aa3932c9d24a1ba4f17f899bb0c58",
+      "format_run_id": "r-3gl00tb2",
+      "format_check": "passed",
+      "source_reconstruction": "passed",
+      "cargo_check": "not_run_windows_test_only_change",
+      "windows_notification_tests": "pending_not_passed"
     }
   },
   "cross_platform_build": {
     "capability": "session-notifications",
     "custom_version": "1.0.41+infinishell.session-notifications.2",
-    "native_commit": "aa584b262081293d84b6fe78e027df7a3ddd4be0",
-    "native_tree": "f8d2bed3472fa83b9695399d7bf71e05c03f426d",
-    "patch_sha256": "1a31ad1713ec038e46c52ba24aaec5146406a87efea25e1491bea7f93adce893",
+    "native_commit": "8855bbe866800bf41a70508e236981cdc98f92ad",
+    "native_tree": "d71b38fcd6036a2692ac4503460711b6ef05b3de",
+    "patch_sha256": "53446e019b39fe8248e399d05f4b37330cfb454768d4171c98608f2aa3671d59",
     "status": "pending",
     "linux_artifact": {
       "status": "pending",
@@ -616,7 +627,7 @@
         "boundary": "继承既有 Windows 符号链接特权不足的后置范围，已核本提交夹具摘要完全相同；不是本通知工件的新平台执行结果。"
       }
     ],
-    "boundary": "本次仅测试源码修正；新源码的 Linux/Windows 定向回归与构建尚未执行。先前失败保留在原 CI 审计中，不计通过。"
+    "boundary": "仅 Windows cfg(test) 一行方法消歧；前次通知测试编译失败保留，新源码须在 Windows 真实编译并运行原通知测试。"
   },
   "host_artifact_binding": {
     "module": "app/src/terminal/cli_agent_sessions/grok_notification_artifact.rs",
@@ -639,15 +650,39 @@
     "不关闭 G08；真实 SSH/tmux pager、resident sidecar、typed PNG 和通知归属仍待验收。",
     "版本二 Mac 原生工件构建、签名和零模型启动检查已完成并绑定；Linux/Windows 新工件与源码门禁待执行，最终宿主门禁仍待完成。",
     "当前宿主增量包含两组英中文案变更；i18n 与双语实际布局仍须按最终宿主构建验收。",
-    "本轮仅提交测试夹具修正；既有 Mac 工件继续绑定 a9c27a25，Windows broker 必须在真实 Windows 上重跑，不把诊断增强计作缺陷已修复。"
+    "本轮仅提交测试夹具修正；既有 Mac 工件继续绑定 a9c27a25，Windows broker 必须在真实 Windows 上重跑，不把诊断增强计作缺陷已修复。",
+    "Windows 通知测试 E0034 仅做一行同步 trait 消歧；新源码尚未在 Windows 编译或执行，不将原 broker 运行失败记作修复通过。"
   ],
   "gap_closed": false,
   "test_only_revision": {
-    "proof": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-aa584b262081/test-only-source-proof.safe.json",
-    "proof_sha256": "7d509fb406714b3231ff424bdb4bb076b2217952e60c8ec3f24cc26c235c8fd8",
-    "previous_source_commit": "a9c27a25fe22ed693273b5428ea27d4a8b0c2940",
+    "proof": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-8855bbe86680/test-only-source-proof.safe.json",
+    "proof_sha256": "a21d47ec1ce28a01418d3b4d742281235e50b7928f716a5104456b07f4487f09",
+    "previous_source_commit": "aa584b262081293d84b6fe78e027df7a3ddd4be0",
+    "macos_artifact_source_commit": "a9c27a25fe22ed693273b5428ea27d4a8b0c2940",
     "production_source_changes": 0,
     "macos_artifact_rebuilt": false,
-    "metadata_before_sha256": "a6ef2942bc2387d53d525f14985a62d79f3a0c642b1d324987322098ace204b4"
+    "metadata_before_sha256": "39dc1ccd59cdd1d1ec47784d548adc3286af62666121f08297190fb965111d6b"
+  },
+  "historical_test_only_revisions": [
+    {
+      "proof": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-aa584b262081/test-only-source-proof.safe.json",
+      "proof_sha256": "7d509fb406714b3231ff424bdb4bb076b2217952e60c8ec3f24cc26c235c8fd8",
+      "previous_source_commit": "a9c27a25fe22ed693273b5428ea27d4a8b0c2940",
+      "production_source_changes": 0,
+      "macos_artifact_rebuilt": false,
+      "metadata_before_sha256": "a6ef2942bc2387d53d525f14985a62d79f3a0c642b1d324987322098ace204b4"
+    }
+  ],
+  "windows_test_compile_followup": {
+    "host_commit": "737b07f323ec787ad56ee0d091d5a96e939666eb",
+    "native_commit": "aa584b262081293d84b6fe78e027df7a3ddd4be0",
+    "native_tree": "f8d2bed3472fa83b9695399d7bf71e05c03f426d",
+    "step": 16,
+    "status": "failed_compile_before_notification_tests",
+    "exit_code": 101,
+    "diagnostic": "E0034: io::Cursor 的 read_to_end 同时匹配 std::io::Read 与 tokio::io::AsyncReadExt",
+    "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/737b-ci/artifact-11161543421.zip",
+    "archive_sha256": "769b45332fae4cd5c1a28d994e9f7e0f0123a73b32cf2b3f365596481f7f079a",
+    "step_log_sha256": "8c4044e0ce4315841b4f0764a8924a3a758c3f05917a53946cf65a38f51b72c0"
   }
 }

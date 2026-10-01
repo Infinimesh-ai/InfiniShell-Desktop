@@ -81,7 +81,12 @@ impl TerminalView {
             return None;
         }
         let client = RemoteServerManager::as_ref(ctx)
-            .client_for_session(warp_core::SessionId::from(owned.launch.terminal_session))?
+            .client_for_session(warp_core::SessionId::from(
+                owned
+                    .launch
+                    .tmux_terminal_session
+                    .unwrap_or(owned.launch.terminal_session),
+            ))?
             .clone();
         Some((
             client.clone(),

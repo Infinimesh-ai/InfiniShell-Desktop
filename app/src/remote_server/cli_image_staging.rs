@@ -21,7 +21,7 @@ use super::cli_image_claude_queue::{
 
 #[path = "cli_image_staging_recovery.rs"]
 mod recovery;
-pub(super) use recovery::{PreflightRejection, QueueClaim, QueueResult};
+pub(super) use recovery::{PreflightRejection, QueueClaim, QueueResult, TmuxImageRecovery};
 
 const MAX_CHUNK_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SCOPE_TRANSFERS: usize = 32;
@@ -73,6 +73,30 @@ pub(crate) struct RemoteImageStaging {
 }
 
 impl RemoteImageStaging {
+    pub(super) fn queue_recovery_claim(
+        &self,
+        scope: &RemoteImageScope,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        self.references
+            .queue_recovery_claim(&scope.cli_session_id, submission, key)
+    }
+
+    pub(super) fn reference_recovery_claim(
+        &self,
+        scope: &RemoteImageScope,
+        transfer: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        self.references.reference_recovery_claim(
+            &scope.cli_session_id,
+            scope.submission_id,
+            transfer,
+            key,
+        )
+    }
+
     pub(super) fn queue_status(&self, scope: &RemoteImageScope, submission: Uuid, key: Uuid) -> io::Result<Option<QueueResult>> {
         self.references.queue_status(scope.host_id.as_str(), &scope.cli_session_id, submission, key)
     }
@@ -151,7 +175,7 @@ impl RemoteImageStaging {
             return Err(rejected("staging directory is not private"));
         }
         let references = recovery::ReferenceStore::new(parent)?;
-        let reserved_bytes = references.retained_bytes(host_id.as_str())?;
+        let reserved_bytes = references.retained_bytes()?;
         Ok(Self {
             host_id,
             root,

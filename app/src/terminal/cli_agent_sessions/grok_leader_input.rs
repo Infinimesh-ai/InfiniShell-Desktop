@@ -385,6 +385,7 @@ mod native {
 
     use command::managed::{
         MacosProcessIdentity, macos_boot_session, macos_peer_identity, macos_process_identity,
+        macos_process_terminal,
     };
     use sha2::{Digest as _, Sha256};
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
@@ -469,6 +470,13 @@ mod native {
     }
 
     impl GrokLeaderTarget {
+        pub(crate) fn terminal_identity(&self) -> Result<(i32, u64), GrokLeaderInputError> {
+            self.validate()?;
+            let terminal = macos_process_terminal(self.tui)?;
+            self.validate()?;
+            Ok((self.tui.pid, terminal.tty_device))
+        }
+
         pub(crate) fn capture(
             binding_id: Uuid,
             session_id: Uuid,

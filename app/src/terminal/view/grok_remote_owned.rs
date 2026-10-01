@@ -5,6 +5,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use warpui::{AppContext, SingletonEntity, ViewContext};
 
+use super::tmux_remote_owned::Instance as TmuxInstance;
 use super::{BlockId, SessionId, ShellType, TerminalView};
 use crate::remote_server::cli_image_grok_client::{self as remote, Journal, Launch};
 use crate::remote_server::cli_image_grok_protocol::{Action, Reply};
@@ -13,6 +14,7 @@ use crate::remote_server::cli_image_grok_protocol::Ticket;
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
 use crate::remote_server::proto::CliImageStagingScope;
+use crate::remote_server::tmux_owned_client::Launch as TmuxLaunch;
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::{CLIAgentSessionsModel, GrokPermissionEvidence};
 use crate::terminal::model::session::command_executor::shell_quote_arg;
@@ -26,6 +28,7 @@ struct Snapshot {
 }
 
 pub(super) struct RemoteOwned {
+    tmux_instance: Option<TmuxInstance>,
     pub(super) launch: Launch,
     pub(super) native_session: Option<Uuid>,
     pub(super) pending: Option<(Arc<RemoteServerClient>, CliImageStagingScope, u64)>,
@@ -61,6 +64,93 @@ impl RemoteOwned {
 }
 
 impl TerminalView {
+    pub(super) fn accept_tmux_owned_grok(
+        &mut self,
+        intent: &TmuxLaunch,
+        cwd: &str,
+        bytes: &[u8],
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let Ok(Reply::Launch {
+            ticket,
+            native_session,
+            ..
+        }) = serde_json::from_slice::<Reply>(bytes)
+        else {
+            return false;
+        };
+        if ticket.id != intent.id || ticket.key != intent.key {
+            return false;
+        }
+        if let Some(id) = native_session {
+            if !self.set_tmux_owned_native_session(CLIAgent::Grok, id) {
+                return false;
+            }
+        }
+        let Some(instance) = self.tmux_owned_instance(intent.id, ctx) else {
+            return false;
+        };
+        let Some((snapshot, client)) = self.remote_grok_snapshot(true, ctx) else {
+            return false;
+        };
+        if self.grok_remote_owned.as_ref().is_some_and(|owned| {
+            owned.launch.ticket == ticket
+                && owned.tmux_instance.as_ref() == Some(&instance)
+                && owned.launch.tmux_terminal_session == Some(snapshot.session.as_u64())
+                && owned.snapshot == snapshot
+        }) {
+            return true;
+        }
+        let launch = Launch {
+            host: intent.host.clone(),
+            terminal_session: intent.terminal_session,
+            block_id: intent.block_id.clone(),
+            cwd: cwd.into(),
+            ticket,
+            tmux_source: Some(intent.id),
+            tmux_terminal_session: Some(snapshot.session.as_u64()),
+        };
+        let remembered = launch.clone();
+        ctx.spawn(
+            blocking::unblock(move || Journal::open()?.remember_tmux(&remembered)),
+            move |view, result, ctx| {
+                if !view.tmux_owned_instance_is_current(&instance, ctx)
+                    || view.remote_grok_snapshot(true, ctx).is_none_or(
+                        |(current, current_client)| {
+                            current != snapshot || !Arc::ptr_eq(&current_client, &client)
+                        },
+                    )
+                {
+                    return;
+                }
+                if result.is_err() {
+                    view.revoke_remote_owned_grok();
+                    return;
+                }
+                if view.grok_remote_owned.as_ref().is_some_and(|owned| {
+                    owned.launch.ticket == launch.ticket
+                        && owned.tmux_instance.as_ref() == Some(&instance)
+                        && owned.launch.tmux_terminal_session == launch.tmux_terminal_session
+                        && owned.snapshot == snapshot
+                }) {
+                    return;
+                }
+                view.grok_remote_owned = Some(RemoteOwned {
+                    tmux_instance: Some(instance),
+                    launch,
+                    native_session: None,
+                    pending: None,
+                    sending: false,
+                    sending_generation: None,
+                    snapshot,
+                    querying: false,
+                });
+                view.observe_remote_owned_grok_start(ctx);
+            },
+        );
+        true
+    }
+
     /// 仅构造已有内存终端的 owned 绑定；测试不经过菜单、持久账本或启动 RPC。
     #[cfg(test)]
     pub(super) fn bind_remote_owned_grok_for_test(
@@ -71,7 +161,10 @@ impl TerminalView {
     ) {
         let (snapshot, client) = self.remote_grok_snapshot(true, ctx).unwrap();
         self.grok_remote_owned = Some(RemoteOwned {
+            tmux_instance: None,
             launch: Launch {
+                tmux_source: None,
+                tmux_terminal_session: None,
                 host: client.cli_image_reference_host().unwrap(),
                 terminal_session: snapshot.session.as_u64(),
                 block_id: snapshot.block.to_string(),
@@ -112,7 +205,11 @@ impl TerminalView {
         {
             return None;
         }
-        let cwd = block.metadata().current_working_directory()?.to_owned();
+        let metadata = block.metadata();
+        let cwd = self
+            .tmux_owned_cwd(CLIAgent::Grok, session_id, block.id())
+            .or_else(|| metadata.current_working_directory())?
+            .to_owned();
         let snapshot = Snapshot {
             session: session_id,
             block: block.id().clone(),
@@ -271,6 +368,7 @@ impl TerminalView {
                     .collect::<Vec<_>>()
                     .join(" ");
                 view.grok_remote_owned = Some(RemoteOwned {
+                    tmux_instance: None,
                     launch,
                     native_session: None,
                     pending: None,
@@ -296,17 +394,28 @@ impl TerminalView {
 
     pub(super) fn remote_owned_grok_is_current(&self, ctx: &AppContext) -> bool {
         self.grok_remote_owned.as_ref().is_some_and(|owned| {
-            self.remote_grok_snapshot(true, ctx)
-                .is_some_and(|(snapshot, client)| {
-                    snapshot == owned.snapshot
-                        && client.cli_image_reference_host().as_deref() == Some(&owned.launch.host)
-                })
+            (owned.launch.tmux_source.is_none()
+                || owned
+                    .tmux_instance
+                    .as_ref()
+                    .is_some_and(|instance| self.tmux_owned_instance_is_current(instance, ctx)))
+                && self
+                    .remote_grok_snapshot(true, ctx)
+                    .is_some_and(|(snapshot, client)| {
+                        snapshot == owned.snapshot
+                            && (client.cli_image_reference_host().as_deref()
+                                == Some(&owned.launch.host)
+                                || owned.launch.tmux_source == Some(owned.launch.ticket.id)
+                                    && owned.launch.tmux_terminal_session.is_some())
+                    })
         })
     }
 
     pub(super) fn revoke_remote_owned_grok(&mut self) {
         remote::revoke(self.view_id);
         if let Some(owned) = &mut self.grok_remote_owned {
+            owned.launch.tmux_terminal_session = None;
+            owned.tmux_instance = None;
             owned.revoke();
         }
     }
@@ -388,11 +497,14 @@ impl TerminalView {
             return;
         }
         let launch = owned.launch.clone();
+        let instance = owned.tmux_instance.clone();
         let expected_ticket = launch.ticket.clone();
         let Ok((scope, revision)) = remote::scope(&client, &launch, Uuid::new_v4()) else {
             return;
         };
         owned.querying = true;
+        let expected_client = client.clone();
+        let expected_scope = scope.clone();
         ctx.spawn(
             async move {
                 remote::request(
@@ -406,16 +518,30 @@ impl TerminalView {
                 .await
             },
             move |view, reply, ctx| {
+                // 先复核原请求所属的连接与恢复操作；旧回复不能清除新对象的查询状态。
+                if !expected_client.cli_image_scope_is_current(&expected_scope)
+                    || instance
+                        .as_ref()
+                        .is_some_and(|instance| !view.tmux_owned_instance_is_current(instance, ctx))
+                    || view
+                        .remote_grok_snapshot(true, ctx)
+                        .is_none_or(|(current, client)| {
+                            current != snapshot || !Arc::ptr_eq(&client, &expected_client)
+                        })
+                    || !view.remote_owned_grok_is_current(ctx)
+                {
+                    return;
+                }
                 let Some(owned) = &mut view.grok_remote_owned else {
                     return;
                 };
-                if owned.launch.ticket != expected_ticket || owned.snapshot != snapshot {
+                if owned.launch.ticket != expected_ticket
+                    || owned.snapshot != snapshot
+                    || owned.tmux_instance != instance
+                {
                     return;
                 }
                 owned.querying = false;
-                if !view.remote_owned_grok_is_current(ctx) {
-                    return;
-                }
                 let Some(current) = CLIAgentSessionsModel::as_ref(ctx).session(view.view_id) else {
                     return;
                 };
@@ -551,6 +677,7 @@ impl TerminalView {
                 }
                 if let Some((launch, native)) = result {
                     view.grok_remote_owned = Some(RemoteOwned {
+                        tmux_instance: None,
                         launch,
                         native_session: Some(native),
                         pending: None,

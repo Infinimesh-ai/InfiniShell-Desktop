@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：tmux 产品整合通过本机回归，完整 SSH 恢复和真实消费待验
+
+本检查点补充门禁：环境增量后的tmux定向19项、真实API1项和最终check通过；其余101文件与前轮396项/i18n快照一致，分轮收据 `fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6`。源码检查不关闭G08。
+
+**新增关闭0项，仍为6关闭／5开放／3移交，PR #22草稿。** 新窗格启动、持久意图、当前pane绑定、三款图片输入及精确旧引用回收已接线。跨daemon恢复原先会因旧host引用阻止初始化；现所有host未释放图片共同计入既有全局500000000声明字节预算，错误/重复释放不能腾出额度。旧连接回调原先按同session_id覆盖或移除新连接；现在每轮connect/reconnect独立UUID，替换时同步撤销旧host索引和父引用，所有安装/握手/退出/重试/EOF核同代次，全局精确请求的失败收尾保留。
+
+首次整合check两处借用临时metadata失败及242项中12项失败均保留；其中包括上述真实恢复缺陷和UI Toast/事件夹具错误。修复后243项通过，随后预算49项通过，最终合并manager增量的 `r-iv1v21o2` 完整remote_server lib与Warp定向396项一次全过，含6项真实内存协议迟到回调回归；无重试、无LEAK。i18n `r-vq0k1j4b` 11项、check `r-7x9tc651`、公开源码合同Python4项与actionlint通过，全部短目录核验退出后清理。对应103文件快照及收据 `cec5f49756678c9d3022dcb1fc79a70333958102a515558246dd20436440f3cc`；它不覆盖后续环境增量。该原收据的本地化数量误写11组，实际新增9条对应消息，已在后续收据明确更正，原件未覆盖。
+
+源码进一步确认旧tmux server缺宿主协议/版本变量时Claude/Codex不会发有效会话通知。新pane通过tmux原生 `-e` 使用与普通PTY相同的受信产品来源，只作用于本次pane，不改全局/session环境。`r-j95bnz9z` 真实tmux 3.7c单挑战/单split通过：原pane和普通split缺两键、新owned pane值准确、server/session保持缺键；原有argv/cwd/SID/TTY/进程代次、持久target、错误pane拒绝及自有进程回收继续通过。日志 `a34641bf65a53feea559a211622011470f2913bdf48d6d7f9275b3f814fff682`，收据 `5818779c26e16abf354014b28ae49b232f55c98fc01be5afa0c24efc557aa128`；没有CLI或模型输入，不计图片验收。
+
+本轮9条菜单/提示已完成英中对应与资源测试；真实双语布局未验，内部连接及pane环境增量无需本地化变更。另确认SSH用户block结束会清除CLI session/listener，Claude/Grok持续存活时没有新的SessionStart，当前Restore只保留launch不足以重建输入；Codex已有只读Observe路径。该真实恢复缺项仍在修复，不能用新注入的测试hook或重放旧idle/审批状态冒充恢复。任意冷态多意图选择尚未实现，不扩大现有已选中意图的范围。
+
+`737b07f32` 的 [平台运行36856818302](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36856818302) Linux check因两处Netlink比较cast失败；Windows app/native check及旧桥81项通过，通知组因测试 `read_to_end` E0034未编译。已主动取消旧源码后续构建，整轮cancelled；Mac Intel跳过。9份官方工件摘要与ZIP CRC核验，完整日志归档摘要 `fbf03c9ada1e1c18c87915c8e20011dd87a6bb934237f6cdaa3ae1c0167572fa`。Linux显式类型和原生Grok `8855bbe86680` 单行限定调用修复已合入，精确新源码目标门禁待验。补丁重建树 `d71b38fcd6036a2692ac4503460711b6ef05b3de` 通过；相对a9五份测试之外4155树项一致，旧Mac工件仍保持a9来源，未重标为新构建。历史失败不回填通过。
+
 ## 2026-10-01：Codex SSH 首图、退出与重连通过，tmux 实现仍在推进
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `879d719be0792de3dda972c7ca83975e249f85e0` 的签名 Mac GUI（SHA-256 `c52ef94a466237852e454c32b842b0e5a8947eb3f54e430d9b9602ae1612766a`）在 `r-9ojwgeap` 实际 SSH 中通过产品菜单单次启动官方 Codex `0.156.1`。原生项目 trust 正常确认后，未发送暖身回合即出现可用富输入；一张图、一次 Return、一个完成回合、零工具调用，回答 `Red, Blue`。原生 `input_image` 与规范 PNG 均为 328 字节／SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，宿主／服务端 confirmed、released、done 与原生队列 ID 一致。原 137 字节图片经过规范化，不称原编码字节未变。

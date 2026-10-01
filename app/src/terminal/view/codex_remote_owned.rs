@@ -1,11 +1,13 @@
 //! 每个 SSH/tmux pane 显式启动独立 Codex；当前原生进程绑定后才提供图片票据。
 
+use super::tmux_remote_owned::Instance as TmuxInstance;
 use super::{BlockId, PendingSpecificCLIAgentLaunch, SessionId, ShellType, TerminalView};
 use crate::remote_server::cli_image_codex_owned_client::{self as remote, Journal, Launch};
 use crate::remote_server::cli_image_codex_owned_protocol::{Action, Owner, ReadOnlySession, Reply};
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
 use crate::remote_server::proto::CliImageStagingScope;
+use crate::remote_server::tmux_owned_client::Launch as TmuxLaunch;
 use crate::settings::AISettings;
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
@@ -33,6 +35,7 @@ struct Observation {
 }
 
 pub(super) struct RemoteOwned {
+    tmux_instance: Option<TmuxInstance>,
     launch: Launch,
     owner: Option<Owner>,
     observation: Option<Observation>,
@@ -44,6 +47,79 @@ pub(super) struct RemoteOwned {
 }
 
 impl TerminalView {
+    pub(super) fn accept_tmux_owned_codex(
+        &mut self,
+        intent: &TmuxLaunch,
+        cwd: &str,
+        bytes: &[u8],
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let Ok(Reply::Launch { ticket, .. }) = serde_json::from_slice::<Reply>(bytes) else {
+            return false;
+        };
+        if ticket.id != intent.id || ticket.key != intent.key {
+            return false;
+        }
+        let Some(instance) = self.tmux_owned_instance(intent.id, ctx) else {
+            return false;
+        };
+        let Some((snapshot, client)) = self.remote_codex_snapshot(true, ctx) else {
+            return false;
+        };
+        if self.codex_remote_owned.as_ref().is_some_and(|owned| {
+            owned.launch.ticket == ticket
+                && owned.tmux_instance.as_ref() == Some(&instance)
+                && owned.launch.tmux_terminal_session == Some(snapshot.session.as_u64())
+                && owned.snapshot == snapshot
+                && Arc::ptr_eq(&owned.client, &client)
+        }) {
+            return true;
+        }
+        let launch = Launch {
+            host: intent.host.clone(),
+            terminal_session: intent.terminal_session,
+            block_id: intent.block_id.clone(),
+            cwd: cwd.into(),
+            ticket,
+            tmux_source: Some(intent.id),
+            tmux_terminal_session: Some(snapshot.session.as_u64()),
+        };
+        let remembered = launch.clone();
+        ctx.spawn(
+            blocking::unblock(move || Journal::open()?.remember_tmux(&remembered)),
+            move |view, result, ctx| {
+                if !view.tmux_owned_instance_is_current(&instance, ctx) {
+                    return;
+                }
+                if result.is_err() {
+                    view.revoke_remote_owned_codex();
+                    return;
+                }
+                if view.codex_remote_owned.as_ref().is_some_and(|owned| {
+                    owned.launch.ticket == launch.ticket
+                        && owned.tmux_instance.as_ref() == Some(&instance)
+                        && owned.launch.tmux_terminal_session == launch.tmux_terminal_session
+                        && owned.snapshot == snapshot
+                        && Arc::ptr_eq(&owned.client, &client)
+                }) {
+                    return;
+                }
+                view.codex_remote_owned = Some(RemoteOwned {
+                    tmux_instance: Some(instance),
+                    launch,
+                    owner: None,
+                    observation: None,
+                    native_session_id: None,
+                    read_only_scope: None,
+                    snapshot,
+                    client,
+                });
+                view.observe_remote_owned_codex_bootstrap(0, ctx);
+            },
+        );
+        true
+    }
+
     pub(crate) fn queue_remote_owned_codex(&mut self, ctx: &mut ViewContext<Self>) {
         if !self.is_remote_owned_codex_launch_available(ctx) {
             self.show_error_toast(crate::t!("cli-agent-codex-remote-launch-unavailable"), ctx);
@@ -91,7 +167,11 @@ impl TerminalView {
         {
             return None;
         }
-        let cwd = block.metadata().current_working_directory()?.to_owned();
+        let metadata = block.metadata();
+        let cwd = self
+            .tmux_owned_cwd(CLIAgent::Codex, session_id, block.id())
+            .or_else(|| metadata.current_working_directory())?
+            .to_owned();
         let snapshot = Snapshot {
             session: session_id,
             block: block.id().clone(),
@@ -250,6 +330,7 @@ impl TerminalView {
                     .collect::<Vec<_>>()
                     .join(" ");
                 view.codex_remote_owned = Some(RemoteOwned {
+                    tmux_instance: None,
                     launch,
                     owner: None,
                     observation: None,
@@ -318,6 +399,13 @@ impl TerminalView {
         ctx: &AppContext,
     ) -> Option<(String, String)> {
         let owned = self.codex_remote_owned.as_ref()?;
+        if owned.launch.tmux_source.is_some()
+            && owned.tmux_instance.as_ref().is_none_or(|instance| {
+                !self.tmux_owned_instance_is_current(instance, ctx)
+            })
+        {
+            return None;
+        }
         let observation = self.remote_codex_observation(ctx)?;
         let (snapshot, client) = self.remote_codex_snapshot(true, ctx)?;
         let owner = owned.owner.as_ref()?;
@@ -473,6 +561,11 @@ impl TerminalView {
             return;
         }
         let view_id = self.view_id;
+        if launch.tmux_source.is_some()
+            && !self.set_tmux_owned_native_session(CLIAgent::Codex, session.native_session_id)
+        {
+            return;
+        }
         let events = self.model_events_handle.clone();
         let listener = ctx
             .add_model(|ctx| CLIAgentSessionListener::new(view_id, CLIAgent::Codex, &events, ctx));
@@ -505,12 +598,15 @@ impl TerminalView {
         self.bind_cli_agent_hook_input_target(ctx);
         self.maybe_show_use_agent_footer_in_blocklist(ctx);
         self.maybe_auto_open_cli_agent_rich_input(ctx);
+        self.replay_tmux_session_start(ctx);
         ctx.notify();
     }
 
     pub(super) fn revoke_remote_owned_codex(&mut self) {
         self.codex_remote_restore_generation = None;
         if let Some(owned) = &mut self.codex_remote_owned {
+            owned.launch.tmux_terminal_session = None;
+            owned.tmux_instance = None;
             owned.owner = None;
             owned.observation = None;
             owned.read_only_scope = None;
@@ -650,6 +746,7 @@ impl TerminalView {
                 }
                 if let Some((launch, owner)) = result {
                     view.codex_remote_owned = Some(RemoteOwned {
+                        tmux_instance: None,
                         launch,
                         owner: Some(owner),
                         native_session_id: Uuid::parse_str(&observation.native_session).ok(),

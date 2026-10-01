@@ -79,6 +79,7 @@ impl Fixture {
             native_request_sha256: pending.request_sha256,
             references: vec![(reference.transfer_id, key)],
             claude_recovery: Some(serde_json::json!({"attempt": pending})),
+            tmux_recovery: None,
         };
         store.claim_queue(&claim).unwrap();
         Self {

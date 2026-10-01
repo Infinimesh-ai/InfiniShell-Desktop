@@ -7,6 +7,8 @@ use std::time::Duration;
 use futures::channel::oneshot;
 use repo_metadata::RepoMetadataUpdate;
 use serde::Serialize;
+#[cfg(not(target_family = "wasm"))]
+use uuid::Uuid;
 use warp_core::SessionId;
 #[cfg(not(target_family = "wasm"))]
 use warp_core::channel::{Channel, ChannelState};
@@ -1336,6 +1338,13 @@ pub struct RemoteServerManager {
     /// Per-session connection state. Each SSH session gets its own dedicated
     /// connection to the remote server.
     sessions: HashMap<SessionId, RemoteSessionState>,
+    /// 同一 shell session 的每轮连接独立编号，旧异步结果不能覆盖新连接。
+    #[cfg(not(target_family = "wasm"))]
+    connection_attempts: HashMap<SessionId, Uuid>,
+    #[cfg(all(test, not(target_family = "wasm")))]
+    connection_finished: HashMap<Uuid, oneshot::Receiver<()>>,
+    #[cfg(all(test, not(target_family = "wasm")))]
+    connection_drained: HashMap<Uuid, oneshot::Receiver<()>>,
     /// 运行时 SSH 控制面路由图，以 shell session 为稳定节点。
     ssh_routes: HashMap<SessionId, SshRouteNode>,
     ssh_route_children: HashMap<SessionId, HashSet<SessionId>>,
@@ -1392,6 +1401,12 @@ impl RemoteServerManager {
     pub fn new(ctx: &mut ModelContext<Self>) -> Self {
         Self {
             sessions: HashMap::new(),
+            #[cfg(not(target_family = "wasm"))]
+            connection_attempts: HashMap::new(),
+            #[cfg(all(test, not(target_family = "wasm")))]
+            connection_finished: HashMap::new(),
+            #[cfg(all(test, not(target_family = "wasm")))]
+            connection_drained: HashMap::new(),
             ssh_routes: HashMap::new(),
             ssh_route_children: HashMap::new(),
             parent_connection_handles: HashMap::new(),
@@ -1923,8 +1938,7 @@ impl RemoteServerManager {
     /// terminal — unlike a write failure, retrying wouldn't help. Resolving
     /// the caller now avoids waiting out the request timeout.
     ///
-    /// Only compiled off-wasm: the sole caller is `forward_client_event`,
-    /// which is itself gated out on wasm.
+    /// 仅在原生客户端事件流中按精确 request_id 收尾，允许已替换连接的原请求完成。
     #[cfg(not(target_family = "wasm"))]
     fn fail_host_request_decode_error(&mut self, request_id: crate::protocol::RequestId) {
         if let Some(pending) = self.pending_host_requests.remove(&request_id) {
@@ -1945,8 +1959,7 @@ impl RemoteServerManager {
     /// request ID through another connected session for the host if possible;
     /// otherwise fails the caller immediately instead of waiting for timeout.
     ///
-    /// Only compiled off-wasm: the sole caller is `forward_client_event`,
-    /// which is itself gated out on wasm.
+    /// 仅在原生客户端事件流中按精确 request_id 收尾，允许已替换连接的原请求完成。
     #[cfg(not(target_family = "wasm"))]
     fn handle_host_scoped_write_failed(
         &mut self,
@@ -2274,14 +2287,40 @@ impl RemoteServerManager {
         {
             log::info!("Starting remote server connection: session={session_id:?}");
 
-            // Advance the user-visible setup pipeline.
+            let connection_attempt = Uuid::new_v4();
+            self.connection_attempts
+                .insert(session_id, connection_attempt);
+            let previous = self
+                .sessions
+                .insert(session_id, RemoteSessionState::Connecting);
+            if let Some(handle) = self.parent_connection_handles.get(&session_id) {
+                handle.set_client(None);
+            }
+            self.session_capabilities.remove(&session_id);
+            self.last_navigation.remove(&session_id);
+            if let Some(route) = self.ssh_routes.get_mut(&session_id) {
+                route.host_id = None;
+                route.state = SshRouteNodeState::Preparing;
+            }
+            self.mark_route_descendants_blocked(session_id);
+            // 旧代次的 EOF 已失效，替换时必须同步撤销旧主机路由，不能等它收尾。
+            if let Some(RemoteSessionState::Connected { host_id, .. }) = &previous {
+                self.remove_from_host_index(host_id, session_id);
+                ctx.emit(RemoteServerManagerEvent::SessionDisconnected {
+                    session_id,
+                    host_id: host_id.clone(),
+                    exit_status: None,
+                    was_reconnect_attempt: false,
+                });
+                self.handle_host_disconnected(host_id, ctx);
+            }
+            drop(previous);
+
+            // 先完成旧连接的撤销，再发布新一轮状态。
             ctx.emit(RemoteServerManagerEvent::SetupStateChanged {
                 session_id,
                 state: RemoteServerSetupState::Initializing,
             });
-
-            self.sessions
-                .insert(session_id, RemoteSessionState::Connecting);
             if let Some(connection_label) = connection_label {
                 self.session_labels.insert(session_id, connection_label);
             }
@@ -2299,10 +2338,17 @@ impl RemoteServerManager {
             // session and can be used to filter token-rotation notifications.
             let identity_key = auth_context.remote_server_identity_key();
 
+            // 测试只等待实际回调完成，不持有客户端或延长流的生存期。
+            #[cfg(test)]
+            let (finished, completion) = oneshot::channel();
+            #[cfg(test)]
+            self.connection_finished
+                .insert(connection_attempt, completion);
             ctx.background_executor()
                 .spawn(async move {
                     match Self::run_connect_and_handshake(
                         session_id,
+                        connection_attempt,
                         &*transport,
                         &auth_context_for_task,
                         codebase_index_limits,
@@ -2316,6 +2362,7 @@ impl RemoteServerManager {
                                 .spawn(move |me, ctx| {
                                     me.mark_session_connected(
                                         session_id,
+                                        connection_attempt,
                                         handshake,
                                         identity_key,
                                         transport,
@@ -2339,6 +2386,11 @@ impl RemoteServerManager {
                             // "user deregistered" by the is_cancelled check).
                             let maybe_resource = spawner
                                 .spawn(move |me, _ctx| {
+                                    if me.connection_attempts.get(&session_id)
+                                        != Some(&connection_attempt)
+                                    {
+                                        return None;
+                                    }
                                     match me.sessions.remove(&session_id) {
                                         Some(RemoteSessionState::Initializing {
                                             resource,
@@ -2385,6 +2437,11 @@ impl RemoteServerManager {
 
                             let _ = spawner
                                 .spawn(move |me, ctx| {
+                                    if me.connection_attempts.get(&session_id)
+                                        != Some(&connection_attempt)
+                                    {
+                                        return;
+                                    }
                                     // Classify: user cancellation vs real failure.
                                     //
                                     // Signal A: session was already deregistered
@@ -2415,11 +2472,17 @@ impl RemoteServerManager {
                                         proxy_stderr,
                                         is_cancelled,
                                     });
-                                    me.mark_session_disconnected(session_id, ctx);
+                                    me.mark_session_disconnected(
+                                        session_id,
+                                        connection_attempt,
+                                        ctx,
+                                    );
                                 })
                                 .await;
                         }
                     }
+                    #[cfg(test)]
+                    let _ = finished.send(());
                 })
                 .detach();
         }
@@ -2436,6 +2499,7 @@ impl RemoteServerManager {
     #[cfg(not(target_family = "wasm"))]
     async fn run_connect_and_handshake(
         session_id: SessionId,
+        connection_attempt: Uuid,
         transport: &dyn RemoteTransport,
         auth_context: &RemoteServerAuthContext,
         codebase_index_limits: Option<CodebaseIndexLimits>,
@@ -2463,7 +2527,7 @@ impl RemoteServerManager {
         // the entry will have been removed; don't re-insert it.
         let was_inserted = spawner
             .spawn(move |me, _ctx| {
-                if !me.sessions.contains_key(&session_id) {
+                if me.connection_attempts.get(&session_id) != Some(&connection_attempt) {
                     return false;
                 }
                 me.sessions.insert(
@@ -2501,6 +2565,19 @@ impl RemoteServerManager {
             )
             .await
             .map_err(|e| ConnectAndHandshakeError::Initialize(anyhow::anyhow!("{e:#}")))?;
+
+        // 握手完成后先核当前代次，拒绝已经被替换的握手继续安装或清理。
+        let current = spawner
+            .spawn(move |me, _ctx| {
+                me.connection_attempts.get(&session_id) == Some(&connection_attempt)
+            })
+            .await
+            .unwrap_or(false);
+        if !current {
+            return Err(ConnectAndHandshakeError::Connect(anyhow::anyhow!(
+                "远端连接握手已被新代次替换"
+            )));
+        }
 
         // Version compatibility check. If the server reports a different
         // release tag than the client expects, the binary on disk is stale.
@@ -2595,6 +2672,8 @@ impl RemoteServerManager {
     ///   outright. Unlike `SessionDisconnected`, this one never fires for
     ///   spontaneous drops -- only for explicit teardown.
     pub fn deregister_session(&mut self, session_id: SessionId, ctx: &mut ModelContext<Self>) {
+        #[cfg(not(target_family = "wasm"))]
+        self.connection_attempts.remove(&session_id);
         let children = self
             .ssh_route_children
             .get(&session_id)
@@ -3858,11 +3937,20 @@ impl RemoteServerManager {
     fn mark_session_connected(
         &mut self,
         session_id: SessionId,
+        connection_attempt: Uuid,
         handshake: InitializeHandshake,
         identity_key: String,
         transport: Arc<dyn RemoteTransport>,
         ctx: &mut ModelContext<Self>,
     ) {
+        if self.connection_attempts.get(&session_id) != Some(&connection_attempt)
+            || !matches!(
+                self.sessions.get(&session_id),
+                Some(RemoteSessionState::Initializing { .. })
+            )
+        {
+            return;
+        }
         let InitializeHandshake {
             host_id,
             capabilities,
@@ -3906,13 +3994,31 @@ impl RemoteServerManager {
             .entry(host_id.clone())
             .or_default()
             .insert(session_id);
+        #[cfg(test)]
+        let (drained, completion) = oneshot::channel();
+        #[cfg(test)]
+        self.connection_drained
+            .insert(connection_attempt, completion);
         ctx.spawn_stream_local(
             event_rx,
-            move |me, event, ctx| {
-                me.forward_client_event(session_id, event, ctx);
+            move |me, event, ctx| match event {
+                // 这两类失败归属于全局 request_id，保留跨连接请求的既有收尾语义。
+                ClientEvent::HostScopedWriteFailed { request_id } => {
+                    me.handle_host_scoped_write_failed(session_id, request_id);
+                }
+                ClientEvent::HostScopedDecodeFailed { request_id } => {
+                    me.fail_host_request_decode_error(request_id);
+                }
+                event => {
+                    if me.connection_attempts.get(&session_id) == Some(&connection_attempt) {
+                        me.forward_client_event(session_id, event, ctx);
+                    }
+                }
             },
             move |me, ctx| {
-                me.mark_session_disconnected(session_id, ctx);
+                me.mark_session_disconnected(session_id, connection_attempt, ctx);
+                #[cfg(test)]
+                let _ = drained.send(());
             },
         );
         // Drain the separate failure channel for request-failed telemetry.
@@ -4053,8 +4159,12 @@ impl RemoteServerManager {
     pub(crate) fn mark_session_disconnected(
         &mut self,
         session_id: SessionId,
+        connection_attempt: Uuid,
         ctx: &mut ModelContext<Self>,
     ) {
+        if self.connection_attempts.get(&session_id) != Some(&connection_attempt) {
+            return;
+        }
         if let Some(handle) = self.parent_connection_handles.get(&session_id) {
             handle.set_client(None);
         }
@@ -4169,6 +4279,9 @@ impl RemoteServerManager {
             "Attempting reconnect: session={session_id:?} attempt={attempt}/{MAX_RECONNECT_ATTEMPTS}"
         );
 
+        let connection_attempt = Uuid::new_v4();
+        self.connection_attempts
+            .insert(session_id, connection_attempt);
         self.sessions.insert(
             session_id,
             RemoteSessionState::Reconnecting {
@@ -4194,7 +4307,7 @@ impl RemoteServerManager {
                 // Check if the session was deregistered during the delay.
                 // (Checked via spawner since sessions lives on the main thread.)
                 let was_removed = spawner
-                    .spawn(move |me, _ctx| !me.sessions.contains_key(&session_id))
+                    .spawn(move |me, _ctx| me.connection_attempts.get(&session_id) != Some(&connection_attempt))
                     .await
                     .unwrap_or(true);
                 if was_removed {
@@ -4204,6 +4317,7 @@ impl RemoteServerManager {
 
                 match Self::run_connect_and_handshake(
                     session_id,
+                    connection_attempt,
                     &*transport_clone,
                     &auth_context_for_task,
                     codebase_index_limits_for_task,
@@ -4217,7 +4331,7 @@ impl RemoteServerManager {
                             .spawn(move |me, ctx| {
                                 // If the session was deregistered during the
                                 // handshake, don't resurrect it.
-                                if !me.sessions.contains_key(&session_id) {
+                                if me.connection_attempts.get(&session_id) != Some(&connection_attempt) {
                                     log::info!(
                                         "Remote server session deregistered during reconnect handshake, aborting: session={session_id:?}"
                                     );
@@ -4226,6 +4340,7 @@ impl RemoteServerManager {
                                 let host_id = handshake.host_id.clone();
                                 me.mark_session_connected(
                                     session_id,
+                                    connection_attempt,
                                     handshake,
                                     identity_key,
                                     transport,
@@ -4250,7 +4365,7 @@ impl RemoteServerManager {
                             .spawn(move |me, ctx| {
                                 // If the session was deregistered during the
                                 // handshake, don't retry or insert Disconnected.
-                                if !me.sessions.contains_key(&session_id) {
+                                if me.connection_attempts.get(&session_id) != Some(&connection_attempt) {
                                     log::info!(
                                         "Remote server session deregistered during reconnect handshake, aborting: session={session_id:?}"
                                     );
@@ -4368,3 +4483,7 @@ impl RemoteServerManager {
 #[cfg(all(test, not(target_family = "wasm")))]
 #[path = "manager_tests.rs"]
 mod tests;
+
+#[cfg(all(test, not(target_family = "wasm")))]
+#[path = "manager_connection_tests.rs"]
+mod connection_tests;

@@ -6149,3 +6149,14 @@ cli-agent-reviewed-command-background = The CLI reported background execution de
 cli-agent-input-remote-image-unconfirmed = Image delivery is unconfirmed; the CLI may already have received this input. Your draft and attachments are kept. Check the CLI before continuing; this input will not be resent automatically.
 
 cli-agent-input-remote-claude-image-hint = Send this input to the remote Claude session to read the original images. Approve Read in the terminal if requested; queued text alone does not confirm image delivery.
+
+workspace-start-tmux-claude = Claude in a new tmux pane
+workspace-start-tmux-codex = Codex in a new tmux pane
+workspace-start-tmux-grok = Grok in a new tmux pane
+workspace-start-tmux-agent-help = Start the verified remote CLI in a new pane of the current tmux session. Requires an active SSH connection and remote image support.
+workspace-restore-tmux-agent = Restore tmux rich input
+workspace-restore-tmux-agent-help = Reconnect to the previously launched CLI in the selected tmux pane. This only checks the existing launch.
+cli-agent-tmux-owned-unavailable = Could not verify the remote tmux pane or CLI. Check the connection and the required CLI version.
+cli-agent-tmux-owned-unknown = The tmux launch status is unknown. Use Restore tmux rich input to check the existing launch without starting another pane.
+
+cli-agent-tmux-owned-exited = This tmux CLI session has ended. Start a new tmux pane to continue.

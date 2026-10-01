@@ -14,7 +14,7 @@ use std::time::{Duration, Instant};
 
 use command::managed::{LinuxProcessHandle, LinuxProcessSnapshot, linux_peer_handle};
 
-use super::{Budget, MAX_FDS, MAX_PIDS, ProcessSnapshot, SocketEndpoint, invalid};
+use super::{Budget, MAX_FDS, MAX_PIDS, ProcessSnapshot, SocketEndpoint, Token, invalid};
 
 const SOCK_DIAG_BY_FAMILY: u16 = 20;
 const UNIX_DIAG_SHOW: u32 = 0x01 | 0x02 | 0x04 | 0x40;
@@ -28,6 +28,16 @@ pub(super) struct Process {
 }
 
 impl Process {
+    pub(super) fn token(&self) -> io::Result<Token> {
+        self.snapshot()?;
+        let token = Token::capture(self.handle.identity().pid)?;
+        if token.linux_identity()? != self.handle.identity() {
+            return Err(invalid("tmux 持久进程代次已改变"));
+        }
+        self.snapshot()?;
+        Ok(token)
+    }
+
     pub(super) fn capture(pid: i32) -> io::Result<Self> {
         let process = Self {
             handle: LinuxProcessHandle::capture(pid)?,
@@ -540,7 +550,7 @@ impl Diagnostics {
         }
         if length as usize != mem::size_of_val(&address)
             || address.nl_pid == 0
-            || address.nl_family != libc::AF_NETLINK as _
+            || address.nl_family != libc::AF_NETLINK as libc::sa_family_t
             || address.nl_groups != 0
         {
             return Err(invalid("tmux NETLINK 本地地址无效"));
@@ -621,7 +631,7 @@ impl Diagnostics {
             }
             if received as usize > bytes.len()
                 || length as usize != mem::size_of_val(&source)
-                || source.nl_family != libc::AF_NETLINK as _
+                || source.nl_family != libc::AF_NETLINK as libc::sa_family_t
                 || source.nl_pid != 0
                 || source.nl_groups != 0
             {

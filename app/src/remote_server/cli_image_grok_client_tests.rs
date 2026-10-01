@@ -27,6 +27,8 @@ fn journal(directory: &Path) -> Journal {
 
 fn launch() -> Launch {
     Launch {
+        tmux_source: None,
+        tmux_terminal_session: None,
         host: "remote-fixture".into(),
         terminal_session: 7,
         block_id: "block-fixture".into(),
@@ -181,4 +183,29 @@ fn mismatched_not_dispatched_receipt_does_not_unlock_unknown_input() {
     );
     assert!(store.claim_input(&launch, &input()).is_err());
     assert!(store.unknown_inputs(&launch).is_err());
+}
+
+#[test]
+fn tmux_grok_launch_keeps_original_identity_and_does_not_restore_runtime_scope() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let mut current = launch();
+    current.tmux_source = Some(current.ticket.id);
+    current.tmux_terminal_session = Some(91);
+    store.remember_tmux(&current).unwrap();
+    let path = directory.path().join(format!("tmux-{}-launch.json", current.ticket.id));
+    let persisted: Launch = store.read(&path).unwrap();
+    assert_eq!(persisted.host, current.host);
+    assert_eq!(persisted.terminal_session, 7);
+    assert_eq!(persisted.tmux_source, current.tmux_source);
+    assert!(persisted.tmux_terminal_session.is_none());
+    assert!(store.known_launches(&current.host, SessionId::from(7), &current.cwd).unwrap().is_empty());
+    let mut mapped_again = current.clone();
+    mapped_again.tmux_terminal_session = Some(92);
+    store.remember_tmux(&mapped_again).unwrap();
+    mapped_again.cwd = "/other".into();
+    assert!(store.remember_tmux(&mapped_again).is_err());
+    let old: Launch = serde_json::from_slice(&encode(&launch()).unwrap()).unwrap();
+    assert!(old.tmux_source.is_none());
+    assert!(old.tmux_terminal_session.is_none());
 }

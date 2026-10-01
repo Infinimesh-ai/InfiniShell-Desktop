@@ -114,6 +114,7 @@ impl Fixture {
                 native_request_sha256: self.pending.request_sha256,
                 references: vec![(self.transfer, self.key)],
                 claude_recovery: Some(serde_json::to_value(recovery).unwrap()),
+                tmux_recovery: None,
             })
             .unwrap();
     }
@@ -297,6 +298,7 @@ fn exact_consumption_remains_confirmed_even_after_the_consumer_exits() {
 #[test]
 fn native_preflight_rejection_survives_lost_response_and_rejects_changed_identity() {
     let mut fixture = Fixture::unclaimed();
+    let service = ImageStagingService::new(fixture.scope.host_id.clone(), &fixture.root).unwrap();
     let connection = ImageStagingConnection::new(fixture.scope.connection_id);
     let lease = SubmissionLease {
         scope: CliImageStagingScope {
@@ -317,6 +319,7 @@ fn native_preflight_rejection_survives_lost_response_and_rejects_changed_identit
     digest.update(b"\x89PNG\r\n\x1a\n");
     let mut request = CliImageClaudeQueue {
         binding: Some(CliImageClaudeBinding {
+            tmux_owned: None,
             process_id_candidate: 0,
             claude_config_directory: fixture.root.to_string_lossy().into_owned(),
             tty_path: "/dev/invalid".into(),
@@ -337,6 +340,7 @@ fn native_preflight_rejection_survives_lost_response_and_rejects_changed_identit
     };
     // 不依赖返回帧，只从重新打开的持久存储恢复精确拒绝。
     submit(
+        &service,
         &mut fixture.staging,
         &connection,
         &lease,
@@ -381,6 +385,7 @@ fn native_preflight_rejection_survives_lost_response_and_rejects_changed_identit
     request.subject_sha256 = vec![0; 32];
     assert!(
         submit(
+            &service,
             &mut fixture.staging,
             &connection,
             &lease,

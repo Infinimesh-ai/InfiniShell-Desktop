@@ -4,12 +4,12 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use uuid::Uuid;
 
 use super::cli_image_codex_owned_launch::{OwnedImageLease, TicketStore, invalid};
-use super::cli_image_codex_owned_protocol::{Action, Reply, Request, Scope, encode};
+use super::cli_image_codex_owned_protocol::{Action, Reply, Request, Scope, Ticket, encode};
 
 struct Terminal {
     epoch: Uuid,
@@ -134,9 +134,110 @@ impl Connection {
 pub(super) struct Service {
     host: String,
     tickets: Arc<TicketStore>,
+    tmux_owned: Mutex<Option<Weak<super::tmux_owned::Service>>>,
 }
 
 impl Service {
+    pub(super) fn set_tmux_owned(&self, service: Weak<super::tmux_owned::Service>) {
+        *self.tmux_owned.lock().expect("tmux Codex 查询服务锁") = Some(service);
+    }
+
+    fn tmux_ticket_scope(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        observe: bool,
+    ) -> io::Result<(Scope, Option<super::tmux_owned::ImageGuard>)> {
+        let service = self
+            .tmux_owned
+            .lock()
+            .map_err(|_| invalid())?
+            .as_ref()
+            .map(|service| service.upgrade().ok_or_else(invalid))
+            .transpose()?;
+        let Some(service) = service else {
+            return Ok((scope.clone(), None));
+        };
+        if !service.owns_ticket(ticket.id)? {
+            return Ok((scope.clone(), None));
+        }
+        let current = super::proto::TerminalBindingScope {
+            host_id: scope.host.clone(),
+            terminal_session_id: scope.terminal_session,
+            terminal_epoch: scope.terminal_epoch.to_string(),
+        };
+        let (guard, original) = if observe {
+            let (guard, original) = service.image_guard(
+                &current,
+                ticket.id,
+                super::proto::TerminalBindingOwnedAgent::Codex,
+            )?;
+            guard.validate_ticket(
+                original.host(),
+                original.terminal_session(),
+                ticket.id,
+                super::proto::TerminalBindingOwnedAgent::Codex,
+            )?;
+            (Some(guard), original)
+        } else {
+            // 已退出的票据仍可读终态或取消未进入的 wrapper，不能恢复输入与 sidecar。
+            (
+                None,
+                service.ticket_terminal(
+                    &current,
+                    ticket.id,
+                    ticket.key,
+                    super::proto::TerminalBindingOwnedAgent::Codex,
+                )?,
+            )
+        };
+        let mut original_scope = scope.clone();
+        original_scope.host = original.host().to_owned();
+        original_scope.terminal_session = original.terminal_session();
+        Ok((original_scope, guard))
+    }
+
+    /// 仅由已挑战的 tmux daemon 调用；票据仍绑定原 scope，不能改变旧票据归属。
+    pub(super) fn reserve_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        cwd: &str,
+    ) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        self.tickets.reserve(scope, ticket, cwd)
+    }
+
+    pub(super) fn status_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        original: &super::tmux_owned::OriginalScope,
+    ) -> io::Result<Reply> {
+        if !original.matches(&scope.host, scope.terminal_session) {
+            return Err(invalid());
+        }
+        self.tickets.lock(scope, ticket)?.status(ticket)
+    }
+
+    pub(super) fn cancel_tmux(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        self.tickets.lock(scope, ticket)?.cancel(ticket)
+    }
+
+    #[cfg(test)]
+    pub(super) fn without_reaper_for_test(host: String, parent: &Path) -> io::Result<Self> {
+        Ok(Self {
+            host,
+            tickets: Arc::new(TicketStore::new(parent)?),
+            tmux_owned: Mutex::new(None),
+        })
+    }
+
     pub(super) fn new(host: String, parent: &Path) -> io::Result<Self> {
         let tickets = Arc::new(TicketStore::new(parent)?);
         let weak = Arc::downgrade(&tickets);
@@ -152,7 +253,11 @@ impl Service {
                     std::thread::sleep(Duration::from_secs(1));
                 }
             })?;
-        Ok(Self { host, tickets })
+        Ok(Self {
+            host,
+            tickets,
+            tmux_owned: Mutex::new(None),
+        })
     }
 
     pub(super) fn handle(self: &Arc<Self>, connection: &Arc<Connection>, bytes: &[u8]) -> Vec<u8> {
@@ -171,23 +276,45 @@ impl Service {
                         self.tickets.reserve(&request.scope, &ticket, &cwd)
                     }
                     Action::Status { ticket } => {
-                        self.tickets.lock(&request.scope, &ticket)?.status(&ticket)
+                        let (scope, tmux) =
+                            self.tmux_ticket_scope(&request.scope, &ticket, false)?;
+                        let reply = self.tickets.lock(&scope, &ticket)?.status(&ticket)?;
+                        if let Some(tmux) = tmux {
+                            tmux.validate()?;
+                        }
+                        Ok(reply)
                     }
                     Action::Observe {
                         ticket,
                         expected_session,
                     } => {
-                        let reply = self
-                            .tickets
-                            .lock(&request.scope, &ticket)?
-                            .observe_session(&ticket, expected_session)?;
+                        let (scope, tmux) =
+                            self.tmux_ticket_scope(&request.scope, &ticket, true)?;
+                        let ticket_guard = self.tickets.lock(&scope, &ticket)?;
+                        if let Some(tmux) = &tmux {
+                            let Reply::Launch {
+                                owner: Some(owner), ..
+                            } = ticket_guard.status(&ticket)?
+                            else {
+                                return Err(invalid());
+                            };
+                            tmux.validate_process(owner.tui_pid, owner.tty_device)?;
+                        }
+                        let reply = ticket_guard.observe_session(&ticket, expected_session)?;
                         if !connection.current(&request.scope) {
                             return Err(invalid());
+                        }
+                        if let Some(tmux) = tmux {
+                            let Reply::Observed { owner, .. } = &reply else {
+                                return Err(invalid());
+                            };
+                            tmux.validate_process(owner.tui_pid, owner.tty_device)?;
                         }
                         Ok(reply)
                     }
                     Action::Cancel { ticket } => {
-                        self.tickets.lock(&request.scope, &ticket)?.cancel(&ticket)
+                        let (scope, _) = self.tmux_ticket_scope(&request.scope, &ticket, false)?;
+                        self.tickets.lock(&scope, &ticket)?.cancel(&ticket)
                     }
                     Action::Revoke { ticket, .. } => {
                         connection.revoke_request(bytes);
@@ -212,5 +339,26 @@ impl Service {
             return Err(invalid());
         }
         self.tickets.image_owner(scope, ticket_id, manifest_sha256)
+    }
+
+    /// 仅 fresh tmux target 产生的能力可查询旧 daemon host 的原票据；普通入口仍核当前 host。
+    pub(super) fn image_owner_tmux(
+        &self,
+        scope: &Scope,
+        ticket_id: Uuid,
+        manifest_sha256: &str,
+        guard: &super::tmux_owned::ImageGuard,
+    ) -> io::Result<OwnedImageLease> {
+        guard.validate_ticket(
+            &scope.host,
+            scope.terminal_session,
+            ticket_id,
+            super::proto::TerminalBindingOwnedAgent::Codex,
+        )?;
+        let lease = self
+            .tickets
+            .image_owner(scope, ticket_id, manifest_sha256)?;
+        guard.validate_process(lease.tui_pid(), lease.tty_device())?;
+        Ok(lease)
     }
 }

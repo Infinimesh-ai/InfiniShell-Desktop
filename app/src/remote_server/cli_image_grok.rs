@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 use base64::Engine;
@@ -31,6 +31,14 @@ struct Terminal {
     input_revision: u64,
     used: HashSet<Uuid>,
     lease: Option<(Uuid, Arc<AtomicU8>)>,
+}
+
+fn terminal_scope(scope: &Scope) -> super::proto::TerminalBindingScope {
+    super::proto::TerminalBindingScope {
+        host_id: scope.host.clone(),
+        terminal_session_id: scope.terminal_session,
+        terminal_epoch: scope.terminal_epoch.to_string(),
+    }
 }
 
 struct RegisteredLaunch {
@@ -192,6 +200,7 @@ pub(super) struct Service {
     host: String,
     tickets: TicketStore,
     cleanup: Sender<(Scope, Ticket)>,
+    tmux_owned: Mutex<Option<Weak<super::tmux_owned::Service>>>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -209,6 +218,83 @@ struct Finished {
 }
 
 impl Service {
+    #[cfg(test)]
+    pub(super) fn without_reaper_for_test(host: String, parent: &Path) -> io::Result<Self> {
+        let (cleanup, _) = mpsc::channel();
+        Ok(Self {
+            host,
+            tickets: TicketStore::new(parent)?,
+            cleanup,
+            tmux_owned: Mutex::new(None),
+        })
+    }
+
+    pub(super) fn set_tmux_owned(&self, service: Weak<super::tmux_owned::Service>) {
+        *self.tmux_owned.lock().expect("tmux 图片服务锁") = Some(service);
+    }
+
+    fn tmux_service(&self) -> io::Result<Option<Arc<super::tmux_owned::Service>>> {
+        self.tmux_owned
+            .lock()
+            .map_err(|_| invalid())?
+            .as_ref()
+            .map(|service| service.upgrade().ok_or_else(invalid))
+            .transpose()
+    }
+
+    fn ticket_scope(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Scope> {
+        let mut original = scope.clone();
+        if let Some(service) = self.tmux_service()? {
+            if service.owns_ticket(ticket.id)? {
+                let stored = service.ticket_terminal(
+                    &terminal_scope(scope),
+                    ticket.id,
+                    ticket.key,
+                    super::proto::TerminalBindingOwnedAgent::Grok,
+                )?;
+                original.host = stored.host().to_owned();
+                original.terminal_session = stored.terminal_session();
+            }
+        }
+        Ok(original)
+    }
+
+    /// tmux pane 可跨 SSH 连接存活，不登记到会在连接 EOF 时取消的普通启动列表。
+    pub(super) fn reserve_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        cwd: &str,
+    ) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        let reply = self.tickets.reserve(scope, ticket, cwd)?;
+        let guard = self.tickets.lock(scope, ticket)?;
+        // 仅登记退出后的回收，不写 cancelled；pane 仍可在 SSH 断开后继续运行。
+        write_new(&guard.directory.join("cleanup-requested.json"), &true)?;
+        Ok(reply)
+    }
+
+    pub(super) fn status_tmux(
+        &self,
+        scope: &Scope,
+        ticket: &Ticket,
+        original: &super::tmux_owned::OriginalScope,
+    ) -> io::Result<Reply> {
+        if !original.matches(&scope.host, scope.terminal_session) {
+            return Err(invalid());
+        }
+        self.tickets.lock(scope, ticket)?.status(ticket)
+    }
+
+    pub(super) fn cancel_tmux(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Reply> {
+        if scope.host != self.host {
+            return Err(invalid());
+        }
+        cancel_launch(&self.tickets, scope, ticket)
+    }
+
     pub(super) fn new(host: String, parent: &Path) -> io::Result<Self> {
         let tickets = TicketStore::new(parent)?;
         let cleanup_tickets = tickets.clone();
@@ -220,6 +306,7 @@ impl Service {
             host,
             tickets,
             cleanup,
+            tmux_owned: Mutex::new(None),
         })
     }
 
@@ -250,14 +337,22 @@ impl Service {
                 connection.register_launch(scope, ticket, self.cleanup.clone());
                 Ok(reply)
             }
-            Action::Status { ticket } => self.tickets.lock(&scope, &ticket)?.status(&ticket),
-            Action::Cancel { ticket } => cancel_launch(&self.tickets, &scope, &ticket),
+            Action::Status { ticket } => self
+                .tickets
+                .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?
+                .status(&ticket),
+            Action::Cancel { ticket } => {
+                cancel_launch(&self.tickets, &self.ticket_scope(&scope, &ticket)?, &ticket)
+            }
             Action::Revoke { ticket, .. } => {
-                self.tickets.lock(&scope, &ticket)?;
+                self.tickets
+                    .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?;
                 Ok(Reply::Revoked { ticket })
             }
             Action::InputStatus { ticket, message_id } => {
-                let guard = self.tickets.lock(&scope, &ticket)?;
+                let guard = self
+                    .tickets
+                    .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?;
                 delivery_status(&guard.directory, &ticket, message_id)
             }
             Action::Submit {
@@ -296,7 +391,8 @@ impl Service {
         }
         let prompt = prompt(&input)?;
         let subject = input_subject(&input)?;
-        let guard = self.tickets.lock(&scope, &ticket)?;
+        let ticket_scope = self.ticket_scope(&scope, &ticket)?;
+        let guard = self.tickets.lock(&ticket_scope, &ticket)?;
         let claim_path = guard
             .directory
             .join(format!("{}-claim.json", input.message_id));
@@ -322,6 +418,26 @@ impl Service {
                 return Err(invalid());
             }
         }
+        let tmux = match self.tmux_service()? {
+            Some(service) if service.owns_ticket(ticket.id)? => Some(
+                service
+                    .image_guard(
+                        &terminal_scope(&scope),
+                        ticket.id,
+                        super::proto::TerminalBindingOwnedAgent::Grok,
+                    )?
+                    .0,
+            ),
+            Some(_) | None => None,
+        };
+        if let Some(tmux) = &tmux {
+            tmux.validate_ticket(
+                &ticket_scope.host,
+                ticket_scope.terminal_session,
+                ticket.id,
+                super::proto::TerminalBindingOwnedAgent::Grok,
+            )?;
+        }
         let mut launch = guard.launch_for_input()?;
         if launch.session_id() != observation.native_session
             || launch.working_directory().to_string_lossy() != observation.cwd
@@ -342,8 +458,16 @@ impl Service {
             )
             .map_err(|_| invalid())?;
         let lease = connection.permit(&scope, revision)?;
-        let mut sidecar =
-            GrokLeaderInput::connect(binding.into_target(), None).map_err(|_| invalid())?;
+        let target = binding.into_target();
+        let terminal = match &tmux {
+            Some(tmux) => {
+                let terminal = target.terminal_identity().map_err(|_| invalid())?;
+                tmux.validate_process(terminal.0, terminal.1)?;
+                Some(terminal)
+            }
+            None => None,
+        };
+        let mut sidecar = GrokLeaderInput::connect(target, None).map_err(|_| invalid())?;
         let body_path = guard
             .directory
             .join(format!("{}-input.json", input.message_id));
@@ -364,6 +488,10 @@ impl Service {
                 )
             },
             || {
+                if let (Some(tmux), Some(terminal)) = (&tmux, terminal) {
+                    tmux.validate_process(terminal.0, terminal.1)
+                        .map_err(|_| GrokLeaderInputError::StaleBinding)?;
+                }
                 if !connection.current(&scope) {
                     return Err(GrokLeaderInputError::StaleBinding);
                 }
@@ -399,7 +527,7 @@ impl Service {
                             let Ok(bytes) = serde_json::to_vec(&raw) else {
                                 break;
                             };
-                            let Ok(guard) = service.tickets.lock(&scope, &ticket) else {
+                            let Ok(guard) = service.tickets.lock(&ticket_scope, &ticket) else {
                                 break;
                             };
                             let Ok(claim) = read_json::<Claim>(

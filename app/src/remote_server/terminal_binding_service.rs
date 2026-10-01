@@ -7,6 +7,11 @@ use super::proto::{
     terminal_binding_response,
 };
 use super::tmux_native::{OuterTerminal, SplitOutcome, TmuxBinding, TmuxSnapshot};
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+use super::{proto::TerminalBindingOwnedAgent, tmux_owned::Service as OwnedService};
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::io;
@@ -68,6 +73,7 @@ impl Attempt {
 }
 
 /// 消费者只能持有可撤销授权，不能绕过连接生存期拿到原始 tmux Arc。
+#[derive(Clone)]
 pub(super) struct Bound {
     attempt: Arc<Attempt>,
     binding: Arc<TmuxBinding>,
@@ -75,6 +81,25 @@ pub(super) struct Bound {
 }
 
 impl Bound {
+    pub(super) fn is_live(&self) -> bool {
+        self.attempt.live.load(Ordering::Acquire)
+    }
+
+    pub(super) fn has_id(&self, id: &str) -> bool {
+        self.is_live() && Uuid::parse_str(id).ok() == Some(self.attempt.binding_id)
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    pub(super) fn source_target(&self) -> io::Result<super::tmux_native::TmuxTarget> {
+        self.validate_pane(&self.source)?;
+        let target = self.source.export_target()?;
+        self.live()?;
+        Ok(target)
+    }
+
     pub(super) fn cwd(&self) -> &Path {
         &self.source.cwd
     }
@@ -218,6 +243,11 @@ impl Connection {
             request,
             operation: Operation::Failed,
             retired: None,
+            #[cfg(any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            ))]
+            owned: None,
         };
         let Some(scope) = work.request.scope.as_ref() else {
             return work;
@@ -291,6 +321,70 @@ impl Connection {
                     work.operation = Operation::Cancel;
                 }
             }
+            Some(terminal_binding_request::Action::StartOwned(_))
+            | Some(terminal_binding_request::Action::StatusOwned(_)) => {
+                #[cfg(any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                ))]
+                {
+                    let (binding_id, launch_id, launch_key, agent, start) =
+                        match work.request.action.as_ref() {
+                            Some(terminal_binding_request::Action::StartOwned(value)) => (
+                                &value.opaque_binding_id,
+                                &value.launch_id,
+                                &value.launch_key,
+                                value.agent,
+                                true,
+                            ),
+                            Some(terminal_binding_request::Action::StatusOwned(value)) => (
+                                &value.opaque_binding_id,
+                                &value.launch_id,
+                                &value.launch_key,
+                                value.agent,
+                                false,
+                            ),
+                            _ => unreachable!("仅在专属启动分支解析"),
+                        };
+                    let Some(attempt) = terminal
+                        .current
+                        .as_ref()
+                        .filter(|attempt| attempt.id == id && attempt.live.load(Ordering::Acquire))
+                    else {
+                        return work;
+                    };
+                    if Uuid::parse_str(binding_id).ok() != Some(attempt.binding_id) {
+                        return work;
+                    }
+                    let (Ok(launch_id), Ok(launch_key), Ok(agent)) = (
+                        Uuid::parse_str(launch_id),
+                        Uuid::parse_str(launch_key),
+                        TerminalBindingOwnedAgent::try_from(agent),
+                    ) else {
+                        return work;
+                    };
+                    if launch_id.is_nil()
+                        || launch_key.is_nil()
+                        || agent == TerminalBindingOwnedAgent::Unspecified
+                    {
+                        return work;
+                    }
+                    let state = attempt.state.lock().expect("终端挑战状态锁");
+                    if let State::Bound(binding, source) = &*state {
+                        work.operation = Operation::Owned {
+                            bound: Bound {
+                                attempt: attempt.clone(),
+                                binding: binding.clone(),
+                                source: source.clone(),
+                            },
+                            launch_id,
+                            launch_key,
+                            agent,
+                            start,
+                        };
+                    }
+                }
+            }
             None => {}
         }
         work
@@ -299,8 +393,13 @@ impl Connection {
     /// 仅用于内部 Work 已完成的回执，在模型线程发送前重新核对所属代次。
     /// 原生成功由 Work 验证，此处不执行原生 I/O；Bound 的实际消费还须经过 bound()。
     pub(super) fn completed_response_is_current(&self, response: &TerminalBindingResponse) -> bool {
+        let owned = matches!(
+            response.result.as_ref(),
+            Some(terminal_binding_response::Result::Owned(_))
+        );
         let binding_id = match response.result.as_ref() {
             Some(terminal_binding_response::Result::ChallengeWritten(_)) => None,
+            Some(terminal_binding_response::Result::Owned(_)) => None,
             Some(terminal_binding_response::Result::Bound(bound)) => Some(&bound.opaque_binding_id),
             Some(terminal_binding_response::Result::Failed(_))
             | Some(terminal_binding_response::Result::Cancelled(_)) => return true,
@@ -324,7 +423,7 @@ impl Connection {
         }
         match binding_id {
             Some(id) => *id == attempt.binding_id.to_string(),
-            None => attempt.pending(),
+            None => owned || attempt.pending(),
         }
     }
 
@@ -359,6 +458,17 @@ enum Operation {
         attempt: Arc<Attempt>,
         outer: Arc<OuterTerminal>,
     },
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    Owned {
+        bound: Bound,
+        launch_id: Uuid,
+        launch_key: Uuid,
+        agent: TerminalBindingOwnedAgent,
+        start: bool,
+    },
     Cancel,
     Failed,
 }
@@ -367,9 +477,23 @@ pub(super) struct Work {
     request: TerminalBindingRequest,
     operation: Operation,
     retired: Option<Arc<Attempt>>,
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    owned: Option<Arc<OwnedService>>,
 }
 
 impl Work {
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    pub(super) fn with_owned(mut self, owned: Option<Arc<OwnedService>>) -> Self {
+        self.owned = owned;
+        self
+    }
+
     pub(super) fn execute(self) -> TerminalBindingResponse {
         // 旧控制客户端在后台结束；这里从不持有连接或 TerminalModel 锁。
         drop(self.retired);
@@ -415,15 +539,44 @@ impl Work {
                 let mut state = attempt.state.lock().expect("终端挑战状态锁");
                 if let Some((binding, source)) = binding.filter(|_| attempt.pending()) {
                     // source 留在 daemon；后续点击到启动期间切换 pane 不得改选新目标。
+                    let pane_cwd = source.cwd.to_string_lossy().into_owned();
                     *state = State::Bound(Arc::new(binding), source);
                     terminal_binding_response::Result::Bound(TerminalBindingBound {
                         opaque_binding_id: attempt.binding_id.to_string(),
+                        pane_cwd,
                     })
                 } else {
                     *state = State::Failed;
                     failed()
                 }
             }
+            #[cfg(any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            ))]
+            Operation::Owned {
+                bound,
+                launch_id,
+                launch_key,
+                agent,
+                start,
+            } => self
+                .owned
+                .as_ref()
+                .and_then(|owned| {
+                    owned
+                        .execute(
+                            bound,
+                            self.request.scope.as_ref()?,
+                            launch_id,
+                            launch_key,
+                            agent,
+                            start,
+                        )
+                        .ok()
+                })
+                .map(terminal_binding_response::Result::Owned)
+                .unwrap_or_else(failed),
             Operation::Cancel => {
                 terminal_binding_response::Result::Cancelled(TerminalBindingCancelled {})
             }

@@ -1102,7 +1102,7 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +mod tests;
 diff --git a/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..af269bc67af9c00adabfac60c975e7d5983147e9
+index 0000000000000000000000000000000000000000..f3cb013a33a445b22a20774fb6acb52dc90ca42a
 --- /dev/null
 +++ b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
 @@ -0,0 +1,381 @@
@@ -1154,7 +1154,7 @@ index 0000000000000000000000000000000000000000..af269bc67af9c00adabfac60c975e7d5
 +    assert_eq!(decoded.peer, frame.peer);
 +    assert_eq!(decoded.command.program, frame.command.program);
 +    let mut rest = Vec::new();
-+    input.read_to_end(&mut rest).unwrap();
++    io::Read::read_to_end(&mut input, &mut rest).unwrap();
 +    assert_eq!(rest, envelope);
 +}
 +

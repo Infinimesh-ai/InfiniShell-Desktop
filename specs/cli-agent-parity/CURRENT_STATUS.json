@@ -6778,6 +6778,31 @@
     "localization": "本增量仅内部协议/原生身份和测试诊断，无用户可见文案变化，无需本地化变更；产品菜单/图片消费另行接线和双语审计。",
     "remaining": "完整tmux GUI启动/原生图片消费、异常恢复和精确提交跨平台源码门禁。",
     "source_freeze_v2_sha256": "be36860b27f0740ec4c194caa39a4fdf1f2f23d0becf4191669433aa84613434",
-    "local_gates_sha256": "87f56cbe3debeaee12b2b6c8a82a318a747bde1e495499a7ff2e002badad989d"
+    "local_gates_sha256": "87f56cbe3debeaee12b2b6c8a82a318a747bde1e495499a7ff2e002badad989d",
+    "platform_run": "36856818302（737b07f32）已主动取消旧源码后续构建，非通过。Linux check两处Netlink比较cast失败；Windows app/native check及旧桥81项通过，notifications测试step16因read_to_end歧义E0034未编译。两项源码均已修，待新提交门禁。终态9工件归档摘要fbf03c9ada1e1c18c87915c8e20011dd87a6bb934237f6cdaa3ae1c0167572fa；旧失败保留。"
+  },
+  "g08_tmux_product_integration_20261001": {
+    "status": "local_integration_passed_real_gui_and_reconnect_identity_pending",
+    "newly_closed_gaps": [],
+    "gap_closed": false,
+    "foundation_commit": "737b07f323ec787ad56ee0d091d5a96e939666eb",
+    "implemented": "三款tmux菜单、持久启动意图、daemon固定启动、新scope恢复和native图片guard已整合；私有QueueClaim精确关联支持跨daemon/无活跃pane的旧ACK与回收，新输入仍核当前目标。旧异步回调按完整连接/绑定/操作身份拒绝；Grok图片查询使用已验证的运行时session。",
+    "first_check": "r-mqvfqkkl因Grok/Codex cwd fallback借用临时metadata两处E0515失败；隔离修正未回填通过。日志18b2ec5ed7417e0569f30b2cafa708214fcce952d5c9d5604ac544b2f889be1b，短目录已清理。",
+    "check_after_repair": "r-73ipw0yg cargo check -p warp通过；日志ad3cb00c1ec84f608471c459d53110a9f68d3ca39c8f2842d8d18e829e3af43a，退出/文件占用核验后短目录已清理。",
+    "first_focused_regression": "r-b1_b7q4y无重试242项，230通过/12失败；图片恢复6项、UI6项。日志0d1c549c4cea4308994285441f7dafa16dd89fdbf88d5fef9a79f92aec12262f。已定位跨daemon旧host引用阻止staging初始化这一产品缺陷，另有非PNG测试夹具及ToastStack未注册；两项UI超时仍在定位。 后续定位OSC夹具未开PluggableNotifications/错误等待重绘，另一项揭示manager旧EOF真实竞态；夹具修正与产品修复分别记录。",
+    "i18n": "r-m9mx2e4m 11项通过，日志2892386edfa63541ea3d323c4fbaad06e75f9729a5750760827eedc130c6c58f；不等于双语GUI布局验收。",
+    "native_target_api": "r-te1fpsb6真实tmux API 1项通过，增加持久目标序列化/原消费者身份/不同pane拒绝；日志775c9399cfbe0a5c775cfe524d0408c94b2775ddd7d5d019a6019672bbc3331a。1次split、全部自有进程退出、短目录已清理；无CLI图片或模型输入。",
+    "import_receipt_sha256": "a42bb4c2d67e10a81d71bc7fc6bdf376eae957dfc31576a89a32c05caeae2421",
+    "boundary": "879 Observe/SID校验保持；仅已选中持久launch的显式恢复，任意冷态多意图选择未实现。真实tmux三CLI图片消费、完整SSH断连后的身份恢复、双语GUI及精确提交跨平台门禁未完成，不关闭G08。",
+    "first_repair_regression": "r-eugh5o1v无重试243/243通过，日志352fef204f921b7e95de7f4c9193a27a1675b17b428e2923fef8f8ed8bfe8b75；短目录退出核验后已清理。该轮尚未包含随后全局预算纠正与manager连接代次修复，不能外推最终源码。",
+    "global_budget_correction": "源码原合同为服务端全局500000000声明图片字节上限；各host引用共同计入额度，精确释放按实际字节扣减，重复/错key/错host不额外腾额。修正导入收据71b0aa46d244c3d8d16d333380592907aa577020127906942ad5e61bfb1cecd0；不声称完整目录磁盘quota。",
+    "connection_race": "已按每次connect/reconnect UUID隔离连接结果、握手、退出等待、重试、push及EOF；同步撤销原host索引/parent引用，精确request_id失败收尾保持。6项真实duplex受控协议回归均通过。",
+    "global_budget_regression": "r-gph_3kvc 图片暂存/恢复49项无重试全通过，包含跨两次daemon重启累计预算与精确/重复/错误释放；日志9574bf57cb029618b598d844270ada4eaac437a99c4e7f52f5609bbc73aedb17，短目录已清理。仍未包含manager代次增量。",
+    "final_integration_regression": "r-iv1v21o2完整remote_server lib及Warp图片/tmux定向396项，无重试全通过；日志a5470f92bac387010075c2943b27a7d1e931961d688192bcef129e6d485dc783。i18n r-vq0k1j4b 11项、check r-7x9tc651通过；Python来源合同4项/actionlint通过，短目录均已清理。收据cec5f49756678c9d3022dcb1fc79a70333958102a515558246dd20436440f3cc；仅对应其103文件快照，不含后续pane环境增量。",
+    "pane_environment": "旧tmux server缺两项宿主变量会阻止Claude/Codex会话通知；新owned pane仅通过-e注入当前协议/构建来源，不改server/session。r-j95bnz9z真实API通过原/普通pane缺键、新pane精确值、原环境不变及全部原身份/清理断言，日志a34641bf65a53feea559a211622011470f2913bdf48d6d7f9275b3f814fff682；收据5818779c26e16abf354014b28ae49b232f55c98fc01be5afa0c24efc557aa128。无CLI/model输入。",
+    "reconnect_identity_gap": "源码确认SSH user block完成会remove_session；Claude/Grok持续存活时不会再发SessionStart，当前Restore只保留launch不足以重建输入。正补重新核验身份的只读恢复；旧SessionStart不能伪装新事件或当前idle/approval状态。Codex已有原生readonly Observe路径。",
+    "native_source": "公开Grok8855bbe86680仅补Windows测试io::Read限定调用；完整补丁重建通过。相对a9五个测试文件之外4155树项相同，Mac工件继续精确绑定a9，不重标新来源。目标Windows复验待完成。",
+    "localization": "9条新增英中菜单/提示已同步，i18n11项通过；manager及pane环境无需本地化变更。新菜单/错误和完整中文成功流程仍须真实GUI审计。",
+    "checkpoint_gates": "两文件环境增量后r-3dycecz9 tmux定向19项、r-j95bnz9z真实API1项和r-mzeiywq2最终check通过；其余101文件与396/i18n门禁快照一致，分轮收据fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6。真实GUI及原生只读恢复缺项仍待完成。"
   }
 }

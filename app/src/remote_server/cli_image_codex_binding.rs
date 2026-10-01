@@ -44,6 +44,10 @@ impl ImageLease {
 }
 
 impl Binding {
+    pub(super) fn terminal_identity(&self) -> (i32, u64) {
+        (self.tui.pid, self.tty_identity.2)
+    }
+
     pub(super) fn connect(candidate: &CliImageCodexBinding) -> io::Result<(Self, UnixStream)> {
         let tty_path = PathBuf::from(&candidate.tty_path);
         let metadata = fs::symlink_metadata(&tty_path)?;

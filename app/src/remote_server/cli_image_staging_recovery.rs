@@ -41,6 +41,17 @@ struct Release {
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
+pub(in crate::remote_server) struct TmuxImageRecovery {
+    pub(in crate::remote_server) version: u32,
+    pub(in crate::remote_server) launch_id: Uuid,
+    pub(in crate::remote_server) launch_key_sha256: String,
+    pub(in crate::remote_server) agent: i32,
+    pub(in crate::remote_server) original_host: String,
+    pub(in crate::remote_server) original_terminal_session: u64,
+}
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::remote_server) struct QueueClaim {
     pub(in crate::remote_server) version: u32,
     pub(in crate::remote_server) host: String,
@@ -53,6 +64,9 @@ pub(in crate::remote_server) struct QueueClaim {
     /// 仅原生历史恢复所需路径、偏移和原图摘要；不含 socket 认证材料。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(in crate::remote_server) claude_recovery: Option<serde_json::Value>,
+    /// 仅已验证的原生目标可登记；此关联只恢复原提交，不恢复输入授权。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::remote_server) tmux_recovery: Option<TmuxImageRecovery>,
 }
 
 /// 此终态仅在原生首写尚未开始时保存，不伪造原生历史或领取记录。
@@ -160,7 +174,7 @@ impl ReferenceStore {
     }
 
     /// 回收仅依据已经落盘的显式释放请求；无记录或未释放的图片不会按年龄删除。
-    pub(super) fn retained_bytes(&self, host: &str) -> io::Result<u64> {
+    pub(super) fn retained_bytes(&self) -> io::Result<u64> {
         let _guard = self.acquire()?;
         let mut bytes = 0u64;
         for item in fs::read_dir(&self.root)? {
@@ -177,7 +191,7 @@ impl ReferenceStore {
             };
             let reference = read_record::<Reference>(&path)?.ok_or_else(invalid)?;
             self.validate_reference(&reference)?;
-            if reference.transfer_id != id || reference.host != host {
+            if reference.transfer_id != id {
                 return Err(invalid());
             }
             if let Some(release) = self.release_record(id)? {
@@ -187,6 +201,7 @@ impl ReferenceStore {
                 self.remove_reference_file(&reference)?;
                 continue;
             }
+            // daemon 重启不会重置额度；所有 host 的未释放图片声明字节均占用预算。
             // 发布未返回时发生崩溃也保留这份引用，等待客户端的持久意图决定。
             bytes = bytes.checked_add(reference.byte_len).ok_or_else(invalid)?;
         }
@@ -503,6 +518,76 @@ impl ReferenceStore {
                 native_ack_sha256: None,
             })),
         }
+    }
+
+    /// 先核精确提交凭据，再由上层用受保护的 tmux 记录验证跨 daemon 归属。
+    pub(super) fn queue_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let _guard = self.acquire()?;
+        let claim = self.read_recovery_claim(native_session, submission)?;
+        if let Some(claim) = &claim
+            && claim.key_hash != key_hash(key)?
+        {
+            return Err(invalid());
+        }
+        Ok(claim)
+    }
+
+    pub(super) fn reference_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+        transfer: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let _guard = self.acquire()?;
+        let Some(claim) = self.read_recovery_claim(native_session, submission)? else {
+            return Ok(None);
+        };
+        if !claim.references.contains(&(transfer, key)) {
+            return Err(invalid());
+        }
+        let reference = read_record::<Reference>(&self.record_path(transfer))?.ok_or_else(invalid)?;
+        self.require_owner(&reference, &claim.host, native_session, key_hash(key)?)?;
+        Ok(Some(claim))
+    }
+
+    fn read_recovery_claim(
+        &self,
+        native_session: &str,
+        submission: Uuid,
+    ) -> io::Result<Option<QueueClaim>> {
+        let claim = read_record::<QueueClaim>(&self.root.join(format!("queue-{submission}.json")))?;
+        if let Some(claim) = &claim {
+            if claim.version != 1
+                || submission.is_nil()
+                || claim.submission != submission
+                || claim.host.is_empty()
+                || native_session.is_empty()
+                || claim.native_session != native_session
+                || claim.references.is_empty()
+                || claim.references.len() > 20
+                || claim
+                    .references
+                    .iter()
+                    .any(|(id, key)| id.is_nil() || key.is_nil())
+            {
+                return Err(invalid());
+            }
+            for (index, (id, _)) in claim.references.iter().enumerate() {
+                if claim.references[..index]
+                    .iter()
+                    .any(|(previous, _)| previous == id)
+                {
+                    return Err(invalid());
+                }
+            }
+        }
+        Ok(claim)
     }
 
     fn record_path(&self, id: Uuid) -> PathBuf {

@@ -33,6 +33,18 @@ mod claude;
 
 const MAX_RESERVED_BYTES: u64 = 500_000_000;
 
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+fn tmux_scope(scope: &RemoteImageScope) -> super::proto::TerminalBindingScope {
+    super::proto::TerminalBindingScope {
+        host_id: scope.host_id.as_str().to_owned(),
+        terminal_session_id: scope.terminal_session_id.into(),
+        terminal_epoch: scope.terminal_epoch.to_string(),
+    }
+}
+
 pub(super) struct ImageStagingConnection {
     id: Uuid,
     live: AtomicBool,
@@ -289,6 +301,11 @@ struct State {
 }
 
 pub(super) struct ImageStagingService {
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    tmux_owned: Option<Arc<super::tmux_owned::Service>>,
     #[cfg(all(
         feature = "local_fs",
         any(
@@ -302,6 +319,103 @@ pub(super) struct ImageStagingService {
 }
 
 impl ImageStagingService {
+    /// 恢复只用于已持久提交的状态和精确文件回收，不能注册上传或连接原生消费者。
+    fn recovered_scope(
+        &self,
+        scope: &RemoteImageScope,
+        claim: Option<&QueueClaim>,
+        expected_agent: Option<super::proto::TerminalBindingOwnedAgent>,
+    ) -> io::Result<RemoteImageScope> {
+        use super::proto::TerminalBindingOwnedAgent;
+        let Some(claim) = claim else {
+            return Ok(scope.clone());
+        };
+        let agent = if claim.claude_recovery.is_some() {
+            TerminalBindingOwnedAgent::Claude
+        } else {
+            TerminalBindingOwnedAgent::Codex
+        };
+        if expected_agent.is_some_and(|expected| expected != agent) {
+            return Err(io::Error::other("native image consumer changed"));
+        }
+        if claim.host == scope.host_id.as_str() {
+            return Ok(scope.clone());
+        }
+        #[cfg(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        ))]
+        {
+            let recovery = claim
+                .tmux_recovery
+                .as_ref()
+                .ok_or_else(|| io::Error::other("tmux image recovery is missing"))?;
+            self.tmux_owned
+                .as_ref()
+                .ok_or_else(|| io::Error::other("tmux image service is unavailable"))?
+                .validate_image_recovery(&tmux_scope(scope), recovery, agent)?;
+            let mut restored = scope.clone();
+            restored.host_id = HostId::new(claim.host.clone());
+            Ok(restored)
+        }
+        #[cfg(not(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )))]
+        Err(io::Error::other("tmux image platform is unavailable"))
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    pub(super) fn with_tmux_owned(
+        mut self,
+        service: Option<Arc<super::tmux_owned::Service>>,
+    ) -> Self {
+        self.tmux_owned = service;
+        self
+    }
+
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
+    fn claude_tmux_guard(
+        &self,
+        scope: &RemoteImageScope,
+        candidate: &super::proto::CliImageClaudeBinding,
+        pid: i32,
+        tty: u64,
+    ) -> io::Result<Option<super::tmux_owned::ImageGuard>> {
+        let scope = tmux_scope(scope);
+        match (&candidate.tmux_owned, &self.tmux_owned) {
+            (Some(reference), Some(service)) => {
+                let id = Uuid::parse_str(&reference.launch_id)
+                    .map_err(|_| io::Error::other("invalid tmux launch"))?;
+                let key = Uuid::parse_str(&reference.launch_key)
+                    .map_err(|_| io::Error::other("invalid tmux launch key"))?;
+                service
+                    .image_guard_for_reference(
+                        &scope,
+                        id,
+                        key,
+                        &reference.opaque_binding_id,
+                        super::proto::TerminalBindingOwnedAgent::Claude,
+                    )
+                    .map(|(guard, _)| Some(guard))
+            }
+            (None, Some(service)) => {
+                if service.owns_consumer(pid, tty)? {
+                    return Err(io::Error::other("tmux image reference is required"));
+                }
+                Ok(None)
+            }
+            (None, None) => Ok(None),
+            (Some(_), None) => Err(io::Error::other("tmux image service is unavailable")),
+        }
+    }
+
     #[cfg(all(
         feature = "local_fs",
         any(
@@ -323,8 +437,18 @@ impl ImageStagingService {
         candidate: &super::proto::CliImageCodexBinding,
     ) -> io::Result<(NativeCodexQueueBinding, std::os::unix::net::UnixStream)> {
         if candidate.owned_ticket_id.is_empty() && candidate.owned_manifest_sha256.is_empty() {
-            return Binding::connect(candidate)
-                .map(|(binding, stream)| (NativeCodexQueueBinding::Shared(binding), stream));
+            let (binding, stream) = Binding::connect(candidate)?;
+            #[cfg(any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            ))]
+            if let Some(service) = &self.tmux_owned {
+                let (pid, tty) = binding.terminal_identity();
+                if service.owns_consumer(pid, tty)? {
+                    return Err(io::Error::other("tmux Codex ticket is required"));
+                }
+            }
+            return Ok((NativeCodexQueueBinding::Shared(binding), stream));
         }
         #[cfg(all(
             feature = "local_fs",
@@ -342,13 +466,36 @@ impl ImageStagingService {
             let ticket = Uuid::parse_str(&candidate.owned_ticket_id)
                 .map_err(|_| io::Error::other("invalid Codex ticket"))?;
             let native_session = scope.cli_session_id.as_str();
-            let scope = super::cli_image_codex_owned_protocol::Scope {
+            let mut ticket_scope = super::cli_image_codex_owned_protocol::Scope {
                 host: scope.host_id.as_str().to_owned(),
                 terminal_session: scope.terminal_session_id.into(),
                 terminal_epoch: scope.terminal_epoch,
                 generation: scope.input_generation,
             };
-            let lease = service.image_owner(&scope, ticket, &candidate.owned_manifest_sha256)?;
+            let tmux = match &self.tmux_owned {
+                Some(service) if service.owns_ticket(ticket)? => {
+                    let (guard, original) = service.image_guard(
+                        &tmux_scope(scope),
+                        ticket,
+                        super::proto::TerminalBindingOwnedAgent::Codex,
+                    )?;
+                    ticket_scope.host = original.host().to_owned();
+                    ticket_scope.terminal_session = original.terminal_session();
+                    Some(guard)
+                }
+                Some(_) | None => None,
+            };
+            let lease = match &tmux {
+                Some(guard) => service.image_owner_tmux(
+                    &ticket_scope,
+                    ticket,
+                    &candidate.owned_manifest_sha256,
+                    guard,
+                )?,
+                None => {
+                    service.image_owner(&ticket_scope, ticket, &candidate.owned_manifest_sha256)?
+                }
+            };
             lease.validate_native_session(native_session)?;
             let tty = std::fs::symlink_metadata(&candidate.tty_path)?;
             if lease.server_pid() as u32 != candidate.daemon_pid_candidate
@@ -361,7 +508,10 @@ impl ImageStagingService {
                 return Err(io::Error::other("owned Codex candidate changed"));
             }
             let stream = lease.connect()?;
-            Ok((NativeCodexQueueBinding::Owned(lease), stream))
+            if let Some(tmux) = &tmux {
+                tmux.validate_process(lease.tui_pid(), lease.tty_device())?;
+            }
+            Ok((NativeCodexQueueBinding::Owned { lease, tmux }, stream))
         }
         #[cfg(not(all(
             feature = "local_fs",
@@ -380,6 +530,11 @@ impl ImageStagingService {
         let staging = RemoteImageStaging::new(host_id.clone(), private_parent, MAX_RESERVED_BYTES)?;
         Ok(Self {
             host_id,
+            #[cfg(any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            ))]
+            tmux_owned: None,
             #[cfg(all(
                 feature = "local_fs",
                 any(
@@ -594,10 +749,25 @@ impl ImageStagingService {
             }
             Action::Release(release) => {
                 let transfer = transfer_id(&release.transfer_id)?;
-                state
+                let recovery_key = parse_scope_uuid(&release.recovery_key)?;
+                let claim = state
                     .staging
-                    .release_published(&scope, transfer, parse_scope_uuid(&release.recovery_key)?)
+                    .reference_recovery_claim(&scope, transfer, recovery_key)
                     .map_err(storage_error)?;
+                let recovered = self
+                    .recovered_scope(&scope, claim.as_ref(), None)
+                    .map_err(storage_error)?;
+                if recovered.host_id != scope.host_id {
+                    state
+                        .staging
+                        .recover_reference(&recovered, transfer, recovery_key, true)
+                        .map_err(storage_error)?;
+                } else {
+                    state
+                        .staging
+                        .release_published(&scope, transfer, recovery_key)
+                        .map_err(storage_error)?;
+                }
                 (
                     request.revision,
                     Response::Released(CliImageStagingReleased {
@@ -621,14 +791,17 @@ impl ImageStagingService {
             }
             Action::Recover(recover) => {
                 let transfer = transfer_id(&recover.transfer_id)?;
+                let recovery_key = parse_scope_uuid(&recover.recovery_key)?;
+                let claim = state
+                    .staging
+                    .reference_recovery_claim(&scope, transfer, recovery_key)
+                    .map_err(storage_error)?;
+                let recovered = self
+                    .recovered_scope(&scope, claim.as_ref(), None)
+                    .map_err(storage_error)?;
                 let (reference, released) = state
                     .staging
-                    .recover_reference(
-                        &scope,
-                        transfer,
-                        parse_scope_uuid(&recover.recovery_key)?,
-                        recover.release,
-                    )
+                    .recover_reference(&recovered, transfer, recovery_key, recover.release)
                     .map_err(storage_error)?;
                 let reference = reference
                     .map(|(path, spec)| {
@@ -665,6 +838,7 @@ impl ImageStagingService {
                 return Ok((
                     request.revision,
                     Response::ClaudeQueue(claude::submit(
+                        self,
                         &mut state.staging,
                         connection,
                         &lease,
@@ -674,12 +848,21 @@ impl ImageStagingService {
                 ));
             }
             Action::ClaudeQueueStatus(status) => {
-                let result = claude::recover(
-                    &mut state.staging,
-                    &scope,
-                    parse_scope_uuid(&status.submission_id)?,
-                    parse_scope_uuid(&status.recovery_key)?,
-                )?;
+                let submission = parse_scope_uuid(&status.submission_id)?;
+                let recovery_key = parse_scope_uuid(&status.recovery_key)?;
+                let claim = state
+                    .staging
+                    .queue_recovery_claim(&scope, submission, recovery_key)
+                    .map_err(storage_error)?;
+                let recovered = self
+                    .recovered_scope(
+                        &scope,
+                        claim.as_ref(),
+                        Some(super::proto::TerminalBindingOwnedAgent::Claude),
+                    )
+                    .map_err(storage_error)?;
+                let result =
+                    claude::recover(&mut state.staging, &recovered, submission, recovery_key)?;
                 (request.revision, Response::ClaudeQueue(result))
             }
             Action::CodexQueue(queue) => {
@@ -699,9 +882,21 @@ impl ImageStagingService {
             }
             Action::CodexQueueStatus(status) => {
                 let submission = parse_scope_uuid(&status.submission_id)?;
+                let recovery_key = parse_scope_uuid(&status.recovery_key)?;
+                let claim = state
+                    .staging
+                    .queue_recovery_claim(&scope, submission, recovery_key)
+                    .map_err(storage_error)?;
+                let recovered = self
+                    .recovered_scope(
+                        &scope,
+                        claim.as_ref(),
+                        Some(super::proto::TerminalBindingOwnedAgent::Codex),
+                    )
+                    .map_err(storage_error)?;
                 let result = state
                     .staging
-                    .queue_status(&scope, submission, parse_scope_uuid(&status.recovery_key)?)
+                    .queue_status(&recovered, submission, recovery_key)
                     .map_err(storage_error)?;
                 if result
                     .as_ref()
@@ -716,7 +911,7 @@ impl ImageStagingService {
                 {
                     state
                         .staging
-                        .finish_queue(&scope, result)
+                        .finish_queue(&recovered, result)
                         .map_err(storage_error)?;
                 }
                 (
@@ -797,9 +992,29 @@ enum NativeCodexQueueBinding {
             all(target_os = "linux", target_arch = "x86_64")
         )
     ))]
-    Owned(super::cli_image_codex_owned_launch::OwnedImageLease),
+    Owned {
+        lease: super::cli_image_codex_owned_launch::OwnedImageLease,
+        tmux: Option<super::tmux_owned::ImageGuard>,
+    },
 }
 impl NativeCodexQueueBinding {
+    fn recovery_identity(&self) -> io::Result<Option<super::cli_image_staging::TmuxImageRecovery>> {
+        match self {
+            Self::Shared(_) => Ok(None),
+            #[cfg(all(
+                feature = "local_fs",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64")
+                )
+            ))]
+            Self::Owned { tmux, .. } => tmux
+                .as_ref()
+                .map(super::tmux_owned::ImageGuard::recovery_identity)
+                .transpose(),
+        }
+    }
+
     fn validate(&self, stream: &std::os::unix::net::UnixStream) -> io::Result<()> {
         match self {
             Self::Shared(binding) => binding.validate(stream),
@@ -810,7 +1025,13 @@ impl NativeCodexQueueBinding {
                     all(target_os = "linux", target_arch = "x86_64")
                 )
             ))]
-            Self::Owned(binding) => binding.validate(stream),
+            Self::Owned { lease, tmux } => {
+                lease.validate(stream)?;
+                if let Some(tmux) = tmux {
+                    tmux.validate_process(lease.tui_pid(), lease.tty_device())?;
+                }
+                lease.validate(stream)
+            }
         }
     }
 }
@@ -940,6 +1161,7 @@ fn queue_input(
                 native_request_sha256: attempt.request_sha256,
                 references,
                 claude_recovery: None,
+                tmux_recovery: binding.recovery_identity()?,
             };
             staging.claim_queue(&claim)?;
             *saved_claim.borrow_mut() = Some(claim);
@@ -1113,3 +1335,13 @@ fn storage_error(error: io::Error) -> CliImageStagingError {
 #[cfg(test)]
 #[path = "cli_image_staging_rpc_tests.rs"]
 mod tests;
+
+#[cfg(all(
+    test,
+    any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )
+))]
+#[path = "cli_image_staging_tmux_recovery_tests.rs"]
+mod tmux_recovery_tests;

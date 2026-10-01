@@ -35,6 +35,11 @@ fn begin_attempt(work: &Work) -> Arc<Attempt> {
     match &work.operation {
         Operation::Begin { attempt, .. } => attempt.clone(),
         Operation::Ack { .. } | Operation::Cancel | Operation::Failed => panic!("预期仅准备挑战"),
+        #[cfg(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        ))]
+        Operation::Owned { .. } => panic!("预期仅准备挑战"),
     }
 }
 
@@ -221,16 +226,44 @@ fn dropping_connection_revokes_a_retained_consumer() {
     assert!(!consumer.claim_launch());
 }
 
+#[test]
+fn owned_start_cannot_consume_a_challenge_before_native_binding() {
+    let (connection, _, mut request) = fixture();
+    let original = connection.prepare(request.clone());
+    let attempt = begin_attempt(&original);
+    request.action = Some(terminal_binding_request::Action::StartOwned(
+        crate::remote_server::proto::TerminalBindingStartOwned {
+            opaque_binding_id: attempt.binding_id.to_string(),
+            launch_id: Uuid::new_v4().to_string(),
+            launch_key: Uuid::new_v4().to_string(),
+            agent: crate::remote_server::proto::TerminalBindingOwnedAgent::Codex as i32,
+        },
+    ));
+    assert_failed(connection.prepare(request).execute());
+    assert_eq!(attempt.launch.load(Ordering::SeqCst), 0);
+    assert!(attempt.pending());
+}
+
 /// 只构造已完成回执的身份字段，用于检查发送前的所属代次，不伪造原生状态。
 fn completed_responses(
     request: &TerminalBindingRequest,
     attempt: &Attempt,
-) -> [TerminalBindingResponse; 2] {
+) -> [TerminalBindingResponse; 3] {
     [
         terminal_binding_response::Result::ChallengeWritten(TerminalBindingChallengeWritten {}),
         terminal_binding_response::Result::Bound(TerminalBindingBound {
             opaque_binding_id: attempt.binding_id.to_string(),
+            pane_cwd: "/fixture".into(),
         }),
+        terminal_binding_response::Result::Owned(
+            crate::remote_server::proto::TerminalBindingOwned {
+                launch_id: Uuid::new_v4().to_string(),
+                agent: crate::remote_server::proto::TerminalBindingOwnedAgent::Claude as i32,
+                phase: "unknown".into(),
+                owned_reply_json: Vec::new(),
+                native_session_id: None,
+            },
+        ),
     ]
     .map(|result| TerminalBindingResponse {
         scope: request.scope.clone(),
@@ -293,7 +326,7 @@ fn completed_reply_requires_exact_scope_attempt_and_binding_id() {
 }
 
 #[test]
-fn cancel_between_completion_and_callback_rejects_both_success_replies() {
+fn cancel_between_completion_and_callback_rejects_all_completed_replies() {
     let (connection, _, mut request) = fixture();
     let work = connection.prepare(request.clone());
     let responses = completed_responses(&request, &begin_attempt(&work));

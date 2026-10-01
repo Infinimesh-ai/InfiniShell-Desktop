@@ -198,6 +198,18 @@ impl TerminalView {
             )
         )))]
         let codex_owned = None;
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        )))]
+        let tmux_owned = self.tmux_owned_image_reference(session.agent, &target.native_session_id, ctx).ok()?;
+        #[cfg(not(all(feature = "local_fs", feature = "local_tty", any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(windows, target_arch = "x86_64")
+        ))))]
+        let tmux_owned = None;
         Some((
             client,
             NativeImageBinding {
@@ -210,6 +222,7 @@ impl TerminalView {
                 cwd: cwd.clone(),
                 consumer,
                 codex_owned,
+                tmux_owned,
             },
         ))
     }

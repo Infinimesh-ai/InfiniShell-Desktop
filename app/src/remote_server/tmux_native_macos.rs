@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use command::managed::{MacosProcessIdentity, macos_peer_handle, macos_process_identity};
 
-use super::{Budget, MAX_FDS, MAX_PIDS, ProcessSnapshot, SocketEndpoint, invalid};
+use super::{Budget, MAX_FDS, MAX_PIDS, ProcessSnapshot, SocketEndpoint, Token, invalid};
 
 #[repr(C)]
 struct FlatProcess {
@@ -59,6 +59,21 @@ pub(super) struct Process {
 }
 
 impl Process {
+    #[cfg(test)]
+    pub(super) fn identity_for_test(&self) -> MacosProcessIdentity {
+        self.identity
+    }
+
+    pub(super) fn token(&self) -> io::Result<Token> {
+        self.snapshot()?;
+        let token = Token::capture(self.identity.pid)?;
+        if token.macos_identity()? != self.identity {
+            return Err(invalid("tmux 持久进程代次已改变"));
+        }
+        self.snapshot()?;
+        Ok(token)
+    }
+
     pub(super) fn capture(pid: i32) -> io::Result<Self> {
         let process = Self {
             identity: macos_process_identity(pid)?,
@@ -69,11 +84,6 @@ impl Process {
 
     pub(super) fn same_identity(&self, other: &Self) -> bool {
         self.identity == other.identity
-    }
-
-    #[cfg(test)]
-    pub(super) fn identity_for_test(&self) -> MacosProcessIdentity {
-        self.identity
     }
 
     pub(super) fn snapshot(&self) -> io::Result<ProcessSnapshot> {

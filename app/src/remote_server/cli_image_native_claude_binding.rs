@@ -142,6 +142,10 @@ impl Binding {
         self.target.clone()
     }
 
+    pub(super) fn terminal_identity(&self) -> (i32, u64) {
+        (self.process.pid, self.tty_identity.2)
+    }
+
     pub(super) fn validate(&self, stream: &UnixStream) -> io::Result<()> {
         self.transcript_guard.verify()?;
         if peer_pid(stream)? != self.process.pid {
@@ -189,14 +193,18 @@ impl Binding {
 }
 
 fn fixed_image(process: &Process) -> io::Result<File> {
+    fixed_image_path(&process.executable, process.executable_identity)
+}
+
+fn fixed_image_path(path: &Path, expected_identity: (u64, u64)) -> io::Result<File> {
     let mut image = OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW)
-        .open(&process.executable)?;
+        .open(path)?;
     let metadata = image.metadata()?;
     if !metadata.is_file()
         || metadata.mode() & 0o022 != 0
-        || (metadata.dev(), metadata.ino()) != process.executable_identity
+        || (metadata.dev(), metadata.ino()) != expected_identity
     {
         return Err(invalid());
     }
@@ -292,4 +300,91 @@ fn socket_metadata(path: &Path) -> io::Result<fs::Metadata> {
 
 fn invalid() -> io::Error {
     io::Error::other("remote Claude process binding is unavailable")
+}
+
+/// Status 只核目标 pane 的固定映像与精确注册表，不连接原生 socket 或读取会话正文。
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(super) fn session_for_tmux(
+    target: &super::tmux_native::TmuxTarget,
+) -> io::Result<Option<Uuid>> {
+    use crate::terminal::{CLIAgent, cli_agent::discover_cli_agent_executable};
+
+    let executable = discover_cli_agent_executable(CLIAgent::Claude)
+        .ok_or_else(invalid)?
+        .canonicalize()?;
+    let metadata = fs::metadata(&executable)?;
+    let image = fixed_image_path(&executable, (metadata.dev(), metadata.ino()))?;
+    let image_identity = identity(&image.metadata()?);
+    let mut found = None;
+    for (pid, tty) in target.consumer_candidates(&executable)? {
+        target.validate_consumer(pid, tty)?;
+        let before = process(pid, Configuration::Claude)?;
+        if before.executable != executable
+            || before.executable_identity != (metadata.dev(), metadata.ino())
+            || before.tty != tty
+            || before.foreground_group != before.group
+            || before
+                .arguments
+                .iter()
+                .skip(1)
+                .any(|arg| arg == b"-p" || arg == b"--print" || arg.starts_with(b"--print="))
+        {
+            return Err(invalid());
+        }
+        let directory = before.config_home.join("sessions");
+        private_directory(&directory)?;
+        let path = directory.join(format!("{pid}.json"));
+        let mut registry = match open_private_file(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(error),
+        };
+        let initial = identity(&registry.metadata()?);
+        let mut bytes = Vec::new();
+        (&mut registry)
+            .take(16 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > 16 * 1024 {
+            return Err(invalid());
+        }
+        #[derive(Deserialize)]
+        struct StatusRegistry {
+            pid: u32,
+            #[serde(flatten)]
+            record: Registry,
+        }
+        let decoded: StatusRegistry = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+        let record = decoded.record;
+        if decoded.pid != pid as u32
+            || record.proc_start.is_empty()
+            || record.proc_start.len() > 128
+            || record.session_id.is_nil()
+            || !record.cwd.is_absolute()
+            || record.kind != "interactive"
+            || found.is_some()
+        {
+            return Err(invalid());
+        }
+        socket_metadata(&record.messaging_socket_path)?;
+        target.validate_listener(pid, tty, &record.messaging_socket_path)?;
+        let current = open_private_file(&path)?;
+        let after = process(pid, Configuration::Claude)?;
+        target.validate_consumer(pid, tty)?;
+        if identity(&current.metadata()?) != initial
+            || identity(&registry.metadata()?) != initial
+            || before.identity != after.identity
+            || before.config_home != after.config_home
+            || before.executable_identity != after.executable_identity
+            || after.tty != tty
+            || image_identity != identity(&image.metadata()?)
+            || image_identity != identity(&fs::symlink_metadata(&executable)?)
+        {
+            return Err(invalid());
+        }
+        found = Some(record.session_id);
+    }
+    Ok(found)
 }

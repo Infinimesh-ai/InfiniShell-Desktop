@@ -11,7 +11,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use super::cli_image_native_lifetime::Token;
 use socket2::{Domain, SockAddr, Socket, Type};
+use warp_core::channel::ChannelState;
+use warp_core::cli_agent_protocol::{WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV};
+
+use crate::terminal::cli_agent_sessions::event::current_protocol_version;
+
+#[path = "tmux_native_target.rs"]
+mod target;
+pub(crate) use target::TmuxTarget;
 
 #[path = "tmux_native_control.rs"]
 mod control;
@@ -337,9 +346,7 @@ impl TmuxBinding {
         )?;
         let stream: UnixStream = socket.into();
         platform::validate_peer(&stream, &server, &budget)?;
-        if private_socket(path)? != file
-            || !server.sockets(&budget)?.contains(&server_endpoint)
-        {
+        if private_socket(path)? != file || !server.sockets(&budget)?.contains(&server_endpoint) {
             return Err(invalid("tmux 监听路径与已绑定 server 不一致"));
         }
         let control = control::Control::start(&client_image, path, &server, &budget)?;
@@ -517,15 +524,34 @@ impl TmuxBinding {
         .into_iter()
         .map(OsString::from)
         .collect();
+        // 旧 server 可能没有宿主能力变量；仅新 pane 采用当前构建的真实值，不改会话环境。
+        for (name, value) in [
+            (
+                WARP_CLI_AGENT_PROTOCOL_VERSION_ENV,
+                current_protocol_version().to_string(),
+            ),
+            (
+                WARP_CLIENT_VERSION_ENV,
+                ChannelState::app_version().unwrap_or("local").to_owned(),
+            ),
+        ] {
+            arguments.extend([
+                OsString::from("-e"),
+                OsString::from(format!("{name}={value}")),
+            ]);
+        }
         arguments.push(shell.clone().into_os_string());
         // -p 禁止读取 BASH_ENV/ENV 和继承 shell 函数；不让用户配置改变固定包装器。
         #[cfg(target_os = "macos")]
         arguments.extend(["--noprofile", "--norc", "-p"].map(OsString::from));
-        arguments.extend([
-            "-c",
-            "cd -P \"$1\" || exit 125; shift; \"$@\"; result=$?; exit \"$result\"",
-            "infinishell-tmux-owned",
-        ].map(OsString::from));
+        arguments.extend(
+            [
+                "-c",
+                "cd -P \"$1\" || exit 125; shift; \"$@\"; result=$?; exit \"$result\"",
+                "infinishell-tmux-owned",
+            ]
+            .map(OsString::from),
+        );
         arguments.push(cwd.as_os_str().to_owned());
         arguments.push(program.as_os_str().to_owned());
         arguments.extend_from_slice(args);

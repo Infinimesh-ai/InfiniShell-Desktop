@@ -6,6 +6,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     config.skip_debug([
         ".remote_server.TerminalBindingAck",
         ".remote_server.TerminalBindingBound",
+        ".remote_server.TerminalBindingStartOwned",
+        ".remote_server.TerminalBindingStatusOwned",
+        ".remote_server.TerminalBindingOwned",
+        ".remote_server.TerminalBindingOwnedReference",
     ]);
     config.compile_protos(
         &["proto/remote_server.proto", "proto/diff_state.proto"],

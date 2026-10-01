@@ -86,6 +86,10 @@ pub(crate) struct Launch {
     pub block_id: String,
     pub cwd: String,
     pub ticket: Ticket,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tmux_source: Option<Uuid>,
+    #[serde(skip)]
+    pub tmux_terminal_session: Option<u64>,
 }
 
 pub(crate) struct Journal {
@@ -163,6 +167,8 @@ impl Journal {
             terminal_session: session.as_u64(),
             block_id,
             cwd,
+            tmux_source: None,
+            tmux_terminal_session: None,
             ticket: Ticket {
                 id: Uuid::new_v4(),
                 key: Uuid::new_v4(),
@@ -170,6 +176,24 @@ impl Journal {
         };
         self.write(&path, &launch)?;
         Ok((launch, true))
+    }
+
+    /// tmux 的来源 ID 与 outer block 分开保存；恢复不得调用普通 Reserve。
+    pub(crate) fn remember_tmux(&self, launch: &Launch) -> io::Result<()> {
+        let source = launch.tmux_source.ok_or_else(invalid)?;
+        if source.is_nil() || source != launch.ticket.id {
+            return Err(invalid());
+        }
+        let _guard = self.acquire()?;
+        let path = self.directory.join(format!("tmux-{source}-launch.json"));
+        if path.exists() {
+            let previous: Launch = self.read(&path)?;
+            if encode(&previous).map_err(|_| invalid())? != encode(launch).map_err(|_| invalid())? {
+                return Err(invalid());
+            }
+            return Ok(());
+        }
+        self.write(&path, launch)
     }
 
     pub(crate) fn claim_launch(&self, launch: &Launch) -> io::Result<()> {
@@ -326,7 +350,8 @@ impl Journal {
                 continue;
             }
             let launch: Launch = self.read(&entry.path())?;
-            if launch.host == host
+            if launch.tmux_source.is_none()
+                && launch.host == host
                 && launch.terminal_session == session.as_u64()
                 && launch.cwd == cwd
             {
@@ -392,13 +417,16 @@ pub(crate) fn scope(
 ) -> io::Result<(CliImageStagingScope, u64)> {
     let (scope, revision) = client
         .allocate_cli_image_scope(
-            SessionId::from(launch.terminal_session),
+            SessionId::from(launch.tmux_terminal_session.unwrap_or(launch.terminal_session)),
             &launch.ticket.id.to_string(),
             generation,
             Uuid::new_v4(),
         )
         .map_err(|_| invalid())?;
-    if scope.host_id != launch.host {
+    // 运行时映射只由 fresh Bound + 原票据 Status 成功回调赋值，磁盘恢复始终为空。
+    let tmux_current = launch.tmux_source == Some(launch.ticket.id)
+        && launch.tmux_terminal_session.is_some();
+    if scope.host_id != launch.host && !tmux_current {
         return Err(invalid());
     }
     Ok((scope, revision))

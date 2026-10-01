@@ -348,6 +348,8 @@ pub struct ServerModel {
         )
     ))]
     codex_owned: Option<Arc<CodexOwnedService>>,
+    #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+    tmux_owned: Option<Arc<super::tmux_owned::Service>>,
     #[cfg(all(
         feature = "local_fs",
         any(
@@ -466,6 +468,8 @@ impl ServerModel {
                 )
             ))]
             codex_owned: None,
+            #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+            tmux_owned: None,
             #[cfg(all(
                 feature = "local_fs",
                 any(
@@ -1812,6 +1816,10 @@ impl ServerModel {
             if self.codex_owned.is_some() && self.image_staging.is_some() {
                 capabilities.push(RemoteServerCapability::CliCodexOwnedV1.into());
             }
+            #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+            if self.tmux_owned.is_some() && self.image_staging.is_some() {
+                capabilities.push(RemoteServerCapability::TmuxOwnedV1.into());
+            }
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             capabilities.push(RemoteServerCapability::TerminalBindingV1.into());
             capabilities
@@ -1840,6 +1848,14 @@ impl ServerModel {
                 self.host_id.clone(),
                 private_parent,
             )?));
+            let tmux = Arc::new(super::tmux_owned::Service::new(
+                self.host_id.clone(), private_parent,
+                self.codex_owned.as_ref().expect("已初始化 Codex 票据").clone(),
+                self.grok_owned.as_ref().expect("已初始化 Grok 票据").clone(),
+            ));
+            self.grok_owned.as_ref().expect("已初始化 Grok 票据").set_tmux_owned(Arc::downgrade(&tmux));
+            self.codex_owned.as_ref().expect("已初始化 Codex 票据").set_tmux_owned(Arc::downgrade(&tmux));
+            self.tmux_owned = Some(tmux);
         }
         let staging =
             ImageStagingService::new(super::HostId::new(self.host_id.clone()), private_parent)?;
@@ -1851,6 +1867,8 @@ impl ServerModel {
             )
         ))]
         let staging = staging.with_codex_owned(self.codex_owned.clone());
+        #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+        let staging = staging.with_tmux_owned(self.tmux_owned.clone());
         self.image_staging = Some(Arc::new(staging));
         Ok(())
     }

@@ -10,20 +10,20 @@ use warpui::{AppContext, SingletonEntity, ViewContext};
 use super::{BlockId, SessionId, ShellType, TerminalView};
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
-use crate::remote_server::proto::TerminalBindingScope;
+use crate::remote_server::proto::{TerminalBindingBound, TerminalBindingScope};
 use crate::terminal::model::ansi::TerminalBindingChallenge;
 
 #[derive(Clone, PartialEq, Eq)]
-struct Snapshot {
-    session: SessionId,
-    block: BlockId,
-    cwd: Option<String>,
+pub(super) struct Snapshot {
+    pub(super) session: SessionId,
+    pub(super) block: BlockId,
+    pub(super) cwd: Option<String>,
 }
 
 enum Phase {
     Waiting { written: bool, nonce: Option<Uuid> },
     Acknowledging,
-    Bound(String),
+    Bound(TerminalBindingBound),
 }
 
 pub(super) struct TerminalBinding {
@@ -70,7 +70,7 @@ impl TerminalBinding {
 }
 
 impl TerminalView {
-    fn terminal_binding_snapshot(
+    pub(super) fn terminal_binding_snapshot(
         &self,
         ctx: &AppContext,
     ) -> Option<(Snapshot, Arc<RemoteServerClient>)> {
@@ -129,7 +129,21 @@ impl TerminalView {
     }
 
     pub(crate) fn cancel_remote_terminal_binding(&mut self) {
-        self.remote_terminal_binding = None;
+        if self.remote_terminal_binding.take().is_some() {
+            #[cfg(all(
+                feature = "local_fs",
+                feature = "local_tty",
+                any(
+                    all(target_os = "macos", target_arch = "aarch64"),
+                    all(target_os = "linux", target_arch = "x86_64"),
+                    all(windows, target_arch = "x86_64")
+                )
+            ))]
+            {
+                self.revoke_remote_owned_codex();
+                self.revoke_remote_owned_grok();
+            }
+        }
     }
 
     /// 由显式产品入口调用；先登记 attempt，避免 TTY 输出先于 Begin 响应到达。
@@ -164,6 +178,16 @@ impl TerminalView {
                 };
                 if reply.is_err() {
                     view.cancel_remote_terminal_binding();
+                    #[cfg(all(
+                        feature = "local_fs",
+                        feature = "local_tty",
+                        any(
+                            all(target_os = "macos", target_arch = "aarch64"),
+                            all(target_os = "linux", target_arch = "x86_64"),
+                            all(windows, target_arch = "x86_64")
+                        )
+                    ))]
+                    view.continue_tmux_owned_after_binding(attempt, ctx);
                     ctx.notify();
                     return;
                 }
@@ -186,6 +210,16 @@ impl TerminalView {
                     })
                 {
                     view.cancel_remote_terminal_binding();
+                    #[cfg(all(
+                        feature = "local_fs",
+                        feature = "local_tty",
+                        any(
+                            all(target_os = "macos", target_arch = "aarch64"),
+                            all(target_os = "linux", target_arch = "x86_64"),
+                            all(windows, target_arch = "x86_64")
+                        )
+                    ))]
+                    view.continue_tmux_owned_after_binding(attempt, ctx);
                     ctx.notify();
                 }
             },
@@ -237,9 +271,29 @@ impl TerminalView {
                     Ok(id) => binding.phase = Phase::Bound(id),
                     Err(_) => view.cancel_remote_terminal_binding(),
                 }
+                #[cfg(all(
+                    feature = "local_fs",
+                    feature = "local_tty",
+                    any(
+                        all(target_os = "macos", target_arch = "aarch64"),
+                        all(target_os = "linux", target_arch = "x86_64"),
+                        all(windows, target_arch = "x86_64")
+                    )
+                ))]
+                view.continue_tmux_owned_after_binding(attempt, ctx);
                 ctx.notify();
             },
         );
+    }
+
+    pub(super) fn current_remote_terminal_pane_cwd(&self, ctx: &AppContext) -> Option<String> {
+        if !self.terminal_binding_is_current(ctx) {
+            return None;
+        }
+        let Phase::Bound(bound) = &self.remote_terminal_binding.as_ref()?.phase else {
+            return None;
+        };
+        Some(bound.pane_cwd.clone())
     }
 
     /// 消费方每次使用前仍须检查原 view/block/client/epoch，不能保存跨重连的 ID。
@@ -258,11 +312,11 @@ impl TerminalView {
             binding.client.clone(),
             binding.scope.clone(),
             binding.attempt,
-            id.clone(),
+            id.opaque_binding_id.clone(),
         ))
     }
 }
 
 #[cfg(test)]
 #[path = "terminal_binding_tests.rs"]
-mod tests;
+pub(super) mod tests;

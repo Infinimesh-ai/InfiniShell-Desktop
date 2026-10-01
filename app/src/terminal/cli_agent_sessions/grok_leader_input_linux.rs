@@ -48,6 +48,11 @@ pub(crate) struct GrokLeaderTarget {
 }
 
 impl GrokLeaderTarget {
+    pub(crate) fn terminal_identity(&self) -> Result<(i32, u64), GrokLeaderInputError> {
+        self.validate()?;
+        Ok((self.tui.pid, self.tty_device))
+    }
+
     pub(crate) fn capture(
         binding_id: Uuid,
         session_id: Uuid,

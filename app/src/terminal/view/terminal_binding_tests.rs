@@ -33,24 +33,25 @@ fn session_id() -> SessionId {
 }
 
 #[derive(Debug)]
-struct Wire {
-    request: TerminalBindingRequest,
-    reply: oneshot::Sender<TerminalBindingResponse>,
+pub(in crate::terminal::view) struct Wire {
+    pub(in crate::terminal::view) request: TerminalBindingRequest,
+    pub(in crate::terminal::view) reply: oneshot::Sender<TerminalBindingResponse>,
 }
 impl Wire {
-    fn written(self) {
+    pub(in crate::terminal::view) fn written(self) {
         self.respond(terminal_binding_response::Result::ChallengeWritten(
             TerminalBindingChallengeWritten {},
         ));
     }
-    fn bound(self) {
+    pub(in crate::terminal::view) fn bound(self) {
         self.respond(terminal_binding_response::Result::Bound(
             TerminalBindingBound {
-                opaque_binding_id: "fixture-binding".into(),
+                pane_cwd: "/fixture/project".into(),
+                opaque_binding_id: "10000000-0000-4000-8000-000000000002".into(),
             },
         ));
     }
-    fn respond(self, result: terminal_binding_response::Result) {
+    pub(in crate::terminal::view) fn respond(self, result: terminal_binding_response::Result) {
         self.reply
             .send(TerminalBindingResponse {
                 scope: self.request.scope,
@@ -66,6 +67,8 @@ struct MemoryTransport {
     done: async_channel::Sender<()>,
     requests: async_channel::Sender<Wire>,
     notifications: async_channel::Sender<notification::Message>,
+    disconnects: async_channel::Sender<AbortHandle>,
+    owned: bool,
 }
 
 #[derive(Debug)]
@@ -142,6 +145,8 @@ impl RemoteTransport for MemoryTransport {
         let done = self.done.clone();
         let requests = self.requests.clone();
         let notifications = self.notifications.clone();
+        let disconnects = self.disconnects.clone();
+        let owned = self.owned;
         Box::pin(async move {
             let (client_stream, server_stream) = tokio::io::duplex(8192);
             let (client_read, client_write) = tokio::io::split(client_stream);
@@ -149,6 +154,7 @@ impl RemoteTransport for MemoryTransport {
             let (client, event_rx, failure_rx, host_response_rx) =
                 RemoteServerClient::new(client_read.compat(), client_write.compat(), &executor);
             let (abort, registration) = AbortHandle::new_pair();
+            disconnects.send(abort.clone()).await.unwrap();
             executor
                 .spawn(async move {
                     let server = async move {
@@ -170,10 +176,9 @@ impl RemoteTransport for MemoryTransport {
                                                         .unwrap_or_default()
                                                         .to_owned(),
                                                     host_id: "terminal-binding-fixture".into(),
-                                                    capabilities: vec![
-                                                        RemoteServerCapability::TerminalBindingV1
-                                                            .into(),
-                                                    ],
+                                                    capabilities: if owned {
+                                                        vec![RemoteServerCapability::TerminalBindingV1.into(), RemoteServerCapability::TmuxOwnedV1.into(), RemoteServerCapability::CliImageClaudeReadV1.into()]
+                                                    } else { vec![RemoteServerCapability::TerminalBindingV1.into()] },
                                                 },
                                             )
                                         }
@@ -182,9 +187,10 @@ impl RemoteTransport for MemoryTransport {
                                         )) => {
                                             let (reply, response) = oneshot::channel();
                                             requests.send(Wire { request, reply }).await.unwrap();
-                                            server_message::Message::TerminalBinding(
-                                                response.await.unwrap(),
-                                            )
+                                            let Ok(response) = response.await else {
+                                                break;
+                                            };
+                                            server_message::Message::TerminalBinding(response)
                                         }
                                         _ => panic!(
                                             "终端绑定夹具禁止导航、图片、owned 启动和模型请求"
@@ -239,7 +245,7 @@ impl RemoteTransport for MemoryTransport {
     }
 }
 
-async fn bounded<T>(future: impl Future<Output = T>) -> T {
+pub(in crate::terminal::view) async fn bounded<T>(future: impl Future<Output = T>) -> T {
     match select(
         Box::pin(future),
         Box::pin(Timer::after(Duration::from_secs(5))),
@@ -251,7 +257,7 @@ async fn bounded<T>(future: impl Future<Output = T>) -> T {
     }
 }
 
-fn state_changed(
+pub(in crate::terminal::view) fn state_changed(
     app: &mut App,
     terminal: &ViewHandle<TerminalView>,
     predicate: impl Fn(&TerminalView) -> bool + 'static,
@@ -270,25 +276,34 @@ fn state_changed(
     receiver
 }
 
-struct Fixture {
-    terminal: ViewHandle<TerminalView>,
-    client: Arc<RemoteServerClient>,
-    requests: async_channel::Receiver<Wire>,
+pub(in crate::terminal::view) struct Fixture {
+    pub(in crate::terminal::view) terminal: ViewHandle<TerminalView>,
+    pub(in crate::terminal::view) client: Arc<RemoteServerClient>,
+    pub(in crate::terminal::view) requests: async_channel::Receiver<Wire>,
     notifications: async_channel::Receiver<notification::Message>,
+    disconnects: async_channel::Receiver<AbortHandle>,
     done: async_channel::Receiver<()>,
     transport: MemoryTransport,
 }
 
 impl Fixture {
-    async fn new(app: &mut App) -> Self {
+    pub(in crate::terminal::view) async fn new(app: &mut App) -> Self {
+        Self::with_owned(app, false).await
+    }
+
+    pub(in crate::terminal::view) async fn with_owned(app: &mut App, owned: bool) -> Self {
         initialize_app_for_terminal_view(app);
+        app.add_singleton_model(|_| crate::workspace::ToastStack);
         let (done_sender, done) = async_channel::unbounded();
         let (request_sender, requests) = async_channel::unbounded();
         let (notification_sender, notifications) = async_channel::unbounded();
+        let (disconnect_sender, disconnects) = async_channel::unbounded();
         let transport = MemoryTransport {
             done: done_sender,
             requests: request_sender,
             notifications: notification_sender,
+            disconnects: disconnect_sender,
+            owned,
         };
         let (sender, receiver) = oneshot::channel();
         let mut sender = Some(sender);
@@ -349,12 +364,13 @@ impl Fixture {
             client,
             requests,
             notifications,
+            disconnects,
             done,
             transport,
         }
     }
 
-    async fn begin(&self, app: &mut App) -> (Uuid, Wire) {
+    pub(in crate::terminal::view) async fn begin(&self, app: &mut App) -> (Uuid, Wire) {
         let attempt = self.terminal.update(app, |view, ctx| {
             view.begin_remote_terminal_binding(ctx).unwrap()
         });
@@ -367,7 +383,7 @@ impl Fixture {
         (attempt, wire)
     }
 
-    fn osc(&self, app: &mut App, attempt: Uuid, nonce: Uuid) {
+    pub(in crate::terminal::view) fn osc(&self, app: &mut App, attempt: Uuid, nonce: Uuid) {
         self.terminal.update(app, |view, _| {
             let mut model = view.model.lock();
             let body = format!("\x1b]9278;t;1;7501;{attempt};{nonce}\x07");
@@ -375,7 +391,12 @@ impl Fixture {
         });
     }
 
-    async fn finish_ack(&self, app: &mut App, attempt: Uuid, nonce: Uuid) {
+    pub(in crate::terminal::view) async fn finish_ack(
+        &self,
+        app: &mut App,
+        attempt: Uuid,
+        nonce: Uuid,
+    ) {
         let wire = bounded(self.requests.recv()).await.unwrap();
         assert_eq!(wire.request.attempt_id, attempt.to_string());
         assert!(
@@ -397,11 +418,11 @@ impl Fixture {
             assert!(Arc::ptr_eq(&client, &self.client));
             assert_eq!(scope.terminal_session_id, 7501);
             assert_eq!(actual_attempt, attempt);
-            assert_eq!(id, "fixture-binding");
+            assert_eq!(id, "10000000-0000-4000-8000-000000000002");
         });
     }
 
-    async fn close(self, app: &mut App) {
+    pub(in crate::terminal::view) async fn close(self, app: &mut App) {
         self.terminal
             .update(app, |view, _| view.cancel_remote_terminal_binding());
         RemoteServerManager::handle(app).update(app, |manager, ctx| {
@@ -577,6 +598,29 @@ fn terminal_binding_reconnect_replays_candidates_but_never_bound_proof() {
         fixture.osc(&mut app, attempt, nonce);
         fixture.finish_ack(&mut app, attempt, nonce).await;
         let old_scope = fixture.client.terminal_binding_scope(session_id()).unwrap();
+        let (disconnected, disconnected_receiver) = oneshot::channel();
+        let mut disconnected = Some(disconnected);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&RemoteServerManager::handle(ctx), move |_, event, _| {
+                if matches!(event, RemoteServerManagerEvent::SessionDisconnected { session_id: id, .. } if *id == session_id())
+                    && let Some(sender) = disconnected.take()
+                {
+                    let _ = sender.send(());
+                }
+            });
+        });
+        // 先让真实旧传输 EOF 完成断连，再建立替代连接；不把两次连接安装叠在一起。
+        bounded(fixture.disconnects.recv()).await.unwrap().abort();
+        bounded(disconnected_receiver).await.unwrap();
+        bounded(fixture.done.recv()).await.unwrap();
+        fixture.terminal.read(&app, |view, ctx| {
+            assert!(
+                RemoteServerManager::as_ref(ctx)
+                    .client_for_session(session_id())
+                    .is_none()
+            );
+            assert!(view.current_remote_terminal_binding(ctx).is_none());
+        });
         let (sender, receiver) = oneshot::channel();
         let mut sender = Some(sender);
         app.update(|ctx| {
@@ -599,7 +643,6 @@ fn terminal_binding_reconnect_replays_candidates_but_never_bound_proof() {
             );
         });
         bounded(receiver).await.unwrap();
-        bounded(fixture.done.recv()).await.unwrap();
         let notification::Message::SessionBootstrapped(bootstrap) =
             bounded(fixture.notifications.recv()).await.unwrap()
         else {
@@ -614,6 +657,38 @@ fn terminal_binding_reconnect_replays_candidates_but_never_bound_proof() {
                 .unwrap();
             assert!(!Arc::ptr_eq(current, &fixture.client));
             assert!(view.current_remote_terminal_binding(ctx).is_none());
+        });
+        assert!(fixture.requests.try_recv().is_err());
+        let (new_attempt, begin) = fixture.begin(&mut app).await;
+        assert_ne!(new_attempt, attempt);
+        begin.written();
+        let new_nonce = Uuid::new_v4();
+        fixture.osc(&mut app, new_attempt, new_nonce);
+        let ack = bounded(fixture.requests.recv()).await.unwrap();
+        assert!(matches!(&ack.request.action,
+            Some(terminal_binding_request::Action::Ack(value)) if value.nonce == new_nonce.to_string()));
+        let ready = state_changed(&mut app, &fixture.terminal, move |view| {
+            view.remote_terminal_binding
+                .as_ref()
+                .is_some_and(|binding| {
+                    binding.attempt == new_attempt && matches!(binding.phase, Phase::Bound(_))
+                })
+        });
+        ack.bound();
+        bounded(ready).await.unwrap();
+        assert!(
+            fixture
+                .client
+                .begin_terminal_binding(old_scope, Uuid::new_v4())
+                .await
+                .is_err()
+        );
+        fixture.osc(&mut app, attempt, nonce);
+        fixture.terminal.read(&app, |view, ctx| {
+            let (client, _, current_attempt, _) =
+                view.current_remote_terminal_binding(ctx).unwrap();
+            assert!(!Arc::ptr_eq(&client, &fixture.client));
+            assert_eq!(current_attempt, new_attempt);
         });
         assert!(fixture.requests.try_recv().is_err());
         fixture.close(&mut app).await;
@@ -677,6 +752,7 @@ fn terminal_binding_old_ack_callback_cannot_publish_into_new_attempt() {
         });
         old_ack.respond(terminal_binding_response::Result::Bound(
             TerminalBindingBound {
+                pane_cwd: "/fixture/project".into(),
                 opaque_binding_id: "stale-binding".into(),
             },
         ));

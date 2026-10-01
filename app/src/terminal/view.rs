@@ -34,6 +34,12 @@ use crate::ssh_manager::password_prompt::{
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
 mod terminal_binding;
+#[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+mod tmux_remote_owned;
 #[cfg(all(
     feature = "local_fs",
     feature = "local_tty",
@@ -2659,6 +2665,12 @@ pub struct TerminalView {
     ))]
     grok_remote_owned: Option<grok_remote_owned::RemoteOwned>,
     remote_terminal_binding: Option<terminal_binding::TerminalBinding>,
+    #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+    tmux_remote_owned: Option<tmux_remote_owned::TmuxOwned>,
     #[cfg(all(
         feature = "local_fs",
         feature = "local_tty",
@@ -4433,6 +4445,12 @@ impl TerminalView {
             ))]
             grok_remote_owned: None,
             remote_terminal_binding: None,
+            #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+            tmux_remote_owned: None,
             #[cfg(all(
                 feature = "local_fs",
                 feature = "local_tty",
@@ -4602,6 +4620,12 @@ impl TerminalView {
             let mgr_handle = RemoteServerManager::handle(ctx);
             ctx.subscribe_to_model(&mgr_handle, |me, _, event, ctx| {
                 me.invalidate_remote_terminal_binding(ctx);
+                #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+                me.invalidate_remote_tmux_owned(ctx);
                 // `RemoteServerManager` is a singleton, so every `TerminalView` receives every event.
                 // Filter for session-scoped events that are specifically tracked by this view.
                 // Host-scoped variants return `None` and pass through unfiltered.
@@ -12024,6 +12048,12 @@ impl TerminalView {
 
     fn handle_terminal_event(&mut self, event: &ModelEvent, ctx: &mut ViewContext<Self>) {
         self.invalidate_remote_terminal_binding(ctx);
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+        self.invalidate_remote_tmux_owned(ctx);
         #[cfg(all(
             feature = "local_fs",
             feature = "local_tty",
@@ -13566,6 +13596,12 @@ impl TerminalView {
         if !is_agent_supported(&notification.agent) {
             return;
         }
+        #[cfg(all(feature = "local_fs", feature = "local_tty", any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64"),
+    all(windows, target_arch = "x86_64")
+)))]
+        if !self.accept_tmux_cli_notification(&notification, body, ctx) { return; }
 
         if notification.agent == CLIAgent::Codex && !FeatureFlag::CodexPlugin.is_enabled() {
             return;

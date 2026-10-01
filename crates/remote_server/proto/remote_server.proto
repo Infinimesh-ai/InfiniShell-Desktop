@@ -225,6 +225,7 @@ enum RemoteServerCapability {
   CLI_IMAGE_CLAUDE_READ_V1 = 8;
   CLI_CODEX_OWNED_V1 = 9;
   TERMINAL_BINDING_V1 = 10;
+  TMUX_OWNED_V1 = 11;
 }
 
 // ── SSH 字节流隧道 ───────────────────────────────────────────────
@@ -1086,6 +1087,7 @@ message CliImageClaudeBinding {
   string tty_path = 3;
   string working_directory = 4;
   string transcript_path = 5;
+  TerminalBindingOwnedReference tmux_owned = 6;
 }
 message CliImageClaudeQueue {
   CliImageClaudeBinding binding = 1;
@@ -1213,6 +1215,29 @@ message TerminalBindingScope {
 message TerminalBindingBegin {}
 message TerminalBindingAck { string nonce = 1; }
 message TerminalBindingCancel {}
+enum TerminalBindingOwnedAgent {
+  TERMINAL_BINDING_OWNED_AGENT_UNSPECIFIED = 0;
+  TERMINAL_BINDING_OWNED_AGENT_CLAUDE = 1;
+  TERMINAL_BINDING_OWNED_AGENT_CODEX = 2;
+  TERMINAL_BINDING_OWNED_AGENT_GROK = 3;
+}
+message TerminalBindingStartOwned {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+  TerminalBindingOwnedAgent agent = 4;
+}
+message TerminalBindingStatusOwned {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+  TerminalBindingOwnedAgent agent = 4;
+}
+message TerminalBindingOwnedReference {
+  string opaque_binding_id = 1;
+  string launch_id = 2;
+  string launch_key = 3;
+}
 message TerminalBindingRequest {
   TerminalBindingScope scope = 1;
   string attempt_id = 2;
@@ -1220,11 +1245,23 @@ message TerminalBindingRequest {
     TerminalBindingBegin begin = 3;
     TerminalBindingAck ack = 4;
     TerminalBindingCancel cancel = 5;
+    TerminalBindingStartOwned start_owned = 6;
+    TerminalBindingStatusOwned status_owned = 7;
   }
 }
 // nonce 只能写入受核验的 TTY，禁止放入响应或错误。
 message TerminalBindingChallengeWritten {}
-message TerminalBindingBound { string opaque_binding_id = 1; }
+message TerminalBindingBound {
+  string opaque_binding_id = 1;
+  string pane_cwd = 2;
+}
+message TerminalBindingOwned {
+  string launch_id = 1;
+  TerminalBindingOwnedAgent agent = 2;
+  string phase = 3;
+  bytes owned_reply_json = 4;
+  optional string native_session_id = 5;
+}
 message TerminalBindingFailed { string code = 1; }
 message TerminalBindingCancelled {}
 message TerminalBindingResponse {
@@ -1235,5 +1272,6 @@ message TerminalBindingResponse {
     TerminalBindingBound bound = 4;
     TerminalBindingFailed failed = 5;
     TerminalBindingCancelled cancelled = 6;
+    TerminalBindingOwned owned = 7;
   }
 }

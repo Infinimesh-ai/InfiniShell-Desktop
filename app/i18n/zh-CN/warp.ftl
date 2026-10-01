@@ -5961,3 +5961,14 @@ cli-agent-reviewed-command-background = CLI 在仅允许前台执行的策略下
 cli-agent-input-remote-image-unconfirmed = 图片投递尚未确认，CLI 可能已收到这条输入。草稿和附件已保留；请先查看 CLI，再决定如何继续。应用不会自动重发。
 
 cli-agent-input-remote-claude-image-hint = 将输入发送到远程 Claude 会话，由其读取原图。如需 Read 审批，请在终端确认；仅有文本入队不代表图片已送达。
+
+workspace-start-tmux-claude = 在 tmux 新窗格启动 Claude
+workspace-start-tmux-codex = 在 tmux 新窗格启动 Codex
+workspace-start-tmux-grok = 在 tmux 新窗格启动 Grok
+workspace-start-tmux-agent-help = 在当前 tmux 会话的新窗格中启动已验证的远端 CLI。需要有效的 SSH 连接和远程图片支持。
+workspace-restore-tmux-agent = 恢复 tmux 富输入
+workspace-restore-tmux-agent-help = 重新连接所选 tmux 窗格中此前启动的 CLI。此操作只查询已有启动。
+cli-agent-tmux-owned-unavailable = 无法验证远端 tmux 窗格或 CLI。请检查连接和所需 CLI 版本。
+cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢复 tmux 富输入”查询已有启动，不会另建窗格。
+
+cli-agent-tmux-owned-exited = 此 tmux CLI 会话已结束。如需继续，请启动新的 tmux 窗格。

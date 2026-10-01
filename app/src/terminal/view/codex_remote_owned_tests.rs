@@ -355,6 +355,8 @@ impl Fixture {
             let (snapshot, current_client) = view.remote_codex_snapshot(true, ctx).unwrap();
             assert!(Arc::ptr_eq(&client, &current_client));
             let launch = Launch {
+                tmux_source: None,
+                tmux_terminal_session: None,
                 host: "predicate-fixture-daemon".into(),
                 terminal_session: remote_session().as_u64(),
                 block_id: snapshot.block.to_string(),
@@ -366,6 +368,7 @@ impl Fixture {
             };
             let (scope, _) = remote::scope(&client, &launch, Uuid::new_v4()).unwrap();
             view.codex_remote_owned = Some(RemoteOwned {
+                tmux_instance: None,
                 launch: launch.clone(),
                 owner: None,
                 observation: None,

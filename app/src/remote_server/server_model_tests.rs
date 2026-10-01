@@ -31,8 +31,6 @@ fn test_model(app: &mut App) -> ServerModel {
         image_staging: None,
         #[cfg(all(unix, feature = "local_fs"))]
         image_staging_connections: HashMap::new(),
-        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
-        terminal_binding_connections: HashMap::new(),
         #[cfg(all(
             feature = "local_fs",
             any(
@@ -49,6 +47,10 @@ fn test_model(app: &mut App) -> ServerModel {
             )
         ))]
         codex_owned: None,
+        #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"))))]
+        tmux_owned: None,
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        terminal_binding_connections: HashMap::new(),
         #[cfg(all(
             feature = "local_fs",
             any(

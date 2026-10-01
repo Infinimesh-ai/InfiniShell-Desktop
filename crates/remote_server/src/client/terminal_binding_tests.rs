@@ -32,6 +32,10 @@ impl Drop for Fixture {
 
 impl Fixture {
     async fn new(capability: bool) -> Self {
+        Self::with_owned(capability, false).await
+    }
+
+    async fn with_owned(capability: bool, owned: bool) -> Self {
         let (client_stream, server_stream) = tokio::io::duplex(8192);
         let (client_read, client_write) = tokio::io::split(client_stream);
         let (server_read, server_write) = tokio::io::split(server_stream);
@@ -57,7 +61,12 @@ impl Fixture {
                             server_version: "test".into(),
                             host_id: "terminal-daemon".into(),
                             capabilities: if capability {
-                                vec![RemoteServerCapability::TerminalBindingV1.into()]
+                                let mut capabilities =
+                                    vec![RemoteServerCapability::TerminalBindingV1.into()];
+                                if owned {
+                                    capabilities.push(RemoteServerCapability::TmuxOwnedV1.into());
+                                }
+                                capabilities
                             } else {
                                 vec![]
                             },
@@ -206,13 +215,17 @@ async fn terminal_binding_roundtrip_echoes_scope_and_attempt_without_image_capab
                 attempt_id: attempt.to_string(),
                 result: Some(terminal_binding_response::Result::Bound(
                     TerminalBindingBound {
+                        pane_cwd: "/fixture/project".into(),
                         opaque_binding_id: "opaque-fixture".into(),
                     },
                 )),
             },
         ))
         .unwrap();
-    assert_eq!(pending.await.unwrap().unwrap(), "opaque-fixture");
+    assert_eq!(
+        pending.await.unwrap().unwrap().opaque_binding_id,
+        "opaque-fixture"
+    );
     fixture
         .client
         .cancel_terminal_binding(scope.clone(), attempt);
@@ -269,6 +282,7 @@ async fn terminal_binding_rejects_wrong_echoes_and_reply_kind() {
             3 => {
                 response.result = Some(terminal_binding_response::Result::Bound(
                     TerminalBindingBound {
+                        pane_cwd: "/fixture/project".into(),
                         opaque_binding_id: "unexpected".into(),
                     },
                 ))
@@ -352,6 +366,7 @@ fn terminal_binding_bound_debug_redacts_all_parent_envelopes() {
                 attempt_id: "attempt".into(),
                 result: Some(terminal_binding_response::Result::Bound(
                     TerminalBindingBound {
+                        pane_cwd: "/fixture/project".into(),
                         opaque_binding_id: "secret-binding-value".into(),
                     },
                 )),
@@ -361,4 +376,161 @@ fn terminal_binding_bound_debug_redacts_all_parent_envelopes() {
     let debug = format!("{message:?}");
     assert!(debug.contains("<redacted>"));
     assert!(!debug.contains("secret-binding-value"));
+}
+
+fn owned_request() -> TerminalBindingStartOwned {
+    TerminalBindingStartOwned {
+        opaque_binding_id: Uuid::new_v4().to_string(),
+        launch_id: Uuid::new_v4().to_string(),
+        launch_key: Uuid::new_v4().to_string(),
+        agent: TerminalBindingOwnedAgent::Claude as i32,
+    }
+}
+
+#[tokio::test]
+async fn tmux_owned_requires_separate_capability_without_sending_start() {
+    let fixture = Fixture::new(true).await;
+    let scope = fixture.bootstrap().await;
+    assert!(!fixture.client.tmux_owned_available());
+    assert!(
+        fixture
+            .client
+            .start_terminal_owned(scope, Uuid::new_v4(), owned_request())
+            .await
+            .is_err()
+    );
+    assert!(fixture.wire.try_recv().is_err());
+}
+
+#[tokio::test]
+async fn tmux_owned_unknown_start_is_followed_only_by_explicit_same_launch_status() {
+    let fixture = Fixture::with_owned(true, true).await;
+    let scope = fixture.bootstrap().await;
+    let attempt = Uuid::new_v4();
+    let launch = owned_request();
+    for status in [false, true] {
+        let client = fixture.client.clone();
+        let pending_scope = scope.clone();
+        let request = launch.clone();
+        let pending = tokio::spawn(async move {
+            if status {
+                client
+                    .status_terminal_owned(pending_scope, attempt, request)
+                    .await
+            } else {
+                client
+                    .start_terminal_owned(pending_scope, attempt, request)
+                    .await
+            }
+        });
+        let wire = fixture.wire.recv().await.unwrap();
+        let request = binding_request(&wire);
+        assert_eq!(request.scope.as_ref(), Some(&scope));
+        match &request.action {
+            Some(terminal_binding_request::Action::StartOwned(actual)) if !status => {
+                assert_eq!(actual, &launch);
+            }
+            Some(terminal_binding_request::Action::StatusOwned(actual)) if status => {
+                assert_eq!(actual.launch_id, launch.launch_id);
+                assert_eq!(actual.launch_key, launch.launch_key);
+                assert_eq!(actual.opaque_binding_id, launch.opaque_binding_id);
+            }
+            _ => panic!("只允许单次 Start 和显式 Status"),
+        }
+        wire.reply
+            .send(server_message::Message::TerminalBinding(
+                TerminalBindingResponse {
+                    scope: Some(scope.clone()),
+                    attempt_id: attempt.to_string(),
+                    result: Some(terminal_binding_response::Result::Owned(
+                        TerminalBindingOwned {
+                            launch_id: launch.launch_id.clone(),
+                            agent: launch.agent,
+                            phase: "unknown".into(),
+                            owned_reply_json: vec![],
+                            native_session_id: None,
+                        },
+                    )),
+                },
+            ))
+            .unwrap();
+        assert_eq!(pending.await.unwrap().unwrap().phase, "unknown");
+        assert!(fixture.wire.try_recv().is_err());
+    }
+}
+
+#[tokio::test]
+async fn tmux_owned_reply_for_other_launch_or_agent_cannot_bind_current_intent() {
+    let fixture = Fixture::with_owned(true, true).await;
+    let scope = fixture.bootstrap().await;
+    for wrong_agent in [false, true] {
+        let client = fixture.client.clone();
+        let pending_scope = scope.clone();
+        let launch = owned_request();
+        let request = launch.clone();
+        let attempt = Uuid::new_v4();
+        let pending = tokio::spawn(async move {
+            client
+                .status_terminal_owned(pending_scope, attempt, request)
+                .await
+        });
+        let wire = fixture.wire.recv().await.unwrap();
+        wire.reply
+            .send(server_message::Message::TerminalBinding(
+                TerminalBindingResponse {
+                    scope: Some(scope.clone()),
+                    attempt_id: attempt.to_string(),
+                    result: Some(terminal_binding_response::Result::Owned(
+                        TerminalBindingOwned {
+                            launch_id: if wrong_agent {
+                                launch.launch_id
+                            } else {
+                                Uuid::new_v4().to_string()
+                            },
+                            agent: if wrong_agent {
+                                TerminalBindingOwnedAgent::Grok as i32
+                            } else {
+                                launch.agent
+                            },
+                            phase: "running".into(),
+                            owned_reply_json: vec![],
+                            native_session_id: None,
+                        },
+                    )),
+                },
+            ))
+            .unwrap();
+        assert!(pending.await.unwrap().is_err());
+    }
+}
+
+#[test]
+fn tmux_owned_messages_redact_key_binding_and_nested_reply() {
+    let launch = owned_request();
+    let message = ClientMessage::session_scoped(
+        "request".into(),
+        session_scoped_request::Message::TerminalBinding(TerminalBindingRequest {
+            scope: None,
+            attempt_id: "attempt".into(),
+            action: Some(terminal_binding_request::Action::StartOwned(launch.clone())),
+        }),
+    );
+    let debug = format!("{message:?}");
+    assert!(debug.contains("<redacted>"));
+    assert!(!debug.contains(&launch.launch_key));
+    assert!(!debug.contains(&launch.opaque_binding_id));
+    let owned = TerminalBindingOwned {
+        launch_id: launch.launch_id,
+        agent: launch.agent,
+        phase: "running".into(),
+        owned_reply_json: b"private-ticket-key".to_vec(),
+        native_session_id: None,
+    };
+    assert!(!format!("{owned:?}").contains("private-ticket-key"));
+    let reference = crate::proto::TerminalBindingOwnedReference {
+        opaque_binding_id: launch.opaque_binding_id.clone(),
+        launch_id: "launch".into(),
+        launch_key: launch.launch_key.clone(),
+    };
+    assert!(!format!("{reference:?}").contains(&launch.launch_key));
 }

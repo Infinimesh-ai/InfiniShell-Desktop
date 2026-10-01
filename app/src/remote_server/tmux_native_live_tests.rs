@@ -21,6 +21,10 @@ use command::managed::{MacosProcessIdentity, macos_process_identity};
 use nix::fcntl::{FcntlArg, FdFlag, OFlag, fcntl};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
+use warp_core::channel::ChannelState;
+use warp_core::cli_agent_protocol::{WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV};
+
+use crate::terminal::cli_agent_sessions::event::current_protocol_version;
 
 const FIXTURE_TEST: &str = "remote_server::tmux_native::live_tests::owned_pane_fixture";
 const ROOT_ENV: &str = "INFINISHELL_TMUX_LIVE_ROOT";
@@ -70,7 +74,7 @@ fn exited(identity: MacosProcessIdentity) -> io::Result<bool> {
     }
 }
 
-fn run(mut command: Command) -> io::Result<Vec<u8>> {
+fn run(mut command: Command, expected_error: Option<&str>) -> io::Result<Vec<u8>> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -98,7 +102,15 @@ fn run(mut command: Command) -> io::Result<Vec<u8>> {
         .expect("标准错误管道")
         .take(8193)
         .read_to_end(&mut stderr)?;
-    if !status.success() || stdout.len() > 8192 || stderr.len() > 8192 {
+    let expected_status = match expected_error {
+        None => status.success(),
+        Some(message) => {
+            status.code() == Some(1)
+                && stdout.is_empty()
+                && stderr == format!("{message}\n").as_bytes()
+        }
+    };
+    if !expected_status || stdout.len() > 8192 || stderr.len() > 8192 {
         return Err(io::Error::other(format!(
             "自有 tmux 元数据命令失败：{status}，stderr={}",
             String::from_utf8_lossy(&stderr)
@@ -136,7 +148,7 @@ impl LiveTmux {
         let mut command = Command::new(&tmux);
         command.arg("-V");
         assert_eq!(
-            String::from_utf8(run(command)?)
+            String::from_utf8(run(command, None)?)
                 .map_err(io::Error::other)?
                 .trim(),
             version
@@ -203,6 +215,9 @@ impl LiveTmux {
             .args(Self::pane_arguments(&root, "original")?)
             .env_remove("TMUX")
             .env_remove("TMUX_PANE")
+            // 模拟从非宿主终端创建的旧 server；不依赖运行测试时的环境碰巧缺失。
+            .env_remove(WARP_CLI_AGENT_PROTOCOL_VERSION_ENV)
+            .env_remove(WARP_CLIENT_VERSION_ENV)
             .env_remove("ENV")
             .env_remove("BASH_ENV")
             .env("TERM", "xterm-256color")
@@ -261,7 +276,24 @@ impl LiveTmux {
     fn command(&self, args: &[&OsStr]) -> io::Result<Vec<u8>> {
         let mut command = Command::new(&self.tmux);
         command.arg("-N").arg("-S").arg(&self.socket).args(args);
-        run(command)
+        run(command, None)
+    }
+
+    fn host_environment_absent(&self) -> io::Result<()> {
+        // 每次只读两个公开能力键；不枚举或归档 server/session 的其他环境变量。
+        for name in [WARP_CLI_AGENT_PROTOCOL_VERSION_ENV, WARP_CLIENT_VERSION_ENV] {
+            for selector in [vec!["-g"], vec!["-t", "infinishell-live"]] {
+                let mut command = Command::new(&self.tmux);
+                command
+                    .args(["-N", "-S"])
+                    .arg(&self.socket)
+                    .arg("show-environment")
+                    .args(selector)
+                    .arg(name);
+                run(command, Some(&format!("unknown variable: {name}")))?;
+            }
+        }
+        Ok(())
     }
 
     fn receipt(&mut self, role: &str) -> io::Result<Value> {
@@ -423,6 +455,9 @@ fn safe_receipt(role: &str, value: &Value, cwd: &Path) -> Value {
     ] {
         fields.insert(key.into(), json!(value[key].as_u64()));
     }
+    for key in ["host_protocol", "host_version"] {
+        fields.insert(key.into(), json!(value[key].as_str()));
+    }
     fields.insert("role".into(), json!(role));
     fields.insert(
         "cwd_matches".into(),
@@ -524,7 +559,9 @@ fn owned_pane_fixture() {
     record(&pending, &json!({"pid": process.pid, "parent": process.parent, "server": parent.parent, "session": process.session,
         "group": process.group, "foreground_group": process.foreground_group, "parent_session": parent.session,
         "parent_group": parent.group, "parent_tty": parent.tty, "tty": process.tty, "devices": devices,
-        "cwd": process.cwd, "literal": std::env::var(LITERAL_ENV).unwrap()})).unwrap();
+        "cwd": process.cwd, "literal": std::env::var(LITERAL_ENV).unwrap(),
+        "host_protocol": std::env::var(WARP_CLI_AGENT_PROTOCOL_VERSION_ENV).ok(),
+        "host_version": std::env::var(WARP_CLIENT_VERSION_ENV).ok()})).unwrap();
     fs::rename(pending, root.join(format!("{role}.json"))).unwrap();
     // 正常路径由父验收释放；故障时也只让本夹具自行退出，不遗留永久 pane。
     let deadline = Instant::now() + Duration::from_secs(90);
@@ -539,6 +576,9 @@ fn owned_pane_fixture() {
 fn real_tmux_product_api_preserves_pane_and_process_identity() {
     let mut fixture = LiveTmux::new().unwrap();
     let original_receipt = fixture.receipt("original").unwrap();
+    assert_eq!(original_receipt["host_protocol"], Value::Null);
+    assert_eq!(original_receipt["host_version"], Value::Null);
+    fixture.host_environment_absent().unwrap();
     let outer = Arc::new(OuterTerminal::capture(fixture.outer.id(), &fixture.tty).unwrap());
     outer.write_challenge(CHALLENGE).unwrap();
     wait_for(|| Ok(fixture.challenges.load(Ordering::Acquire) == 1)).unwrap();
@@ -568,6 +608,8 @@ fn real_tmux_product_api_preserves_pane_and_process_identity() {
         .command(&args.iter().map(OsString::as_os_str).collect::<Vec<_>>())
         .unwrap();
     let alternate_receipt = fixture.receipt("alternate").unwrap();
+    assert_eq!(alternate_receipt["host_protocol"], Value::Null);
+    assert_eq!(alternate_receipt["host_version"], Value::Null);
     let before = fixture
         .command(&[
             OsStr::new("list-panes"),
@@ -624,6 +666,15 @@ fn real_tmux_product_api_preserves_pane_and_process_identity() {
         SplitOutcome::OutcomeUnknown => panic!("真实 split 未取得确定回执，不能重投"),
     };
     let receipt = fixture.receipt("owned").unwrap();
+    assert_eq!(
+        receipt["host_protocol"],
+        current_protocol_version().to_string()
+    );
+    assert_eq!(
+        receipt["host_version"],
+        ChannelState::app_version().unwrap_or("local")
+    );
+    fixture.host_environment_absent().unwrap();
     assert_eq!(receipt["literal"], LITERAL);
     assert_eq!(receipt["cwd"], fixture.cwd.to_str().unwrap());
     assert_eq!(receipt["parent"], current.pane_pid);
@@ -649,6 +700,29 @@ fn real_tmux_product_api_preserves_pane_and_process_identity() {
             "pane_at_start": identity_value(current.process.identity_for_test()),
             "pane_now": identity_value(observed.process.identity_for_test()),
         })
+    );
+    let target = current.export_target().unwrap();
+    let encoded_target = serde_json::to_vec(&target).unwrap();
+    let restored_target: super::TmuxTarget = serde_json::from_slice(&encoded_target).unwrap();
+    binding
+        .snapshot()
+        .unwrap()
+        .validate_target(&restored_target)
+        .unwrap();
+    assert!(expected.validate_target(&restored_target).is_err());
+    restored_target
+        .validate_consumer(
+            receipt["pid"].as_i64().unwrap() as i32,
+            receipt["tty"].as_u64().unwrap(),
+        )
+        .unwrap();
+    assert!(
+        restored_target
+            .matches_consumer(
+                receipt["pid"].as_i64().unwrap() as i32,
+                receipt["tty"].as_u64().unwrap()
+            )
+            .unwrap()
     );
     let after = fixture
         .command(&[
@@ -700,6 +774,7 @@ fn real_tmux_product_api_preserves_pane_and_process_identity() {
             "tmux": fixture.tmux, "original": original_receipt, "alternate": alternate_receipt,
             "owned": receipt, "identities": fixture.identities.iter().copied().map(identity_value).collect::<Vec<_>>(),
             "challenge_frames": 1, "old_pane_rejected": true, "cancelled_claim_rejected": true, "split_count": 1,
+            "owned_host_environment_verified": true, "original_server_session_environment_unchanged": true,
             "only_own_control_closed": true, "native_release_completed": true, "cleanup_ready": true
         })
     );

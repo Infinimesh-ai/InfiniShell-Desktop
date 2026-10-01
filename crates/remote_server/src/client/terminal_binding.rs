@@ -3,14 +3,25 @@
 use super::{ClientError, RemoteServerClient};
 use crate::proto::{
     ClientMessage, RemoteServerCapability, TerminalBindingAck, TerminalBindingBegin,
-    TerminalBindingCancel, TerminalBindingRequest, TerminalBindingScope, notification,
-    server_message, session_scoped_request, terminal_binding_request, terminal_binding_response,
+    TerminalBindingBound, TerminalBindingCancel, TerminalBindingOwned, TerminalBindingOwnedAgent,
+    TerminalBindingRequest, TerminalBindingScope, TerminalBindingStartOwned,
+    TerminalBindingStatusOwned, notification, server_message, session_scoped_request,
+    terminal_binding_request, terminal_binding_response,
 };
 use crate::protocol::RequestId;
 use uuid::Uuid;
 use warp_core::SessionId;
 
 impl RemoteServerClient {
+    pub fn tmux_owned_available(&self) -> bool {
+        self.terminal_binding_available()
+            && self
+                .initialize_response
+                .read()
+                .expect("initialize response lock poisoned")
+                .as_ref()
+                .is_some_and(|response| response.supports(RemoteServerCapability::TmuxOwnedV1))
+    }
     pub fn terminal_binding_available(&self) -> bool {
         !self.is_disconnected()
             && self
@@ -104,9 +115,8 @@ impl RemoteServerClient {
             terminal_binding_response::Result::ChallengeWritten(_) => Ok(()),
             terminal_binding_response::Result::Bound(_)
             | terminal_binding_response::Result::Failed(_)
-            | terminal_binding_response::Result::Cancelled(_) => {
-                Err(ClientError::UnexpectedResponse)
-            }
+            | terminal_binding_response::Result::Cancelled(_)
+            | terminal_binding_response::Result::Owned(_) => Err(ClientError::UnexpectedResponse),
         }
     }
 
@@ -116,7 +126,7 @@ impl RemoteServerClient {
         scope: TerminalBindingScope,
         attempt: Uuid,
         nonce: Uuid,
-    ) -> Result<String, ClientError> {
+    ) -> Result<TerminalBindingBound, ClientError> {
         if nonce.is_nil() {
             return Err(ClientError::UnexpectedResponse);
         }
@@ -136,12 +146,100 @@ impl RemoteServerClient {
                     && bound
                         .opaque_binding_id
                         .bytes()
-                        .all(|byte| byte.is_ascii_graphic()) =>
+                        .all(|byte| byte.is_ascii_graphic())
+                    && bound.pane_cwd.starts_with('/')
+                    && bound.pane_cwd.len() <= 4096
+                    && !bound.pane_cwd.contains('\0') =>
             {
-                Ok(bound.opaque_binding_id)
+                Ok(bound)
             }
             terminal_binding_response::Result::Bound(_)
             | terminal_binding_response::Result::ChallengeWritten(_)
+            | terminal_binding_response::Result::Failed(_)
+            | terminal_binding_response::Result::Cancelled(_)
+            | terminal_binding_response::Result::Owned(_) => Err(ClientError::UnexpectedResponse),
+        }
+    }
+
+    /// 此方法只派发一次；连接或响应未知后只能使用 Status 查询原 launch_id。
+    pub async fn start_terminal_owned(
+        &self,
+        scope: TerminalBindingScope,
+        attempt: Uuid,
+        launch: TerminalBindingStartOwned,
+    ) -> Result<TerminalBindingOwned, ClientError> {
+        self.terminal_owned_request(scope, attempt, launch, false)
+            .await
+    }
+
+    pub async fn status_terminal_owned(
+        &self,
+        scope: TerminalBindingScope,
+        attempt: Uuid,
+        launch: TerminalBindingStartOwned,
+    ) -> Result<TerminalBindingOwned, ClientError> {
+        self.terminal_owned_request(scope, attempt, launch, true)
+            .await
+    }
+
+    async fn terminal_owned_request(
+        &self,
+        scope: TerminalBindingScope,
+        attempt: Uuid,
+        launch: TerminalBindingStartOwned,
+        status: bool,
+    ) -> Result<TerminalBindingOwned, ClientError> {
+        if !self.tmux_owned_available() {
+            return Err(ClientError::UnexpectedResponse);
+        }
+        let valid_id = |value: &str| {
+            Uuid::parse_str(value).is_ok_and(|id| !id.is_nil() && id.to_string() == value)
+        };
+        if !valid_id(&launch.opaque_binding_id)
+            || !valid_id(&launch.launch_id)
+            || !valid_id(&launch.launch_key)
+            || !matches!(
+                TerminalBindingOwnedAgent::try_from(launch.agent),
+                Ok(TerminalBindingOwnedAgent::Claude
+                    | TerminalBindingOwnedAgent::Codex
+                    | TerminalBindingOwnedAgent::Grok)
+            )
+        {
+            return Err(ClientError::UnexpectedResponse);
+        }
+        let expected_id = launch.launch_id.clone();
+        let expected_agent = launch.agent;
+        let action = if status {
+            terminal_binding_request::Action::StatusOwned(TerminalBindingStatusOwned {
+                opaque_binding_id: launch.opaque_binding_id,
+                launch_id: launch.launch_id,
+                launch_key: launch.launch_key,
+                agent: launch.agent,
+            })
+        } else {
+            terminal_binding_request::Action::StartOwned(launch)
+        };
+        match self
+            .terminal_binding_request(scope, attempt, action)
+            .await?
+        {
+            terminal_binding_response::Result::Owned(owned)
+                if owned.launch_id == expected_id
+                    && owned.agent == expected_agent
+                    && owned.phase.len() <= 64
+                    && !owned.phase.is_empty()
+                    && owned
+                        .phase
+                        .bytes()
+                        .all(|byte| byte.is_ascii_lowercase() || byte == b'-')
+                    && owned.owned_reply_json.len() <= 128 * 1024
+                    && owned.native_session_id.as_deref().is_none_or(valid_id) =>
+            {
+                Ok(owned)
+            }
+            terminal_binding_response::Result::Owned(_)
+            | terminal_binding_response::Result::ChallengeWritten(_)
+            | terminal_binding_response::Result::Bound(_)
             | terminal_binding_response::Result::Failed(_)
             | terminal_binding_response::Result::Cancelled(_) => {
                 Err(ClientError::UnexpectedResponse)

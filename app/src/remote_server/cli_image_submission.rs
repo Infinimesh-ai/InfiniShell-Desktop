@@ -82,6 +82,7 @@ pub(crate) struct NativeImageBinding {
     pub(crate) cwd: String,
     pub(crate) consumer: NativeImageConsumer,
     pub(crate) codex_owned: Option<(String, String)>,
+    pub(crate) tmux_owned: Option<(String, String, String)>,
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -292,6 +293,9 @@ impl RemoteImageSubmission {
                     tty_path: process.tty_path.clone(),
                     working_directory: self.binding.cwd.clone(),
                     transcript_path: transcript_path.clone(),
+                    tmux_owned: self.binding.tmux_owned.as_ref().map(|(binding, id, key)| super::proto::TerminalBindingOwnedReference {
+                        opaque_binding_id: binding.clone(), launch_id: id.clone(), launch_key: key.clone(),
+                    }),
                 }),
                 text,
                 references,

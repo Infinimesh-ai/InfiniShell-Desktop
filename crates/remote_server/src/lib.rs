@@ -33,6 +33,30 @@ pub mod proto {
         }
     }
 
+    impl std::fmt::Debug for TerminalBindingStartOwned {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("TerminalBindingStartOwned(<redacted>)")
+        }
+    }
+
+    impl std::fmt::Debug for TerminalBindingStatusOwned {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("TerminalBindingStatusOwned(<redacted>)")
+        }
+    }
+
+    impl std::fmt::Debug for TerminalBindingOwned {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("TerminalBindingOwned(<redacted>)")
+        }
+    }
+
+    impl std::fmt::Debug for TerminalBindingOwnedReference {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("TerminalBindingOwnedReference(<redacted>)")
+        }
+    }
+
     // ── ClientMessage constructors ──────────────────────────────────
     //
     // These helpers wrap inner message types in the appropriate
