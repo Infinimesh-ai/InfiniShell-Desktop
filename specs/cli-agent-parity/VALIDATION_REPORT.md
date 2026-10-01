@@ -2,6 +2,22 @@
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
+## 2026-10-01：G07 Claude 双语及 Codex 原生拒绝补验，最终门禁仍未满足
+
+**新增关闭 0 项：4 关闭／7 开放／3 移交，G01／G07 仍开放，PR #22 保持草稿。** 新 Mac GUI 实际构建来源 `142c635412a21e92161111fba5148b6583c8334a`，源二进制 SHA-256 `afd13b4b69e596a51b5fbd52c630e9b05cb012e4993e4616db3ec48eb40f5f48`，构建绑定 `1fc0d81765fb28a83dd0c488330bd6332cae2a2b46d93e1f23e6e873a838c03f`。下述新证据位于仓外 `resume-20260930/g07-preparation`；旧 Grok `.3` 与固定 Codex 双卡正例继续按原构建计证，不重标为本次重跑。
+
+Claude `2.1.280` 的 `r-9g0qj9u3-claude-gui` 完成普通 GUI 双卡单次输入：仅传原绝对路径 JSON、无夹具标记，两次真实 `Read` 原字节结果与两行精确答案匹配；正例 `positive.safe.json` SHA-256 `2409ca91302d78babc95c2a462247bb54f769efc401dc2f9109d6d48f78b942b`。随后独立一次 Read 审批 No，精确 tool ID 的 `user-rejected`／`User rejected tool use` 与原生 interruption 对齐，零成功内容／替代工具／拒绝文件标记泄露；没有 `READ_DENIED` 模型回复，也不冒称正常 `end_turn` 或 managed ACK。拒绝 `refusal.safe.json` 摘要 `21134913098a79a2d4c00db5556b8a35106a4a2f3a8161862ba8d59e3b04143a`。
+
+同一新构建的英文与简体中文分别在双卡形成后删除长文件名目标再提交：完整错误说明和文件名分两行可见、无裁切／省略，原草稿及双卡保留，持久活动零新增。`bilingual-layout.safe.json` SHA-256 `bb2f4cf0123bab36b0c65a9dca596d6eb9e108a4faafd0694a43ca6f743ae073`，对应第 09／10、18／19 图；未声称读取编辑器原始缓冲区、测量 PTY 字节或在该轮运行 mode 000。共用 Toast 高度修复完成英中真实布局审计，旧失败原件保留。Claude 索引 `acceptance-index.safe.json` 为 `393fcc8081f99bb25628f973909b5fa1480fed4c9d267c4519d46adf6ff4284b`；两代 App 均自然 exit 0 且自有进程已退出，但 System Events／FolderActionsDispatcher 的共享归属不满足清理条件，**`cleanup_ready=false`、短目录保留**。不终止共享服务、不豁免门禁；`cleanup-deferred.safe.json` 为 `46bee2e555e68fccea99530b1701f4787c6b8fa9828bdfe906dd71b7ea6d0249`。
+
+固定 Codex `0.156.1` 的 `r-__g9v72o-codex-gui` 保持真实 HOME／CODEX_HOME，仅操作本轮私有项目。一张中文空格路径卡、一次输入，真实审批显示精确 `/bin/cat` 因策略需要批准，操作者选择 No。唯一 cwd 定位的 SID `01a0f4ad-fb08-7652-b426-fa605a93342d` 中，同 call 拒绝输出 `aborted by user after 42.5s` 与同 turn 的 `turn_aborted/interrupted`，结合第 08／09／10 图的审批、No 与取消终态，证明原生拒绝；零成功读取、替代命令、重投、第二输入和标记泄露。UI “Ran” 标签不证明执行，未出现 `task_complete` 或模型拒绝终答；输入前 SID 尚未落盘，仅记录精确 cwd 索引为空，不宣称原生全历史零输入。独立复核 `codex-denial-reviewed.safe.json` SHA-256 `92cf37d1ae5da83a762fd32e0762df5a6db36129510559d2f91083932a7b248f`，四条相关原始行 `codex-denial-native-selected.jsonl` 为 `210799d18e6f33bd33ea4a771e97020942c46bb4f7c18d987b53612149b55eeb`；不导出其他会话、完整 system／reasoning。28 文件索引 `9ac093a4beb0dcbbdec65868381ace2ec9c9430380472c9410a8b19b5db52271`，外层自然 exit 0、`cleaned`，日志 `830882ccff904e12dbb1d899082fedb3d0fae96775e724f5a7c465b9ae5ca2b9`。
+
+[最终 CI 36789334970](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36789334970) 仍进行中，不能计整轮通过。Windows Claude 第 0 场景已启动原生，但 45 秒内未取得有效匹配的 SessionStart；第 1 场景成功。旧循环会吞掉解析／匹配异常，原 PTY 仅留字节数和摘要且私有目录已删除，不能断言零 OSC 或归因于 Grok。原通知收据 `g01-cross-platform/ci-36789334970/claude-windows-notifications/contents/claude-windows-notifications.json` SHA-256 `91e5b5c8eaae98311b9b99940a28d5fe9111ed290baa77ee82b3374b56002379`；最小原 PTY 保全改动仅在 Job 已空后导出本轮两份有界原件并绑定字节／SHA，失败保留现场，不延时、不重试、不降低匹配，**诊断改动不等于通知故障修复**。
+
+Linux 作业已 completed／success，独立逐名审计确认普通桥 36、host 1469、desktop 670 项真实通过，但漏跑账本 19 项；审计 SHA-256 `6df4725f9c5b54b009f587cf5334ef9963586ba5743aef3d91097063de5d0e79`，完整 job 日志 `7e194f1d5aa9c1c7f9bbed4f98276b628f7622dfcd7d8fab201a0b437891fab8`。Windows 仍在 host 测试。两平台 host 筛选将 `local_cli_tasks_grok_native_bridge` 文件名当模块，已替换为 `persistence::local_cli_tasks::grok_native_bridge::tests::`，不能回填其跨平台覆盖。实际应用证据脚本改动后的本机门禁：check `r-y9abd9lq` 日志 SHA-256 `fe5279323daf61303e907cef32149304d678622844e27391e6fffea8cc90db77`；Python 27／27，`r-y1k4zzq7` 日志 `cb44ebee5ee84c93a3c582611a8b52d8d1f8ea417525ed8bd60ff150428f54f8`；精确账本 nextest 19／19、retries 0、8243 skipped，`r-g3gcq1gy` 日志 `d2d2d8b78590c28041f1e8a24ce2b112bdc7ca23a0c9be8e3601d5bf98153b1f`。三轮均 exit 0 且已清理；修正筛选后的 actionlint `r-gtjqciby` 亦 exit 0 且已清理，空日志 SHA-256 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`。仅证据脚本／测试／CI 筛选变化，无需本地化变更。G01／G07 仍等待精确最终源码门禁，Claude 现场另按归属证据收尾；其他平台实机移交不替代实现或源码门禁。
+
+以下同日记录保留当时结果及待验边界；最新补验以上节为准，不把历史失败改写为通过。
+
 ## 2026-10-01：G07 短两行提示实窗仍裁切，修正高度约束待复验
 
 **新增关闭 0 项，仍为 4／7／3。** `8f860ed43506f02b1cd713acc1f5c0233fc148ec` 的实际新 Mac 构建源映像 SHA-256 `462b03876135ef2c44526ca3a348ea57758d60eed3467913236685621d47817d`、构建绑定 `1a052d73354e1ff34021450d59d4485afb060f60b6ad6292b4f741a405a184f1`。`r-0zfrzk4y` 通过真实选择器建立两卡，再删除长文件名目标；68 字节草稿及两卡保留，原生／宿主 14 项计数与增量均为 0，历史／桥账本字节与宿主逻辑行不变。英文第 07 图仍将两行文本拼为单行，文件名被渐隐裁切，**布局失败，未继续计中文通过**。

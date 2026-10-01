@@ -289,6 +289,75 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 probe.select_dependencies(bash, root / "jq.cmd")
 
+    def test_raw_archive_preserves_only_two_fixed_case_bytes_and_worker_digests(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            root = parent / "owned"
+            root.mkdir()
+            (root / ".probe-owned").write_bytes(probe.MARKER)
+            samples = [b"\x1b[31msynthetic failure\x00\xff", osc(notification())]
+            rows = []
+            for index, raw in enumerate(samples):
+                (root / f"case-{index}.pty.bin").write_bytes(raw)
+                rows.append({"passed": index == 1, "raw_pty": {
+                    "bytes": len(raw), "sha256": probe.hashlib.sha256(raw).hexdigest()}})
+            rows[0]["raw_pty"] = {"bytes": 4, "sha256": probe.hashlib.sha256(b"UI t").hexdigest()}
+            (root / "case-2.pty.bin").write_bytes(b"must remain private")
+            report = {"job_empty": True, "worker": {"transport_cases": rows}}
+            probe.archive_raw_pty(root, parent / "report.json", report)
+            self.assertTrue(report["raw_pty_archived"])
+            self.assertEqual(set(report["raw_pty_files"]), {"case-0.pty.bin", "case-1.pty.bin"})
+            for index, raw in enumerate(samples):
+                record = report["raw_pty_files"][f"case-{index}.pty.bin"]
+                self.assertEqual(record["worker_digest_matched"], index == 1)
+                self.assertEqual(record["worker_snapshot"], rows[index]["raw_pty"])
+                self.assertEqual((parent / record["file"]).read_bytes(), raw)
+                self.assertEqual({key: record[key] for key in ("bytes", "sha256")}, {
+                    "bytes": len(raw), "sha256": probe.hashlib.sha256(raw).hexdigest()})
+            self.assertFalse((parent / "report.case-2.pty.bin").exists())
+
+    def test_raw_archive_requires_empty_job_and_rejects_oversize_or_success_digest_change(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            root = parent / "owned"
+            root.mkdir()
+            (root / ".probe-owned").write_bytes(probe.MARKER)
+            source = root / "case-0.pty.bin"
+            source.write_bytes(b"12345")
+            output = parent / "report.json"
+            for report in ({}, {"job_empty": False}):
+                with self.subTest(report=report), self.assertRaises(ValueError):
+                    probe.archive_raw_pty(root, output, report)
+            with mock.patch.object(probe, "MAX_OUTPUT", 4), self.assertRaises(ValueError):
+                probe.archive_raw_pty(root, output, {"job_empty": True})
+            self.assertFalse(output.with_suffix(".case-0.pty.bin").exists())
+            with self.assertRaises(ValueError):
+                probe.archive_raw_pty(root, output, {"job_empty": True, "worker": {
+                    "transport_cases": [{"passed": True, "raw_pty": {"bytes": 5, "sha256": "0" * 64}}]}})
+            self.assertEqual(output.with_suffix(".case-0.pty.bin").read_bytes(), b"12345")
+            self.assertEqual(source.read_bytes(), b"12345")
+
+    def test_raw_archive_does_not_replace_existing_evidence_or_fabricate_missing_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory).resolve()
+            root = parent / "owned"
+            root.mkdir()
+            (root / ".probe-owned").write_bytes(probe.MARKER)
+            output = parent / "report.json"
+            report = {"job_empty": True}
+            probe.archive_raw_pty(root, output, report)
+            self.assertFalse(report["raw_pty_archived"])
+            self.assertEqual(report["raw_pty_files"], {
+                "case-0.pty.bin": {"present": False}, "case-1.pty.bin": {"present": False}})
+            source = root / "case-0.pty.bin"
+            source.write_bytes(b"synthetic raw")
+            destination = output.with_suffix(".case-0.pty.bin")
+            destination.write_bytes(b"previous evidence")
+            with self.assertRaises(FileExistsError):
+                probe.archive_raw_pty(root, output, {"job_empty": True})
+            self.assertEqual(destination.read_bytes(), b"previous evidence")
+            self.assertEqual(source.read_bytes(), b"synthetic raw")
+
     def test_controller_timeout_recovers_receipts_then_removes_only_owned_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()
@@ -307,6 +376,7 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             def launch(*unused, **unused_keywords):
                 probe.write_json(private / "worker.json", {"schema": 1, "passed": False, "path_cases": [{"passed": False}]})
                 probe.write_json(private / "case-0.driver.json", {"passed": False, "native_child_attached": True})
+                (private / "case-0.pty.bin").write_bytes(b"synthetic failed terminal output")
                 return process
             with mock.patch.object(probe, "require_native_host"), mock.patch.object(probe, "verify_binary", return_value={"sha256": "fixed"}), \
                  mock.patch.object(probe, "select_dependencies", return_value=(args.bash_executable, args.jq_executable)), \
@@ -323,6 +393,11 @@ class ClaudeWindowsNotificationsTests(unittest.TestCase):
             self.assertTrue(report["private_directory_removed"])
             self.assertEqual(set(report["recovered_receipts"]), {"worker.json", "case-0.driver.json"})
             self.assertFalse(private.exists())
+            archived = report["raw_pty_files"]["case-0.pty.bin"]
+            self.assertEqual((root / archived["file"]).read_bytes(), b"synthetic failed terminal output")
+            self.assertEqual(archived["sha256"], probe.hashlib.sha256(b"synthetic failed terminal output").hexdigest())
+            self.assertFalse(report["raw_pty_archived"])
+            self.assertEqual(report["raw_pty_files"]["case-1.pty.bin"], {"present": False})
             self.assertEqual(outside.read_bytes(), b"do not change")
             job.terminate.assert_called_once()
             job.close.assert_called_once()

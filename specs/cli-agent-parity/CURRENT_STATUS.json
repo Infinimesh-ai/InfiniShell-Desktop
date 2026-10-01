@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 三平台实现与工件绑定已补，最终宿主源码门禁待验；G07 Grok普通双文件及拒绝链取得真实证据，双语提示、Claude链及Codex原生拒绝待验；4项关闭、7项开放、3项移交，PR #22草稿",
+  "status_zh": "本次 Mac 范围关闭 G02/G04/G05/G06；G01 三平台实现与工件已补，最终门禁仍欠账本精确筛选覆盖及 Windows Claude 通知失败诊断；G07 已补 Claude 双语、双文件读取/拒绝与 Codex 原生拒绝，最终源码门禁未完，Claude 现场保留待安全清理；4项关闭、7项开放、3项移交，PR #22草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -675,6 +675,64 @@
         "archive_summary_sha256": "90fcfcf6aef3a5b6ea25ccb1f2a494e61196482741ff67af4d062e6479e5d062",
         "logs_zip_sha256": "4813b50d6aa9bf13e9b0d53301c3f4c5a8e4ff8fd2d434fe4bb26121d60ae703",
         "boundary": "21条原生命令均成功，四库均真实非零命中，版本/帮助/异步补全入口通过。独立归档后停止剩余重复验证，整个workflow为cancelled；摘要绑定后的最终两平台宿主门禁仍待验。"
+      },
+      "final_host_gate_followup": {
+        "run_id": 36789334970,
+        "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36789334970",
+        "status": "in_progress_with_known_failure_and_coverage_gap",
+        "full_gate_satisfied": false,
+        "windows_claude_notification": {
+          "case_0": "native已启动，45秒内未有有效匹配SessionStart，forced_cleanup；原PTY未归档且私有目录已删除。",
+          "case_1": "有效通知通过，原生自然exit0。",
+          "receipt_sha256": "91e5b5c8eaae98311b9b99940a28d5fe9111ed290baa77ee82b3374b56002379",
+          "boundary": "不能断言零OSC或归因Grok；最小原PTY保全改动只改善后续诊断，不延时/重试/降低匹配，不计故障修复。"
+        },
+        "ledger_filter": {
+          "previous": "test(local_cli_tasks_grok_native_bridge)",
+          "corrected": "test(persistence::local_cli_tasks::grok_native_bridge::tests::)",
+          "missed_tests": 19,
+          "boundary": "当前CI漏跑，修正后的本机通过不回填两平台覆盖。"
+        },
+        "local_gates": {
+          "cargo_check": {
+            "run_id": "r-y9abd9lq",
+            "log_sha256": "fe5279323daf61303e907cef32149304d678622844e27391e6fffea8cc90db77"
+          },
+          "python": {
+            "run_id": "r-y1k4zzq7",
+            "passed": 27,
+            "log_sha256": "cb44ebee5ee84c93a3c582611a8b52d8d1f8ea417525ed8bd60ff150428f54f8"
+          },
+          "ledger": {
+            "run_id": "r-g3gcq1gy",
+            "passed": 19,
+            "retries": 0,
+            "skipped": 8243,
+            "log_sha256": "d2d2d8b78590c28041f1e8a24ce2b112bdc7ca23a0c9be8e3601d5bf98153b1f"
+          },
+          "all_exit_code": 0,
+          "all_temporary_directories": "cleaned",
+          "actionlint": {
+            "run_id": "r-gtjqciby",
+            "exit_code": 0,
+            "temporary_directory": "cleaned",
+            "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "localization": "仅证据脚本、测试与CI筛选变化，无需本地化变更。",
+        "gap_closed": false,
+        "linux": {
+          "status": "completed",
+          "conclusion": "success",
+          "ordinary_bridge_passed": 36,
+          "host_passed": 1469,
+          "desktop_passed": 670,
+          "ledger_tests_missing": 19,
+          "independent_audit_sha256": "6df4725f9c5b54b009f587cf5334ef9963586ba5743aef3d91097063de5d0e79",
+          "job_log_sha256": "7e194f1d5aa9c1c7f9bbed4f98276b628f7622dfcd7d8fab201a0b437891fab8",
+          "boundary": "作业成功但缺账本模块，不能计精确最终源码门禁通过。"
+        },
+        "windows_status": "host_tests_in_progress"
       }
     },
     "g06_progress": {
@@ -812,10 +870,11 @@
         "sha256": "e70e0e66e7487a5c12d8183a26c8ee5b4561d8773ab5d10e5fa7d71bfdea6528"
       },
       "localization": {
-        "status": "toast_render_fix_pending_bilingual_verification",
-        "finding": "8f860ed43新Mac构建的r-0zfrzk4y英文07图仍将两行提示拼为单行并截断文件名，布局失败；14项计数及增量均为0，稿卡保留。已修正没有展开入口的短提示高度约束，待新英中实窗复验。",
+        "status": "shared_toast_bilingual_verified_on_142c_claude_gui",
+        "finding": "8f860ed43的r-0zfrzk4y英文长文件名裁切失败保留；142c635412新构建在Claude普通GUI完成英文/简体中文长文件名、完整错误说明与双卡草稿保留实窗核验。旧Grok模型链未重跑。",
         "failed_layout_index_sha256": "8b113f8a550e2dd491dc4c45dbd4a1cba5bf7ed99bd883e9b0b985688faac04e",
-        "failed_layout_cleanup": "GUI及原生自然退出；finish在认证副本身份门禁拒绝，launcher中断后外层exit -2、cleanup_ready=false，私有短目录保留，不记已清理。"
+        "failed_layout_cleanup": "GUI及原生自然退出；finish在认证副本身份门禁拒绝，launcher中断后外层exit -2、cleanup_ready=false，私有短目录保留，不记已清理。",
+        "current_receipt_sha256": "bb2f4cf0123bab36b0c65a9dca596d6eb9e108a4faafd0694a43ca6f743ae073"
       },
       "cleanup": {
         "outer_record": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-i4txg6p2.json",
@@ -827,12 +886,54 @@
         "boundary": "App与已拥有进程退出、认证副本删除，白名单小证据归档后短TMPDIR已清理；profile/DB保留，完整原生system/reasoning/history未导出。"
       },
       "remaining": [
-        "新构建的文件错误Toast英文与简体中文完整布局验收",
-        "Claude独立已认证普通GUI的双文件读取与必要失败/拒绝链",
-        "固定Codex0.156.1原生文件读取审批拒绝；旧Shell模式保护不代替原生拒绝，旧TextEdit拒绝原件尚未复核",
-        "G01平台工件绑定后的最终源码门禁；其他平台实机按用户授权后置"
+        "精确最终Linux/Windows源码门禁，须包含修正筛选后的普通桥账本19项；当前CI的Windows Claude通知失败不能计通过"
       ],
-      "gap_closed": false
+      "gap_closed": false,
+      "current_mac_followup": {
+        "source_commit": "142c635412a21e92161111fba5148b6583c8334a",
+        "raw_binary_sha256": "afd13b4b69e596a51b5fbd52c630e9b05cb012e4993e4616db3ec48eb40f5f48",
+        "build_binding_sha256": "1fc0d81765fb28a83dd0c488330bd6332cae2a2b46d93e1f23e6e873a838c03f",
+        "claude": {
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-9g0qj9u3-claude-gui",
+          "native_version": "2.1.280",
+          "positive_sha256": "2409ca91302d78babc95c2a462247bb54f769efc401dc2f9109d6d48f78b942b",
+          "positive": "普通GUI双卡一次输入，仅原路径JSON；两次Read原字节与两行精确答案匹配，无输入标记泄露或替代工具。",
+          "refusal_sha256": "21134913098a79a2d4c00db5556b8a35106a4a2f3a8161862ba8d59e3b04143a",
+          "refusal": "一次Read审批No，同tool ID user-rejected/is_error及原生interruption；零成功内容/替代工具/标记泄露，没有READ_DENIED模型回复，不称managed ACK。",
+          "bilingual_layout_sha256": "bb2f4cf0123bab36b0c65a9dca596d6eb9e108a4faafd0694a43ca6f743ae073",
+          "bilingual_layout": "两语言成卡后删除长文件名目标，完整提示与文件名两行可读，草稿/双卡保留、持久活动零新增；未测PTY字节，本轮未运行mode000。",
+          "index_sha256": "393fcc8081f99bb25628f973909b5fa1480fed4c9d267c4519d46adf6ff4284b",
+          "cleanup": {
+            "owned_app_generations_exit_code": [
+              0,
+              0
+            ],
+            "cleanup_ready": false,
+            "private_root_retained": true,
+            "deferred_receipt_sha256": "46bee2e555e68fccea99530b1701f4787c6b8fa9828bdfe906dd71b7ea6d0249",
+            "reason": "共享System Events/FolderActionsDispatcher归属未满足清理门禁；不终止共享服务、不豁免门禁。"
+          }
+        },
+        "codex": {
+          "archive": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260930/g07-preparation/r-__g9v72o-codex-gui",
+          "native_version": "0.156.1",
+          "native_session_id": "01a0f4ad-fb08-7652-b426-fa605a93342d",
+          "review_sha256": "92cf37d1ae5da83a762fd32e0762df5a6db36129510559d2f91083932a7b248f",
+          "selected_native_rows_sha256": "210799d18e6f33bd33ea4a771e97020942c46bb4f7c18d987b53612149b55eeb",
+          "accepted": "单卡一次输入，精确/bin/cat策略审批选择No；同call拒绝输出及同turn的turn_aborted/interrupted结合真实审批截图对齐，零成功读取/替代/重投/第二输入/标记泄露。",
+          "boundary": "首输入前SID未落盘，不声称历史零输入；UI Ran不是执行证明，没有task_complete或拒绝模型终答；只导出本轮4条相关原始行，保留真实HOME/CODEX_HOME。",
+          "index_sha256": "9ac093a4beb0dcbbdec65868381ace2ec9c9430380472c9410a8b19b5db52271",
+          "indexed_files": 28,
+          "cleanup": {
+            "outer_exit_code": 0,
+            "status": "cleaned",
+            "cleanup_ready": true,
+            "log_sha256": "830882ccff904e12dbb1d899082fedb3d0fae96775e724f5a7c465b9ae5ca2b9"
+          }
+        },
+        "historical_source_boundary": "Grok与旧固定Codex双卡正例仍按各自原构建计证，不重标新构建或重复运行。",
+        "gap_closed": false
+      }
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
