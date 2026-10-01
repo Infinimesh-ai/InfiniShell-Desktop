@@ -173,6 +173,19 @@ impl Service {
                     Action::Status { ticket } => {
                         self.tickets.lock(&request.scope, &ticket)?.status(&ticket)
                     }
+                    Action::Observe {
+                        ticket,
+                        expected_session,
+                    } => {
+                        let reply = self
+                            .tickets
+                            .lock(&request.scope, &ticket)?
+                            .observe_session(&ticket, expected_session)?;
+                        if !connection.current(&request.scope) {
+                            return Err(invalid());
+                        }
+                        Ok(reply)
+                    }
                     Action::Cancel { ticket } => {
                         self.tickets.lock(&request.scope, &ticket)?.cancel(&ticket)
                     }

@@ -341,6 +341,7 @@ impl ImageStagingService {
                 .ok_or_else(|| io::Error::other("owned Codex unavailable"))?;
             let ticket = Uuid::parse_str(&candidate.owned_ticket_id)
                 .map_err(|_| io::Error::other("invalid Codex ticket"))?;
+            let native_session = scope.cli_session_id.as_str();
             let scope = super::cli_image_codex_owned_protocol::Scope {
                 host: scope.host_id.as_str().to_owned(),
                 terminal_session: scope.terminal_session_id.into(),
@@ -348,6 +349,7 @@ impl ImageStagingService {
                 generation: scope.input_generation,
             };
             let lease = service.image_owner(&scope, ticket, &candidate.owned_manifest_sha256)?;
+            lease.validate_native_session(native_session)?;
             let tty = std::fs::symlink_metadata(&candidate.tty_path)?;
             if lease.server_pid() as u32 != candidate.daemon_pid_candidate
                 || lease.codex_home() != std::fs::canonicalize(&candidate.codex_home)?

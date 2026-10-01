@@ -6,6 +6,7 @@
 
 use base64::Engine;
 use uuid::Uuid;
+use warp_core::cli_agent_protocol::CodexProcessEvidence;
 use warpui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
@@ -1311,6 +1312,45 @@ impl TerminalView {
         CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id) == Some(generation)
     }
 
+    /// hook 与专属原生只读证明分别验证；后者不能提供状态、审批或回合完成语义。
+    fn cli_agent_has_bound_input_session(&self, ctx: &AppContext) -> bool {
+        if CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .is_some_and(|session| session.received_rich_notification)
+        {
+            return true;
+        }
+        self.codex_owned_input_process(ctx).is_some()
+    }
+
+    fn codex_owned_input_process(&self, ctx: &AppContext) -> Option<CodexProcessEvidence> {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.remote_owned_codex_process(ctx);
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        {
+            let _ = ctx;
+            None
+        }
+    }
+
     pub(super) fn bind_cli_agent_hook_input_target(&mut self, ctx: &AppContext) {
         let sessions = CLIAgentSessionsModel::as_ref(ctx);
         let Some(session) = sessions.session(self.view_id) else {
@@ -1322,7 +1362,7 @@ impl TerminalView {
         ) else {
             return;
         };
-        if !session.received_rich_notification || native_session_id.is_empty() {
+        if !self.cli_agent_has_bound_input_session(ctx) || native_session_id.is_empty() {
             return;
         }
         let model = self.model.lock();
@@ -1349,6 +1389,7 @@ impl TerminalView {
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
             return false;
         };
+        let has_bound_session = self.cli_agent_has_bound_input_session(ctx);
         let model = self.model.lock();
         let block = model.block_list().active_block();
         // 包装命令名本身不能证明 CLI 身份；通知绑定必须仍属于同一 block、PTY 和原生会话。
@@ -1358,7 +1399,7 @@ impl TerminalView {
             .is_some_and(|target| {
                 &target.block_id == block.id()
                     && target.model_events_id == self.model_events_handle.id()
-                    && session.received_rich_notification
+                    && has_bound_session
                     && session.session_context.session_id.as_ref()
                         == Some(&target.native_session_id)
                     && session.listener.as_ref().map(|listener| listener.id())

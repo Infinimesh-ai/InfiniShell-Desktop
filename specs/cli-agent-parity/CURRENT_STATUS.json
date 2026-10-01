@@ -6655,6 +6655,68 @@
     "localization": "无需本地化变更；复核原英中成功、等待及失败提示，后台修复不改变文案语义；修复后的双语真实GUI仍待验。",
     "remaining": "修复版真实消费/清稿/回收、其他异常恢复、SSH/tmux组合、英中GUI及最终源码门禁。",
     "screenshots": "仅本任务CUA工具图像，未生成外置截图文件。",
-    "cleanup": "App、sshd、Grok、Codex已退出；daemon按原10分钟空闲期限退出，000006finish与外层exit0确认。旧status为此前存活快照；现场保留cleanup_ready=false，独立保全审计尚待完成。"
+    "cleanup": "App、sshd、Grok、Codex已退出；daemon按原10分钟空闲期限退出，000006finish与外层exit0确认。旧status为此前存活快照；现场保留cleanup_ready=false；独立审计后slot同设备排他保全到r-co3bb00k/retired-remote-server，收据4b52248a3184ba59f9b3fcf88342ccd84595deaa2d2b704ae8ea7a8bab457d5d，旧原生锁和socket仍保留。"
+  },
+  "g08_grok_clear_release_codex_first_turn_20261001": {
+    "status": "grok_english_ssh_consumption_clear_release_passed_codex_and_tmux_implementation_open",
+    "source_commit": "0a7ab86e9fe8276e40afdb6a8be97376b70a553c",
+    "run_id": "r-ezc4sbpx",
+    "language": "en",
+    "newly_closed_gaps": [],
+    "gap_closed": false,
+    "grok": {
+      "native_commit": "a9c27a25fe22ed693273b5428ea27d4a8b0c2940",
+      "model_inputs": 1,
+      "answer": "Red, Blue",
+      "native_typed_image_exact": true,
+      "finished_ack_match": true,
+      "draft_empty_after_reopen": true,
+      "cards_after_reopen": 0,
+      "manual_clear": false,
+      "ticket_released": true,
+      "socket_and_lock_removed": true,
+      "consumption_receipt_sha256": "d5dc0991614bc28f741211c88f6864e8981d139a5c5305c8173d299a1ebb7b67",
+      "exit_receipt_sha256": "f42de49ab54bbf4504476c1d67691d6a2aa1ce5e63bdd31f25fa09f6adb00963"
+    },
+    "codex": {
+      "version": "0.156.1",
+      "hooks_active_and_trusted": true,
+      "rich_input_available": false,
+      "model_inputs": 0,
+      "image_inputs": 0,
+      "ticket_released": true,
+      "blocker": "固定版本SessionStart延迟到首个模型回合；首图之前需要专属原生唯一线程只读绑定。",
+      "receipt_sha256": "a8247892e1da24b191d1e35b1129acaab41b92d8bffc2802ca5aa24e900be7e0"
+    },
+    "tmux": {
+      "version": "3.7c",
+      "private_single_pane": true,
+      "allow_passthrough": true,
+      "remote_owned_menu_available": false,
+      "model_inputs": 0,
+      "blocker": "外层tmux长命令使现有专属启动入口不可用；未接内部窗格启动与绑定。",
+      "receipt_sha256": "88983684ec7a33e08543665f18f3611a03bb35cd50a32ec24eddb0f44f5f6250"
+    },
+    "localization": "英文Codex菜单截断已定位；同键英中短标签改动待新构建与双语布局门禁。",
+    "lifecycle": "App、sshd及两款原生实例均退出，daemon按原空闲期限退出；000004 finish和外层exit0确认。实时进程/FD/服务及目录身份复核后，slot同设备排他保全到r-ezc4sbpx/retired-remote-server，收据733135cd5b6236c4ab3d3f3247960e946c5a8aa525e420db4ae6e8a1bc0691d3。历史、profiles及tmux残留socket保留，cleanup_ready=false；旧status是历史快照。",
+    "remaining": "Codex首图、tmux入口及原生消费、异常组合、中文成功布局和最终源码门禁。"
+  },
+  "g08_codex_zero_turn_readonly_20261001": {
+    "status": "implemented_local_source_gates_passed_real_gui_pending",
+    "newly_closed_gaps": [],
+    "gap_closed": false,
+    "source_freeze_sha256": "69228b42ec4167708e6fff1c256b8a10b809b44b460240bf8f6378ad7dad0834",
+    "gate_receipt_sha256": "971e9f6ce5e4d81f824b3ce9f3ce3badfab360d2752a6921bfddb74507f2b765",
+    "implementation": "唯一loaded thread及metadata-only cwd查询；原票据/TTY/原生出生/socket peer匹配后排他固定SID；真实hook标记保持false，消费/恢复核同一SID，无暖身输入。单个退避观察保留Started前后任务，旧client/epoch/block/ticket/SID拒绝。",
+    "local_gates": {
+      "check": "r-wl6q8mvv通过；后续生产Rust未变",
+      "focused": "r-dr5tkoky原59项58通过/1导航夹具失败；修正共享夹具后r-k0d3g7yg的17项UI全部通过，其余42项源码未变且原轮通过。",
+      "i18n": "r-3t8zzwwm，11项通过",
+      "cleanup": "上述短目录均已核验cleaned，失败原件保留"
+    },
+    "native_grok": "aa584b262081仅五份测试文件变化，4155其他树项相同；修正Windows路径/console目标ready/错误保留。Mac16项串行及原生check通过，原并行两条LEAK保留。实际Mac工件仍a9，不声称aa工件已构建。Windows旧POSIX无生产调用通知模块按固定源码排除并保留原失败；真实新runner/broker仍须通过。",
+    "cross_platform": "新增Codex UI已纳入两平台普通/定向筛选；待新提交实际运行。旧ea74 Linux控制TTY缺失、Windows原生通知失败未解决。",
+    "localization": "英中两个菜单短标签同步，i18n通过；实际布局待新构建。",
+    "remaining": "Codex真实首图及双语布局、tmux产品入口/原生消费、断线与旧回调异常组合、最终源码门禁。"
   }
 }

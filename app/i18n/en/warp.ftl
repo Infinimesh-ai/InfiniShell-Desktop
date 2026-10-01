@@ -6102,8 +6102,8 @@ cli-agent-grok-fixed-skills-unavailable = This Grok task accepts only the skills
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 can read, edit, and create project files, list directories, and search the contents of a specified file. Each tool call requires approval. Shell commands, hooks, and skills are disabled. Subtasks keep this policy; earlier tasks do not gain permissions. This is not an operating system sandbox.
 
 workspace-new-grok-rich-input = Grok rich input (grok-4.7)
-workspace-start-remote-grok-rich-input = Grok rich input in current remote terminal
-workspace-start-remote-codex-rich-input = Codex rich input in current remote terminal
+workspace-start-remote-grok-rich-input = Grok rich input in this pane
+workspace-start-remote-codex-rich-input = Codex rich input in this pane
 workspace-start-remote-codex-rich-input-help = Start Codex 0.156.1 with a separate app server bound to this SSH/tmux pane. Requires Bash or Zsh and remote image support.
 cli-agent-codex-remote-launch-unavailable = The remote Codex session could not be started. It requires Codex 0.156.1, Bash or Zsh, and a current SSH connection with remote image support.
 cli-agent-codex-owned-launch-claimed = This Codex launch has already been claimed or its status is unconfirmed. Check the current remote terminal before starting another session.

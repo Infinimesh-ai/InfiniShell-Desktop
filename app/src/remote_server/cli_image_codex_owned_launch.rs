@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read as _, Write as _};
 use std::os::unix::fs::{
-    DirBuilderExt as _, MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _,
+    DirBuilderExt as _, FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _,
+    PermissionsExt as _,
 };
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -17,10 +18,12 @@ use command::unix::CommandExt as _;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
+use warp_core::cli_agent_protocol::CodexProcessEvidence;
 
 use super::cli_image_codex_owned_protocol::{
-    MAX_BODY_BYTES, Owner, REMOTE_CODEX_COMMAND, Reply, Scope, Ticket,
+    MAX_BODY_BYTES, Owner, REMOTE_CODEX_COMMAND, ReadOnlySession, Reply, Scope, Ticket,
 };
+use super::cli_image_codex_queue::CodexImageQueue;
 use super::cli_image_codex_owned_socket::{SocketLease, SocketStamp};
 use super::cli_image_native_process::{Configuration, peer_pid, process};
 use crate::terminal::{CLIAgent, cli_agent::discover_cli_agent_executable};
@@ -60,9 +63,18 @@ struct Manifest {
     shell: Token,
     group: i32,
     tty_device: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tty_path: Option<PathBuf>,
     socket: PathBuf,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     notifications: Option<NotificationPlan>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NativeSessionRecord {
+    manifest_sha256: String,
+    native_session_id: Uuid,
 }
 
 // 只嵌入现有通知脚本闭包，不加载项目插件、MCP、技能或任意额外启动参数。
@@ -489,6 +501,52 @@ impl TicketStore {
 }
 
 impl Guard {
+    pub(super) fn observe_session(
+        self,
+        ticket: &Ticket,
+        expected_session: Option<Uuid>,
+    ) -> io::Result<Reply> {
+        let owner = self.owner()?;
+        let lease = OwnedImageLease::capture(self, &owner.manifest_sha256)?;
+        let pinned = bound_native_session(&lease.guard, &lease.hash)?;
+        if pinned
+            .zip(expected_session)
+            .is_some_and(|(pinned, expected)| pinned != expected)
+        {
+            return Err(invalid());
+        }
+        // 旧 manifest 仍可使用真实 hook 路径；零轮发现必须有 wrapper 封存的 TTY。
+        let tty_path = lease.manifest.tty_path.as_ref().ok_or_else(invalid)?;
+        validate_tty_path(tty_path, lease.tty_device())?;
+        let process = CodexProcessEvidence {
+            daemon_pid_candidate: lease.server_pid().try_into().map_err(|_| invalid())?,
+            codex_home: lease.codex_home().to_str().ok_or_else(invalid)?.into(),
+            tty_path: tty_path.to_str().ok_or_else(invalid)?.into(),
+        };
+        let stream = lease.connect()?;
+        let validate = |stream: &UnixStream| {
+            validate_tty_path(tty_path, lease.tty_device())?;
+            lease.validate(stream)
+        };
+        let native_session_id = match pinned.or(expected_session) {
+            Some(id) => {
+                CodexImageQueue::connect(stream, id, lease.cwd(), &validate)?;
+                id
+            }
+            None => CodexImageQueue::discover(stream, lease.cwd(), &validate)?,
+        };
+        pin_native_session(&lease.guard, &lease.hash, native_session_id)?;
+        let owner = lease.guard.owner()?;
+        Ok(Reply::Observed {
+            ticket: ticket.clone(),
+            owner,
+            session: ReadOnlySession {
+                native_session_id,
+                process,
+            },
+        })
+    }
+
     pub(super) fn status(&self, ticket: &Ticket) -> io::Result<Reply> {
         let _ = self.reap();
         let phase = if self.directory.join("released.json").exists() {
@@ -523,6 +581,7 @@ impl Guard {
             return Err(invalid());
         }
         bound_socket(&self.directory, &manifest, &server)?;
+        let pinned_native_session_id = bound_native_session(self, &hash)?;
         Ok(Owner {
             ticket_id: manifest.ticket,
             manifest_sha256: hash,
@@ -530,6 +589,7 @@ impl Guard {
             tui_pid: tui.pid,
             server_pid: server.pid,
             tty_device: manifest.tty_device,
+            pinned_native_session_id,
         })
     }
     pub(super) fn cancel(&self, ticket: &Ticket) -> io::Result<Reply> {
@@ -638,6 +698,16 @@ impl OwnedImageLease {
     pub(super) fn tty_device(&self) -> u64 {
         self.manifest.tty_device
     }
+    pub(super) fn validate_native_session(&self, native_session: &str) -> io::Result<()> {
+        let candidate = Uuid::parse_str(native_session).map_err(|_| invalid())?;
+        if candidate.is_nil()
+            || bound_native_session(&self.guard, &self.hash)?
+                .is_some_and(|pinned| pinned != candidate)
+        {
+            return Err(invalid());
+        }
+        Ok(())
+    }
     pub(super) fn validate(&self, stream: &UnixStream) -> io::Result<()> {
         verify_notifications(&self.guard.directory, self.manifest.notifications.as_ref())?;
         self.socket.validate()?;
@@ -734,6 +804,7 @@ fn supervise(path: &Path, expected_hash: &str) -> io::Result<()> {
         shell,
         group,
         tty_device,
+        tty_path: Some(current_terminal_path(tty_device)?),
         socket: directory.join("control.sock"),
         notifications: reservation.notifications,
     };
@@ -1044,6 +1115,55 @@ fn current_terminal() -> io::Result<(Token, u64, i32)> {
     }
     parent_token.validate()?;
     Ok((parent_token, device, group))
+}
+
+fn validate_tty_path(path: &Path, device: u64) -> io::Result<()> {
+    let metadata = fs::symlink_metadata(path)?;
+    if !path.is_absolute()
+        || !metadata.file_type().is_char_device()
+        || metadata.rdev() != device
+        || metadata.uid() != unsafe { libc::geteuid() }
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+fn bound_native_session(guard: &Guard, hash: &str) -> io::Result<Option<Uuid>> {
+    let Some(record) =
+        optional_json::<NativeSessionRecord>(&guard.directory.join("native-session.json"))?
+    else {
+        return Ok(None);
+    };
+    if record.manifest_sha256 != hash || record.native_session_id.is_nil() {
+        return Err(invalid());
+    }
+    Ok(Some(record.native_session_id))
+}
+
+/// 原票据排他锁覆盖查询和首次固定；后续观察及真实 hook 都无权覆盖这个 SID。
+fn pin_native_session(guard: &Guard, hash: &str, native_session_id: Uuid) -> io::Result<()> {
+    if native_session_id.is_nil() {
+        return Err(invalid());
+    }
+    if let Some(pinned) = bound_native_session(guard, hash)? {
+        return (pinned == native_session_id)
+            .then_some(())
+            .ok_or_else(invalid);
+    }
+    write_new(
+        &guard.directory.join("native-session.json"),
+        &NativeSessionRecord {
+            manifest_sha256: hash.into(),
+            native_session_id,
+        },
+    )
+}
+
+fn current_terminal_path(device: u64) -> io::Result<PathBuf> {
+    let path = nix::unistd::ttyname(libc::STDIN_FILENO).map_err(io::Error::other)?;
+    validate_tty_path(&path, device)?;
+    Ok(path)
 }
 
 fn resolve_executable() -> io::Result<PathBuf> {

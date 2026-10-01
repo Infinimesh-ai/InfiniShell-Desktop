@@ -1,5 +1,27 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：Codex 首回合只读绑定已实现，真实首图仍待验
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** 专属 Codex 在首个模型回合前，经原生 WebSocket 分页查询唯一 loaded thread，并用不含 turns 的 metadata 核对 cwd。原票据、TTY、进程出生、socket peer 和连接代次均须匹配；首次 SID 排他持久化，后续消费及恢复保持同一 SID。界面区分只读证明与真实 rich hook，未伪造 SessionStart，也未发送暖身回合。尚未就绪时保留单个有退避的观察请求；旧 client、epoch、block、ticket 或会话不可恢复旧图片绑定。
+
+34 文件冻结 SHA-256 `69228b42ec4167708e6fff1c256b8a10b809b44b460240bf8f6378ad7dad0834`；本机 `cargo check -p warp` 通过。定向原轮 59 项中 58 通过，1 项因内存协议夹具未回应真实目录导航而失败；修正后共享夹具影响的 17 项 UI 用例全部通过，包含真正 Observe 失败后重试成功。其余 42 项源码未变且原轮通过，不合写为同一轮 59 项通过。i18n 11 项通过；受审门禁收据 `g08-build-preparation/codex-zero-turn-local-gates-v1.safe.json` SHA-256 `971e9f6ce5e4d81f824b3ce9f3ce3badfab360d2752a6921bfddb74507f2b765`，短目录均已核验清理。早先导入及事件夹具失败保留。两平台普通和定向源码门禁已纳入新增 UI 用例，尚待新提交实际运行。
+
+Grok 公开补丁推进至 `aa584b262081293d84b6fe78e027df7a3ddd4be0`，相对 `a9c27a25fe22` 仅五份测试文件变化，4155 个其他树项相同；补丁 SHA-256 `1a31ad1713ec038e46c52ba24aaec5146406a87efea25e1491bea7f93adce893`。修正 Windows 路径夹具，并让真实 console broker 用例确认目标已附着且保留失败错误码；不声称 Windows 原生问题已修复。Mac 16 项串行及原生 check 通过，原并行运行的两条 LEAK 保留。Windows 定向门禁只排除经双源码摘要固定、无生产调用的旧 POSIX pager 通知模块，仍保留其四项原失败，新增 hooks runner 和真实 broker 必须通过；Mac 实际工件仍绑定 a9，不回填 aa 构建。旧 [ea74 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36835106269) 的 Linux 控制 TTY 通知缺失及 Windows 原生通知测试失败均未解决，不由本机通过覆盖。
+
+英中两条菜单标签已同步缩短，修复版真实双语布局及 Codex 首图待验。tmux 的产品入口／原生消费、断线与旧回调异常组合、最终源码门禁仍开放；原生能力实验不计功能关闭。
+
+## 2026-10-01：Grok 首图清稿及退出回收通过，Codex 首轮绑定和 tmux 入口仍缺失
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** 签名构建 `0a7ab86e9fe8276e40afdb6a8be97376b70a553c`、二进制 SHA-256 `5aed4adb2d2c027c376c877a6026896c2b127b5ba6f893fb01c21c90619d39e8` 在 `r-ezc4sbpx` 的英文实际 SSH 中复验。固定 Grok `.2/a9c27a25fe22/grok-4.7` 经产品菜单一次启动，初始全局／插件 SessionStart 均成功。单次图片提交产生唯一 text＋typed PNG、一次 EndTurn 与 `Red, Blue`；328 字节规范 PNG SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d` 与上传后的内容一致。原 137 字节夹具经过规范化，不称原编码字节未变。
+
+宿主／服务端 finished 与原生 ACK 精确一致，图片输入文件已删除。自动收起后重新打开，草稿为空且卡片为零，没有手动清稿、编辑或重投。真正 `/exit` 后回到同一 SSH，产品确认原生生存期退出并保存 retired／released；socket、leader.lock 及私有 socket 目录均不存在。没有外部信号；leader 可由产品 reaper 回收，不称全部自然退出。消费收据 `d5dc0991614bc28f741211c88f6864e8981d139a5c5305c8173d299a1ebb7b67`、退出收据 `f42de49ab54bbf4504476c1d67691d6a2aa1ce5e63bdd31f25fa09f6adb00963`、CUA 观察收据 `46665a08c9c8137f3dcd4b46f05215164e8c92c3d8d74a78b3f8f46ce5fb61ea` 均位于 `resume-20261001/g08-preparation/r-ezc4sbpx-grok-codex-owned-gui`。截图仅在 CUA 输出，没有外置原图。
+
+Codex `0.156.1` 的通知已由原生显示 installed=1、active=1、SessionFlags Trusted；无需手动信任，但富输入仍未出现。固定官方 `b412ff32` 的新线程先登记 pending SessionStart，直到首个 `run_turn` 才执行 hook，因此原实现不能让首张图片触发首个回合。源码还明确支持零回合的内存 loaded/list 与 metadata-only thread/read，后续以专属票据、原生进程／socket 身份及唯一线程查询修复；不发送暖身回合、不伪造通知。当前零图片／零模型，原生 `/exit` 后 server／TUI 消失、released=true、两种 socket 路径均移除，收据 `a8247892e1da24b191d1e35b1129acaab41b92d8bffc2802ca5aa24e900be7e0`。
+
+私有 tmux 3.7c 的真实单窗格保持同一 SSH、相同 cwd，并开启 allow-passthrough；tab 下拉确实没有 Grok／Codex 当前远端专属入口。原生 server／client／pane、两层 TTY 与 socket 已记录，收据 `88983684ec7a33e08543665f18f3611a03bb35cd50a32ec24eddb0f44f5f6250`。该轮没有 CLI／模型／图片操作；唯一 shell 原生 exit 后返回 SSH，精确三个 PID 均消失，tmux 残留 socket 保留，不冒称整个目录已清理。产品入口和窗格绑定仍是实现缺口。
+
+英文 Grok 入口与清稿流程可读，Codex 菜单末尾截断；已缩短同键英中标签，仍须新构建和两语言布局验证。App／SSH、私有 sshd 与 remote daemon 均已退出；daemon沿原空闲期限结束，000004 finish与外层exit 0确认，日志摘要 `585afb838159919d48597d7bf18bd096c7e15fce9f12385177760c8b9314189b`。实时进程、FD、服务及目录身份复核后，原 slot 同设备排他保全到 `r-ezc4sbpx/retired-remote-server`，收据 `733135cd5b6236c4ab3d3f3247960e946c5a8aa525e420db4ae6e8a1bc0691d3`；现场 cleanup_ready=false，历史、profile和tmux残留socket保留。旧 `r-co3bb00k` 已完成身份、进程、打开文件审计并将原 slot 无覆盖保全到其 `retired-remote-server`，收据 `4b52248a3184ba59f9b3fcf88342ccd84595deaa2d2b704ae8ea7a8bab457d5d`；唯一历史／profile 保留，旧失败不回填。
+
 ## 2026-10-01：Grok 真实首图与清稿／锁回收缺陷、Codex hook 参数解析
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `ea74c1d03` 的中文实际 SSH 现场 `r-co3bb00k` 通过产品菜单启动固定 Grok `.2/a9c27a25fe22`。初始插件 SessionStart 生效，选择器单张红蓝 PNG 一次提交后回答“红色，蓝色”。原生唯一 text＋typed PNG、同原生 prompt 的 EndTurn、宿主与服务端 finished／ACK 一致；typed PNG 为 328 字节，SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，与规范上传字节一致。原 137 字节夹具经过 PNG 规范化，不声称原编码未变。白名单收据 SHA-256 `bc757fa89f45e7e913f1d8fe8a9fb4adf6a6c09b15c5e88fec717555cf437955`。

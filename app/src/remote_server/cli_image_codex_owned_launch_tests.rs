@@ -15,6 +15,64 @@ fn directory() -> tempfile::TempDir {
 }
 
 #[test]
+fn serial_observation_cannot_replace_a_pinned_native_session() {
+    let directory = directory();
+    let first = Uuid::parse_str("10000000-0000-4000-8000-000000000001").unwrap();
+    let second = Uuid::parse_str("10000000-0000-4000-8000-000000000002").unwrap();
+    {
+        let guard = lock_directory(directory.path()).unwrap();
+        pin_native_session(&guard, "manifest-a", first).unwrap();
+    }
+    let guard = lock_directory(directory.path()).unwrap();
+    assert!(pin_native_session(&guard, "manifest-a", second).is_err());
+    assert_eq!(
+        bound_native_session(&guard, "manifest-a").unwrap(),
+        Some(first)
+    );
+    pin_native_session(&guard, "manifest-a", first).unwrap();
+}
+
+#[test]
+fn pinned_session_cannot_move_to_another_manifest() {
+    let directory = directory();
+    let guard = lock_directory(directory.path()).unwrap();
+    let native = Uuid::parse_str("10000000-0000-4000-8000-000000000001").unwrap();
+    pin_native_session(&guard, "manifest-a", native).unwrap();
+    assert!(bound_native_session(&guard, "manifest-b").is_err());
+    assert!(pin_native_session(&guard, "manifest-b", native).is_err());
+}
+
+#[test]
+fn legacy_manifest_without_tty_does_not_gain_readonly_evidence() {
+    let directory = directory();
+    let manifest = legacy_manifest(directory.path());
+    let bytes = serde_json::to_vec(&manifest).unwrap();
+    assert!(
+        serde_json::from_slice::<serde_json::Value>(&bytes)
+            .unwrap()
+            .get("tty_path")
+            .is_none()
+    );
+    assert!(
+        serde_json::from_slice::<Manifest>(&bytes)
+            .unwrap()
+            .tty_path
+            .is_none()
+    );
+    let guard = lock_directory(directory.path()).unwrap();
+    assert_eq!(bound_native_session(&guard, "legacy").unwrap(), None);
+}
+
+#[test]
+fn tty_evidence_rejects_an_ordinary_file_or_another_device() {
+    let directory = directory();
+    let path = directory.path().join("not-tty");
+    fs::write(&path, b"fixture").unwrap();
+    assert!(validate_tty_path(&path, 0).is_err());
+    assert!(validate_tty_path(Path::new("/dev/null"), u64::MAX).is_err());
+}
+
+#[test]
 fn tui_helper_inherits_all_three_terminal_descriptors() {
     const ROOT: &str = "INFINISHELL_CODEX_TUI_STDIO_FIXTURE";
     if let Some(root) = std::env::var_os(ROOT) {
@@ -232,6 +290,7 @@ fn legacy_manifest(directory: &Path) -> Manifest {
         shell: token,
         group: 7,
         tty_device: 11,
+        tty_path: None,
         socket: directory.join("control.sock"),
         notifications: None,
     }

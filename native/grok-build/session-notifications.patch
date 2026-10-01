@@ -1102,13 +1102,15 @@ index 0000000000000000000000000000000000000000..dcf338e9fb8b3877025c55baf804959b
 +mod tests;
 diff --git a/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818c8ef4e25
+index 0000000000000000000000000000000000000000..af269bc67af9c00adabfac60c975e7d5983147e9
 --- /dev/null
 +++ b/crates/codegen/xai-grok-hooks/src/runner/notification_console_windows_tests.rs
-@@ -0,0 +1,337 @@
+@@ -0,0 +1,381 @@
 +use super::*;
 +
-+use tokio::io::AsyncWriteExt;
++use std::io::Write;
++
++use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 +use windows::Win32::System::Threading::CREATE_NEW_CONSOLE;
 +use xai_grok_tools::util::{ProcessGroup, ProcessScope};
 +
@@ -1287,6 +1289,34 @@ index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818
 +    ConsolePeer::from_transferred_handle(handle.0 as usize as u64, identity).unwrap()
 +}
 +
++async fn wait_for_console_ready(child: &mut tokio::process::Child) {
++    let expected = format!("console-target-ready:{}", child.id().unwrap());
++    let mut output = BufReader::new(child.stdout.take().unwrap());
++    tokio::time::timeout(Duration::from_secs(15), async {
++        loop {
++            let mut line = String::new();
++            if output.read_line(&mut line).await.unwrap() == 0 {
++                let mut error = String::new();
++                child
++                    .stderr
++                    .as_mut()
++                    .unwrap()
++                    .read_to_string(&mut error)
++                    .await
++                    .unwrap();
++                panic!("控制台夹具在完成内核成员验证前退出: {error}");
++            }
++            if line.trim_end() == expected {
++                break;
++            }
++        }
++    })
++    .await
++    .expect("控制台夹具未发出就绪确认");
++    // 保留管道，避免夹具退出时 libtest 写入已关闭的 stdout。
++    child.stdout = Some(output.into_inner());
++}
++
 +async fn test_broker(peer: &ConsolePeer) -> PreparedConsoleHook {
 +    let mut hook =
 +        fixture_command("runner::notification_console_windows::tests::console_hook_fixture");
@@ -1319,12 +1349,11 @@ index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818
 +async fn console_broker_binds_real_console_and_cancellation_preserves_both_peers() {
 +    let mut target_command =
 +        fixture_command("runner::notification_console_windows::tests::console_target_fixture");
-+    target_command
-+        .creation_flags(CREATE_NEW_CONSOLE.0)
-+        .stdout(Stdio::null())
-+        .stderr(Stdio::null());
++    target_command.creation_flags(CREATE_NEW_CONSOLE.0);
 +    let mut target = target_command.spawn().unwrap();
 +    let mut other = target_command.spawn().unwrap();
++    wait_for_console_ready(&mut target).await;
++    wait_for_console_ready(&mut other).await;
 +    let peer = retained_child_peer(&target);
 +    let other_peer = retained_child_peer(&other);
 +
@@ -1341,8 +1370,10 @@ index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818
 +        .unwrap();
 +    assert!(
 +        result.status.success(),
-+        "broker stderr: {}",
-+        String::from_utf8_lossy(&result.stderr)
++        "broker status: {}; stderr: {}; stdout: {}",
++        result.status,
++        String::from_utf8_lossy(&result.stderr),
++        String::from_utf8_lossy(&result.stdout)
 +    );
 +    assert!(String::from_utf8_lossy(&result.stdout).contains("console-bound-envelope-ok"));
 +    drop(job);
@@ -1411,6 +1442,10 @@ index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818
 +    if std::env::var(FIXTURE_ENV).as_deref() != Ok("1") {
 +        return;
 +    }
++    assert!(console_members().unwrap().contains(&std::process::id()));
++    // 只在真实控制台可用后放行父测试；不以 CreateProcess 返回代替就绪。
++    let mut output = duplicate_standard_handle(STD_OUTPUT_HANDLE).unwrap();
++    writeln!(output, "\nconsole-target-ready:{}", std::process::id()).unwrap();
 +    let mut bytes = Vec::new();
 +    io::stdin().read_to_end(&mut bytes).unwrap();
 +    assert!(bytes.is_empty());
@@ -1422,7 +1457,16 @@ index 0000000000000000000000000000000000000000..6e0341d3b9170e161c2f71ef27984818
 +    if std::env::var(FIXTURE_ENV).as_deref() != Ok("1") {
 +        return;
 +    }
-+    std::process::exit(run_broker().unwrap_or(1));
++    // AttachConsole/FreeConsole 可改变标准句柄；诊断必须保留原父测试管道。
++    let mut diagnostic = duplicate_standard_handle(STD_ERROR_HANDLE).unwrap();
++    let code = match run_broker() {
++        Ok(code) => code,
++        Err(error) => {
++            writeln!(diagnostic, "notification broker failed: {error:?}").unwrap();
++            1
++        }
++    };
++    std::process::exit(code);
 +}
 +
 +#[test]
@@ -8040,6 +8084,49 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
      /// Refuses a cwd that is neither a grok worktree nor the session's own, so it cannot detach a real checkout.
      async fn restore_session_code(
          &self,
+diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
+index 31676cc8adb8fefe81a76ba015de81de5685d244..81f92ec0bb4b722c1e74aa61de098ad0494da2e2 100644
+--- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
++++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
+@@ -1189,7 +1189,7 @@ fn make_test_handle(
+     let hunk_cancel = tokio_util::sync::CancellationToken::new();
+     let hunk_tracker_handle = xai_hunk_tracker::HunkTrackerActor::spawn(
+         "test".to_string(),
+-        std::path::PathBuf::from("/tmp"),
++        std::env::temp_dir(),
+         hunk_event_tx,
+         xai_hunk_tracker::TrackingMode::AllDirty,
+         hunk_cancel,
+@@ -1205,7 +1205,7 @@ fn make_test_handle(
+         active_work: std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+         info: crate::session::info::Info {
+             id: acp::SessionId::new("test"),
+-            cwd: "/tmp".to_string(),
++            cwd: std::env::temp_dir().to_string_lossy().into_owned(),
+         },
+         max_turns: None,
+         resolved_tool_overrides: std::sync::Arc::new(arc_swap::ArcSwapOption::empty()),
+@@ -1228,9 +1228,9 @@ fn make_test_handle(
+         upload_queue: Arc::new(OnceLock::new()),
+         upload_failures_since_success: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+         tool_context: crate::tools::ToolContext::new_local_context(
+-            xai_grok_paths::AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap(),
++            xai_grok_paths::AbsPathBuf::new(std::env::temp_dir()).unwrap(),
+             std::sync::Arc::new(xai_grok_workspace::file_system::LocalFs::new(
+-                std::path::PathBuf::from("/tmp"),
++                std::env::temp_dir(),
+             )),
+             std::sync::Arc::new(crate::terminal::LocalTerminalRunner),
+         ),
+@@ -1245,7 +1245,7 @@ fn make_test_handle(
+         ask_user_question_enabled: true,
+         non_interactive: false,
+         plan_mode: std::sync::Arc::new(parking_lot::Mutex::new(
+-            crate::session::plan_mode::PlanModeTracker::new(std::path::PathBuf::from("/tmp")),
++            crate::session::plan_mode::PlanModeTracker::new(std::env::temp_dir()),
+         )),
+         force_compact: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+         permission_handle: xai_grok_workspace::permission::PermissionHandle::allow_all(),
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/mod.rs b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 index 063a4934d6979db4c93e5c1a7ff45df060c7c121..8cb19411ab4c4e6ac8347dcee897e4257c36f614 100644
 --- a/crates/codegen/xai-grok-shell/src/extensions/mod.rs
@@ -9711,9 +9798,18 @@ index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
-index 78e5d0eb80c820a86562faa8933b02ed60c2c273..90ac58039c222e7360bb9974e98002ed66514718 100644
+index 78e5d0eb80c820a86562faa8933b02ed60c2c273..fe59c27c861cf70fc12a7e564d3fcbbb343899de 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
+@@ -50,7 +50,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
+         }
+     });
+     let (persistence_tx, persistence_rx) = mpsc::unbounded_channel::<PersistenceMsg>();
+-    let cwd = AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap();
++    let cwd = AbsPathBuf::new(std::env::temp_dir()).unwrap();
+     let fs = Arc::new(MockFs::new(cwd.to_path_buf()));
+     let terminal = Arc::new(DummyTerminal {});
+     let (hunk_tx, _hunk_rx) = tokio::sync::mpsc::unbounded_channel();
 @@ -66,6 +66,7 @@ pub(super) async fn make_replay_send_update_fixture() -> ReplaySendUpdateFixture
          running_task: None,
          finalization_gate: Default::default(),
@@ -9723,7 +9819,7 @@ index 78e5d0eb80c820a86562faa8933b02ed60c2c273..90ac58039c222e7360bb9974e98002ed
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
-index fa11f50caa83041f8fa681e919b95d7f21d59265..4bbf121ff67f1f2b09ae696412a1b65e602664e3 100644
+index fa11f50caa83041f8fa681e919b95d7f21d59265..a092722e59921bd5fdd2e9532b65b2b48b03f79a 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 @@ -284,7 +284,7 @@ async fn create_test_actor_inner(
@@ -9743,6 +9839,24 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..4bbf121ff67f1f2b09ae696412a1b65e
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -844,7 +845,7 @@ pub(crate) fn pre_tool_use_spec(
+         url: None,
+         url_raw: None,
+         timeout_ms: 5000,
+-        source_dir: std::path::PathBuf::from("/tmp"),
++        source_dir: std::env::temp_dir(),
+         extra_env: std::collections::HashMap::new(),
+         layer: xai_grok_hooks::config::HookProvenance::File,
+     }
+@@ -878,7 +879,7 @@ pub(crate) fn install_pre_tool_use_hooks(
+ ) {
+     let (mut registry, _) = xai_grok_hooks::discovery::load_hooks(None, None);
+     registry.append_specs(specs);
+-    actor.hook_resolved_workspace_root = "/tmp".to_string();
++    actor.hook_resolved_workspace_root = actor.session_info.cwd.clone();
+     *actor.hook_registry.borrow_mut() = Some(Arc::new(registry));
+ }
+ #[cfg(test)]
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46deb4f844
@@ -10026,9 +10140,18 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..21ff4d739570a93d54e71927a9c4002c
          source: String,
      },
 diff --git a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
-index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..6d758646da8b43b6e798ccd56b853eeab1463d8e 100644
+index 3dcd3391ce05f86e522f39cab41dbdcd81cea60c..e9e632ab557e0258e5a54d1df90804f9cc78fb4a 100644
 --- a/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/compaction_inline_auto_compact_flow_tests.rs
+@@ -31,7 +31,7 @@ async fn create_test_actor(
+     gateway_tx: mpsc::UnboundedSender<xai_acp_lib::AcpClientMessage>,
+     persistence_tx: mpsc::UnboundedSender<PersistenceMsg>,
+ ) -> SessionActor {
+-    let cwd = AbsPathBuf::new(std::path::PathBuf::from("/tmp")).unwrap();
++    let cwd = AbsPathBuf::new(std::env::temp_dir()).unwrap();
+     let fs = Arc::new(MockFs::new(cwd.to_path_buf()));
+     let terminal = Arc::new(DummyTerminal {});
+     let (hunk_tx, _hunk_rx) = tokio::sync::mpsc::unbounded_channel();
 @@ -47,6 +47,7 @@ async fn create_test_actor(
          running_task: None,
          finalization_gate: Default::default(),

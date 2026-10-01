@@ -128,7 +128,8 @@ impl TerminalView {
         let target = self.cli_agent_hook_input_target.as_ref()?;
         let consumer = match session.agent {
             CLIAgent::Codex => {
-                NativeImageConsumer::Codex(session.session_context.codex_process_evidence.clone()?)
+                NativeImageConsumer::Codex(session.session_context.codex_process_evidence.clone()
+                    .or_else(|| self.codex_owned_input_process(ctx))?)
             }
             CLIAgent::Claude => {
                 let (process, transcript_path) =
@@ -159,7 +160,7 @@ impl TerminalView {
         };
         let cwd = session.session_context.cwd.as_ref()?;
         if session.remote_host.is_none()
-            || !session.received_rich_notification
+            || !self.cli_agent_has_bound_input_session(ctx)
             || session.listener.as_ref().map(|listener| listener.id()) != Some(target.listener_id)
             || session.session_context.session_id.as_ref() != Some(&target.native_session_id)
             || self.model_events_handle.id() != target.model_events_id

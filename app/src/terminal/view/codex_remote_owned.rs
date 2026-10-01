@@ -2,13 +2,17 @@
 
 use super::{BlockId, PendingSpecificCLIAgentLaunch, SessionId, ShellType, TerminalView};
 use crate::remote_server::cli_image_codex_owned_client::{self as remote, Journal, Launch};
-use crate::remote_server::cli_image_codex_owned_protocol::{Action, Owner, Reply};
+use crate::remote_server::cli_image_codex_owned_protocol::{Action, Owner, ReadOnlySession, Reply};
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
+use crate::remote_server::proto::CliImageStagingScope;
+use crate::settings::AISettings;
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
+use crate::terminal::cli_agent_sessions::listener::CLIAgentSessionListener;
 use crate::terminal::model::session::command_executor::shell_quote_arg;
 use std::sync::Arc;
+use std::time::Duration;
 use uuid::Uuid;
 use warp_core::cli_agent_protocol::CodexProcessEvidence;
 use warpui::{AppContext, EntityId, SingletonEntity, ViewContext};
@@ -20,6 +24,7 @@ struct Snapshot {
     cwd: String,
     shell: ShellType,
 }
+
 #[derive(Clone, PartialEq, Eq)]
 struct Observation {
     native_session: String,
@@ -31,6 +36,9 @@ pub(super) struct RemoteOwned {
     launch: Launch,
     owner: Option<Owner>,
     observation: Option<Observation>,
+    native_session_id: Option<Uuid>,
+    /// 只读原生会话证明绑定原连接代次，不把它记成已收到 rich hook。
+    read_only_scope: Option<CliImageStagingScope>,
     snapshot: Snapshot,
     client: Arc<RemoteServerClient>,
 }
@@ -158,6 +166,7 @@ impl TerminalView {
                     Reply::Launch { ticket, .. } if !fresh && ticket == launch.ticket => None,
                     Reply::Reserved { .. }
                     | Reply::Launch { .. }
+                    | Reply::Observed { .. }
                     | Reply::Revoked { .. }
                     | Reply::Failed { .. } => return Err(()),
                 };
@@ -244,6 +253,8 @@ impl TerminalView {
                     launch,
                     owner: None,
                     observation: None,
+                    native_session_id: None,
+                    read_only_scope: None,
                     snapshot,
                     client: client.clone(),
                 });
@@ -256,6 +267,8 @@ impl TerminalView {
                         crate::t!("cli-agent-codex-remote-launch-unavailable"),
                         ctx,
                     );
+                } else {
+                    view.observe_remote_owned_codex_bootstrap(0, ctx);
                 }
             },
         );
@@ -264,20 +277,39 @@ impl TerminalView {
 
     fn remote_codex_observation(&self, ctx: &AppContext) -> Option<Observation> {
         let session = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id)?;
-        if session.agent != CLIAgent::Codex
-            || session.remote_host.is_none()
-            || !session.received_rich_notification
-        {
+        if session.agent != CLIAgent::Codex || session.remote_host.is_none() {
             return None;
         }
         let native_session = session.session_context.session_id.clone()?;
-        if Uuid::parse_str(&native_session).ok()?.is_nil() {
+        let native_id = Uuid::parse_str(&native_session).ok()?;
+        if native_id.is_nil()
+            || self
+                .codex_remote_owned
+                .as_ref()
+                .and_then(|owned| owned.native_session_id)
+                .is_some_and(|pinned| pinned != native_id)
+        {
             return None;
         }
+        let listener = session.listener.as_ref()?.id();
+        let process = if session.received_rich_notification {
+            session.session_context.codex_process_evidence.clone()?
+        } else {
+            let owned = self.codex_remote_owned.as_ref()?;
+            let scope = owned.read_only_scope.as_ref()?;
+            let observed = owned.observation.as_ref()?;
+            if !owned.client.cli_image_scope_is_current(scope)
+                || observed.native_session != native_session
+                || observed.listener != listener
+            {
+                return None;
+            }
+            observed.process.clone()
+        };
         Some(Observation {
             native_session,
-            listener: session.listener.as_ref()?.id(),
-            process: session.session_context.codex_process_evidence.clone()?,
+            listener,
+            process,
         })
     }
 
@@ -294,10 +326,186 @@ impl TerminalView {
             || owned.observation.as_ref() != Some(&observation)
             || owner.server_pid as u32 != observation.process.daemon_pid_candidate
             || owner.ticket_id != owned.launch.ticket.id
+            || !owner_session_matches(owner, &observation.native_session)
+            || owned
+                .read_only_scope
+                .as_ref()
+                .is_some_and(|scope| !client.cli_image_scope_is_current(scope))
         {
             return None;
         }
         Some((owner.ticket_id.to_string(), owner.manifest_sha256.clone()))
+    }
+
+    pub(super) fn remote_owned_codex_process(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<CodexProcessEvidence> {
+        self.remote_owned_codex_image_proof(ctx)?;
+        Some(self.remote_codex_observation(ctx)?.process)
+    }
+
+    /// 第一次图像不依赖先发文字来触发 SessionStart；此循环只查询菜单创建的原票据。
+    fn observe_remote_owned_codex_bootstrap(&mut self, attempt: u32, ctx: &mut ViewContext<Self>) {
+        let Some(owned) = self.codex_remote_owned.as_ref() else {
+            return;
+        };
+        if owned.observation.is_some() || self.codex_remote_restore_generation.is_some() {
+            return;
+        }
+        let launch = owned.launch.clone();
+        let snapshot = owned.snapshot.clone();
+        let client = owned.client.clone();
+        let generation = Uuid::new_v4();
+        let Ok((scope, revision)) = remote::scope(&client, &launch, generation) else {
+            return;
+        };
+        self.codex_remote_restore_generation = Some(generation);
+        let query_client = client.clone();
+        let query_scope = scope.clone();
+        let ticket = launch.ticket.clone();
+        ctx.spawn(
+            async move {
+                // 首次信任和慢启动不设总时限；每轮仅查询原票据，UI 回调决定是否继续。
+                let delay = Duration::from_millis(250 * (1_u64 << attempt.min(4)));
+                warpui::r#async::Timer::after(delay).await;
+                if !query_client.cli_image_scope_is_current(&query_scope) {
+                    return None;
+                }
+                let reply = remote::request(
+                    &query_client,
+                    query_scope,
+                    revision,
+                    Action::Observe {
+                        ticket: ticket.clone(),
+                        expected_session: None,
+                    },
+                )
+                .await
+                .ok()?;
+                if let Reply::Observed {
+                    ticket: returned,
+                    owner,
+                    session,
+                } = reply
+                {
+                    return (returned == ticket).then_some((owner, session));
+                }
+                None
+            },
+            move |view, result, ctx| {
+                if view.codex_remote_restore_generation != Some(generation) {
+                    return;
+                }
+                view.codex_remote_restore_generation = None;
+                if !client.cli_image_scope_is_current(&scope)
+                    || view.codex_remote_owned.as_ref().is_none_or(|owned| {
+                        owned.launch.ticket != launch.ticket
+                            || owned.snapshot != snapshot
+                            || !Arc::ptr_eq(&owned.client, &client)
+                    })
+                    || view
+                        .remote_codex_snapshot(true, ctx)
+                        .or_else(|| view.remote_codex_snapshot(false, ctx))
+                        .is_none_or(|(now, current)| {
+                            now != snapshot || !Arc::ptr_eq(&current, &client)
+                        })
+                {
+                    return;
+                }
+                if let Some((owner, session)) = result {
+                    if view.remote_codex_snapshot(true, ctx).is_none() {
+                        view.observe_remote_owned_codex_bootstrap(attempt.saturating_add(1), ctx);
+                        return;
+                    }
+                    view.accept_remote_owned_codex_session(
+                        &launch, &snapshot, &client, scope, owner, session, ctx,
+                    );
+                    // 同一时期若已有真实 hook，它沿原路径升级，不能被只读结果覆盖。
+                    view.observe_remote_owned_codex_start(ctx);
+                } else {
+                    view.observe_remote_owned_codex_bootstrap(attempt.saturating_add(1), ctx);
+                }
+            },
+        );
+    }
+
+    fn accept_remote_owned_codex_session(
+        &mut self,
+        launch: &Launch,
+        snapshot: &Snapshot,
+        client: &Arc<RemoteServerClient>,
+        scope: CliImageStagingScope,
+        owner: Owner,
+        session: ReadOnlySession,
+        ctx: &mut ViewContext<Self>,
+    ) {
+        if !client.cli_image_scope_is_current(&scope)
+            || self
+                .remote_codex_snapshot(true, ctx)
+                .is_none_or(|(now, current)| &now != snapshot || !Arc::ptr_eq(&current, client))
+            || self.codex_remote_owned.as_ref().is_none_or(|owned| {
+                owned.launch.ticket != launch.ticket
+                    || owned.snapshot != *snapshot
+                    || !Arc::ptr_eq(&owned.client, client)
+                    || owned.observation.is_some()
+                    || owned
+                        .native_session_id
+                        .is_some_and(|pinned| pinned != session.native_session_id)
+            })
+            || session.native_session_id.is_nil()
+            || owner.ticket_id != launch.ticket.id
+            || owner.pinned_native_session_id != Some(session.native_session_id)
+            || owner.manifest_sha256.len() != 64
+            || owner.server_pid as u32 != session.process.daemon_pid_candidate
+            || CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|current| {
+                    current.agent != CLIAgent::Codex
+                        || current.received_rich_notification
+                        || current
+                            .session_context
+                            .session_id
+                            .as_ref()
+                            .is_some_and(|id| id != &session.native_session_id.to_string())
+                })
+        {
+            return;
+        }
+        let view_id = self.view_id;
+        let events = self.model_events_handle.clone();
+        let listener = ctx
+            .add_model(|ctx| CLIAgentSessionListener::new(view_id, CLIAgent::Codex, &events, ctx));
+        let observation = Observation {
+            native_session: session.native_session_id.to_string(),
+            listener: listener.id(),
+            process: session.process,
+        };
+        let remote_host = self.active_session_remote_host(ctx);
+        let auto_open = *AISettings::as_ref(ctx).auto_open_rich_input_on_cli_agent_start;
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+            sessions.register_listener(
+                view_id,
+                CLIAgent::Codex,
+                Some(snapshot.cwd.clone()),
+                None,
+                Some(observation.native_session.clone()),
+                None,
+                remote_host,
+                auto_open,
+                listener,
+                ctx,
+            );
+        });
+        let owned = self.codex_remote_owned.as_mut().unwrap();
+        owned.owner = Some(owner);
+        owned.native_session_id = Some(session.native_session_id);
+        owned.observation = Some(observation);
+        owned.read_only_scope = Some(scope);
+        self.bind_cli_agent_hook_input_target(ctx);
+        self.maybe_show_use_agent_footer_in_blocklist(ctx);
+        self.maybe_auto_open_cli_agent_rich_input(ctx);
+        ctx.notify();
     }
 
     pub(super) fn revoke_remote_owned_codex(&mut self) {
@@ -305,6 +513,7 @@ impl TerminalView {
         if let Some(owned) = &mut self.codex_remote_owned {
             owned.owner = None;
             owned.observation = None;
+            owned.read_only_scope = None;
         }
     }
 
@@ -347,6 +556,17 @@ impl TerminalView {
     /// 首次通知、后续 listener 更新和 SSH 重连共用查询；查询失败不能变成启动重放。
     pub(super) fn observe_remote_owned_codex_start(&mut self, ctx: &mut ViewContext<Self>) {
         let Some(observation) = self.remote_codex_observation(ctx) else {
+            // 初始观察尚未返回时，无 rich 上下文的中间事件不撤销该只读任务。
+            // 任务回调仍以原票据、block、client 和 epoch 判定继续或停止。
+            if self.codex_remote_restore_generation.is_some()
+                && self.codex_remote_owned.as_ref().is_some_and(|owned| {
+                    owned.owner.is_none()
+                        && owned.observation.is_none()
+                        && owned.native_session_id.is_none()
+                })
+            {
+                return;
+            }
             self.revoke_remote_owned_codex();
             return;
         };
@@ -367,6 +587,7 @@ impl TerminalView {
         let query_snapshot = snapshot.clone();
         let expected_client = client.clone();
         let expected_process = observation.process.daemon_pid_candidate;
+        let expected_session = observation.native_session.clone();
         ctx.spawn(
             async move {
                 let candidates = blocking::unblock(move || {
@@ -401,6 +622,7 @@ impl TerminalView {
                             && owner.ticket_id == ticket.id
                             && phase == "active"
                             && owner.server_pid as u32 == expected_process
+                            && owner_session_matches(&owner, &expected_session)
                             && owner.manifest_sha256.len() == 64
                         {
                             if matched.is_some() {
@@ -430,7 +652,9 @@ impl TerminalView {
                     view.codex_remote_owned = Some(RemoteOwned {
                         launch,
                         owner: Some(owner),
+                        native_session_id: Uuid::parse_str(&observation.native_session).ok(),
                         observation: Some(observation),
+                        read_only_scope: None,
                         snapshot,
                         client: expected_client,
                     });
@@ -441,3 +665,14 @@ impl TerminalView {
         );
     }
 }
+
+fn owner_session_matches(owner: &Owner, native_session: &str) -> bool {
+    // 无记录仅保留真实 hook 恢复兼容；零轮入口另行要求精确 Some(SID)。
+    owner
+        .pinned_native_session_id
+        .is_none_or(|pinned| pinned.to_string() == native_session)
+}
+
+#[cfg(test)]
+#[path = "codex_remote_owned_tests.rs"]
+mod tests;

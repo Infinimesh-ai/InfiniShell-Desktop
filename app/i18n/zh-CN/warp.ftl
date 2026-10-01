@@ -5914,8 +5914,8 @@ cli-agent-grok-fixed-skills-unavailable = 此 Grok 任务仅接受创建时选�
 cli-task-manager-permission-grok-files-v2-help = Grok Build 1.0.41 可读取、编辑和创建项目文件，列举目录，以及搜索指定单个文件的内容。每次工具调用均需审批。终端命令、钩子和技能均禁用。子任务保持此策略，旧任务不会自动增加权限。这不是操作系统沙箱。
 
 workspace-new-grok-rich-input = Grok 富输入（grok-4.7）
-workspace-start-remote-grok-rich-input = 在当前远程终端启动 Grok 富输入
-workspace-start-remote-codex-rich-input = 在当前远程终端启动 Codex 富输入
+workspace-start-remote-grok-rich-input = 当前窗格 Grok 富输入
+workspace-start-remote-codex-rich-input = 当前窗格 Codex 富输入
 workspace-start-remote-codex-rich-input-help = 启动 Codex 0.156.1，为当前 SSH/tmux 窗格绑定独立 app server。需要 Bash 或 Zsh 及远程图片支持。
 cli-agent-codex-remote-launch-unavailable = 远程 Codex 会话未能启动。需要 Codex 0.156.1、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 cli-agent-codex-owned-launch-claimed = 此 Codex 启动已被认领或状态尚未确认，请先检查当前远程终端，再启动其他会话。
