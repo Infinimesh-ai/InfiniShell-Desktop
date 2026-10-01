@@ -1,5 +1,24 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G08／V03 在本次 Mac 范围关闭
+
+**本轮关闭 G08、V03；累计 8 关闭／3 开放／3 移交，PR #22 保持草稿。** 仍开放 G03、G09、G10；V01、V02、V05 及其他平台实机验收按用户决定后置，均未改记通过。以下历史“未关闭”结论保留当时范围，不回填旧失败。
+
+G08 的三款真实 SSH／tmux 首图、完整 SSH 断开后原 SID／消费者恢复及第二新输入，共六次 typed PNG、双方确认和引用释放按 `7b7fc36fc/r-hx4at14_` 原构建计证。Claude Read 待批重连后的同文同卡再次提交没有新增 claim／queue／原生输入；旧请求完成保留新稿新卡，随后不同内容正常消费。拒绝与退休清理沿用 `c3ff/r-u10vfmtu` 的真实 Read No，不改称本轮重跑。137 字节夹具规范编码为 328 字节，原生 typed PNG 与规范上传字节一致；不声称原编码未变。Codex 逆序问题仍答正序的模型语义失败保留。英中菜单、恢复、附件及相关提示按原实窗审计；功能审计 `g08-final-functional-audit-v2.safe.json` SHA-256 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。
+
+V03 的八项原条件逐项核验：三款真实通知／双向交互与恢复，实际重复提交及晚到事件，真实运行回合取消，以及 Codex 关闭 tmux 透传的独立双端负例。`b47/r-o5rrajvm` 正式 Claude 通知就绪后的流式 Ctrl-C 和 Codex 工具运行 Escape 分别取得原生 Interrupted／turn_aborted；Codex 同 turn 的迟到 ToolComplete 后 GUI 仍为 Blocked。Grok 取消与 `.4` 正常退出分别沿用 `51b0/r-myk6vj3w`、`r-dpopymbl` 原证据。不开新模型轮次，不把 Claude／Codex 的 Blocked 当作收到 cancelled hook，也不声称停止整棵工具树或现场证明 listener 内存退役顺序。完整审计 `v03-full-conditions-audit-v2.safe.json` SHA-256 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`。
+
+精确提交 `b47a86ff71d64eb033030da8f80205fd7e00e0c6` 的 [最终宿主门禁 36916171947](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 已终态成功，并逐份核对完整日志：
+
+| 平台 | 实际通过 | 明确边界 |
+| --- | --- | --- |
+| Linux x64 | check；lifecycle 1872；IPC 2；glibc 1；command 14；监督者 5；rust-genai 81；原生通知 worker 的 10 项诊断与 15 项功能，含真实 tmux pane／TTY 写入 | installed hook 缺 fish／zsh 的 2 项跳过；本轮 desktop／TUI 步骤按所选 scope 跳过，不计执行 |
+| Windows x64 | check；lifecycle 1532；IPC 2；原 ConPTY 1；command 36；监督者 5；desktop／TUI 670；rust-genai 81；SSH worker 构建及固定 CLI 通知／安装／退出边界 | 本轮 host-only，未重建原生 `.4`；Windows 原生 broker 与源码工件沿用已验 51b0 来源，不冒称产品 remote-owned Windows pin |
+
+两平台本轮均零 FAIL／RETRY／FLAKY／LEAK；Windows 前轮两个 context-menu LEAK 用例本轮同名均普通 PASS，**不据此认定旧泄漏根因或永久修复**。`b47a86ff7-ci/host-final-results-v1.safe.json` SHA-256 `22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8`；Windows 全日志 `05a5de52291982446f3dd7c0a11ba4c5885e780037f977db6447dff546ad92d3`，Linux 全日志 `c0ab4668c9dccb9cc4e850cede3a9d928cbfbe141fa50c32e548aaad811a9a84`。日志 API 空响应及一次 gh 日志缓存 ZIP 读取失败另行保留，随后标准读取成功；没有重派或重跑门禁。
+
+Linux `.4` 的真实 SHA／完整版本已绑定，Mac `.4` 原工件不变；原 `.3` 图片证据结合已审 `.4` 影响范围沿用，未虚构同一工件全量重跑。G03 `.5` 仅普通 PTY 图片路径，仍独立开放，不增加为 G08／V03 的关闭条件。历史 Mac 原生 LEAK、7b7 原失败、51b Windows 两条 LEAK及现场保留约束不删除；已知自有进程退出与唯一历史保全分别计证，cleanup_ready=false 不被改写为已清理。既有英中功能审计有效，本次仅更新状态文档，无需本地化变更；提交前主代理另以短 TMPDIR `r-swy1h4_m` 完成 `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed`，exit 0，日志 SHA-256 `7b61007231a2ce5948224fcc55eb1ea4bfa644a81e87b0a20f6885da4f1717f9`；进程、launchd 与打开文件核验后已清理。
+
 ## 2026-10-02：普通 Grok 原生 PNG 实现与宿主门禁通过，实窗待验
 
 **新增关闭 0 项；6 关闭／5 开放／3 移交，PR #22 草稿。** 固定公开上游 `07e35a3dfeed` 加完整 128 文件补丁可重建原生提交 `8644e7f68a5c7803e3d1b3cc174ae56b93552ef2` 的 tree `c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478`。补丁摘要 `0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92`；Mac `.5` 签名工件 SHA-256 `b5432ea1a6b4fec7d898de5f3d289ec55a838b70cb7797ecacaeb982f79ce444`。只将它加入普通未绑定 PTY 桥，远程 owned 继续绑定 `.4`，旧 G01 文本工件不变。

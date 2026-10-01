@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G01/G02/G04/G05/G06/G07；G01三平台原生实现与工件齐备、Mac功能/英中已验，G07三CLI普通文件卡读取/拒绝及双语布局已验；e3精确两平台源码门禁逐名通过；6项关闭、5项开放、3项移交，PR #22草稿",
+  "status_zh": "本次 Mac 范围关闭 G01/G02/G04/G05/G06/G07/G08/V03；G08 三CLI真实SSH/tmux图片、恢复与异常链及V03通知/交互/取消原条件已验，b47精确两平台最终源码门禁通过；8项关闭、3项开放、3项移交，PR #22草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -13,7 +13,9 @@
       "G04",
       "G05",
       "G06",
-      "G07"
+      "G07",
+      "G08",
+      "V03"
     ],
     "deferred_platform_acceptance_items": [
       "V01",
@@ -22,13 +24,11 @@
     ],
     "remaining_items": [
       "G03",
-      "G08",
       "G09",
-      "G10",
-      "V03"
+      "G10"
     ],
-    "remaining_count": 5,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。",
+    "remaining_count": 3,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -51,7 +51,7 @@
         "windows-x64"
       ]
     },
-    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。",
+    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。",
     "source_gate": {
       "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
@@ -1223,10 +1223,8 @@
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G03",
-    "G08",
     "G09",
-    "G10",
-    "V03"
+    "G10"
   ],
   "remaining_items_interpretation": "本次 Mac 范围仍开放项；其他平台移交不计通过，全平台原始清单见 current_goal_scope。",
   "tracked_native_semantic_boundaries": [
@@ -7070,5 +7068,81 @@
     "boundary": "真实CLI各按原构建计证；原取消/通知/模型语义失败保留，未假称所有hook或后台工具树取消。新审计不以当前dirty G03与b47相同为前提。",
     "cleanup": "r-o5rrajvm全部已知自有进程自然结束；remote slot同设备无覆盖保全，现场/唯一历史仍retained、cleanup_ready=false",
     "other_platform_live_acceptance": "按用户决定后置，不计通过"
+  },
+  "g08_v03_closure_20261002": {
+    "status": "closed_in_current_mac_goal_scope",
+    "closed_items": [
+      "G08",
+      "V03"
+    ],
+    "closed_count_delta": 2,
+    "current_counts": {
+      "closed": 8,
+      "open": 3,
+      "deferred": 3
+    },
+    "acceptance_scope": "macos-arm64 GUI -> isolated loopback OpenSSH / real PTY -> private tmux 3.7c; fixed Codex 0.156.1 / Claude 2.1.280 / Grok 1.0.41 notification .3/.4, each original build retained",
+    "functional_audits": {
+      "g08_sha256": "300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085",
+      "v03_sha256": "dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f"
+    },
+    "final_source_gate": {
+      "source_commit": "b47a86ff71d64eb033030da8f80205fd7e00e0c6",
+      "run_id": 36916171947,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947",
+      "status": "completed",
+      "conclusion": "success",
+      "audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/b47a86ff7-ci/host-final-results-v1.safe.json",
+      "audit_sha256": "22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8",
+      "linux": {
+        "job_id": 110550570607,
+        "lifecycle_passed": 1872,
+        "ipc_passed": 2,
+        "glibc_passed": 1,
+        "command_passed": 14,
+        "supervisor_passed": 5,
+        "rust_genai_passed": 81,
+        "installed_hook_diagnostic_passed": 10,
+        "installed_hook_functional_passed": 15,
+        "installed_hook_skipped": 2,
+        "installed_hook_skipped_reason": "真实fish/zsh缺失，不计通过",
+        "desktop_tui": "skipped_by_selected_workflow_scope",
+        "log_sha256": "c0ab4668c9dccb9cc4e850cede3a9d928cbfbe141fa50c32e548aaad811a9a84"
+      },
+      "windows": {
+        "job_id": 110550570372,
+        "lifecycle_passed": 1532,
+        "ipc_passed": 2,
+        "original_conpty_passed": 1,
+        "command_passed": 36,
+        "supervisor_passed": 5,
+        "desktop_tui_passed": 670,
+        "rust_genai_passed": 81,
+        "ssh_worker_build": "passed",
+        "log_sha256": "05a5de52291982446f3dd7c0a11ba4c5885e780037f977db6447dff546ad92d3"
+      },
+      "failures": 0,
+      "retries": 0,
+      "flaky": 0,
+      "leaks": 0
+    },
+    "linux_notification_artifact": "实际.4 SHA d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6 及完整版本已绑定；不把Windows原生broker源码门禁称为Windows产品通知pin",
+    "evidence_boundaries": [
+      "六次图片按7b7/.3原构建计证，.4影响范围已审，不重跑或重标旧模型输入",
+      "V03三款取消按各自真实原生状态与GUI证据计证，不虚构Claude/Codex cancelled hook或整棵工具树清理",
+      "旧7b7失败、51b Windows两条LEAK、Mac原生LEAK与Codex逆序回答语义失败保留；本轮通过不反推旧根因",
+      "G03 .5普通PTY图片仍独立开放，不加入G08/V03关闭条件",
+      "其他平台实机按用户决定移交，不计通过；保留现场及唯一历史，不修改cleanup_ready=false"
+    ],
+    "localization": "既有英中功能审计按原构建有效；本次仅状态文档变化，无需本地化变更",
+    "pr_draft": true,
+    "all_required_acceptance_satisfied": false,
+    "documentation_commit_check": {
+      "run_id": "r-swy1h4_m",
+      "result": "passed",
+      "command": "cargo +1.92.0 check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "log_sha256": "7b61007231a2ce5948224fcc55eb1ea4bfa644a81e87b0a20f6885da4f1717f9",
+      "temporary_directory_status": "cleaned"
+    }
   }
 }

@@ -1,8 +1,8 @@
 # CLI 能力缺项与验收缺口
 
-更新日期：2026-10-01。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。历史 Claude 图片双技能在线收据已绑定提交 `2383428dac785fc34ed44120226b596d592ad191`；其他旧在线收据仍按各自源码摘要绑定，不回填最终提交验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
+更新日期：2026-10-02。历史核对基线为 `3c5910678`，原产品冻结于 `ee839b4fc`、相关原生验证提交为 `50e1515bc`；输入实现提交 `84102bb1c687f87a2425bc1937784e77250c416c`已继续实现图片与文件卡片，npm 来源绑定另见 `b6f93f662`。历史 Claude 图片双技能在线收据已绑定提交 `2383428dac785fc34ed44120226b596d592ad191`；其他旧在线收据仍按各自源码摘要绑定，不回填最终提交验收。本表固定讨论 Codex CLI `0.156.1`、Claude Code `2.1.280`、Grok Build `1.0.41`，不将历史版本或未登录探针外推为所有版本、账号与模型的能力。
 
-**本次 Goal 按 2026-09-30 用户新指令以 Mac 能力和验收为准，其他平台实机验收移交用户。当前 G01／G02／G04／G05／G06／G07 在本次范围关闭，V01／V02／V05 移交后续验收，其余 5 项仍开放；PR #22 保持草稿。** 全平台验收尚未完成，移交不计通过。以下为历史产品源码及门禁记录：`64bb5f6c3988a9ca463d2d8a6d79a81eb543b447`；本机定向证据只覆盖对应记录范围。含该源码的精确分支提交 `301040fe3c18c3ffc806f1b048f2e448bdc81ca5` 已通过 [Linux／Windows 普通门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36503995096)，不含在线模型或 G09 原生失败专项。**安全拒绝、明确降级、原生安装成功或入口可见均不等于对应功能完成。** 原先“P0–P5 全部完成、剩余项为空”的汇总结论不能作为完整 Goal 的验收结论；具体通过记录仍按其实际范围有效。
+**本次 Goal 按 2026-09-30 用户新指令以 Mac 能力和验收为准，其他平台实机验收移交用户。当前 G01／G02／G04／G05／G06／G07／G08／V03 在本次范围关闭，V01／V02／V05 移交后续验收，其余 G03／G09／G10 共 3 项仍开放；PR #22 保持草稿。** 全平台验收尚未完成，移交不计通过。以下为历史产品源码及门禁记录：`64bb5f6c3988a9ca463d2d8a6d79a81eb543b447`；本机定向证据只覆盖对应记录范围。含该源码的精确分支提交 `301040fe3c18c3ffc806f1b048f2e448bdc81ca5` 已通过 [Linux／Windows 普通门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36503995096)，不含在线模型或 G09 原生失败专项。**安全拒绝、明确降级、原生安装成功或入口可见均不等于对应功能完成。** 原先“P0–P5 全部完成、剩余项为空”的汇总结论不能作为完整 Goal 的验收结论；具体通过记录仍按其实际范围有效。
 
 本表集中记录已确认的边界。目录精简后，历史原始通过、失败、截图与摘要由固定 Git 提交链接追溯，当前树只保留验证结论和必要夹具。功能证据见[验证结论](VALIDATION_REPORT.md)，平台与源码对应见[验证结论](VALIDATION_REPORT.md)，当前用户可用范围见[支持说明](RELEASE_SUPPORT.md)。当前状态和后续工作以本表为准，历史报告中的阶段性“完成”不关闭这些条目。
 
@@ -20,7 +20,9 @@
 | G05 | Mac 范围关闭 | 纯 PNG、PNG＋单技能的原生接收、实际结果、新建／冷恢复及 GUI 重关联分别已有正例；不外推所有格式排列 |
 | G06 | Mac 范围关闭 | 两款多技能／热新增／恢复按原工件计证，Grok 用户来源及固定技能真实链补齐；英中审计与本轮两平台源码门禁通过，Windows 桌面 LEAK 警告保留 |
 | G07 | Mac 范围关闭 | 三款普通 GUI 的路径卡片、原生实际读取及审批拒绝齐备，失效／不可读保护与英中错误布局已验，最终附件／提交／i18n／Toast 源码门禁通过 |
-| G03、G08–G10、V03 | 开放，共 5 项 | 继续逐项核对 Mac 能力及真实验收；既有部分正例不计整项关闭 |
+| G08 | Mac 范围关闭 | 三 CLI 真实 SSH／tmux 图片、原消费者断连恢复、重复与旧回调保稿、权限拒绝及引用清理齐备；b47 两平台最终源码门禁通过 |
+| V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
+| G03、G09、G10 | 开放，共 3 项 | 继续逐项核对 Mac 能力及真实验收；既有部分正例不计整项关闭 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -200,6 +202,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G08 — 远程 CLI 图片传输
 
+- **2026-10-02 本次 Mac 范围关闭**：真实三 CLI 的 SSH／tmux 图片、原消费者完整断线重连、Claude 待批重复投递与旧请求完成保留新稿、Read No 及引用清理，按原构建和原生 SID 分别计证；英中界面已审计。功能条件审计 SHA-256 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。Linux `.4` 的实际摘要和完整版本已绑定，精确 `b47a86ff71d64eb033030da8f80205fd7e00e0c6` 的 [最终源码门禁 36916171947](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 两平台成功：Linux lifecycle 1872、Windows lifecycle 1532，相关 command／监督者、Windows 原 ConPTY 与 670 项桌面／TUI 均通过，本轮零失败／重试／LEAK。Linux installed hook 的 15 项实际功能和 10 项诊断通过，缺少 fish／zsh 的 2 项跳过单列，不外推已验。终态审计 SHA-256 `22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8`。旧 `.3` 图片证据按已审影响范围沿用，不声称在 `.4` 重跑六次模型请求；G03 `.5` 普通 PTY 图片仍独立待验。历史失败／LEAK、Codex 逆序回答错误及其他平台实机移交均保留。
+
 - **2026-10-02 原条件内 Mac 功能已齐，最终源码门禁待结束**：三款真实 tmux 图片／重连、Claude 待批重复与旧回调保稿、拒绝清理及英中布局按各自原构建完整计证，审计 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。Linux `.4` 实际工件已在 b47 绑定；正在等待 [b47 两平台宿主门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 的终态与逐项结果，不重复六次模型验收、不提前关闭。G03 新 `.5` 只进入普通 PTY 桥，远程 owned 仍用 `.4`。
 
 - **2026-10-02 Linux 通知原生工件已绑定，最终宿主门禁未结束**：[51b0 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的官方 Linux 工件已核验 ZIP 摘要、公开基线／补丁、实际 ELF 及完整版本。`.4` 二进制 SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，完整版本含 `07e35a3dfeed`；实际 525 次测试执行、516 个唯一名称全部通过，版本／帮助／异步启动通过。审计摘要 `001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b`。Linux／Windows 最终宿主门禁仍在执行，不关闭 G08；旧 Mac LEAK 及其他平台实机边界保留。
@@ -234,9 +238,9 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **隔离认证前置核查**：固定 Claude `2.1.280` 在全新私有 `HOME`／`CLAUDE_CONFIG_DIR` 且不继承 API 环境时，原生 `auth status --json` 返回未登录；进程与短临时目录清理确认。该轮未发送模型输入，也未取得远端原生 `Read` 或历史图片字节。继续实测须先让私有测试配置完成原生登录，不借用日常配置推定认证。G08 不关闭。
 - **固定 Grok 隔离认证复核**：固定 `1.0.41` 在新私有 `HOME`／`GROK_HOME`、独立 leader socket 且不继承认证环境时，单轮模型标记探针退出 1、没有标记或 `auth.json`；没有发送图片。脱敏收据 `resume-20260929/g08-isolated-grok-r-6574681e/receipt.safe.json` SHA-256 `f640ca4ad9bded5aad4ca880cb3959869f3e8e1ad847950c50f41bfdb6ba5e76`，私有进程与短目录已核验清理。离线审查未发现可在无认证条件下确定复现的远端消费缺陷；这只说明本轮认证前置不满足，G08 仍需专用登录及交互式 SSH／tmux 的原生消费验收。
 
-- **状态／优先级／范围**：功能缺项，中；P1 附件、P5 SSH／tmux。
-- **实际情况与影响**：三款 CLI 的实际 SSH／tmux 图片消费、完整断连重连、重复投递和旧请求保护已完成限定验收，详见本节 2026-10-02 记录；源码门禁尚有失败，仍保持开放。未满足来源／会话合同的输入继续拒绝。
-- **未验证代码增量**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。Claude 的实际 SSH 首图消费与释放、成功后重开清稿/清卡、拒绝后退出的宿主 retired 回收及退出后重连无新增，已由 c3ff/r-u10vfmtu 在英文 GUI 的限定链复验；367旧缺陷与失败仍按原轮保留。中文布局、Codex／Grok 与 tmux 原生图片消费及其他异常组合仍待实测，不以可靠拒绝或暂存正例代替完成。
+- **状态／优先级／范围**：本次 Mac 范围关闭；中；P1 附件、P5 SSH／tmux。其他平台实机验收移交，不计通过。
+- **实际情况与影响**：三款 CLI 的实际 SSH／tmux 图片消费、完整断连重连、重复投递和旧请求保护已完成限定验收，详见本节 2026-10-02 记录；本次 Mac 范围及 b47 精确两平台源码门禁已通过，G08 在本次范围关闭；历史失败按原轮保留。未满足来源／会话合同的输入继续拒绝。
+- **历史未验证代码增量（以下为当时状态，后续验收见本节 2026-10-02 关闭记录）**：已整合分块图片 RPC、SSH 连接／终端代次绑定、引用账本、发布／释放和断连撤销。固定 Codex `thread/queue/add` 已接一次 Unknown 派发与图片快照回执，语义为后续排队；固定 daemon hook 的环境不证明发起 TUI 身份，目前额外限定同 CODEX_HOME 唯一前台客户端、完整分页唯一 loaded thread，现已另接每窗格独立 app-server/显式 Unix socket/当前 TUI 一次票据、内核身份、GUI入口及查询恢复，供多 pane 独立绑定；原默认路径仍保留唯一性约束。Grok 远端专属 ticket、真实 PTY wrapper、持久状态查询、同连接撤销、类型化图片服务、当前 SSH/tmux pane 双语菜单、GUI 发送及应用重启关联已整合。Claude 固定 2.1.280 已接正式插件进程/历史候选、TTY/内核peer/映像绑定、上传原图后原生 next 消息触发 Read；写出文本不算图片消费，只有同请求后代的 Read tool_use 与最终历史 typed image 原字节匹配才清理，Unknown 持久保留且只查不重发。Claude 合计原图32MiB、单图20MiB、最多20图，原生图片重编码或历史替换的未确认引用仍保留。Claude 的实际 SSH 首图消费与释放、成功后重开清稿/清卡、拒绝后退出的宿主 retired 回收及退出后重连无新增，已由 c3ff/r-u10vfmtu 在英文 GUI 的限定链复验；367旧缺陷与失败仍按原轮保留。中文布局、Codex／Grok 与 tmux 原生图片消费及其他异常组合仍待实测，不以可靠拒绝或暂存正例代替完成。
 - **恢复补接**：`5aac3f7d0` 增加同会话 Claude 原生事件后的有限只读补查，并在 Grok 确认未进入 Submit 时保存精确未派发终态，允许用户主动重试；未知 RPC 不重投、不清新草稿。新增十项回归本地通过，英中提示同步；真实远程延迟审批／回收及布局待验，G08 不关闭。
 - **当前替代方式**：用户先将图片放到目标环境，再使用该 CLI 已验证的远程文件路径读取方式；本机附件路径不能直接当远程路径。
 - **源码／证据**：[远程图片门禁](../../app/src/terminal/view/use_agent_footer/mod.rs#L972)、[SSH 现有覆盖](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)。
@@ -357,6 +361,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
 
+- **2026-10-02 本次 Mac 范围关闭**：八项原关闭条件均已有真实证据和对应源码合同，完整审计 SHA-256 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`。包括三款实际 SSH／tmux 通知与交互、原 SID 重连，Claude 待批重复与旧请求完成、Codex 取消后真实晚到 ToolComplete 不使 GUI 离开 Blocked、三款运行回合取消，以及 Codex 关闭透传时内层真实发送／外层零接收的独立双端原件。Grok `.4` 正常退出四 hook 成功另按原现场计证；不把零输入通知冒称回合 Stop，也不把 Claude／Codex Blocked 冒称原生 cancelled hook 或整棵工具树停止。精确 b47 的 [两平台最终源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 已逐项通过，本轮零重试／LEAK，终态审计 `22f33836c2ed44e640e29264fd3afdc576ce2ecdb19b924960294fe9758ba1e8`。既有英中状态和控件已复核；本次仅状态文档变化，无需本地化变更。Linux／Windows／WSL 实机仍按用户决定移交；历史失败和旧 LEAK 保留，PR 继续草稿。
+
 - **2026-10-02 Mac 原条件完整复核，最终源码门禁待结束**：`b47/r-o5rrajvm` 已补正式 Claude 插件就绪后的真实流式 Ctrl-C，以及 Codex 工具运行 Escape／迟到 ToolComplete 后 GUI 保持 Blocked；原生分别记录 Interrupted／turn_aborted，不伪称存在 cancelled hook 或取消整棵工具树。Grok 取消沿用 `51b0/.4` 正例。八项原条件逐项审计 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`，包括 Codex 关闭透传的独立双端原件；当前只剩 b47 最终两平台源码门禁，V03 仍开放。全部自有进程已退出，现场及唯一历史保全，其他平台实机验收仍移交用户。
 
 - **2026-10-02 真实取消与本地按键修复，仍开放**：`51b0/r-myk6vj3w` 的 Grok 单次输入后真实工具运行中 Ctrl-C，原生 Cancelled 与同 SID／prompt 宿主通知一致；后台 sleep 自然结束，不声称按键清理进程树。Codex 单次输入后 Escape 取得原生 turn_aborted，但没有取消通知，后续 ToolComplete 也不能证明仍运行。源码已补本地实际转发边界的 Ctrl-C／Codex 独立 Escape 观察，确认超时仅为 Unknown，迟到工具完成保持未知。Claude 第四次人工输入取得真实生成中断，前三次不足；本轮私有配置缺通知插件，不能计完整宿主链。四文件定向 83 项、i18n 11 项、check 全通过，收据 `3c4a6c3d347dc675adf5645c04f753a676e470104ae6747d9e9cf99f2b68db70`。新构建真实复验与更新后平台门禁待完成，无需本地化变更。
@@ -365,8 +371,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 - **2026-10-02 原生退出修复待实窗复验**：公开 Grok 源码提交 `ba8ce6d346aa`／`.4` 将正常 owned 退出改为在原 IPC 与终端仍附着时等待闲置 actor 的 SessionEnd／Stop，然后撤销原代际路由；繁忙会话只脱离、不新增取消，意外断连仍立即撤销。Mac check、真实 actor 四 hook 正例及签名构建通过；主仓定向、GUI `/exit` 和新 Windows console broker 门禁待验。旧 `.3` 通知失败与测试 LEAK 保留，不以进程退出代替通知完成，不关闭 V03。
 
-- **状态／优先级／范围**：验收缺口，高；P2 通知、P4 重连、P5 SSH／tmux。
-- **实际情况与影响**：当前固定版本三款链主要覆盖 Mac 到本机隔离 OpenSSH，并包含 tmux 断连重接；不覆盖远端 Linux、Windows、WSL 等组合。旧 Codex 关闭 tmux 透传补测仅观察到产品接收 0，缺少内层发送证据。2026-09-29 独立本机回环补测在固定 `0.156.1` 的原生 `SessionStart`／`UserPromptSubmit` hook、私有 tmux `3.7c` 且 `allow-passthrough=off` 下，确认 pane 内两条通知与外层 SSH 输出零通知；该双端负例补齐这一窄范围，不代表远端组合、产品 UI 的双向交互或断连取消验收。
+- **状态／优先级／范围**：本次 Mac 范围关闭；高；P2 通知、P4 重连、P5 SSH／tmux。其他平台实机验收移交，不计通过。
+- **实际情况与影响**：本次固定三款 CLI 的 Mac 到本机隔离 OpenSSH／tmux 通知、双向交互、断连恢复与取消，已按本节 2026-10-02 关闭记录补齐；远端 Linux、Windows、WSL 实机组合仍移交用户，不计通过。早期 Codex 关闭 tmux 透传补测仅观察到产品接收 0、缺少内层发送证据的问题保留为历史。2026-09-29 独立本机回环补测在固定 `0.156.1` 的原生 `SessionStart`／`UserPromptSubmit` hook、私有 tmux `3.7c` 且 `allow-passthrough=off` 下，确认 pane 内两条通知与外层 SSH 输出零通知。该双端负例只证明相应传输边界；本次产品 UI 交互、恢复与取消另由本节后续真实验收计证，不外推未验远端组合。
 - **当前替代方式**：按已测 Mac→本机组合说明支持，不把本机 CLI 安装检出当作远端就绪。
 - **源码／证据**：[三款 SSH／tmux 场景表](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/MAC_FIXED_VERSION_DELIVERY_20260924.md#普通终端ssh-与-tmux-原生通知)、[Codex 关闭透传原收据](https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/macos-fixed-versions-20260924/codex-tmux-off-one-input-v2.safe.json)。
 - **关闭条件**：明确后续目标远端组合，在真实目标 CLI、插件与 PTY 上验证通知、双向交互、重复／乱序、断连恢复和取消；Codex 关闭透传须同时独立观察内层原生发送与外层无接收，不能把未触发误判为成功拦截。
