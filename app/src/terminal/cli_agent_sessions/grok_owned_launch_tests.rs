@@ -7,6 +7,7 @@ fn manifest(directory: &Path) -> LaunchManifest {
         launch_id: Uuid::from_u128(1),
         session_id: Uuid::from_u128(2),
         history: None,
+        notifications: None,
         executable: PathBuf::from("/private/tmp/grok"),
         app_executable: PathBuf::from("/private/tmp/InfiniShell.app/Contents/MacOS/infinishell"),
         cwd: PathBuf::from("/private/tmp/中文 项目"),
@@ -42,6 +43,112 @@ fn native_argv_keeps_explicit_leader_and_native_approval_without_shell_syntax() 
             "grok-4.7".into(),
         ])
     );
+}
+
+#[test]
+fn remote_notification_argv_preserves_typed_session_and_native_approval() {
+    let state = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let worker = root.join("private-worker");
+    fs::write(&worker, b"test worker").unwrap();
+    fs::set_permissions(&worker, fs::Permissions::from_mode(0o700)).unwrap();
+    let (directory, _socket, mut value) = durable_manifest(&root);
+    value.version = 4;
+    value.cwd = root.clone();
+    value.app_executable = worker.clone();
+    value.notifications =
+        Some(NotificationPlan::create(&root, value.session_id, &root, &worker).unwrap());
+    validate_manifest(&directory.path().join("launch.json"), &value).unwrap();
+    let argv = native_arguments(&value);
+    assert_eq!(argv.len(), 13);
+    assert_eq!(argv[7], "--session-id");
+    assert_eq!(argv[8], "00000000-0000-0000-0000-000000000002");
+    assert_eq!(argv[9], "--model");
+    assert_eq!(argv[10], "grok-4.7");
+    assert_eq!(argv[11], "--infinishell-notification-plugin");
+    assert_eq!(
+        argv[12],
+        root.join("notifications/binding.json").as_os_str()
+    );
+
+    value.history = Some(HistorySource {
+        task_id: Uuid::new_v4().to_string(),
+        generation: 1,
+        launch_id: Uuid::new_v4(),
+        session_id: value.session_id,
+        manifest_path: root.join("previous.json"),
+        manifest_sha256: "previous".into(),
+        cwd: root,
+    });
+    let resumed = native_arguments(&value);
+    assert_eq!(resumed[7], "--resume");
+    assert!(!resumed.iter().any(|argument| argument == "--session-id"));
+    assert_eq!(&resumed[8..], &argv[8..]);
+}
+
+#[test]
+fn remote_notification_manifest_recovery_does_not_authorize_changed_resources() {
+    let state = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let worker = root.join("private-worker");
+    fs::write(&worker, b"test worker").unwrap();
+    fs::set_permissions(&worker, fs::Permissions::from_mode(0o700)).unwrap();
+    let (directory, _socket, mut value) = durable_manifest(&root);
+    value.version = 4;
+    value.cwd = root.clone();
+    value.app_executable = worker.clone();
+    value.notifications =
+        Some(NotificationPlan::create(&root, value.session_id, &root, &worker).unwrap());
+    let path = directory.path().join("launch.json");
+    let bytes = serde_json::to_vec(&value).unwrap();
+    write_new(&path, &bytes).unwrap();
+    fs::remove_file(root.join("notifications/plugin/hooks/notify.cjs")).unwrap();
+    let mut recovered = GrokOwnedLaunch::restore(&path, &digest(&bytes)).unwrap();
+    assert!(
+        recovered
+            .manifest
+            .notifications
+            .as_ref()
+            .unwrap()
+            .verify_current()
+            .is_err()
+    );
+    assert_eq!(recovered.phase, LaunchPhase::RecoveredUnsent);
+    assert!(recovered.dispatch_remote_reserved().is_err());
+    assert!(!directory.path().join("dispatched").exists());
+    value.notifications = None;
+    assert!(validate_manifest(&path, &value).is_err());
+}
+
+#[test]
+fn dispatched_legacy_manifest_cannot_receive_new_remote_notification_input() {
+    let state = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let worker = root.join("private-worker");
+    fs::write(&worker, b"test worker").unwrap();
+    fs::set_permissions(&worker, fs::Permissions::from_mode(0o700)).unwrap();
+    let mut value = manifest(&root);
+    value.cwd = root.clone();
+    value.app_executable = worker.clone();
+    let notifications = NotificationPlan::create(&root, value.session_id, &root, &worker).unwrap();
+    let path = root.join("launch.json");
+    let bytes = serde_json::to_vec(&value).unwrap();
+    let checksum = digest(&bytes);
+    write_new(&path, &bytes).unwrap();
+    write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
+    let recovered = GrokOwnedLaunch::restore(&path, &checksum).unwrap();
+    assert_eq!(recovered.phase, LaunchPhase::Dispatched);
+    notifications.verify_current().unwrap();
+    assert!(recovered.verify_remote_input(&notifications).is_err());
 }
 
 #[test]

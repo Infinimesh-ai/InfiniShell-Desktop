@@ -1,6 +1,31 @@
 # CLI 支持与能力对齐：验证结论
 
-## 2026-10-01 G08 清稿、退休响应与 Codex 会话通知源码门禁
+## 2026-10-01：Claude `c3ff` 英文 SSH 复验与 Grok 通知工件整合
+
+**新增关闭0项，仍为6关闭／5开放／3移交，PR #22保持草稿。** `c3ff0bba80a65acf9eb0fe090b54783a71d4f80d` 的签名 Mac GUI `r-u10vfmtu` 在实际 SSH 普通 Claude `2.1.280/claude-opus-5-5` 中，首图通过系统选择器成卡、一次提交和原生 Read AllowOnce；typed PNG与规范上传 PNG均为328字节、SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，回答 `Red, Blue`。宿主和服务端confirmed/释放/完成一致，自动收起后重开输入区已空、卡片为零，没有手动清稿。原137字节夹具经过PNG规范化，不能称原编码字节未变。
+
+第二次选择同图并单次提交，在原生Read选择No后得到错误结果且typed图片为零，重新打开仍保留原中文草稿和单卡；没有再提交。真正执行 `/exit` 后，原生进程消失，宿主及服务端均保存retired，宿主release/done为true，发布图片已删除；退休仅回收文件，不确认消费。退出原生后重连同SSH且未启动新CLI，两笔提交、宿主和服务端记录及原生历史均未变化，请求各一次。这一组合不覆盖活跃消费中断线、拒绝后重投、其他CLI、tmux或所有旧回调场景。
+
+本轮英文界面由CUA实际观察，中文未验；截图仅存在工具回执，没有归档外置原图，消费Toast未观察到，不能声称Toast验收。签名应用SHA-256 `15fbed9977f6909db881051c161ae3fcfe0a5740694a2ebd68616eee05873756`。归档目录 `resume-20261001/g08-preparation/r-u10vfmtu-claude-ssh-gui` 中的原件摘要：
+
+| 原件 | SHA-256 |
+| --- | --- |
+| `whitelist-first-consumed.safe.json` | `0f33428e316c16437051f84a1bbe0c30e2dbe77740e599e318d8e90fc06ff498` |
+| `whitelist-second-denied.safe.json` | `8398225d4ac4c147107eda1b25763b72fefc196f58cb66f66381dbae6c059d0f` |
+| `whitelist-second-native-exited.safe.json` | `f75671d8d63036e973ffc34eecf8e6ec02ccb202f4dff4b323b9396567e0b2ef` |
+| `whitelist-ssh-reconnected.safe.json` | `216fd50a7f2d89930ce2f12c5255a0d95e2327ae2f522aee06735f2e814a255c` |
+| `whitelist-reconnect-comparison.safe.json` | `e81be712bb7bb1da3bc456b5a6e6c5ff27aa874b8d6c054e1407c872373b3ff8` |
+| `cua-observations.safe.json` | `72bd663e7f06b6fc467e04f85701b2638711e42efd8ab2f895013a5c61d2dc99` |
+
+App和sshd均自然exit 0；早期状态收据列出的remote daemon两个进程，在宽限等待后的 `finish.safe.json` 中已确认为全部自有进程退出，收据SHA-256 `5c0ed5a9708225984cce2f0ebf66dfec6637cbaf312279ea6352e931dfe0545b`。外层 exit 0、日志SHA-256 `f20728f827a7fd127aace6eace92ebd87aea5ae6cc12ce504d500e0b01afdb44`，状态completed/retained，cleanup_ready=false，现场和历史保留，不改称已清理。[CI 36822357366](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36822357366) 本次记录时仍运行，只绑定c3ff，不覆盖后续Grok整合。旧367源码运行36814148707的Windows桌面LEAK继续保留，不回填为无异常门禁。
+
+Grok原生通知增量已提交为 `13a09e440e297bf52b8a0941b7af5bf42e882013`。固定公开基线 `07e35a3dfeed2f200d319ef6c893b5ea286d9a51` 加独立补丁SHA-256 `2bca441da55912b1f463e732e8a0889bb505c2706941993ee055cc8f9aaf1019`，通过归档隔离索引精确重建tree `e8537e6cf1b788320882c4d65eb6dbf9d429da0a`，104个差异文件逐一取摘要，实际工作索引不变。来源见[新来源清单](../../native/grok-build/session-notifications-source.json)。最终原生 `r-ihrmtr2u` 通知44项（hooks4/pager1/shell39）与check通过，日志SHA-256 `f03082ab7d0a1c77a7f9e87bb122b6a158aa45dcab1f275729d917dbf5abb691`，安全收据 `08f456883034c8c7175a43bf98debc4d8f6b333c3f497a1519200005f0480ba6`。旧 `r-u0rvam6k` 仍为73通过/1个旧namespace金样失败；修正后 `r-1hv5iwt5` 单项及check通过，不合并成最终源码一次74项通过。
+
+Mac原生 `r-_v2vq8kh` 构建、codesign严格校验、`--version`、`--help`、真实async completions均通过，零模型输入；完整版本为 `grok 1.0.41+infinishell.session-notifications.1 (13a09e440e29)`，工件SHA-256 `0f3d4aa695e1d596c120be296dc68d1942dacc8c2a6320dc887cda127d0ea3f0`，CDHash `95444e4ea5436ac5bba72febc3f698fceaad3806`，构建收据SHA-256 `ccb9493f1f0b1a558968758733fa8564c5666548699545ca44717ef94b7e27e1`。这些原生轮次短目录均已清理，仅Mac远端owned入口绑定新工件，旧G01来源/工件/tb1保持独立，Linux通知工件仍为None。
+
+18个宿主/CI/来源文件已经整合主树但未提交，冻结 `g08-build-preparation/host-source-freeze-v1.safe.json` SHA-256 `ff79d75fc90d455e86f60ea250219bf015ad868318d1e6e254655a43d4908aad`。`r-qbicqrss` 的 `cargo +1.92.0 check --locked -p warp --features warpui/test-util,rust-embed/debug-embed` 通过，日志 `fc1b7b9f6d2971efeece3eec5f832b4a58462608d762e8900d030b2d5b3b4d24`。随后 `r-tq_tvb8i` 同特性、零重试定向nextest为67跑/54过/13失败，日志 `c46b0aaeebb11c614d6d4a1a5848e25765c0abcff155df1432982010a0af2605`，exit100且已清理。12项在NotificationPlan::create、1项在TicketStore::new失败；锁定tempfile 3.23的目录默认权限为 `0777 & umask`，本轮得到 `0755`，不满足私有 `0700` 要求。根代理仅把三份测试文件的六处新夹具创建改为 `tempfile::Builder.permissions(0700).tempdir`，生产代码未变，没有修改既有目录权限。`r-nc7llcn1` 单独复验新增及版本关联 14 项全过，日志SHA-256 `048a32e06604b3c64a2df5194ab031098902d61fcd1ab852a59ec784b86a8b69`，exit 0且已清理；没有重复其余54个已通过项，不将新结果回填为原运行67项全过。i18n `r-zleu1c4y` 11项通过，日志SHA-256 `14dd1e18bff05840bd0deac554f183cfca96ed16a34b8b21c2e9da4421bafb4a`，exit 0且已清理；最终check `r-vbxjs18d` 通过，日志SHA-256 `2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27`，exit 0且已清理。最终 `host-source-freeze-v2.safe.json` SHA-256 `fe3f747818dc9de3b5665e2e7288ecc4f81f9291675abafa1b820fa9fe65093e`，相对v1仅三份测试夹具文件变化；这些本地门禁不替代新增量跨平台源码门禁和真实验收。Grok两组英中文案已同步，真实双语布局未验；实际Grok pager→resident sidecar→typed PNG→通知归属链仍待验证，G08保持开放。
+
+## 历史记录：2026-10-01 G08 清稿、退休响应与 Codex 会话通知源码门禁
 
 **2026-10-01 清稿、退休响应与 Codex 通知接线修复，真实复验待完成**：Claude 自动收起/恢复后仅保留原提交的只读清稿凭证，写租约仍撤销；原笔回调按 generation 与 submission ID 释放租约，不能清新稿或释放新提交。客户端接受原消费者已退出的 retired 回执用于回收，不把退休当成消费。Codex 专属入口冻结五类通知、八份脚本及 SessionFlags，app-server/TUI 使用相同固定参数，不改用户 HOME、CODEX_HOME 或审批配置。客户端 9 项、本机 app 原轮 229 项通过；10 项新连接绑定用例因共享夹具遗漏真实 BlockMetadata 而失败，修正夹具后 10 项独立通过，原失败保留。i18n 11 项及最终 `cargo check -p warp` 通过；收据 `g08-ui-client-local-gates-v1.safe.json` SHA-256 `61e792488c73bcc94bc836f72d49945962fbc32f823c7929d080bf76e9cb007f`，短目录已清理。无需本地化变更；新构建真实英中 GUI、Codex/Grok、tmux 和异常链仍待验，新增关闭 0 项。
 
@@ -9,7 +34,7 @@ Grok 公开源码通知扩展在隔离工作区通过 Mac 通知定向 41 项；
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
-## 2026-10-01：G08 消费和文件释放已实证，界面清稿及客户端退休状态仍需修复
+## 历史记录：2026-10-01 G08 消费和文件释放已实证，界面清稿及客户端退休状态仍需修复
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** 精确提交 `367279c7aa97df1a85689602115a119f4173e7cc` 的新 Mac 构建、独立签名 GUI 在真实 SSH 普通 Claude `2.1.280/claude-opus-5-5` 中，首图经本文件 Read 允许后返回 typed PNG，与规范上传 PNG 同为 328 字节且摘要相同，回答 `Red, Blue`。服务端和宿主均记录 confirmed／释放／完成，远端图片已删除；自动收起后重新打开仍显示原稿和卡片，证明这是界面清稿缺陷，不能再归因为消费解析失败。
 

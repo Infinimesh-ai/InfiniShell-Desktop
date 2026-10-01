@@ -5919,8 +5919,8 @@ workspace-start-remote-codex-rich-input = 在当前远程终端启动 Codex 富�
 workspace-start-remote-codex-rich-input-help = 启动 Codex 0.156.1，为当前 SSH/tmux 窗格绑定独立 app server。需要 Bash 或 Zsh 及远程图片支持。
 cli-agent-codex-remote-launch-unavailable = 远程 Codex 会话未能启动。需要 Codex 0.156.1、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 cli-agent-codex-owned-launch-claimed = 此 Codex 启动已被认领或状态尚未确认，请先检查当前远程终端，再启动其他会话。
-workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中使用 grok-4.7 启动 Grok 1.0.41。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
-cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要 Grok 1.0.41、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
+workspace-start-remote-grok-rich-input-help = 在当前 SSH/tmux 终端中，以 grok-4.7 启动支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本。需要 Bash 或 Zsh 及远程图片支持。此操作不会更新远端 CLI 安装包。
+cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需要支持 InfiniShell 会话通知的 Grok 1.0.41 构建版本、Bash 或 Zsh，以及支持远程图片的有效 SSH 连接。
 
 cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
 

@@ -13,7 +13,7 @@ use super::cli_image_grok_protocol::{REMOTE_GROK_COMMAND, Reply, Scope, Ticket};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent::discover_cli_agent_executable;
 use crate::terminal::cli_agent_sessions::grok_owned_launch::{
-    GrokOwnedLaunch, GrokOwnedPty, exec_owned_from_manifest,
+    GrokOwnedLaunch, GrokOwnedPty, NotificationPlan, exec_owned_from_manifest,
 };
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -27,6 +27,27 @@ struct Reservation {
     cwd: PathBuf,
     app_executable: PathBuf,
     app_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    notifications: Option<NotificationPlan>,
+}
+
+impl Reservation {
+    fn supported_version(&self) -> bool {
+        matches!(
+            (self.version, &self.notifications),
+            (1, None) | (2, Some(_))
+        )
+    }
+
+    fn entry_notifications(&self, directory: &Path) -> io::Result<NotificationPlan> {
+        if self.version != 2 {
+            return Err(invalid());
+        }
+        let plan = self.notifications.clone().ok_or_else(invalid)?;
+        plan.verify_parent(directory)?;
+        plan.verify(plan.session_id, &self.cwd, &self.app_executable)?;
+        Ok(plan)
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -91,8 +112,10 @@ impl TicketStore {
         fs::DirBuilder::new().mode(0o700).create(&directory)?;
         File::open(&self.root)?.sync_all()?;
         let app_executable = std::env::current_exe()?.canonicalize()?;
+        let notifications =
+            NotificationPlan::create(&directory, Uuid::new_v4(), &cwd, &app_executable)?;
         let reservation = Reservation {
-            version: 1,
+            version: 2,
             id: ticket.id,
             key_sha256: digest(ticket.key.as_bytes()),
             host: scope.host.clone(),
@@ -100,6 +123,7 @@ impl TicketStore {
             cwd,
             app_sha256: executable_digest(&app_executable)?,
             app_executable,
+            notifications: Some(notifications),
         };
         write_new(&directory.join("ticket.json"), &reservation)?;
         let bytes = read_private(&directory.join("ticket.json"))?;
@@ -141,7 +165,7 @@ impl TicketStore {
             let Ok(reservation) = read_json::<Reservation>(&directory.join("ticket.json")) else {
                 continue;
             };
-            if reservation.version != 1 || reservation.id != id {
+            if !reservation.supported_version() || reservation.id != id {
                 continue;
             }
             // 即使插件缺失也捕获私有进程；不由插件是否上线决定退出清理能力。
@@ -162,7 +186,7 @@ impl TicketStore {
         let directory = self.directory(ticket)?;
         let guard = lock_directory(&directory)?;
         let reservation: Reservation = read_json(&directory.join("ticket.json"))?;
-        if reservation.version != 1
+        if !reservation.supported_version()
             || reservation.id != ticket.id
             || reservation.key_sha256 != digest(ticket.key.as_bytes())
             || reservation.host != scope.host
@@ -186,6 +210,14 @@ impl TicketGuard {
         if !launch.was_dispatched() || launch.session_id() != link.native_session {
             return Err(invalid());
         }
+        Ok(launch)
+    }
+
+    pub(super) fn launch_for_input(&self) -> io::Result<GrokOwnedLaunch> {
+        let reservation: Reservation = read_json(&self.directory.join("ticket.json"))?;
+        let notifications = reservation.entry_notifications(&self.directory)?;
+        let launch = self.launch()?;
+        launch.verify_remote_input(&notifications)?;
         Ok(launch)
     }
 
@@ -275,7 +307,7 @@ pub(crate) fn run_from_args() -> Option<io::Result<()>> {
         let bytes = read_private(&path)?;
         let ticket: Reservation = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
         if digest(&bytes) != hash
-            || ticket.version != 1
+            || ticket.version != 2
             || ticket.id.is_nil()
             || directory.file_name().and_then(|value| value.to_str())
                 != Some(ticket.id.to_string().as_str())
@@ -286,17 +318,19 @@ pub(crate) fn run_from_args() -> Option<io::Result<()>> {
         {
             return Err(invalid());
         }
+        let notifications = ticket.entry_notifications(directory)?;
         // 该记录也覆盖 prepare 中途崩溃；再次执行同一命令永远不能重启原会话。
         write_new(&directory.join("entered.json"), &true)?;
         let prepared = (|| {
             let pty = GrokOwnedPty::from_current_terminal()?;
             let executable = discover_cli_agent_executable(CLIAgent::Grok).ok_or_else(invalid)?;
-            let mut launch = GrokOwnedLaunch::prepare(
+            let mut launch = GrokOwnedLaunch::prepare_remote(
                 &executable,
                 &ticket.app_executable,
                 &ticket.cwd,
                 directory,
                 pty,
+                notifications,
             )?;
             let link = LaunchLink {
                 manifest: launch.manifest_path(),
@@ -436,3 +470,7 @@ pub(super) fn write_new<T: Serialize>(path: &Path, value: &T) -> io::Result<()> 
 pub(super) fn invalid() -> io::Error {
     io::Error::other("远端 Grok 私有启动身份或状态无效")
 }
+
+#[cfg(test)]
+#[path = "cli_image_grok_launch_tests.rs"]
+mod tests;

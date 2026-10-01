@@ -6107,8 +6107,8 @@ workspace-start-remote-codex-rich-input = Codex rich input in current remote ter
 workspace-start-remote-codex-rich-input-help = Start Codex 0.156.1 with a separate app server bound to this SSH/tmux pane. Requires Bash or Zsh and remote image support.
 cli-agent-codex-remote-launch-unavailable = The remote Codex session could not be started. It requires Codex 0.156.1, Bash or Zsh, and a current SSH connection with remote image support.
 cli-agent-codex-owned-launch-claimed = This Codex launch has already been claimed or its status is unconfirmed. Check the current remote terminal before starting another session.
-workspace-start-remote-grok-rich-input-help = Start Grok 1.0.41 with grok-4.7 in the current SSH/tmux terminal. Requires Bash or Zsh and remote image support. Remote CLI packages are not updated by this action.
-cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be started. It requires Grok 1.0.41, Bash or Zsh, and a current SSH connection with remote image support.
+workspace-start-remote-grok-rich-input-help = Start the InfiniShell build of Grok 1.0.41 with session notifications and grok-4.7 in the current SSH/tmux terminal. Requires Bash or Zsh and remote image support. Remote CLI packages are not updated by this action.
+cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be started. It requires the InfiniShell build of Grok 1.0.41 with session notifications, Bash or Zsh, and a current SSH connection with remote image support.
 
 cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 

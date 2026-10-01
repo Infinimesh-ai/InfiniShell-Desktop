@@ -1,4 +1,4 @@
-"""从固定公开基线和受审补丁构建普通 Grok 桥；仅由现有跨平台 workflow 调用。"""
+"""从固定公开基线和独立受审补丁构建 Grok 原生能力；仅由现有跨平台 workflow 调用。"""
 import argparse
 import hashlib
 import json
@@ -12,8 +12,11 @@ import subprocess
 import time
 
 REPOSITORY = Path(__file__).resolve().parents[2]
-SOURCE_METADATA = REPOSITORY / "native/grok-build/source.json"
-PATCH = REPOSITORY / "native/grok-build/terminal-bridge.patch"
+SOURCE_PROFILES = {
+    "terminal-bridge": ("source.json", "terminal-bridge.patch", "1.0.41+infinishell.terminal-bridge.11"),
+    "session-notifications": ("session-notifications-source.json", "session-notifications.patch",
+                              "1.0.41+infinishell.session-notifications.1"),
+}
 UPSTREAM = "https://github.com/xai-org/grok-build"
 BASE = "07e35a3dfeed2f200d319ef6c893b5ea286d9a51"
 TOOLCHAIN = "1.94.0"
@@ -24,23 +27,32 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def load_source(capability):
+    metadata_name, patch_name, version = SOURCE_PROFILES[capability]
+    source_metadata = REPOSITORY / "native/grok-build" / metadata_name
+    patch = REPOSITORY / "native/grok-build" / patch_name
+    metadata = json.loads(source_metadata.read_text(encoding="utf-8"))
+    build = metadata["cross_platform_build"]
+    if metadata["upstream"] != UPSTREAM or metadata["base_commit"] != BASE:
+        raise RuntimeError("公开源码基线不匹配")
+    patch_digest = digest(patch)
+    if patch_digest != build["patch_sha256"] or not build["native_tree"]:
+        raise RuntimeError("补丁摘要或预期源码树未冻结")
+    if build["custom_version"] != version:
+        raise RuntimeError("定制构建版本不匹配")
+    return metadata, build, source_metadata, patch, patch_digest
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--capability", choices=SOURCE_PROFILES, default="terminal-bridge")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--target-dir", required=True, type=Path)
     args = parser.parse_args()
     system = platform.system()
     if system not in ("Linux", "Windows") or platform.machine().lower() not in ("x86_64", "amd64"):
         raise RuntimeError("只允许本机 Linux/Windows x64 工具链构建")
-    metadata = json.loads(SOURCE_METADATA.read_text(encoding="utf-8"))
-    build = metadata["cross_platform_build"]
-    if metadata["upstream"] != UPSTREAM or metadata["base_commit"] != BASE:
-        raise RuntimeError("公开源码基线不匹配")
-    patch_digest = digest(PATCH)
-    if patch_digest != build["patch_sha256"] or not build["native_tree"]:
-        raise RuntimeError("补丁摘要或预期源码树未冻结")
-    if build["custom_version"] != "1.0.41+infinishell.terminal-bridge.11":
-        raise RuntimeError("定制构建版本不匹配")
+    metadata, build, source_metadata, patch, patch_digest = load_source(args.capability)
     output = args.output.absolute()
     output.mkdir(parents=True, exist_ok=False)
     source = output / "source"
@@ -52,10 +64,11 @@ def main():
     environment = dict(os.environ, CARGO_TARGET_DIR=str(target),
                        GROK_VERSION=build["custom_version"], CARGO_TERM_COLOR="never")
     receipt = {"schema_version": 1, "status": "running", "platform": system,
+               "capability": args.capability,
                "kernel_release": platform.release(),
                "host_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY, text=True).strip(),
                "upstream": UPSTREAM, "base_commit": BASE, "native_tree": build["native_tree"],
-               "patch_sha256": patch_digest, "metadata_sha256": digest(SOURCE_METADATA),
+               "patch_sha256": patch_digest, "metadata_sha256": digest(source_metadata),
                "custom_version": build["custom_version"], "toolchain": TOOLCHAIN,
                "commands": [], "model_inputs": 0,
                "boundary": "公开源码构建及定向库回归；不代表模型或交互式桌面验收"}
@@ -88,7 +101,7 @@ def main():
         run(["git", "checkout", "--detach", "FETCH_HEAD"])
         if run(["git", "rev-parse", "HEAD"], True) != BASE:
             raise RuntimeError("下载的公开基线不是固定提交")
-        run(["git", "apply", "--index", str(PATCH)])
+        run(["git", "apply", "--index", str(patch)])
         if run(["git", "write-tree"], True) != build["native_tree"]:
             raise RuntimeError("补丁重建源码树不匹配")
         run(["rustup", "toolchain", "install", TOOLCHAIN, "--profile", "minimal", "--no-self-update"])
@@ -124,6 +137,33 @@ def main():
         if len(results) != 4 or any(passed == 0 or failed or ignored for passed, failed, ignored in results):
             raise RuntimeError("原子桥四库必须分别实际执行并零失败，不能将 cfg 排除后的零命中记为通过")
         receipt["bridge_library_results"] = results
+        if args.capability == "session-notifications":
+            notification_tests = run([
+                "cargo", "+" + TOOLCHAIN, "test", "--locked", "--no-fail-fast",
+                "-p", "xai-grok-hooks", "-p", "xai-grok-pager", "-p", "xai-grok-shell",
+                "--lib", "notification", "--", "--test-threads=1",
+                # 这些 helper 由主动测试用精确名称派生；不把 ignored helper 当作验收成功。
+                "--skip", "runner::notification_console_windows::tests::console_target_fixture",
+                "--skip", "runner::notification_console_windows::tests::console_broker_fixture",
+                "--skip", "runner::notification_console_windows::tests::console_hook_fixture",
+                "--skip", "session::notification_route_windows::tests::notification_pipe_child_fixture",
+            ], True)
+            notification_results = [tuple(map(int, values)) for values in re.findall(
+                r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", notification_tests)]
+            if len(notification_results) != 3 or any(
+                    passed == 0 or failed or ignored for passed, failed, ignored in notification_results):
+                raise RuntimeError("通知扩展三库必须分别真实执行并零失败，不能把零命中或忽略项记为通过")
+            receipt["notification_library_results"] = notification_results
+            if system == "Linux":
+                # 既有回归使用 sh 派生真实后代；Windows 由新增控制台生命周期测试覆盖。
+                ordinary_hook = run([
+                    "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell",
+                    "--lib", "session::acp_session::turn_end_reporting_tests::session_end_cancels_in_flight_start_hook",
+                    "--", "--exact", "--test-threads=1",
+                ], True)
+                if not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", ordinary_hook):
+                    raise RuntimeError("普通 SessionStart 退出取消回归必须实际执行并通过")
+                receipt["ordinary_start_hook_cancellation"] = "passed"
         run(["cargo", "+" + TOOLCHAIN, "build", "--locked", "-p", "xai-grok-pager-bin"])
         if run(["git", "write-tree"], True) != build["native_tree"]:
             raise RuntimeError("构建期间源码索引改变")

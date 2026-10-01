@@ -296,7 +296,7 @@ impl Service {
                 return Err(invalid());
             }
         }
-        let mut launch = guard.launch()?;
+        let mut launch = guard.launch_for_input()?;
         if launch.session_id() != observation.native_session
             || launch.working_directory().to_string_lossy() != observation.cwd
         {

@@ -390,6 +390,9 @@ mod native {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
     use super::*;
+    use crate::terminal::cli_agent_sessions::grok_owned_launch::{
+        NotificationPlan, notification_artifact,
+    };
 
     #[cfg(test)]
     fn record_final_history_shape(result: &Value, prompt_id: Uuid) -> io::Result<()> {
@@ -462,6 +465,7 @@ mod native {
         tui: MacosProcessIdentity,
         leader: MacosProcessIdentity,
         socket_identity: (u64, u64),
+        notifications: Option<NotificationPlan>,
     }
 
     impl GrokLeaderTarget {
@@ -474,6 +478,30 @@ mod native {
             tui_pid: i32,
             leader_pid: i32,
             native_permission_mode: &str,
+        ) -> Result<Self, GrokLeaderInputError> {
+            Self::capture_with_notifications(
+                binding_id,
+                session_id,
+                cwd,
+                socket_path,
+                executable,
+                tui_pid,
+                leader_pid,
+                native_permission_mode,
+                None,
+            )
+        }
+
+        pub(crate) fn capture_with_notifications(
+            binding_id: Uuid,
+            session_id: Uuid,
+            cwd: &Path,
+            socket_path: &Path,
+            executable: &Path,
+            tui_pid: i32,
+            leader_pid: i32,
+            native_permission_mode: &str,
+            notifications: Option<NotificationPlan>,
         ) -> Result<Self, GrokLeaderInputError> {
             if binding_id.is_nil()
                 || session_id.is_nil()
@@ -502,7 +530,15 @@ mod native {
                 }
                 digest.update(&chunk[..length]);
             }
-            if format!("{:x}", digest.finalize()) != FIXED_BINARY_SHA256 {
+            if let Some(plan) = &notifications {
+                plan.verify_session(session_id, &cwd)?;
+            }
+            let expected_sha256 = if notifications.is_some() {
+                notification_artifact::sha256()?
+            } else {
+                FIXED_BINARY_SHA256
+            };
+            if format!("{:x}", digest.finalize()) != expected_sha256 {
                 return Err(GrokLeaderInputError::IncompatibleNative);
             }
             let target = Self {
@@ -515,12 +551,16 @@ mod native {
                 tui: macos_process_identity(tui_pid)?,
                 leader: macos_process_identity(leader_pid)?,
                 socket_identity: socket_identity(socket_path)?,
+                notifications,
             };
             target.validate()?;
             Ok(target)
         }
 
         fn validate(&self) -> Result<(), GrokLeaderInputError> {
+            if let Some(plan) = &self.notifications {
+                plan.verify_session(self.session_id, &self.cwd)?;
+            }
             if macos_boot_session()? != self.boot_session
                 || macos_process_identity(self.tui.pid)? != self.tui
                 || macos_process_identity(self.leader.pid)? != self.leader
@@ -550,7 +590,7 @@ mod native {
                     return Err(GrokLeaderInputError::IdentityChanged);
                 }
             }
-            let expected: Vec<OsString> = vec![
+            let mut expected: Vec<OsString> = vec![
                 "--leader".into(),
                 "--minimal".into(),
                 "--no-alt-screen".into(),
@@ -566,9 +606,17 @@ mod native {
             let tui = system
                 .process(pids[0])
                 .ok_or(GrokLeaderInputError::IdentityChanged)?;
+            if let Some(plan) = &self.notifications {
+                expected.extend([
+                    "--infinishell-notification-plugin".into(),
+                    plan.descriptor_path().into_os_string(),
+                ]);
+            }
             let mut resumed = expected.clone();
             resumed[7] = "--resume".into();
-            if tui.cmd().get(1..) != Some(expected.as_slice()) && tui.cmd().get(1..) != Some(resumed.as_slice()) {
+            if tui.cmd().get(1..) != Some(expected.as_slice())
+                && tui.cmd().get(1..) != Some(resumed.as_slice())
+            {
                 return Err(GrokLeaderInputError::InvalidTarget);
             }
             Ok(())
@@ -840,16 +888,23 @@ mod native {
 
         fn handshake(&mut self) -> Result<(), GrokLeaderInputError> {
             let deadline = Instant::now() + HANDSHAKE_TIMEOUT;
-            self.write_frame(
-                &json!({"type":"register", "client_type":"infinishell-readonly-probe",
-                "mode":"stdio", "capabilities":{"client_version":CLI_VERSION,
+            let native_version = if self.target.notifications.is_some() {
+                notification_artifact::VERSION
+            } else {
+                CLI_VERSION
+            };
+            let mut registration = json!({"type":"register", "client_type":"infinishell-readonly-probe",
+                "mode":"stdio", "capabilities":{"client_version":native_version,
                     "yolo_mode":false,"auto_mode":false,"terminal":false,
-                    "fs_read":false,"fs_write":false,"user_message_echo":true}}),
-            )?;
+                    "fs_read":false,"fs_write":false,"user_message_echo":true}});
+            if self.target.notifications.is_some() {
+                registration["build_contract"] = notification_artifact::BUILD_CONTRACT.into();
+            }
+            self.write_frame(&registration)?;
             let registered = self.wait_for(deadline, |frame| frame["type"] == "registered")?;
             if registered["ready"] != true
                 || registered["leader_protocol_version"] != 1
-                || registered["leader_binary_version"] != CLI_VERSION
+                || registered["leader_binary_version"] != native_version
                 || registered["leader_capabilities"]["control_v1"] != true
             {
                 return Err(GrokLeaderInputError::IncompatibleNative);
@@ -864,7 +919,7 @@ mod native {
             if native["type"] != "leader_info"
                 || native["pid"] != self.target.leader.pid
                 || native["leader_protocol_version"] != 1
-                || native["leader_binary_version"] != CLI_VERSION
+                || native["leader_binary_version"] != native_version
                 || native["socket_path"].as_str() != self.target.socket_path.to_str()
             {
                 return Err(GrokLeaderInputError::IdentityChanged);
@@ -880,7 +935,9 @@ mod native {
             )?;
             if initialized["protocolVersion"] != 1
                 || initialized["agentCapabilities"]["loadSession"] != true
-                || initialized["_meta"]["agentVersion"] != CLI_VERSION
+                || initialized["_meta"]["agentVersion"] != native_version
+                || (self.target.notifications.is_some()
+                    && initialized["_meta"]["infinishell/notificationPlugin"] != 1)
                 || initialized["_meta"]["currentWorkingDirectory"].as_str()
                     != self.target.cwd.to_str()
                 || initialized["_meta"]["modelState"]["currentModelId"] != MODEL_ID
