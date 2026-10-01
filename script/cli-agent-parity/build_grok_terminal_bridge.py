@@ -15,7 +15,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 SOURCE_PROFILES = {
     "terminal-bridge": ("source.json", "terminal-bridge.patch", "1.0.41+infinishell.terminal-bridge.11"),
     "session-notifications": ("session-notifications-source.json", "session-notifications.patch",
-                              "1.0.41+infinishell.session-notifications.1"),
+                              "1.0.41+infinishell.session-notifications.2"),
 }
 UPSTREAM = "https://github.com/xai-org/grok-build"
 BASE = "07e35a3dfeed2f200d319ef6c893b5ea286d9a51"
@@ -164,6 +164,15 @@ def main():
                 if not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", ordinary_hook):
                     raise RuntimeError("普通 SessionStart 退出取消回归必须实际执行并通过")
                 receipt["ordinary_start_hook_cancellation"] = "passed"
+                initial_hooks = run([
+                    "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell",
+                    "--features", "test-support", "--test", "session_create_plugin_hooks",
+                    "session_create_initializes_plugin_hooks_before_session_start",
+                    "--", "--exact", "--test-threads=1",
+                ], True)
+                if not re.search(r"test result: ok\. 1 passed; 0 failed; 0 ignored;", initial_hooks):
+                    raise RuntimeError("真实 ACP 初始会话插件 hook 回归必须实际执行并通过")
+                receipt["initial_session_plugin_hooks"] = "passed"
         run(["cargo", "+" + TOOLCHAIN, "build", "--locked", "-p", "xai-grok-pager-bin"])
         if run(["git", "write-tree"], True) != build["native_tree"]:
             raise RuntimeError("构建期间源码索引改变")

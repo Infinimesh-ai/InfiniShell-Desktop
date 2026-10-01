@@ -1,14 +1,80 @@
 use super::*;
 use std::io::{Read as _, Write as _};
+use std::os::fd::{AsRawFd as _, FromRawFd as _};
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::fs::symlink;
 use std::os::unix::net::UnixListener;
+
+use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 
 fn directory() -> tempfile::TempDir {
     tempfile::Builder::new()
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir()
         .unwrap()
+}
+
+#[test]
+fn tui_helper_inherits_all_three_terminal_descriptors() {
+    const ROOT: &str = "INFINISHELL_CODEX_TUI_STDIO_FIXTURE";
+    if let Some(root) = std::env::var_os(ROOT) {
+        // 仅隔离夹具拥有 PTY；不修改并行测试进程的全局标准描述符。
+        let root = PathBuf::from(root);
+        let mut manifest = legacy_manifest(&root);
+        manifest.app = root.join("check-tty.sh");
+        let status = helper_command(&manifest, &root.join("manifest.json"), "fixture", "tui")
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+        assert!(status.success(), "TUI helper 丢失终端描述符：{status}");
+        fs::write(root.join("verified"), b"stdin stdout stderr").unwrap();
+        return;
+    }
+    let directory = directory();
+    let root = directory.path().canonicalize().unwrap();
+    let script = root.join("check-tty.sh");
+    fs::write(&script, b"#!/bin/sh\n[ -t 0 ] && [ -t 1 ] && [ -t 2 ]\n").unwrap();
+    fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+    let pair = nix::pty::openpty(None, None).unwrap();
+    let (master, slave) = unsafe {
+        (
+            File::from_raw_fd(pair.master),
+            File::from_raw_fd(pair.slave),
+        )
+    };
+    for file in [&master, &slave] {
+        fcntl(file.as_raw_fd(), FcntlArg::F_SETFD(FdFlag::FD_CLOEXEC)).unwrap();
+    }
+    let mut fixture = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "remote_server::cli_image_codex_owned_launch::tests::tui_helper_inherits_all_three_terminal_descriptors",
+            "--nocapture",
+        ])
+        .env(ROOT, &root)
+        .stdin(Stdio::from(slave.try_clone().unwrap()))
+        .stdout(Stdio::from(slave.try_clone().unwrap()))
+        .stderr(Stdio::from(slave))
+        .spawn()
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let status = loop {
+        if let Some(status) = fixture.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = fixture.kill();
+            let _ = fixture.wait();
+            panic!("TUI 标准描述符夹具超时");
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert!(status.success(), "TUI 标准描述符夹具失败：{status}");
+    assert_eq!(
+        fs::read(root.join("verified")).unwrap(),
+        b"stdin stdout stderr"
+    );
 }
 
 struct NativeSocketFixture {
@@ -115,6 +181,29 @@ fn replaced_physical_socket_cannot_receive_a_connection() {
         replacement.accept().unwrap_err().kind(),
         io::ErrorKind::WouldBlock
     );
+}
+
+#[test]
+fn tui_arguments_use_the_pinned_physical_socket_and_reject_replacement() {
+    let fixture = NativeSocketFixture::new();
+    let root = fixture.requested.parent().unwrap();
+    let manifest = legacy_manifest(root);
+    assert!(arguments(&manifest, "tui").is_err());
+    let lease = SocketLease::capture(&fixture.requested).unwrap();
+    write_new(&root.join("socket.json"), &lease.stamp().unwrap()).unwrap();
+    let server = arguments(&manifest, "server").unwrap();
+    assert_eq!(server[2], format!("unix://{}", fixture.requested.display()));
+    let tui = arguments(&manifest, "tui").unwrap();
+    assert_eq!(tui[1], format!("unix://{}", fixture.physical.display()));
+    // 按原生 TUI 的直接 connect 路径验收，不能由宿主连接函数替它解析别名。
+    let _client = UnixStream::connect(tui[1].strip_prefix("unix://").unwrap()).unwrap();
+    let _accepted = fixture.listener.accept().unwrap();
+    fs::rename(&fixture.requested, root.join("retained-alias")).unwrap();
+    symlink(&fixture.physical, &fixture.requested).unwrap();
+    assert!(arguments(&manifest, "tui").is_err());
+    let mut actual = vec![b"codex".to_vec()];
+    actual.extend(tui.iter().map(|argument| argument.as_bytes().to_vec()));
+    assert!(!arguments_match(&actual, &manifest, "tui"));
 }
 
 fn legacy_manifest(directory: &Path) -> Manifest {
@@ -294,7 +383,7 @@ fn legacy_manifest_remains_queryable_but_reserved_ticket_cannot_start_again() {
     );
     let restored = bound_manifest(&root, &encoded).unwrap();
     assert_eq!(
-        arguments(&restored, "server"),
+        arguments(&restored, "server").unwrap(),
         vec![
             "app-server".to_string(),
             "--listen".to_string(),
@@ -310,8 +399,10 @@ fn legacy_manifest_remains_queryable_but_reserved_ticket_cannot_start_again() {
 
 #[test]
 fn native_identity_requires_same_typed_flags_for_server_and_tui() {
-    let directory = directory();
-    let root = directory.path().canonicalize().unwrap();
+    let fixture = NativeSocketFixture::new();
+    let root = fixture.requested.parent().unwrap().to_path_buf();
+    let lease = SocketLease::capture(&fixture.requested).unwrap();
+    write_new(&root.join("socket.json"), &lease.stamp().unwrap()).unwrap();
     let mut manifest = legacy_manifest(&root);
     manifest.version = 2;
     manifest.notifications = Some(NotificationPlan::create(&root).unwrap());
@@ -324,7 +415,7 @@ fn native_identity_requires_same_typed_flags_for_server_and_tui() {
     );
     assert!(helper.get_envs().next().is_none());
     for role in ["server", "tui"] {
-        let expected = arguments(&manifest, role);
+        let expected = arguments(&manifest, role).unwrap();
         assert_eq!(&expected[..20], &flags);
         let mut actual = vec![b"codex".to_vec()];
         actual.extend(expected.iter().map(|item| item.as_bytes().to_vec()));

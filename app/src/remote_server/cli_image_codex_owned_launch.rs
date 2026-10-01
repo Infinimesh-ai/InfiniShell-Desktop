@@ -809,6 +809,13 @@ fn helper_command(manifest: &Manifest, path: &Path, hash: &str, role: &str) -> C
         .arg(hash)
         .arg(role)
         .current_dir(&manifest.cwd);
+    if role == "tui" {
+        // command::spawn 默认使用 null；交互 helper 必须保留原前台终端的三个描述符。
+        command
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit());
+    }
     unsafe {
         command.pre_exec(|| {
             for signal in [libc::SIGINT, libc::SIGQUIT] {
@@ -864,7 +871,7 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
     drop(guard);
     let mut command = Command::new(&manifest.executable);
     command
-        .args(arguments(&manifest, role))
+        .args(arguments(&manifest, role)?)
         .current_dir(&manifest.cwd);
     // 仅禁止此私有进程注册额外远程控制入口；queue、认证与审批配置仍由原生读取。
     if role == "server" {
@@ -876,8 +883,16 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
     Err(error)
 }
 
-fn arguments(manifest: &Manifest, role: &str) -> Vec<String> {
-    let endpoint = format!("unix://{}", manifest.socket.display());
+fn arguments(manifest: &Manifest, role: &str) -> io::Result<Vec<String>> {
+    let endpoint = if role == "server" {
+        format!("unix://{}", manifest.socket.display())
+    } else {
+        // 原生 TUI 不解析过长的 rendezvous 别名；只使用监督者已固定身份的物理 socket。
+        let socket = SocketLease::capture(&manifest.socket)?;
+        let directory = manifest.socket.parent().ok_or_else(invalid)?;
+        socket.validate_stamp(&read_json(&directory.join("socket.json"))?)?;
+        format!("unix://{}", socket.physical().display())
+    };
     let mut arguments = manifest
         .notifications
         .as_ref()
@@ -893,10 +908,12 @@ fn arguments(manifest: &Manifest, role: &str) -> Vec<String> {
             manifest.cwd.to_string_lossy().into_owned(),
         ]
     });
-    arguments
+    Ok(arguments)
 }
 fn arguments_match(actual: &[Vec<u8>], manifest: &Manifest, role: &str) -> bool {
-    let expected = arguments(manifest, role);
+    let Ok(expected) = arguments(manifest, role) else {
+        return false;
+    };
     actual.len() == expected.len() + 1
         && actual[1..]
             .iter()

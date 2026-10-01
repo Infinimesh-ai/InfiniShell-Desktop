@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：真实启动暴露的 Grok 初始 hooks 与 Codex TUI 接线
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `400fe985f` 的独立中文 GUI `r-vpukvpd7` 通过产品菜单分别启动 Grok 和 Codex，均未提交图片或模型输入。Grok `13a09e440e29` 已到原生首页，但通知只有全局 SessionStart，插件未进入初始 registry；富输入未出现。Ctrl-G 进入原生 vi，随后关闭窗格，TUI／vi 退出而 leader 留存。Codex 此次已通过 server readiness 并保存 socket.json，但没有 tui-birth；包装器 19.418 秒后结束，server 已退出且 released=true。两份失败白名单 SHA-256 分别为 `c8793e022c77c6eb30748e2b4bdd4ada4fa89a98c19fa890bf85196c6976f286`、`caa9c4376694f0aef0180a15e59488ac1ce7c1004d227943dcc32554c8c62264`；截图仅保留在 CUA 回执，不称图片或成功布局已验。
+
+源码核对确认 Codex helper 的 spawn 默认把三个标准描述符置 null；现对 TUI 显式继承，server 仍独立。固定官方 `b412ff32` 的 TUI 也不解析长 socket 别名，现从持久 SocketStamp 验证后传入物理路径，精确 argv 校验同步使用该路径。官方 12 文件审查摘要 `972e4b7c3078cb3fe31bcc241bfe0a22b5aebea27d591f7ef1c1850b0199e216`。Grok 宿主从成功 Reserve 登记连接所属票据，EOF／Drop 原子封闭登记并请求原票据回收；覆盖 Reserve 晚于 EOF，保持新连接、输入 Revoke、活跃 TUI 和内核身份边界。Service／Connection 发送端释放后排空回收队列，不丢弃未落盘请求。
+
+四文件冻结 `50a6f61c43b75951510b540339212bda9e4d1f87ef930f46874a366f0eb7add1`；真实 PTY 用例先在未修复 stdio 上失败，修复后通过。整合 `r-yzvob9qe` 21 项断言通过，但 `input_revoke_does_not_request_launch_cleanup` 有一条 LEAK；外层最终未见进程、服务或打开文件并清理目录，不能据此推定 LEAK 根因。i18n 11 项和最终 cargo check 通过，汇总收据 `owned-startup-local-gates-v1.safe.json` SHA-256 `24011125c9a2e79f03e5510f9e33682073c4b0743ab78740a57b5efaa78336cb`。首次并行编辑期间因测试模块文件尚未创建而编译失败的记录保留。无需本地化变更；既有英中通知、失败语义不变，成功流程的双语布局仍待真实验收。
+
+原生 Grok 真实 ACP session/new 红基线确认预期 10 个通知 hook 实际为 0；`a9c27a25fe22` 在 SessionStart 前装配 active plugin 文件与内联 hooks，并替换继承的 plugin 命名空间防重，`.2` 的 45 项回归与完整原生 check 通过。验证摘要 `f6bc0f379f2da6f3ac3265e20124f9fe4b07e12e476edbc53f33cfe4bb595f54`；Mac `.2` 工件已构建、严格签名和零模型启动检查并绑定宿主，SHA-256 `2e1397f1587a34297195b7ddfed6da16bee4bc0944f984a8a6401055a8ae1923`，构建收据 `ee1090dd5dbcee1e318cff0276403c2a422ec864c5520557c7e212cea2521f86`；105 文件公开补丁精确重建原生 tree `36e0a1768607c2dc72c4880df9cc97189bbf7c88`。Linux 真实 ACP 回归已加入原生源码门禁，Linux 工件尚待实际构建；不将原生正例改记为 G08 完成。
+
+最终整合冻结21个源码／资源／来源文件，摘要 `05b40229c02e5411d64178a224194cc0f244f59cef85ba7030ca2d54cfe6f37a`。`r-47_btdcn` 串行零重试21项通过且无LEAK，日志 `1e290e2daf4209a0a85c81a0d1645217bb665abe33910f5b8e47b846a4b38f6f`；不据此解释旧并发LEAK。整合后i18n `r-yv_7vg06` 11项通过，日志 `b6289d382dc7358918e38407053dbdf16f53385566c57e4b8b2b0712f3712f1c`；最终check `r-zegvl7kg` 通过，日志 `b927881e04cad61fe44dc5b54317561b939349ce90d44beddf16cb02169a387f`。三轮短目录均已核验退出并清理；Python构建脚本4项通过。
+
+失败现场的 Grok leader 经本轮 ticket／清单、已退出 TUI、内核完整生存期、映像和 argv 核验后仅发送一次 SIGTERM，确认原生生存期退出；收据 `3f1e85abbb6faeb1d691229533c7915ac312af454a77cd577351935b0baaa2e3`。这不是自然退出或产品回收成功，原 ticket 无 released；GUI／sshd 退出且现场保留，cleanup_ready=false。旧slot已在重新核验进程、服务、打开文件与目录身份后同设备无覆盖保全，收据 `1b4fc2158f9715401244484e64bbc10d1ba6711beae4cb35a4c12424979242b0`；物理socket和四个profile仍原样保留。旧 `r-9u32vjqt` 的 Codex 孤儿同样经精确 TERM 后退出，slot 已同设备无覆盖保全，收据 `6df231fd04a7007abd012f7572d6f8c595652d417a6ffb85f52a91ab0608c6e4`，旧失败不回填。
+
+上一源码 `c3ff` 的 [CI 36822357366](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36822357366) 两平台作业成功；Linux host 1563／client 9／desktop 670，Windows host 1354／client 9／desktop 670。Windows `test_closing_tab_context_menu_restores_active_tab_focus` 首次 60.138 秒超时、第二次通过，不能称最终无异常门禁。13 份工件摘要与 CRC 通过，最终审计摘要 `66b553938bb1b2bc58dda5e7283ccc57c36fdeaf72d766d8b97ac7fc4f713686`；不覆盖本轮新源码。G08 的新构建图片消费、回收、SSH／tmux 异常恢复、英中实际界面和最终源码门禁继续开放。
+
 ## 2026-10-01：Codex 真实远端启动的长 socket 别名修复
 
 **新增关闭0项，仍为6关闭／5开放／3移交。** `c3ff0bba8/r-9u32vjqt` 的中文真实 SSH 产品菜单单次启动 Codex，官方原生已成功创建94字节物理socket及121字节rendezvous别名。宿主却用过长别名调用UnixStream::connect，ready等待20秒后失败；首次bound_socket/reaper同样使用别名，原生app-server残留。没有TUI、提示提交或模型请求。白名单收据SHA-256 `ed4efbd300331e3f5633d09ba2a8316d24bd573f1b0c58cb78aa4cc60ac5a552`；CUA观察收据 `7fafbe55f7f856e99d4aadfe8df065ed1b0652e4ef7217e9c5a20b273ece5748`。截图只在CUA工具输出，没有外置原图；App与SSH正常退出，stop因原生残留拒绝，现场保留待精确回收。

@@ -1536,7 +1536,7 @@ index 4989ab32a4cf5af11885d4e1457655639e502241..48560319d13a057cbf6f21cfef46da66
          workspace_root: dir.path().to_str().unwrap(),
          process_scope: None,
 diff --git a/crates/codegen/xai-grok-pager-bin/build.rs b/crates/codegen/xai-grok-pager-bin/build.rs
-index b821aa776cf7b3da1378ee8f3c54bfdeb3efeea7..6df008afc99e5f0512e07d3a8e0d6ef51f5a2ba7 100644
+index b821aa776cf7b3da1378ee8f3c54bfdeb3efeea7..1df18ad1786c2104f44d86bc7fe601105446c4ce 100644
 --- a/crates/codegen/xai-grok-pager-bin/build.rs
 +++ b/crates/codegen/xai-grok-pager-bin/build.rs
 @@ -31,9 +31,9 @@ fn main() {
@@ -1547,7 +1547,7 @@ index b821aa776cf7b3da1378ee8f3c54bfdeb3efeea7..6df008afc99e5f0512e07d3a8e0d6ef5
      let version = std::env::var("GROK_VERSION")
 -        .or_else(|_| std::env::var("CARGO_PKG_VERSION"))
 -        .unwrap_or_else(|_| "0.0.0".to_string());
-+        .unwrap_or_else(|_| "1.0.41+infinishell.session-notifications.1".to_string());
++        .unwrap_or_else(|_| "1.0.41+infinishell.session-notifications.2".to_string());
  
      println!("cargo:rustc-env=VERSION_WITH_COMMIT={version} ({commit})");
  
@@ -7816,7 +7816,7 @@ index 0000000000000000000000000000000000000000..c27d04ecd8cfdac180647ba1b52d29ae
 +    .await;
 +}
 diff --git a/crates/codegen/xai-grok-shell/Cargo.toml b/crates/codegen/xai-grok-shell/Cargo.toml
-index 7c3d22881ad4741ad387853d5dacd10e5ac1b8d2..495aa09f3ba0dcac5148c8c318bb1614ed975c0c 100644
+index 7c3d22881ad4741ad387853d5dacd10e5ac1b8d2..5e57ce92d682275b51a7097b414cb1f33d968f4d 100644
 --- a/crates/codegen/xai-grok-shell/Cargo.toml
 +++ b/crates/codegen/xai-grok-shell/Cargo.toml
 @@ -201,7 +201,7 @@ nix = { workspace = true }
@@ -7828,6 +7828,17 @@ index 7c3d22881ad4741ad387853d5dacd10e5ac1b8d2..495aa09f3ba0dcac5148c8c318bb1614
  
  [dev-dependencies]
  xai-dirs = { workspace = true }
+@@ -262,6 +262,10 @@ harness = false
+ # links one binary. The test name is `xai-grok-shell-all` (Bazel `//pkg:all`
+ # is the package wildcard). Process-isolated suites stay as implicit
+ # `tests/*.rs` binaries.
++[[test]]
++name = "session_create_plugin_hooks"
++required-features = ["test-support"]
++
+ [[test]]
+ name = "test_startup_prefetch_fallback"
+ required-features = ["test-support"]
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 index 094085e49711c48227827fa1d4dd44447f301d58..4d6af8752964e4d959c9d683b5603bf37f93940e 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
@@ -9315,10 +9326,20 @@ index 0000000000000000000000000000000000000000..16bcca9661b0785888ac30c4e75d5604
 +    assert!(start.notification_task.is_none());
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
-index 380683fa095ec19e8cded8cf8b61ff7e86856b07..deaa809d8f9624bee96ccead15f64a676ac8c4d5 100644
+index 380683fa095ec19e8cded8cf8b61ff7e86856b07..12c6f0c6639d5929a026c2b0200a79fe3ca0ee14 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/spawn.rs
-@@ -659,6 +659,7 @@ pub(crate) async fn spawn_session_actor(
+@@ -9,6 +9,9 @@ use crate::agent::remote_config::task_model_policy::{
+ };
+ use crate::remote::DEFAULT_CONTEXT_WINDOW;
+ use tracing::Instrument;
++use xai_grok_agent::plugins::hooks_adapter::{
++    parse_plugin_hooks, parse_plugin_hooks_from_value,
++};
+ use xai_grok_telemetry::region;
+ use xai_grok_telemetry::region::Parent as SpanParent;
+ use xai_grok_telemetry::subagent_spawn::phase_region_under;
+@@ -659,6 +662,7 @@ pub(crate) async fn spawn_session_actor(
          running_task: None,
          finalization_gate: Default::default(),
          message_delivery: Default::default(),
@@ -9326,6 +9347,70 @@ index 380683fa095ec19e8cded8cf8b61ff7e86856b07..deaa809d8f9624bee96ccead15f64a67
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+@@ -1561,7 +1565,7 @@ pub(crate) async fn spawn_session_actor(
+     let allowed_subagent_types_for_handle = agent.definition().allowed_subagent_types.clone();
+     let mut hook_discovery_errors: Vec<xai_grok_hooks::error::HookError> = Vec::new();
+     let hooks_discovery = spawn_step!("hooks_discovery");
+-    let built_hook_registry: Option<Arc<xai_grok_hooks::discovery::HookRegistry>> =
++    let mut built_hook_registry: Option<Arc<xai_grok_hooks::discovery::HookRegistry>> =
+         if let Some(override_reg) = hook_registry_override {
+             Some(override_reg)
+         } else {
+@@ -1592,14 +1596,51 @@ pub(crate) async fn spawn_session_actor(
+                 Some(Arc::new(registry))
+             }
+         };
+-    drop(hooks_discovery);
+-    let hook_registry_for_handle = built_hook_registry.clone();
+-    let workspace_ops_for_handle = workspace_ops.clone();
+     #[allow(clippy::arc_with_non_send_sync)]
+     let mut _hook_load_errors: Vec<String> = hook_discovery_errors
+         .iter()
+         .map(|e| e.to_string())
+         .collect();
++    if let Some(plugins) = &plugin_registry {
++        // 首次 SessionStart 前装入插件；派生会话可能已继承插件，先替换其命名空间以免重复执行。
++        let mut registry = built_hook_registry
++            .take()
++            .map(Arc::unwrap_or_clone)
++            .unwrap_or_default();
++        registry.remove_by_prefix("plugin/");
++        for plugin in plugins.active_plugins() {
++            if let Some(hooks_path) = &plugin.hooks_path {
++                let (specs, warnings) = parse_plugin_hooks(
++                    hooks_path,
++                    &plugin.name,
++                    &plugin.root_str(),
++                    &plugin.data_dir_str(),
++                );
++                for warning in &warnings {
++                    tracing::warn!("{warning}");
++                }
++                _hook_load_errors.extend(warnings);
++                registry.append_specs(specs);
++            }
++            if let Some(inline_value) = &plugin.inline_hooks {
++                let (specs, warnings) = parse_plugin_hooks_from_value(
++                    inline_value,
++                    &plugin.name,
++                    &plugin.root_str(),
++                    &plugin.data_dir_str(),
++                );
++                for warning in &warnings {
++                    tracing::warn!("{warning}");
++                }
++                _hook_load_errors.extend(warnings);
++                registry.append_specs(specs);
++            }
++        }
++        built_hook_registry = (!registry.is_empty()).then(|| Arc::new(registry));
++    }
++    drop(hooks_discovery);
++    let hook_registry_for_handle = built_hook_registry.clone();
++    let workspace_ops_for_handle = workspace_ops.clone();
+     let upload_queue = Arc::new(std::sync::OnceLock::new());
+     let (goal_update_tx, goal_update_rx) = tokio::sync::mpsc::unbounded_channel::<
+         xai_grok_tools::implementations::grok_build::update_goal::UpdateGoalEnvelope,
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97e33e3785
@@ -12289,6 +12374,251 @@ index 0000000000000000000000000000000000000000..6cccdfa12f083995e3ff7d7bdfb0c2b6
 +    peer.verify().unwrap();
 +    cloned.console_peer().verify().unwrap();
 +}
+diff --git a/crates/codegen/xai-grok-shell/tests/session_create_plugin_hooks.rs b/crates/codegen/xai-grok-shell/tests/session_create_plugin_hooks.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c7f668252d39f910592f39613d59af2801dcf06
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/tests/session_create_plugin_hooks.rs
+@@ -0,0 +1,239 @@
++#![cfg(unix)]
++
++#[allow(dead_code)]
++mod acp_harness;
++
++use std::path::{Path, PathBuf};
++use std::time::Duration;
++
++use acp_harness::{AutoApproveClient, RPC_TIMEOUT, connect_and_auth, ext_method, run_agent_test};
++use agent_client_protocol::{self as acp, Agent as _};
++use serde_json::json;
++use sha2::{Digest, Sha256};
++use xai_grok_shell::session::notification_plugin::NotificationPlugin;
++use xai_hooks_plugins_types::HooksListResponse;
++
++fn start_hook(marker: &Path) -> serde_json::Value {
++    json!({"hooks": {"SessionStart": [{"hooks": [{
++        "type": "command", "command": format!("printf 'start\\n' >> '{}'", marker.display()),
++        "timeout": 5
++    }]}]}})
++}
++
++fn write_json(path: &Path, value: serde_json::Value) {
++    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
++    std::fs::write(path, serde_json::to_vec(&value).unwrap()).unwrap();
++}
++
++fn notification_plugin(cwd: &Path, plugin_dir: PathBuf, session_id: String) -> NotificationPlugin {
++    write_json(
++        &plugin_dir.join(".grok-plugin/plugin.json"),
++        json!({"name": "infinishell-grok", "version": "test"}),
++    );
++    let hooks = [
++        "SessionStart", "UserPromptSubmit", "PostToolUse", "PostToolUseFailure",
++        "PermissionDenied", "Notification", "StopFailure", "Stop", "SessionEnd", "StopCancelled",
++    ].into_iter().map(|event| (event.to_owned(), json!([{"hooks": [{
++        "type": "command",
++        "command": "node -e \"require(process.env.GROK_PLUGIN_ROOT + '/hooks/notify.cjs').main()\"",
++        "timeout": 5,
++        "env": {
++            "WARP_CLI_AGENT_PROTOCOL_VERSION": "1",
++            "WARP_CLI_AGENT_NOTIFY_EXECUTABLE": cwd.join("synthetic-worker"),
++            "WARP_CLI_AGENT_SESSION_ROUTE": "1"
++        }
++    }]}]))).collect::<serde_json::Map<_, _>>();
++    write_json(
++        &plugin_dir.join("hooks/hooks.json"),
++        json!({"hooks": hooks}),
++    );
++    std::fs::write(
++        plugin_dir.join("hooks/notify.cjs"),
++        b"exports.main = () => {};\n",
++    )
++    .unwrap();
++    let files = [
++        ".grok-plugin/plugin.json",
++        "hooks/hooks.json",
++        "hooks/notify.cjs",
++    ]
++    .into_iter()
++    .map(|name| {
++        (
++            name.to_owned(),
++            format!(
++                "{:x}",
++                Sha256::digest(std::fs::read(plugin_dir.join(name)).unwrap())
++            ),
++        )
++    })
++    .collect();
++    let binding = NotificationPlugin {
++        version: 1,
++        session_id,
++        cwd: cwd.to_owned(),
++        plugin_dir,
++        files,
++    };
++    binding.validate_target(&binding.session_id, cwd).unwrap();
++    binding
++}
++
++async fn list_hooks(
++    conn: &acp::ClientSideConnection,
++    session_id: &acp::SessionId,
++) -> HooksListResponse {
++    let response = ext_method(conn, "x.ai/hooks/list", json!({"sessionId": session_id.0})).await;
++    serde_json::from_value(response.get("result").unwrap_or(&response).clone()).unwrap()
++}
++
++#[test]
++fn session_create_initializes_plugin_hooks_before_session_start() {
++    run_agent_test(|cwd, _server| async move {
++        let cwd = dunce::canonicalize(cwd).unwrap();
++        let grok_home = PathBuf::from(std::env::var("GROK_HOME").unwrap());
++        // 仅隔离 GROK_HOME；不改用户 HOME/CODEX_HOME，也不导入用户兼容配置。
++        std::fs::write(grok_home.join("config.toml"), concat!(
++            "[claude_compat]\nimported = true\n",
++            "[plugins]\ndisabled = [\"disabled-plugin\"]\n",
++            "[compat.claude]\nskills = false\nrules = false\nagents = false\nmcps = false\nhooks = false\nsessions = false\n",
++            "[compat.cursor]\nskills = false\nrules = false\nagents = false\nmcps = false\nhooks = false\nsessions = false\n",
++        )).unwrap();
++        git2::Repository::init(&cwd).unwrap();
++        let global_marker = cwd.join("global-start");
++        let project_marker = cwd.join("project-start");
++        let file_marker = cwd.join("file-start");
++        let inline_marker = cwd.join("inline-start");
++        let disabled_marker = cwd.join("disabled-start");
++        let user_disabled_marker = cwd.join("user-disabled-start");
++        write_json(
++            &grok_home.join("hooks/global.json"),
++            start_hook(&global_marker),
++        );
++        write_json(
++            &cwd.join(".grok/hooks/project.json"),
++            start_hook(&project_marker),
++        );
++        xai_grok_workspace::folder_trust::grant_folder_trust(&cwd);
++
++        let file_plugin = cwd.join("file-plugin");
++        write_json(
++            &file_plugin.join("plugin.json"),
++            json!({"name": "file-plugin"}),
++        );
++        write_json(
++            &file_plugin.join("hooks/hooks.json"),
++            start_hook(&file_marker),
++        );
++        let user_disabled_plugin = cwd.join("user-disabled-plugin");
++        write_json(
++            &user_disabled_plugin.join("plugin.json"),
++            json!({"name": "user-disabled-plugin"}),
++        );
++        write_json(
++            &user_disabled_plugin.join("hooks/hooks.json"),
++            start_hook(&user_disabled_marker),
++        );
++        let disabled_hook_name = "plugin/user-disabled-plugin/hooks:session_start[0].hooks[0]";
++        std::fs::write(
++            grok_home.join("disabled-hooks"),
++            format!("{disabled_hook_name}\n"),
++        )
++        .unwrap();
++        let inline_plugin = cwd.join("inline-plugin");
++        write_json(
++            &inline_plugin.join("plugin.json"),
++            json!({
++                "name": "inline-plugin", "hooks": start_hook(&inline_marker)
++            }),
++        );
++        let disabled_plugin = cwd.join("disabled-plugin");
++        write_json(
++            &disabled_plugin.join("plugin.json"),
++            json!({
++                "name": "disabled-plugin", "hooks": start_hook(&disabled_marker)
++            }),
++        );
++
++        let sid = uuid::Uuid::new_v4().to_string();
++        let binding = notification_plugin(&cwd, cwd.join("notification-plugin"), sid.clone());
++        let (conn, _init) = connect_and_auth(AutoApproveClient, "plugin-startup-test").await;
++        // 走真实 ACP→prefetch→actor 启动；这里不伪造 leader 的原生终端身份。
++        let session = tokio::time::timeout(RPC_TIMEOUT, conn.new_session(
++            acp::NewSessionRequest::new(cwd.clone()).meta(json!({
++                "modelId": "test-model", "sessionId": sid,
++                "pluginDirs": [file_plugin, inline_plugin, disabled_plugin, user_disabled_plugin, binding.plugin_dir]
++            }).as_object().cloned())
++        )).await.unwrap().unwrap().session_id;
++        let hooks = list_hooks(&conn, &session).await;
++        assert!(hooks.load_errors.is_empty(), "{:?}", hooks.load_errors);
++        assert_eq!(
++            hooks
++                .hooks
++                .iter()
++                .filter(|hook| hook.name.starts_with("plugin/infinishell-grok/"))
++                .count(),
++            10
++        );
++        assert!(
++            !hooks
++                .hooks
++                .iter()
++                .any(|hook| hook.name.starts_with("plugin/disabled-plugin/"))
++        );
++        assert!(
++            hooks
++                .hooks
++                .iter()
++                .any(|hook| hook.name == disabled_hook_name && hook.disabled)
++        );
++        assert_eq!(
++            hooks
++                .hooks
++                .iter()
++                .filter(|hook| hook.name.starts_with("global/"))
++                .count(),
++            1
++        );
++        assert_eq!(
++            hooks
++                .hooks
++                .iter()
++                .filter(|hook| hook.name.starts_with("project/"))
++                .count(),
++            1
++        );
++
++        tokio::time::timeout(Duration::from_secs(15), async {
++            while [
++                &global_marker,
++                &project_marker,
++                &file_marker,
++                &inline_marker,
++            ]
++            .iter()
++            .any(|marker| !marker.exists())
++            {
++                tokio::time::sleep(Duration::from_millis(20)).await;
++            }
++        })
++        .await
++        .expect("真实启动必须执行文件插件、内联插件及既有全局/项目 SessionStart");
++        assert_eq!(std::fs::read_to_string(global_marker).unwrap(), "start\n");
++        assert_eq!(std::fs::read_to_string(project_marker).unwrap(), "start\n");
++        assert_eq!(std::fs::read_to_string(file_marker).unwrap(), "start\n");
++        assert_eq!(std::fs::read_to_string(inline_marker).unwrap(), "start\n");
++        assert!(!disabled_marker.exists());
++        assert!(!user_disabled_marker.exists());
++
++        // 后续普通新会话不能继承前一会话的插件目录。
++        let next = acp_harness::new_session(&conn, &cwd).await;
++        assert!(
++            !list_hooks(&conn, &next)
++                .await
++                .hooks
++                .iter()
++                .any(|hook| hook.name.starts_with("plugin/"))
++        );
++    });
++}
 diff --git a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs b/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
 index 1fa947b413d32967c761713ad78e3863614110ef..752b8064e90369d3de69b3d80cc457d67ed47902 100644
 --- a/crates/codegen/xai-grok-shell/tests/test_leader_stdio_integration.rs
@@ -12823,7 +13153,7 @@ index eb5bfb69d4dcf83b2147b5ddac87bea7771e4bdb..41272a9b13f438cd7478d387b5b4651a
      /// `Completions` without draining; the requester's ledger discards the copies at a later drain. `suppress_ids` is ignored.
      PeekCompletions(SubagentCompletionsRequest),
 diff --git a/crates/codegen/xai-grok-version/src/lib.rs b/crates/codegen/xai-grok-version/src/lib.rs
-index d78baa06c11a48083c390aa578f7094d3da0d2a3..f4ff2c7fe371dfec38ae29b36dcc01fe9dad57d7 100644
+index d78baa06c11a48083c390aa578f7094d3da0d2a3..564d0cb3ec3fe9de7c25018d99ee14b22a40fbe9 100644
 --- a/crates/codegen/xai-grok-version/src/lib.rs
 +++ b/crates/codegen/xai-grok-version/src/lib.rs
 @@ -8,9 +8,16 @@ use semver::Version;
@@ -12833,7 +13163,7 @@ index d78baa06c11a48083c390aa578f7094d3da0d2a3..f4ff2c7fe371dfec38ae29b36dcc01fe
 +/// 原子终端桥的构建合同；所有共享 leader 的客户端都必须明确声明。
 +pub const TERMINAL_BRIDGE_BUILD_CONTRACT: &str = "infinishell-terminal-bridge-v1+session-notifications-v1";
 +/// 与上游发行版分开标识，保留原版本比较规则。
-+pub const TERMINAL_BRIDGE_CLIENT_VERSION: &str = "1.0.41+infinishell.session-notifications.1";
++pub const TERMINAL_BRIDGE_CLIENT_VERSION: &str = "1.0.41+infinishell.session-notifications.2";
 +/// 固定使用独立的短名称，避免与上游 leader 混用并控制 Unix socket 路径长度。
 +pub const TERMINAL_BRIDGE_LEADER_NAMESPACE: &str = "leader-isp-sn1";
 +

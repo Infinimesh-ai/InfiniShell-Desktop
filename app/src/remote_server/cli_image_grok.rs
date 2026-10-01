@@ -4,7 +4,9 @@ use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -31,10 +33,30 @@ struct Terminal {
     lease: Option<(Uuid, Arc<AtomicU8>)>,
 }
 
+struct RegisteredLaunch {
+    scope: Scope,
+    ticket: Ticket,
+    cleanup: Sender<(Scope, Ticket)>,
+}
+
+impl RegisteredLaunch {
+    fn request_cleanup(self) {
+        let _ = self.cleanup.send((self.scope, self.ticket));
+    }
+}
+
 pub(super) struct Connection {
     live: AtomicBool,
     initialized: AtomicBool,
     terminals: Mutex<HashMap<u64, Terminal>>,
+    // 启动生命周期独立于输入租约；None 表示断连已封闭登记。
+    launches: Mutex<Option<Vec<RegisteredLaunch>>>,
+}
+
+impl Drop for Connection {
+    fn drop(&mut self) {
+        self.disconnect();
+    }
 }
 
 impl Connection {
@@ -43,6 +65,7 @@ impl Connection {
             live: AtomicBool::new(true),
             initialized: AtomicBool::new(false),
             terminals: Mutex::new(HashMap::new()),
+            launches: Mutex::new(Some(Vec::new())),
         }
     }
     pub(super) fn initialize(&self) {
@@ -79,11 +102,33 @@ impl Connection {
     }
     pub(super) fn disconnect(&self) {
         self.live.store(false, Ordering::Release);
+        let launches = self.launches.lock().expect("远端 Grok 启动锁").take();
+        if let Some(launches) = launches {
+            for launch in launches {
+                launch.request_cleanup();
+            }
+        }
         for terminal in self.terminals.lock().expect("远端 Grok 终端锁").values() {
             if let Some((_, lease)) = &terminal.lease {
                 let _ = lease.compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst);
             }
         }
+    }
+
+    fn register_launch(&self, scope: Scope, ticket: Ticket, cleanup: Sender<(Scope, Ticket)>) {
+        let launch = RegisteredLaunch {
+            scope,
+            ticket,
+            cleanup,
+        };
+        let mut launches = self.launches.lock().expect("远端 Grok 启动锁");
+        if let Some(launches) = launches.as_mut() {
+            launches.push(launch);
+            return;
+        }
+        drop(launches);
+        // Reserve 的磁盘写入可晚于 EOF 完成；此时不能把成功票据遗留在已关闭连接。
+        launch.request_cleanup();
     }
     fn current(&self, scope: &Scope) -> bool {
         self.live.load(Ordering::Acquire)
@@ -146,13 +191,7 @@ impl Connection {
 pub(super) struct Service {
     host: String,
     tickets: TicketStore,
-    stop_cleanup: Arc<AtomicBool>,
-}
-
-impl Drop for Service {
-    fn drop(&mut self) {
-        self.stop_cleanup.store(true, Ordering::Release);
-    }
+    cleanup: Sender<(Scope, Ticket)>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -172,25 +211,15 @@ struct Finished {
 impl Service {
     pub(super) fn new(host: String, parent: &Path) -> io::Result<Self> {
         let tickets = TicketStore::new(parent)?;
-        let stop_cleanup = Arc::new(AtomicBool::new(false));
         let cleanup_tickets = tickets.clone();
-        let cleanup_stop = stop_cleanup.clone();
+        let (cleanup, requested) = mpsc::channel();
         std::thread::Builder::new()
             .name("grok-owned-cleanup".into())
-            .spawn(move || {
-                while !cleanup_stop.load(Ordering::Acquire) {
-                    if let Ok(directories) = cleanup_tickets.reap_requested() {
-                        for directory in directories {
-                            let _ = cleanup_payloads(&directory);
-                        }
-                    }
-                    std::thread::sleep(std::time::Duration::from_secs(5));
-                }
-            })?;
+            .spawn(move || cleanup_worker(cleanup_tickets, requested))?;
         Ok(Self {
             host,
             tickets,
-            stop_cleanup,
+            cleanup,
         })
     }
 
@@ -216,16 +245,13 @@ impl Service {
     ) -> io::Result<Reply> {
         let scope = request.scope;
         match request.action {
-            Action::Reserve { ticket, cwd } => self.tickets.reserve(&scope, &ticket, &cwd),
-            Action::Status { ticket } => self.tickets.lock(&scope, &ticket)?.status(&ticket),
-            Action::Cancel { ticket } => {
-                let guard = self.tickets.lock(&scope, &ticket)?;
-                let reply = guard.cancel(&ticket)?;
-                if matches!(&reply, Reply::Launch { phase, .. } if phase == "released") {
-                    cleanup_payloads(&guard.directory)?;
-                }
+            Action::Reserve { ticket, cwd } => {
+                let reply = self.tickets.reserve(&scope, &ticket, &cwd)?;
+                connection.register_launch(scope, ticket, self.cleanup.clone());
                 Ok(reply)
             }
+            Action::Status { ticket } => self.tickets.lock(&scope, &ticket)?.status(&ticket),
+            Action::Cancel { ticket } => cancel_launch(&self.tickets, &scope, &ticket),
             Action::Revoke { ticket, .. } => {
                 self.tickets.lock(&scope, &ticket)?;
                 Ok(Reply::Revoked { ticket })
@@ -426,6 +452,33 @@ impl Service {
     }
 }
 
+fn cleanup_worker(tickets: TicketStore, requested: Receiver<(Scope, Ticket)>) {
+    loop {
+        if let Ok(directories) = tickets.reap_requested() {
+            for directory in directories {
+                let _ = cleanup_payloads(&directory);
+            }
+        }
+        match requested.recv_timeout(Duration::from_secs(5)) {
+            Ok((scope, ticket)) => {
+                let _ = cancel_launch(&tickets, &scope, &ticket);
+            }
+            Err(RecvTimeoutError::Timeout) => {}
+            // Service 与登记的连接均释放发送端后，排空已关闭连接的回收请求才退出。
+            Err(RecvTimeoutError::Disconnected) => break,
+        }
+    }
+}
+
+fn cancel_launch(tickets: &TicketStore, scope: &Scope, ticket: &Ticket) -> io::Result<Reply> {
+    let guard = tickets.lock(scope, ticket)?;
+    let reply = guard.cancel(ticket)?;
+    if matches!(&reply, Reply::Launch { phase, .. } if phase == "released") {
+        cleanup_payloads(&guard.directory)?;
+    }
+    Ok(reply)
+}
+
 fn prompt(input: &Input) -> io::Result<GrokLeaderPrompt> {
     if input.images.is_empty() {
         return GrokLeaderPrompt::text(&input.text).map_err(|_| invalid());
@@ -542,3 +595,7 @@ pub(crate) fn input_subject(input: &Input) -> io::Result<String> {
         &encode(&(&input.text, &input.images)).map_err(|_| invalid())?,
     ))
 }
+
+#[cfg(test)]
+#[path = "cli_image_grok_tests.rs"]
+mod tests;

@@ -6485,5 +6485,104 @@
     "newly_closed_gaps": [],
     "gap_closed": false,
     "local_gates_receipt_sha256": "8ae6cdee20e13e3d77a59aef6d384f37cd01491da42f3ee8b3b2e713c3ffcb99"
+  },
+  "g08_owned_startup_20261001": {
+    "status": "native_artifact_bound_local_gates_passed_real_gui_reverification_pending",
+    "source_base": "400fe985fe584c91318f0f6165c1f4b4f3cdec2e",
+    "newly_closed_gaps": [],
+    "gap_closed": false,
+    "reproduction": {
+      "run_id": "r-vpukvpd7",
+      "language": "zh-CN",
+      "model_inputs": 0,
+      "image_submissions": 0,
+      "grok": "原生首页已启动；初始registry只有全局hook，插件缺失；关闭后leader未自动回收。",
+      "grok_whitelist_sha256": "c8793e022c77c6eb30748e2b4bdd4ada4fa89a98c19fa890bf85196c6976f286",
+      "codex": "server ready并绑定socket；TUI无birth，包装器结束后server已退出且released=true。",
+      "codex_whitelist_sha256": "caa9c4376694f0aef0180a15e59488ac1ce7c1004d227943dcc32554c8c62264"
+    },
+    "implementation": [
+      "Codex TUI helper显式继承三个PTY描述符；server仍隔离。",
+      "TUI --remote及argv身份校验使用持久SocketStamp核验的物理socket；server --listen保留官方别名合同。",
+      "Grok连接登记成功Reserve票据，断连/Drop与晚完成Reserve原子封闭，队列排空后退出；新连接/输入撤销不受影响。"
+    ],
+    "source_freeze_sha256": "50a6f61c43b75951510b540339212bda9e4d1f87ef930f46874a366f0eb7add1",
+    "official_codex_review_sha256": "972e4b7c3078cb3fe31bcc241bfe0a22b5aebea27d591f7ef1c1850b0199e216",
+    "local_gates_sha256": "24011125c9a2e79f03e5510f9e33682073c4b0743ab78740a57b5efaa78336cb",
+    "tests": {
+      "run_id": "r-yzvob9qe",
+      "passed": 21,
+      "leak_count": 1,
+      "leak_test": "remote_server::cli_image_grok::tests::input_revoke_does_not_request_launch_cleanup",
+      "leak_root_cause": "not_established",
+      "exit_proof": "无残余进程/相关launchd/打开文件，短目录已清理；不由此推定LEAK原因。"
+    },
+    "i18n": {
+      "run_id": "r-9ktfdfsb",
+      "passed": 11
+    },
+    "check": {
+      "run_id": "r-ormo_wkw",
+      "exit_code": 0
+    },
+    "native_followup": {
+      "commit": "a9c27a25fe22ed693273b5428ea27d4a8b0c2940",
+      "custom_version": "1.0.41+infinishell.session-notifications.2",
+      "initial_hook_count_before_fix": 0,
+      "expected_notification_hooks": 10,
+      "tests_passed": 45,
+      "check": "passed",
+      "validation_sha256": "f6bc0f379f2da6f3ac3265e20124f9fe4b07e12e476edbc53f33cfe4bb595f54",
+      "artifact_and_host_binding": "mac_artifact_built_verified_and_bound",
+      "artifact_sha256": "2e1397f1587a34297195b7ddfed6da16bee4bc0944f984a8a6401055a8ae1923",
+      "build_receipt_sha256": "ee1090dd5dbcee1e318cff0276403c2a422ec864c5520557c7e212cea2521f86",
+      "patch_sha256": "0f87e451807cebf30f0670f2e88c38d91daa4b1b286a01aa632edde6fad7a787",
+      "source_metadata_sha256": "a6ef2942bc2387d53d525f14985a62d79f3a0c642b1d324987322098ace204b4",
+      "linux_artifact": "pending_actual_ci_build"
+    },
+    "lifecycle": {
+      "grok_exit_method": "单次内核身份绑定SIGTERM，原生生存期已退出；非自然退出/产品回收。",
+      "grok_term_sha256": "3f1e85abbb6faeb1d691229533c7915ac312af454a77cd577351935b0baaa2e3",
+      "grok_ticket_released": false,
+      "gui_and_sshd_exit_code": 0,
+      "run_status": "completed_retained",
+      "cleanup_ready": false,
+      "slot_retained_receipt_sha256": "1b4fc2158f9715401244484e64bbc10d1ba6711beae4cb35a4c12424979242b0",
+      "slot_retained_path": "/Users/zhishi/InfiniShell-Tests/r-vpukvpd7/retired-remote-server"
+    },
+    "previous_ci": {
+      "run_id": 36822357366,
+      "source": "c3ff0bba80a65acf9eb0fe090b54783a71d4f80d",
+      "conclusion": "success_with_one_windows_flaky",
+      "audit_sha256": "66b553938bb1b2bc58dda5e7283ccc57c36fdeaf72d766d8b97ac7fc4f713686",
+      "boundary": "不覆盖本轮新源码；保留首次60.138秒超时。"
+    },
+    "localization": "无需本地化变更；既有英中通知和失败语义不变，成功流程布局仍待真实验收。",
+    "remaining": "真实图片消费及回收、SSH/tmux异常恢复、英中GUI、Linux通知工件及最终源码门禁。",
+    "integrated_source_freeze_sha256": "05b40229c02e5411d64178a224194cc0f244f59cef85ba7030ca2d54cfe6f37a",
+    "integrated_tests": {
+      "run_id": "r-47_btdcn",
+      "passed": 21,
+      "failed": 0,
+      "leak_count": 0,
+      "retries": 0,
+      "test_threads": 1,
+      "log_sha256": "1e290e2daf4209a0a85c81a0d1645217bb665abe33910f5b8e47b846a4b38f6f",
+      "cleanup_ready": true,
+      "boundary": "整合后串行运行通过；不证明前轮并发LEAK的根因。"
+    },
+    "integrated_i18n": {
+      "run_id": "r-yv_7vg06",
+      "passed": 11,
+      "log_sha256": "b6289d382dc7358918e38407053dbdf16f53385566c57e4b8b2b0712f3712f1c",
+      "cleanup_ready": true
+    },
+    "integrated_check": {
+      "run_id": "r-zegvl7kg",
+      "exit_code": 0,
+      "log_sha256": "b927881e04cad61fe44dc5b54317561b939349ce90d44beddf16cb02169a387f",
+      "cleanup_ready": true
+    },
+    "integrated_local_gates_sha256": "268763da2bea2a468085f3ef1605557b29a1a9a98dd01d607e8e0d20da7c97b2"
   }
 }
