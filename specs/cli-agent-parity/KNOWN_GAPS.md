@@ -351,6 +351,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
 
+- **2026-10-02 `.4` 正常退出实窗正例**：`51b0e4aed/r-dpopymbl` 的冷启动中文 GUI 经真实 SSH／tmux 产品菜单启动固定 `.4`，空会话只执行一次 `/exit`。同一 SID 的 global/plugin SessionEnd、Stop 四项成功，原 pane shell／TUI／leader 退出，retired/released 与原 manifest 一致，私有 socket 回收；退出收据 `1be89a860de809d0d7c07f89ffe1e40bbd114224c69bc9740e63a0fc9f7a6f83`。宿主 ANSI 入口收到两条退出通知，零回合按插件合同降为 `notification`，不能冒称模型回合 Stop 或现场证明 listener 内存退役顺序。另一次误开日常 Grok 的输入已取消并单列，不属于此 SID 的零输入证明。旧 pager LEAK 原因仍未知；[修复提交源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 待完成，V03 保持开放。
+
 - **2026-10-02 原生退出修复待实窗复验**：公开 Grok 源码提交 `ba8ce6d346aa`／`.4` 将正常 owned 退出改为在原 IPC 与终端仍附着时等待闲置 actor 的 SessionEnd／Stop，然后撤销原代际路由；繁忙会话只脱离、不新增取消，意外断连仍立即撤销。Mac check、真实 actor 四 hook 正例及签名构建通过；主仓定向、GUI `/exit` 和新 Windows console broker 门禁待验。旧 `.3` 通知失败与测试 LEAK 保留，不以进程退出代替通知完成，不关闭 V03。
 
 - **状态／优先级／范围**：验收缺口，高；P2 通知、P4 重连、P5 SSH／tmux。

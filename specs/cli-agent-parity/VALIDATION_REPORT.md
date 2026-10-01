@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：Grok 原生正常退出实窗通过，最终源码门禁进行中
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `51b0e4aed` 的冷启动中文签名 GUI 在 `r-dpopymbl` 经实际 SSH／tmux 产品菜单启动 Grok `.4/ba8ce6d346aa`。目标 SID `02068f66-965b-4e46-b9e8-1121b34f576b` 的 global/plugin SessionStart 成功；在原生提示符输入并目验单斜线 `/exit` 后只按一次 Enter。global/plugin SessionEnd 成功（157/242 ms）、Stop 成功（82/209 ms），目标会话用户／模型／完成回合计数全为零。原 pane shell、TUI、leader 已退出，retired/released 与同一 manifest 匹配，私有 socket 及其目录回收。启动、退出收据 SHA-256 分别为 `a01508b2ae49921b75e11ed92802edf2e284ea07e94053e26f6bbcff6acfac44`、`1be89a860de809d0d7c07f89ffe1e40bbd114224c69bc9740e63a0fc9f7a6f83`，均在 `g08-preparation/r-dpopymbl-tmux-owned-gui`。
+
+宿主日志中同 SID／cwd 的启动及两条退出通知均到达 ANSI 接收入口；零回合的 SessionEnd／Stop 按既有插件合同降为 `notification`。该共享日志没有 PID，不用于证明 listener 内存退役或路由线性化；源码守卫、既有受控断言及真实文件／进程退役分别计证。接收审计 SHA-256 `38fdeeed063f92bfd36a7dc3591580f654ab7befb1704a53b4ad57a7fadf4bb3`；CUA 观察收据 `13a3caebd15ec412ed8fe5b870033cd66c3e54ad721cc5ca8e63f6299ae3c088`。随后 tmux、SSH、GUI 顺次正常退出，GUI exit 0；专属 daemon 及其僵尸子进程沿既有十分钟宽限退出，finish 确认全部自有进程结束（摘要 `16dcb87233a857eeaffeed42d96d01ce64fa7c246a00aa6d951b18099cab736c`）。核实无打开文件后，remote slot 同设备无覆盖保全到原短目录；收据 `a317c0bd7bbef180c818811bf5539f1232e0f1e5856024d9a7af882542778887`。唯一历史与 profiles 保留，cleanup_ready=false。中文通知提示和富输入控件可读，本轮无新增文案，无需本地化变更。
+
+同一现场此前误点全局 Grok 入口，启动了日常 `1.0.46`，输入被转为 `//exit` 并触发一次模型请求；已立即取消并关闭该标签。此错误独立保留，不查询其历史，不计入验收，也不把整个现场称为零模型输入。原 `.3` 退出通知失败与 pager 超时测试 LEAK 均保留；后者原因未知，真实 `.4` 正常 ACK 正例不覆盖 LEAK。
+
+[旧门禁 36881884266](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266) 已终态失败：Linux 18 项 lifecycle 夹具失败及通知写入超时；Windows lifecycle 1440 项中 1425 通过（含 2 项重试通过）、15 失败，17 个初次失败均指向旧 Codex bootstrap 顺序。Windows 另有 Claude 第二子进程 stdin EOF 5012 ms 未退出、Grok console broker 拒绝访问；桌面/TUI 670 项通过不能覆盖这些失败。Windows 终态审计 SHA-256 `fa014fc3f0660b5828c36f079fdb9c6fb1e13b48827594804568108b922decb3`。已完成 Mac 门禁的 `51b0e4aed` 正在运行 [新门禁 36898008829](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829)，明确选择 Linux／Windows 通知源码及宿主回归，不增加超时、不把新运行当作旧失败已修复。
+
+V03 剩余条件逐项审计 SHA-256 `5d80ceac99115922f8e0547a8942b82e47dd9a7f9a03b5243748fd637235e4f0`：三款真实 SSH／tmux 运行回合取消仍缺证据；空闲 `/exit`、审批拒绝和受控取消回执不能代替。当前继续完成 G08 最终源码门禁。本文提交前 `cargo check -p warp` 在 `r-d1zsoiow` 通过，日志摘要 `11d98597b65cb6e41f1b24198f9898e86f8ee44c8f088d1891a82c39a0416d64`，短目录已核验清理；其余源码／i18n 未变，不重复模型输入。
+
 ## 2026-10-02：三款真实 tmux 图片、重连与旧请求保护完成，源码门禁仍开放
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `7b7fc36fc41d79be842ecda87e2fc7c7dc521419` 的签名 GUI（SHA-256 `123a4112528cbd2eaee76bdd5d98a56acfc1dbb5153f816be3ada6c3b028728b`）在 `r-hx4at14_` 实际回环 SSH／tmux 中完成三款固定 CLI 首图、完整断连重接和原消费者第二条新内容。Grok `.3/975d815fec8e`、Codex `0.156.1`、Claude `2.1.280` 分别保持原 SID／进程生存期；六条真实请求均有原生 typed PNG、独立请求及两端 ACK／引用释放。137 字节源 PNG 规范化后为 328 字节，上传、原生图片及像素内容分别核对，不称原编码字节不变。索引 `resume-20261001/g08-preparation/r-hx4at14_-tmux-owned-gui/functional-review-v1.safe.json` SHA-256 `a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85`。

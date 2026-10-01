@@ -6865,12 +6865,19 @@
     "source_gate": {
       "run_id": 36881884266,
       "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266",
-      "status": "failed_checks_pending_fix",
+      "status": "completed_failure",
       "failures": [
         "Linux lifecycle夹具18项及installed Grok hook通知写入超时",
         "Windows Claude权限观察探针",
         "Windows Grok真实console broker拒绝访问；非编译失败"
-      ]
+      ],
+      "windows_final_audit_sha256": "fa014fc3f0660b5828c36f079fdb9c6fb1e13b48827594804568108b922decb3",
+      "windows_lifecycle": {
+        "passed": 1425,
+        "failed": 15,
+        "flaky_in_passed": 2,
+        "root_cause": "旧Codex夹具bootstrap顺序；新源码目标复验待完成"
+      }
     },
     "gap_closed": false,
     "newly_closed_items": []
@@ -6884,8 +6891,8 @@
     "source_file_count": 125,
     "passed": "原生最终check、真实actor SessionEnd/Stop四hook、Mac构建与零模型启动检查",
     "remaining": [
-      "真实GUI正常退出通知",
-      "Linux/Windows最终源码门禁"
+      "Linux/Windows最终源码门禁",
+      "V03其余Mac组合按原关闭条件核验"
     ],
     "historical_failure": "旧.3退出通知失败、旧nextest LEAK及CI失败保留，未被新正例覆盖",
     "windows_fix": "broker由CREATE_NO_WINDOW改用DETACHED_PROCESS；真实控制台附着尚待新CI",
@@ -6900,6 +6907,42 @@
       "cargo_check": "passed",
       "localization": "无需本地化变更",
       "temporary_runs": "all cleaned"
+    },
+    "gui_exit": {
+      "source_commit": "51b0e4aed0e790b96e0020f21ce15d658efd61c6",
+      "run_id": "r-dpopymbl",
+      "session_id": "02068f66-965b-4e46-b9e8-1121b34f576b",
+      "status": "passed_for_idle_normal_exit",
+      "started_receipt_sha256": "a01508b2ae49921b75e11ed92802edf2e284ea07e94053e26f6bbcff6acfac44",
+      "exited_receipt_sha256": "1be89a860de809d0d7c07f89ffe1e40bbd114224c69bc9740e63a0fc9f7a6f83",
+      "gui_receiver_sha256": "38fdeeed063f92bfd36a7dc3591580f654ab7befb1704a53b4ad57a7fadf4bb3",
+      "cua_receipt_sha256": "13a3caebd15ec412ed8fe5b870033cd66c3e54ad721cc5ca8e63f6299ae3c088",
+      "target_session_model_inputs": 0,
+      "wrong_local_launch_model_requests": 1,
+      "wrong_local_launch_cancelled_and_excluded": true,
+      "accepted": "四个结束hook成功；同manifest退役和释放、原进程退出、socket回收；宿主ANSI接收两条notification。",
+      "boundary": "零回合通知不称模型Stop；共享宿主日志无PID，不证明listener内存退役顺序。",
+      "cleanup": "全部自有进程已退出，含daemon及僵尸子进程；remote slot身份核对及无打开文件后同设备无覆盖保全；唯一历史与profiles保留，cleanup_ready=false。",
+      "finish_sha256": "16dcb87233a857eeaffeed42d96d01ce64fa7c246a00aa6d951b18099cab736c",
+      "slot_retention_sha256": "a317c0bd7bbef180c818811bf5539f1232e0f1e5856024d9a7af882542778887"
+    },
+    "final_source_gate": {
+      "source_commit": "51b0e4aed0e790b96e0020f21ce15d658efd61c6",
+      "run_id": 36898008829,
+      "status": "in_progress",
+      "dispatch_receipt_sha256": "a9963541e95125d9369202ede116755acc6e577822d22224b3149e08760b7f68"
+    },
+    "v03_remaining_audit": {
+      "receipt_sha256": "5d80ceac99115922f8e0547a8942b82e47dd9a7f9a03b5243748fd637235e4f0",
+      "remaining_real_acceptance": "三款真实SSH/tmux运行回合取消；不以/exit、审批拒绝或受控取消回执替代。",
+      "gap_closed": false
+    },
+    "documentation_check": {
+      "run_id": "r-d1zsoiow",
+      "command": "cargo check -p warp",
+      "result": "passed",
+      "log_sha256": "11d98597b65cb6e41f1b24198f9898e86f8ee44c8f088d1891a82c39a0416d64",
+      "temporary_directory": "cleaned"
     }
   }
 }
