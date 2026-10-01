@@ -1160,7 +1160,7 @@ mod native {
             };
             self.validate_connection()?;
             let descriptor = plan.descriptor()?;
-            let result = self.rpc_readonly(Instant::now() + HANDSHAKE_TIMEOUT, "x.ai/session/info",
+            let result = self.rpc_readonly(Instant::now() + HANDSHAKE_TIMEOUT, "_x.ai/session/info",
                 json!({"sessionId":self.target.session_id.to_string(),"infinishellOwnedIdentity":true}))?;
             verify_owned_identity_result(
                 &result,

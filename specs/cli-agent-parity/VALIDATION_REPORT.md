@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：修复 Grok 原生扩展查询的线上方法名
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `4aeab1a51/r-e2yx7g07` 的真实 tmux 产品菜单单次启动 Grok `.3`，原生 SessionStart 成功；首张图片只提交一次，草稿和卡片保留，无原生问题／typed PNG，也无服务端 claim。持久 pane 结果为 started，客户端 start-unknown 文件只是写前防重标记。源码核验确定 Mac／Linux 将扩展方法裸发为 `x.ai/session/info`，锁定 ACP SDK 仅接受 `_x.ai/session/info`；查询在 claim 创建前失败，临时 input 随后被清理。未捕获现场 RPC 错误码，不将源码推断改称原生零入队回执。根因收据 `resume-20261001/g08-preparation/r-e2yx7g07-tmux-owned-gui/grok-native-wire-root-cause-v1.safe.json` SHA-256 `b60c7088015062f9339895ff3cca86c28955afdb1b6c112208509a5f5ba06a60`。
+
+现仅修正两处线上方法名，原生 `.3` 工件和权限／身份守卫不变。另修复 Codex 内存测试夹具：等待构造器本地事件 FIFO 完成后再建立远端状态，防止旧本地 metadata 覆盖新远端缓存；不增加 timeout 或重试。Mac 定向 54／54、i18n 11／11、`cargo check -p warp` 一次通过，三轮短目录均核验清理；收据 `g08-build-preparation/grok-wire-local-gates-v1.safe.json` SHA-256 `d85565eb09daf8fcc1bea4116e86afdd08bf63a71287fe99100ae5aabfebd110`。无需本地化变更。真实修复版图片／恢复回归及同提交两平台源码门禁待验，Windows 下载超时和 Vim LEAK 历史仍保留；G08 不关闭。
+
 ## 2026-10-01：Grok原生会话证明与tmux恢复接线通过本机分轮门禁
 
 **新增关闭0项，仍为6关闭／5开放／3移交，PR #22草稿。** 完整SSH命令结束后，Claude/Grok恢复现在重新核对原native SID、当前tmux绑定、listener和连接代次，只重建Unknown／Closed身份；旧状态、审批与输入租约不会回放。Grok原生新增仅查询驻留actor的只读身份、当前权限和通知描述符；实际输入在同一队列接收临界区复核default模式及活动描述符，保留原有繁忙排队语义。明确的接收前拒绝保留草稿、释放当前租约，同一message不得重投；真实权限事件撤销缓存和在途证明。

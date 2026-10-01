@@ -20,7 +20,7 @@ use crate::terminal::event::BlockMetadataReceivedEvent;
 use crate::terminal::model::ansi::Handler;
 use crate::terminal::model::block::BlockMetadata;
 use crate::terminal::model::session::{BootstrapSessionType, SessionInfo};
-use crate::terminal::model_events::ModelEvent;
+use crate::terminal::model_events::{AnsiHandlerEvent, ModelEvent};
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use async_compat::CompatExt;
@@ -241,6 +241,31 @@ async fn bounded<T>(future: impl Future<Output = T>) -> T {
     }
 }
 
+async fn finish_initial_bootstrap(app: &mut App, terminal: &ViewHandle<TerminalView>) {
+    let events = terminal.read(app, |view, _| view.model_event_dispatcher().clone());
+    let (sender, receiver) = oneshot::channel();
+    let mut sender = Some(sender);
+    app.update(|ctx| {
+        ctx.subscribe_to_model(&events, move |events, event, ctx| {
+            // 构造器的最后一个 precmd 与前面的本地 metadata 经过同一 FIFO；
+            // 等它完成后才设置远端会话，避免旧本地事件覆盖新的视图缓存。
+            if matches!(event, ModelEvent::Handler(AnsiHandlerEvent::Precmd))
+                && let Some(sender) = sender.take()
+            {
+                assert_eq!(
+                    events.as_ref(ctx).active_session_id(),
+                    Some(SessionId::from(123))
+                );
+                let _ = sender.send(());
+            }
+        });
+    });
+    bounded(receiver).await.unwrap();
+    terminal.read(app, |view, _| {
+        assert_eq!(view.active_block_session_id(), Some(SessionId::from(123)));
+    });
+}
+
 async fn connect(app: &mut App, transport: MemoryTransport) -> Arc<RemoteServerClient> {
     let (sender, receiver) = oneshot::channel();
     let mut sender = Some(sender);
@@ -338,6 +363,7 @@ impl Fixture {
         )
         .await;
         let terminal = add_window_with_terminal(app, None);
+        finish_initial_bootstrap(app, &terminal).await;
         let (launch, snapshot, scope) = terminal.update(app, |view, ctx| {
             let mut info = SessionInfo::new_for_test()
                 .with_session_type(BootstrapSessionType::WarpifiedRemote)

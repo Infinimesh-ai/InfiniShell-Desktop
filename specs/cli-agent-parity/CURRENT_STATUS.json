@@ -6819,5 +6819,22 @@
     "b38_cloud": "Linux通过；Windows下载超时、Codex内存协议最终proof等待3次超时、desktop/TUI Vim Escape 1 LEAK保留。新.3原生平台门禁未运行。",
     "remaining": "新工件真实SSH/tmux三款图片消费、断连恢复/拒绝/重复/旧回调、真实英中布局及最终跨平台源码门禁。",
     "gap_closed": false
+  },
+  "g08_grok_wire_prefix_followup": {
+    "source_baseline": "4aeab1a51fabc1a8adafa538cc5629f8697cae7c",
+    "status": "fixed_locally_real_gui_and_platform_validation_pending",
+    "failure_run": "r-e2yx7g07",
+    "root_cause": "ACP扩展线上方法缺少下划线；Mac/Linux已修正，原生.3工件不变。",
+    "root_cause_receipt_sha256": "b60c7088015062f9339895ff3cca86c28955afdb1b6c112208509a5f5ba06a60",
+    "local_gates": {
+      "focused_tests": 54,
+      "i18n_tests": 11,
+      "cargo_check": "passed",
+      "receipt_sha256": "d85565eb09daf8fcc1bea4116e86afdd08bf63a71287fe99100ae5aabfebd110"
+    },
+    "windows_fixture": "本地构造器FIFO排空后才建立远端，Mac通过不能替代Windows复验；旧下载超时/Vim LEAK保留。",
+    "localization": "无需本地化变更",
+    "remaining": "修复版真实图片消费、恢复与异常组合、最终两平台源码门禁。",
+    "closed_gaps": []
   }
 }
