@@ -6,7 +6,7 @@ use std::sync::mpsc::SyncSender;
 use anyhow::{Context, Result, bail};
 use diesel::prelude::*;
 use futures::channel::oneshot;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -927,7 +927,7 @@ fn insert_task_result(
             return Ok(Some(message));
         }
         let body = task_result_message_body(&task);
-        let message = LocalCliMessage {
+        let mut message = LocalCliMessage {
             version: 1,
             message_id,
             sender_task_id: task.task_id,
@@ -940,6 +940,15 @@ fn insert_task_result(
             receipt_kind: None,
         };
         insert_message_with_origin(connection, message.clone(), true)?;
+        if let Some(current) = read_task(connection, &message.recipient_task_id)?
+            && current.harness == "claude"
+            && current.generation != message.recipient_generation
+            && !claude_result_history_matches(connection, &message, &current)?
+        {
+            // 子任务可能在用户换代之后才完成；保留结果，但不恢复已经断开的自动执行资格。
+            message.state = LocalCliMessageState::Cancelled;
+            write_message_state(connection, &message)?;
+        }
         Ok(Some(message))
     })
 }
@@ -1056,6 +1065,52 @@ fn claim_result_if_current(
                         bail!("未确认结果的原接收身份无效");
                     }
                     if grok_same_process(&original, &recipient) {
+                        return Ok(None);
+                    }
+                }
+            }
+            stored.state = LocalCliMessageState::Sent;
+            write_message_state(connection, &stored)?;
+            return Ok(Some(stored));
+        }
+        if recipient.harness == "claude" && recipient.state == LocalCliTaskState::Completed {
+            // 已完成父回合的结果领取必须来自当前在线 worker 的精确快照。
+            // 普通消息与仅有磁盘记录的冷恢复仍不能进入这一分支。
+            let config: Value = serde_json::from_str(&recipient.config_json)?;
+            if expected_recipient != Some(&recipient)
+                || recipient.version != 1
+                || recipient.native_session_id.as_deref().is_none_or(|sid| {
+                    sid.trim().is_empty() || sid.len() > 4096 || sid.chars().any(char::is_control)
+                })
+                || config["runtime_generation"]
+                    .as_str()
+                    .and_then(|value| Uuid::parse_str(value).ok())
+                    .is_none_or(|token| token.is_nil())
+                || config
+                    .get("claude_pending_input")
+                    .is_some_and(|pending| !pending.is_null())
+            {
+                bail!("Claude 结果接收运行未验证或仍有待确认输入");
+            }
+            if !claude_result_history_matches(connection, &message, &recipient)? {
+                bail!("Claude 结果来源或原生 ACK 驱动的连续父运行不符");
+            }
+            let sent = local_cli_messages::table
+                .filter(local_cli_messages::recipient_task_id.eq(&recipient.task_id))
+                .filter(local_cli_messages::state.eq("sent"))
+                .select(local_cli_messages::data)
+                .load::<String>(connection)?;
+            for row in sent {
+                let other: LocalCliMessage = serde_json::from_str(&row)?;
+                if other.subject == TASK_RESULT_SUBJECT {
+                    // 同原生进程的未确认结果仍占槽，不能靠换任务代再次派发。
+                    let original = read_task_generation(
+                        connection,
+                        &other.recipient_task_id,
+                        other.recipient_generation,
+                    )?
+                    .context("Claude 未确认结果的原接收运行不存在")?;
+                    if claude_same_process(&original, &recipient) {
                         return Ok(None);
                     }
                 }
@@ -1287,6 +1342,203 @@ pub(crate) fn grok_mailbox_origin_matches(
                 && task_result_message_body(sender) == message.body))
 }
 
+/// 自动结果保留原消息代与冻结正文，当前准入代由 pending 独立记录。
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClaudeResultLink {
+    pub message_id: Uuid,
+    pub recipient_generation: i64,
+    pub mailbox_sha256: String,
+}
+
+impl ClaudeResultLink {
+    pub(crate) fn from_message(message: &LocalCliMessage) -> Result<Self> {
+        if message.subject != TASK_RESULT_SUBJECT || message.recipient_generation < 1 {
+            bail!("Claude 自动结果关联无效");
+        }
+        Ok(Self {
+            message_id: Uuid::parse_str(&message.message_id)?,
+            recipient_generation: message.recipient_generation,
+            mailbox_sha256: grok_mailbox_digest(message)?,
+        })
+    }
+
+    fn matches(&self, message: &LocalCliMessage) -> bool {
+        Self::from_message(message).is_ok_and(|actual| actual == *self)
+    }
+}
+
+fn claude_same_process(original: &LocalCliTask, current: &LocalCliTask) -> bool {
+    let runtime = |task: &LocalCliTask| {
+        serde_json::from_str::<Value>(&task.config_json)
+            .ok()
+            .and_then(|config| {
+                config["runtime_generation"]
+                    .as_str()
+                    .and_then(|id| Uuid::parse_str(id).ok())
+            })
+            .filter(|id| !id.is_nil())
+    };
+    original.version == 1
+        && current.version == 1
+        && original.harness == "claude"
+        && current.harness == "claude"
+        && original.task_id == current.task_id
+        && original.generation <= current.generation
+        && original.native_session_id.as_deref().is_some_and(|sid| {
+            !sid.trim().is_empty() && sid.len() <= 4096 && !sid.chars().any(char::is_control)
+        })
+        && original.native_session_id == current.native_session_id
+        && runtime(original).is_some()
+        && runtime(original) == runtime(current)
+}
+
+fn claude_result_origin_matches(
+    connection: &mut SqliteConnection,
+    message: &LocalCliMessage,
+    parent: &LocalCliTask,
+) -> Result<bool> {
+    let Some(source) = read_task_generation(
+        connection,
+        &message.sender_task_id,
+        message.sender_generation,
+    )?
+    else {
+        return Ok(false);
+    };
+    Ok(message.version == 1
+        && message.subject == TASK_RESULT_SUBJECT
+        && message.recipient_task_id == parent.task_id
+        && message.recipient_generation == parent.generation
+        && source.version == 1
+        && source.task_id == message.sender_task_id
+        && source.generation == message.sender_generation
+        && source.parent_task_id.as_deref() == Some(parent.task_id.as_str())
+        && source.parent_generation == Some(parent.generation)
+        && source.state.is_terminal()
+        && task_result_message_body(&source) == message.body)
+}
+
+/// 每次跨代都必须由本进程原生 ACK 的自动结果驱动，普通用户新回合不能继承。
+fn claude_result_history_matches(
+    connection: &mut SqliteConnection,
+    message: &LocalCliMessage,
+    current: &LocalCliTask,
+) -> Result<bool> {
+    if message.recipient_generation < 1
+        || message.recipient_generation > current.generation
+        || message.recipient_task_id != current.task_id
+        || message.subject != TASK_RESULT_SUBJECT
+        || !matches!(
+            current.state,
+            LocalCliTaskState::Queued
+                | LocalCliTaskState::Running
+                | LocalCliTaskState::WaitingForUser
+                | LocalCliTaskState::Completed
+        )
+    {
+        return Ok(false);
+    }
+    let Some(mut previous) =
+        read_task_generation(connection, &current.task_id, message.recipient_generation)?
+    else {
+        return Ok(false);
+    };
+    if !claude_same_process(&previous, current)
+        || !claude_result_origin_matches(connection, message, &previous)?
+    {
+        return Ok(false);
+    }
+    for generation in (message.recipient_generation + 1)..=current.generation {
+        let Some(next) = read_task_generation(connection, &current.task_id, generation)? else {
+            return Ok(false);
+        };
+        if previous.state != LocalCliTaskState::Completed || !claude_same_process(&next, current) {
+            return Ok(false);
+        }
+        let config: Value = serde_json::from_str(&next.config_json)?;
+        let input = &config["claude_current_input"];
+        let Some(link) = input.get("result").filter(|v| !v.is_null()) else {
+            return Ok(false);
+        };
+        let link: ClaudeResultLink = serde_json::from_value(link.clone())?;
+        let previous_config: Value = serde_json::from_str(&previous.config_json)?;
+        let pending = &previous_config["claude_pending_input"];
+        if input["turn_id"].as_str() != Some(link.message_id.to_string().as_str())
+            || input["submission_generation"].as_i64() != Some(previous.generation)
+            || pending["message_id"] != input["turn_id"]
+            || pending["submission_generation"] != input["submission_generation"]
+            || pending["result"] != input["result"]
+            || link.recipient_generation > previous.generation
+        {
+            return Ok(false);
+        }
+        let Some(driver) = read_message(connection, &link.message_id.to_string())? else {
+            return Ok(false);
+        };
+        let Some(origin) =
+            read_task_generation(connection, &current.task_id, link.recipient_generation)?
+        else {
+            return Ok(false);
+        };
+        if driver.state != LocalCliMessageState::Acknowledged
+            || driver.receipt_kind != Some(LocalCliReceiptKind::NativeProtocol)
+            || !link.matches(&driver)
+            || !claude_same_process(&origin, current)
+            || !claude_result_origin_matches(connection, &driver, &origin)?
+        {
+            return Ok(false);
+        }
+        previous = next;
+    }
+    Ok(previous == *current)
+}
+
+fn matches_claude_result_receipt(
+    connection: &mut SqliteConnection,
+    message: &LocalCliMessage,
+    current: &LocalCliTask,
+    state: LocalCliMessageState,
+    receipt: Option<LocalCliReceiptKind>,
+) -> Result<bool> {
+    if !((state == LocalCliMessageState::Acknowledged
+        && receipt == Some(LocalCliReceiptKind::NativeProtocol))
+        || (state == LocalCliMessageState::Failed && receipt.is_none()))
+        || !matches!(
+            message.state,
+            LocalCliMessageState::Sent | LocalCliMessageState::Acknowledged
+        )
+        || !claude_result_history_matches(connection, message, current)?
+    {
+        return Ok(false);
+    }
+    let config: Value = serde_json::from_str(&current.config_json)?;
+    for (key, id_key) in [
+        ("claude_pending_input", "message_id"),
+        ("claude_current_input", "turn_id"),
+    ] {
+        let input = &config[key];
+        if input[id_key].as_str() == Some(message.message_id.as_str())
+            && input
+                .get("result")
+                .filter(|v| !v.is_null())
+                .is_some_and(|link| {
+                    serde_json::from_value::<ClaudeResultLink>(link.clone())
+                        .is_ok_and(|link| link.matches(message))
+                })
+            && input["submission_generation"]
+                .as_i64()
+                .is_some_and(|generation| {
+                    generation == current.generation
+                        || (key == "claude_current_input" && generation + 1 == current.generation)
+                })
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// 自动结果只能沿同一原生进程的正常回合前进，不能借继续历史会话重新执行。
 pub(crate) fn grok_same_process(original: &LocalCliTask, current: &LocalCliTask) -> bool {
     let runtime = |task: &LocalCliTask| {
@@ -1505,7 +1757,7 @@ fn update_message_state_with_receipt(
             && receipt == Some(LocalCliReceiptKind::NativeProtocol);
         let is_delivery_outcome = is_native_ack || state == LocalCliMessageState::Failed;
         // 已派发消息的发送方可能先进入下一轮，回执仍属于原来的发送记录。
-        // 仅 Grok 同一进程的持久队列允许跨接收代；邮箱另外核对原亲缘与内容摘要。
+        // 跨接收代须验证 Grok 队列或 Claude 自动结果 ACK 链，不能仅凭旧消息 ID。
         let sender = if is_delivery_outcome {
             read_task_generation(
                 connection,
@@ -1533,6 +1785,9 @@ fn update_message_state_with_receipt(
                 &message, &sender, original, &recipient, state, receipt,
             )
         });
+        let same_claude_result = recipient.harness == "claude"
+            && recipient.generation != message.recipient_generation
+            && matches_claude_result_receipt(connection, &message, &recipient, state, receipt)?;
         if message.version != 1
             || recipient.version != 1
             || sender.version != 1
@@ -1540,7 +1795,7 @@ fn update_message_state_with_receipt(
             || recipient.parent_task_id.is_some() != recipient.parent_generation.is_some()
             || message.recipient_task_id != task_id
             || message.recipient_generation != generation
-            || (recipient.generation != generation && !same_grok_queue)
+            || (recipient.generation != generation && !same_grok_queue && !same_claude_result)
             || (sender.generation != message.sender_generation
                 && message.subject != TASK_RESULT_SUBJECT)
         {
@@ -1675,6 +1930,14 @@ fn cancel_pending_messages(
             {
                 continue;
             }
+        }
+        if message.subject == TASK_RESULT_SUBJECT
+            && message.recipient_task_id == task_id
+            && let Some(current) = read_task(connection, task_id)?
+            && current.harness == "claude"
+            && claude_result_history_matches(connection, &message, &current)?
+        {
+            continue;
         }
         message.state = LocalCliMessageState::Cancelled;
         write_message_state(connection, &message)?;

@@ -10,9 +10,11 @@ use sha2::{Digest as _, Sha256};
 
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
-// 固定工作流构建的 Linux x64 .6 工件；按真实映像 FD 核验，不能继承其他构建。
-const ARTIFACT_SHA256S: &[&str] =
-    &["e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb"];
+// 旧文本桥与受验 PNG 桥分别绑定完整映像；按真实 FD 核验，不能继承其他构建。
+const ARTIFACT_SHA256S: &[&str] = &[
+    "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb",
+    "e3b1bea1e10ded36c70f1d641acf2e4a73a9dfcffd9ca3236f51ea6ef46dc6f2",
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

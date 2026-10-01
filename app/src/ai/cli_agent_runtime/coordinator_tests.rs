@@ -2089,7 +2089,10 @@ fn result_blocked_by_a_native_pending_input_stays_queued_and_is_written_once_aft
         assert_eq!(commands.try_recv().unwrap().message_id, user_id);
         let result_id = Uuid::parse_str(&result.message_id).unwrap();
         let action = RuntimeAction::Submit {
-            input: vec![InputContent::Text("自动结果".into())],
+            input: vec![InputContent::Text(format!(
+                "Subject: {}\n\n{}",
+                result.subject, result.body
+            ))],
         };
         send_mailbox_request(
             &writer.sender,
@@ -5657,6 +5660,681 @@ async fn grok_mailbox_result_fixture(
     (parent, message)
 }
 
+async fn claude_completed_results_fixture(
+    sender: &SyncSender<ModelEvent>,
+    token: Uuid,
+    pending: Option<ClaudePendingInput>,
+    second_child: bool,
+) -> (ManagedTaskSnapshot, Vec<LocalCliMessage>) {
+    let mut parent = snapshot();
+    parent.task.harness = "claude".into();
+    parent.task.config_json = json!({"runtime_generation":token,"cli_version":"2.1.280",
+        "selected_skills":[]})
+    .to_string();
+    set_claude_pending_input(&mut parent.task, pending).unwrap();
+    checkpoint_task(sender, parent.task.clone(), None)
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    let mut child = snapshot().task;
+    child.harness = "claude".into();
+    child.parent_task_id = Some(parent.task.task_id.clone());
+    child.parent_generation = Some(1);
+    checkpoint_task(sender, child.clone(), None)
+        .unwrap()
+        .await
+        .unwrap()
+        .unwrap();
+    let mut children = vec![child];
+    if second_child {
+        let mut sibling = children[0].clone();
+        sibling.task_id = Uuid::new_v4().to_string();
+        sibling.native_session_id = Some(Uuid::new_v4().to_string());
+        checkpoint_task(sender, sibling.clone(), None)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        children.push(sibling);
+    }
+    let previous = parent.task.clone();
+    parent.task.state = LocalCliTaskState::Completed;
+    parent.task.result = Some("PARENT_QUEUED".into());
+    parent.task.terminal_evidence = Some("父首轮原生完成".into());
+    commit_transition(sender, &mut parent.task, &previous)
+        .await
+        .unwrap();
+    let mut messages = Vec::new();
+    for mut child in children {
+        child.revision = 1;
+        child.state = LocalCliTaskState::Completed;
+        child.result = Some(format!("子任务真实命令结果 {}", child.task_id));
+        child.terminal_evidence = Some("子回合原生完成".into());
+        checkpoint_task(sender, child.clone(), Some(1))
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        messages.push(
+            enqueue_task_result(sender, child.task_id, 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap(),
+        );
+    }
+    (parent, messages)
+}
+
+async fn claude_completed_result_fixture(
+    sender: &SyncSender<ModelEvent>,
+    token: Uuid,
+    pending: Option<ClaudePendingInput>,
+) -> (ManagedTaskSnapshot, LocalCliMessage) {
+    let (parent, mut messages) =
+        claude_completed_results_fixture(sender, token, pending, false).await;
+    (parent, messages.remove(0))
+}
+
+#[test]
+fn claude_completed_parent_result_waits_for_native_ack_and_start_before_next_generation() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("result.sqlite")).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let (mut state, message) =
+            claude_completed_result_fixture(&writer.sender, token, None).await;
+        let (controller, mut wire, _sender, _events) = channels(token);
+        let (commands, mut requests) = mpsc::channel(1);
+        let mut coordinator = LocalCLITaskCoordinator::new(None);
+        coordinator.entries.insert(
+            state.task.task_id.clone(),
+            ManagedTaskEntry {
+                token,
+                snapshot: state.clone(),
+                commands,
+                pending_tool_calls: HashSet::new(),
+            },
+        );
+        assert!(coordinator.endpoint(&state.task.task_id).is_none());
+        let endpoint = coordinator.result_endpoint(&state.task.task_id).unwrap();
+        let send = send_prepared_result(endpoint, message.clone());
+        let receive = async {
+            let request = requests.recv().await.unwrap();
+            assert_eq!(request.expected_generation, 1);
+            let result = send_mailbox_request(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                request.message_id,
+                request.action,
+                request.prepared_result,
+            )
+            .await;
+            request.reply.send(result).unwrap();
+        };
+        let (sent, ()) = futures::join!(send, receive);
+        sent.unwrap();
+        let dispatched = wire.try_recv().unwrap();
+        assert_eq!(dispatched.message_id.to_string(), message.message_id);
+        assert_eq!(
+            dispatched.action,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text(format!(
+                    "Subject: local_task_result\n\n{}",
+                    message.body
+                ))]
+            }
+        );
+        assert_eq!(state.task.state, LocalCliTaskState::Completed);
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.task.result.as_deref(), Some("PARENT_QUEUED"));
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored[0].state, LocalCliMessageState::Sent);
+        assert_eq!(stored[0].receipt_kind, None);
+        send_mailbox_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            dispatched.message_id,
+            dispatched.action.clone(),
+            Some(message.clone()),
+        )
+        .await
+        .unwrap();
+        assert!(wire.try_recv().is_err(), "重复结果不得二次派发");
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        let start = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::TurnStarted {
+                turn_id: message.message_id.clone(),
+            },
+        };
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &start,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err(),
+            "没有原生 ACK 不能开新代"
+        );
+        accepted.insert(message.message_id.clone());
+        assert!(
+            commit_runtime_event(
+                &writer.sender,
+                &mut state,
+                &start,
+                &mut accepted,
+                &mut finished
+            )
+            .await
+            .is_err(),
+            "内存收到事件但 SQLite 尚无原生 ACK 时仍不能开新代"
+        );
+        accepted.clear();
+        let ack = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::MessageAccepted {
+                message_id: dispatched.message_id,
+                turn_id: Some(message.message_id.clone()),
+            },
+        };
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &ack,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 1);
+        assert_eq!(state.task.state, LocalCliTaskState::Completed);
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &start,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.generation, 2);
+        assert_eq!(state.task.state, LocalCliTaskState::Running);
+        assert!(!claude_input_pending(&state.task));
+        let stored = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored[0].body, message.body);
+        assert_eq!(stored[0].recipient_generation, 1);
+        assert_eq!(stored[0].state, LocalCliMessageState::Acknowledged);
+        assert_eq!(
+            stored[0].receipt_kind,
+            Some(LocalCliReceiptKind::NativeProtocol)
+        );
+        let done = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind: RuntimeEventKind::TurnFinished {
+                turn_id: message.message_id,
+                outcome: TurnOutcome::Completed,
+                output: "父已收到子任务真实命令结果".into(),
+            },
+        };
+        commit_runtime_event(
+            &writer.sender,
+            &mut state,
+            &done,
+            &mut accepted,
+            &mut finished,
+        )
+        .await
+        .unwrap();
+        assert_eq!(state.task.state, LocalCliTaskState::Completed);
+        assert_eq!(state.task.generation, 2);
+        assert_eq!(
+            state.task.result.as_deref(),
+            Some("父已收到子任务真实命令结果")
+        );
+        assert!(wire.try_recv().is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_completed_parent_result_stays_queued_when_another_input_is_pending() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("pending.sqlite")).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let pending = ClaudePendingInput {
+            message_id: Uuid::new_v4(),
+            submission_generation: 1,
+            result: None,
+        };
+        let (mut state, message) =
+            claude_completed_result_fixture(&writer.sender, token, Some(pending.clone())).await;
+        let (controller, mut wire, _sender, _events) = channels(token);
+        let (commands, _requests) = mpsc::channel(1);
+        let mut coordinator = LocalCLITaskCoordinator::new(None);
+        coordinator.entries.insert(
+            state.task.task_id.clone(),
+            ManagedTaskEntry {
+                token,
+                snapshot: state.clone(),
+                commands,
+                pending_tool_calls: HashSet::new(),
+            },
+        );
+        assert!(coordinator.result_endpoint(&state.task.task_id).is_none());
+        // 入口取得后才占用输入槽的排队请求也必须安全延期，而非误报已派发。
+        send_mailbox_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            message.message_id.parse().unwrap(),
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text(format!(
+                    "Subject: local_task_result\n\n{}",
+                    message.body
+                ))],
+            },
+            Some(message.clone()),
+        )
+        .await
+        .unwrap();
+        assert!(wire.try_recv().is_err());
+        assert_eq!(claude_pending_input(&state.task).unwrap(), Some(pending));
+        assert_eq!(
+            load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                .unwrap()
+                .await
+                .unwrap()
+                .unwrap(),
+            vec![message]
+        );
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_completed_parent_result_rejects_stale_connection_or_modified_input() {
+    for invalid in [
+        "disconnected",
+        "not-ready",
+        "active-turn",
+        "failed",
+        "cancelled",
+        "unknown",
+        "runtime",
+        "session",
+        "generation",
+        "body",
+        "ordinary",
+    ] {
+        let directory = tempfile::tempdir().unwrap();
+        let writer =
+            crate::persistence::start_test_writer(&directory.path().join("stale.sqlite")).unwrap();
+        block_on(async {
+            let token = Uuid::new_v4();
+            let (mut state, message) =
+                claude_completed_result_fixture(&writer.sender, token, None).await;
+            let (controller, mut wire, _sender, _events) = channels(token);
+            let mut action = RuntimeAction::Submit {
+                input: vec![InputContent::Text(format!(
+                    "Subject: local_task_result\n\n{}",
+                    message.body
+                ))],
+            };
+            let mut offered = message.clone();
+            match invalid {
+                "disconnected" => state.connected = false,
+                "not-ready" => state.ready = false,
+                "active-turn" => state.active_turn_id = Some(Uuid::new_v4().to_string()),
+                "failed" => state.task.state = LocalCliTaskState::Failed,
+                "cancelled" => state.task.state = LocalCliTaskState::Cancelled,
+                "unknown" => state.task.state = LocalCliTaskState::Unknown,
+                "runtime" => {
+                    state.task.config_json =
+                        json!({"runtime_generation":Uuid::new_v4()}).to_string()
+                }
+                "session" => state.task.native_session_id = Some(Uuid::new_v4().to_string()),
+                "generation" => state.task.generation = 2,
+                "body" => {
+                    action = RuntimeAction::Submit {
+                        input: vec![InputContent::Text("伪造的结果".into())],
+                    }
+                }
+                "ordinary" => offered.subject = "followup".into(),
+                _ => unreachable!("固定测试变体"),
+            }
+            assert!(
+                send_mailbox_request(
+                    &writer.sender,
+                    &mut state,
+                    &controller,
+                    token,
+                    message.message_id.parse().unwrap(),
+                    action,
+                    Some(offered)
+                )
+                .await
+                .is_err(),
+                "{invalid}"
+            );
+            assert!(wire.try_recv().is_err(), "{invalid}");
+            assert_eq!(
+                load_messages(&writer.sender, message.recipient_task_id.clone(), 1)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                vec![message],
+                "{invalid}"
+            );
+        });
+        writer.sender.send(ModelEvent::Terminate).unwrap();
+        writer.handle.join().unwrap();
+    }
+}
+
+async fn send_claude_prepared_result_for_test(
+    sender: &SyncSender<ModelEvent>,
+    state: &mut ManagedTaskSnapshot,
+    controller: &RuntimeController,
+    token: Uuid,
+    message: &LocalCliMessage,
+) {
+    let (commands, mut requests) = mpsc::channel(1);
+    let endpoint = ManagedTaskEndpoint {
+        task_id: state.task.task_id.clone(),
+        generation: state.task.generation,
+        harness: Harness::Claude,
+        runtime_generation: token,
+        active_turn_id: state.active_turn_id.clone(),
+        commands,
+    };
+    if message.recipient_generation != endpoint.generation {
+        // 普通消息不能借自动结果入口跨代；它在任何写盘/写协议之前拒绝。
+        assert!(
+            crate::ai::local_cli_mailbox::send_local_message(
+                sender,
+                endpoint.clone(),
+                message.clone()
+            )
+            .await
+            .is_err()
+        );
+    }
+    let send = send_prepared_result(endpoint, message.clone());
+    let receive = async {
+        let request = requests.recv().await.unwrap();
+        assert_eq!(request.expected_generation, state.task.generation);
+        let result = send_mailbox_request(
+            sender,
+            state,
+            controller,
+            token,
+            request.message_id,
+            request.action,
+            request.prepared_result,
+        )
+        .await;
+        request.reply.send(result).unwrap();
+    };
+    let (result, ()) = futures::join!(send, receive);
+    result.unwrap();
+}
+
+async fn finish_claude_result_for_test(
+    sender: &SyncSender<ModelEvent>,
+    state: &mut ManagedTaskSnapshot,
+    token: Uuid,
+    message: &LocalCliMessage,
+    accepted: &mut HashSet<String>,
+    finished: &mut HashSet<String>,
+) {
+    for kind in [
+        RuntimeEventKind::MessageAccepted {
+            message_id: message.message_id.parse().unwrap(),
+            turn_id: Some(message.message_id.clone()),
+        },
+        RuntimeEventKind::TurnStarted {
+            turn_id: message.message_id.clone(),
+        },
+        RuntimeEventKind::TurnFinished {
+            turn_id: message.message_id.clone(),
+            outcome: TurnOutcome::Completed,
+            output: "父已消费这个子结果".into(),
+        },
+    ] {
+        let event = RuntimeEvent {
+            generation: token,
+            native_session_id: state.task.native_session_id.clone(),
+            kind,
+        };
+        commit_runtime_event(sender, state, &event, accepted, finished)
+            .await
+            .unwrap();
+    }
+}
+
+#[test]
+fn claude_completed_parent_consumes_two_children_serially_with_original_native_receipts() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("two-results.sqlite"))
+            .unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let (mut state, messages) =
+            claude_completed_results_fixture(&writer.sender, token, None, true).await;
+        assert_ne!(messages[0].sender_task_id, messages[1].sender_task_id);
+        let (controller, mut wire, _sender, _events) = channels(token);
+        let mut accepted = HashSet::new();
+        let mut finished = HashSet::new();
+        for (index, message) in messages.iter().enumerate() {
+            send_claude_prepared_result_for_test(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                message,
+            )
+            .await;
+            assert_eq!(
+                wire.try_recv().unwrap().message_id.to_string(),
+                message.message_id
+            );
+            assert_eq!(state.task.generation, index as i64 + 1);
+            assert_eq!(state.task.state, LocalCliTaskState::Completed);
+            let pending = claude_pending_input(&state.task).unwrap().unwrap();
+            assert_eq!(pending.submission_generation, state.task.generation);
+            assert_eq!(pending.result.unwrap().recipient_generation, 1);
+            if index == 0 {
+                let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+                    .unwrap()
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    saved
+                        .iter()
+                        .find(|m| m.message_id == messages[1].message_id)
+                        .unwrap()
+                        .state,
+                    LocalCliMessageState::Queued,
+                    "保存第一条 pending 不能取消另一子结果"
+                );
+                send_claude_prepared_result_for_test(
+                    &writer.sender,
+                    &mut state,
+                    &controller,
+                    token,
+                    &messages[1],
+                )
+                .await;
+                assert!(wire.try_recv().is_err(), "首条 ACK 前第二条不得占槽");
+            }
+            finish_claude_result_for_test(
+                &writer.sender,
+                &mut state,
+                token,
+                message,
+                &mut accepted,
+                &mut finished,
+            )
+            .await;
+            assert_eq!(state.task.generation, index as i64 + 2);
+            assert!(!claude_input_pending(&state.task));
+            send_claude_prepared_result_for_test(
+                &writer.sender,
+                &mut state,
+                &controller,
+                token,
+                message,
+            )
+            .await;
+            assert!(wire.try_recv().is_err(), "完成后原消息不得重投");
+        }
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(saved.len(), 2);
+        for message in &messages {
+            let receipt = saved
+                .iter()
+                .find(|m| m.message_id == message.message_id)
+                .unwrap();
+            assert_eq!(receipt.body, message.body);
+            assert_eq!(receipt.recipient_generation, 1);
+            assert_eq!(receipt.state, LocalCliMessageState::Acknowledged);
+            assert_eq!(
+                receipt.receipt_kind,
+                Some(LocalCliReceiptKind::NativeProtocol)
+            );
+        }
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_completed_parent_explicit_user_turn_breaks_remaining_result_chain() {
+    let directory = tempfile::tempdir().unwrap();
+    let writer =
+        crate::persistence::start_test_writer(&directory.path().join("user-turn.sqlite")).unwrap();
+    block_on(async {
+        let token = Uuid::new_v4();
+        let (mut state, messages) =
+            claude_completed_results_fixture(&writer.sender, token, None, true).await;
+        let (controller, mut wire, _sender, _events) = channels(token);
+        send_claude_prepared_result_for_test(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            &messages[0],
+        )
+        .await;
+        wire.try_recv().unwrap();
+        finish_claude_result_for_test(
+            &writer.sender,
+            &mut state,
+            token,
+            &messages[0],
+            &mut HashSet::new(),
+            &mut HashSet::new(),
+        )
+        .await;
+        let id = Uuid::new_v4();
+        send_user_request(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            id,
+            RuntimeAction::Submit {
+                input: vec![InputContent::Text("用户的新意图".into())],
+            },
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(wire.try_recv().unwrap().message_id, id);
+        assert_eq!(state.task.generation, 3);
+        assert!(
+            claude_pending_input(&state.task)
+                .unwrap()
+                .unwrap()
+                .result
+                .is_none()
+        );
+        let saved = load_messages(&writer.sender, state.task.task_id.clone(), 1)
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            saved
+                .iter()
+                .find(|m| m.message_id == messages[1].message_id)
+                .unwrap()
+                .state,
+            LocalCliMessageState::Cancelled
+        );
+        send_claude_prepared_result_for_test(
+            &writer.sender,
+            &mut state,
+            &controller,
+            token,
+            &messages[1],
+        )
+        .await;
+        assert!(wire.try_recv().is_err());
+    });
+    writer.sender.send(ModelEvent::Terminate).unwrap();
+    writer.handle.join().unwrap();
+}
+
+#[test]
+fn claude_pending_input_legacy_json_does_not_inherit_result_authority() {
+    let id = Uuid::new_v4();
+    let pending: ClaudePendingInput =
+        serde_json::from_value(json!({"message_id":id,"submission_generation":1})).unwrap();
+    assert!(pending.result.is_none());
+    assert!(
+        serde_json::to_value(pending)
+            .unwrap()
+            .get("result")
+            .is_none()
+    );
+}
+
 #[test]
 fn grok_mailbox_completed_parent_continues_only_after_native_result_ack_and_start() {
     let directory = tempfile::tempdir().unwrap();
@@ -7340,6 +8018,7 @@ fn claude_fixed_version_ack_rejects_invalid_self_input_and_missing_message() {
                 Some(ClaudePendingInput {
                     message_id,
                     submission_generation: 1,
+                    result: None,
                 }),
             )
             .unwrap();

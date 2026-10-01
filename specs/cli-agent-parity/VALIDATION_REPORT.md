@@ -1,5 +1,23 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G10 父结果回传修复，本机门禁通过，真实复验待执行
+
+新增关闭 0 项，累计仍为 8 关闭／3 开放／3 移交。源码冻结 `739193b2dc970d78c35635bb6704ac13d294cd743c312d56dcbc1db7ed3fa407` 补齐 Claude Completed 父任务的专用结果消费；领取与单槽共用 SQLite 事务，原结果代与当前准入代分开保存，跨代仅接受同 runtime／SID 中逐代由真实 NativeProtocol ACK 驱动的自动结果。多个子结果保持 Queued 后串行交付；普通消息不扩权，显式用户新轮、新进程、失败或取消断链；在用户换代后才生成的旧结果保留正文但标记 Cancelled。
+
+`r-f1idf8ok` 的协调器／任务持久化／邮箱 166 项为 163 过、3 失败，日志 `badff2a3a79a592ffd75af3822ee5ae2146277e128e4989b331783844ec8cf3f`。失败分别是两子夹具复用原生 SID 触发唯一约束，以及旧夹具使用非真实自动结果正文；只修夹具，不改生产校验、断言或超时。`r-y8cm90ip` 三项定向复验全过，日志 `f8f8f1a7a606e76a30d42fa16e6fecdb604c28d07f1ad64271182ca9377c62a2`，不回填首轮为全过。`r-63_zvl1g` i18n 11／11，日志 `35473dc839d4c08d8e10084a820f9cb0ca38e7c2333abdec0cf9aecc0f361522`；`r-h1tjavt5` 提交前 cargo check 通过，日志 `356c07ef9b2af4c3995b9ad97bd1b38af6d9fd9dc7e45c65e2ee5daaba145caa`。四轮均核实退出、占用与归档后清理。独立源码审查未发现新的确定阻断；汇总收据 `1b5a06138f987a47a802588d7abdcb3a0537a6807321553ab3823098286cd098`。
+
+本次沿用的英文及简体中文错误、结果标签已审计，无需本地化变更，也无布局变更。Grok 公开补丁构建器 Python 4 项另通过（`r-m8tun0oz`，日志 `e73c3805f810fdcf3d0167ced7085c48306c9482a952ffb710551d230cdb3e51`）。G10 新 worker 与 libtest 的同提交真实受审命令复验、G03 Windows 工件和最终源码门禁仍待完成；PR 保持草稿。
+
+## 2026-10-02：G03 双语拒绝布局通过，G10 自动子结果回传失败
+
+本轮新增关闭 0 项，累计仍为 8 关闭／3 开放／3 移交。`r-goa_c41x` 复用 `69c17fce3` 的产品构建，旧 `.3` 文本原生会话在中文和英文分别一次 Return 后显示完整图片能力拒绝提示：中文在 2093／5012 ms 为单行，英文在 2094／5013 ms 为两行，均无截断且文字与图片保留。首尾约 0.5／9 秒画面无 Toast；这是有限采样，不是连续录像，也不将旧轮未观察到提示改记通过。视觉收据 `366f8c8647f890e305ede598419a88f4bc21362bfd0093d3bfbe37548b6ab227`，截图只在 CUA 回执；三代 GUI 正常退出，Preview 打开对话框导致的图片映射在 CUA 退出后释放，最终 finish `a4b17a803aaf398de7c8e979eccfa14643ef76c4dff6d8fb0950bfc37aecb73d`。同 SID 最终局部只读审计确认真实用户输入／助手输出、宿主消息与领取均为 0，三代九条 SessionStart／SessionEnd／Stop 全部成功，收据 `8ac7494197603026c59627905a79c86304d7fb2bdbdb100bc284e4e58663371b`；不将这些计数外推为 HTTP 请求统计。现场保留，cleanup_ready=false。Finder 原生拖放仍欠证。
+
+`d49c24be6` 的 G10 受审命令入口已实际执行 `r-62nv09__`：两 SID 的原生模型均为 `claude-opus-5-5`，一个父输入派发唯一子任务，子命令 A 拒绝后新请求获准、B 获准，两条真实 exit 0、macOS resource coalition 清理确认，子结果包含两标记。父首轮 `PARENT_QUEUED` 后进入 Completed，自动 `local_task_result` 永久 queued、无 ACK，最终 450 秒超时，libtest exit 101／外层 exit 1；诊断 `a715c43c9c840bf76d094071111512698e91742d8fab7142931f24635c2b0387`，原生最终审计 `22518c319458643c85b0c211ee4cf9db4218bd92bea1d9b02dafa1de96c982fc`。两个 runtime 均有退出及清理回执；并行 G03 服务不算作 G10 后代，原失败不重写。失败构建的 endpoint、worker 请求准入和领取事务对 Claude Completed 父回传均有阻断，后续修复及验收按本报告最新条目计证；本轮命令正例不关闭 G10。
+
+[69c17 门禁 36927434162](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36927434162) 的 Linux `.5` 官方工件已核：ELF SHA-256 `e3b1bea1e10ded36c70f1d641acf2e4a73a9dfcffd9ca3236f51ea6ef46dc6f2`，真实版本 `1.0.41+infinishell.session-notifications.5 (07e35a3dfeed)`；32 条构建命令通过，542 次测试／533 个唯一名称，17 项新 PNG 用例各一次通过。审计 `5393dcaa2f2d767553c9d6b1ff4b4a080b281e540233ede01b2521b9bcaee9b7`，未在本机执行下载工件；审计后已将该精确 Linux 工件摘要加入普通桥白名单，绑定后源码门禁待验。Windows `.5` 四库通过 58＋32＋4＋4 项，通知组在 `hook_ask_under_yolo_fires_permission_prompt_notification` 的外层 5 秒等待失败，无 Windows 新工件；审计 `40f504be360961e4e984480930158d0a3fcc2c136f222b5ada4ba503c0dc459f`。相关七文件与此前通过 `.4` 相同，但日志没有 hook／审批阶段，不能确定根因或归因环境。另一个 Windows Claude SessionStart 失败继续保留；整体源码门禁尚未通过。
+
+Grok 原生 `92b51c9b5040` 相对 `.5/8644e7f68a5c` 仅改两份测试，给单一超时用例增加白名单阶段计数和耗时，生产行为、审批、5 秒／3 秒限制及断言均保留。Mac 通知组 5／5、共享 PreToolUse 组 15／15 和 `cargo check -p xai-grok-shell` 通过，日志分别为 `856dc1c671fc1e3f7a2c1449ada353eafe0779231b826565e86e90026d96a965`、`0af289ac4b107617575ce4019753ed879b754995fa1ddee145be0ac7f2ecd0fc`、`eba9e918b39f044330fc1a45fb18a9fa5a2d1ab49d8aeef01534fe18f2c64ff8`，三轮目录已清理。公开补丁 `74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24` 以隔离索引重建精确 tree，收据 `ddf74e7759bae48edf5da3601b601a7ed0b50331ed0d82b55a80db81658df585`；旧原生工件继续按原源码计证。无需本地化变更，诊断不计修复或关闭，Windows 复验仍待完成。
+
 ## 2026-10-02：G10 受审命令父子链验收入口
 
 新增 Mac arm64 的显式忽略测试 `real_claude_g10_reviewed_commands_parent_child`，调用生产协调器与真实固定 Claude `2.1.280`，限定一个子任务和两条项目脚本：首条拒绝后须由原生另起请求，再允许 A、等待真实退出清理后允许 B；分别核原生工具审批、宿主命令审批、持久父权限上限、输入与结果 NativeProtocol ACK、实际标记及两代退出。入口编译与现场执行分别计证，新增测试不计 G10 关闭，也不覆盖 GUI、冷恢复、取消及其他命令族。此次只增加测试入口和证据记录，生产行为与英中资源未变，无需本地化变更。

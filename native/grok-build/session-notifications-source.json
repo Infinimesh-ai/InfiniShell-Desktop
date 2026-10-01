@@ -23,21 +23,21 @@
   "custom_version": "1.0.41+infinishell.session-notifications.5",
   "build_contract": "infinishell-terminal-bridge-v1+session-notifications-v1",
   "leader_namespace": "leader-isp-sn1",
-  "native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
-  "native_tree": "c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478",
+  "native_commit": "92b51c9b5040ed77a5616a314b676120587931cf",
+  "native_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
   "patch_file": "session-notifications.patch",
-  "patch_sha256": "0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92",
+  "patch_sha256": "74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24",
   "patch_reconstruction": {
     "status": "passed",
     "base_commit": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
-    "rebuilt_tree": "c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478",
+    "rebuilt_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
     "actual_worktree_index_unchanged": true,
-    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-8644e7f68a5c/reconstruction.safe.json",
-    "receipt_sha256": "8cda04944acf23e3ca83d5e3d69efd3fac447eda8b2ffcde8f1f8a08401834d1"
+    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/source-export-92b51c9b5040/reconstruction.safe.json",
+    "receipt_sha256": "ddf74e7759bae48edf5da3601b601a7ed0b50331ed0d82b55a80db81658df585"
   },
-  "source_file_count": 128,
+  "source_file_count": 129,
   "source_change_counts": {
-    "M": 77,
+    "M": 78,
     "A": 51
   },
   "source_files_sha256": {
@@ -134,8 +134,9 @@
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/memory_config_tests.rs": "650249b39cac0a52181a554c5be347b2ad2a82fec26cd8acdf98f6106c04252d",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_exit_tests.rs": "bd5dc32eee3ede3a2213f0a99a8d0015c6accd713d8795c1dc4f646514423003",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs": "22a396d7717f179d46ba80e5870a201b30c3eb18ac429cfaaf14e8abaa74a54d",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs": "96ed24849d49a54c8add4b51905038400f30a8b62ab3878000d1c1864af0db50",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs": "f19c62cbf31b4dd4c52cd9de77596088bd703cbfdaccdd85f7e27e72d8011965",
-    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "df1c9d39e0f7ddc6ae282432090e0fc7cf5fe88d9801b7551b0ee6bbafb74093",
+    "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs": "00dfb0b52b156c2f5480fc39ad2176ae35dfceff4e992101f88584122cf83a87",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs": "f685a3c9f49f8577f1df87cca66b1f95e9b4243daea862c3f68e36f5b48f5c1a",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/tool_layer_images_bridge_tests.rs": "f4bd7cf138b5c96966eacb5ee853f8c05d4bc268529b3c75979a8c83eb93a2ee",
     "crates/codegen/xai-grok-shell/src/session/acp_session_tests/turn_end_reporting_tests.rs": "abdbdce8a431ec4a5f0fad299f13d8c892dec4c34d53b54ce07b243ab0dcf684",
@@ -1424,8 +1425,21 @@
       "version_output": "grok 1.0.41+infinishell.session-notifications.5 (8644e7f68a5c)"
     },
     "linux_x86_64": {
-      "status": "pending",
-      "sha256": null
+      "status": "artifact_verified_host_bound_final_source_gate_pending",
+      "sha256": "e3b1bea1e10ded36c70f1d641acf2e4a73a9dfcffd9ca3236f51ea6ef46dc6f2",
+      "bytes": 608907384,
+      "version_output": "grok 1.0.41+infinishell.session-notifications.5 (07e35a3dfeed)",
+      "native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
+      "source_tree": "c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478",
+      "patch_sha256": "0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92",
+      "build_host_commit": "69c17fce39bf5ae849e33b1a20d839f97efd38ce",
+      "run_id": 36927434162,
+      "artifact_id": 11197511756,
+      "zip_sha256": "54d39db2e84f1416c6168182aab6347e85848c86d4a50e7f0c4b1431b5496745",
+      "build_receipt_sha256": "89eab3573dfcc28fd47b223d302c9d89eb57f6ffe0d8a12e843da5990176b7bd",
+      "audit_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/69c17-ci/linux-native-build-audit-v1.safe.json",
+      "audit_receipt_sha256": "5393dcaa2f2d767553c9d6b1ff4b4a080b281e540233ede01b2521b9bcaee9b7",
+      "scope": "Linux .5普通桥工件，最终宿主源码门禁待验，用户实机验收后置；远程owned仍绑定.4。"
     },
     "windows_x86_64": {
       "status": "pending",
@@ -1458,5 +1472,35 @@
     ],
     "normalization_boundary": "只有受保护typed图片路径跳过重新编码、孤立图片占位符补图与文本base64附图；既有文本@文件上下文语义保留。",
     "localization_audit": "无需本地化变更：原生只变协议字段和稳定错误码；宿主用户提示由宿主英中门禁单独验收。"
+  },
+  "notification_test_diagnostics_followup": {
+    "previous_native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
+    "changed_test_files": [
+      "crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs",
+      "crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs"
+    ],
+    "production_behavior_changed": false,
+    "timeouts_and_assertions_unchanged": true,
+    "macos_tests": {
+      "run_id": "r-6sli1d08",
+      "passed": 5,
+      "failed": 0,
+      "log_sha256": "856dc1c671fc1e3f7a2c1449ada353eafe0779231b826565e86e90026d96a965"
+    },
+    "macos_check": {
+      "run_id": "r-n19ayza6",
+      "passed": true,
+      "log_sha256": "eba9e918b39f044330fc1a45fb18a9fa5a2d1ab49d8aeef01534fe18f2c64ff8"
+    },
+    "windows_validation": "pending",
+    "previous_windows_failure_preserved": true,
+    "localization_audit": "无需本地化变更：仅测试白名单阶段次数与耗时，不改变原生生产行为、审批策略或超时。",
+    "existing_artifact_bindings": "现有工件保持各自原native commit与摘要，不冒称由本轮测试诊断源码重建。",
+    "macos_pre_tool_use_tests": {
+      "run_id": "r-ofi7v2bm",
+      "passed": 15,
+      "failed": 0,
+      "log_sha256": "0af289ac4b107617575ce4019753ed879b754995fa1ddee145be0ac7f2ecd0fc"
+    }
   }
 }

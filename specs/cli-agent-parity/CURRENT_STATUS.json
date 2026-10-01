@@ -5981,9 +5981,11 @@
       "G04",
       "G05",
       "G06",
-      "G07"
+      "G07",
+      "G08",
+      "V03"
     ],
-    "remaining_count": 5,
+    "remaining_count": 3,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [
@@ -7187,6 +7189,88 @@
     "temporary_directories": "cleaned",
     "localization": "无需本地化变更，仅新增显式忽略测试和证据记录",
     "real_model_executed": false,
+    "gap_closed": false
+  },
+  "g03_cap0_bilingual_followup_20261002": {
+    "status": "bilingual_layout_passed_gap_open",
+    "source_commit": "69c17fce39bf5ae849e33b1a20d839f97efd38ce",
+    "run_id": "r-goa_c41x",
+    "gui_observation_sha256": "366f8c8647f890e305ede598419a88f4bc21362bfd0093d3bfbe37548b6ab227",
+    "native_final_readonly_sha256": "8ac7494197603026c59627905a79c86304d7fb2bdbdb100bc284e4e58663371b",
+    "finish_sha256": "a4b17a803aaf398de7c8e979eccfa14643ef76c4dff6d8fb0950bfc37aecb73d",
+    "accepted": "旧.3图片能力拒绝：英中分别一次Return，约2/5秒完整Toast，文字和单图保留；英文两行/中文单行无截断",
+    "native_inputs": 0,
+    "host_messages": 0,
+    "host_claims": 0,
+    "boundary": "有限CUA截图采样；不回填旧未观察Toast，不声称HTTP请求计数。三代同SID SessionStart/End/Stop均成功，原件未清理。",
+    "remaining": [
+      "Finder原生拖放",
+      "Windows .5工件与最终源码门禁"
+    ],
+    "gap_closed": false
+  },
+  "g10_reviewed_commands_live_failure_20261002": {
+    "status": "failed_parent_result_not_delivered",
+    "source_commit": "d49c24be6cb8c92e9c24b087890c52f473e306f9",
+    "run_id": "r-62nv09__",
+    "diagnosis_sha256": "a715c43c9c840bf76d094071111512698e91742d8fab7142931f24635c2b0387",
+    "native_final_sha256": "22518c319458643c85b0c211ee4cf9db4218bd92bea1d9b02dafa1de96c982fc",
+    "actual_model": "claude-opus-5-5",
+    "command_decisions": [
+      "deny A",
+      "allow new A",
+      "allow B"
+    ],
+    "command_exit_codes": [
+      0,
+      0
+    ],
+    "command_cleanup_confirmed": true,
+    "child_result_contains_both_markers": true,
+    "parent_result_acked": false,
+    "failure": "Completed Claude父被result endpoint、worker请求准入及持久领取守卫阻断；自动结果queued，450秒超时。",
+    "cleanup": "两runtime退出/清理确认，外层exit1/libtest101，原件保留cleanup_ready=false",
+    "gap_closed": false
+  },
+  "g03_69c17_native_build_followup_20261002": {
+    "run_id": 36927434162,
+    "linux": {
+      "status": "native_artifact_verified",
+      "receipt_sha256": "5393dcaa2f2d767553c9d6b1ff4b4a080b281e540233ede01b2521b9bcaee9b7",
+      "binary_sha256": "e3b1bea1e10ded36c70f1d641acf2e4a73a9dfcffd9ca3236f51ea6ef46dc6f2",
+      "test_executions": 542,
+      "unique_test_names": 533,
+      "new_png_tests_passed": 17,
+      "host_pin_updated": true,
+      "host_pin_source_gate": "pending"
+    },
+    "windows": {
+      "status": "native_test_failed_no_artifact",
+      "receipt_sha256": "40f504be360961e4e984480930158d0a3fcc2c136f222b5ada4ba503c0dc459f",
+      "failure": "hook_ask_under_yolo_fires_permission_prompt_notification，prepare_tool_call外层5秒Elapsed；原日志无阶段，根因未定。"
+    },
+    "overall_source_gate_passed": false,
+    "gap_closed": false
+  },
+  "g10_completed_parent_result_fix_20261002": {
+    "status": "local_gates_passed_live_and_platform_pending",
+    "base_head": "d49c24be6cb8c92e9c24b087890c52f473e306f9",
+    "source_freeze_sha256": "739193b2dc970d78c35635bb6704ac13d294cd743c312d56dcbc1db7ed3fa407",
+    "local_gates_receipt_sha256": "1b5a06138f987a47a802588d7abdcb3a0537a6807321553ab3823098286cd098",
+    "initial_regressions": {
+      "passed": 163,
+      "failed": 3
+    },
+    "fixture_only_retest": {
+      "passed": 3,
+      "failed": 0
+    },
+    "i18n_passed": 11,
+    "cargo_check_passed": true,
+    "behavior": "同一在线Claude父进程完成后串行消费子结果；逐代原生ACK证明保留原消息回执，用户新轮及换进程断链，晚到旧结果保留而不再派发。",
+    "localization": "无需本地化变更：既有英中错误与结果标签已复核，新增字段为持久身份和协议数据，无布局变更。",
+    "real_model_revalidated": false,
+    "cross_platform_final_source_gate_passed": false,
     "gap_closed": false
   }
 }

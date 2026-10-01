@@ -12534,6 +12534,58 @@ index 0000000000000000000000000000000000000000..c4ce3814e208e8bd1c31258c41b65233
 +        })
 +        .await;
 +}
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs
+index 8d3ec119173319a5f29541efc4e410d4c8b5a420..d494bc22bc97e92db44fd2478ac392b4fe262ed5 100644
+--- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs
++++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/permission_prompt_notification_tests.rs
+@@ -23,13 +23,14 @@ async fn setup_actor(
+     yolo: bool,
+     park_until_hook: bool,
+ ) -> (Arc<SessionActor>, Arc<AtomicUsize>, tokio::task::LocalSet) {
+-    setup_actor_with_pre_tool_use_hook(yolo, park_until_hook, None).await
++    setup_actor_with_pre_tool_use_hook(yolo, park_until_hook, None, None).await
+ }
+ 
+ async fn setup_actor_with_pre_tool_use_hook(
+     yolo: bool,
+     park_until_hook: bool,
+     pre_tool_use_script: Option<&str>,
++    trace: Option<Arc<PermissionPromptTrace>>,
+ ) -> (Arc<SessionActor>, Arc<AtomicUsize>, tokio::task::LocalSet) {
+     let local = tokio::task::LocalSet::new();
+     let (actor, hooks) = local
+@@ -52,7 +53,7 @@ async fn setup_actor_with_pre_tool_use_hook(
+             let actor = Arc::new(actor);
+             actor.wire_permission_prompt_notification();
+             let hooks = Arc::new(AtomicUsize::new(0));
+-            spawn_gateway_loop_counting_prompt_hooks(gateway_rx, hooks.clone(), park_until_hook);
++            spawn_gateway_loop_with_prompt_trace(gateway_rx, hooks.clone(), park_until_hook, trace);
+             (actor, hooks)
+         })
+         .await;
+@@ -158,15 +159,22 @@ async fn yolo_tool_does_not_fire_permission_prompt_notification() {
+ 
+ #[tokio::test(flavor = "current_thread")]
+ async fn hook_ask_under_yolo_fires_permission_prompt_notification() {
++    let trace = Arc::new(PermissionPromptTrace::new());
+     let (actor, hooks, local) = setup_actor_with_pre_tool_use_hook(
+         /*yolo=*/ true,
+         /*park_until_hook=*/ true,
+         Some(r#"echo '{"hookSpecificOutput":{"permissionDecision":"ask"}}'"#),
++        Some(trace.clone()),
+     )
+     .await;
+     local
+         .run_until(async {
++            trace.record("prepare_started", serde_json::Value::Null);
+             let result = prepare_call(&actor, search_replace_call("call_hook_ask")).await;
++            trace.record(
++                "prepare_returned",
++                serde_json::json!({"prepared": result.is_ok()}),
++            );
+             assert!(
+                 result.is_ok(),
+                 "the forced prompt was approved, so the call must run; got {:?}",
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 index 78e5d0eb80c820a86562faa8933b02ed60c2c273..66a7a0dd6d9bbb374628f93b687020fc754ef4bb 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
@@ -12564,7 +12616,7 @@ index 78e5d0eb80c820a86562faa8933b02ed60c2c273..66a7a0dd6d9bbb374628f93b687020fc
          hook_resolved_workspace_root: String::new(),
          hook_load_errors: std::cell::RefCell::new(Vec::new()),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
-index fa11f50caa83041f8fa681e919b95d7f21d59265..df504ed00d572f7851e72d8fea1c27c1177741ff 100644
+index fa11f50caa83041f8fa681e919b95d7f21d59265..c081bafb31b69a26b14edd1867d24446e3a32eb8 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/support.rs
 @@ -284,7 +284,7 @@ async fn create_test_actor_inner(
@@ -12610,6 +12662,159 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..df504ed00d572f7851e72d8fea1c27c1
      *actor.hook_registry.borrow_mut() = Some(Arc::new(registry));
  }
  #[cfg(test)]
+@@ -913,11 +915,84 @@ pub(crate) fn spawn_gateway_loop(
+         false,
+     )
+ }
++/// 仅单个诊断用例启用；只输出固定阶段、次数和耗时，不输出 hook 正文或错误内容。
++pub(crate) struct PermissionPromptTrace {
++    started: std::time::Instant,
++    counts: std::sync::Mutex<std::collections::BTreeMap<&'static str, usize>>,
++}
++
++impl PermissionPromptTrace {
++    pub(crate) fn new() -> Self {
++        Self {
++            started: std::time::Instant::now(),
++            counts: std::sync::Mutex::new(std::collections::BTreeMap::new()),
++        }
++    }
++
++    pub(crate) fn record(&self, stage: &'static str, detail: serde_json::Value) {
++        let count = {
++            let mut counts = self.counts.lock().unwrap();
++            let count = counts.entry(stage).or_default();
++            *count += 1;
++            *count
++        };
++        let row = serde_json::json!({
++            "stage": stage,
++            "count": count,
++            "elapsed_ms": self.started.elapsed().as_millis(),
++            "detail": detail,
++        });
++        eprintln!("permission_prompt_test {row}");
++    }
++
++    fn hook_update(&self, update: &serde_json::Value) {
++        if update["event_name"] != "pre_tool_use" {
++            return;
++        }
++        match update["sessionUpdate"].as_str() {
++            Some("hook_run_started") => self.record(
++                "hook_run_started",
++                serde_json::json!({"hook_count": update["count"].as_u64()}),
++            ),
++            Some("hook_execution") => {
++                for run in update["runs"].as_array().into_iter().flatten() {
++                    if run["name"] != "test/ask" {
++                        continue;
++                    }
++                    let status = match run["status"]["status"].as_str() {
++                        Some("success") => "success",
++                        Some("failed") => "failed",
++                        Some("skipped") => "skipped",
++                        _ => "unrecognized",
++                    };
++                    self.record(
++                        "hook_execution",
++                        serde_json::json!({
++                            "status": status,
++                            "hook_elapsed_ms": run["status"]["elapsed_ms"].as_u64(),
++                        }),
++                    );
++                }
++            }
++            _ => {}
++        }
++    }
++}
++
+ #[cfg(test)]
+ pub(crate) fn spawn_gateway_loop_counting_prompt_hooks(
+     gateway_rx: tokio::sync::mpsc::UnboundedReceiver<xai_acp_lib::AcpClientMessage>,
+     permission_prompt_hooks: Arc<std::sync::atomic::AtomicUsize>,
+     park_until_hook: bool,
++) -> Arc<std::sync::Mutex<Vec<serde_json::Value>>> {
++    spawn_gateway_loop_with_prompt_trace(gateway_rx, permission_prompt_hooks, park_until_hook, None)
++}
++
++pub(crate) fn spawn_gateway_loop_with_prompt_trace(
++    gateway_rx: tokio::sync::mpsc::UnboundedReceiver<xai_acp_lib::AcpClientMessage>,
++    permission_prompt_hooks: Arc<std::sync::atomic::AtomicUsize>,
++    park_until_hook: bool,
++    trace: Option<Arc<PermissionPromptTrace>>,
+ ) -> Arc<std::sync::Mutex<Vec<serde_json::Value>>> {
+     use std::sync::atomic::Ordering;
+     let updates: Arc<std::sync::Mutex<Vec<serde_json::Value>>> = Arc::default();
+@@ -927,19 +1002,35 @@ pub(crate) fn spawn_gateway_loop_counting_prompt_hooks(
+         while let Some(msg) = gateway_rx.recv().await {
+             match msg {
+                 xai_acp_lib::AcpClientMessage::RequestPermission(args) => {
++                    if let Some(trace) = &trace {
++                        trace.record("permission_requested", serde_json::Value::Null);
++                    }
+                     let hooks = permission_prompt_hooks.clone();
++                    let trace = trace.clone();
+                     tokio::task::spawn_local(async move {
+                         if park_until_hook {
+                             let start = std::time::Instant::now();
++                            if let Some(trace) = &trace {
++                                trace.record("notification_wait_started", serde_json::Value::Null);
++                            }
+                             while hooks.load(Ordering::SeqCst) == 0 {
++                                let elapsed = start.elapsed();
++                                if elapsed >= std::time::Duration::from_secs(3)
++                                    && let Some(trace) = &trace
++                                {
++                                    trace.record(
++                                        "notification_wait_timeout",
++                                        serde_json::Value::Null,
++                                    );
++                                }
+                                 assert!(
+-                                    start.elapsed() < std::time::Duration::from_secs(3),
++                                    elapsed < std::time::Duration::from_secs(3),
+                                     "permission_prompt hook must fire before the user answers"
+                                 );
+                                 tokio::task::yield_now().await;
+                             }
+                         }
+-                        let _ = args
++                        let sent = args
+                             .response_tx
+                             .send(Ok(acp::RequestPermissionResponse::new(
+                                 acp::RequestPermissionOutcome::Selected(
+@@ -948,6 +1039,12 @@ pub(crate) fn spawn_gateway_loop_counting_prompt_hooks(
+                                     ),
+                                 ),
+                             )));
++                        if let Some(trace) = &trace {
++                            trace.record(
++                                "permission_answered",
++                                serde_json::json!({"response_sent": sent.is_ok()}),
++                            );
++                        }
+                     });
+                 }
+                 xai_acp_lib::AcpClientMessage::ExtNotification(args) => {
+@@ -959,9 +1056,16 @@ pub(crate) fn spawn_gateway_loop_counting_prompt_hooks(
+                                 == Some(&serde_json::json!("permission_prompt"))
+                             {
+                                 permission_prompt_hooks.fetch_add(1, Ordering::SeqCst);
++                                if let Some(trace) = &trace {
++                                    trace
++                                        .record("permission_notification", serde_json::Value::Null);
++                                }
+                             }
+                         }
+                         "x.ai/session_notification" => {
++                            if let Some(trace) = &trace {
++                                trace.hook_update(&params["update"]);
++                            }
+                             captured.lock().unwrap().push(
+                                 params
+                                     .get("update")
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..0ed81174aa09a5199574b0c9c831233f0c6f0b95
