@@ -1512,6 +1512,9 @@ mod input_approval_guard_tests;
 #[path = "file_submission_tests.rs"]
 mod file_submission_tests;
 
+#[path = "remote_image_consumption_tests.rs"]
+mod remote_image_consumption_tests;
+
 #[test]
 fn collapsed_cli_file_button_opens_composer_and_restores_draft_for_supported_agents() {
     use futures::channel::oneshot;

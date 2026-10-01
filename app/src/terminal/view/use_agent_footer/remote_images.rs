@@ -239,6 +239,35 @@ impl TerminalView {
                 })
     }
 
+    /// 只读消费确认不恢复写租约；除了自动可见性迁移的 generation，其余绑定必须原样。
+    fn remote_image_consumption_target_is_current(
+        &self,
+        submission: &RemoteImageSubmission,
+        binding: &NativeImageBinding,
+        ctx: &AppContext,
+    ) -> bool {
+        let Some(generation) = CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id)
+        else {
+            return false;
+        };
+        let Ok(submission_id) = Uuid::parse_str(&submission.scope.submission_id) else {
+            return false;
+        };
+        CLIAgentSessionsModel::as_ref(ctx)
+            .remote_image_consumption_revision(self.view_id, submission_id)
+            .is_some()
+            && submission.native_write_was_claimed()
+            && submission
+                .client
+                .cli_image_scope_is_current(&submission.scope)
+            && self
+                .remote_image_binding(generation, ctx)
+                .is_some_and(|(client, mut current)| {
+                    current.generation = binding.generation;
+                    Arc::ptr_eq(&client, &submission.client) && current == *binding
+                })
+    }
+
     pub(super) fn submit_remote_cli_images(
         &mut self,
         images: Vec<ImageContext>,
@@ -267,6 +296,29 @@ impl TerminalView {
             );
             return;
         };
+        let Ok(submission_id) = Uuid::parse_str(&submission.scope.submission_id) else {
+            submission.revoke();
+            self.fail_cli_agent_text_submit(
+                generation,
+                crate::t!("cli-agent-input-remote-image-unavailable"),
+                ctx,
+            );
+            return;
+        };
+        let owned = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.register_remote_image_submission_owner(
+                self.view_id,
+                generation,
+                submission_id,
+                snapshot
+                    .as_ref()
+                    .map(|snapshot| snapshot.editor_revision.clone()),
+            )
+        });
+        if !owned {
+            submission.revoke();
+            return;
+        }
         let spawner = ctx.spawner();
         let worker = submission.clone();
         ctx.spawn(
@@ -294,8 +346,21 @@ impl TerminalView {
                     let binding = binding.clone();
                     spawner
                         .spawn(move |me, ctx| {
-                            me.remote_image_target_is_current(&worker, &binding, ctx)
-                                && worker.claim_native_write(subject)
+                            if !me.remote_image_target_is_current(&worker, &binding, ctx)
+                                || !worker.claim_native_write(subject)
+                            {
+                                return false;
+                            }
+                            if binding.consumer.is_claude() {
+                                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                                    sessions.register_remote_image_consumption(
+                                        me.view_id,
+                                        binding.generation,
+                                        submission_id,
+                                    );
+                                });
+                            }
+                            true
                         })
                         .await
                 };
@@ -304,13 +369,40 @@ impl TerminalView {
                 }
                 // 原生输入只由远端类型化 RPC 派发一次；不写路径、Enter 或审批答复。
                 let accepted = worker.submit_native_queue(text, subject, intent).await?;
-                Ok((worker, binding, accepted))
+                Ok((worker, binding, submission_id, accepted))
             },
             move |me, result, ctx| match result {
-                Ok((worker, binding, true))
-                    if me.remote_image_target_is_current(&worker, &binding, ctx) =>
-                {
-                    me.complete_cli_agent_text_submit(generation, snapshot, ctx);
+                Ok((worker, binding, submission_id, true)) => {
+                    let codex_current = !binding.consumer.is_claude()
+                        && me.remote_image_target_is_current(&worker, &binding, ctx);
+                    let owned = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                        sessions.finish_remote_image_submission(
+                            me.view_id,
+                            generation,
+                            submission_id,
+                        )
+                    });
+                    let current = if binding.consumer.is_claude() {
+                        if me.remote_image_consumption_target_is_current(&worker, &binding, ctx)
+                            && let Some(snapshot) = snapshot.as_ref()
+                        {
+                            me.complete_remote_cli_image_consumption(submission_id, snapshot, ctx)
+                        } else {
+                            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                                sessions.finish_remote_image_consumption(me.view_id, submission_id);
+                            });
+                            false
+                        }
+                    } else if owned && codex_current {
+                        me.complete_cli_agent_text_submit(generation, snapshot, ctx);
+                        true
+                    } else {
+                        false
+                    };
+                    if !current {
+                        // 原回执已经持久化，身份或草稿变化后不能清理新输入。
+                        return;
+                    }
                     let message = if binding.consumer.is_claude() {
                         crate::t!("cli-agent-input-remote-claude-image-consumed")
                     } else {
@@ -325,17 +417,24 @@ impl TerminalView {
                         );
                     });
                 }
-                Ok((_, _, true)) => {
-                    // 回执已持久化，旧视图不清除新草稿，也不重新发送。
-                }
-                Ok((_, _, false)) | Err(()) => {
+                Ok((_, _, _, false)) | Err(()) => {
+                    let owned = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                        sessions.finish_remote_image_consumption(me.view_id, submission_id);
+                        sessions.finish_remote_image_submission(
+                            me.view_id,
+                            generation,
+                            submission_id,
+                        )
+                    });
                     submission.revoke();
                     let message = if submission.native_write_was_claimed() {
                         crate::t!("cli-agent-input-remote-image-unconfirmed")
                     } else {
                         crate::t!("cli-agent-input-image-delivery-failed")
                     };
-                    me.fail_cli_agent_text_submit(generation, message, ctx);
+                    if owned && me.cli_agent_input_generation_matches(generation, ctx) {
+                        me.show_error_toast(message, ctx);
+                    }
                 }
             },
         );
@@ -405,3 +504,7 @@ fn prepare_pngs(images: Vec<ImageContext>, text: &[u8]) -> Result<Vec<Vec<u8>>, 
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "remote_image_predicate_tests.rs"]
+mod tests;

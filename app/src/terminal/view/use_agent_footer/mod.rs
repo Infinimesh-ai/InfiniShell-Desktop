@@ -715,8 +715,13 @@ impl TerminalView {
         let draft = self.input.as_ref(ctx).buffer_text(ctx);
         let view_id = self.view_id;
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
-            sessions_model.set_draft(view_id, draft);
-            sessions_model.close_input(view_id, should_auto_toggle_input, ctx);
+            sessions_model.close_input_with_draft(
+                view_id,
+                should_auto_toggle_input,
+                reason,
+                Some(draft),
+                ctx,
+            );
         });
 
         let cli_agent_type: Option<CLIAgentType> = CLIAgentSessionsModel::as_ref(ctx)
@@ -1452,6 +1457,47 @@ impl TerminalView {
         if self.cli_agent_input_generation_matches(generation, ctx) {
             self.show_error_toast(message, ctx);
         }
+    }
+
+    /// 已验证的图片消费回执只能清理这次草稿，不补造延迟的 PromptSubmit 状态。
+    fn complete_remote_cli_image_consumption(
+        &mut self,
+        submission_id: Uuid,
+        snapshot: &CliInputSubmission,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let revision = CLIAgentSessionsModel::as_ref(ctx)
+            .remote_image_consumption_revision(self.view_id, submission_id);
+        let current_revision = self
+            .input
+            .as_ref(ctx)
+            .editor()
+            .as_ref(ctx)
+            .buffer_revision(ctx);
+        let unchanged = revision.as_ref() == Some(&current_revision)
+            && self
+                .ai_context_model
+                .as_ref(ctx)
+                .pending_attachments_revision()
+                == snapshot.attachments_revision;
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.finish_remote_image_consumption(self.view_id, submission_id);
+        });
+        if !unchanged {
+            return false;
+        }
+        if self.has_active_cli_agent_input_session(ctx) {
+            self.input.update(ctx, |input, ctx| {
+                input.acknowledge_cli_input_submission(&current_revision, ctx)
+            });
+        }
+        self.ai_context_model.update(ctx, |model, ctx| {
+            model.clear_pending_attachments(ctx);
+        });
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.clear_draft(self.view_id);
+        });
+        true
     }
 
     fn complete_cli_agent_text_submit(

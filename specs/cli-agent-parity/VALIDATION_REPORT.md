@@ -1,6 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01 G08 清稿、退休响应与 Codex 会话通知源码门禁
+
+**2026-10-01 清稿、退休响应与 Codex 通知接线修复，真实复验待完成**：Claude 自动收起/恢复后仅保留原提交的只读清稿凭证，写租约仍撤销；原笔回调按 generation 与 submission ID 释放租约，不能清新稿或释放新提交。客户端接受原消费者已退出的 retired 回执用于回收，不把退休当成消费。Codex 专属入口冻结五类通知、八份脚本及 SessionFlags，app-server/TUI 使用相同固定参数，不改用户 HOME、CODEX_HOME 或审批配置。客户端 9 项、本机 app 原轮 229 项通过；10 项新连接绑定用例因共享夹具遗漏真实 BlockMetadata 而失败，修正夹具后 10 项独立通过，原失败保留。i18n 11 项及最终 `cargo check -p warp` 通过；收据 `g08-ui-client-local-gates-v1.safe.json` SHA-256 `61e792488c73bcc94bc836f72d49945962fbc32f823c7929d080bf76e9cb007f`，短目录已清理。无需本地化变更；新构建真实英中 GUI、Codex/Grok、tmux 和异常链仍待验，新增关闭 0 项。
+
+Grok 公开源码通知扩展在隔离工作区通过 Mac 通知定向 41 项；原原子桥回归 73 项通过，1 项旧命名空间金样已修并等待单项/最终检查。Windows 静态审查定位并修正仅继承 ACL 条目的误拒，实际 Windows 测试仍待运行。该原生增量尚未绑定工件或进入本 PR，不能算 G08 关闭。
+
+
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
+
+## 2026-10-01：G08 消费和文件释放已实证，界面清稿及客户端退休状态仍需修复
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** 精确提交 `367279c7aa97df1a85689602115a119f4173e7cc` 的新 Mac 构建、独立签名 GUI 在真实 SSH 普通 Claude `2.1.280/claude-opus-5-5` 中，首图经本文件 Read 允许后返回 typed PNG，与规范上传 PNG 同为 328 字节且摘要相同，回答 `Red, Blue`。服务端和宿主均记录 confirmed／释放／完成，远端图片已删除；自动收起后重新打开仍显示原稿和卡片，证明这是界面清稿缺陷，不能再归因为消费解析失败。
+
+第二图 Read 选 No，原生结果报错且无图片数据，没有替代读取。第三次相同 Return 没有新增原生请求，但 CLI 等待守卫也会拦截，不能单独证明持久 Unknown 防重。菜单粘贴 `/exit` 首次被该守卫拒绝；后续实际原生键入 `/exit`、PID 消失才证明退出。服务端由精确生存期产生 retired 并释放图片，客户端却把它拒为 UnexpectedResponse；宿主状态仍空、done=false，实际退出 SSH 并重连后也未恢复。两处缺陷分别补独立消费清稿凭证和仅 Claude 的 retired 响应校验；退休仍不等于消费成功，也不清草稿。
+
+独立业务审计 `resume-20261001/g08-preparation/r-caeh0l9f-claude-ssh-gui/acceptance-review.safe.json` SHA-256 `414055d94ab25cf1c86b9426f07ba474bb27a0f35e282af0dd99fbb17c73d470`。自然退出后，精确进程、打开文件及服务归属核验完成，remote slot 通过同设备无覆盖重命名保存在本轮目录；收据 `56824240b737c503acf5c3b9219ebf8b65cfabf27eb534c00468055caaacda51`。唯一历史及 profile 保留，cleanup_ready=false，不导出完整历史或凭据。审计辅助脚本沿用旧文件名导致的首次失败和服务分类前的首次拒绝均保留，不覆写原件。
+
+客户端定向回归 `r-viza9eze` 为 9／9 首次通过，exit 0、目录已清理，日志 SHA-256 `a241609f639771868ead2f9757a488ce219f7393bc702ba350481d0e4933a3e1`。界面修复首次 check `r-22gsv0t7` exit 101，捕获跨线程 Rc，日志 `40b792f1ff22b102822c51d7b6b033413389ba2520930daa52f7d5b23cc748ab`；改为必要修订号并补同代次旧回执精确释放后仍待新门禁。现有英中文案语义无需变更；真实新构建清稿、退休回收和双语界面尚未复验。
+
+[367279c7a 的 CI 36814148707](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36814148707) 两作业 success。Linux main 1531、新 23 项，Windows main 1331、新 4 项均首次通过；Windows desktop/TUI 670 中有 1 条 LEAK，具体为 `terminal::input::tests::test_ai_context_menu_closes_when_space_immediately_after_at_symbol`，不是最终无异常门禁。13 份 ZIP 均通过 GitHub digest／CRC 独立核验，最终审计 `44dc32031d75a115f8429d08090eb08d883d071d101629cde15b435c840d838c`。本轮原生专项跳过独立 remote_server 客户端组，下轮设 native_acceptance_only=false。Linux TMP 因打开引用可见性不足保留，不用清理拒绝代替功能结论。
 
 ## 2026-10-01：G08 真实 SSH 首图读取成功，消费关联及异常回收修复待复验
 

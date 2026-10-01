@@ -66,6 +66,7 @@ use self::event_cursor::{EventCursor, EventDisposition};
 use self::listener::CLIAgentSessionListener;
 use super::CLIAgent;
 use crate::ai::blocklist::InputConfig;
+use crate::editor::EditorBufferRevision;
 
 /// Ctrl-C 后等待可信事件的时间；超时只能将结果标记为未知。
 pub const CTRL_C_CANCEL_WINDOW: Duration = Duration::from_secs(2);
@@ -461,6 +462,21 @@ struct CtrlCCancelState {
     armed_token: Option<u64>,
 }
 
+/// 修订号保留在 UI 线程；写租约仅由代际和提交编号标识，不依赖清稿权限。
+struct RemoteImageSubmissionOwner {
+    generation: Uuid,
+    submission_id: Uuid,
+    editor_revision: Option<EditorBufferRevision>,
+}
+
+/// 只允许精确消费回执清理原草稿，不能恢复已撤销的发送权限。
+struct RemoteImageConsumption {
+    submission_id: Uuid,
+    generation: Uuid,
+    editor_revision: EditorBufferRevision,
+    input_open: bool,
+}
+
 /// Singleton model that tracks pane-scoped CLI agent state and plugin-enriched session context.
 pub struct CLIAgentSessionsModel {
     sessions: HashMap<EntityId, CLIAgentSession>,
@@ -475,6 +491,8 @@ pub struct CLIAgentSessionsModel {
     event_cursors: HashMap<EntityId, EventCursor>,
     input_generations: HashMap<EntityId, Uuid>,
     input_submissions: HashMap<EntityId, Uuid>,
+    remote_image_submission_owners: HashMap<EntityId, RemoteImageSubmissionOwner>,
+    remote_image_consumptions: HashMap<EntityId, RemoteImageConsumption>,
     #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
     native_grok_submissions: HashMap<EntityId, grok_native_bridge_submission::SubmissionRegistration>,
     #[cfg(feature = "local_fs")]
@@ -510,6 +528,8 @@ impl CLIAgentSessionsModel {
             event_cursors: HashMap::new(),
             input_generations: HashMap::new(),
             input_submissions: HashMap::new(),
+            remote_image_submission_owners: HashMap::new(),
+            remote_image_consumptions: HashMap::new(),
             #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
             native_grok_submissions: HashMap::new(),
             #[cfg(feature = "local_fs")]
@@ -569,7 +589,134 @@ impl CLIAgentSessionsModel {
             return false;
         }
         self.input_submissions.insert(terminal_view_id, generation);
+        self.remote_image_submission_owners.remove(&terminal_view_id);
+        self.remote_image_consumptions.remove(&terminal_view_id);
         true
+    }
+
+    /// 异步准备开始前绑定这一笔提交，编辑或清稿授权撤销不能改变写租约归属。
+    pub(crate) fn register_remote_image_submission_owner(
+        &mut self,
+        terminal_view_id: EntityId,
+        generation: Uuid,
+        submission_id: Uuid,
+        editor_revision: Option<EditorBufferRevision>,
+    ) -> bool {
+        if submission_id.is_nil()
+            || !self.is_input_submission_current(terminal_view_id, generation)
+        {
+            return false;
+        }
+        self.remote_image_submission_owners.insert(
+            terminal_view_id,
+            RemoteImageSubmissionOwner {
+                generation,
+                submission_id,
+                editor_revision,
+            },
+        );
+        true
+    }
+
+    pub(crate) fn finish_remote_image_submission(
+        &mut self,
+        terminal_view_id: EntityId,
+        generation: Uuid,
+        submission_id: Uuid,
+    ) -> bool {
+        if !self
+            .remote_image_submission_owners
+            .get(&terminal_view_id)
+            .is_some_and(|owner| {
+                owner.generation == generation && owner.submission_id == submission_id
+            })
+        {
+            return false;
+        }
+        self.finish_input_submission(terminal_view_id, generation);
+        true
+    }
+
+    /// 调用方仅在本次原生写入已经领取后登记；仍需原来的发送代际。
+    pub(crate) fn register_remote_image_consumption(
+        &mut self,
+        terminal_view_id: EntityId,
+        generation: Uuid,
+        submission_id: Uuid,
+    ) {
+        if submission_id.is_nil()
+            || !self.is_input_submission_current(terminal_view_id, generation)
+            || !self.is_input_open(terminal_view_id)
+        {
+            return;
+        }
+        let Some(editor_revision) = self
+            .remote_image_submission_owners
+            .get(&terminal_view_id)
+            .filter(|owner| owner.generation == generation && owner.submission_id == submission_id)
+            .and_then(|owner| owner.editor_revision.clone())
+        else {
+            return;
+        };
+        self.remote_image_consumptions.insert(
+            terminal_view_id,
+            RemoteImageConsumption {
+                submission_id,
+                generation,
+                editor_revision,
+                input_open: true,
+            },
+        );
+    }
+
+    /// 只有原版本经过可见性事件的程序化保存/恢复，才能迁移清稿修订号。
+    pub(crate) fn transition_remote_image_consumption(
+        &mut self,
+        terminal_view_id: EntityId,
+        previous_open: bool,
+        next_open: bool,
+        before: &EditorBufferRevision,
+        after: EditorBufferRevision,
+    ) {
+        let generation = self.input_generation(terminal_view_id);
+        let Some(consumption) = self.remote_image_consumptions.get_mut(&terminal_view_id) else {
+            return;
+        };
+        if generation != Some(consumption.generation)
+            || consumption.input_open != previous_open
+            || previous_open == next_open
+            || consumption.editor_revision != *before
+        {
+            self.remote_image_consumptions.remove(&terminal_view_id);
+            return;
+        }
+        consumption.editor_revision = after;
+        consumption.input_open = next_open;
+    }
+
+    pub(crate) fn remote_image_consumption_revision(
+        &self,
+        terminal_view_id: EntityId,
+        submission_id: Uuid,
+    ) -> Option<EditorBufferRevision> {
+        let consumption = self.remote_image_consumptions.get(&terminal_view_id)?;
+        (consumption.submission_id == submission_id
+            && self.input_generation(terminal_view_id) == Some(consumption.generation))
+            .then(|| consumption.editor_revision.clone())
+    }
+
+    pub(crate) fn finish_remote_image_consumption(
+        &mut self,
+        terminal_view_id: EntityId,
+        submission_id: Uuid,
+    ) {
+        if self
+            .remote_image_consumptions
+            .get(&terminal_view_id)
+            .is_some_and(|consumption| consumption.submission_id == submission_id)
+        {
+            self.remote_image_consumptions.remove(&terminal_view_id);
+        }
     }
 
     pub(crate) fn is_input_submission_current(
@@ -584,6 +731,7 @@ impl CLIAgentSessionsModel {
     pub(crate) fn finish_input_submission(&mut self, terminal_view_id: EntityId, generation: Uuid) {
         if self.input_submissions.get(&terminal_view_id) == Some(&generation) {
             self.input_submissions.remove(&terminal_view_id);
+            self.remote_image_submission_owners.remove(&terminal_view_id);
             #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
             self.revoke_native_grok_submission(terminal_view_id);
         }
@@ -642,6 +790,7 @@ impl CLIAgentSessionsModel {
         {
             // Codex 来源候选只属于原监听器；注册新监听器后必须等待其真实 hook。
             if matches!(session.agent, CLIAgent::Codex | CLIAgent::Claude) {
+                self.remote_image_consumptions.remove(&terminal_view_id);
                 session.session_context.codex_process_evidence = None;
                 session.session_context.claude_image_evidence = None;
             }
@@ -698,6 +847,7 @@ impl CLIAgentSessionsModel {
     }
 
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
+        self.remote_image_consumptions.remove(&terminal_view_id);
         #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
         self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
@@ -715,6 +865,7 @@ impl CLIAgentSessionsModel {
         self.revoke_owned_grok_input(terminal_view_id);
         self.input_generations.remove(&terminal_view_id);
         self.input_submissions.remove(&terminal_view_id);
+        self.remote_image_submission_owners.remove(&terminal_view_id);
         self.abort_pending_cancel(terminal_view_id);
         self.ctrl_c_cancel_state.remove(&terminal_view_id);
         self.event_cursors.remove(&terminal_view_id);
@@ -793,6 +944,7 @@ impl CLIAgentSessionsModel {
                 let changed = context.codex_process_evidence != incoming;
                 context.codex_process_evidence = incoming;
                 if changed {
+                    self.remote_image_consumptions.remove(&terminal_view_id);
                     #[cfg(not(target_family = "wasm"))]
                     crate::remote_server::cli_image_submission::revoke(terminal_view_id);
                 }
@@ -808,6 +960,7 @@ impl CLIAgentSessionsModel {
                 let changed = context.claude_image_evidence != incoming;
                 context.claude_image_evidence = incoming;
                 if changed {
+                    self.remote_image_consumptions.remove(&terminal_view_id);
                     #[cfg(not(target_family = "wasm"))]
                     crate::remote_server::cli_image_submission::revoke(terminal_view_id);
                 }
@@ -1001,6 +1154,7 @@ impl CLIAgentSessionsModel {
         terminal_view_id: EntityId,
         ctx: &mut ModelContext<Self>,
     ) {
+        self.remote_image_consumptions.remove(&terminal_view_id);
         #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
         self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
@@ -1180,6 +1334,26 @@ impl CLIAgentSessionsModel {
         should_auto_toggle_input: bool,
         ctx: &mut ModelContext<Self>,
     ) {
+        self.close_input_with_draft(
+            terminal_view_id,
+            should_auto_toggle_input,
+            CLIAgentRichInputCloseReason::Other,
+            None,
+            ctx,
+        );
+    }
+
+    pub(crate) fn close_input_with_draft(
+        &mut self,
+        terminal_view_id: EntityId,
+        should_auto_toggle_input: bool,
+        reason: CLIAgentRichInputCloseReason,
+        draft: Option<String>,
+        ctx: &mut ModelContext<Self>,
+    ) {
+        if reason != CLIAgentRichInputCloseReason::AutoToggle {
+            self.remote_image_consumptions.remove(&terminal_view_id);
+        }
         #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
         self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]
@@ -1198,14 +1372,24 @@ impl CLIAgentSessionsModel {
         let Some(session) = self.sessions.get_mut(&terminal_view_id) else {
             return;
         };
+        if let Some(draft) = draft {
+            session.draft_text = (!draft.trim().is_empty()).then_some(draft);
+        }
         if session.input_state == CLIAgentInputState::Closed {
             return;
         }
 
         let previous_input_state = session.input_state;
         session.input_state = CLIAgentInputState::Closed;
-        self.input_generations
-            .insert(terminal_view_id, Uuid::new_v4());
+        let generation = Uuid::new_v4();
+        let previous_generation = self.input_generations.insert(terminal_view_id, generation);
+        if let Some(consumption) = self.remote_image_consumptions.get_mut(&terminal_view_id) {
+            if previous_generation == Some(consumption.generation) {
+                consumption.generation = generation;
+            } else {
+                self.remote_image_consumptions.remove(&terminal_view_id);
+            }
+        }
         session.should_auto_toggle_input = should_auto_toggle_input;
         ctx.emit(CLIAgentSessionsModelEvent::InputSessionChanged {
             terminal_view_id,
@@ -1273,6 +1457,7 @@ impl CLIAgentSessionsModel {
     /// Saves draft text from the rich input composer for the given terminal.
     /// Stores `None` for empty or whitespace-only text.
     pub fn set_draft(&mut self, terminal_view_id: EntityId, text: String) {
+        self.remote_image_consumptions.remove(&terminal_view_id);
         if let Some(session) = self.sessions.get_mut(&terminal_view_id) {
             session.draft_text = if text.trim().is_empty() {
                 None
@@ -1284,6 +1469,7 @@ impl CLIAgentSessionsModel {
 
     /// Clears any saved draft text for the given terminal.
     pub fn clear_draft(&mut self, terminal_view_id: EntityId) {
+        self.remote_image_consumptions.remove(&terminal_view_id);
         if let Some(session) = self.sessions.get_mut(&terminal_view_id) {
             session.draft_text = None;
         }

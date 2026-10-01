@@ -6074,5 +6074,147 @@
     "boundary": "本轮修复后的真实功能、双语布局、Codex/Grok与SSH/tmux异常组合均待验；不把前一构建消费证据当成本轮回收成功",
     "local_evidence": "resume-20261001/g08-preparation/g08-consumption-release-local-gates-v2.safe.json",
     "local_evidence_sha256": "542d123c414997aa4cf8fa599c2fc4a8374953f8279d97910f376953da83b624"
+  },
+  "g08_gui_consumption_review_20261001": {
+    "source_commit": "367279c7aa97df1a85689602115a119f4173e7cc",
+    "status": "ui_client_and_codex_notification_local_gates_passed_real_acceptance_pending",
+    "newly_closed_gaps": [],
+    "gui_run": "r-caeh0l9f",
+    "review_sha256": "414055d94ab25cf1c86b9426f07ba474bb27a0f35e282af0dd99fbb17c73d470",
+    "positive": "实际SSH普通Claude首图：typed PNG字节匹配、Red Blue答案、confirmed、服务端文件释放及宿主完成账本；第二图原生Read拒绝，无图片消费和替代读取。",
+    "defects": [
+      "自动收起/恢复后成功消费仍未清原稿与卡片",
+      "原生退出后服务端retired/释放，但客户端拒绝retired响应，宿主状态未完成；重连后仍然如此"
+    ],
+    "duplicate_boundary": "第三次Return没有新增原生请求，但同时受CLI waiting guard拦截，不单列为持久Unknown防重通过。",
+    "client_fix_gate": {
+      "run_id": "r-viza9eze",
+      "tests_passed": 9,
+      "exit_code": 0,
+      "log_sha256": "a241609f639771868ead2f9757a488ce219f7393bc702ba350481d0e4933a3e1",
+      "temporary_directory": "cleaned"
+    },
+    "ui_initial_check": {
+      "run_id": "r-22gsv0t7",
+      "exit_code": 101,
+      "log_sha256": "40b792f1ff22b102822c51d7b6b033413389ba2520930daa52f7d5b23cc748ab",
+      "failure": "Rc<CliInputSubmission>不能跨Send异步任务；修复后待新门禁",
+      "temporary_directory": "cleaned"
+    },
+    "source_ci": {
+      "run_id": 36814148707,
+      "workflow_conclusion": "success",
+      "audit_sha256": "44dc32031d75a115f8429d08090eb08d883d071d101629cde15b435c840d838c",
+      "linux_new_first_pass": 23,
+      "windows_new_first_pass": 4,
+      "windows_desktop_leaks": [
+        "terminal::input::tests::test_ai_context_menu_closes_when_space_immediately_after_at_symbol"
+      ],
+      "clean_final_gate": false,
+      "independent_client_group": "此次native_acceptance_only=true跳过；下轮必须设false"
+    },
+    "lifecycle": {
+      "launcher_exit_code": 0,
+      "all_owned_processes_exited": true,
+      "slot_retained_receipt_sha256": "56824240b737c503acf5c3b9219ebf8b65cfabf27eb534c00468055caaacda51",
+      "cleanup_ready": false,
+      "unique_history_and_profiles_retained": true
+    },
+    "localization": "现有英中消费/未确认文案语义无需变更；新清稿行为及双语实窗复验仍待完成。",
+    "remaining": "Claude清稿/回收新构建复验；Codex/Grok通知接线及原生消费；tmux、断连/重连/旧回执组合及最终源码门禁。",
+    "gap_closed": false,
+    "ui_test_attempts": [
+      {
+        "run_id": "r-9xnghs1j",
+        "exit_code": 101,
+        "log_sha256": "d570345fc9191b57f8b5e8c803b4dd5429ce1c77a1ec99b8cb6da09e114f2d8a",
+        "result": "编译失败：EditorBufferRevision内部Rc仍非Send；测试依赖未启用tokio_util compat。已改UI线程owner保存版本号并复用async_compat，尚待实际测试。",
+        "temporary_directory": "cleaned"
+      },
+      {
+        "run_id": "r-9pz0jkpa",
+        "exit_code": -2,
+        "log_sha256": "317c09876c1b8c1073edaa8af19160004b66e531a00991e79086c92072f17d4a",
+        "result": "编译期间主动中止；先修夹具事件flush可能读取真实账本的问题，不计通过。",
+        "temporary_directory": "cleaned"
+      },
+      {
+        "run_id": "r-jqpyo32a",
+        "exit_code": 100,
+        "passed": 229,
+        "failed": 10,
+        "log_sha256": "c55dbba414cb18ba5b91f6a7f296f6d4a52ebdfad64820930bc3cb9abc4dc9b5",
+        "result": "共享夹具未同步BlockMetadata，remote_host为空；guard正确拒绝。只修测试以真实元数据事件同步后，10项另轮通过，原失败保留。",
+        "temporary_directory": "cleaned"
+      }
+    ],
+    "implementation": "自动收起仅迁移原稿的只读消费凭证，写租约仍撤销；按generation和submission_id释放原笔租约，防止旧回调释放新提交。Claude retired响应可用于回收但不确认消费。Codex每票据冻结通知脚本与SessionFlags，不修改用户HOME/CODEX_HOME或审批配置。",
+    "local_gates": {
+      "receipt_sha256": "61e792488c73bcc94bc836f72d49945962fbc32f823c7929d080bf76e9cb007f",
+      "app_tests": "229项原轮通过；仅修改共享夹具后10项另轮通过，不称原失败运行239/239成功。",
+      "new_app_tests": {
+        "codex_notifications": 9,
+        "draft_and_lease": 13,
+        "real_binding_predicate": 10
+      },
+      "predicate_run": "r-19o5joly",
+      "predicate_log_sha256": "1fc4089f7cbce0167483d3efbd4e51741ba3f090f2399e0d94d65c6fd1743da8",
+      "i18n_run": "r-_6_zv8x4",
+      "i18n_passed": 11,
+      "i18n_log_sha256": "64642bf116885bc1e19829b8a3bc8b1d40a05438b13721c2f1a1f6002a6a1713",
+      "check_run": "r-f9ewzmct",
+      "check_log_sha256": "243efb53603ecb8c16313d9e7bb3b4aa53b4078ed45e5f40419e5d02b79c2296",
+      "temporary_directories": "cleaned"
+    }
+  },
+  "g08_native_notification_source_20261001": {
+    "status": "mac_notification_tests_passed_final_native_check_pending",
+    "newly_closed_gaps": [],
+    "upstream": "https://github.com/xai-org/grok-build",
+    "public_base": "07e35a3dfeed2f200d319ef6c893b5ea286d9a51",
+    "native_base": "77d8004b18b5d7c7f7ced42f084dbe5a54048a23",
+    "version": "1.0.41+infinishell.session-notifications.1",
+    "source_freeze_sha256": "7f1766e1d4c95d21540ad255a7010d6fe7d54474de7ce82fc808eae8a5e49450",
+    "source_files_map_sha256": "9d3f92476905aa74b316b0045903a2371d7e466ef543eec19151d800a72c1dcb",
+    "implementation": "独立会话通知工件；冻结SID/插件绑定、内核验证pager终端路由、resident图片侧车附着、按会话撤销和双SessionStart取消隔离。",
+    "first_check": {
+      "run_id": "r-q7ze1r_p",
+      "exit_code": 101,
+      "log_sha256": "8a049366dda977ea622921ff891da6eaa708c90b85f19c20d3be5cd36ba732b6",
+      "failure": "ReadHalf无get_ref；改为同一连接读取注册帧后、拆分前采集内核peer身份。",
+      "temporary_directory": "cleaned"
+    },
+    "check": {
+      "run_id": "r-wxkeh4d6",
+      "exit_code": 0,
+      "log_sha256": "196a4aed8178d25f170a5d7ff6365c5004236f42c44e839d7a6d07b7b8808b54",
+      "command": "cargo +1.94.0 check --locked -p xai-grok-pager-bin",
+      "temporary_directory": "cleaned",
+      "source_freeze_sha256": "7d143b79ae246ee7b37e6d855dc819e40a442dbe275910be0fce5df51e5848d6"
+    },
+    "boundary": "尚未绑定可执行工件，宿主与原生实现仍在隔离工作区，不能计为G08完成；实际PNG消费、通知归属、回收、双语和Linux/Windows源码门禁待完成。",
+    "localization": "Grok新入口需同步两对英中文案，隔离工作区已修改但未验布局。主分支Claude清稿/Codex通知无需文案变更。",
+    "gap_closed": false,
+    "notification_tests": {
+      "run_id": "r-ko1h2tar",
+      "passed": 41,
+      "log_sha256": "ce4983acffa15f124ba7b283418446cc79c04c240dd61bc19cbf5f4af247b79c",
+      "source_freeze_sha256": "39f827067f7a71e4f837f8d2f26375cf5609b09583cab11e8c33e7908fee2810",
+      "temporary_directory": "cleaned"
+    },
+    "test_failures": [
+      {
+        "run_id": "r-u3jh99_x",
+        "log_sha256": "38b7d4b4902b50cb988ab03cc9e569ec2841e2cca82bf0e9735c9cf52e46a57d",
+        "reason": "两处AppView测试构造遗漏新字段；修正后41项通知测试通过。"
+      },
+      {
+        "run_id": "r-u0rvam6k",
+        "log_sha256": "e73dd08753d883bb9db420b91ecf37e44550ae56675803a9258e12edf5cd5e82",
+        "passed": 73,
+        "failed": 1,
+        "reason": "namespace测试仍期待旧leader-isp-tb1；已修金样为独立leader-isp-sn1，单项及最终check待完成。"
+      }
+    ]
   }
 }

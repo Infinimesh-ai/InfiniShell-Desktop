@@ -2668,6 +2668,7 @@ impl Input {
         ctx.subscribe_to_model(&CLIAgentSessionsModel::handle(ctx), |me, _, event, ctx| {
             let CLIAgentSessionsModelEvent::InputSessionChanged {
                 terminal_view_id,
+                previous_input_state,
                 new_input_state,
                 ..
             } = event
@@ -2678,6 +2679,7 @@ impl Input {
                 return;
             }
 
+            let before = me.editor.as_ref(ctx).buffer_revision(ctx);
             match new_input_state {
                 CLIAgentInputState::Open { .. } => {
                     // Input just opened — switch to agent mode.
@@ -2700,6 +2702,18 @@ impl Input {
                     me.clear_buffer_and_reset_undo_stack(ctx);
                 }
             }
+
+            // 自动收起/恢复只迁移未编辑的原草稿清理凭证，不恢复发送租约。
+            let after = me.editor.as_ref(ctx).buffer_revision(ctx);
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                sessions.transition_remote_image_consumption(
+                    me.terminal_view_id,
+                    matches!(previous_input_state, CLIAgentInputState::Open { .. }),
+                    matches!(new_input_state, CLIAgentInputState::Open { .. }),
+                    &before,
+                    after,
+                );
+            });
 
             // Set the CLI agent flag after the mode switch so that
             // refresh_categories_state sees the correct is_ai_or_autodetect_mode.

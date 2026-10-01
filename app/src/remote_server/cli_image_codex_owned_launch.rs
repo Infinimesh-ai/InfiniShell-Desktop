@@ -1,9 +1,12 @@
 //! 显式启动的每终端私有 Codex app-server 与 TUI；继承用户配置，不修改审批策略。
 //! 子进程在 exec 前保存生存期，监督者退出后仍可精确识别并回收自身服务端。
 
+use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read as _, Write as _};
-use std::os::unix::fs::{DirBuilderExt as _, MetadataExt as _, OpenOptionsExt as _};
+use std::os::unix::fs::{
+    DirBuilderExt as _, MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _,
+};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -39,6 +42,8 @@ struct Reservation {
     cwd: PathBuf,
     app: PathBuf,
     app_sha256: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    notifications: Option<NotificationPlan>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -56,6 +61,292 @@ struct Manifest {
     group: i32,
     tty_device: u64,
     socket: PathBuf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    notifications: Option<NotificationPlan>,
+}
+
+// 只嵌入现有通知脚本闭包，不加载项目插件、MCP、技能或任意额外启动参数。
+const NOTIFICATION_SCRIPTS: [(&str, &[u8]); 8] = [
+    (
+        "on-session-start.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-session-start.sh"
+        ),
+    ),
+    (
+        "on-prompt-submit.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-prompt-submit.sh"
+        ),
+    ),
+    (
+        "on-permission-request.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-permission-request.sh"
+        ),
+    ),
+    (
+        "on-post-tool-use.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-post-tool-use.sh"
+        ),
+    ),
+    (
+        "on-stop.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/on-stop.sh"
+        ),
+    ),
+    (
+        "build-payload.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/build-payload.sh"
+        ),
+    ),
+    (
+        "should-use-structured.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/should-use-structured.sh"
+        ),
+    ),
+    (
+        "warp-notify.sh",
+        include_bytes!(
+            "../../assets/bundled/cli-agent-plugins/codex/source/plugins/warp/scripts/warp-notify.sh"
+        ),
+    ),
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+enum NotificationEvent {
+    SessionStart,
+    UserPromptSubmit,
+    PermissionRequest,
+    PostToolUse,
+    Stop,
+}
+impl NotificationEvent {
+    fn fields(self) -> (&'static str, &'static str, &'static str) {
+        match self {
+            Self::SessionStart => ("SessionStart", "session_start", "on-session-start.sh"),
+            Self::UserPromptSubmit => (
+                "UserPromptSubmit",
+                "user_prompt_submit",
+                "on-prompt-submit.sh",
+            ),
+            Self::PermissionRequest => (
+                "PermissionRequest",
+                "permission_request",
+                "on-permission-request.sh",
+            ),
+            Self::PostToolUse => ("PostToolUse", "post_tool_use", "on-post-tool-use.sh"),
+            Self::Stop => ("Stop", "stop", "on-stop.sh"),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NotificationHook {
+    event: NotificationEvent,
+    command: String,
+    key: String,
+    normalized_hash: String,
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NotificationFile {
+    name: String,
+    sha256: String,
+    identity: (u64, u64, u64, i64, i64),
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NotificationPlan {
+    version: u32,
+    root: PathBuf,
+    directory_identity: (u64, u64),
+    scripts_identity: (u64, u64),
+    files: Vec<NotificationFile>,
+    hooks: Vec<NotificationHook>,
+}
+
+impl NotificationPlan {
+    fn create(directory: &Path) -> io::Result<Self> {
+        private_metadata(directory, true)?;
+        let root = directory.join("notifications");
+        let scripts = root.join("scripts");
+        fs::DirBuilder::new().mode(0o700).create(&root)?;
+        fs::DirBuilder::new().mode(0o700).create(&scripts)?;
+        for (name, bytes) in NOTIFICATION_SCRIPTS {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o700)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                .open(scripts.join(name))?;
+            // 通知脚本会直接执行同目录 warp-notify.sh，仅自持文件需要执行权限。
+            file.set_permissions(fs::Permissions::from_mode(0o700))?;
+            file.write_all(bytes)?;
+            file.sync_all()?;
+        }
+        File::open(&scripts)?.sync_all()?;
+        File::open(&root)?.sync_all()?;
+        File::open(directory)?.sync_all()?;
+        Self::capture(directory)
+    }
+
+    fn capture(directory: &Path) -> io::Result<Self> {
+        let root = directory.join("notifications");
+        if !root.is_absolute() || root.canonicalize()? != root {
+            return Err(invalid());
+        }
+        let metadata = private_metadata(&root, true)?;
+        let scripts = root.join("scripts");
+        let scripts_metadata = private_metadata(&scripts, true)?;
+        let root_entries = fs::read_dir(&root)?.collect::<Result<Vec<_>, _>>()?;
+        if root_entries.len() != 1 || root_entries[0].file_name() != "scripts" {
+            return Err(invalid());
+        }
+        let script_entries = fs::read_dir(&scripts)?.collect::<Result<Vec<_>, _>>()?;
+        if script_entries.len() != NOTIFICATION_SCRIPTS.len() {
+            return Err(invalid());
+        }
+        let mut files = Vec::new();
+        for (name, expected) in NOTIFICATION_SCRIPTS {
+            let path = scripts.join(name);
+            let before = fs::symlink_metadata(&path)?;
+            if !before.is_file()
+                || before.file_type().is_symlink()
+                || before.uid() != unsafe { libc::geteuid() }
+                || before.mode() & 0o7777 != 0o700
+                || before.nlink() != 1
+                || before.len() != expected.len() as u64
+            {
+                return Err(invalid());
+            }
+            let mut file = OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+                .open(&path)?;
+            let opened = image_identity(&file.metadata()?);
+            let mut bytes = Vec::new();
+            (&mut file)
+                .take(expected.len() as u64 + 1)
+                .read_to_end(&mut bytes)?;
+            if image_identity(&before) != opened
+                || bytes != expected
+                || image_identity(&file.metadata()?) != opened
+                || image_identity(&fs::symlink_metadata(&path)?) != opened
+            {
+                return Err(invalid());
+            }
+            files.push(NotificationFile {
+                name: name.into(),
+                sha256: digest(&bytes),
+                identity: opened,
+            });
+        }
+        let mut hooks = Vec::new();
+        for event in [
+            NotificationEvent::SessionStart,
+            NotificationEvent::UserPromptSubmit,
+            NotificationEvent::PermissionRequest,
+            NotificationEvent::PostToolUse,
+            NotificationEvent::Stop,
+        ] {
+            let (_, label, script) = event.fields();
+            let script = scripts.join(script);
+            let quoted =
+                shlex::try_quote(script.to_str().ok_or_else(invalid)?).map_err(|_| invalid())?;
+            let command = format!("bash {quoted}");
+            hooks.push(NotificationHook {
+                event,
+                normalized_hash: notification_hash(event, &command)?,
+                command,
+                // 固定 0.156.1 discovery.rs 为 SessionFlags 使用此合成来源；不涉及 cwd 信任。
+                key: format!("/<session-flags>/config.toml:{label}:0:0"),
+            });
+        }
+        let after = private_metadata(&root, true)?;
+        let scripts_after = private_metadata(&scripts, true)?;
+        if (metadata.dev(), metadata.ino()) != (after.dev(), after.ino())
+            || (scripts_metadata.dev(), scripts_metadata.ino())
+                != (scripts_after.dev(), scripts_after.ino())
+        {
+            return Err(invalid());
+        }
+        Ok(Self {
+            version: 1,
+            root,
+            directory_identity: (metadata.dev(), metadata.ino()),
+            scripts_identity: (scripts_metadata.dev(), scripts_metadata.ino()),
+            files,
+            hooks,
+        })
+    }
+
+    fn verify(&self, directory: &Path) -> io::Result<()> {
+        if Self::capture(directory)? != *self {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+
+    fn arguments(&self) -> Vec<String> {
+        let mut arguments = Vec::new();
+        for hook in &self.hooks {
+            let (event, _, _) = hook.event.fields();
+            let command = toml::Value::String(hook.command.clone());
+            let key = toml::Value::String(hook.key.clone());
+            let hash = toml::Value::String(hook.normalized_hash.clone());
+            // 只传五个固定通知声明及其精确内容信任；不设项目、审批或沙箱参数。
+            arguments.extend([
+                "-c".into(),
+                format!("hooks.{event}=[{{hooks=[{{type=\"command\",command={command},timeout=600,async=false}}]}}]"),
+                "-c".into(),
+                format!("hooks.state.{key}={{enabled=true,trusted_hash={hash}}}"),
+            ]);
+        }
+        arguments
+    }
+}
+
+fn notification_hash(event: NotificationEvent, command: &str) -> io::Result<String> {
+    // 固定上游 b412ff32 的 normalized TOML 会省略 None；fingerprint 再按 JSON 键排序。
+    let handler = BTreeMap::from([
+        ("async", serde_json::Value::Bool(false)),
+        ("command", serde_json::Value::String(command.into())),
+        ("timeout", serde_json::Value::from(600)),
+        ("type", serde_json::Value::String("command".into())),
+    ]);
+    let identity = BTreeMap::from([
+        (
+            "event_name",
+            serde_json::Value::String(event.fields().1.into()),
+        ),
+        (
+            "hooks",
+            serde_json::to_value([handler]).map_err(|_| invalid())?,
+        ),
+    ]);
+    Ok(format!(
+        "sha256:{}",
+        digest(&serde_json::to_vec(&identity).map_err(|_| invalid())?)
+    ))
+}
+
+fn notification_version(version: u32, plan: Option<&NotificationPlan>) -> bool {
+    matches!((version, plan), (1, None) | (2, Some(_)))
+}
+
+fn verify_notifications(directory: &Path, plan: Option<&NotificationPlan>) -> io::Result<()> {
+    match plan {
+        Some(plan) => plan.verify(directory),
+        None => Ok(()),
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -113,8 +404,9 @@ impl TicketStore {
         fs::DirBuilder::new().mode(0o700).create(&directory)?;
         File::open(&self.root)?.sync_all()?;
         let app = std::env::current_exe()?.canonicalize()?;
+        let notifications = NotificationPlan::create(&directory)?;
         let reservation = Reservation {
-            version: 1,
+            version: 2,
             id: ticket.id,
             key_sha256: digest(ticket.key.as_bytes()),
             host: scope.host.clone(),
@@ -122,6 +414,7 @@ impl TicketStore {
             cwd,
             app_sha256: executable_digest(&app)?,
             app,
+            notifications: Some(notifications),
         };
         let path = directory.join("ticket.json");
         write_new(&path, &reservation)?;
@@ -138,7 +431,7 @@ impl TicketStore {
     pub(super) fn lock(&self, scope: &Scope, ticket: &Ticket) -> io::Result<Guard> {
         let guard = lock_directory(&self.directory(ticket.id)?)?;
         let reservation: Reservation = read_json(&guard.directory.join("ticket.json"))?;
-        if reservation.version != 1
+        if !notification_version(reservation.version, reservation.notifications.as_ref())
             || reservation.id != ticket.id
             || ticket.key.is_nil()
             || reservation.key_sha256 != digest(ticket.key.as_bytes())
@@ -332,6 +625,7 @@ impl OwnedImageLease {
         self.manifest.tty_device
     }
     pub(super) fn validate(&self, stream: &UnixStream) -> io::Result<()> {
+        verify_notifications(&self.guard.directory, self.manifest.notifications.as_ref())?;
         self.socket.validate()?;
         self.tui.validate()?;
         self.server.validate()?;
@@ -400,19 +694,22 @@ fn supervise(path: &Path, expected_hash: &str) -> io::Result<()> {
         return Err(invalid());
     }
     let reservation: Reservation = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
-    if reservation.version != 1
+    // 旧票据只可查询或回收；不能冷恢复为一次新的原生启动。
+    if reservation.version != 2
+        || reservation.notifications.is_none()
         || std::env::current_exe()?.canonicalize()? != reservation.app
         || executable_digest(&reservation.app)? != reservation.app_sha256
     {
         return Err(invalid());
     }
+    verify_notifications(directory, reservation.notifications.as_ref())?;
     let (shell, tty_device, group) = current_terminal()?;
     let executable = resolve_executable()?;
     let binary = fixed_executable(&executable)?;
     let wrapper = Token::capture(unsafe { libc::getpid() })?;
     let codex_home = process(wrapper.pid, Configuration::Codex)?.config_home;
     let manifest = Manifest {
-        version: 1,
+        version: 2,
         ticket: reservation.id,
         reservation_sha256: expected_hash.into(),
         executable,
@@ -424,6 +721,7 @@ fn supervise(path: &Path, expected_hash: &str) -> io::Result<()> {
         group,
         tty_device,
         socket: directory.join("control.sock"),
+        notifications: reservation.notifications,
     };
     write_new(&directory.join("entered.json"), &manifest.wrapper)?;
     let path = directory.join("manifest.json");
@@ -508,8 +806,7 @@ fn helper_command(manifest: &Manifest, path: &Path, hash: &str, role: &str) -> C
         .arg(path)
         .arg(hash)
         .arg(role)
-        .current_dir(&manifest.cwd)
-        .env("CODEX_HOME", &manifest.codex_home);
+        .current_dir(&manifest.cwd);
     unsafe {
         command.pre_exec(|| {
             for signal in [libc::SIGINT, libc::SIGQUIT] {
@@ -533,9 +830,10 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
     {
         return Err(invalid());
     }
-    let manifest: Manifest = serde_json::from_slice(&bytes).map_err(|_| invalid())?;
+    let manifest = bound_manifest(directory, &bytes)?;
     let reservation: Reservation = read_json(&directory.join("ticket.json"))?;
-    if manifest.version != 1
+    if manifest.version != 2
+        || manifest.notifications.is_none()
         || manifest.reservation_sha256 != digest(&read_private(&directory.join("ticket.json"))?)
         || manifest.ticket != reservation.id
         || std::env::current_exe()?.canonicalize()? != reservation.app
@@ -555,6 +853,7 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
             return Err(invalid());
         }
     }
+    verify_notifications(directory, manifest.notifications.as_ref())?;
     let birth = Birth {
         manifest_sha256: hash.into(),
         process: Token::capture(unsafe { libc::getpid() })?,
@@ -564,8 +863,7 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
     let mut command = Command::new(&manifest.executable);
     command
         .args(arguments(&manifest, role))
-        .current_dir(&manifest.cwd)
-        .env("CODEX_HOME", &manifest.codex_home);
+        .current_dir(&manifest.cwd);
     // 仅禁止此私有进程注册额外远程控制入口；queue、认证与审批配置仍由原生读取。
     if role == "server" {
         command.env("CODEX_INTERNAL_APP_SERVER_REMOTE_CONTROL_DISABLED", "1");
@@ -578,7 +876,12 @@ fn exec_child(path: &Path, hash: &str, role: &str) -> io::Result<()> {
 
 fn arguments(manifest: &Manifest, role: &str) -> Vec<String> {
     let endpoint = format!("unix://{}", manifest.socket.display());
-    if role == "server" {
+    let mut arguments = manifest
+        .notifications
+        .as_ref()
+        .map(NotificationPlan::arguments)
+        .unwrap_or_default();
+    arguments.extend(if role == "server" {
         vec!["app-server".into(), "--listen".into(), endpoint]
     } else {
         vec![
@@ -587,7 +890,8 @@ fn arguments(manifest: &Manifest, role: &str) -> Vec<String> {
             "--cd".into(),
             manifest.cwd.to_string_lossy().into_owned(),
         ]
-    }
+    });
+    arguments
 }
 fn arguments_match(actual: &[Vec<u8>], manifest: &Manifest, role: &str) -> bool {
     let expected = arguments(manifest, role);
@@ -598,6 +902,7 @@ fn arguments_match(actual: &[Vec<u8>], manifest: &Manifest, role: &str) -> bool 
             .all(|(actual, expected)| actual == expected.as_bytes())
 }
 fn child(directory: &Path, manifest: &Manifest, hash: &str, role: &str) -> io::Result<Token> {
+    verify_notifications(directory, manifest.notifications.as_ref())?;
     let birth: Birth = read_json(&directory.join(format!("{role}-birth.json")))?;
     let token = Token::capture(birth.process.pid)?;
     let current = process(token.pid, Configuration::Codex)?;
@@ -617,8 +922,9 @@ fn bound_manifest(directory: &Path, bytes: &[u8]) -> io::Result<Manifest> {
     let manifest: Manifest = serde_json::from_slice(bytes).map_err(|_| invalid())?;
     let reserved = read_private(&directory.join("ticket.json"))?;
     let reservation: Reservation = serde_json::from_slice(&reserved).map_err(|_| invalid())?;
-    if manifest.version != 1
-        || reservation.version != 1
+    if !notification_version(manifest.version, manifest.notifications.as_ref())
+        || manifest.version != reservation.version
+        || manifest.notifications != reservation.notifications
         || manifest.ticket != reservation.id
         || manifest.reservation_sha256 != digest(&reserved)
         || manifest.cwd != reservation.cwd
@@ -627,6 +933,7 @@ fn bound_manifest(directory: &Path, bytes: &[u8]) -> io::Result<Manifest> {
     {
         return Err(invalid());
     }
+    verify_notifications(directory, manifest.notifications.as_ref())?;
     Ok(manifest)
 }
 
@@ -921,3 +1228,7 @@ pub(super) fn write_new<T: Serialize>(path: &Path, value: &T) -> io::Result<()> 
 pub(super) fn invalid() -> io::Error {
     io::Error::other("远端 Codex 私有启动身份或状态无效")
 }
+
+#[cfg(test)]
+#[path = "cli_image_codex_owned_launch_tests.rs"]
+mod tests;
