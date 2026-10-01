@@ -21,6 +21,9 @@ use zeroize::Zeroizing;
 #[path = "cli_image_claude_transcript.rs"]
 mod transcript;
 pub(crate) use transcript::ClaudeTranscript;
+#[path = "cli_image_claude_history_anchor.rs"]
+mod history_anchor;
+pub(crate) use history_anchor::{TranscriptAnchor, TranscriptPathGuard};
 
 const MAX_WIRE_BYTES: usize = 1024 * 1024;
 const MAX_PRIVATE_JSON_BYTES: u64 = 16 * 1024;
@@ -49,7 +52,7 @@ pub(crate) struct ClaudeQueueImage {
     pub(crate) sha256: [u8; 32],
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ClaudeTranscriptIdentity {
     pub(crate) device: u64,
@@ -67,6 +70,79 @@ pub(crate) struct ClaudeImageAttempt {
     pub(crate) transcript_identity: ClaudeTranscriptIdentity,
     pub(crate) transcript_offset: u64,
     pub(crate) images: Vec<ClaudeQueueImage>,
+}
+
+/// 旧对象原样读写；缺少旧 identity/offset 不能被解释为等待创建。
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(crate) enum ClaudeQueuedImageAttempt {
+    Existing(ClaudeImageAttempt),
+    Pending(ClaudePendingImageAttempt),
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClaudePendingImageAttempt {
+    pub(crate) version: u32,
+    pub(crate) kind: ClaudePendingKind,
+    pub(crate) client_message_id: Uuid,
+    pub(crate) session_id: Uuid,
+    pub(crate) request_sha256: [u8; 32],
+    pub(crate) transcript_path: PathBuf,
+    pub(crate) anchor: TranscriptAnchor,
+    pub(crate) images: Vec<ClaudeQueueImage>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub(crate) enum ClaudePendingKind {
+    #[serde(rename = "awaiting_transcript")]
+    AwaitingTranscript,
+}
+
+impl ClaudeQueuedImageAttempt {
+    pub(crate) fn client_message_id(&self) -> Uuid {
+        match self {
+            Self::Existing(value) => value.client_message_id,
+            Self::Pending(value) => value.client_message_id,
+        }
+    }
+    pub(crate) fn request_sha256(&self) -> [u8; 32] {
+        match self {
+            Self::Existing(value) => value.request_sha256,
+            Self::Pending(value) => value.request_sha256,
+        }
+    }
+}
+
+impl ClaudePendingImageAttempt {
+    pub(crate) fn bound(
+        &self,
+        identity: ClaudeTranscriptIdentity,
+    ) -> io::Result<ClaudeImageAttempt> {
+        if self.version != 1 {
+            return Err(rejected("unsupported_pending_transcript"));
+        }
+        Ok(ClaudeImageAttempt {
+            client_message_id: self.client_message_id,
+            session_id: self.session_id,
+            request_sha256: self.request_sha256,
+            transcript_path: self.transcript_path.clone(),
+            transcript_identity: identity,
+            transcript_offset: 0,
+            images: self.images.clone(),
+        })
+    }
+}
+
+/// 只在领取记录的独占锁内创建，首个 inode 与目录链以后不能重新选择。
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ClaudeTranscriptBinding {
+    pub(crate) version: u32,
+    pub(crate) claim_sha256: [u8; 32],
+    pub(crate) anchor: TranscriptAnchor,
+    pub(crate) identity: ClaudeTranscriptIdentity,
+    pub(crate) observed_len: u64,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -197,9 +273,9 @@ impl ClaudeImageInbox {
         client_message_id: Uuid,
         text: &str,
         images: &[ClaudeQueueImage],
-        before_write: impl FnOnce(&ClaudeImageAttempt) -> io::Result<()>,
+        before_write: impl FnOnce(&ClaudeQueuedImageAttempt) -> io::Result<()>,
         validate: &impl Fn(&UnixStream) -> io::Result<()>,
-    ) -> io::Result<ClaudeImageAttempt> {
+    ) -> io::Result<ClaudeQueuedImageAttempt> {
         if client_message_id.is_nil() || text.len() > MAX_WIRE_BYTES / 2 || text.contains('\0') {
             return Err(rejected("invalid_request"));
         }
@@ -240,25 +316,58 @@ impl ClaudeImageInbox {
         }
         self.verify_private_binding()?;
         validate(&self.stream)?;
-        let mut transcript = open_private_file(&self.target.transcript_path)?;
-        let metadata = transcript.metadata()?;
-        let offset = metadata.len();
-        if offset != 0 {
-            transcript.seek(SeekFrom::End(-1))?;
-            let mut last = [0_u8; 1];
-            transcript.read_exact(&mut last)?;
-            if last[0] != b'\n' {
-                return Err(rejected("transcript_append_in_progress"));
+        let config = self
+            .target
+            .registry_directory
+            .parent()
+            .ok_or_else(|| rejected("invalid_config_path"))?;
+        let path_guard = TranscriptPathGuard::capture(
+            config,
+            &self.target.transcript_path,
+            self.target.session_id,
+        )?;
+        let opened = path_guard
+            .anchor
+            .open(&self.target.transcript_path, self.target.session_id);
+        let (attempt, transcript) = match opened {
+            Ok((mut transcript, _)) => {
+                let metadata = transcript.metadata()?;
+                let offset = metadata.len();
+                if offset != 0 {
+                    transcript.seek(SeekFrom::End(-1))?;
+                    let mut last = [0_u8; 1];
+                    transcript.read_exact(&mut last)?;
+                    if last[0] != b'\n' {
+                        return Err(rejected("transcript_append_in_progress"));
+                    }
+                }
+                (
+                    ClaudeQueuedImageAttempt::Existing(ClaudeImageAttempt {
+                        client_message_id,
+                        session_id: self.target.session_id,
+                        request_sha256: Sha256::digest(&encoded).into(),
+                        transcript_path: self.target.transcript_path.clone(),
+                        transcript_identity: identity(&metadata),
+                        transcript_offset: offset,
+                        images: images.to_vec(),
+                    }),
+                    Some(transcript),
+                )
             }
-        }
-        let attempt = ClaudeImageAttempt {
-            client_message_id,
-            session_id: self.target.session_id,
-            request_sha256: Sha256::digest(&encoded).into(),
-            transcript_path: self.target.transcript_path.clone(),
-            transcript_identity: identity(&metadata),
-            transcript_offset: offset,
-            images: images.to_vec(),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => (
+                ClaudeQueuedImageAttempt::Pending(ClaudePendingImageAttempt {
+                    version: 1,
+                    kind: ClaudePendingKind::AwaitingTranscript,
+                    client_message_id,
+                    session_id: self.target.session_id,
+                    request_sha256: Sha256::digest(&encoded).into(),
+                    transcript_path: self.target.transcript_path.clone(),
+                    anchor: path_guard.anchor.clone(),
+                    images: images.to_vec(),
+                }),
+                None,
+            ),
+            Err(error) => return Err(error),
         };
         before_write(&attempt)?;
         self.verify_private_binding()?;
@@ -266,7 +375,20 @@ impl ClaudeImageInbox {
         for (image, file) in images.iter().zip(&image_leases) {
             verify_file_path(file, &image.path)?;
         }
-        verify_file_path(&transcript, &self.target.transcript_path)?;
+        path_guard.verify()?;
+        if let Some(transcript) = &transcript {
+            verify_file_path(transcript, &self.target.transcript_path)?;
+        } else {
+            // 领取后若原生已创建历史，本次不猜测新的发送边界；仍保留 Unknown。
+            match path_guard
+                .anchor
+                .open(&self.target.transcript_path, self.target.session_id)
+            {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Ok(_) => return Err(rejected("transcript_created_before_write")),
+                Err(error) => return Err(error),
+            }
+        }
         // auth 与 user 均为 JSONL。没有输入 ACK；写入、关闭或之后的错误都保留 Unknown。
         self.stream
             .write_all(&auth)
@@ -473,3 +595,7 @@ impl Write for DigestWriter<'_> {
 pub(super) fn rejected(code: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, code)
 }
+
+#[cfg(test)]
+#[path = "cli_image_claude_queue_tests.rs"]
+mod tests;

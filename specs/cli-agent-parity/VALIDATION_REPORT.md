@@ -2,6 +2,14 @@
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
+## 2026-10-01：G08 Claude 首图历史延迟创建实现，缺口继续开放
+
+本增量新增关闭 0 项，累计仍为 6 关闭／5 开放／3 移交，PR #22 保持草稿。Claude 首图不再要求原生提前创建历史；Pending 领取保存既存目录锚，首个原生 inode 绑定须持久化后才能按既有 Read／typed image 原字节证明确认。原 claim 不改写，旧格式不降级为 Pending，未知提交不重投。首次观察长度只提供长度下限，不能证明所有离线截断后重写。
+
+Mac `cargo check -p warp --features warpui/test-util,rust-embed/debug-embed` 通过；同特性下定向 nextest 114／114（含新增 20 项），`cargo test -p warp --lib i18n::tests` 11／11。三轮短 TMPDIR 均 exit 0、cleaned、cleanup_ready；源码 11 文件摘要与完整命令绑定在仓外 `resume-20261001/g08-preparation/g08-first-image-local-gates.safe.json`，SHA-256 `a92596f30bfd4ccbff12adc463dd6cfda69cc5d0ade7cdd1d76be5e64ab174dd`。最初 check 因遗漏 `Component` 导入失败，原记录保留，修正后重跑通过。既有英中远端图片提示、消费和未确认语义已复核，无需本地化变更。
+
+真实 SSH 首图正在独立旧 142c 构建现场验收，当前不计修复前复现或新实现成功；新构建、双语布局、SSH／tmux 三款消费与异常恢复，以及本次 Linux／Windows 源码门禁尚未完成。以下 G01／G07 关闭记录保持各自原来源，不外推为本增量已经通过。
+
 ## 2026-10-01：G01／G07 本次 Mac 范围关闭
 
 **本轮关闭 G01、G07，累计 6 关闭／5 开放／3 移交。** 仍开放 G03、G08、G09、G10、V03；V01／V02／V05 的其他平台实机验收移交用户，未改记通过。PR #22 保持草稿，完整 Goal 尚未完成。

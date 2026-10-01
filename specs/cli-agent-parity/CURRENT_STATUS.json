@@ -6042,5 +6042,18 @@
     "archive_manifest_sha256": "6200acd7602065f1ab9713870cf95b1bba4085503a2a47d0d2110eccb74f22be",
     "log_manifest_sha256": "da283d3483d170eed90b934b3d0076e8d78571ce7c205190851b631950ec795c",
     "boundary": "同源码 Linux/Windows 选定离线门禁；Mac Intel 按条件跳过。不含两平台已认证模型、真实 GUI 或全部必要缺口验收。"
+  },
+  "g08_claude_first_image_pending_history_20261001": {
+    "status": "implemented_local_gates_passed_gap_open",
+    "source_base": "2ca0b2f79bfbfc09a7a055d207c8760a49990864",
+    "local_evidence": "resume-20261001/g08-preparation/g08-first-image-local-gates.safe.json",
+    "local_evidence_sha256": "a92596f30bfd4ccbff12adc463dd6cfda69cc5d0ade7cdd1d76be5e64ab174dd",
+    "mac_check": "passed",
+    "related_nextest": "114/114 including 20 new regressions",
+    "i18n": "11/11",
+    "localization": "既有英中语义已复核，无需本地化变更；真实SSH双语布局待验",
+    "contract": "Explicit pending history, immutable claim, directory anchor, first inode bound durably before parse; unknown queries never resend",
+    "boundary": "observed_len仅首次观察长度下限；新SSH/tmux消费及异常恢复和Linux/Windows源码门禁未完成",
+    "newly_closed_gaps": 0
   }
 }

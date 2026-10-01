@@ -15,6 +15,10 @@ use tempfile::{NamedTempFile, TempDir};
 use uuid::Uuid;
 use warp_core::{HostId, SessionId};
 
+use super::cli_image_claude_queue::{
+    ClaudeImageAttempt, ClaudePendingImageAttempt, ClaudeTranscriptBinding,
+};
+
 #[path = "cli_image_staging_recovery.rs"]
 mod recovery;
 pub(super) use recovery::{QueueClaim, QueueResult};
@@ -75,6 +79,14 @@ impl RemoteImageStaging {
 
     pub(super) fn claim_queue(&self, claim: &QueueClaim) -> io::Result<()> {
         self.references.claim_queue(claim)
+    }
+
+    pub(super) fn bind_claude_transcript(
+        &self,
+        claim: &QueueClaim,
+        pending: &ClaudePendingImageAttempt,
+    ) -> io::Result<(fs::File, ClaudeImageAttempt, ClaudeTranscriptBinding)> {
+        self.references.bind_claude_transcript(claim, pending)
     }
 
     pub(super) fn finish_queue(&mut self, scope: &RemoteImageScope, result: &QueueResult) -> io::Result<()> {

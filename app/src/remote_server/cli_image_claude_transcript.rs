@@ -12,8 +12,8 @@ use uuid::Uuid;
 
 use super::{
     ClaudeImageAttempt, ClaudeImageReadReceipt, ClaudeImageReceipt, ClaudeInboxTarget,
-    DigestWriter, MAX_TOTAL_IMAGE_BYTES, identity, is_absolute_normal_path, open_private_file,
-    rejected, verify_file_path,
+    ClaudeTranscriptBinding, DigestWriter, MAX_TOTAL_IMAGE_BYTES, TranscriptAnchor, identity,
+    is_absolute_normal_path, open_private_file, rejected, verify_file_path,
 };
 
 const MAX_LINE_BYTES: usize = 64 * 1024 * 1024;
@@ -47,6 +47,8 @@ pub(crate) struct ClaudeTranscript {
     offset: u64,
     pending: Vec<u8>,
     records: HashMap<Uuid, NativeRecord>,
+    anchor: Option<TranscriptAnchor>,
+    minimum_len: u64,
 }
 
 impl ClaudeTranscript {
@@ -56,6 +58,64 @@ impl ClaudeTranscript {
         target: &ClaudeInboxTarget,
         attempt: &ClaudeImageAttempt,
     ) -> io::Result<Self> {
+        Self::validate_attempt(target, attempt)?;
+        let file = open_private_file(&attempt.transcript_path)?;
+        Self::from_file(target, attempt, file, None, attempt.transcript_offset)
+    }
+
+    pub(crate) fn recover_bound(
+        target: &ClaudeInboxTarget,
+        attempt: &ClaudeImageAttempt,
+        file: File,
+        binding: ClaudeTranscriptBinding,
+    ) -> io::Result<Self> {
+        if binding.version != 1 || binding.identity != attempt.transcript_identity {
+            return Err(rejected("transcript_binding_mismatch"));
+        }
+        Self::from_file(
+            target,
+            attempt,
+            file,
+            Some(binding.anchor),
+            binding.observed_len,
+        )
+    }
+
+    fn from_file(
+        target: &ClaudeInboxTarget,
+        attempt: &ClaudeImageAttempt,
+        mut file: File,
+        anchor: Option<TranscriptAnchor>,
+        minimum_len: u64,
+    ) -> io::Result<Self> {
+        Self::validate_attempt(target, attempt)?;
+        if let Some(anchor) = &anchor {
+            anchor.verify(&attempt.transcript_path, attempt.session_id)?;
+        }
+        verify_file_path(&file, &attempt.transcript_path)?;
+        let metadata = file.metadata()?;
+        if identity(&metadata) != attempt.transcript_identity
+            || metadata.len() < attempt.transcript_offset
+            || metadata.len() < minimum_len
+        {
+            return Err(rejected("transcript_replaced_or_truncated"));
+        }
+        file.seek(SeekFrom::Start(attempt.transcript_offset))?;
+        Ok(Self {
+            file,
+            attempt: attempt.clone(),
+            offset: attempt.transcript_offset,
+            pending: Vec::new(),
+            records: HashMap::new(),
+            anchor,
+            minimum_len,
+        })
+    }
+
+    fn validate_attempt(
+        target: &ClaudeInboxTarget,
+        attempt: &ClaudeImageAttempt,
+    ) -> io::Result<()> {
         if target.session_id != attempt.session_id
             || target.transcript_path != attempt.transcript_path
             || attempt.client_message_id.is_nil()
@@ -75,29 +135,21 @@ impl ClaudeTranscript {
         {
             return Err(rejected("transcript_attempt_mismatch"));
         }
-        let mut file = open_private_file(&attempt.transcript_path)?;
-        let metadata = file.metadata()?;
-        if identity(&metadata) != attempt.transcript_identity
-            || metadata.len() < attempt.transcript_offset
-        {
-            return Err(rejected("transcript_replaced_or_truncated"));
-        }
-        file.seek(SeekFrom::Start(attempt.transcript_offset))?;
-        Ok(Self {
-            file,
-            attempt: attempt.clone(),
-            offset: attempt.transcript_offset,
-            pending: Vec::new(),
-            records: HashMap::new(),
-        })
+        Ok(())
     }
 
     /// 有界读取，None 包括仍在排队、等待审批、工具未读图及原生压缩后原字节不匹配。
     /// 只有 Some 表示全部原图已有精确消费证据；它不证明模型理解正确。
     pub(crate) fn poll(&mut self) -> io::Result<Option<ClaudeImageReceipt>> {
+        if let Some(anchor) = &self.anchor {
+            anchor.verify(&self.attempt.transcript_path, self.attempt.session_id)?;
+        }
         verify_file_path(&self.file, &self.attempt.transcript_path)?;
         let metadata = self.file.metadata()?;
-        if identity(&metadata) != self.attempt.transcript_identity || metadata.len() < self.offset {
+        if identity(&metadata) != self.attempt.transcript_identity
+            || metadata.len() < self.offset
+            || metadata.len() < self.minimum_len
+        {
             return Err(rejected("transcript_replaced_or_truncated"));
         }
         let remaining = metadata.len() - self.offset;
@@ -142,6 +194,12 @@ impl ClaudeTranscript {
             self.records.insert(record.uuid, record);
         }
         verify_file_path(&self.file, &self.attempt.transcript_path)?;
+        if let Some(anchor) = &self.anchor {
+            anchor.verify(&self.attempt.transcript_path, self.attempt.session_id)?;
+        }
+        if self.file.metadata()?.len() < self.offset {
+            return Err(rejected("transcript_replaced_or_truncated"));
+        }
         self.receipt()
     }
 

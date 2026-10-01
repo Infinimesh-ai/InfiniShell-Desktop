@@ -4,7 +4,8 @@ use std::cell::{Cell, RefCell};
 use std::path::PathBuf;
 
 use super::super::cli_image_claude_queue::{
-    ClaudeImageAttempt, ClaudeImageInbox, ClaudeInboxTarget, ClaudeQueueImage, ClaudeTranscript,
+    ClaudeImageInbox, ClaudeInboxTarget, ClaudeQueueImage, ClaudeQueuedImageAttempt,
+    ClaudeTranscript,
 };
 use super::super::cli_image_native_claude_binding::Binding;
 use super::super::proto::CliImageClaudeQueue;
@@ -20,10 +21,10 @@ struct Recovery {
     socket: PathBuf,
     registry: PathBuf,
     transcript: PathBuf,
-    attempt: ClaudeImageAttempt,
+    attempt: ClaudeQueuedImageAttempt,
 }
 impl Recovery {
-    fn new(target: &ClaudeInboxTarget, attempt: &ClaudeImageAttempt) -> Self {
+    fn new(target: &ClaudeInboxTarget, attempt: &ClaudeQueuedImageAttempt) -> Self {
         Self {
             session: target.session_id,
             cwd: target.cwd.clone(),
@@ -66,8 +67,8 @@ pub(super) fn recover(
     let recovery: Recovery = serde_json::from_value(data.clone())
         .map_err(|_| storage_error(io::Error::other("invalid image recovery")))?;
     if recovery.session.to_string() != scope.cli_session_id
-        || recovery.attempt.client_message_id != submission
-        || recovery.attempt.request_sha256 != result.claim.native_request_sha256
+        || recovery.attempt.client_message_id() != submission
+        || recovery.attempt.request_sha256() != result.claim.native_request_sha256
     {
         return Err(storage_error(io::Error::other(
             "image recovery identity changed",
@@ -75,7 +76,26 @@ pub(super) fn recover(
     }
     if result.status == "unknown" {
         // 原生历史缺失、被替换或暂未产生图片时，保留未知状态和文件；查询从不启动 CLI。
-        if let Ok(mut history) = ClaudeTranscript::recover(&recovery.target(), &recovery.attempt)
+        let history = match &recovery.attempt {
+            ClaudeQueuedImageAttempt::Existing(attempt) => {
+                ClaudeTranscript::recover(&recovery.target(), attempt)
+            }
+            ClaudeQueuedImageAttempt::Pending(pending) => {
+                if pending.session_id != recovery.session
+                    || pending.transcript_path != recovery.transcript
+                {
+                    return Err(storage_error(io::Error::other(
+                        "pending transcript identity changed",
+                    )));
+                }
+                staging
+                    .bind_claude_transcript(&result.claim, pending)
+                    .and_then(|(file, attempt, binding)| {
+                        ClaudeTranscript::recover_bound(&recovery.target(), &attempt, file, binding)
+                    })
+            }
+        };
+        if let Ok(mut history) = history
             && let Ok(Some(receipt)) = history.poll_available()
         {
             let encoded = serde_json::to_vec(&receipt)
@@ -206,7 +226,7 @@ pub(super) fn submit(
                 submission: scope.submission_id,
                 key_hash: Sha256::digest(key.as_bytes()).into(),
                 subject,
-                native_request_sha256: attempt.request_sha256,
+                native_request_sha256: attempt.request_sha256(),
                 references,
                 claude_recovery: Some(claude_recovery),
             };
@@ -239,3 +259,7 @@ pub(super) fn submit(
     // 写出成功仍未知；不把消息入队当作图片消费。
     recover(staging, scope, scope.submission_id, key)
 }
+
+#[cfg(test)]
+#[path = "cli_image_claude_dispatch_tests.rs"]
+mod tests;

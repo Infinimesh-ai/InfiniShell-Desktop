@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use super::super::cli_image_claude_queue::{
+    ClaudeImageAttempt, ClaudePendingImageAttempt, ClaudeTranscriptBinding,
+    identity as transcript_identity, verify_file_path as verify_transcript_path,
+};
+
 const RECORD_LIMIT: u64 = 256 * 1024;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -294,6 +299,85 @@ impl ReferenceStore {
         write_record(&self.root, &path, result)
     }
 
+    /// 不改写原领取记录。首次原生文件绑定在同一存储锁内落盘，冷恢复只能使用该 inode。
+    pub(super) fn bind_claude_transcript(
+        &self,
+        claim: &QueueClaim,
+        pending: &ClaudePendingImageAttempt,
+    ) -> io::Result<(File, ClaudeImageAttempt, ClaudeTranscriptBinding)> {
+        let _guard = self.acquire()?;
+        let original =
+            read_record::<QueueClaim>(&self.root.join(format!("queue-{}.json", claim.submission)))?
+                .ok_or_else(invalid)?;
+        let encoded_pending = serde_json::to_value(pending).map_err(|_| invalid())?;
+        if original != *claim
+            || claim.version != 1
+            || pending.version != 1
+            || claim.submission != pending.client_message_id
+            || claim.native_session != pending.session_id.to_string()
+            || claim.native_request_sha256 != pending.request_sha256
+            || claim
+                .claude_recovery
+                .as_ref()
+                .and_then(|data| data.get("attempt"))
+                != Some(&encoded_pending)
+        {
+            return Err(invalid());
+        }
+        pending
+            .anchor
+            .verify(&pending.transcript_path, pending.session_id)?;
+        let claim_sha256: [u8; 32] =
+            Sha256::digest(serde_json::to_vec(&original).map_err(|_| invalid())?).into();
+        let path = self
+            .root
+            .join(format!("queue-claude-transcript-{}.json", claim.submission));
+        let (file, binding) = match read_record::<ClaudeTranscriptBinding>(&path)? {
+            Some(binding) => {
+                if binding.version != 1
+                    || binding.claim_sha256 != claim_sha256
+                    || !binding.anchor.extends(&pending.anchor)
+                {
+                    return Err(invalid());
+                }
+                let (file, anchor) = binding
+                    .anchor
+                    .open(&pending.transcript_path, pending.session_id)?;
+                if anchor != binding.anchor
+                    || transcript_identity(&file.metadata()?) != binding.identity
+                    || file.metadata()?.len() < binding.observed_len
+                {
+                    return Err(invalid());
+                }
+                (file, binding)
+            }
+            None => {
+                let (file, anchor) = pending
+                    .anchor
+                    .open(&pending.transcript_path, pending.session_id)?;
+                let metadata = file.metadata()?;
+                let binding = ClaudeTranscriptBinding {
+                    version: 1,
+                    claim_sha256,
+                    anchor,
+                    identity: transcript_identity(&metadata),
+                    observed_len: metadata.len(),
+                };
+                write_record(&self.root, &path, &binding)?;
+                (file, binding)
+            }
+        };
+        // 落盘后仍保持原文件句柄；目录或文件在 fsync 期间改变不能获得消费确认。
+        binding
+            .anchor
+            .verify(&pending.transcript_path, pending.session_id)?;
+        verify_transcript_path(&file, &pending.transcript_path)?;
+        if file.metadata()?.len() < binding.observed_len {
+            return Err(invalid());
+        }
+        Ok((file, pending.bound(binding.identity.clone())?, binding))
+    }
+
     pub(super) fn queue_status(
         &self,
         host: &str,
@@ -514,3 +598,7 @@ fn write_record<T: Serialize>(directory: &Path, path: &Path, record: &T) -> io::
         .sync_all()?;
     File::open(directory)?.sync_all()
 }
+
+#[cfg(test)]
+#[path = "cli_image_staging_claude_binding_tests.rs"]
+mod claude_binding_tests;

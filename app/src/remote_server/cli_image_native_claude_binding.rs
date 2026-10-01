@@ -10,7 +10,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-use super::cli_image_claude_queue::ClaudeInboxTarget;
+use super::cli_image_claude_queue::{ClaudeInboxTarget, TranscriptPathGuard};
 use super::cli_image_native_process::{Configuration, Process, peer_pid, process};
 use super::proto::CliImageClaudeBinding;
 
@@ -37,6 +37,7 @@ pub(super) struct Binding {
     registry: File,
     registry_identity: (u64, u64),
     registry_fields: Registry,
+    transcript_guard: TranscriptPathGuard,
 }
 
 impl Binding {
@@ -99,29 +100,8 @@ impl Binding {
         let socket = socket_metadata(&record.messaging_socket_path)?;
         let socket_identity = (socket.dev(), socket.ino());
         let transcript = PathBuf::from(&candidate.transcript_path);
-        // 历史必须位于当前配置的 projects 下，且每一层均无链接；消费者再验证原生会话链。
-        let relative = transcript
-            .strip_prefix(config.join("projects"))
-            .map_err(|_| invalid())?;
-        if relative
-            .components()
-            .any(|part| !matches!(part, Component::Normal(_)))
-            || transcript.file_name().and_then(|name| name.to_str())
-                != Some(format!("{session}.jsonl").as_str())
-        {
-            return Err(invalid());
-        }
-        let mut checked = config.join("projects");
-        for component in relative.components() {
-            checked.push(component);
-            let entry = fs::symlink_metadata(&checked)?;
-            if entry.file_type().is_symlink()
-                || entry.uid() != process.uid
-                || entry.mode() & 0o022 != 0
-            {
-                return Err(invalid());
-            }
-        }
+        // 首条输入前历史可能尚不存在；只锚定既存父目录，不替原生创建任何文件。
+        let transcript_guard = TranscriptPathGuard::capture(&config, &transcript, session)?;
         let target = ClaudeInboxTarget {
             session_id: session,
             cwd: record.cwd.clone(),
@@ -143,6 +123,7 @@ impl Binding {
             registry,
             registry_identity,
             registry_fields: record,
+            transcript_guard,
         };
         binding.validate(&stream)?;
         Ok((binding, stream))
@@ -153,6 +134,7 @@ impl Binding {
     }
 
     pub(super) fn validate(&self, stream: &UnixStream) -> io::Result<()> {
+        self.transcript_guard.verify()?;
         if peer_pid(stream)? != self.process.pid {
             return Err(invalid());
         }
