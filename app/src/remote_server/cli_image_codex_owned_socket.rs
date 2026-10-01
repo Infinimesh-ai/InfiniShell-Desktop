@@ -4,6 +4,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::os::unix::ffi::OsStrExt as _;
 use std::os::unix::fs::{FileTypeExt as _, MetadataExt as _, OpenOptionsExt as _};
+use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -69,11 +70,16 @@ impl SocketLease {
         })
     }
 
-    pub(super) fn requested(&self) -> &Path {
-        &self.requested
-    }
     pub(super) fn physical(&self) -> &Path {
         &self.physical
+    }
+
+    pub(super) fn connect(&self) -> io::Result<UnixStream> {
+        self.validate()?;
+        // rendezvous 别名可长于 sockaddr_un；只连接已验证的物理路径，保留两端身份检查。
+        let stream = UnixStream::connect(self.physical())?;
+        self.validate()?;
+        Ok(stream)
     }
 
     pub(super) fn stamp(&self) -> io::Result<SocketStamp> {

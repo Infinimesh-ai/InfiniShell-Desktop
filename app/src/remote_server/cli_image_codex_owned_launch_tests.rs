@@ -1,10 +1,120 @@
 use super::*;
+use std::io::{Read as _, Write as _};
+use std::os::unix::ffi::OsStrExt as _;
+use std::os::unix::fs::symlink;
+use std::os::unix::net::UnixListener;
 
 fn directory() -> tempfile::TempDir {
     tempfile::Builder::new()
         .permissions(fs::Permissions::from_mode(0o700))
         .tempdir()
         .unwrap()
+}
+
+struct NativeSocketFixture {
+    directory: tempfile::TempDir,
+    listener: UnixListener,
+    requested: PathBuf,
+    physical: PathBuf,
+    renamed_physical: Option<PathBuf>,
+    created_daemon_root: bool,
+}
+
+impl NativeSocketFixture {
+    fn new() -> Self {
+        let directory = directory();
+        let root = directory.path().canonicalize().unwrap();
+        let parent = root.join("long-codex-owned-alias-for-real-unix-socket-connection-regression-that-exceeds-both-macos-and-linux-sockaddr-un-path-limits");
+        fs::DirBuilder::new().mode(0o700).create(&parent).unwrap();
+        let requested = parent.join("control.sock");
+        let daemon_root = fs::canonicalize("/tmp")
+            .unwrap()
+            .join(format!("codex-daemon-{}", unsafe { libc::geteuid() }));
+        let created_daemon_root = match fs::DirBuilder::new().mode(0o700).create(&daemon_root) {
+            Ok(()) => true,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => false,
+            Err(error) => panic!("无法创建本轮 socket 目录：{error}"),
+        };
+        // 既有官方目录只核对，不修改其 owner 或权限。
+        private_metadata(&daemon_root, true).unwrap();
+        let physical = daemon_root.join(digest(requested.as_os_str().as_bytes()));
+        let listener = UnixListener::bind(&physical).unwrap();
+        fs::set_permissions(&physical, fs::Permissions::from_mode(0o600)).unwrap();
+        symlink(&physical, &requested).unwrap();
+        Self {
+            directory,
+            listener,
+            requested,
+            physical,
+            renamed_physical: None,
+            created_daemon_root,
+        }
+    }
+}
+
+impl Drop for NativeSocketFixture {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.physical);
+        if let Some(path) = &self.renamed_physical {
+            let _ = fs::remove_file(path);
+        }
+        if self.created_daemon_root {
+            let _ = fs::remove_dir(self.physical.parent().unwrap());
+        }
+    }
+}
+
+#[test]
+fn long_socket_alias_connects_through_verified_physical_listener() {
+    let fixture = NativeSocketFixture::new();
+    assert!(fixture.requested.as_os_str().len() > 108);
+    assert!(UnixStream::connect(&fixture.requested).is_err());
+    let lease = SocketLease::capture(&fixture.requested).unwrap();
+
+    let mut client = lease.connect().unwrap();
+    let (mut server, _) = fixture.listener.accept().unwrap();
+    client.write_all(b"physical").unwrap();
+    let mut received = [0; 8];
+    server.read_exact(&mut received).unwrap();
+    assert_eq!(&received, b"physical");
+    lease.validate().unwrap();
+}
+
+#[test]
+fn replaced_socket_alias_cannot_connect_to_original_listener() {
+    let fixture = NativeSocketFixture::new();
+    let lease = SocketLease::capture(&fixture.requested).unwrap();
+    fs::rename(
+        &fixture.requested,
+        fixture.directory.path().join("retained-alias"),
+    )
+    .unwrap();
+    symlink(&fixture.physical, &fixture.requested).unwrap();
+
+    assert!(lease.connect().is_err());
+    fixture.listener.set_nonblocking(true).unwrap();
+    assert_eq!(
+        fixture.listener.accept().unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
+}
+
+#[test]
+fn replaced_physical_socket_cannot_receive_a_connection() {
+    let mut fixture = NativeSocketFixture::new();
+    let lease = SocketLease::capture(&fixture.requested).unwrap();
+    let retained = fixture.physical.with_extension("retained");
+    fs::rename(&fixture.physical, &retained).unwrap();
+    fixture.renamed_physical = Some(retained);
+    let replacement = UnixListener::bind(&fixture.physical).unwrap();
+    fs::set_permissions(&fixture.physical, fs::Permissions::from_mode(0o600)).unwrap();
+
+    assert!(lease.connect().is_err());
+    replacement.set_nonblocking(true).unwrap();
+    assert_eq!(
+        replacement.accept().unwrap_err().kind(),
+        io::ErrorKind::WouldBlock
+    );
 }
 
 fn legacy_manifest(directory: &Path) -> Manifest {

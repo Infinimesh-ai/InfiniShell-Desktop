@@ -6193,7 +6193,7 @@
       "temporary_directory": "cleaned",
       "source_freeze_sha256": "7d143b79ae246ee7b37e6d855dc819e40a442dbe275910be0fce5df51e5848d6"
     },
-    "boundary": "原生13a09e4已提交、公开补丁精确重建，Mac工件已绑定，18个宿主/CI/来源文件已整合主树但未提交；首轮宿主check通过，定向回归原轮54过13失败保留，三份测试文件六处夹具修正后目标14项另轮通过，i18n另轮11项通过，最终check通过，当前增量跨平台源码门禁与真实验收待完成。Grok实际SSH/tmux PNG消费、通知归属、回收和双语布局仍未验收；不关闭G08。旧G01工件、tb1和来源文件保持独立。",
+    "boundary": "原生13a09e4已提交、公开补丁精确重建，Mac工件已绑定，18个宿主/CI/来源文件已整合并由73d5a34c8提交推送；首轮宿主check通过，定向回归原轮54过13失败保留，三份测试文件六处夹具修正后目标14项另轮通过，i18n另轮11项通过，最终check通过，当前增量跨平台源码门禁与真实验收待完成。Grok实际SSH/tmux PNG消费、通知归属、回收和双语布局仍未验收；不关闭G08。旧G01工件、tb1和来源文件保持独立。",
     "localization": "Grok远端入口两组英文/简体中文消息键已同步到主树，i18n 11项通过，真实双语布局待验；Claude清稿/Codex通知本轮无需文案变更，Claude仅英文GUI已有实观，中文未验。",
     "gap_closed": false,
     "notification_tests": {
@@ -6342,7 +6342,8 @@
         "sha256": "fe3f747818dc9de3b5665e2e7288ecc4f81f9291675abafa1b820fa9fe65093e",
         "changed_since_v1": "仅三份测试文件的六处新夹具创建显式0700；生产代码不变。"
       }
-    }
+    },
+    "host_implementation_commit": "73d5a34c8c4a20debf4e8ed7eb623fe9cb203525"
   },
   "g08_claude_c3ff_ssh_verification_20261001": {
     "status": "bounded_english_ssh_positive_g08_open",
@@ -6419,7 +6420,9 @@
       "outer_log_sha256": "f20728f827a7fd127aace6eace92ebd87aea5ae6cc12ce504d500e0b01afdb44",
       "outer_receipt_sha256": "088b45789a69e205468913595df1f4876ecd732501f1ba89549cd4aa0679b233",
       "finish_receipt_sha256": "5c0ed5a9708225984cce2f0ebf66dfec6637cbaf312279ea6352e931dfe0545b",
-      "cleanup_boundary": "cleanup_ready仍为false，现场及历史保留；不将完成退出改称目录已清理。"
+      "cleanup_boundary": "cleanup_ready仍为false，现场及历史保留；不将完成退出改称目录已清理。",
+      "slot_retained_receipt_sha256": "125f8383eae124bf55c21bce93b86acc4a1670be7a417a9da1fbff2eaf7b023c",
+      "slot_retained_path": "/Users/zhishi/InfiniShell-Tests/r-u10vfmtu/retired-remote-server"
     },
     "cross_platform_gate": {
       "run_id": 36822357366,
@@ -6431,5 +6434,56 @@
     "remaining": "Grok/Codex真实图片消费、tmux、活跃断线/旧回执等组合；Claude中文布局；Grok双语布局、最终源码门禁。",
     "newly_closed_gaps": [],
     "gap_closed": false
+  },
+  "g08_codex_physical_socket_20261001": {
+    "status": "implemented_local_gates_passed_gui_reverification_pending",
+    "base_commit": "73d5a34c8c4a20debf4e8ed7eb623fe9cb203525",
+    "reproduction": {
+      "source_commit": "c3ff0bba80a65acf9eb0fe090b54783a71d4f80d",
+      "run_id": "r-9u32vjqt",
+      "language": "zh-CN",
+      "ticket": "d138022f-11b4-436d-81d3-33a4f5e4f6e4",
+      "requested_path_bytes": 121,
+      "physical_path_bytes": 94,
+      "native_socket_created": true,
+      "tui_never_executed": true,
+      "model_inputs": 0,
+      "whitelist_sha256": "ed4efbd300331e3f5633d09ba2a8316d24bd573f1b0c58cb78aa4cc60ac5a552",
+      "cua_observations_sha256": "7fafbe55f7f856e99d4aadfe8df065ed1b0652e4ef7217e9c5a20b273ece5748",
+      "cleanup": "App与SSH已正常退出；原生app-server因同一路径缺陷未被产品回收，stop拒绝，现场保留，待按精确内核身份终止。"
+    },
+    "root_cause": "宿主校验了官方短物理socket及长rendezvous别名，却实际连接121字节别名，超过macOS sockaddr_un容量；readiness失败，首次绑定和reap同样受影响。不是原生bind失败。",
+    "implementation": "SocketLease统一验证别名/物理inode及父目录，连接已验证物理路径后再次验证。readiness、首次绑定/回收、shared与owned图片消费复用；调用方原peer、进程代次和前台组检查保留。",
+    "source_freeze_sha256": "30ab2d2741e35028cfc381612e8f46f34acb9bc957687156e14a873464c15332",
+    "tests": {
+      "run_id": "r-dhli2d_1",
+      "passed": 12,
+      "new_real_socket_tests": 3,
+      "exit_code": 0,
+      "log_sha256": "9ca3530898d9a6626c94bff5b6b6ecee83e2f0b35493b54b2739bb662a6a7a65",
+      "temporary_directory": "cleaned"
+    },
+    "i18n": {
+      "run_id": "r-b0aj3u_5",
+      "passed": 11,
+      "exit_code": 0,
+      "log_sha256": "4c1b3cd25619377f216c2112c52d6773af75b101d2b29845ad3580d46844abd4",
+      "temporary_directory": "cleaned"
+    },
+    "check": {
+      "run_id": "r-uh0w0jy3",
+      "gate": "check",
+      "passed_tests": null,
+      "exit_code": 0,
+      "record_sha256": "a360ee0ab68fbf620fa64697283ab496b771da226ee9826fd926ea739fada48d",
+      "log_sha256": "0734ca67fa982dd062c0d2b9d25070241a55503ec9bffbb8cf1a651cd2950643",
+      "temporary_directory": "cleaned",
+      "status": "passed"
+    },
+    "localization": "无需本地化变更；既有英中不可用/失败语义不变。中文菜单与错误行实际可见，TUI/图片/成功布局未验。",
+    "boundary": "本地真实socket回归不替代修复版GUI、原生SessionStart、图片消费与回收；新提交跨平台源码门禁待验。",
+    "newly_closed_gaps": [],
+    "gap_closed": false,
+    "local_gates_receipt_sha256": "8ae6cdee20e13e3d77a59aef6d384f37cd01491da42f3ee8b3b2e713c3ffcb99"
   }
 }

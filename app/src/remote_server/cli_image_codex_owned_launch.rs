@@ -606,8 +606,10 @@ impl OwnedImageLease {
             executable_identity,
         })
     }
-    pub(super) fn socket_path(&self) -> &Path {
-        self.socket.requested()
+    pub(super) fn connect(&self) -> io::Result<UnixStream> {
+        let stream = self.socket.connect()?;
+        self.validate(&stream)?;
+        Ok(stream)
     }
     pub(super) fn cwd(&self) -> &Path {
         &self.manifest.cwd
@@ -752,7 +754,7 @@ fn supervise(path: &Path, expected_hash: &str) -> io::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(20);
     let ready = loop {
         if let Ok(socket) = SocketLease::capture(&manifest.socket) {
-            if let Ok(stream) = UnixStream::connect(socket.requested()) {
+            if let Ok(stream) = socket.connect() {
                 if peer_pid(&stream).ok() == Some(server.id() as i32)
                     && child(directory, &manifest, &hash, "server").is_ok()
                 {
@@ -944,7 +946,7 @@ fn bound_socket(directory: &Path, manifest: &Manifest, server: &Token) -> io::Re
         socket.validate_stamp(&stamp)?;
     } else {
         // 首次记录必须连接本次已登记的原生子进程；之后不以现存替换对象刷新身份。
-        let stream = UnixStream::connect(socket.requested())?;
+        let stream = socket.connect()?;
         server.validate()?;
         if peer_pid(&stream)? != server.pid {
             return Err(invalid());

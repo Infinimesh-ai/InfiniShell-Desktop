@@ -70,7 +70,7 @@ impl Binding {
         let foreground = tui.group;
         let socket_path = codex_home.join("app-server-control/app-server-control.sock");
         let socket = SocketLease::capture(&socket_path)?;
-        let stream = UnixStream::connect(&socket_path)?;
+        let stream = socket.connect()?;
         let peer = process(peer_pid(&stream)?)?;
         if peer.uid != tui.uid
             || peer.config_home != codex_home

@@ -358,8 +358,7 @@ impl ImageStagingService {
             {
                 return Err(io::Error::other("owned Codex candidate changed"));
             }
-            let stream = std::os::unix::net::UnixStream::connect(lease.socket_path())?;
-            lease.validate(&stream)?;
+            let stream = lease.connect()?;
             Ok((NativeCodexQueueBinding::Owned(lease), stream))
         }
         #[cfg(not(all(

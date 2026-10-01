@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：Codex 真实远端启动的长 socket 别名修复
+
+**新增关闭0项，仍为6关闭／5开放／3移交。** `c3ff0bba8/r-9u32vjqt` 的中文真实 SSH 产品菜单单次启动 Codex，官方原生已成功创建94字节物理socket及121字节rendezvous别名。宿主却用过长别名调用UnixStream::connect，ready等待20秒后失败；首次bound_socket/reaper同样使用别名，原生app-server残留。没有TUI、提示提交或模型请求。白名单收据SHA-256 `ed4efbd300331e3f5633d09ba2a8316d24bd573f1b0c58cb78aa4cc60ac5a552`；CUA观察收据 `7fafbe55f7f856e99d4aadfe8df065ed1b0652e4ef7217e9c5a20b273ece5748`。截图只在CUA工具输出，没有外置原图；App与SSH正常退出，stop因原生残留拒绝，现场保留待精确回收。
+
+修复仅将真正的连接目标改为受审物理路径，连接前后验证别名、物理socket和父目录；readiness、首次绑定/回收、shared与owned图片消费共用，peer、代次、前台组和通知资源检查保持。5文件冻结SHA-256 `30ab2d2741e35028cfc381612e8f46f34acb9bc957687156e14a873464c15332`。`r-dhli2d_1` 定向12项通过，包含长别名真实监听器读写8字节及两种替换后零连接回归，日志 `9ca3530898d9a6626c94bff5b6b6ecee83e2f0b35493b54b2739bb662a6a7a65`；`r-b0aj3u_5` i18n11项通过，日志 `4c1b3cd25619377f216c2112c52d6773af75b101d2b29845ad3580d46844abd4`，两轮短目录已清理。最终check `r-uh0w0jy3` 通过，日志SHA-256 `0734ca67fa982dd062c0d2b9d25070241a55503ec9bffbb8cf1a651cd2950643`，短目录已清理。无需本地化变更；中文菜单/错误可见不代表成功布局、SessionStart或图片消费通过，修复版真实验收和新源码跨平台门禁仍待完成。
+
+Grok原生通知及宿主整合已提交推送为 `73d5a34c8c4a20debf4e8ed7eb623fe9cb203525`。此前Claude `r-u10vfmtu` 全部自有进程退出后，slot已同设备无覆盖保全到本轮 `retired-remote-server`，收据SHA-256 `125f8383eae124bf55c21bce93b86acc4a1670be7a417a9da1fbff2eaf7b023c`；历史/profile仍保留，cleanup_ready=false。
+
 ## 2026-10-01：Claude `c3ff` 英文 SSH 复验与 Grok 通知工件整合
 
 **新增关闭0项，仍为6关闭／5开放／3移交，PR #22保持草稿。** `c3ff0bba80a65acf9eb0fe090b54783a71d4f80d` 的签名 Mac GUI `r-u10vfmtu` 在实际 SSH 普通 Claude `2.1.280/claude-opus-5-5` 中，首图通过系统选择器成卡、一次提交和原生 Read AllowOnce；typed PNG与规范上传 PNG均为328字节、SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，回答 `Red, Blue`。宿主和服务端confirmed/释放/完成一致，自动收起后重开输入区已空、卡片为零，没有手动清稿。原137字节夹具经过PNG规范化，不能称原编码字节未变。
