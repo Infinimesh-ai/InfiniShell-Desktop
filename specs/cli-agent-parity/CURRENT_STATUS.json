@@ -7144,5 +7144,49 @@
       "log_sha256": "7b61007231a2ce5948224fcc55eb1ea4bfa644a81e87b0a20f6885da4f1717f9",
       "temporary_directory_status": "cleaned"
     }
+  },
+  "g03_ordinary_gui_20261002": {
+    "status": "open",
+    "source_commit": "69c17fce39bf5ae849e33b1a20d839f97efd38ce",
+    "run_id": "r-idckjva9",
+    "gui_observation_sha256": "eae1971deed36c4e9206956224edc4c47f78701ac9ebf7a38b4e6bc04aa116a0",
+    "gui_close_sha256": "710bf723a55702a7baf9591ba1dc1ece96d5be28127b34f67357bafe7df6ee4c",
+    "passed_boundaries": [
+      "普通PTY纯PNG唯一原生ACK及清卡；模型后续探索被取消，不计完整回答",
+      "文字加双PNG顺序/字节/完整识色回答/清稿",
+      "原生审批期间失败Return及焦点往返保留文字和图片，原生无第四输入",
+      "英文和简体中文卡片及既有占位布局"
+    ],
+    "unresolved": [
+      "Finder原生拖放事件",
+      "新能力拒绝提示实窗英中布局",
+      "Linux/Windows .5实际工件和最终门禁"
+    ],
+    "source_gate_run_id": 36927434162,
+    "source_gate_observed_failure": "Windows Claude SessionStart 空格路径45秒未收到，另一特殊路径1.405秒正例不覆盖；根因未定，零模型/凭据输入，未重试",
+    "cleanup": "GUI两代exit0/已知后代退出；Preview映射释放后finish成功，现场及唯一原生历史保全cleanup_ready=false",
+    "no_new_gap_closure": true
+  },
+  "g10_reviewed_commands_entry_20261002": {
+    "status": "compiled_not_live_accepted",
+    "test_source_sha256": "ee164d90c25d3ce08072065615b386aa4ab58f5d33f4a0f58e03eabba77bada4",
+    "compile": {
+      "run_id": "r-jofm7jzr",
+      "exit_code": 0,
+      "log_sha256": "20a7dca4431fdb5730b9cf8fdd2bf38cc3ce876cfe8a110c91ffaf70a57928e0",
+      "features": [
+        "warpui/test-util",
+        "rust-embed/debug-embed"
+      ]
+    },
+    "precommit_check": {
+      "run_id": "r-rmk7_gxo",
+      "exit_code": 0,
+      "log_sha256": "b419cd4461ce6d5116e27b0d10a43c75c0fefb95faea585d3b7525def33c5e8e"
+    },
+    "temporary_directories": "cleaned",
+    "localization": "无需本地化变更，仅新增显式忽略测试和证据记录",
+    "real_model_executed": false,
+    "gap_closed": false
   }
 }

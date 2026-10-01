@@ -4732,6 +4732,10 @@ mod g10_fixed_policy_live_tests;
 #[path = "g10_cold_recovery_live_tests.rs"]
 mod g10_cold_recovery_live_tests;
 
+#[cfg(all(test, target_os = "macos", target_arch = "aarch64"))]
+#[path = "g10_reviewed_commands_live_tests.rs"]
+mod g10_reviewed_commands_live_tests;
+
 #[cfg(all(test, target_os = "macos"))]
 #[path = "codex_coordinator_live_tests.rs"]
 mod codex_live_tests;

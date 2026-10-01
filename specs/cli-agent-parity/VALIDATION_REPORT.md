@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G10 受审命令父子链验收入口
+
+新增 Mac arm64 的显式忽略测试 `real_claude_g10_reviewed_commands_parent_child`，调用生产协调器与真实固定 Claude `2.1.280`，限定一个子任务和两条项目脚本：首条拒绝后须由原生另起请求，再允许 A、等待真实退出清理后允许 B；分别核原生工具审批、宿主命令审批、持久父权限上限、输入与结果 NativeProtocol ACK、实际标记及两代退出。入口编译与现场执行分别计证，新增测试不计 G10 关闭，也不覆盖 GUI、冷恢复、取消及其他命令族。此次只增加测试入口和证据记录，生产行为与英中资源未变，无需本地化变更。
+
+`r-jofm7jzr` 的 `cargo +1.92.0 test --locked -p warp --lib --no-run --features warpui/test-util,rust-embed/debug-embed` 通过，日志 SHA-256 `20a7dca4431fdb5730b9cf8fdd2bf38cc3ce876cfe8a110c91ffaf70a57928e0`；`r-rmk7_gxo` 的提交前 `cargo +1.92.0 check --locked -p warp` 通过，日志 `b419cd4461ce6d5116e27b0d10a43c75c0fefb95faea585d3b7525def33c5e8e`。两轮临时目录均在核实退出和占用后清理；编译前两次语法／生命周期失败保留在仓外 `g10-preparation/compile-source-v1` 和 `v2`，修复后源码摘要 `ee164d90c25d3ce08072065615b386aa4ab58f5d33f4a0f58e03eabba77bada4`。尚未运行真实模型，不更新缺口关闭计数。
+
+## 2026-10-02：G03 普通 Grok 图片实窗取得正例，仍开放
+
+本轮新增关闭 0 项，累计仍为 8 关闭／3 开放／3 移交。`69c17fce3/r-idckjva9` 绑定 Mac `.5/8644e7f68a5c` 普通未绑定 PTY：纯 PNG 的唯一原生 ACK、宿主清卡已验；模型识别红蓝后自行探索，由主代理取消，不能计完整回答。随后文字加红蓝／绿黄双 PNG，原生输入顺序和规范 PNG 字节一致，完整回答正确识别四种颜色，文字与卡片清除。分别核原生收据 SHA-256 `4564c37c2fabe7b477e6aa359ae82fdea0be2a5fbdfa2a1bcc709317e68a439b`、`70639814c8091f02afa23cb1cbb925d349a88ac5e6e20516e54ffb8fea2ac379`；不把原夹具 454 字节冒称剪贴板规范编码的 1044／1045 字节。
+
+原生待审批时，另一文图草稿经过焦点往返及一次 Return 后完整保留；本 SID 人类输入仍 3、图片 claim 2、原生 journal 6 条。随后 Ctrl-C 拒绝原生请求，文字也被按键清空而图片保留，这一步不计文字保留。英文和简体中文的卡片、既有占位及富输入控件可读；新图片能力拒绝 Toast 尚未观察，不计双语拒绝布局通过。旧 `.3` 负例在三次主动 Return（两次纯图、一次文图）后 human 0／journal 0、宿主 claim 不增加；未见 Toast 原因未定，不猜测生产修复。指定两 SID 最终只读诊断 SHA-256 `d07a6f4aab17708f88ed1e2fee8da1e8cd66f7fe29dd65a3d5dfe14c73452edb`。
+
+GUI 观察 SHA-256 `eae1971deed36c4e9206956224edc4c47f78701ac9ebf7a38b4e6bc04aa116a0` 明确保留两项操作边界：CUA 中文 typeText 错误已在提交前全选粘贴纠正；菜单误路由曾提前提交原计划第二条输入，不能据此声称该条提交前切换窗格保稿。收尾 SHA-256 `710bf723a55702a7baf9591ba1dc1ece96d5be28127b34f67357bafe7df6ee4c`：两代 GUI exit 0、已知后代退出；首次 finish 因 Preview 仍映射图片失败，关闭已无文档窗口的 Preview 后打开文件释放，第二次 finish 成功。现场和唯一历史保全，cleanup_ready=false，不冒称整棵原生服务树清理。
+
+Finder 原生拖放仍缺事件。精确 [69c17 两平台原生源码与宿主门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36927434162) 尚在运行：Windows Claude SessionStart 的空格路径 case 已失败（原生附着后 45 秒无通知并强制清理），另一特殊字符路径 1.405 秒收到通知且自然退出；两者分列。23 份对应来源与此前通过的 b47 一致，不据此归因 G03 或认定随机故障；没有重试，零模型／凭据输入，失败收据 SHA-256 `99f3b040597f6fb7422ecdcbaf1f3857a8824b49b628cf6cfbd356a13e5e5e86`。Linux／Windows `.5` 实际工件与最终门禁未提前计通过。
+
 ## 2026-10-02：G08／V03 在本次 Mac 范围关闭
 
 **本轮关闭 G08、V03；累计 8 关闭／3 开放／3 移交，PR #22 保持草稿。** 仍开放 G03、G09、G10；V01、V02、V05 及其他平台实机验收按用户决定后置，均未改记通过。以下历史“未关闭”结论保留当时范围，不回填旧失败。
