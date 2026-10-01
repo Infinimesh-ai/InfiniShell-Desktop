@@ -22,16 +22,23 @@ use crate::terminal::cli_agent_sessions::{
     CLIAgentRichInputCloseReason, CLIAgentSessionsModel, GrokPermissionEvidence,
     GrokPermissionObservation,
 };
+use crate::terminal::view::grok_remote_owned::ReadonlyIdentity;
 
 #[derive(Clone)]
 struct Binding {
     client: Arc<RemoteServerClient>,
     launch: Launch,
-    observed: GrokPermissionObservation,
+    identity: InputIdentity,
     listener: EntityId,
     events: EntityId,
     generation: Uuid,
     attempt: Uuid,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum InputIdentity {
+    Hook(GrokPermissionObservation),
+    Owned(ReadonlyIdentity),
 }
 
 fn same_remote_grok_attempt<T>(
@@ -61,20 +68,32 @@ impl TerminalView {
         let owned = self.grok_remote_owned.as_ref()?;
         let native = owned.native_session?;
         let session = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id)?;
-        let GrokPermissionEvidence::Observed(observed) =
-            &session.session_context.grok_permission_evidence
-        else {
-            return None;
+        let identity = if let Some(identity) = self.remote_owned_grok_readonly_identity(ctx) {
+            InputIdentity::Owned(identity.clone())
+        } else {
+            let GrokPermissionEvidence::Observed(observed) =
+                &session.session_context.grok_permission_evidence
+            else {
+                return None;
+            };
+            if !session.received_rich_notification || observed.mode != "default" {
+                return None;
+            }
+            InputIdentity::Hook(observed.clone())
+        };
+        let (session_id, cwd) = match &identity {
+            InputIdentity::Hook(observed) => (observed.session_id.clone(), observed.cwd.as_str()),
+            InputIdentity::Owned(identity) => {
+                (identity.native_session.to_string(), identity.cwd.as_str())
+            }
         };
         let target = self.cli_agent_hook_input_target.as_ref()?;
         if session.agent != CLIAgent::Grok
             || session.remote_host.is_none()
-            || !session.received_rich_notification
-            || observed.session_id != native.to_string()
-            || observed.cwd != owned.launch.cwd
-            || observed.mode != "default"
+            || session_id != native.to_string()
+            || cwd != owned.launch.cwd
             || session.listener.as_ref().map(|listener| listener.id()) != Some(target.listener_id)
-            || target.native_session_id != observed.session_id
+            || target.native_session_id != session_id
             || target.model_events_id != self.model_events_handle.id()
             || CLIAgentSessionsModel::as_ref(ctx).input_generation(self.view_id) != Some(generation)
         {
@@ -93,7 +112,7 @@ impl TerminalView {
             Binding {
                 client,
                 launch: owned.launch.clone(),
-                observed: observed.clone(),
+                identity,
                 listener: target.listener_id,
                 events: target.model_events_id,
                 generation,
@@ -133,7 +152,7 @@ impl TerminalView {
             .is_some_and(|(client, current)| {
                 Arc::ptr_eq(&client, &binding.client)
                     && current.launch.ticket == binding.launch.ticket
-                    && current.observed == binding.observed
+                    && current.identity == binding.identity
                     && current.listener == binding.listener
                     && current.events == binding.events
             })
@@ -237,14 +256,25 @@ impl TerminalView {
         owned.sending = true;
         owned.sending_generation = Some(binding.attempt);
         owned.pending = Some((client.clone(), scope.clone(), revision));
-        remote::register(
-            self.view_id,
-            client.clone(),
-            scope.clone(),
-            revision,
-            binding.launch.ticket.clone(),
-            binding.observed.clone(),
-        );
+        match &binding.identity {
+            InputIdentity::Hook(observed) => remote::register(
+                self.view_id,
+                client.clone(),
+                scope.clone(),
+                revision,
+                binding.launch.ticket.clone(),
+                observed.clone(),
+            ),
+            InputIdentity::Owned(identity) => remote::register_owned(
+                self.view_id,
+                client.clone(),
+                scope.clone(),
+                revision,
+                binding.launch.ticket.clone(),
+                identity.native_session,
+                identity.cwd.clone(),
+            ),
+        }
         let worker_binding = binding.clone();
         let worker_client = client.clone();
         ctx.spawn(
@@ -351,27 +381,29 @@ impl TerminalView {
                 ctx.spawn(
                     async move {
                         let message_id = input.message_id;
-                        let observation = Observation {
-                            native_session: Uuid::parse_str(&worker_binding.observed.session_id)
-                                .map_err(|_| ())?,
-                            cwd: worker_binding.observed.cwd.clone(),
-                            event_id: worker_binding.observed.session_start_event_id.clone(),
-                            permission_mode: worker_binding.observed.mode.clone(),
-                            permission_revision: Uuid::new_v4(),
-                            binding_id: Uuid::new_v4(),
-                        };
-                        let reply = remote::request(
-                            &worker_client,
-                            worker_scope,
-                            revision,
-                            Action::Submit {
+                        let action = match &worker_binding.identity {
+                            InputIdentity::Hook(observed) => Action::Submit {
                                 ticket: worker_binding.launch.ticket.clone(),
-                                observation,
+                                observation: Observation {
+                                    native_session: Uuid::parse_str(&observed.session_id)
+                                        .map_err(|_| ())?,
+                                    cwd: observed.cwd.clone(),
+                                    event_id: observed.session_start_event_id.clone(),
+                                    permission_mode: observed.mode.clone(),
+                                    permission_revision: Uuid::new_v4(),
+                                    binding_id: Uuid::new_v4(),
+                                },
                                 input,
                             },
-                        )
-                        .await
-                        .map_err(|_| ())?;
+                            InputIdentity::Owned(_) => Action::SubmitOwned {
+                                ticket: worker_binding.launch.ticket.clone(),
+                                binding_id: Uuid::new_v4(),
+                                input,
+                            },
+                        };
+                        let reply = remote::request(&worker_client, worker_scope, revision, action)
+                            .await
+                            .map_err(|_| ())?;
                         Journal::open()
                             .and_then(|journal| {
                                 journal.record_reply(&worker_binding.launch, &reply)
@@ -449,6 +481,19 @@ impl TerminalView {
         };
         if ticket != &binding.launch.ticket || *message_id != message || *subject_sha256 != subject
         {
+            return;
+        }
+        if state == "rejected_before_enqueue"
+            && native_prompt_id.is_none()
+            && native_ack_sha256.as_ref().is_some_and(|digest| {
+                digest.len() == 64 && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+        {
+            let current = self.remote_grok_binding_matches(&binding, ctx);
+            self.finish_remote_grok_worker(&binding, ctx);
+            if current {
+                self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
+            }
             return;
         }
         if matches!(state.as_str(), "finished" | "cancelled")

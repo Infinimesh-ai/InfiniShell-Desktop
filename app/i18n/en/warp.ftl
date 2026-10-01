@@ -6160,3 +6160,5 @@ cli-agent-tmux-owned-unavailable = Could not verify the remote tmux pane or CLI.
 cli-agent-tmux-owned-unknown = The tmux launch status is unknown. Use Restore tmux rich input to check the existing launch without starting another pane.
 
 cli-agent-tmux-owned-exited = This tmux CLI session has ended. Start a new tmux pane to continue.
+
+cli-agent-tmux-restored-text-unconfirmed = The current session state is unconfirmed. Enter text in the native terminal; images can still be sent to its native image queue.

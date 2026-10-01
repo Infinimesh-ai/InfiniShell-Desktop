@@ -25,6 +25,34 @@ use crate::terminal::cli_agent_sessions::grok_leader_input::{
     GrokLeaderInputEvent, GrokLeaderOutcome, GrokLeaderPrompt,
 };
 
+enum InputAuthority {
+    Hook(Observation),
+    Owned { binding_id: Uuid },
+}
+
+impl InputAuthority {
+    fn binding_id(&self) -> io::Result<Uuid> {
+        let binding_id = match self {
+            Self::Hook(observation) => {
+                if observation.native_session.is_nil()
+                    || observation.permission_revision.is_nil()
+                    || observation.event_id.is_empty()
+                    || observation.event_id.len() > 512
+                    || observation.permission_mode != "default"
+                {
+                    return Err(invalid());
+                }
+                observation.binding_id
+            }
+            Self::Owned { binding_id } => *binding_id,
+        };
+        if binding_id.is_nil() {
+            return Err(invalid());
+        }
+        Ok(binding_id)
+    }
+}
+
 struct Terminal {
     epoch: Uuid,
     revision: u64,
@@ -341,6 +369,7 @@ impl Service {
                 .tickets
                 .lock(&self.ticket_scope(&scope, &ticket)?, &ticket)?
                 .status(&ticket),
+            Action::Observe { ticket } => self.observe(connection, &scope, ticket),
             Action::Cancel { ticket } => {
                 cancel_launch(&self.tickets, &self.ticket_scope(&scope, &ticket)?, &ticket)
             }
@@ -364,10 +393,64 @@ impl Service {
                 scope,
                 request.revision,
                 ticket,
-                observation,
+                InputAuthority::Hook(observation),
+                input,
+            ),
+            Action::SubmitOwned {
+                ticket,
+                binding_id,
+                input,
+            } => self.submit(
+                connection,
+                scope,
+                request.revision,
+                ticket,
+                InputAuthority::Owned { binding_id },
                 input,
             ),
         }
+    }
+
+    /// 重连身份只来自当前 challenge 和 resident actor，不合成或回填 hook 观察。
+    fn observe(&self, connection: &Connection, scope: &Scope, ticket: Ticket) -> io::Result<Reply> {
+        let service = self.tmux_service()?.ok_or_else(invalid)?;
+        let ticket_scope = self.ticket_scope(scope, &ticket)?;
+        let (tmux, _) = service.image_guard(
+            &terminal_scope(scope),
+            ticket.id,
+            super::proto::TerminalBindingOwnedAgent::Grok,
+        )?;
+        tmux.validate_ticket(
+            &ticket_scope.host,
+            ticket_scope.terminal_session,
+            ticket.id,
+            super::proto::TerminalBindingOwnedAgent::Grok,
+        )?;
+        let guard = self.tickets.lock(&ticket_scope, &ticket)?;
+        let mut launch = guard.launch_for_input()?;
+        let target = launch
+            .readonly_target(Uuid::new_v4())
+            .map_err(|_| invalid())?;
+        let terminal = target.terminal_identity().map_err(|_| invalid())?;
+        tmux.validate_process(terminal.0, terminal.1)?;
+        let observer = GrokLeaderInput::connect_observer(target).map_err(|_| invalid())?;
+        tmux.validate_process(terminal.0, terminal.1)?;
+        if !connection.current(scope) {
+            return Err(invalid());
+        }
+        // 只读连接不能提交；结束观察不撤销 pager 路由或重放任何原生通知。
+        let _ = observer.disconnect();
+        Ok(Reply::OwnedIdentity {
+            ticket,
+            native_session: launch.session_id(),
+            cwd: launch
+                .working_directory()
+                .to_str()
+                .ok_or_else(invalid)?
+                .to_owned(),
+            manifest_sha256: launch.manifest_sha256().to_owned(),
+            permission_mode: "default".into(),
+        })
     }
 
     fn submit(
@@ -376,17 +459,11 @@ impl Service {
         scope: Scope,
         revision: u64,
         ticket: Ticket,
-        observation: Observation,
+        authority: InputAuthority,
         input: Input,
     ) -> io::Result<Reply> {
-        if input.message_id.is_nil()
-            || observation.native_session.is_nil()
-            || observation.binding_id.is_nil()
-            || observation.permission_revision.is_nil()
-            || observation.event_id.is_empty()
-            || observation.event_id.len() > 512
-            || observation.permission_mode != "default"
-        {
+        let binding_id = authority.binding_id()?;
+        if input.message_id.is_nil() {
             return Err(invalid());
         }
         let prompt = prompt(&input)?;
@@ -439,26 +516,32 @@ impl Service {
             )?;
         }
         let mut launch = guard.launch_for_input()?;
-        if launch.session_id() != observation.native_session
-            || launch.working_directory().to_string_lossy() != observation.cwd
-        {
-            return Err(invalid());
-        }
-        let observed = GrokPermissionObservation {
-            session_id: observation.native_session.to_string(),
-            cwd: observation.cwd,
-            session_start_event_id: observation.event_id,
-            mode: observation.permission_mode,
+        let target = match authority {
+            InputAuthority::Hook(observation) => {
+                if launch.session_id() != observation.native_session
+                    || launch.working_directory().to_string_lossy() != observation.cwd
+                {
+                    return Err(invalid());
+                }
+                let observed = GrokPermissionObservation {
+                    session_id: observation.native_session.to_string(),
+                    cwd: observation.cwd,
+                    session_start_event_id: observation.event_id,
+                    mode: observation.permission_mode,
+                };
+                launch
+                    .bind(binding_id, observation.permission_revision, &observed)
+                    .map_err(|_| invalid())?
+                    .into_target()
+            }
+            InputAuthority::Owned { .. } => {
+                if tmux.is_none() {
+                    return Err(invalid());
+                }
+                launch.readonly_target(binding_id).map_err(|_| invalid())?
+            }
         };
-        let binding = launch
-            .bind(
-                observation.binding_id,
-                observation.permission_revision,
-                &observed,
-            )
-            .map_err(|_| invalid())?;
         let lease = connection.permit(&scope, revision)?;
-        let target = binding.into_target();
         let terminal = match &tmux {
             Some(tmux) => {
                 let terminal = target.terminal_identity().map_err(|_| invalid())?;
@@ -475,7 +558,7 @@ impl Service {
         let claim_subject = subject.clone();
         // 原图的持久内容先写，原生 RPC ID/Unknown 后写，最后领取当前连接/输入代际。
         let submitted = sidecar.submit_prompt_once_checked(
-            observation.binding_id,
+            binding_id,
             input.message_id,
             &prompt,
             |delivery| {
@@ -502,12 +585,17 @@ impl Service {
             },
         );
         if submitted.is_err() {
+            // 最后只读查询也可能拒绝；只有尚未创建claim时才清理本次自有副本。
+            // 已创建或损坏的claim仍按Unknown保留，不能从一般RPC错误推断未入队。
+            if optional_json::<Claim>(&claim_path)?.is_none() {
+                remove_payload(&body_path, &subject)?;
+                return Err(invalid());
+            }
             return delivery_status(&guard.directory, &ticket, input.message_id);
         }
         let service = self.clone();
         let directory = guard.directory.clone();
         let message = input.message_id;
-        let binding_id = observation.binding_id;
         let reply_ticket = ticket.clone();
         drop(guard);
         // 断连后仅继续收取已领取请求的精确 ACK；本线程没有恢复、重投或答复审批入口。
@@ -517,8 +605,11 @@ impl Service {
                 loop {
                     match sidecar.poll(binding_id) {
                         Ok(Some(GrokLeaderInputEvent::Delivery(delivery))) => {
-                            if !matches!(delivery.status, GrokLeaderDeliveryStatus::Finished { .. })
-                            {
+                            if !matches!(
+                                delivery.status,
+                                GrokLeaderDeliveryStatus::Finished { .. }
+                                    | GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. }
+                            ) {
                                 continue;
                             }
                             let Some(raw) = sidecar.take_final_response() else {
@@ -639,23 +730,28 @@ fn delivery_status(directory: &Path, ticket: &Ticket, message_id: Uuid) -> io::R
     if let Some(record) =
         optional_json::<Finished>(&directory.join(format!("{message_id}-finished.json")))?
     {
-        let GrokLeaderDeliveryStatus::Finished {
-            native_prompt_id,
-            outcome,
-        } = record.claim.delivery.status
-        else {
-            return Err(invalid());
+        let (state, native_prompt_id) = match record.claim.delivery.status {
+            GrokLeaderDeliveryStatus::Finished {
+                native_prompt_id,
+                outcome,
+            } => (
+                match outcome {
+                    GrokLeaderOutcome::EndTurn => "finished",
+                    GrokLeaderOutcome::Cancelled => "cancelled",
+                },
+                Some(native_prompt_id),
+            ),
+            GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. } => {
+                ("rejected_before_enqueue", None)
+            }
+            GrokLeaderDeliveryStatus::Unknown => return Err(invalid()),
         };
         return Ok(Reply::Input {
             ticket: ticket.clone(),
             message_id,
             subject_sha256: record.claim.subject,
-            state: match outcome {
-                GrokLeaderOutcome::EndTurn => "finished",
-                GrokLeaderOutcome::Cancelled => "cancelled",
-            }
-            .into(),
-            native_prompt_id: Some(native_prompt_id),
+            state: state.into(),
+            native_prompt_id,
             native_ack_sha256: Some(record.native_ack_sha256),
         });
     }

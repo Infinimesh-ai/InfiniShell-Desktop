@@ -513,6 +513,39 @@ impl GrokOwnedLaunch {
         {
             return Err(GrokLeaderInputError::InvalidTarget);
         }
+        let target = self.capture_target(binding_id, Some(&observation.mode))?;
+        Ok(GrokOwnedBinding {
+            target,
+            launch_id: self.manifest.launch_id,
+            binding_id,
+            session_id: self.manifest.session_id,
+            permission_revision,
+            working_directory: self.manifest.cwd.clone(),
+        })
+    }
+
+    /// 只允许带冻结通知资源的远端自有启动取得只读目标，不合成 SessionStart。
+    pub(crate) fn readonly_target(
+        &mut self,
+        binding_id: Uuid,
+    ) -> Result<GrokLeaderTarget, GrokLeaderInputError> {
+        if self.phase != LaunchPhase::Dispatched || binding_id.is_nil() {
+            return Err(GrokLeaderInputError::InvalidTarget);
+        }
+        let notifications = self
+            .manifest
+            .notifications
+            .as_ref()
+            .ok_or(GrokLeaderInputError::InvalidTarget)?;
+        self.verify_remote_input(notifications)?;
+        self.capture_target(binding_id, None)
+    }
+
+    fn capture_target(
+        &mut self,
+        binding_id: Uuid,
+        observed_permission_mode: Option<&str>,
+    ) -> Result<GrokLeaderTarget, GrokLeaderInputError> {
         let receipt = self.exec_receipt()?;
         let tui_handle = LinuxProcessHandle::capture(receipt.process.pid)?;
         let snapshot = tui_handle.snapshot()?;
@@ -534,17 +567,33 @@ impl GrokOwnedLaunch {
         let peer = UnixStream::connect(&self.manifest.socket_path)?;
         let leader = linux_peer_identity(&peer)?;
         drop(peer);
-        let target = GrokLeaderTarget::capture_with_notifications(
-            binding_id,
-            self.manifest.session_id,
-            &self.manifest.cwd,
-            &self.manifest.socket_path,
-            &self.manifest.executable,
-            actual.pid,
-            leader.pid,
-            &observation.mode,
-            self.manifest.notifications.clone(),
-        )?;
+        let target = match observed_permission_mode {
+            Some(mode) => GrokLeaderTarget::capture_with_notifications(
+                binding_id,
+                self.manifest.session_id,
+                &self.manifest.cwd,
+                &self.manifest.socket_path,
+                &self.manifest.executable,
+                actual.pid,
+                leader.pid,
+                mode,
+                self.manifest.notifications.clone(),
+            )?,
+            None => GrokLeaderTarget::capture_remote_identity(
+                binding_id,
+                self.manifest.session_id,
+                &self.manifest.cwd,
+                &self.manifest.socket_path,
+                &self.manifest.executable,
+                actual.pid,
+                leader.pid,
+                self.manifest
+                    .notifications
+                    .clone()
+                    .ok_or(GrokLeaderInputError::InvalidTarget)?,
+            )?,
+        };
+
         target.verify_owned(actual, leader, receipt.tty_device)?;
         let bound = BoundProcesses {
             version: 1,
@@ -556,14 +605,7 @@ impl GrokOwnedLaunch {
         validate_bound_processes(&bound, &receipt)?;
         self.record_owned_processes(&bound, &receipt)?;
         self.processes = Some((actual, leader));
-        Ok(GrokOwnedBinding {
-            target,
-            launch_id: self.manifest.launch_id,
-            binding_id,
-            session_id: self.manifest.session_id,
-            permission_revision,
-            working_directory: self.manifest.cwd.clone(),
-        })
+        Ok(target)
     }
 
     fn record_owned_processes(

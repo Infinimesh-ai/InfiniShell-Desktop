@@ -209,3 +209,89 @@ fn tmux_grok_launch_keeps_original_identity_and_does_not_restore_runtime_scope()
     assert!(old.tmux_source.is_none());
     assert!(old.tmux_terminal_session.is_none());
 }
+
+#[test]
+fn owned_identity_keeps_matching_native_prompt_but_revokes_changed_permission() {
+    let native = Uuid::new_v4();
+    let identity = ActiveIdentity::Owned {
+        native_session: native,
+        cwd: "/fixture/project".into(),
+    };
+    let body = serde_json::json!({"v":1,"agent":"grok","event":"prompt_submit","session_id":native,
+        "cwd":"/fixture/project","event_id":"actual-prompt","permission_mode":"default"})
+    .to_string();
+    let event =
+        crate::terminal::cli_agent_sessions::event::parse_event(Some("warp://cli-agent"), &body)
+            .unwrap();
+    assert!(!identity.invalidated_by(&event));
+    for mode in [None, Some("auto"), Some("plan"), Some("bypassPermissions")] {
+        let mut changed = event.clone();
+        changed.payload.permission_mode = mode.map(str::to_owned);
+        assert!(identity.invalidated_by(&changed));
+    }
+    let mut changed = event.clone();
+    changed.event = CLIAgentEventType::SessionStart;
+    assert!(identity.invalidated_by(&changed));
+    changed = event.clone();
+    changed.session_id = Some(Uuid::new_v4().to_string());
+    assert!(identity.invalidated_by(&changed));
+    changed = event;
+    changed.cwd = Some("/another/project".into());
+    assert!(identity.invalidated_by(&changed));
+}
+
+#[test]
+fn native_pre_enqueue_rejection_is_terminal_but_never_allows_same_message_replay() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let launch = launch();
+    let original = input();
+    let subject = store.claim_input(&launch, &original).unwrap();
+    let reply = Reply::Input {
+        ticket: launch.ticket.clone(),
+        message_id: original.message_id,
+        subject_sha256: subject.clone(),
+        state: "rejected_before_enqueue".into(),
+        native_prompt_id: None,
+        native_ack_sha256: Some("b".repeat(64)),
+    };
+    store.record_reply(&launch, &reply).unwrap();
+    assert!(store.unknown_inputs(&launch).unwrap().is_empty());
+    assert!(store.claim_input(&launch, &original).is_err());
+    assert_eq!(store.claim_input(&launch, &input()).unwrap(), subject);
+}
+
+#[test]
+fn native_pre_enqueue_rejection_requires_exact_claim_and_ack() {
+    let directory = private_directory();
+    let store = journal(directory.path());
+    let launch = launch();
+    let original = input();
+    let subject = store.claim_input(&launch, &original).unwrap();
+    for (prompt, ack, hash) in [
+        (Some(Uuid::new_v4()), Some("b".repeat(64)), subject.clone()),
+        (None, None, subject.clone()),
+        (None, Some("not-a-digest".into()), subject.clone()),
+        (None, Some("b".repeat(64)), "different-subject".into()),
+    ] {
+        assert!(
+            store
+                .record_reply(
+                    &launch,
+                    &Reply::Input {
+                        ticket: launch.ticket.clone(),
+                        message_id: original.message_id,
+                        subject_sha256: hash,
+                        state: "rejected_before_enqueue".into(),
+                        native_prompt_id: prompt,
+                        native_ack_sha256: ack,
+                    }
+                )
+                .is_err()
+        );
+    }
+    assert_eq!(
+        store.unknown_inputs(&launch).unwrap(),
+        vec![original.message_id]
+    );
+}

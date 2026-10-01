@@ -575,6 +575,7 @@ impl Service {
                     argv.into_iter().map(OsString::from).collect()
                 }
                 grok::Reply::Launch { .. }
+                | grok::Reply::OwnedIdentity { .. }
                 | grok::Reply::Input { .. }
                 | grok::Reply::Revoked { .. }
                 | grok::Reply::Failed { .. } => return Err(invalid()),
@@ -665,6 +666,7 @@ impl Service {
                 let phase = match &value {
                     grok::Reply::Launch { phase, .. } => owned_phase(phase, false),
                     grok::Reply::Reserved { .. }
+                    | grok::Reply::OwnedIdentity { .. }
                     | grok::Reply::Input { .. }
                     | grok::Reply::Revoked { .. }
                     | grok::Reply::Failed { .. } => return Err(invalid()),

@@ -1846,3 +1846,95 @@ fn cli_agent_updates_wait_for_local_process_exit_even_after_a_completed_turn() {
     model.sessions.remove(&id);
     assert!(!model.has_local_session(CLIAgent::Claude));
 }
+
+#[test]
+fn restored_grok_identity_epoch_tracks_only_accepted_native_permission_events() {
+    App::test((), |mut app| async move {
+        let model = app.add_singleton_model(|_| CLIAgentSessionsModel::new());
+        for (kind, mode, cwd, incoming_session, retains) in [
+            (
+                "prompt_submit",
+                Some("default"),
+                "/project",
+                Some("resident"),
+                true,
+            ),
+            (
+                "session_start",
+                Some("default"),
+                "/project",
+                Some("resident"),
+                false,
+            ),
+            (
+                "notification",
+                Some("plan"),
+                "/project",
+                Some("resident"),
+                false,
+            ),
+            ("notification", None, "/project", Some("resident"), false),
+            (
+                "notification",
+                Some("default"),
+                "/other",
+                Some("resident"),
+                false,
+            ),
+            (
+                "notification",
+                Some("plan"),
+                "/project",
+                Some("foreign"),
+                true,
+            ),
+            ("notification", Some("default"), "/project", None, false),
+        ] {
+            let view_id = EntityId::new();
+            let epoch = uuid::Uuid::new_v4();
+            model.update(&mut app, |model, ctx| {
+                let mut session = cli_agent_session(CLIAgentSessionStatus::Unknown, false);
+                session.agent = CLIAgent::Grok;
+                session.session_context.session_id = Some("resident".into());
+                session.session_context.cwd = Some("/project".into());
+                // 克隆旧上下文不能继承证明；只有恢复路径可在新监听器建立后授予代次。
+                session.session_context.grok_owned_identity_epoch = Some(epoch);
+                model.set_session(view_id, session, ctx);
+                assert!(
+                    model
+                        .session(view_id)
+                        .unwrap()
+                        .session_context
+                        .grok_owned_identity_epoch
+                        .is_none()
+                );
+                model
+                    .sessions
+                    .get_mut(&view_id)
+                    .unwrap()
+                    .session_context
+                    .grok_owned_identity_epoch = Some(epoch);
+                let event = parse_event(
+                    Some("warp://cli-agent"),
+                    &serde_json::json!({
+                        "v":1,"agent":"grok","event":kind,"event_id":"accepted-event",
+                        "session_id":incoming_session,"cwd":cwd,"permission_mode":mode,
+                        "plugin_version":"0.1.5","prompt_id":"current-prompt"
+                    })
+                    .to_string(),
+                )
+                .unwrap();
+                model.update_from_event(view_id, &event, ctx);
+                assert_eq!(
+                    model
+                        .session(view_id)
+                        .unwrap()
+                        .session_context
+                        .grok_owned_identity_epoch,
+                    retains.then_some(epoch)
+                );
+                model.remove_session(view_id, ctx);
+            });
+        }
+    });
+}

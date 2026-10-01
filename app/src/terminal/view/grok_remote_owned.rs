@@ -36,6 +36,17 @@ pub(super) struct RemoteOwned {
     pub(super) sending_generation: Option<Uuid>,
     snapshot: Snapshot,
     querying: bool,
+    readonly_identity: Option<ReadonlyIdentity>,
+    readonly_query_epoch: Option<Uuid>,
+}
+
+/// 当前连接重新查询的专属原生身份，不是 hook 或运行状态。
+#[derive(Clone, PartialEq, Eq)]
+pub(super) struct ReadonlyIdentity {
+    pub(super) native_session: Uuid,
+    pub(super) cwd: String,
+    manifest_sha256: String,
+    epoch: Uuid,
 }
 
 impl Drop for RemoteOwned {
@@ -144,6 +155,8 @@ impl TerminalView {
                     sending_generation: None,
                     snapshot,
                     querying: false,
+                    readonly_identity: None,
+                    readonly_query_epoch: None,
                 });
                 view.observe_remote_owned_grok_start(ctx);
             },
@@ -177,7 +190,31 @@ impl TerminalView {
             sending_generation: None,
             snapshot,
             querying: false,
+            readonly_identity: None,
+            readonly_query_epoch: None,
         });
+    }
+
+    #[cfg(test)]
+    pub(super) fn bind_tmux_owned_grok_for_test(
+        &mut self,
+        ticket: Ticket,
+        native: Uuid,
+        ctx: &AppContext,
+    ) {
+        let instance = self.tmux_owned_instance(ticket.id, ctx).unwrap();
+        self.bind_remote_owned_grok_for_test(ticket, native, ctx);
+        let owned = self.grok_remote_owned.as_mut().unwrap();
+        owned.launch.tmux_source = Some(owned.launch.ticket.id);
+        owned.launch.tmux_terminal_session = Some(owned.snapshot.session.as_u64());
+        owned.tmux_instance = Some(instance);
+    }
+
+    #[cfg(test)]
+    pub(super) fn remote_grok_identity_query_pending_for_test(&self) -> bool {
+        self.grok_remote_owned
+            .as_ref()
+            .is_some_and(|owned| owned.querying)
     }
 
     pub(crate) fn is_remote_owned_grok_launch_available(&self, ctx: &AppContext) -> bool {
@@ -284,6 +321,7 @@ impl TerminalView {
                     Reply::Launch { ticket, .. } if !fresh && ticket == launch.ticket => None,
                     Reply::Reserved { .. }
                     | Reply::Launch { .. }
+                    | Reply::OwnedIdentity { .. }
                     | Reply::Input { .. }
                     | Reply::Revoked { .. }
                     | Reply::Failed { .. } => return Err(()),
@@ -376,6 +414,8 @@ impl TerminalView {
                     sending_generation: None,
                     snapshot,
                     querying: false,
+                    readonly_identity: None,
+                    readonly_query_epoch: None,
                 });
                 let sent = view.input.update(ctx, |input, ctx| {
                     input.execute_owned_cli_command_once(&command, ctx)
@@ -416,6 +456,8 @@ impl TerminalView {
         if let Some(owned) = &mut self.grok_remote_owned {
             owned.launch.tmux_terminal_session = None;
             owned.tmux_instance = None;
+            owned.readonly_identity = None;
+            owned.readonly_query_epoch = None;
             owned.revoke();
         }
     }
@@ -469,6 +511,26 @@ impl TerminalView {
         if !self.remote_owned_grok_is_current(ctx) {
             self.revoke_remote_owned_grok();
             return;
+        }
+        if self
+            .tmux_restored_native_session(CLIAgent::Grok, ctx)
+            .is_some()
+        {
+            if CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|session| session.session_context.grok_owned_identity_epoch.is_some())
+            {
+                self.observe_remote_owned_grok_identity(ctx);
+                return;
+            }
+            if let Some(owned) = self.grok_remote_owned.as_mut() {
+                let had_identity = owned.readonly_identity.take().is_some();
+                let had_query = owned.readonly_query_epoch.take().is_some();
+                if had_identity || had_query {
+                    owned.native_session = None;
+                    owned.querying = false;
+                }
+            }
         }
         let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
             return;
@@ -573,6 +635,134 @@ impl TerminalView {
                         ctx.notify();
                     }
                 }
+            },
+        );
+    }
+
+    pub(in crate::terminal::view) fn remote_owned_grok_readonly_identity(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<&ReadonlyIdentity> {
+        if !self.remote_owned_grok_is_current(ctx) {
+            return None;
+        }
+        let native = self.tmux_restored_native_session(CLIAgent::Grok, ctx)?;
+        let owned = self.grok_remote_owned.as_ref()?;
+        let identity = owned.readonly_identity.as_ref()?;
+        (identity.native_session == native
+            && owned.native_session == Some(native)
+            && CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|session| {
+                    session.session_context.grok_owned_identity_epoch == Some(identity.epoch)
+                })
+            && identity.cwd == owned.launch.cwd)
+            .then_some(identity)
+    }
+
+    fn observe_remote_owned_grok_identity(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(native) = self.tmux_restored_native_session(CLIAgent::Grok, ctx) else {
+            return;
+        };
+        let Some((snapshot, client)) = self.remote_grok_snapshot(true, ctx) else {
+            return;
+        };
+        let Some(epoch) = CLIAgentSessionsModel::as_ref(ctx)
+            .session(self.view_id)
+            .and_then(|session| session.session_context.grok_owned_identity_epoch)
+        else {
+            return;
+        };
+        let Some(owned) = self.grok_remote_owned.as_mut() else {
+            return;
+        };
+        if owned.querying || owned.readonly_identity.is_some() {
+            return;
+        }
+        let Some(instance) = owned.tmux_instance.clone() else {
+            return;
+        };
+        let ticket = owned.launch.ticket.clone();
+        let Ok((scope, revision)) = remote::scope(&client, &owned.launch, Uuid::new_v4()) else {
+            return;
+        };
+        owned.querying = true;
+        owned.readonly_query_epoch = Some(epoch);
+        let expected_client = client.clone();
+        let expected_scope = scope.clone();
+        let requested_ticket = ticket.clone();
+        ctx.spawn(
+            async move {
+                remote::request(
+                    &client,
+                    scope,
+                    revision,
+                    Action::Observe {
+                        ticket: requested_ticket,
+                    },
+                )
+                .await
+            },
+            move |view, reply, ctx| {
+                if !expected_client.cli_image_scope_is_current(&expected_scope)
+                    || !view.tmux_owned_instance_is_current(&instance, ctx)
+                    || view.tmux_restored_native_session(CLIAgent::Grok, ctx) != Some(native)
+                    || view
+                        .remote_grok_snapshot(true, ctx)
+                        .is_none_or(|(current, client)| {
+                            current != snapshot || !Arc::ptr_eq(&client, &expected_client)
+                        })
+                {
+                    return;
+                }
+                if CLIAgentSessionsModel::as_ref(ctx)
+                    .session(view.view_id)
+                    .is_none_or(|session| {
+                        session.session_context.grok_owned_identity_epoch != Some(epoch)
+                    })
+                {
+                    // 当前线路的查询已被真实事件撤销；完成时刷新界面，但不恢复旧证明。
+                    ctx.notify();
+                    return;
+                }
+                let Some(owned) = view.grok_remote_owned.as_mut() else {
+                    return;
+                };
+                if owned.launch.ticket != ticket
+                    || owned.tmux_instance.as_ref() != Some(&instance)
+                    || owned.snapshot != snapshot
+                    || owned.readonly_query_epoch != Some(epoch)
+                {
+                    return;
+                }
+                owned.querying = false;
+                owned.readonly_query_epoch = None;
+                if let Ok(Reply::OwnedIdentity {
+                    ticket: response_ticket,
+                    native_session,
+                    cwd,
+                    manifest_sha256,
+                    permission_mode,
+                }) = reply
+                {
+                    if response_ticket == ticket
+                        && native_session == native
+                        && cwd == owned.launch.cwd
+                        && permission_mode == "default"
+                        && manifest_sha256.len() == 64
+                        && manifest_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+                    {
+                        owned.native_session = Some(native);
+                        owned.readonly_identity = Some(ReadonlyIdentity {
+                            native_session,
+                            cwd,
+                            manifest_sha256,
+                            epoch,
+                        });
+                        view.bind_cli_agent_hook_input_target(ctx);
+                    }
+                }
+                ctx.notify();
             },
         );
     }
@@ -685,6 +875,8 @@ impl TerminalView {
                         sending_generation: None,
                         snapshot,
                         querying: false,
+                        readonly_identity: None,
+                        readonly_query_epoch: None,
                     });
                     view.bind_cli_agent_hook_input_target(ctx);
                     ctx.notify();

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use uuid::Uuid;
-use warpui::{AppContext, SingletonEntity, ViewContext};
+use warpui::{AppContext, EntityId, SingletonEntity, ViewContext};
 
 use super::terminal_binding::Snapshot;
 use super::{DismissibleToast, TerminalView, ToastStack};
@@ -16,7 +16,27 @@ use crate::remote_server::proto::{
 use crate::remote_server::tmux_owned_client::{Journal, Launch};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
-use crate::terminal::cli_agent_sessions::event::{CLIAgentEvent, CLIAgentEventType};
+use crate::terminal::cli_agent_sessions::event::{
+    CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType, ClaudeProcessEvidence,
+};
+use crate::terminal::cli_agent_sessions::listener::CLIAgentSessionListener;
+
+/// 只保留实际 hook 的身份候选；不保留运行、审批、输入租约或回合状态。
+#[derive(Clone)]
+struct ObservedIdentity {
+    launch: Launch,
+    agent: CLIAgent,
+    native_session: Uuid,
+    cwd: String,
+    plugin_version: Option<String>,
+    claude_image: Option<(ClaudeProcessEvidence, String)>,
+}
+
+struct RestoredIdentity {
+    instance: Instance,
+    listener: EntityId,
+    events: EntityId,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -46,6 +66,8 @@ pub(super) struct TmuxOwned {
     native_session: Option<Uuid>,
     // 只保存已解析的真实 SessionStart；身份确认后再交给现有通知入口。
     starts: Vec<(Uuid, String)>,
+    observed_identity: Option<ObservedIdentity>,
+    restored_identity: Option<RestoredIdentity>,
 }
 
 /// 同一持久票据可以多次恢复；异步结果必须仍属于最初的线路确认和连接。
@@ -166,6 +188,7 @@ impl TerminalView {
             owned.phase = Phase::Detached;
             owned.native_session = None;
             owned.starts.clear();
+            owned.restored_identity = None;
             self.revoke_remote_owned_codex();
             self.revoke_remote_owned_grok();
         }
@@ -201,6 +224,8 @@ impl TerminalView {
             launched: false,
             native_session: None,
             starts: Vec::new(),
+            observed_identity: None,
+            restored_identity: None,
         });
         ctx.spawn(
             blocking::unblock(move || {
@@ -227,21 +252,24 @@ impl TerminalView {
         ctx.notify();
     }
 
-    /// 用户显式恢复时只读原意图；即使之前没有收到 Start 响应，也不重新启动。
-    pub(crate) fn restore_remote_tmux_owned(&mut self, ctx: &mut ViewContext<Self>) {
+    fn prepare_tmux_owned_restore(
+        &mut self,
+        ctx: &AppContext,
+    ) -> Option<(Uuid, Snapshot, Option<Launch>)> {
         if !self.can_restore_remote_tmux_owned(ctx) {
-            return;
+            return None;
         }
-        let Some((snapshot, client)) = self.terminal_binding_snapshot(ctx) else {
-            return;
-        };
-        let Some(scope) = client.terminal_binding_scope(snapshot.session) else {
-            return;
-        };
+        let (snapshot, client) = self.terminal_binding_snapshot(ctx)?;
+        let scope = client.terminal_binding_scope(snapshot.session)?;
         let retained = self
             .tmux_remote_owned
             .as_ref()
             .and_then(|owned| owned.launch.clone());
+        let observed_identity = self
+            .tmux_remote_owned
+            .as_ref()
+            .and_then(|owned| owned.observed_identity.clone())
+            .filter(|identity| retained.as_ref() == Some(&identity.launch));
         let operation = Uuid::new_v4();
         self.cancel_remote_terminal_binding();
         self.tmux_remote_owned = Some(TmuxOwned {
@@ -259,7 +287,17 @@ impl TerminalView {
             launched: false,
             native_session: None,
             starts: Vec::new(),
+            observed_identity,
+            restored_identity: None,
         });
+        Some((operation, snapshot, retained))
+    }
+
+    /// 用户显式恢复时只读原意图；即使之前没有收到 Start 响应，也不重新启动。
+    pub(crate) fn restore_remote_tmux_owned(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some((operation, snapshot, retained)) = self.prepare_tmux_owned_restore(ctx) else {
+            return;
+        };
         ctx.spawn(
             blocking::unblock(move || {
                 let journal = Journal::open()?;
@@ -499,6 +537,7 @@ impl TerminalView {
             self.tmux_remote_owned.as_mut().unwrap().native_session = Some(native);
         }
         self.replay_tmux_session_start(ctx);
+        self.restore_tmux_hook_identity(ctx);
     }
 
     pub(super) fn set_tmux_owned_native_session(&mut self, agent: CLIAgent, id: Uuid) -> bool {
@@ -536,6 +575,7 @@ impl TerminalView {
                     CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
                         sessions.update_from_event(self.view_id, &event, ctx)
                     });
+                    self.remember_tmux_hook_identity(&event, ctx);
                     self.bind_cli_agent_hook_input_target(ctx);
                     self.observe_remote_owned_codex_start(ctx);
                     self.observe_remote_owned_grok_start(ctx);
@@ -544,6 +584,137 @@ impl TerminalView {
                 self.handle_cli_agent_notification(sentinel, &body, ctx);
             }
         }
+    }
+
+    pub(super) fn remember_tmux_hook_identity(&mut self, event: &CLIAgentEvent, ctx: &AppContext) {
+        if event.source != CLIAgentEventSource::RichPlugin
+            || event.event != CLIAgentEventType::SessionStart
+        {
+            return;
+        }
+        let Some(owned) = self.tmux_remote_owned.as_ref() else {
+            return;
+        };
+        let Some(launch) = owned.launch.clone() else {
+            return;
+        };
+        let Some(native) = owned.native_session else {
+            return;
+        };
+        if !self.tmux_owned_launch_is_current(launch.id, ctx)
+            || event.agent != owned.agent
+            || event.session_id.as_deref() != Some(native.to_string().as_str())
+        {
+            return;
+        }
+        let Some(session) = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id) else {
+            return;
+        };
+        let Some(cwd) = session.session_context.cwd.clone() else {
+            return;
+        };
+        if !session.received_rich_notification
+            || session.agent != owned.agent
+            || session.session_context.session_id != event.session_id
+            || owned.pane_cwd.as_deref() != Some(cwd.as_str())
+        {
+            return;
+        }
+        self.tmux_remote_owned.as_mut().unwrap().observed_identity = Some(ObservedIdentity {
+            launch,
+            agent: event.agent,
+            native_session: native,
+            cwd,
+            plugin_version: session.plugin_version.clone(),
+            claude_image: session.session_context.claude_image_evidence.clone(),
+        });
+    }
+
+    fn restore_tmux_hook_identity(&mut self, ctx: &mut ViewContext<Self>) {
+        let Some(owned) = self.tmux_remote_owned.as_ref() else {
+            return;
+        };
+        let Some(identity) = owned.observed_identity.clone() else {
+            return;
+        };
+        if !owned.restore
+            || owned.launch.as_ref() != Some(&identity.launch)
+            || owned.agent != identity.agent
+            || owned.native_session != Some(identity.native_session)
+            || owned.pane_cwd.as_deref() != Some(identity.cwd.as_str())
+            || CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some()
+        {
+            return;
+        }
+        let Some(instance) = self.tmux_owned_instance(identity.launch.id, ctx) else {
+            return;
+        };
+        let events = self.model_events_handle.clone();
+        let view_id = self.view_id;
+        let listener = ctx
+            .add_model(|ctx| CLIAgentSessionListener::new(view_id, identity.agent, &events, ctx));
+        let listener_id = listener.id();
+        let remote_host = self.active_session_remote_host(ctx);
+        let registered = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, ctx| {
+            sessions.register_restored_listener(
+                view_id,
+                identity.agent,
+                identity.cwd,
+                identity.native_session.to_string(),
+                identity.plugin_version,
+                remote_host,
+                listener,
+                ctx,
+            )
+        });
+        if registered {
+            self.tmux_remote_owned.as_mut().unwrap().restored_identity = Some(RestoredIdentity {
+                instance,
+                listener: listener_id,
+                events: events.id(),
+            });
+            self.bind_cli_agent_hook_input_target(ctx);
+            self.observe_remote_owned_grok_start(ctx);
+            ctx.notify();
+        }
+    }
+
+    pub(super) fn tmux_restored_native_session(
+        &self,
+        agent: CLIAgent,
+        ctx: &AppContext,
+    ) -> Option<Uuid> {
+        let owned = self.tmux_remote_owned.as_ref()?;
+        let identity = owned.observed_identity.as_ref()?;
+        let restored = owned.restored_identity.as_ref()?;
+        let session = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id)?;
+        (owned.agent == agent
+            && identity.agent == agent
+            && owned.launch.as_ref() == Some(&identity.launch)
+            && owned.native_session == Some(identity.native_session)
+            && self.tmux_owned_instance_is_current(&restored.instance, ctx)
+            && restored.events == self.model_events_handle.id()
+            && session.agent == agent
+            && session.listener.as_ref().map(|listener| listener.id()) == Some(restored.listener)
+            && session.session_context.session_id.as_deref()
+                == Some(identity.native_session.to_string().as_str())
+            && session.session_context.cwd.as_deref() == Some(identity.cwd.as_str()))
+        .then_some(identity.native_session)
+    }
+
+    pub(in crate::terminal::view) fn tmux_restored_claude_image(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<(ClaudeProcessEvidence, String)> {
+        self.tmux_restored_native_session(CLIAgent::Claude, ctx)?;
+        self.tmux_remote_owned
+            .as_ref()?
+            .observed_identity
+            .as_ref()?
+            .claude_image
+            .clone()
     }
 
     pub(super) fn accept_tmux_cli_notification(

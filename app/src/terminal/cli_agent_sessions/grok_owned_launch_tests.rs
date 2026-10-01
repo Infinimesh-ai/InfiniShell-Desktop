@@ -146,10 +146,11 @@ fn dispatched_legacy_manifest_cannot_receive_new_remote_notification_input() {
     let checksum = digest(&bytes);
     write_new(&path, &bytes).unwrap();
     write_new(&root.join("dispatched"), checksum.as_bytes()).unwrap();
-    let recovered = GrokOwnedLaunch::restore(&path, &checksum).unwrap();
+    let mut recovered = GrokOwnedLaunch::restore(&path, &checksum).unwrap();
     assert_eq!(recovered.phase, LaunchPhase::Dispatched);
     notifications.verify_current().unwrap();
     assert!(recovered.verify_remote_input(&notifications).is_err());
+    assert!(recovered.readonly_target(Uuid::new_v4()).is_err());
 }
 
 #[test]

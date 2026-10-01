@@ -13614,6 +13614,16 @@ impl TerminalView {
         CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions_model, ctx| {
             sessions_model.update_from_event(self.view_id, &notification, ctx);
         });
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        self.remember_tmux_hook_identity(&notification, ctx);
 
         if notification.source == CLIAgentEventSource::RichPlugin
             && matches!(

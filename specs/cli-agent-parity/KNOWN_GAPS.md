@@ -198,6 +198,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G08 — 远程 CLI 图片传输
 
+- **2026-10-01 原生`.3`及tmux恢复接线，仍开放**：Claude/Grok只恢复经当前绑定复核的Unknown／Closed身份；Grok新增驻留actor只读权限/描述符查询与保留busy队列语义的原子接收前置。原生975d815fec8e完整117文件补丁可重建，新Mac工件5c1bdc369735已绑定并通过签名/启动检查；新增17项原生测试/check通过，原并发1项LEAK保留。宿主488项经夹具修正后487通过/1失败，最后两行夹具修正的2项独立PASS，i18n11及最终check通过，分轮收据 `c3573942ccfdfb5abdd348dfd12361b2c8972ac0535c68f896ddaa6b3f5e41f6`，不合称单轮全过。英中新增状态未确认提示已审计，真实布局待验；b38 Linux通过，Windows下载失败、独立Codex等待超时及Vim LEAK保留。新版三CLI真实tmux图片消费、恢复异常链和新平台源码门禁待验，不关闭G08。
+
 本检查点补充门禁：环境增量后的tmux定向19项、真实API1项和最终check通过；其余101文件与前轮396项/i18n快照一致，分轮收据 `fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6`。源码检查不关闭G08。
 
 - **2026-10-01 tmux 产品启动、图片恢复与连接代次整合，仍开放**：三款新窗格菜单、持久启动意图、当前 pane/原生消费者身份、新 scope 查询及精确旧图片 ACK/回收已接线。修正跨 daemon 的全局图片预算恢复及旧连接 EOF/握手覆盖新连接；完整 remote_server lib 与 Warp 定向 `r-iv1v21o2` 396/396、i18n 11项、check、来源合同 Python 4项和 actionlint通过，收据 `cec5f49756678c9d3022dcb1fc79a70333958102a515558246dd20436440f3cc`。随后发现旧 tmux server 缺宿主变量会静默丢失通知，仅新 pane 用固定协议/构建值注入；真实 API `r-j95bnz9z` 验证原/普通 pane 缺键、新 pane 正确值且 server/session 环境不变，收据 `5818779c26e16abf354014b28ae49b232f55c98fc01be5afa0c24efc557aa128`，无 CLI/model 输入。源码还确认完整 SSH block 结束后 Claude/Grok listener 被移除而原进程不会重发 SessionStart，现有 Restore 尚不能恢复输入；正在补只读身份重建，不能重放旧状态冒充当前就绪。9条英中消息已同步，真实双语布局及三款 tmux 图片消费仍待验；本轮关闭0项。

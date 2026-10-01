@@ -125,6 +125,8 @@ pub struct CLIAgentSessionContext {
     pub response: Option<String>,
     /// 仅本次监听期间的原生 SessionStart 证据，不能从数据库恢复为有效证据。
     pub grok_permission_evidence: GrokPermissionEvidence,
+    /// 恢复监听器的只读证明代次；真实权限变化撤销后，同监听器不能重新授予。
+    pub grok_owned_identity_epoch: Option<Uuid>,
     /// 仅在当前监听器和原生 UUID 下有效；不可从持久化历史恢复为进程身份。
     pub codex_process_evidence: Option<CodexProcessEvidence>,
     /// 当前监听器的 Claude 进程与历史路径候选，不从历史状态恢复权限。
@@ -846,6 +848,40 @@ impl CLIAgentSessionsModel {
         );
     }
 
+    /// 只恢复已经重新核验的原生身份；旧 hook 不是当前运行状态或新的通知。
+    pub(crate) fn register_restored_listener(
+        &mut self,
+        terminal_view_id: EntityId,
+        agent: CLIAgent,
+        cwd: String,
+        session_id: String,
+        plugin_version: Option<String>,
+        remote_host: Option<String>,
+        listener: ModelHandle<CLIAgentSessionListener>,
+        ctx: &mut ModelContext<Self>,
+    ) -> bool {
+        if self.sessions.contains_key(&terminal_view_id) {
+            return false;
+        }
+        self.register_listener(
+            terminal_view_id,
+            agent,
+            Some(cwd),
+            None,
+            Some(session_id),
+            plugin_version,
+            remote_host,
+            false,
+            listener,
+            ctx,
+        );
+        let session = self.sessions.get_mut(&terminal_view_id).unwrap();
+        session.status = CLIAgentSessionStatus::Unknown;
+        session.session_context.grok_owned_identity_epoch =
+            (agent == CLIAgent::Grok).then(Uuid::new_v4);
+        true
+    }
+
     pub fn remove_session(&mut self, terminal_view_id: EntityId, ctx: &mut ModelContext<Self>) {
         self.remote_image_consumptions.remove(&terminal_view_id);
         #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
@@ -931,11 +967,30 @@ impl CLIAgentSessionsModel {
             .accept(event);
         // 先去重，再观察权限；无回合 ID 的会话提醒也必须撤销失效证据。
         if disposition != EventDisposition::Drop {
+            #[cfg(all(feature = "local_fs", not(target_family = "wasm")))]
+            crate::remote_server::cli_image_grok_client::revoke_owned_if_event_changed(
+                terminal_view_id,
+                event,
+            );
             let session = self
                 .sessions
                 .get_mut(&terminal_view_id)
                 .expect("session checked above");
             let context = &mut session.session_context;
+            if context.grok_owned_identity_epoch.is_some()
+                && event.agent == CLIAgent::Grok
+                && event.source == CLIAgentEventSource::RichPlugin
+                && (event.event == CLIAgentEventType::SessionStart
+                    || event.session_id != context.session_id
+                    || event.cwd != context.cwd
+                    || event.payload.permission_mode.as_deref() != Some("default"))
+            {
+                context.grok_owned_identity_epoch = None;
+                ctx.emit(CLIAgentSessionsModelEvent::SessionUpdated {
+                    terminal_view_id,
+                    agent: session.agent,
+                });
+            }
             let codex_evidence_changed = if session.agent == CLIAgent::Codex
                 && event.source == CLIAgentEventSource::RichPlugin
             {
@@ -1408,6 +1463,7 @@ impl CLIAgentSessionsModel {
         // 新注册、恢复和克隆上下文都必须重新观察本次监听器的原生进程候选。
         session.session_context.codex_process_evidence = None;
         session.session_context.claude_image_evidence = None;
+        session.session_context.grok_owned_identity_epoch = None;
         #[cfg(all(feature = "local_fs", any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64"))))]
         self.revoke_native_grok_submission(terminal_view_id);
         #[cfg(not(target_family = "wasm"))]

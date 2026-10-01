@@ -15,7 +15,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 SOURCE_PROFILES = {
     "terminal-bridge": ("source.json", "terminal-bridge.patch", "1.0.41+infinishell.terminal-bridge.11"),
     "session-notifications": ("session-notifications-source.json", "session-notifications.patch",
-                              "1.0.41+infinishell.session-notifications.2"),
+                              "1.0.41+infinishell.session-notifications.3"),
 }
 UPSTREAM = "https://github.com/xai-org/grok-build"
 BASE = "07e35a3dfeed2f200d319ef6c893b5ea286d9a51"
@@ -179,6 +179,53 @@ def main():
                     passed == 0 or failed or ignored for passed, failed, ignored in notification_results):
                 raise RuntimeError("通知扩展三库必须分别真实执行并零失败，不能把零命中或忽略项记为通过")
             receipt["notification_library_results"] = notification_results
+            # 身份查询和原子输入约束不含 notification 名称，必须单独执行，不能由通知组代证。
+            owned_identity_tests = run([
+                "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell",
+                "--lib", "owned_identity", "--", "--test-threads=1",
+            ], True)
+            owned_identity_count = 14 if system == "Linux" else 10
+            if not re.search(
+                    rf"test result: ok\. {owned_identity_count} passed; 0 failed; 0 ignored;",
+                    owned_identity_tests):
+                raise RuntimeError("驻留身份与条件队列测试数量或结果不符")
+            owned_input_tests = run([
+                "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-workspace",
+                "--lib", "owned_input", "--", "--test-threads=1",
+            ], True)
+            if not re.search(r"test result: ok\. 3 passed; 0 failed; 0 ignored;", owned_input_tests):
+                raise RuntimeError("默认权限与跨线程模式互斥必须实际验证")
+            receipt["owned_identity_tests"] = owned_identity_count
+            receipt["owned_input_tests"] = 3
+            if system == "Windows":
+                receipt["owned_identity_unix_fixture"] = {
+                    "status": "not_applicable",
+                    "scope": "4项POSIX PTY身份/入队测试仅在Unix编译；不代表Windows原生恢复已验收。",
+                }
+            queue_tests = run([
+                "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-shell",
+                "--lib", "session::acp_session::prompt_queue_actor_tests::queue_input_",
+                "--", "--test-threads=1",
+            ], True)
+            queue_results = re.findall(
+                r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", queue_tests)
+            if len(queue_results) != 1 or int(queue_results[0][0]) == 0 or queue_results[0][1:] != ("0", "0"):
+                raise RuntimeError("既有繁忙队列和send-now行为回归必须实际执行并通过")
+            receipt["prompt_queue_tests"] = int(queue_results[0][0])
+            permission_regressions = {}
+            for test_filter, expected_count in (("seed_auto_", 2), ("enabling_yolo_clears_seeded_auto", 1),
+                                                ("yolo_pin_clamps_", 2), ("clamp_yolo_respects_pin", 1)):
+                permission_tests = run([
+                    "cargo", "+" + TOOLCHAIN, "test", "--locked", "-p", "xai-grok-workspace",
+                    "--lib", "permission::manager::tests::" + test_filter,
+                    "--", "--test-threads=1",
+                ], True)
+                if not re.search(
+                        rf"test result: ok\. {expected_count} passed; 0 failed; 0 ignored;",
+                        permission_tests):
+                    raise RuntimeError("既有权限初始化、模式切换与固定策略回归失败")
+                permission_regressions[test_filter] = expected_count
+            receipt["permission_mode_regressions"] = permission_regressions
             if system == "Linux":
                 # 既有回归使用 sh 派生真实后代；Windows 由新增控制台生命周期测试覆盖。
                 ordinary_hook = run([

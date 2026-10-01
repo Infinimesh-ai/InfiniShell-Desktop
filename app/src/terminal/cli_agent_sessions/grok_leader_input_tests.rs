@@ -326,3 +326,153 @@ fn only_valid_final_response_retains_raw_ack_for_sqlite_validation() {
     assert_eq!(tracker.observe(&response).unwrap(), None);
     assert_eq!(tracker.final_response, None);
 }
+
+fn owned_descriptor(session: Uuid) -> Value {
+    json!({"version":1,"session_id":session.to_string(),"cwd":"/fixture",
+        "plugin_dir":"/fixture/private/plugin","files":{
+            ".grok-plugin/plugin.json":"a".repeat(64),"hooks/hooks.json":"b".repeat(64),
+            "hooks/notify.cjs":"c".repeat(64)}})
+}
+
+#[test]
+fn owned_prompt_preserves_typed_png_and_binds_atomic_precondition_to_rpc() {
+    let rpc_id = Uuid::new_v4();
+    let session = Uuid::new_v4();
+    let descriptor = owned_descriptor(session);
+    let prompt = GrokLeaderPrompt::with_png(
+        Some("确认图片".into()),
+        vec![ImageContext {
+            data: "AA==".into(),
+            mime_type: "image/png".into(),
+            file_name: "fixture.png".into(),
+            is_figma: false,
+        }],
+    )
+    .unwrap();
+    let frame = prompt.frame_with_owned_precondition(rpc_id, session, Some(&descriptor));
+    let rpc = decode_acp(&frame).unwrap();
+    assert_eq!(rpc["id"], rpc_id.to_string());
+    assert_eq!(rpc["params"]["prompt"][1]["type"], "image");
+    assert_eq!(rpc["params"]["prompt"][1]["mimeType"], "image/png");
+    assert_eq!(
+        rpc["params"]["_meta"],
+        json!({"verbatim":true,"infinishellOwnedInput":{
+        "protocolVersion":1,"requireDefaultPermissions":true,"requestId":rpc_id.to_string(),
+        "notificationBinding":descriptor}})
+    );
+    let ordinary =
+        decode_acp(&prompt.frame_with_owned_precondition(rpc_id, session, None)).unwrap();
+    assert!(ordinary["params"].get("_meta").is_none());
+}
+
+#[test]
+fn owned_identity_requires_resident_default_and_exact_frozen_descriptor() {
+    let session = Uuid::new_v4();
+    let descriptor = owned_descriptor(session);
+    let result = json!({"result":{"sessionId":session.to_string(),"cwd":"/fixture",
+        "infinishellOwnedIdentity":{"protocolVersion":1,"permissionMode":"default",
+            "notificationBinding":descriptor}}});
+    verify_owned_identity_result(&result, session, "/fixture", &descriptor).unwrap();
+    for mode in ["plan", "auto", "bypassPermissions", "", "DEFAULT"] {
+        let mut other = result.clone();
+        other["result"]["infinishellOwnedIdentity"]["permissionMode"] = mode.into();
+        assert!(verify_owned_identity_result(&other, session, "/fixture", &descriptor).is_err());
+    }
+    assert!(
+        verify_owned_identity_result(&result, Uuid::new_v4(), "/fixture", &descriptor).is_err()
+    );
+    assert!(verify_owned_identity_result(&result, session, "/other", &descriptor).is_err());
+    let mut other = result.clone();
+    other["result"]["infinishellOwnedIdentity"]["notificationBinding"]["files"]["hooks/notify.cjs"] =
+        "d".repeat(64).into();
+    assert!(verify_owned_identity_result(&other, session, "/fixture", &descriptor).is_err());
+    assert!(
+        verify_owned_identity_result(&result["result"], session, "/fixture", &descriptor).is_err()
+    );
+    let mut error = result;
+    error["error"] = json!({"code":"not_resident"});
+    assert!(verify_owned_identity_result(&error, session, "/fixture", &descriptor).is_err());
+}
+
+fn owned_rejection_response(record: &GrokLeaderDelivery) -> Value {
+    json!({"jsonrpc":"2.0","id":record.rpc_id.to_string(),"error":{"code":-32073,
+        "message":"fixed rejection", "data":{"code":"infinishell_owned_input_rejected",
+            "protocolVersion":1,"sessionId":record.session_id.to_string(),
+            "requestId":record.rpc_id.to_string(),"queued":false,"reason":"precondition_changed"}}})
+}
+
+#[test]
+fn exact_owned_rejection_is_terminal_without_creating_a_native_prompt() {
+    let mut tracker = tracker();
+    let record = tracker
+        .record_before_write(Uuid::new_v4(), |_| Ok(()))
+        .unwrap()
+        .clone();
+    let rpc = owned_rejection_response(&record);
+    let Some(GrokLeaderInputEvent::Delivery(rejected)) = tracker.observe(&rpc).unwrap() else {
+        panic!("精确原生零入队回执必须收尾")
+    };
+    assert_eq!(
+        rejected.status,
+        GrokLeaderDeliveryStatus::RejectedBeforeEnqueue {
+            reason: GrokOwnedInputRejection::PreconditionChanged,
+        }
+    );
+    assert_eq!(tracker.final_response.as_ref(), Some(&rpc));
+    assert_eq!(tracker.observe(&rpc).unwrap(), None);
+    assert!(
+        tracker
+            .record_before_write(record.message_id, |_| panic!("原message不能重派"))
+            .is_err()
+    );
+    assert!(
+        tracker
+            .observe(&final_response(&record, Uuid::new_v4()))
+            .is_err()
+    );
+}
+
+#[test]
+fn incomplete_or_mismatched_owned_rejection_remains_unknown() {
+    for field in [
+        "code",
+        "protocolVersion",
+        "sessionId",
+        "requestId",
+        "queued",
+        "reason",
+        "extra",
+    ] {
+        let mut tracker = tracker();
+        let record = tracker
+            .record_before_write(Uuid::new_v4(), |_| Ok(()))
+            .unwrap()
+            .clone();
+        let mut rpc = owned_rejection_response(&record);
+        rpc["error"]["data"][field] = json!("mismatch");
+        assert!(matches!(
+            tracker.observe(&rpc),
+            Err(GrokLeaderInputError::NativeRequestFailed { .. })
+        ));
+        assert_eq!(
+            tracker.delivery.unwrap().status,
+            GrokLeaderDeliveryStatus::Unknown
+        );
+        assert!(tracker.final_response.is_none());
+    }
+    let mut tracker = tracker();
+    let record = tracker
+        .record_before_write(Uuid::new_v4(), |_| Ok(()))
+        .unwrap()
+        .clone();
+    let mut rpc = owned_rejection_response(&record);
+    rpc["error"]["code"] = (-32603).into();
+    assert!(tracker.observe(&rpc).is_err());
+    rpc["error"]["code"] = (-32073).into();
+    rpc["id"] = Uuid::new_v4().to_string().into();
+    assert_eq!(tracker.observe(&rpc).unwrap(), None);
+    assert_eq!(
+        tracker.delivery.unwrap().status,
+        GrokLeaderDeliveryStatus::Unknown
+    );
+}

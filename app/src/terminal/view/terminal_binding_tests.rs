@@ -2,20 +2,26 @@
 
 use super::*;
 use crate::remote_server::auth::RemoteServerAuthContext;
+use crate::remote_server::cli_image_grok_protocol::{
+    Action as GrokAction, Reply as GrokReply, Request as GrokRequest, Ticket,
+};
 use crate::remote_server::manager::{RemoteServerExitStatus, RemoteServerManagerEvent};
 use crate::remote_server::proto::{
-    InitializeResponse, RemoteServerCapability, ServerMessage, TerminalBindingBound,
-    TerminalBindingChallengeWritten, TerminalBindingFailed, TerminalBindingRequest,
-    TerminalBindingResponse, client_message, notification, server_message, session_scoped_request,
-    terminal_binding_request, terminal_binding_response,
+    CliGrokOwnedResponse, InitializeResponse, RemoteServerCapability, ServerMessage,
+    TerminalBindingBound, TerminalBindingChallengeWritten, TerminalBindingFailed,
+    TerminalBindingRequest, TerminalBindingResponse, client_message, notification, server_message,
+    session_scoped_request, terminal_binding_request, terminal_binding_response,
 };
 use crate::remote_server::protocol;
 use crate::remote_server::setup::{PreinstallCheckResult, RemotePlatform};
 use crate::remote_server::transport::{
     Connection, ControlPath, Error, InstallOutcome, RemoteTransport, TransportConnection,
 };
+use crate::terminal::event::BlockMetadataReceivedEvent;
 use crate::terminal::model::ansi::Processor;
+use crate::terminal::model::block::BlockMetadata;
 use crate::terminal::model::session::{BootstrapSessionType, SessionInfo};
+use crate::terminal::model_events::ModelEvent;
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use async_compat::CompatExt;
@@ -69,6 +75,18 @@ struct MemoryTransport {
     notifications: async_channel::Sender<notification::Message>,
     disconnects: async_channel::Sender<AbortHandle>,
     owned: bool,
+    grok: bool,
+    grok_observations: async_channel::Sender<GrokObservation>,
+}
+
+pub(in crate::terminal::view) struct GrokObservation {
+    pub(in crate::terminal::view) ticket: Ticket,
+    pub(in crate::terminal::view) reply: oneshot::Sender<GrokReply>,
+}
+impl std::fmt::Debug for GrokObservation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("GrokObservation")
+    }
 }
 
 #[derive(Debug)]
@@ -147,6 +165,8 @@ impl RemoteTransport for MemoryTransport {
         let notifications = self.notifications.clone();
         let disconnects = self.disconnects.clone();
         let owned = self.owned;
+        let grok = self.grok;
+        let grok_observations = self.grok_observations.clone();
         Box::pin(async move {
             let (client_stream, server_stream) = tokio::io::duplex(8192);
             let (client_read, client_write) = tokio::io::split(client_stream);
@@ -177,7 +197,9 @@ impl RemoteTransport for MemoryTransport {
                                                         .to_owned(),
                                                     host_id: "terminal-binding-fixture".into(),
                                                     capabilities: if owned {
-                                                        vec![RemoteServerCapability::TerminalBindingV1.into(), RemoteServerCapability::TmuxOwnedV1.into(), RemoteServerCapability::CliImageClaudeReadV1.into()]
+                                                        let mut capabilities = vec![RemoteServerCapability::TerminalBindingV1.into(), RemoteServerCapability::TmuxOwnedV1.into(), RemoteServerCapability::CliImageClaudeReadV1.into()];
+                                                        if grok { capabilities.extend([i32::from(RemoteServerCapability::CliImageUnpublishedStagingV1), i32::from(RemoteServerCapability::CliImageReferenceRecoveryV1), i32::from(RemoteServerCapability::CliGrokOwnedV1)]); }
+                                                        capabilities
                                                     } else { vec![RemoteServerCapability::TerminalBindingV1.into()] },
                                                 },
                                             )
@@ -191,6 +213,24 @@ impl RemoteTransport for MemoryTransport {
                                                 break;
                                             };
                                             server_message::Message::TerminalBinding(response)
+                                        }
+                                        Some(session_scoped_request::Message::CliGrokOwned(request)) => {
+                                            assert!(grok);
+                                            let scope = request.scope.unwrap();
+                                            let request = GrokRequest::decode(&request.body_json).unwrap();
+                                            assert_eq!(request.scope.host, scope.host_id);
+                                            assert_eq!(request.scope.terminal_session, scope.terminal_session_id);
+                                            assert_eq!(request.scope.terminal_epoch.to_string(), scope.terminal_epoch);
+                                            let GrokAction::Observe { ticket } = request.action else {
+                                                panic!("恢复夹具只允许指定票据的只读 Observe，不接受启动或输入");
+                                            };
+                                            let (reply, response) = oneshot::channel();
+                                            grok_observations.send(GrokObservation { ticket, reply }).await.unwrap();
+                                            let Ok(reply) = response.await else { break; };
+                                            server_message::Message::CliGrokOwned(CliGrokOwnedResponse {
+                                                scope: Some(scope),
+                                                body_json: serde_json::to_vec(&reply).unwrap(),
+                                            })
                                         }
                                         _ => panic!(
                                             "终端绑定夹具禁止导航、图片、owned 启动和模型请求"
@@ -284,6 +324,8 @@ pub(in crate::terminal::view) struct Fixture {
     disconnects: async_channel::Receiver<AbortHandle>,
     done: async_channel::Receiver<()>,
     transport: MemoryTransport,
+    current_session: SessionId,
+    pub(in crate::terminal::view) grok_observations: async_channel::Receiver<GrokObservation>,
 }
 
 impl Fixture {
@@ -292,18 +334,29 @@ impl Fixture {
     }
 
     pub(in crate::terminal::view) async fn with_owned(app: &mut App, owned: bool) -> Self {
+        Self::with_capabilities(app, owned, false).await
+    }
+
+    pub(in crate::terminal::view) async fn with_grok_owned(app: &mut App) -> Self {
+        Self::with_capabilities(app, true, true).await
+    }
+
+    async fn with_capabilities(app: &mut App, owned: bool, grok: bool) -> Self {
         initialize_app_for_terminal_view(app);
         app.add_singleton_model(|_| crate::workspace::ToastStack);
         let (done_sender, done) = async_channel::unbounded();
         let (request_sender, requests) = async_channel::unbounded();
         let (notification_sender, notifications) = async_channel::unbounded();
         let (disconnect_sender, disconnects) = async_channel::unbounded();
+        let (grok_sender, grok_observations) = async_channel::unbounded();
         let transport = MemoryTransport {
             done: done_sender,
             requests: request_sender,
             notifications: notification_sender,
             disconnects: disconnect_sender,
             owned,
+            grok,
+            grok_observations: grok_sender,
         };
         let (sender, receiver) = oneshot::channel();
         let mut sender = Some(sender);
@@ -359,6 +412,18 @@ impl Fixture {
             bounded(notifications.recv()).await.unwrap(),
             notification::Message::SessionBootstrapped(_)
         ));
+        terminal.update(app, |view, ctx| {
+            let block_index = view.model.lock().block_list().active_block_index();
+            view.handle_terminal_event(
+                &ModelEvent::BlockMetadataReceived(BlockMetadataReceivedEvent {
+                    block_metadata: BlockMetadata::new(Some(session_id()), None),
+                    block_index,
+                    is_after_in_band_command: false,
+                    is_done_bootstrapping: true,
+                }),
+                ctx,
+            );
+        });
         Self {
             terminal,
             client,
@@ -367,6 +432,8 @@ impl Fixture {
             disconnects,
             done,
             transport,
+            current_session: session_id(),
+            grok_observations,
         }
     }
 
@@ -384,10 +451,102 @@ impl Fixture {
     }
 
     pub(in crate::terminal::view) fn osc(&self, app: &mut App, attempt: Uuid, nonce: Uuid) {
+        let session = self.current_session.as_u64();
         self.terminal.update(app, |view, _| {
             let mut model = view.model.lock();
-            let body = format!("\x1b]9278;t;1;7501;{attempt};{nonce}\x07");
+            let body = format!("\x1b]9278;t;1;{session};{attempt};{nonce}\x07");
             Processor::new().parse_bytes(&mut *model, body.as_bytes(), &mut std::io::sink());
+        });
+    }
+
+    /// 真实 EOF 后建立另一个 SSH session；模型块由调用方先完成并等待收尾。
+    pub(in crate::terminal::view) async fn reconnect_as(
+        &mut self,
+        app: &mut App,
+        new_session: SessionId,
+    ) {
+        let old_session = self.current_session;
+        let (sender, receiver) = oneshot::channel();
+        let mut sender = Some(sender);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&RemoteServerManager::handle(ctx), move |_, event, _| {
+                if matches!(event, RemoteServerManagerEvent::SessionDisconnected { session_id, .. } if *session_id == old_session)
+                    && let Some(sender) = sender.take()
+                { let _ = sender.send(()); }
+            });
+        });
+        bounded(self.disconnects.recv()).await.unwrap().abort();
+        bounded(receiver).await.unwrap();
+        bounded(self.done.recv()).await.unwrap();
+        let (sender, receiver) = oneshot::channel();
+        let mut sender = Some(sender);
+        app.update(|ctx| {
+            ctx.subscribe_to_model(&RemoteServerManager::handle(ctx), move |_, event, _| {
+                if matches!(event, RemoteServerManagerEvent::SessionConnected { session_id, .. } if *session_id == new_session)
+                    && let Some(sender) = sender.take()
+                { let _ = sender.send(()); }
+            });
+        });
+        RemoteServerManager::handle(app).update(app, |manager, ctx| {
+            manager.deregister_session(old_session, ctx);
+            manager.connect_session(
+                new_session,
+                self.transport.clone(),
+                Arc::new(RemoteServerAuthContext::new(
+                    || Box::pin(async { None }),
+                    || "terminal-binding-fixture".into(),
+                )),
+                None,
+                ctx,
+            );
+        });
+        bounded(receiver).await.unwrap();
+        self.current_session = new_session;
+        self.client = RemoteServerManager::handle(app).read(app, |manager, _| {
+            manager.client_for_session(new_session).unwrap().clone()
+        });
+        self.terminal.update(app, |view, ctx| {
+            let mut info = SessionInfo::new_for_test()
+                .with_session_type(BootstrapSessionType::WarpifiedRemote)
+                .with_shell_type(ShellType::Zsh);
+            info.session_id = new_session;
+            view.sessions
+                .update(ctx, |sessions, _| sessions.register_session_for_test(info));
+            let mut model = view.model.lock();
+            model.simulate_long_running_block("tmux", "");
+            model
+                .block_list_mut()
+                .active_block_mut()
+                .set_session_id(new_session);
+            model.register_session_id(new_session);
+        });
+        RemoteServerManager::handle(app).update(app, |manager, _| {
+            manager.notify_session_bootstrapped_with_terminal_candidate(
+                new_session,
+                "zsh",
+                Some("/bin/zsh"),
+                Some(1235),
+                Some("/dev/pts/8"),
+            );
+        });
+        loop {
+            if matches!(bounded(self.notifications.recv()).await.unwrap(),
+                notification::Message::SessionBootstrapped(message) if message.session_id == new_session.as_u64())
+            {
+                break;
+            }
+        }
+        self.terminal.update(app, |view, ctx| {
+            let block_index = view.model.lock().block_list().active_block_index();
+            view.handle_terminal_event(
+                &ModelEvent::BlockMetadataReceived(BlockMetadataReceivedEvent {
+                    block_metadata: BlockMetadata::new(Some(new_session), None),
+                    block_index,
+                    is_after_in_band_command: false,
+                    is_done_bootstrapping: true,
+                }),
+                ctx,
+            );
         });
     }
 
@@ -416,7 +575,7 @@ impl Fixture {
             let (client, scope, actual_attempt, id) =
                 view.current_remote_terminal_binding(ctx).unwrap();
             assert!(Arc::ptr_eq(&client, &self.client));
-            assert_eq!(scope.terminal_session_id, 7501);
+            assert_eq!(scope.terminal_session_id, self.current_session.as_u64());
             assert_eq!(actual_attempt, attempt);
             assert_eq!(id, "10000000-0000-4000-8000-000000000002");
         });
@@ -426,7 +585,7 @@ impl Fixture {
         self.terminal
             .update(app, |view, _| view.cancel_remote_terminal_binding());
         RemoteServerManager::handle(app).update(app, |manager, ctx| {
-            manager.deregister_session(session_id(), ctx)
+            manager.deregister_session(self.current_session, ctx)
         });
         bounded(self.done.recv()).await.unwrap();
     }

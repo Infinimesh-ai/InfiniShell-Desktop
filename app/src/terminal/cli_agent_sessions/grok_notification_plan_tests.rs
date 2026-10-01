@@ -130,3 +130,16 @@ fn frozen_plugin_cannot_be_created_twice_for_one_ticket() {
     assert!(NotificationPlan::create(&plan.cwd, plan.session_id, &plan.cwd, &plan.worker).is_err());
     plan.verify_current().unwrap();
 }
+
+#[test]
+fn resident_descriptor_matches_frozen_bytes_and_rejects_replaced_resource() {
+    let (_directory, plan) = fixture();
+    let expected: serde_json::Value =
+        serde_json::from_slice(&fs::read(plan.descriptor_path()).unwrap()).unwrap();
+    assert_eq!(plan.descriptor().unwrap(), expected);
+    let path = plan.root.join("plugin/hooks/notify.cjs");
+    let replacement = plan.cwd.join("replacement-for-identity.cjs");
+    write_new(&replacement, NOTIFY).unwrap();
+    fs::rename(&replacement, path).unwrap();
+    assert!(plan.descriptor().is_err());
+}

@@ -452,7 +452,7 @@ impl Fixture {
                     message_id: self.message,
                     subject_sha256: "subject".into(),
                     state: state.into(),
-                    native_prompt_id: Some(Uuid::new_v4()),
+                    native_prompt_id: (state != "rejected_before_enqueue").then(Uuid::new_v4),
                     native_ack_sha256: Some("a".repeat(64)),
                 },
                 ctx,
@@ -509,6 +509,28 @@ fn finished_grok_receipt_clears_draft_after_real_auto_hide_and_restore() {
         });
         fixture.acknowledge(&mut app);
         fixture.assert_draft(&app, "", 0);
+        fixture.close(&mut app).await;
+    });
+}
+
+#[test]
+fn native_pre_enqueue_rejection_preserves_grok_draft_and_releases_only_current_lease() {
+    App::test((), |mut app| async move {
+        let fixture = Fixture::new(&mut app).await;
+        fixture.acknowledge_state(&mut app, "rejected_before_enqueue");
+        fixture.assert_draft(&app, "原图片草稿", 1);
+        fixture.terminal.read(&app, |view, ctx| {
+            assert!(!view.grok_remote_owned.as_ref().unwrap().sending);
+            let sessions = CLIAgentSessionsModel::as_ref(ctx);
+            assert!(
+                !sessions.is_input_submission_current(view.view_id, fixture.binding.generation)
+            );
+            assert!(
+                sessions
+                    .remote_image_consumption_revision(view.view_id, fixture.binding.attempt)
+                    .is_none()
+            );
+        });
         fixture.close(&mut app).await;
     });
 }

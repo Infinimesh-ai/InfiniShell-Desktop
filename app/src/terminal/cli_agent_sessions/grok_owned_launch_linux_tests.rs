@@ -186,3 +186,27 @@ fn private_receipt_still_rejects_readable_mode() {
     assert!(read_private(&path).is_err());
     assert_eq!(fs::read(&path).unwrap(), b"{}");
 }
+
+#[test]
+fn legacy_manifest_cannot_produce_a_remote_owned_identity_target() {
+    let state = tempfile::Builder::new()
+        .permissions(fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (directory, _socket, manifest) = durable_manifest(&root);
+    let mut launch = GrokOwnedLaunch {
+        directory: directory.path().canonicalize().unwrap(),
+        manifest,
+        manifest_sha256: "a".repeat(64),
+        reservation: None,
+        phase: LaunchPhase::Dispatched,
+        processes: None,
+    };
+    assert!(matches!(
+        launch.readonly_target(Uuid::new_v4()),
+        Err(GrokLeaderInputError::InvalidTarget)
+    ));
+    assert!(launch.processes.is_none());
+    assert!(!directory.path().join("bound.json").exists());
+}

@@ -7883,32 +7883,90 @@ index 7c3d22881ad4741ad387853d5dacd10e5ac1b8d2..5e57ce92d682275b51a7097b414cb1f3
  [[test]]
  name = "test_startup_prefetch_fallback"
  required-features = ["test-support"]
+diff --git a/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs b/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
+index dc0ceefe97afa923ab05d662159047653c0e5d94..c37093d54bff484a9e60dc0281af6230ae00fc64 100644
+--- a/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
++++ b/crates/codegen/xai-grok-shell/src/agent/handlers/session.rs
+@@ -56,6 +56,8 @@ async fn handle_roster_list(
+ #[serde(rename_all = "camelCase")]
+ struct SessionInfoRequest {
+     session_id: Option<String>,
++    #[serde(default)]
++    infinishell_owned_identity: bool,
+ }
+ 
+ #[derive(Deserialize)]
+@@ -70,6 +72,24 @@ async fn handle_session_info(
+     let req: SessionInfoRequest = serde_json::from_str(args.params.get())
+         .map_err(|e| acp::Error::invalid_params().data(format!("invalid params: {e}")))?;
+ 
++    if req.infinishell_owned_identity {
++        // 不采用普通展示接口的首个会话回退，也不在 actor 消失后返回默认展示字段。
++        let session_id = req.session_id.ok_or_else(acp::Error::invalid_params)?;
++        let id = uuid::Uuid::parse_str(&session_id).map_err(|_| acp::Error::invalid_params())?;
++        if id.is_nil() || id.to_string() != session_id {
++            return Err(acp::Error::invalid_params());
++        }
++        let sid = acp::SessionId::new(session_id);
++        let session = agent.resident_handle(&sid).ok_or_else(acp::Error::invalid_params)?;
++        let (tx, rx) = tokio::sync::oneshot::channel();
++        session.cmd_tx.send(SessionCommand::GetOwnedIdentity { responds_to: tx })
++            .map_err(|_| acp::Error::invalid_params())?;
++        let identity = rx.await.map_err(|_| acp::Error::invalid_params())??;
++        return ExtMethodResult::success(identity)
++            .to_ext_response()
++            .map_err(|_| acp::Error::internal_error());
++    }
++
+     let session_id = req.session_id.or_else(|| {
+         agent
+             .resident_ids()
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-index 094085e49711c48227827fa1d4dd44447f301d58..4d6af8752964e4d959c9d683b5603bf37f93940e 100644
+index 094085e49711c48227827fa1d4dd44447f301d58..142122b053e48943aee6a47336ea17eefa83a5a2 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-@@ -573,6 +573,7 @@ impl acp::Agent for MvpAgent {
+@@ -573,6 +573,9 @@ impl acp::Agent for MvpAgent {
                      // `session/new` / `session/load` accept per-session plugin roots in `_meta.pluginDirs`
                      // The SDKs gate `GrokOptions.plugins` on this
                      (SESSION_PLUGIN_DIRS_CAPABILITY_KEY): true,
 +                    (crate::session::notification_plugin::META_KEY): 1,
++                    "infinishell/ownedSessionIdentity": 1,
++                    "infinishell/ownedInputPrecondition": 1,
                      "currentWorkingDirectory": current_working_directory.to_string_lossy().to_string(),
                      "agentVersion": xai_grok_version::VERSION,
                      "agentId": agent_id(),
-@@ -999,6 +1000,7 @@ impl acp::Agent for MvpAgent {
+@@ -999,6 +1002,8 @@ impl acp::Agent for MvpAgent {
          mut arguments: acp::PromptRequest,
      ) -> Result<acp::PromptResponse, acp::Error> {
          use crate::session::plan_mode::PromptMode;
++        let owned_condition = crate::extensions::owned_identity::input_precondition(&arguments)?;
 +        let terminal_bridge = crate::extensions::terminal_bridge::requires_idle(&arguments)?;
          if let Some(meta) = arguments.meta.as_ref() {
              xai_grok_otel::link_current_span_to_meta(
                  &serde_json::Value::Object(meta.clone()),
-@@ -1355,7 +1357,38 @@ impl acp::Agent for MvpAgent {
+@@ -1355,7 +1360,55 @@ impl acp::Agent for MvpAgent {
              .as_ref()
              .map(|ctx| ctx.artifact_upload_context());
          let traceparent = xai_grok_otel::current_traceparent();
 -        let dispatch_result: Result<(), acp::Error> = if send_now {
-+        let dispatch_result: Result<(), acp::Error> = if terminal_bridge {
++        let dispatch_result: Result<(), acp::Error> = if let Some(condition) = owned_condition {
++            let (admitted, admission_rx) = oneshot::channel();
++            handle.cmd_tx.send(SessionCommand::OwnedPrompt {
++                prompt_id: prompt_id.clone(),
++                content: crate::session::message_delivery::HumanPromptContent {
++                    prompt_blocks, prompt_mode, artifact_upload_ctx,
++                    client_identifier: prompt_client_identifier,
++                    screen_mode: prompt_screen_mode, verbatim, traceparent, json_schema,
++                    tool_overrides_update, respond_to: tx, parsed_prompt_tx,
++                },
++                condition,
++                admitted,
++            }).map_err(|_| acp::Error::internal_error())?;
++            if !admission_rx.await.unwrap_or(false) {
++                return Err(rx.await.ok().and_then(Result::err).unwrap_or_else(acp::Error::internal_error));
++            }
++            Ok(())
++        } else if terminal_bridge {
 +            let (admitted, admission_rx) = oneshot::channel();
 +            handle
 +                .cmd_tx
@@ -7943,7 +8001,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..4d6af8752964e4d959c9d683b5603bf3
              handle
                  .cmd_tx
                  .send(SessionCommand::Prompt {
-@@ -1969,6 +2002,42 @@ impl acp::Agent for MvpAgent {
+@@ -1969,6 +2022,42 @@ impl acp::Agent for MvpAgent {
          let mut backend_no_bridge_err: Option<acp::Error> = None;
          let method = args.method.clone();
          let result = match method.as_ref() {
@@ -7998,6 +8056,107 @@ index f3a0e56386cc814e2d130e4c56d2aa6305648260..1b170dbb4f56316ed79a7f0a37c77825
                  source: source.to_string(),
              });
          self.notify_session_cwd_for_watch(std::path::Path::new(&session_info.cwd));
+diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_identity_tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_identity_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..a4fd006e4fd4a63adefef9c4defae46e7bf03ee7
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/owned_identity_tests.rs
+@@ -0,0 +1,95 @@
++use super::*;
++use crate::session::{OwnedSessionIdentity, OwnedSessionInfo};
++use acp::Agent as _;
++
++async fn query(agent: &MvpAgent, params: serde_json::Value) -> acp::Result<acp::ExtResponse> {
++    agent
++        .ext_method(acp::ExtRequest::new(
++            "x.ai/session/info",
++            std::sync::Arc::from(serde_json::value::to_raw_value(&params).unwrap()),
++        ))
++        .await
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_requires_an_explicit_resident_session() {
++    let agent = build_minimal_agent_for_tests();
++    let sid = uuid::Uuid::new_v4().to_string();
++    assert!(
++        query(&agent, serde_json::json!({"infinishellOwnedIdentity":true}))
++            .await
++            .is_err()
++    );
++    assert!(
++        query(
++            &agent,
++            serde_json::json!({"sessionId":sid,"infinishellOwnedIdentity":true})
++        )
++        .await
++        .is_err()
++    );
++    assert!(agent.resident_ids().is_empty());
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_closed_actor_cannot_return_display_defaults() {
++    let agent = build_minimal_agent_for_tests();
++    let sid = acp::SessionId::new(uuid::Uuid::new_v4().to_string());
++    let (handle, _tx, rx) = make_live_session_handle(&sid, None);
++    agent.insert_resident(&sid, handle);
++    drop(rx);
++    assert!(
++        query(
++            &agent,
++            serde_json::json!({"sessionId":sid,"infinishellOwnedIdentity":true})
++        )
++        .await
++        .is_err()
++    );
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_uses_actor_reply_without_load_or_session_start() {
++    let agent = build_minimal_agent_for_tests();
++    let sid = acp::SessionId::new(uuid::Uuid::new_v4().to_string());
++    let (mut handle, _tx, mut rx) = make_live_session_handle(&sid, None);
++    let cwd = std::env::temp_dir();
++    handle.info.cwd = cwd.to_string_lossy().into_owned();
++    agent.insert_resident(&sid, handle);
++    let binding = crate::session::notification_plugin::NotificationPlugin {
++        version: 1,
++        session_id: sid.to_string(),
++        cwd: cwd.clone(),
++        plugin_dir: cwd.join("synthetic-plugin"),
++        files: Default::default(),
++    };
++    let identity = OwnedSessionInfo {
++        session_id: sid.to_string(),
++        cwd: cwd.to_string_lossy().into_owned(),
++        infinishell_owned_identity: OwnedSessionIdentity {
++            protocol_version: 1,
++            permission_mode: "auto".into(),
++            notification_binding: binding,
++        },
++    };
++    let expected = serde_json::to_value(&identity).unwrap();
++    let answer = async {
++        let Some(TestSessionCommand::GetOwnedIdentity { responds_to }) = rx.recv().await else {
++            panic!("只读查询不能入队 load、prompt 或通知命令");
++        };
++        responds_to.send(Ok(identity)).unwrap();
++    };
++    let (response, ()) = futures::join!(
++        query(
++            &agent,
++            serde_json::json!({"sessionId":sid,"infinishellOwnedIdentity":true})
++        ),
++        answer
++    );
++    assert_eq!(
++        serde_json::to_value(response.unwrap()).unwrap()["result"],
++        expected
++    );
++    assert!(rx.try_recv().is_err());
++    assert_eq!(agent.resident_ids(), vec![sid]);
++}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs
 index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed84545eac16d 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/session_setup.rs
@@ -8085,7 +8244,7 @@ index a5cc07f98d3653bd87e28bacbd6bc66a635cb52f..6e9e5330e07d6b86b2123e2f5b9ed845
      async fn restore_session_code(
          &self,
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
-index 31676cc8adb8fefe81a76ba015de81de5685d244..81f92ec0bb4b722c1e74aa61de098ad0494da2e2 100644
+index 31676cc8adb8fefe81a76ba015de81de5685d244..0ecbf7f713603ef6feb56cd49afdfa053c8e3583 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/tests.rs
 @@ -1189,7 +1189,7 @@ fn make_test_handle(
@@ -8127,11 +8286,26 @@ index 31676cc8adb8fefe81a76ba015de81de5685d244..81f92ec0bb4b722c1e74aa61de098ad0
          )),
          force_compact: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
          permission_handle: xai_grok_workspace::permission::PermissionHandle::allow_all(),
+@@ -8885,3 +8885,6 @@ fn user_message_echo_session_meta_outranks_the_client_that_started_the_process()
+     assert!(!wanted(Some(acp::Meta::new()), says_nothing()));
+     assert!(!wanted(None, says_nothing()));
+ }
++
++#[path = "owned_identity_tests.rs"]
++mod owned_identity_tests;
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/mod.rs b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
-index 063a4934d6979db4c93e5c1a7ff45df060c7c121..8cb19411ab4c4e6ac8347dcee897e4257c36f614 100644
+index 063a4934d6979db4c93e5c1a7ff45df060c7c121..30b72bd3d90de306abcb8e736405c4cb1ebc1555 100644
 --- a/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 +++ b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
-@@ -45,6 +45,7 @@ pub mod subagent_message;
+@@ -23,6 +23,7 @@ pub mod marketplace;
+ pub mod mcp;
+ pub mod memory;
+ pub mod notification;
++pub(crate) mod owned_identity;
+ pub mod plugins;
+ pub mod pr;
+ pub mod privacy;
+@@ -45,6 +46,7 @@ pub mod subagent_message;
  pub mod suggest;
  pub mod task;
  pub mod terminal;
@@ -8139,6 +8313,160 @@ index 063a4934d6979db4c93e5c1a7ff45df060c7c121..8cb19411ab4c4e6ac8347dcee897e425
  pub mod usage;
  pub mod worktree;
  pub(crate) mod worktree_seed;
+diff --git a/crates/codegen/xai-grok-shell/src/extensions/owned_identity.rs b/crates/codegen/xai-grok-shell/src/extensions/owned_identity.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..99a3008d865e8ac710df7f8430fb81fc9beba920
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/extensions/owned_identity.rs
+@@ -0,0 +1,66 @@
++//! Owned 输入约束只缩紧一次接收条件，不改变普通输入和权限选择。
++
++use crate::session::OwnedInputPrecondition;
++use agent_client_protocol as acp;
++
++pub(crate) const INPUT_KEY: &str = "infinishellOwnedInput";
++
++pub(crate) fn input_precondition(
++    request: &acp::PromptRequest,
++) -> acp::Result<Option<OwnedInputPrecondition>> {
++    let Some(meta) = &request.meta else {
++        return Ok(None);
++    };
++    let Some(value) = meta.get(INPUT_KEY) else {
++        return Ok(None);
++    };
++    let condition: OwnedInputPrecondition =
++        serde_json::from_value(value.clone()).map_err(|_| acp::Error::invalid_params())?;
++    let id =
++        uuid::Uuid::parse_str(&condition.request_id).map_err(|_| acp::Error::invalid_params())?;
++    if id.is_nil() || id.to_string() != condition.request_id {
++        return Err(acp::Error::invalid_params());
++    }
++    if condition.protocol_version != 1
++        || !condition.require_default_permissions
++        || condition.notification_binding.session_id != request.session_id.0.as_ref()
++        || meta.get("verbatim").and_then(|value| value.as_bool()) != Some(true)
++        || meta.keys().any(|key| {
++            !matches!(
++                key.as_str(),
++                INPUT_KEY
++                    | "verbatim"
++                    | "clientIdentifier"
++                    | "screenMode"
++                    | "traceparent"
++                    | "tracestate"
++            )
++        })
++        || request.prompt.is_empty()
++        || request.prompt.iter().any(|block| match block {
++            acp::ContentBlock::Text(text) => text.meta.is_some(),
++            acp::ContentBlock::Image(image) => {
++                image.meta.is_some() || image.mime_type != "image/png"
++            }
++            _ => true,
++        })
++    {
++        return Err(rejected(
++            request.session_id.0.as_ref(),
++            &condition.request_id,
++            "invalid_precondition",
++        ));
++    }
++    Ok(Some(condition))
++}
++
++pub(crate) fn rejected(session_id: &str, request_id: &str, reason: &str) -> acp::Error {
++    acp::Error::new(-32073, "owned input precondition rejected").data(serde_json::json!({
++        "code":"infinishell_owned_input_rejected", "protocolVersion":1,
++        "sessionId":session_id, "requestId":request_id, "queued":false, "reason":reason,
++    }))
++}
++
++#[cfg(test)]
++#[path = "owned_identity_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-shell/src/extensions/owned_identity_tests.rs b/crates/codegen/xai-grok-shell/src/extensions/owned_identity_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4eccc1aeefc10012ab12c8d956307e4a82fcd7b2
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/extensions/owned_identity_tests.rs
+@@ -0,0 +1,76 @@
++use super::*;
++use serde_json::json;
++
++fn request() -> acp::PromptRequest {
++    acp::PromptRequest::new(
++        acp::SessionId::new("00000000-0000-4000-8000-000000000001"),
++        vec![
++            acp::ContentBlock::Text(acp::TextContent::new("第一行\nsecond line")),
++            acp::ContentBlock::Image(acp::ImageContent::new("AA==", "image/png")),
++        ],
++    )
++    .meta(Some(
++        json!({
++            "verbatim":true,
++            "infinishellOwnedInput": {
++                "protocolVersion":1,"requireDefaultPermissions":true,
++                "requestId":"00000000-0000-4000-8000-000000000002",
++                "notificationBinding": {
++                    "version":1,"session_id":"00000000-0000-4000-8000-000000000001",
++                    "cwd":"/synthetic/project","plugin_dir":"/synthetic/plugin","files":{}
++                }
++            }
++        })
++        .as_object()
++        .unwrap()
++        .clone(),
++    ))
++}
++
++#[test]
++fn owned_identity_input_preserves_typed_png_and_text() {
++    let request = request();
++    let before = serde_json::to_value(&request.prompt).unwrap();
++    let condition = input_precondition(&request).unwrap().unwrap();
++    assert_eq!(condition.request_id, "00000000-0000-4000-8000-000000000002");
++    assert_eq!(serde_json::to_value(&request.prompt).unwrap(), before);
++}
++
++#[test]
++fn owned_identity_input_cannot_override_permissions_or_queue_semantics() {
++    let mut request = request();
++    request
++        .meta
++        .as_mut()
++        .unwrap()
++        .insert("mode".into(), json!("plan"));
++    let error = input_precondition(&request).unwrap_err();
++    assert_eq!(serde_json::to_value(error.code).unwrap(), -32073);
++    assert_eq!(
++        error.data.unwrap(),
++        json!({
++            "code":"infinishell_owned_input_rejected", "protocolVersion":1,
++            "sessionId":"00000000-0000-4000-8000-000000000001",
++            "requestId":"00000000-0000-4000-8000-000000000002", "queued":false,
++            "reason":"invalid_precondition"
++        })
++    );
++}
++
++#[test]
++fn owned_identity_input_rejects_foreign_descriptor_and_nondefault_requirement() {
++    let mut request = request();
++    request.meta.as_mut().unwrap().get_mut(INPUT_KEY).unwrap()["notificationBinding"]["session_id"] =
++        json!("foreign");
++    assert!(input_precondition(&request).is_err());
++    let mut request = self::request();
++    request.meta.as_mut().unwrap().get_mut(INPUT_KEY).unwrap()["requireDefaultPermissions"] =
++        json!(false);
++    assert!(input_precondition(&request).is_err());
++}
++
++#[test]
++fn ordinary_prompt_has_no_owned_precondition() {
++    let request = acp::PromptRequest::new(acp::SessionId::new("ordinary"), vec![]);
++    assert!(input_precondition(&request).unwrap().is_none());
++}
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da54284d902a5a
@@ -9175,7 +9503,7 @@ index 56ce8c0172a5f0d057f1535232c6a3160fe1e7c7..a3760f7fdc18bba0c37c37d0ada3730c
              // \\.\pipe\grok-leader- (20 chars) + 16 hex chars = 36 total
              assert!(name.len() <= 256, "pipe name too long: {}", name.len());
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session.rs b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
-index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d8bbf010b 100644
+index 973157c16df3f591192f8ffbd2e339216573fbad..0319859dd2c6ae9fb12b3ee0d9c9b345ec547c17 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 @@ -141,6 +141,8 @@ use queue_mutation::{InputOrigin, QueueMutationPolicy};
@@ -9187,7 +9515,16 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d
  #[cfg(test)]
  use tool_calls::BridgeToolSuccess;
  #[path = "acp_session_impl/mcp.rs"]
-@@ -380,6 +382,8 @@ pub(crate) struct State {
+@@ -249,6 +251,8 @@ mod recap;
+ mod rewind;
+ #[path = "acp_session_impl/session_setup.rs"]
+ mod session_setup;
++#[path = "acp_session_impl/owned_identity.rs"]
++mod owned_identity;
+ #[path = "acp_session_impl/side_call.rs"]
+ mod side_call;
+ #[path = "acp_session_impl/status_line.rs"]
+@@ -380,6 +384,8 @@ pub(crate) struct State {
      finalization_gate: FinalizationGate,
      pub(crate) message_delivery: parent_message::MessageDeliveryState,
      pub(crate) pending_inputs: VecDeque<InputItem>,
@@ -9196,7 +9533,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d
      pub(crate) pending_notifications: Vec<PendingNotification>,
      /// Prompt ids under composer edit, stamped (and re-stamped) by `hold_edit`.
      /// Held followers are skipped by combine; a live held front blocks promote.
-@@ -1743,6 +1747,9 @@ mod prompt_mode_transition_tests;
+@@ -1743,6 +1749,9 @@ mod prompt_mode_transition_tests;
  #[cfg(test)]
  #[path = "acp_session_tests/prompt_queue_actor_tests.rs"]
  mod prompt_queue_actor_tests;
@@ -9206,6 +9543,22 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..7dec463c8967fab095f86c7ed4110a3d
  /// Regression coverage for the per-turn `record_token_usage` path.
  #[cfg(test)]
  #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
+@@ -1868,6 +1877,7 @@ mod tool_meta_stamp_tests {
+                     cmd_tx: perm_tx,
+                     yolo_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                     auto_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
++                    mode_guard: Arc::new(parking_lot::Mutex::new(())),
+                     side_query_wired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                     yolo_pin: None,
+                     deny_read_globs: Arc::new(vec![]),
+@@ -2281,3 +2291,7 @@ mod recap_display_only_tests;
+ #[cfg(test)]
+ #[path = "acp_session_tests/reminder_policy_tests.rs"]
+ mod reminder_policy_tests;
++
++#[cfg(all(test, unix))]
++#[path = "acp_session_tests/owned_identity_tests.rs"]
++mod owned_identity_tests;
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs
 index 55150bdb00654f2e04b722d86c371ae0a1ef4f96..0a7a9f0c677bb2c03b98d2c1831fffa9575c1a72 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/hook_dispatch.rs
@@ -9218,8 +9571,227 @@ index 55150bdb00654f2e04b722d86c371ae0a1ef4f96..0a7a9f0c677bb2c03b98d2c1831fffa9
              session_id: &self.session_info.id.0,
              workspace_root: &self.hook_resolved_workspace_root,
              process_scope: self.tool_context.process_scope.clone(),
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/owned_identity.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/owned_identity.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee7eb0d0dd524c7b5f28a6cf4d9701590e8ab235
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/owned_identity.rs
+@@ -0,0 +1,63 @@
++//! 仅当前驻留 actor 可以返回 owned 身份；本查询没有启动、投递或通知副作用。
++
++use super::*;
++use std::path::Path;
++
++pub(super) struct OwnedInputGuard<'a> {
++    _route: crate::session::notification_route::OwnedBindingGuard,
++    _permissions: parking_lot::MutexGuard<'a, ()>,
++    _plan: parking_lot::MutexGuard<'a, crate::session::plan_mode::PlanModeTracker>,
++}
++
++impl SessionActor {
++    pub(super) fn owned_input_guard(
++        &self,
++        condition: &OwnedInputPrecondition,
++    ) -> acp::Result<OwnedInputGuard<'_>> {
++        let reject = || {
++            crate::extensions::owned_identity::rejected(
++                self.session_info.id.0.as_ref(),
++                &condition.request_id,
++                "precondition_changed",
++            )
++        };
++        // 固定顺序：queue state（调用方已持有）→ plan → permission mode → route。
++        // 持锁直到同步队列修改结束；所有通知与异步工作必须在释放后执行。
++        let plan = self.plan_mode.lock();
++        if plan.is_active()
++            || condition.protocol_version != 1
++            || !condition.require_default_permissions
++        {
++            return Err(reject());
++        }
++        let permissions = self.permissions.default_mode_guard().ok_or_else(reject)?;
++        let route = crate::session::notification_route::owned_binding_guard(
++            self.session_info.id.0.as_ref(),
++            Path::new(&self.session_info.cwd),
++            &condition.notification_binding,
++        )
++        .map_err(|_| reject())?;
++        Ok(OwnedInputGuard {
++            _route: route,
++            _permissions: permissions,
++            _plan: plan,
++        })
++    }
++
++    pub(super) fn owned_identity(&self) -> acp::Result<OwnedSessionInfo> {
++        let binding = crate::session::notification_route::owned_binding(
++            self.session_info.id.0.as_ref(),
++            Path::new(&self.session_info.cwd),
++        )
++        .map_err(|_| acp::Error::invalid_params().data("owned notification binding unavailable"))?;
++        Ok(OwnedSessionInfo {
++            session_id: self.session_info.id.to_string(),
++            cwd: self.session_info.cwd.clone(),
++            infinishell_owned_identity: OwnedSessionIdentity {
++                protocol_version: 1,
++                permission_mode: self.permission_mode_label().to_owned(),
++                notification_binding: binding,
++            },
++        })
++    }
++}
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/prompt_queue.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/prompt_queue.rs
+index 2033b2b8bf4762201b6a6586065ffe2823bf159f..d0f6bfa4d744aee420124fa7d6785da567ad8e45 100644
+--- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/prompt_queue.rs
++++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/prompt_queue.rs
+@@ -111,6 +111,14 @@ impl SessionActor {
+     /// Returns `true` when the caller must cancel the running turn.
+     #[must_use = "true means the caller must cancel the running turn"]
+     pub(super) async fn queue_input(&self, request: QueueInputRequest) -> bool {
++        self.queue_input_inner(request, None).await.unwrap_or(false)
++    }
++
++    pub(super) async fn queue_owned_input(&self, request: QueueInputRequest, condition: &OwnedInputPrecondition) -> Option<bool> {
++        self.queue_input_inner(request, Some(condition)).await
++    }
++
++    async fn queue_input_inner(&self, request: QueueInputRequest, owned: Option<&OwnedInputPrecondition>) -> Option<bool> {
+         let QueueInputRequest {
+             prompt_blocks,
+             prompt_id,
+@@ -159,12 +167,12 @@ impl SessionActor {
+         let policy = input_origin.policy();
+ 
+         // Bump before any await so a LocalSet recap cannot commit/emit after this Prompt was accepted but before handle_prompt runs
+-        if policy.authority.is_human_intent() {
++        if owned.is_none() && policy.authority.is_human_intent() {
+             self.invalidate_side_calls_for_new_prompt();
+         }
+ 
+         // Prompt history is human-authored history, not a generic conversational log.
+-        if policy.analytics.is_human_prompt()
++        if owned.is_none() && policy.analytics.is_human_prompt()
+             && !raw_prompt_text.is_empty()
+             && !self.startup_hints.is_subagent
+         {
+@@ -175,7 +183,7 @@ impl SessionActor {
+             let entry = crate::session::prompt_history::PromptEntry {
+                 timestamp: chrono::Utc::now(),
+                 session_id,
+-                prompt: raw_prompt_text,
++                prompt: raw_prompt_text.clone(),
+                 is_bash,
+             };
+             crate::session::prompt_history::append_prompt_async(cwd, entry).await;
+@@ -224,6 +232,28 @@ impl SessionActor {
+         let follow_up_steer = crate::util::config::follow_up_steer_enabled().await;
+ 
+         let mut state = self.state.lock().await;
++        let owned_guard = if let Some(condition) = owned {
++            match self.owned_input_guard(condition) {
++                Ok(guard) => Some(guard),
++                Err(error) => {
++                    let _ = respond_to.send(Err(error));
++                    return None;
++                }
++            }
++        } else { None };
++        if owned.is_some() {
++            self.invalidate_side_calls_for_new_prompt();
++            if let Some(gate) = &self.tool_context.task_wake_suppressed { gate.set(false); }
++            state.notifications_suppressed = false;
++            state.take_hook_block_hold();
++            self.user_input_generation.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
++        }
++        let owned_history = (owned.is_some() && policy.analytics.is_human_prompt()
++            && !raw_prompt_text.is_empty() && !self.startup_hints.is_subagent)
++            .then(|| crate::session::prompt_history::PromptEntry {
++                timestamp: chrono::Utc::now(), session_id: self.session_info.id.to_string(),
++                prompt: raw_prompt_text, is_bash: Self::extract_bash_command(&prompt_blocks).is_some(),
++            });
+ 
+         // User prompts have priority over queued synthetic auto-wake prompts
+         // The guarded sweep exempts the running turn's own slot (see `State::sweep_pending_inputs`)
+@@ -330,19 +360,28 @@ impl SessionActor {
+             && turn_running
+             && goal_active
+             && Self::extract_bash_command(&item.prompt_blocks).is_none();
++        let mut deferred_interjection = None;
+         if merge_into_goal {
+             self.enqueue_prompt_as_planner_steering(&item);
+-            self.enqueue_prompt_as_interjection(
+-                item,
+-                crate::session::events::InterjectionSource::Direct,
+-            );
++            if owned.is_some() {
++                deferred_interjection = Some(self.queue_prompt_as_interjection(item));
++            } else {
++                self.enqueue_prompt_as_interjection(item, crate::session::events::InterjectionSource::Direct);
++            }
+         } else if send_now {
+             item.send_now = true;
+             let insert_at = Self::send_now_insert_index(&state, running_front_id.as_deref());
+             state.pending_inputs.insert(insert_at, item);
++        } else if owned.is_some() {
++            state.pending_inputs.push_back(item);
+         } else {
+             self.commit_queued_delivery(&mut state, PreparedDelivery(item));
+         }
++        // 输入已实际接收，先释放模式与路由锁，再广播和写入历史。
++        drop(owned_guard);
++        if let Some(interjection) = deferred_interjection {
++            self.notify_queued_interjection(interjection, crate::session::events::InterjectionSource::Direct);
++        }
+         // qtrace: server appended a prompt to the authoritative FIFO (the leader-mode source of truth that clients must mirror)
+         // The index it lands at and whether a turn is already running tell us if it will run next or queue behind others
+         tracing::debug!(
+@@ -373,10 +412,14 @@ impl SessionActor {
+                 })),
+             );
+         }
+-        if merge_into_goal || send_now {
++        if owned.is_some() || merge_into_goal || send_now {
+             self.broadcast_queue_changed(&state);
+         }
+-        cancel_running_turn
++        drop(state);
++        if let Some(entry) = owned_history {
++            crate::session::prompt_history::append_prompt_async(self.session_info.cwd.clone(), entry).await;
++        }
++        Some(cancel_running_turn)
+     }
+ 
+     /// Prefers a block's `displayText` meta (the compact user-facing form, e.g. `/loop 5s echo "x"`) over the raw wire text.
+@@ -627,6 +670,11 @@ impl SessionActor {
+         item: InputItem,
+         source: crate::session::events::InterjectionSource,
+     ) {
++        let queued = self.queue_prompt_as_interjection(item);
++        self.notify_queued_interjection(queued, source);
++    }
++
++    fn queue_prompt_as_interjection(&self, item: InputItem) -> (String, String, u32, oneshot::Sender<PromptTurnResult>) {
+         let InputItem {
+             prompt_id,
+             prompt_blocks,
+@@ -653,6 +701,15 @@ impl SessionActor {
+             text: text.clone(),
+             attachments,
+         });
++        (prompt_id, text, image_count, respond_to)
++    }
++
++    fn notify_queued_interjection(
++        &self,
++        queued: (String, String, u32, oneshot::Sender<PromptTurnResult>),
++        source: crate::session::events::InterjectionSource,
++    ) {
++        let (prompt_id, text, image_count, respond_to) = queued;
+         self.broadcast_interjection(&text, Some(&prompt_id));
+         self.events
+             .emit(crate::session::events::Event::Interjected {
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
-index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe7f89bd5c 100644
+index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..2efa0393aa48fe717efaaed2258a667ce44e9279 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 @@ -46,33 +46,43 @@ const DEFERRED_START_CANCEL_JOIN: std::time::Duration = std::time::Duration::fro
@@ -9275,7 +9847,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe
  /// SessionEnd hooks and stop dispatch.
  /// Shared so the channel-closed and Shutdown paths cannot drift on hook ordering (memory save still runs after this).
  pub(super) async fn fire_session_end_hooks(
-@@ -722,6 +732,18 @@ pub(super) async fn run_session(
+@@ -722,6 +732,47 @@ pub(super) async fn run_session(
                          SessionCommand::SetToolOverrides { overrides } => {
                              session.set_tool_overrides(overrides);
                          }
@@ -9286,6 +9858,35 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe
 +                                SessionActor::maybe_start_running_task(session.clone(), completion_tx.clone()).await;
 +                            }
 +                        }
++                        SessionCommand::OwnedPrompt { prompt_id, content, condition, admitted } => {
++                            session.ensure_prefix_ready().await;
++                            let crate::session::message_delivery::HumanPromptContent {
++                                prompt_blocks, prompt_mode, artifact_upload_ctx, client_identifier,
++                                screen_mode, verbatim, traceparent, json_schema,
++                                tool_overrides_update, respond_to, parsed_prompt_tx,
++                            } = content;
++                            let (trace_gcs_config, artifact_tracker) = match artifact_upload_ctx {
++                                Some(context) => (Some(context.gcs_config), Some(context.artifact_tracker)),
++                                None => (None, None),
++                            };
++                            let input_origin = InputOrigin::from_prompt_id(&prompt_id);
++                            let outcome = session.queue_owned_input(QueueInputRequest {
++                                prompt_blocks, prompt_id, input_origin, prompt_mode,
++                                trace_gcs_config, artifact_tracker, client_identifier, screen_mode,
++                                verbatim, json_schema, send_now: false, task_wake_fallback: None,
++                                tool_overrides_update, respond_to, persist_ack: None, parsed_prompt_tx,
++                                initial_child_prompt_ready: None, traceparent,
++                            }, &condition).await;
++                            let _ = admitted.send(outcome.is_some());
++                            if let Some(cancel_for_send_now) = outcome {
++                                let settled = if cancel_for_send_now {
++                                    session.cancel_turn_for_send_now(&mut replay_buffer).await.settled
++                                } else { true };
++                                if settled {
++                                    SessionActor::maybe_start_running_task(session.clone(), completion_tx.clone()).await;
++                                }
++                            }
++                        }
 +                        SessionCommand::TerminalBridgeReceipt { prompt_id, respond_to } => {
 +                            let state = session.state.lock().await;
 +                            let committed = state.terminal_bridge_messages.get(&prompt_id) == Some(&true);
@@ -9294,7 +9895,17 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe
                          SessionCommand::Prompt { prompt_id, prompt_blocks, prompt_mode, artifact_upload_ctx, client_identifier, screen_mode, verbatim, traceparent, json_schema, send_now, admission, tool_overrides_update, respond_to, prompt_admitted, persist_ack, parsed_prompt_tx } => {
                              let origin = super::PromptOrigin::from_prompt_id(&prompt_id);
                              let (actor_admitted, task_wake_fallback) = match admission {
-@@ -1915,7 +1937,7 @@ pub(super) async fn run_session(
+@@ -907,6 +958,9 @@ pub(super) async fn run_session(
+                             let info = session.build_session_info().await;
+                             let _ = responds_to.send(info);
+                         }
++                        SessionCommand::GetOwnedIdentity { responds_to } => {
++                            let _ = responds_to.send(session.owned_identity());
++                        }
+                         SessionCommand::BackgroundForegroundCommand { tool_call_id, respond_to } => {
+                             let result = session.agent.borrow().tool_bridge()
+                                 .background_foreground_command(&tool_call_id)
+@@ -1915,7 +1969,7 @@ pub(super) async fn run_session(
                                  s.reload_skills_from_disk().await;
                              });
                          }
@@ -9303,7 +9914,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe
                              // Observe hooks cannot gate; don't hold session/new on the command loop.
                              if !deferred_start.cancel.is_cancelled() {
                                  let s = session.clone();
-@@ -1926,19 +1948,27 @@ pub(super) async fn run_session(
+@@ -1926,19 +1980,27 @@ pub(super) async fn run_session(
                                              if cancel.is_cancelled() {
                                                  return;
                                              }
@@ -9340,7 +9951,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..a293ac902c4b623cf4beb30581675afe
                                              let ctx = s.hook_run_ctx();
                                              let results =
                                                  xai_grok_hooks::dispatcher::dispatch_non_blocking(
-@@ -1965,7 +1995,7 @@ pub(super) async fn run_session(
+@@ -1965,7 +2027,7 @@ pub(super) async fn run_session(
                                      })
                                      .await;
                                  });
@@ -9797,6 +10408,209 @@ index 9cd511afd5085d8c0eaa65edd72fc52c7e2b1ba3..494c6bef01e5ca0e163ef169607390b4
          pending_inputs: VecDeque::new(),
          edit_holds: HashMap::new(),
          pending_notifications: Vec::new(),
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..597090f121e5a11f4f7087234241d16fdc0f78b5
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/owned_identity_tests.rs
+@@ -0,0 +1,197 @@
++use super::support::*;
++use super::*;
++use crate::session::notification_route::owned_identity_fixture::Fixture;
++use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
++
++async fn actor(fixture: &Fixture) -> SessionActor {
++    let mut actor = plain_actor().await;
++    actor.session_info.id = acp::SessionId::new(fixture.binding().session_id.clone());
++    actor.session_info.cwd = fixture.binding().cwd.to_string_lossy().into_owned();
++    actor.startup_hints.is_subagent = true;
++    let (cmd_tx, _rx) = mpsc::unbounded_channel();
++    actor.permissions = xai_grok_workspace::permission::PermissionHandle::Actor {
++        cmd_tx,
++        yolo_state: Arc::new(AtomicBool::new(false)),
++        auto_state: Arc::new(AtomicBool::new(false)),
++        mode_guard: Arc::new(parking_lot::Mutex::new(())),
++        side_query_wired: Arc::new(AtomicBool::new(false)),
++        yolo_pin: None,
++        deny_read_globs: Arc::new(vec![]),
++        in_flight: Arc::new(AtomicUsize::new(0)),
++        user_prompt_notify: Arc::new(parking_lot::Mutex::new(None)),
++    };
++    actor
++}
++
++fn condition(fixture: &Fixture) -> OwnedInputPrecondition {
++    OwnedInputPrecondition {
++        protocol_version: 1,
++        require_default_permissions: true,
++        request_id: uuid::Uuid::new_v4().to_string(),
++        notification_binding: fixture.binding().clone(),
++    }
++}
++
++fn input() -> (QueueInputRequest, oneshot::Receiver<PromptTurnResult>) {
++    let (tx, rx) = oneshot::channel();
++    let mut request = QueueInputRequest::from_legacy_prompt_id(
++        vec![
++            acp::ContentBlock::Text(acp::TextContent::new("中文\nEnglish")),
++            acp::ContentBlock::Image(acp::ImageContent::new("AA==", "image/png")),
++        ],
++        "owned-image".into(),
++        PromptMode::Agent,
++        tx,
++    );
++    request.verbatim = true;
++    (request, rx)
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_reads_current_actor_and_preserves_pending_permission() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let actor = actor(&fixture).await;
++            actor.pending_interactions.lock().unwrap().insert(
++                "approval".into(),
++                crate::session::pending_interaction::PendingKind::Permission,
++            );
++            let before = actor.user_input_generation.load(Ordering::Acquire);
++            let identity = actor.owned_identity().unwrap();
++            assert_eq!(identity.session_id, fixture.binding().session_id);
++            assert_eq!(
++                identity.infinishell_owned_identity.permission_mode,
++                "default"
++            );
++            assert_eq!(
++                identity.infinishell_owned_identity.notification_binding,
++                *fixture.binding()
++            );
++            assert!(actor.state.lock().await.pending_inputs.is_empty());
++            assert_eq!(actor.user_input_generation.load(Ordering::Acquire), before);
++            assert_eq!(actor.pending_interactions.lock().unwrap().len(), 1);
++            actor.permissions.set_auto_mode(true);
++            assert_eq!(
++                actor
++                    .owned_identity()
++                    .unwrap()
++                    .infinishell_owned_identity
++                    .permission_mode,
++                "auto"
++            );
++            actor.permissions.set_yolo_mode(true);
++            assert_eq!(
++                actor
++                    .owned_identity()
++                    .unwrap()
++                    .infinishell_owned_identity
++                    .permission_mode,
++                "bypassPermissions"
++            );
++            actor.plan_mode.lock().enter_pending();
++            actor.plan_mode.lock().activate();
++            assert_eq!(
++                actor
++                    .owned_identity()
++                    .unwrap()
++                    .infinishell_owned_identity
++                    .permission_mode,
++                "plan"
++            );
++            fixture.close().await;
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_mode_changed_after_query_rejects_before_queue() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let actor = actor(&fixture).await;
++            assert_eq!(
++                actor
++                    .owned_identity()
++                    .unwrap()
++                    .infinishell_owned_identity
++                    .permission_mode,
++                "default"
++            );
++            actor.permissions.set_auto_mode(true);
++            let before = actor.user_input_generation.load(Ordering::Acquire);
++            let condition = condition(&fixture);
++            let (request, response) = input();
++            assert_eq!(actor.queue_owned_input(request, &condition).await, None);
++            let error = response.await.unwrap().unwrap_err();
++            assert_eq!(serde_json::to_value(error.code).unwrap(), -32073);
++            assert_eq!(
++                error.data.unwrap(),
++                serde_json::json!({
++                    "code":"infinishell_owned_input_rejected","protocolVersion":1,
++                    "sessionId":fixture.binding().session_id,"requestId":condition.request_id,
++                    "queued":false,"reason":"precondition_changed"
++                })
++            );
++            assert!(actor.state.lock().await.pending_inputs.is_empty());
++            assert_eq!(actor.user_input_generation.load(Ordering::Acquire), before);
++            fixture.close().await;
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_busy_default_preserves_typed_prompt_queue() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let actor = actor(&fixture).await;
++            {
++                let mut state = actor.state.lock().await;
++                state
++                    .pending_inputs
++                    .push_back(user_item("ordinary", "client"));
++                state.running_task = Some(running_task_stub("ordinary"));
++            }
++            let (request, _response) = input();
++            let expected = serde_json::to_value(&request.prompt_blocks).unwrap();
++            assert_eq!(
++                actor.queue_owned_input(request, &condition(&fixture)).await,
++                Some(false)
++            );
++            {
++                let state = actor.state.lock().await;
++                assert_eq!(state.pending_inputs.len(), 2);
++                assert_eq!(state.pending_inputs.front().unwrap().prompt_id, "ordinary");
++                let item = state.pending_inputs.back().unwrap();
++                assert_eq!(item.prompt_id, "owned-image");
++                assert_eq!(serde_json::to_value(&item.prompt_blocks).unwrap(), expected);
++                assert!(item.verbatim);
++                assert!(!item.send_now);
++            }
++            fixture.close().await;
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn owned_identity_changed_descriptor_rejects_without_input_side_effects() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let fixture = Fixture::new().await;
++            let actor = actor(&fixture).await;
++            let mut condition = condition(&fixture);
++            condition
++                .notification_binding
++                .files
++                .insert("hooks/notify.cjs".into(), "0".repeat(64));
++            let (request, response) = input();
++            let before = actor.user_input_generation.load(Ordering::Acquire);
++            assert_eq!(actor.queue_owned_input(request, &condition).await, None);
++            assert!(response.await.unwrap().is_err());
++            assert!(actor.state.lock().await.pending_inputs.is_empty());
++            assert_eq!(actor.user_input_generation.load(Ordering::Acquire), before);
++            fixture.close().await;
++        })
++        .await;
++}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
 index 78e5d0eb80c820a86562faa8933b02ed60c2c273..fe59c27c861cf70fc12a7e564d3fcbbb343899de 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/replay_buffer_send_update_tests.rs
@@ -10108,11 +10922,49 @@ index 6fb3b2e637eb896862a56a2c8759fe53034d363c..7d45653c8e2194aa97573f79587b168a
                  source: "new".into(),
              })
              .unwrap();
+diff --git a/crates/codegen/xai-grok-shell/src/session/acp_types.rs b/crates/codegen/xai-grok-shell/src/session/acp_types.rs
+index 6b4ef6323d69233f7def8a844bcea95b6acc4eed..839186a6da8cc332f10b7a77ae030c438aeae26a 100644
+--- a/crates/codegen/xai-grok-shell/src/session/acp_types.rs
++++ b/crates/codegen/xai-grok-shell/src/session/acp_types.rs
+@@ -572,6 +572,33 @@ pub struct SessionInfoResponse {
+     pub data: SessionInfoData,
+ }
+ 
++/// 每次 owned prompt 的显式约束；不能用于改变当前权限或活动通知绑定。
++#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct OwnedInputPrecondition {
++    pub protocol_version: u32,
++    pub require_default_permissions: bool,
++    pub request_id: String,
++    pub notification_binding: super::notification_plugin::NotificationPlugin,
++}
++
++/// 原生当前会话的只读身份快照；不声明编辑器空闲，也不授予一次输入许可。
++#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct OwnedSessionIdentity {
++    pub protocol_version: u32,
++    pub permission_mode: String,
++    pub notification_binding: super::notification_plugin::NotificationPlugin,
++}
++
++#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
++#[serde(rename_all = "camelCase", deny_unknown_fields)]
++pub struct OwnedSessionInfo {
++    pub session_id: String,
++    pub cwd: String,
++    pub infinishell_owned_identity: OwnedSessionIdentity,
++}
++
+ // ── Feedback context ────────────────────────────────────────────────────
+ 
+ /// Context gathered from a session to enrich feedback notifications.
 diff --git a/crates/codegen/xai-grok-shell/src/session/commands.rs b/crates/codegen/xai-grok-shell/src/session/commands.rs
-index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..21ff4d739570a93d54e71927a9c4002c99ce3bb4 100644
+index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..f741dd59695402bd65d8321464d276955afbd6d6 100644
 --- a/crates/codegen/xai-grok-shell/src/session/commands.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/commands.rs
-@@ -362,6 +362,18 @@ pub enum SessionCommand {
+@@ -362,6 +362,26 @@ pub enum SessionCommand {
      SetToolOverrides {
          overrides: xai_grok_sampling_types::ToolOverrides,
      },
@@ -10123,6 +10975,14 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..21ff4d739570a93d54e71927a9c4002c
 +        content: crate::session::message_delivery::HumanPromptContent,
 +        admitted: oneshot::Sender<bool>,
 +    },
++    /// 保留普通 typed prompt 排队语义，在真实接收点核对 owned 权限前置。
++    OwnedPrompt {
++        prompt_id: String,
++        #[allow(private_interfaces)]
++        content: crate::session::message_delivery::HumanPromptContent,
++        condition: OwnedInputPrecondition,
++        admitted: oneshot::Sender<bool>,
++    },
 +    /// 只在用户消息和持久化屏障均完成后返回肯定回执。
 +    TerminalBridgeReceipt {
 +        prompt_id: String,
@@ -10131,7 +10991,18 @@ index 49dd0f3e9a1618a6ae1caafe01b5b3e40de29ccf..21ff4d739570a93d54e71927a9c4002c
      Prompt {
          prompt_id: String,
          prompt_blocks: Vec<acp::ContentBlock>,
-@@ -843,6 +855,7 @@ pub enum SessionCommand {
+@@ -455,6 +475,10 @@ pub enum SessionCommand {
+     GetSessionInfo {
+         responds_to: oneshot::Sender<SessionInfoData>,
+     },
++    /// 指定驻留 actor 的当前身份；不恢复会话、重放通知或变更权限。
++    GetOwnedIdentity {
++        responds_to: oneshot::Sender<acp::Result<OwnedSessionInfo>>,
++    },
+     CompactSession {
+         user_context: Option<String>,
+         respond_to: oneshot::Sender<acp::Result<()>>,
+@@ -843,6 +867,7 @@ pub enum SessionCommand {
      ReloadSkills,
      /// Dispatch session_start hook using the actor's loaded HookRegistry.
      DispatchSessionStartHook {
@@ -10218,7 +11089,7 @@ index 8400649d81c8b1633c0e4b436edeea31a32d3263..f11bf8bf68bc2572bd80d97cb1b969cb
 +mod notification_plugin_windows;
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_plugin.rs b/crates/codegen/xai-grok-shell/src/session/notification_plugin.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..a77a5a06f71b5e2e1fa632872e7bc2b32e8724b1
+index 0000000000000000000000000000000000000000..0aca181c0ed67bc2ef0bb42ff4c67b1574cc90f6
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_plugin.rs
 @@ -0,0 +1,412 @@
@@ -10633,23 +11504,23 @@ index 0000000000000000000000000000000000000000..a77a5a06f71b5e2e1fa632872e7bc2b3
 +
 +#[cfg(test)]
 +#[path = "notification_plugin_tests.rs"]
-+mod tests;
++pub(crate) mod tests;
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_plugin_tests.rs b/crates/codegen/xai-grok-shell/src/session/notification_plugin_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e3009d27b3c225a607adaf62659885fb24706d27
+index 0000000000000000000000000000000000000000..7d2b617b77229067a88072713528d3924819c53b
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_plugin_tests.rs
 @@ -0,0 +1,344 @@
 +use super::*;
 +
-+struct Fixture {
++pub(crate) struct Fixture {
 +    _temp: tempfile::TempDir,
-+    root: PathBuf,
-+    binding: NotificationPlugin,
++    pub(crate) root: PathBuf,
++    pub(crate) binding: NotificationPlugin,
 +}
 +
 +impl Fixture {
-+    fn new() -> Self {
++    pub(crate) fn new() -> Self {
 +        let temp = tempfile::tempdir().unwrap();
 +        let root = dunce::canonicalize(temp.path()).unwrap();
 +        let plugin_dir = root.join("notification-plugin");
@@ -11332,10 +12203,10 @@ index 0000000000000000000000000000000000000000..8154b62ac316bfa50ded4747d4dda717
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_route.rs b/crates/codegen/xai-grok-shell/src/session/notification_route.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..f224d3528df962556b59834f6da5e497c1769e1b
+index 0000000000000000000000000000000000000000..4db86ed32e632216c634ebae064a0dce794aaf60
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_route.rs
-@@ -0,0 +1,581 @@
+@@ -0,0 +1,631 @@
 +//! 通知路由由 leader 的连接身份建立；不持久化，也不信任客户端指定的任意终端。
 +
 +use std::collections::HashMap;
@@ -11791,6 +12662,52 @@ index 0000000000000000000000000000000000000000..f224d3528df962556b59834f6da5e497
 +    routes.retain(|_, state| state.active.is_some() || state.pending.is_some());
 +}
 +
++/// 返回真实活动路由冻结的描述符；请求者不能用查询参数替换绑定或领取通知路由。
++pub(crate) fn owned_binding(session_id: &str, cwd: &Path) -> Result<NotificationPlugin> {
++    let routes = routes().lock().map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    let state = routes.get(session_id).context("notification route unavailable")?;
++    owned_binding_from_state(state, session_id, cwd, |route| {
++        route.binding.validate_target(session_id, cwd)?;
++        route.peer.verify(&route.candidate)
++    })
++}
++
++pub(crate) struct OwnedBindingGuard {
++    _routes: std::sync::MutexGuard<'static, HashMap<String, SessionRoute>>,
++}
++
++/// 接收 owned 输入时持续持有活动路由代际，检查与队列写入之间不可替换或撤销。
++pub(crate) fn owned_binding_guard(
++    session_id: &str,
++    cwd: &Path,
++    expected: &NotificationPlugin,
++) -> Result<OwnedBindingGuard> {
++    let routes = routes().lock().map_err(|_| anyhow::anyhow!("notification route unavailable"))?;
++    let state = routes.get(session_id).context("notification route unavailable")?;
++    let binding = owned_binding_from_state(state, session_id, cwd, |route| {
++        route.binding.validate_target(session_id, cwd)?;
++        route.peer.verify(&route.candidate)
++    })?;
++    ensure!(binding == *expected, "notification descriptor changed");
++    Ok(OwnedBindingGuard { _routes: routes })
++}
++
++fn owned_binding_from_state(
++    state: &SessionRoute,
++    session_id: &str,
++    cwd: &Path,
++    verify: impl FnOnce(&Route) -> Result<()>,
++) -> Result<NotificationPlugin> {
++    let route = state.active.as_ref().context("notification route is not active")?;
++    ensure!(
++        route.binding.session_id == session_id && route.binding.cwd == cwd,
++        "notification identity target mismatch"
++    );
++    ensure!(!route.process_scope.is_closed(), "notification route is closed");
++    verify(route)?;
++    Ok(route.binding.clone())
++}
++
 +pub(crate) fn provider(session_id: &str) -> Arc<dyn SessionNotificationRoute> {
 +    Arc::new(SessionProvider(session_id.to_string()))
 +}
@@ -11917,12 +12834,16 @@ index 0000000000000000000000000000000000000000..f224d3528df962556b59834f6da5e497
 +#[cfg(test)]
 +#[path = "notification_route_tests.rs"]
 +mod tests;
++
++#[cfg(all(test, unix))]
++#[path = "owned_identity_fixture.rs"]
++pub(crate) mod owned_identity_fixture;
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs b/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..cf585e87c37f362e15a8ab16121fe0372d937dac
+index 0000000000000000000000000000000000000000..517ff6b85e8973038c07d0adcf38557f8e3915cd
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/notification_route_tests.rs
-@@ -0,0 +1,424 @@
+@@ -0,0 +1,459 @@
 +use super::*;
 +use crate::session::SessionCommand;
 +
@@ -12347,6 +13268,41 @@ index 0000000000000000000000000000000000000000..cf585e87c37f362e15a8ab16121fe037
 +    assert!(active_scope.is_closed());
 +    assert!(!pending_scope.is_closed());
 +}
++
++#[test]
++fn owned_identity_reads_active_descriptor_without_replacing_pending_route() {
++    let active = route(1, "active");
++    let expected = active.binding.clone();
++    let mut pending = route(2, "pending");
++    pending.binding = expected.clone();
++    let state = SessionRoute { active: Some(active), pending: Some(pending) };
++    assert_eq!(owned_binding_from_state(&state, &expected.session_id, &expected.cwd, |_| Ok(())).unwrap(), expected);
++    assert_eq!(state.active.as_ref().unwrap().generation, "active");
++    assert_eq!(state.pending.as_ref().unwrap().generation, "pending");
++    assert!(!state.active.as_ref().unwrap().process_scope.is_closed());
++    assert!(!state.pending.as_ref().unwrap().process_scope.is_closed());
++}
++
++#[test]
++fn owned_identity_rejects_pending_only_and_foreign_targets() {
++    let pending = route(1, "pending");
++    let expected = pending.binding.clone();
++    let state = SessionRoute { active: None, pending: Some(pending) };
++    assert!(owned_binding_from_state(&state, &expected.session_id, &expected.cwd, |_| panic!("待生效路由不能授权")).is_err());
++    let state = SessionRoute { active: Some(route(1, "active")), pending: None };
++    assert!(owned_binding_from_state(&state, &expected.session_id, &expected.cwd, |_| panic!("其他 SID 不能授权")).is_err());
++    let expected = &state.active.as_ref().unwrap().binding;
++    assert!(owned_binding_from_state(&state, &expected.session_id, Path::new("/other"), |_| panic!("其他 cwd 不能授权")).is_err());
++}
++
++#[test]
++fn owned_identity_rejects_invalid_peer_without_revoking_active_route() {
++    let state = SessionRoute { active: Some(route(1, "active")), pending: None };
++    let binding = &state.active.as_ref().unwrap().binding;
++    assert!(owned_binding_from_state(&state, &binding.session_id, &binding.cwd, |_| bail!("peer exited")).is_err());
++    assert!(!state.active.as_ref().unwrap().process_scope.is_closed());
++    assert_eq!(state.active.as_ref().unwrap().generation, "active");
++}
 diff --git a/crates/codegen/xai-grok-shell/src/session/notification_route_windows.rs b/crates/codegen/xai-grok-shell/src/session/notification_route_windows.rs
 new file mode 100644
 index 0000000000000000000000000000000000000000..ca6e2dcc789dfa221bb37ebcab0549f1e3ac31a2
@@ -12496,6 +13452,140 @@ index 0000000000000000000000000000000000000000..6cccdfa12f083995e3ff7d7bdfb0c2b6
 +    drop(server);
 +    peer.verify().unwrap();
 +    cloned.console_peer().verify().unwrap();
++}
+diff --git a/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs b/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..fd3c5e556f2817767a2d92a4777f62327837e699
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/session/owned_identity_fixture.rs
+@@ -0,0 +1,128 @@
++//! 只在自有 PTY 上构造真实通知 peer；不替换产品的身份校验。
++
++use super::*;
++use std::fs::File;
++use std::os::fd::{FromRawFd, RawFd};
++use std::process::Stdio;
++use tokio::process::{Child, Command};
++
++pub(crate) struct Fixture {
++    plugin: super::super::notification_plugin::tests::Fixture,
++    master: Option<File>,
++    child: Child,
++}
++
++impl Fixture {
++    pub(crate) async fn new() -> Self {
++        let plugin = super::super::notification_plugin::tests::Fixture::new();
++        plugin.binding.validate().unwrap();
++        let mut master: RawFd = -1;
++        let mut slave: RawFd = -1;
++        assert_eq!(
++            unsafe {
++                libc::openpty(
++                    &mut master,
++                    &mut slave,
++                    std::ptr::null_mut(),
++                    std::ptr::null_mut(),
++                    std::ptr::null_mut(),
++                )
++            },
++            0
++        );
++        assert_eq!(
++            unsafe { libc::fcntl(master, libc::F_SETFD, libc::FD_CLOEXEC) },
++            0
++        );
++        assert_eq!(
++            unsafe { libc::fcntl(slave, libc::F_SETFD, libc::FD_CLOEXEC) },
++            0
++        );
++        let master = unsafe { File::from_raw_fd(master) };
++        let slave = unsafe { File::from_raw_fd(slave) };
++        let mut path = vec![0_u8; 1024];
++        use std::os::fd::AsRawFd;
++        assert_eq!(
++            unsafe { libc::ttyname_r(slave.as_raw_fd(), path.as_mut_ptr().cast(), path.len()) },
++            0
++        );
++        let end = path.iter().position(|value| *value == 0).unwrap();
++        let tty =
++            dunce::canonicalize(Path::new(std::str::from_utf8(&path[..end]).unwrap())).unwrap();
++        let mut command = Command::new("/bin/sh");
++        command
++            .args(["-c", "read -r line"])
++            .current_dir(&plugin.root)
++            .stdin(Stdio::from(slave))
++            .stdout(Stdio::null())
++            .stderr(Stdio::null())
++            .kill_on_drop(true);
++        unsafe {
++            command.pre_exec(|| {
++                if libc::setsid() == -1 || libc::ioctl(libc::STDIN_FILENO, libc::TIOCSCTTY as _, 0) == -1
++                {
++                    return Err(std::io::Error::last_os_error());
++                }
++                Ok(())
++            });
++        }
++        let child = command.spawn().unwrap();
++        let pid = i32::try_from(child.id().unwrap()).unwrap();
++        let peer = PeerIdentity::capture(pid, unsafe { libc::geteuid() }).unwrap();
++        let candidate = RouteCandidate {
++            tty,
++            tmux: None,
++            tmux_pane: None,
++        };
++        peer.verify(&candidate).unwrap();
++        let route = Route {
++            process_scope: xai_grok_tools::util::ProcessScope::new(),
++            client: u64::from(pid as u32),
++            generation: uuid::Uuid::new_v4().to_string(),
++            peer,
++            candidate,
++            binding: plugin.binding.clone(),
++            request: serde_json::json!("fixture"),
++        };
++        assert!(
++            routes()
++                .lock()
++                .unwrap()
++                .insert(
++                    plugin.binding.session_id.clone(),
++                    SessionRoute {
++                        active: Some(route),
++                        pending: None,
++                    }
++                )
++                .is_none()
++        );
++        Self {
++            plugin,
++            master: Some(master),
++            child,
++        }
++    }
++
++    pub(crate) fn binding(&self) -> &NotificationPlugin {
++        &self.plugin.binding
++    }
++
++    pub(crate) async fn close(mut self) {
++        self.master.take();
++        let result = tokio::time::timeout(Duration::from_secs(2), self.child.wait()).await;
++        assert!(result.is_ok(), "自有 PTY 关闭后子进程必须退出");
++        assert!(result.unwrap().is_ok());
++    }
++}
++
++impl Drop for Fixture {
++    fn drop(&mut self) {
++        routes()
++            .lock()
++            .unwrap()
++            .remove(&self.plugin.binding.session_id);
++        self.master.take();
++        // Tokio 的 kill_on_drop 只兜底此夹具拥有的 Child；正常路径已通过 close 等待退出。
++    }
 +}
 diff --git a/crates/codegen/xai-grok-shell/tests/session_create_plugin_hooks.rs b/crates/codegen/xai-grok-shell/tests/session_create_plugin_hooks.rs
 new file mode 100644
@@ -13297,3 +14387,182 @@ index d78baa06c11a48083c390aa578f7094d3da0d2a3..564d0cb3ec3fe9de7c25018d99ee14b2
  };
  
  /// The release pipeline always injects `GROK_VERSION`; without it the build is from source.
+diff --git a/crates/codegen/xai-grok-workspace/src/permission/manager/mod.rs b/crates/codegen/xai-grok-workspace/src/permission/manager/mod.rs
+index a74d98c585f8e74d4eed89a33676df7d01a88ca9..12f4086fd7b763f43936c86f7b9650060fc698b0 100644
+--- a/crates/codegen/xai-grok-workspace/src/permission/manager/mod.rs
++++ b/crates/codegen/xai-grok-workspace/src/permission/manager/mod.rs
+@@ -70,6 +70,8 @@ pub enum PermissionHandle {
+         yolo_state: Arc<AtomicBool>,
+         /// Auto mode (LLM classifier), mutually exclusive with yolo at runtime.
+         auto_state: Arc<AtomicBool>,
++        /// 同步模式更新与 owned 输入接收；不覆盖工具审批过程。
++        mode_guard: Arc<Mutex<()>>,
+         /// True when the installed auto classifier has a live `ClassifyTextFn` (session sampling side-query).
+         /// False for heuristic-only fallbacks.
+         side_query_wired: Arc<AtomicBool>,
+@@ -98,9 +100,11 @@ impl PermissionHandle {
+             yolo_state,
+             auto_state,
+             yolo_pin,
++            mode_guard,
+             ..
+         } = self
+         {
++            let _mode = mode_guard.lock();
+             // Clamp the Arc synchronously so `is_yolo_mode()` is correct immediately (no optimistic-true window)
+             // The raw request is still forwarded so the actor logs the refusal once and re-clamps
+             let clamped = clamp_yolo(enabled, *yolo_pin);
+@@ -121,9 +125,11 @@ impl PermissionHandle {
+             cmd_tx,
+             yolo_state,
+             auto_state,
++            mode_guard,
+             ..
+         } = self
+         {
++            let _mode = mode_guard.lock();
+             auto_state.store(enabled, Ordering::Relaxed);
+             if enabled {
+                 yolo_state.store(false, Ordering::Relaxed);
+@@ -230,6 +236,18 @@ impl PermissionHandle {
+         }
+     }
+ 
++    /// 持有该 guard 时保持 default；调用者只能在无 await 的接收临界区使用。
++    pub fn default_mode_guard(&self) -> Option<parking_lot::MutexGuard<'_, ()>> {
++        match self {
++            Self::AllowAll => None,
++            Self::Actor { mode_guard, yolo_state, auto_state, .. } => {
++                let guard = mode_guard.lock();
++                (!yolo_state.load(Ordering::Relaxed) && !auto_state.load(Ordering::Relaxed))
++                    .then_some(guard)
++            }
++        }
++    }
++
+     pub fn is_yolo_mode(&self) -> bool {
+         match self {
+             PermissionHandle::AllowAll => true,
+@@ -472,6 +490,8 @@ pub fn spawn_permission_manager_with_pin(
+     }
+     let auto_state = Arc::new(AtomicBool::new(seed_auto));
+     let auto_state_actor = auto_state.clone();
++    let mode_guard = Arc::new(Mutex::new(()));
++    let mode_guard_actor = mode_guard.clone();
+     let side_query_wired = Arc::new(AtomicBool::new(false));
+     let in_flight = Arc::new(AtomicUsize::new(0));
+     let in_flight_actor = in_flight.clone();
+@@ -523,6 +543,7 @@ pub fn spawn_permission_manager_with_pin(
+         while let Some(cmd) = rx.recv().await {
+             match cmd {
+                 PermissionCommand::SetYoloMode(enabled) => {
++                    let _mode = mode_guard_actor.lock();
+                     let clamped = clamp_yolo(enabled, yolo_pin);
+                     if enabled && !clamped && !pin_refusal_logged {
+                         tracing::warn!("always-approve enable refused: disabled by managed policy");
+@@ -537,6 +558,7 @@ pub fn spawn_permission_manager_with_pin(
+                     }
+                 }
+                 PermissionCommand::SetAutoMode(enabled) => {
++                    let _mode = mode_guard_actor.lock();
+                     tracing::info!("auto permission mode set to: {}", enabled);
+                     auto_mode = enabled;
+                     auto_state_actor.store(enabled, Ordering::Relaxed);
+@@ -1497,6 +1519,7 @@ pub fn spawn_permission_manager_with_pin(
+             cmd_tx: tx,
+             yolo_state,
+             auto_state,
++            mode_guard,
+             side_query_wired,
+             yolo_pin,
+             deny_read_globs: Arc::new(deny_read_globs),
+@@ -2612,6 +2635,7 @@ mod tests {
+             cmd_tx,
+             yolo_state: Arc::new(AtomicBool::new(false)),
+             auto_state: Arc::new(AtomicBool::new(false)),
++            mode_guard: Arc::new(Mutex::new(())),
+             side_query_wired: Arc::new(AtomicBool::new(false)),
+             yolo_pin: None,
+             deny_read_globs: Arc::new(vec![]),
+@@ -7779,3 +7803,7 @@ mod tests {
+             .await;
+     }
+ }
++
++#[cfg(test)]
++#[path = "owned_input_tests.rs"]
++mod owned_input_tests;
+diff --git a/crates/codegen/xai-grok-workspace/src/permission/manager/owned_input_tests.rs b/crates/codegen/xai-grok-workspace/src/permission/manager/owned_input_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..f4941b780582a94f3125620b94b03a3c4239234c
+--- /dev/null
++++ b/crates/codegen/xai-grok-workspace/src/permission/manager/owned_input_tests.rs
+@@ -0,0 +1,68 @@
++use super::*;
++use std::time::Duration;
++
++fn handle() -> PermissionHandle {
++    let (cmd_tx, _rx) = mpsc::unbounded_channel();
++    PermissionHandle::Actor {
++        cmd_tx,
++        yolo_state: Arc::new(AtomicBool::new(false)),
++        auto_state: Arc::new(AtomicBool::new(false)),
++        mode_guard: Arc::new(Mutex::new(())),
++        side_query_wired: Arc::new(AtomicBool::new(false)),
++        yolo_pin: None,
++        deny_read_globs: Arc::new(vec![]),
++        in_flight: Arc::new(AtomicUsize::new(0)),
++        user_prompt_notify: Arc::new(Mutex::new(None)),
++    }
++}
++
++#[test]
++fn owned_input_default_guard_rejects_auto_yolo_and_allow_all() {
++    let handle = handle();
++    assert!(handle.default_mode_guard().is_some());
++    handle.set_auto_mode(true);
++    assert!(handle.default_mode_guard().is_none());
++    handle.set_yolo_mode(true);
++    assert!(handle.default_mode_guard().is_none());
++    handle.set_yolo_mode(false);
++    assert!(handle.default_mode_guard().is_some());
++    assert!(PermissionHandle::AllowAll.default_mode_guard().is_none());
++}
++
++fn concurrent_setter_waits(enable_auto: bool) {
++    let handle = handle();
++    let guard = handle.default_mode_guard().unwrap();
++    let other = handle.clone();
++    let (started_tx, started_rx) = std::sync::mpsc::channel();
++    let (done_tx, done_rx) = std::sync::mpsc::channel();
++    let thread = std::thread::spawn(move || {
++        started_tx.send(()).unwrap();
++        if enable_auto {
++            other.set_auto_mode(true);
++        } else {
++            other.set_yolo_mode(true);
++        }
++        done_tx.send(()).unwrap();
++    });
++    started_rx.recv_timeout(Duration::from_secs(2)).unwrap();
++    assert!(matches!(
++        done_rx.recv_timeout(Duration::from_millis(25)),
++        Err(std::sync::mpsc::RecvTimeoutError::Timeout)
++    ));
++    assert!(!handle.is_yolo_mode());
++    assert!(!handle.is_auto_mode());
++    drop(guard);
++    done_rx.recv_timeout(Duration::from_secs(2)).unwrap();
++    thread.join().unwrap();
++    assert!(handle.default_mode_guard().is_none());
++}
++
++#[test]
++fn owned_input_default_guard_excludes_concurrent_yolo_setter() {
++    concurrent_setter_waits(false);
++}
++
++#[test]
++fn owned_input_default_guard_excludes_concurrent_auto_setter() {
++    concurrent_setter_waits(true);
++}

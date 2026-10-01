@@ -12,7 +12,11 @@ use uuid::Uuid;
 use warp_core::SessionId;
 use warpui::EntityId;
 
+use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent_sessions::GrokPermissionObservation;
+use crate::terminal::cli_agent_sessions::event::{
+    CLIAgentEvent, CLIAgentEventSource, CLIAgentEventType,
+};
 
 use super::cli_image_grok_protocol::{
     Action, Input, MAX_BODY_BYTES, Reply, Request, Scope, Ticket, encode,
@@ -25,7 +29,29 @@ struct Active {
     scope: CliImageStagingScope,
     revision: u64,
     ticket: Ticket,
-    observation: GrokPermissionObservation,
+    identity: ActiveIdentity,
+}
+enum ActiveIdentity {
+    Hook(GrokPermissionObservation),
+    Owned { native_session: Uuid, cwd: String },
+}
+
+impl ActiveIdentity {
+    fn invalidated_by(&self, event: &CLIAgentEvent) -> bool {
+        let Self::Owned {
+            native_session,
+            cwd,
+        } = self
+        else {
+            return false;
+        };
+        event.agent == CLIAgent::Grok
+            && event.source == CLIAgentEventSource::RichPlugin
+            && (event.event == CLIAgentEventType::SessionStart
+                || event.session_id.as_deref() != Some(native_session.to_string().as_str())
+                || event.cwd.as_deref() != Some(cwd.as_str())
+                || event.payload.permission_mode.as_deref() != Some("default"))
+    }
 }
 static ACTIVE: LazyLock<Mutex<HashMap<EntityId, Active>>> = LazyLock::new(Mutex::default);
 
@@ -45,9 +71,46 @@ pub(crate) fn register(
             scope,
             revision,
             ticket,
-            observation,
+            identity: ActiveIdentity::Hook(observation),
         },
     );
+}
+
+pub(crate) fn register_owned(
+    view: EntityId,
+    client: Arc<RemoteServerClient>,
+    scope: CliImageStagingScope,
+    revision: u64,
+    ticket: Ticket,
+    native_session: Uuid,
+    cwd: String,
+) {
+    revoke(view);
+    ACTIVE.lock().expect("远端 Grok 输入锁").insert(
+        view,
+        Active {
+            client,
+            scope,
+            revision,
+            ticket,
+            identity: ActiveIdentity::Owned {
+                native_session,
+                cwd,
+            },
+        },
+    );
+}
+
+/// 仅消费当前 listener 接受的真实事件；旧 hook 证据不能撤销或授予 owned 身份。
+pub(crate) fn revoke_owned_if_event_changed(view: EntityId, event: &CLIAgentEvent) {
+    let stale = ACTIVE
+        .lock()
+        .expect("远端 Grok 输入锁")
+        .get(&view)
+        .is_some_and(|active| active.identity.invalidated_by(event));
+    if stale {
+        revoke(view);
+    }
 }
 
 pub(crate) fn revoke(view: EntityId) {
@@ -72,7 +135,10 @@ pub(crate) fn revoke_unless(view: EntityId, observed: Option<&GrokPermissionObse
         .lock()
         .expect("远端 Grok 输入锁")
         .get(&view)
-        .is_some_and(|active| Some(&active.observation) != observed);
+        .is_some_and(|active| match &active.identity {
+            ActiveIdentity::Hook(previous) => Some(previous) != observed,
+            ActiveIdentity::Owned { .. } => false,
+        });
     if stale {
         revoke(view);
     }
@@ -308,10 +374,18 @@ impl Journal {
         if ticket != &launch.ticket {
             return Err(invalid());
         }
-        if !matches!(state.as_str(), "finished" | "cancelled") {
+        if !matches!(
+            state.as_str(),
+            "finished" | "cancelled" | "rejected_before_enqueue"
+        ) {
             return Ok(());
         }
-        if native_prompt_id.is_none_or(|id| id.is_nil())
+        let prompt_matches = if state == "rejected_before_enqueue" {
+            native_prompt_id.is_none()
+        } else {
+            native_prompt_id.is_some_and(|id| !id.is_nil())
+        };
+        if !prompt_matches
             || native_ack_sha256.as_ref().is_none_or(|value| {
                 value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit())
             })

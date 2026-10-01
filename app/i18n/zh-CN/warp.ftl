@@ -5972,3 +5972,5 @@ cli-agent-tmux-owned-unavailable = 无法验证远端 tmux 窗格或 CLI。请�
 cli-agent-tmux-owned-unknown = tmux 启动状态尚未确认。请使用“恢复 tmux 富输入”查询已有启动，不会另建窗格。
 
 cli-agent-tmux-owned-exited = 此 tmux CLI 会话已结束。如需继续，请启动新的 tmux 窗格。
+
+cli-agent-tmux-restored-text-unconfirmed = 当前会话状态尚未确认。请在原生终端输入文字；图片仍可发送到原生图片队列。

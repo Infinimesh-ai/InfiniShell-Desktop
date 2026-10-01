@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：Grok原生会话证明与tmux恢复接线通过本机分轮门禁
+
+**新增关闭0项，仍为6关闭／5开放／3移交，PR #22草稿。** 完整SSH命令结束后，Claude/Grok恢复现在重新核对原native SID、当前tmux绑定、listener和连接代次，只重建Unknown／Closed身份；旧状态、审批与输入租约不会回放。Grok原生新增仅查询驻留actor的只读身份、当前权限和通知描述符；实际输入在同一队列接收临界区复核default模式及活动描述符，保留原有繁忙排队语义。明确的接收前拒绝保留草稿、释放当前租约，同一message不得重投；真实权限事件撤销缓存和在途证明。
+
+原生提交 `975d815fec8e`（tree `7c4ee8aeae62aa1f4291f35ae98d19a539237c65`）的117文件公开补丁可重建，补丁SHA `79977a05dd2378219b66eeb6e2d9a03ec355a2b616135010589e647479e3f048`。新 `.3` Mac工件SHA `5c1bdc369735850fe26a6a86544b0fa1457d98788873d49bfd44a8f17b054b00`，构建/签名/三个零模型入口及短目录清理通过，工件收据 `c10d211638741db782fcea2586855ec17552f37e346a0b95b3d1d27c9fe75ffa`。原生新增17项普通PASS和check通过；516项并发断言通过但一项LEAK仍保留，单项复验PASS不抹去未知根因。旧a9/.2工件未重标为新来源。
+
+宿主前两次测试编译失败（AppContext和枚举转换）保留。实际488项首轮486通过/2项夹具能力缺失失败，补齐后487通过/1项夹具遗漏真实BlockCompleted目标清理失败；最后仅改该专项夹具两行，`r-0b9wbc3f` 两项Grok恢复独立普通PASS，无重试，不能称单轮488全过。新增9项UI回归均有逐名PASS；`r-t6fk2vr0` i18n11项及 `r-4mzkqakt` 最终check通过，Python来源合同4项/actionlint通过，短目录全部核验清理。107文件分轮门禁收据 `c3573942ccfdfb5abdd348dfd12361b2c8972ac0535c68f896ddaa6b3f5e41f6`。新增一条英中“当前会话状态尚未确认”提示已审计；原生协议无需其它文案修改，真实双语布局待验。
+
+[b38平台门禁36866084183](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36866084183) Linux通过、Windows失败。Windows固定Codex准备仅到下载阶段：两次HTTPError后第三次读HTTP响应超时；另一独立内存协议用例在两次Observe之后等待最终proof/window invalidation超时，三次均失败，不能归因为原生下载。lifecycle为1407通过/1失败；desktop/TUI670项含1条Vim补全Escape用例LEAK，根因未定。该轮未构建新Grok原生，不替代`.3`平台门禁。新版真实SSH/tmux三款图片消费、异常恢复、英中GUI及最终源码门禁仍待验，G08继续开放。
+
 ## 2026-10-01：tmux 产品整合通过本机回归，完整 SSH 恢复和真实消费待验
 
 本检查点补充门禁：环境增量后的tmux定向19项、真实API1项和最终check通过；其余101文件与前轮396项/i18n快照一致，分轮收据 `fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6`。源码检查不关闭G08。

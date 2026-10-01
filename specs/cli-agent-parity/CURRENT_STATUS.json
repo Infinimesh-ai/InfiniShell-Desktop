@@ -6804,5 +6804,20 @@
     "native_source": "公开Grok8855bbe86680仅补Windows测试io::Read限定调用；完整补丁重建通过。相对a9五个测试文件之外4155树项相同，Mac工件继续精确绑定a9，不重标新来源。目标Windows复验待完成。",
     "localization": "9条新增英中菜单/提示已同步，i18n11项通过；manager及pane环境无需本地化变更。新菜单/错误和完整中文成功流程仍须真实GUI审计。",
     "checkpoint_gates": "两文件环境增量后r-3dycecz9 tmux定向19项、r-j95bnz9z真实API1项和r-mzeiywq2最终check通过；其余101文件与396/i18n门禁快照一致，分轮收据fb2143a28aae68efbfc2701b06bbdb5d89509b4b89ea7ea852e74280872417f6。真实GUI及原生只读恢复缺项仍待完成。"
+  },
+  "g08_tmux_restored_native_identity_20261001": {
+    "status": "mac_source_checkpoint_passed_real_acceptance_pending",
+    "base_commit": "b38c92ecaeae0b5586d9ac5d2d4509f648ca2c02",
+    "newly_closed_gaps": [],
+    "native_commit": "975d815fec8e267ce4636636c16b98214ff0109d",
+    "native_artifact_version": "1.0.41+infinishell.session-notifications.3",
+    "native_artifact_sha256": "5c1bdc369735850fe26a6a86544b0fa1457d98788873d49bfd44a8f17b054b00",
+    "gate_receipt_sha256": "c3573942ccfdfb5abdd348dfd12361b2c8972ac0535c68f896ddaa6b3f5e41f6",
+    "source_freeze_sha256": "72ae7b5f83221b73aa7170acb967507b009f6af56e6cf0eee82e45e5e839149b",
+    "mac_gates": "487通过/1夹具失败后，最后两行夹具修正的2项独立普通PASS；9项新增UI均逐名通过；i18n11/final check/Python4/actionlint通过。分轮记录，不抹旧失败。",
+    "native_boundary": "新17项普通PASS/check及新工件构建/签名/零模型入口通过；原516项并发1 LEAK根因未定，单项PASS不抹去。",
+    "b38_cloud": "Linux通过；Windows下载超时、Codex内存协议最终proof等待3次超时、desktop/TUI Vim Escape 1 LEAK保留。新.3原生平台门禁未运行。",
+    "remaining": "新工件真实SSH/tmux三款图片消费、断连恢复/拒绝/重复/旧回调、真实英中布局及最终跨平台源码门禁。",
+    "gap_closed": false
   }
 }

@@ -79,7 +79,8 @@ impl TerminalView {
         };
         if session.agent != CLIAgent::Claude
             || session.remote_host.is_none()
-            || !session.received_rich_notification
+            || !(session.received_rich_notification
+                || self.tmux_restored_claude_image_candidate(ctx).is_some())
             || session.listener.as_ref().map(|listener| listener.id()) != Some(target.listener_id)
             || session.session_context.session_id.as_ref() != Some(&target.native_session_id)
             || self.model_events_handle.id() != target.model_events_id
@@ -133,7 +134,8 @@ impl TerminalView {
             }
             CLIAgent::Claude => {
                 let (process, transcript_path) =
-                    session.session_context.claude_image_evidence.clone()?;
+                    session.session_context.claude_image_evidence.clone()
+                        .or_else(|| self.tmux_restored_claude_image_candidate(ctx))?;
                 NativeImageConsumer::Claude {
                     process,
                     transcript_path,
@@ -225,6 +227,16 @@ impl TerminalView {
                 tmux_owned,
             },
         ))
+    }
+
+    #[cfg(test)]
+    pub(in crate::terminal::view) fn remote_image_binding_is_available_for_test(
+        &self,
+        ctx: &AppContext,
+    ) -> bool {
+        CLIAgentSessionsModel::as_ref(ctx)
+            .input_generation(self.view_id)
+            .is_some_and(|generation| self.remote_image_binding(generation, ctx).is_some())
     }
 
     pub(super) fn is_remote_cli_image_input(&self, ctx: &AppContext) -> bool {

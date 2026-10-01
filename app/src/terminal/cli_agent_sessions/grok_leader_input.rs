@@ -1,7 +1,8 @@
 //! 固定 Grok 普通 TUI 的显式 leader 侧车；不接管审批、不发送 PTY 按键。
 //!
-//! 调用者必须先绑定本地活动 PTY、原生 SessionStart 和输入 generation，且在目标或权限
+//! 普通路径必须先绑定本地活动 PTY、原生 SessionStart 和输入 generation，且在目标或权限
 //! 改变时立即废弃该绑定。本模块不发现其他 leader，不启动进程，也不恢复或重投历史输入。
+//! 远端 tmux 自有票据使用独立 resident 身份证明及原子默认权限前置，不回填 hook 观察。
 //! 首次校准仅覆盖 macOS arm64、1.0.41、grok-4.7、default 权限和文本（可含文件引用）。
 //! 文件仍由原生工具按原生权限读取；图片走独立类型化内容，不能将文本路径计为图片接收。
 //! 图片扩展复用固定 ACP 编码，普通 TUI 的图片显示及模型链仍待独立验收。
@@ -76,10 +77,47 @@ impl GrokLeaderPrompt {
         }))
     }
 
+    fn frame_with_owned_precondition(
+        &self,
+        rpc_id: Uuid,
+        session_id: Uuid,
+        descriptor: Option<&Value>,
+    ) -> Value {
+        let Some(descriptor) = descriptor else {
+            return self.frame(rpc_id, session_id);
+        };
+        acp_frame(json!({
+            "jsonrpc":"2.0", "id":rpc_id.to_string(), "method":"session/prompt",
+            "params":{"sessionId":session_id.to_string(), "prompt":self.content,
+                "_meta":{"verbatim":true,"infinishellOwnedInput":{
+                    "protocolVersion":1,"requireDefaultPermissions":true,
+                    "requestId":rpc_id.to_string(),"notificationBinding":descriptor
+                }}}
+        }))
+    }
+
     fn validate_budget(&self) -> Result<(), GrokLeaderInputError> {
         // UUID 的编码长度固定；在 SQLite 领取之前检查包含转义开销的最终帧。
         encode_frame(&self.frame(Uuid::nil(), Uuid::nil())).map(|_| ())
     }
+}
+
+/// 原生 endpoint 保留 ExtMethodResult 外壳；只接受指定 resident 会话的当前默认权限。
+fn verify_owned_identity_result(
+    result: &Value,
+    session_id: Uuid,
+    cwd: &str,
+    descriptor: &Value,
+) -> Result<(), GrokLeaderInputError> {
+    if result.get("error").is_some_and(|error| !error.is_null())
+        || result["result"]
+            != json!({"sessionId":session_id.to_string(),"cwd":cwd,
+            "infinishellOwnedIdentity":{"protocolVersion":1,"permissionMode":"default",
+                "notificationBinding":descriptor}})
+    {
+        return Err(GrokLeaderInputError::IdentityChanged);
+    }
+    Ok(())
 }
 
 /// 协议错误只返回稳定分类；不得把可能包含输入或认证材料的原生错误正文写入日志。
@@ -134,11 +172,40 @@ pub(crate) fn calibrated_platform() -> Result<(), GrokLeaderInputError> {
 pub(crate) enum GrokLeaderDeliveryStatus {
     /// 必须在第一次写入之前持久化；即使只写出部分帧，也不得自动重投。
     Unknown,
+    /// 仅专有前置拒绝回执能证明本次 RPC 没有入队；原 message_id 仍不能再次派发。
+    RejectedBeforeEnqueue { reason: GrokOwnedInputRejection },
     /// 仅精确匹配 RPC ID、sessionId 和原生 promptId 的最终响应可以到达这里。
     Finished {
         native_prompt_id: Uuid,
         outcome: GrokLeaderOutcome,
     },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum GrokOwnedInputRejection {
+    InvalidPrecondition,
+    PreconditionChanged,
+}
+
+fn owned_rejection(rpc: &Value, record: &GrokLeaderDelivery) -> Option<GrokOwnedInputRejection> {
+    let reason = match rpc.pointer("/error/data/reason")?.as_str()? {
+        "invalid_precondition" => GrokOwnedInputRejection::InvalidPrecondition,
+        "precondition_changed" => GrokOwnedInputRejection::PreconditionChanged,
+        _ => return None,
+    };
+    if rpc.get("result").is_some()
+        || rpc["error"]["code"] != -32073
+        || rpc["error"]["data"]
+            != json!({
+                "code":"infinishell_owned_input_rejected", "protocolVersion":1,
+                "sessionId":record.session_id.to_string(), "requestId":record.rpc_id.to_string(),
+                "queued":false, "reason":reason
+            })
+    {
+        return None;
+    }
+    Some(reason)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -262,6 +329,21 @@ impl DeliveryTracker {
             return Ok(None);
         }
         if rpc.get("error").is_some() {
+            if let Some(reason) = owned_rejection(rpc, record) {
+                let status = GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { reason };
+                match record.status {
+                    GrokLeaderDeliveryStatus::Unknown => record.status = status,
+                    GrokLeaderDeliveryStatus::Finished { .. }
+                    | GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. } => {
+                        if record.status != status {
+                            return Err(GrokLeaderInputError::Protocol);
+                        }
+                        return Ok(None);
+                    }
+                }
+                self.final_response = Some(rpc.clone());
+                return Ok(Some(GrokLeaderInputEvent::Delivery(record.clone())));
+            }
             return Err(GrokLeaderInputError::NativeRequestFailed {
                 code: rpc.pointer("/error/code").and_then(Value::as_i64),
             });
@@ -293,7 +375,8 @@ impl DeliveryTracker {
         };
         match &record.status {
             GrokLeaderDeliveryStatus::Unknown => record.status = status,
-            GrokLeaderDeliveryStatus::Finished { .. } => {
+            GrokLeaderDeliveryStatus::Finished { .. }
+            | GrokLeaderDeliveryStatus::RejectedBeforeEnqueue { .. } => {
                 // 重复相同终态可以忽略；同 RPC ID 的第二个 promptId 是重复执行负例。
                 if record.status != status {
                     return Err(GrokLeaderInputError::Protocol);
@@ -454,7 +537,7 @@ mod native {
         "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d";
     const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 
-    /// 必须来自同一活动 PTY 的启动记录和 SessionStart，不能用 leader 枚举结果拼装。
+    /// 普通路径要求同一活动 PTY 的启动记录和 SessionStart；远端自有路径要求冻结清单及原生当前证明。
     /// 首增量严格匹配已经实测的显式启动参数；未来新增模式需要独立原生校准。
     pub(crate) struct GrokLeaderTarget {
         binding_id: Uuid,
@@ -511,12 +594,59 @@ mod native {
             native_permission_mode: &str,
             notifications: Option<NotificationPlan>,
         ) -> Result<Self, GrokLeaderInputError> {
+            if native_permission_mode != "default" {
+                return Err(GrokLeaderInputError::InvalidTarget);
+            }
+            Self::capture_identity(
+                binding_id,
+                session_id,
+                cwd,
+                socket_path,
+                executable,
+                tui_pid,
+                leader_pid,
+                notifications,
+            )
+        }
+
+        /// 仅捕获产品自有进程；是否允许输入仍须原生当前权限及原子前置证明。
+        pub(crate) fn capture_remote_identity(
+            binding_id: Uuid,
+            session_id: Uuid,
+            cwd: &Path,
+            socket_path: &Path,
+            executable: &Path,
+            tui_pid: i32,
+            leader_pid: i32,
+            notifications: NotificationPlan,
+        ) -> Result<Self, GrokLeaderInputError> {
+            Self::capture_identity(
+                binding_id,
+                session_id,
+                cwd,
+                socket_path,
+                executable,
+                tui_pid,
+                leader_pid,
+                Some(notifications),
+            )
+        }
+
+        fn capture_identity(
+            binding_id: Uuid,
+            session_id: Uuid,
+            cwd: &Path,
+            socket_path: &Path,
+            executable: &Path,
+            tui_pid: i32,
+            leader_pid: i32,
+            notifications: Option<NotificationPlan>,
+        ) -> Result<Self, GrokLeaderInputError> {
             if binding_id.is_nil()
                 || session_id.is_nil()
                 || tui_pid <= 0
                 || leader_pid <= 0
                 || tui_pid == leader_pid
-                || native_permission_mode != "default"
                 || !cwd.is_absolute()
                 || !socket_path.is_absolute()
                 || !executable.is_absolute()
@@ -657,12 +787,30 @@ mod native {
         tracker: DeliveryTracker,
         connection: Option<UnixStream>,
         decoder: FrameDecoder,
+        read_only: bool,
     }
 
     impl GrokLeaderInput {
         pub(crate) fn connect(
             target: GrokLeaderTarget,
             restored: Option<GrokLeaderDelivery>,
+        ) -> Result<Self, GrokLeaderInputError> {
+            Self::connect_mode(target, restored, false)
+        }
+
+        pub(crate) fn connect_observer(
+            target: GrokLeaderTarget,
+        ) -> Result<Self, GrokLeaderInputError> {
+            if target.notifications.is_none() {
+                return Err(GrokLeaderInputError::InvalidTarget);
+            }
+            Self::connect_mode(target, None, true)
+        }
+
+        fn connect_mode(
+            target: GrokLeaderTarget,
+            restored: Option<GrokLeaderDelivery>,
+            read_only: bool,
         ) -> Result<Self, GrokLeaderInputError> {
             target.validate()?;
             let connection = UnixStream::connect(&target.socket_path)?;
@@ -677,6 +825,7 @@ mod native {
                 tracker,
                 connection: Some(connection),
                 decoder: FrameDecoder::default(),
+                read_only,
             };
             bridge.handshake()?;
             Ok(bridge)
@@ -726,11 +875,24 @@ mod native {
             persist: impl FnOnce(&GrokLeaderDelivery) -> io::Result<()>,
             authorize_write: impl FnOnce() -> Result<(), GrokLeaderInputError>,
         ) -> Result<(), GrokLeaderInputError> {
+            if self.read_only {
+                return Err(GrokLeaderInputError::InvalidTarget);
+            }
             self.tracker.check_binding(current_binding_id)?;
             prompt.validate_budget()?;
             self.validate_connection()?;
+            let descriptor = self.verify_owned_default_permission()?;
+            encode_frame(&prompt.frame_with_owned_precondition(
+                Uuid::nil(),
+                self.target.session_id,
+                descriptor.as_ref(),
+            ))?;
             let record = self.tracker.record_before_write(message_id, persist)?;
-            let frame = prompt.frame(record.rpc_id, record.session_id);
+            let frame = prompt.frame_with_owned_precondition(
+                record.rpc_id,
+                record.session_id,
+                descriptor.as_ref(),
+            );
             // 持久化可能耗时，再核对进程；即便此时失败，也保留已经领取的 Unknown。
             let result = self
                 .validate_connection()
@@ -945,7 +1107,9 @@ mod native {
                 || initialized["agentCapabilities"]["loadSession"] != true
                 || initialized["_meta"]["agentVersion"] != native_version
                 || (self.target.notifications.is_some()
-                    && initialized["_meta"]["infinishell/notificationPlugin"] != 1)
+                    && (initialized["_meta"]["infinishell/notificationPlugin"] != 1
+                        || initialized["_meta"]["infinishell/ownedSessionIdentity"] != 1
+                        || initialized["_meta"]["infinishell/ownedInputPrecondition"] != 1))
                 || initialized["_meta"]["currentWorkingDirectory"].as_str()
                     != self.target.cwd.to_str()
                 || initialized["_meta"]["modelState"]["currentModelId"] != MODEL_ID
@@ -960,6 +1124,10 @@ mod native {
                     })
             {
                 return Err(GrokLeaderInputError::AuthenticationUnavailable);
+            }
+            if self.read_only {
+                let _ = self.verify_owned_default_permission()?;
+                return self.validate_connection();
             }
             let loaded = self.rpc_readonly(
                 deadline,
@@ -981,6 +1149,30 @@ mod native {
                 return Err(GrokLeaderInputError::IdentityChanged);
             }
             self.validate_connection()
+        }
+
+        /// 只查询当前 resident actor；不加载、激活、补 hook 或改变路由。
+        fn verify_owned_default_permission(
+            &mut self,
+        ) -> Result<Option<Value>, GrokLeaderInputError> {
+            let Some(plan) = self.target.notifications.clone() else {
+                return Ok(None);
+            };
+            self.validate_connection()?;
+            let descriptor = plan.descriptor()?;
+            let result = self.rpc_readonly(Instant::now() + HANDSHAKE_TIMEOUT, "x.ai/session/info",
+                json!({"sessionId":self.target.session_id.to_string(),"infinishellOwnedIdentity":true}))?;
+            verify_owned_identity_result(
+                &result,
+                self.target.session_id,
+                self.target
+                    .cwd
+                    .to_str()
+                    .ok_or(GrokLeaderInputError::InvalidTarget)?,
+                &descriptor,
+            )?;
+            self.validate_connection()?;
+            Ok(Some(descriptor))
         }
 
         fn rpc_readonly(

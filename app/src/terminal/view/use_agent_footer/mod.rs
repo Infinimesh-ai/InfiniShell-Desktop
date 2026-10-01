@@ -6,7 +6,7 @@
 
 use base64::Engine;
 use uuid::Uuid;
-use warp_core::cli_agent_protocol::CodexProcessEvidence;
+use warp_core::cli_agent_protocol::{ClaudeProcessEvidence, CodexProcessEvidence};
 use warpui::clipboard::{ClipboardContent, ImageData};
 
 use crate::ai::agent::ImageContext;
@@ -834,6 +834,9 @@ impl TerminalView {
         if self.reject_unsafe_cli_agent_input(generation, Some(text.clone()), ctx) {
             return;
         }
+        if images.is_empty() && self.reject_unconfirmed_tmux_claude_text(ctx) {
+            return;
+        }
         if !files.is_empty() {
             let session = CLIAgentSessionsModel::as_ref(ctx)
                 .session(self.view_id)
@@ -931,6 +934,9 @@ impl TerminalView {
         text: String,
         ctx: &mut ViewContext<Self>,
     ) {
+        if self.reject_unconfirmed_tmux_claude_text(ctx) {
+            return;
+        }
         let Some(agent) = CLIAgentSessionsModel::as_ref(ctx)
             .session(self.view_id)
             .map(|s| s.agent)
@@ -964,6 +970,7 @@ impl TerminalView {
         ctx: &mut ViewContext<Self>,
     ) -> bool {
         if text.is_empty()
+            || self.reject_unconfirmed_tmux_claude_text(ctx)
             || self.reject_unsafe_cli_agent_input(generation, Some(text.to_owned()), ctx)
             || !self.begin_cli_agent_text_submit(generation, ctx)
         {
@@ -1321,6 +1328,76 @@ impl TerminalView {
             return true;
         }
         self.codex_owned_input_process(ctx).is_some()
+            || self.tmux_restored_input_identity(ctx)
+    }
+
+    fn tmux_restored_input_identity(&self, ctx: &AppContext) -> bool {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.tmux_restored_claude_image(ctx).is_some()
+                || self.remote_owned_grok_readonly_identity(ctx).is_some();
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        false
+    }
+
+    fn tmux_restored_claude_image_candidate(
+        &self,
+        ctx: &AppContext,
+    ) -> Option<(ClaudeProcessEvidence, String)> {
+        #[cfg(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        ))]
+        {
+            return self.tmux_restored_claude_image(ctx);
+        }
+        #[cfg(not(all(
+            feature = "local_fs",
+            feature = "local_tty",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64"),
+                all(windows, target_arch = "x86_64")
+            )
+        )))]
+        None
+    }
+
+    /// 恢复的身份仅允许原生图片队列；Unknown 不能变成向当前 PTY 发送文字的许可。
+    pub(super) fn reject_unconfirmed_tmux_claude_text(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        let only_identity = self.tmux_restored_claude_image_candidate(ctx).is_some()
+            && CLIAgentSessionsModel::as_ref(ctx)
+                .session(self.view_id)
+                .is_some_and(|session| !session.received_rich_notification);
+        if only_identity {
+            self.show_error_toast(crate::t!("cli-agent-tmux-restored-text-unconfirmed"), ctx);
+        }
+        only_identity
     }
 
     fn codex_owned_input_process(&self, ctx: &AppContext) -> Option<CodexProcessEvidence> {

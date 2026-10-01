@@ -262,6 +262,25 @@ impl NotificationPlan {
     pub(crate) fn verify_current(&self) -> io::Result<()> {
         self.verify(self.session_id, &self.cwd, &self.worker)
     }
+
+    /// 原生只读证明与输入前置使用同一完整描述符；对象字段顺序不参与身份判断。
+    pub(crate) fn descriptor(&self) -> io::Result<serde_json::Value> {
+        self.verify_current()?;
+        let resources = resources(&self.worker)?;
+        let descriptor = Descriptor {
+            version: 1,
+            session_id: self.session_id,
+            cwd: &self.cwd,
+            plugin_dir: self.root.join("plugin"),
+            files: resources
+                .iter()
+                .map(|(name, bytes)| (*name, digest(bytes)))
+                .collect(),
+        };
+        let value = serde_json::to_value(descriptor).map_err(io::Error::other)?;
+        self.verify_current()?;
+        Ok(value)
+    }
 }
 
 fn resources(worker: &Path) -> io::Result<BTreeMap<&'static str, Vec<u8>>> {

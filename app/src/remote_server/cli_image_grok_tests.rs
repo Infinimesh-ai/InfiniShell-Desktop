@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::TryRecvError;
 
 use super::*;
+use crate::terminal::cli_agent_sessions::grok_leader_input::GrokOwnedInputRejection;
 
 #[test]
 fn configured_tmux_service_cannot_fall_back_after_its_owner_disappears() {
@@ -315,4 +316,100 @@ fn service_drop_before_connection_still_drains_launch_cleanup() {
     assert!(directory.join("cleanup-requested.json").exists());
     assert!(!directory.join("released.json").exists());
     drop((scope, root));
+}
+
+#[test]
+fn ordinary_ticket_cannot_be_promoted_to_owned_identity_without_tmux_guard() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    let before = fs::read_dir(&directory).unwrap().count();
+    let request = Request {
+        version: 1,
+        revision: 2,
+        scope: fixture.scope.clone(),
+        action: Action::Observe {
+            ticket: ticket.clone(),
+        },
+    };
+    let response = fixture
+        .service
+        .handle(&fixture.connection, &encode(&request).unwrap());
+    assert!(matches!(
+        serde_json::from_slice::<Reply>(&response).unwrap(),
+        Reply::Failed { .. }
+    ));
+    assert_eq!(fs::read_dir(&directory).unwrap().count(), before);
+    assert!(!directory.join("entered.json").exists());
+}
+
+#[test]
+fn owned_submit_protocol_has_no_fabricated_hook_observation() {
+    let fixture = Fixture::new();
+    let request = Request {
+        version: 1,
+        revision: 1,
+        scope: fixture.scope.clone(),
+        action: Action::SubmitOwned {
+            ticket: ticket(),
+            binding_id: Uuid::new_v4(),
+            input: Input {
+                message_id: Uuid::new_v4(),
+                text: "图片".into(),
+                images: Vec::new(),
+            },
+        },
+    };
+    let bytes = encode(&request).unwrap();
+    assert!(matches!(
+        Request::decode(&bytes).unwrap().action,
+        Action::SubmitOwned { .. }
+    ));
+    let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(value["action"]["action"], "submit_owned");
+    assert!(value["action"].get("observation").is_none());
+    assert!(value["action"].get("event_id").is_none());
+    assert!(value["action"].get("permission_revision").is_none());
+    assert!(
+        InputAuthority::Owned {
+            binding_id: Uuid::nil()
+        }
+        .binding_id()
+        .is_err()
+    );
+}
+
+#[test]
+fn exact_persisted_rejection_is_queryable_without_a_native_prompt_id() {
+    let fixture = Fixture::new();
+    let ticket = ticket();
+    fixture.reserve(&fixture.connection, &fixture.scope, &ticket);
+    let directory = fixture.directory(&fixture.scope, &ticket);
+    let message_id = Uuid::new_v4();
+    let record = Finished {
+        claim: Claim {
+            subject: "a".repeat(64),
+            delivery: GrokLeaderDelivery {
+                binding_id: Uuid::new_v4(),
+                session_id: Uuid::new_v4(),
+                message_id,
+                rpc_id: Uuid::new_v4(),
+                status: GrokLeaderDeliveryStatus::RejectedBeforeEnqueue {
+                    reason: GrokOwnedInputRejection::PreconditionChanged,
+                },
+            },
+        },
+        native_ack_sha256: "b".repeat(64),
+    };
+    write_new(
+        &directory.join(format!("{message_id}-finished.json")),
+        &record,
+    )
+    .unwrap();
+    assert!(
+        matches!(delivery_status(&directory, &ticket, message_id).unwrap(),
+        Reply::Input { state, native_prompt_id: None, native_ack_sha256: Some(_), .. }
+            if state == "rejected_before_enqueue")
+    );
 }
