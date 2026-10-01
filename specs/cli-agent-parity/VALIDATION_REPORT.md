@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：绑定已核验的 Linux 通知原生工件
+
+**本轮新增关闭 0 项；6 关闭／5 开放／3 移交，PR #22 保持草稿。** [51b0 源码门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的 Linux 原生构建产物 `11184345103` 已核官方 ZIP 摘要、公开基线加 125 文件补丁的来源 tree、实际 ELF64 x86_64 字节和三个零模型启动入口。二进制 608,773,152 字节，SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，实际完整版本为 `grok 1.0.41+infinishell.session-notifications.4 (07e35a3dfeed)`；宿主只将这两个已验证值替换此前未绑定的 Linux 常量，Mac 绑定不变。
+
+32 个构建命令全部成功，16 个测试步骤实际执行 525 次、516 个唯一测试名称，均零失败／忽略；重复筛选不计独立用例。四库桥 50/20/4/4、通知 4/178/203、owned exit 12/4 等逐名核对。来源审计 `51b0-ci/linux-native-audit-v1/audit.safe.json` 摘要 `001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b`，逐名计数审计摘要 `222f101b0f2cc709e513750de8d197adf6372ac8d42e4dfff7599ad904b911c7`。Linux 临时目录因为进程引用可见性不足保留，cleanup_ready=false；本轮 cargo test 不证明旧 Mac nextest LEAK 已解决。
+
+绑定提交前 `cargo check -p warp` 的 `r-9ik7wddp` 通过，日志摘要 `a2e24beefa0a1d243262c6239330950c80adf273cd128a20cf8f3426c04e31a7`；i18n `r-c_0vh2fh` 11 项通过，摘要 `92841df85882c155c9fcad8107182cf4b1484ba50acabcbed5f1b0b1aa439f74`，两短目录已核验清理。无界面或文案变化，无需本地化变更。Linux／Windows 最终宿主步骤仍在执行；绑定后的源码门禁及正在修复的 V03 中断状态链尚待验证，不提前关闭缺口。
+
 ## 2026-10-02：Grok 原生正常退出实窗通过，最终源码门禁进行中
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `51b0e4aed` 的冷启动中文签名 GUI 在 `r-dpopymbl` 经实际 SSH／tmux 产品菜单启动 Grok `.4/ba8ce6d346aa`。目标 SID `02068f66-965b-4e46-b9e8-1121b34f576b` 的 global/plugin SessionStart 成功；在原生提示符输入并目验单斜线 `/exit` 后只按一次 Enter。global/plugin SessionEnd 成功（157/242 ms）、Stop 成功（82/209 ms），目标会话用户／模型／完成回合计数全为零。原 pane shell、TUI、leader 已退出，retired/released 与同一 manifest 匹配，私有 socket 及其目录回收。启动、退出收据 SHA-256 分别为 `a01508b2ae49921b75e11ed92802edf2e284ea07e94053e26f6bbcff6acfac44`、`1be89a860de809d0d7c07f89ffe1e40bbd114224c69bc9740e63a0fc9f7a6f83`，均在 `g08-preparation/r-dpopymbl-tmux-owned-gui`。

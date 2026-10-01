@@ -10,7 +10,8 @@ pub(crate) const BUILD_CONTRACT: &str = "infinishell-terminal-bridge-v1+session-
 const SHA256: Option<&str> =
     Some("b196c3a073a37a109af57ddb4d12d45ca40eaa2a99d6b08c5c5a9c88ddab2ad3");
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const SHA256: Option<&str> = None;
+const SHA256: Option<&str> =
+    Some("d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6");
 
 pub(crate) fn sha256() -> io::Result<&'static str> {
     SHA256.ok_or_else(|| io::Error::other("Grok 会话通知原生工件尚未绑定"))
@@ -21,7 +22,8 @@ pub(crate) fn sha256() -> io::Result<&'static str> {
 const VERSION_OUTPUT: Option<&str> =
     Some("grok 1.0.41+infinishell.session-notifications.4 (ba8ce6d346aa)");
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-const VERSION_OUTPUT: Option<&str> = None;
+const VERSION_OUTPUT: Option<&str> =
+    Some("grok 1.0.41+infinishell.session-notifications.4 (07e35a3dfeed)");
 
 pub(crate) fn version_output() -> io::Result<&'static str> {
     VERSION_OUTPUT.ok_or_else(|| io::Error::other("Grok 会话通知原生版本输出尚未绑定"))

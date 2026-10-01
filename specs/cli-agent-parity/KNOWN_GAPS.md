@@ -198,6 +198,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G08 — 远程 CLI 图片传输
 
+- **2026-10-02 Linux 通知原生工件已绑定，最终宿主门禁未结束**：[51b0 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的官方 Linux 工件已核验 ZIP 摘要、公开基线／补丁、实际 ELF 及完整版本。`.4` 二进制 SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，完整版本含 `07e35a3dfeed`；实际 525 次测试执行、516 个唯一名称全部通过，版本／帮助／异步启动通过。审计摘要 `001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b`。Linux／Windows 最终宿主门禁仍在执行，不关闭 G08；旧 Mac LEAK 及其他平台实机边界保留。
+
 - **2026-10-02 `7b7fc36fc` 三 CLI 真实 tmux 图片与恢复链完成，最终门禁待修**：`r-hx4at14_` 的 Mac 签名 GUI 经实际回环 SSH／tmux 产品入口分别提交 Grok、Codex、Claude 首图；三款均在完整 SSH 断开、重连及恢复原消费者后接收第二条新内容。六条原生请求的 typed PNG 与规范上传字节一致，双方确认及图片引用释放齐备。Claude 在原生 Read 待批时重连，相同内容产生新上传但未产生 claim／queue／原生输入；旧请求获允许并完成后，新草稿与原卡保留，随后不同内容正常消费并自动清稿。权限拒绝沿用 `c3ff/r-u10vfmtu` 的真实 Read No／retired 清理，不伪称本轮重跑。Codex 第二图要求逆序却仍答正序，明确保留模型语义失败，不影响已核实的新请求及图片输送事实。功能证据索引 SHA-256 `a869d1ff4b0dda5cb675a8356c320a286f803a0e43f6ca46413686f5c957be85`；全部自有进程已退出，唯一历史与 profiles 保留。Grok `.3` 正常退出的 SessionEnd／Stop 通知仍失败，归入 V03 继续修原生；[7b7 平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36881884266) Linux 测试和 Windows 原生门禁失败，尚未取得最终源码通过结论。本轮不关闭 G08，不再重复上述同类模型验收。
 
 - **2026-10-01 首图协议拒绝已定位，仍开放**：`4aeab1a51/r-e2yx7g07` 真实 tmux 单次 Grok 首图未消费。锁定 ACP SDK 要求扩展线上方法带 `_`，宿主 Mac／Linux 漏此前缀；现精准修正，两处权限／身份守卫不变。Mac 54项定向、i18n11项及check通过，收据 `d85565eb09daf8fcc1bea4116e86afdd08bf63a71287fe99100ae5aabfebd110`；另修正Codex测试夹具初始FIFO顺序，Windows原失败仍待目标复验。无需本地化变更；真实修复版三CLI图片／恢复链与最终平台门禁待验，详见验证报告，不关闭缺口。

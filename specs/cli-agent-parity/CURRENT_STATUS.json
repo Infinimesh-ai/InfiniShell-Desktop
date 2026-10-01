@@ -6943,6 +6943,33 @@
       "result": "passed",
       "log_sha256": "11d98597b65cb6e41f1b24198f9898e86f8ee44c8f088d1891a82c39a0416d64",
       "temporary_directory": "cleaned"
+    },
+    "linux_artifact_binding": {
+      "source_commit": "51b0e4aed0e790b96e0020f21ce15d658efd61c6",
+      "run_id": 36898008829,
+      "artifact_id": 11184345103,
+      "binary_sha256": "d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6",
+      "version_output": "grok 1.0.41+infinishell.session-notifications.4 (07e35a3dfeed)",
+      "audit_sha256": "001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b",
+      "test_audit_sha256": "222f101b0f2cc709e513750de8d197adf6372ac8d42e4dfff7599ad904b911c7",
+      "status": "native_source_and_startup_passed_host_final_pending",
+      "test_executions": 525,
+      "unique_test_names": 516,
+      "boundary": "仅绑定官方来源构建的实际ELF和完整版本；宿主最终门禁尚未结束，Linux实机交互仍移交；cargo test不覆盖旧Mac nextest LEAK。",
+      "cleanup": "Linux原生临时目录因进程引用可见性不足保留，cleanup_ready=false；不称清理完成。",
+      "localization": "无用户可见文案变化，无需本地化变更。",
+      "local_check": {
+        "run_id": "r-9ik7wddp",
+        "log_sha256": "a2e24beefa0a1d243262c6239330950c80adf273cd128a20cf8f3426c04e31a7",
+        "status": "passed_cleaned"
+      },
+      "i18n": {
+        "run_id": "r-c_0vh2fh",
+        "log_sha256": "92841df85882c155c9fcad8107182cf4b1484ba50acabcbed5f1b0b1aa439f74",
+        "passed": 11,
+        "cleanup": "cleaned"
+      },
+      "gap_closed": false
     }
   }
 }
