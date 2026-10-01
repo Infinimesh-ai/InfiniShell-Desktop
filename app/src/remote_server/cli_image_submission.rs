@@ -348,7 +348,7 @@ impl RemoteImageSubmission {
         let accepted = journal
             .record_queue_result(&intent, &result)
             .map_err(|_| ())?;
-        if matches!(result.status.as_str(), "confirmed" | "rejected") {
+        if matches!(result.status.as_str(), "confirmed" | "rejected" | "retired") {
             let _ = journal
                 .recover(&self.client, &self.scope, self.revision)
                 .await;
@@ -356,17 +356,19 @@ impl RemoteImageSubmission {
             state.references.clear();
             state.pending_lease = None;
             drop(state);
-            SUBMISSIONS
-                .lock()
-                .expect("image registry poisoned")
-                .unknown
-                .remove(&(
-                    self.view_id,
-                    self.binding.listener_id,
-                    self.binding.model_events_id,
-                    self.scope.cli_session_id.clone(),
-                    subject,
-                ));
+            if result.status != "retired" {
+                SUBMISSIONS
+                    .lock()
+                    .expect("image registry poisoned")
+                    .unknown
+                    .remove(&(
+                        self.view_id,
+                        self.binding.listener_id,
+                        self.binding.model_events_id,
+                        self.scope.cli_session_id.clone(),
+                        subject,
+                    ));
+            }
         }
         Ok(accepted)
     }

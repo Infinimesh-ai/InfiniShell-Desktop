@@ -3,6 +3,7 @@
 //! cc-socks 只接收文本；真实图片由当前会话的 Read 工具读取，保留原生审批。
 //! 写出文本不代表图片已消费；只有最终会话历史中的内联原图可产生回执。
 
+use std::cell::Cell;
 use std::collections::HashSet;
 use std::fs::{self, File, Metadata, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -190,6 +191,18 @@ struct NativeRegistry {
     kind: String,
 }
 
+/// 只有进入首个原生 write 调用才置位；调用返回错误后可证明仍未开始写出。
+#[derive(Default)]
+pub(crate) struct ClaudeWriteState {
+    started: Cell<bool>,
+}
+
+impl ClaudeWriteState {
+    pub(crate) fn started(&self) -> bool {
+        self.started.get()
+    }
+}
+
 pub(crate) struct ClaudeImageInbox {
     stream: UnixStream,
     target: ClaudeInboxTarget,
@@ -273,10 +286,15 @@ impl ClaudeImageInbox {
         client_message_id: Uuid,
         text: &str,
         images: &[ClaudeQueueImage],
+        write_state: &ClaudeWriteState,
         before_write: impl FnOnce(&ClaudeQueuedImageAttempt) -> io::Result<()>,
         validate: &impl Fn(&UnixStream) -> io::Result<()>,
     ) -> io::Result<ClaudeQueuedImageAttempt> {
-        if client_message_id.is_nil() || text.len() > MAX_WIRE_BYTES / 2 || text.contains('\0') {
+        if write_state.started()
+            || client_message_id.is_nil()
+            || text.len() > MAX_WIRE_BYTES / 2
+            || text.contains('\0')
+        {
             return Err(rejected("invalid_request"));
         }
         let image_leases = prepare_images(images)?;
@@ -379,7 +397,7 @@ impl ClaudeImageInbox {
         if let Some(transcript) = &transcript {
             verify_file_path(transcript, &self.target.transcript_path)?;
         } else {
-            // 领取后若原生已创建历史，本次不猜测新的发送边界；仍保留 Unknown。
+            // 领取后若原生已创建历史，本次不猜测新的发送边界；首写前失败可持久拒绝。
             match path_guard
                 .anchor
                 .open(&self.target.transcript_path, self.target.session_id)
@@ -389,7 +407,8 @@ impl ClaudeImageInbox {
                 Err(error) => return Err(error),
             }
         }
-        // auth 与 user 均为 JSONL。没有输入 ACK；写入、关闭或之后的错误都保留 Unknown。
+        // auth 与 user 均为 JSONL。首个 write 一旦开始，错误也不能证明零字节。
+        write_state.started.set(true);
         self.stream
             .write_all(&auth)
             .and_then(|()| self.stream.write_all(&encoded))

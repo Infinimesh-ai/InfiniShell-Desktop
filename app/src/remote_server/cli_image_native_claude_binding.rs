@@ -11,6 +11,7 @@ use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use super::cli_image_claude_queue::{ClaudeInboxTarget, TranscriptPathGuard};
+use super::cli_image_native_lifetime::NativeLifetime;
 use super::cli_image_native_process::{Configuration, Process, peer_pid, process};
 use super::proto::CliImageClaudeBinding;
 
@@ -127,6 +128,14 @@ impl Binding {
         };
         binding.validate(&stream)?;
         Ok((binding, stream))
+    }
+
+    /// 前后均核验原 socket/映像/会话，不能把复用 PID 的新进程存为原消费者。
+    pub(super) fn lifetime(&self, stream: &UnixStream) -> io::Result<NativeLifetime> {
+        self.validate(stream)?;
+        let lifetime = NativeLifetime::capture(self.process.pid)?;
+        self.validate(stream)?;
+        Ok(lifetime)
     }
 
     pub(super) fn target(&self) -> ClaudeInboxTarget {

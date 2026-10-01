@@ -26,6 +26,18 @@ impl TerminalView {
             if event.terminal_view_id() == me.view_id
                 && matches!(
                     event,
+                    CLIAgentSessionsModelEvent::Ended {
+                        agent: CLIAgent::Claude,
+                        ..
+                    }
+                )
+            {
+                // 结束通知仅触发只读查询；服务端仍须核验原消费者的内核生存期。
+                me.recover_current_remote_image_references(ctx);
+            }
+            if event.terminal_view_id() == me.view_id
+                && matches!(
+                    event,
                     CLIAgentSessionsModelEvent::SessionUpdated {
                         agent: CLIAgent::Claude,
                         ..

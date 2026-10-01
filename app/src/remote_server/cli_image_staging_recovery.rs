@@ -55,6 +55,19 @@ pub(in crate::remote_server) struct QueueClaim {
     pub(in crate::remote_server) claude_recovery: Option<serde_json::Value>,
 }
 
+/// 此终态仅在原生首写尚未开始时保存，不伪造原生历史或领取记录。
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(in crate::remote_server) struct PreflightRejection {
+    pub(in crate::remote_server) version: u32,
+    pub(in crate::remote_server) host: String,
+    pub(in crate::remote_server) native_session: String,
+    pub(in crate::remote_server) submission: Uuid,
+    pub(in crate::remote_server) key_hash: [u8; 32],
+    pub(in crate::remote_server) subject: [u8; 32],
+    pub(in crate::remote_server) references: Vec<(Uuid, Uuid)>,
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(in crate::remote_server) struct QueueResult {
@@ -243,6 +256,74 @@ impl ReferenceStore {
             .join(&reference.filename)
     }
 
+    pub(super) fn reject_preflight(&self, rejection: &PreflightRejection) -> io::Result<()> {
+        let _guard = self.acquire()?;
+        if rejection.version != 1
+            || rejection.host.is_empty()
+            || rejection.native_session.is_empty()
+            || rejection.submission.is_nil()
+            || rejection.references.is_empty()
+            || rejection.references.len() > 20
+            || read_record::<QueueClaim>(
+                &self
+                    .root
+                    .join(format!("queue-{}.json", rejection.submission)),
+            )?
+            .is_some()
+        {
+            return Err(invalid());
+        }
+        let path = self.preflight_rejection_path(rejection.submission);
+        if let Some(previous) = read_record::<PreflightRejection>(&path)? {
+            return if previous == *rejection {
+                Ok(())
+            } else {
+                Err(invalid())
+            };
+        }
+        for (id, key) in &rejection.references {
+            let reference =
+                read_record::<Reference>(&self.record_path(*id))?.ok_or_else(invalid)?;
+            self.require_owner(
+                &reference,
+                &rejection.host,
+                &rejection.native_session,
+                key_hash(*key)?,
+            )?;
+            if self.release_record(*id)?.is_some() {
+                return Err(invalid());
+            }
+            self.open_reference_file(&reference)?;
+        }
+        write_record(&self.root, &path, rejection)
+    }
+
+    pub(super) fn preflight_rejection(
+        &self,
+        host: &str,
+        native_session: &str,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<PreflightRejection>> {
+        let _guard = self.acquire()?;
+        let value = read_record::<PreflightRejection>(&self.preflight_rejection_path(submission))?;
+        if let Some(rejection) = &value
+            && (rejection.version != 1
+                || rejection.host != host
+                || rejection.native_session != native_session
+                || rejection.submission != submission
+                || rejection.key_hash != key_hash(key)?)
+        {
+            return Err(invalid());
+        }
+        Ok(value)
+    }
+
+    fn preflight_rejection_path(&self, submission: Uuid) -> PathBuf {
+        self.root
+            .join(format!("queue-preflight-rejected-{submission}.json"))
+    }
+
     /// 原生写入前落盘未知状态。已经存在的编号只可查询，不能再次领取发送。
     pub(super) fn claim_queue(&self, claim: &QueueClaim) -> io::Result<()> {
         let _guard = self.acquire()?;
@@ -252,6 +333,8 @@ impl ReferenceStore {
             || claim.references.len() > 20
             || claim.submission.is_nil()
             || read_record::<QueueClaim>(&path)?.is_some()
+            || read_record::<PreflightRejection>(&self.preflight_rejection_path(claim.submission))?
+                .is_some()
         {
             return Err(invalid());
         }
@@ -281,8 +364,12 @@ impl ReferenceStore {
         )?
         .ok_or_else(invalid)?;
         if claim != result.claim
-            || !matches!(result.status.as_str(), "confirmed" | "rejected")
+            || !matches!(result.status.as_str(), "confirmed" | "rejected" | "retired")
             || (result.status == "confirmed" && result.native_queue_id.is_empty())
+            || (result.status == "retired"
+                && (claim.claude_recovery.is_none()
+                    || !result.native_queue_id.is_empty()
+                    || result.native_ack_sha256.is_some()))
         {
             return Err(invalid());
         }
@@ -404,7 +491,7 @@ impl ReferenceStore {
         )? {
             Some(result)
                 if result.claim == claim
-                    && matches!(result.status.as_str(), "confirmed" | "rejected") =>
+                    && matches!(result.status.as_str(), "confirmed" | "rejected" | "retired") =>
             {
                 Ok(Some(result))
             }

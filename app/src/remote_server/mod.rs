@@ -100,6 +100,8 @@ mod cli_image_native_claude_binding;
 #[cfg(all(unix, feature = "local_fs"))]
 mod cli_image_native_process;
 #[cfg(all(unix, feature = "local_fs"))]
+mod cli_image_native_lifetime;
+#[cfg(all(unix, feature = "local_fs"))]
 mod cli_image_staging;
 #[cfg(all(unix, feature = "local_fs"))]
 mod cli_image_staging_rpc;

@@ -81,12 +81,14 @@ fn private_file(path: &Path, bytes: &[u8]) {
 fn first_image_sends_once_without_creating_native_history_or_parents() {
     let fixture = InboxFixture::new();
     let (inbox, mut peer) = fixture.connect();
+    let write_state = ClaudeWriteState::default();
     let message = Uuid::new_v4();
     let attempt = inbox
         .submit_once(
             message,
             "首图输入",
             &[fixture.image.clone()],
+            &write_state,
             |attempt| {
                 assert!(matches!(attempt, ClaudeQueuedImageAttempt::Pending(_)));
                 assert!(!fixture.target.transcript_path.parent().unwrap().exists());
@@ -95,6 +97,7 @@ fn first_image_sends_once_without_creating_native_history_or_parents() {
             &|_| Ok(()),
         )
         .unwrap();
+    assert!(write_state.started());
     let mut wire = String::new();
     peer.read_to_string(&mut wire).unwrap();
     let frames = wire
@@ -111,17 +114,20 @@ fn first_image_sends_once_without_creating_native_history_or_parents() {
 fn failed_durable_claim_sends_no_auth_or_user_bytes() {
     let fixture = InboxFixture::new();
     let (inbox, mut peer) = fixture.connect();
+    let write_state = ClaudeWriteState::default();
     assert!(
         inbox
             .submit_once(
                 Uuid::new_v4(),
                 "首图",
                 &[fixture.image.clone()],
+                &write_state,
                 |_| Err(io::Error::other("fixture claim failure")),
                 &|_| Ok(())
             )
             .is_err()
     );
+    assert!(!write_state.started());
     let mut wire = Vec::new();
     peer.read_to_end(&mut wire).unwrap();
     assert!(wire.is_empty());
@@ -142,6 +148,7 @@ fn legacy_attempt_round_trips_without_new_fields_or_pending_fallback() {
             Uuid::new_v4(),
             "既有历史",
             &[fixture.image.clone()],
+            &ClaudeWriteState::default(),
             |_| Ok(()),
             &|_| Ok(()),
         )
@@ -185,6 +192,7 @@ fn legacy_recovery_does_not_treat_replaced_history_as_pending() {
             Uuid::new_v4(),
             "旧记录",
             &[fixture.image.clone()],
+            &ClaudeWriteState::default(),
             |_| Ok(()),
             &|_| Ok(()),
         )
@@ -206,12 +214,14 @@ fn legacy_recovery_does_not_treat_replaced_history_as_pending() {
 fn creation_during_claim_does_not_change_the_frozen_send_boundary() {
     let fixture = InboxFixture::new();
     let (inbox, mut peer) = fixture.connect();
+    let write_state = ClaudeWriteState::default();
     assert!(
         inbox
             .submit_once(
                 Uuid::new_v4(),
                 "首图",
                 &[fixture.image.clone()],
+                &write_state,
                 |_| {
                     fs::DirBuilder::new()
                         .recursive(true)
@@ -225,7 +235,29 @@ fn creation_during_claim_does_not_change_the_frozen_send_boundary() {
             )
             .is_err()
     );
+    assert!(!write_state.started());
     let mut wire = Vec::new();
     peer.read_to_end(&mut wire).unwrap();
     assert!(wire.is_empty());
+}
+
+#[test]
+fn native_write_error_is_not_reclassified_as_zero_write() {
+    let fixture = InboxFixture::new();
+    let (inbox, peer) = fixture.connect();
+    drop(peer);
+    let write_state = ClaudeWriteState::default();
+    assert!(
+        inbox
+            .submit_once(
+                Uuid::new_v4(),
+                "首图",
+                &[fixture.image.clone()],
+                &write_state,
+                |_| Ok(()),
+                &|_| Ok(()),
+            )
+            .is_err()
+    );
+    assert!(write_state.started());
 }

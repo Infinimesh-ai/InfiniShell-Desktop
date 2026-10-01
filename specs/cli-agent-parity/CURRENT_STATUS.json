@@ -6055,5 +6055,24 @@
     "contract": "Explicit pending history, immutable claim, directory anchor, first inode bound durably before parse; unknown queries never resend",
     "boundary": "observed_len仅首次观察长度下限；新SSH/tmux消费及异常恢复和Linux/Windows源码门禁未完成",
     "newly_closed_gaps": 0
+  },
+  "g08_claude_consumption_and_retirement_20261001": {
+    "status": "implemented_local_gates_passed_gap_open",
+    "source_base": "e8233ac67e0382d388f806d3e3aba10a4b20953f",
+    "newly_closed_gaps": 0,
+    "real_ssh_source": "e8233ac67e0382d388f806d3e3aba10a4b20953f",
+    "real_ssh_native": "Claude 2.1.280 / claude-opus-5-5",
+    "real_ssh_evidence": "resume-20261001/g08-preparation/r-p7h47_62-claude-ssh-gui/first-image-native-consumption.safe.json",
+    "real_ssh_evidence_sha256": "c66dd5eb6c92da18425d376396e29f3c1e475c7789908f91b8af7d56508fdf6d",
+    "real_ssh_result": "一次首图真实Read及规范PNG精确字节成功；attachment祖先遗漏导致无消费终态及回收，G08不关闭",
+    "implementation": "attachment仅参与祖先关联；首写前持久拒绝；只读原消费者生存期与Linux观察环境绑定；退休清图但Unknown防重及草稿保留；旧无Token记录不推定退出",
+    "localization": "既有英中文案语义已审计，无需本地化变更；新构建实际布局待验",
+    "mac_check": "passed r-z2d5d9lf",
+    "related_nextest": "136/136 including 22 new regressions",
+    "i18n": "11/11",
+    "cross_platform_gate": "pending for this increment; e823 previous gate 36808124672 passed",
+    "boundary": "本轮修复后的真实功能、双语布局、Codex/Grok与SSH/tmux异常组合均待验；不把前一构建消费证据当成本轮回收成功",
+    "local_evidence": "resume-20261001/g08-preparation/g08-consumption-release-local-gates-v2.safe.json",
+    "local_evidence_sha256": "542d123c414997aa4cf8fa599c2fc4a8374953f8279d97910f376953da83b624"
   }
 }

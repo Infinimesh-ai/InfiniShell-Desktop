@@ -2,7 +2,17 @@
 
 本报告保留截至 2026-10-01 的固定版本验收结论、源码来源和未验边界，不保存逐轮日志或截图。**这是阶段交付，完整 Goal 尚未完成。** 当前状态以 [CURRENT_STATUS](CURRENT_STATUS.json) 为准；剩余功能、优先级和关闭条件统一维护在 [KNOWN_GAPS](KNOWN_GAPS.md)。
 
-## 2026-10-01：G08 Claude 首图历史延迟创建实现，缺口继续开放
+## 2026-10-01：G08 真实 SSH 首图读取成功，消费关联及异常回收修复待复验
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `e8233ac67e0382d388f806d3e3aba10a4b20953f` 的独立新 Mac 构建及签名 GUI，在真实 SSH 普通 Claude `2.1.280` 中完成一次首图提交：新 SID 起始无 `<SID>.jsonl`，原生自行创建历史，仅本文件 Read 审批后返回 typed PNG，328 字节与上传规范 PNG 完全相等，最终答案 `Red, Blue`。原始 137 字节 PNG 被产品重新编码，已有像素相同证明；不混同原编码与规范 PNG 的字节一致性。选定请求／祖先关系、Read、结果摘要和最终答案收据为仓外 `resume-20261001/g08-preparation/r-p7h47_62-claude-ssh-gui/first-image-native-consumption.safe.json`，SHA-256 `c66dd5eb6c92da18425d376396e29f3c1e475c7789908f91b8af7d56508fdf6d`；没有导出完整历史、系统提示、隐藏推理或凭据。
+
+该实测发现消费解析只接收 user／assistant，真实请求至 Read 的四个原生 `attachment` 因而断链，服务端未产生确认或回收记录。草稿和卡片保留是独立观察，延迟回执本来也不能清除已切换代次的草稿。另在旧 142c 首图失败现场确认普通 Claude 没有可靠退出回收，第二次相同图片／正文被防重挡在宿主领取之前；旧截图不能当成第二次原生预检失败。
+
+本轮精准修复仅让同 SID、非 sidechain 的 `attachment` 连接祖先图，其内容不提供任何工具或图片证明，`system` 不扩围；同时把首个原生 write 之前可证明的失败持久为拒绝，写入开始后仍为 Unknown。新提交保存独立的只读原生生存期，Linux 还固定观察者 PID namespace 与 `/proc` 根身份；原消费者明确结束才退休图片引用。退休不确认消费、不解锁同 SID／正文、不清草稿，旧无生存期记录不补猜身份。既有英中消费／未确认／远程 Read 提示的语义已复核，**无需本地化变更**。Mac check、相关 nextest 136／136（新增 22 项）、i18n 11／11 均通过；成功门禁的短 TMPDIR 均已清理，逐名 PASS 无 FAIL／LEAK／FLAKY／重试。收据 `resume-20261001/g08-preparation/g08-consumption-release-local-gates-v2.safe.json` SHA-256 `542d123c414997aa4cf8fa599c2fc4a8374953f8279d97910f376953da83b624`。首轮闭包生命周期编译失败及测试 Command 导入失败均保留原日志，分别精准修正后通过；其后仅 rustfmt 合并闭包换行，逆变换与测试源码摘要一致，最终 check 再通过；没有修无关警告。新构建真实回收、双语布局、Codex／Grok、SSH／tmux 异常组合和本轮跨平台源码门禁尚未完成。
+
+前一提交 `e8233ac67` 的 [Linux／Windows 源码门禁 36808124672](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36808124672) 已完成：Linux 主组 1508／1508，新增首图 20 项逐名首次 PASS，i18n 11；Windows 主组 1327／1327、桌面／TUI 670／670、i18n 11。两平台完整日志无 FAIL／LEAK／FLAKY／重试，13 份小工件与 GitHub 摘要一致；审计收据 `resume-20261001/g08-preparation/ci-run-36808124672-e8233ac67/audit.safe.json` SHA-256 `f240cc955b1234086d3490f2bbc0e53876c4505f08ab3fa823286e7dd5f07b35`。独立 remote_server 图片客户端步骤、Linux 桌面／TUI、全量工作区及认证 GUI 均跳过；不外推为本轮新修复通过。
+
+## 2026-10-01 历史：G08 Claude 首图历史延迟创建实现，缺口继续开放
 
 本增量新增关闭 0 项，累计仍为 6 关闭／5 开放／3 移交，PR #22 保持草稿。Claude 首图不再要求原生提前创建历史；Pending 领取保存既存目录锚，首个原生 inode 绑定须持久化后才能按既有 Read／typed image 原字节证明确认。原 claim 不改写，旧格式不降级为 Pending，未知提交不重投。首次观察长度只提供长度下限，不能证明所有离线截断后重写。
 

@@ -181,7 +181,7 @@ impl Journal {
         Ok(intent)
     }
 
-    /// 精确 ACK 和显式未派发结果允许释放；Unknown/Absent 永远不被当成未执行。
+    /// 精确 ACK、显式未派发或原消费者退休允许释放；退休不证明已消费或未发送。
     pub(super) fn record_queue_result(
         &self,
         intent: &QueueIntent,
@@ -189,7 +189,12 @@ impl Journal {
     ) -> io::Result<bool> {
         if result.submission_id != intent.submission.to_string()
             || result.subject_sha256.as_slice() != intent.subject
-            || !matches!(result.status.as_str(), "confirmed" | "rejected" | "unknown")
+            || !matches!(
+                result.status.as_str(),
+                "confirmed" | "rejected" | "unknown" | "retired"
+            )
+            || (result.status == "retired"
+                && (!intent.claude || !result.native_queue_id.is_empty()))
             || (result.status == "confirmed" && result.native_queue_id.is_empty())
         {
             return Err(invalid());
@@ -223,15 +228,20 @@ impl Journal {
                 continue;
             }
             if self
-                .read::<bool>(&self.path("done", intent.transfer_id))?
-                .is_some()
-            {
-                continue;
-            }
-            if self
                 .read::<Claim>(&self.path("claim", intent.submission_id))?
                 .is_some_and(|claim| claim.subject == subject)
             {
+                let terminal = self
+                    .read::<(String, String)>(&self.path("queue-result", intent.submission_id))?;
+                // done 只证明引用回收；退休后的未知投递及旧无终态记录仍禁止同正文重投。
+                let known_terminal = terminal
+                    .as_ref()
+                    .is_some_and(|(status, _)| matches!(status.as_str(), "confirmed" | "rejected"));
+                if self.read::<bool>(&self.path("done", intent.transfer_id))? == Some(true)
+                    && known_terminal
+                {
+                    continue;
+                }
                 return Err(invalid());
             }
         }
@@ -382,7 +392,8 @@ impl Journal {
                     };
                     if result.status != "absent" {
                         self.record_queue_result(&queue, &result)?;
-                        release = matches!(result.status.as_str(), "confirmed" | "rejected");
+                        release =
+                            matches!(result.status.as_str(), "confirmed" | "rejected" | "retired");
                     }
                     recovered_queues.insert(intent.submission_id, release);
                 }

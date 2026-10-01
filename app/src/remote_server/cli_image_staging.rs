@@ -21,7 +21,7 @@ use super::cli_image_claude_queue::{
 
 #[path = "cli_image_staging_recovery.rs"]
 mod recovery;
-pub(super) use recovery::{QueueClaim, QueueResult};
+pub(super) use recovery::{PreflightRejection, QueueClaim, QueueResult};
 
 const MAX_CHUNK_BYTES: usize = 4 * 1024 * 1024;
 const MAX_SCOPE_TRANSFERS: usize = 32;
@@ -75,6 +75,33 @@ pub(crate) struct RemoteImageStaging {
 impl RemoteImageStaging {
     pub(super) fn queue_status(&self, scope: &RemoteImageScope, submission: Uuid, key: Uuid) -> io::Result<Option<QueueResult>> {
         self.references.queue_status(scope.host_id.as_str(), &scope.cli_session_id, submission, key)
+    }
+
+    pub(super) fn preflight_rejection(
+        &self,
+        scope: &RemoteImageScope,
+        submission: Uuid,
+        key: Uuid,
+    ) -> io::Result<Option<PreflightRejection>> {
+        self.references.preflight_rejection(
+            scope.host_id.as_str(),
+            &scope.cli_session_id,
+            submission,
+            key,
+        )
+    }
+
+    pub(super) fn reject_preflight(
+        &mut self,
+        scope: &RemoteImageScope,
+        rejection: &PreflightRejection,
+    ) -> io::Result<()> {
+        self.references.reject_preflight(rejection)?;
+        // 先持久拒绝再回收，响应丢失或中途断连也能仅凭原身份继续清理。
+        for (id, key) in &rejection.references {
+            self.release_recovered(scope, *id, *key)?;
+        }
+        Ok(())
     }
 
     pub(super) fn claim_queue(&self, claim: &QueueClaim) -> io::Result<()> {

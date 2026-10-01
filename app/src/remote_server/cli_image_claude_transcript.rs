@@ -306,7 +306,7 @@ fn parse_record(line: &[u8], attempt: &ClaudeImageAttempt) -> io::Result<Option<
     let Some(kind) = value.get("type").and_then(Value::as_str) else {
         return Ok(None);
     };
-    if kind != "assistant" && kind != "user" {
+    if !matches!(kind, "assistant" | "user" | "attachment") {
         return Ok(None);
     }
     let Some(uuid) = value.get("uuid").and_then(value_uuid) else {
@@ -324,12 +324,17 @@ fn parse_record(line: &[u8], attempt: &ClaudeImageAttempt) -> io::Result<Option<
     let mut record = NativeRecord {
         uuid,
         parent: value.get("parentUuid").and_then(value_uuid),
-        source_assistant: value.get("sourceToolAssistantUUID").and_then(value_uuid),
+        source_assistant: None,
         request_root,
         raw_sha256: Sha256::digest(line).into(),
         reads: Vec::new(),
         results: Vec::new(),
     };
+    // 原生 attachment 会串入 parentUuid 链；只保留祖先身份，不把其内容视为工具证明。
+    if kind == "attachment" {
+        return Ok(Some(record));
+    }
+    record.source_assistant = value.get("sourceToolAssistantUUID").and_then(value_uuid);
     let Some(content) = value.pointer("/message/content").and_then(Value::as_array) else {
         return Ok(Some(record));
     };
@@ -412,3 +417,7 @@ fn native_tool_id(value: &Value) -> Option<&str> {
         .as_str()
         .filter(|id| !id.is_empty() && id.len() <= 512 && !id.chars().any(char::is_control))
 }
+
+#[cfg(test)]
+#[path = "cli_image_claude_transcript_tests.rs"]
+mod tests;
