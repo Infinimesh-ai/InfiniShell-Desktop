@@ -1320,6 +1320,8 @@ struct NavigationCache {
 struct SessionBootstrapInfo {
     shell_type: String,
     shell_path: Option<String>,
+    shell_pid: Option<u32>,
+    shell_tty: Option<String>,
 }
 
 /// Singleton model that manages connections to `remote_server` processes on
@@ -3089,17 +3091,43 @@ impl RemoteServerManager {
         shell_type: &str,
         shell_path: Option<&str>,
     ) {
+        self.notify_session_bootstrapped_with_terminal_candidate(
+            session_id,
+            shell_type,
+            shell_path,
+            None,
+            None,
+        );
+    }
+
+    /// 重连只重发候选，不能恢复前一连接已取得的终端绑定。
+    pub fn notify_session_bootstrapped_with_terminal_candidate(
+        &mut self,
+        session_id: SessionId,
+        shell_type: &str,
+        shell_path: Option<&str>,
+        shell_pid: Option<u32>,
+        shell_tty: Option<&str>,
+    ) {
         // Always persist so we can re-send after a reconnect.
         self.session_bootstrap_info.insert(
             session_id,
             SessionBootstrapInfo {
                 shell_type: shell_type.to_owned(),
                 shell_path: shell_path.map(ToOwned::to_owned),
+                shell_pid,
+                shell_tty: shell_tty.map(ToOwned::to_owned),
             },
         );
 
         if let Some(client) = self.client_for_session(session_id) {
-            client.notify_session_bootstrapped(session_id, shell_type, shell_path);
+            client.notify_session_bootstrapped_with_terminal_candidate(
+                session_id,
+                shell_type,
+                shell_path,
+                shell_pid,
+                shell_tty,
+            );
         } else {
             log::info!(
                 "notify_session_bootstrapped: session {session_id:?} not yet connected, \
@@ -3952,10 +3980,12 @@ impl RemoteServerManager {
             log::info!(
                 "Remote server sending SessionBootstrapped notification: session={session_id:?}"
             );
-            client.notify_session_bootstrapped(
+            client.notify_session_bootstrapped_with_terminal_candidate(
                 session_id,
                 &info.shell_type,
                 info.shell_path.as_deref(),
+                info.shell_pid,
+                info.shell_tty.as_deref(),
             );
         }
     }

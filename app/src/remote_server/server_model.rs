@@ -33,6 +33,10 @@ use super::proto::{
 mod codex;
 #[path = "server_model_grok.rs"]
 mod grok;
+#[path = "server_model_terminal_binding.rs"]
+mod terminal_binding;
+#[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+use super::terminal_binding_service::Connection as TerminalBindingConnection;
 
 #[cfg(all(
     feature = "local_fs",
@@ -322,6 +326,8 @@ pub struct ServerModel {
     /// a connection's `Uuid` to the channel the connection task drains to
     /// write `ServerMessage`s back to its proxy.
     connection_senders: HashMap<ConnectionId, async_channel::Sender<ServerMessage>>,
+    #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+    terminal_binding_connections: HashMap<ConnectionId, Arc<TerminalBindingConnection>>,
     #[cfg(all(unix, feature = "local_fs"))]
     image_staging: Option<Arc<ImageStagingService>>,
     #[cfg(all(unix, feature = "local_fs"))]
@@ -476,6 +482,8 @@ impl ServerModel {
                 )
             ))]
             codex_owned_connections: HashMap::new(),
+            #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+            terminal_binding_connections: HashMap::new(),
             snapshot_sent_roots_by_connection: HashMap::new(),
             grace_timer_cancel: None,
             in_progress: HashMap::new(),
@@ -965,6 +973,10 @@ impl ServerModel {
         self.codex_owned_connections
             .entry(conn_id)
             .or_insert_with(|| Arc::new(CodexOwnedConnection::new()));
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        self.terminal_binding_connections
+            .entry(conn_id)
+            .or_insert_with(|| Arc::new(TerminalBindingConnection::new(self.host_id.clone())));
         self.connection_senders.insert(conn_id, conn_tx);
         self.snapshot_sent_roots_by_connection
             .insert(conn_id, HashSet::new());
@@ -974,6 +986,11 @@ impl ServerModel {
     /// Called when a proxy disconnects.  Removes it from the connection map
     /// and starts the grace timer if no connections remain.
     pub fn deregister_connection(&mut self, conn_id: ConnectionId, ctx: &mut ModelContext<Self>) {
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        if let Some(connection) = self.terminal_binding_connections.remove(&conn_id) {
+            let retired = connection.disconnect();
+            ctx.background_executor().spawn(async move { drop(retired); }).detach();
+        }
         #[cfg(all(
             feature = "local_fs",
             any(
@@ -1229,6 +1246,9 @@ impl ServerModel {
                     Some(session_scoped_request::Message::CliCodexOwned(m)) => {
                         self.handle_cli_codex_owned(m, &request_id, conn_id, ctx)
                     }
+                    Some(session_scoped_request::Message::TerminalBinding(m)) => {
+                        self.handle_terminal_binding(m, &request_id, conn_id, ctx)
+                    }
                     Some(session_scoped_request::Message::GetDiffState(m)) => {
                         self.handle_get_diff_state(m, &request_id, conn_id, ctx)
                     }
@@ -1292,7 +1312,15 @@ impl ServerModel {
                     Some(notification::Message::RevokeCliCodexOwned(request)) => {
                         self.revoke_cli_codex_owned(request, conn_id);
                     }
+                    Some(notification::Message::CancelTerminalBinding(request)) => {
+                        self.cancel_terminal_binding(request, conn_id, ctx);
+                    }
                     Some(notification::Message::SessionBootstrapped(m)) => {
+                        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+                        if let Some(connection) = self.terminal_binding_connections.get(&conn_id) {
+                            let retired = connection.bootstrap(&m);
+                            ctx.background_executor().spawn(async move { drop(retired); }).detach();
+                        }
                         #[cfg(all(
                             feature = "local_fs",
                             any(
@@ -1730,6 +1758,10 @@ impl ServerModel {
         if let Some(connection) = self.codex_owned_connections.get(&conn_id) {
             connection.initialize();
         }
+        #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+        if let Some(connection) = self.terminal_binding_connections.get(&conn_id) {
+            connection.initialize();
+        }
         let server_version = ChannelState::app_version().unwrap_or("").to_string();
         HandlerOutcome::Sync(server_message::Message::InitializeResponse(
             InitializeResponse {
@@ -1780,6 +1812,8 @@ impl ServerModel {
             if self.codex_owned.is_some() && self.image_staging.is_some() {
                 capabilities.push(RemoteServerCapability::CliCodexOwnedV1.into());
             }
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            capabilities.push(RemoteServerCapability::TerminalBindingV1.into());
             capabilities
         }
         #[cfg(not(all(unix, feature = "local_fs")))]

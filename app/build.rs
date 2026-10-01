@@ -48,6 +48,11 @@ fn main() -> Result<()> {
             .file("src/platform/mac/objc/services.m")
             .compile("warp_objc");
 
+        println!("cargo:rerun-if-changed=src/remote_server/tmux_native_macos.c");
+        cc::Build::new()
+            .file("src/remote_server/tmux_native_macos.c")
+            .compile("warp_tmux_native");
+
         // Build the dock tile plugin
         println!("cargo:rerun-if-changed=DockTilePlugin/InfiniShellDockTilePlugin.m");
         println!("cargo:rerun-if-changed=DockTilePlugin/InfiniShellDockTilePlugin.h");

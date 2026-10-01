@@ -33,6 +33,7 @@ use crate::ssh_manager::password_prompt::{
 };
 use crate::ssh_manager::{SshTreeChangedEvent, SshTreeChangedNotifier};
 pub(crate) mod docker_sandbox;
+mod terminal_binding;
 #[cfg(all(
     feature = "local_fs",
     feature = "local_tty",
@@ -2657,6 +2658,7 @@ pub struct TerminalView {
         )
     ))]
     grok_remote_owned: Option<grok_remote_owned::RemoteOwned>,
+    remote_terminal_binding: Option<terminal_binding::TerminalBinding>,
     #[cfg(all(
         feature = "local_fs",
         feature = "local_tty",
@@ -4430,6 +4432,7 @@ impl TerminalView {
                 )
             ))]
             grok_remote_owned: None,
+            remote_terminal_binding: None,
             #[cfg(all(
                 feature = "local_fs",
                 feature = "local_tty",
@@ -4598,6 +4601,7 @@ impl TerminalView {
         if FeatureFlag::SshRemoteServer.is_enabled() {
             let mgr_handle = RemoteServerManager::handle(ctx);
             ctx.subscribe_to_model(&mgr_handle, |me, _, event, ctx| {
+                me.invalidate_remote_terminal_binding(ctx);
                 // `RemoteServerManager` is a singleton, so every `TerminalView` receives every event.
                 // Filter for session-scoped events that are specifically tracked by this view.
                 // Host-scoped variants return `None` and pass through unfiltered.
@@ -12019,6 +12023,7 @@ impl TerminalView {
     }
 
     fn handle_terminal_event(&mut self, event: &ModelEvent, ctx: &mut ViewContext<Self>) {
+        self.invalidate_remote_terminal_binding(ctx);
         #[cfg(all(
             feature = "local_fs",
             feature = "local_tty",
@@ -13144,6 +13149,9 @@ impl TerminalView {
                     state,
                     block_id: Some(block_id.clone()),
                 });
+            }
+            ModelEvent::TerminalBindingChallenge(challenge) => {
+                self.handle_terminal_binding_challenge(challenge, ctx);
             }
             ModelEvent::PluggableNotification { title, body } => {
                 // Intercept structured CLI agent notifications (e.g. from Claude Code plugin).

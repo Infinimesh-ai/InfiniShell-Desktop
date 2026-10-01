@@ -2,6 +2,11 @@
 // `crate::remote_server::*` imports in `app` continue to work.
 pub use remote_server::*;
 
+#[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+mod tmux_native;
+#[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
+mod terminal_binding_service;
+
 #[cfg(not(target_family = "wasm"))]
 pub(crate) mod cli_image_submission;
 #[cfg(not(target_family = "wasm"))]

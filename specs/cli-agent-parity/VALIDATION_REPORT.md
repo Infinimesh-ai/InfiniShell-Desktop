@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：Codex SSH 首图、退出与重连通过，tmux 实现仍在推进
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `879d719be0792de3dda972c7ca83975e249f85e0` 的签名 Mac GUI（SHA-256 `c52ef94a466237852e454c32b842b0e5a8947eb3f54e430d9b9602ae1612766a`）在 `r-9ojwgeap` 实际 SSH 中通过产品菜单单次启动官方 Codex `0.156.1`。原生项目 trust 正常确认后，未发送暖身回合即出现可用富输入；一张图、一次 Return、一个完成回合、零工具调用，回答 `Red, Blue`。原生 `input_image` 与规范 PNG 均为 328 字节／SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，宿主／服务端 confirmed、released、done 与原生队列 ID 一致。原 137 字节图片经过规范化，不称原编码字节未变。
+
+自动收起后重开为空稿和 0 卡，没有手动清稿。一次原生 `/exit` 后 TUI／app-server 退出，票据 released 且 control socket 消失；同一 SSH 重连后只有远端 shell，唯一提交及原生历史摘要不变。消费收据 `7242e781cb44480d6e51e5c8a0cb78f88c1de5bcd13210eaca49df3bb04a7061`，退出／重连收据 `efe857bbea22d64a96bf272972dbdca0ecf4143841846ba75ef00cc767029d01`，均在 `resume-20261001/g08-preparation/r-9ojwgeap-grok-codex-owned-gui`。新短菜单英中两组均完整可见；在私有 GUI 设置中切语言且未重启，不扩为完整中文流程。截图仅 CUA 输出。App／sshd exit0、daemon 沿原宽限自然退出，finish 摘要 `e0633e77a77a7366624abe5ae649885ed3ad8e1bfcbe89726257f07ff0119a6f` 确认全部自有进程结束，外层 exit0／日志 `a4042cbdaa22e48559c1de1a3bc33757d6acbc8dbcc781154be3352f8389fcd4`；实时进程、打开文件、服务及目录身份复核后，原 slot 同设备排他保全到 `r-9ojwgeap/retired-remote-server`，收据 `1c47102113199025e7fe802c3d6e9b80d9819418c2c241beaa0be9dcfab2bea6`；原生历史及 profiles 保留，cleanup_ready=false。
+
+旧 [ea74 CI 36835106269](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36835106269) 已完成且失败，15 份工件的官方摘要、ZIP 摘要和 CRC 已核验。Linux host 1586、新 59、旧 20、client 9、desktop 670 通过；原生 bridge 78／notifications 376 通过；installed hook 17 项为 14 通过、1 错误、2 缺 shell 跳过，真实 main 的控制 TTY 为 0 字节。Windows host 1354、新 27、client 9 通过；原生 check 和 bridge 81 通过、notifications 371 通过／11 失败；desktop 669 通过及 1 条 LEAK 单列。终态审计 SHA-256 `97b18c039fdd1205375430be9577c0ccceaebd6483bc028bf363441e63ab2f69`，不以本机正例回填失败，也不外推到 879 或 aa 测试修正版。
+
+tmux 终端挑战、内核进程／socket 身份及新 pane 基础已实现，初次旧 fixture 缺字段失败保留；修正后 49 项及新增 guard 后 53 项定向回归分别通过。真实 API 三轮曾在同 pane 生存期比较失败：白名单诊断确认同 PID／出生 ID／TTY，仅 macOS `pid_version` 递增。本机 `/bin/sh` 是再次执行 Bash 的选择器，现直接使用系统 Bash 并禁用启动配置，等待最终映像后发布回执；未放宽身份比较。定位收据 `c6e6730cbdefc0f6863ed35005dd756fb21990df08599fd776d0066179955a0e`。修复版 `r-l93zb7q4` 单挑战、单新 pane、带特殊字符 argv／cwd、SID／TTY 与后续完整进程身份一致，旧 pane／撤销／重复保护、仅关闭自有 control、原生退出及清理均通过；日志 `9afe4d7fddb351633b10d6a73a7ff1f67275ed820c984b3c5388f377ee1e501a`。这是实际 tmux 产品 API 验收，尚未启动三款 CLI 或提交模型，不能计 G08 关闭。 基础源码 45 文件冻结摘要 `be36860b27f0740ec4c194caa39a4fdf1f2f23d0becf4191669433aa84613434`；最终 warp 定向 48 项、i18n 11 项及 `cargo check -p warp` 通过，remote_server 前轮 5 项源码未变，分轮记证。Python 诊断 9 项和含自托管标签配置的 actionlint 通过，汇总 `87f56cbe3debeaee12b2b6c8a82a318a747bde1e495499a7ff2e002badad989d`。本基础增量无需本地化变更。完整 tmux GUI 启动／图片消费、断连／拒绝／重复／旧回调组合、中文成功流程及最终源码门禁仍待完成。
+
 ## 2026-10-01：Codex 首回合只读绑定已实现，真实首图仍待验
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** 专属 Codex 在首个模型回合前，经原生 WebSocket 分页查询唯一 loaded thread，并用不含 turns 的 metadata 核对 cwd。原票据、TTY、进程出生、socket peer 和连接代次均须匹配；首次 SID 排他持久化，后续消费及恢复保持同一 SID。界面区分只读证明与真实 rich hook，未伪造 SessionStart，也未发送暖身回合。尚未就绪时保留单个有退避的观察请求；旧 client、epoch、block、ticket 或会话不可恢复旧图片绑定。
