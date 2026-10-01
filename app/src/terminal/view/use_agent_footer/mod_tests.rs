@@ -1330,6 +1330,138 @@ fn windows_image_policy_distinguishes_claude_codex_and_grok() {
     assert_eq!(cli_agent_paste_keystroke_bytes(CLIAgent::Grok, false), None);
 }
 
+fn begin_atomic_grok_draft_completion(
+    app: &mut App,
+    terminal: &ViewHandle<TerminalView>,
+) -> (Uuid, Rc<CliInputSubmission>) {
+    terminal.update(app, |view, ctx| {
+        view.input.update(ctx, |input, ctx| {
+            input.replace_buffer_content("原图片草稿", ctx);
+        });
+        view.ai_context_model.update(ctx, |model, ctx| {
+            model.append_pending_images(vec![test_image("aGVsbG8=", "original.png")], ctx);
+        });
+        let snapshot = Rc::new(CliInputSubmission {
+            agent: CLIAgent::Grok,
+            query: "原图片草稿".to_owned(),
+            editor_revision: view
+                .input
+                .as_ref(ctx)
+                .editor()
+                .as_ref(ctx)
+                .buffer_revision(ctx),
+            attachments_revision: view
+                .ai_context_model
+                .as_ref(ctx)
+                .pending_attachments_revision(),
+        });
+        let generation = CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            let generation = sessions.input_generation(view.view_id).unwrap();
+            assert!(sessions.begin_input_submission(view.view_id, generation));
+            assert!(
+                sessions
+                    .session(view.view_id)
+                    .unwrap()
+                    .session_context
+                    .query
+                    .is_none()
+            );
+            generation
+        });
+        (generation, snapshot)
+    })
+}
+
+fn assert_atomic_grok_draft_completion(
+    terminal: &ViewHandle<TerminalView>,
+    generation: Uuid,
+    expected_text: &str,
+    expected_images: &[ImageContext],
+    app: &App,
+) {
+    terminal.read(app, |view, ctx| {
+        assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), expected_text);
+        assert_eq!(
+            view.ai_context_model.as_ref(ctx).pending_images(),
+            expected_images.iter().collect::<Vec<_>>()
+        );
+        let sessions = CLIAgentSessionsModel::as_ref(ctx);
+        assert!(!sessions.is_input_submission_current(view.view_id, generation));
+        let session = sessions.session(view.view_id).unwrap();
+        assert_eq!(session.status, CLIAgentSessionStatus::InProgress);
+        assert_eq!(session.session_context.query.as_deref(), Some("原图片草稿"));
+        assert_eq!(
+            session.draft_text.as_deref(),
+            (!expected_text.is_empty()).then_some(expected_text)
+        );
+        // 本地完成回调只记账，不制造插件通知或原生 ACK。
+        assert!(!session.received_rich_notification);
+    });
+}
+
+#[test]
+fn atomic_grok_completion_preserves_new_text_with_original_image() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let (generation, snapshot) = begin_atomic_grok_draft_completion(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            view.input.update(ctx, |input, ctx| {
+                input.replace_buffer_content("新图片草稿", ctx);
+            });
+            view.complete_cli_agent_input_submit(generation, Some(snapshot), true, ctx);
+        });
+        assert_atomic_grok_draft_completion(
+            &terminal,
+            generation,
+            "新图片草稿",
+            &[test_image("aGVsbG8=", "original.png")],
+            &app,
+        );
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn atomic_grok_completion_preserves_original_text_with_new_image() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let (generation, snapshot) = begin_atomic_grok_draft_completion(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            view.ai_context_model.update(ctx, |model, ctx| {
+                model.append_pending_images(vec![test_image("d29ybGQ=", "new.png")], ctx);
+            });
+            view.complete_cli_agent_input_submit(generation, Some(snapshot), true, ctx);
+        });
+        assert_atomic_grok_draft_completion(
+            &terminal,
+            generation,
+            "原图片草稿",
+            &[
+                test_image("aGVsbG8=", "original.png"),
+                test_image("d29ybGQ=", "new.png"),
+            ],
+            &app,
+        );
+        assert!(writes.borrow().is_empty());
+    });
+}
+
+#[test]
+fn atomic_grok_completion_clears_unchanged_text_and_images_together() {
+    App::test((), |mut app| async move {
+        let terminal = prepare_rich_cli_test(&mut app, CLIAgent::Grok);
+        let writes = collect_cli_test_writes(&mut app, &terminal);
+        let (generation, snapshot) = begin_atomic_grok_draft_completion(&mut app, &terminal);
+        terminal.update(&mut app, |view, ctx| {
+            view.complete_cli_agent_input_submit(generation, Some(snapshot), true, ctx);
+        });
+        assert_atomic_grok_draft_completion(&terminal, generation, "", &[], &app);
+        assert!(writes.borrow().is_empty());
+    });
+}
+
 #[test]
 fn input_submission_lease_survives_old_callbacks_without_blocking_a_new_session() {
     App::test((), |mut app| async move {

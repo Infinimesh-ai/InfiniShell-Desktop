@@ -19,8 +19,8 @@ use windows::Win32::Storage::FileSystem::{
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 // 仅接受已核验的 Windows x64 定制 .11 工件，并通过实际主映像句柄核对摘要。
-pub(super) const ARTIFACT_SHA256: &str =
-    "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc";
+const ARTIFACT_SHA256S: &[&str] =
+    &["acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"];
 const MAX_ARTIFACT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -57,6 +57,7 @@ pub(super) struct Artifact {
     process: WindowsProcessLease,
     file: File,
     stamp: FileStamp,
+    sha256: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -122,31 +123,34 @@ impl FileStamp {
 
 impl Artifact {
     pub(super) fn capture(peer: &WindowsProcessLease) -> io::Result<Self> {
-        validate_digest(ARTIFACT_SHA256)?;
         peer.validate()?;
         let process = WindowsProcessLease::from_process_handle(peer)?;
         let mut bootstrap = Command::new(std::env::current_exe()?);
         bootstrap.arg("--grok-image-observer-bootstrap");
         let file = observe_process_image(peer, bootstrap)?;
         let stamp = FileStamp::read(&file)?;
-        verify_digest(&file, stamp, ARTIFACT_SHA256)?;
+        let sha256 = verify_digest(&file, stamp, ARTIFACT_SHA256S)?;
         process.validate()?;
         peer.validate()?;
         Ok(Self {
             process,
             file,
             stamp,
+            sha256,
         })
     }
 
+    pub(super) fn sha256(&self) -> &'static str {
+        self.sha256
+    }
+
     pub(super) fn verify(&self, peer: &WindowsProcessLease) -> io::Result<()> {
-        validate_digest(ARTIFACT_SHA256)?;
         self.process.validate()?;
         peer.validate()?;
         if self.process.identity() != peer.identity() {
             return Err(invalid());
         }
-        verify_digest(&self.file, self.stamp, ARTIFACT_SHA256)?;
+        verify_digest(&self.file, self.stamp, &[self.sha256])?;
         self.process.validate()?;
         peer.validate()
     }
@@ -163,8 +167,10 @@ fn validate_digest(expected: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn verify_digest(file: &File, stamp: FileStamp, expected: &str) -> io::Result<()> {
-    validate_digest(expected)?;
+fn verify_digest<'a>(file: &File, stamp: FileStamp, expected: &[&'a str]) -> io::Result<&'a str> {
+    for digest in expected {
+        validate_digest(digest)?;
+    }
     if FileStamp::read(file)? != stamp {
         return Err(invalid());
     }
@@ -182,10 +188,15 @@ fn verify_digest(file: &File, stamp: FileStamp, expected: &str) -> io::Result<()
         digest.update(&buffer[..count]);
         offset += count as u64;
     }
-    if FileStamp::read(file)? != stamp || format!("{:x}", digest.finalize()) != expected {
+    if FileStamp::read(file)? != stamp {
         return Err(invalid());
     }
-    Ok(())
+    let digest = format!("{:x}", digest.finalize());
+    expected
+        .iter()
+        .copied()
+        .find(|expected| *expected == digest)
+        .ok_or_else(invalid)
 }
 
 pub(super) fn verify_terminal(

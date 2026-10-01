@@ -15,9 +15,7 @@ use tokio::net::windows::named_pipe::{ClientOptions, NamedPipeClient};
 use tokio::runtime::{Builder, Handle, Runtime};
 use uuid::Uuid;
 
-use super::super::grok_native_bridge_identity::{
-    ARTIFACT_SHA256, Artifact, NativeBridgeProcess, verify_terminal,
-};
+use super::super::grok_native_bridge_identity::{Artifact, NativeBridgeProcess, verify_terminal};
 use super::super::grok_native_bridge_root::pin_ancestors;
 use super::{
     Envelope, IO_TIMEOUT, MAX_FRAME_BYTES, Request, canonical_uuid, invalid, lower_hex,
@@ -122,7 +120,7 @@ impl Transport {
                 instance_id: canonical_uuid(&locator.manifest.instance_id)?,
                 native_process: peer.identity().into(),
                 shell: shell.into(),
-                artifact_sha256: ARTIFACT_SHA256.to_owned(),
+                artifact_sha256: artifact.sha256().to_owned(),
                 terminal_generation: pty.generation(),
             };
             let transport = Self {

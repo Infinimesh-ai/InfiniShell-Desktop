@@ -1,9 +1,14 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Barrier};
 use std::thread;
 
 use diesel::connection::SimpleConnection;
 use diesel_migrations::MigrationHarness;
 use serde_json::json;
+use warp_cli::agent::Harness;
+
+use crate::ai::agent::ImageContext;
+use crate::ai::cli_agent_runtime::managed_input;
 
 use super::*;
 
@@ -30,6 +35,7 @@ fn input() -> NativeBridgeInput {
         input_revision: Uuid::from_u128(3),
         message_id: Uuid::from_u128(4),
         replaces: None,
+        subject: INPUT_SUBJECT.into(),
         body: "第一行中文\n第二行按字面提交".into(),
     }
 }
@@ -177,6 +183,7 @@ fn cold_recovery_and_new_instance_do_not_replay_unknown_body() {
             &mut recovered,
             current.binding.clone(),
             Some(current.session_id),
+            INPUT_SUBJECT,
             &current.body
         )
         .unwrap(),
@@ -221,7 +228,14 @@ fn lookup_without_session_requires_one_matching_binding_session_head() {
     let mut connection = fixture();
     let original = claimed(&mut connection, input());
     assert_eq!(
-        lookup_exact(&mut connection, input().binding, None, &input().body).unwrap(),
+        lookup_exact(
+            &mut connection,
+            input().binding,
+            None,
+            INPUT_SUBJECT,
+            &input().body
+        )
+        .unwrap(),
         Some(original.clone())
     );
     let other = NativeBridgeInput {
@@ -231,12 +245,22 @@ fn lookup_without_session_requires_one_matching_binding_session_head() {
         ..input()
     };
     claimed(&mut connection, other);
-    assert!(lookup_exact(&mut connection, input().binding, None, &input().body).is_err());
+    assert!(
+        lookup_exact(
+            &mut connection,
+            input().binding,
+            None,
+            INPUT_SUBJECT,
+            &input().body
+        )
+        .is_err()
+    );
     assert_eq!(
         lookup_exact(
             &mut connection,
             input().binding,
             Some(input().session_id),
+            INPUT_SUBJECT,
             &input().body
         )
         .unwrap(),
@@ -440,7 +464,14 @@ fn acknowledged_body_requires_explicit_replaces_and_lookup_returns_latest_chain_
     let second = claimed(&mut connection, second_input.clone());
     assert_eq!(second.delivery.replaces, Some(original.delivery.message_id));
     assert_eq!(
-        lookup_exact(&mut connection, input().binding, None, &input().body).unwrap(),
+        lookup_exact(
+            &mut connection,
+            input().binding,
+            None,
+            INPUT_SUBJECT,
+            &input().body
+        )
+        .unwrap(),
         Some(second.clone())
     );
     let stale = NativeBridgeInput {
@@ -729,6 +760,7 @@ fn linux_and_windows_ledger_recovery_never_regrants_transport() {
                 &mut connection,
                 input.binding,
                 Some(input.session_id),
+                INPUT_SUBJECT,
                 &input.body
             )
             .unwrap(),
@@ -840,4 +872,202 @@ fn existing_owned_session_task_and_mailbox_coexist_with_native_input_ledger() {
         vec![message]
     );
     assert_eq!(native_records(&mut connection).unwrap().len(), 1);
+}
+
+const RED_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
+const BLUE_PNG: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
+
+fn rich_fixture() -> (tempfile::TempDir, PathBuf, SqliteConnection) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory
+        .path()
+        .canonicalize()
+        .unwrap()
+        .join("ledger.sqlite");
+    let mut connection = connection(path.to_str().unwrap());
+    connection
+        .run_pending_migrations(::persistence::MIGRATIONS)
+        .unwrap();
+    (directory, path, connection)
+}
+
+fn rich_input(path: &std::path::Path, images: &[&str]) -> NativeBridgeInput {
+    let images = images
+        .iter()
+        .map(|data| ImageContext {
+            data: (*data).into(),
+            mime_type: "image/png".into(),
+            file_name: "fixture.png".into(),
+            is_figma: false,
+        })
+        .collect::<Vec<_>>();
+    let prepared = managed_input::prepare_managed_input(
+        Harness::Grok,
+        "中文\n".into(),
+        &images,
+        Vec::new(),
+        &path.parent().unwrap().join("local-cli-attachments"),
+    )
+    .unwrap();
+    NativeBridgeInput {
+        subject: RICH_INPUT_SUBJECT.into(),
+        body: json!({"version":1,"input":prepared}).to_string(),
+        ..input()
+    }
+}
+
+#[test]
+fn rich_ledger_cold_recovery_and_changed_instance_never_regrant_same_batch() {
+    let (_directory, path, mut first) = rich_fixture();
+    let original_input = rich_input(&path, &[RED_PNG, BLUE_PNG]);
+    let original = claimed(&mut first, original_input.clone());
+    assert_eq!(original.delivery.version, 2);
+    assert_eq!(
+        original.delivery.payload_digest,
+        "blake3:97e469a43a4f801f94c4a09285886353720487402268d93c3bac94dc9d2c09d5"
+    );
+    assert!(original.delivery.body_sha256.is_some());
+    assert!(!original.message.body.contains(RED_PNG));
+    drop(first);
+    let mut recovered = connection(path.to_str().unwrap());
+    let mut current = original_input;
+    current.message_id = Uuid::new_v4();
+    current.input_revision = Uuid::new_v4();
+    current.binding["instance_id"] = json!(Uuid::new_v4());
+    assert_eq!(
+        lookup_exact(
+            &mut recovered,
+            current.binding.clone(),
+            Some(current.session_id),
+            &current.subject,
+            &current.body
+        )
+        .unwrap(),
+        Some(original.clone())
+    );
+    assert_eq!(
+        claim_once(&mut recovered, current).unwrap(),
+        NativeBridgeClaimOutcome::Existing(original)
+    );
+    assert_eq!(native_records(&mut recovered).unwrap().len(), 1);
+}
+
+#[test]
+fn rich_subject_order_and_draft_revision_are_part_of_claim_identity() {
+    let (_directory, path, mut connection) = rich_fixture();
+    let original_input = rich_input(&path, &[RED_PNG, BLUE_PNG]);
+    let original = claimed(&mut connection, original_input.clone());
+    let mut reordered = rich_input(&path, &[BLUE_PNG, RED_PNG]);
+    assert!(claim_once(&mut connection, reordered.clone()).is_err());
+    reordered.message_id = Uuid::new_v4();
+    assert!(claim_once(&mut connection, reordered.clone()).is_err());
+    reordered.input_revision = Uuid::new_v4();
+    let next = claimed(&mut connection, reordered);
+    assert_ne!(
+        next.delivery.payload_digest,
+        original.delivery.payload_digest
+    );
+    let mut literal = original_input;
+    literal.subject = INPUT_SUBJECT.into();
+    assert!(claim_once(&mut connection, literal.clone()).is_err());
+    literal.message_id = Uuid::new_v4();
+    literal.input_revision = Uuid::new_v4();
+    let text = claimed(&mut connection, literal);
+    assert_eq!(text.delivery.version, 1);
+    assert_eq!(text.delivery.body_sha256, None);
+    assert_ne!(
+        text.delivery.payload_digest,
+        original.delivery.payload_digest
+    );
+}
+
+#[test]
+fn missing_old_png_does_not_block_exact_receipt_or_unrelated_text_but_prevents_new_claim() {
+    let (_directory, path, mut connection) = rich_fixture();
+    let original_input = rich_input(&path, &[RED_PNG]);
+    let original = claimed(&mut connection, original_input.clone());
+    let body: Value = serde_json::from_str(&original_input.body).unwrap();
+    let image_path = body["input"][1]["LocalImage"].as_str().unwrap();
+    std::fs::remove_file(image_path).unwrap();
+    assert_eq!(
+        lookup_exact(
+            &mut connection,
+            original_input.binding.clone(),
+            Some(original_input.session_id),
+            &original_input.subject,
+            &original_input.body
+        )
+        .unwrap(),
+        Some(original.clone())
+    );
+    assert_eq!(
+        acknowledge(&mut connection, &original).delivery.state,
+        NativeBridgeDeliveryState::NativeAcknowledged
+    );
+    assert!(
+        claim_once(
+            &mut connection,
+            NativeBridgeInput {
+                message_id: Uuid::new_v4(),
+                input_revision: Uuid::new_v4(),
+                replaces: Some(original.delivery.message_id),
+                ..original_input
+            }
+        )
+        .is_err()
+    );
+    let ordinary = claimed(
+        &mut connection,
+        NativeBridgeInput {
+            message_id: Uuid::new_v4(),
+            input_revision: Uuid::new_v4(),
+            ..input()
+        },
+    );
+    assert_eq!(ordinary.message.subject, INPUT_SUBJECT);
+    assert_eq!(native_records(&mut connection).unwrap().len(), 2);
+}
+
+#[test]
+fn rich_reference_tampering_and_generic_ack_cannot_change_persisted_claim() {
+    let (_directory, path, mut connection) = rich_fixture();
+    let original = claimed(&mut connection, rich_input(&path, &[RED_PNG]));
+    assert!(
+        update_message_state(
+            &mut connection,
+            &original.message.message_id,
+            &original.delivery.task_id,
+            1,
+            LocalCliMessageState::Acknowledged
+        )
+        .is_err()
+    );
+    let mut queued = original.message.clone();
+    queued.state = LocalCliMessageState::Queued;
+    assert!(insert_message(&mut connection, queued).is_err());
+    let mut failed = original.message.clone();
+    failed.state = LocalCliMessageState::Failed;
+    assert!(write_message_state(&mut connection, &failed).is_err());
+    let mut changed = original.clone();
+    changed.message.body = changed
+        .message
+        .body
+        .replace("local-cli-attachments", "other-attachments");
+    diesel::update(
+        local_cli_messages::table
+            .filter(local_cli_messages::message_id.eq(&original.message.message_id)),
+    )
+    .set(local_cli_messages::data.eq(serde_json::to_string(&changed).unwrap()))
+    .execute(&mut connection)
+    .unwrap();
+    assert!(read_record(&mut connection, original.delivery.message_id).is_err());
+    assert!(
+        acknowledge_exact(
+            &mut connection,
+            original.delivery.clone(),
+            input().binding,
+            response(&original, "native_acknowledged")
+        )
+        .is_err()
+    );
 }

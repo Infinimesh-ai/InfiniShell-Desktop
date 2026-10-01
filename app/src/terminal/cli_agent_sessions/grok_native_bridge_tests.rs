@@ -260,3 +260,108 @@ fn strict_protocol_rejects_extra_fields_invalid_states_and_noncanonical_ids() {
         .is_err()
     );
 }
+
+fn png_prompt() -> NativeBridgePrompt {
+    NativeBridgePrompt::with_png(String::new(), &[crate::ai::agent::ImageContext {
+        data: "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC".into(),
+        mime_type: "image/png".into(),
+        file_name: "fixture.png".into(),
+        is_figma: false,
+    }]).unwrap()
+}
+
+#[test]
+fn legacy_state_and_text_wire_stay_compatible_without_image_capability() {
+    let current = parse_state(wire(state()), instance(), Instant::now()).unwrap();
+    assert_eq!(current.typed_png_images, 0);
+    let lease = current.lease.unwrap();
+    let prompt = NativeBridgePrompt::text("中文\n第二行").unwrap();
+    validate_prompt_frame(&lease, instance(), &prompt).unwrap();
+    assert_eq!(
+        NativeBridgeMessage::for_prompt(instance(), "native-session".into(), &prompt).unwrap(),
+        message()
+    );
+    let value = serde_json::to_value(Request::SubmitIfIdle {
+        instance_id: "fixture-instance",
+        lease_id: "fixture-lease",
+        session_id: "native-session",
+        binding_epoch: 9,
+        input_epoch: 7,
+        message_id: instance().to_string(),
+        prompt_id: instance().to_string(),
+        text: prompt.text_value(),
+        images: prompt.images(),
+    })
+    .unwrap();
+    assert_eq!(
+        value,
+        json!({"operation":"submit_if_idle","instance_id":"fixture-instance",
+        "lease_id":"fixture-lease","session_id":"native-session","binding_epoch":9,
+        "input_epoch":7,"message_id":instance(),"prompt_id":instance(),"text":"中文\n第二行"})
+    );
+}
+
+#[test]
+fn typed_png_requires_exact_live_state_capability_before_claim() {
+    let prompt = png_prompt();
+    let old = parse_state(wire(state()), instance(), Instant::now())
+        .unwrap()
+        .lease
+        .unwrap();
+    assert_eq!(
+        validate_prompt_frame(&old, instance(), &prompt)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::Unsupported
+    );
+    let mut unknown = state();
+    unknown["typed_png_images"] = json!(2);
+    let unknown = parse_state(wire(unknown), instance(), Instant::now())
+        .unwrap()
+        .lease
+        .unwrap();
+    assert_eq!(
+        validate_prompt_frame(&unknown, instance(), &prompt)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::Unsupported
+    );
+    let mut supported = state();
+    supported["typed_png_images"] = json!(1);
+    let supported = parse_state(wire(supported), instance(), Instant::now())
+        .unwrap()
+        .lease
+        .unwrap();
+    validate_prompt_frame(&supported, instance(), &prompt).unwrap();
+}
+
+#[test]
+fn entire_authenticated_frame_counts_json_escaping_before_claim() {
+    let lease = parse_state(wire(state()), instance(), Instant::now())
+        .unwrap()
+        .lease
+        .unwrap();
+    let prompt = NativeBridgePrompt::text(&"\"".repeat(MAX_TEXT_BYTES)).unwrap();
+    assert_eq!(
+        validate_prompt_frame(&lease, instance(), &prompt)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::InvalidInput
+    );
+    let prompt = NativeBridgePrompt::text(&"x".repeat(MAX_TEXT_BYTES)).unwrap();
+    validate_prompt_frame(&lease, instance(), &prompt).unwrap();
+}
+
+#[test]
+fn typed_png_receipt_binds_decoded_batch_instead_of_persisted_json_or_text() {
+    let prompt = png_prompt();
+    let expected =
+        NativeBridgeMessage::for_prompt(instance(), "native-session".into(), &prompt).unwrap();
+    assert!(parse_receipt(wire(receipt()), &expected).is_err());
+    let mut correct = receipt();
+    correct["receipt"]["payload_digest"] = json!(prompt.payload_digest());
+    assert!(matches!(
+        parse_receipt(wire(correct), &expected).unwrap(),
+        NativeBridgeResponse::Receipt(_)
+    ));
+}

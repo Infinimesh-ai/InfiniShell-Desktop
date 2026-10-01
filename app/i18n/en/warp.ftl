@@ -5752,7 +5752,7 @@ cli-agent-plugin-refresh-marketplace-step = Refresh the marketplace while keepin
 cli-agent-plugin-disabled = This plugin is disabled. Enable it explicitly to restore notifications.
 cli-agent-plugin-enable-step = Enable the installed plugin:
 cli-agent-plugin-enable-codex-config-step = Enable the plugin in your Codex config.toml:
-cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. In an InfiniShell Grok rich-input session, paste or drop images into the input box and submit them there.
+cli-agent-grok-image-paste-unavailable = Image paste is unavailable in this Grok session. Use a supported Grok version, then paste or drop images into the rich input box and submit them there.
 cli-agent-image-too-large = { $filename } is too large to send to the agent (limit { $limit_mb } MB).
 
 cli-agent-task-already-bound = This terminal already has an active local task.
@@ -6113,8 +6113,8 @@ cli-agent-grok-remote-launch-unavailable = The remote Grok session could not be 
 cli-agent-grok-owned-launch-unavailable = Grok rich input requires the verified local Grok 1.0.41 installation and a supported shell. The session could not be started.
 
 cli-agent-grok-owned-input-unavailable = Grok input is not ready or its session identity has changed. Your draft has been kept.
-cli-agent-grok-native-images-unavailable = This Grok connection supports text and file paths. Your draft and images have been kept.
-cli-agent-grok-native-already-received = Grok already received this text. Your draft is kept. Click this notification to send it again as a new turn.
+cli-agent-grok-native-images-unavailable = This Grok connection does not support image input. Your draft and images have been kept.
+cli-agent-grok-native-already-received = Grok already received this input. Your draft is kept. Click this notification to send it again as a new turn.
 
 cli-agent-grok-owned-result-unverified = Grok finished, but its task result could not be verified or saved. Check the native session.
 

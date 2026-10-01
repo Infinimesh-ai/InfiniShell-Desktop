@@ -119,7 +119,7 @@ const CLI_AGENT_IMAGE_PASTE_DELAY: Duration = Duration::from_millis(300);
 #[allow(clippy::byte_char_slices)]
 const CLI_AGENT_MODE_SWITCH_PREFIXES: &[u8] = &[b'!', b'&'];
 
-/// 普通粘贴、拖放和富输入附件共用平台策略；Grok 图片尚未通过真实验证。
+/// 普通粘贴、拖放和富输入附件共用平台策略；Grok 图片只走类型化提交，不发粘贴按键。
 fn cli_agent_paste_keystroke_bytes(agent: CLIAgent, windows: bool) -> Option<Vec<u8>> {
     if agent == CLIAgent::Grok {
         None
@@ -1188,7 +1188,9 @@ impl TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        if self.prepare_owned_grok_image_composer(ctx) {
+        if self.prepare_owned_grok_image_composer(ctx)
+            || self.prepare_native_grok_image_composer(ctx)
+        {
             let content = ctx.clipboard().read();
             return self.input.update(ctx, |input, ctx| {
                 input.attach_cli_clipboard_images(content, ctx)
@@ -1235,7 +1237,9 @@ impl TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        if self.prepare_owned_grok_image_composer(ctx) {
+        if self.prepare_owned_grok_image_composer(ctx)
+            || self.prepare_native_grok_image_composer(ctx)
+        {
             self.input.update(ctx, |input, ctx| {
                 input.handle_pasted_or_dragdropped_image_filepaths(image_filepaths, ctx)
             });
@@ -1624,6 +1628,16 @@ impl TerminalView {
         snapshot: Option<Rc<CliInputSubmission>>,
         ctx: &mut ViewContext<Self>,
     ) {
+        self.complete_cli_agent_input_submit(generation, snapshot, false, ctx);
+    }
+
+    fn complete_cli_agent_input_submit(
+        &mut self,
+        generation: Uuid,
+        snapshot: Option<Rc<CliInputSubmission>>,
+        atomic_draft: bool,
+        ctx: &mut ViewContext<Self>,
+    ) {
         self.release_cli_agent_input_submission(generation, ctx);
         if !self.cli_agent_input_generation_matches(generation, ctx) {
             return;
@@ -1636,10 +1650,21 @@ impl TerminalView {
             .as_ref(ctx)
             .pending_attachments_revision()
             == snapshot.attachments_revision;
-        let editor_unchanged = self.input.update(ctx, |input, ctx| {
-            input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
-        });
-        if attachments_unchanged {
+        // 原子图文的旧回执不能拆清新草稿；文字或附件任一变化时整批保留。
+        let may_clear = !atomic_draft
+            || (attachments_unchanged
+                && self
+                    .input
+                    .as_ref(ctx)
+                    .editor()
+                    .as_ref(ctx)
+                    .buffer_revision(ctx)
+                    == snapshot.editor_revision);
+        let editor_unchanged = may_clear
+            && self.input.update(ctx, |input, ctx| {
+                input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
+            });
+        if attachments_unchanged && may_clear {
             self.ai_context_model.update(ctx, |model, ctx| {
                 model.clear_pending_attachments(ctx);
             });

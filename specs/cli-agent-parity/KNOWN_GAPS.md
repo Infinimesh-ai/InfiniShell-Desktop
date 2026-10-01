@@ -115,6 +115,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G03 — Grok 普通终端图片粘贴
 
+- **2026-10-02 普通 PTY 原生 PNG 已实现，真实验收待完成**：核实公开 Grok 源码后，新增 `.5/8644e7f68a5c` 的有序 typed PNG 整批提交、独立能力与摘要；Mac 签名工件 `b5432ea1a6b4` 已接普通桥，旧 G01 文本工件及远程 owned `.4` 保留。宿主保存当前 scope 的图片引用，领取前核完整帧及能力；旧回执在文字或附件变化时整批保留新草稿。普通剪贴板与完整拖放批次已接线，131 项回归、i18n 11 项和最终 check 通过，收据 `3edc7062a01deed42f4d0a4f6f255321eb91f83a8be19415cd8a2519cb26d073`；两项新夹具先前失败及原生未知 LEAK 保留。三条英中提示已同步，实窗布局、普通 PTY 纯图／多图／焦点／审批等待，以及 Linux／Windows `.5` 构建和最终宿主门禁尚待完成；Finder 原生拖放仍有下述独立手势限制。测试及构建不计关闭，G03 继续开放。
+
 - **状态／优先级／范围**：功能缺项，高；P0、P1、P5。
 - **实际情况与影响**：普通未绑定终端图片门禁仍保留；专属 TUI 选择器路径已有下文 Mac 单图 GUI 正例，粘贴／拖放仍欠验。历史原生 Ctrl+V 后再粘贴 bracketed text 会重复附图；改用普通 UTF-8 输入及 Alt+Enter 换行虽得到单图识色正例，却没有剪贴板消费 ACK 或可信输入就绪，不能用该手工操作代替应用自动链。G02 的托管 ACP 正例也不替代本项。
 - **未验证代码增量**：专属 TUI 会话新增 PNG 类型化输入，图片先校验后持久化为当前数据库 scope 的哈希文件；独立富消息主题保存文本和图片引用，worker 重读核验后发送同一 session/prompt，沿用单次领取和原生回执。纯图、文字加多图、粘贴／拖放进富输入框及失败保留已接线；不再依靠剪贴板时序。macOS arm64、Linux x86_64 与 Windows x86_64 已共用固定 1.0.41/grok-4.7/default 输入；Windows ConPTY 入口已整合。已开展的自动化门禁见[最新门禁](VALIDATION_REPORT.md)，图片模型及真实 GUI 验收仍待补。
@@ -197,6 +199,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **入口增量**：CLI 富输入收起时点击选择文件，现改为携带当前输入代次打开富输入，待草稿恢复事件完成后复用附件选择器，生成文件卡片。新入口不再直接插入裸路径；旧异步路径回调仍可处理。Mac GUI 该入口的固定 Codex 正例见上，Claude／Grok 及其他平台仍待补，已开展的平台自动化回归见[最新门禁](VALIDATION_REPORT.md)。
 
 ### G08 — 远程 CLI 图片传输
+
+- **2026-10-02 原条件内 Mac 功能已齐，最终源码门禁待结束**：三款真实 tmux 图片／重连、Claude 待批重复与旧回调保稿、拒绝清理及英中布局按各自原构建完整计证，审计 `300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085`。Linux `.4` 实际工件已在 b47 绑定；正在等待 [b47 两平台宿主门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36916171947) 的终态与逐项结果，不重复六次模型验收、不提前关闭。G03 新 `.5` 只进入普通 PTY 桥，远程 owned 仍用 `.4`。
 
 - **2026-10-02 Linux 通知原生工件已绑定，最终宿主门禁未结束**：[51b0 门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36898008829) 的官方 Linux 工件已核验 ZIP 摘要、公开基线／补丁、实际 ELF 及完整版本。`.4` 二进制 SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`，完整版本含 `07e35a3dfeed`；实际 525 次测试执行、516 个唯一名称全部通过，版本／帮助／异步启动通过。审计摘要 `001f4bb378bf66fc7555d880e3b3963d6745e9fc3846fb8c9a6a3cb0cb46058b`。Linux／Windows 最终宿主门禁仍在执行，不关闭 G08；旧 Mac LEAK 及其他平台实机边界保留。
 
@@ -352,6 +356,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：在两平台实际输入法中验证 preedit、数字／空格选词、中英文混排、多行和 Enter 不误提交，覆盖普通终端富输入与托管输入并保留真实界面及输入结果。
 
 ### V03 — SSH／tmux 远端组合与 Codex 关闭透传负例
+
+- **2026-10-02 Mac 原条件完整复核，最终源码门禁待结束**：`b47/r-o5rrajvm` 已补正式 Claude 插件就绪后的真实流式 Ctrl-C，以及 Codex 工具运行 Escape／迟到 ToolComplete 后 GUI 保持 Blocked；原生分别记录 Interrupted／turn_aborted，不伪称存在 cancelled hook 或取消整棵工具树。Grok 取消沿用 `51b0/.4` 正例。八项原条件逐项审计 `dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f`，包括 Codex 关闭透传的独立双端原件；当前只剩 b47 最终两平台源码门禁，V03 仍开放。全部自有进程已退出，现场及唯一历史保全，其他平台实机验收仍移交用户。
 
 - **2026-10-02 真实取消与本地按键修复，仍开放**：`51b0/r-myk6vj3w` 的 Grok 单次输入后真实工具运行中 Ctrl-C，原生 Cancelled 与同 SID／prompt 宿主通知一致；后台 sleep 自然结束，不声称按键清理进程树。Codex 单次输入后 Escape 取得原生 turn_aborted，但没有取消通知，后续 ToolComplete 也不能证明仍运行。源码已补本地实际转发边界的 Ctrl-C／Codex 独立 Escape 观察，确认超时仅为 Unknown，迟到工具完成保持未知。Claude 第四次人工输入取得真实生成中断，前三次不足；本轮私有配置缺通知插件，不能计完整宿主链。四文件定向 83 项、i18n 11 项、check 全通过，收据 `3c4a6c3d347dc675adf5645c04f753a676e470104ae6747d9e9cf99f2b68db70`。新构建真实复验与更新后平台门禁待完成，无需本地化变更。
 

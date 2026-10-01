@@ -26819,7 +26819,7 @@ impl TerminalView {
 
         let image_filepaths = get_image_filepaths_from_paths(paths);
 
-        // 本地托管 Grok 富输入打开时，拖放必须留在附件流程，不能退回 PTY 路径输入。
+        // 本地 Grok 拖放整批留在附件流程，不能把非图片或失配目标退回 PTY 输入。
         #[cfg(all(
             feature = "local_fs",
             feature = "local_tty",
@@ -26829,15 +26829,30 @@ impl TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        if self.grok_owned_input.is_some()
-            && CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id)
+        if (self.grok_owned_input.is_some()
+            && CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id))
+            || (is_in_long_running_command
+                && (!image_filepaths.is_empty()
+                    || CLIAgentSessionsModel::as_ref(ctx).is_input_open(self.view_id))
+                && CLIAgentSessionsModel::as_ref(ctx)
+                    .session(self.view_id)
+                    .is_some_and(|session| {
+                        session.agent == CLIAgent::Grok && session.remote_host.is_none()
+                    }))
         {
-            if !is_in_long_running_command || !self.owned_grok_context_target_matches(ctx) {
+            if !is_in_long_running_command
+                || !(self.owned_grok_context_target_matches(ctx)
+                    || self.native_grok_image_target_matches(ctx))
+            {
                 self.show_error_toast(crate::t!("cli-agent-grok-owned-input-unavailable"), ctx);
                 return;
             }
             if image_filepaths.len() != paths.len() {
                 self.show_error_toast(crate::t!("cli-agent-input-non-image-drop-unavailable"), ctx);
+                return;
+            }
+            self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+            if !self.has_active_cli_agent_input_session(ctx) {
                 return;
             }
             self.input.update(ctx, |input, ctx| {
@@ -29165,8 +29180,13 @@ impl View for TerminalView {
                 all(windows, target_arch = "x86_64")
             )
         ))]
-        let final_element = if self.grok_owned_input.is_some()
-            && CLIAgentSessionsModel::as_ref(app).is_input_open(self.view_id)
+        let final_element = if CLIAgentSessionsModel::as_ref(app).is_input_open(self.view_id)
+            && (self.grok_owned_input.is_some()
+                || CLIAgentSessionsModel::as_ref(app)
+                    .session(self.view_id)
+                    .is_some_and(|session| {
+                        session.agent == CLIAgent::Grok && session.remote_host.is_none()
+                    }))
         {
             TerminalSizeElement::new_owned_grok_file_drop_guard(final_element).finish()
         } else {

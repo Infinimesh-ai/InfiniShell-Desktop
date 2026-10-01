@@ -1,8 +1,8 @@
 //! 普通 Grok PTY 通过原生原子桥提交；持久领取前不发送，未知回执只查询。
 
-use std::rc::Rc;
 use std::sync::mpsc::SyncSender;
 use std::time::{Duration, Instant};
+use std::{io, rc::Rc};
 
 use futures::executor::block_on;
 use serde_json::json;
@@ -16,13 +16,14 @@ use crate::persistence::local_cli_tasks::grok_native_bridge::{
 };
 use crate::persistence::{ModelEvent, PersistenceWriter};
 use crate::terminal::CLIAgent;
-use crate::terminal::cli_agent_sessions::CLIAgentSessionsModel;
 use crate::terminal::cli_agent_sessions::grok_native_bridge::{
     NativeBridge, NativeBridgeLease, NativeBridgeMessage, NativeBridgeReceiptState,
     NativeBridgeResponse,
 };
+use crate::terminal::cli_agent_sessions::grok_native_bridge_prompt::{self, NativeBridgePrompt};
 use crate::terminal::cli_agent_sessions::grok_native_bridge_root;
 use crate::terminal::cli_agent_sessions::grok_native_bridge_submission::SubmissionLease;
+use crate::terminal::cli_agent_sessions::{CLIAgentInputEntrypoint, CLIAgentSessionsModel};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 use crate::terminal::view::{BlockId, SessionId};
 use crate::view_components::DismissibleToast;
@@ -44,7 +45,9 @@ struct PreparedInput {
     lease: Option<NativeBridgeLease>,
     previous: Option<NativeBridgeInputRecord>,
     session_id: Uuid,
+    subject: String,
     body: String,
+    prompt: NativeBridgePrompt,
     replaces: Option<Uuid>,
 }
 
@@ -55,6 +58,27 @@ enum DeliveryOutcome {
 }
 
 impl TerminalView {
+    pub(in crate::terminal::view) fn native_grok_image_target_matches(
+        &self,
+        ctx: &AppContext,
+    ) -> bool {
+        self.grok_owned_input.is_none()
+            && self.grok_remote_owned.is_none()
+            && self.native_grok_input_target(ctx).is_some()
+    }
+
+    pub(super) fn prepare_native_grok_image_composer(
+        &mut self,
+        ctx: &mut ViewContext<Self>,
+    ) -> bool {
+        if !self.native_grok_image_target_matches(ctx) {
+            return false;
+        }
+        // 开框只保存本地附件；提交时另验原生图片能力、空闲租约和整批字节。
+        self.open_cli_agent_rich_input(CLIAgentInputEntrypoint::AutoShow, ctx);
+        self.has_active_cli_agent_input_session(ctx)
+    }
+
     fn native_grok_input_target(&self, ctx: &AppContext) -> Option<InputTarget> {
         let cli = CLIAgentSessionsModel::as_ref(ctx).session(self.view_id)?;
         if cli.agent != CLIAgent::Grok || cli.remote_host.is_some() {
@@ -115,15 +139,14 @@ impl TerminalView {
             self.reject_unsafe_cli_agent_input(generation, Some(text), ctx);
             return;
         };
-        if !self
+        let images = self
             .ai_context_model
             .as_ref(ctx)
             .pending_images()
-            .is_empty()
-        {
-            self.show_error_toast(crate::t!("cli-agent-grok-native-images-unavailable"), ctx);
-            return;
-        }
+            .into_iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let atomic_draft = !images.is_empty();
         let Some(database) = PersistenceWriter::as_ref(ctx).sender() else {
             self.show_error_toast(crate::t!("cli-agent-task-save-failed"), ctx);
             return;
@@ -172,7 +195,16 @@ impl TerminalView {
                     file_attachments::prepare_file_attachments(text, files).await?
                 };
                 blocking::unblock(move || {
+                    let (subject, body) = if images.is_empty() {
+                        (ledger::INPUT_SUBJECT.to_owned(), body)
+                    } else {
+                        (
+                            ledger::RICH_INPUT_SUBJECT.to_owned(),
+                            grok_native_bridge_prompt::prepare(body, &images)?,
+                        )
+                    };
                     prepare_input(
+                        subject,
                         body,
                         &preparation_target,
                         observed_session,
@@ -251,7 +283,9 @@ impl TerminalView {
                         }
                         match result {
                             Ok(DeliveryOutcome::Acknowledged) => {
-                                view.complete_cli_agent_text_submit(generation, Some(snapshot), ctx)
+                                view.complete_cli_agent_input_submit(
+                                    generation, Some(snapshot), atomic_draft, ctx,
+                                )
                             }
                             Ok(DeliveryOutcome::AlreadyAcknowledged(message_id)) => {
                                 view.release_cli_agent_input_submission(generation, ctx);
@@ -334,6 +368,7 @@ impl TerminalView {
 }
 
 fn prepare_input(
+    subject: String,
     body: String,
     target: &InputTarget,
     observed_session: Option<String>,
@@ -341,8 +376,12 @@ fn prepare_input(
     database: &SyncSender<ModelEvent>,
 ) -> Result<Option<PreparedInput>, String> {
     let unavailable = || crate::t!("cli-agent-grok-owned-input-unavailable");
+    let prompt = grok_native_bridge_prompt::decode(&subject, &body)
+        .map_err(|_| crate::t!("cli-agent-input-image-delivery-failed"))?;
     let root = grok_native_bridge_root::root().map_err(|_| unavailable())?;
-    let Some(bridge) = NativeBridge::discover(&root, target.pty.clone()).map_err(|_| unavailable())? else {
+    let Some(bridge) =
+        NativeBridge::discover(&root, target.pty.clone()).map_err(|_| unavailable())?
+    else {
         return Ok(None);
     };
     let observed_session = observed_session
@@ -352,8 +391,14 @@ fn prepare_input(
     let binding = serde_json::to_value(bridge.binding()).map_err(|_| unavailable())?;
     let lookup = |session| {
         block_on(
-            ledger::lookup_input(database, binding.clone(), session, body.clone())
-                .map_err(|_| crate::t!("cli-agent-task-save-failed"))?,
+            ledger::lookup_input(
+                database,
+                binding.clone(),
+                session,
+                subject.clone(),
+                body.clone(),
+            )
+            .map_err(|_| crate::t!("cli-agent-task-save-failed"))?,
         )
         .map_err(|_| crate::t!("cli-agent-task-save-failed"))?
         .map_err(|_| crate::t!("cli-agent-task-save-failed"))
@@ -438,7 +483,9 @@ fn prepare_input(
         lease,
         previous,
         session_id,
+        subject,
         body,
+        prompt,
         replaces,
     }))
 }
@@ -454,7 +501,9 @@ fn deliver_input(
         lease,
         previous,
         session_id,
+        subject,
         body,
+        prompt,
         replaces,
     } = prepared;
     let persistence_error = || crate::t!("cli-agent-task-save-failed");
@@ -462,12 +511,29 @@ fn deliver_input(
     let (record, can_write) = match previous {
         Some(record) => (record, false),
         None => {
+            let message_id = Uuid::new_v4();
+            let Some(current_lease) = lease.as_ref() else {
+                return Ok(DeliveryOutcome::Unconfirmed);
+            };
+            // 图片能力和完整帧预算先验完，再创建不可重复投递的持久领取记录。
+            bridge
+                .validate_prompt(current_lease, message_id, &prompt)
+                .map_err(|error| {
+                    if error.kind() == io::ErrorKind::Unsupported {
+                        crate::t!("cli-agent-grok-native-images-unavailable")
+                    } else if error.kind() == io::ErrorKind::InvalidInput {
+                        crate::t!("cli-agent-grok-owned-image-budget")
+                    } else {
+                        crate::t!("cli-agent-grok-owned-input-not-dispatched")
+                    }
+                })?;
             let input = NativeBridgeInput {
                 binding: binding.clone(),
                 session_id,
                 working_directory: target.cwd,
                 input_revision: Uuid::new_v4(),
-                message_id: Uuid::new_v4(),
+                message_id,
+                subject,
                 body: body.clone(),
                 replaces,
             };
@@ -485,13 +551,16 @@ fn deliver_input(
             record.delivery.message_id,
         ));
     }
-    let expected =
-        NativeBridgeMessage::new(record.delivery.message_id, session_id.to_string(), &body)
-            .map_err(|_| persistence_error())?;
+    let expected = NativeBridgeMessage::for_prompt(
+        record.delivery.message_id,
+        session_id.to_string(),
+        &prompt,
+    )
+    .map_err(|_| persistence_error())?;
     // 数据库提交成功之后才有可能写原生 socket；任何错误都保留领取记录，绝不换 ID 重投。
     let first = if can_write {
         match lease {
-            Some(lease) => bridge.submit(lease, expected.message_id, &body, || {
+            Some(lease) => bridge.submit_prompt(lease, expected.message_id, &prompt, || {
                 authorization.claim_write()
             }),
             None => return Ok(DeliveryOutcome::Unconfirmed),
@@ -507,7 +576,7 @@ fn deliver_input(
                 | "native_bridge_unavailable" | "journal_unavailable" | "access_blocked"
                 | "connection_transition" | "no_active_agent" | "application_owns_input"
                 | "session_unbound" | "session_loading" | "session_busy" | "queue_pending"
-                | "editor_not_ready" | "receipt_pending"
+                | "editor_not_ready" | "receipt_pending" | "typed_png_images_unavailable"
         )
     );
     // 固定原生版本中这些拒绝都发生于去重检查之后、账本 claim 之前；只接受本次 submit 回包。

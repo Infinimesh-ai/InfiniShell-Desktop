@@ -1242,7 +1242,7 @@
   "tracked_items_total": 18,
   "gap_register": "KNOWN_GAPS.md",
   "partial_merge_is_goal_waiver": false,
-  "source_behavior_changed_in_this_revision": false,
+  "source_behavior_changed_in_this_revision": true,
   "supersedes_overall_completion_conclusions": [
     {
       "sha256": "1abf5f02fb6e9d751f0824b717cd175ad751d05de7358a335bdd557b6fac16ba",
@@ -1270,8 +1270,8 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
-  "documentation_updated_at": "2026-09-30",
-  "documentation_source_commit": "d290fd7137165223de8d762cf65a257117c6bf9a",
+  "documentation_updated_at": "2026-10-02",
+  "documentation_source_commit": "b47a86ff71d64eb033030da8f80205fd7e00e0c6",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -7024,5 +7024,51 @@
       "更新后Linux/Windows源码门禁"
     ],
     "cleanup": "CLI/tmux/SSH/GUI均正常退出；专属daemon及其defunct子进程等待既有宽限自然退出，现场保留cleanup_ready=false。"
+  },
+  "g03_ordinary_png_native_20261002": {
+    "status": "native_implemented_local_gates_passed_real_gui_and_platform_gates_pending",
+    "gap_closed": false,
+    "base_commit": "b47a86ff71d64eb033030da8f80205fd7e00e0c6",
+    "native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
+    "native_tree": "c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478",
+    "native_version": "1.0.41+infinishell.session-notifications.5",
+    "macos_binary_sha256": "b5432ea1a6b4fec7d898de5f3d289ec55a838b70cb7797ecacaeb982f79ce444",
+    "public_patch_sha256": "0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92",
+    "source_freeze_sha256": "a2dd970cbdc35f01eb305dc39434038c584003a3190c124f6fb57a6106e9df28",
+    "local_gate_receipt_sha256": "3edc7062a01deed42f4d0a4f6f255321eb91f83a8be19415cd8a2519cb26d073",
+    "host_gates": {
+      "focused": 131,
+      "i18n": 11,
+      "cargo_check": "passed",
+      "temporary_directories": "cleaned"
+    },
+    "native_gates": "17新增属于91桥回归子集，check通过；首轮1 LEAK根因未知保留",
+    "semantics": "独立rich主题、有序PNG整批摘要、领取前实时能力及完整帧预算；持久领取后只一次写，未知只查询；双revision ACK不能拆清新稿。",
+    "localization": "三条英中消息无变量且i18n通过；真实布局待验",
+    "retained_failures": [
+      "r-lgryzv_o",
+      "r-zdkz5_6d",
+      "r-je1m21u0",
+      "r-x3q6_wpl",
+      "r-xym2qmet"
+    ],
+    "remaining": [
+      "普通PTY真实剪贴板/纯图/双图顺序/焦点/审批等待/双语布局",
+      "Finder原生拖放交付；既有CUA手势边界保留",
+      "Linux/Windows .5实际构建工件与最终宿主源码门禁"
+    ],
+    "remote_owned_binding": "继续使用已验.4，未升级或重复模型验收"
+  },
+  "g08_v03_macos_functional_review_20261002": {
+    "status": "functional_conditions_complete_final_source_gate_pending",
+    "gaps_closed": [],
+    "g08_audit_sha256": "300f309fcb7c2baf9aa1aca0eea6d8a9655635d42d7ba13c5f3314b167909085",
+    "v03_audit_sha256": "dbbe7602c89b5c4068e84c458c4fa809491836ed030aa1fa065d2b57d820b43f",
+    "v03_cancel_audit_sha256": "c85f489455c8523cacefe27e3a1dd827c429ecf06dd31e856bb9f2420eb1bcbf",
+    "source_commit": "b47a86ff71d64eb033030da8f80205fd7e00e0c6",
+    "source_gate_run": 36916171947,
+    "boundary": "真实CLI各按原构建计证；原取消/通知/模型语义失败保留，未假称所有hook或后台工具树取消。新审计不以当前dirty G03与b47相同为前提。",
+    "cleanup": "r-o5rrajvm全部已知自有进程自然结束；remote slot同设备无覆盖保全，现场/唯一历史仍retained、cleanup_ready=false",
+    "other_platform_live_acceptance": "按用户决定后置，不计通过"
   }
 }

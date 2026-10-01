@@ -15,7 +15,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 SOURCE_PROFILES = {
     "terminal-bridge": ("source.json", "terminal-bridge.patch", "1.0.41+infinishell.terminal-bridge.11"),
     "session-notifications": ("session-notifications-source.json", "session-notifications.patch",
-                              "1.0.41+infinishell.session-notifications.4"),
+                              "1.0.41+infinishell.session-notifications.5"),
 }
 UPSTREAM = "https://github.com/xai-org/grok-build"
 BASE = "07e35a3dfeed2f200d319ef6c893b5ea286d9a51"
@@ -41,6 +41,22 @@ def load_source(capability):
     if build["custom_version"] != version:
         raise RuntimeError("定制构建版本不匹配")
     return metadata, build, source_metadata, patch, patch_digest
+
+
+def verify_typed_png_coverage(output, contract):
+    expected = contract["test_names"]
+    counts = {"xai-grok-pager": 5, "xai-grok-shell": 12}
+    if contract["package_counts"] != counts or {name: len(tests) for name, tests in expected.items()} != counts:
+        raise RuntimeError("PNG 测试清单必须精确绑定 pager 5项及 shell 12项")
+    expected_names = [name for tests in expected.values() for name in tests]
+    if len(set(expected_names)) != 17 or any("::typed_png_" not in name for name in expected_names):
+        raise RuntimeError("PNG 测试清单含重复名称或不匹配的过滤条件")
+    # run() 从未截断的完整逐步日志读取；既有四库命令已执行这些测试，不再重复运行。
+    actual = re.findall(r"^test (\S+::typed_png_\S+) \.\.\. ok\s*$", output, re.MULTILINE)
+    if sorted(actual) != sorted(expected_names):
+        raise RuntimeError("PNG 整批输入17项必须逐名实际通过，缺失、重复或忽略均不计通过")
+    return {"covered_by": "terminal_bridge_library_tests", "package_counts": counts,
+            "test_names": expected, "additional_cargo_invocations": 0}
 
 
 def main():
@@ -138,6 +154,9 @@ def main():
             raise RuntimeError("原子桥四库必须分别实际执行并零失败，不能将 cfg 排除后的零命中记为通过")
         receipt["bridge_library_results"] = results
         if args.capability == "session-notifications":
+            receipt["typed_png_tests"] = verify_typed_png_coverage(
+                bridge_tests, build["required_typed_png_tests"])
+            save()
             notification_command = [
                 "cargo", "+" + TOOLCHAIN, "test", "--locked", "--no-fail-fast",
                 "-p", "xai-grok-hooks", "-p", "xai-grok-pager", "-p", "xai-grok-shell",

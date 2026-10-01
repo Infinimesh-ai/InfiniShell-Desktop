@@ -15,19 +15,32 @@ use futures::future::{Either, select};
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use warpui::r#async::Timer;
 use warpui::geometry::vector::vec2f;
-use warpui::{App, EntityIdSet, Presenter, TypedActionView, ViewHandle, WindowInvalidation};
+use warpui::platform::WindowStyle;
+use warpui::{
+    App, AppContext, Element, Entity, EntityIdSet, ModelHandle, Presenter, TypedActionView, View,
+    ViewHandle, WindowInvalidation,
+};
 
 use super::*;
 use crate::ai::blocklist::{BlocklistAIContextEvent, PendingAttachment, PendingFile};
 use crate::ai::llms::{LLMInfo, LLMPreferences};
 use crate::features::FeatureFlag;
+use crate::pane_group::TerminalViewResources;
 use crate::persistence::{ModelEvent as PersistenceEvent, WriterHandles};
-use crate::terminal::Event;
+use crate::terminal::{Event, MockTerminalManager, ShellLaunchData, ShellLaunchState, TerminalManager};
+use crate::terminal::available_shells::AvailableShell;
 use crate::terminal::cli_agent_sessions::CLIAgentInputEntrypoint;
 use crate::terminal::cli_agent_sessions::event::parse_event;
 use crate::terminal::cli_agent_sessions::grok_leader_input::GrokLeaderInputError;
 use crate::terminal::cli_agent_sessions::listener::CLIAgentSessionListener;
 use crate::terminal::input::InputAction;
+use crate::terminal::model::ansi::{
+    BootstrappedValue, CommandFinishedValue, CompletionMetadata, Handler as _, PrecmdValue,
+    PromptMetadata,
+};
+use crate::terminal::model::session::SessionInfo;
+use crate::terminal::model_events::{AnsiHandlerEvent, ModelEvent};
+use crate::terminal::shell::ShellName;
 use crate::test_util::add_window_with_terminal;
 use crate::test_util::terminal::initialize_app_for_terminal_view;
 use crate::workspace::{ToastStack, ToastStackEvent};
@@ -85,6 +98,15 @@ fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, OwnedPtyFixture) 
     app.add_singleton_model(|_| ToastStack);
     let terminal = add_window_with_terminal(app, None);
     let pty = OwnedPtyFixture::new();
+    bind_owned_terminal(app, &terminal, &pty);
+    (terminal, pty)
+}
+
+fn bind_owned_terminal(
+    app: &mut App,
+    terminal: &ViewHandle<TerminalView>,
+    pty: &OwnedPtyFixture,
+) {
     // 使用实际持有该控制终端的 shell；测试不连接原生 socket 或读取认证材料。
     let identity = LocalPtyIdentity::capture(pty.shell.id(), &pty.master).unwrap();
     terminal.update(app, |view, ctx| {
@@ -185,6 +207,140 @@ fn owned_terminal(app: &mut App) -> (ViewHandle<TerminalView>, OwnedPtyFixture) 
             launch_command: None,
         });
     });
+}
+
+struct NativeGrokTestRoot {
+    terminal_view: ViewHandle<TerminalView>,
+    // 根视图保留 manager；它与 dispatcher 随窗口释放，不建立 view 自持有环。
+    _terminal_manager: ModelHandle<Box<dyn TerminalManager>>,
+}
+
+impl Entity for NativeGrokTestRoot {
+    type Event = ();
+}
+
+impl View for NativeGrokTestRoot {
+    fn ui_name() -> &'static str {
+        "NativeGrokTestRoot"
+    }
+
+    fn render(&self, _app: &AppContext) -> Box<dyn Element> {
+        warpui::elements::ChildView::new(&self.terminal_view).finish()
+    }
+}
+
+impl TypedActionView for NativeGrokTestRoot {
+    type Action = ();
+}
+
+async fn image_terminal(
+    app: &mut App,
+    native_bridge: bool,
+) -> (ViewHandle<TerminalView>, OwnedPtyFixture) {
+    if !native_bridge {
+        return owned_terminal(app);
+    }
+    initialize_app_for_terminal_view(app);
+    app.add_singleton_model(|_| ToastStack);
+    let tips_completed = app.add_model(|_| Default::default());
+    let (window_id, _) = app.add_window(WindowStyle::NotStealFocus, |ctx| {
+        let terminal = MockTerminalManager::create_model(
+            ShellLaunchState::ShellSpawned {
+                available_shell: Some(AvailableShell::new_custom_shell(
+                    "sh".into(),
+                    "/bin/sh".into(),
+                    ShellType::Bash,
+                )),
+                display_name: ShellName::blank(),
+                shell_type: ShellType::Bash,
+            },
+            TerminalViewResources {
+                tips_completed,
+                model_event_sender: None,
+            },
+            None,
+            None,
+            vec2f(7., 10.5),
+            ctx.window_id(),
+            ctx,
+        );
+        NativeGrokTestRoot {
+            terminal_view: terminal.view,
+            _terminal_manager: terminal.manager,
+        }
+    });
+    let terminal = app.views_of_type::<TerminalView>(window_id).unwrap()[0].clone();
+    let session_id = SessionId::from(123);
+    let (processed, received) = oneshot::channel();
+    let mut processed = Some(processed);
+    let events = terminal.read(app, |view, _| view.model_event_dispatcher().clone());
+    app.update(|ctx| {
+        ctx.subscribe_to_model(&events, move |events, event, ctx| {
+            if matches!(event, ModelEvent::Handler(AnsiHandlerEvent::Precmd))
+                && let Some(processed) = processed.take()
+            {
+                assert_eq!(events.as_ref(ctx).active_session_id(), Some(session_id));
+                processed.send(()).unwrap();
+            }
+        });
+    });
+    terminal.update(app, |view, ctx| {
+        let launch_data = ShellLaunchData::Executable {
+            executable_path: "/bin/sh".into(),
+            shell_type: ShellType::Bash,
+        };
+        let mut session = SessionInfo::new_for_test().with_shell_type(ShellType::Bash);
+        session.session_id = session_id;
+        session.launch_data = Some(launch_data.clone());
+        view.sessions.update(ctx, |sessions, _| {
+            // 保留 TestCommandExecutor，测试启动元数据不查询开发机真实 shell。
+            sessions.register_session_for_test(session);
+        });
+        let mut model = view.model.lock();
+        model.register_session_id(session_id);
+        model.set_pending_shell_launch_data(launch_data);
+        // 只初始化 block 渲染状态；不发 Bootstrapped 事件替换测试命令执行器。
+        model.block_list_mut().bootstrapped(BootstrappedValue {
+            session_id: Some(session_id.as_u64()),
+            shell: "bash".into(),
+            ..Default::default()
+        });
+        // 构造器未发送 InitShell，先经过真实开始转移，避免 Unknown 完成被恢复守卫拒绝。
+        assert!(model.start_command_execution().is_accepted());
+        let completion_metadata = CompletionMetadata::default();
+        model.command_finished(CommandFinishedValue {
+            completion_metadata: completion_metadata.clone(),
+            session_id: Some(session_id.as_u64()),
+        });
+        model.precmd_with_completion_metadata(PrecmdValue {
+            completion_metadata,
+            prompt_metadata: PromptMetadata {
+                session_id: Some(session_id.as_u64()),
+                ..Default::default()
+            },
+        });
+    });
+    // 与构造器事件同一 FIFO 完成后才注册 CLI listener，避免初始事件覆盖它。
+    received_event_at(received, "普通桥夹具：初始 Precmd FIFO").await;
+    let pty = OwnedPtyFixture::new();
+    bind_owned_terminal(app, &terminal, &pty);
+    terminal.update(app, |view, ctx| {
+        // 保留真实本地 PTY，但移除专属绑定，验证普通原生终端分支。
+        view.grok_owned_input = None;
+        {
+            let mut model = view.model.lock();
+            let block = model.block_list_mut().active_block_mut();
+            assert_eq!(block.session_id(), Some(session_id));
+            block.set_current_working_directory("/private/tmp".into());
+        }
+        let session = view.sessions.as_ref(ctx).get(session_id).unwrap();
+        assert!(session.is_local());
+        assert!(matches!(
+            session.launch_data(),
+            Some(ShellLaunchData::Executable { .. })
+        ));
+        assert!(view.native_grok_image_target_matches(ctx));
+    });
     (terminal, pty)
 }
 
@@ -273,10 +429,19 @@ fn saved_result_only_updates_matching_owned_task() {
 
 #[test]
 fn owned_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
-    App::test((), |mut app| async move {
+    grok_clipboard_and_drop_attach_in_order_without_pty_write(false);
+}
+
+#[test]
+fn native_bridge_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
+    grok_clipboard_and_drop_attach_in_order_without_pty_write(true);
+}
+
+fn grok_clipboard_and_drop_attach_in_order_without_pty_write(native_bridge: bool) {
+    App::test((), move |mut app| async move {
         let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
         let _images = FeatureFlag::ImageAsContext.override_enabled(true);
-        let (terminal, _pty) = owned_terminal(&mut app);
+        let (terminal, _pty) = image_terminal(&mut app, native_bridge).await;
         let writes = Arc::new(AtomicUsize::new(0));
         let observed = writes.clone();
         app.update(|ctx| {
@@ -313,7 +478,7 @@ fn owned_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
             assert!(view.paste_clipboard_image_to_cli_agent(ctx));
             assert!(view.is_cli_agent_rich_input_open(ctx));
         });
-        received_event(first_attached).await;
+        received_event_at(first_attached, "图片输入：剪贴板首图入卡").await;
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("drop.png");
         std::fs::write(&path, png).unwrap();
@@ -333,7 +498,7 @@ fn owned_grok_clipboard_and_drop_attach_in_order_without_pty_write() {
         terminal.update(&mut app, |view, ctx| {
             view.paste_dropped_images_to_cli_agent(vec![path.to_string_lossy().into_owned()], ctx);
         });
-        received_event(second_attached).await;
+        received_event_at(second_attached, "图片输入：拖放第二图入卡").await;
         terminal.read(&app, |view, ctx| {
             let images = view.ai_context_model.as_ref(ctx).pending_images();
             assert_eq!(images.len(), 2);
@@ -423,10 +588,19 @@ fn owned_grok_open_composer_routes_image_drops_without_pty_write() {
 
 #[test]
 fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
-    App::test((), |mut app| async move {
+    grok_file_drop_event_reaches_batch_guard_before_editor(false);
+}
+
+#[test]
+fn native_bridge_grok_file_drop_event_reaches_batch_guard_before_editor() {
+    grok_file_drop_event_reaches_batch_guard_before_editor(true);
+}
+
+fn grok_file_drop_event_reaches_batch_guard_before_editor(native_bridge: bool) {
+    App::test((), move |mut app| async move {
         let _rich_input = FeatureFlag::CLIAgentRichInput.override_enabled(true);
         let _images = FeatureFlag::ImageAsContext.override_enabled(true);
-        let (terminal, _pty) = owned_terminal(&mut app);
+        let (terminal, _pty) = image_terminal(&mut app, native_bridge).await;
         let window_id = app.window_ids()[0];
         let writes = Arc::new(AtomicUsize::new(0));
         let observed = writes.clone();
@@ -523,7 +697,7 @@ fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
                 other.to_string_lossy().into_owned(),
             ],
         );
-        received_event(mixed_notification).await;
+        received_event_at(mixed_notification, "窗口拖放：混合文件拒绝通知").await;
         terminal.read(&app, |view, ctx| {
             assert!(
                 view.ai_context_model
@@ -549,7 +723,7 @@ fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
             });
         });
         drop_files(&mut app, vec![first.to_string_lossy().into_owned()]);
-        received_event(received).await;
+        received_event_at(received, "窗口拖放：有效首图入卡").await;
         terminal.read(&app, |view, ctx| {
             let images = view.ai_context_model.as_ref(ctx).pending_images();
             assert_eq!(images.len(), 1);
@@ -558,10 +732,14 @@ fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
         });
 
         terminal.update(&mut app, |view, _| {
-            view.grok_owned_input.as_mut().unwrap().invalidated = true;
+            if native_bridge {
+                view.model.lock().set_local_pty_identity(None);
+            } else {
+                view.grok_owned_input.as_mut().unwrap().invalidated = true;
+            }
         });
         drop_files(&mut app, vec![second.to_string_lossy().into_owned()]);
-        received_event(unavailable_notification).await;
+        received_event_at(unavailable_notification, "窗口拖放：失效目标拒绝通知").await;
         terminal.read(&app, |view, ctx| {
             assert_eq!(view.ai_context_model.as_ref(ctx).pending_images().len(), 1);
             assert_eq!(view.input.as_ref(ctx).buffer_text(ctx), original_draft);
@@ -571,9 +749,13 @@ fn owned_grok_file_drop_event_reaches_batch_guard_before_editor() {
 }
 
 async fn received_event(receiver: oneshot::Receiver<()>) {
+    received_event_at(receiver, "owned 输入事件").await;
+}
+
+async fn received_event_at(receiver: oneshot::Receiver<()>, stage: &str) {
     match select(receiver, Box::pin(Timer::after(Duration::from_secs(5)))).await {
-        Either::Left((result, _)) => result.unwrap(),
-        Either::Right((_, _)) => panic!("owned 输入测试未收到预期事件"),
+        Either::Left((result, _)) => result.unwrap_or_else(|_| panic!("事件通道提前关闭：{stage}")),
+        Either::Right((_, _)) => panic!("输入测试未收到预期事件：{stage}"),
     }
 }
 

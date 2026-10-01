@@ -23,9 +23,7 @@ use socket2::{Domain, SockAddr, Socket, Type};
 use uuid::Uuid;
 
 use super::super::grok_native_bridge_identity::NativeBridgeProcess;
-use super::super::grok_native_bridge_identity::{
-    ARTIFACT_SHA256, Artifact, FileStamp, verify_terminal,
-};
+use super::super::grok_native_bridge_identity::{Artifact, FileStamp, verify_terminal};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 use super::{
@@ -160,7 +158,7 @@ impl Transport {
                 boot_session: boot_identity.clone(),
                 shell: shell.into(),
                 slave_device: pty.slave_device(),
-                artifact_sha256: ARTIFACT_SHA256.to_owned(),
+                artifact_sha256: artifact.sha256().to_owned(),
             };
             let bridge = Self {
                 locator,

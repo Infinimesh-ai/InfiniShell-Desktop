@@ -2,12 +2,26 @@
 
 这是 G01 的原生能力补丁，仅用于从普通 shell 启动的独立受审定制工件；官方发行版不含此桥。Mac `.3` 的原生编译、74 项定向回归及独立构建已通过；Mac 标准首页普通 TUI 的 InfiniShell GUI 已取得八条真实原生输入、精确回执与结果，包含中文长文本、审批保护和同会话冷恢复。随后文本粘贴已修为本地草稿路由，七门禁及英中各一条真实输入通过；中文手动回退提示截断已由单行缩短及新工件布局复验解决。Mac 功能与双语审计已满足；Linux 宿主普通桥接入、Windows 原生传输及宿主接入均已实现，三平台已分别绑定 Mac `.3`、Linux `.6`、Windows `.11` 工件。最终两平台宿主源码门禁 `36796894945` 已在精确 `e3d5e58a0` 逐名覆盖账本各 19 项及全部必要桥组，G01 在本次 Mac 范围关闭；其他必要缺口仍开放，PR #22 保持草稿。各轮源码与二进制分别绑定，不继承旧定制构建或官方发行版的验收。
 
-## 固定来源与构建
+## 普通桥 PNG 扩展：session-notifications.5
+
+本轮新增能力使用独立 `session-notifications.patch` 与 `session-notifications-source.json`，版本为 `1.0.41+infinishell.session-notifications.5`。原生提交 `8644e7f68a5c7803e3d1b3cc174ae56b93552ef2`，源码树 `c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478`；完整补丁 SHA-256 为 `0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92`，含 128 个差异文件，可从上述同一公开基线重建。它继承 G01 各平台原生修复；旧 `source.json`、`terminal-bridge.patch` 及 Mac `.3`／Linux `.6`／Windows `.11` 文本工件保持原身份。
+
+此处 `.5` **仅用于普通未绑定 PTY 的图片桥**。远程 owned Grok 通知继续使用已验 `session-notifications.4`：Mac SHA-256 `b196c3a073a37a109af57ddb4d12d45ca40eaa2a99d6b08c5c5a9c88ddab2ad3`，Linux SHA-256 `d128a7b8f624368f8ae16cba1c40f11d16962b0ce5eee0b37450b889087fd8c6`；不把本次源码升级自动扩展到该入口。
+
+Mac `.5` 独立工件为 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-native-source/mac-session-notifications-8644e7f68a5c/grok`，SHA-256 `b5432ea1a6b4fec7d898de5f3d289ec55a838b70cb7797ecacaeb982f79ce444`，CDHash `0bd055aaf74487889b084c04be1b73a31a1e85df`。原生 `cargo check`、新增 17 项及四库桥回归 91 项均通过；17 项属于 91 项的子集，不累加为 108 项。独立构建、签名、版本／帮助／异步补全零模型检查通过。首轮 `r-xym2qmet` 的 18 项断言通过但 1 项未知 LEAK 保留；后轮 `r-tmi2mncu` 的精确 17 项串行和 91 项默认并行均普通通过，不据此改写首轮失败。完整来源、逐文件摘要、重建及构建收据见新 metadata。
+
+协议仍为 v1：`submit_if_idle` 可附有序 `images`，每项仅含 `mime_type: "image/png"` 与 canonical STANDARD base64 `data`，最多 20 张；纯图允许空文本。每张图保留原字节，校验 PNG CRC、完整解码及首个零长度 IEND 正好结束于文件末尾；最小边 8、像素数 512 至 1,150,000。任一图片无效则整批拒绝，不能丢图后继续发送。文本上限 128 KiB、完整帧上限 256 KiB 不变，超过容量明确拒绝。`state.typed_png_images` 为独立的 `0/1` 能力，变化撤销旧租约；旧程序继续支持原文本合同。
+
+无图摘要仍为原 BLAKE3 文本摘要；有图摘要使用独立域、文本字节长度、有序图数、MIME 和每图原始字节长度及内容（精确编码见 metadata）。actor 在原租约／审批／繁忙守卫下绑定整批摘要，turn 复核后才保留 typed 图片；旧文本回执、换图和换序均不能借用原准入。仅此受保护图片路径跳过重新编码、孤立图片占位符补图和文本 base64 附图；原文本 `@文件` 上下文语义保留。
+
+跨平台构建入口为 `script/cli-agent-parity/build_grok_terminal_bridge.py --capability session-notifications`。既有四库 `terminal_bridge` 步骤包含全部新增测试，脚本从完整日志逐名核对 pager 5 项、shell 12 项，缺失、忽略或重复均失败，不重复调用 Cargo。Linux／Windows `.5` 实际构建仍待 CI；历史 `.4` 工件及门禁不算 `.5` 通过。Mac 普通图片 GUI、最终宿主门禁和双语验收仍待完成，G03 不因源码或构建通过而关闭。原生仅增加协议字段与稳定错误码，无需本地化变更；宿主提示由宿主中英文门禁另验。
+
+## G01 文本桥固定来源与构建
 
 - 官方源码：<https://github.com/xai-org/grok-build>
 - 基线：`07e35a3dfeed2f200d319ef6c893b5ea286d9a51`，版本字段 `1.0.41`。
 - `SOURCE_REV`：`84745de98b3d3996729aefcefd518890ffb73930`，不同于已验官方发行版 `4220f3b224a6`。
-- 当前定制源码：`77d8004b18b5d7c7f7ced42f084dbe5a54048a23`，版本 `1.0.41+infinishell.terminal-bridge.11`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
+- G01 文本桥定制源码：`77d8004b18b5d7c7f7ced42f084dbe5a54048a23`，版本 `1.0.41+infinishell.terminal-bridge.11`。Mac 已验工件仍绑定原 `.3` 提交 `1491b486fbaa4bff3b124db2893a413c7019e2fd`。
 - 补丁身份及门禁范围见 `source.json`；许可证和修改声明见 `LICENSE`、`NOTICE`。
 
 在该精确基线的独立干净工作树内，核验补丁 SHA-256 后运行以下命令。不要覆盖系统安装或默认 Grok 配置；当前二进制仍作为独立验收工件管理。
@@ -59,7 +73,7 @@ Mac 继续绑定 `.3` 的原工件和既有功能／双语证据。本轮只验�
 
 仅普通 TUI 进程显式设置 `GROK_TERMINAL_BRIDGE_DIR` 时开启 Unix socket。该根必须预先创建，属于当前用户、权限 `0700`，真实绝对路径及祖先不可由组或其他用户写入。每次 TUI 启动产生独立 `t-<UUID>` 目录，包含私有 `control.sock` 和 `manifest.json`；清单控制令牌不进入日志或验收归档。退出清理 socket/清单，保留仅含身份、摘要与状态的 `receipts.jsonl`。
 
-调用方必须将 socket 对端的内核进程身份、UID、实际二进制及当前终端 PTY 对应核验；清单里的 PID、进程名或存活检查不能独立证明身份。Mac 宿主接线使用内核 audit token、真实前台 PTY、固定 SHA-256 及动态 CDHash 核验，只接受 `source.json` 中的独立工件。自行重建所得二进制必须重新审核身份及验收，不能仅改版本号沿用信任。
+调用方必须将 socket 对端的内核进程身份、UID、实际二进制及当前终端 PTY 对应核验；清单里的 PID、进程名或存活检查不能独立证明身份。Mac 宿主接线使用内核 audit token、真实前台 PTY、固定 SHA-256 及动态 CDHash 核验，只接受 `source.json` 中的旧文本工件及 `session-notifications-source.json` 单独绑定的普通桥 PNG 工件。自行重建所得二进制必须重新审核身份及验收，不能仅改版本号沿用信任。
 
 macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`；宿主改为每次连接建立后捕获该连接的内核对端凭据，再于写入前后、读取后复核存活进程身份、签名、文件身份及前台 PTY。读取响应改用非阻塞 socket 与 `poll`，共用绝对截止时间，避免对端已关闭时设置 `SO_RCVTIMEO` 返回 `EINVAL` 而丢弃已缓冲的回包。发现时仍完整读取并校验 SHA-256；主仓仅将 `sha2 0.10.9` 的开发配置优化级别设为 `3`，不缓存验证结果、不缩减校验范围。
 
@@ -69,7 +83,7 @@ macOS Unix socket 正常回包并关闭后不能再次读取 `LOCAL_PEERTOKEN`�
 
 - `state`：传 `instance_id`，只读返回可信可用状态及绑定 agent／会话／代际的短期一次性租约；不创建或切换会话。
 - `prepare_session_if_idle`：仅由用户本次提交在标准首页触发，传 `instance_id/input_epoch`，复用原生首页 Enter 的创建／工作区确认流程，不携正文。返回固定 agent、预期会话及首次绑定代际；宿主之后仅查询该目标，取得新租约后才领取正文。拒绝或响应丢失不重试创建，也不代用户回答确认。
-- `submit_if_idle`：传当前租约的 `lease_id/session_id/binding_epoch/input_epoch`、`instance_id`、相同且规范的非空 UUID `message_id/prompt_id` 以及字面 `text`。
+- `submit_if_idle`：传当前租约的 `lease_id/session_id/binding_epoch/input_epoch`、`instance_id`、相同且规范的非空 UUID `message_id/prompt_id` 以及字面 `text`；`.5` 的可选 `images` 合同见上文。
 - `query_receipt`：传 `instance_id/message_id`，仅查询原事务。处于未确认状态时可向原生 actor 补查持久收据，绝不重发输入。
 
 空闲检查与领取在 TUI 同一事件循环完成；原生 actor 再检查会话运行、队列、审批及真实后台任务。普通原生权限和 Hook 继续生效。先将一次领取账本刷盘，再发专用原子接口；只有用户消息写入原生历史且持久化屏障成功才记 `native_acknowledged`。普通回合完成、Hook 拒绝、本地派发和连接断开不构成此确认。已领取的相同 ID 只读原收据，未知结果不得自动生成新 ID 重投。

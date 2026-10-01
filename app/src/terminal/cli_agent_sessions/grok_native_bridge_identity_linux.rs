@@ -11,8 +11,8 @@ use sha2::{Digest as _, Sha256};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 // 固定工作流构建的 Linux x64 .6 工件；按真实映像 FD 核验，不能继承其他构建。
-pub(super) const ARTIFACT_SHA256: &str =
-    "e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb";
+const ARTIFACT_SHA256S: &[&str] =
+    &["e2cb765c093fe6381eecfbb3ba8329e4b4edb76ecb6f98f38f88fc8203c76ffb"];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -56,6 +56,7 @@ pub(super) struct Artifact {
     process: LinuxProcessHandle,
     file: File,
     stamp: FileStamp,
+    sha256: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -92,20 +93,24 @@ impl FileStamp {
 impl Artifact {
     pub(super) fn capture(peer: &LinuxProcessHandle) -> io::Result<Self> {
         // 工件未绑定时先拒绝，不能将 manifest、运行路径或当前进程的摘要当白名单。
-        validate_digest(ARTIFACT_SHA256)?;
         let process = peer.try_clone()?;
         let mut file = process.executable_file()?;
         let metadata = file.metadata()?;
         validate_artifact(&metadata)?;
         let stamp = FileStamp::of(&metadata);
-        verify_digest(&mut file, stamp, ARTIFACT_SHA256)?;
+        let sha256 = verify_digest(&mut file, stamp, ARTIFACT_SHA256S)?;
         let artifact = Self {
             process,
             file,
             stamp,
+            sha256,
         };
         artifact.verify(peer)?;
         Ok(artifact)
+    }
+
+    pub(super) fn sha256(&self) -> &'static str {
+        self.sha256
     }
 
     pub(super) fn verify(&self, peer: &LinuxProcessHandle) -> io::Result<()> {
@@ -141,8 +146,14 @@ fn validate_digest(digest: &str) -> io::Result<()> {
     Ok(())
 }
 
-fn verify_digest(file: &mut File, stamp: FileStamp, expected: &str) -> io::Result<()> {
-    validate_digest(expected)?;
+fn verify_digest<'a>(
+    file: &mut File,
+    stamp: FileStamp,
+    expected: &[&'a str],
+) -> io::Result<&'a str> {
+    for digest in expected {
+        validate_digest(digest)?;
+    }
     if !stamp.matches(&file.metadata()?) {
         return Err(invalid());
     }
@@ -160,13 +171,15 @@ fn verify_digest(file: &mut File, stamp: FileStamp, expected: &str) -> io::Resul
         }
         digest.update(&buffer[..length]);
     }
-    if count != stamp.size
-        || format!("{:x}", digest.finalize()) != expected
-        || !stamp.matches(&file.metadata()?)
-    {
+    if count != stamp.size || !stamp.matches(&file.metadata()?) {
         return Err(invalid());
     }
-    Ok(())
+    let digest = format!("{:x}", digest.finalize());
+    expected
+        .iter()
+        .copied()
+        .find(|expected| *expected == digest)
+        .ok_or_else(invalid)
 }
 
 fn validate_artifact(metadata: &Metadata) -> io::Result<()> {

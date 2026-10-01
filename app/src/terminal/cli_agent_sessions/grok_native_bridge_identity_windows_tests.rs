@@ -54,7 +54,18 @@ fn digest_reads_the_actual_file_from_zero_regardless_of_shared_cursor() {
     let mut shared = file.try_clone().unwrap();
     shared.seek(SeekFrom::End(0)).unwrap();
 
-    verify_digest(&file, stamp, HELLO_SHA256).unwrap();
+    assert_eq!(
+        verify_digest(
+            &file,
+            stamp,
+            &[
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                HELLO_SHA256,
+            ],
+        )
+        .unwrap(),
+        HELLO_SHA256,
+    );
 }
 
 #[test]
@@ -66,8 +77,8 @@ fn changed_image_content_or_file_identity_is_rejected() {
     file.write_all(b"HELLO").unwrap();
     file.sync_all().unwrap();
 
-    assert!(verify_digest(&file, stamp, HELLO_SHA256).is_err());
+    assert!(verify_digest(&file, stamp, &[HELLO_SHA256]).is_err());
     let other_directory = tempfile::tempdir().unwrap();
     let other = fixture(other_directory.path());
-    assert!(verify_digest(&other, stamp, HELLO_SHA256).is_err());
+    assert!(verify_digest(&other, stamp, &[HELLO_SHA256]).is_err());
 }

@@ -1,14 +1,21 @@
 //! 普通 Grok PTY 的输入账本；身份快照不授予传输权限，也不建立 owned 会话。
 
 use std::collections::BTreeMap;
+#[cfg(not(target_family = "wasm"))]
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use super::*;
 
 pub(crate) const INPUT_SUBJECT: &str = "grok_native_terminal_input_v1";
+pub(crate) const RICH_INPUT_SUBJECT: &str = "grok_native_terminal_rich_input_v1";
 const EXECUTION_KIND: &str = INPUT_SUBJECT;
 const MAX_TEXT_BYTES: usize = 128 * 1024;
+
+pub(crate) fn is_input_subject(subject: &str) -> bool {
+    subject == INPUT_SUBJECT || subject == RICH_INPUT_SUBJECT
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -183,6 +190,7 @@ pub struct NativeBridgeInput {
     pub input_revision: Uuid,
     pub message_id: Uuid,
     pub replaces: Option<Uuid>,
+    pub subject: String,
     pub body: String,
 }
 
@@ -208,6 +216,8 @@ pub struct NativeBridgeDelivery {
     pub message_id: Uuid,
     pub replaces: Option<Uuid>,
     pub payload_digest: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body_sha256: Option<String>,
     pub state: NativeBridgeDeliveryState,
 }
 
@@ -235,6 +245,7 @@ pub enum NativeBridgePersistenceRequest {
     Lookup {
         binding: Value,
         session_id: Option<Uuid>,
+        subject: String,
         body: String,
         completion: oneshot::Sender<Result<Option<NativeBridgeInputRecord>, String>>,
     },
@@ -272,6 +283,7 @@ pub(crate) fn lookup_input(
     sender: &SyncSender<ModelEvent>,
     binding: Value,
     session_id: Option<Uuid>,
+    subject: String,
     body: String,
 ) -> Result<RecordReceiver, String> {
     let (completion, receiver) = oneshot::channel();
@@ -280,6 +292,7 @@ pub(crate) fn lookup_input(
         LocalCliPersistenceRequest::GrokNativeBridge(NativeBridgePersistenceRequest::Lookup {
             binding,
             session_id,
+            subject,
             body,
             completion,
         }),
@@ -334,10 +347,11 @@ pub(super) fn handle_request(
         NativeBridgePersistenceRequest::Lookup {
             binding,
             session_id,
+            subject,
             body,
             completion,
         } => complete(
-            lookup_exact(connection, binding, session_id, &body),
+            lookup_exact(connection, binding, session_id, &subject, &body),
             completion,
         ),
         NativeBridgePersistenceRequest::Acknowledge {
@@ -381,14 +395,99 @@ fn binding_snapshot(value: Value) -> Result<NativeBridgeBindingSnapshot> {
     Ok(binding)
 }
 
-fn payload_digest(body: &str) -> String {
-    format!("blake3:{}", blake3::hash(body.as_bytes()).to_hex())
+fn payload_digest(connection: &mut SqliteConnection, subject: &str, body: &str) -> Result<String> {
+    validate_body(subject, body)?;
+    if subject == INPUT_SUBJECT {
+        return Ok(format!("blake3:{}", blake3::hash(body.as_bytes()).to_hex()));
+    }
+    #[cfg(not(target_family = "wasm"))]
+    {
+        #[derive(QueryableByName)]
+        struct DatabaseFile {
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            name: String,
+            #[diesel(sql_type = diesel::sql_types::Text)]
+            file: String,
+        }
+        let database = diesel::sql_query("PRAGMA database_list")
+            .load::<DatabaseFile>(connection)?
+            .into_iter()
+            .find(|database| database.name == "main")
+            .context("普通 Grok 图片账本缺少数据库文件")?;
+        let path = Path::new(&database.file);
+        if !path.is_absolute() {
+            bail!("普通 Grok 图片账本必须绑定持久数据库 scope");
+        }
+        let store = path
+            .parent()
+            .context("数据库目录无效")?
+            .join("local-cli-attachments");
+        let prompt =
+            crate::terminal::cli_agent_sessions::grok_native_bridge_prompt::decode_from_store(
+                subject, body, &store,
+            )?;
+        Ok(prompt.payload_digest().to_owned())
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = connection;
+        bail!("此平台不支持普通 Grok 原生图片桥");
+    }
 }
 
-fn validate_input(session_id: Uuid, body: &str) -> Result<()> {
-    if session_id.is_nil() || body.trim().is_empty() || body.len() > MAX_TEXT_BYTES {
+fn validate_body(subject: &str, body: &str) -> Result<()> {
+    let valid = match subject {
+        INPUT_SUBJECT => !body.trim().is_empty() && body.len() <= MAX_TEXT_BYTES,
+        RICH_INPUT_SUBJECT => !body.is_empty() && body.len() <= 1024 * 1024,
+        _ => false,
+    };
+    if !valid {
+        bail!("普通 Grok 原生桥输入类型或正文无效");
+    }
+    Ok(())
+}
+
+fn validate_input(session_id: Uuid, subject: &str, body: &str) -> Result<()> {
+    if session_id.is_nil() {
         bail!("普通 Grok 原生桥会话或输入正文无效");
     }
+    validate_body(subject, body)
+}
+
+fn validate_stored_payload(record: &NativeBridgeInputRecord) -> Result<()> {
+    let message = &record.message;
+    let delivery = &record.delivery;
+    if message.subject == INPUT_SUBJECT {
+        if delivery.version != 1
+            || delivery.body_sha256.is_some()
+            || delivery.payload_digest
+                != format!("blake3:{}", blake3::hash(message.body.as_bytes()).to_hex())
+        {
+            bail!("普通 Grok 原生桥旧文本记录不一致");
+        }
+        return Ok(());
+    }
+    if delivery.version != 2
+        || delivery.body_sha256.as_deref()
+            != Some(format!("{:x}", Sha256::digest(message.body.as_bytes())).as_str())
+        || !delivery
+            .payload_digest
+            .strip_prefix("blake3:")
+            .is_some_and(|digest| {
+                digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+    {
+        bail!("普通 Grok 原生桥图片引用记录不一致");
+    }
+    #[cfg(not(target_family = "wasm"))]
+    crate::terminal::cli_agent_sessions::grok_native_bridge_prompt::validate_persisted_body(
+        &message.body,
+    )?;
+    #[cfg(target_family = "wasm")]
+    bail!("此平台不支持普通 Grok 原生图片桥");
     Ok(())
 }
 
@@ -446,11 +545,11 @@ fn read_record(
     let message = &record.message;
     let delivery = &record.delivery;
     delivery.binding.validate()?;
-    validate_input(delivery.session_id, &message.body)?;
+    validate_input(delivery.session_id, &message.subject, &message.body)?;
+    validate_stored_payload(&record)?;
     if message.version != 1
-        || message.subject != INPUT_SUBJECT
+        || !is_input_subject(&message.subject)
         || message.message_id != message_id.to_string()
-        || delivery.version != 1
         || delivery.message_id != message_id
         || delivery.message_id.is_nil()
         || delivery.input_revision.is_nil()
@@ -459,7 +558,6 @@ fn read_record(
         || message.recipient_task_id != delivery.task_id
         || message.sender_generation != 1
         || message.recipient_generation != 1
-        || delivery.payload_digest != payload_digest(&message.body)
         || state != state_name(message.state)?
     {
         bail!("普通 Grok 原生桥输入账本身份或正文不一致");
@@ -516,17 +614,16 @@ fn lookup_exact(
     connection: &mut SqliteConnection,
     binding: Value,
     session_id: Option<Uuid>,
+    subject: &str,
     body: &str,
 ) -> Result<Option<NativeBridgeInputRecord>> {
     let binding = binding_snapshot(binding)?;
-    if session_id.is_some_and(|session_id| session_id.is_nil())
-        || body.trim().is_empty()
-        || body.len() > MAX_TEXT_BYTES
-    {
+    validate_body(subject, body)?;
+    if session_id.is_some_and(|session_id| session_id.is_nil()) {
         bail!("普通 Grok 原生桥查询会话或正文无效");
     }
     let mut matched = None;
-    for record in latest_inputs(connection, session_id, body)? {
+    for record in latest_inputs(connection, session_id, subject, body)? {
         let matches_scope = match session_id {
             Some(session_id) => record.delivery.session_id == session_id,
             None => record.delivery.binding == binding,
@@ -545,12 +642,28 @@ fn lookup_exact(
 fn latest_inputs(
     connection: &mut SqliteConnection,
     session_id: Option<Uuid>,
+    subject: &str,
     body: &str,
 ) -> Result<Vec<NativeBridgeInputRecord>> {
-    let digest = payload_digest(body);
+    let records = native_records(connection)?;
+    // 相同封存引用的查收不能依赖图片文件仍在；新领取已在事务外完整解码核过摘要。
+    let stored_digest = records
+        .iter()
+        .find(|record| {
+            subject == RICH_INPUT_SUBJECT
+                && record.message.subject == subject
+                && record.message.body == body
+                && session_id.is_none_or(|session_id| record.delivery.session_id == session_id)
+        })
+        .map(|record| record.delivery.payload_digest.clone());
+    let digest = match stored_digest {
+        Some(digest) => digest,
+        None => payload_digest(connection, subject, body)?,
+    };
     let mut sessions = BTreeMap::<Uuid, Vec<NativeBridgeInputRecord>>::new();
-    for record in native_records(connection)? {
+    for record in records {
         if session_id.is_some_and(|session_id| record.delivery.session_id != session_id)
+            || record.message.subject != subject
             || record.delivery.payload_digest != digest
         {
             continue;
@@ -614,7 +727,8 @@ fn claim_once(
     input: NativeBridgeInput,
 ) -> Result<NativeBridgeClaimOutcome> {
     let binding = binding_snapshot(input.binding)?;
-    validate_input(input.session_id, &input.body)?;
+    validate_input(input.session_id, &input.subject, &input.body)?;
+    let digest = payload_digest(connection, &input.subject, &input.body)?;
     if input.message_id.is_nil()
         || input.input_revision.is_nil()
         || input
@@ -628,14 +742,28 @@ fn claim_once(
         if let Some((_, record)) = read_record(connection, input.message_id)? {
             if record.delivery.binding != binding
                 || record.delivery.session_id != input.session_id
+                || record.message.subject != input.subject
                 || record.message.body != input.body
+                || record.delivery.payload_digest != digest
             {
                 bail!("同一普通 Grok 消息 ID 不能用于另一绑定、会话或正文");
             }
             return Ok(NativeBridgeClaimOutcome::Existing(record));
         }
         // TUI 重启不会产生投递资格；只有明确引用已确认链头的新用户动作可续链。
-        let previous = latest_inputs(connection, Some(input.session_id), &input.body)?.pop();
+        let previous = latest_inputs(
+            connection,
+            Some(input.session_id),
+            &input.subject,
+            &input.body,
+        )?
+        .pop();
+        if previous
+            .as_ref()
+            .is_some_and(|record| record.delivery.payload_digest != digest)
+        {
+            bail!("普通 Grok 图片引用与原领取摘要不一致");
+        }
         match (previous, input.replaces) {
             (Some(record), Some(replaces)) if record.delivery.message_id == replaces => {
                 if record.delivery.state == NativeBridgeDeliveryState::Unknown {
@@ -651,7 +779,7 @@ fn claim_once(
         for record in native_records(connection)? {
             if record.delivery.session_id == input.session_id
                 && record.delivery.input_revision == input.input_revision
-                && record.message.body != input.body
+                && (record.message.subject != input.subject || record.message.body != input.body)
             {
                 bail!("同一普通 Grok 草稿修订不能提交不同正文");
             }
@@ -663,6 +791,8 @@ fn claim_once(
         } else {
             write_task(connection, &task)?;
         }
+        let rich = input.subject == RICH_INPUT_SUBJECT;
+        let body_sha256 = rich.then(|| format!("{:x}", Sha256::digest(input.body.as_bytes())));
         let record = NativeBridgeInputRecord {
             message: LocalCliMessage {
                 version: 1,
@@ -671,25 +801,24 @@ fn claim_once(
                 recipient_task_id: task.task_id.clone(),
                 sender_generation: 1,
                 recipient_generation: 1,
-                subject: INPUT_SUBJECT.to_owned(),
+                subject: input.subject,
                 body: input.body,
                 state: LocalCliMessageState::Unknown,
                 receipt_kind: None,
             },
             delivery: NativeBridgeDelivery {
-                version: 1,
+                version: if rich { 2 } else { 1 },
                 task_id: task.task_id.clone(),
                 binding: binding.clone(),
                 session_id: input.session_id,
                 input_revision: input.input_revision,
                 message_id: input.message_id,
                 replaces: input.replaces,
-                payload_digest: String::new(),
+                payload_digest: digest,
+                body_sha256,
                 state: NativeBridgeDeliveryState::Unknown,
             },
         };
-        let mut record = record;
-        record.delivery.payload_digest = payload_digest(&record.message.body);
         diesel::insert_into(local_cli_messages::table)
             .values((
                 local_cli_messages::message_id.eq(&record.message.message_id),

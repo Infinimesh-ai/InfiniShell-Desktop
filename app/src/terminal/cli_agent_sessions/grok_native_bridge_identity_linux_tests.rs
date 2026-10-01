@@ -104,19 +104,25 @@ fn terminal_bridge_digest_requires_the_complete_fixed_content() {
     fs::write(&path, b"abc").unwrap();
     let mut file = File::open(&path).unwrap();
     let stamp = FileStamp::of(&file.metadata().unwrap());
-    verify_digest(
-        &mut file,
-        stamp,
+    assert_eq!(
+        verify_digest(
+            &mut file,
+            stamp,
+            &[
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ],
+        )
+        .unwrap(),
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-    )
-    .unwrap();
+    );
 
     file.seek(SeekFrom::Start(1)).unwrap();
     assert!(
         verify_digest(
             &mut file,
             stamp,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            &["ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"]
         )
         .is_err()
     );
@@ -125,11 +131,11 @@ fn terminal_bridge_digest_requires_the_complete_fixed_content() {
         verify_digest(
             &mut file,
             stamp,
-            "0000000000000000000000000000000000000000000000000000000000000000"
+            &["0000000000000000000000000000000000000000000000000000000000000000"]
         )
         .is_err()
     );
-    assert!(verify_digest(&mut file, stamp, "").is_err());
+    assert!(verify_digest(&mut file, stamp, &[""]).is_err());
 }
 
 #[test]
@@ -151,7 +157,7 @@ fn terminal_bridge_digest_rejects_mutation_since_the_pre_hash_snapshot() {
         verify_digest(
             &mut file,
             stamp,
-            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            &["ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"]
         )
         .is_err()
     );

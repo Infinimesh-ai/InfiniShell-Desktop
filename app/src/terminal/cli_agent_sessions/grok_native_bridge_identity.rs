@@ -25,9 +25,17 @@ use sha2::{Digest as _, Sha256};
 
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
-pub(super) const ARTIFACT_SHA256: &str =
-    "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1";
-const ARTIFACT_CDHASH: &str = "356fe77c29f339fcaa90e48094fc7af7e0571ec5";
+// 旧文本桥与受验 PNG 桥分别绑定完整映像和签名，不以版本字符串授权。
+const ARTIFACTS: &[(&str, &str)] = &[
+    (
+        "edcdc3d8729cc657080e6a266e26a6590ec2b275f4545a5b93c1dd5e26bf08f1",
+        "356fe77c29f339fcaa90e48094fc7af7e0571ec5",
+    ),
+    (
+        "b5432ea1a6b4fec7d898de5f3d289ec55a838b70cb7797ecacaeb982f79ce444",
+        "0bd055aaf74487889b084c04be1b73a31a1e85df",
+    ),
+];
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -54,6 +62,8 @@ pub(super) struct Artifact {
     path: PathBuf,
     file: File,
     stamp: FileStamp,
+    sha256: &'static str,
+    cdhash: &'static str,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -115,12 +125,27 @@ impl Artifact {
             }
             digest.update(&buffer[..length]);
         }
-        if count != before.len() || format!("{:x}", digest.finalize()) != ARTIFACT_SHA256 {
+        if count != before.len() {
             return Err(invalid());
         }
-        let artifact = Self { path, file, stamp };
+        let digest = format!("{:x}", digest.finalize());
+        let &(sha256, cdhash) = ARTIFACTS
+            .iter()
+            .find(|(expected, _)| *expected == digest)
+            .ok_or_else(invalid)?;
+        let artifact = Self {
+            path,
+            file,
+            stamp,
+            sha256,
+            cdhash,
+        };
         artifact.verify(peer)?;
         Ok(artifact)
+    }
+
+    pub(super) fn sha256(&self) -> &'static str {
+        self.sha256
     }
 
     pub(super) fn verify(&self, peer: &MacosPeerHandle) -> io::Result<()> {
@@ -130,7 +155,8 @@ impl Artifact {
         {
             return Err(invalid());
         }
-        verify_code(peer)?;
+        // 映像摘要和运行中签名必须来自同一受验工件，不能混搭白名单的两个版本。
+        verify_code_requirement(peer, &format!("cdhash H\"{}\"", self.cdhash))?;
         if !self.stamp.matches(&self.file.metadata()?)
             || !self.stamp.matches(&fs::symlink_metadata(&self.path)?)
             || macos_process_identity(peer.identity().pid)? != peer.identity()
@@ -180,6 +206,15 @@ fn process_path(expected: MacosProcessIdentity) -> io::Result<PathBuf> {
 
 /// audit token 必须来自连接的内核凭据；PID 或 manifest 不能构造动态 SecCode 身份。
 fn verify_code(peer: &MacosPeerHandle) -> io::Result<()> {
+    let requirement = ARTIFACTS
+        .iter()
+        .map(|(_, cdhash)| format!("cdhash H\"{cdhash}\""))
+        .collect::<Vec<_>>()
+        .join(" or ");
+    verify_code_requirement(peer, &requirement)
+}
+
+fn verify_code_requirement(peer: &MacosPeerHandle, requirement: &str) -> io::Result<()> {
     let bytes: Vec<u8> = peer
         .audit_token()
         .iter()
@@ -202,7 +237,7 @@ fn verify_code(peer: &MacosPeerHandle) -> io::Result<()> {
         return Err(invalid());
     }
     let code_guard = unsafe { CFType::wrap_under_create_rule(code.cast()) };
-    let text = CFString::new(&format!("cdhash H\"{ARTIFACT_CDHASH}\""));
+    let text = CFString::new(requirement);
     let mut requirement = ptr::null_mut();
     if unsafe { SecRequirementCreateWithString(text.as_concrete_TypeRef(), 0, &mut requirement) }
         != 0

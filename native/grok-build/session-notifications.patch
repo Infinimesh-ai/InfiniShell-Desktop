@@ -1719,10 +1719,18 @@ index 9e1e53ed5179160f4da33d8b160acd63402e7981..13eb86a6c50f2dba6d82e5a5917039af
  }
  /// Parse `availableCommands` from an `InitializeResponse.meta` value.
 diff --git a/crates/codegen/xai-grok-pager/src/app/actions.rs b/crates/codegen/xai-grok-pager/src/app/actions.rs
-index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..cbf72fa7eb3a7e341002523921031f53b5a16630 100644
+index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..e5f0d16d79e8e99752d6698864075b32d0936b7b 100644
 --- a/crates/codegen/xai-grok-pager/src/app/actions.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/actions.rs
-@@ -1553,6 +1553,14 @@ pub enum Effect {
+@@ -10,6 +10,7 @@ use crate::app::status_line::StatusLineRun;
+ use crate::scrollback::entry::EntryId;
+ use agent_client_protocol as acp;
+ use xai_grok_shell::sampling::types::ReasoningEffort;
++use xai_grok_shell::extensions::terminal_bridge_images::PngImage;
+ use xai_grok_shell::session::unified_list::SessionKind;
+ /// Typed error for model switch failures.
+ /// Replaces the raw `String` in `TaskResult::SwitchModelComplete` so dispatch can match on the variant instead of parsing strings.
+@@ -1553,6 +1554,15 @@ pub enum Effect {
          /// Contract: the offsets index the block's `text` displayed verbatim, never combined with a `displayText` override.
          skill_token_ranges: Vec<std::ops::Range<usize>>,
      },
@@ -1731,13 +1739,14 @@ index 1e1f1d55dafbe0b212b0509a19e026fe4257da2c..cbf72fa7eb3a7e341002523921031f53
 +        agent_id: AgentId,
 +        session_id: acp::SessionId,
 +        text: String,
++        images: Vec<PngImage>,
 +        prompt_id: String,
 +        message_id: String,
 +    },
      /// `session/prompt` with `_meta.executePlan` after a post-turn plan approve
      ExecutePlan {
          agent_id: AgentId,
-@@ -2604,6 +2612,16 @@ pub enum TaskResult {
+@@ -2604,6 +2614,16 @@ pub enum TaskResult {
          /// `None` for synthetic/test constructions that don't need gating.
          prompt_id: Option<String>,
      },
@@ -1847,10 +1856,18 @@ index a57df79bcb4d819ee5e25964c0b02eba003ab579..53aa8669135cfff2fe791a3f86a3d3e5
      present_export_copy_tip, show_small_screen_tip, show_ssh_wrap_tip,
  };
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
-index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fbfa636282 100644
+index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..fc784ed12912ff732ec15da3bba1f9baec9115ba 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/prompt.rs
-@@ -63,6 +63,36 @@ pub(crate) fn dispatch_initial_prompt(app: &mut AppView, prompt: String) -> Vec<
+@@ -26,6 +26,7 @@ use crate::scrollback::blocks::{MemoryCommandKind, SessionEvent};
+ use crate::slash::command::DoctorRequest;
+ use agent_client_protocol as acp;
+ use xai_grok_telemetry::session_ctx::log_event;
++use xai_grok_shell::extensions::terminal_bridge_images::PngImage;
+ 
+ /// Shared by every submit guard that refuses while the session reconnects.
+ pub(super) const RECONNECTING_NOTICE: &str = "Reconnecting, please wait...";
+@@ -63,6 +64,38 @@ pub(crate) fn dispatch_initial_prompt(app: &mut AppView, prompt: String) -> Vec<
      effects
  }
  
@@ -1859,6 +1876,7 @@ index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fb
 +pub(crate) fn dispatch_terminal_bridge_prompt(
 +    app: &mut AppView,
 +    text: String,
++    images: Vec<PngImage>,
 +    message_id: String,
 +    prompt_id: String,
 +) -> Vec<Effect> {
@@ -1879,6 +1897,7 @@ index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fb
 +        agent_id,
 +        session_id,
 +        text,
++        images,
 +        prompt_id,
 +        message_id,
 +    }]
@@ -1887,6 +1906,14 @@ index 0323caeb5005cd06f0b7ae2fff291fe30475a7f9..8beb9434b9cb7bc31a208c1de27978fb
  pub(super) fn collect_live_doctor_report_for_terminal(
      app: &AppView,
      agent_id: AgentId,
+@@ -854,6 +887,7 @@ pub(super) fn dispatch_send_prompt_submission(
+                 {
+                     use xai_grok_telemetry::events::{PagerCommandSource, PagerSlashCommand};
+                     use xai_grok_telemetry::session_ctx::log_event;
++use xai_grok_shell::extensions::terminal_bridge_images::PngImage;
+                     let source = if is_builtin {
+                         PagerCommandSource::Builtin
+                     } else {
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs
 index eaf1f2997f6c3c5edfff51782ab690a1eb413929..c77482b3182057375ff97d41757914d8dbc6e933 100644
 --- a/crates/codegen/xai-grok-pager/src/app/dispatch/queue.rs
@@ -1962,10 +1989,10 @@ index 94636a63e166e0e80473a3f7c1789f71bbbf1f0a..8a1f48f66f6f2dd6a165bc3c3c5cb176
          relaunch: None,
 diff --git a/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..f2cfafe5c1e6e1767ce45178cd7aae61a3cb0ada
+index 0000000000000000000000000000000000000000..cd028dafa591b072551b8407ee8e8cacfdc160f3
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/dispatch/tests/terminal_bridge.rs
-@@ -0,0 +1,246 @@
+@@ -0,0 +1,247 @@
 +use super::*;
 +use crate::app::acp_handler::apply_session_event_for_test;
 +use crate::app::dispatch::prompt::dispatch_terminal_bridge_prompt;
@@ -1981,6 +2008,7 @@ index 0000000000000000000000000000000000000000..f2cfafe5c1e6e1767ce45178cd7aae61
 +        let effects = dispatch_terminal_bridge_prompt(
 +            &mut app,
 +            BODY.into(),
++            vec![],
 +            PROMPT_ID.into(),
 +            PROMPT_ID.into(),
 +        );
@@ -2241,10 +2269,18 @@ index 96df72c4376f13a4f6c0a8297f6e31148bac6bac..63f855998d8c3689b76c2cf430668052
      /// Returns `None` for the default `grok-build` profile (no `_meta` needed; it already includes TaskTool).
      /// Chat mode never injects a Build profile (remote owns agent behavior).
 diff --git a/crates/codegen/xai-grok-pager/src/app/effects/mod.rs b/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
-index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c2095f3c6dd5 100644
+index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..60b63df337dc946c87ed50a39dae54a40f275cf6 100644
 --- a/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
 +++ b/crates/codegen/xai-grok-pager/src/app/effects/mod.rs
-@@ -244,6 +244,7 @@ pub(crate) fn execute(
+@@ -3,6 +3,7 @@
+ //! When tasks complete, the event loop converts their output into [`TaskResult`] and feeds it back through dispatch.
+ mod helpers;
+ mod session_list;
++use xai_grok_shell::extensions::terminal_bridge_images;
+ use super::actions;
+ use super::worktree_session;
+ #[allow(unused_imports)]
+@@ -244,6 +245,7 @@ pub(crate) fn execute(
              if is_chat_path {
                  scrub_chat_workspace_bind_meta(&mut meta);
              }
@@ -2252,7 +2288,7 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c209
              let preferred_for_preflight = preferred_session_id.clone();
              tasks
                  .spawn(async move {
-@@ -494,6 +495,7 @@ pub(crate) fn execute(
+@@ -494,6 +496,7 @@ pub(crate) fn execute(
                      .insert("x.ai/restore_code".into(), serde_json::Value::Bool(rc));
              }
              let cwd = session_cwd.unwrap_or_else(|| cwd.to_path_buf());
@@ -2260,7 +2296,7 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c209
              let acp_session_id = acp::SessionId::new(session_id);
              tasks
                  .spawn(async move {
-@@ -1240,6 +1242,56 @@ pub(crate) fn execute(
+@@ -1240,6 +1243,50 @@ pub(crate) fn execute(
                      }
                  });
          }
@@ -2268,6 +2304,7 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c209
 +            agent_id,
 +            session_id,
 +            text,
++            images,
 +            prompt_id,
 +            message_id,
 +        } => {
@@ -2275,17 +2312,10 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c209
 +            let screen_mode = session_flags.screen_mode_label;
 +            let is_api_key_auth = session_flags.is_api_key_auth;
 +            tasks.spawn(async move {
-+                let mut meta = prompt_request_meta(&prompt_id, screen_mode);
-+                meta["verbatim"] = true.into();
-+                meta["infinishellTerminalBridge"] = serde_json::json!({
-+                    "protocolVersion": 1,
-+                    "requireIdle": true,
-+                    "messageId": message_id,
-+                });
-+                // 此入口不解析斜杠命令，也不发送审批响应；服务端仍执行原生权限检查。
-+                let prompt = vec![plain_prompt_content_block(text, &[])];
-+                let prompt = acp::PromptRequest::new(session_id.clone(), prompt)
-+                    .meta(meta.as_object().cloned());
++                // 图片在领取之前已整批校验，构帧保持原字节与顺序。
++                let prompt = terminal_bridge_images::prompt_request(
++                    session_id.clone(), text, images, &prompt_id, &message_id, screen_mode,
++                );
 +                // 独立方法使旧 leader 明确拒绝，不能静默忽略空闲限制后按普通输入派发。
 +                let req = acp::ExtRequest::new(
 +                    "infinishell/session/submit_if_idle",
@@ -2317,6 +2347,90 @@ index 2b2cc56b61f36335deb3f3c4e640c88ffad5edd4..0696629cc9ac7348527a0f72c7b6c209
          Effect::SendPrompt {
              agent_id,
              session_id,
+@@ -5750,3 +5797,7 @@ fn build_interject_params(
+ }
+ #[cfg(test)]
+ mod tests;
++
++#[cfg(test)]
++#[path = "terminal_bridge_tests.rs"]
++mod terminal_bridge_tests;
+diff --git a/crates/codegen/xai-grok-pager/src/app/effects/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/effects/terminal_bridge_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b40f31853e09fb2364c917a1874680916aa2d0a
+--- /dev/null
++++ b/crates/codegen/xai-grok-pager/src/app/effects/terminal_bridge_tests.rs
+@@ -0,0 +1,70 @@
++use super::*;
++use std::sync::Arc;
++use xai_acp_lib::AcpAgentMessage;
++use xai_grok_shell::extensions::terminal_bridge_images::PngImage;
++
++const RED: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
++const BLUE: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
++
++#[tokio::test]
++async fn typed_png_effect_emits_one_exact_atomic_acp_request() {
++    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
++    let mut tasks = JoinSet::new();
++    let (progress, _progress_rx) = tokio::sync::mpsc::unbounded_channel();
++    execute(
++        Effect::SendTerminalBridgePrompt {
++            agent_id: AgentId(0),
++            session_id: "session".into(),
++            text: "中文\n".into(),
++            images: vec![
++                PngImage {
++                    mime_type: "image/png".into(),
++                    data: RED.into(),
++                },
++                PngImage {
++                    mime_type: "image/png".into(),
++                    data: BLUE.into(),
++                },
++            ],
++            prompt_id: "441a1b92-6fa1-4bab-b80c-95ce5627c18c".into(),
++            message_id: "441a1b92-6fa1-4bab-b80c-95ce5627c18c".into(),
++        },
++        &mut tasks,
++        &tx,
++        Path::new("."),
++        &SessionFlags::default(),
++        &progress,
++    );
++    let Some(AcpAgentMessage::ExtMethod(args)) = rx.recv().await else {
++        panic!("必须使用专用原子方法");
++    };
++    assert_eq!(
++        args.request.method.as_ref(),
++        "infinishell/session/submit_if_idle"
++    );
++    let value: serde_json::Value = serde_json::from_str(args.request.params.get()).unwrap();
++    assert_eq!(
++        value["prompt"],
++        serde_json::json!([
++            {"type":"text","text":"中文\n"}, {"type":"image","mimeType":"image/png","data":RED}, {"type":"image","mimeType":"image/png","data":BLUE}
++        ])
++    );
++    assert_eq!(value["_meta"]["verbatim"], true);
++    assert_eq!(
++        value["_meta"]["infinishellTerminalBridge"]["requireIdle"],
++        true
++    );
++    args.response_tx
++        .send(Ok(acp::ExtResponse::new(Arc::from(
++            serde_json::value::RawValue::from_string("{\"stopReason\":\"end_turn\"}".into())
++                .unwrap(),
++        ))))
++        .unwrap();
++    let result = tasks.join_next().await.unwrap().unwrap();
++    assert!(matches!(
++        result,
++        TaskResult::TerminalBridgeResponse { result: Ok(_), .. }
++    ));
++    assert!(tasks.is_empty());
++    assert!(rx.try_recv().is_err());
++}
 diff --git a/crates/codegen/xai-grok-pager/src/app/effects/tests.rs b/crates/codegen/xai-grok-pager/src/app/effects/tests.rs
 index 89063c5ae04de7ac346de0bb3302b2c21628b13f..1d4483dbd16f1d57002be3842ef43bb63e1874bc 100644
 --- a/crates/codegen/xai-grok-pager/src/app/effects/tests.rs
@@ -3020,10 +3134,10 @@ index e1077eb31a632e49b9c0effb632ec1f79364cf66..6f8d12638be1f2adb4275ea2d232eec5
          status_line_tick_demand(TickInputs {
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d202360514
+index 0000000000000000000000000000000000000000..a7d3a35ef4bafb07328811bb47540900ec8de4bd
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge.rs
-@@ -0,0 +1,741 @@
+@@ -0,0 +1,783 @@
 +//! 普通 TUI 的外部输入事务；所有状态检查与提交均由原生事件循环串行调用。
 +
 +use std::collections::HashMap;
@@ -3036,6 +3150,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +use std::time::{Duration, Instant};
 +
 +use serde::{Deserialize, Serialize};
++use xai_grok_shell::extensions::terminal_bridge_images::{self, PngImage};
 +
 +use super::actions::{Action, Effect};
 +use super::agent::{AgentId, BgTaskStatus, GoalDisplayStatus};
@@ -3044,7 +3159,6 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +use super::dispatch::{dispatch, dispatch_terminal_bridge_prompt};
 +
 +const LEASE_LIFETIME: Duration = Duration::from_secs(5);
-+const MAX_TEXT_BYTES: usize = 128 * 1024;
 +const MAX_RECEIPTS: usize = 4096;
 +
 +#[derive(Clone, Debug, Deserialize, Serialize)]
@@ -3066,6 +3180,8 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +        message_id: String,
 +        prompt_id: String,
 +        text: String,
++        #[serde(default, skip_serializing_if = "Vec::is_empty")]
++        images: Vec<PngImage>,
 +    },
 +    QueryReceipt {
 +        instance_id: String,
@@ -3108,6 +3224,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +        instance_id: String,
 +        input_epoch: u64,
 +        ready: bool,
++        typed_png_images: u32,
 +        reason: Option<String>,
 +        lease: Option<Lease>,
 +    },
@@ -3143,6 +3260,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +    journal: super::terminal_bridge_windows::Journal,
 +    journal_failed: bool,
 +    native_available: bool,
++    native_images: bool,
 +}
 +
 +/// 只证明同一次纯显示 tick 前后的目标身份；不能用最终空草稿替代输入事件撤销。
@@ -3178,6 +3296,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +            journal,
 +            journal_failed: false,
 +            native_available: false,
++            native_images: false,
 +        })
 +    }
 +
@@ -3185,6 +3304,17 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +    pub(crate) fn set_native_capability(&mut self, available: bool) {
 +        if self.native_available != available {
 +            self.native_available = available;
++            if !available {
++                self.native_images = false;
++            }
++            self.invalidate();
++        }
++    }
++
++    pub(crate) fn set_native_images(&mut self, available: bool) {
++        let available = available && self.native_available;
++        if self.native_images != available {
++            self.native_images = available;
 +            self.invalidate();
 +        }
 +    }
@@ -3398,6 +3528,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +                        instance_id: self.instance_id.clone(),
 +                        input_epoch: self.input_epoch,
 +                        ready: reason.is_none(),
++                        typed_png_images: u32::from(self.native_images),
 +                        reason: reason.map(str::to_owned),
 +                        lease,
 +                    },
@@ -3428,6 +3559,7 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +                message_id,
 +                prompt_id,
 +                text,
++                images,
 +            } => {
 +                if instance_id != self.instance_id {
 +                    return rejected("instance_mismatch");
@@ -3435,12 +3567,13 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +                if message_id != prompt_id
 +                    || !uuid::Uuid::parse_str(&message_id)
 +                        .is_ok_and(|id| !id.is_nil() && id.to_string() == message_id)
-+                    || text.trim().is_empty()
-+                    || text.len() > MAX_TEXT_BYTES
 +                {
 +                    return rejected("invalid_submission");
 +                }
-+                let payload_digest = format!("blake3:{}", blake3::hash(text.as_bytes()).to_hex());
++                let payload_digest = match terminal_bridge_images::payload_digest(&text, &images) {
++                    Ok(digest) => digest,
++                    Err(reason) => return rejected(reason),
++                };
 +                // 查重先于租约判断：断连后的相同请求只返回原账本，不生成第二个 Effect。
 +                if let Some(receipt) = self.receipts.get(&message_id) {
 +                    if receipt.prompt_id != prompt_id
@@ -3455,6 +3588,24 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +                        },
 +                        vec![],
 +                    );
++                }
++                if !images.is_empty() {
++                    if !self.native_images {
++                        return rejected("typed_png_images_unavailable");
++                    }
++                    let prompt = terminal_bridge_images::prompt_request(
++                        session_id.clone().into(),
++                        text.clone(),
++                        images.clone(),
++                        &prompt_id,
++                        &message_id,
++                        Some(app.screen_mode.meta_label()),
++                    );
++                    if serde_json::to_vec(&prompt).map_or(true, |bytes| {
++                        bytes.len() > terminal_bridge_images::MAX_FRAME_BYTES
++                    }) {
++                        return rejected("image_frame_capacity");
++                    }
 +                }
 +                if self.receipts.len() >= MAX_RECEIPTS {
 +                    return rejected("receipt_capacity");
@@ -3498,8 +3649,13 @@ index 0000000000000000000000000000000000000000..ee07a11761e43981ea0aee805c5d87d2
 +                    self.receipts.insert(message_id, receipt.clone());
 +                    return (Response::Receipt { receipt }, vec![]);
 +                }
-+                let effects =
-+                    dispatch_terminal_bridge_prompt(app, text, message_id.clone(), prompt_id);
++                let effects = dispatch_terminal_bridge_prompt(
++                    app,
++                    text,
++                    images,
++                    message_id.clone(),
++                    prompt_id,
++                );
 +                receipt.state = if effects.is_empty() {
 +                    ReceiptState::Unknown
 +                } else {
@@ -4802,10 +4958,10 @@ index 0000000000000000000000000000000000000000..81010a1a488e0efc82bc478f0bc11f9c
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b92a91494
+index 0000000000000000000000000000000000000000..b0444fbcae440461c975e2af262b8b3674dbd991
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop.rs
-@@ -0,0 +1,258 @@
+@@ -0,0 +1,267 @@
 +//! 将私有 IPC 事务串行接入普通 TUI，不把本地派发升级为原生回执。
 +
 +use super::super::actions::{Effect, TaskResult};
@@ -4918,7 +5074,7 @@ index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b
 +pub(super) struct Connection {
 +    pub(super) io: BridgeIo,
 +    pub(super) state: TerminalBridge,
-+    capability: Option<(oneshot::Receiver<bool>, JoinHandle<()>)>,
++    capability: Option<(oneshot::Receiver<(bool, bool)>, JoinHandle<()>)>,
 +    receipt_queries: ReceiptQueries,
 +}
 +
@@ -4970,13 +5126,21 @@ index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b
 +            let supported =
 +                match tokio::time::timeout(Duration::from_secs(5), acp_send(request, &tx)).await {
 +                    Ok(Ok(response)) => serde_json::from_str::<serde_json::Value>(response.0.get())
-+                        .is_ok_and(|value| {
-+                            value.get("protocolVersion").and_then(|v| v.as_u64()) == Some(1)
-+                                && value.get("submitIfIdle").and_then(|v| v.as_bool()) == Some(true)
-+                                && value.get("durableReceipts").and_then(|v| v.as_bool())
++                        .map(|value| {
++                            let text = value.get("protocolVersion").and_then(|v| v.as_u64())
++                                == Some(1)
++                                && value.get("submitIfIdle").and_then(|v| v.as_bool())
 +                                    == Some(true)
-+                        }),
-+                    Ok(Err(_)) | Err(_) => false,
++                                && value.get("durableReceipts").and_then(|v| v.as_bool())
++                                    == Some(true);
++                            (
++                                text,
++                                text && value.get("typedPngImages").and_then(|v| v.as_u64())
++                                    == Some(1),
++                            )
++                        })
++                        .unwrap_or((false, false)),
++                    Ok(Err(_)) | Err(_) => (false, false),
 +                };
 +            let _ = sender.send(supported);
 +        });
@@ -4986,8 +5150,9 @@ index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b
 +    pub(super) fn handle(&mut self, request: BridgeRequest, app: &mut AppView) -> Vec<Effect> {
 +        if let Some((receiver, _)) = self.capability.as_mut() {
 +            match receiver.try_recv() {
-+                Ok(supported) => {
++                Ok((supported, images)) => {
 +                    self.state.set_native_capability(supported);
++                    self.state.set_native_images(images);
 +                    self.capability = None;
 +                }
 +                Err(oneshot::error::TryRecvError::Empty) => {}
@@ -5066,10 +5231,10 @@ index 0000000000000000000000000000000000000000..8febbe367222276648cd8ee84f824b2b
 +mod tests;
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..3aa1bfb2d06ee8be5889c0ac1834cab406492212
+index 0000000000000000000000000000000000000000..a2706970d51bfa14f9a5d140139ac078681c62af
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_loop_tests.rs
-@@ -0,0 +1,234 @@
+@@ -0,0 +1,235 @@
 +use super::*;
 +
 +#[cfg(windows)]
@@ -5116,6 +5281,7 @@ index 0000000000000000000000000000000000000000..3aa1bfb2d06ee8be5889c0ac1834cab4
 +        message_id: message_id.clone(),
 +        prompt_id: message_id,
 +        text: "只查询收据，不重新投递此正文".into(),
++        images: vec![],
 +    };
 +    let (response, effects) = state.handle(request.clone(), &mut app);
 +    assert_eq!(effects.len(), 1);
@@ -5850,10 +6016,10 @@ index 0000000000000000000000000000000000000000..7ec9119da0f342fd8d0db61e68110600
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..82ccf663ddad8d86230606a695f3427e69c624e7
+index 0000000000000000000000000000000000000000..e864270c06af30c322cc5aef481f57b6d14b165a
 --- /dev/null
 +++ b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_tests.rs
-@@ -0,0 +1,1027 @@
+@@ -0,0 +1,1160 @@
 +use super::*;
 +
 +use crate::app::actions::TaskResult;
@@ -5911,6 +6077,7 @@ index 0000000000000000000000000000000000000000..82ccf663ddad8d86230606a695f3427e
 +        message_id: "988b3ed9-86d7-4c57-9609-e106f0a01501".into(),
 +        prompt_id: "988b3ed9-86d7-4c57-9609-e106f0a01501".into(),
 +        text: text.into(),
++        images: vec![],
 +    }
 +}
 +
@@ -6880,6 +7047,138 @@ index 0000000000000000000000000000000000000000..82ccf663ddad8d86230606a695f3427e
 +    let (response, effects) = bridge.handle(request, &mut app);
 +    assert!(matches!(response, Response::Rejected { reason } if reason == "instance_mismatch"));
 +    assert!(effects.is_empty());
++}
++
++const RED: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
++const BLUE: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
++
++fn image_submission(lease: &Lease, text: &str, images: &[&str]) -> Request {
++    let mut request = submission(lease, text);
++    if let Request::SubmitIfIdle { images: batch, .. } = &mut request {
++        *batch = images
++            .iter()
++            .map(|data| PngImage {
++                mime_type: "image/png".into(),
++                data: (*data).into(),
++            })
++            .collect();
++    }
++    request
++}
++
++#[test]
++fn typed_png_batch_dispatches_once_and_order_changes_conflict() {
++    let (_directory, mut bridge, mut app) = setup();
++    bridge.set_native_images(true);
++    let lease = lease(&mut bridge, &mut app);
++    let request = image_submission(&lease, "中文\n", &[RED, BLUE]);
++    let (response, effects) = bridge.handle(request.clone(), &mut app);
++    let first = receipt(response);
++    assert_eq!(
++        first.payload_digest,
++        "blake3:97e469a43a4f801f94c4a09285886353720487402268d93c3bac94dc9d2c09d5"
++    );
++    assert!(
++        matches!(effects.as_slice(), [Effect::SendTerminalBridgePrompt { images, text, .. }] if text == "中文\n" && images[0].data == RED && images[1].data == BLUE)
++    );
++    bridge.set_native_images(false);
++    let (response, effects) = bridge.handle(request, &mut app);
++    assert_eq!(receipt(response), first);
++    assert!(effects.is_empty());
++    let (response, effects) =
++        bridge.handle(image_submission(&lease, "中文\n", &[BLUE, RED]), &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "message_id_conflict"));
++    assert!(effects.is_empty());
++}
++
++#[test]
++fn typed_png_missing_capability_and_bad_batch_never_claim() {
++    let (directory, mut bridge, mut app) = setup();
++    let first_lease = lease(&mut bridge, &mut app);
++    let (response, effects) = bridge.handle(image_submission(&first_lease, "", &[RED]), &mut app);
++    assert!(
++        matches!(response, Response::Rejected { reason } if reason == "typed_png_images_unavailable")
++    );
++    assert!(effects.is_empty());
++    bridge.set_native_images(true);
++    let second_lease = lease(&mut bridge, &mut app);
++    let (response, effects) =
++        bridge.handle(image_submission(&second_lease, "", &[RED, "bad"]), &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "invalid_image"));
++    assert!(effects.is_empty());
++    assert!(bridge.receipts.is_empty());
++    assert_eq!(
++        std::fs::metadata(directory.path().join("receipts.jsonl"))
++            .unwrap()
++            .len(),
++        0
++    );
++    let (response, effects) = bridge.handle(image_submission(&second_lease, "", &[RED]), &mut app);
++    assert_eq!(receipt(response).state, ReceiptState::Dispatched);
++    assert_eq!(effects.len(), 1);
++}
++
++#[test]
++fn typed_png_capability_change_invalidates_lease_but_text_v1_wire_stays_unchanged() {
++    let (_directory, mut bridge, mut app) = setup();
++    let old = lease(&mut bridge, &mut app);
++    assert!(
++        serde_json::to_value(submission(&old, "abc"))
++            .unwrap()
++            .get("images")
++            .is_none()
++    );
++    bridge.set_native_images(true);
++    let (response, effects) = bridge.handle(image_submission(&old, "", &[RED]), &mut app);
++    assert!(matches!(response, Response::Rejected { reason } if reason == "stale_lease"));
++    assert!(effects.is_empty());
++    let (response, _) = bridge.handle(
++        Request::State {
++            instance_id: "test-instance".into(),
++        },
++        &mut app,
++    );
++    assert!(matches!(
++        response,
++        Response::State {
++            typed_png_images: 1,
++            ..
++        }
++    ));
++    bridge.set_native_capability(false);
++    let (response, _) = bridge.handle(
++        Request::State {
++            instance_id: "test-instance".into(),
++        },
++        &mut app,
++    );
++    assert!(matches!(
++        response,
++        Response::State {
++            typed_png_images: 0,
++            ..
++        }
++    ));
++}
++
++#[test]
++fn typed_png_full_serialized_frame_budget_rejects_before_receipt() {
++    let (directory, mut bridge, mut app) = setup();
++    bridge.set_native_images(true);
++    let lease = lease(&mut bridge, &mut app);
++    let (response, effects) = bridge.handle(
++        image_submission(&lease, &"\n".repeat(128 * 1024), &[RED]),
++        &mut app,
++    );
++    assert!(matches!(response, Response::Rejected { reason } if reason == "image_frame_capacity"));
++    assert!(effects.is_empty());
++    assert!(bridge.receipts.is_empty());
++    assert_eq!(
++        std::fs::metadata(directory.path().join("receipts.jsonl"))
++            .unwrap()
++            .len(),
++        0
++    );
 +}
 diff --git a/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs b/crates/codegen/xai-grok-pager/src/app/terminal_bridge_windows.rs
 new file mode 100644
@@ -8379,7 +8678,7 @@ index dc0ceefe97afa923ab05d662159047653c0e5d94..11984af3f67fa290b30b465a6003051c
 +    .map_err(|_| acp::Error::internal_error())
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
-index 094085e49711c48227827fa1d4dd44447f301d58..4e3d37f57bcaa47663f06c26a5ca2c401bd6c70f 100644
+index 094085e49711c48227827fa1d4dd44447f301d58..c0b6a68df9a1d65b715610312792f25decb7bb2a 100644
 --- a/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 +++ b/crates/codegen/xai-grok-shell/src/agent/mvp_agent/acp_agent.rs
 @@ -573,6 +573,10 @@ impl acp::Agent for MvpAgent {
@@ -8459,7 +8758,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..4e3d37f57bcaa47663f06c26a5ca2c40
              handle
                  .cmd_tx
                  .send(SessionCommand::Prompt {
-@@ -1969,11 +2023,48 @@ impl acp::Agent for MvpAgent {
+@@ -1969,11 +2023,49 @@ impl acp::Agent for MvpAgent {
          let mut backend_no_bridge_err: Option<acp::Error> = None;
          let method = args.method.clone();
          let result = match method.as_ref() {
@@ -8468,6 +8767,7 @@ index 094085e49711c48227827fa1d4dd44447f301d58..4e3d37f57bcaa47663f06c26a5ca2c40
 +                    "protocolVersion": 1,
 +                    "submitIfIdle": true,
 +                    "durableReceipts": true,
++                    "typedPngImages": 1,
 +                }))
 +            }
 +            crate::extensions::terminal_bridge::RECEIPT_METHOD => {
@@ -9007,7 +9307,7 @@ index 31676cc8adb8fefe81a76ba015de81de5685d244..862162f2da442e2898f75306a71a7711
 +#[path = "owned_exit_tests.rs"]
 +mod owned_exit_tests;
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/mod.rs b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
-index 063a4934d6979db4c93e5c1a7ff45df060c7c121..30b72bd3d90de306abcb8e736405c4cb1ebc1555 100644
+index 063a4934d6979db4c93e5c1a7ff45df060c7c121..1ee9e0dd52c50481221b9adc34e75ca5c1dec819 100644
 --- a/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 +++ b/crates/codegen/xai-grok-shell/src/extensions/mod.rs
 @@ -23,6 +23,7 @@ pub mod marketplace;
@@ -9018,11 +9318,12 @@ index 063a4934d6979db4c93e5c1a7ff45df060c7c121..30b72bd3d90de306abcb8e736405c4cb
  pub mod plugins;
  pub mod pr;
  pub mod privacy;
-@@ -45,6 +46,7 @@ pub mod subagent_message;
+@@ -45,6 +46,8 @@ pub mod subagent_message;
  pub mod suggest;
  pub mod task;
  pub mod terminal;
 +pub(crate) mod terminal_bridge;
++pub mod terminal_bridge_images;
  pub mod usage;
  pub mod worktree;
  pub(crate) mod worktree_seed;
@@ -9182,10 +9483,10 @@ index 0000000000000000000000000000000000000000..4eccc1aeefc10012ab12c8d956307e4a
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da54284d902a5a
+index 0000000000000000000000000000000000000000..5e557f4e279bf6a6cd3659d4ff051824838d1fe4
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge.rs
-@@ -0,0 +1,200 @@
+@@ -0,0 +1,250 @@
 +//! 普通 TUI 的专用原子提交合同；元数据只增加约束，不授予权限。
 +
 +use crate::session::SessionCommand;
@@ -9269,6 +9570,33 @@ index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da5428
 +}
 +
 +pub(crate) fn parse_request(args: &acp::ExtRequest) -> Result<acp::PromptRequest, acp::Error> {
++    let raw: serde_json::Value = serde_json::from_str(args.params.get()).unwrap_or_default();
++    if let Some(blocks) = raw.get("prompt").and_then(|v| v.as_array())
++        && blocks
++            .iter()
++            .any(|block| block.get("type").and_then(|v| v.as_str()) == Some("image"))
++        && blocks.iter().any(|block| {
++            block.as_object().is_none_or(|object| {
++                match object.get("type").and_then(|value| value.as_str()) {
++                    Some("text") => object
++                        .keys()
++                        .any(|key| !matches!(key.as_str(), "type" | "text")),
++                    Some("image") => object
++                        .keys()
++                        .any(|key| !matches!(key.as_str(), "type" | "data" | "mimeType")),
++                    Some(_) | None => true,
++                }
++            })
++        })
++    {
++        return Err(rejection_error(
++            raw.get("sessionId").and_then(|v| v.as_str()),
++            raw.pointer("/_meta/promptId").and_then(|v| v.as_str()),
++            raw.pointer("/_meta/infinishellTerminalBridge/messageId")
++                .and_then(|v| v.as_str()),
++            "infinishell_terminal_bridge_invalid_request",
++        ));
++    }
 +    let request: BridgeRequest = super::parse_params(args).map_err(|_| {
 +        let raw: serde_json::Value = serde_json::from_str(args.params.get()).unwrap_or_default();
 +        rejection_error(
@@ -9316,14 +9644,37 @@ index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da5428
 +            )
 +        })
 +        || request.prompt.is_empty()
-+        || request
++        || !valid_blocks(&request.prompt)
++        || (request
 +            .prompt
 +            .iter()
-+            .any(|block| !matches!(block, acp::ContentBlock::Text(text) if text.meta.is_none()))
++            .any(|block| matches!(block, acp::ContentBlock::Image(_)))
++            && serde_json::to_vec(request).map_or(true, |bytes| {
++                bytes.len() > super::terminal_bridge_images::MAX_FRAME_BYTES
++            }))
 +    {
 +        return Err(invalid_request(request));
 +    }
 +    Ok(true)
++}
++
++fn valid_blocks(blocks: &[acp::ContentBlock]) -> bool {
++    match super::terminal_bridge_images::validate_prompt_blocks(blocks) {
++        Ok(true) => true,
++        Ok(false) => blocks
++            .iter()
++            .all(|block| matches!(block, acp::ContentBlock::Text(text) if text.meta.is_none())),
++        Err(_) => false,
++    }
++}
++
++pub(crate) fn invalid_image_batch(session_id: &str, prompt_id: &str) -> acp::Error {
++    rejection_error(
++        Some(session_id),
++        Some(prompt_id),
++        Some(prompt_id),
++        "infinishell_terminal_bridge_invalid_request",
++    )
 +}
 +
 +fn invalid_request(request: &acp::PromptRequest) -> acp::Error {
@@ -9386,12 +9737,346 @@ index 0000000000000000000000000000000000000000..82a1fa4a523ef13c0c64716514da5428
 +#[cfg(test)]
 +#[path = "terminal_bridge_tests.rs"]
 +mod tests;
+diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..ade5f13d6a0c1e89797076fbd8aa6c671dce81f1
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images.rs
+@@ -0,0 +1,192 @@
++//! 普通终端桥的整批 PNG 合同；只接受原字节，不补读路径或逐图降级。
++
++use crate::session::image_normalize::{MIN_VISION_SIDE_PX, MIN_VISION_TOTAL_PX};
++use agent_client_protocol as acp;
++use base64::{Engine as _, engine::general_purpose::STANDARD};
++use serde::{Deserialize, Serialize};
++use xai_grok_tools::util::image_validate;
++
++pub const MAX_FRAME_BYTES: usize = 256 * 1024;
++const MAX_TEXT_BYTES: usize = 128 * 1024;
++const MAX_IMAGES: usize = 20;
++const MAX_PIXELS: u64 = 1_150_000;
++const DIGEST_DOMAIN: &[u8] = b"infinishell-terminal-bridge-png-v1\0";
++
++#[derive(Clone, Deserialize, Serialize, PartialEq, Eq)]
++#[serde(deny_unknown_fields)]
++pub struct PngImage {
++    pub mime_type: String,
++    pub data: String,
++}
++
++impl std::fmt::Debug for PngImage {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        f.debug_struct("PngImage")
++            .field("encoded_bytes", &self.data.len())
++            .finish()
++    }
++}
++
++fn png_ends_at_iend(bytes: &[u8]) -> bool {
++    if !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
++        return false;
++    }
++    let mut offset = 8usize;
++    while let Some(header) = bytes.get(offset..offset.saturating_add(8)) {
++        let [l0, l1, l2, l3, t0, t1, t2, t3] = header else {
++            return false;
++        };
++        let length = u32::from_be_bytes([*l0, *l1, *l2, *l3]) as usize;
++        let Some(end) = offset.checked_add(12).and_then(|n| n.checked_add(length)) else {
++            return false;
++        };
++        if end > bytes.len() {
++            return false;
++        }
++        if [*t0, *t1, *t2, *t3] == *b"IEND" {
++            return length == 0 && end == bytes.len();
++        }
++        offset = end;
++    }
++    false
++}
++
++fn decode(image: &PngImage) -> Result<Vec<u8>, &'static str> {
++    if image.mime_type != "image/png" {
++        return Err("invalid_image");
++    }
++    if image.data.len() > MAX_FRAME_BYTES {
++        return Err("image_frame_capacity");
++    }
++    let bytes = STANDARD.decode(&image.data).map_err(|_| "invalid_image")?;
++    if STANDARD.encode(&bytes) != image.data {
++        return Err("invalid_image");
++    }
++    // 先检查头部尺寸，再完整解码，避免压缩炸弹先占用像素内存。
++    let (width, height, mime) =
++        image_validate::validate_image_bytes_with(&bytes, false).map_err(|_| "invalid_image")?;
++    let pixels = u64::from(width) * u64::from(height);
++    if mime != "image/png"
++        || width < MIN_VISION_SIDE_PX
++        || height < MIN_VISION_SIDE_PX
++        || !(MIN_VISION_TOTAL_PX..=MAX_PIXELS).contains(&pixels)
++        || !png_ends_at_iend(&bytes)
++        || !image_validate::image_structurally_complete(&bytes)
++    {
++        return Err("invalid_image");
++    }
++    image_validate::validate_image_bytes(&bytes).map_err(|_| "invalid_image")?;
++    Ok(bytes)
++}
++
++/// 无图时沿用 v1 文本摘要；图批次以长度和域分隔绑定原字节及顺序。
++pub fn payload_digest(text: &str, images: &[PngImage]) -> Result<String, &'static str> {
++    if text.len() > MAX_TEXT_BYTES || (images.is_empty() && text.trim().is_empty()) {
++        return Err("invalid_submission");
++    }
++    if images.is_empty() {
++        return Ok(format!("blake3:{}", blake3::hash(text.as_bytes()).to_hex()));
++    }
++    if images.len() > MAX_IMAGES {
++        return Err("image_count_capacity");
++    }
++    let mut hasher = blake3::Hasher::new();
++    hasher.update(DIGEST_DOMAIN);
++    hasher.update(&(text.len() as u64).to_be_bytes());
++    hasher.update(text.as_bytes());
++    hasher.update(&(images.len() as u32).to_be_bytes());
++    let mut encoded_bytes = 0usize;
++    for image in images {
++        encoded_bytes = encoded_bytes
++            .checked_add(image.data.len())
++            .ok_or("image_frame_capacity")?;
++        if encoded_bytes > MAX_FRAME_BYTES {
++            return Err("image_frame_capacity");
++        }
++        let bytes = decode(image)?;
++        hasher.update(&9u32.to_be_bytes());
++        hasher.update(b"image/png");
++        hasher.update(&(bytes.len() as u64).to_be_bytes());
++        hasher.update(&bytes);
++    }
++    Ok(format!("blake3:{}", hasher.finalize().to_hex()))
++}
++
++pub fn prompt_blocks(text: String, images: Vec<PngImage>) -> Vec<acp::ContentBlock> {
++    let mut blocks = Vec::with_capacity(images.len() + 1);
++    if !text.is_empty() || images.is_empty() {
++        blocks.push(acp::ContentBlock::from(text));
++    }
++    blocks.extend(images.into_iter().map(|image| {
++        acp::ContentBlock::Image(acp::ImageContent::new(image.data, image.mime_type))
++    }));
++    blocks
++}
++
++/// 图批次只允许可选的首个文本块，随后为无元数据的 PNG；返回值不授予准入。
++pub fn prompt_image_digest(blocks: &[acp::ContentBlock]) -> Result<Option<String>, &'static str> {
++    let has_images = blocks
++        .iter()
++        .any(|block| matches!(block, acp::ContentBlock::Image(_)));
++    if !has_images {
++        return Ok(None);
++    }
++    let mut text = "";
++    let mut images = Vec::new();
++    for (index, block) in blocks.iter().enumerate() {
++        match block {
++            acp::ContentBlock::Text(value)
++                if index == 0 && value.meta.is_none() && value.annotations.is_none() =>
++            {
++                text = &value.text
++            }
++            acp::ContentBlock::Image(value)
++                if value.meta.is_none() && value.annotations.is_none() && value.uri.is_none() =>
++            {
++                images.push(PngImage {
++                    mime_type: value.mime_type.clone(),
++                    data: value.data.clone(),
++                })
++            }
++            _ => return Err("invalid_image_batch"),
++        }
++    }
++    let digest = payload_digest(text, &images)?;
++    if serde_json::to_vec(blocks)
++        .map_err(|_| "invalid_image_batch")?
++        .len()
++        > MAX_FRAME_BYTES
++    {
++        return Err("image_frame_capacity");
++    }
++    Ok(Some(digest))
++}
++
++pub fn validate_prompt_blocks(blocks: &[acp::ContentBlock]) -> Result<bool, &'static str> {
++    prompt_image_digest(blocks).map(|digest| digest.is_some())
++}
++
++pub fn prompt_request(
++    session_id: acp::SessionId,
++    text: String,
++    images: Vec<PngImage>,
++    prompt_id: &str,
++    message_id: &str,
++    screen_mode: Option<&str>,
++) -> acp::PromptRequest {
++    let mut meta = acp::Meta::new();
++    meta.insert("promptId".into(), prompt_id.into());
++    if let Some(mode) = screen_mode {
++        meta.insert("screenMode".into(), mode.into());
++    }
++    meta.insert("verbatim".into(), true.into());
++    meta.insert(
++        "infinishellTerminalBridge".into(),
++        serde_json::json!({"protocolVersion":1,"requireIdle":true,"messageId":message_id}),
++    );
++    acp::PromptRequest::new(session_id, prompt_blocks(text, images)).meta(Some(meta))
++}
++
++#[cfg(test)]
++#[path = "terminal_bridge_images_tests.rs"]
++mod tests;
+diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images_tests.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images_tests.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c375f563f7a3b71ed399823ac4be88b09d5b8bf
+--- /dev/null
++++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_images_tests.rs
+@@ -0,0 +1,130 @@
++use super::*;
++use std::io::Cursor;
++
++const RED: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
++const BLUE: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
++
++fn png(data: &str) -> PngImage {
++    PngImage {
++        mime_type: "image/png".into(),
++        data: data.into(),
++    }
++}
++
++#[test]
++fn typed_png_digest_matches_independent_ordered_golden() {
++    assert_eq!(
++        payload_digest("中文\n", &[png(RED), png(BLUE)]).unwrap(),
++        "blake3:97e469a43a4f801f94c4a09285886353720487402268d93c3bac94dc9d2c09d5"
++    );
++    assert_eq!(
++        payload_digest("中文\n", &[png(BLUE), png(RED)]).unwrap(),
++        "blake3:4179efe33f074957eae316395d881d07756a8c8edc73c7234227f9fd0950fc3e"
++    );
++    assert_eq!(
++        payload_digest("", &[png(RED)]).unwrap(),
++        "blake3:06867bbf1b6ab21af733242d8be039ebbacb2fee3e9976d42831caaaf48a5483"
++    );
++    assert_eq!(
++        payload_digest("abc", &[]).unwrap(),
++        "blake3:6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85"
++    );
++}
++
++#[test]
++fn typed_png_batch_rejects_one_bad_crc_and_noncanonical_encoding() {
++    let mut corrupt = STANDARD.decode(BLUE).unwrap();
++    corrupt[50] ^= 1;
++    assert_eq!(
++        payload_digest("", &[png(RED), png(&STANDARD.encode(corrupt))]),
++        Err("invalid_image")
++    );
++    assert_eq!(
++        payload_digest("", &[png(&format!("{RED}\n"))]),
++        Err("invalid_image")
++    );
++    assert_eq!(
++        payload_digest(
++            "",
++            &[PngImage {
++                mime_type: "image/jpeg".into(),
++                data: RED.into()
++            }]
++        ),
++        Err("invalid_image")
++    );
++    assert!(serde_json::from_value::<PngImage>(serde_json::json!({"mime_type":"image/png","data":RED,"uri":"file:///private/image.png"})).is_err());
++}
++
++#[test]
++fn typed_png_count_and_encoded_capacity_are_explicit() {
++    assert_eq!(
++        payload_digest("", &vec![png(RED); 21]),
++        Err("image_count_capacity")
++    );
++    assert_eq!(
++        payload_digest("", &[png(&"A".repeat(MAX_FRAME_BYTES + 1))]),
++        Err("image_frame_capacity")
++    );
++    assert_eq!(payload_digest("", &[]), Err("invalid_submission"));
++}
++
++#[test]
++fn typed_png_requires_native_pixel_floor_without_reencoding_long_image() {
++    let mut tiny = Cursor::new(Vec::new());
++    image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(8, 8, image::Rgb([255, 0, 0])))
++        .write_to(&mut tiny, image::ImageFormat::Png)
++        .unwrap();
++    assert_eq!(
++        payload_digest("", &[png(&STANDARD.encode(tiny.into_inner()))]),
++        Err("invalid_image")
++    );
++    let mut long = Cursor::new(Vec::new());
++    image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
++        2048,
++        8,
++        image::Rgb([255, 0, 0]),
++    ))
++    .write_to(&mut long, image::ImageFormat::Png)
++    .unwrap();
++    let data = STANDARD.encode(long.into_inner());
++    let blocks = prompt_blocks("".into(), vec![png(&data)]);
++    assert!(validate_prompt_blocks(&blocks).unwrap());
++    assert!(
++        matches!(&blocks[0], acp::ContentBlock::Image(image) if image.data == data && image.mime_type == "image/png")
++    );
++}
++
++#[test]
++fn typed_png_prompt_preserves_bytes_and_rejects_uri_or_reordered_text() {
++    let blocks = prompt_blocks("中文\n".into(), vec![png(RED), png(BLUE)]);
++    assert_eq!(
++        serde_json::to_value(&blocks).unwrap(),
++        serde_json::json!([
++            {"type":"text","text":"中文\n"}, {"type":"image","mimeType":"image/png","data":RED}, {"type":"image","mimeType":"image/png","data":BLUE}
++        ])
++    );
++    let mut uri = blocks.clone();
++    if let acp::ContentBlock::Image(image) = &mut uri[1] {
++        image.uri = Some("file:///private/image.png".into());
++    }
++    assert_eq!(validate_prompt_blocks(&uri), Err("invalid_image_batch"));
++    let mut mixed = blocks;
++    mixed.swap(0, 1);
++    assert_eq!(validate_prompt_blocks(&mixed), Err("invalid_image_batch"));
++}
++
++#[test]
++fn typed_png_iend_must_end_the_entire_payload() {
++    let mut bytes = STANDARD.decode(RED).unwrap();
++    bytes.extend_from_slice(b"trailing data");
++    assert_eq!(
++        payload_digest("", &[png(&STANDARD.encode(&bytes))]),
++        Err("invalid_image")
++    );
++    bytes.extend_from_slice(b"\0\0\0\0IEND\xaeB`\x82");
++    assert_eq!(
++        payload_digest("", &[png(&STANDARD.encode(&bytes))]),
++        Err("invalid_image")
++    );
++}
 diff --git a/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..1e4183c88acde0b93950676dbbf29fe22440530c
+index 0000000000000000000000000000000000000000..b612aa5a0704dc7f9dce55b1636d88dc001c81ac
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/extensions/terminal_bridge_tests.rs
-@@ -0,0 +1,219 @@
+@@ -0,0 +1,244 @@
 +use super::*;
 +use serde_json::json;
 +use std::sync::Arc;
@@ -9610,6 +10295,31 @@ index 0000000000000000000000000000000000000000..1e4183c88acde0b93950676dbbf29fe2
 +    };
 +    let (proof, ()) = futures::join!(query_receipt(Some(&sender), "session", MESSAGE_ID), actor);
 +    assert_eq!(proof, receipt("session", MESSAGE_ID, false));
++}
++
++const RED: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
++const BLUE: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
++
++#[test]
++fn typed_png_contract_keeps_order_and_rejects_extra_content_fields() {
++    let mut value = request_value();
++    value["prompt"] = serde_json::json!([
++        {"type":"text","text":"中文\n"}, {"type":"image","mimeType":"image/png","data":RED}, {"type":"image","mimeType":"image/png","data":BLUE}
++    ]);
++    let parsed = parse(&value).unwrap();
++    assert_eq!(
++        serde_json::to_value(parsed.prompt).unwrap(),
++        value["prompt"]
++    );
++    for key in ["uri", "_meta", "annotations", "unknown"] {
++        let mut bad = value.clone();
++        bad["prompt"][1][key] = serde_json::json!(null);
++        let error = parse(&bad).unwrap_err();
++        assert_eq!(serde_json::to_value(error.code).unwrap(), -32071);
++        assert_eq!(error.data.unwrap()[BRIDGE_META_KEY]["admitted"], false);
++    }
++    value["prompt"][2]["data"] = serde_json::json!("bad");
++    assert!(parse(&value).is_err());
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/leader/client.rs b/crates/codegen/xai-grok-shell/src/leader/client.rs
 index eabc29448ca275b88136bae5c8a1c940112e134e..41bcea76ef46c5205c51370ec762334d3aff0d31 100644
@@ -10216,7 +10926,7 @@ index 56ce8c0172a5f0d057f1535232c6a3160fe1e7c7..a3760f7fdc18bba0c37c37d0ada3730c
              // \\.\pipe\grok-leader- (20 chars) + 16 hex chars = 36 total
              assert!(name.len() <= 256, "pipe name too long: {}", name.len());
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session.rs b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
-index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc3e0e8f7e 100644
+index 973157c16df3f591192f8ffbd2e339216573fbad..b8f34000f60258c619a451f733a6f083bfc8f133 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session.rs
 @@ -141,6 +141,8 @@ use queue_mutation::{InputOrigin, QueueMutationPolicy};
@@ -10237,16 +10947,29 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc
  #[path = "acp_session_impl/side_call.rs"]
  mod side_call;
  #[path = "acp_session_impl/status_line.rs"]
-@@ -380,6 +384,8 @@ pub(crate) struct State {
+@@ -372,6 +376,12 @@ fn backdate_edit_hold(
+         *since = std::time::Instant::now() - age;
+     }
+ }
++/// 同锁领取的桥消息；图片摘要不能由后来的普通输入复用或替换。
++pub(crate) struct TerminalBridgeMessage {
++    pub(crate) committed: bool,
++    pub(crate) image_digest: Option<String>,
++}
++
+ /// Task scheduling state: the only fields that remain behind `TokioMutex`.
+ /// All chat state has been fully migrated to `ChatStateActor` via `chat_state_handle`.
+ /// Credentials (api_key, optional extra access key, client_version) live in the `credentials` sync mutex on `SessionActor`.
+@@ -380,6 +390,8 @@ pub(crate) struct State {
      finalization_gate: FinalizationGate,
      pub(crate) message_delivery: parent_message::MessageDeliveryState,
      pub(crate) pending_inputs: VecDeque<InputItem>,
 +    /// 已接收的桥消息在本 actor 生命周期内不可再次入队；跨重启凭据由 TUI 持久化。
-+    pub(crate) terminal_bridge_messages: HashMap<String, bool>,
++    pub(crate) terminal_bridge_messages: HashMap<String, TerminalBridgeMessage>,
      pub(crate) pending_notifications: Vec<PendingNotification>,
      /// Prompt ids under composer edit, stamped (and re-stamped) by `hold_edit`.
      /// Held followers are skipped by combine; a live held front blocks promote.
-@@ -1066,6 +1072,8 @@ pub(crate) struct SessionActor {
+@@ -1066,6 +1078,8 @@ pub(crate) struct SessionActor {
      /// Set once by [`turn_end_hooks::TurnEndQueue::spawn`]; `None` before the loop starts.
      pub(crate) turn_end_tx:
          std::cell::RefCell<Option<tokio::sync::mpsc::UnboundedSender<turn_end_hooks::QueueItem>>>,
@@ -10255,7 +10978,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc
      /// Client hooks from `session/new` `_meta["x.ai/hooks"]`; gated in [`crate::session::acp_session::hooks`].
      /// `RefCell` so `load_session` reconnect can replace the set on the live actor (see `SessionCommand::SetClientHooks`).
      pub(crate) client_hooks: std::cell::RefCell<crate::extensions::hooks::ClientHooks>,
-@@ -1743,6 +1751,9 @@ mod prompt_mode_transition_tests;
+@@ -1743,6 +1757,9 @@ mod prompt_mode_transition_tests;
  #[cfg(test)]
  #[path = "acp_session_tests/prompt_queue_actor_tests.rs"]
  mod prompt_queue_actor_tests;
@@ -10265,7 +10988,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc
  /// Regression coverage for the per-turn `record_token_usage` path.
  #[cfg(test)]
  #[path = "acp_session_tests/record_response_token_usage_tests.rs"]
-@@ -1868,6 +1879,7 @@ mod tool_meta_stamp_tests {
+@@ -1868,6 +1885,7 @@ mod tool_meta_stamp_tests {
                      cmd_tx: perm_tx,
                      yolo_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                      auto_state: Arc::new(std::sync::atomic::AtomicBool::new(false)),
@@ -10273,7 +10996,7 @@ index 973157c16df3f591192f8ffbd2e339216573fbad..1ebc9d8cf4fd58815c17b22a671f89cc
                      side_query_wired: Arc::new(std::sync::atomic::AtomicBool::new(false)),
                      yolo_pin: None,
                      deny_read_globs: Arc::new(vec![]),
-@@ -2281,3 +2293,11 @@ mod recap_display_only_tests;
+@@ -2281,3 +2299,11 @@ mod recap_display_only_tests;
  #[cfg(test)]
  #[path = "acp_session_tests/reminder_policy_tests.rs"]
  mod reminder_policy_tests;
@@ -10520,7 +11243,7 @@ index 2033b2b8bf4762201b6a6586065ffe2823bf159f..d0f6bfa4d744aee420124fa7d6785da5
          self.events
              .emit(crate::session::events::Event::Interjected {
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
-index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..f2aad21852e0971cacc0ee16bf498fa726b737fb 100644
+index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..68166123f2ac149a914780f24c73d0e0cbcea327 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/run_loop.rs
 @@ -46,33 +46,65 @@ const DEFERRED_START_CANCEL_JOIN: std::time::Duration = std::time::Duration::fro
@@ -10662,7 +11385,7 @@ index ab7e4d167b444b9f0baf656d3bae55c13cdfc3d5..f2aad21852e0971cacc0ee16bf498fa7
 +                        }
 +                        SessionCommand::TerminalBridgeReceipt { prompt_id, respond_to } => {
 +                            let state = session.state.lock().await;
-+                            let committed = state.terminal_bridge_messages.get(&prompt_id) == Some(&true);
++                            let committed = state.terminal_bridge_messages.get(&prompt_id).is_some_and(|entry| entry.committed);
 +                            let _ = respond_to.send(committed);
 +                        }
                          SessionCommand::Prompt { prompt_id, prompt_blocks, prompt_mode, artifact_upload_ctx, client_identifier, screen_mode, verbatim, traceparent, json_schema, send_now, admission, tool_overrides_update, respond_to, prompt_admitted, persist_ack, parsed_prompt_tx } => {
@@ -10892,14 +11615,16 @@ index 380683fa095ec19e8cded8cf8b61ff7e86856b07..b9cc11f5c04b3da564a4b04ebc40fa2c
          hook_load_errors: std::cell::RefCell::new(_hook_load_errors),
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97e33e3785
+index 0000000000000000000000000000000000000000..74d8c5669b1fc574a24ee2b45b308c2e55e79313
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/terminal_bridge.rs
-@@ -0,0 +1,189 @@
+@@ -0,0 +1,255 @@
 +//! 普通终端桥的会话级空闲检查与一次接收。
 +
 +use super::*;
-+use crate::extensions::terminal_bridge::{busy_error, duplicate_error};
++use crate::extensions::terminal_bridge::{busy_error, duplicate_error, invalid_image_batch};
++use crate::extensions::terminal_bridge_images::prompt_image_digest;
++use crate::session::acp_session::TerminalBridgeMessage;
 +use crate::session::message_delivery::HumanPromptContent;
 +use std::sync::atomic::Ordering;
 +use std::time::Duration;
@@ -10918,8 +11643,55 @@ index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97
 +            .terminal_bridge_messages
 +            .get_mut(prompt_id)
 +        {
-+            *committed = true;
++            committed.committed = true;
 +        }
++    }
++
++    /// 只复用本 actor 已原子领取的输入身份，外部元数据不能开启保真通路。
++    pub(super) async fn terminal_bridge_exact_images(
++        &self,
++        prompt_id: &str,
++        blocks: &[acp::ContentBlock],
++    ) -> Result<Option<Vec<acp::ImageContent>>, acp::Error> {
++        let expected = self
++            .state
++            .lock()
++            .await
++            .terminal_bridge_messages
++            .get(prompt_id)
++            .map(|entry| entry.image_digest.clone());
++        let Some(expected) = expected else {
++            return Ok(None);
++        };
++        let Some(expected) = expected else {
++            if blocks
++                .iter()
++                .any(|block| matches!(block, acp::ContentBlock::Image(_)))
++            {
++                return Err(invalid_image_batch(
++                    &self.session_info.id.to_string(),
++                    prompt_id,
++                ));
++            }
++            return Ok(None);
++        };
++        let actual = prompt_image_digest(blocks)
++            .map_err(|_| invalid_image_batch(&self.session_info.id.to_string(), prompt_id))?;
++        if actual.as_deref() != Some(expected.as_str()) {
++            return Err(invalid_image_batch(
++                &self.session_info.id.to_string(),
++                prompt_id,
++            ));
++        }
++        Ok(Some(
++            blocks
++                .iter()
++                .filter_map(|block| match block {
++                    acp::ContentBlock::Image(image) => Some(image.clone()),
++                    _ => None,
++                })
++                .collect(),
++        ))
 +    }
 +
 +    async fn terminal_bridge_idle_lease(
@@ -10962,6 +11734,17 @@ index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97
 +        prompt_id: String,
 +        content: HumanPromptContent,
 +    ) -> bool {
++        // 即使由内部命令直接调用，也必须整批通过，不能领取后再逐图丢弃。
++        let image_digest = match prompt_image_digest(&content.prompt_blocks) {
++            Ok(digest) => digest,
++            Err(_) => {
++                let _ = content.respond_to.send(Err(invalid_image_batch(
++                    &self.session_info.id.to_string(),
++                    &prompt_id,
++                )));
++                return false;
++            }
++        };
 +        self.ensure_prefix_ready().await;
 +        let mut state = self.state.lock().await;
 +        if state.terminal_bridge_messages.contains_key(&prompt_id) {
@@ -11056,7 +11839,13 @@ index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97
 +            send_now: false,
 +            traceparent,
 +        };
-+        state.terminal_bridge_messages.insert(prompt_id, false);
++        state.terminal_bridge_messages.insert(
++            prompt_id,
++            TerminalBridgeMessage {
++                committed: false,
++                image_digest,
++            },
++        );
 +        state.notifications_suppressed = false;
 +        state.pending_inputs.push_back(item);
 +        // 同锁内完成接收后才能恢复子任务启动，失败路径由 RAII 自动释放。
@@ -11086,10 +11875,52 @@ index 0000000000000000000000000000000000000000..e0ff18758f95f5bd2c18f8edcae4fc97
 +    }
 +}
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
-index a071e7abbe45338eb45d361bbd0f1280ad1052f2..6deebb20133fa37a1a2e108f027bf7afb56cb30a 100644
+index a071e7abbe45338eb45d361bbd0f1280ad1052f2..1e0d391f8dd1cbbb66497b645b89cbf1e45b163a 100644
 --- a/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_impl/turn.rs
-@@ -1253,6 +1253,7 @@ impl SessionActor {
+@@ -524,6 +524,10 @@ impl SessionActor {
+             start_gate: _,
+         } = request;
+         let prompt_id = prompt_id.as_str();
++        let bridge_images = self
++            .terminal_bridge_exact_images(prompt_id, &prompt_blocks)
++            .await?;
++        let exact_bridge_images = bridge_images.is_some();
+         let handle_prompt_start = std::time::Instant::now();
+         *self.active_skill.lock() = None;
+         xai_grok_telemetry::unified_log::info(
+@@ -997,7 +1001,9 @@ impl SessionActor {
+                     return Err(err);
+                 }
+             };
+-            let recovered = if policy.authority == InputAuthority::ModelAuthoredUntrusted {
++            let recovered = if exact_bridge_images
++                || policy.authority == InputAuthority::ModelAuthoredUntrusted
++            {
+                 0
+             } else {
+                 crate::session::placeholder_images::recover_orphan_placeholders(
+@@ -1023,10 +1029,15 @@ impl SessionActor {
+             } else {
+                 query
+             };
+-            let user_images = self
+-                .normalize_images_with_notices(&mut context, raw_images, is_cursor)
+-                .await;
+-            let (query, extra_images) = if !self.is_cursor_harness() {
++            // 已领取的桥接批次保留校验过的原图；不逐图重编码、补读路径或提取额外附件。
++            let user_images = match bridge_images {
++                Some(images) => images,
++                None => {
++                    self.normalize_images_with_notices(&mut context, raw_images, is_cursor)
++                        .await
++                }
++            };
++            let (query, extra_images) = if !exact_bridge_images && !self.is_cursor_harness() {
+                 let extraction = xai_grok_tools::util::base64_images::extract_base64_images(query);
+                 if extraction.images.is_empty() {
+                     (extraction.text, Vec::new())
+@@ -1253,6 +1264,7 @@ impl SessionActor {
                  {
                      let session_dir = crate::session::persistence::session_dir(&self.session_info);
                      crate::session::fork_status::commit_claim(&session_dir);
@@ -11781,10 +12612,10 @@ index fa11f50caa83041f8fa681e919b95d7f21d59265..df504ed00d572f7851e72d8fea1c27c1
  #[cfg(test)]
 diff --git a/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
 new file mode 100644
-index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46deb4f844
+index 0000000000000000000000000000000000000000..0ed81174aa09a5199574b0c9c831233f0c6f0b95
 --- /dev/null
 +++ b/crates/codegen/xai-grok-shell/src/session/acp_session_tests/terminal_bridge_tests.rs
-@@ -0,0 +1,221 @@
+@@ -0,0 +1,379 @@
 +use super::support::*;
 +use super::*;
 +use crate::session::message_delivery::HumanPromptContent;
@@ -11847,7 +12678,7 @@ index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46
 +                state
 +                    .terminal_bridge_messages
 +                    .values()
-+                    .all(|committed| !committed)
++                    .all(|entry| !entry.committed)
 +            );
 +            let item = state.pending_inputs.front().unwrap();
 +            assert!(item.verbatim);
@@ -11991,8 +12822,9 @@ index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46
 +                    .lock()
 +                    .await
 +                    .terminal_bridge_messages
-+                    .get("bridge"),
-+                Some(&false)
++                    .get("bridge")
++                    .map(|entry| entry.committed),
++                Some(false)
 +            );
 +            actor.mark_terminal_bridge_committed("ordinary").await;
 +            assert!(
@@ -12003,6 +12835,163 @@ index 0000000000000000000000000000000000000000..2d21b6ac4176d19be8143e0c14f55c46
 +                    .terminal_bridge_messages
 +                    .contains_key("ordinary")
 +            );
++        })
++        .await;
++}
++
++const RED: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHklEQVR4nGP4z8BAU0Rb00ctGLVg1IJRC0YtoBICAE7E/hC4KNCvAAAAAElFTkSuQmCC";
++const BLUE: &str = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAQCAIAAAD4YuoOAAAAHElEQVR4nGNgYPhPYzRqwagFoxaMWjBqwRCwAABSiP4QftsDtAAAAABJRU5ErkJggg==";
++
++fn image_content() -> (HumanPromptContent, oneshot::Receiver<PromptTurnResult>) {
++    let (mut content, response) = content();
++    content.prompt_blocks = vec![
++        acp::ContentBlock::from("中文\n"),
++        acp::ContentBlock::Image(acp::ImageContent::new(RED, "image/png")),
++        acp::ContentBlock::Image(acp::ImageContent::new(BLUE, "image/png")),
++    ];
++    (content, response)
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn typed_png_actor_keeps_exact_order_and_binds_turn_digest() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let actor = actor().await;
++            let (content, _response) = image_content();
++            let expected = content.prompt_blocks.clone();
++            assert!(actor.admit_terminal_bridge("images".into(), content).await);
++            let state = actor.state.lock().await;
++            assert_eq!(state.pending_inputs.len(), 1);
++            assert_eq!(state.pending_inputs[0].prompt_blocks, expected);
++            assert!(state.pending_inputs[0].is_queue_protected());
++            assert_eq!(
++                state.terminal_bridge_messages["images"]
++                    .image_digest
++                    .as_deref(),
++                Some("blake3:97e469a43a4f801f94c4a09285886353720487402268d93c3bac94dc9d2c09d5")
++            );
++            drop(state);
++            let images = actor
++                .terminal_bridge_exact_images("images", &expected)
++                .await
++                .unwrap()
++                .unwrap();
++            assert_eq!(images[0].data, RED);
++            assert_eq!(images[1].data, BLUE);
++            let mut changed = expected.clone();
++            changed.swap(1, 2);
++            assert!(
++                actor
++                    .terminal_bridge_exact_images("images", &changed)
++                    .await
++                    .is_err()
++            );
++            changed[1] = acp::ContentBlock::Image(acp::ImageContent::new(RED, "image/png"));
++            changed[2] = acp::ContentBlock::Image(acp::ImageContent::new(RED, "image/png"));
++            assert!(
++                actor
++                    .terminal_bridge_exact_images("images", &changed)
++                    .await
++                    .is_err()
++            );
++            assert!(
++                actor
++                    .terminal_bridge_exact_images("ordinary", &expected)
++                    .await
++                    .unwrap()
++                    .is_none()
++            );
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn typed_png_actor_rejects_whole_bad_batch_before_ledger_and_queue() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let actor = actor().await;
++            let (mut content, response) = image_content();
++            content.prompt_blocks[2] =
++                acp::ContentBlock::Image(acp::ImageContent::new("invalid", "image/png"));
++            assert!(!actor.admit_terminal_bridge("images".into(), content).await);
++            let error = response.await.unwrap().unwrap_err();
++            assert_eq!(serde_json::to_value(error.code).unwrap(), -32071);
++            let state = actor.state.lock().await;
++            assert!(state.pending_inputs.is_empty());
++            assert!(state.terminal_bridge_messages.is_empty());
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn typed_png_cannot_borrow_text_receipt_for_preserved_images() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let actor = actor().await;
++            let (text, _response) = content();
++            assert!(actor.admit_terminal_bridge("text".into(), text).await);
++            let (images, _response) = image_content();
++            assert!(
++                actor
++                    .terminal_bridge_exact_images("text", &images.prompt_blocks)
++                    .await
++                    .is_err()
++            );
++            assert!(!actor.state.lock().await.terminal_bridge_messages["text"].committed);
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn typed_png_competing_requests_still_admit_exactly_one() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let actor = actor().await;
++            let (first, first_response) = image_content();
++            let (second, second_response) = image_content();
++            let (a, b) = futures::join!(
++                actor.admit_terminal_bridge("first".into(), first),
++                actor.admit_terminal_bridge("second".into(), second)
++            );
++            assert_ne!(a, b);
++            let rejected = if a { second_response } else { first_response };
++            assert_eq!(
++                serde_json::to_value(rejected.await.unwrap().unwrap_err().code).unwrap(),
++                -32071
++            );
++            let state = actor.state.lock().await;
++            assert_eq!(state.pending_inputs.len(), 1);
++            assert_eq!(state.terminal_bridge_messages.len(), 1);
++        })
++        .await;
++}
++
++#[tokio::test(flavor = "current_thread")]
++async fn typed_png_permission_pending_never_claims_or_changes_approval() {
++    tokio::task::LocalSet::new()
++        .run_until(async {
++            let actor = actor().await;
++            actor
++                .pending_interactions
++                .lock()
++                .unwrap()
++                .insert("permission".into(), PendingKind::Permission);
++            let (content, response) = image_content();
++            assert!(!actor.admit_terminal_bridge("images".into(), content).await);
++            assert_eq!(
++                serde_json::to_value(response.await.unwrap().unwrap_err().code).unwrap(),
++                -32071
++            );
++            assert!(
++                actor
++                    .pending_interactions
++                    .lock()
++                    .unwrap()
++                    .contains_key("permission")
++            );
++            let state = actor.state.lock().await;
++            assert!(state.pending_inputs.is_empty());
++            assert!(state.terminal_bridge_messages.is_empty());
 +        })
 +        .await;
 +}

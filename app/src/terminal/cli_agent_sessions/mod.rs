@@ -3,6 +3,8 @@ mod event_cursor;
 pub(crate) mod grok_leader_input;
 #[cfg(any(all(target_os = "macos", target_arch = "aarch64"), all(target_os = "linux", target_arch = "x86_64"), all(windows, target_arch = "x86_64")))]
 pub(crate) mod grok_native_bridge;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) mod grok_native_bridge_prompt;
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
 mod grok_native_bridge_identity;
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]

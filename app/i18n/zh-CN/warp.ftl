@@ -5564,7 +5564,7 @@ cli-agent-plugin-refresh-marketplace-step = 刷新插件市场并保留已安装
 cli-agent-plugin-disabled = 此插件已禁用。请手动启用以恢复通知。
 cli-agent-plugin-enable-step = 启用已安装插件：
 cli-agent-plugin-enable-codex-config-step = 在 Codex 的 config.toml 中启用此插件：
-cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法直接粘贴图片。请在 InfiniShell 启动的 Grok 富输入会话中，将图片粘贴或拖入输入框后提交。
+cli-agent-grok-image-paste-unavailable = 此 Grok 会话无法粘贴图片。请使用受支持的 Grok 版本，将图片粘贴或拖入富输入框后提交。
 cli-agent-image-too-large = { $filename } 过大，无法发送给智能体（上限 { $limit_mb } MB）。
 
 cli-agent-task-already-bound = 此终端已关联一个本地任务。
@@ -5925,8 +5925,8 @@ cli-agent-grok-remote-launch-unavailable = 远程 Grok 会话未能启动。需�
 cli-agent-grok-owned-launch-unavailable = Grok 富输入需要已验证的本地 Grok 1.0.41 和支持的 shell，当前无法启动此会话。
 
 cli-agent-grok-owned-input-unavailable = Grok 输入尚未就绪或会话身份已变化，已保留草稿。
-cli-agent-grok-native-images-unavailable = 此 Grok 连接支持文本和文件路径，已保留草稿与图片。
-cli-agent-grok-native-already-received = Grok 已接收过这段文本，草稿已保留。点击此提示可再次发送，开启新一轮。
+cli-agent-grok-native-images-unavailable = 此 Grok 连接不支持图片输入，已保留草稿与图片。
+cli-agent-grok-native-already-received = Grok 已接收过这次输入，草稿已保留。点击此提示可再次发送，开启新一轮。
 
 cli-agent-grok-owned-result-unverified = Grok 已结束本轮，但任务结果未能核验保存。请查看原生会话。
 

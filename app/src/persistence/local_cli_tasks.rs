@@ -827,7 +827,7 @@ fn insert_message_with_origin(
     message: LocalCliMessage,
     is_task_result: bool,
 ) -> Result<LocalCliEnqueueOutcome> {
-    if message.subject == grok_native_bridge::INPUT_SUBJECT {
+    if grok_native_bridge::is_input_subject(&message.subject) {
         bail!("普通 Grok 原生桥输入只能使用专用领取事务");
     }
     if message.version != 1
@@ -1496,7 +1496,7 @@ fn update_message_state_with_receipt(
         let mut message = read_message(connection, message_id)?.context("本地消息不存在")?;
         // 普通 Grok 侧车只能由绑定 RPC/session/prompt 的专用事务确认，不能退回通用 ACK。
         if grok_terminal::is_input_subject(&message.subject)
-            || message.subject == grok_native_bridge::INPUT_SUBJECT
+            || grok_native_bridge::is_input_subject(&message.subject)
         {
             bail!("普通 Grok 输入必须使用原生精确回执");
         }
@@ -1599,7 +1599,7 @@ fn update_message_state_with_receipt(
 }
 
 fn write_message_state(connection: &mut SqliteConnection, message: &LocalCliMessage) -> Result<()> {
-    if message.subject == grok_native_bridge::INPUT_SUBJECT {
+    if grok_native_bridge::is_input_subject(&message.subject) {
         bail!("普通 Grok 原生桥输入只能使用专用精确回执事务");
     }
     // 保留专用领取扩展；通用队列清理仅可取消尚未派发、没有投递记录的消息。

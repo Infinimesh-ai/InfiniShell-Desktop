@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use super::grok_native_bridge_prompt::{NativeBridgeImage, NativeBridgePrompt, frame_too_large};
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
 #[cfg(unix)]
@@ -49,6 +50,20 @@ impl NativeBridgeMessage {
             session_id,
             payload_digest: format!("blake3:{}", blake3::hash(text.as_bytes()).to_hex()),
         })
+    }
+
+    pub(crate) fn for_prompt(
+        message_id: Uuid,
+        session_id: String,
+        prompt: &NativeBridgePrompt,
+    ) -> io::Result<Self> {
+        let expected = Self {
+            message_id,
+            session_id,
+            payload_digest: prompt.payload_digest().to_owned(),
+        };
+        expected.validate()?;
+        Ok(expected)
     }
 
     fn validate(&self) -> io::Result<()> {
@@ -97,6 +112,7 @@ pub(crate) struct NativeBridgeState {
     pub input_epoch: u64,
     pub reason: Option<String>,
     pub lease: Option<NativeBridgeLease>,
+    pub typed_png_images: u32,
 }
 
 /// 不实现 Clone、Serialize 或 Deserialize，过期租约不能从磁盘重新获得授权。
@@ -104,6 +120,7 @@ pub(crate) struct NativeBridgeLease {
     instance_id: Uuid,
     issued_before: Instant,
     wire: WireLease,
+    typed_png_images: u32,
 }
 
 /// 只确认首页初始化的固定目标，不授予正文写入权，也不是接收回执。
@@ -183,6 +200,8 @@ enum Request<'a> {
         message_id: String,
         prompt_id: String,
         text: &'a str,
+        #[serde(skip_serializing_if = "<[NativeBridgeImage]>::is_empty")]
+        images: &'a [NativeBridgeImage],
     },
     QueryReceipt {
         instance_id: &'a str,
@@ -205,6 +224,8 @@ enum WireResponse {
         ready: bool,
         reason: Option<String>,
         lease: Option<WireLease>,
+        #[serde(default)]
+        typed_png_images: u32,
     },
     Prepared {
         instance_id: String,
@@ -278,12 +299,34 @@ impl NativeBridge {
         text: &str,
         admit: impl FnOnce() -> bool,
     ) -> io::Result<NativeBridgeResponse> {
+        self.submit_prompt(lease, message_id, &NativeBridgePrompt::text(text)?, admit)
+    }
+
+    /// 必须在持久领取前执行；完整帧包括 token、真实会话和 JSON 转义开销。
+    pub(crate) fn validate_prompt(
+        &self,
+        lease: &NativeBridgeLease,
+        message_id: Uuid,
+        prompt: &NativeBridgePrompt,
+    ) -> io::Result<()> {
         if lease.instance_id != self.binding().instance_id
             || lease.issued_before.elapsed() >= LEASE_LIFETIME
         {
             return Err(invalid());
         }
-        let expected = NativeBridgeMessage::new(message_id, lease.wire.session_id.clone(), text)?;
+        validate_prompt_frame(lease, message_id, prompt)
+    }
+
+    pub(crate) fn submit_prompt(
+        &self,
+        lease: NativeBridgeLease,
+        message_id: Uuid,
+        prompt: &NativeBridgePrompt,
+        admit: impl FnOnce() -> bool,
+    ) -> io::Result<NativeBridgeResponse> {
+        self.validate_prompt(&lease, message_id, prompt)?;
+        let expected =
+            NativeBridgeMessage::for_prompt(message_id, lease.wire.session_id.clone(), prompt)?;
         let response = self.exchange(
             Request::SubmitIfIdle {
                 instance_id: &self.binding().instance_id.to_string(),
@@ -293,7 +336,8 @@ impl NativeBridge {
                 input_epoch: lease.wire.input_epoch,
                 message_id: message_id.to_string(),
                 prompt_id: message_id.to_string(),
-                text,
+                text: prompt.text_value(),
+                images: prompt.images(),
             },
             Some(lease.issued_before + LEASE_LIFETIME),
             admit,
@@ -325,6 +369,40 @@ impl NativeBridge {
     }
 }
 
+fn validate_prompt_frame(
+    lease: &NativeBridgeLease,
+    message_id: Uuid,
+    prompt: &NativeBridgePrompt,
+) -> io::Result<()> {
+    NativeBridgeMessage::for_prompt(message_id, lease.wire.session_id.clone(), prompt)?;
+    if prompt.has_images() && lease.typed_png_images != 1 {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "grok_native_bridge.typed_png_unavailable",
+        ));
+    }
+    // 发现器已严格验证 token 为 64 个小写十六进制字符，故占位符编码长度精确相同。
+    let bytes = serde_json::to_vec(&Envelope {
+        token: &"0".repeat(64),
+        request: Request::SubmitIfIdle {
+            instance_id: &lease.instance_id.to_string(),
+            lease_id: &lease.wire.lease_id,
+            session_id: &lease.wire.session_id,
+            binding_epoch: lease.wire.binding_epoch,
+            input_epoch: lease.wire.input_epoch,
+            message_id: message_id.to_string(),
+            prompt_id: message_id.to_string(),
+            text: prompt.text_value(),
+            images: prompt.images(),
+        },
+    })
+    .map_err(|_| invalid())?;
+    if bytes.len() > MAX_FRAME_BYTES {
+        return Err(frame_too_large());
+    }
+    Ok(())
+}
+
 fn parse_state(
     response: WireResponse,
     expected: Uuid,
@@ -336,6 +414,7 @@ fn parse_state(
         ready,
         reason,
         lease,
+        typed_png_images,
     } = response
     else {
         return Err(invalid());
@@ -358,6 +437,7 @@ fn parse_state(
                 instance_id: expected,
                 issued_before,
                 wire,
+                typed_png_images,
             })
         })
         .transpose()?;
@@ -366,6 +446,7 @@ fn parse_state(
         input_epoch,
         reason,
         lease,
+        typed_png_images,
     })
 }
 
