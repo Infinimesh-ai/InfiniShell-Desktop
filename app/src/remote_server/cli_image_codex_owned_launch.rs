@@ -297,19 +297,31 @@ impl NotificationPlan {
 
     fn arguments(&self) -> Vec<String> {
         let mut arguments = Vec::new();
+        let mut states = toml::Table::new();
         for hook in &self.hooks {
             let (event, _, _) = hook.event.fields();
             let command = toml::Value::String(hook.command.clone());
-            let key = toml::Value::String(hook.key.clone());
-            let hash = toml::Value::String(hook.normalized_hash.clone());
             // 只传五个固定通知声明及其精确内容信任；不设项目、审批或沙箱参数。
             arguments.extend([
                 "-c".into(),
                 format!("hooks.{event}=[{{hooks=[{{type=\"command\",command={command},timeout=600,async=false}}]}}]"),
-                "-c".into(),
-                format!("hooks.state.{key}={{enabled=true,trusted_hash={hash}}}"),
             ]);
+            states.insert(
+                hook.key.clone(),
+                toml::Value::Table(toml::Table::from_iter([
+                    ("enabled".into(), toml::Value::Boolean(true)),
+                    (
+                        "trusted_hash".into(),
+                        toml::Value::String(hook.normalized_hash.clone()),
+                    ),
+                ])),
+            );
         }
+        // 固定原生只按点拆分 -c 左侧，不解析引号；含 config.toml 的完整键须留在右侧表值。
+        arguments.extend([
+            "-c".into(),
+            format!("hooks.state={}", toml::Value::Table(states)),
+        ]);
         arguments
     }
 }

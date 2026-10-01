@@ -198,6 +198,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G08 — 远程 CLI 图片传输
 
+- **2026-10-01 Grok 真实首图通过，清稿／退役及 Codex 通知参数仍需修复版复验**：`ea74/r-co3bb00k` 中文实际 SSH 的 Grok `.2` 初始插件通知已生效；单次 PNG 输入、原生 typed 字节、双方 finished／ACK 与回答“红色，蓝色”一致，但重开仍保留原稿和单卡。实际 `/exit` 后 TUI／leader 已退出，0644 原生 PID 锁被宿主错误套用私有 JSON 权限合同，未释放票据；没有外部 TERM。Codex 已进入真实 TUI，但五个精确通知状态键因原生 `-c` 左侧按点拆分而被忽略；未手动信任、零模型输入，原生退出后 released=true。三处精准修复已写入，Mac／Linux 锁合同同步；Mac 85 项回归、i18n 11 项与最终 check 已通过；新构建真实复验及 Linux 专属测试仍待完成。证据摘要与边界见验证报告，不关闭 G08。
+
 - **2026-10-01 真实启动仍失败，继续开放**：`400fe985f/r-vpukvpd7` 的 Grok 原生初始会话漏装插件 hooks，Codex app-server 已就绪但 TUI helper 标准描述符为 null。宿主现补 TUI 继承及经过持久身份核验的物理 socket 参数；Grok 成功 Reserve 后绑定连接回收票据，断连／Drop 不再依赖首次图片输入。21 项断言通过但有 1 条 LEAK，i18n 11 项及 check 通过；无需本地化变更。Grok 原生 `.2/a9c27a25fe22` 已补初始插件装配并通过真实 ACP／通知 45 项及 check，Mac 工件已绑定，整合后串行零重试 21 项无 LEAK 通过，前轮并发 LEAK 根因仍未明；最终源码门禁继续执行。两款本轮均零图片／模型输入；Grok 残留 leader 经精确单次 TERM 退出不计产品回收，旧失败保留。新构建消费、回收、异常链、英中 GUI 及最终源码门禁仍待验，详见验证报告；新增关闭 0 项。
 
 - **2026-10-01 Codex 长 socket 别名导致真实启动失败，已修复连接目标**：`c3ff/r-9u32vjqt` 中文实际 SSH 中，产品菜单单次启动产生原生 app-server 和94字节物理socket，但宿主连接121字节别名而超出macOS地址容量，20秒ready等待失败；TUI从未执行、模型输入为零，原生进程因同一路径的reap缺陷残留，现场保留。不是原生bind失败。现 readiness、首次绑定/回收及shared/owned消费统一连接已验证物理路径，别名/物理inode、父目录、peer与进程代次检查仍保留。白名单SHA `ed4efbd300331e3f5633d09ba2a8316d24bd573f1b0c58cb78aa4cc60ac5a552`；12项定向测试含3项真实socket通信/替换拒绝、i18n11项通过，最终check `r-uh0w0jy3` 通过，日志SHA-256 `0734ca67fa982dd062c0d2b9d25070241a55503ec9bffbb8cf1a651cd2950643`，短目录已清理。无需本地化变更；真实修复版及跨平台待验，不关闭G08。

@@ -134,6 +134,23 @@ impl TerminalView {
             })
     }
 
+    fn remote_grok_consumption_matches(&self, binding: &Binding, ctx: &AppContext) -> bool {
+        let sessions = CLIAgentSessionsModel::as_ref(ctx);
+        if sessions
+            .remote_image_consumption_revision(self.view_id, binding.attempt)
+            .is_none()
+        {
+            return false;
+        }
+        let Some(generation) = sessions.input_generation(self.view_id) else {
+            return false;
+        };
+        // 仅清稿收据可跟随自动收起/恢复；原发送绑定与写入租约仍保持旧代际。
+        let mut current = binding.clone();
+        current.generation = generation;
+        self.remote_grok_binding_matches(&current, ctx)
+    }
+
     pub(in crate::terminal::view) fn submit_remote_owned_grok_input(
         &mut self,
         text: String,
@@ -196,6 +213,21 @@ impl TerminalView {
             );
             return;
         };
+        if !CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.register_remote_image_submission_owner(
+                self.view_id,
+                generation,
+                binding.attempt,
+                Some(snapshot.editor_revision.clone()),
+            )
+        }) {
+            self.fail_cli_agent_text_submit(
+                generation,
+                crate::t!("cli-agent-grok-owned-input-unavailable"),
+                ctx,
+            );
+            return;
+        }
         let owned = self.grok_remote_owned.as_mut().unwrap();
         owned.sending = true;
         owned.sending_generation = Some(binding.attempt);
@@ -290,8 +322,7 @@ impl TerminalView {
                             let current = view.remote_grok_binding_matches(&binding, ctx);
                             view.finish_remote_grok_worker(&binding, ctx);
                             if current {
-                                view.fail_cli_agent_text_submit(
-                                    binding.generation,
+                                view.show_error_toast(
                                     crate::t!("cli-agent-grok-owned-input-not-dispatched"),
                                     ctx,
                                 );
@@ -300,6 +331,15 @@ impl TerminalView {
                     );
                     return;
                 }
+                // 持久账本已领取唯一派发；先保存原稿收据，最终精确 ACK 才能确认消费。
+                // 此记录不恢复已撤销的写权限，也不允许查询或重连重新派发。
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                    sessions.register_remote_image_consumption(
+                        view.view_id,
+                        binding.generation,
+                        binding.attempt,
+                    );
+                });
                 let worker_binding = binding.clone();
                 let worker_scope = scope.clone();
                 let worker_client = client.clone();
@@ -350,20 +390,20 @@ impl TerminalView {
         let current = self.remote_grok_binding_matches(binding, ctx);
         self.finish_remote_grok_worker(binding, ctx);
         if current {
-            if let Some(owned) = &mut self.grok_remote_owned {
-                owned.sending = false;
-                owned.revoke();
-            }
-            self.fail_cli_agent_text_submit(
-                binding.generation,
-                crate::t!("cli-agent-grok-owned-input-claimed"),
-                ctx,
-            );
+            self.show_error_toast(crate::t!("cli-agent-grok-owned-input-claimed"), ctx);
         }
     }
 
     /// 只结束本次传输占用与提交租约；未知草稿仍由持久账本拒绝再次派发。
     fn finish_remote_grok_worker(&mut self, binding: &Binding, ctx: &mut ViewContext<Self>) {
+        CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+            sessions.finish_remote_image_consumption(self.view_id, binding.attempt);
+            sessions.finish_remote_image_submission(
+                self.view_id,
+                binding.generation,
+                binding.attempt,
+            );
+        });
         if !self.remote_grok_attempt_matches(binding) {
             return;
         }
@@ -372,7 +412,6 @@ impl TerminalView {
             owned.sending_generation = None;
             owned.revoke();
         }
-        self.release_cli_agent_input_submission(binding.generation, ctx);
     }
 
     fn receive_remote_grok_reply(
@@ -399,14 +438,7 @@ impl TerminalView {
             let current = self.remote_grok_binding_matches(&binding, ctx);
             self.finish_remote_grok_worker(&binding, ctx);
             if current {
-                if let Some(owned) = &mut self.grok_remote_owned {
-                    owned.sending = false;
-                }
-                self.fail_cli_agent_text_submit(
-                    binding.generation,
-                    crate::t!("cli-agent-grok-owned-input-claimed"),
-                    ctx,
-                );
+                self.show_error_toast(crate::t!("cli-agent-grok-owned-input-claimed"), ctx);
             }
             return;
         };
@@ -418,8 +450,9 @@ impl TerminalView {
             && native_prompt_id.is_some()
             && native_ack_sha256.is_some()
         {
-            let current = self.remote_grok_binding_matches(&binding, ctx);
-            // 精确 ACK 已独立持久化；新 listener/会话/输入代际绝不被旧回调清空。
+            let consumed =
+                state == "finished" && self.remote_grok_consumption_matches(&binding, ctx);
+            // 精确 ACK 已独立持久化；取消、编辑、新附件或新会话都不能清空当前草稿。
             if self.remote_grok_attempt_matches(&binding) {
                 if let Some(owned) = &mut self.grok_remote_owned {
                     owned.sending = false;
@@ -427,28 +460,23 @@ impl TerminalView {
                     owned.pending = None;
                 }
             }
-            if current {
-                self.release_cli_agent_input_submission(binding.generation, ctx);
-                let attachments_unchanged = self
-                    .ai_context_model
-                    .as_ref(ctx)
-                    .pending_attachments_revision()
-                    == snapshot.attachments_revision;
-                let editor_unchanged = self.input.update(ctx, |input, ctx| {
-                    input.acknowledge_cli_input_submission(&snapshot.editor_revision, ctx)
-                });
-                if attachments_unchanged {
-                    self.ai_context_model
-                        .update(ctx, |model, ctx| model.clear_pending_attachments(ctx));
-                }
-                let draft = self.input.as_ref(ctx).buffer_text(ctx);
-                CLIAgentSessionsModel::handle(ctx)
-                    .update(ctx, |sessions, _| sessions.set_draft(self.view_id, draft));
+            CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                sessions.finish_remote_image_submission(
+                    self.view_id,
+                    binding.generation,
+                    binding.attempt,
+                );
+            });
+            if consumed {
                 // 原生最终 ACK 不合成 PromptSubmit，避免覆盖已经到达的 Stop。
-                if editor_unchanged && attachments_unchanged {
+                if self.complete_remote_cli_image_consumption(binding.attempt, &snapshot, ctx) {
                     self.maybe_close_rich_input_after_submit(ctx);
                 }
                 ctx.notify();
+            } else {
+                CLIAgentSessionsModel::handle(ctx).update(ctx, |sessions, _| {
+                    sessions.finish_remote_image_consumption(self.view_id, binding.attempt);
+                });
             }
             return;
         }
@@ -490,11 +518,7 @@ impl TerminalView {
                     let current = view.remote_grok_binding_matches(&binding, ctx);
                     view.finish_remote_grok_worker(&binding, ctx);
                     if current {
-                        view.fail_cli_agent_text_submit(
-                            binding.generation,
-                            crate::t!("cli-agent-grok-owned-input-claimed"),
-                            ctx,
-                        );
+                        view.show_error_toast(crate::t!("cli-agent-grok-owned-input-claimed"), ctx);
                     }
                 }
             },

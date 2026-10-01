@@ -1,5 +1,6 @@
 use super::*;
 use std::os::unix::fs::symlink;
+use std::os::unix::net::UnixListener;
 
 fn manifest(directory: &Path) -> LaunchManifest {
     LaunchManifest {
@@ -226,8 +227,10 @@ fn private_receipt_rejects_group_access_and_symlink_replacement() {
     write_new(&path, b"{}").unwrap();
     assert_eq!(read_private(&path).unwrap(), b"{}");
     assert!(write_new(&path, b"replacement").is_err());
-    fs::set_permissions(&path, fs::Permissions::from_mode(0o640)).unwrap();
-    assert!(read_private(&path).is_err());
+    for mode in [0o640, 0o644] {
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        assert!(read_private(&path).is_err());
+    }
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     fs::set_permissions(&root, fs::Permissions::from_mode(0o750)).unwrap();
     assert!(read_private(&path).is_err());
@@ -653,12 +656,82 @@ fn manifest_versions_cannot_mix_legacy_and_durable_socket_contracts() {
 }
 
 #[test]
+fn remote_release_retires_native_leader_lock_with_readable_mode() {
+    for mode in [0o600, 0o644] {
+        let state = tempfile::tempdir().unwrap();
+        let root = state.path().canonicalize().unwrap();
+        let (directory, socket, mut manifest) = durable_manifest(&root);
+        manifest.boot_session = macos_boot_session().unwrap();
+        let path = directory.path().join("launch.json");
+        let bytes = serde_json::to_vec(&manifest).unwrap();
+        let checksum = digest(&bytes);
+        let (mut receipt, mut bound) = process_receipts(&manifest, &checksum);
+        receipt.process.pid = i32::MAX - 1;
+        bound.tui.pid = receipt.process.pid;
+        bound.leader.pid = i32::MAX;
+        assert!(identity_exited(kernel_identity(&bound.tui)));
+        assert!(identity_exited(kernel_identity(&bound.leader)));
+        write_new(&path, &bytes).unwrap();
+        write_new(&directory.path().join("dispatched"), checksum.as_bytes()).unwrap();
+        write_new(
+            &directory.path().join("exec.json"),
+            &serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+        write_new(
+            &directory.path().join("bound.json"),
+            &serde_json::to_vec(&bound).unwrap(),
+        )
+        .unwrap();
+        let lock = socket.path().join("leader.lock");
+        fs::write(&lock, b"2147483647").unwrap();
+        fs::set_permissions(&lock, fs::Permissions::from_mode(mode)).unwrap();
+        drop(UnixListener::bind(&manifest.socket_path).unwrap());
+        let mut restored = GrokOwnedLaunch::restore(&path, &checksum).unwrap();
+
+        restored.release_remote_after_exit().unwrap();
+
+        assert!(restored.is_retired());
+        assert!(directory.path().join("retired.json").exists());
+        assert!(!socket.path().exists());
+        assert!(path.exists());
+        assert!(GrokOwnedLaunch::restore(&path, &checksum).unwrap().is_retired());
+    }
+}
+
+#[test]
+fn native_leader_lock_rejects_shared_write_and_nonprivate_parent() {
+    let state = tempfile::tempdir().unwrap();
+    let root = state.path().canonicalize().unwrap();
+    let (_directory, socket, manifest) = durable_manifest(&root);
+    let exited = MacosProcessIdentity {
+        pid: i32::MAX,
+        pid_version: 1,
+        unique_id: 1,
+        resource_cid: 1,
+    };
+    let lock = socket.path().join("leader.lock");
+    fs::write(&lock, b"2147483647").unwrap();
+    for mode in [0o620, 0o602, 0o664, 0o666] {
+        fs::set_permissions(&lock, fs::Permissions::from_mode(mode)).unwrap();
+        assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
+        assert_eq!(fs::read(&lock).unwrap(), b"2147483647");
+    }
+    fs::set_permissions(&lock, fs::Permissions::from_mode(0o644)).unwrap();
+    fs::set_permissions(socket.path(), fs::Permissions::from_mode(0o750)).unwrap();
+    assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
+    assert_eq!(fs::read(&lock).unwrap(), b"2147483647");
+    fs::set_permissions(socket.path(), fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+#[test]
 fn native_leader_lock_requires_bound_exited_lifetime_and_exact_bytes() {
     let state = tempfile::tempdir().unwrap();
     let root = state.path().canonicalize().unwrap();
     let (_directory, socket, manifest) = durable_manifest(&root);
     let lock = socket.path().join("leader.lock");
     write_new(&lock, b"2147483647").unwrap();
+    fs::set_permissions(&lock, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(cleanup_socket_directory(&manifest, None).is_err());
     let exited = MacosProcessIdentity {
         pid: i32::MAX,
@@ -685,6 +758,7 @@ fn live_leader_lock_is_preserved_even_when_pid_text_matches() {
     let live = macos_process_identity(std::process::id() as i32).unwrap();
     let lock = socket.path().join("leader.lock");
     write_new(&lock, live.pid.to_string().as_bytes()).unwrap();
+    fs::set_permissions(&lock, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(cleanup_socket_directory(&manifest, Some(live)).is_err());
     assert!(lock.exists());
 }
@@ -702,14 +776,21 @@ fn leader_lock_alias_and_extra_bytes_are_preserved() {
     };
     let lock = socket.path().join("leader.lock");
     write_new(&lock, b"2147483647\n").unwrap();
+    fs::set_permissions(&lock, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
     fs::remove_file(&lock).unwrap();
     let other = root.join("other.lock");
     write_new(&other, b"2147483647").unwrap();
+    fs::set_permissions(&other, fs::Permissions::from_mode(0o644)).unwrap();
     fs::hard_link(&other, &lock).unwrap();
     assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
-    assert_eq!(fs::read(other).unwrap(), b"2147483647");
+    assert_eq!(fs::read(&other).unwrap(), b"2147483647");
     assert!(lock.exists());
+    fs::remove_file(&lock).unwrap();
+    symlink(&other, &lock).unwrap();
+    assert!(cleanup_socket_directory(&manifest, Some(exited)).is_err());
+    assert_eq!(fs::read(other).unwrap(), b"2147483647");
+    assert!(fs::symlink_metadata(&lock).unwrap().file_type().is_symlink());
 }
 
 #[test]

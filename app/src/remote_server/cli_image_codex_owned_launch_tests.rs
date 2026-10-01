@@ -269,7 +269,7 @@ fn normalized_notification_hash_matches_existing_native_discovery_receipts() {
 }
 
 #[test]
-fn typed_session_flags_contain_only_five_notifications_and_exact_trust() {
+fn native_cli_parser_preserves_five_notification_keys_and_exact_trust() {
     let directory = directory();
     let root = directory
         .path()
@@ -278,43 +278,47 @@ fn typed_session_flags_contain_only_five_notifications_and_exact_trust() {
     let root = root.canonicalize().unwrap();
     let plan = NotificationPlan::create(&root).unwrap();
     let arguments = plan.arguments();
-    assert_eq!(arguments.len(), 20);
+    assert_eq!(arguments.len(), 12);
     let mut merged = toml::Table::new();
     for pair in arguments.chunks_exact(2) {
         assert_eq!(pair[0], "-c");
-        let parsed: toml::Table = pair[1].parse().unwrap();
-        assert_eq!(parsed.len(), 1);
-        let hooks = parsed["hooks"].as_table().unwrap();
-        for (key, value) in hooks {
-            if key == "state" {
-                let states = value.as_table().unwrap();
-                assert_eq!(states.len(), 1);
-                let (key, state) = states.iter().next().unwrap();
-                let hook = plan.hooks.iter().find(|hook| &hook.key == key).unwrap();
-                assert_eq!(state["enabled"].as_bool(), Some(true));
-                assert_eq!(
-                    state["trusted_hash"].as_str(),
-                    Some(hook.normalized_hash.as_str())
-                );
-                assert_eq!(state.as_table().unwrap().len(), 2);
-            } else {
-                assert!(merged.insert(key.clone(), value.clone()).is_none());
-                let handler = &value.as_array().unwrap()[0]["hooks"][0];
-                assert_eq!(handler["type"].as_str(), Some("command"));
-                assert_eq!(handler["timeout"].as_integer(), Some(600));
-                assert_eq!(handler["async"].as_bool(), Some(false));
-                assert_eq!(handler.as_table().unwrap().len(), 4);
-                let command = shlex::split(handler["command"].as_str().unwrap()).unwrap();
-                assert_eq!(command.len(), 2);
-                assert_eq!(command[0], "bash");
-                assert_eq!(
-                    Path::new(&command[1]).parent(),
-                    Some(plan.root.join("scripts").as_path())
-                );
-            }
-        }
+        // 固定 0.156.1 只对右侧解析 TOML，左侧 path.split('.') 不识别引号。
+        // 若把整条参数当 TOML 解析，旧版含点状态键的真实启动错误会被漏掉。
+        let (path, value) = pair[1].split_once('=').unwrap();
+        let segments = path.split('.').collect::<Vec<_>>();
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0], "hooks");
+        let parsed: toml::Table = format!("value={value}").parse().unwrap();
+        assert!(
+            merged
+                .insert(segments[1].into(), parsed["value"].clone())
+                .is_none()
+        );
     }
-    assert_eq!(merged.len(), 5);
+    assert_eq!(merged.len(), 6);
+    let states = merged["state"].as_table().unwrap();
+    assert_eq!(states.len(), 5);
+    for hook in &plan.hooks {
+        let state = states[&hook.key].as_table().unwrap();
+        assert_eq!(state.len(), 2);
+        assert_eq!(state["enabled"].as_bool(), Some(true));
+        assert_eq!(
+            state["trusted_hash"].as_str(),
+            Some(hook.normalized_hash.as_str())
+        );
+        let handler = &merged[hook.event.fields().0].as_array().unwrap()[0]["hooks"][0];
+        assert_eq!(handler["type"].as_str(), Some("command"));
+        assert_eq!(handler["timeout"].as_integer(), Some(600));
+        assert_eq!(handler["async"].as_bool(), Some(false));
+        assert_eq!(handler.as_table().unwrap().len(), 4);
+        let command = shlex::split(handler["command"].as_str().unwrap()).unwrap();
+        assert_eq!(command.len(), 2);
+        assert_eq!(command[0], "bash");
+        assert_eq!(
+            Path::new(&command[1]).parent(),
+            Some(plan.root.join("scripts").as_path())
+        );
+    }
     assert_eq!(plan.files.len(), 8);
     assert!(!root.join(".codex").exists());
 }
@@ -416,7 +420,7 @@ fn native_identity_requires_same_typed_flags_for_server_and_tui() {
     assert!(helper.get_envs().next().is_none());
     for role in ["server", "tui"] {
         let expected = arguments(&manifest, role).unwrap();
-        assert_eq!(&expected[..20], &flags);
+        assert_eq!(&expected[..flags.len()], &flags);
         let mut actual = vec![b"codex".to_vec()];
         actual.extend(expected.iter().map(|item| item.as_bytes().to_vec()));
         assert!(arguments_match(&actual, &manifest, role));

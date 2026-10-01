@@ -1162,13 +1162,52 @@ mod native {
         }
         validate_socket_directory(manifest)?;
         let lock = root.join("leader.lock");
-        if let Some(bytes) = read_optional_private(&lock)? {
-            // 固定 1.0.41 留下只含 leader PID 的私有锁文件。只有已绑定进程退出，且
-            // 原始字节与该 leader 完全一致时才清理；文件名或可复用的 PID 单独均不够。
+        let lock_metadata = match fs::symlink_metadata(&lock) {
+            Ok(metadata) => Some(metadata),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error),
+        };
+        if let Some(metadata) = lock_metadata {
+            // 原生锁按默认 OpenOptions 与 umask 创建，允许 0644；其 0700 父目录已经核验。
+            // 此合同仅适用于原生 PID 锁，启动清单等私有 JSON 仍要求 0600。
+            let uid = unsafe { libc::geteuid() };
+            if !metadata.is_file()
+                || metadata.uid() != uid
+                || metadata.mode() & 0o022 != 0
+                || metadata.nlink() != 1
+                || metadata.len() > 10
+            {
+                return Err(io::Error::other("原生 leader 锁权限或类型无效"));
+            }
             let expected = leader.ok_or_else(|| io::Error::other("缺少原生 leader 锁归属"))?;
+            let file = OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+                .open(&lock)?;
+            let opened = file.metadata()?;
+            if opened.dev() != metadata.dev()
+                || opened.ino() != metadata.ino()
+                || !opened.is_file()
+                || opened.uid() != uid
+                || opened.mode() & 0o022 != 0
+                || opened.nlink() != 1
+            {
+                return Err(io::Error::other("原生 leader 锁已替换"));
+            }
+            let mut bytes = Vec::new();
+            (&file).take(11).read_to_end(&mut bytes)?;
+            // 删除前复核目录与所读 inode；PID 字节匹配也不能代替绑定生存期已退出的证明。
+            validate_socket_directory(manifest)?;
+            let current = fs::symlink_metadata(&lock)?;
             if !identity_exited(expected)
                 || bytes != expected.pid.to_string().as_bytes()
-                || fs::symlink_metadata(&lock)?.nlink() != 1
+                || current.dev() != opened.dev()
+                || current.ino() != opened.ino()
+                || !current.is_file()
+                || current.uid() != uid
+                || current.mode() & 0o022 != 0
+                || current.nlink() != 1
+                || current.len() != bytes.len() as u64
             {
                 return Err(io::Error::other("原生 leader 锁归属或退出状态不匹配"));
             }

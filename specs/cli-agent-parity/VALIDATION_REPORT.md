@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-01：Grok 真实首图与清稿／锁回收缺陷、Codex hook 参数解析
+
+**新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `ea74c1d03` 的中文实际 SSH 现场 `r-co3bb00k` 通过产品菜单启动固定 Grok `.2/a9c27a25fe22`。初始插件 SessionStart 生效，选择器单张红蓝 PNG 一次提交后回答“红色，蓝色”。原生唯一 text＋typed PNG、同原生 prompt 的 EndTurn、宿主与服务端 finished／ACK 一致；typed PNG 为 328 字节，SHA-256 `40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d`，与规范上传字节一致。原 137 字节夹具经过 PNG 规范化，不声称原编码未变。白名单收据 SHA-256 `bc757fa89f45e7e913f1d8fe8a9fb4adf6a6c09b15c5e88fec717555cf437955`。
+
+自动收起后重开却仍有原稿和单卡，真实缺陷保留。原生 `/exit` 回到原 SSH shell，TUI 与 leader 均已退出；leader 由产品 reaper 回收，不称全部自然退出，也没有外部 TERM。cleanup-requested 已落盘，但 retired／released 不存在，原生 `leader.lock` 实际为 0644，内容精确绑定原 leader。原生默认 OpenOptions 受 umask 影响生成该模式，宿主却套用私有 JSON 的 0600 合同。退出收据 SHA-256 `00eee9c3af4f2e6b2fe56f8d44a0bcc2409a5c7cc80105ceb7b4fbec1a7f7d6c`。
+
+同 SSH 的 Codex `0.156.1` 已进入真实 TUI，但五类通知均 installed=1、active=0、review=1；F2 明确五个 SessionFlags 状态键被忽略。固定官方 `b412ff32c417f855c2b2d1581b77058eed87c84b` 的 `config/src/overrides.rs` 对左侧仅 `path.split('.')`，不解析 TOML 引号，导致含 `config.toml` 的键被拆错。未手动信任 hooks，零图片和模型输入；真实 `/exit` 后 server／TUI 不可见、released=true。白名单 SHA-256 `851fe2ac991dab98fef16d71116c0bf08672feeafa5bedc6297ef93388765e58`，官方四文件源码与来源摘要已独立核验。
+
+当前修复复用原提交的消费收据处理自动收起／恢复，仅精确 finished ACK 清原稿，取消、编辑、附件变化、旧会话和旧提交不影响新稿或新租约。Mac／Linux 原生锁单独校验私有父目录、UID、单链接、无组他写、O_NOFOLLOW、inode、精确 PID 字节及绑定生存期退出；私有 JSON 读取合同不变。Codex 将五个精确状态键放入 `-c` 右侧表，保留原生逐层 hook 状态合并，不改项目、审批、沙箱或用户配置。25 文件冻结摘要 `042eb15401a7a056f204d9d4848862b1e4d0de356c6c6cfc8756c9f522eef65a`；Mac 串行零重试 `r-61atygcd` 85 项通过且无 LEAK／FLAKY，i18n `r-csgi9402` 11 项通过，最终 `r-5ucqpf5v` cargo check 通过，三轮目录均已核验清理；汇总收据 SHA-256 `cb3f84f5571bfb39c566bfba49e0d387bcbd59b770d10a562b0f898b62321c43`。新增 Linux 专属回收测试未在 Mac 执行，仍待同源码 Linux 门禁。
+
+无需本地化变更；原英中状态与失败提示语义已复核，修复版真实双语布局仍待验。截图仅为 CUA 工具图像，没有外置原图。App／sshd、两款原生进程均已退出，daemon 按原 10 分钟空闲期限退出，000006 finish 与外层 exit 0 已确认；旧 status 保留此前存活快照。现场保留、cleanup_ready=false，独立保全审计尚待完成。上述正例不关闭 G08 的清稿／回收、异常恢复、SSH／tmux 与最终源码门禁。
+
 ## 2026-10-01：真实启动暴露的 Grok 初始 hooks 与 Codex TUI 接线
 
 **新增关闭 0 项，仍为 6 关闭／5 开放／3 移交，PR #22 草稿。** `400fe985f` 的独立中文 GUI `r-vpukvpd7` 通过产品菜单分别启动 Grok 和 Codex，均未提交图片或模型输入。Grok `13a09e440e29` 已到原生首页，但通知只有全局 SessionStart，插件未进入初始 registry；富输入未出现。Ctrl-G 进入原生 vi，随后关闭窗格，TUI／vi 退出而 leader 留存。Codex 此次已通过 server readiness 并保存 socket.json，但没有 tui-birth；包装器 19.418 秒后结束，server 已退出且 released=true。两份失败白名单 SHA-256 分别为 `c8793e022c77c6eb30748e2b4bdd4ada4fa89a98c19fa890bf85196c6976f286`、`caa9c4376694f0aef0180a15e59488ac1ce7c1004d227943dcc32554c8c62264`；截图仅保留在 CUA 回执，不称图片或成功布局已验。

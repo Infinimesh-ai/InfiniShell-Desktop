@@ -8,6 +8,8 @@ use warpui::{AppContext, SingletonEntity, ViewContext};
 use super::{BlockId, SessionId, ShellType, TerminalView};
 use crate::remote_server::cli_image_grok_client::{self as remote, Journal, Launch};
 use crate::remote_server::cli_image_grok_protocol::{Action, Reply};
+#[cfg(test)]
+use crate::remote_server::cli_image_grok_protocol::Ticket;
 use crate::remote_server::client::RemoteServerClient;
 use crate::remote_server::manager::RemoteServerManager;
 use crate::remote_server::proto::CliImageStagingScope;
@@ -59,6 +61,32 @@ impl RemoteOwned {
 }
 
 impl TerminalView {
+    /// 仅构造已有内存终端的 owned 绑定；测试不经过菜单、持久账本或启动 RPC。
+    #[cfg(test)]
+    pub(super) fn bind_remote_owned_grok_for_test(
+        &mut self,
+        ticket: Ticket,
+        native_session: Uuid,
+        ctx: &AppContext,
+    ) {
+        let (snapshot, client) = self.remote_grok_snapshot(true, ctx).unwrap();
+        self.grok_remote_owned = Some(RemoteOwned {
+            launch: Launch {
+                host: client.cli_image_reference_host().unwrap(),
+                terminal_session: snapshot.session.as_u64(),
+                block_id: snapshot.block.to_string(),
+                cwd: snapshot.cwd.clone(),
+                ticket,
+            },
+            native_session: Some(native_session),
+            pending: None,
+            sending: false,
+            sending_generation: None,
+            snapshot,
+            querying: false,
+        });
+    }
+
     pub(crate) fn is_remote_owned_grok_launch_available(&self, ctx: &AppContext) -> bool {
         self.remote_grok_snapshot(false, ctx).is_some()
     }

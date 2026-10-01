@@ -6584,5 +6584,77 @@
       "cleanup_ready": true
     },
     "integrated_local_gates_sha256": "268763da2bea2a468085f3ef1605557b29a1a9a98dd01d607e8e0d20da7c97b2"
+  },
+  "g08_grok_consumption_codex_hooks_20261001": {
+    "status": "real_grok_image_positive_with_draft_and_cleanup_defects_codex_hook_flags_failed",
+    "gap_closed": false,
+    "closed_gap_count_delta": 0,
+    "source_commit": "ea74c1d039262f84c021ca4a41559a6aa760c58b",
+    "run_id": "r-co3bb00k",
+    "language": "zh-CN",
+    "archive": "resume-20261001/g08-preparation/r-co3bb00k-grok-codex-owned-gui",
+    "grok": {
+      "native": "1.0.41+infinishell.session-notifications.2 / a9c27a25fe22 / grok-4.7",
+      "native_session_id": "3a018576-e0fb-4a3e-9dc0-8ae6739ff3ed",
+      "inputs": 1,
+      "model_turns": 1,
+      "result": "红色，蓝色",
+      "typed_png_bytes": 328,
+      "typed_png_sha256": "40e362f2828d701266b69c824f700610ca07e8cd1855fcdcea10462ba4597b2d",
+      "consumption_receipt_sha256": "bc757fa89f45e7e913f1d8fe8a9fb4adf6a6c09b15c5e88fec717555cf437955",
+      "exit_receipt_sha256": "00eee9c3af4f2e6b2fe56f8d44a0bcc2409a5c7cc80105ceb7b4fbec1a7f7d6c",
+      "native_image_and_host_ack_match": true,
+      "draft_clear_passed": false,
+      "ticket_release_passed": false,
+      "observed": "真正SSH产品菜单启动，初始插件SessionStart成功；一次选择器图片提交，原生唯一text+typed PNG输入、双方finished与ACK匹配、图片文件已删除。自动收起后重开原稿和单卡仍在。原生/exit回到原SSH shell，TUI和leader均退出；leader由产品reaper回收，不称全部自然退出。cleanup-requested存在但无retired/released，现场原生锁0644被私有JSON检查拒绝。无外部信号。"
+    },
+    "codex": {
+      "native": "0.156.1",
+      "ticket": "99ca2c08-2b29-4659-b44f-fe2b56cbc01e",
+      "native_session_id": "01a0f694-4a08-7633-bc63-af4eb7f4d304",
+      "inputs": 0,
+      "model_turns": 0,
+      "receipt_sha256": "851fe2ac991dab98fef16d71116c0bf08672feeafa5bedc6297ef93388765e58",
+      "observed": "已进入真正TUI，但5个SessionFlags通知hook均installed1/active0/review1，F2明确忽略5个状态键。未手动信任hook、未发模型输入；真正/exit后原生进程退出且released=true。",
+      "cause": "固定原生config/src/overrides.rs只对-c右侧解析TOML，左侧path.split点不识别引号；宿主把含config.toml的完整状态键放在左侧而拆错。",
+      "upstream_source_commit": "b412ff32c417f855c2b2d1581b77058eed87c84b"
+    },
+    "fixes": "Grok按原提交独立消费收据迁移自动收起/恢复修订号，finished精确ACK才清，取消/编辑/附件变化/旧会话保留；Mac/Linux仅原生PID锁兼容无组他写的0644，私有JSON仍严格；Codex仅把五个精确通知状态键放入-c右侧表，不修改用户配置、审批或沙箱。",
+    "source_freeze_sha256": "042eb15401a7a056f204d9d4848862b1e4d0de356c6c6cfc8756c9f522eef65a",
+    "local_gate": {
+      "status": "passed",
+      "source_freeze_sha256": "042eb15401a7a056f204d9d4848862b1e4d0de356c6c6cfc8756c9f522eef65a",
+      "receipt_sha256": "cb3f84f5571bfb39c566bfba49e0d387bcbd59b770d10a562b0f898b62321c43",
+      "runs": {
+        "regression": {
+          "run_id": "r-61atygcd",
+          "record_sha256": "e40b1f467185237bc9ced1e02e3919c280d81dc3658fb95db500fc2be2de2f66",
+          "log_sha256": "d50c2707f0bd4ab2b744fd54b83616a876372e649e1373f043cd5cca12dbccc3",
+          "exit_code": 0,
+          "cleanup_ready": true,
+          "passed": 85
+        },
+        "i18n": {
+          "run_id": "r-csgi9402",
+          "record_sha256": "65acc723ee29b126a3c42f54af6485629e7aa8379dfcceb074e52d7d13502211",
+          "log_sha256": "bfcbc0edae88ecb0e5cc2407ea371e904e49a71b746f7b88f1f1ea4b4dd82b8f",
+          "exit_code": 0,
+          "cleanup_ready": true,
+          "passed": 11
+        },
+        "check": {
+          "run_id": "r-5ucqpf5v",
+          "record_sha256": "b4201585e5338e9c2f81d6034fd0da3e5cd805e4dc0c01b86b083268c91c51bb",
+          "log_sha256": "e38d4565b304e8e4cadc854d8b83e86b454c967e8c140befc161c990e3664adf",
+          "exit_code": 0,
+          "cleanup_ready": true
+        }
+      },
+      "linux_specific_tests": "未在Mac执行，待同源码Linux门禁"
+    },
+    "localization": "无需本地化变更；复核原英中成功、等待及失败提示，后台修复不改变文案语义；修复后的双语真实GUI仍待验。",
+    "remaining": "修复版真实消费/清稿/回收、其他异常恢复、SSH/tmux组合、英中GUI及最终源码门禁。",
+    "screenshots": "仅本任务CUA工具图像，未生成外置截图文件。",
+    "cleanup": "App、sshd、Grok、Codex已退出；daemon按原10分钟空闲期限退出，000006finish与外层exit0确认。旧status为此前存活快照；现场保留cleanup_ready=false，独立保全审计尚待完成。"
   }
 }
