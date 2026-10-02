@@ -1,5 +1,33 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Grok 真实 npm 消费者与用户镜像更新
+
+新增关闭0项，保持 **9关闭／G03、G09共2开放／3移交**，PR草稿。真实官方npm安装1.0.41及其postinstall用户镜像由GUI `r-4dr6ibtn` 自动发现实时Stable1.0.46；保留原GROK_HOME，只点击一次更新，无额外Check、重试或模型请求。沿用原v4构建，9份非审计源码与279630逐SHA等价，不称重建当前提交。
+
+事务 `e306fcea-59ba-414f-b8e8-f1ac8d90fd66` 完整29官方文件的SHA/大小/模式与prepared树身份全部匹配；公共链接原inode不变，包内第二级链接正确，GROK_HOME新映像/新链接与journal一致，旧41镜像和原config SHA保留。Node/npm等12组件5928项完整重核不变。唯一代次 `4a4f7af5-b7c4-41f6-b688-bba46a232146` 的原生绑定摘要独立重算，exit0、同代claim/launch/exit与CID销毁闭合，精确launchd查询113，活动journal/stage及mirror暂存项消失。完整独审SHA `4ac1f006ce26839113e462905983f9c7eaf80c1b4ac82898fd2960abce4defbb`。在原GUI真实终端执行npm公共 `bin/grok --version` 与原GROK_HOME `bin/grok --version` 各一次，均实际返回 `grok 1.0.46 (2765805b9442)` 并回到prompt；GUI观察SHA `2d67e6bf85d1c47edfbc4d705b356d6fc016e6efd2d36033ebb576fba2042dd3`，原AX/截图位于对话工具输出。
+
+本轮英文版本/来源/渠道匹配、独立通知插件缺失提示完整，无需本地化变更；既有共用英中审计按原构建计证，不称本轮重验中文或插件已安装。两次独立审计脚本因原schema字段/APFS目录计数差异失败的原件保留，修正后完整核验通过，未重跑产品或修改安装。14个已见进程及observer退出，GUI和outer均exit0，root/profile/state/精确Preferences及observer短根清理；真实prefix46和GROK_HOME按登记保留。最终独审SHA `2180c2d5e5e45d4621811feae01ac2241cda10a5e9a16c9118b79da10c46191e`，86件冻结索引 `09b08e18bd688ed872a22e76a5f7cb173dfbcd37755d1fcb06e095e3441742d9`，清理 `a6d25a04c93ffc243f28119e5769af7888f0ea303b3c1fe9af076f8873c32aba`，仓外 `g09-grok-npm-gui-v1/independent-tools`。
+
+本次仅3份审计文档变化，提交前check `r-3wfftna5`通过/短根清理，log SHA `0a5f05242b6dd7fe51f8e8dbd5d8c2f8d59612c6e841e2d7b81babb90d9ca140`；原v4定向364项/i18n11项及源码绑定沿用，不重复同范围测试。Grok Homebrew双别名/三补全的更新及应用中断恢复、Windows原生npm及最终源码门禁仍欠，不关闭G09。
+
+## 2026-10-03：6726 两平台门禁终态与 Windows 原生阻塞
+
+精确 `6726e735994568e0f2b0995a068d6c5bb32924f1` 的 [37045744557](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37045744557) 终态failure：Linux success；Windows failure。普通nextest为Linux5406、Windows5011普通PASS，未见FAIL/LEAK/RETRY/FLAKY；Linux17新/增强、7项Python读端、Windows3新调试及1增强回归逐名通过。i18n两端各11唯一用例，22次运行不加倍计数。Linux旧installed Grok hook失败同名本轮通过，历史失败保留。Windows独立原生专项失败不被普通回归覆盖。
+
+第一处为固定Codex0.156.1在首次untrusted hooks/list后未于5秒内自然退出，驱动最终终止exit1；未发模型请求，Job在Resume之前已绑定且清理确认。同源驱动和CLI旧轮曾自然退出，不能冲销本轮；官方源码EOF关闭合同未证明缺显式shutdown RPC，父端EOFclose错误被吞亦使EOF真正到达子端未独立确证。第二处为真实npm首updated CMD候选ProbeFailed/Interrupted：实际spawn/Wait/validate/Continue均thread20544，已接47事件均验证并继续、pending为空，2689次Wait中2642超时；匹配Node租约文件身份的进程按FILETIME记录已在终止请求前创建（creation_age_at_stop_ms=283802），其CREATE事件仅在取消清理阶段收到；不将独立计时起点相减，也不证明父CreateProcess已返回或Node用户代码已执行。不能据此继续声称debug循环停滞、线程迁移、漏Continue或Node从未创建。stderr原“拒绝访问”未绑定具体API；本次清理退出3221225738不等于旧Node初始化0xc0000142。
+
+19份源码及helper映像、generation/manifest/退出摘要链和Job/AppContainer/私有窗口站/桌面清理原件已逐项核；清理通过不计npm成功。仍缺取消前root/Node线程原生栈及等待原因、CreateProcess调用返回边界和实际station关联；CSR/console等待只是未证假设，不能据此修改权限、控制流或超时。PowerShell及其余四场景/冷恢复未执行，不重跑近似探针。原生独审SHA `502a878c67233048659227a75f74615dddf9b29e6eeac6142237d19de4df9796`，因果边界 `a067b8a978287fb86ffa45e9b61d317469e62843094f5efe9e5fbd134fa596b3`。
+
+14官方ZIP/105条目全部按API摘要、大小和CRC核验，终审SHA `23afb980553d6b8c0c779c745b0eaceb3fc3d35577cff4e6ec2e9805ccb72396`，最终索引 `754a149e13cfaabd416c764dd2ec8827b4804b3e578987a6935e43b465dc95ec`，仓外 `6726e7359-ci`。大ZIP首次传输EOF的partial保留，只有工件只读重取，没有CI/原生重试。本轮仅计6726；新增279630应验两端cargo check、updates全模块和i18n，含Linux5/Windows4新用例。现有workflow无法独立关闭固定Codex原生专项同时保持普通广筛，暂未重复派发或为绿色调整范围。G03/G09保持开放，PR草稿，新增关闭0项。
+
+## 2026-10-03：Codex 真实 npm 消费者更新
+
+新增关闭0项，保持 **9关闭／G03、G09共2开放／3移交**，PR #22草稿。真实官方Node22.14.0/npm10.9.2前缀由签名GUI `r-1bvid119` 自动发现Codex0.156.1与Latest0.160.0；仅一次空闲更新，成功后公开 `bin/codex --version` 实际输出 `codex-cli 0.160.0`。沿用上一节原v4构建 `r-9a71ln4q`，`279630e44` 的9份非审计源码与原冻结逐SHA相同，不称该提交重建。
+
+事务 `742a5777-d7dd-4e1c-a3a2-8b25ee733084` 的完整47文件新树匹配固定官方SHA/大小/模式及journal prepared身份，公共symlink身份不变。代次 `0b69add8-e8ee-4d79-8cc4-d7349624fe9b` 实际绑定原Node执行暂存 `codex.js --version`，48项文件闭包和摘要独立重算，原生退出0、claim/launch/exit及coalition/launchd清理闭合，journal/stage移除。15个保护组件5953项完整重核，Node/npm/Claude及私有配置未变。完整独审SHA `bb8f2aa8a0ef1d1a4b7a9f689dd1274b15e967260ba353a0005224d1c33ae21e`，最终独审 `49ed70daf4a4a7e9fa0500ece6fab4cd259a4240002505c6ea15d0ec29f78b0d`，76件冻结索引 `a4d2c5370a5b12d26a8cf383b01375bfb80f451a3b84c4d1e5e778f563e69a0b`，位于仓外 `g09-codex-npm-gui-v1/independent-tools`。
+
+无需本地化变更：本轮英文版本、来源、渠道匹配和两个独立插件提示完整，原英中共用语义和布局按既有构建保留，不称本轮重新验中文。未启动模型或宣称插件已安装，未扩展忙碌/中断矩阵。GUI、已知后代与observer正常退出，外层exit0，log SHA `775d899652628fe328af14f74daf6e978a1ae141e7b1a228f0b0c95829ea2523`；本轮root/profile/state/精确Preferences/observer短根清理，真实npm前缀保留160。清理SHA `f4fc969788068d0aa96e5e876cbe7fa38217fb227e7173fea3894f32b5562ae0`；20个已归档私有只读克隆目录经绑定后加owner-write删除，3个内部arg0链接只unlink，不跟随或改真实前缀。归档初版因默认Follow未显式持久化update_channels而KeyError，原失败保留；v2仅如实记录字段缺省，未重跑产品。Grok真实消费者、Homebrew多入口恢复、Windows原生npm与最终源码门禁仍待完成。
+
 ## 2026-10-03：Claude 真实 Homebrew 跨 cask 降级、忙碌延期与应用冷回滚
 
 新增关闭 0 项，保持 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。官方 Latest 与 Stable 使用互斥的 `claude-code@latest` 和 `claude-code` 两个 cask，既有同 token 更新不能承接实际 287→285。现以独立迁移 journal 绑定两个 cask 的固定官方源码校验和、原生 SHA/长度、完整树、公共链接及配置；只接受显式 Stable 及实时匹配渠道。双锁下先准备并探测候选、发布新 token、交换入口，再退下旧 token 和发布配置；恢复不访问网络，提交点之前完整回滚，持久化配置发布意图之后向前收敛。原 journal 格式及未知版本拒绝保持。应用首次检查前的启动保护补齐所有实际活动 journal，已退下的失败记录不冒充待恢复事务。
