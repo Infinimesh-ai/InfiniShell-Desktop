@@ -1,5 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Grok 真实 Homebrew 多入口更新、应用冷回滚与中文重试
+
+新增关闭0项，保持 **9关闭／G03、G09共2开放／3移交**，PR草稿。复用v4构建 `r-9a71ln4q`，`0d65c2b88` 的9份产品源码逐SHA等价，不称当前提交重建。真实官方Homebrew7.0.4安装Grok41，沿用原GROK_HOME；GUI `r-tfdpxo3a` 实时发现Stable46。事务 `b5dae3b4-68d4-4dac-9805-42d6cd0fa1bf` 在ExchangeIntent已发布完整46树、`grok/agent`双入口和bash/zsh/fish三补全，旧41回滚树及入口仍绑定；9个已注册原生探针全部退出0且清理闭合后，仅向精确出生身份和签名映像的GUI64863发送一次SIGKILL。中断独审SHA `04dd704588fb7fb29aa77ac3d0dadea1f2681999f0fb662ef0b063ebb97b9f9f`。
+
+同环境正常重启66934，无检查/更新点击，自动还原全部旧41成员的身份/权限/大小/摘要、两个原入口及三补全字节/权限，活动journal/stage消失，GROK_HOME保持；完整恢复SHA `e7a09b8e18bcc8b31e1feb2d56c3e624b7e89a76086031e9c33a71832caedfe1`。两个公开入口在GUI终端各一次返回 `grok 1.0.41 (4220f3b224a6)`。英文失败提示完整保留；经UI选择简体中文、正常退出并以原环境重启69404后，失败提示仍在，只点击一次空闲更新。事务 `aa41b66e-ec20-4d93-b33a-17c36c6e8d71` 成功：固定官方映像150374256B/SHA `e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3`、完整4文件树和metadata/tab、双入口、三补全全部核对；11代原生均退出0、绑定摘要及PID/launchd清理闭合。成功独审SHA `8f219008c482038312040be3ab25ca7ee42fb0319076a48bd12a09c4b93a734a`。
+
+中文GUI显示Installed/Target46、Homebrew/Stable、渠道匹配，原失败消失，独立通知插件缺失提示仍在。真实终端公开 `grok --version` 和 `agent --version` 各一次均返回 `grok 1.0.46 (2765805b9442)` 并回到prompt；观察SHA `4d75f0766b2e08f609efddfdf3096e11eecb4cd2261a9b12d943147d6da52f3e`。无需本地化变更：英文/简体中文失败、重试、版本、来源、渠道及插件提示完整可读，无截断重叠；原AX/截图保留于会话工具输出，仓外JSON不冒充截图。没有模型请求，插件缺失不计兼容通过。真实Brew准备时缺官方tag导致tab不符的失败保留，补齐官方tag并真实重装后才验收；独审初版JSON字段顺序导致摘要失败亦保留，仅修正审计器，未改产品收据或重复恢复。
+
+按G09原包管理器关闭条件复核，Mac消费者、来源绑定、渠道、忙碌、合法降级、更新、失败回滚和应用中断恢复已齐备。Codex/Grok同token Homebrew共用 `recover→rollback_publication`，本轮Grok还覆盖双别名；不将Codex完成后重启写成它自身中断恢复，也不新增每款乘场景矩阵。Claude跨cask独立后端有自身真实冷回滚证据。最新源码门禁仍待运行，Windows真实npm及固定Codex hook自然退出失败继续独立开放，不能用Mac通过或清理通过关闭G09。
+
+两次正常重启GUI均退出0，原GUI计划中断使outer如实exit247；合并544条PID/出生身份及20原生代的40个内核身份和launchd全部退出。小证据归档后，root/profile/state/专属Preferences和observer短根精确清理，20个已归档只读快照目录只为删除加owner写权限；真实brew46及GROK_HOME保留。最终604件索引SHA `fead2230435b5afa2378295ec557baa6c9ea319274df94ce18784196ea17f790`，清理SHA `54a8603633f0bb82dbe287ee2bf25a336aec9da2e63a041b757acefd4e1f63c7`，仓外 `g09-grok-brew-gui-v1/independent-tools`。
+
+提交前check `r-2crokqb2`通过并清理短根，log SHA `c9fba70a63cb4ce1d05e20f24a9ddb79cc8c4dd4abfc0087172676d3a369829c`；产品源码未变，沿用原v4定向364和i18n11，不重复同范围测试。
+
+## 2026-10-03：源码门禁与真实 CLI 专项分开执行
+
+新增默认关闭的 `source_gate_only`，完整保留原普通广筛和更新器、两端cargo check/i18n/command/IPC及平台辅助回归；只读Node绑定、合成Grok hook和自建SSH参数仍运行。固定外部CLI准备及真实hook/更新/恢复/GUI专项单列，避免重复没有新因果证据的已知失败。独立scope前置job拒绝与full、任一专项及非默认专项选择混用，所有执行job依赖其成功，不能通过步骤的 `!cancelled()` 绕过。默认、push和合法full行为不变；51个输入组合（22合法/29拒绝）、actionlint和diffcheck通过，原普通run/filter字节未变。远端尚未派发，不计源码通过。
+
+此为测试阶段拆分，原关闭条件不减：6726的Windows固定Codex hooks退出和真实npm首CMD候选失败继续保留。源码门禁即使通过也不表示原生失败修复、G09关闭或PR可合并。无需本地化变更。
+
 ## 2026-10-03：Grok 真实 npm 消费者与用户镜像更新
 
 新增关闭0项，保持 **9关闭／G03、G09共2开放／3移交**，PR草稿。真实官方npm安装1.0.41及其postinstall用户镜像由GUI `r-4dr6ibtn` 自动发现实时Stable1.0.46；保留原GROK_HOME，只点击一次更新，无额外Check、重试或模型请求。沿用原v4构建，9份非审计源码与279630逐SHA等价，不称重建当前提交。

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；04ac最终门禁成功，Windows菜单测试1条LEAK根因未明、独立保留",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备，Windows原生失败及最新源码门禁仍待解决，历史LEAK独立保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1274,6 +1274,59 @@
       "cleanup": "14个已见进程/observer均退出，GUI及outer exit0，root/profile/state/preferences和observer短根全清；真实prefix46及GROK_HOME保留。",
       "preserved_failures": "两个独立审计脚本schema/APFS目录计数比较失败保留，修正按原schema比较；无产品失败、重试或改写真实安装。",
       "remaining": "Grok真实Homebrew多入口更新/应用中断恢复、Windows原生npm及最终源码门禁；G03仍缺Finder原生拖放。"
+    },
+    "g09_grok_brew_gui_20261003": {
+      "status": "mac_real_homebrew_interrupted_recovery_and_retry_passed",
+      "gap_closed": false,
+      "checkout_commit": "0d65c2b884707714bedadb0af1ec7b7044f085b0",
+      "source_record_sha256": "460576cfd5f7a03d6fd68d0e0ce552aaf850804f3e41cd58972ae67e76218e59",
+      "build_run": "r-9a71ln4q",
+      "gui_run": "r-tfdpxo3a",
+      "source_binding": "复用v4原构建，9份产品源码逐SHA等价；私有真实Homebrew7.0.4及原GROK_HOME，不改HOME/CODEX_HOME，不复制认证。",
+      "interrupted_transaction": "b5dae3b4-68d4-4dac-9805-42d6cd0fa1bf",
+      "interrupted": "真实ExchangeIntent已发布46完整树、grok/agent双入口及三补全；原41回滚树仍归journal持有，9代原生均退出0且清理闭合。仅SIGKILL精确GUI64863一次。",
+      "recovery": "同环境正常重启66934，不点检查/更新，自动恢复全部41原树/双入口身份及三补全字节/模式，移除stage/活动journal；两公开入口实际返回1.0.41。",
+      "retry_transaction": "aa41b66e-ec20-4d93-b33a-17c36c6e8d71",
+      "retry": "GUI切简体中文后正常退出并以相同环境重启69404，仅一次重试成功46。完整4文件树及metadata/tab、双入口和三补全匹配；11原生代均exit0及清理闭合，GROK_HOME不变。",
+      "public_versions": {
+        "grok": "grok 1.0.46 (2765805b9442)",
+        "agent": "grok 1.0.46 (2765805b9442)"
+      },
+      "evidence": {
+        "interrupted_full_audit_sha256": "04dd704588fb7fb29aa77ac3d0dadea1f2681999f0fb662ef0b063ebb97b9f9f",
+        "rollback_full_audit_sha256": "e7a09b8e18bcc8b31e1feb2d56c3e624b7e89a76086031e9c33a71832caedfe1",
+        "success_full_audit_sha256": "8f219008c482038312040be3ab25ca7ee42fb0319076a48bd12a09c4b93a734a",
+        "chinese_failure_layout_sha256": "cd8b39d3c7d8f155b5aff5382dfd1f6bd4a6753588e653810f5b2d0ef73eecaf",
+        "chinese_success_layout_sha256": "f0a6d01b713be3e6c6c38cd2aa3185ec5c07c2138d33ad180dbf6a9b0c0f68d9",
+        "public_versions_sha256": "4d75f0766b2e08f609efddfdf3096e11eecb4cd2261a9b12d943147d6da52f3e",
+        "outer_log_sha256": "a62609a68ccf10f207b5e70006142e6f8e3a62f12944cb046fa4a2c67bccd5e6",
+        "final_index_sha256": "fead2230435b5afa2378295ec557baa6c9ea319274df94ce18784196ea17f790",
+        "cleanup_sha256": "54a8603633f0bb82dbe287ee2bf25a336aec9da2e63a041b757acefd4e1f63c7",
+        "record_final_sha256": "468446f36744cdd3516c83bbd8a3bf65a4b9fd194685279535ea625369bda778",
+        "final_index_count": 604
+      },
+      "localization": "无需本地化变更；英文/简体中文失败、重试、版本/渠道/来源及独立插件状态实窗完整可读，原AX/截图在会话工具输出。插件缺失不改记兼容通过。",
+      "local_check": {
+        "run": "r-2crokqb2",
+        "passed": true,
+        "temporary_root_cleaned": true,
+        "log_sha256": "c9fba70a63cb4ce1d05e20f24a9ddb79cc8c4dd4abfc0087172676d3a369829c"
+      },
+      "cleanup": "两次正常重启GUI退出0，首GUI计划SIGKILL使outer如实exit247。合并544条PID/出生身份和两轮20原生代共40个内核身份及launchd已退出，root/profile/state/专属Preferences和observer短根已清；真实brew46与GROK_HOME保留。20个已归档只读快照仅为删除加owner写权限。",
+      "preserved_failures": "真实Brew准备时缺官方tag导致tab版本不满足要求，补齐官方tag并真实重装后验收；恢复独审初版JSON字段序影响摘要，修正审计器后通过；原失败保留，未改产品收据或重跑恢复。",
+      "mac_scope_review": "原条件按包管理器覆盖；Claude npm/Homebrew已真实合法降级和忙碌延期，Codex/Grok同token Homebrew共用恢复主体由本轮真实冷回滚覆盖，Claude跨cask独立恢复已有自身证据；不将Codex完成后重启记作中断恢复，不新增每款乘场景矩阵。",
+      "remaining": "G09 Windows原生npm首CMD候选及固定Codex hooks自然退出仍失败；需取消前原生栈/等待原因和创建返回边界，不能靠近似探针或安全拒绝关闭。最新两平台源码门禁待完成；G03 Finder实际拖放仍欠。"
+    },
+    "g09_final_source_gate_separation_20261003": {
+      "status": "local_validated_remote_pending",
+      "input": "source_gate_only",
+      "default": false,
+      "scope": "原普通broad nextest、完整updates、cargo check、i18n、command/IPC与平台辅助回归不减；自建SSH参数、只读Node绑定和合成Grok hook保留。",
+      "conflicts": "与全量、任一原生/安装/GUI专项或非默认专项选择混用时，独立前置scope job失败，所有执行job需其成功，不能被步骤!cancelled绕过。",
+      "excluded": "固定外部CLI准备及其真实hook、更新、恢复、GUI专项；默认/push/合法full原路径不变。",
+      "boundary": "只分离源码与真实验收执行阶段，不豁免条件。6726的Windows固定Codex hooks退出和真实npm首CMD候选失败保留，source gate成功亦不关闭G09或允许合并。",
+      "local": "51组合通过（22合法/29拒绝），actionlint与diffcheck通过；普通run/filter字节不变。",
+      "remaining": "精确提交两平台源码运行待派发、独立审计待完成；Windows真实失败需要新因果证据，G03实际Finder拖放仍欠。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

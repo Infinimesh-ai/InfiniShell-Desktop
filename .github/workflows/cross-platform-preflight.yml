@@ -31,6 +31,11 @@ on:
         required: true
         default: false
         type: boolean
+      source_gate_only:
+        description: 仅运行完整普通源码门禁及自建辅助回归；不覆盖已知原生失败或关闭缺口
+        required: true
+        default: false
+        type: boolean
       run_gui_clipboard:
         description: 单独复验真实 GUI 系统剪贴板，不重复完整工作区测试
         required: true
@@ -153,8 +158,46 @@ env:
   RUST_BACKTRACE: "1"
 
 jobs:
+  validate_scope:
+    name: Validate verification scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # 独立前置 job 阻止冲突模式进入含 !cancelled() 条件的后续步骤。
+      - name: Reject conflicting source-only inputs
+        shell: bash
+        env:
+          PREFLIGHT_INPUTS: ${{ toJSON(inputs) }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import sys
+
+          inputs = json.loads(os.environ["PREFLIGHT_INPUTS"])
+          if not inputs.get("source_gate_only", False):
+              sys.exit(0)
+          allowed = {"source_gate_only", "run_linux", "run_windows"}
+          defaults = {
+              "grok_native_source_capability": "terminal-bridge",
+              "windows_atomic_debug_scope": "all",
+              "windows_atomic_agent": "all",
+              "linux_atomic_agent": "all",
+          }
+          conflicts = [
+              name for name, value in inputs.items()
+              if name not in allowed
+              and (value if isinstance(value, bool) else name not in defaults or defaults[name] != value)
+          ]
+          if conflicts:
+              sys.exit("源码门禁不能与专项、原生、GUI 或全量模式混用：" + ", ".join(sorted(conflicts)))
+          if not (inputs.get("run_linux", False) or inputs.get("run_windows", False)):
+              sys.exit("源码门禁至少选择 Linux 或 Windows 一个平台")
+          PY
+
   linux:
     name: Linux x64
+    needs: validate_scope
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_linux)
@@ -302,7 +345,7 @@ jobs:
           python3 -B script/cli-agent-parity/probe_claude_permission_snapshot_tests.py -v
 
       - name: Prepare fixed native Codex without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_codex
         shell: bash
         run: |
@@ -311,7 +354,7 @@ jobs:
           printf 'INFINISHELL_TEST_CODEX_EXE=%s\n' "$codex_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Claude without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_claude
         shell: bash
         timeout-minutes: 10
@@ -321,7 +364,7 @@ jobs:
           printf 'INFINISHELL_TEST_CLAUDE_EXE=%s\n' "$claude_executable" >> "$GITHUB_ENV"
 
       - name: Prepare fixed native Grok without credentials
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static || inputs.run_grok_viewport_approval_synthetic) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests || inputs.run_grok_viewport_static || inputs.run_grok_viewport_approval_synthetic) && !cancelled() && steps.native_python.outcome == 'success' && steps.linux_toolchain.outcome == 'success') }}
         id: fixed_grok
         shell: bash
         timeout-minutes: 5
@@ -741,7 +784,7 @@ jobs:
           python3 -B script/cli-agent-parity/run_grok_supervised_exit.py --test-binary "$test_binary" --grok "$INFINISHELL_TEST_GROK_EXE" --supervisor "$target_dir/debug/infinishell-tui" --output "$RUNNER_TEMP/grok-supervised-exit.json"
 
       - name: Preserve Linux native CLI boundary evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled() }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.linux_gui_only || inputs.full_workspace_tests) && !cancelled()) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-linux-native-boundaries-${{ github.sha }}
@@ -919,8 +962,24 @@ jobs:
         # integration 的系统剪贴板用例由上方专用真实窗口步骤执行，其余 GUI 不计为全量通过。
         run: cargo nextest run --no-fail-fast --workspace --exclude command-signatures-v2 --exclude integration --exclude warp_tui
 
+      - name: Report Linux source-only gate boundary
+        if: ${{ always() && inputs.source_gate_only }}
+        shell: bash
+        env:
+          CHECK_RESULT: ${{ steps.check_app.outcome }}
+          TEST_RESULT: ${{ steps.test_app.outcome }}
+        run: |
+          {
+            echo '### Linux 普通源码门禁'
+            echo "提交：$GITHUB_SHA；cargo check：$CHECK_RESULT；普通主应用回归：$TEST_RESULT。其余源码步骤须按本 job 终态分别审计。"
+            echo '保留原普通广筛、完整更新器、i18n、command/IPC 和平台辅助回归；自建 worker/合成夹具不计外部 CLI 验收。'
+            echo '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
+            echo '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   macos_intel_ssh_extension_build:
     name: macOS Intel SSH extension fallback cross-build
+    needs: validate_scope
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_macos_intel }}
     runs-on: macos-26
     timeout-minutes: 360
@@ -1017,6 +1076,7 @@ jobs:
 
   windows:
     name: Windows x64
+    needs: validate_scope
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.run_windows)
@@ -1254,7 +1314,7 @@ jobs:
 
       - name: Prepare fixed native Codex without credentials
         id: fixed_codex
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -1265,7 +1325,7 @@ jobs:
       # 生产通知安装器的当前插件合同仍精确绑定 0.147.0；不要把最新版运行时冒充该合同。
       - name: Prepare fixed Codex production installer contract
         id: fixed_codex_installer
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -1276,7 +1336,7 @@ jobs:
 
       - name: Prepare fixed native Claude without credentials
         id: fixed_claude
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success')) }}
         shell: pwsh
         timeout-minutes: 10
         run: |
@@ -1287,7 +1347,7 @@ jobs:
 
       - name: Prepare fixed native Grok without credentials
         id: fixed_grok
-        if: ${{ !cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success' }}
+        if: ${{ !inputs.source_gate_only && (!cancelled() && steps.native_python.outcome == 'success' && steps.windows_toolchain.outcome == 'success') }}
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -1381,7 +1441,7 @@ jobs:
 
       # 原生候选只在临时目录加载，必须在模型调用前由真实 hook 阻断，不开启产品安装门禁。
       - name: Verify Codex Windows native hooks without model requests
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -1400,7 +1460,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve Codex Windows native hook evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-native-hooks-${{ github.sha }}
@@ -1410,7 +1470,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify Codex Windows ConPTY notification transport
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1430,7 +1490,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve Codex Windows ConPTY evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-windows-conpty-${{ github.sha }}
@@ -1443,7 +1503,7 @@ jobs:
 
       # 当前固定版本独立验收；旧版 0.147 专项不能替代新版原生派发和 ConPTY。
       - name: Verify fixed Codex 0.156.1 Windows native hooks without model requests
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 20
         env:
@@ -1462,7 +1522,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Codex native Windows hook verification failed; compatibility remains unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows native hook evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-native-hooks-${{ github.sha }}
@@ -1472,7 +1532,7 @@ jobs:
 
       # 单独读取真实 ConPTY 字节；hook 完成或独立 CONOUT$ 标记均不能代替通知到达。
       - name: Verify fixed Codex 0.156.1 Windows ConPTY notification transport
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         shell: pwsh
         timeout-minutes: 10
         env:
@@ -1490,7 +1550,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native Codex ConPTY transport failed; product notifications remain unverified' }
 
       - name: Preserve fixed Codex 0.156.1 Windows ConPTY evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: codex-01561-windows-conpty-${{ github.sha }}
@@ -1989,7 +2049,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Fixed Grok production supervised cleanup failed' }
 
       - name: Preserve Windows native CLI boundary evidence
-        if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled()) }}
+        if: ${{ !inputs.source_gate_only && ((github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (!cancelled())) }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cli-windows-native-boundaries-${{ github.sha }}
@@ -2126,3 +2186,18 @@ jobs:
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests) && (always()) }}
         shell: pwsh
         run: '& $env:RUSTC_WRAPPER --show-stats'
+
+      - name: Report Windows source-only gate boundary
+        if: ${{ always() && inputs.source_gate_only }}
+        shell: pwsh
+        env:
+          CHECK_RESULT: ${{ steps.check_app.outcome }}
+          TEST_RESULT: ${{ steps.test_app.outcome }}
+        run: |
+          @(
+            '### Windows 普通源码门禁'
+            "提交：${env:GITHUB_SHA}；cargo check：${env:CHECK_RESULT}；普通主应用回归：${env:TEST_RESULT}。其余源码步骤须按本 job 终态分别审计。"
+            '保留原普通广筛、完整更新器、i18n、command/IPC 和平台辅助回归；自建 worker/合成夹具不计外部 CLI 验收。'
+            '未执行固定外部 CLI、真实安装/升级/恢复及 GUI 专项；这些条件仍待验收。'
+            '6726e735994568e0f2b0995a068d6c5bb32924f1 / run 37045744557 的 Windows 固定 Codex hooks 退出和真实 npm 首 CMD 候选失败仍然保留；本次源码结果不覆盖或修复它们，不关闭 G09，不构成最终合并许可。'
+          ) | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
