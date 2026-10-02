@@ -224,3 +224,66 @@ fn consumer_downgrade_accepts_only_terminal_history_without_native_sessions() {
     task.state = LocalCliTaskState::Disconnected;
     assert!(!compatible_history(intent, [&task].into_iter()));
 }
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn homebrew_stable_intent_is_distinct_and_cannot_enter_npm_recovery() {
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Homebrew,
+            "2.1.287",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Ok(Some(Intent::ClaudeHomebrewStable21287To21285))
+    );
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Homebrew,
+            "2.1.287",
+            "2.1.285",
+            Channel::FollowInstallation
+        ),
+        Err(Error::ChannelMismatch)
+    );
+    assert_eq!(
+        validate(
+            Some(Intent::ClaudeHomebrewStable21287To21285),
+            "2.1.287",
+            "2.1.285",
+            &None
+        ),
+        Err(Error::RecoveryRequired)
+    );
+    assert_eq!(
+        validate_homebrew(
+            Some(Intent::ClaudeNpmStable21287To21285),
+            "2.1.287",
+            "2.1.285",
+            &None
+        ),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn homebrew_downgrade_keeps_the_consumer_native_history_guard() {
+    let mut task = historical_task();
+    assert!(!compatible_history(
+        Intent::ClaudeHomebrewStable21287To21285,
+        [&task].into_iter()
+    ));
+    task.native_session_id = None;
+    assert!(compatible_history(
+        Intent::ClaudeHomebrewStable21287To21285,
+        [&task].into_iter()
+    ));
+    task.state = crate::persistence::model::LocalCliTaskState::Unknown;
+    assert!(!compatible_history(
+        Intent::ClaudeHomebrewStable21287To21285,
+        [&task].into_iter()
+    ));
+}

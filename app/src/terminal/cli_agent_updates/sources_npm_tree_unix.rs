@@ -64,6 +64,46 @@ pub(super) struct Snapshot {
 }
 
 impl Snapshot {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    pub(super) fn file_manifest(&self) -> BTreeMap<PathBuf, (u64, [u8; 32])> {
+        self.nodes
+            .iter()
+            .filter_map(|(path, node)| {
+                node.sha256
+                    .map(|digest| (path.clone(), (node.length, digest)))
+            })
+            .collect()
+    }
+
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    pub(super) fn verify_file(
+        &self,
+        path: &Path,
+        length: u64,
+        digest: [u8; 32],
+    ) -> Result<(), Error> {
+        if self
+            .nodes
+            .get(path)
+            .is_none_or(|node| node.length != length || node.sha256 != Some(digest))
+        {
+            return Err(Error::InvalidRelease);
+        }
+        Ok(())
+    }
+
+    pub(super) fn verify_remaining(&self, expected: &Self) -> Result<(), Error> {
+        if self.root != expected.root
+            || self
+                .nodes
+                .iter()
+                .any(|(path, node)| expected.nodes.get(path) != Some(node))
+        {
+            return Err(Error::RecoveryRequired);
+        }
+        Ok(())
+    }
+
     pub(super) fn verify_release_files(
         &self,
         expected: &BTreeMap<PathBuf, (u64, [u8; 32])>,
@@ -812,6 +852,26 @@ impl Directory {
         self.sync()
     }
 
+    /// 跨 cask 改名只锚定本目录 fd，目标已存在时绝不覆盖。
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    pub(super) fn rename_noreplace(&self, from: &OsStr, to: &OsStr) -> Result<(), Error> {
+        let from = name(from)?;
+        let to = name(to)?;
+        if unsafe {
+            libc::renameatx_np(
+                self.file.as_raw_fd(),
+                from.as_ptr(),
+                self.file.as_raw_fd(),
+                to.as_ptr(),
+                libc::RENAME_EXCL,
+            )
+        } != 0
+        {
+            return Err(Error::SourceChanged);
+        }
+        self.sync()
+    }
+
     pub(super) fn exchange(&self, left: &OsStr, right: &OsStr) -> Result<(), Error> {
         let left = name(left)?;
         let right = name(right)?;
@@ -867,14 +927,7 @@ impl Directory {
             None => directory.snapshot()?,
         };
         // 清理中断后仅接受原清单的未变子集；新增或改写的文件不得继续删除。
-        if current.root != expected.root
-            || current
-                .nodes
-                .iter()
-                .any(|(path, node)| expected.nodes.get(path) != Some(node))
-        {
-            return Err(Error::RecoveryRequired);
-        }
+        current.verify_remaining(expected)?;
         let mut remaining = current.nodes;
         directory.remove_contents_inner(expected, Path::new(""), link, &mut remaining)?;
         if self.child(leaf)?.identity()? != expected.root {

@@ -463,3 +463,43 @@ fn claude_cleanup_rejects_a_replaced_member() {
     );
     assert!(root.join("claude/bin/claude.exe").exists());
 }
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn homebrew_rename_never_overwrites_an_existing_directory_or_link() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let original = directory(&root, "source", b"original").snapshot().unwrap();
+    directory(&root, "target", b"other");
+    let parent = Directory::open(&root).unwrap();
+    assert!(
+        parent
+            .rename_noreplace(OsStr::new("source"), OsStr::new("target"))
+            .is_err()
+    );
+    symlink("missing", root.join("link")).unwrap();
+    assert!(
+        parent
+            .rename_noreplace(OsStr::new("source"), OsStr::new("link"))
+            .is_err()
+    );
+    assert_eq!(
+        parent
+            .child(OsStr::new("source"))
+            .unwrap()
+            .snapshot()
+            .unwrap(),
+        original
+    );
+    parent
+        .rename_noreplace(OsStr::new("source"), OsStr::new("new-name"))
+        .unwrap();
+    assert_eq!(
+        parent
+            .child(OsStr::new("new-name"))
+            .unwrap()
+            .snapshot()
+            .unwrap(),
+        original
+    );
+}

@@ -18,13 +18,16 @@ pub(super) const TO: &str = "2.1.278";
 pub(super) enum Intent {
     ClaudeNpmStable21280To21278,
     ClaudeNpmStable21287To21285,
+    ClaudeHomebrewStable21287To21285,
 }
 
 impl Intent {
     fn target(self) -> &'static str {
         match self {
             Self::ClaudeNpmStable21280To21278 => TO,
-            Self::ClaudeNpmStable21287To21285 => claude_current_release::V285,
+            Self::ClaudeNpmStable21287To21285 | Self::ClaudeHomebrewStable21287To21285 => {
+                claude_current_release::V285
+            }
         }
     }
 }
@@ -44,6 +47,26 @@ pub(super) fn select(
     target: &str,
     selected: Channel,
 ) -> Result<Option<Intent>, Error> {
+    if agent == CLIAgent::Claude
+        && source == Source::Homebrew
+        && installed == claude_current_release::V287
+        && target == claude_current_release::V285
+    {
+        if !cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            return Err(Error::UnsupportedPlatform);
+        }
+        return if selected == Channel::Stable {
+            Ok(Some(Intent::ClaudeHomebrewStable21287To21285))
+        } else {
+            Err(Error::ChannelMismatch)
+        };
+    }
+    if agent == CLIAgent::Claude
+        && source == Source::Homebrew
+        && super::compare_versions(installed, target)? == std::cmp::Ordering::Greater
+    {
+        return Err(Error::InvalidRelease);
+    }
     if agent != CLIAgent::Claude || source != Source::Npm {
         return Ok(None);
     }
@@ -99,6 +122,26 @@ pub(super) fn validate(
     if intent.is_none() {
         return Ok(());
     }
+    validate_stable_config(config)
+}
+
+pub(super) fn validate_homebrew(
+    intent: Option<Intent>,
+    installed: &str,
+    target: &str,
+    config: &Option<ConfigBackup>,
+) -> Result<(), Error> {
+    if !cfg!(all(target_os = "macos", target_arch = "aarch64"))
+        || intent != Some(Intent::ClaudeHomebrewStable21287To21285)
+        || installed != claude_current_release::V287
+        || target != claude_current_release::V285
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    validate_stable_config(config)
+}
+
+fn validate_stable_config(config: &Option<ConfigBackup>) -> Result<(), Error> {
     let desired: Value = config
         .as_ref()
         .and_then(|config| config.publication_bytes(true))
@@ -143,7 +186,10 @@ pub(super) fn compatible_history<'a>(
             return task.state.is_terminal();
         }
         // 消费者发行原件的审核不证明 285 能继续任意托管原生历史。
-        if intent == Intent::ClaudeNpmStable21287To21285 {
+        if matches!(
+            intent,
+            Intent::ClaudeNpmStable21287To21285 | Intent::ClaudeHomebrewStable21287To21285
+        ) {
             return false;
         }
         if task

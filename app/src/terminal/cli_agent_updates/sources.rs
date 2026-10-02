@@ -147,7 +147,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 77] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 78] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -181,6 +181,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 77] = [
     include_bytes!("sources_brew_claude_linux.rs"),
     include_bytes!("sources_brew_claude_linux_probes.rs"),
     include_bytes!("sources_brew_transaction.rs"),
+    include_bytes!("sources_brew_claude_migration.rs"),
     include_bytes!("sources_brew_codex.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_codex_cask_probe_linux.rs"),
     include_bytes!("../../../../script/cli-agent-parity/codex_0155_package_manifest.json"),
@@ -779,6 +780,16 @@ pub(super) async fn inspect(
             None
         }
     };
+    if downgrade == Some(claude_downgrade::Intent::ClaudeHomebrewStable21287To21285)
+        && installation
+            .invocation
+            .as_ref()
+            .and_then(|invocation| invocation.artifacts.get(&ArtifactRole::DependencyRoot))
+            .and_then(|path| path.file_name())
+            != Some(OsStr::new("claude-code@latest"))
+    {
+        error = Some(Error::UnsupportedSource);
+    }
     if installation
         .source_target
         .as_ref()
@@ -794,7 +805,9 @@ pub(super) async fn inspect(
     }
     let config = snapshot_config(&installation, &installed_version, &target_version, channel)?;
     if agent == CLIAgent::Claude
-        && (source_is_native_claude(&installation) || installation.source == Source::Npm)
+        && (source_is_native_claude(&installation)
+            || installation.source == Source::Npm
+            || downgrade == Some(claude_downgrade::Intent::ClaudeHomebrewStable21287To21285))
         && !version_matches
     {
         let compatibility = config
@@ -1751,6 +1764,24 @@ async fn discover_brew(
         } else {
             Channel::Latest
         };
+        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        if agent == CLIAgent::Claude
+            && *cask == "claude-code@latest"
+            && installed == claude_current_release::V287
+            && requested == Channel::Stable
+        {
+            let target = brew::metadata("claude-code").await?;
+            brew_transaction::claude_migration_metadata(&metadata, &target)?;
+            found.channel = Channel::Stable;
+            found.source_target = Some(claude_current_release::V285.to_owned());
+            let home = user_home().ok_or(Error::UnsupportedSource)?;
+            found.config = Some((
+                absolute_env("CLAUDE_CONFIG_DIR")
+                    .unwrap_or_else(|| home.join(".claude"))
+                    .join("settings.json"),
+                ConfigKind::Claude,
+            ));
+        }
         if requested != Channel::FollowInstallation && requested != found.channel {
             found.error = Some(Error::ChannelMismatch);
             return Ok(Some(found));
@@ -4020,18 +4051,32 @@ fn recovery_pending_in(root: &Path, agent: CLIAgent) -> bool {
     if plain_ancestors(root).is_err() {
         return true;
     }
-    let npm_path = root.join(format!("{}-npm.json", agent.command_prefix()));
-    match fs::symlink_metadata(npm_path) {
-        Ok(_) => return true,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-        Err(_) => return true,
+    let prefix = agent.command_prefix();
+    let mut names = vec![format!("{prefix}-npm.json"), format!("{prefix}.json")];
+    if matches!(agent, CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok) {
+        names.extend([
+            format!("{prefix}-homebrew.json"),
+            format!("{prefix}-npm-windows.json"),
+        ]);
     }
-    let path = root.join(format!("{}.json", agent.command_prefix()));
-    match fs::symlink_metadata(path) {
-        Ok(_) => true,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
-        Err(_) => true,
+    if agent == CLIAgent::Claude {
+        names.extend([
+            "claude-homebrew-migration.json".to_owned(),
+            "claude-winget-candidate.json".to_owned(),
+            "claude-winget-portable.json".to_owned(),
+        ]);
     }
+    if matches!(agent, CLIAgent::Codex | CLIAgent::Grok) {
+        names.push(format!("{prefix}-winget-v1.json"));
+    }
+    // 首次检查前禁止启动所有未收敛的来源；退下的 retained/failed 记录不占启动保护。
+    names
+        .iter()
+        .any(|name| match fs::symlink_metadata(root.join(name)) {
+            Ok(_) => true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(_) => true,
+        })
 }
 
 #[cfg(test)]

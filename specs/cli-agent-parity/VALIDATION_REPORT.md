@@ -1,5 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Claude 真实 Homebrew 跨 cask 降级、忙碌延期与应用冷回滚
+
+新增关闭 0 项，保持 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。官方 Latest 与 Stable 使用互斥的 `claude-code@latest` 和 `claude-code` 两个 cask，既有同 token 更新不能承接实际 287→285。现以独立迁移 journal 绑定两个 cask 的固定官方源码校验和、原生 SHA/长度、完整树、公共链接及配置；只接受显式 Stable 及实时匹配渠道。双锁下先准备并探测候选、发布新 token、交换入口，再退下旧 token 和发布配置；恢复不访问网络，提交点之前完整回滚，持久化配置发布意图之后向前收敛。原 journal 格式及未知版本拒绝保持。应用首次检查前的启动保护补齐所有实际活动 journal，已退下的失败记录不冒充待恢复事务。
+
+冻结 `g09-claude-brew-build-v4/source.safe.json` SHA `460576cfd5f7a03d6fd68d0e0ce552aaf850804f3e41cd58972ae67e76218e59`，基线 `6726e7359` 加明确 diff；构建 `r-9a71ln4q` 的 raw SHA `f3a9f9b416a5a0e74bcd276bc7b7cfd36928aa746a5ca92fbfa26e38f256faf4`，签名 GUI `r-drgt6zkc`。本机定向 `r-wk6se3vt` 364 普通 PASS、8347 未选，零 FAIL/LEAK/RETRY/FLAKY；i18n `r-f7lji1oe` 11 项、最终 check `r-qvwg_o9d` 和 build 均通过，短根已清。门禁汇总 SHA `bca56ac633325eb4fa1df3955cc0bed76e1ddbd579a9d5c030e0070ac0e6e3c8`。此前两个导入编译失败和已被 v4 替代、未做 GUI 的 v3 构建原件保留，不回填为本轮结果。
+
+真实 Homebrew 7.0.4 安装的 Latest 287 由实际 GUI 自动发现 Stable 285。旧 Claude TUI 活跃时仅一次点击空闲更新，完整旧树、公链和配置不变，零 journal/原生代次；通过应用确认关闭本轮旧终端后自动继续，没有第二次检查或更新。旧 CLI 退出由精确 PID 消失证明，不称自然 exit 0。事务 `59acca1c-37fb-4aa3-907f-21b672d3387f` 达到 RetiringSource，公开入口已换至285、配置仍 latest；仅向绑定出生身份及签名映像的本轮 GUI 40935 发一次 SIGKILL。完整现场独审 SHA `491c6b81edebe254026144f781ec8d2fee85a03b6c44aed28c4a4d2d05a0866e` 确认原/新树和链接均匹配 journal，候选退出0、原生清理闭合。原环境正常重启44643，未点击检查或更新，自动将全部原287树及入口的身份、权限、字节/摘要和原配置还原，移除新token、stage、backup及活动journal；完整恢复 SHA `58bfddf487f7e55bf4b5ec96347fdff9bd2cb3fe452301164950529de5e8bf4b`，英文保留可读失败/重试提示。
+
+正确环境的中文实例45681只主动重试一次，事务 `e0ffbaab-18cf-47d4-9ca1-3d3cce139c1e` 成功提交；完整目标树等于 prepared，公共入口指向285，原 token、所有暂存/备份和活动 journal 消失，私有配置仅 settings 的渠道改为 stable，其他成员与原 Codex 65 项不变。新候选 `3c6799d6-4c67-46b8-81d6-4a4bc24012ca` 的7份身份/退出收据闭合，exit0、双PID退出、coalition销毁及精确launchd job不存在；完整独审 SHA `1eb44201ce90eedecac82dbaf3422fd7c35e7cc3720bafcd911fdb36dbd47df5`。真实 GUI 新终端公开 `brew/bin/claude --version` 返回 `2.1.285 (Claude Code)`，设置页 Installed/Target285、Homebrew/Stable、渠道匹配和两个独立插件提示完整可见。中文实例正常退出0。
+
+无需本地化变更：既有英文/简体中文渠道、忙碌、失败、重试、成功与插件文案仍适用，实际英中布局无截断或重叠；CUA原截图在对话工具输出，仓外JSON只作观察记录。英文退出后误调用已退出绑定的读取接口，导致工具通过 LaunchServices 意外重启44986，未保持私有PATH/TMPDIR；该实例曾显示未知来源并做一次手动检查，未点击更新。已核实其退出后才绑定正确45681，不把错误实例计入产品验收。相关原件及旧PATH仅捕获前缀的限制均保留。当前真实消费者来源余项、Grok Homebrew 双别名/三补全的中断恢复、Windows原生npm和新提交两平台源码门禁仍待满足，G09不关闭。
+
+本轮4代GUI及全部已见后代、2个观察器、两代原生job/coalition均退出，root/profile/state/精确Preferences和观察器短根已清理；仅2个已归档0500快照目录在退出证明后由原fd加owner写位以删除，真实安装权限未改。第一代计划中断使外层如实exit247，日志SHA `18bbb01a0ad862d6ddda1c9dfaa3adf8f522d3fa12918c262f2242d0b604d2bb`；后两正确GUI正常exit0。清理收据SHA `8bbb7cafed44d1aac7964e23f5924e6fbf1264e6623dd4811ecf2183709cb72d`，观察器清理 `60a6770114d054fee1514c45e0154bab969b6cd979daba72865efd15f214d27d`。真实Homebrew前缀按登记保留，小证据位于仓外 `g09-claude-brew-gui-v1`。
+
+## 2026-10-03：Claude npm 实际会话忙碌延期
+
+新增关闭 0 项，保持 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。精确 `6726e735994568e0f2b0995a068d6c5bb32924f1` 构建 `r-_wghh92i` 的签名 GUI `r-2pmgk97b` 中，真实 Claude 2.1.285 会话活跃时只点击一次空闲更新；界面等待会话结束，独立观察确认完整旧树身份及摘要不变、无 journal/stage/原生代次。Ctrl-C/Ctrl-D 没有使原 CLI 退出，随后通过应用 Close pane 确认关闭测试会话；不声称旧 CLI 自然退出 0。其精确 PID 消失后，应用自动完成 285→287，未第二次点击更新或检查。
+
+唯一代次 `88638e0b-6bba-49df-a8b4-53009e27fafc` 的 manifest/launch/exit 摘要及原生身份匹配，候选原生退出 0、launchd job 和 coalition 清理确认；新 11 文件／4 目录完整树匹配固定官方合同，journal/stage 删除，设置页 Installed/Target 均为287，公开入口实际输出 `2.1.287 (Claude Code)`。独审 `65061910e72fdadcff2a9da340fb3eb1442f2ffba387edec039cb21ce30e3ba4`，最终61工件索引 `4b1472296b8e985c528aa878f39a448c3e61c875e649bb8418f7d1f581115dd7`，位于仓外 `g09-npm-busy-gui-v1/r-2pmgk97b-en/independent-observation-v1` 及同轮 closeout。GUI/已知后代/observer均退出，短根及精确profile/state/Preferences已核验清理，真实npm安装保留。无需本地化变更；本轮英文等待/自动更新/成功状态完整，既有英中语义及布局审计按原构建保留，不称本轮重新验中文。Homebrew 合法跨渠道降级与应用中断恢复、Windows 原生 npm 及最终源码门禁仍待完成。
+
 ## 2026-10-03：Claude 官方 npm 硬链接布局修复、真实升级降级与应用冷回滚
 
 新增关闭 0 项，保持 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。真实官方 npm postinstall 的两名硬链接已按固定平台／版本、完整 SHA 与长度、同 inode／owner／mode、恰好 nlink2 支持；普通快照、Codex／Grok及新候选仍要求 nlink1。旧 journal 格式不变，恢复由旧版本推导合同，已持有两名的清理支持 2→1 及中断后的未变子集；第三链接、外部链接、名称替换或改写仍拒绝。

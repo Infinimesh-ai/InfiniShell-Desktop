@@ -1080,7 +1080,7 @@
       "mac_consumer_and_homebrew_acceptance_complete": false,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "Claude真实npm已完成287→285合法降级、285→287升级、交换后GUI中断/正常启动完整回滚及单次主动重试，其他消费者来源/Homebrew恢复与Windows原生npm仍欠；不只差其他平台设备。"
+      "boundary": "Claude真实npm升级/合法降级/忙碌延期/应用冷回滚及单次重试已验；Claude真实Homebrew跨cask合法降级、忙碌、交换后应用冷回滚和中文重试已验。其余消费者来源、Grok Homebrew多入口恢复、Windows原生npm及最终源码门禁仍欠；不只差其他平台设备。"
     },
     "g09_real_consumers_20261003": {
       "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
@@ -1167,6 +1167,35 @@
         "localization": "无需本地化变更",
         "gap_closed": false
       }
+    },
+    "g09_claude_brew_gui_20261003": {
+      "status": "mac_real_homebrew_cross_cask_recovery_and_retry_passed_source_gate_pending",
+      "gap_closed": false,
+      "source_base": "6726e735994568e0f2b0995a068d6c5bb32924f1",
+      "source_record_sha256": "460576cfd5f7a03d6fd68d0e0ce552aaf850804f3e41cd58972ae67e76218e59",
+      "build_run": "r-9a71ln4q",
+      "raw_binary_sha256": "f3a9f9b416a5a0e74bcd276bc7b7cfd36928aa746a5ca92fbfa26e38f256faf4",
+      "gui_run": "r-drgt6zkc",
+      "implementation": "官方Latest287至Stable285跨互斥cask的独立事务；固定完整合同、双锁、入口/旧新树/配置一体恢复，独立journal不改旧格式，应用启动保护覆盖全部实际活动来源journal。",
+      "accepted": [
+        "真实Homebrew7.0.4来源自动发现；真实旧TUI忙碌只预约一次且原树不变，应用关闭旧终端后自动继续",
+        "公开链接交换后/配置发布前仅SIGKILL本轮GUI一次；正常重启无手动检查自动完整还原287树、公链及latest配置",
+        "中文正确实例单次重试成功285；完整树/配置/原生退出清理闭合，真实GUI公开入口输出2.1.285；Codex65项不变"
+      ],
+      "evidence": {
+        "interrupted_full_audit_sha256": "491c6b81edebe254026144f781ec8d2fee85a03b6c44aed28c4a4d2d05a0866e",
+        "rollback_full_audit_sha256": "58bfddf487f7e55bf4b5ec96347fdff9bd2cb3fe452301164950529de5e8bf4b",
+        "retry_full_audit_sha256": "1eb44201ce90eedecac82dbaf3422fd7c35e7cc3720bafcd911fdb36dbd47df5",
+        "local_gates_sha256": "bca56ac633325eb4fa1df3955cc0bed76e1ddbd579a9d5c030e0070ac0e6e3c8",
+        "sidecar_cleanup_sha256": "8bbb7cafed44d1aac7964e23f5924e6fbf1264e6623dd4811ecf2183709cb72d",
+        "observer_cleanup_sha256": "60a6770114d054fee1514c45e0154bab969b6cd979daba72865efd15f214d27d",
+        "outer_log_sha256": "18bbb01a0ad862d6ddda1c9dfaa3adf8f522d3fa12918c262f2242d0b604d2bb"
+      },
+      "local_gates": "check/i18n11/build通过；定向364普通PASS，8347未选，零FAIL/LEAK/RETRY/FLAKY；9份源码与验收冻结逐SHA一致。",
+      "localization": "无需本地化变更；实际英文等待/失败与中文失败/重试/成功/双插件状态布局完整无截断；CUA原截图在对话，JSON仅观察记录。",
+      "preserved_failures": "两次早期导入编译失败、未验GUI的被替代v3构建保留；退出后工具AX调用误经LaunchServices重启丢失私有PATH/TMPDIR，错误实例未知来源不计产品失败或通过，未启动更新。",
+      "cleanup": "4代GUI/全部已见后代/2观察器/原生job及coalition退出，root/profile/state/精确Preferences和2观察器短根均清理；第一代计划中断的外层exit247保留，后两正确实例exit0；真实brew前缀继续登记保留。仅2个归档后快照0500目录按原fd加owner写位用于删除，不改真实安装权限。",
+      "remaining": "Codex/Grok真实npm消费者链、Grok Homebrew真实多入口更新/回滚、Windows原生npm、精确提交两平台源码门禁；G03 Finder真实拖放另行开放。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -8058,5 +8087,17 @@
     "originals_index_sha256": "c1031703d77c33f5207434fa52dfcc5464ccbfc6d82a122254a7a2dff2cbbeae",
     "log_sha256": "0ae7da51290fe01da055b461da6597ee2a203f7c98738c9f333ee549d7aa308b",
     "boundary": "生产窗口站能力通过不等于Node/npm执行成功；不关闭G09，不覆盖后续Mac源码，也不外推普通非提升交互用户。"
+  },
+  "g09_npm_busy_gui_20261003": {
+    "source_commit": "6726e735994568e0f2b0995a068d6c5bb32924f1",
+    "run_id": "r-2pmgk97b",
+    "gap_closed": false,
+    "result": "真实Claude npm 285会话活跃时单击空闲更新，完整旧树不变且无事务；通过应用关闭该终端后，自动发布287，无二次点击。公开入口实际输出2.1.287。",
+    "native": "唯一generation88638e0b-6bba-49df-a8b4-53009e27fafc；版本探针native_exit=0，launchd/coalition清理确认，完整新树和入口绑定，journal/stage已删除。",
+    "boundary": "Ctrl-C/Ctrl-D未使原CLI退出；最终通过应用Close pane确认关闭，不声称原CLI自然退出0。",
+    "independent_audit_sha256": "65061910e72fdadcff2a9da340fb3eb1442f2ffba387edec039cb21ce30e3ba4",
+    "final_index_sha256": "4b1472296b8e985c528aa878f39a448c3e61c875e649bb8418f7d1f581115dd7",
+    "cleanup": "GUI/后代/原生资源/observer均退出；短根、profile、state和精确Preferences已按身份清理，真实npm安装仍为287并保留。",
+    "localization": "无需本地化变更；本轮英文忙碌/自动更新/成功状态完整，既有英中语义及布局审计仍按原构建计证。"
   }
 }
