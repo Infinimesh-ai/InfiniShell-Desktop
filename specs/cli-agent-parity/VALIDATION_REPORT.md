@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G10 Mac 真实功能和英中审批齐备，最终源码门禁运行中
+
+**新增关闭 0 项，仍为 8 关闭／3 开放／3 移交，PR #22 保持草稿。** `04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af` 的修复后真实功能和英中审计已满足，G10 只剩 [最终 Linux／Windows 源码门禁 36985767809](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809)及逐名审计。该轮原生补验、Grok host 窄筛均关闭，普通筛选包含 `test(cli_agent)`，覆盖 Grok profile；不能用此前 4a 门禁替代新修复。Mac 九份关键收据重新核对摘要，汇总 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`，路径见 CURRENT_STATUS.json 的 `g10_macos_real_acceptance_20261002`。
+
+Grok `r-0aa9cs1x` 使用官方 `1.0.41/grok-4.7`，67 条安全事件核对真实父子 Skill、Grep、命令拒绝后新请求允许、命令退出与完整结果、父自动接收子结果及未授权 beta 子任务拒绝。父 3 次和子 1 次真实输入、原生会话、回合及持久代次逐项匹配；生产 Rust 场景和清理均成功。原外层 exit 2 保留：旧审计器要求 user_message_chunk 带 promptId，而公开原生合同没有该字段。新离线审计按输入片段的唯一终态关联，继续要求所有显式回合 ID 一致，并核对完整输入、promptIndex、ACK 和持久身份；原有 167 项 require 全部保留，增加 3 项。只对同轮原件重新对账，无模型重跑。离线审计摘要 `a14ad8ad920ab1d33b5d3e3da023f52e0b0dcc36ff96cc5317f6323e23768cc7`，原生链 `44a43227058cd60701b33bd385f2e4917d5d65b59f3ecf9a0aa5573fe0a378ce`，独立清理 `625c41b4b13d7db23a47292736b4f90ef1b4b5d98d0202455469e3afd637fe8a`。
+
+真实 GUI `r-1u9ov31_` 只向固定 Claude `2.1.280/claude-opus-5-5` 提交一次。原生工具与宿主命令分别一次 AllowOnce，同一宿主待审批任务先在英文、再在切换语言后的同进程新窗口审计中文；两行说明、实际 executable/argv/cwd/timeout、允许和拒绝按钮均完整。模型将 npm-cli.js 请求规范化为已允许的 Node＋argv，审批确认并执行的是展示的实际形式，不称字节相同的原请求。允许后实际 `npm run verify` 退出 0，随机输出、原生工具结果、最终回答、保存状态一致；唯一输入及 ACK、2 次允许、1 次 completed 和完整事件链均由独立审计确认。原生与命令两个资源域清理确认，29 个已知进程退出，4 处文件占用检查为空，GUI 外层退出 0。最终审计 `8b1d281f791b4ad81dbfcbaea0b373082207ea6c23ae5220917c481cff06de76`；英中现场观察 `ab96d34e30e7e0c5b2f8ce6e6dcbbaf3a614f440e22def698f0876fd63909eee`。截图只在 CUA 工具回执，不虚构独立 PNG。新轮测试私有 PATH 仅增加可信 `/usr/bin/security`，没有复制或修改默认认证；原未登录失败保留。
+
+原 G10 关闭条件逐项复核：工具范围及父权限上限由固定策略和真实越界链覆盖；命令／技能允许与拒绝由此前 Claude 及本轮 Grok 链覆盖；运行中取消和清理由 `4a/r-agu5bntu` 独立正例覆盖，父后续未确认回合不计完成；双向 ACK、结果回传及冷恢复按此前 Claude/Grok 原构建真实证据和本轮结果核对，不扩大到所有策略排列。旧 Grok V8 的 dirty snapshot、`native_effective_policy_verified=false` 和无 GUI 边界保留，本轮固定权限证据另立。**无需本地化变更**：本次合同修复恢复既有承诺，既有英文和简体中文策略、审批、取消及结果语义已复核，相关静态与实际审批布局完整可读。完整中文冷启动和其他平台实机不在本轮通过声明内。
+
+真实短目录、私有 profile 与唯一原件保留，cleanup_ready=false；原生资源清理通过不等于目录已删除。G03 仍缺 Finder 真拖放验收；G09 仍缺符合普通用户产品约束的 Windows 私有交互环境，既有管理员 Node 正例不能替代。最终源码门禁结果待补记，当前不关闭 G10。
+
+此前 [4a 源码门禁 36977301774](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36977301774)完整日志已独立核验：Linux／Windows nextest 分别 1917／2267 次普通 PASS，四项受审命令取消回归在两平台逐名通过；次数不是去重测试总数。两端 rust-genai 各 81 项、TAP 各 18 项通过，Python 分别 57／50 套共 1313／1087 次执行，含 12／36 次显式跳过。无 FAIL／RETRY／FLAKY／LEAK 状态。Windows 清理未运行的 sccache 服务时连接拒绝 10061、编译警告、Linux 缺 fish/zsh 和 Windows 符号链接条件等均按原日志保留，不称全日志无异常。审计摘要 `a26e72ff784f2ee205063e613beee2c7c2e3a8eaaf9c7c179e3dedf7645bac91`，只证明 4a 原源码；不替代正在运行的 04ac 最终门禁。
+
+本次仅三份验收文档变化，提交前 `r-59_hi84s` 的 `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed` 通过，日志摘要 `2c5bb0cee3684f2284ce24c127c261d0090661cd87424eb82d5a9afd103329b5`，短目录已核验清理。产品源码仍与 04ac 完全一致，不因文档更新重复已完成的模型和 GUI 链。
+
 ## 2026-10-02：Claude 真实运行取消通过，Grok 搜索与取消协议修复
 
 **新增关闭 0 项，仍为 8 关闭／3 开放／3 后置，PR #22 保持草稿。** `4a78fc3f0/r-agu5bntu` 的固定 Claude `2.1.280/claude-opus-5-5` 真实搜索取得随机答案、命令父子成员已运行后，child journal 序列 15 的 Interrupt ACK 直接接序列 16 Cancelled，两任务均无 RequestFailed。两原始输入与子结果分别只接收一次；取消结果、三个原生/命令资源域销毁及无晚写通过独立审计 `8c8f03120838ae1f33df604c1f0396ac9fe7ba67acfa4d9c038bf46463e7b818`。父后续第 2 代为 unconfirmed，不冒称完成；短根和唯一原件保留，cleanup_ready=false。

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围关闭 G01/G02/G04/G05/G06/G07/G08/V03；G08 三CLI真实SSH/tmux图片、恢复与异常链及V03通知/交互/取消原条件已验，b47精确两平台最终源码门禁通过；8项关闭、3项开放、3项移交，PR #22草稿",
+  "status_zh": "本次 Mac 范围已关闭 G01/G02/G04/G05/G06/G07/G08/V03；G10 真实功能及英中审批齐备，仅待04ac精确两平台最终源码门禁；8项关闭、3项开放、3项移交，PR #22草稿",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1269,7 +1269,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-10-02",
-  "documentation_source_commit": "b47a86ff71d64eb033030da8f80205fd7e00e0c6",
+  "documentation_source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {
@@ -7559,5 +7559,113 @@
       "最终源码门禁"
     ],
     "gap_closed": false
+  },
+  "g10_macos_real_acceptance_20261002": {
+    "schema": 1,
+    "created_at": "2026-10-02T08:44:19.048409+00:00",
+    "source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+    "status": "mac_functional_and_bilingual_passed_final_source_ci_pending",
+    "gap_closed": false,
+    "counts": {
+      "closed": 8,
+      "open": 3,
+      "deferred": 3
+    },
+    "grok": {
+      "run_id": "r-0aa9cs1x",
+      "native": "官方 Grok Build 1.0.41 / grok-4.7",
+      "accepted": "真实父子技能、Grep、命令拒绝后新请求允许、实际结果及父自动回传、越界 beta 子任务拒绝；原生输入与 ACK、持久身份和清理逐项一致。",
+      "original_outer_exit": 2,
+      "rust_scenario_ok": true,
+      "rust_cleanup_ok": true,
+      "offline_reconciliation": "原生 user_message_chunk 按公开合同没有 promptId；新离线审计按唯一终态与完整输入片段、promptIndex、ACK 和持久身份核验。原有167项require全部保留并新增3项；不重跑模型，不改写原失败。"
+    },
+    "gui": {
+      "run_id": "r-1u9ov31_",
+      "outer_exit": 0,
+      "native": "Claude Code 2.1.280 / claude-opus-5-5",
+      "accepted": "一条原始输入、原生与宿主各一次 AllowOnce；同一待审批命令先英文后中文实窗审计，允许后实际运行、退出0、结果与持久保存一致；进程和资源域清理核验通过。",
+      "boundary": "模型将 npm-cli.js 请求规范化为已允许的 Node+argv，审批确认的是实际参数；切语言后同进程新窗口复核，未称完整中文冷启动；截图只在CUA工具回执。"
+    },
+    "localization": "无需本地化变更；既有英文与简体中文策略、审批、取消及结果语义已复核，受影响布局完整可读。",
+    "retention": "真实短目录、私有profile和唯一原件保留，cleanup_ready=false；功能清理成功不等同目录已删除。",
+    "remaining": [
+      "最终04ac源码Linux/Windows普通门禁及逐名审计"
+    ],
+    "evidence": {
+      "grok_same_run_audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-search-contract-repair-v1/offline-audit-r-0aa9cs1x-v1/offline-audit.safe.json",
+        "sha256": "a14ad8ad920ab1d33b5d3e3da023f52e0b0dcc36ff96cc5317f6323e23768cc7",
+        "bytes": 6355
+      },
+      "grok_native_chain": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-search-contract-repair-v1/offline-audit-r-0aa9cs1x-v1/native-chain.safe.json",
+        "sha256": "44a43227058cd60701b33bd385f2e4917d5d65b59f3ecf9a0aa5573fe0a378ce",
+        "bytes": 11498
+      },
+      "grok_cleanup": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-search-contract-repair-v1/offline-audit-r-0aa9cs1x-v1/independent-cleanup.safe.json",
+        "sha256": "625c41b4b13d7db23a47292736b4f90ef1b4b5d98d0202455469e3afd637fe8a",
+        "bytes": 15962
+      },
+      "gui_independent_audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/gui-auth-path-repair-v1/r-1u9ov31_-independent-audit/final-independent-audit.safe.json",
+        "sha256": "8b1d281f791b4ad81dbfcbaea0b373082207ea6c23ae5220917c481cff06de76",
+        "bytes": 17406
+      },
+      "gui_bilingual_observation": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/gui-auth-path-repair-v1/r-1u9ov31_-bilingual-observation.safe.json",
+        "sha256": "ab96d34e30e7e0c5b2f8ce6e6dcbbaf3a614f440e22def698f0876fd63909eee",
+        "bytes": 4228
+      },
+      "gui_finish": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/gui-auth-path-repair-v1/r-1u9ov31_-gui/finish.safe.json",
+        "sha256": "d58fa875c04c46b27bb667a9669d3d60ac03116765f5eac87af93fbb23aa0503",
+        "bytes": 6893
+      },
+      "claude_running_cancel": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-success-audit-v1/r-agu5bntu-independent.safe.json",
+        "sha256": "8c8f03120838ae1f33df604c1f0396ac9fe7ba67acfa4d9c038bf46463e7b818",
+        "bytes": 9830
+      },
+      "local_gates": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-grok-native-contract-local-gates-v1.safe.json",
+        "sha256": "207596f6b66dc1365151a727fa2ed8d9f65119840174d328ecc779843ab9b1d8",
+        "bytes": 2769
+      },
+      "source_freeze": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/mac-build-04ac0d46f/source-freeze.safe.json",
+        "sha256": "e061343002582f11f1245f33fd72bfda2c7b571f2376d5ba381ec8cb578ccc59",
+        "bytes": 39863
+      }
+    },
+    "summary": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-macos-real-acceptance-v1.safe.json",
+      "sha256": "c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06"
+    },
+    "final_source_ci": {
+      "run_id": 36985767809,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809",
+      "source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+      "status": "in_progress",
+      "dispatch_sha256": "9a84b55d3de3db5150e548c5680ad1d86b8ff1d8b1cdcdf474972ff52d091399",
+      "scope": "Linux/Windows 普通广筛包含 test(cli_agent)，逐名确认两条 Grok 输入/取消回归；不是其他平台在线或桌面验收。"
+    },
+    "previous_source_ci_audit": {
+      "source_commit": "4a78fc3f0c9e131cba821e97e2bf806efaf98351",
+      "run_id": 36977301774,
+      "conclusion": "success",
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/4a78fc3f0-ci/terminal-log-audit-v1/terminal-audit.safe.json",
+      "sha256": "a26e72ff784f2ee205063e613beee2c7c2e3a8eaaf9c7c179e3dedf7645bac91",
+      "scope": "四项取消回归双平台普通PASS，无FAIL/RETRY/FLAKY/LEAK状态；显式跳过、警告和sccache清理连接拒绝保留。旧源码门禁不替代04ac修复后门禁。"
+    },
+    "documentation_gate": {
+      "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "run_id": "r-59_hi84s",
+      "result": "passed",
+      "log_sha256": "2c5bb0cee3684f2284ce24c127c261d0090661cd87424eb82d5a9afd103329b5",
+      "temporary_directory": "cleaned",
+      "scope": "本轮仅三份验收文档变动，产品源码仍与04ac一致；功能回归与i18n使用已通过且精确绑定的原轮证据。"
+    }
   }
 }
