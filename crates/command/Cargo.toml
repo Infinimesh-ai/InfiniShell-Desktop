@@ -16,7 +16,9 @@ log.workspace = true
 tempfile = "3.8.0"
 
 [target.'cfg(windows)'.dev-dependencies]
-windows = { workspace = true, features = ["Win32_System_StationsAndDesktops", "Win32_Graphics_Gdi"] }
+sha2.workspace = true
+serde_json.workspace = true
+windows = { workspace = true, features = ["Win32_System_StationsAndDesktops", "Win32_Graphics_Gdi", "Win32_Security_Authentication_Identity"] }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 async-process = { workspace = true }

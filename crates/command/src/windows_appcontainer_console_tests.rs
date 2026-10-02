@@ -4,6 +4,15 @@ use std::os::windows::io::AsHandle as _;
 
 use super::*;
 
+#[path = "windows_appcontainer_netcredentials_tests.rs"]
+mod netcredentials;
+
+#[test]
+#[ignore = "仅在固定无网络 helper 的非管理员服务身份新登录会话候选验证中执行"]
+fn netcredentials_two_stage_station_records_identity_and_cleanup() {
+    netcredentials::run();
+}
+
 #[test]
 fn no_window_mode_preserves_redirected_standard_handles_without_show_flags() {
     // 仅比较启动结构中的哨兵值，不把它们交给任何句柄 API。

@@ -110,7 +110,7 @@ on:
         default: false
         type: boolean
       windows_atomic_debug_scope:
-        description: Windows 原生调试范围；stdio 跑既有三项，nul_token 跑 CreateFile，g09_tokens 跑 CreateFile 与私有桌面
+        description: Windows 原生调试范围；g09_tokens 验证 NUL/私有桌面，g09_netcredentials 仅验证两段窗口站候选
         required: true
         default: all
         type: choice
@@ -119,6 +119,7 @@ on:
           - stdio
           - nul_token
           - g09_tokens
+          - g09_netcredentials
       windows_atomic_agent:
         description: Windows Grok 安装器专项附加升级对象；默认、原生和全量模式仍验三款
         required: true
@@ -1708,14 +1709,30 @@ jobs:
         run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
 
       - name: Diagnose unnamed Windows station without changing the production probe
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
         shell: pwsh
         run: cargo nextest run --no-fail-fast --retries 0 --success-output immediate -p command --lib --run-ignored only -E 'test(=windows::appcontainer::console_tests::unnamed_station_create_only_reports_identity_and_cleanup)'
+
+      - name: Verify two-stage Windows logon window station identity and cleanup
+        id: windows_netcredentials
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope == 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
+        shell: pwsh
+        timeout-minutes: 5
+        run: ./script/cli-agent-parity/verify_windows_netcredentials_station.ps1
+
+      - name: Preserve two-stage Windows logon window station evidence
+        if: ${{ !cancelled() && steps.windows_netcredentials.outcome != 'skipped' && env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-netcredentials-station-${{ github.sha }}
+          path: ${{ env.INFINISHELL_WINDOWS_NETCREDENTIALS_EVIDENCE_DIR }}/**/*
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Diagnose Windows atomic image-debug exit in a strict Job
         id: atomic_windows_debug
         # 原生调试可独立运行；保留首次失败，不继承服务会话测试的自动重试。
-        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && steps.check_app.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
         shell: pwsh
         timeout-minutes: 5
         env:
