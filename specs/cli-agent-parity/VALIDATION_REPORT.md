@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G09 完整条件复核与新窗口站候选，未关闭
+
+**本轮新增关闭 0 项，仍为 9 关闭／2 开放／3 移交，PR #22 保持草稿。G09 不只差 Windows。** 按原关闭条件复核，Mac 三款 npm 的固定后端事务不能替代真实来源／渠道、实际忙碌延期、合法降级、GUI 更新及插件复检、应用重启后的恢复入口。Claude npm 历史五场景包括降级拒绝，不能计为合法降级；本轮未找到其旧 Documents 索引位置，不宣称重新核验原件通过。Codex npm run-03／04、Grok npm 私有 APFS run-03 的历史范围保留，不改为同一当前提交整体验收。
+
+本轮重新读取三份既有独立审查及其明确排除项：Codex run-04 `5a638607ad57175e6a9296a51175d9644e8a76113345f1927b68a3fb1ce49d03`，Grok run-03 `b98361dcee870bc76685cf7dc18917085eb968d9a67925ae8252847f7348a771`，Claude cask run-01 `a735d548a6e43775c70d68f80502dc185c6eb73a92cc1c5476783b8021d7fb5a`。Claude cask 明确为人工登记／派生元数据的后端四场景，不是真实 Homebrew 来源发现；Codex/Grok Homebrew 实际升级、失败回滚和冷恢复仍未见通过记录。只重核审查原件，没有重新执行或重新核对全部底层原件。
+
+2026-10-02 11:59 UTC 直接读取 npm 官方端点，Claude [Stable](https://registry.npmjs.org/@anthropic-ai/claude-code/stable) 为 `2.1.285`、[Latest](https://registry.npmjs.org/@anthropic-ai/claude-code/latest) 为 `2.1.287`；HTTP 200、原 URL、原始 JSON 与摘要均已保留。现有包更新合同只审核升级 `2.1.280` 和受限降级 `2.1.278`，本轮没有增加版本白名单、放宽布局或用固定测试指针替代生产实时指针。此观察只证明当时的公开渠道，不执行安装、升级或模型请求。
+
+另已提交测试候选 `1ac53f4dabc0599d8940883cfd5607649f89bab2`：以无真实凭据、无网络调用的固定 C helper 验证新 LSA 会话与第二段不继承句柄的窗口站选择。保留双有效 Admins=false、原创建句柄、映像身份、挂起恢复前精确 Job 核验、失败清理及原始错误。现有 runner 为非管理员服务身份，提升／完整性独立记录，不能称普通交互用户通过。即使候选成功，新站 AppContainer SID 的 DACL／low label、正式 worker 初始化、zero-cap Node/npm 仍需证明；生产 `WindowsProcessLease` 的 AuthId 合同不变。
+
+本地 `r-g5fk3c2f` 的 Windows 测试目标类型检查、`r-tpe_rto3` 的应用 cargo check、`r-i4z18k2d` 的 actionlint（仅忽略已知自托管标签提示）和 `r-23nlq1nx` 的 PowerShell 解析通过，短目录全部完成身份核验并清理。首次 `r-o9nfut9f` 的 Windows Error API 类型错误原件保留，改用已核依赖的 `from_thread` 后才通过；应用既有 5 条编译警告保留。本轮没有产品用户功能或界面文案变化，**无需本地化变更**。唯一新范围的 [Windows 37001996114](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37001996114) 仍在运行，尚无原生结果；不重复旧 NUL/Node/未命名站矩阵。
+
+完整复核索引位于 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-scope-audit-v1.safe.json`，SHA-256 `fe2aa3f9623d217e39956c5d8b4c9da1173a363496e876f6d401605dd10f9980`；公开渠道原件索引 `c4306be2c543776688c5e0f7bbaaea204834baea915415c571c6a80054932d6e`，本地门禁索引 `20e4533fd6f8ef6b964db62c03da0771b3baff60e908b31887ad4294862e273b`，7 个提交 blob 与验证字节的绑定 `3251d6ec458309b6cbe428a2e948dd1e057db5d62395cd773dbf9216129886e0`。原关闭条件及旧失败不变。本次三份说明提交前 `r-qjgteqic` 的应用 cargo check 通过，日志 `b4c6e578d1304848bcc4fdf0a3398e6993f8abf0f43b71040505d83253306d9b`，5 条既有警告保留，短目录已清理。
+
 ## 2026-10-02：G10 按本次 Mac 范围关闭，Windows LEAK 独立保留
 
 **本轮关闭 G10；当前 9 关闭／G03、G09 共 2 开放／V01、V02、V05 共 3 移交。PR #22 保持草稿。** 原关闭条件的真实父权限、命令／技能允许和拒绝、越界拒绝、运行取消及资源清理、双向 ACK、冷恢复与结果均已满足，前节所列实际宿主审批英中布局完整可读。各轮证据继续绑定原构建，Mac 关键收据汇总 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`；没有重跑模型或扩大模型／策略排列验收。
