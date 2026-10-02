@@ -210,6 +210,7 @@ struct Manifest {
     root: PathBuf,
     worker: Binary,
     supervisor: Binary,
+    station_bootstrap: Binary,
     node: Binary,
     npm_cli: Binary,
     old_public_sha256: String,
@@ -271,6 +272,18 @@ const SOURCES: &[(&str, &[u8])] = &[
     (
         "crates/command/src/windows_appcontainer.rs",
         include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
+    ),
+    (
+        "crates/command/src/windows_appcontainer_desktop.rs",
+        include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_bootstrap.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_bootstrap.rs"),
+    ),
+    (
+        "crates/command/src/bin/infinishell-station-bootstrap.rs",
+        include_bytes!("../../../../crates/command/src/bin/infinishell-station-bootstrap.rs"),
     ),
     (
         "script/cli-agent-parity/codex_0156_package_manifest.json",
@@ -432,6 +445,7 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
     for binary in [
         &manifest.worker,
         &manifest.supervisor,
+        &manifest.station_bootstrap,
         &manifest.node,
         &manifest.npm_cli,
     ] {
@@ -448,6 +462,15 @@ fn validate(manifest: &Manifest, path: &Path) -> Result<(), String> {
             .as_ref()
             == Some(&manifest.worker.path),
         "worker_binding",
+    )?;
+    check(
+        manifest
+            .supervisor
+            .path
+            .parent()
+            .map(|directory| directory.join("infinishell-station-bootstrap.exe"))
+            == Some(manifest.station_bootstrap.path.clone()),
+        "station_bootstrap_not_packaged_sibling",
     )?;
     check(
         manifest

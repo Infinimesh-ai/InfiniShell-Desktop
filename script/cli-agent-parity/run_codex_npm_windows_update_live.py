@@ -33,6 +33,9 @@ SOURCE_FILES = (
         "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
         "managed_process_npm_probe_windows.rs")],
     "crates/command/src/windows_appcontainer.rs",
+    "crates/command/src/windows_appcontainer_desktop.rs",
+    "crates/command/src/windows_station_bootstrap.rs",
+    "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
     "script/cli-agent-parity/run_claude_npm_update_live.py",
     "script/cli-agent-parity/run_codex_npm_windows_update_live.py",
@@ -302,7 +305,7 @@ def parser():
     result.add_argument("--repo", type=Path, required=True)
     result.add_argument("--output", type=Path, required=True)
     result.add_argument("--official-inputs", type=Path)
-    for role in ("test-binary", "supervisor", "node", "npm-cli"):
+    for role in ("test-binary", "supervisor", "station-bootstrap", "node", "npm-cli"):
         result.add_argument("--" + role, type=Path, required=True)
         result.add_argument("--" + role + "-sha256", required=True)
     result.add_argument("--case", choices=CASES, action="append")
@@ -320,11 +323,15 @@ def main():
     require(not any(char in str(args.output) for char in '\n\r\x00%&|<>"'), "fixture_path_metacharacters")
     require(shutil.disk_usage(args.output).free > 4 * 1024**3, "fixture_space_insufficient")
     binaries = {}
-    for key,role in (("worker","test_binary"),("supervisor","supervisor"),("node","node"),("npm_cli","npm_cli")):
+    for key,role in (("worker","test_binary"),("supervisor","supervisor"),
+                     ("station_bootstrap","station_bootstrap"),("node","node"),("npm_cli","npm_cli")):
         path = canonical(getattr(args, role))
         expected = getattr(args, role + "_sha256").lower()
         require(re.fullmatch(r"[0-9a-f]{64}", expected) and sha(path) == expected, "binary_binding")
         binaries[key] = {"path":str(path),"sha256":expected}
+    require(Path(binaries["station_bootstrap"]["path"])
+            == Path(binaries["supervisor"]["path"]).parent / "infinishell-station-bootstrap.exe",
+            "station_bootstrap_not_packaged_sibling")
     node, npm_cli = Path(binaries["node"]["path"]), Path(binaries["npm_cli"]["path"])
     require(node.name.lower() == "node.exe" and npm_cli == node.parent / "node_modules/npm/bin/npm-cli.js", "same_node_npm_installation")
     manager_root = npm_cli.parent.parent

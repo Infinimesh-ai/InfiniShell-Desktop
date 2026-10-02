@@ -1238,8 +1238,7 @@
   "all_required_acceptance_satisfied": false,
   "remaining_required_items": [
     "G03",
-    "G09",
-    "G10"
+    "G09"
   ],
   "remaining_items_interpretation": "本次 Mac 范围仍开放项；其他平台移交不计通过，全平台原始清单见 current_goal_scope。",
   "tracked_native_semantic_boundaries": [
@@ -5998,9 +5997,10 @@
       "G06",
       "G07",
       "G08",
+      "G10",
       "V03"
     ],
-    "remaining_count": 3,
+    "remaining_count": 2,
     "merge_allowed": false,
     "requirement": "按 2026-09-30 用户新范围：补齐仍缺能力并完成 Mac 验收及最终源码门禁后才可合并；其他平台实机验收由用户后续执行。",
     "deferred_items": [
@@ -7885,5 +7885,41 @@
     "independent_audit_sha256": "615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774",
     "remaining": "生产bootstrap/完整宿主接线、新站AppContainer SID DACL及低完整性授权、真实Node/npm双入口与全生命周期清理尚未完成；不外推普通非提升交互用户",
     "localization": "无需本地化变更：该候选仅测试；插件用户功能本地化另列"
+  },
+  "g09_plugin_recheck_source_gate_20261002": {
+    "source_commit": "798f6c6cb585e39662e18129fbefebd95e9fa5b7",
+    "run_id": 37012577482,
+    "conclusion": "success",
+    "gap_closed": false,
+    "results": {
+      "linux": {
+        "ordinary_nextest_pass": 1932,
+        "explicit_ignored_pass": 6,
+        "warnings": 73
+      },
+      "windows": {
+        "ordinary_nextest_pass": 1612,
+        "explicit_ignored_pass": 5,
+        "warnings": 95
+      }
+    },
+    "required_regressions": "20项净新增及1项改名增强测试在两平台均逐名普通PASS；i18n各11项，rust-genai各81项；FAIL/LEAK/RETRY/FLAKY/TIMEOUT均0",
+    "audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/798f6c6cb-ci/terminal-audit.safe.json",
+    "audit_sha256": "4f231826362e1cf15f9d6818a9a910490ed256478a43ae2b2ef63b67ab579724",
+    "originals_index_sha256": "6500b50310f8bee11d08770c2225462216cd492dda3dae31c0af8c1a44990902",
+    "boundary": "13份官方ZIP/50份解压原件摘要、大小及CRC均核；不覆盖后续station bootstrap、GUI布局或全工作区；旧pending为原轮状态保留"
+  },
+  "g09_station_production_20261002": {
+    "status": "implemented_local_gates_native_execution_pending",
+    "gap_closed": false,
+    "source_base": "798f6c6cb585e39662e18129fbefebd95e9fa5b7",
+    "source_audit_sha256": "a7fd229cccfd495eb4eae958094a3ff916a6efdc4604b4c44632cee2d8702e9e",
+    "behavior": "新增随GUI/TUI打包的固定同目录引导器；两段新LUID进程仅通过本地已认证命名管道控制；挂起原句柄、文件身份、精确Job及新站不存在证明贯穿创建/退出；新站派生AppContainer SID、DACL和Low MIC读回；原业务进程AuthId/zero capability/调试映像绑定不变",
+    "cleanup": "关闭新桌面前恢复本新站原线程桌面；业务Job退出后再关闭helpers/Job，证明站及LUID消失后回收ACL/profile；正常关闭失败时独立abort_and_reap保留失败，不发布成功更新或普通cleanup收据",
+    "local_gates": "Windows command全目标类型检查、Mac warp cargo check、i18n11项、Python运行器15项、PowerShell解析及actionlint通过；所有短TMPDIR归档清理",
+    "negative_evidence": "首轮Windows类型检查E0658已改用稳定GetFileInformationByHandle.nNumberOfLinks修复，原失败日志保留",
+    "localization": "无需本地化变更：内部引导器/协议/诊断无新界面文案；现有SourceChanged/ProbeFailed/RecoveryRequired的英中消息语义继续适用，无布局变化",
+    "remaining": "真实cmd/PowerShell到AppContainer内Node/npm、更新及清理尚待执行；实际Windows安装器未验；高完整性Session0候选不外推普通交互用户。G09其他Mac消费者及Homebrew验收条件不变",
+    "local_gate_audit_sha256": "11f6d7e005ec5b74a46a2dbb0a77566aa109efa928aa03644c5b0ecde697d714"
   }
 }

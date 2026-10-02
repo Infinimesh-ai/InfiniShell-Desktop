@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G09 Windows 生产引导器接线，真实 npm 待验
+
+新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 保持草稿。Windows 版本探针已接随 GUI/TUI 打包的 `infinishell-station-bootstrap.exe`，只取已核监督程序同目录文件，文件身份和摘要进入事务并持租约。两段新 LUID helper 的挂起原句柄、创建时间、用户/Session/完整性、精确 Job 及本地命名管道 peer 均绑定；第二段仅从保留的第一段进程复制原句柄。磁盘 JSON 只作证据，不作为授权或恢复入口。原业务进程 AuthId、zero-cap AppContainer 和调试映像约束不变。
+
+新站必须与新 LUID 预测匹配、非交互且在创建前不存在；派生 AppContainer SID 并核对新站/桌面的 owner、DACL、Low MIC。关闭桌面前恢复本新站原线程桌面。业务 Job 退出后才关闭两段 helper 和 Job，并证明站/LSA 会话消失，再回收原 ACL/profile；关闭失败的强制回收写独立失败收据，不把失败更新变为成功。GUI/TUI 安装器均包含 helper，旧版无 helper 的 TUI 仍可保留为 previous；安装器实际运行尚未验收。
+
+20 个产品、测试和打包文件绑定基线 `798f6c6cb585e39662e18129fbefebd95e9fa5b7`，冻结源码索引 `g08-build-preparation/g09-station-production-v1/source.safe.json` SHA `a7fd229cccfd495eb4eae958094a3ff916a6efdc4604b4c44632cee2d8702e9e`。Windows 全目标类型检查 `r-d_ga6u2p`、Mac 应用 check `r-mabw7vwx`、Python 15项 `r-unepdqf3`、PowerShell 解析 `r-3h51qmn1` 和 actionlint `r-8qb25hra` 通过，i18n `r-bc7zzsfn` 11项通过；短TMPDIR全部归档清理。本地门禁索引 `11f6d7e005ec5b74a46a2dbb0a77566aa109efa928aa03644c5b0ecde697d714`。首次 Windows E0658 失败保留，已用稳定文件句柄 API 读取硬链接数。无需本地化变更：复核既有 SourceChanged／ProbeFailed／RecoveryRequired 英中消息，无新用户文案或布局变化。Windows 类型检查不能证明运行时 Node/npm；下一步仅跑生产双入口和五场景事务，不再重跑窗口站诊断候选。Linux 未选：本增量原生实现与安装器仅影响 Windows；Mac 编译覆盖其他平台条件分支。
+
+前一插件提交 `798f6c6cb` 的[双平台门禁 37012577482](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37012577482)已完成 success。20项净新增和1项改名增强回归两端均普通PASS，i18n各11项；Linux nextest 1932普通+6显式ignored PASS，Windows1612+5，两端rust-genai各81。无FAIL/LEAK/RETRY/FLAKY/TIMEOUT，warning分别73/95行保留。完整日志及13份官方ZIP/50份原件摘要、大小、CRC已独立核验，终态审计 `4f231826362e1cf15f9d6818a9a910490ed256478a43ae2b2ef63b67ab579724`，原件索引 `6500b50310f8bee11d08770c2225462216cd492dda3dae31c0af8c1a44990902`。此门禁不覆盖本轮新引导器，也不替代GUI或全工作区。原pending与失败按历史保留。
+
 ## 2026-10-02：G09 插件完整性复检与窗口站前置能力，未关闭
 
 本轮关闭 0 项，累计 9 关闭／2 开放／3 移交，PR #22 继续草稿。通知与编排插件分别返回缺失、禁用、待更新、文件不符、未验证或已验证；检查及更新成功后均重读完整文件树，绕过界面缓存。Grok 桥使用本次实际入口与版本，Claude 编排插件因缺完整内容合同继续显示未验证。复检期间保留更新操作和启动保护；旧回调不发布结果，插件问题不覆盖已经成功的 CLI 更新，也不开放未知版本托管能力。

@@ -165,6 +165,7 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             thread: None,
             process_id: 0,
             cleaned: false,
+            private_station: None,
             private_desktop: None,
         },
     )

@@ -82,6 +82,19 @@ fn invalid() -> io::Error {
     io::Error::other("Codex Windows npm 探针闭包不匹配")
 }
 
+fn station_bootstrap_executable() -> io::Result<PathBuf> {
+    // 只使用本版监督程序同目录的已打包引导器，不从用户 PATH 查找。
+    let supervisor = super::supervisor_executable()?.canonicalize()?;
+    let path = supervisor
+        .parent()
+        .ok_or_else(invalid)?
+        .join("infinishell-station-bootstrap.exe");
+    if path.canonicalize()? != path || !safe_path(&path) {
+        return Err(invalid());
+    }
+    Ok(path)
+}
+
 fn system_program(mode: &str) -> io::Result<PathBuf> {
     let mut buffer = [0u16; 32768];
     let count = unsafe { GetSystemDirectoryW(Some(&mut buffer)) } as usize;
@@ -153,7 +166,11 @@ pub(super) fn validate(input: &ProbeInputs) -> io::Result<()> {
         .into_iter()
         .map(|(name, text)| (input.prefix().join(name), text))
         .collect();
-    let mut external = BTreeSet::from([input.program.clone(), input.node().to_owned()]);
+    let mut external = BTreeSet::from([
+        input.program.clone(),
+        input.node().to_owned(),
+        station_bootstrap_executable()?,
+    ]);
     if input.files.len() > 64
         || input
             .files
@@ -225,6 +242,7 @@ pub(crate) fn capture(
     let mut files = vec![
         ExpectedFileIdentity::capture(&program)?,
         ExpectedFileIdentity::capture(node)?,
+        ExpectedFileIdentity::capture(&station_bootstrap_executable()?)?,
     ];
     for name in contract::SHIM_NAMES {
         files.push(ExpectedFileIdentity::capture(&prefix.join(name))?);
@@ -346,6 +364,31 @@ pub(super) fn execute(
     };
     validate(&input)?;
     super::verify_expected_files(&input.files)?;
+    let bootstrap_path = station_bootstrap_executable()?;
+    let bootstrap_identity = input
+        .files
+        .iter()
+        .find(|file| file.path == bootstrap_path)
+        .ok_or_else(invalid)?;
+    // 同一文件身份进入事务摘要，并在引导器接管前锁住原文件，封住路径替换窗口。
+    let mut bootstrap_handle = OpenOptions::new()
+        .read(true)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(&bootstrap_path)?;
+    if ExpectedFileIdentity::capture_opened(
+        &bootstrap_path,
+        bootstrap_path.clone(),
+        &mut bootstrap_handle,
+    )? != *bootstrap_identity
+    {
+        return Err(invalid());
+    }
+    let bootstrap = command::windows::StationBootstrapImage::capture(
+        &bootstrap_path,
+        bootstrap_identity.size,
+        &bootstrap_identity.sha256,
+    )?;
     let install = manifest.cwd.join("install");
     fs::create_dir(&install)?;
     // 保留官方 shim 原先的 Node 选路；PATH 布局不能在镜像中变成本地 Node 分支。
@@ -360,7 +403,7 @@ pub(super) fn execute(
     let mut readonly = Vec::new();
     let mut images = Vec::new();
     for expected in &input.files {
-        if expected.path == input.program {
+        if expected.path == input.program || expected.path == bootstrap_path {
             continue;
         }
         let destination = if expected.path == input.node() {
@@ -436,16 +479,16 @@ pub(super) fn execute(
     cwd.verify_for_spawn()?;
     let mut debugger = executable.prepare_image_debug_session()?;
     debugger.bind_cancellation(cancellation);
-    let mut process =
-        command::windows::AppContainerProbe::spawn_package_suspended_with_execution_cwd(
-            executable.execution_path(),
-            arguments.as_ref(),
-            cwd.execution_path(),
-            &execution_cwd,
-            &environment,
-            &format!("InfiniShell.Version.{}", manifest.generation),
-            &readonly,
-        )?;
+    let mut process = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
+        executable.execution_path(),
+        arguments.as_ref(),
+        cwd.execution_path(),
+        &execution_cwd,
+        &environment,
+        &format!("InfiniShell.Version.{}", manifest.generation),
+        &readonly,
+        &bootstrap,
+    )?;
     let started = Instant::now();
     let result = run_package_probe(&mut process, &mut debugger, started);
     if let Err(failure) = &result {
@@ -466,6 +509,8 @@ pub(super) fn execute(
         Err(failure) => record_phase("cleanup_failed", started, Some(failure)),
     }
     drop(handles);
+    drop(bootstrap);
+    drop(bootstrap_handle);
     let code = match result {
         Ok(code) => {
             cleanup?;

@@ -50,6 +50,8 @@ use windows::Win32::System::Threading::{
 use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{BOOL, PCWSTR, PWSTR};
 
+use super::station_bootstrap::{PrivateStation, StationBootstrapImage};
+
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
     let mut bytes: Vec<_> = value.encode_wide().collect();
     if bytes.contains(&0) {
@@ -253,9 +255,8 @@ impl Drop for Attributes {
     }
 }
 
-#[cfg(any(test, feature = "test-util"))]
 #[path = "windows_appcontainer_desktop.rs"]
-mod desktop;
+pub(super) mod desktop;
 
 /// 除固定 --version 外不接受其他参数；进程在 token 与严格 Job 核对前始终挂起。
 pub struct AppContainerProbe {
@@ -267,12 +268,14 @@ pub struct AppContainerProbe {
     thread: Option<OwnedHandle>,
     process_id: u32,
     cleaned: bool,
+    private_station: Option<PrivateStation>,
     #[cfg(any(test, feature = "test-util"))]
     private_desktop: Option<desktop::ProbeDesktop>,
 }
 
-enum ProbeDesktopMode {
+enum ProbeDesktopMode<'a> {
     Inherited,
+    NewLogon(&'a StationBootstrapImage),
     #[cfg(any(test, feature = "test-util"))]
     Private,
     #[cfg(any(test, feature = "test-util"))]
@@ -384,6 +387,30 @@ impl AppContainerProbe {
         )
     }
 
+    /// 新站由精确绑定的两段 helper 持有；仅向本轮 AppContainer SID 授权。
+    pub fn spawn_package_suspended_with_station(
+        program: &Path,
+        arguments: &std::ffi::OsStr,
+        cwd: &Path,
+        execution_cwd: &Path,
+        environment: &[(OsString, OsString)],
+        name: &str,
+        readonly: &[std::path::PathBuf],
+        bootstrap: &StationBootstrapImage,
+    ) -> io::Result<Self> {
+        Self::spawn_package_internal(
+            program,
+            arguments,
+            cwd,
+            execution_cwd,
+            environment,
+            name,
+            readonly,
+            ProbeConsoleMode::NoWindow,
+            ProbeDesktopMode::NewLogon(bootstrap),
+        )
+    }
+
     /// 仅供独立测试 driver 的固定 Node 根 --version 对照；不接受任意桌面名称。
     #[cfg(any(test, feature = "test-util"))]
     pub fn spawn_package_suspended_with_private_desktop(
@@ -448,7 +475,7 @@ impl AppContainerProbe {
         name: &str,
         readonly: &[std::path::PathBuf],
         console_mode: ProbeConsoleMode,
-        desktop_mode: ProbeDesktopMode,
+        desktop_mode: ProbeDesktopMode<'_>,
     ) -> io::Result<Self> {
         if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
             return Err(io::Error::other("版本探针执行目录不匹配"));
@@ -483,7 +510,7 @@ impl AppContainerProbe {
         name: &str,
         readonly: Option<&[std::path::PathBuf]>,
         console_mode: ProbeConsoleMode,
-        desktop_mode: ProbeDesktopMode,
+        desktop_mode: ProbeDesktopMode<'_>,
     ) -> io::Result<Self> {
         if !name.starts_with("InfiniShell.Version.")
             || name.len() != "InfiniShell.Version.".len() + 36
@@ -521,11 +548,16 @@ impl AppContainerProbe {
             thread: None,
             process_id: 0,
             cleaned: false,
+            private_station: None,
             #[cfg(any(test, feature = "test-util"))]
             private_desktop: None,
         };
         match desktop_mode {
             ProbeDesktopMode::Inherited => {}
+            ProbeDesktopMode::NewLogon(image) => {
+                result.private_station =
+                    Some(PrivateStation::create(image, cwd, name, result.sid)?);
+            }
             #[cfg(any(test, feature = "test-util"))]
             ProbeDesktopMode::Private => {
                 result.private_desktop = Some(desktop::ProbeDesktop::NewStation(
@@ -639,6 +671,9 @@ impl AppContainerProbe {
         startup.StartupInfo.hStdOutput = handles[1];
         startup.StartupInfo.hStdError = handles[2];
         startup.lpAttributeList = attributes.list;
+        if let Some(station) = &mut result.private_station {
+            station.configure_startup(&mut startup.StartupInfo)?;
+        }
         #[cfg(any(test, feature = "test-util"))]
         if let Some(desktop) = &mut result.private_desktop {
             desktop.configure_startup(&mut startup.StartupInfo)?;
@@ -861,6 +896,11 @@ impl AppContainerProbe {
         if self.process.is_some() {
             self.exit_code()?;
         }
+        if let Some(station) = &mut self.private_station {
+            // CLI 与其严格 Job 已退出，才允许 helper 释放本轮站与新登录会话。
+            station.close()?;
+            self.private_station = None;
+        }
         #[cfg(any(test, feature = "test-util"))]
         if let Some(desktop) = &mut self.private_desktop {
             // 只有进程与严格 Job 均已确认退出，才关闭本次私有对象。
@@ -906,8 +946,23 @@ impl Drop for AppContainerProbe {
             }
             let _ = unsafe { TerminateJobObject(handle(&self.job), 1) };
             let deadline = Instant::now() + Duration::from_secs(3);
-            while self.cleanup().is_err() && Instant::now() < deadline {
+            while matches!(self.processes_terminated(), Ok(false)) && Instant::now() < deadline {
                 thread::sleep(Duration::from_millis(10));
+            }
+            // 正常 close 的错误仍返回调用方；析构只在业务进程确证退出后收敛辅助资源。
+            if self.processes_terminated().unwrap_or(false) {
+                let station_reaped = match &mut self.private_station {
+                    Some(station) => station.abort_and_reap().is_ok(),
+                    None => true,
+                };
+                if station_reaped {
+                    self.private_station = None;
+                    // helper Job、站和 LSA 均已释放，才恢复文件 ACL 并删除本轮 profile。
+                    // 此路径不调用 write_cleanup_receipt，不能将失败事务标为成功。
+                    while self.cleanup().is_err() && Instant::now() < deadline {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                }
             }
         }
         unsafe { FreeSid(self.sid) };

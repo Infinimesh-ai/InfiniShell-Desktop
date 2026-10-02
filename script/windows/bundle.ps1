@@ -186,6 +186,7 @@ if ($EXTRA_FEATURES) {
 }
 
 $BINARY_PATH = "$CARGO_TARGET_OUTPUT_DIR\$BINARY_NAME"
+$STATION_BOOTSTRAP_PATH = "$CARGO_TARGET_OUTPUT_DIR\infinishell-station-bootstrap.exe"
 # AUMID(Windows AppUserModel ID)—— 必须与进程端 `ChannelState::app_id()` 生成的完全一致,
 # 否则 Windows ToastNotificationManager 会在 Start Menu 快捷方式 / 进程 AUMID 不匹配时
 # 静默吞掉 toast。TUI 全部使用 `dev.infinishell.<Name>`；GUI 的 OSS 版在
@@ -242,6 +243,13 @@ if ($CHECK_ONLY) {
             exit 1
         }
     }
+    if (-not $IS_CLI) {
+        cargo check -p command --profile "$CARGO_PROFILE" --bin infinishell-station-bootstrap --target $PLATFORM_TARGET
+        if (-Not $?) {
+            Write-Error "未通过 InfiniShell 窗口站引导编译检查：$CARGO_PROFILE"
+            exit 1
+        }
+    }
     exit 0
 }
 
@@ -276,6 +284,23 @@ if (-Not $SKIP_BUILD_BINARY) {
             Write-Error "Failed to build InfiniShell SSH worker with profile $CARGO_PROFILE"
             exit 1
         }
+    }
+    if (-not $IS_CLI) {
+        # 与实际 GUI／TUI 使用相同架构和 profile，不继承应用的 UI feature。
+        cargo build -p command --profile "$CARGO_PROFILE" --bin infinishell-station-bootstrap --target $PLATFORM_TARGET
+        if (-Not $?) {
+            Write-Error "未能构建 InfiniShell 窗口站引导：$CARGO_PROFILE"
+            exit 1
+        }
+    }
+}
+
+if (-not $IS_CLI) {
+    if (-not (Test-Path -LiteralPath $STATION_BOOTSTRAP_PATH -PathType Leaf)) {
+        throw "缺少 InfiniShell 窗口站引导：$STATION_BOOTSTRAP_PATH"
+    }
+    if ($REQUIRE_SIGNATURES) {
+        Assert-ValidSignature -Path $STATION_BOOTSTRAP_PATH
     }
 }
 

@@ -107,6 +107,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 Source: "{#TargetProfileDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#TargetProfileDir}\infinishell-ssh.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#TargetProfileDir}\infinishell-station-bootstrap.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#AssetsDir}\{#Arch}\conpty.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#AssetsDir}\{#Arch}\OpenConsole.exe"; DestDir: "{app}\{#Arch}"; Flags: ignoreversion
 Source: "..\..\app\channels\{#ReleaseChannel}\icon\padded\icon.ico"; DestDir: "{app}"; Flags: ignoreversion

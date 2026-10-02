@@ -1706,7 +1706,7 @@ jobs:
       - name: Test managed command process ownership
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
-        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::)'
+        run: cargo nextest run --no-fail-fast -p command --lib -E 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::)'
 
       - name: Diagnose unnamed Windows station without changing the production probe
         if: ${{ !cancelled() && inputs.run_atomic_windows_debug && inputs.windows_atomic_debug_scope != 'g09_netcredentials' && steps.check_app.outcome == 'success' }}
@@ -1832,7 +1832,7 @@ jobs:
         shell: pwsh
         env:
           CARGO_BUILD_JOBS: "2"
-        run: cargo build -p warp_tui --bin infinishell-tui
+        run: cargo build -p warp_tui --bin infinishell-tui -p command --bin infinishell-station-bootstrap
 
       # 真实 npm 生成私有安装登记和入口；不改写用户前缀、凭据或执行策略。
       - name: Verify fixed Windows Codex npm update transactions without credentials
@@ -1856,18 +1856,23 @@ jobs:
           "WINDOWS_CODEX_NPM_EVIDENCE=$evidence" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $testBinary = Join-Path $parityFixture 'warp-libtest.exe'
           $supervisor = Join-Path $parityFixture 'supervisor.exe'
+          $stationBootstrap = Join-Path $parityFixture 'infinishell-station-bootstrap.exe'
+          "WINDOWS_STATION_BOOTSTRAP_EVIDENCE=$stationBootstrap" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           $sourceSupervisor = Join-Path $metadata.target_directory 'debug/infinishell-tui.exe'
+          $sourceBootstrap = Join-Path $metadata.target_directory 'debug/infinishell-station-bootstrap.exe'
           Copy-Item -LiteralPath $executables[0] -Destination $testBinary
           Copy-Item -LiteralPath $sourceSupervisor -Destination $supervisor
+          Copy-Item -LiteralPath $sourceBootstrap -Destination $stationBootstrap
           function Get-ParityDigest([string] $path) {
             return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
           }
           if ((Get-ParityDigest $testBinary) -ne (Get-ParityDigest $executables[0])) { throw 'Copied libtest hash mismatch' }
           if ((Get-ParityDigest $supervisor) -ne (Get-ParityDigest $sourceSupervisor)) { throw 'Copied supervisor hash mismatch' }
+          if ((Get-ParityDigest $stationBootstrap) -ne (Get-ParityDigest $sourceBootstrap)) { throw 'Copied station bootstrap hash mismatch' }
           $nodePath = (Get-Command node.exe -CommandType Application).Source
           $npmPath = Join-Path (Split-Path -Parent $nodePath) 'node_modules/npm/bin/npm-cli.js'
           if (-not (Test-Path -LiteralPath $npmPath -PathType Leaf)) { throw 'Fixed Node npm entry is missing' }
-          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath)
+          python -B script/cli-agent-parity/run_codex_npm_windows_update_live.py --repo "$env:GITHUB_WORKSPACE" --output $evidence --test-binary $testBinary --test-binary-sha256 (Get-ParityDigest $testBinary) --supervisor $supervisor --supervisor-sha256 (Get-ParityDigest $supervisor) --station-bootstrap $stationBootstrap --station-bootstrap-sha256 (Get-ParityDigest $stationBootstrap) --node $nodePath --node-sha256 (Get-ParityDigest $nodePath) --npm-cli $npmPath --npm-cli-sha256 (Get-ParityDigest $npmPath)
           if ($LASTEXITCODE -ne 0) { throw 'Windows Codex npm transaction failed; original receipts are preserved' }
 
       - name: Preserve Windows Codex npm update receipts
@@ -1888,6 +1893,8 @@ jobs:
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.json
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/*.log
             ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/cli-agent-processes/**/appcontainer-cleanup-v1
+            ${{ env.WINDOWS_CODEX_NPM_EVIDENCE }}/**/claude-npm-version-*/station-*/*.json
+            ${{ env.WINDOWS_STATION_BOOTSTRAP_EVIDENCE }}
           if-no-files-found: error
           retention-days: 14
 

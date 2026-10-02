@@ -257,6 +257,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-02 Windows 生产引导器已接，真实 npm 待验，仍开放**：固定同目录引导器已进入 GUI/TUI 打包和事务身份闭包；两段原句柄/新LUID/精确Job/认证管道、新站 AppContainer SID 授权与退出后站/LSA消失核验已实现，业务身份及zero-cap隔离不变。桌面恢复和失败强制回收已补齐，失败不变成功。Windows全目标类型检查、Mac check、Python15项、i18n11项及脚本解析通过，短TMPDIR已归档清理；20文件源码索引 `a7fd229cccfd495eb4eae958094a3ff916a6efdc4604b4c44632cee2d8702e9e`。真实CMD/PowerShell→Node/npm、五场景事务及安装器仍未通过；Mac消费者原条件不变。前一插件提交798f的[双平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37012577482)已成功，两端新增20项+增强1项逐名普通PASS，独立审计 `4f231826362e1cf15f9d6818a9a910490ed256478a43ae2b2ef63b67ab579724`；该门禁不覆盖新引导器。无需本地化变更：既有英中错误语义适用，无新UI文案。
+
 - **2026-10-02 插件复检实装与 Windows 原生前置通过，仍开放**：检查及成功更新后已接只读完整树复检，使用本次真实入口/版本，通知和编排插件结果分别显示，不改变未知托管版本门禁或回滚已提交的 CLI。Mac check、i18n11项、定向484项及英中实窗通过；私有夹具实际复检显示缺失、禁用、文件不符和未知版本未验证，文件未改写，审计 `3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec`。首次旧Codex树误判已按既有严格合同修复，原失败保留；更新后的Linux/Windows源码门禁待验。另 [04a874d7a Windows候选](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37008880591) 的新LUID两段站身份及退出回收已通过，独立审计 `615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774`；尚未接生产AppContainer/Node/npm，不外推普通交互用户。真实消费者渠道、忙碌延期、合法降级、GUI更新和应用重启恢复等其余原条件不变。
 
 - **2026-10-02 完整条件复核，仍开放**：Mac 三款 npm 的既有固定后端正例不覆盖真实消费者渠道、实际忙碌延期、合法降级、GUI 更新、插件复检及应用重启恢复；跨 PID worker 冷恢复不能直接替代应用启动入口。Claude Homebrew 四场景采用人工登记和派生 cask 元数据，不证明真实 Homebrew 来源；Codex/Grok Homebrew 实际升级、回滚和冷恢复仍未见通过记录。降级拒绝和失败回滚均不能代替合法降级。11:59 UTC 只读取得 Claude 官方 Stable `2.1.285`、Latest `2.1.287`，超出当前 npm 升级 `2.1.280`／降级 `2.1.278` 审核合同；固定测试渠道不能冒充实时渠道。审查索引 `fe2aa3f9623d217e39956c5d8b4c9da1173a363496e876f6d401605dd10f9980`，公开渠道原件索引 `c4306be2c543776688c5e0f7bbaaea204834baea915415c571c6a80054932d6e`，详见验证报告。原关闭条件不变，不把 Windows 当作唯一剩余项。

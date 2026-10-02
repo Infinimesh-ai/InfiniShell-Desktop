@@ -16,7 +16,7 @@ class RunnerTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.binaries = {name:{"path":str(self.root / (name + ".exe")), "sha256":"a" * 64}
-                         for name in ("node", "npm_cli", "worker", "supervisor")}
+                         for name in ("node", "npm_cli", "worker", "supervisor", "station_bootstrap")}
         for binary in self.binaries.values():
             Path(binary["path"]).write_bytes(b"offline fixture; never execute")
 
@@ -172,7 +172,7 @@ class RunnerTests(unittest.TestCase):
 
     def test_parser_exposes_both_publication_recovery_points(self):
         arguments = ["--repo",str(self.root),"--output",str(self.root / "new")]
-        for name in ("test-binary","supervisor","node","npm-cli"):
+        for name in ("test-binary","supervisor","station-bootstrap","node","npm-cli"):
             arguments.extend(["--"+name,str(self.root / name),"--"+name+"-sha256","a"*64])
         args = runner.parser().parse_args(arguments + ["--case","old_moved","--case","published_receipt_missing"])
         self.assertEqual(args.case,["old_moved","published_receipt_missing"])

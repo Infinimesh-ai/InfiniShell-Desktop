@@ -11,6 +11,10 @@ use warp_errors::report_error;
 mod appcontainer;
 pub use appcontainer::AppContainerProbe;
 
+#[path = "windows_station_bootstrap.rs"]
+mod station_bootstrap;
+pub use station_bootstrap::{StationBootstrapImage, run_station_bootstrap};
+
 /// 主线程仍处于 `CREATE_SUSPENDED` 状态的子进程。
 ///
 /// 此类型不提供直接取出 [`Child`] 的通道；只有原生恢复成功后才会移交进程所有权。
