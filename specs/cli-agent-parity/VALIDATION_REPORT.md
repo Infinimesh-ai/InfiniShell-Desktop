@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：Grok 源码包绑定修正，原生门禁仍待重验
+
+新增关闭 0 项，仍为 8 关闭／3 开放／3 移交，PR 保持草稿。精确 `f3cbb6093038dde43393b8f5cce77b477b93ec10` 的 [CI 36940578820](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36940578820) 已终态失败：两平台 `load_source` 读取的 `cross_platform_build` 仍为旧 `8644` 三身份字段，与已更新的 `92b` 补丁不符，原生 Cargo 尚未执行；Windows 上传失败是工件目录未建立的后果。Linux 同名 artifact 只有临时目录收据，不含原生构建日志或二进制，不能据上传成功计原生通过。
+
+宿主 nextest 的 Linux 5329 次／5070 个唯一 package＋name、Windows 4958 次／4711 个唯一 package＋name 均普通 PASS，G10 新增 12 项在各平台各一次通过；两端 desktop／TUI 各 670 普通 PASS、rust-genai 各 81 项另列，无本轮 LEAK／FLAKY／重试。逐项与跳过审计 SHA-256 `9468a2e41ac001354fd893d5de8af32e53bcc8275c7da7bd341af5f7593cf883`。旧 69c17 的 Windows Claude 通知失败、Grok 5 秒审批通知超时和桌面 1 条 LEAK 保留，未由本轮原生前置失败覆盖。
+
+本次只同步 `cross_platform_build.native_commit/native_tree/patch_sha256`，历史实际工件的来源逐字段保持不变。新增回归读取两个实际仓库源码包：`r-c7qxeka2` 在修正前复现同一错误（4 过／1 失败，日志 `53e00ab1dc183f8b28e6c830f3da7a680d7ef9b582de68c0e083b9c42c8c8722`）；`r-qdeajcxl` 修正后 5／5 通过（日志 `a04ef3c4df9602b0f4b936a455b1fbe11fb33acac7b5d24283eee50352d887bf`），`r-dxvcenat` cargo check 通过（日志 `356c07ef9b2af4c3995b9ad97bd1b38af6d9fd9dc7e45c65e2ee5daaba145caa`）。三轮已核实退出、占用和归档并清理；修复收据 `e5b9d8470359b90601236e42371c60d79c394de41b97f0c212804d6f7ab29dcb`。无需本地化变更；目标原生构建、旧超时复验、工件绑定与最终门禁仍待完成。
+
 ## 2026-10-02：G10 父结果回传修复，本机门禁通过，真实复验待执行
 
 新增关闭 0 项，累计仍为 8 关闭／3 开放／3 移交。源码冻结 `739193b2dc970d78c35635bb6704ac13d294cd743c312d56dcbc1db7ed3fa407` 补齐 Claude Completed 父任务的专用结果消费；领取与单槽共用 SQLite 事务，原结果代与当前准入代分开保存，跨代仅接受同 runtime／SID 中逐代由真实 NativeProtocol ACK 驱动的自动结果。多个子结果保持 Queued 后串行交付；普通消息不扩权，显式用户新轮、新进程、失败或取消断链；在用户换代后才生成的旧结果保留正文但标记 Cancelled。

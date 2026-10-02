@@ -9,6 +9,17 @@ from unittest.mock import patch
 import build_grok_terminal_bridge as build
 
 
+class RepositorySourceProfileTests(unittest.TestCase):
+    def test_checked_in_source_bundles_match_build_metadata(self):
+        # 使用实际发布补丁，避免夹具掩盖只更新顶层摘要、遗漏构建元数据的问题。
+        for capability in build.SOURCE_PROFILES:
+            with self.subTest(capability=capability):
+                metadata, target, _, _, patch_digest = build.load_source(capability)
+                for key in ("native_commit", "native_tree", "patch_sha256"):
+                    self.assertEqual(metadata[key], target[key], key)
+                self.assertEqual(metadata["patch_sha256"], patch_digest)
+
+
 class SourceProfileTests(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.TemporaryDirectory()

@@ -265,9 +265,9 @@
       "boundary": "按库独立执行 owned_exit，数量必须精确相符且零失败、零忽略；Windows 的 11 项 Unix 夹具不适用，不计 Windows 成功。"
     },
     "custom_version": "1.0.41+infinishell.session-notifications.5",
-    "native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
-    "native_tree": "c49bef7a6d381709ca7bc6de8b0f9fc9c4bd5478",
-    "patch_sha256": "0a8fa3da52bea3c19fa57e7d3725bec20c3721960a155dd2d596cd27cf8dbd92",
+    "native_commit": "92b51c9b5040ed77a5616a314b676120587931cf",
+    "native_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
+    "patch_sha256": "74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24",
     "status": "pending",
     "linux_artifact": {
       "status": "pending",

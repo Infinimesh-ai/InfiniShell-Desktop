@@ -117,6 +117,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G03 — Grok 普通终端图片粘贴
 
+- **2026-10-02 原生构建元数据前置修复，仍开放**：精确 `f3cbb6093` 的 [CI 36940578820](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36940578820) 两平台均因 `cross_platform_build` 残留旧补丁摘要而在原生构建前失败，未运行原生测试、没有新工件。宿主新 G10 回归各 12／12 通过，不能覆盖该失败。现仅同步源码提交／tree／补丁摘要，旧工件不重标；实际仓库源码包回归先复现失败，修正后 5 项与提交前 cargo check 通过，收据 `e5b9d8470359b90601236e42371c60d79c394de41b97f0c212804d6f7ab29dcb`。Windows 旧审批通知超时尚未复验，Finder 拖放和最终源码门禁仍待完成。
+
 - **2026-10-02 图片能力拒绝双语实窗补齐，仍开放**：同 `69c17fce3` 产品构建的 `r-goa_c41x` 使用旧 `.3` 文本工件，在中文及英文界面分别一次 Return；约 2 秒及 5 秒的画面均显示完整提示，中文单行、英文两行，无截断，文字与单图卡片始终保留。约 0.5 秒与 9 秒的画面没有提示，不据此回填此前未观察到 Toast 的旧轮。视觉收据 SHA-256 `366f8c8647f890e305ede598419a88f4bc21362bfd0093d3bfbe37548b6ab227`；三代 GUI 正常退出，首次 finish 的 Preview 图片映射已释放，最终收尾 `a4b17a803aaf398de7c8e979eccfa14643ef76c4dff6d8fb0950bfc37aecb73d`，唯一历史继续保留。Linux `.5` 官方工件已完成来源、实际版本和测试审计；Windows 同版审批通知测试在 5 秒外层等待超时，尚无可绑定工件，不把 Linux 通过覆盖该失败。Finder 原生拖放与最终源码门禁仍待完成，本轮不关闭 G03。
 
 - **2026-10-02 普通 PTY 图片实窗正例，仍开放**：`69c17fce3/r-idckjva9` 的 `.5` 普通未绑定 Grok 在英文 GUI 接收纯 PNG，原生唯一 claimed/dispatched/ACK 与产品清卡一致；模型识别后自行探索被手动取消，不计完整回答。随后中文文本加红蓝／绿黄双 PNG，原生顺序、规范字节、完整识色回答和清稿均通过；审批期间第三次输入未派发，焦点往返及失败 Return 保留文字和图片，原生人类输入仍 3、图片领取仅 2。英中卡片和既有占位可读；新能力拒绝 Toast 尚未观察，不能计双语拒绝布局通过。旧 `.3` 同轮能力负例没有领取或模型输入且保稿，原因审查不以此关闭功能。GUI 观察 `eae1971deed36c4e9206956224edc4c47f78701ac9ebf7a38b4e6bc04aa116a0`，收尾 `710bf723a55702a7baf9591ba1dc1ece96d5be28127b34f67357bafe7df6ee4c`；两代 GUI 和已知后代退出，唯一历史保全。Finder 原生事件仍缺证；[69c17 新两平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36927434162) 尚在执行，Windows Claude SessionStart 空格路径负例已失败，另一特殊路径正例不覆盖失败，原生 `.5` 工件未提前计通过。

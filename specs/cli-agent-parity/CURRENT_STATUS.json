@@ -7272,5 +7272,30 @@
     "real_model_revalidated": false,
     "cross_platform_final_source_gate_passed": false,
     "gap_closed": false
+  },
+  "grok_source_bundle_metadata_fix_20261002": {
+    "status": "local_gates_passed_platform_revalidation_pending",
+    "base_head": "f3cbb6093038dde43393b8f5cce77b477b93ec10",
+    "prior_ci": {
+      "run_id": 36940578820,
+      "conclusion": "failure",
+      "native_tests_executed": 0,
+      "new_native_binary": false,
+      "linux_host_nextest_pass_executions": 5329,
+      "windows_host_nextest_pass_executions": 4958,
+      "new_g10_tests_passed_each_platform": 12,
+      "host_final_audit_sha256": "9468a2e41ac001354fd893d5de8af32e53bcc8275c7da7bd341af5f7593cf883"
+    },
+    "cause": "源码导出更新了顶层92b身份和补丁，却遗漏构建器读取的cross_platform_build三字段；两平台均在load_source前置失败，未复验旧Windows原生超时。",
+    "fix": "仅同步cross_platform_build的native_commit/native_tree/patch_sha256；原工件历史来源不变，增加实际仓库两个源码包的一致性回归。",
+    "local_gates": {
+      "before_fix": "r-c7qxeka2: 4通过、实际session-notifications源码包1失败",
+      "after_fix": "r-qdeajcxl: 5通过",
+      "cargo_check": "r-dxvcenat: passed",
+      "all_temporary_directories": "cleaned",
+      "receipt_sha256": "e5b9d8470359b90601236e42371c60d79c394de41b97f0c212804d6f7ab29dcb"
+    },
+    "localization": "无需本地化变更：仅来源元数据和验收测试变化。",
+    "gap_closed": false
   }
 }
