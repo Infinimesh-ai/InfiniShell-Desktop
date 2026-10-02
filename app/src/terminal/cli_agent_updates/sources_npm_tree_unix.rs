@@ -64,7 +64,10 @@ pub(super) struct Snapshot {
 }
 
 impl Snapshot {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
     pub(super) fn file_manifest(&self) -> BTreeMap<PathBuf, (u64, [u8; 32])> {
         self.nodes
             .iter()
@@ -75,7 +78,10 @@ impl Snapshot {
             .collect()
     }
 
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
     pub(super) fn verify_file(
         &self,
         path: &Path,
@@ -853,11 +859,15 @@ impl Directory {
     }
 
     /// 跨 cask 改名只锚定本目录 fd，目标已存在时绝不覆盖。
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
     pub(super) fn rename_noreplace(&self, from: &OsStr, to: &OsStr) -> Result<(), Error> {
         let from = name(from)?;
         let to = name(to)?;
-        if unsafe {
+        #[cfg(target_os = "macos")]
+        let result = unsafe {
             libc::renameatx_np(
                 self.file.as_raw_fd(),
                 from.as_ptr(),
@@ -865,8 +875,19 @@ impl Directory {
                 to.as_ptr(),
                 libc::RENAME_EXCL,
             )
-        } != 0
-        {
+        };
+        #[cfg(target_os = "linux")]
+        let result = unsafe {
+            libc::syscall(
+                libc::SYS_renameat2,
+                self.file.as_raw_fd(),
+                from.as_ptr(),
+                self.file.as_raw_fd(),
+                to.as_ptr(),
+                libc::RENAME_NOREPLACE,
+            )
+        };
+        if result != 0 {
             return Err(Error::SourceChanged);
         }
         self.sync()

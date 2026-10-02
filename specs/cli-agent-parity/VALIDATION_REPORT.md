@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：精确源码门禁捕获 Linux 原子改名遗漏
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。精确770的[37063514848](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37063514848)两平台成功：Linux5411、Windows5015普通PASS，新/增强5/4项逐名通过，updates261/157；i18n各22次执行、11唯一用例，无FAIL/LEAK/RETRY/FLAKY。3个官方ZIP按API大小/摘要和CRC全部核验，最终索引SHA `1041bba3460c38feeb735633f82cb04e88d5675525dc86b879594a8da62c71a8`。Linux Grok辅助临时根仍retained/cleanup_ready=false；只有收尾ValueError类型，无消息/栈，源码可证未进入递归删除，不能宣称远端已清理。外部原生专项按模式跳过，6726失败保留；此结果不外推后续三批降级代码。
+
+最新fcd的[37074002886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37074002886)中，Linux check因Snapshot::file_manifest/verify_file及Directory::rename_noreplace仍限制Mac ARM而失败，共6个E0599和4个级联E0282，退出101；后续普通Rust回归未执行，新增16个预期用例均不计通过。完整Linux log SHA `e8fbf51a67b6132d773b1ab97045230f66c0968a7b54da415da06a077910c21d`，早期审计 `1b6051c1671779fa8c44a0c169b5f07f06a1972574d32266fa5dd37e6352cbbb`；Windows同run仍在check，不取消或重派。
+
+修复将三个辅助方法的cfg与migration的Mac ARM/Linux x64范围对齐；Linux使用同一已打开目录fd上的renameat2(RENAME_NOREPLACE)，名称仍仅单叶，失败不回退到覆盖式rename，成功后同步目录。Mac RENAME_EXCL和Linux严格Caskroom权限边界保持。原不覆盖测试现纳入Linux，增加空目录目标身份保持断言，能够识别普通rename对空目录的覆盖。两文件独审无阻断，源码索引 `ac2567cc5af7c2fc1efa3e453a5faab3d52115c68a28f86d04eecac40dbb7b96`，仓外 `g09-linux-cask-rename-fix-v1`。
+
+本机check `r-okvoc561`、定向 `r-51p24t1p`372普通PASS／8347 skipped及i18n `r-eem538cw`11项通过，无FAIL/LEAK/RETRY/FLAKY，增强空目录回归逐名通过；三个短根已按退出和打开文件证据清理，门禁索引 `c81be511610e35ce51455c15ac5913b3fff4168e19ea4991629cbcf7b49a7f64`。无需本地化变更：底层平台实现修正，既有英中错误/恢复文案与布局保持。Linux新增syscall及修复后目标编译仍待平台复验，未执行真实CLI更新。原run自然结束后验证最新修复提交；G03真实Finder拖放和两项Windows原生失败继续开放。
+
 ## 2026-10-03：WinGet 合法降级、登记与配置恢复
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Windows x64 Claude WinGet已接固定286→Stable285；用户明确Stable、实时渠道一致且原PE/登记/配置完整绑定才执行。ConfigPublishing前恢复旧PE和ARP两字段，外部配置/策略变化保留并留账报错；提交点后验证候选/退出收据，再幂等发布Stable，PE/ARP/配置三方完整一致后才清理。PreparedCandidate摘要在发布和恢复时重算，意图、版本、映像、源配置/策略和收据均绑定；旧280账本及成功语义保持，新285只有完整前滚成功才清除活动失败标记。

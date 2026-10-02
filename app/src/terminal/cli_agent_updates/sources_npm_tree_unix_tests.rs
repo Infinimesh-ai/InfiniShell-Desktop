@@ -464,7 +464,10 @@ fn claude_cleanup_rejects_a_replaced_member() {
     assert!(root.join("claude/bin/claude.exe").exists());
 }
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
 #[test]
 fn homebrew_rename_never_overwrites_an_existing_directory_or_link() {
     let temporary = tempfile::tempdir().unwrap();
@@ -472,6 +475,24 @@ fn homebrew_rename_never_overwrites_an_existing_directory_or_link() {
     let original = directory(&root, "source", b"original").snapshot().unwrap();
     directory(&root, "target", b"other");
     let parent = Directory::open(&root).unwrap();
+    let empty = parent
+        .create(OsStr::new("empty"))
+        .unwrap()
+        .snapshot()
+        .unwrap();
+    assert!(
+        parent
+            .rename_noreplace(OsStr::new("source"), OsStr::new("empty"))
+            .is_err()
+    );
+    assert_eq!(
+        parent
+            .child(OsStr::new("empty"))
+            .unwrap()
+            .snapshot()
+            .unwrap(),
+        empty
+    );
     assert!(
         parent
             .rename_noreplace(OsStr::new("source"), OsStr::new("target"))
