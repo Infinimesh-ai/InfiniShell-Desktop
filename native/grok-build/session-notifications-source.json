@@ -171,7 +171,7 @@
     "crates/codegen/xai-grok-workspace/src/permission/manager/mod.rs": "17b78f7eb7071b12e702b16a9511a3c5ddd2e05d8e28ee9590c8040d9eee7ff8",
     "crates/codegen/xai-grok-workspace/src/permission/manager/owned_input_tests.rs": "128269aadc0b7a354aa0fe8c7f02404104c16689afa65f382691239eb76198b4"
   },
-  "source_digest": "cf131108ee9769e98777cfcc6cd51efd122092bbf2de4fc49f14989bbdb91cf1",
+  "source_digest": "4489e25b1fbaf9435617c9f7bbe226fc6a6d55ef8a58d63efcb86fa324843142",
   "source_digest_encoding": "按路径排序的 source_files_sha256 映射，以 UTF-8 JSON、ensure_ascii=false、分隔符逗号和冒号且无额外空白编码后取 SHA-256。",
   "local_validation": {
     "platform": "macOS arm64",

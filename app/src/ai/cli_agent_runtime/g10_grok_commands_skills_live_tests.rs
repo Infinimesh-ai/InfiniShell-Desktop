@@ -604,9 +604,9 @@ async fn drive(
         "Call native skill exactly once for user:{ALPHA}, awaiting permission, and retain its actual hidden marker. Next call native grep exactly once with {}. Await its own permission and actual successful output; retain the hidden G10_SEARCH_ marker from the matching line. Then use SDK MCP {MCP_SERVER_NAME}__reviewed_project_command with exactly {}. The host will deny that first command. Accept the error; explicitly make one new command call with the identical arguments, await its separately granted permission, then await its actual success. Do not retry other failures or uncertain outcomes. Do not use read_file, any additional search, shell/native terminal tools, or create children. If needed search_tool at most once with limit 5 and query {MCP_SERVER_NAME}. Finish with {CHILD_DONE}, then the skill marker, search marker, and command marker in that order.",
         fixture.search_input, fixture.input
     );
-    let spawn = json!({"summary":"G10 Grok CommandsSkills child","base_prompt":"","harness":"grok","model_id":MODEL,
+    let spawn = json!({"summary":"G10 Grok CommandsSkills child","base_prompt":"","harness":"grok","model_id":"",
         "skills":[fixture.selected(ALPHA).path],"agent_run_configs":[{"name":"g10-child","prompt":child_prompt}]});
-    let outside_spawn = json!({"summary":"G10 selected-skill ceiling rejection","base_prompt":"","harness":"grok","model_id":MODEL,
+    let outside_spawn = json!({"summary":"G10 selected-skill ceiling rejection","base_prompt":"","harness":"grok","model_id":"",
         "skills":[fixture.selected(BETA).path],"agent_run_configs":[{"name":"must-not-exist","prompt":"Do not run tools. This child must not be created."}]});
     let prompt = format!(
         "Use SDK MCP {MCP_SERVER_NAME}__run_agents exactly once with {spawn}. If discovery is necessary, search_tool at most once with limit 5 and query {MCP_SERVER_NAME}. Do not perform child work or use other tools. Once queued, reply PARENT_QUEUED. When Subject: local_task_result arrives for that sole child, consume its real result and answer {PARENT_DONE}, then its skill, search, and command markers in original order. Do not call tools for that automatic result."
@@ -626,7 +626,7 @@ async fn drive(
         permission_ceiling: None,
         claude_profile: None,
         grok_profile: None,
-        model: Some(MODEL.into()),
+        model: None,
         local_tools: Some(LocalToolPermissions {
             allow_spawn: true,
             allow_message: false,
@@ -641,7 +641,7 @@ async fn drive(
         parent_generation: None,
         harness: "grok".into(),
         working_directory: fixture.project.to_string_lossy().into(),
-        config_json: json!({"model":MODEL,"permission_policy":"GrokReviewedCommandsSkillsV1"})
+        config_json: json!({"model":null,"permission_policy":"GrokReviewedCommandsSkillsV1"})
             .to_string(),
         native_session_id: None,
         generation: 1,
@@ -652,17 +652,10 @@ async fn drive(
     };
     let initial = Uuid::new_v4();
     evidence.record(json!({"event":"run_started","parent_task_id":parent_id,"initial_message_id":initial,
-        "runtime_generation":options.generation,"requested_model":MODEL,"actual_model_verified":false}))?;
-    coordinator.update(app, |model, ctx| {
-        model.start_with_input(
-            task,
-            options,
-            None,
-            initial,
-            vec![InputContent::Text(prompt)],
-            ctx,
-        )
-    })?;
+        "runtime_generation":options.generation,"expected_model":MODEL,"actual_model_verified":false}))?;
+    // 创建时登记 alpha 上限；父输入仅含委派文本，避免 Skill 卡片追加父工具调用指令。
+    coordinator.update(app, |model, ctx| model.start(task, options, None, ctx))?;
+    let mut parent_input = Some(vec![InputContent::Text(prompt)]);
     let deadline = Instant::now() + Duration::from_secs(450);
     let mut identities = HashMap::<String, (Uuid, String)>::new();
     let mut ready = HashSet::new();
@@ -727,6 +720,12 @@ async fn drive(
                     evidence.record(json!({"event":"session_ready","task_id":task.task_id,
                         "runtime_generation":event.generation,"native_session_id":event.native_session_id,
                         "verified_cli_version":verified_cli_version,"permissions_sha256":digest(serde_json::to_vec(effective_permissions).map_err(|error| error.to_string())?)}))?;
+                    if parent {
+                        let input = parent_input.take().ok_or("父初始输入重复派发")?;
+                        coordinator.update(app, |model, _| {
+                            model.request_for_generation(&task.task_id, task.generation, initial, RuntimeAction::Submit { input })
+                        })?.await.map_err(|_| "父初始控制确认通道关闭")??;
+                    }
                 }
                 RuntimeEventKind::ApprovalRequested { approval_id, turn_id, method, details } => {
                     if !ready.contains(&task.task_id) || decisions.iter().any(|row| row.task_id==task.task_id && row.approval_id==*approval_id) { return Err("审批 ID 重复".into()); }
@@ -1026,7 +1025,7 @@ fn real_grok_g10_commands_skills_parent_child() {
         "mode":state_metadata.mode() & 0o777}))
         .unwrap();
     evidence.record(json!({"event":"acceptance_started","scope":SCOPE,"cli_version":CLI_VERSION,
-        "requested_model":MODEL,"actual_model_verified":false,"policy":"GrokReviewedCommandsSkillsV1","max_children":1,
+        "expected_model":MODEL,"actual_model_verified":false,"policy":"GrokReviewedCommandsSkillsV1","max_children":1,
         "max_host_command_requests":2,"max_command_executions":1,"max_native_file_search_calls":1,"real_gui_verified":false,
         "cold_recovery_verified":false,"other_command_families_verified":false})).unwrap();
     App::test((), |mut app| async move {

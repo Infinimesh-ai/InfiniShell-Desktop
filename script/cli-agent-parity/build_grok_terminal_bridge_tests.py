@@ -19,6 +19,13 @@ class RepositorySourceProfileTests(unittest.TestCase):
                     self.assertEqual(metadata[key], target[key], key)
                 self.assertEqual(metadata["patch_sha256"], patch_digest)
 
+    def test_session_notification_source_digest_matches_manifest(self):
+        metadata, _, _, _, _ = build.load_source("session-notifications")
+        # 按清单声明的规范编码重算，确保修改文件摘要时同步更新汇总摘要。
+        encoded = json.dumps(metadata["source_files_sha256"], sort_keys=True,
+                             ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.assertEqual(metadata["source_digest"], hashlib.sha256(encoded).hexdigest())
+
 
 class SourceProfileTests(unittest.TestCase):
     def setUp(self):

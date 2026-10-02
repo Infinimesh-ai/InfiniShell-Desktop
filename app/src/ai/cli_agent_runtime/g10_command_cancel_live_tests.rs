@@ -262,7 +262,7 @@ fn inspect_running(
     if identities.len() != 2 {
         return Err("未取得两个原生 CLI 身份".into());
     }
-    for (runtime, _) in identities.values() {
+    for (runtime, native_session) in identities.values() {
         let path = current_state_dir()
             .join("cli-agent-hosts")
             .join(runtime.to_string())
@@ -271,14 +271,23 @@ fn inspect_running(
             .join(runtime.to_string());
         let cli_claim = json_file(&path.join("macos-coalition.json"), 16 * 1024)?;
         let cli_native = json_file(&path.join("macos-native.json"), 16 * 1024)?;
-        let actual_cli = identity(&cli_native["identity"])?;
+        let authorized_cli = identity(&cli_native["identity"])?;
+        let actual_cli =
+            macos_process_identity(authorized_cli.pid).map_err(|error| error.to_string())?;
+        evidence.record(
+            json!({"event":"cli_exec_identity_observed","runtime_generation":runtime,
+            "native_session_id":native_session,"authorized_identity":identity_value(authorized_cli),
+            "actual_identity":identity_value(actual_cli)}),
+        )?;
+        // 与生产 validate_after_exec 一致：exec 可变更 PID version，但不能变更生存期或资源域。
         if cli_claim["generation"] != json!(runtime)
             || cli_native["generation"] != json!(runtime)
             || cli_native["claim_sha256"]
                 != digest(read_owned(&path.join("macos-coalition.json"), 16 * 1024)?)
             || actual_cli.resource_cid == wrapper.resource_cid
-            || macos_process_identity(actual_cli.pid).map_err(|error| error.to_string())?
-                != actual_cli
+            || actual_cli.pid != authorized_cli.pid
+            || actual_cli.unique_id != authorized_cli.unique_id
+            || actual_cli.resource_cid != authorized_cli.resource_cid
         {
             return Err("命令与父子 CLI 资源域未保持独立".into());
         }

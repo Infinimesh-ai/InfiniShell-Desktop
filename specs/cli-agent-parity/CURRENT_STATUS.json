@@ -7350,5 +7350,39 @@
       "task_manager": 46,
       "temporary_directories": "all_cleaned"
     }
+  },
+  "g10_live_contract_repair_20261002": {
+    "status": "driver_contract_gates_passed_real_retry_pending",
+    "source_baseline": "87821e10719eb44e0e66ac272bb262ef1ec0a205",
+    "evidence": {
+      "claude_failed_execution": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-execution-87821e107-v1/r-m8dmj72e-command-cancel/execution.safe.json",
+        "sha256": "4c3628a987f5af87c7310d9274b93960bc5f4c38d42ec956651860602a61cb4e"
+      },
+      "grok_startup_failure": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-reviewed-commands-repair-v1/failed-run.safe.json",
+        "sha256": "b6cb0340844e3bd087995a10ee15cef94163273c916c5422a8a497ef81052c9a"
+      },
+      "claude_search_audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-repair-v1/r-m8dmj72e-independent-native-search.safe.json",
+        "sha256": "ce333b340506dbb2107b2b800b411fb9798cc14ba6c17ddbef71596e34bc592b"
+      },
+      "claude_failure_cleanup_audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-repair-v1/r-m8dmj72e-independent-cleanup.safe.json",
+        "sha256": "5edd9ad5056612a1e0b0198b716009f6abfa0b7b3e7350a4d142dcba167c0377"
+      }
+    },
+    "claude": "r-m8dmj72e实际Grep、隐藏答案和命令两层允许已到达，但CLI exec前/后全身份比较失败，未发Interrupt。按生产合同改核PID/unique_id/CID并记录两端完整身份；运行命令成员的实际全身份及清理门禁保留。不能补造失败轮的实际PID version。",
+    "grok": "r-dl4kzrdx在原生启动前拒绝，未有Ready或模型回合。修复驱动错误model覆盖与初始纯文本清空skill问题：原生默认model、父start登记alpha，唯一Ready后同UUID Submit文本；实际模型与创建上限后审计不变。",
+    "localization": "仅验收驱动变化，无需本地化变更；审批提示实窗仍待验。",
+    "gap_closed": false,
+    "gates": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-live-contract-repair-local-gates-v1.safe.json",
+      "sha256": "8f1b92443a8cb70a952a342003cbcbd7c352910db320e3082bb36195d480d4b5",
+      "compile": "passed_no_run",
+      "cargo_check": "passed",
+      "metadata_tests_passed": 6
+    },
+    "native_source_digest": "129项映射重算摘要4489e25b1fbaf9435617c9f7bbe226fc6a6d55ef8a58d63efcb86fa324843142，替换遗漏的旧声明；实际仓库回归先红后绿。"
   }
 }
