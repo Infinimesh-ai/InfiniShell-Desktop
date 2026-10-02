@@ -20,6 +20,7 @@ pub(super) enum Intent {
     ClaudeNpmStable21287To21285,
     ClaudeHomebrewStable21287To21285,
     ClaudeNpmWindowsStable21287To21285,
+    ClaudeWingetStable21286To21285,
 }
 
 impl Intent {
@@ -28,7 +29,8 @@ impl Intent {
             Self::ClaudeNpmStable21280To21278 => TO,
             Self::ClaudeNpmStable21287To21285
             | Self::ClaudeHomebrewStable21287To21285
-            | Self::ClaudeNpmWindowsStable21287To21285 => claude_current_release::V285,
+            | Self::ClaudeNpmWindowsStable21287To21285
+            | Self::ClaudeWingetStable21286To21285 => claude_current_release::V285,
         }
     }
 }
@@ -48,6 +50,18 @@ pub(super) fn select(
     target: &str,
     selected: Channel,
 ) -> Result<Option<Intent>, Error> {
+    if agent == CLIAgent::Claude && source == Source::WinGet {
+        if !cfg!(windows) || target == claude_current_release::V285 && !cfg!(target_arch = "x86_64")
+        {
+            return Err(Error::UnsupportedPlatform);
+        }
+        let intent = winget_transition(installed, target)?;
+        return if intent.is_some() && selected != Channel::Stable {
+            Err(Error::ChannelMismatch)
+        } else {
+            Ok(intent)
+        };
+    }
     if agent == CLIAgent::Claude
         && source == Source::Homebrew
         && installed == claude_current_release::V287
@@ -146,6 +160,59 @@ pub(super) fn validate_windows_npm(
     Ok(())
 }
 
+fn winget_transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
+    if target == FROM {
+        return if super::compare_versions(installed, target)? != std::cmp::Ordering::Greater {
+            Ok(None)
+        } else {
+            Err(Error::InvalidRelease)
+        };
+    }
+    match (installed, target) {
+        (claude_current_release::V285, claude_current_release::V285) => Ok(None),
+        ("2.1.286", claude_current_release::V285) => {
+            Ok(Some(Intent::ClaudeWingetStable21286To21285))
+        }
+        _ => Err(Error::InvalidRelease),
+    }
+}
+
+#[cfg(windows)]
+pub(super) fn validate_winget(
+    intent: Option<Intent>,
+    installed: &str,
+    target: &str,
+    config: &Option<ConfigBackup>,
+) -> Result<(), Error> {
+    let expected = winget_transition(installed, target).map_err(|_| Error::RecoveryRequired)?;
+    if intent != expected {
+        return Err(Error::RecoveryRequired);
+    }
+    if target == FROM {
+        return if config.is_none() {
+            Ok(())
+        } else {
+            Err(Error::ChannelMismatch)
+        };
+    }
+    if !cfg!(target_arch = "x86_64") {
+        return Err(Error::UnsupportedPlatform);
+    }
+    validate_stable_config(config)?;
+    let config = config.as_ref().ok_or(Error::RecoveryRequired)?;
+    if !matches!(config.kind, super::ConfigKind::Claude)
+        || config.publication_bytes(true).cloned()
+            != super::selected_channel_config(
+                super::ConfigKind::Claude,
+                config.before.as_deref(),
+                Some(Channel::Stable),
+            )?
+    {
+        return Err(Error::RecoveryRequired);
+    }
+    Ok(())
+}
+
 pub(super) fn validate(
     intent: Option<Intent>,
     installed: &str,
@@ -236,6 +303,7 @@ pub(super) fn compatible_history<'a>(
             Intent::ClaudeNpmStable21287To21285
                 | Intent::ClaudeHomebrewStable21287To21285
                 | Intent::ClaudeNpmWindowsStable21287To21285
+                | Intent::ClaudeWingetStable21286To21285
         ) {
             return false;
         }

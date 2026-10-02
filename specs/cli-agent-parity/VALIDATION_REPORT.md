@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：WinGet 合法降级、登记与配置恢复
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Windows x64 Claude WinGet已接固定286→Stable285；用户明确Stable、实时渠道一致且原PE/登记/配置完整绑定才执行。ConfigPublishing前恢复旧PE和ARP两字段，外部配置/策略变化保留并留账报错；提交点后验证候选/退出收据，再幂等发布Stable，PE/ARP/配置三方完整一致后才清理。PreparedCandidate摘要在发布和恢复时重算，意图、版本、映像、源配置/策略和收据均绑定；旧280账本及成功语义保持，新285只有完整前滚成功才清除活动失败标记。
+
+固定WinGet提交 `f0fb65e5263ef3f223bb0a750b6d1246189c5956` 的285和 `863c5234aebe4890d1e79addfce9fa8178edcfeb` 的286完整728B manifest分别匹配SHA `49a958e559951e096ad13db8e07a2a0529388ecaf9349af8ab31f18da878eebd`、`16baff02f9f3aca7d8c5a7ba706b556c9a9da9290dc2d4b151ddf45a5d324d8b`。285原生243751072B／SHA `121fc8151ed40bd9c144d68aa1cea23427803628ffab65e23da1cceda155697e`，286原生245092000B／SHA `0b6ecec8edef1ce3069682f696c894d1553239faa6b84e56e167a3ced88fa333`，完整字节与两官方来源一致。285复用已核npm映像重新哈希，286完整下载；不存在的287 WinGet manifest未拼造，ARM条目不代表准入。静态PE导入/证书检查不代记Windows签名信任或原生执行。原件审计 `808583c3a143b6b7e998672af67bc18dc78a81fb39165d37f3c2ba8912431dab`，13文件冻结索引 `a4cd2a0ec7d4ff1007fb82f90af8601c1b79e1097b4e86ac2028aa568fc24fb0`，仓外 `g09-windows-winget-downgrade-source-v1`。
+
+基于56b729001的12文件源码索引 `3e5519bb649c442d6359617e399f7f0ccd920340a9fccd628cd9e96cd48cc9b7`，独立审查 `d9d5f1caa60a8b0c7a7b1616d450770011f8d7ac8bf6441819014404ff367dc8` 无阻断。Mac check `r-qa39z5n7`通过；定向 `r-4hvheo4b`372项普通PASS／8347 skipped，无FAIL/LEAK/RETRY/FLAKY，log SHA `8f218c5fd40f9ed722fb779e27b365fa61221cedd89f02c895540b09348038dd`；i18n `r-8plntuea`11项通过，log SHA `42083610e93169f1d5fd782a0666ec7b8f8d304fd0674f0d56980b1584067eac`。三个短根均已核验清理，门禁索引 `a40dc0b73cd4f2613c9f9115c3946964197f58ebd230634b44f005a95685cda3`。无需本地化变更：既有英中更新、渠道、失败及恢复语义和布局适用。
+
+新增Windows专属文件/配置阶段恢复、ARP字段和旧账本兼容回归仍待精确平台门禁；测试不实际修改注册表，也不代替消费者WinGet原生事务。旧770门禁自然结束后仅派发包含Linux Homebrew、Windows npm及WinGet的最新提交源码门禁。有限源码复核未再定位明确未实现原生分支；Windows实际npm首CMD候选和独立固定Codex hooks自然退出失败根因未定，继续单列，不能写成仅缺设备。其他平台实机验收按授权移交，G03真实Finder拖放仍欠，不关闭G09。
+
 ## 2026-10-03：Windows npm 合法降级与旧账本兼容
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Windows x64的Claude npm已新增固定287→Stable285合同；只有用户明确选择Stable且派发前实时渠道仍为285才能执行。原287完整树、候选285全成员、双shell探针输入/实际版本/退出收据与账本相互绑定；恢复先复核意图和完整版本合同，再按已有ConfigPublishing提交点向前收敛或回滚。旧schema1缺少downgrade字段按None读取，旧三参探针仍仅280，新四参仅285，原278/280→280事务保持。不放行287候选、未知升级/降级或混合目标，不修改AppContainer、系统权限和超时。

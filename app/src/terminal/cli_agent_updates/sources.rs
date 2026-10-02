@@ -95,6 +95,9 @@ mod package_tree;
 #[cfg(windows)]
 #[path = "sources_winget.rs"]
 mod winget;
+#[cfg(any(windows, test))]
+#[path = "sources_winget_claude_contract.rs"]
+mod winget_claude_contract;
 #[cfg(all(feature = "local_fs", windows))]
 #[path = "sources_winget_codex.rs"]
 mod winget_codex;
@@ -147,7 +150,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 79] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 81] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -206,6 +209,8 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 79] = [
     include_bytes!("../../ai/cli_agent_runtime/managed_process_winget_codex_probe_windows.rs"),
     include_bytes!("sources_winget.rs"),
     include_bytes!("sources_winget_transaction.rs"),
+    include_bytes!("sources_winget_claude_contract.rs"),
+    include_bytes!("sources_winget_claude_contract.json"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
     include_bytes!("../../../../crates/command/src/windows_station_bootstrap.rs"),
@@ -757,6 +762,10 @@ pub(super) async fn inspect(
     #[cfg(all(feature = "local_fs", windows))]
     if installation.source == Source::WinGet {
         installation.error = winget::supports(agent, &target_version).err();
+        if installation.error.is_none() {
+            installation.error =
+                winget::supports_transition(agent, &installed_version, &target_version).err();
+        }
         if channel != Channel::FollowInstallation && channel != installation.channel {
             installation.error = Some(Error::ChannelMismatch);
         }
@@ -813,7 +822,13 @@ pub(super) async fn inspect(
     if agent == CLIAgent::Claude
         && (source_is_native_claude(&installation)
             || installation.source == Source::Npm
-            || downgrade == Some(claude_downgrade::Intent::ClaudeHomebrewStable21287To21285))
+            || matches!(
+                downgrade,
+                Some(
+                    claude_downgrade::Intent::ClaudeHomebrewStable21287To21285
+                        | claude_downgrade::Intent::ClaudeWingetStable21286To21285
+                )
+            ))
         && !version_matches
     {
         let compatibility = config
@@ -3178,6 +3193,15 @@ pub(super) async fn execute(
 
     #[cfg(all(feature = "local_fs", windows))]
     if installation.source == Source::WinGet {
+        if plan.agent == CLIAgent::Claude {
+            claude_downgrade::validate_winget(
+                plan.downgrade,
+                &plan.installed_version,
+                &plan.target_version,
+                &plan.config,
+            )?;
+            claude_downgrade::revalidate(plan.downgrade).await?;
+        }
         return if plan.agent == CLIAgent::Codex {
             winget_codex::execute(&plan, &root, verification_progress).await
         } else if plan.agent == CLIAgent::Grok {

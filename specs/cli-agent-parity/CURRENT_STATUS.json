@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备；Linux Homebrew及Windows npm合法降级实现已过本机门禁、待精确平台门禁；WinGet合法降级和Windows原生运行失败仍开放，历史LEAK独立保留",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备；Linux Homebrew、Windows npm及WinGet合法降级实现已过本机门禁、待精确平台门禁；Windows已证原生运行失败仍开放，历史LEAK独立保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1379,6 +1379,29 @@
       },
       "localization": "无需本地化变更；英中既有更新、渠道、失败和恢复语义适用，无文案或布局变化。",
       "remaining": "精确Linux/Windows源码门禁与Windows专属回归待完成；WinGet固定286→285降级原件已核、实现未完成。既有Windows实际npm失败及Codex hooks退出失败保留，其他平台实机验收移交不抵消原生实现欠项。G03真实Finder拖放仍欠。"
+    },
+    "g09_windows_winget_downgrade_20261003": {
+      "status": "local_gates_passed_cross_platform_source_pending",
+      "gap_closed": false,
+      "base_commit": "56b7290017fdefc7287dd52102a1e91e2a0e1f7e",
+      "source_record_sha256": "3e5519bb649c442d6359617e399f7f0ccd920340a9fccd628cd9e96cd48cc9b7",
+      "official_static_audit_sha256": "808583c3a143b6b7e998672af67bc18dc78a81fb39165d37f3c2ba8912431dab",
+      "official_freeze_sha256": "a4cd2a0ec7d4ff1007fb82f90af8601c1b79e1097b4e86ac2028aa568fc24fb0",
+      "independent_review_sha256": "d9d5f1caa60a8b0c7a7b1616d450770011f8d7ac8bf6441819014404ff367dc8",
+      "implemented": "Windows x64 Claude WinGet固定286→Stable285合同；独立意图、实时Stable重查、官方完整manifest/PE、旧树、ARP两字段和仅渠道配置变动绑定。ConfigPublishing前恢复旧PE和ARP，保留外部配置/策略变化及账本；之后向前提交PE/ARP/配置并完整核验才清理。旧280账本和结果语义保持，新285仅完整前滚才返回成功和清除活动失败标记。",
+      "source_basis": "固定WinGet提交的285/286完整manifest与完整官方PE、native manifest一致；285复用已核npm原件并重新哈希，286完整下载。仅x64准入，静态签名解析不代记Windows信任校验或实际执行。未拼造不存在的287 WinGet manifest。",
+      "local_gates": {
+        "audit_sha256": "a40dc0b73cd4f2613c9f9115c3946964197f58ebd230634b44f005a95685cda3",
+        "check_run": "r-qa39z5n7",
+        "nextest_run": "r-4hvheo4b",
+        "ordinary_passes": 372,
+        "skipped": 8347,
+        "i18n_run": "r-8plntuea",
+        "i18n_passes": 11,
+        "all_short_roots_cleaned": true
+      },
+      "localization": "无需本地化变更；既有英中更新、渠道、错误、恢复文案和布局适用。",
+      "remaining": "最新精确Linux/Windows源码门禁和Windows专属文件/ARP/配置恢复回归待完成；未执行Windows真实消费者事务。有限源码复核未再定位明确未实现原生分支，但既有Windows实际npm失败与独立Codex hooks退出失败根因未定，仍开放；其余平台实机验收按授权移交。G03 Finder实际拖放仍欠。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

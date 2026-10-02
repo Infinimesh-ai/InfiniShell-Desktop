@@ -20,6 +20,119 @@ fn historical_downgrade_intent_keeps_its_persisted_name() {
         serde_json::to_string(&Intent::ClaudeNpmWindowsStable21287To21285).unwrap(),
         r#""claude_npm_windows_stable21287_to21285""#
     );
+    assert_eq!(
+        serde_json::to_string(&Intent::ClaudeWingetStable21286To21285).unwrap(),
+        r#""claude_winget_stable21286_to21285""#
+    );
+}
+
+#[test]
+fn winget_transition_rejects_unreviewed_backward_edges_and_npm_versions() {
+    assert_eq!(winget_transition("2.1.278", "2.1.280"), Ok(None));
+    assert_eq!(winget_transition("2.1.280", "2.1.280"), Ok(None));
+    assert_eq!(winget_transition("2.1.285", "2.1.285"), Ok(None));
+    assert_eq!(
+        winget_transition("2.1.286", "2.1.285"),
+        Ok(Some(Intent::ClaudeWingetStable21286To21285))
+    );
+    assert_eq!(
+        winget_transition("2.1.286", "2.1.280"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        winget_transition("2.1.287", "2.1.285"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        winget_transition("2.1.280", "2.1.285"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        winget_transition("2.1.285", "2.1.286"),
+        Err(Error::InvalidRelease)
+    );
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn winget_downgrade_does_not_claim_managed_native_history_compatibility() {
+    let mut task = historical_task();
+    let intent = Intent::ClaudeWingetStable21286To21285;
+    assert!(!compatible_history(intent, [&task].into_iter()));
+    task.native_session_id = None;
+    assert!(compatible_history(intent, [&task].into_iter()));
+    task.state = crate::persistence::model::LocalCliTaskState::Running;
+    assert!(!compatible_history(intent, [&task].into_iter()));
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[test]
+fn winget_downgrade_binds_explicit_stable_config_and_its_own_source_intent() {
+    use super::super::{ConfigDesired, ConfigKind};
+
+    let intent = Some(Intent::ClaudeWingetStable21286To21285);
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::WinGet,
+            "2.1.286",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Ok(intent)
+    );
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::WinGet,
+            "2.1.286",
+            "2.1.285",
+            Channel::FollowInstallation
+        ),
+        Err(Error::ChannelMismatch)
+    );
+    let mut config = Some(ConfigBackup {
+        kind: ConfigKind::Claude,
+        path: PathBuf::from("C:/unused/settings.json"),
+        before: Some(br#"{"autoUpdatesChannel":"latest","other":true}"#.to_vec()),
+        after: None,
+        desired: Some(ConfigDesired {
+            bytes: Some(b"{\n  \"autoUpdatesChannel\": \"stable\",\n  \"other\": true\n}".to_vec()),
+        }),
+        before_mode: None,
+        restore_stage: None,
+    });
+    assert_eq!(
+        validate_winget(intent, "2.1.286", "2.1.285", &config),
+        Ok(())
+    );
+    assert_eq!(validate_winget(None, "2.1.285", "2.1.285", &config), Ok(()));
+    assert_eq!(
+        validate_winget(
+            Some(Intent::ClaudeNpmWindowsStable21287To21285),
+            "2.1.286",
+            "2.1.285",
+            &config
+        ),
+        Err(Error::RecoveryRequired)
+    );
+    assert_eq!(validate_winget(None, "2.1.278", "2.1.280", &None), Ok(()));
+    assert_eq!(
+        validate_winget(intent, "2.1.286", "2.1.285", &None),
+        Err(Error::ChannelMismatch)
+    );
+    config.as_mut().unwrap().desired.as_mut().unwrap().bytes =
+        Some(b"{\n  \"autoUpdatesChannel\": \"stable\",\n  \"other\": false\n}".to_vec());
+    assert_eq!(
+        validate_winget(intent, "2.1.286", "2.1.285", &config),
+        Err(Error::RecoveryRequired)
+    );
+    config.as_mut().unwrap().desired.as_mut().unwrap().bytes =
+        Some(br#"{"autoUpdatesChannel":"latest"}"#.to_vec());
+    assert_eq!(
+        validate_winget(intent, "2.1.286", "2.1.285", &config),
+        Err(Error::ChannelMismatch)
+    );
 }
 
 #[test]
