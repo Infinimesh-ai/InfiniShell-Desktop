@@ -3270,7 +3270,7 @@ impl GrokProtocol {
             Some("cancelled")
                 if matches!(
                     result["_meta"]["cancellationCategory"].as_str(),
-                    Some("MidTurnAbort" | "PermissionRejected")
+                    Some("MidTurnAbort" | "PermissionRejected" | "PermissionCancelled")
                 ) =>
             {
                 TurnOutcome::Cancelled

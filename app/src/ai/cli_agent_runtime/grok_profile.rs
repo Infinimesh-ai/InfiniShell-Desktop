@@ -840,7 +840,7 @@ impl GrokCreationPolicyV1 {
                 | GrokToolSet::Skills
                 | GrokToolSet::Commands
                 | GrokToolSet::CommandsSkills
-        ) && matches!(input["variant"].as_str(), Some("GrepSearch" | "ListDir"))
+        ) && matches!(input["variant"].as_str(), Some("Grep" | "ListDir"))
         {
             return self.validate().is_ok()
                 && search::approval_allowed(&self.canonical_working_directory, tool_call);

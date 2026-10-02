@@ -230,7 +230,7 @@ impl Fixture {
     }
     fn search_approval(&self) -> Value {
         let mut input = self.search_input.clone();
-        input["variant"] = json!("GrepSearch");
+        input["variant"] = json!("Grep");
         input
     }
     fn require_absent(&self) -> Result<(), String> {

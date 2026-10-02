@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：Claude 真实运行取消通过，Grok 搜索与取消协议修复
+
+**新增关闭 0 项，仍为 8 关闭／3 开放／3 后置，PR #22 保持草稿。** `4a78fc3f0/r-agu5bntu` 的固定 Claude `2.1.280/claude-opus-5-5` 真实搜索取得随机答案、命令父子成员已运行后，child journal 序列 15 的 Interrupt ACK 直接接序列 16 Cancelled，两任务均无 RequestFailed。两原始输入与子结果分别只接收一次；取消结果、三个原生/命令资源域销毁及无晚写通过独立审计 `8c8f03120838ae1f33df604c1f0396ac9fe7ba67acfa4d9c038bf46463e7b818`。父后续第 2 代为 unconfirmed，不冒称完成；短根和唯一原件保留，cleanup_ready=false。
+
+同源 Grok `r-m9z049qc` 已在官方 `1.0.41/grok-4.7` 实际派发子任务、完成受审 Skill，随后搜索被错误拒绝。公开 `ToolInput::Grep` 与原生 rawInput 都明确输入 variant 为 `Grep`，当前产品却检查 `GrepSearch`；后者实际是输出名。公开 PermissionCancelled 常量、ToolLoop::Cancelled 映射和本轮原生取消记录也一致，适配器原先未接受该类别。现在仅修这两个精确合同，保留固定版本、路径/字段边界、逐次审批、父权限和超时；新增回归使用原生原始行，验证正确输入、越界拒绝、取消等待同会话/回合历史及冲突终态拒绝。未知类别仍拒绝。因果审计 `1770b16462f27d76fba44d156efb657b1d0153d54780242ce9fa9204d45677ff`；原 exit 2 不改写。严格 cleanup_ok=false 来自 child adapter_succeeded=false，父子原生清理均确认且精确进程/标签已核空，不误报为进程残留；现场保留。
+
+`r-ik6s0205` 的英文/中文四个权限按钮完整，两种共享说明英文各 5 行、中文各 3 行均无截断，画面只在 CUA 回执中。唯一实际 Claude 任务返回 Not logged in，未取得审批，不能计真实审批布局通过。测试私有 PATH 缺少 Claude 用于读取已有登录的 security 命令，而成功取消驱动保留系统 PATH；静态依赖因果审计 `0216cd43eab78264589e545e8df8ce2707f0f39c5a8ac2644c7dbfc75d2ee426`，修复后登录仍待实窗；后续仅修夹具依赖。视觉观察收据 `e5c09005f9d283e1547e4a850c3f8beb87f28ddadb1ad98df0b3548e4e08afe6`。两语言打开面板画面均显示私有固定 CLI，收尾另观察到同 bundle 额外 GUI，不据此声称全程独占；两代和已知进程最终退出，唯一证据保留。
+
+本机 Grok 476 项通过、18 项显式忽略，i18n 11 项通过；源码/收据见 CURRENT_STATUS.json 的 `g10_grok_native_contract_repair_20261002`。提交前 cargo check 通过，三轮短目录均核验后清理；门禁汇总 `207596f6b66dc1365151a727fa2ed8d9f65119840174d328ecc779843ab9b1d8`。最终源码门禁仍待完成。复核英中搜索、取消及命令说明语义，**无需本地化变更**。修复后的 Grok 完整真实父子链和实际宿主审批双语布局仍待验，不因新增回归或静态画面关闭 G10。
+
 ## 2026-10-02：Windows PNG 身份补齐，真实取消缺陷与验收夹具修复
 
 **新增关闭 0 项，仍为 8 关闭／3 开放／3 后置，PR #22 草稿。** 精确 `95d16846d` 的 [原生步骤 36967571751](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36967571751) 已分别审计：native `92b51c9b5040`、重建树 `b2ca7be22f08`、补丁 `74abeb50…` 一致。Linux 32 条命令、542 次测试／533 个唯一名，Windows 31 条、520 次／516 个唯一名均过；两平台新增 PNG 17 项逐名核对。实际 Linux ELF 为 `23fecc04a15884d6ea88e08518c74cd17e0f73da3d98e0241fe63d7ad7c3b39f`，Windows PE 为 `168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9`。版本、帮助与异步补全启动通过，零模型；根代理随后观察两平台整 job 元数据 success、无 failed steps；完整日志 FAIL/RETRY/LEAK 审计另行补记，不能作为当前宿主增量的最终门禁。Linux/Windows 独立审计摘要分别为 `d630cd442e5733cfb04dbd3b11351b4fd9015339e2f5dca06624becbb29990bd`、`eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e`。原 69c17/f3cbb 失败和既定排除/后置范围保留；Linux 因进程引用可见性不足保留临时目录，Windows 工件没有目录清理收据。

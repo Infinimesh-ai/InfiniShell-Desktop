@@ -7488,5 +7488,76 @@
       "final_cross_platform_source_gate": "pending"
     },
     "gap_closed": false
+  },
+  "g10_grok_native_contract_repair_20261002": {
+    "status": "native_contract_fixed_mac_regressions_passed_real_chain_and_gui_approval_pending",
+    "source_baseline": "4a78fc3f0c9e131cba821e97e2bf806efaf98351",
+    "closed_gaps": [],
+    "goal_counts": {
+      "closed": 8,
+      "open": 3,
+      "deferred": 3
+    },
+    "claude_running_cancel": {
+      "run_id": "r-agu5bntu",
+      "result": "passed",
+      "audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-success-audit-v1/r-agu5bntu-independent.safe.json",
+      "audit_sha256": "8c8f03120838ae1f33df604c1f0396ac9fe7ba67acfa4d9c038bf46463e7b818",
+      "evidence": "固定 Claude 2.1.280、实际 claude-opus-5-5；原生搜索结果、真实命令两成员运行与心跳增长后，child journal Interrupt ACK 15 直接接 Cancelled 16，无 RequestFailed；命令取消结果、三资源域销毁和无晚写核对通过。",
+      "boundary": "两原始 user_input 与自动子结果均恰好一次原生 ACK；父后续第 2 代 unconfirmed 不记完成。目录与唯一证据保留，cleanup_ready=false。"
+    },
+    "grok_failure": {
+      "run_id": "r-m9z049qc",
+      "audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-search-contract-repair-v1/failed-run.safe.json",
+      "audit_sha256": "1770b16462f27d76fba44d156efb657b1d0153d54780242ce9fa9204d45677ff",
+      "evidence": "固定官方 1.0.41/grok-4.7 父子各一个原始输入，子 Skill 实际成功；随后 rawInput.variant=Grep 被误按 GrepSearch 拒绝，原生 PermissionCancelled 再被适配器拒绝，真实命令没有执行。",
+      "cleanup": "外层 exit 2 保留；cleanup_ok=false 因 child adapter_succeeded=false，父子原生 cleanup_confirmed/job_removed/resource_cid_destroyed 均 true，18 个精确进程及两标签已核空；现场保留，cleanup_ready=false。"
+    },
+    "repair": {
+      "source_audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-search-contract-repair-v1/source-index.final-review.safe.json",
+      "source_audit_sha256": "e172fe9c2ac7f0cdfeced7ff36b4818e4841794786269ac1586e3c5d6a405d0a",
+      "change": "按公开 ToolInput::Grep 和固定官方实际记录匹配输入；输出仍为 GrepSearch。PermissionCancelled 仅映射取消，并继续等待同原生会话/回合历史终态；未知类别与冲突历史拒绝。",
+      "scope_preserved": "固定版本、父权限、搜索目录与字段边界、逐次审批及超时不变；无猜测输入别名。"
+    },
+    "local_gates": {
+      "grok_tests": {
+        "run_id": "r-qxmmd0st",
+        "passed": 476,
+        "ignored": 18,
+        "failed": 0,
+        "log_sha256": "a2c655c5a6a33a5874575e2d4fd2094ad31b8e395170c5c8b67cd4685229d34f"
+      },
+      "i18n": {
+        "run_id": "r-vf24lsdx",
+        "passed": 11,
+        "log_sha256": "10f322c965898afde2b535f5018f35b3c48b35baec5d3aac25dafed5fee17894"
+      },
+      "cargo_check": {
+        "result": "passed",
+        "run_id": "r-9m2fn4r1",
+        "log_sha256": "e38d4565b304e8e4cadc854d8b83e86b454c967e8c140befc161c990e3664adf"
+      },
+      "final_source_ci": "pending",
+      "receipt": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-grok-native-contract-local-gates-v1.safe.json",
+        "sha256": "207596f6b66dc1365151a727fa2ed8d9f65119840174d328ecc779843ab9b1d8"
+      }
+    },
+    "gui": {
+      "run_id": "r-ik6s0205",
+      "strategy_layout": "EN/ZH 四个受审命令/命令技能按钮均完整；两种共享说明英文各 5 行、中文各 3 行无截断。画面在 CUA 工具回执，未另存 PNG。",
+      "actual_approval": "pending",
+      "failure": "唯一 Claude 任务返回 Not logged in，尚未到达实际审批；测试私有 PATH 缺 security，成功真实驱动保留系统 PATH。正修测试启动依赖，不改变用户登录。",
+      "identity_boundary": "两语言打开面板的画面均显示私有固定 CLI；收尾还观察到同 bundle 的额外 GUI，不宣称全程独占。两代与已知进程均退出，目录保留。",
+      "visual_audit_sha256": "e5c09005f9d283e1547e4a850c3f8beb87f28ddadb1ad98df0b3548e4e08afe6",
+      "auth_audit_sha256": "0216cd43eab78264589e545e8df8ce2707f0f39c5a8ac2644c7dbfc75d2ee426"
+    },
+    "localization": "已复核英中搜索/取消状态和受审命令既有语义；产品修复恢复既有承诺，无需本地化变更。策略静态布局通过不替代真实审批双语布局。",
+    "remaining": [
+      "Grok 修复后真实父子技能/搜索/受审命令及权限上限链",
+      "实际宿主命令审批的英文和中文实窗",
+      "最终源码门禁"
+    ],
+    "gap_closed": false
   }
 }
