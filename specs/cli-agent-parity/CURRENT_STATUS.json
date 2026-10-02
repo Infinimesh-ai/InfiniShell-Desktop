@@ -1282,7 +1282,7 @@
   "history_preservation": "历史报告中的归档路径和保留声明记录的是当时状态；用户已主动清理部分旧工作树、缓存和本地归档，本轮不将这些旧路径视为仍可用。固定 Git 历史及既有通过、失败、未验结论不重写。2026-09-27 续作的小型日志、收据和合成夹具位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927，不恢复体积庞大的旧缓存。",
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
-  "documentation_updated_at": "2026-10-02",
+  "documentation_updated_at": "2026-10-03",
   "documentation_source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
@@ -7921,5 +7921,56 @@
     "localization": "无需本地化变更：内部引导器/协议/诊断无新界面文案；现有SourceChanged/ProbeFailed/RecoveryRequired的英中消息语义继续适用，无布局变化",
     "remaining": "真实cmd/PowerShell到AppContainer内Node/npm、更新及清理尚待执行；实际Windows安装器未验；高完整性Session0候选不外推普通交互用户。G09其他Mac消费者及Homebrew验收条件不变",
     "local_gate_audit_sha256": "11f6d7e005ec5b74a46a2dbb0a77566aa109efa928aa03644c5b0ecde697d714"
+  },
+  "g09_consumer_contracts_20261002": {
+    "status": "implemented_local_gates_passed_consumer_acceptance_pending",
+    "gap_closed": false,
+    "source_base": "e9d93e13389d613f0d20cb0740335188db99d179",
+    "macos_contracts": {
+      "codex": "0.160.0 npm/Homebrew 完整发行树，保留0.156.1旧合同",
+      "claude": "2.1.285/2.1.287 npm/Homebrew；显式Stable 2.1.287→2.1.285，保留旧降级意图",
+      "grok": "1.0.46 npm/Homebrew完整发行树，保留1.0.41旧合同"
+    },
+    "native_runtime_boundary": "更新发行合同不扩大托管运行/模型版本白名单；旧journal语义与未知版本拒绝保留",
+    "real_homebrew": {
+      "prefix": "/Users/zhishi/InfiniShell-Tests/r-mbqmnwc7/brew",
+      "manager_version": "7.0.4",
+      "installed_codex": "0.156.1",
+      "evidence": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-homebrew-real-source-v1/installed-codex-01561.safe.json",
+      "sha256": "8bfd73d3d9254cb980c91abf42ef4fd3ae8a7345438340c76655a73a49b80f2e",
+      "status": "installed_retained",
+      "cleanup_ready": false,
+      "boundary": "真实官方brew安装/重装、42文件10目录、三份补全已核；尚未运行GUI更新事务。初次安装缺两个补全的旧失败保留。"
+    },
+    "private_caskroom": "真实0700私有前缀内Homebrew创建的0775 Caskroom，事务与专用原生版本/补全快照共用窄权限合同；同UID/设备/无ACL和句柄路径身份在复制前后复核，普通包/G01/状态目录检查保持。未修改真实安装权限。",
+    "localization": "无需本地化变更：扩展已审发行合同和安全来源路径，既有英中版本、渠道、忙碌、更新及错误提示语义仍适用；本轮GUI更新验收尚未运行",
+    "remaining": "精确提交双平台源码门禁、消费者GUI真实更新/忙碌预约/合法降级/应用重启恢复；Windows npm首候选失败另记，G09不关闭",
+    "recovery": "Codex156/160恢复闭包严格绑定journal目标版本，两方向重标拒绝，旧schema/摘要保持。",
+    "source_freeze_sha256": "46f8926b012d4ee7c4846aa9f067d6732a8870c6ce025e1685166bcd5388b8a6",
+    "source_files": 58,
+    "local_gates": {
+      "check": "passed",
+      "i18n": 11,
+      "focused_nextest": 316,
+      "skipped": 8354,
+      "audit_sha256": "1e3a9cca0f12275000b9fdcf5a63d0912b2a21832a64861b5f74873bb3dbf9b2",
+      "short_tmpdirs": "全部核验后归档清理"
+    }
+  },
+  "g09_station_production_terminal_20261002": {
+    "status": "failed_native_npm_station_cleanup_passed",
+    "gap_closed": false,
+    "source_commit": "e9d93e13389d613f0d20cb0740335188db99d179",
+    "run": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37018916543",
+    "job": 110876642030,
+    "source_gates": "cargo check、1043项lifecycle和43项command普通PASS，含7项bootstrap/i18n11/updates135；无nextest FAIL/LEAK/RETRY/FLAKY",
+    "native_result": "首updated场景CMD候选ProbeFailed、execute exit101，ignored libtest一项FAIL；stdout为空。PowerShell及其他四场景尚未执行。",
+    "station_result": "两段生产helper实际ready/exit0，新窗口站匹配；desktop_closed/job_empty/station_absent/logon_absent及AppContainer Job/profile清理确认",
+    "remaining_cause": "drain_before之后调试事件循环停滞约292秒，取消清理时才取得此前已创建Node的CREATE事件。此循环是WaitForDebugEvent而非stdout ReadFile；当前收据不足以认定唯一根因或ACL失败，未猜测修改超时/重复运行相似探针。",
+    "artifact_audit": "三份官方ZIP按API摘要/大小/CRC核验，19份追踪源码匹配精确Git blob，helper映像一致；完整原件保留",
+    "audit_sha256": "8537ee1b346579a29822d340c3e1afec1bb40cb7a51a98ce07efa2f0c255fb44",
+    "originals_index_sha256": "c1031703d77c33f5207434fa52dfcc5464ccbfc6d82a122254a7a2dff2cbbeae",
+    "log_sha256": "0ae7da51290fe01da055b461da6597ee2a203f7c98738c9f333ee549d7aa308b",
+    "boundary": "生产窗口站能力通过不等于Node/npm执行成功；不关闭G09，不覆盖后续Mac源码，也不外推普通非提升交互用户。"
   }
 }

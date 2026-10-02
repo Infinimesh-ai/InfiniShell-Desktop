@@ -1,5 +1,25 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：G09 当前消费合同与真实私有 Homebrew 支持，验收待完成
+
+新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。Mac ARM64 的 Codex 0.160.0、Claude 2.1.285/2.1.287、Grok 1.0.46 已按官方npm/cask完整树接线；Claude显式Stable的2.1.287→2.1.285使用独立意图，旧版本、旧降级意图、journal/schema及未知版本拒绝保留。Codex恢复额外将完整探针闭包绑定到账本目标版本，156/160双向误标均拒绝；更新合同不扩大托管运行或模型白名单。
+
+真实 Homebrew 7.0.4 在私有前缀 `/Users/zhishi/InfiniShell-Tests/r-mbqmnwc7/brew` 安装Codex0.156.1，真实tab、42文件/10目录及三份补全已独立核验，收据SHA `8bfd73d3d9254cb980c91abf42ef4fd3ae8a7345438340c76655a73a49b80f2e`。首次安装缺少两份补全的旧失败保留；只创建私有补全父目录后由官方brew重装，没有手写tab或修改现有安装权限。安装保留供GUI验收，cleanup_ready=false。
+
+真实Caskroom由Homebrew创建为0775，暴露事务与原生快照祖先两处拒绝。现仅Mac ARM64当前用户0700私有前缀中的固定Caskroom可接纳该模式；同UID、同设备、无ACL、原句柄和路径身份前后复核。普通包目录/文件、G01及快照状态目录保持严格检查；其他可写祖先、公开前缀、链接、权限或身份变化继续拒绝。该修复尚未通过真实GUI更新链，不将单元正例计为更新成功。
+
+冻结基线e9d93e133的58文件索引 `g09-consumer-contract-v3/source.safe.json` SHA `46f8926b012d4ee7c4846aa9f067d6732a8870c6ce025e1685166bcd5388b8a6`；本机check `r-8foebn90`、i18n11项 `r-fw5u2ksf`、定向316项 `r-emt25uhf` 均通过，8354项未选，三个短目录均核验并清理。定向范围包括更新/恢复、版本探针、npm worker及Mac原生快照；9项新增快照例外回归均通过。汇总SHA `1e3a9cca0f12275000b9fdcf5a63d0912b2a21832a64861b5f74873bb3dbf9b2`。早期v1测试编译E0308及后续子集结果保留，不回填成本轮结果。
+
+无需本地化变更：复核既有英中版本、渠道、忙碌、更新、错误及插件复检文案，语义无新增，i18n门禁通过。精确提交Linux/Windows源码门禁和Mac真实消费者更新、忙碌预约、合法降级、应用重启恢复仍待完成；Windows生产窗口站通过但npm首候选失败按下一节单列，不关闭G09。
+
+## 2026-10-02：G09 生产窗口站通过，真实 npm 首候选仍失败
+
+新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。精确 `e9d93e133` 的 [Windows 37018916543](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37018916543) 已终态失败：编译、1043项 lifecycle 与43项 command 普通PASS，含7项bootstrap、i18n11项及updates135项；nextest无FAIL/LEAK/RETRY/FLAKY，后续真实npm ignored libtest为1项FAIL，不能合称门禁成功。
+
+首个 updated 场景的CMD候选返回 ProbeFailed、execute exit101且stdout为空，PowerShell及其他四场景未执行。生产helper两段均ready并实际exit0，新窗口站匹配；桌面关闭、Job空、站与LUID消失及AppContainer profile清理确认。`drain_before`之后在WaitForDebugEvent循环停滞约292秒，取消清理时才取得此前已创建Node的CREATE事件。该循环不是stdout ReadFile；原件不足以认定唯一根因或ACL拒绝，不以改超时或相近探针补计成功。
+
+三份官方ZIP按API摘要、大小及CRC核验，19份追踪源码均匹配e9 Git blob，helper映像一致。终态审计 `g08-build-preparation/e9d93e133-ci/terminal-audit.safe.json` SHA `8537ee1b346579a29822d340c3e1afec1bb40cb7a51a98ce07efa2f0c255fb44`，原件索引 `c1031703d77c33f5207434fa52dfcc5464ccbfc6d82a122254a7a2dff2cbbeae`，完整日志 `0ae7da51290fe01da055b461da6597ee2a203f7c98738c9f333ee549d7aa308b`。历史pending与失败保留；此结果不覆盖后续Mac消费合同、不证明普通非提升交互用户，也不关闭G09。仅补记审计，无需本地化变更。
+
 ## 2026-10-02：G09 Windows 生产引导器接线，真实 npm 待验
 
 新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 保持草稿。Windows 版本探针已接随 GUI/TUI 打包的 `infinishell-station-bootstrap.exe`，只取已核监督程序同目录文件，文件身份和摘要进入事务并持租约。两段新 LUID helper 的挂起原句柄、创建时间、用户/Session/完整性、精确 Job 及本地命名管道 peer 均绑定；第二段仅从保留的第一段进程复制原句柄。磁盘 JSON 只作证据，不作为授权或恢复入口。原业务进程 AuthId、zero-cap AppContainer 和调试映像约束不变。

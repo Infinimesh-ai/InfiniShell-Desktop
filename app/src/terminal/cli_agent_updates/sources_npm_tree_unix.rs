@@ -332,6 +332,42 @@ impl Directory {
         Identity::read(&self.file.metadata().map_err(|_| Error::SourceChanged)?)
     }
 
+    /// Homebrew 会创建 0775 的 Caskroom；仅私有前缀隔离下接纳该固定父目录。
+    /// 包目录和文件仍使用严格的 identity/snapshot，不继承父目录的例外。
+    pub(super) fn homebrew_caskroom(&self) -> Result<(Self, Identity), Error> {
+        let prefix = self.identity()?;
+        let directory = self.child(OsStr::new("Caskroom"))?;
+        reject_extra_permissions(&directory.file)?;
+        let metadata = directory
+            .file
+            .metadata()
+            .map_err(|_| Error::SourceChanged)?;
+        let identity = match Identity::read(&metadata) {
+            Ok(identity) => identity,
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+            Err(Error::UnsupportedSource)
+                if prefix.mode & 0o7777 == 0o700
+                    && metadata.is_dir()
+                    && metadata.uid() == prefix.uid
+                    && metadata.dev() == prefix.device
+                    && metadata.mode() & 0o7777 == 0o775 =>
+            {
+                Identity {
+                    device: metadata.dev(),
+                    inode: metadata.ino(),
+                    uid: metadata.uid(),
+                    gid: metadata.gid(),
+                    mode: metadata.mode(),
+                }
+            }
+            Err(error) => return Err(error),
+        };
+        if self.identity()? != prefix {
+            return Err(Error::SourceChanged);
+        }
+        Ok((directory, identity))
+    }
+
     pub(super) fn child(&self, leaf: &OsStr) -> Result<Self, Error> {
         let leaf = name(leaf)?;
         Ok(Self {

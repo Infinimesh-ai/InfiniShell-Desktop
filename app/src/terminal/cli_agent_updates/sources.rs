@@ -28,6 +28,8 @@ use crate::terminal::cli_agent::{CLIAgent, parse_cli_agent_version};
 #[cfg(test)]
 use crate::terminal::cli_agent_sessions::plugin_manager::plugin_manager_for;
 
+#[path = "sources_claude_current_release.rs"]
+mod claude_current_release;
 #[path = "sources_claude_downgrade.rs"]
 mod claude_downgrade;
 
@@ -145,15 +147,18 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 73] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 77] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
+    include_bytes!("sources_claude_current_release.rs"),
+    include_bytes!("sources_claude_current_release.json"),
     include_bytes!("sources_npm.rs"),
     include_bytes!("sources_npm_grok.rs"),
     include_bytes!("sources_npm_grok_contract.rs"),
     include_bytes!("sources_npm_grok_mirror.rs"),
     include_bytes!("../../../../script/cli-agent-parity/grok_1041_npm_manifest.json"),
+    include_bytes!("../../../../script/cli-agent-parity/grok_1046_macos_npm_manifest.json"),
     include_bytes!("sources_npm_release.rs"),
     include_bytes!("sources_npm_codex.rs"),
     include_bytes!("sources_npm_codex_windows.rs"),
@@ -184,6 +189,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 73] = [
     include_bytes!("sources_brew_grok_probes.rs"),
     include_bytes!("sources_brew_completions.rs"),
     include_bytes!("../../../../script/cli-agent-parity/codex_0156_package_manifest.json"),
+    include_bytes!("../../../../script/cli-agent-parity/codex_0160_macos_package_manifest.json"),
     include_bytes!("sources_winget_grok.rs"),
     include_bytes!("sources_winget_grok_contract.rs"),
     include_bytes!("sources_winget_grok_dependencies.rs"),
@@ -599,7 +605,10 @@ impl UpdatePlan {
         &self,
         tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
     ) -> bool {
-        self.downgrade.is_none() || claude_downgrade::compatible_history(tasks)
+        match self.downgrade {
+            Some(intent) => claude_downgrade::compatible_history(intent, tasks),
+            None => true,
+        }
     }
 }
 
@@ -1685,15 +1694,17 @@ async fn discover_npm(
     Ok(Some(found))
 }
 
-/// 只认领已校准的系统平台和 Homebrew 前缀，其他自定义布局保留来源拒绝。
-fn brew_prefixes() -> &'static [&'static str] {
-    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-        &["/opt/homebrew", "/usr/local"]
-    } else if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-        &["/home/linuxbrew/.linuxbrew"]
-    } else {
-        &[]
-    }
+/// 版本探针和更新事务共用真实前缀的权限边界。
+pub(crate) fn valid_homebrew_prefix(prefix: &Path) -> bool {
+    brew::validate_prefix(prefix).is_ok()
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+pub(crate) fn valid_homebrew_caskroom(prefix: &Path) -> bool {
+    brew::validate_prefix(prefix).is_ok()
+        && package_tree::Directory::open(prefix)
+            .and_then(|directory| directory.homebrew_caskroom())
+            .is_ok()
 }
 
 async fn discover_brew(
@@ -1708,71 +1719,71 @@ async fn discover_brew(
         CLIAgent::Claude => &["claude-code", "claude-code@latest"],
         _ => return Ok(None),
     };
-    for &base in brew_prefixes() {
-        let brew = Path::new(base).join("bin/brew");
-        if !brew.is_file() {
+    let Ok(base) = brew::prefix_from_entry(agent, &installation.entry) else {
+        return Ok(None);
+    };
+    let brew = base.join("bin/brew");
+    if !brew.is_file() {
+        return Ok(None);
+    }
+    for cask in casks {
+        let cask_root = base.join("Caskroom").join(cask).join(installed);
+        if !same_tree(&installation.stamp.canonical, &cask_root) {
             continue;
         }
-        for cask in casks {
-            let cask_root = Path::new(base).join("Caskroom").join(cask).join(installed);
-            if !same_tree(&installation.stamp.canonical, &cask_root) {
-                continue;
-            }
-            let registered =
-                brew::registration(agent, installation, Path::new(base), cask, installed)?;
-            let metadata = brew::metadata(cask).await?;
-            let mut found = installation.clone();
-            found.source = Source::Homebrew;
-            let manager = stamp(&brew)?;
-            let brew = manager.canonical.clone();
-            found.manager = Some(manager);
-            found.registration = Some((registered.receipt.clone(), registered.receipt_stamp));
-            found.source_target = metadata
-                .get("version")
-                .and_then(Value::as_str)
-                .map(ToOwned::to_owned);
-            if found.source_target.is_none() {
-                return Err(Error::InvalidRelease);
-            }
-            found.channel = if matches!(*cask, "claude-code" | "grok-build") {
-                Channel::Stable
-            } else {
-                Channel::Latest
-            };
-            if requested != Channel::FollowInstallation && requested != found.channel {
-                found.error = Some(Error::ChannelMismatch);
-                return Ok(Some(found));
-            }
-            let mut invocation = BoundInvocation::manual_only(
-                [
-                    (ArtifactRole::Program, brew.clone()),
-                    (ArtifactRole::Entry, installation.entry.clone()),
-                    (ArtifactRole::Manager, brew),
-                    (ArtifactRole::InstallRoot, PathBuf::from(base)),
-                    (ArtifactRole::DependencyRoot, registered.root),
-                    (ArtifactRole::Registration, registered.receipt),
-                ],
-                ArtifactRole::Program,
-                ["upgrade", "--cask", "--greedy", cask]
-                    .into_iter()
-                    .map(|argument| ArgumentRef::Literal(argument.into()))
-                    .collect(),
-                "不派生 Homebrew Ruby 闭包；已审核单二进制布局由宿主 cask 事务执行",
-            );
-            invocation.environment.extend([
-                (
-                    "HOMEBREW_NO_AUTO_UPDATE".into(),
-                    ArgumentRef::Literal("1".into()),
-                ),
-                (
-                    "HOMEBREW_NO_INSTALL_CLEANUP".into(),
-                    ArgumentRef::Literal("1".into()),
-                ),
-            ]);
-            found.invocation = Some(invocation);
-            found.error = Some(Error::UnsupportedSource);
+        let registered = brew::registration(agent, installation, &base, cask, installed)?;
+        let metadata = brew::metadata(cask).await?;
+        let mut found = installation.clone();
+        found.source = Source::Homebrew;
+        let manager = brew::manager_stamp(&base)?;
+        let brew = manager.canonical.clone();
+        found.manager = Some(manager);
+        found.registration = Some((registered.receipt.clone(), registered.receipt_stamp));
+        found.source_target = metadata
+            .get("version")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned);
+        if found.source_target.is_none() {
+            return Err(Error::InvalidRelease);
+        }
+        found.channel = if matches!(*cask, "claude-code" | "grok-build") {
+            Channel::Stable
+        } else {
+            Channel::Latest
+        };
+        if requested != Channel::FollowInstallation && requested != found.channel {
+            found.error = Some(Error::ChannelMismatch);
             return Ok(Some(found));
         }
+        let mut invocation = BoundInvocation::manual_only(
+            [
+                (ArtifactRole::Program, brew.clone()),
+                (ArtifactRole::Entry, installation.entry.clone()),
+                (ArtifactRole::Manager, brew),
+                (ArtifactRole::InstallRoot, base.clone()),
+                (ArtifactRole::DependencyRoot, registered.root),
+                (ArtifactRole::Registration, registered.receipt),
+            ],
+            ArtifactRole::Program,
+            ["upgrade", "--cask", "--greedy", cask]
+                .into_iter()
+                .map(|argument| ArgumentRef::Literal(argument.into()))
+                .collect(),
+            "不派生 Homebrew Ruby 闭包；已审核单二进制布局由宿主 cask 事务执行",
+        );
+        invocation.environment.extend([
+            (
+                "HOMEBREW_NO_AUTO_UPDATE".into(),
+                ArgumentRef::Literal("1".into()),
+            ),
+            (
+                "HOMEBREW_NO_INSTALL_CLEANUP".into(),
+                ArgumentRef::Literal("1".into()),
+            ),
+        ]);
+        found.invocation = Some(invocation);
+        found.error = Some(Error::UnsupportedSource);
+        return Ok(Some(found));
     }
     Ok(None)
 }

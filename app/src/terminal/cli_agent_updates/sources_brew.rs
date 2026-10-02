@@ -7,6 +7,147 @@ use serde_json::Value;
 
 use super::{CLIAgent, Error, Installation, MAX_CONFIG, Stamp, read_limited, stamp};
 
+/// 前缀只从已经选中的公共入口推导，不能从 cask 原生映像或恢复账本另选安装。
+pub(super) fn prefix_from_entry(agent: CLIAgent, entry: &Path) -> Result<PathBuf, Error> {
+    if !matches!(agent, CLIAgent::Claude | CLIAgent::Codex | CLIAgent::Grok)
+        || entry.file_name().and_then(|name| name.to_str()) != Some(agent.command_prefix())
+    {
+        return Err(Error::UnsupportedSource);
+    }
+    let bin = entry.parent().ok_or(Error::UnsupportedSource)?;
+    if bin.file_name().and_then(|name| name.to_str()) != Some("bin") {
+        return Err(Error::UnsupportedSource);
+    }
+    let prefix = bin.parent().ok_or(Error::UnsupportedSource)?;
+    validate_prefix(prefix)?;
+    Ok(prefix.to_owned())
+}
+
+pub(super) fn validate_prefix(prefix: &Path) -> Result<(), Error> {
+    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    {
+        validate_macos_prefix(prefix)
+    }
+    #[cfg(not(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64")))]
+    {
+        if cfg!(all(target_os = "linux", target_arch = "x86_64"))
+            && prefix == Path::new("/home/linuxbrew/.linuxbrew")
+        {
+            Ok(())
+        } else {
+            Err(Error::UnsupportedPlatform)
+        }
+    }
+}
+
+/// 更新不运行 brew，但管理器公共入口也必须仍指向该前缀内同一份文件。
+pub(super) fn manager_stamp(prefix: &Path) -> Result<Stamp, Error> {
+    validate_prefix(prefix)?;
+    let manager = stamp(&prefix.join("bin/brew"))?;
+    if !manager.canonical.starts_with(prefix) {
+        return Err(Error::UnsupportedSource);
+    }
+    #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+    {
+        use std::os::unix::fs::MetadataExt as _;
+
+        validate_macos_prefix(manager.canonical.parent().ok_or(Error::UnsupportedSource)?)?;
+        let file = std::fs::File::open(&manager.canonical).map_err(|_| Error::SourceChanged)?;
+        let metadata = file.metadata().map_err(|_| Error::SourceChanged)?;
+        if metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.mode() & 0o7022 != 0
+            || metadata.nlink() != 1
+        {
+            return Err(Error::UnsupportedSource);
+        }
+        super::package_tree::reject_extra_permissions(&file)?;
+    }
+    Ok(manager)
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+fn validate_macos_prefix(prefix: &Path) -> Result<(), Error> {
+    use std::os::unix::fs::MetadataExt as _;
+
+    if !prefix.is_absolute() || prefix.canonicalize().ok().as_deref() != Some(prefix) {
+        return Err(Error::UnsupportedSource);
+    }
+    let uid = unsafe { libc::geteuid() };
+    for ancestor in prefix.ancestors() {
+        let metadata = std::fs::symlink_metadata(ancestor).map_err(|_| Error::SourceChanged)?;
+        if !metadata.is_dir()
+            || metadata.uid() != 0 && metadata.uid() != uid
+            || metadata.mode() & 0o022 != 0
+        {
+            return Err(Error::UnsupportedSource);
+        }
+        reject_writable_ancestor_acl(ancestor)?;
+    }
+    // 前缀本身继续使用事务目录的当前用户、mode 和无额外 ACL 约束。
+    super::package_tree::Directory::open(prefix)?.identity()?;
+    Ok(())
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+fn reject_writable_ancestor_acl(path: &Path) -> Result<(), Error> {
+    use std::ffi::{CString, c_void};
+    use std::os::unix::ffi::OsStrExt as _;
+
+    unsafe extern "C" {
+        fn acl_get_file(path: *const libc::c_char, kind: libc::c_int) -> *mut c_void;
+        fn acl_get_entry(acl: *mut c_void, id: libc::c_int, entry: *mut *mut c_void)
+        -> libc::c_int;
+        fn acl_get_tag_type(entry: *mut c_void, tag: *mut libc::c_int) -> libc::c_int;
+        fn acl_get_permset(entry: *mut c_void, permissions: *mut *mut c_void) -> libc::c_int;
+        fn acl_get_perm_np(permissions: *mut c_void, permission: libc::c_int) -> libc::c_int;
+        fn acl_free(acl: *mut c_void) -> libc::c_int;
+    }
+    let path = CString::new(path.as_os_str().as_bytes()).map_err(|_| Error::UnsupportedSource)?;
+    // sys/acl.h：ACL_TYPE_EXTENDED；只读和 deny 条目不增加目录写权限。
+    let acl = unsafe { acl_get_file(path.as_ptr(), 0x100) };
+    if acl.is_null() {
+        return if std::io::Error::last_os_error().raw_os_error() == Some(libc::ENOENT) {
+            Ok(())
+        } else {
+            Err(Error::UnsupportedSource)
+        };
+    }
+    let result = (|| {
+        let mut id = 0; // ACL_FIRST_ENTRY；后续为 ACL_NEXT_ENTRY。
+        loop {
+            let mut entry = std::ptr::null_mut();
+            let status = unsafe { acl_get_entry(acl, id, &mut entry) };
+            if status != 0 {
+                return if std::io::Error::last_os_error().raw_os_error() == Some(libc::EINVAL) {
+                    Ok(())
+                } else {
+                    Err(Error::UnsupportedSource)
+                };
+            }
+            id = -1;
+            let mut tag = 0;
+            if unsafe { acl_get_tag_type(entry, &mut tag) } != 0 || !matches!(tag, 1 | 2) {
+                return Err(Error::UnsupportedSource);
+            }
+            if tag == 2 {
+                continue;
+            }
+            let mut permissions = std::ptr::null_mut();
+            if unsafe { acl_get_permset(entry, &mut permissions) } != 0 {
+                return Err(Error::UnsupportedSource);
+            }
+            // 写入、删除、追加、删除子项、属性、扩展属性、安全描述和所有者。
+            for bit in [2, 4, 5, 6, 8, 10, 12, 13] {
+                if unsafe { acl_get_perm_np(permissions, 1 << bit) } != 0 {
+                    return Err(Error::UnsupportedSource);
+                }
+            }
+        }
+    })();
+    unsafe { acl_free(acl) };
+    result
+}
+
 pub(super) struct Registration {
     pub(super) root: PathBuf,
     pub(super) receipt: PathBuf,
@@ -64,13 +205,22 @@ pub(super) fn registration(
     };
     super::parse_version(version)?;
     let root = prefix.join("Caskroom").join(token);
-    if prefix.canonicalize().ok().as_deref() != Some(prefix)
+    if prefix_from_entry(agent, &installation.entry)?.as_path() != prefix
+        || prefix.canonicalize().ok().as_deref() != Some(prefix)
         || root.canonicalize().ok().as_deref() != Some(root.as_path())
         || installation.entry != prefix.join("bin").join(command)
         || !std::fs::symlink_metadata(&installation.entry)
             .is_ok_and(|metadata| metadata.file_type().is_symlink())
     {
         return Err(Error::UnsupportedSource);
+    }
+    let manager = manager_stamp(prefix)?;
+    if installation
+        .manager
+        .as_ref()
+        .is_some_and(|expected| *expected != manager)
+    {
+        return Err(Error::SourceChanged);
     }
     let entry_relative = installation
         .stamp
@@ -146,7 +296,10 @@ pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
         #[cfg(not(all(feature = "local_fs", target_os = "linux")))]
         return Err(Error::UnsupportedPlatform);
     }
-    if version != "2.1.280" {
+    if version != "2.1.280"
+        && !(cfg!(all(target_os = "macos", target_arch = "aarch64"))
+            && super::claude_current_release::supports(version, "darwin-arm64").is_ok())
+    {
         return Err(Error::InvalidRelease);
     }
     Ok(())
@@ -238,6 +391,11 @@ pub(super) fn release(
         .and_then(Value::as_str)
         .ok_or(Error::InvalidRelease)?;
     let digest = decode_sha256(sha)?;
+    if version != "2.1.280"
+        && digest != super::claude_current_release::native(version, "darwin-arm64")?.1
+    {
+        return Err(Error::InvalidRelease);
+    }
     Ok((value, url, digest))
 }
 
@@ -252,3 +410,12 @@ pub(super) fn decode_sha256(value: &str) -> Result<[u8; 32], Error> {
     }
     Ok(digest)
 }
+
+#[cfg(all(
+    test,
+    feature = "local_fs",
+    target_os = "macos",
+    target_arch = "aarch64"
+))]
+#[path = "sources_brew_tests.rs"]
+mod tests;

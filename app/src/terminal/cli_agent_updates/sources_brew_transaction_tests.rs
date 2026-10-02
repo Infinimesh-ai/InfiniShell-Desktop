@@ -12,6 +12,80 @@ fn fixture() -> Fixture {
     publication_fixture(false)
 }
 
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+fn private_caskroom_fixture() -> Fixture {
+    let mut fixture = fixture();
+    let prefix = &fixture.journal.prefix;
+    fs::set_permissions(prefix, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(prefix.join("Caskroom"), fs::Permissions::from_mode(0o775)).unwrap();
+    let directory = Directory::open(prefix).unwrap();
+    fixture.journal.prefix_identity = directory.identity().unwrap();
+    fixture.journal.parent_identity = directory.homebrew_caskroom().unwrap().1;
+    fixture.journal.verify_external().unwrap();
+    fixture
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_caskroom_recovery_rejects_changed_prefix_permissions() {
+    let fixture = private_caskroom_fixture();
+    fs::set_permissions(&fixture.journal.prefix, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(fixture.journal.verify_external().is_err());
+    assert_eq!(
+        fs::read(&fixture.journal.entry).unwrap(),
+        b"new public binary"
+    );
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_caskroom_recovery_rejects_replaced_prefix_or_parent() {
+    for replace_prefix in [false, true] {
+        let fixture = private_caskroom_fixture();
+        let path = if replace_prefix {
+            fixture.journal.prefix.clone()
+        } else {
+            fixture.journal.parent()
+        };
+        let saved = path.with_extension("saved");
+        fs::rename(&path, &saved).unwrap();
+        fs::create_dir(&path).unwrap();
+        fs::set_permissions(
+            &path,
+            fs::Permissions::from_mode(if replace_prefix { 0o700 } else { 0o775 }),
+        )
+        .unwrap();
+        assert!(fixture.journal.verify_external().is_err());
+        assert!(saved.exists());
+    }
+}
+
+#[test]
+fn replaced_public_manager_link_preserves_the_original_manager_and_package() {
+    let mut fixture = fixture();
+    let prefix = &fixture.journal.prefix;
+    let manager = prefix.join("Homebrew/bin/brew");
+    fs::create_dir_all(manager.parent().unwrap()).unwrap();
+    fs::rename(prefix.join("bin/brew"), &manager).unwrap();
+    symlink(&manager, prefix.join("bin/brew")).unwrap();
+    fixture.journal.manager = stamp(&prefix.join("bin/brew")).unwrap();
+    fixture.journal.verify_external().unwrap();
+    let other = prefix.join("Homebrew/bin/other-brew");
+    fs::write(&other, b"another manager").unwrap();
+    fs::remove_file(prefix.join("bin/brew")).unwrap();
+    symlink(other, prefix.join("bin/brew")).unwrap();
+
+    assert!(matches!(
+        fixture.journal.verify_external(),
+        Err(Error::SourceChanged)
+    ));
+    assert_eq!(fs::read(manager).unwrap(), b"unchanged manager");
+    assert_eq!(
+        fs::read(&fixture.journal.entry).unwrap(),
+        b"new public binary"
+    );
+}
+
 fn publication_fixture(with_alias: bool) -> Fixture {
     let temporary = tempfile::tempdir().unwrap();
     let prefix = temporary.path().canonicalize().unwrap().join("prefix");

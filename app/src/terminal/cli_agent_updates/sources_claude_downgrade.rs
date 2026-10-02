@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use super::{CLIAgent, Channel, ConfigBackup, Error, Source};
+use super::{CLIAgent, Channel, ConfigBackup, Error, Source, claude_current_release};
 
 pub(super) const FROM: &str = "2.1.280";
 pub(super) const TO: &str = "2.1.278";
@@ -17,6 +17,16 @@ pub(super) const TO: &str = "2.1.278";
 #[serde(rename_all = "snake_case")]
 pub(super) enum Intent {
     ClaudeNpmStable21280To21278,
+    ClaudeNpmStable21287To21285,
+}
+
+impl Intent {
+    fn target(self) -> &'static str {
+        match self {
+            Self::ClaudeNpmStable21280To21278 => TO,
+            Self::ClaudeNpmStable21287To21285 => claude_current_release::V285,
+        }
+    }
 }
 
 pub(super) fn platform() -> Result<&'static str, Error> {
@@ -34,20 +44,40 @@ pub(super) fn select(
     target: &str,
     selected: Channel,
 ) -> Result<Option<Intent>, Error> {
-    if agent != CLIAgent::Claude || source != Source::Npm || target != TO {
+    if agent != CLIAgent::Claude || source != Source::Npm {
         return Ok(None);
     }
-    platform()?;
-    if installed == target {
-        return Ok(None);
-    }
-    if installed != FROM {
-        return Err(Error::InvalidRelease);
-    }
-    if selected != Channel::Stable {
+    let intent = transition(installed, target)?;
+    if intent.is_some() && selected != Channel::Stable {
         return Err(Error::ChannelMismatch);
     }
-    Ok(Some(Intent::ClaudeNpmStable21280To21278))
+    Ok(intent)
+}
+
+fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
+    use claude_current_release::{V285, V287};
+
+    if target == TO {
+        platform()?;
+        return match installed {
+            TO => Ok(None),
+            FROM => Ok(Some(Intent::ClaudeNpmStable21280To21278)),
+            _ => Err(Error::InvalidRelease),
+        };
+    }
+    if matches!(target, V285 | V287) {
+        claude_current_release::supports(target, platform()?)?;
+        return match (installed, target) {
+            (FROM, V285 | V287) | (V285, V287) | (V285, V285) | (V287, V287) => Ok(None),
+            (V287, V285) => Ok(Some(Intent::ClaudeNpmStable21287To21285)),
+            _ => Err(Error::InvalidRelease),
+        };
+    }
+    // 新消费者版本没有回退到开发基线的合同；不能沿用旧 280 入口绕过明确降级边。
+    if target == FROM && matches!(installed, V285 | V287) {
+        return Err(Error::InvalidRelease);
+    }
+    Ok(None)
 }
 
 pub(super) fn validate(
@@ -56,19 +86,18 @@ pub(super) fn validate(
     target: &str,
     config: &Option<ConfigBackup>,
 ) -> Result<(), Error> {
-    if target != TO {
-        return if intent.is_none() {
-            Ok(())
+    let expected = transition(installed, target).map_err(|error| {
+        if error == Error::InvalidRelease {
+            Error::RecoveryRequired
         } else {
-            Err(Error::RecoveryRequired)
-        };
-    }
-    platform()?;
-    if installed == target && intent.is_none() {
-        return Ok(());
-    }
-    if installed != FROM || intent != Some(Intent::ClaudeNpmStable21280To21278) {
+            error
+        }
+    })?;
+    if intent != expected {
         return Err(Error::RecoveryRequired);
+    }
+    if intent.is_none() {
+        return Ok(());
     }
     let desired: Value = config
         .as_ref()
@@ -82,14 +111,14 @@ pub(super) fn validate(
 }
 
 pub(super) async fn revalidate(intent: Option<Intent>) -> Result<(), Error> {
-    if intent.is_some()
+    if let Some(intent) = intent
         && super::latest(
             CLIAgent::Claude,
             Channel::Stable,
             &http_client::Client::new(),
         )
         .await?
-            != TO
+            != intent.target()
     {
         return Err(Error::ChannelMismatch);
     }
@@ -98,6 +127,7 @@ pub(super) async fn revalidate(intent: Option<Intent>) -> Result<(), Error> {
 
 #[cfg(feature = "local_fs")]
 pub(super) fn compatible_history<'a>(
+    intent: Intent,
     tasks: impl Iterator<Item = &'a crate::persistence::model::LocalCliTask>,
 ) -> bool {
     use crate::ai::cli_agent_runtime::permissions::ClaudeFileProfile;
@@ -111,6 +141,10 @@ pub(super) fn compatible_history<'a>(
         }
         if task.native_session_id.is_none() {
             return task.state.is_terminal();
+        }
+        // 消费者发行原件的审核不证明 285 能继续任意托管原生历史。
+        if intent == Intent::ClaudeNpmStable21287To21285 {
+            return false;
         }
         if task
             .native_session_id
@@ -353,3 +387,7 @@ fn files(platform: &str) -> Result<BTreeMap<PathBuf, (u64, &'static str, u32)>, 
         .map(|(path, size, sha, mode)| (PathBuf::from(path), (*size, *sha, *mode)))
         .collect())
 }
+
+#[cfg(test)]
+#[path = "sources_claude_downgrade_tests.rs"]
+mod tests;

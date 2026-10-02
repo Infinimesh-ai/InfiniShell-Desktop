@@ -16,6 +16,10 @@ use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
 
 mod sources;
 
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+pub(crate) use sources::valid_homebrew_caskroom;
+pub(crate) use sources::valid_homebrew_prefix;
+
 const AGENTS: [CLIAgent; 3] = [CLIAgent::Codex, CLIAgent::Claude, CLIAgent::Grok];
 const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 const TICK_INTERVAL: Duration = Duration::from_secs(60);

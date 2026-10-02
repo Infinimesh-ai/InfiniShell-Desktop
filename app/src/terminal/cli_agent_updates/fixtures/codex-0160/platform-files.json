@@ -1,0 +1,222 @@
+{
+  "vendor/aarch64-apple-darwin/bin/codex": [
+    241555024,
+    "112fae7a5a1223e673c8a1791d32338f37df8b527ff1159bb8adac6c4dbf1b4b",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/bin/codex-code-mode-host": [
+    65391216,
+    "679eedaea70529aa1cffc9bc0a0788c186412663544fa76c09d63b57f383a65a",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/bin/codex-voice-host": [
+    9900112,
+    "e408413b79d76e518966046ce1d7758523c606844269fe4dd56446bed80c1062",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-path/rg": [
+    4030432,
+    "7c7d5b09c3a57de864500c65dc2e9c4d2a5e96a3fc7b7d5318480c19887a739b",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/zsh/bin/zsh": [
+    754208,
+    "d715e06edcf1661edb2e7767d65fbd1b44af505edfb217281b701f0a6ae93b15",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libffi.8.dylib": [
+    136768,
+    "3dfe23b471423eb61bf38785c21ddb7054c5be1f87f87fbed7aa8a8c91e3bde0",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgio-2.0.0.dylib": [
+    1866272,
+    "b0c1b06de1deef21fde623c38a604cf413b1d607dda85644e296fb6d97067c39",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libglib-2.0.0.dylib": [
+    1310992,
+    "65a0785497ed134d79284c08118d8bba560f7f60e20682debe4ee12e848a5f8c",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgmodule-2.0.0.dylib": [
+    68912,
+    "3b4b70cdd569c088c28d6618b330d1acdc0fe456cf34267525c594f89e5dae84",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgobject-2.0.0.dylib": [
+    403088,
+    "ae78667a1a328528169ade0b18aa4ef547ce6b5f70db891781db8dab95ac46a1",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstapp-1.0.0.dylib": [
+    152608,
+    "04d8b371136a375f1efe0af61d18a7605a8556b80599b2cfa0c91a5a235a43e4",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstapp.dylib": [
+    49872,
+    "86a4f96e8ecc4802777eec36391105226976dce1a80ce68e561989aa83314e9d",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstaudio-1.0.0.dylib": [
+    530400,
+    "3fa362d9b53ef65993108a7fdc88471086e95012f5de4cb35ab37991490cfb60",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstaudioconvert.dylib": [
+    93824,
+    "4c85c9ea1568cf778f8f1365979cc8383376bb2a4630768de24eb66a1b254c52",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstaudioresample.dylib": [
+    91840,
+    "757a61f900ed50c0a51ec9928c4ca0b27798ff6b0a3a235329d240faedd438c1",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstbase-1.0.0.dylib": [
+    505968,
+    "437beaf6d2f2b1204a58d987d0698fd8c1c796a6c341f25c8a7a797b0e045540",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstcoreelements.dylib": [
+    446608,
+    "a2e96bac9f9a88712a94320d9017077346f212e77c4fc4b20f02f23c3ee6ff49",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstnet-1.0.0.dylib": [
+    117008,
+    "5173345f4b6ab9fa75ca731c8fe94ae187d6ac395eb213844312a04218924e3e",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstopus.dylib": [
+    131680,
+    "42eac3b57ef0ec6de84c9aed32453b07482294738345062f4699ec9e0454c867",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstpbutils-1.0.0.dylib": [
+    309856,
+    "e3f9bb0e56280e1572267f2cf482cd26b5341cecae4cc279e2d1dd2b6d80920c",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstreamer-1.0.0.dylib": [
+    1304704,
+    "0e6826b74f874848e8a0e37fdcb7f5061abc711edfb802587771c5dc1c399f1b",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstrtp-1.0.0.dylib": [
+    205696,
+    "fd50798327e0f20605c02ff133a3ca4583ebb8cf13f082205360da8b07389209",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstrtp.dylib": [
+    673888,
+    "591b36944f84d8740b2813ff7bee74b15fdd364b5ac3351bd40c91a498d7f54b",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/plugins/libgstrtpmanager.dylib": [
+    527568,
+    "5109cff21697ce04c93ea822577aac3bcb0fb659a53ea32f332f10ca44c0496e",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgsttag-1.0.0.dylib": [
+    283696,
+    "3b40bd0003b56507d701d3c4111ee5b8c58be3a2dcaf6da9e0a30498611222bc",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libgstvideo-1.0.0.dylib": [
+    903664,
+    "ae8adbb687f26decf3c685265e595f1649769e49202e38b6854f1debdc06d363",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libintl.8.dylib": [
+    50112,
+    "d9ee5a31754b382365628fad50df33b6111ad84e133d6f141e73822611c9f727",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libopus.0.dylib": [
+    504080,
+    "c51f552406b80e7026659f77902488eea4ddad101af84f244cfe4912e90bccb2",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libpcre2-8.0.dylib": [
+    456816,
+    "ce76aa5a13b32e8d8d8ddfd723f519e025e028b53250f3e11a90df39ec473e53",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/lib/libz.1.dylib": [
+    123312,
+    "d80d2b42ec19b265c361d5bba2070c29c38a6ef389ffecd87822e248fc700993",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-package.json": [
+    200,
+    "404c4c935bf9b7a57fc02b6f0d09ba6b7bbbf15cf14286fc017de2a6c01cab47",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/manifest.json": [
+    4637,
+    "dcf75f68cd3d1e94e557f80998dd1a707283dc2a9799c9c14c5d46aa6e158909",
+    420
+  ],
+  "package.json": [
+    517,
+    "2497ae33d4df7cb43618e3935fb1dfbff6a7bf536e2258776d1e95afc3c47017",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/runtime.json": [
+    14915,
+    "2a2e60d93e82a335039dc5a08a26963ca853f2238e927c2498d76dc2466f7d74",
+    493
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/sources.json": [
+    4911,
+    "e2f6b124f6277e7c3c4f5c7cc8830c66190f671ad65e972bb2cc9507dbfcb937",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/NOTICE.md": [
+    2403,
+    "40097a1799441051aa0b6645cdc819cceb19be73cdd265eb602aa2b15e0b1f48",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/PCRE2.md": [
+    4011,
+    "197d8a73ffee0d6b09adba2f9c677b5f5aede24edf89258a68e48248d010d811",
+    420
+  ],
+  "README.md": [
+    3334,
+    "ba4e1f69ff48386e72a9c5e1edaf76aad64a475c2d51af79ccba6d1128261ba7",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/LGPL-2.1.txt": [
+    26431,
+    "ad2eec519ebd4b5df86ea84dff24ae3bfa2edea846a703b58902dd221ae375db",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/libffi.txt": [
+    1132,
+    "17b64dc60f3b6897a60f971e288b973f655c2edcdf08b25f3c3dd5549857881c",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/Opus.txt": [
+    1945,
+    "01e1167d54a096d123cf6dfbbeb19587278845c6481d2d66d545669846079551",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/proxy-libintl.txt": [
+    25292,
+    "d245807f90032872d1438d741ed21e2490e1175dc8aa3afa5ddb6c8e529b58e5",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/sljit.txt": [
+    1444,
+    "5f216505c0f6ea3273caec89e766eef93cdeb7bbb0c429f9360116d7c938feeb",
+    420
+  ],
+  "vendor/aarch64-apple-darwin/codex-resources/voice/licenses/zlib.txt": [
+    1002,
+    "e32ff4e00d9d94930537635291da39e7e612703334bf6fde8c7f1686fe8a45a2",
+    420
+  ]
+}

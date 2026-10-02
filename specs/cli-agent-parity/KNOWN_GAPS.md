@@ -257,6 +257,10 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-03 当前消费合同与私有Homebrew原生修复**：Mac的Codex0.160、Claude2.1.285/287及Grok1.0.46 npm/cask完整合同已接线；显式Claude287→285与旧意图分离，Codex恢复拒156/160误标。真实Homebrew7.0.4已安装Codex0156.1，尚未执行GUI更新。仅私有0700前缀内0775 Caskroom获窄事务/原生快照支持，普通包及G01权限不放宽；check、i18n11、定向316通过，门禁审计`1e3a9cca0f12275000b9fdcf5a63d0912b2a21832a64861b5f74873bb3dbf9b2`。消费者真实更新、忙碌、降级、应用重启恢复及精确源码门禁仍缺，不关闭G09。
+
+- **2026-10-02 Windows生产窗口站已验，npm仍失败**：精确`e9d93e133`的[37018916543](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37018916543)编译与1086普通回归通过，7项bootstrap普通PASS；真实npm首updated/CMD候选ProbeFailed，1项ignored libtest FAIL，PowerShell及其余四场景未执行。两段生产helper、新窗口站与完整退出清理通过；调试事件循环停滞仍待定位，不能算npm成功。三份官方ZIP、19份源码及完整日志已核，终态审计`8537ee1b346579a29822d340c3e1afec1bb40cb7a51a98ce07efa2f0c255fb44`。Mac消费者与真实Homebrew验收仍缺，G09不关闭。
+
 - **2026-10-02 Windows 生产引导器已接，真实 npm 待验，仍开放**：固定同目录引导器已进入 GUI/TUI 打包和事务身份闭包；两段原句柄/新LUID/精确Job/认证管道、新站 AppContainer SID 授权与退出后站/LSA消失核验已实现，业务身份及zero-cap隔离不变。桌面恢复和失败强制回收已补齐，失败不变成功。Windows全目标类型检查、Mac check、Python15项、i18n11项及脚本解析通过，短TMPDIR已归档清理；20文件源码索引 `a7fd229cccfd495eb4eae958094a3ff916a6efdc4604b4c44632cee2d8702e9e`。真实CMD/PowerShell→Node/npm、五场景事务及安装器仍未通过；Mac消费者原条件不变。前一插件提交798f的[双平台门禁](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37012577482)已成功，两端新增20项+增强1项逐名普通PASS，独立审计 `4f231826362e1cf15f9d6818a9a910490ed256478a43ae2b2ef63b67ab579724`；该门禁不覆盖新引导器。无需本地化变更：既有英中错误语义适用，无新UI文案。
 
 - **2026-10-02 插件复检实装与 Windows 原生前置通过，仍开放**：检查及成功更新后已接只读完整树复检，使用本次真实入口/版本，通知和编排插件结果分别显示，不改变未知托管版本门禁或回滚已提交的 CLI。Mac check、i18n11项、定向484项及英中实窗通过；私有夹具实际复检显示缺失、禁用、文件不符和未知版本未验证，文件未改写，审计 `3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec`。首次旧Codex树误判已按既有严格合同修复，原失败保留；更新后的Linux/Windows源码门禁待验。另 [04a874d7a Windows候选](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37008880591) 的新LUID两段站身份及退出回收已通过，独立审计 `615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774`；尚未接生产AppContainer/Node/npm，不外推普通交互用户。真实消费者渠道、忙碌延期、合法降级、GUI更新和应用重启恢复等其余原条件不变。

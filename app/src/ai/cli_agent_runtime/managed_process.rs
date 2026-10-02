@@ -386,6 +386,11 @@ struct OpenedFileMetadata {
 }
 
 impl ExpectedFileIdentity {
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    pub(crate) fn matches_release_image(&self, size: u64, sha256: &str) -> bool {
+        self.size == size && self.sha256 == sha256
+    }
+
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
@@ -3059,12 +3064,27 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                         )?,
                         None => state_dir.to_owned(),
                     };
-                    let executable = atomic_macos::prepare_native_executable(
-                        &snapshot_root,
-                        manifest.generation,
-                        binding.digest(),
-                        &manifest.expected_files[0],
-                    )?;
+                    let executable = if matches!(
+                        manifest.atomic_launch_kind,
+                        Some(
+                            AtomicLaunchKind::ClaudeHomebrewVersionProbeV1
+                                | AtomicLaunchKind::CodexHomebrewVersionProbeV1
+                                | AtomicLaunchKind::GrokHomebrewVersionProbeV1
+                        )
+                    ) {
+                        atomic_macos::prepare_homebrew_probe_executable(
+                            &snapshot_root,
+                            binding.digest(),
+                            manifest,
+                        )?
+                    } else {
+                        atomic_macos::prepare_native_executable(
+                            &snapshot_root,
+                            manifest.generation,
+                            binding.digest(),
+                            &manifest.expected_files[0],
+                        )?
+                    };
                     executable.verify_for_execution()?;
                     if version_probe::is_probe(manifest.atomic_launch_kind) {
                         version_probe::deny_network()?;

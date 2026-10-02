@@ -108,6 +108,9 @@ pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
     match version {
         "2.1.280" => Ok(()),
         claude_downgrade::TO => claude_downgrade::platform().map(|_| ()),
+        super::claude_current_release::V285 | super::claude_current_release::V287 => {
+            super::claude_current_release::supports(version, &target()?)
+        }
         _ => Err(Error::InvalidRelease),
     }
 }
@@ -441,7 +444,7 @@ pub(super) async fn execute(
     )
     .await?;
     if plan.agent == CLIAgent::Codex {
-        npm_codex::verify_metadata(&wrapper_meta, &platform_meta)?;
+        npm_codex::verify_metadata(&plan.target_version, &wrapper_meta, &platform_meta)?;
     } else if plan.target_version == claude_downgrade::TO {
         claude_downgrade::verify_metadata(&platform, &wrapper_meta, &platform_meta)?;
     }
@@ -499,9 +502,24 @@ pub(super) async fn execute(
         .verify_archive(platform_file.as_file_mut())?;
     release.verify_entries(&wrapper_verified, &platform_verified)?;
     if plan.agent == CLIAgent::Codex {
-        npm_codex::verify_archives(&release, &wrapper_verified, &platform_verified)?;
+        npm_codex::verify_archives(
+            &plan.target_version,
+            &release,
+            &wrapper_verified,
+            &platform_verified,
+        )?;
     } else if plan.target_version == claude_downgrade::TO {
         claude_downgrade::verify_archives(&platform, &wrapper_verified, &platform_verified)?;
+    } else if matches!(
+        plan.target_version.as_str(),
+        super::claude_current_release::V285 | super::claude_current_release::V287
+    ) {
+        super::claude_current_release::verify_archives(
+            &plan.target_version,
+            &platform,
+            &wrapper_verified,
+            &platform_verified,
+        )?;
     }
     #[cfg(test)]
     live_tests::preserve_verified_inputs(
@@ -922,6 +940,7 @@ fn validate(agent: CLIAgent, entry: &Path, journal: &Journal) -> Result<(), Erro
                     &closure.expected_files,
                 )
                 .is_err()
+                || npm_codex::verify_probe_target(&journal.target_version, &stage, closure).is_err()
                 || probe.binding_digest
                     != format!(
                         "{:x}",

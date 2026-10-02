@@ -3,6 +3,9 @@ use super::super::{
 };
 use super::*;
 
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+use std::os::unix::fs::{PermissionsExt as _, symlink};
+
 #[cfg(all(
     any(target_os = "macos", target_os = "linux"),
     any(target_arch = "x86_64", target_arch = "aarch64")
@@ -191,4 +194,154 @@ fn captured_executable_must_match_the_independently_verified_release_bytes() {
     ExpectedFileIdentity::capture_release_image(&path, 8, digest).unwrap();
     fs::write(&path, b"modified").unwrap();
     assert!(ExpectedFileIdentity::capture_release_image(&path, 8, digest).is_err());
+}
+
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[test]
+fn grok_npm_probe_requires_a_complete_platform_specific_image_pair() {
+    let (temporary, mut manifest) = fixture();
+    let root = temporary.path().canonicalize().unwrap();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::GrokNpmVersionProbeV1);
+    manifest.executable = root
+        .join(format!(".infinishell-grok-npm-{}", Uuid::new_v4()))
+        .join("bin/grok-native");
+    fs::create_dir_all(manifest.executable.parent().unwrap()).unwrap();
+    fs::write(&manifest.executable, b"manifest validation fixture").unwrap();
+    manifest.expected_files = vec![ExpectedFileIdentity::capture(&manifest.executable).unwrap()];
+    let old_mac = "9c844eb13365180787d9ad22b2b3748a024be8e1ed845253cc114781b31c591d";
+    let current_mac = "e8daa302364c9c3b6a5546d511cfbd1ab5e5d407a9b04282f660665ea405f9f3";
+    let linux = "9ce03ed23e16ea01072b4496263d6213a27899e1e3e107f008d36edf82e70407";
+    // 这里只核准入字段；实际原件读取和执行另由租约及真实事务验证。
+    for (size, digest, accepted) in [
+        (145_657_952, old_mac, cfg!(target_os = "macos")),
+        (150_374_256, current_mac, cfg!(target_os = "macos")),
+        (165_967_424, linux, cfg!(target_os = "linux")),
+        (145_657_952, current_mac, false),
+        (150_374_256, old_mac, false),
+        (150_374_256, linux, false),
+    ] {
+        manifest.expected_files[0].size = size;
+        manifest.expected_files[0].sha256 = digest.to_owned();
+        assert_eq!(validate(&manifest, &root).is_ok(), accepted);
+    }
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_brew_candidate_paths_use_shared_prefix_guard() {
+    let (temporary, mut manifest) = fixture();
+    let root = temporary.path().canonicalize().unwrap();
+    let prefix = root.join("brew");
+    fs::create_dir_all(prefix.join("bin")).unwrap();
+    fs::write(prefix.join("bin/brew"), b"manager fixture").unwrap();
+    let stage = format!(".infinishell-brew-{}", Uuid::new_v4());
+    for (kind, relative) in [
+        (
+            AtomicLaunchKind::CodexHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/0.160.0/bin/codex"),
+        ),
+        (
+            AtomicLaunchKind::GrokHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/1.0.41/grok-1.0.41-macos-aarch64"),
+        ),
+        (
+            AtomicLaunchKind::GrokHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/1.0.46/grok-1.0.46-macos-aarch64"),
+        ),
+        (
+            AtomicLaunchKind::ClaudeHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/2.1.280/claude"),
+        ),
+        (
+            AtomicLaunchKind::ClaudeHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/2.1.285/claude"),
+        ),
+        (
+            AtomicLaunchKind::ClaudeHomebrewVersionProbeV1,
+            format!("Caskroom/{stage}/2.1.287/claude"),
+        ),
+    ] {
+        manifest.atomic_launch_kind = Some(kind);
+        manifest.executable = prefix.join(&relative);
+        fs::create_dir_all(manifest.executable.parent().unwrap()).unwrap();
+        fs::write(&manifest.executable, b"candidate fixture").unwrap();
+        assert!(valid_entry(&manifest));
+        let alias = root.join("linked-brew");
+        symlink(&prefix, &alias).unwrap();
+        manifest.executable = alias.join(&relative);
+        assert!(!valid_entry(&manifest));
+        fs::remove_file(alias).unwrap();
+        manifest.executable = prefix.join(&relative);
+        fs::set_permissions(&prefix, fs::Permissions::from_mode(0o770)).unwrap();
+        assert!(!valid_entry(&manifest));
+        fs::set_permissions(&prefix, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(valid_entry(&manifest));
+    }
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1);
+    for relative in [
+        format!("Caskroom/{stage}/2.1.286/claude"),
+        "Caskroom/claude-code/2.1.285/claude".to_owned(),
+    ] {
+        manifest.executable = prefix.join(relative);
+        fs::create_dir_all(manifest.executable.parent().unwrap()).unwrap();
+        fs::write(&manifest.executable, b"unapproved entry fixture").unwrap();
+        assert!(!valid_entry(&manifest));
+    }
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_codex_brew_probe_keeps_reviewed_version_and_caskroom_boundary() {
+    let (temporary, mut manifest) = fixture();
+    let prefix = temporary.path().canonicalize().unwrap().join("brew");
+    fs::create_dir_all(prefix.join("bin")).unwrap();
+    fs::write(prefix.join("bin/brew"), b"manager fixture").unwrap();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::CodexHomebrewVersionProbeV1);
+    for (relative, accepted) in [
+        ("Caskroom/codex/0.155.1/bin/codex", true),
+        ("Caskroom/codex/0.156.1/bin/codex", true),
+        ("Caskroom/codex/0.160.0/bin/codex", true),
+        ("Caskroom/codex/0.159.0/bin/codex", false),
+        ("Caskroom/codex/0.161.0/bin/codex", false),
+        ("Library/codex/0.160.0/bin/codex", false),
+        ("Caskroom/other/0.160.0/bin/codex", false),
+    ] {
+        manifest.executable = prefix.join(relative);
+        fs::create_dir_all(manifest.executable.parent().unwrap()).unwrap();
+        fs::write(&manifest.executable, b"installed fixture").unwrap();
+        assert_eq!(valid_entry(&manifest), accepted, "{relative}");
+    }
+}
+
+#[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_grok_brew_probe_binds_reviewed_version_to_exact_entry() {
+    let (temporary, mut manifest) = fixture();
+    let prefix = temporary.path().canonicalize().unwrap().join("brew");
+    fs::create_dir_all(prefix.join("bin")).unwrap();
+    fs::write(prefix.join("bin/brew"), b"manager fixture").unwrap();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::GrokHomebrewVersionProbeV1);
+    for (relative, accepted) in [
+        ("Caskroom/grok-build/1.0.40/grok-1.0.40-macos-aarch64", true),
+        ("Caskroom/grok-build/1.0.41/grok-1.0.41-macos-aarch64", true),
+        ("Caskroom/grok-build/1.0.46/grok-1.0.46-macos-aarch64", true),
+        (
+            "Caskroom/grok-build/1.0.45/grok-1.0.45-macos-aarch64",
+            false,
+        ),
+        (
+            "Caskroom/grok-build/1.0.46/grok-1.0.41-macos-aarch64",
+            false,
+        ),
+        ("Caskroom/grok-build/1.0.46/grok-1.0.46-linux-x86_64", false),
+        ("Caskroom/other/1.0.46/grok-1.0.46-macos-aarch64", false),
+    ] {
+        manifest.executable = prefix.join(relative);
+        fs::create_dir_all(manifest.executable.parent().unwrap()).unwrap();
+        fs::write(&manifest.executable, b"installed fixture").unwrap();
+        assert_eq!(valid_entry(&manifest), accepted, "{relative}");
+    }
 }

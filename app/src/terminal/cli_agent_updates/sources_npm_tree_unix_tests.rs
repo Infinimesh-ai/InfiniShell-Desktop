@@ -10,6 +10,60 @@ fn directory(root: &Path, leaf: &str, bytes: &[u8]) -> Directory {
 }
 
 #[test]
+fn homebrew_caskroom_never_follows_a_directory_link() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    fs::create_dir(root.join("elsewhere")).unwrap();
+    symlink(root.join("elsewhere"), root.join("Caskroom")).unwrap();
+    assert!(Directory::open(&root).unwrap().homebrew_caskroom().is_err());
+}
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[test]
+fn private_homebrew_parent_does_not_relax_package_permissions() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let caskroom = root.join("Caskroom");
+    fs::create_dir(&caskroom).unwrap();
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    fs::set_permissions(&caskroom, fs::Permissions::from_mode(0o775)).unwrap();
+    let prefix = Directory::open(&root).unwrap();
+    let (parent, identity) = prefix.homebrew_caskroom().unwrap();
+    assert_eq!(identity.mode & 0o7777, 0o775);
+    assert!(Directory::open(&caskroom).is_err());
+    let package = parent.create(OsStr::new("codex")).unwrap();
+    package.snapshot().unwrap();
+    fs::set_permissions(caskroom.join("codex"), fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(package.snapshot().is_err());
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(prefix.homebrew_caskroom().is_err());
+}
+
+#[test]
+fn homebrew_parent_rejects_world_writable_or_special_modes() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let caskroom = root.join("Caskroom");
+    fs::create_dir(&caskroom).unwrap();
+    fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+    let prefix = Directory::open(&root).unwrap();
+    for mode in [0o777, 0o1775, 0o2775] {
+        fs::set_permissions(&caskroom, fs::Permissions::from_mode(mode)).unwrap();
+        assert!(prefix.homebrew_caskroom().is_err(), "{mode:o}");
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn linux_homebrew_keeps_the_existing_strict_parent_contract() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    fs::create_dir(root.join("Caskroom")).unwrap();
+    fs::set_permissions(root.join("Caskroom"), fs::Permissions::from_mode(0o775)).unwrap();
+    assert!(Directory::open(&root).unwrap().homebrew_caskroom().is_err());
+}
+
+#[test]
 fn exchange_preserves_two_complete_tree_identities() {
     let temporary = tempfile::tempdir().unwrap();
     let root = temporary.path().canonicalize().unwrap();
