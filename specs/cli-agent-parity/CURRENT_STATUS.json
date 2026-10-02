@@ -7384,5 +7384,109 @@
       "metadata_tests_passed": 6
     },
     "native_source_digest": "129项映射重算摘要4489e25b1fbaf9435617c9f7bbe226fc6a6d55ef8a58d63efcb86fa324843142，替换遗漏的旧声明；实际仓库回归先红后绿。"
+  },
+  "g03_native_binding_g10_cancel_repair_20261002": {
+    "status": "native_artifacts_audited_local_gates_passed_real_acceptance_and_final_source_gate_pending",
+    "source_baseline": "c539655680e485a38812c1fd027f0b71a3503f34",
+    "closed_gaps": [],
+    "goal_counts": {
+      "closed": 8,
+      "open": 3,
+      "deferred": 3
+    },
+    "native_artifacts": {
+      "host_commit": "95d16846dcca4cc7c1bd610e0ded8a3d2935cfdf",
+      "run_id": 36967571751,
+      "native_commit": "92b51c9b5040ed77a5616a314b676120587931cf",
+      "native_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
+      "patch_sha256": "74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24",
+      "linux": {
+        "audit": {
+          "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/linux-native-build-audit-v1.safe.json",
+          "sha256": "d630cd442e5733cfb04dbd3b11351b4fd9015339e2f5dca06624becbb29990bd"
+        },
+        "commands": 32,
+        "test_occurrences": 542,
+        "unique_tests": 533,
+        "typed_png_exact_tests": 17,
+        "binary_sha256": "23fecc04a15884d6ea88e08518c74cd17e0f73da3d98e0241fe63d7ad7c3b39f"
+      },
+      "windows": {
+        "audit": {
+          "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/windows-native-build-audit-v1.safe.json",
+          "sha256": "eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e"
+        },
+        "commands": 31,
+        "test_occurrences": 520,
+        "unique_tests": 516,
+        "typed_png_exact_tests": 17,
+        "binary_sha256": "168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9"
+      },
+      "boundary": "原生步骤、逐名测试、实际二进制和启动 smoke 已独立通过；整 job 元数据已观察 success，完整日志 FAIL/RETRY/LEAK 审计另行补记，不外推后续宿主改动或交互实机。Linux 临时目录因进程引用可见性不足保留；Windows 工件无临时目录清理收据。旧 69c17/f3cbb 失败与原排除/后置范围保留。",
+      "observed_ci_terminal_status": {
+        "linux_job": "success",
+        "windows_job": "success",
+        "source_commit": "95d16846dcca4cc7c1bd610e0ded8a3d2935cfdf",
+        "full_log_fail_retry_leak_audit": "pending",
+        "boundary": "根代理已观察两平台整 job 成功且无 failed steps；不等同本次 Windows 新绑定/取消修复的最终源码门禁。"
+      }
+    },
+    "g03_windows_binding": {
+      "change": "Windows 普通桥加入已核 .5 PE 精确摘要；运行时仍须证明真实进程映像、ConPTY 与 typed_png_images=1。",
+      "preserved": "G01 Windows .11 文本 pin、Mac/Linux 原有 .5 工件身份和 remote owned .4 pins 不变；新 Linux 工件只登记原生构建证据。",
+      "remaining": [
+        "Finder 原生拖放事件",
+        "绑定后最终宿主源码门禁"
+      ],
+      "gap_closed": false
+    },
+    "claude_running_cancel": {
+      "run_id": "r-2_vfuh68",
+      "audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/command-cancel-post-interrupt-v1/r-2_vfuh68-causal-audit.safe.json",
+        "sha256": "00722c63ff9e460f7bdf76afe29ea8b430779115b4aa6ed48949abf492475276"
+      },
+      "failure": "真实命令已启动并收到 Interrupt ACK；命令清理后内部工具回复遇到已取消原回合，被误报 RequestFailed。日志序列为 ACK 15、RequestFailed 16、Cancelled 17；严格验收失败保留。",
+      "repair": "仅完整清理后的内部受审命令回复，且 generation/turn/call/tool/未响应状态精确匹配已取消调用时，不再回送晚结果，仍发布清理后终态；外部响应、错误身份及活跃回复保持原严格合同。",
+      "real_revalidation": "pending",
+      "cleanup_boundary": "命令清理摘要链与精确 launchd job 消失已核；原现场 completed_retained、cleanup_ready=false，不写为目录已清理。"
+    },
+    "grok_commands_skills_fixture": {
+      "run_id": "r-_gr57x9b",
+      "audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/grok-reviewed-commands-repair-v2/failed-run.safe.json",
+        "sha256": "6b8f73e054c6f2cdbae80f74c4e0512478e729f26e5f9adbb8bdb87d6a38236a"
+      },
+      "failure": "固定 1.0.41/grok-4.7 已接收父输入和两次审批，但 SkillManager 未注册夹具 alpha，派发返回技能缺失；没有子任务、技能/搜索/宿主命令实际执行。",
+      "repair": "仅修 ignored 验收夹具：两技能放入生产 .agents/skills 目录并注册真实 SkillManager，在模型前通过生产路径解析与原生元数据校验；将原生 call ID 与 MCP 内部 ID 按同 task/turn/generation 的已完成审批明确关联。父 alpha 上限和 beta 越界断言不变。",
+      "real_revalidation": "pending",
+      "cleanup_boundary": "唯一父 runtime 退出/adapter 终止/journal 完成已确认；原现场 completed_retained、cleanup_ready=false。"
+    },
+    "gui_process_diagnosis": {
+      "run_id": "r-hfb9go2h",
+      "audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g10-preparation/gui-contract-repair-v1/r-hfb9go2h-cli-detection-diagnosis.safe.json",
+        "sha256": "ff6c20937c454b2a619109e311b520f943c99985cc01179a10adfb2b72bfda3e"
+      },
+      "finding": "运行器 PID 33370 的探测子进程使用私有固定 CLI；另有 PPID 1 的 33388/35310 GUI 使用全局 CLI。安装扫描直接读取进程 PATH，并非登录 shell 重采。下一轮先以 listApps 确认已运行的精确 bundle，再选择已有应用并核窗口/运行器 PID 和固定版本；不再次直接 getApp(path) 启动实例。",
+      "model_inputs": 0,
+      "real_bilingual_approval_acceptance": "pending",
+      "global_cli_or_user_configuration_changed": false
+    },
+    "localization": "复核英中取消按钮/已取消状态、受审命令审批和等待清理说明，以及 Grok 图片能力/超限/未投递提示；现修复恢复既有承诺，无需本地化变更。G10 真实审批双语布局仍待验，不能以本轮双 GUI 零模型观察代替。",
+    "local_gates": {
+      "receipt": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-cancel-native-binding-local-gates-v2.safe.json",
+        "sha256": "304e21a6de4e5439f8b7fd5f4f7a3c7063b28f11b551633a199313096972a946"
+      },
+      "reviewed_host_regressions": 4,
+      "claude_runtime": 141,
+      "i18n": 11,
+      "native_source_metadata": 6,
+      "cargo_check": "passed",
+      "all_temporary_directories": "cleaned",
+      "final_cross_platform_source_gate": "pending"
+    },
+    "gap_closed": false
   }
 }

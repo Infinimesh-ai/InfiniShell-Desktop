@@ -27,6 +27,7 @@ use super::local_skills::{
 use super::local_tools::{ClaudeMcpRequest, NativeLocalToolRequest};
 use super::managed_input::restore_claude_managed_images;
 use super::permissions::verify_effective_permissions;
+use super::reviewed_project_commands_windows::TOOL_NAME as REVIEWED_COMMAND_TOOL;
 use super::{
     ApprovalDecision, InputContent, PermissionPolicy, RuntimeAction, RuntimeCommand,
     RuntimeConnection, RuntimeError, RuntimeEvent, RuntimeEventKind, SessionOptions, SessionTarget,
@@ -485,7 +486,9 @@ async fn run_transport(
                 }
             }
             Incoming::HostCommand(result) => {
-                let effects = protocol.command(result?);
+                let reply = result?;
+                let cleanup_events = protocol.host_commands.take_cancelled_events();
+                let effects = protocol.host_command_reply(reply, cleanup_events);
                 flush_effects(protocol, stdin, events, effects).await?;
             }
             Incoming::Command(Some(command)) => {
@@ -1131,6 +1134,46 @@ impl ClaudeProtocol {
         self.host_commands
             .next_reply(&mut self.reviewed_commands)
             .await
+    }
+
+    fn host_command_reply(
+        &mut self,
+        reply: RuntimeCommand,
+        cleanup_events: Vec<RuntimeEventKind>,
+    ) -> Effects {
+        // 仅 next_reply 确认受审命令完整清理后的内部回复可进入；外部命令仍走严格拒绝。
+        let cancelled = match &reply.action {
+            RuntimeAction::RespondLocalTool {
+                turn_id, call_id, ..
+            } => {
+                reply.generation == self.options.generation
+                    && self.local_tools.get(call_id).is_some_and(|call| {
+                        call.request.call_id == *call_id
+                            && call.request.turn_id == *turn_id
+                            && call.request.tool == REVIEWED_COMMAND_TOOL
+                            && call.response.is_none()
+                            && (call.cancelled
+                                || cleanup_events.iter().any(|event| {
+                                    matches!(event, RuntimeEventKind::TurnFinished {
+                                        turn_id: finished_turn, outcome: TurnOutcome::Cancelled, ..
+                                    } if finished_turn == turn_id)
+                                }))
+                    })
+            }
+            RuntimeAction::Submit { .. }
+            | RuntimeAction::Steer { .. }
+            | RuntimeAction::Interrupt { .. }
+            | RuntimeAction::RespondApproval { .. }
+            | RuntimeAction::Shutdown => false,
+        };
+        let mut effects = if cancelled {
+            // 原生取消已使精确调用失效；保留清理后释放的终态，不再回送迟到工具结果。
+            Effects::default()
+        } else {
+            self.command(reply)
+        };
+        effects.events.extend(cleanup_events);
+        effects
     }
 
     fn new(options: SessionOptions) -> Self {

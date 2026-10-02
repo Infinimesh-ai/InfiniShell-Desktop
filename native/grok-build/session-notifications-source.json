@@ -268,16 +268,32 @@
     "native_commit": "92b51c9b5040ed77a5616a314b676120587931cf",
     "native_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
     "patch_sha256": "74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24",
-    "status": "pending",
+    "status": "native_steps_passed_final_host_source_gate_pending",
     "linux_artifact": {
-      "status": "pending",
-      "sha256": null,
-      "version_output": null
+      "status": "source_build_and_targeted_tests_passed",
+      "sha256": "23fecc04a15884d6ea88e08518c74cd17e0f73da3d98e0241fe63d7ad7c3b39f",
+      "bytes": 608907384,
+      "version_output": "grok 1.0.41+infinishell.session-notifications.5 (07e35a3dfeed)",
+      "build_host_commit": "95d16846dcca4cc7c1bd610e0ded8a3d2935cfdf",
+      "run_id": 36967571751,
+      "artifact_id": 11211568042,
+      "zip_sha256": "730e473819e7a8c81919a51ef39fb7fe9b4fd51e0ba2b41022af358c4caa7894",
+      "build_receipt_sha256": "a252a394784f8256b2b2b6f0e41792b3c97fdc6bd6e6e17b88573d87eebec129",
+      "audit_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/linux-native-build-audit-v1.safe.json",
+      "audit_receipt_sha256": "d630cd442e5733cfb04dbd3b11351b4fd9015339e2f5dca06624becbb29990bd"
     },
     "windows_artifact": {
-      "status": "pending",
-      "sha256": null,
-      "version_output": null
+      "status": "source_build_and_targeted_tests_passed",
+      "sha256": "168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9",
+      "bytes": 246118400,
+      "version_output": "grok 1.0.41+infinishell.session-notifications.5 (07e35a3dfeed)",
+      "build_host_commit": "95d16846dcca4cc7c1bd610e0ded8a3d2935cfdf",
+      "run_id": 36967571751,
+      "artifact_id": 11211518847,
+      "zip_sha256": "860c3adf05064367c60e20811841fa9b13cc709aa4193acadd66619924ecd605",
+      "build_receipt_sha256": "e4308021bb24877e453fce0956cf8bb0a93347458eebbfb31dc3d1932d4b537b",
+      "audit_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/windows-native-build-audit-v1.safe.json",
+      "audit_receipt_sha256": "eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e"
     },
     "required_typed_png_tests": {
       "covered_by": "terminal_bridge_library_tests",
@@ -311,7 +327,7 @@
       },
       "boundary": "既有四库terminal_bridge步骤已包含全部17项，逐名核对且零失败/零忽略，不另开重复测试步骤。"
     },
-    "boundary": "版本五新增普通桥图片生产能力；仅Mac源码/构建已执行，Linux/Windows本版本实际源码和工件待CI，历史版本四不能计为本版本通过。"
+    "boundary": "版本五 Linux/Windows 的92b源码重建、定向测试和真实工件已核验；仅原生步骤通过，不代表整个CI任务或交互式桌面验收。普通桥宿主pin分别保留各自实际工件身份，历史版本四不代替本版本。"
   },
   "host_artifact_binding": {
     "module": "app/src/terminal/cli_agent_sessions/grok_notification_artifact.rs",
@@ -1414,7 +1430,7 @@
   "ordinary_typed_png_artifact_binding": {
     "module": "app/src/terminal/cli_agent_sessions/grok_native_bridge_identity.rs",
     "scope": "仅普通未绑定PTY的原生桥图片输入；G01旧文本工件继续独立接受，远程owned通知pin不变。",
-    "status": "macos_bound_final_host_gates_and_real_gui_pending",
+    "status": "macos_linux_windows_bound_final_host_source_gate_and_macos_gui_pending",
     "custom_version": "1.0.41+infinishell.session-notifications.5",
     "native_commit": "8644e7f68a5c7803e3d1b3cc174ae56b93552ef2",
     "macos_aarch64": {
@@ -1442,8 +1458,21 @@
       "scope": "Linux .5普通桥工件，最终宿主源码门禁待验，用户实机验收后置；远程owned仍绑定.4。"
     },
     "windows_x86_64": {
-      "status": "pending",
-      "sha256": null
+      "status": "artifact_verified_host_bound_final_source_gate_pending",
+      "sha256": "168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9",
+      "bytes": 246118400,
+      "version_output": "grok 1.0.41+infinishell.session-notifications.5 (07e35a3dfeed)",
+      "native_commit": "92b51c9b5040ed77a5616a314b676120587931cf",
+      "source_tree": "b2ca7be22f08c3cdb4dcbcb3a0b4962cfab16b5f",
+      "patch_sha256": "74abeb501baa213423b17a0c90638fb9f70b6eb3c8da62c0064fac835e205c24",
+      "build_host_commit": "95d16846dcca4cc7c1bd610e0ded8a3d2935cfdf",
+      "run_id": 36967571751,
+      "artifact_id": 11211518847,
+      "zip_sha256": "860c3adf05064367c60e20811841fa9b13cc709aa4193acadd66619924ecd605",
+      "build_receipt_sha256": "e4308021bb24877e453fce0956cf8bb0a93347458eebbfb31dc3d1932d4b537b",
+      "audit_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/windows-native-build-audit-v1.safe.json",
+      "audit_receipt_sha256": "eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e",
+      "scope": "Windows .5普通桥PNG工件，最终宿主源码门禁待验，用户实机验收后置；G01旧文本.11及远程owned的.4身份保留。"
     },
     "legacy_source_metadata": "source.json",
     "legacy_source_metadata_unchanged": true
@@ -1492,7 +1521,7 @@
       "passed": true,
       "log_sha256": "eba9e918b39f044330fc1a45fb18a9fa5a2d1ab49d8aeef01534fe18f2c64ff8"
     },
-    "windows_validation": "pending",
+    "windows_validation": "five_notification_tests_passed_native_step_only",
     "previous_windows_failure_preserved": true,
     "localization_audit": "无需本地化变更：仅测试白名单阶段次数与耗时，不改变原生生产行为、审批策略或超时。",
     "existing_artifact_bindings": "现有工件保持各自原native commit与摘要，不冒称由本轮测试诊断源码重建。",
@@ -1501,6 +1530,19 @@
       "passed": 15,
       "failed": 0,
       "log_sha256": "0af289ac4b107617575ce4019753ed879b754995fa1ddee145be0ac7f2ecd0fc"
+    },
+    "windows_validation_evidence": {
+      "run_id": 36967571751,
+      "artifact_id": 11211518847,
+      "audit_receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/95d16846d-ci/windows-native-build-audit-v1.safe.json",
+      "audit_receipt_sha256": "eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e",
+      "permission_prompt_notification_tests": [
+        "session::acp_session::permission_prompt_notification_tests::auto_allowed_tool_does_not_fire_permission_prompt_notification",
+        "session::acp_session::permission_prompt_notification_tests::hook_ask_under_yolo_fires_permission_prompt_notification",
+        "session::acp_session::permission_prompt_notification_tests::inherited_handle_second_wire_does_not_steal_parent_hook",
+        "session::acp_session::permission_prompt_notification_tests::real_user_prompt_fires_permission_prompt_notification",
+        "session::acp_session::permission_prompt_notification_tests::yolo_tool_does_not_fire_permission_prompt_notification"
+      ]
     }
   }
 }

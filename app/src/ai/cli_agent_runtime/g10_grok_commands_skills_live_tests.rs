@@ -6,15 +6,19 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read as _, Write as _};
 use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 
+use ai::skills::{SkillReference, parse_skill};
 use repo_metadata::repositories::DetectedRepositories;
 use repo_metadata::{DirectoryWatcher, RepoMetadataModel};
 use serde_json::Value;
+use warp_util::local_or_remote_path::LocalOrRemotePath;
 use warpui::r#async::FutureExt as _;
 use warpui::{App, ModelHandle};
 use watcher::HomeDirectoryWatcher;
 
 use super::*;
-use crate::ai::cli_agent_runtime::local_skills::SelectedLocalSkill;
+use crate::ai::cli_agent_runtime::local_skills::{
+    SelectedLocalSkill, collect_local_child_skills, prepare_local_cli_skill_inputs,
+};
 use crate::ai::cli_agent_runtime::local_tools::LocalToolPermissions;
 use crate::ai::cli_agent_runtime::local_tools::{MCP_SERVER_NAME, NativeLocalToolRequest};
 use crate::ai::cli_agent_runtime::managed_process::{
@@ -123,7 +127,11 @@ impl Fixture {
     fn selected(&self, name: &str) -> SelectedLocalSkill {
         SelectedLocalSkill {
             name: name.into(),
-            path: self.root.join("skills").join(name).join("SKILL.md"),
+            path: self
+                .root
+                .join("skill-catalog/.agents/skills")
+                .join(name)
+                .join("SKILL.md"),
         }
     }
     fn load(root: &Path) -> Result<Self, String> {
@@ -153,7 +161,13 @@ impl Fixture {
         let command = ceiling
             .approve_host(&input)
             .ok_or("命令不在实际捕获上限内")?;
-        let skill = read_owned(&root.join("skills").join(ALPHA).join("SKILL.md"), 64 * 1024)?;
+        let skill = read_owned(
+            &root
+                .join("skill-catalog/.agents/skills")
+                .join(ALPHA)
+                .join("SKILL.md"),
+            64 * 1024,
+        )?;
         let skill = String::from_utf8(skill).map_err(|error| error.to_string())?;
         let alpha_marker = skill
             .lines()
@@ -203,8 +217,8 @@ impl Fixture {
             "project/package.json",
             "project/g10-command.cjs",
             "project/search-target.txt",
-            "skills/isp-g10-fixed-alpha/SKILL.md",
-            "skills/isp-g10-fixed-beta/SKILL.md",
+            "skill-catalog/.agents/skills/isp-g10-fixed-alpha/SKILL.md",
+            "skill-catalog/.agents/skills/isp-g10-fixed-beta/SKILL.md",
         ] {
             if self.prepared["files_sha256"][relative]
                 != digest(read_owned(&self.root.join(relative), 64 * 1024)?)
@@ -240,6 +254,7 @@ struct Decision {
     turn_id: String,
     runtime_generation: Uuid,
     command_generation: Option<Uuid>,
+    native_call_id: Option<String>,
     message_id: Uuid,
     decision: ApprovalDecision,
     resolved: bool,
@@ -281,7 +296,6 @@ impl Decision {
 fn verify_command_exit(
     fixture: &Fixture,
     decision: &Decision,
-    native_calls: &HashSet<String>,
     evidence: &mut Evidence,
 ) -> Result<(), String> {
     fixture.verify_sources()?;
@@ -311,8 +325,16 @@ fn verify_command_exit(
     let expected_generation =
         Uuid::from_bytes(identity[..16].try_into().expect("SHA-256 固定长度"));
     let command_bytes = serde_json::to_vec(&fixture.command).map_err(|error| error.to_string())?;
-    if !native_calls.contains(call)
-        || generation != expected_generation
+    let native_call = decision
+        .native_call_id
+        .as_deref()
+        .ok_or("宿主命令缺少唯一已批准的原生调用")?;
+    if !call.strip_prefix("grok-mcp-").is_some_and(|value| {
+        value.len() == 64
+            && value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    }) || generation != expected_generation
         || record["version"] != 1
         || record["platform"] != "macos"
         || record["parentGeneration"] != json!(decision.runtime_generation)
@@ -363,7 +385,7 @@ fn verify_command_exit(
     }
     evidence.record(json!({"event":"command_exit_verified","fixture":"a",
         "command_generation":generation,"runtime_generation":decision.runtime_generation,
-        "call_id":call,"approval_id":decision.approval_id,
+        "call_id":call,"native_call_id":native_call,"approval_id":decision.approval_id,
         "record_sha256":digest(record_bytes),"result_sha256":digest(result_bytes),
         "command_sha256":digest(command_bytes),"exit_receipt_sha256":digest(exit_bytes),
         "stdout_sha256":digest(&stdout),"stdout_bytes":stdout.len(),
@@ -663,7 +685,7 @@ async fn drive(
     let mut child_id = None;
     let mut decisions = Vec::<Decision>::new();
     let mut commands = Vec::<usize>::new();
-    let mut command_calls = HashSet::new();
+    let mut command_calls: Vec<(String, usize)> = Vec::new();
     let mut skill_calls = HashSet::new();
     let mut searches = HashSet::new();
     let mut file_search_calls = HashSet::new();
@@ -730,9 +752,18 @@ async fn drive(
                 RuntimeEventKind::ApprovalRequested { approval_id, turn_id, method, details } => {
                     if !ready.contains(&task.task_id) || decisions.iter().any(|row| row.task_id==task.task_id && row.approval_id==*approval_id) { return Err("审批 ID 重复".into()); }
                     let mut command_generation = None;
+                    let mut native_call_id = None;
                     let decision = if method == "infinishell/reviewed_project_command" && !parent {
                         let step = commands.len();
-                        if step >= 2 { return Err("额外宿主命令请求".into()); }
+                        if step >= 2 || command_calls.len() != step + 1 { return Err("宿主命令没有唯一待关联原生审批".into()); }
+                        let (call, permission_index) = &command_calls[step];
+                        let permission = &decisions[*permission_index];
+                        if !permission.resolved || !permission.dispatched || permission.decision != ApprovalDecision::AllowOnce
+                            || permission.task_id != task.task_id || permission.turn_id != *turn_id
+                            || permission.runtime_generation != event.generation {
+                            return Err("宿主命令的原生审批尚未完成或身份不符".into());
+                        }
+                        native_call_id = Some(call.clone());
                         fixture.verify_sources()?;
                         let generation: Uuid = serde_json::from_value(details["commandId"].clone()).map_err(|error| error.to_string())?;
                         let mut expected = fixture.command.approval_context();
@@ -773,7 +804,9 @@ async fn drive(
                                 && raw["tool_input"] == (if outside.is_some() { outside_spawn.clone() } else { spawn.clone() })
                                 && spawn_permissions.len() < 2 && spawn_permissions.insert(call_id.to_owned()) {
                             } else if !parent && raw["tool_name"] == format!("{MCP_SERVER_NAME}__reviewed_project_command")
-                                && raw["tool_input"] == fixture.input && command_calls.len()<2 && command_calls.insert(call_id.to_owned()) {
+                                && raw["tool_input"] == fixture.input && command_calls.len()<2
+                                && command_calls.len()==commands.len() && !command_calls.iter().any(|(id, _)| id==call_id) {
+                                command_calls.push((call_id.to_owned(),decisions.len()));
                             } else { return Err("原生 SDK 目标或参数越界".into()); }
                         } else { return Err("原生工具不是本轮固定技能/文件搜索/命令/派发".into()); }
                         ApprovalDecision::AllowOnce
@@ -781,10 +814,10 @@ async fn drive(
                     let message_id = control(app,coordinator,&task,RuntimeAction::RespondApproval { approval_id:approval_id.clone(),decision }).await?;
                     evidence.record(json!({"event":"approval_decision","task_id":task.task_id,"runtime_generation":event.generation,
                         "native_session_id":event.native_session_id,"approval_id":approval_id,"turn_id":turn_id,"method":method,
-                        "command_generation":command_generation,"message_id":message_id,"decision":decision,
+                        "command_generation":command_generation,"native_call_id":native_call_id,"message_id":message_id,"decision":decision,
                         "details_sha256":digest(serde_json::to_vec(details).map_err(|error| error.to_string())?)}))?;
                     decisions.push(Decision { task_id:task.task_id.clone(),approval_id:approval_id.clone(),turn_id:turn_id.clone(),
-                        runtime_generation:event.generation,command_generation,message_id,decision,resolved:false,dispatched:false });
+                        runtime_generation:event.generation,command_generation,native_call_id,message_id,decision,resolved:false,dispatched:false });
                 }
                 RuntimeEventKind::ApprovalResolved { approval_id, decision } => {
                     let row = decisions.iter_mut().find(|row| row.task_id==task.task_id && row.approval_id==*approval_id).ok_or("未知审批解决")?;
@@ -840,7 +873,7 @@ async fn drive(
             )
             .await?
         {
-            verify_command_exit(fixture, &decisions[commands[1]], &command_calls, evidence)?;
+            verify_command_exit(fixture, &decisions[commands[1]], evidence)?;
             decisions[commands[0]].denied_directory_still_absent()?;
             let allowed = decisions[commands[1]].command_state()?;
             let count = fs::read_dir(allowed.parent().ok_or("命令父目录缺失")?)
@@ -1037,7 +1070,35 @@ fn real_grok_g10_commands_skills_parent_child() {
         app.add_singleton_model(RepoMetadataModel::new);
         app.add_singleton_model(HomeDirectoryWatcher::new_for_test);
         app.add_singleton_model(WarpManagedPathsWatcher::new_for_testing);
-        app.add_singleton_model(SkillManager::new);
+        let selected = [fixture.selected(ALPHA), fixture.selected(BETA)];
+        let skills = app.add_singleton_model(SkillManager::new);
+        skills.update(&mut app, |manager, _| {
+            manager.handle_skills_added(
+                selected
+                    .iter()
+                    .map(|skill| parse_skill(&skill.path).unwrap())
+                    .collect(),
+            )
+        });
+        // 两个技能都进入真实目录；后续 beta 拒绝必须来自父上限，而非目录缺失。
+        let references = selected
+            .iter()
+            .map(|skill| SkillReference::Path(LocalOrRemotePath::Local(skill.path.clone())))
+            .collect::<Vec<_>>();
+        let parsed = app
+            .update(|ctx| collect_local_child_skills(&references, ctx))
+            .expect("技能目录预检失败；尚未派发模型输入");
+        assert_eq!(
+            prepare_local_cli_skill_inputs(parsed, Harness::Grok, true)
+                .expect("原生技能元数据预检失败；尚未派发模型输入"),
+            selected
+                .into_iter()
+                .map(|skill| InputContent::Skill {
+                    name: skill.name,
+                    path: skill.path,
+                })
+                .collect::<Vec<_>>()
+        );
         let executable = PathBuf::from(env::var_os("INFINISHELL_GROK_LIVE_EXECUTABLE").unwrap());
         app.add_singleton_model(|_| {
             CLIAgentInstallModel::with_installation_for_test(

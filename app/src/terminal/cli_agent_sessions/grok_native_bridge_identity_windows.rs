@@ -18,9 +18,11 @@ use windows::Win32::Storage::FileSystem::{
 
 use crate::terminal::model::local_pty_identity::LocalPtyIdentity;
 
-// 仅接受已核验的 Windows x64 定制 .11 工件，并通过实际主映像句柄核对摘要。
-const ARTIFACT_SHA256S: &[&str] =
-    &["acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc"];
+// 旧文本桥与受验 PNG 桥分别绑定完整映像；按实际主映像句柄核验，不能继承其他构建。
+const ARTIFACT_SHA256S: &[&str] = &[
+    "acb9a34e9371285e1d5ce5f932dc4697e54927aea366048d361675075d4dbefc",
+    "168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9",
+];
 const MAX_ARTIFACT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]

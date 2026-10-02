@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：Windows PNG 身份补齐，真实取消缺陷与验收夹具修复
+
+**新增关闭 0 项，仍为 8 关闭／3 开放／3 后置，PR #22 草稿。** 精确 `95d16846d` 的 [原生步骤 36967571751](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36967571751) 已分别审计：native `92b51c9b5040`、重建树 `b2ca7be22f08`、补丁 `74abeb50…` 一致。Linux 32 条命令、542 次测试／533 个唯一名，Windows 31 条、520 次／516 个唯一名均过；两平台新增 PNG 17 项逐名核对。实际 Linux ELF 为 `23fecc04a15884d6ea88e08518c74cd17e0f73da3d98e0241fe63d7ad7c3b39f`，Windows PE 为 `168fa15df74a15b8e2487e02ce875aba2c3ac23eefd06302bde0ac1f439450d9`。版本、帮助与异步补全启动通过，零模型；根代理随后观察两平台整 job 元数据 success、无 failed steps；完整日志 FAIL/RETRY/LEAK 审计另行补记，不能作为当前宿主增量的最终门禁。Linux/Windows 独立审计摘要分别为 `d630cd442e5733cfb04dbd3b11351b4fd9015339e2f5dca06624becbb29990bd`、`eeb7d074a13e95230ea7d1405a37368c80cc1b047abfcbc47196970e1db0341e`。原 69c17/f3cbb 失败和既定排除/后置范围保留；Linux 因进程引用可见性不足保留临时目录，Windows 工件没有目录清理收据。
+
+Windows 普通桥现在加入上述 `.5` 精确映像身份，继续要求真实进程/ConPTY 与运行时图片能力；旧 `.11` 文本 pin、Mac/Linux 原有 `.5` 身份及远程 owned `.4` pins 不变，新 Linux 工件仅登记原生构建证据。G03 仍缺 Finder 原生拖放事件及绑定后的最终宿主门禁。
+
+`c53965568/r-2_vfuh68` 真实命令已启动并收到 Interrupt ACK；命令完整清理后，内部工具回复被旧协议当成外部晚回复，公开 RequestFailed，再发布 Cancelled（journal 序列 15→16→17）。因果审计 `00722c63ff9e460f7bdf76afe29ea8b430779115b4aa6ed48949abf492475276` 核对实际命令清理摘要链和精确 launchd job 消失。产品修复仅对同 generation/turn/call/tool、尚未响应且已取消的内部受审命令清理回复丢弃晚结果，保留清理后终态；外部回复、错误身份及活跃调用仍按原合同处理。原真实失败不改写为通过，修复后真实复验待执行。
+
+Grok `r-_gr57x9b` 已核固定 `1.0.41/grok-4.7`、父输入与两次审批，但测试未向 SkillManager 注册 alpha，派发返回技能缺失，尚无子任务、技能/搜索/命令执行。失败审计 `6b8f73e054c6f2cdbae80f74c4e0512478e729f26e5f9adbb8bdb87d6a38236a` 保留。仅修 ignored 夹具：两技能使用生产 `.agents/skills` 目录和真实目录注册，模型前按生产函数校验；原生 call ID 与 MCP 内部 ID 按同 task/turn/generation 的已完成审批关联，不放宽父 alpha 上限、beta 越界或结果断言。Claude/Grok 两失败现场均为 `completed_retained/cleanup_ready=false`，原生清理证据不等同目录已删除。
+
+零模型 GUI `r-hfb9go2h` 的原运行器 PID 33370 实际探测私有固定 CLI，另有 PPID 1 的 33388/35310 使用全局 CLI；安装扫描直接读取 GUI 进程 PATH，并非登录 shell 重采。诊断 `ff6c20937c454b2a619109e311b520f943c99985cc01179a10adfb2b72bfda3e` 未据过程表断定哪次 UI 操作触发额外实例。后续先以 listApps 确认已运行的精确 bundle，再选择已有应用并核窗口/运行器 PID 与固定版本，避免直接 getApp(path) 再开实例；随后进行真实审批双语验收；未改默认设置或全局 CLI。
+
+本机新增 4 项回归 `r-vqbu1xyh` 与完整 Claude runtime 141 项 `r-lf8lz7hj` 均零失败、已清理，日志摘要分别为 `6c92b1e42623072b9dc3c06060ad87eb0779ef35de7f4cc6b73c2d48a67e437f`、`faf257164052b2f7c7694e4319dc87f86e55710ddd5f231eb8dc27ef41a5b464`。i18n 11 项、原生来源元数据 6 项和 cargo check 同样通过；含最终 driver rustfmt 的本机门禁汇总 SHA-256 `304e21a6de4e5439f8b7fd5f4f7a3c7063b28f11b551633a199313096972a946`，全部短目录已清理。最终跨平台源码门禁仍待完成。复核英中取消/已取消、命令审批/等待清理及图片能力/保稿提示，修复恢复既有承诺，**无需本地化变更**；G10 真实审批双语布局仍未通过本轮验收。
+
 ## 2026-10-02：两条真实验收首轮失败，按生产合同修复驱动
 
 新增关闭 0 项。`87821e107` 的同提交构建与签名已完成，完整 253 项来源一致。Claude `r-m8dmj72e` 的真实 Grep、隐藏答案与两层命令允许均到达，但测试把 CLI 授权前的 PID version 与 exec 后全等比较，未进入预定 Interrupt；原失败不改写为取消通过。生产 `validate_after_exec` 只要求 PID、unique_id、CID 稳定；驱动据此修正并记录授权与实际完整身份，命令成员的连续实际身份及取消后清理断言保留。不能从已退出原件补造失败当时的 PID version。
