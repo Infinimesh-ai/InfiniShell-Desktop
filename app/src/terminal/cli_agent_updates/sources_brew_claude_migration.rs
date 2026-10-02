@@ -59,7 +59,62 @@ struct Migration {
     policy: ClaudeUpdateScope,
 }
 
-pub(in super::super) fn verify_metadata(old: &Value, target: &Value) -> Result<(), Error> {
+pub(in super::super) async fn metadata(old: &Value) -> Result<(Value, Value), Error> {
+    if old["token"] != OLD_TOKEN || old["tap"] != "homebrew/cask" {
+        return Err(Error::InvalidRelease);
+    }
+    #[cfg(target_os = "linux")]
+    {
+        sources::brew_claude_linux::migration_metadata().await
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let target = brew::metadata(NEW_TOKEN).await?;
+        verify_metadata(old, &target)?;
+        Ok((old.clone(), target))
+    }
+}
+
+fn native_image(version: &str) -> Result<(u64, [u8; 32]), Error> {
+    #[cfg(target_os = "linux")]
+    {
+        sources::brew_claude_linux::native(version)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        sources::claude_current_release::native(version, "darwin-arm64")
+    }
+}
+
+fn target_image(target: &Value) -> Result<(String, [u8; 32]), Error> {
+    #[cfg(target_os = "linux")]
+    {
+        let url = format!(
+            "https://downloads.claude.ai/claude-code-releases/{NEW_VERSION}/linux-x64/claude"
+        );
+        let digest = native_image(NEW_VERSION)?.1;
+        if target["token"] != NEW_TOKEN
+            || target["version"] != NEW_VERSION
+            || target["url"] != url
+            || target["sha256"] != hex::encode(digest)
+        {
+            return Err(Error::InvalidRelease);
+        }
+        Ok((url, digest))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let (_, url, digest) = brew::release(
+            NEW_TOKEN,
+            NEW_VERSION,
+            &serde_json::to_vec(target).map_err(|_| Error::InvalidRelease)?,
+        )?;
+        Ok((url, digest))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn verify_metadata(old: &Value, target: &Value) -> Result<(), Error> {
     for (value, token, version, other, checksum) in [
         (
             old,
@@ -201,7 +256,7 @@ impl Migration {
         sources::claude_metadata_path(&self.config)?;
         sources::config_restore_stage(&self.config)?;
         if let Some(probe) = &tx.probe {
-            let digest = sources::claude_current_release::native(NEW_VERSION, "darwin-arm64")?.1;
+            let digest = native_image(NEW_VERSION)?.1;
             if probe.generation.is_nil()
                 || probe.program != self.candidate()
                 || probe.arguments != [OsString::from("--version")]
@@ -223,7 +278,7 @@ impl Migration {
 fn verify_tree_contract(snapshot: &Snapshot, version: &str, token: &str) -> Result<(), Error> {
     let files = snapshot.file_manifest();
     let native = PathBuf::from(version).join("claude");
-    let image = sources::claude_current_release::native(version, "darwin-arm64")?;
+    let image = native_image(version)?;
     snapshot.verify_file(&native, image.0, image.1)?;
     if files.len() != 4
         || !files.contains_key(Path::new(".metadata/INSTALL_RECEIPT.json"))
@@ -267,7 +322,7 @@ fn verify_tree_contract(snapshot: &Snapshot, version: &str, token: &str) -> Resu
 /// 固定发行映像之外，只允许真实 Homebrew 无脚本登记的三份小文件。
 fn verify_old_tree(root: &Path, snapshot: &Snapshot) -> Result<(), Error> {
     let native = PathBuf::from(OLD_VERSION).join("claude");
-    let (length, digest) = sources::claude_current_release::native(OLD_VERSION, "darwin-arm64")?;
+    let (length, digest) = native_image(OLD_VERSION)?;
     managed_process::ExpectedFileIdentity::capture_release_image(
         &root.join(&native),
         length,
@@ -338,8 +393,7 @@ pub(super) async fn execute(
     )?;
     claude_downgrade::revalidate(plan.downgrade).await?;
     let old = brew::metadata(OLD_TOKEN).await?;
-    let target = brew::metadata(NEW_TOKEN).await?;
-    verify_metadata(&old, &target)?;
+    let (_, target) = metadata(&old).await?;
     let prefix = brew::prefix_from_entry(CLIAgent::Claude, &plan.installation.entry)?;
     // Homebrew 的两个原生 cask 锁保持固定顺序；不能与并发 brew 操作交错。
     let stable_lock = lock_cask(&prefix, NEW_TOKEN)?;
@@ -380,13 +434,8 @@ pub(super) async fn execute(
         sources::claude_metadata_path(&config)?,
         NEW_VERSION,
     )?;
-    let (_, url, digest) = brew::release(
-        NEW_TOKEN,
-        NEW_VERSION,
-        &serde_json::to_vec(&target).map_err(|_| Error::InvalidRelease)?,
-    )?;
-    let (length, fixed_digest) =
-        sources::claude_current_release::native(NEW_VERSION, "darwin-arm64")?;
+    let (url, digest) = target_image(&target)?;
+    let (length, fixed_digest) = native_image(NEW_VERSION)?;
     if digest != fixed_digest {
         return Err(Error::InvalidRelease);
     }
@@ -914,6 +963,6 @@ fn remove_link_if_matching(path: &Path, expected: &Link) -> Result<(), Error> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "sources_brew_claude_migration_tests.rs"]
 mod tests;

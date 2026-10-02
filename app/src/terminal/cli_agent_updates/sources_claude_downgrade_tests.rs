@@ -287,3 +287,75 @@ fn homebrew_downgrade_keeps_the_consumer_native_history_guard() {
         [&task].into_iter()
     ));
 }
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn linux_homebrew_downgrade_requires_the_reviewed_edge_and_stable_configuration() {
+    use super::super::{ConfigDesired, ConfigKind};
+
+    let intent = Some(Intent::ClaudeHomebrewStable21287To21285);
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Homebrew,
+            "2.1.287",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Ok(intent)
+    );
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Homebrew,
+            "2.1.287",
+            "2.1.285",
+            Channel::FollowInstallation
+        ),
+        Err(Error::ChannelMismatch)
+    );
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Homebrew,
+            "2.1.288",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Err(Error::InvalidRelease)
+    );
+    let config = Some(ConfigBackup {
+        kind: ConfigKind::Claude,
+        path: PathBuf::from("/unused/settings.json"),
+        before: Some(br#"{"autoUpdatesChannel":"latest","other":true}"#.to_vec()),
+        after: None,
+        desired: Some(ConfigDesired {
+            bytes: Some(br#"{"autoUpdatesChannel":"stable","other":true}"#.to_vec()),
+        }),
+        before_mode: Some(0o600),
+        restore_stage: None,
+    });
+    assert_eq!(
+        validate_homebrew(intent, "2.1.287", "2.1.285", &config),
+        Ok(())
+    );
+    assert_eq!(
+        validate_homebrew(None, "2.1.287", "2.1.285", &config),
+        Err(Error::RecoveryRequired)
+    );
+    assert_eq!(
+        validate_homebrew(intent, "2.1.287", "2.1.285", &None),
+        Err(Error::ChannelMismatch)
+    );
+    // Homebrew 的固定原件审核不能连带授予未经审核的 Linux npm 消费者版本。
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Npm,
+            "2.1.287",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Err(Error::UnsupportedPlatform)
+    );
+}

@@ -73,7 +73,9 @@ fn valid_entry(manifest: &Manifest) -> bool {
                 .and_then(|name| name.to_str());
             let candidate = (version == Some("2.1.280")
                 || cfg!(all(target_os = "macos", target_arch = "aarch64"))
-                    && matches!(version, Some("2.1.285" | "2.1.287")))
+                    && matches!(version, Some("2.1.285" | "2.1.287"))
+                || cfg!(all(target_os = "linux", target_arch = "x86_64"))
+                    && version == Some("2.1.285"))
                 && name
                     .and_then(|name| name.strip_prefix(".infinishell-brew-"))
                     .and_then(|id| Uuid::parse_str(id).ok())
@@ -396,6 +398,10 @@ pub(super) fn validate(manifest: &Manifest, state_dir: &Path) -> io::Result<()> 
             Some("2.1.280") => (
                 233_709_640,
                 "1e08503dbdf3c2cb0d706d32f3408277388d1c76ef108673e8fe42c1b322925b",
+            ),
+            Some("2.1.285") => (
+                240_327_864,
+                "33dad1ec615a2e08cc78b494f05c110e49916de2c79d78ec8799ebf46b233d29",
             ),
             _ => return Err(io::Error::other("Claude Linux cask 探针版本不匹配")),
         };

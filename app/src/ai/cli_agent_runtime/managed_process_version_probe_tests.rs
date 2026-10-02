@@ -229,6 +229,77 @@ fn grok_npm_probe_requires_a_complete_platform_specific_image_pair() {
     }
 }
 
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn linux_claude_migration_probe_binds_only_the_fixed_285_candidate_image() {
+    let (temporary, mut manifest) = fixture();
+    let root = temporary.path().canonicalize().unwrap();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1);
+    manifest.executable = Path::new("/home/linuxbrew/.linuxbrew/Caskroom")
+        .join(format!(".infinishell-brew-{}", Uuid::new_v4()))
+        .join("2.1.285/claude");
+    manifest.expected_files[0].path = manifest.executable.clone();
+    manifest.expected_files[0].canonical_path = manifest.executable.clone();
+    // 这里只核 Manifest 准入；真实文件租约和 ELF 执行由原生派生链独立验证。
+    for (size, digest, accepted) in [
+        (
+            240_327_864,
+            "33dad1ec615a2e08cc78b494f05c110e49916de2c79d78ec8799ebf46b233d29",
+            true,
+        ),
+        (
+            240_327_863,
+            "33dad1ec615a2e08cc78b494f05c110e49916de2c79d78ec8799ebf46b233d29",
+            false,
+        ),
+        (
+            240_327_864,
+            "51f09bd1e021d9fa8a1864c179799bd37cb39962a937935c5cf6823398e86db4",
+            false,
+        ),
+        (
+            244_317_368,
+            "3920489a5109cff5786a1a392c25277408ff22bc796d5edb9c16a60e5a1718f0",
+            false,
+        ),
+    ] {
+        manifest.expected_files[0].size = size;
+        manifest.expected_files[0].sha256 = digest.to_owned();
+        assert_eq!(validate(&manifest, &root).is_ok(), accepted);
+    }
+}
+
+#[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[test]
+fn linux_claude_migration_does_not_authorize_other_versions_public_entries_or_prefixes() {
+    let (_temporary, mut manifest) = fixture();
+    manifest.atomic_launch_kind = Some(AtomicLaunchKind::ClaudeHomebrewVersionProbeV1);
+    let stage = format!(".infinishell-brew-{}", Uuid::new_v4());
+    for (relative, accepted) in [
+        (format!("{stage}/2.1.285/claude"), true),
+        (format!("{stage}/2.1.280/claude"), true),
+        ("claude-code@latest/2.1.278/claude".to_owned(), true),
+        ("claude-code@latest/2.1.280/claude".to_owned(), true),
+        (format!("{stage}/2.1.278/claude"), false),
+        (format!("{stage}/2.1.287/claude"), false),
+        (format!("{stage}/2.1.286/claude"), false),
+        ("claude-code/2.1.285/claude".to_owned(), false),
+        ("claude-code@latest/2.1.287/claude".to_owned(), false),
+        ("claude-code@latest/2.1.285/claude".to_owned(), false),
+        (
+            ".infinishell-brew-00000000-0000-0000-0000-000000000000/2.1.285/claude".to_owned(),
+            false,
+        ),
+    ] {
+        manifest.executable = Path::new("/home/linuxbrew/.linuxbrew/Caskroom").join(&relative);
+        assert_eq!(valid_entry(&manifest), accepted, "{relative}");
+    }
+    manifest.executable = Path::new("/other/Caskroom")
+        .join(stage)
+        .join("2.1.285/claude");
+    assert!(!valid_entry(&manifest));
+}
+
 #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
 #[test]
 fn private_brew_candidate_paths_use_shared_prefix_guard() {

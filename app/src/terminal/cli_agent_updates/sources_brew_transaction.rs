@@ -21,12 +21,18 @@ use warpui::r#async::FutureExt as _;
 use super::brew_completions::Completion;
 use super::brew_grok_aliases::Alias;
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
 #[path = "sources_brew_claude_migration.rs"]
 mod claude_migration;
 
-#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-pub(super) use claude_migration::verify_metadata as claude_migration_metadata;
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+pub(super) use claude_migration::metadata as claude_migration_metadata;
 
 #[cfg(target_os = "linux")]
 #[path = "sources_brew_claude_linux_probes.rs"]
@@ -275,9 +281,17 @@ pub(super) async fn execute(
     root: &Path,
     progress: Option<VerificationProgress>,
 ) -> Result<String, Error> {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
     if plan.downgrade == Some(super::claude_downgrade::Intent::ClaudeHomebrewStable21287To21285) {
         return claude_migration::execute(plan, root, progress).await;
+    }
+    #[cfg(target_os = "linux")]
+    if plan.agent == CLIAgent::Claude {
+        // 消费者降级只能进入双 cask 事务；同 token 升级继续沿用原有固定合同。
+        super::brew_claude_linux::supports(&plan.target_version)?;
     }
     brew::supports(plan.agent, &plan.target_version)?;
     if plan.agent == CLIAgent::Codex {
@@ -984,7 +998,10 @@ fn rollback_publication(journal: &Journal, parent: &Directory) -> Result<(), Err
 }
 
 pub(super) fn recover(agent: CLIAgent, entry: &Path, root: &Path) -> Result<Option<String>, Error> {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    #[cfg(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    ))]
     if let Some(result) = claude_migration::recover_if_present(agent, entry, root)? {
         return Ok(result);
     }

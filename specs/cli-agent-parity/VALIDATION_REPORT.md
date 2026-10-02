@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Linux Homebrew 合法降级实现与原生范围复核
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Mac消费者链原证据保持；原生实现不能随其他设备验收移交。源码复核确认Linux Homebrew此前所有合法降级都被拒绝；Windows npm和WinGet也缺少受审核来源、渠道、配置和恢复绑定的Claude降级合同，独立于Windows实际npm运行失败，继续列为实现待办。
+
+官方Stable历史由277直接升到280，没有Stable278，未从已有278映像拼造cask。固定Homebrew提交 `8d9df9ae501d586458789ecbf01115d91fe838c0` 的两份完整Ruby原件及Claude官方manifest已核；Linux285为240327864B／SHA `33dad1ec615a2e08cc78b494f05c110e49916de2c79d78ec8799ebf46b233d29`，287为244317368B／SHA `3920489a5109cff5786a1a392c25277408ff22bc796d5edb9c16a60e5a1718f0`。完整下载与两上游摘要一致；静态ELF使用既有六库和解释器，无新增加载属性或系统目录权限。合同SHA `d72cadf4e1d2501d7991450a716f8f6a11321561fd334713820df700ab660917`，16件原件索引 `09111509a170b1dcef2d78fc83784ee690f9f3d1324b7e8945b2161224aa9982`，仓外 `g09-linux-brew-downgrade-source-v1/current-287-to-285`；未执行CLI或真实更新。
+
+新实现接通Linux来源发现、精确287→285 Stable意图、双cask事务及无网络冷恢复；发布前重查Claude Stable和Homebrew Stable，固定原cask下载严格校验。旧树287、候选285、登记/入口/配置及恢复账本逐身份绑定；仅候选285获新增原生准入，公开285/287及stage287继续拒绝。普通280和旧恢复合同保持，Linux npm未扩展。审查发现的新版本检查/执行不一致已在生成计划前修正：280→285/287与285→287不再产生可执行计划。
+
+12文件冻结源码索引 `5a4dd0641fac942342a0880a3fa2e79e01a049e0bb25a4688ea9987f077416b0`，基于7707733b6。check `r-2xo4z2jd`通过、短根清理，log SHA `7bca83a1fcde7a0e60fa4d80ff2db19ae48d1a03245d3303576728fc42b38cf4`；本机定向 `r-o9v7lkls` 共364项普通PASS、8347 skipped，无FAIL/LEAK/RETRY/FLAKY，log SHA `f3e4e1168a9bc25698ec4e03a802f6f103155c24707020a9f924a396bc0c2dce`；i18n `r-lii11vxs` 11项通过，log SHA `6a435e27e418d8ae2fef8e130d09290a32ee61486d38a2c00c07073b03f3bb26`。三个短根均清理，本机门禁索引 `8303bb015be46163608ce1b1503fadd3dab702da2d9c2f9496f3196b3fd6299d`。精确提交Linux/Windows门禁待完成，新增7个Linux专属回归不能用Mac检查代记通过。无需本地化变更：沿用已审英中检查、更新、失败与恢复语义，无文案或布局变更。其他平台真实验收仍后置，不宣称本轮Linux功能运行通过或G09关闭。
+
 ## 2026-10-03：Grok 真实 Homebrew 多入口更新、应用冷回滚与中文重试
 
 新增关闭0项，保持 **9关闭／G03、G09共2开放／3移交**，PR草稿。复用v4构建 `r-9a71ln4q`，`0d65c2b88` 的9份产品源码逐SHA等价，不称当前提交重建。真实官方Homebrew7.0.4安装Grok41，沿用原GROK_HOME；GUI `r-tfdpxo3a` 实时发现Stable46。事务 `b5dae3b4-68d4-4dac-9805-42d6cd0fa1bf` 在ExchangeIntent已发布完整46树、`grok/agent`双入口和bash/zsh/fish三补全，旧41回滚树及入口仍绑定；9个已注册原生探针全部退出0且清理闭合后，仅向精确出生身份和签名映像的GUI64863发送一次SIGKILL。中断独审SHA `04dd704588fb7fb29aa77ac3d0dadea1f2681999f0fb662ef0b063ebb97b9f9f`。

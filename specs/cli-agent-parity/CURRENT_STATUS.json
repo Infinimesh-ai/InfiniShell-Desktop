@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备，Windows原生失败及最新源码门禁仍待解决，历史LEAK独立保留",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备；Linux Homebrew合法降级新增实现待门禁，Windows npm/WinGet合法降级实现及原生运行失败仍开放，历史LEAK独立保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1316,6 +1316,35 @@
       "preserved_failures": "真实Brew准备时缺官方tag导致tab版本不满足要求，补齐官方tag并真实重装后验收；恢复独审初版JSON字段序影响摘要，修正审计器后通过；原失败保留，未改产品收据或重跑恢复。",
       "mac_scope_review": "原条件按包管理器覆盖；Claude npm/Homebrew已真实合法降级和忙碌延期，Codex/Grok同token Homebrew共用恢复主体由本轮真实冷回滚覆盖，Claude跨cask独立恢复已有自身证据；不将Codex完成后重启记作中断恢复，不新增每款乘场景矩阵。",
       "remaining": "G09 Windows原生npm首CMD候选及固定Codex hooks自然退出仍失败；需取消前原生栈/等待原因和创建返回边界，不能靠近似探针或安全拒绝关闭。最新两平台源码门禁待完成；G03 Finder实际拖放仍欠。"
+    },
+    "g09_linux_brew_downgrade_20261003": {
+      "status": "local_gates_passed_cross_platform_source_pending",
+      "gap_closed": false,
+      "base_commit": "7707733b66bc87b9a7627e3b0eb3c459044a1d9e",
+      "source_record_sha256": "5a4dd0641fac942342a0880a3fa2e79e01a049e0bb25a4688ea9987f077416b0",
+      "native_contract_sha256": "d72cadf4e1d2501d7991450a716f8f6a11321561fd334713820df700ab660917",
+      "source_freeze_sha256": "09111509a170b1dcef2d78fc83784ee690f9f3d1324b7e8945b2161224aa9982",
+      "implemented": "Linux x64官方Latest287→Stable285双cask迁移、来源发现与离线冷恢复；固定完整原件及原安装树/入口/配置身份绑定；仅新增285候选版本探针，保留普通280合同和未知版本拒绝。",
+      "source_basis": "官方Stable历史277直接到280，无Stable278；没有拼造降级cask。固定commit8d9df9ae两原cask的Linux分支及完整native与官方manifest一致。两ELF无须扩大系统库允许集，静态原件审计不是实际运行通过。",
+      "transition_guard": "生成计划前拒绝没有执行合同的280→285/287及285→287；仅同版观察或明确287→285 Stable可进入消费者合同。Linux npm版本范围不连带扩大。",
+      "local_check": {
+        "run": "r-2xo4z2jd",
+        "passed": true,
+        "temporary_root_cleaned": true,
+        "log_sha256": "7bca83a1fcde7a0e60fa4d80ff2db19ae48d1a03245d3303576728fc42b38cf4"
+      },
+      "localization": "无需本地化变更；英中既有检查、更新、失败和恢复语义适用，无新文案或布局；i18n11项通过。",
+      "remaining": "本机门禁已过，精确Linux/Windows源码门禁待完成；其他平台真实设备验收仍移交。Windows npm及WinGet缺受审核来源/渠道/配置/恢复绑定的Claude合法降级合同，属于原生实现欠项；另有已证实的Windows npm运行和固定Codex hooks退出失败。G03 Finder实际拖放仍欠。",
+      "local_gates": {
+        "audit_sha256": "8303bb015be46163608ce1b1503fadd3dab702da2d9c2f9496f3196b3fd6299d",
+        "nextest_run": "r-o9v7lkls",
+        "ordinary_passes": 364,
+        "i18n_run": "r-lii11vxs",
+        "i18n_passes": 11,
+        "all_short_roots_cleaned": true,
+        "new_linux_tests": 7,
+        "new_linux_tests_passed": false
+      }
     },
     "g09_final_source_gate_separation_20261003": {
       "status": "local_validated_remote_pending",

@@ -744,6 +744,11 @@ pub(super) async fn inspect(
     #[cfg(all(feature = "local_fs", any(target_os = "macos", target_os = "linux")))]
     if installation.source == Source::Homebrew {
         installation.error = brew::supports(agent, &target_version).err();
+        #[cfg(target_os = "linux")]
+        if agent == CLIAgent::Claude && installation.error.is_none() {
+            installation.error =
+                brew_claude_linux::supports_transition(&installed_version, &target_version).err();
+        }
         if channel != Channel::FollowInstallation && channel != installation.channel {
             installation.error = Some(Error::ChannelMismatch);
         }
@@ -1764,14 +1769,19 @@ async fn discover_brew(
         } else {
             Channel::Latest
         };
-        #[cfg(all(feature = "local_fs", target_os = "macos", target_arch = "aarch64"))]
+        #[cfg(all(
+            feature = "local_fs",
+            any(
+                all(target_os = "macos", target_arch = "aarch64"),
+                all(target_os = "linux", target_arch = "x86_64")
+            )
+        ))]
         if agent == CLIAgent::Claude
             && *cask == "claude-code@latest"
             && installed == claude_current_release::V287
             && requested == Channel::Stable
         {
-            let target = brew::metadata("claude-code").await?;
-            brew_transaction::claude_migration_metadata(&metadata, &target)?;
+            brew_transaction::claude_migration_metadata(&metadata).await?;
             found.channel = Channel::Stable;
             found.source_target = Some(claude_current_release::V285.to_owned());
             let home = user_home().ok_or(Error::UnsupportedSource)?;

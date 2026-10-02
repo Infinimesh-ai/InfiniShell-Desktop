@@ -292,7 +292,15 @@ pub(super) fn supports(agent: CLIAgent, version: &str) -> Result<(), Error> {
     }
     if cfg!(target_os = "linux") {
         #[cfg(all(feature = "local_fs", target_os = "linux"))]
-        return super::brew_claude_linux::supports(version);
+        {
+            if matches!(
+                version,
+                super::claude_current_release::V285 | super::claude_current_release::V287
+            ) {
+                return super::brew_claude_linux::native(version).map(|_| ());
+            }
+            return super::brew_claude_linux::supports(version);
+        }
         #[cfg(not(all(feature = "local_fs", target_os = "linux")))]
         return Err(Error::UnsupportedPlatform);
     }

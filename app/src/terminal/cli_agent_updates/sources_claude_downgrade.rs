@@ -52,7 +52,10 @@ pub(super) fn select(
         && installed == claude_current_release::V287
         && target == claude_current_release::V285
     {
-        if !cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        if !cfg!(any(
+            all(target_os = "macos", target_arch = "aarch64"),
+            all(target_os = "linux", target_arch = "x86_64")
+        )) {
             return Err(Error::UnsupportedPlatform);
         }
         return if selected == Channel::Stable {
@@ -131,8 +134,10 @@ pub(super) fn validate_homebrew(
     target: &str,
     config: &Option<ConfigBackup>,
 ) -> Result<(), Error> {
-    if !cfg!(all(target_os = "macos", target_arch = "aarch64"))
-        || intent != Some(Intent::ClaudeHomebrewStable21287To21285)
+    if !cfg!(any(
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "linux", target_arch = "x86_64")
+    )) || intent != Some(Intent::ClaudeHomebrewStable21287To21285)
         || installed != claude_current_release::V287
         || target != claude_current_release::V285
     {
