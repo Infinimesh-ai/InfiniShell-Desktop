@@ -121,7 +121,7 @@ static BOOL token_field(HANDLE token, TOKEN_INFORMATION_CLASS kind, void *value,
 static BOOL snapshot(HANDLE process, PROCESS_SNAPSHOT *value) {
     FILETIME created, exited, kernel, user;
     TOKEN_STATISTICS statistics;
-    TOKEN_ELEVATION elevation;
+    TOKEN_ELEVATION elevation = {0};
     HANDLE token = NULL;
     value->pid = GetProcessId(process);
     if (value->pid == 0 || !GetProcessTimes(process, &created, &exited, &kernel, &user)) return FALSE;

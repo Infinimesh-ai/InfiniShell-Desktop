@@ -7806,5 +7806,24 @@
       "temporary_directory": "cleaned",
       "compiler_warnings": 5
     }
+  },
+  "g09_netcredentials_first_ci_20261002": {
+    "source_commit": "1ac53f4dabc0599d8940883cfd5607649f89bab2",
+    "run_id": 37001996114,
+    "conclusion": "failure",
+    "failure_stage": "MSVC helper build: C4701 TOKEN_ELEVATION elevation under /W4 /WX",
+    "native_candidate_executed": false,
+    "gap_closed": false,
+    "originals_index_sha256": "9fd5a56d49b1ac5e3dc56825c4f3577f022ef73d7f0aa3dc7ec6c369ad8ee8c3",
+    "fix": "仅显式零初始化结构；查询成功、准确长度和权限断言不变；目标复验待完成",
+    "localization": "无需本地化变更",
+    "fix_local_check": {
+      "run_id": "r-b1ux436a",
+      "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "result": "passed",
+      "log_sha256": "9b40e1868db51bbe17ddd721349ad75a0df22aa1d2ffd0a1f8e8106d02e81d2c",
+      "cleanup": "cleaned",
+      "boundary": "Mac Rust检查不编译MSVC C helper；其修复仍待精确提交Windows门禁"
+    }
   }
 }
