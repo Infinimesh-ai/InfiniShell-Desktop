@@ -19,15 +19,16 @@ pub(super) enum Intent {
     ClaudeNpmStable21280To21278,
     ClaudeNpmStable21287To21285,
     ClaudeHomebrewStable21287To21285,
+    ClaudeNpmWindowsStable21287To21285,
 }
 
 impl Intent {
     fn target(self) -> &'static str {
         match self {
             Self::ClaudeNpmStable21280To21278 => TO,
-            Self::ClaudeNpmStable21287To21285 | Self::ClaudeHomebrewStable21287To21285 => {
-                claude_current_release::V285
-            }
+            Self::ClaudeNpmStable21287To21285
+            | Self::ClaudeHomebrewStable21287To21285
+            | Self::ClaudeNpmWindowsStable21287To21285 => claude_current_release::V285,
         }
     }
 }
@@ -83,6 +84,13 @@ pub(super) fn select(
 fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
     use claude_current_release::{V285, V287};
 
+    #[cfg(windows)]
+    if matches!(target, V285 | V287) {
+        if !cfg!(target_arch = "x86_64") {
+            return Err(Error::UnsupportedPlatform);
+        }
+        return windows_npm_transition(installed, target);
+    }
     if target == TO {
         platform()?;
         return match installed {
@@ -104,6 +112,38 @@ fn transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
         return Err(Error::InvalidRelease);
     }
     Ok(None)
+}
+
+#[cfg(any(windows, test))]
+fn windows_npm_transition(installed: &str, target: &str) -> Result<Option<Intent>, Error> {
+    use claude_current_release::{V285, V287};
+
+    match (installed, target) {
+        (TO | FROM, FROM) | (V285, V285) => Ok(None),
+        (V287, V285) => Ok(Some(Intent::ClaudeNpmWindowsStable21287To21285)),
+        _ => Err(Error::InvalidRelease),
+    }
+}
+
+#[cfg(windows)]
+pub(super) fn validate_windows_npm(
+    intent: Option<Intent>,
+    installed: &str,
+    target: &str,
+    config: &Option<ConfigBackup>,
+) -> Result<(), Error> {
+    if !cfg!(target_arch = "x86_64") {
+        return Err(Error::UnsupportedPlatform);
+    }
+    let expected =
+        windows_npm_transition(installed, target).map_err(|_| Error::RecoveryRequired)?;
+    if intent != expected {
+        return Err(Error::RecoveryRequired);
+    }
+    if intent.is_some() {
+        validate_stable_config(config)?;
+    }
+    Ok(())
 }
 
 pub(super) fn validate(
@@ -193,7 +233,9 @@ pub(super) fn compatible_history<'a>(
         // 消费者发行原件的审核不证明 285 能继续任意托管原生历史。
         if matches!(
             intent,
-            Intent::ClaudeNpmStable21287To21285 | Intent::ClaudeHomebrewStable21287To21285
+            Intent::ClaudeNpmStable21287To21285
+                | Intent::ClaudeHomebrewStable21287To21285
+                | Intent::ClaudeNpmWindowsStable21287To21285
         ) {
             return false;
         }

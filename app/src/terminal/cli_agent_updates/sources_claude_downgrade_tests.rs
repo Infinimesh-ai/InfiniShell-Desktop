@@ -16,6 +16,110 @@ fn historical_downgrade_intent_keeps_its_persisted_name() {
         r#""claude_npm_stable21287_to21285""#
     );
     assert!(serde_json::from_str::<Intent>(r#""claude_npm_stable21288_to21285""#).is_err());
+    assert_eq!(
+        serde_json::to_string(&Intent::ClaudeNpmWindowsStable21287To21285).unwrap(),
+        r#""claude_npm_windows_stable21287_to21285""#
+    );
+}
+
+#[test]
+fn windows_consumer_transition_keeps_legacy_updates_and_one_distinct_downgrade() {
+    assert_eq!(windows_npm_transition("2.1.278", "2.1.280"), Ok(None));
+    assert_eq!(windows_npm_transition("2.1.280", "2.1.280"), Ok(None));
+    assert_eq!(windows_npm_transition("2.1.285", "2.1.285"), Ok(None));
+    assert_eq!(
+        windows_npm_transition("2.1.287", "2.1.285"),
+        Ok(Some(Intent::ClaudeNpmWindowsStable21287To21285))
+    );
+    assert_eq!(
+        windows_npm_transition("2.1.280", "2.1.285"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        windows_npm_transition("2.1.285", "2.1.287"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        windows_npm_transition("2.1.288", "2.1.285"),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        windows_npm_transition("2.1.287", "2.1.280"),
+        Err(Error::InvalidRelease)
+    );
+}
+
+#[cfg(feature = "local_fs")]
+#[test]
+fn windows_consumer_downgrade_preserves_the_native_history_boundary() {
+    let mut task = historical_task();
+    let intent = Intent::ClaudeNpmWindowsStable21287To21285;
+    assert!(!compatible_history(intent, [&task].into_iter()));
+    task.native_session_id = None;
+    assert!(compatible_history(intent, [&task].into_iter()));
+    task.state = crate::persistence::model::LocalCliTaskState::Unknown;
+    assert!(!compatible_history(intent, [&task].into_iter()));
+}
+
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[test]
+fn windows_npm_downgrade_requires_explicit_stable_and_the_platform_intent() {
+    use super::super::{ConfigDesired, ConfigKind};
+
+    let intent = Some(Intent::ClaudeNpmWindowsStable21287To21285);
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Npm,
+            "2.1.287",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Ok(intent)
+    );
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Npm,
+            "2.1.287",
+            "2.1.285",
+            Channel::FollowInstallation
+        ),
+        Err(Error::ChannelMismatch)
+    );
+    let config = Some(ConfigBackup {
+        kind: ConfigKind::Claude,
+        path: PathBuf::from("C:/unused/settings.json"),
+        before: None,
+        after: None,
+        desired: Some(ConfigDesired {
+            bytes: Some(br#"{"autoUpdatesChannel":"stable"}"#.to_vec()),
+        }),
+        before_mode: None,
+        restore_stage: None,
+    });
+    assert_eq!(
+        validate_windows_npm(intent, "2.1.287", "2.1.285", &config),
+        Ok(())
+    );
+    assert_eq!(validate(intent, "2.1.287", "2.1.285", &config), Ok(()));
+    assert_eq!(
+        validate_windows_npm(
+            Some(Intent::ClaudeNpmStable21287To21285),
+            "2.1.287",
+            "2.1.285",
+            &config
+        ),
+        Err(Error::RecoveryRequired)
+    );
+    assert_eq!(
+        validate_windows_npm(intent, "2.1.287", "2.1.285", &None),
+        Err(Error::ChannelMismatch)
+    );
+    assert_eq!(
+        validate_windows_npm(None, "2.1.278", "2.1.280", &None),
+        Ok(())
+    );
 }
 
 #[cfg(all(target_os = "macos", target_arch = "aarch64"))]

@@ -38,7 +38,7 @@ mod npm;
 #[cfg(all(feature = "local_fs", windows))]
 #[path = "sources_npm_claude_windows.rs"]
 mod npm_claude_windows;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 #[path = "sources_npm_claude_windows_contract.rs"]
 mod npm_claude_windows_contract;
 #[cfg(all(feature = "local_fs", windows))]
@@ -147,7 +147,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 78] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 79] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -171,6 +171,7 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 78] = [
     include_bytes!("sources_npm_claude_windows.rs"),
     include_bytes!("sources_npm_claude_windows_tree.rs"),
     include_bytes!("sources_npm_claude_windows_contract.rs"),
+    include_bytes!("sources_npm_claude_windows_contract.json"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_claude_npm_probe_windows.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_windows.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe.rs"),

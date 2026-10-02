@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Windows npm 合法降级与旧账本兼容
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Windows x64的Claude npm已新增固定287→Stable285合同；只有用户明确选择Stable且派发前实时渠道仍为285才能执行。原287完整树、候选285全成员、双shell探针输入/实际版本/退出收据与账本相互绑定；恢复先复核意图和完整版本合同，再按已有ConfigPublishing提交点向前收敛或回滚。旧schema1缺少downgrade字段按None读取，旧三参探针仍仅280，新四参仅285，原278/280→280事务保持。不放行287候选、未知升级/降级或混合目标，不修改AppContainer、系统权限和超时。
+
+完整官方wrapper与win32-x64归档的SRI、11个成员、mode及native均已核。285 native为243751072B／SHA `121fc8151ed40bd9c144d68aa1cea23427803628ffab65e23da1cceda155697e`，287为247736480B／SHA `6d5be51f0edfe3429cd1a9885950db31c1e59eb9a2c9a30a47e64179d2ff98b4`，与官方manifest一致。安装脚本和shim与280相同；PE两版均7直接导入、12延迟导入，静态证书解析不等于Windows信任/吊销校验通过。原件审计SHA `32bfada515686525d34bc9aa7a2ef5511c71fe4213c5d16954492965db6c82c5`、52件冻结索引 `5fde811a2877b5892620ab0918a8aa6f496b9a882e4c39a6eb40ae910922feca`，仓外 `g09-windows-claude-downgrade-source-v1`；未执行CLI、安装或真实更新。
+
+基于9ef55fb02的16文件源码索引 `975a39232cae2fe4ec6be891165a829bb913fa4b0bf8e96ed62e669946563ee9`，独立审查 `903f26c8e7ff5c5b1a3d9a3012f2274fbcd6f096852b09656447f6fb5a2ff3b5` 无阻断。Mac check `r-mcxcqubd`通过，log SHA `7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6`；定向 `r-q0ca8_fl`为368普通PASS／8347 skipped、无FAIL/LEAK/RETRY/FLAKY，log SHA `e54e32ecfa28857234076c09565b13b3c0d8a022e9d166908628b80beee2a9a0`；i18n `r-iixudjym`11项通过，log SHA `f25a5a9b9755a54c877ffa7cdbe3ec5bc14940a64ad2cc937bde0d1c76d70021`。三个短根均已核验清理，本地汇总 `461ba8b910984eeb535b1d95f352189f08fe959c3587959f64a1e30395724276`。无需本地化变更：既有英文/简体中文渠道、更新、失败及恢复语义仍适用，无文案或布局变化。
+
+对应Windows专属编译、旧账本真实文件恢复与硬链接回归尚待精确平台门禁，Mac合同测试不代记Windows通过。待旧770源码门禁自然结束后，按最新完成实现的精确提交运行两平台源码门禁，避免同分支并发取消和重复已知原生失败。WinGet固定286→285官方manifest和完整PE已核，实现继续推进；Windows实际npm首CMD候选及固定Codex hooks自然退出失败仍保留。G03真实Finder拖放仍欠，本轮代码和测试不关闭G09。
+
 ## 2026-10-03：Linux Homebrew 合法降级实现与原生范围复核
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。Mac消费者链原证据保持；原生实现不能随其他设备验收移交。源码复核确认Linux Homebrew此前所有合法降级都被拒绝；Windows npm和WinGet也缺少受审核来源、渠道、配置和恢复绑定的Claude降级合同，独立于Windows实际npm运行失败，继续列为实现待办。

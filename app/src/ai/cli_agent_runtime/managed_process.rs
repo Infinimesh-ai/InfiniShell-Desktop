@@ -1540,8 +1540,9 @@ pub(crate) fn capture_windows_claude_npm_probe(
     mode: &str,
     stage: &Path,
     prefix: &Path,
+    version: &str,
 ) -> io::Result<WindowsClaudeNpmProbeInputs> {
-    claude_npm_windows_probe::capture(mode, stage, prefix)
+    claude_npm_windows_probe::capture(mode, stage, prefix, version)
 }
 
 #[cfg(windows)]

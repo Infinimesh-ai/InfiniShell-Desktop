@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备；Linux Homebrew合法降级新增实现待门禁，Windows npm/WinGet合法降级实现及原生运行失败仍开放，历史LEAK独立保留",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备；Linux Homebrew及Windows npm合法降级实现已过本机门禁、待精确平台门禁；WinGet合法降级和Windows原生运行失败仍开放，历史LEAK独立保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1356,6 +1356,29 @@
       "boundary": "只分离源码与真实验收执行阶段，不豁免条件。6726的Windows固定Codex hooks退出和真实npm首CMD候选失败保留，source gate成功亦不关闭G09或允许合并。",
       "local": "51组合通过（22合法/29拒绝），actionlint与diffcheck通过；普通run/filter字节不变。",
       "remaining": "精确提交两平台源码运行待派发、独立审计待完成；Windows真实失败需要新因果证据，G03实际Finder拖放仍欠。"
+    },
+    "g09_windows_npm_downgrade_20261003": {
+      "status": "local_gates_passed_cross_platform_source_pending",
+      "gap_closed": false,
+      "base_commit": "9ef55fb02e9b452837497f57ef995af11396e896",
+      "source_record_sha256": "975a39232cae2fe4ec6be891165a829bb913fa4b0bf8e96ed62e669946563ee9",
+      "official_static_audit_sha256": "32bfada515686525d34bc9aa7a2ef5511c71fe4213c5d16954492965db6c82c5",
+      "official_freeze_sha256": "5fde811a2877b5892620ab0918a8aa6f496b9a882e4c39a6eb40ae910922feca",
+      "independent_review_sha256": "903f26c8e7ff5c5b1a3d9a3012f2274fbcd6f096852b09656447f6fb5a2ff3b5",
+      "implemented": "Windows x64 Claude npm唯一287→Stable285固定合同，独立意图、实时Stable重查、原287及候选285完整树、双shell探针、配置发布及离线恢复逐版本绑定；旧schema1无downgrade字段、三参280与原278/280→280事务兼容。新四参探针仅285；拒绝未知或混合版本，不扩大权限和超时。",
+      "source_basis": "两官方版本wrapper/platform完整归档SRI、11成员、全mode及native大小/SHA核验；静态PE导入列表一致。PKCS7证书解析不代表Windows签名信任/吊销通过，未执行CLI或安装。",
+      "local_gates": {
+        "audit_sha256": "461ba8b910984eeb535b1d95f352189f08fe959c3587959f64a1e30395724276",
+        "check_run": "r-mcxcqubd",
+        "nextest_run": "r-q0ca8_fl",
+        "ordinary_passes": 368,
+        "skipped": 8347,
+        "i18n_run": "r-iixudjym",
+        "i18n_passes": 11,
+        "all_short_roots_cleaned": true
+      },
+      "localization": "无需本地化变更；英中既有更新、渠道、失败和恢复语义适用，无文案或布局变化。",
+      "remaining": "精确Linux/Windows源码门禁与Windows专属回归待完成；WinGet固定286→285降级原件已核、实现未完成。既有Windows实际npm失败及Codex hooks退出失败保留，其他平台实机验收移交不抵消原生实现欠项。G03真实Finder拖放仍欠。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

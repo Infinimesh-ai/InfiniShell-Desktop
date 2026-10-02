@@ -46,6 +46,16 @@ impl ProbeInputs {
     pub(crate) fn prefix(&self) -> &Path {
         self.arguments.get(2).map_or(Path::new(""), Path::new)
     }
+    pub(crate) fn version(&self) -> &str {
+        if self.arguments.len() == 3 {
+            contract::VERSION
+        } else {
+            self.arguments
+                .get(3)
+                .and_then(|value| value.to_str())
+                .unwrap_or_default()
+        }
+    }
     pub(super) fn files(&self) -> Vec<ExpectedFileIdentity> {
         self.files.clone()
     }
@@ -84,7 +94,9 @@ fn safe_path(path: &Path) -> bool {
 }
 
 pub(super) fn valid_entry(program: &Path, arguments: &[OsString]) -> bool {
-    if !cfg!(target_arch = "x86_64") || arguments.len() != 3 {
+    if !cfg!(target_arch = "x86_64")
+        || !(arguments.len() == 3 || arguments.len() == 4 && arguments[3] == OsStr::new("2.1.285"))
+    {
         return false;
     }
     let mode = arguments[0].to_str().unwrap_or_default();
@@ -114,7 +126,7 @@ pub(super) fn validate(input: &ProbeInputs) -> io::Result<()> {
         return Err(invalid());
     }
     super::validate_expected_files_contract(&input.program, &input.files)?;
-    let mut required = contract::files();
+    let mut required = contract::files_for(input.version()).ok_or_else(invalid)?;
     let mut shims: BTreeMap<_, _> = contract::shims()
         .into_iter()
         .map(|(name, text)| (input.prefix().join(name), text))
@@ -172,13 +184,24 @@ pub(super) fn verify_external(input: &ProbeInputs) -> io::Result<()> {
     super::verify_expected_files(&files)
 }
 
-pub(crate) fn capture(mode: &str, stage: &Path, prefix: &Path) -> io::Result<ProbeInputs> {
+pub(crate) fn capture(
+    mode: &str,
+    stage: &Path,
+    prefix: &Path,
+    version: &str,
+) -> io::Result<ProbeInputs> {
     let program = system_program(mode)?;
-    let arguments = vec![
+    let mut arguments = vec![
         mode.into(),
         stage.as_os_str().to_owned(),
         prefix.as_os_str().to_owned(),
     ];
+    if version != contract::VERSION {
+        if version != "2.1.285" {
+            return Err(invalid());
+        }
+        arguments.push(version.into());
+    }
     if !valid_entry(&program, &arguments) {
         return Err(invalid());
     }
@@ -186,7 +209,10 @@ pub(crate) fn capture(mode: &str, stage: &Path, prefix: &Path) -> io::Result<Pro
     for (name, _contents) in contract::shims() {
         files.push(ExpectedFileIdentity::capture(&prefix.join(name))?);
     }
-    for path in contract::files().into_keys() {
+    for path in contract::files_for(version)
+        .ok_or_else(invalid)?
+        .into_keys()
+    {
         files.push(ExpectedFileIdentity::capture(&stage.join(path))?);
     }
     let input = ProbeInputs {
@@ -344,3 +370,7 @@ pub(super) fn execute(manifest: &Manifest, record_directory: &Path) -> io::Resul
         std::process::exit(code as i32);
     }
 }
+
+#[cfg(test)]
+#[path = "managed_process_claude_npm_probe_windows_tests.rs"]
+mod tests;

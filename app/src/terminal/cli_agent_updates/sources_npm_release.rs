@@ -110,6 +110,16 @@ impl NpmRelease {
         wrapper_metadata: &[u8],
         platform_metadata: &[u8],
     ) -> Result<Self, Error> {
+        #[cfg(windows)]
+        let windows_claude_consumer = agent == CLIAgent::Claude
+            && target == "win32-x64"
+            && matches!(
+                version,
+                super::claude_current_release::V285 | super::claude_current_release::V287
+            )
+            && super::npm_claude_windows_contract::supports(version);
+        #[cfg(not(windows))]
+        let windows_claude_consumer = false;
         // 消费者渠道仍由外层选择；布局合同不会把本次验收外推到未知版本。
         let layout = if agent == CLIAgent::Codex
             && (version == "0.156.1"
@@ -122,7 +132,8 @@ impl NpmRelease {
             && (version == "2.1.280"
                 || (version == super::claude_downgrade::TO
                     && matches!(target, "darwin-arm64" | "linux-x64"))
-                || super::claude_current_release::supports(version, target).is_ok())
+                || super::claude_current_release::supports(version, target).is_ok()
+                || windows_claude_consumer)
         {
             Layout::ClaudeNativeV1
         } else {
@@ -134,12 +145,22 @@ impl NpmRelease {
                 super::claude_current_release::V285 | super::claude_current_release::V287
             )
         {
-            super::claude_current_release::verify_metadata(
-                version,
-                target,
-                wrapper_metadata,
-                platform_metadata,
-            )?;
+            if windows_claude_consumer {
+                #[cfg(windows)]
+                super::npm_claude_windows_contract::verify_metadata(
+                    version,
+                    wrapper_metadata,
+                    platform_metadata,
+                )
+                .map_err(|_| Error::InvalidRelease)?;
+            } else {
+                super::claude_current_release::verify_metadata(
+                    version,
+                    target,
+                    wrapper_metadata,
+                    platform_metadata,
+                )?;
+            }
         }
         let (package, command, entry, targets) = match layout {
             Layout::CodexNativeV1 => (
