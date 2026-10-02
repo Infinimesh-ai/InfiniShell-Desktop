@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G10 按本次 Mac 范围关闭，Windows LEAK 独立保留
+
+**本轮关闭 G10；当前 9 关闭／G03、G09 共 2 开放／V01、V02、V05 共 3 移交。PR #22 保持草稿。** 原关闭条件的真实父权限、命令／技能允许和拒绝、越界拒绝、运行取消及资源清理、双向 ACK、冷恢复与结果均已满足，前节所列实际宿主审批英中布局完整可读。各轮证据继续绑定原构建，Mac 关键收据汇总 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`；没有重跑模型或扩大模型／策略排列验收。
+
+精确产品源码 `04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af` 的[最终源码门禁 36985767809](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809)已 completed/success，Linux／Windows 两作业均成功。完整双日志及逐项清单已核：Linux nextest 5335 次普通 PASS；Windows 4962 次普通 PASS，另 1 次 LEAK。两条新增 Grok 回归 `fixed_search_policy_accepts_native_grep_and_preserves_its_scope`、`native_permission_cancelled_waits_for_matching_history_and_never_reports_completed` 在两平台均普通 PASS，分别见 Linux 原日志 6556／6447 行、Windows 7272／7159 行。无 FAIL／RETRY／FLAKY 状态。两端 rust-genai 各 81 项、TAP 各 18 项；Python 共 57／50 套、1313／1087 次执行，含 12／36 次显式跳过；编译警告 125／180 行。计数为执行次数，不是去重总数。Windows sccache 未运行服务连接拒绝 10061 等原日志诊断保留，不称全日志无异常。
+
+Windows 原日志 12984 行是 `terminal::input::tests::test_ai_context_menu_preserves_lock_state` 的 LEAK，13072 行原汇总为 `670 passed (1 leaky), 8402 skipped`。该用例检查菜单开关保持 Shell 模式与锁状态，自 Goal 起点没有修改；历史同名已检索记录为 PASS，不能称同名旧泄漏或确定间接关联不存在。日志没有残留进程／输出句柄身份，根因及最终清理未证实。只读源码审查发现假终端 bootstrap 仍启动生产 metadata 查询，部分为 detached；Windows 进程组清理为空，但查询显式 stdout/stderr=piped，尚无本轮捕获句柄因果证据。独立保留这一问题，后续应取得精确子 PID、spawn/wait/drop 与句柄归属，不用延时、放宽门禁或重复跑绿替代。仓库及 G10 原规则没有全仓零 LEAK 的额外关闭条件；本次如实记录门禁 success 和风险，不把该条计为普通 PASS。
+
+根代理终态索引 `9335eca2537bfe5dd55a9c0056c732ad5a569a34675cc501eb9de5d4a01a52b0` 位于 `/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/04ac0d46f-ci/terminal-log-audit-v1/terminal-audit-root-v1.safe.json`，引用冻结完整日志、清单和负面诊断；Linux 日志 `6ee69ad88e56cd3fc9517c65f9c48cd79d33f7365f88773b0efe91d5377afda8`，Windows 日志 `210031164cb96c4b342bb8430c978b4247c68d3725d2422074188ab19796dd0b`。Windows 两条逐名收据 `88f46ccc66c795bbdb316e076a6c7e3fb1f890caeac408cfc09f1aee71942f3b`。此前 pending、失败和 cleanup_ready=false 现场不改写；资源回收证据不等同目录删除。
+
+本次只改三份验收文档，产品源码与 04ac 一致；提交前 `r-m_f4050a` 的 `cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed` 通过，日志 `ebdea4fd9a721a7547ef8b9c7a6fccf91f58e6ed4445359da4d9a41159a39534`，短目录已按身份清理。**无需本地化变更**；既有英文／简体中文语义与实际受影响布局沿用已验收据，不称完整中文冷启动或其他平台实机通过。G03 仍缺 Finder 原生拖放证据；G09 仍缺普通用户原生私有交互环境及真实 npm 事务，不能以管理员 Node 正例替代。
+
 ## 2026-10-02：G10 Mac 真实功能和英中审批齐备，最终源码门禁运行中
 
 **新增关闭 0 项，仍为 8 关闭／3 开放／3 移交，PR #22 保持草稿。** `04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af` 的修复后真实功能和英中审计已满足，G10 只剩 [最终 Linux／Windows 源码门禁 36985767809](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809)及逐名审计。该轮原生补验、Grok host 窄筛均关闭，普通筛选包含 `test(cli_agent)`，覆盖 Grok profile；不能用此前 4a 门禁替代新修复。Mac 九份关键收据重新核对摘要，汇总 `c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06`，路径见 CURRENT_STATUS.json 的 `g10_macos_real_acceptance_20261002`。

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次 Mac 范围已关闭 G01/G02/G04/G05/G06/G07/G08/V03；G10 真实功能及英中审批齐备，仅待04ac精确两平台最终源码门禁；8项关闭、3项开放、3项移交，PR #22草稿",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；04ac最终门禁成功，Windows菜单测试1条LEAK根因未明、独立保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -15,6 +15,7 @@
       "G06",
       "G07",
       "G08",
+      "G10",
       "V03"
     ],
     "deferred_platform_acceptance_items": [
@@ -24,11 +25,10 @@
     ],
     "remaining_items": [
       "G03",
-      "G09",
-      "G10"
+      "G09"
     ],
-    "remaining_count": 3,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。",
+    "remaining_count": 2,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。 G10真实父权限、命令/技能审批、越界、运行取消及清理、双向ACK、冷恢复和结果已齐备，实际宿主审批英中布局通过。04ac两平台最终源码门禁success、两新Grok回归普通PASS；Windows菜单测试1条LEAK独立保留，不称全体普通PASS或无残留，不扩展原G10条件。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -51,7 +51,7 @@
         "windows-x64"
       ]
     },
-    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。",
+    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。 G10实际宿主命令审批在同一任务先英文后中文实窗审计，完整说明、参数和按钮均可读；本次关闭记录无需本地化变更。",
     "source_gate": {
       "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
@@ -1066,6 +1066,13 @@
         "indexed_raw_logs": 56,
         "logs_zip_sha256": "0b867ff3134639121b7e1c0b5b871d2c9bfb3c9d3b6f2426d1d621c7f7e4680b"
       }
+    },
+    "g10": {
+      "status": "closed_in_current_mac_scope",
+      "closure_ref": "g10_closure_20261002",
+      "source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+      "source_gate_run_id": 36985767809,
+      "source_gate_warning": "Windows terminal::input::tests::test_ai_context_menu_preserves_lock_state 出现1条LEAK；原汇总670 passed (1 leaky)，单列而不计普通PASS。根因未明，无后代PID或输出句柄身份，未证明已清理；同名历史未见LEAK，不冒称旧同根因问题。"
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -7667,5 +7674,63 @@
       "temporary_directory": "cleaned",
       "scope": "本轮仅三份验收文档变动，产品源码仍与04ac一致；功能回归与i18n使用已通过且精确绑定的原轮证据。"
     }
+  },
+  "g10_closure_20261002": {
+    "schema": 1,
+    "created_at": "2026-10-02T10:53:29.310332+00:00",
+    "status": "closed_in_current_mac_scope",
+    "gap_closed": true,
+    "source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+    "counts": {
+      "closed": 9,
+      "open": 2,
+      "deferred": 3
+    },
+    "acceptance_basis": "原G10父权限、审批允许/拒绝、越界、实际命令/技能、运行取消与清理、双向ACK、冷恢复和结果条件均由各自原构建真实证据满足；不增加模型或策略笛卡尔积要求。",
+    "mac_evidence": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g10-macos-real-acceptance-v1.safe.json",
+      "sha256": "c8760542659c246919ac44f21b2dfd76550d4e31fdf1bbd3e6387a6388f55f06"
+    },
+    "final_source_gate": {
+      "run_id": 36985767809,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36985767809",
+      "source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+      "status": "completed",
+      "conclusion": "success",
+      "linux": "success",
+      "windows": "success",
+      "audit": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/04ac0d46f-ci/terminal-log-audit-v1/terminal-audit-root-v1.safe.json",
+        "sha256": "9335eca2537bfe5dd55a9c0056c732ad5a569a34675cc501eb9de5d4a01a52b0"
+      },
+      "required_grok_regressions": "两项在Linux与Windows均逐名普通PASS",
+      "nextest_ordinary_pass_occurrences": {
+        "linux": 5335,
+        "windows": 4962
+      },
+      "windows_leak_occurrences": 1,
+      "fail_retry_flaky_statuses": 0,
+      "boundary": "Windows terminal::input::tests::test_ai_context_menu_preserves_lock_state 出现1条LEAK；原汇总670 passed (1 leaky)，单列而不计普通PASS。根因未明，无后代PID或输出句柄身份，未证明已清理；同名历史未见LEAK，不冒称旧同根因问题。"
+    },
+    "localization": "无需本地化变更；既有英文与简体中文策略、审批、取消及结果语义和实际受影响布局已审，未称完整中文冷启动或其他平台实机通过。",
+    "documentation_gate": {
+      "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
+      "result": "passed",
+      "run_id": "r-m_f4050a",
+      "log_sha256": "ebdea4fd9a721a7547ef8b9c7a6fccf91f58e6ed4445359da4d9a41159a39534",
+      "temporary_directory": "cleaned",
+      "scope": "关闭记录仅更新三份验收文档；产品源码与04ac一致，不重复模型、GUI或远程门禁。"
+    },
+    "remaining_items": [
+      "G03",
+      "G09"
+    ],
+    "deferred_platform_acceptance_items": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "pr_draft": true,
+    "negative_evidence_preserved": "原失败、离线审计修正、LEAK、跳过及警告按原轮保留；私有现场cleanup_ready=false，不把资源清理计作目录删除。"
   }
 }
