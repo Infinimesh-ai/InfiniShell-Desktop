@@ -1441,8 +1441,26 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
     diagnostics.roles.insert(process_id, NpmProcessRole::Root);
     diagnostics.received(process_id, EXIT_PROCESS_DEBUG_EVENT, Some(17));
     session.npm_diagnostics = Some(diagnostics);
+    session.bind_package_diagnostics(Uuid::new_v4());
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received(
+            &DEBUG_EVENT {
+                dwDebugEventCode: EXIT_PROCESS_DEBUG_EVENT,
+                dwProcessId: process_id,
+                ..Default::default()
+            },
+            0,
+            unsafe { GetCurrentThreadId() },
+            false,
+        );
 
-    assert!(session.continue_pending(DBG_CONTINUE).is_err());
+    let failure = session.continue_pending(DBG_CONTINUE).unwrap_err();
 
     assert_eq!(
         session.pending_event,
@@ -1456,6 +1474,15 @@ fn failed_exit_continue_keeps_process_and_pending_event() {
         Some(&NpmProcessRole::Root)
     );
     assert_eq!(diagnostics.pending_exit_code, Some(17));
+    let fields = session.package_debug_summary(Err(&failure)).unwrap();
+    assert_eq!(fields["last_boundary"], "continue_failed");
+    assert_eq!(fields["continued"], 0);
+    assert_eq!(fields["recent"][0]["continuation"]["ok"], false);
+    assert!(fields["recent"][0]["continuation"]["hresult"].is_i64());
+    assert_eq!(
+        fields["pending_event"],
+        serde_json::json!([process_id, 0, EXIT_PROCESS_DEBUG_EVENT.0])
+    );
 }
 
 struct PackageProbeFixture {

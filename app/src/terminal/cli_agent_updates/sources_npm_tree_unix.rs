@@ -92,6 +92,47 @@ impl Snapshot {
     }
 }
 
+/// 只为已审核 Claude 原生包接受官方 postinstall 的两名包内硬链接。
+#[derive(Clone, Debug)]
+pub(super) struct ClaudeHardlink {
+    paths: [PathBuf; 2],
+    length: u64,
+    sha256: [u8; 32],
+}
+
+impl ClaudeHardlink {
+    pub(super) fn new(platform: &str, length: u64, sha256: [u8; 32]) -> Result<Self, Error> {
+        if !matches!(platform, "darwin-arm64" | "linux-x64") {
+            return Err(Error::UnsupportedPlatform);
+        }
+        Ok(Self {
+            paths: [
+                "bin/claude.exe".into(),
+                format!("node_modules/@anthropic-ai/claude-code-{platform}/claude").into(),
+            ],
+            length,
+            sha256,
+        })
+    }
+
+    fn contains(&self, path: &Path) -> bool {
+        self.paths.iter().any(|member| member == path)
+    }
+
+    fn linked_node<'a>(&self, snapshot: &'a Snapshot) -> Option<&'a Node> {
+        let first = snapshot.nodes.get(&self.paths[0])?;
+        let second = snapshot.nodes.get(&self.paths[1])?;
+        (first.sha256.is_some() && first == second).then_some(first)
+    }
+
+    fn verify_image(&self, node: &Node) -> Result<(), Error> {
+        if node.length != self.length || node.sha256 != Some(self.sha256) {
+            return Err(Error::UnsupportedSource);
+        }
+        Ok(())
+    }
+}
+
 pub(super) struct Directory {
     file: File,
 }
@@ -225,7 +266,7 @@ impl Directory {
         let root = self.identity()?;
         let mut nodes = BTreeMap::new();
         let mut link = None;
-        self.snapshot_into_grok(Path::new(""), &mut nodes, &mut 0, &mut link, true)?;
+        self.snapshot_into_grok(Path::new(""), &mut nodes, &mut 0, &mut link, true, None)?;
         if self.identity()? != root {
             return Err(Error::SourceChanged);
         }
@@ -483,13 +524,71 @@ impl Directory {
         Ok(Snapshot { root, nodes })
     }
 
+    pub(super) fn claude_snapshot(&self, link: &ClaudeHardlink) -> Result<Snapshot, Error> {
+        self.claude_snapshot_remaining(link, None)
+    }
+
+    fn claude_snapshot_remaining(
+        &self,
+        link: &ClaudeHardlink,
+        expected: Option<&Snapshot>,
+    ) -> Result<Snapshot, Error> {
+        let root = self.identity()?;
+        let mut nodes = BTreeMap::new();
+        self.snapshot_into_grok(
+            Path::new(""),
+            &mut nodes,
+            &mut 0,
+            &mut None,
+            false,
+            Some(link),
+        )?;
+        let snapshot = Snapshot { root, nodes };
+        let linked = expected
+            .and_then(|old| link.linked_node(old))
+            .or_else(|| link.linked_node(&snapshot));
+        if let Some(node) = linked {
+            link.verify_image(node)?;
+            if node.identity.device != snapshot.root.device {
+                return Err(Error::UnsupportedSource);
+            }
+        }
+        // 用原根描述符重新打开两名；nlink 必须恰等于本包仍持有的已知名称数。
+        for path in &link.paths {
+            if let Some(node) = snapshot.nodes.get(path) {
+                let count = if linked.is_some_and(|old| old.identity == node.identity) {
+                    link.paths
+                        .iter()
+                        .filter(|member| snapshot.nodes.get(*member) == Some(node))
+                        .count() as u64
+                } else {
+                    1
+                };
+                let (parent, leaf) = self.relative_parent(path, false)?;
+                let opened = parent.read_file(&leaf)?;
+                reject_extra_permissions(&opened)?;
+                let metadata = opened.metadata().map_err(|_| Error::SourceChanged)?;
+                if Identity::read(&metadata)? != node.identity
+                    || metadata.len() != node.length
+                    || metadata.nlink() != count
+                {
+                    return Err(Error::SourceChanged);
+                }
+            }
+        }
+        if self.identity()? != snapshot.root {
+            return Err(Error::SourceChanged);
+        }
+        Ok(snapshot)
+    }
+
     fn snapshot_into(
         &self,
         relative: &Path,
         nodes: &mut BTreeMap<PathBuf, Node>,
         bytes: &mut u64,
     ) -> Result<(), Error> {
-        self.snapshot_into_grok(relative, nodes, bytes, &mut None, false)
+        self.snapshot_into_grok(relative, nodes, bytes, &mut None, false, None)
     }
 
     fn snapshot_into_grok(
@@ -499,6 +598,7 @@ impl Directory {
         bytes: &mut u64,
         link: &mut Option<GrokLink>,
         grok: bool,
+        claude: Option<&ClaudeHardlink>,
     ) -> Result<(), Error> {
         if relative.components().count() > 32 {
             return Err(Error::UnsupportedSource);
@@ -519,14 +619,16 @@ impl Directory {
             let identity = Identity::read(&before)?;
             let node = if before.is_dir() {
                 let child = Self { file: opened };
-                child.snapshot_into_grok(&path, nodes, bytes, link, grok)?;
+                child.snapshot_into_grok(&path, nodes, bytes, link, grok, claude)?;
                 Node {
                     identity,
                     length: 0,
                     sha256: None,
                 }
             } else {
-                if before.nlink() != 1 {
+                if before.nlink() != 1
+                    && !(before.nlink() == 2 && claude.is_some_and(|link| link.contains(&path)))
+                {
                     return Err(Error::UnsupportedSource);
                 }
                 *bytes = bytes
@@ -558,6 +660,7 @@ impl Directory {
                     || before.mtime_nsec() != after.mtime_nsec()
                     || before.ctime() != after.ctime()
                     || before.ctime_nsec() != after.ctime_nsec()
+                    || claude.is_some() && before.nlink() != after.nlink()
                 {
                     return Err(Error::SourceChanged);
                 }
@@ -740,8 +843,29 @@ impl Directory {
     }
 
     pub(super) fn remove_matching(&self, leaf: &OsStr, expected: &Snapshot) -> Result<(), Error> {
+        self.remove_matching_inner(leaf, expected, None)
+    }
+
+    pub(super) fn remove_claude_matching(
+        &self,
+        leaf: &OsStr,
+        expected: &Snapshot,
+        link: &ClaudeHardlink,
+    ) -> Result<(), Error> {
+        self.remove_matching_inner(leaf, expected, Some(link))
+    }
+
+    fn remove_matching_inner(
+        &self,
+        leaf: &OsStr,
+        expected: &Snapshot,
+        link: Option<&ClaudeHardlink>,
+    ) -> Result<(), Error> {
         let directory = self.child(leaf)?;
-        let current = directory.snapshot()?;
+        let current = match link {
+            Some(link) => directory.claude_snapshot_remaining(link, Some(expected))?,
+            None => directory.snapshot()?,
+        };
         // 清理中断后仅接受原清单的未变子集；新增或改写的文件不得继续删除。
         if current.root != expected.root
             || current
@@ -751,7 +875,8 @@ impl Directory {
         {
             return Err(Error::RecoveryRequired);
         }
-        directory.remove_contents(expected, Path::new(""))?;
+        let mut remaining = current.nodes;
+        directory.remove_contents_inner(expected, Path::new(""), link, &mut remaining)?;
         if self.child(leaf)?.identity()? != expected.root {
             return Err(Error::RecoveryRequired);
         }
@@ -763,7 +888,18 @@ impl Directory {
         self.sync()
     }
 
+    #[cfg(test)]
     fn remove_contents(&self, expected: &Snapshot, relative: &Path) -> Result<(), Error> {
+        self.remove_contents_inner(expected, relative, None, &mut expected.nodes.clone())
+    }
+
+    fn remove_contents_inner(
+        &self,
+        expected: &Snapshot,
+        relative: &Path,
+        link: Option<&ClaudeHardlink>,
+        remaining: &mut BTreeMap<PathBuf, Node>,
+    ) -> Result<(), Error> {
         let identity = if relative.as_os_str().is_empty() {
             &expected.root
         } else {
@@ -800,10 +936,11 @@ impl Directory {
                 Self {
                     file: opened.try_clone().map_err(|_| Error::RecoveryRequired)?,
                 }
-                .remove_contents(expected, &path)?;
+                .remove_contents_inner(expected, &path, link, remaining)?;
                 libc::AT_REMOVEDIR
             } else {
-                if before.nlink() != 1 || before.len() != node.length {
+                let links = Self::remaining_claude_links(link, expected, remaining, &path, node)?;
+                if before.nlink() != links || before.len() != node.length {
                     return Err(Error::RecoveryRequired);
                 }
                 let mut digest = Sha256::new();
@@ -833,7 +970,8 @@ impl Directory {
             let after = current.metadata().map_err(|_| Error::RecoveryRequired)?;
             if Identity::read(&after)? != node.identity
                 || (!before.is_dir()
-                    && (after.nlink() != 1
+                    && (after.nlink()
+                        != Self::remaining_claude_links(link, expected, remaining, &path, node)?
                         || after.len() != before.len()
                         || after.mtime() != before.mtime()
                         || after.mtime_nsec() != before.mtime_nsec()
@@ -846,11 +984,34 @@ impl Directory {
             if unsafe { libc::unlinkat(self.file.as_raw_fd(), leaf.as_ptr(), flags) } != 0 {
                 return Err(Error::RecoveryRequired);
             }
+            remaining.remove(&path);
         }
         if !self.names()?.is_empty() || &self.identity()? != identity {
             return Err(Error::RecoveryRequired);
         }
         self.sync()
+    }
+
+    fn remaining_claude_links(
+        link: Option<&ClaudeHardlink>,
+        expected: &Snapshot,
+        remaining: &BTreeMap<PathBuf, Node>,
+        path: &Path,
+        node: &Node,
+    ) -> Result<u64, Error> {
+        let Some(link) = link else { return Ok(1) };
+        let Some(linked) = link.linked_node(expected) else {
+            return Ok(1);
+        };
+        link.verify_image(linked)?;
+        if !link.contains(path) || linked.identity != node.identity {
+            return Ok(1);
+        }
+        Ok(link
+            .paths
+            .iter()
+            .filter(|member| remaining.get(*member) == Some(node))
+            .count() as u64)
     }
 
     pub(super) fn sync(&self) -> Result<(), Error> {

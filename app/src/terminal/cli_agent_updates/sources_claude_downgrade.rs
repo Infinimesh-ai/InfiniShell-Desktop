@@ -282,7 +282,7 @@ pub(super) fn verify_archives(
     Ok(())
 }
 
-fn files(platform: &str) -> Result<BTreeMap<PathBuf, (u64, &'static str, u32)>, Error> {
+pub(super) fn files(platform: &str) -> Result<BTreeMap<PathBuf, (u64, &'static str, u32)>, Error> {
     let files: &[(&str, u64, &str, u32)] = match platform {
         "wrapper" => &[
             (

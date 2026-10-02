@@ -1080,7 +1080,93 @@
       "mac_consumer_and_homebrew_acceptance_complete": false,
       "windows_native_candidate_complete": false,
       "gap_closed": false,
-      "boundary": "不只差Windows：Mac消费者、合法降级、Homebrew事务和应用恢复仍欠；固定后端正例不替代。"
+      "boundary": "Claude真实npm已完成287→285合法降级、285→287升级、交换后GUI中断/正常启动完整回滚及单次主动重试，其他消费者来源/Homebrew恢复与Windows原生npm仍欠；不只差其他平台设备。"
+    },
+    "g09_real_consumers_20261003": {
+      "status": "codex_homebrew_gui_passed_claude_npm_hardlink_fix_pending",
+      "gap_closed": false,
+      "source_commit": "4e4758dcc1078b13ea677136a19b44d3bedeeccd",
+      "codex_homebrew": {
+        "run_id": "r-2l5quutv",
+        "accepted": "真实Homebrew7.0.4安装的0.156.1，由实际GUI查询当前Latest0.160.0；原生Codex忙碌时保持旧树，正常Ctrl-D后无需二次点击自动更新；真实公开入口输出codex-cli0.160.0；原登记环境冷重启及英中状态/插件布局通过。",
+        "native_audit_sha256": "9dde348b1dddb2303a9de536b5fea1ea0169d59d183f4932cb988790c571a05c",
+        "final_index_sha256": "fc597fa306bb8012a07c13e153405a7dc0f8d225d9a811c32a4fe7e7c8bc8290",
+        "cleanup_sha256": "68e2de778dff537240fbcc9c94c37761a75b330e234e7646f3520630f0ea943b",
+        "boundary": "42文件/10目录、真实tab及三补全匹配，7原生探针exit0/清理确认。后置观察没有完整journal中间序列；完成后冷启动不等于中断事务恢复。一次工具自动重启未保留PATH/TMPDIR，独立负例保留，后续原环境才通过。",
+        "cleanup": "GUI四代及54已知进程退出；短root/profile/state/精确preferences已清；真实brew前缀保留供其余恢复验收。"
+      },
+      "claude_npm": {
+        "preparation": "官方Node22.14.0/npm10.9.2真实安装2.1.287，官方postinstall未改写，入口正常输出2.1.287。",
+        "run_id": "r-3zes6cit",
+        "actual_result": "GUI正确发现npm287及Stable285，实际更新被拒；原始树未改，零journal/native generation。",
+        "failure_sha256": "8e9519938f796ef166165adc16d5276a95ef39f6e6e0f48bc34f51c6521d568b",
+        "native_missing": "官方postinstall两固定成员同inode且nlink2；Unix包快照/清理仅允许nlink1，需固定包内硬链接合同，不能改真实安装或泛化放行。",
+        "closure_status": "未通过合法降级，修复及真实复验待完成",
+        "cleanup": "GUI短根/sidecars已清；真实npm前缀r-u6fdf2y_登记保留。"
+      },
+      "windows": "只读官方Node/CLI/微软合同复核排除无站句柄即必回旧LUID站的推断；e9具体阻塞事件仍未定位，未加继承/ACL猜测补丁或重跑近似探针。审计ee8550643a86df8942c0c9b59219d6bde90a885ef05df2a6b7150ffe7dbdc1a5。",
+      "localization": "Codex更新后渠道和两插件状态英文/简体中文实窗完整；既有文案无需本地化变更。Claude合法降级尚未成功。",
+      "source_gate": "4e4758dcc两平台37031319203运行中，不替代后续源码修复门禁。",
+      "remaining": "G03真实Finder拖放；G09真实合法降级、其余来源消费者链/回滚/应用中断恢复、Windows原生npm失败。9关闭/2开放/3移交。"
+    },
+    "g09_claude_hardlink_gui_20261003": {
+      "status": "mac_claude_npm_consumer_chain_passed_final_source_gate_pending",
+      "gap_closed": false,
+      "source_base": "4e4758dcc1078b13ea677136a19b44d3bedeeccd",
+      "source_record_sha256": "c7af0704da084a7fc1fa20da509941593d225cf770015b0b2b6133d564f4f847",
+      "build_run": "r-0p2zouxy",
+      "raw_binary_sha256": "77e3629f40abc6fa46d97de0f00a99afa3bf1783a4099878cdf8b08096907927",
+      "gui_run": "r-w3vkj6p2",
+      "implementation": "只接受已审核Claude原生包的两固定名称/同inode/nlink2/固定SHA；普通快照与候选保持nlink1，恢复沿旧journal版本推导合同，清理支持已持有两名的2→1中断。",
+      "accepted": [
+        "官方npm真实287硬链接原安装经GUI Stable降至285，公开入口实际285",
+        "GUI Latest升回287，完整11文件/4目录、原生退出清理闭合，公开入口实际287",
+        "合法降级交换后SIGKILL本轮GUI一次，真实两树与SwapIntent原件保留；原环境正常启动自动恢复完整原287树和原latest配置，公开入口实际287",
+        "中文界面主动重试一次成功285，失败标记/stage/journal移除，公开入口实际285"
+      ],
+      "evidence": {
+        "initial_downgrade_audit_sha256": "658b912caa296d130a56f70876b843e3666f7defd1ce766807e085f8d5dd8919",
+        "natural_upgrade_audit_sha256": "8be967cbdfe5fbe887f57ba7ffb01dce0b8b023dcda3a77baaadeee470f8b0ab",
+        "swapped_interruption_audit_sha256": "bd09b3012ed022ae4aaaf5f5394e817cc0d43e18007a52b8e287a34dbfdb9c18",
+        "cold_restored_tree_sha256": "6e92019b416badfd4387636ce0a1a58637b700b10da60dfdaeb853b31e028a00",
+        "manual_retry_audit_sha256": "25d68cf5b3a6a1b20ba498fc99469cf866db383c13a569bf7ec5eab20ff0df73",
+        "bilingual_ui_sha256": "b3586d8ee2f5c83bd17fdf993e76cb55497c6048a0e5c29334abdfd1b39f0754",
+        "retry_zh_ui_sha256": "a8e9ce7572fbd0fb340f4cb11d7093d3523a2438d08f7346635f4d2d3ba7c4d5",
+        "final_index_sha256": "609f00328a0a2b225a466ece64d899d580e622e87cef24133f3702b6e1a4f023",
+        "cleanup_sha256": "b3292c9241b8743a26352b0ad88a169ecffd7d763c7ab0b957d40ae347e5077f"
+      },
+      "local_gate": "check与i18n11项通过；定向333项为332普通PASS+1 LEAK，17条新增硬链接回归均普通PASS；LEAK来自homebrew_ancestor_exception_rejects_generic_native_authority，根因未明，不称全体普通PASS。",
+      "preserved_failures": "旧4e实际硬链接安装拒绝保留；中断辅助v1因kqueue不支持with预检TypeError零信号，v2误比较staging源路径与真实隔离快照路径零信号且自然升级，不计两次中断验收；v3真实交换后一次信号才计冷回滚。",
+      "localization": "无需本地化变更；英中版本/渠道/插件/失败及中文重试成功实窗完整无截断。CUA原截图在对话，JSON只为观察记录。",
+      "cleanup": "第一代GUI按计划中断、外层exit247原样保留，后两代正常exit0；本轮进程、四个原生generation、launchd与打开文件核空，小证据归档后短根/profile/state/精确Preferences已清理；两个真实安装前缀保留。",
+      "remaining": "其余包来源消费者链和Homebrew应用中断恢复、Windows真实npm失败、当前新增源码Linux/Windows门禁；9关闭/2开放/3移交保持。",
+      "latest_mac_check": {
+        "run": "r-yuiu1xs8",
+        "log_sha256": "c8c11fff895a449f5b3143a07c029122b7cde5b595457e1b6d72d26ba315579f",
+        "result": "passed"
+      },
+      "prior_source_gate": {
+        "source_commit": "4e4758dcc1078b13ea677136a19b44d3bedeeccd",
+        "run_id": 37031319203,
+        "overall": "failure",
+        "linux": "5389普通PASS，新增34普通PASS；installed_grok_hook_tests实际1FAIL/2skip，不回填新修复",
+        "windows": "job success；5007普通PASS+1LEAK；新增18普通PASS",
+        "leak_test": "terminal::input::tests::test_ai_context_menu_keeps_workflow_reference_in_ai_input",
+        "terminal_audit_sha256": "816cb9769ceeb8212104ba94ffdc4346445906514a71102d58e0619186b8beed"
+      },
+      "windows_diagnostic_followup": {
+        "implementation": "真实generation的spawn线程、Wait/验证/Continue数值结果与耗时；失败前保存最近16事件，正常仅总计，非零原生退出明确失败；不改授权、超时、事件继续或清理",
+        "tests": "新增3回归+扩展既有Continue失败回归，Windows未运行",
+        "local_check_blocker": {
+          "run": "r-ysabgecz",
+          "exit": 101,
+          "log_sha256": "7cfa677c4c3fcd71e3ce2f6e8d8fedccff967d0cd1e693523944bcbc7050ba0b",
+          "blocker": "aws-lc-sys C构建缺Windows SDK windows.h；未达到新Windows应用源类型检查",
+          "will_not_repeat_locally": true
+        },
+        "localization": "无需本地化变更",
+        "gap_closed": false
+      }
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",

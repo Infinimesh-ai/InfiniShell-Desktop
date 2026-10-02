@@ -5,7 +5,7 @@
 //! 以前保持对象身份。目录必须申请真实读取访问参与共享删除检查；固定官方更新器
 //! 由来源层绑定固定安装布局；未知 helper 或 DLL 在放行调试事件前拒绝。
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read as _, Seek as _};
@@ -20,6 +20,8 @@ use std::time::{Duration, Instant};
 
 use command::blocking::Command;
 use command::windows::AppContainerProbe;
+use serde::Serialize;
+use uuid::Uuid;
 use windows::Win32::Foundation::{
     DBG_CONTINUE, DBG_EXCEPTION_NOT_HANDLED, DUPLICATE_SAME_ACCESS, DuplicateHandle,
     ERROR_SEM_TIMEOUT, EXCEPTION_BREAKPOINT, FILETIME, GENERIC_READ, HANDLE, HLOCAL, LocalFree,
@@ -46,9 +48,9 @@ use windows::Win32::System::SystemInformation::{
     GetSystemDirectoryW, GetSystemTimePreciseAsFileTime,
 };
 use windows::Win32::System::Threading::{
-    GetCurrentProcess, GetProcessTimes, TerminateProcess, WaitForSingleObject,
+    GetCurrentProcess, GetCurrentThreadId, GetProcessTimes, TerminateProcess, WaitForSingleObject,
 };
-use windows::core::HRESULT;
+use windows::core::{Error as WindowsError, HRESULT};
 
 use super::{
     AtomicDirectoryIdentity, ExpectedFileId, ExpectedFileIdentity, WindowsChildImage, sha256_file,
@@ -72,6 +74,7 @@ const DEBUG_INITIAL_TIMEOUT: Duration = Duration::from_secs(20);
 const DEBUG_SESSION_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 const DEBUG_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 const MAX_WINDOWS_PATH_U16: usize = 32_768;
+const MAX_NPM_DEBUG_EVENTS: usize = 16;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct LeasedIdentity {
@@ -221,6 +224,165 @@ struct NpmProcessDiagnostics {
     cleanup: bool,
     cancel_observed: bool,
     termination_requested_at: Option<u64>,
+    trace: Option<NpmDebugTrace>,
+}
+
+/// 只保存原 API 调用的固定字段；不读取调试字符串、异常地址、路径或控制材料。
+#[derive(Debug, Serialize)]
+struct NpmDebugTrace {
+    generation: Uuid,
+    spawn_thread_id: u32,
+    spawn_return_thread_id: Option<u32>,
+    spawn_result: Option<NpmDebugResult>,
+    last_boundary: &'static str,
+    last_call_thread_id: u32,
+    wait_calls: u64,
+    wait_timeouts: u64,
+    wait_elapsed_ms: u128,
+    longest_wait_ms: u128,
+    last_wait_hresult: Option<i32>,
+    received: u64,
+    validated: u64,
+    continued: u64,
+    dropped_events: u64,
+    recent: VecDeque<NpmDebugEvent>,
+}
+
+#[derive(Debug, Serialize)]
+struct NpmDebugEvent {
+    sequence: u64,
+    process_id: u32,
+    thread_id: u32,
+    code: u32,
+    received_ms: u128,
+    received_on_thread_id: u32,
+    mode: &'static str,
+    role: &'static str,
+    exception_code: Option<i32>,
+    first_chance: Option<u32>,
+    validation: Option<NpmDebugResult>,
+    continuation: Option<NpmDebugResult>,
+    continue_status: Option<i32>,
+}
+
+#[derive(Debug, Serialize)]
+struct NpmDebugResult {
+    ok: bool,
+    elapsed_ms: u128,
+    call_thread_id: u32,
+    hresult: Option<i32>,
+    win32_error: Option<i32>,
+}
+
+impl NpmDebugResult {
+    fn from_io(result: Result<(), &io::Error>, elapsed: Duration, thread_id: u32) -> Self {
+        let failure = result.err();
+        Self {
+            ok: failure.is_none(),
+            elapsed_ms: elapsed.as_millis(),
+            call_thread_id: thread_id,
+            hresult: failure
+                .and_then(io::Error::get_ref)
+                .and_then(|source| source.downcast_ref::<WindowsError>())
+                .map(|source| source.code().0),
+            win32_error: failure.and_then(io::Error::raw_os_error),
+        }
+    }
+}
+
+impl NpmDebugTrace {
+    fn new(generation: Uuid, thread_id: u32) -> Self {
+        Self {
+            generation,
+            spawn_thread_id: thread_id,
+            spawn_return_thread_id: None,
+            spawn_result: None,
+            last_boundary: "spawn_before",
+            last_call_thread_id: thread_id,
+            wait_calls: 0,
+            wait_timeouts: 0,
+            wait_elapsed_ms: 0,
+            longest_wait_ms: 0,
+            last_wait_hresult: None,
+            received: 0,
+            validated: 0,
+            continued: 0,
+            dropped_events: 0,
+            recent: VecDeque::with_capacity(MAX_NPM_DEBUG_EVENTS),
+        }
+    }
+
+    fn wait_finished(&mut self, elapsed: Duration, thread_id: u32, hresult: Option<HRESULT>) {
+        self.last_call_thread_id = thread_id;
+        self.wait_calls = self.wait_calls.saturating_add(1);
+        self.wait_elapsed_ms = self.wait_elapsed_ms.saturating_add(elapsed.as_millis());
+        self.longest_wait_ms = self.longest_wait_ms.max(elapsed.as_millis());
+        self.last_wait_hresult = hresult.map(|code| code.0);
+        let timeout = hresult == Some(HRESULT::from_win32(ERROR_SEM_TIMEOUT.0));
+        self.wait_timeouts = self.wait_timeouts.saturating_add(u64::from(timeout));
+        self.last_boundary = if timeout {
+            "wait_timeout"
+        } else if hresult.is_some() {
+            "wait_failed"
+        } else {
+            "wait_returned"
+        };
+    }
+
+    fn received(&mut self, event: &DEBUG_EVENT, elapsed_ms: u128, thread_id: u32, cleanup: bool) {
+        self.received = self.received.saturating_add(1);
+        self.last_boundary = "received";
+        self.last_call_thread_id = thread_id;
+        if self.recent.len() == MAX_NPM_DEBUG_EVENTS {
+            self.recent.pop_front();
+            self.dropped_events = self.dropped_events.saturating_add(1);
+        }
+        let exception =
+            (event.dwDebugEventCode == EXCEPTION_DEBUG_EVENT).then(|| unsafe { event.u.Exception });
+        self.recent.push_back(NpmDebugEvent {
+            sequence: self.received,
+            process_id: event.dwProcessId,
+            thread_id: event.dwThreadId,
+            code: event.dwDebugEventCode.0,
+            received_ms: elapsed_ms,
+            received_on_thread_id: thread_id,
+            mode: if cleanup { "cleanup" } else { "normal" },
+            role: "unknown",
+            exception_code: exception.map(|value| value.ExceptionRecord.ExceptionCode.0),
+            first_chance: exception.map(|value| value.dwFirstChance),
+            validation: None,
+            continuation: None,
+            continue_status: None,
+        });
+    }
+
+    fn validated(&mut self, result: NpmDebugResult, role: &'static str) {
+        self.last_call_thread_id = result.call_thread_id;
+        self.last_boundary = if result.ok {
+            "validated"
+        } else {
+            "validation_failed"
+        };
+        self.validated = self.validated.saturating_add(u64::from(result.ok));
+        if let Some(event) = self.recent.back_mut() {
+            event.role = role;
+            event.validation = Some(result);
+        }
+    }
+
+    fn continued(&mut self, result: NpmDebugResult, status: i32) {
+        self.last_call_thread_id = result.call_thread_id;
+        self.last_boundary = if result.ok {
+            "continued"
+        } else {
+            "continue_failed"
+        };
+        self.continued = self.continued.saturating_add(u64::from(result.ok));
+        if let Some(event) = self.recent.back_mut() {
+            event.continue_status = Some(status);
+            event.continuation = Some(result);
+        }
+    }
 }
 
 struct NpmProcessEvent {
@@ -242,6 +404,7 @@ impl NpmProcessDiagnostics {
             cleanup: false,
             cancel_observed: false,
             termination_requested_at: None,
+            trace: None,
         }
     }
 
@@ -495,6 +658,104 @@ impl WindowsImageDebugSession {
         self.cancellation = Some(cancellation);
     }
 
+    pub(super) fn bind_package_diagnostics(&mut self, generation: Uuid) {
+        if let Some(diagnostics) = &mut self.npm_diagnostics {
+            diagnostics.trace.get_or_insert_with(|| {
+                NpmDebugTrace::new(generation, unsafe { GetCurrentThreadId() })
+            });
+        }
+    }
+
+    pub(super) fn record_package_spawn_result(
+        &mut self,
+        result: Result<(), &io::Error>,
+        elapsed: Duration,
+    ) {
+        if let Some(trace) = self
+            .npm_diagnostics
+            .as_mut()
+            .and_then(|value| value.trace.as_mut())
+        {
+            let thread_id = unsafe { GetCurrentThreadId() };
+            trace.spawn_return_thread_id = Some(thread_id);
+            trace.last_call_thread_id = thread_id;
+            trace.last_boundary = if result.is_ok() {
+                "spawn_returned"
+            } else {
+                "spawn_failed"
+            };
+            trace.spawn_result = Some(NpmDebugResult::from_io(result, elapsed, thread_id));
+        }
+    }
+
+    fn package_debug_summary(&self, result: Result<u32, &io::Error>) -> Option<serde_json::Value> {
+        let trace = self.npm_diagnostics.as_ref()?.trace.as_ref()?;
+        let failure = result.err();
+        let native_exit_code = result.ok();
+        let failed = failure.is_some() || native_exit_code.is_some_and(|code| code != 0);
+        let mut summary = serde_json::json!({
+            "generation": trace.generation,
+            "root_pid": self.root_process_id,
+            "spawn_thread_id": trace.spawn_thread_id,
+            "spawn_return_thread_id": trace.spawn_return_thread_id,
+            "spawn_result": trace.spawn_result,
+            "last_call_thread_id": trace.last_call_thread_id,
+            "last_boundary": trace.last_boundary,
+            "wait_calls": trace.wait_calls,
+            "wait_timeouts": trace.wait_timeouts,
+            "wait_elapsed_ms": trace.wait_elapsed_ms,
+            "longest_wait_ms": trace.longest_wait_ms,
+            "last_wait_hresult": trace.last_wait_hresult,
+            "received": trace.received,
+            "validated": trace.validated,
+            "continued": trace.continued,
+            "dropped_events": trace.dropped_events,
+            "pending_event": self.pending_event.map(|(pid, tid, code)| (pid, tid, code.0)),
+            "native_exit_code": native_exit_code,
+            "failed": failed,
+        });
+        if let Some(failure) = failure {
+            summary["failure_kind"] = serde_json::json!(format!("{:?}", failure.kind()));
+            summary["failure_codes"] = serde_json::json!(NpmDebugResult::from_io(
+                Err(failure),
+                Duration::ZERO,
+                unsafe { GetCurrentThreadId() },
+            ));
+        }
+        if failed {
+            summary["recent"] = serde_json::json!(trace.recent);
+        }
+        Some(summary)
+    }
+
+    pub(super) fn record_package_probe_result(&self, result: Result<u32, &io::Error>) {
+        if let Some(summary) = self.package_debug_summary(result) {
+            // 隐藏 worker 未初始化 GUI 日志；成功只记总计，失败只记最近 16 个事件。
+            // 不逐次输出 100 ms 等待，也不改变原生 API 返回值或待继续事件的所有权。
+            warp_core::safe_eprintln!(
+                safe: ("managed_process.windows_npm_debug_summary={summary}"),
+                full: ("managed_process.windows_npm_debug_summary={summary}")
+            );
+        }
+    }
+
+    fn record_event_validation(&mut self, result: Result<(), &io::Error>, elapsed: Duration) {
+        if let Some(diagnostics) = &mut self.npm_diagnostics
+            && let Some(trace) = &mut diagnostics.trace
+        {
+            let role = self
+                .pending_event
+                .and_then(|(pid, _, _)| diagnostics.roles.get(&pid))
+                .copied()
+                .unwrap_or(NpmProcessRole::Unknown)
+                .as_str();
+            trace.validated(
+                NpmDebugResult::from_io(result, elapsed, unsafe { GetCurrentThreadId() }),
+                role,
+            );
+        }
+    }
+
     pub(super) fn record_package_termination_request(&mut self) {
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             diagnostics
@@ -562,17 +823,32 @@ impl WindowsImageDebugSession {
                 "managed_process.atomic_windows_debug_event_still_pending",
             ));
         }
+        let diagnostics = self
+            .npm_diagnostics
+            .as_mut()
+            .and_then(|value| value.trace.as_mut());
         let event = match self.cancellation.as_deref() {
-            Some(cancellation) => {
-                wait_for_cancellable_debug_event(deadline, timeout_message, cancellation)?
-            }
-            None => wait_for_debug_event_until(deadline, timeout_message)?,
+            Some(cancellation) => wait_for_cancellable_debug_event(
+                deadline,
+                timeout_message,
+                cancellation,
+                diagnostics,
+            )?,
+            None => wait_for_debug_event_until(deadline, timeout_message, diagnostics)?,
         };
         self.pending_event = Some((event.dwProcessId, event.dwThreadId, event.dwDebugEventCode));
         if let Some(diagnostics) = &mut self.npm_diagnostics {
             let exit_code = (event.dwDebugEventCode == EXIT_PROCESS_DEBUG_EVENT)
                 .then(|| unsafe { event.u.ExitProcess.dwExitCode });
             diagnostics.received(event.dwProcessId, event.dwDebugEventCode, exit_code);
+            if let Some(trace) = &mut diagnostics.trace {
+                trace.received(
+                    &event,
+                    diagnostics.started.elapsed().as_millis(),
+                    unsafe { GetCurrentThreadId() },
+                    diagnostics.cleanup,
+                );
+            }
         }
         #[cfg(test)]
         if let Some(mut trace) = self.loader_trace.take() {
@@ -587,7 +863,25 @@ impl WindowsImageDebugSession {
         let (process_id, thread_id, code) = self
             .pending_event
             .ok_or_else(|| error("managed_process.atomic_windows_debug_event_missing"))?;
-        unsafe { ContinueDebugEvent(process_id, thread_id, status) }.map_err(io::Error::other)?;
+        let started = Instant::now();
+        let call_thread_id = unsafe { GetCurrentThreadId() };
+        let result =
+            unsafe { ContinueDebugEvent(process_id, thread_id, status) }.map_err(io::Error::other);
+        if let Some(trace) = self
+            .npm_diagnostics
+            .as_mut()
+            .and_then(|value| value.trace.as_mut())
+        {
+            trace.continued(
+                NpmDebugResult::from_io(
+                    result.as_ref().map(|_| ()),
+                    started.elapsed(),
+                    call_thread_id,
+                ),
+                status.0,
+            );
+        }
+        result?;
         self.pending_event = None;
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
         if code == EXIT_PROCESS_DEBUG_EVENT {
@@ -665,7 +959,10 @@ impl WindowsImageDebugSession {
                 "managed_process.atomic_windows_initial_debug_event_invalid",
             ));
         }
-        if let Err(failure) = self.handle_create_process(&event, true, container) {
+        let started = Instant::now();
+        let validation = self.handle_create_process(&event, true, container);
+        self.record_event_validation(validation.as_ref().map(|_| ()), started.elapsed());
+        if let Err(failure) = validation {
             if reject_on_error {
                 self.reject_event_and_drain(&event);
             }
@@ -775,7 +1072,8 @@ impl WindowsImageDebugSession {
         event: &DEBUG_EVENT,
         container: Option<&AppContainerProbe>,
     ) -> io::Result<windows::Win32::Foundation::NTSTATUS> {
-        match event.dwDebugEventCode {
+        let started = Instant::now();
+        let result = (|| match event.dwDebugEventCode {
             CREATE_PROCESS_DEBUG_EVENT => {
                 self.handle_create_process(
                     event,
@@ -841,7 +1139,9 @@ impl WindowsImageDebugSession {
             code => Err(io::Error::other(format!(
                 "managed_process.atomic_windows_unknown_debug_event:{code:?}"
             ))),
-        }
+        })();
+        self.record_event_validation(result.as_ref().map(|_| ()), started.elapsed());
+        result
     }
 
     fn handle_create_process(
@@ -1913,9 +2213,22 @@ fn duplicate_process_handle(handle: HANDLE) -> io::Result<OwnedHandle> {
     Ok(unsafe { OwnedHandle::from_raw_handle(duplicate.0) })
 }
 
-fn wait_for_debug_event(timeout_ms: u32) -> io::Result<DEBUG_EVENT> {
+fn wait_for_debug_event(
+    timeout_ms: u32,
+    diagnostics: Option<&mut NpmDebugTrace>,
+) -> io::Result<DEBUG_EVENT> {
     let mut event = DEBUG_EVENT::default();
-    unsafe { WaitForDebugEvent(&mut event, timeout_ms) }.map_err(io::Error::other)?;
+    let started = Instant::now();
+    let thread_id = unsafe { GetCurrentThreadId() };
+    let result = unsafe { WaitForDebugEvent(&mut event, timeout_ms) };
+    if let Some(trace) = diagnostics {
+        trace.wait_finished(
+            started.elapsed(),
+            thread_id,
+            result.as_ref().err().map(WindowsError::code),
+        );
+    }
+    result.map_err(io::Error::other)?;
     Ok(event)
 }
 
@@ -1923,9 +2236,13 @@ fn wait_for_cancellable_debug_event(
     deadline: Instant,
     timeout_message: &'static str,
     cancellation: &AtomicBool,
+    mut diagnostics: Option<&mut NpmDebugTrace>,
 ) -> io::Result<DEBUG_EVENT> {
     loop {
         if cancellation.load(Ordering::Acquire) {
+            if let Some(trace) = diagnostics {
+                trace.last_boundary = "wait_cancelled";
+            }
             return Err(io::Error::new(
                 io::ErrorKind::Interrupted,
                 "managed_process.atomic_windows_probe_cancelled",
@@ -1933,12 +2250,25 @@ fn wait_for_cancellable_debug_event(
         }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
+            if let Some(trace) = diagnostics {
+                trace.last_boundary = "wait_deadline";
+            }
             return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
         }
         // Windows 调试接口必须留在创建进程的线程；控制监听只设置停止标记。
         let interval = remaining.min(Duration::from_millis(100));
         let mut event = DEBUG_EVENT::default();
-        match unsafe { WaitForDebugEvent(&mut event, interval.as_millis().max(1) as u32) } {
+        let started = Instant::now();
+        let thread_id = unsafe { GetCurrentThreadId() };
+        let result = unsafe { WaitForDebugEvent(&mut event, interval.as_millis().max(1) as u32) };
+        if let Some(trace) = diagnostics.as_deref_mut() {
+            trace.wait_finished(
+                started.elapsed(),
+                thread_id,
+                result.as_ref().err().map(WindowsError::code),
+            );
+        }
+        match result {
             Ok(()) => return Ok(event),
             Err(failure) if failure.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => {}
             Err(failure) => return Err(io::Error::other(failure)),
@@ -1949,15 +2279,19 @@ fn wait_for_cancellable_debug_event(
 fn wait_for_debug_event_until(
     deadline: Instant,
     timeout_message: &'static str,
+    diagnostics: Option<&mut NpmDebugTrace>,
 ) -> io::Result<DEBUG_EVENT> {
     let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
+        if let Some(trace) = diagnostics {
+            trace.last_boundary = "wait_deadline";
+        }
         return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
     }
     let timeout_ms = u32::try_from(remaining.as_millis())
         .unwrap_or(u32::MAX)
         .max(1);
-    wait_for_debug_event(timeout_ms).map_err(|failure| {
+    wait_for_debug_event(timeout_ms, diagnostics).map_err(|failure| {
         if Instant::now() >= deadline {
             io::Error::new(io::ErrorKind::TimedOut, timeout_message)
         } else {

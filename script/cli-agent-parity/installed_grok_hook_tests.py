@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import selectors
 import shutil
 import tempfile
 import stat
@@ -15,6 +16,52 @@ from unittest.mock import patch
 import unittest
 
 from run_installed_grok_hook import plain_file, verify_installed_hook
+
+
+NOTIFICATION_PREFIX = b"\x1b]777;notify;warp://cli-agent;"
+TERMINAL_OBSERVATION_SECONDS = 2
+
+
+def terminal_output_summary(output, *, tmux=False):
+    prefix, suffix = (b"\x1bPtmux;", b"\x1b\\") if tmux else (NOTIFICATION_PREFIX, b"\x07")
+    return json.dumps({"byte_count": len(output), "sha256": hashlib.sha256(output).hexdigest(),
+                       "complete": output.startswith(prefix) and output.endswith(suffix)}, sort_keys=True)
+
+
+def collect_terminal_output(descriptor, *, expect_notification):
+    result = bytearray()
+    deadline = time.monotonic() + TERMINAL_OBSERVATION_SECONDS
+
+    def fail(reason):
+        raise AssertionError(f"{reason}: {terminal_output_summary(result)}") from None
+
+    with selectors.DefaultSelector() as selector:
+        selector.register(descriptor, selectors.EVENT_READ)
+        while True:
+            try:
+                chunk = os.read(descriptor, 65536)
+            except BlockingIOError:
+                # 写端退出不代表 PTY 已完成排队投递；只在完整帧读完后允许结束。
+                complete = result.startswith(NOTIFICATION_PREFIX) and result.endswith(b"\x07")
+                if complete:
+                    return bytes(result)
+                # 截止点前已就绪的数据必须先读完，避免调度延迟令负例误报零字节。
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    if expect_notification:
+                        fail("terminal_read_deadline")
+                    return bytes(result)
+                selector.select(timeout=remaining)
+                continue
+            except OSError as error:
+                fail(f"terminal_read_error_{error.errno}")
+            if not chunk:
+                fail("terminal_read_eof")
+            result.extend(chunk)
+            if len(result) > 65536:
+                fail("terminal_output_limit")
+            if not expect_notification:
+                fail("unexpected_terminal_output")
 
 
 def setUpModule():
@@ -160,31 +207,26 @@ class DetachedGrokHookTests(unittest.TestCase):
         self.assertEqual(result.stdout, b"")
         self.assertEqual(result.stderr, b"")
 
-    def output(self, index):
-        result = bytearray()
-        while True:
-            try:
-                chunk = os.read(self.terminals[index][0], 65536)
-            except BlockingIOError:
-                return bytes(result)
-            if not chunk:
-                return bytes(result)
-            result.extend(chunk)
-            self.assertLessEqual(len(result), 65536)
+    def output(self, index, *, expect_notification=False):
+        # 非目标终端必须完成同一观察窗口，不能把首次 EAGAIN 当作零字节证据。
+        return collect_terminal_output(self.terminals[index][0], expect_notification=expect_notification)
 
     def assert_notification(self, output, tmux=False):
+        summary = terminal_output_summary(output, tmux=tmux)
         if tmux:
-            self.assertTrue(output.startswith(b"\x1bPtmux;"))
-            self.assertTrue(output.endswith(b"\x1b\\"))
+            self.assertTrue(output.startswith(b"\x1bPtmux;"), summary)
+            self.assertTrue(output.endswith(b"\x1b\\"), summary)
             output = output[7:-2].replace(b"\x1b\x1b", b"\x1b")
-        prefix = b"\x1b]777;notify;warp://cli-agent;"
-        self.assertTrue(output.startswith(prefix))
-        self.assertTrue(output.endswith(b"\x07"))
-        event = json.loads(output[len(prefix):-1])
-        self.assertEqual(event["event"], "session_start")
-        self.assertEqual(event["session_id"], "detached-terminal-test")
-        self.assertEqual(event["plugin_version"], "0.1.5")
-        self.assertEqual(event["agent"], "grok")
+        self.assertTrue(output.startswith(NOTIFICATION_PREFIX), summary)
+        self.assertTrue(output.endswith(b"\x07"), summary)
+        try:
+            event = json.loads(output[len(NOTIFICATION_PREFIX):-1])
+        except ValueError:
+            raise AssertionError(f"terminal_notification_json_invalid: {summary}") from None
+        self.assertTrue(isinstance(event, dict), summary)
+        for field, expected in (("event", "session_start"), ("session_id", "detached-terminal-test"),
+                                ("plugin_version", "0.1.5"), ("agent", "grok")):
+            self.assertTrue(event.get(field) == expected, f"terminal_notification_{field}_invalid: {summary}")
 
     def check_bootstrap_refresh(self, shell, filename, marker, tail):
         executable = shutil.which(shell)
@@ -221,13 +263,13 @@ class DetachedGrokHookTests(unittest.TestCase):
 
     def test_refreshed_shell_terminal_beats_inherited_ssh_terminal(self):
         self.run_hook({"WARP_CLI_AGENT_TTY": self.terminals[0][2], "SSH_TTY": self.terminals[1][2]})
-        self.assert_notification(self.output(0))
+        self.assert_notification(self.output(0, expect_notification=True))
         self.assertEqual(self.output(1), b"")
         self.assertFalse((self.root / "data").exists())
 
     def test_ssh_terminal_without_bootstrap_still_uses_real_pty(self):
         self.run_hook({"SSH_TTY": self.terminals[0][2]})
-        self.assert_notification(self.output(0))
+        self.assert_notification(self.output(0, expect_notification=True))
         self.assertEqual(self.output(1), b"")
 
     def test_invalid_tmux_identity_never_writes_outer_or_ssh_terminal(self):
@@ -296,6 +338,87 @@ class DetachedGrokHookTests(unittest.TestCase):
             self.assertEqual(command("capture-pane", "-p", "-t", first), "")
         finally:
             command("kill-server")
+
+
+class TerminalOutputReadTests(unittest.TestCase):
+    def setUp(self):
+        # 只模拟读取与时间，不启动 hook、worker 或真实终端。
+        self.now = 0
+        self.wait_delays = iter(())
+        clock = patch.object(time, "monotonic", side_effect=lambda: self.now)
+        self.addCleanup(clock.stop)
+        clock.start()
+        reader = patch.object(os, "read")
+        self.addCleanup(reader.stop)
+        self.reader = reader.start()
+        selector = patch.object(selectors, "DefaultSelector")
+        self.addCleanup(selector.stop)
+        self.selector = selector.start().return_value.__enter__.return_value
+
+        def wait(timeout):
+            elapsed = next(self.wait_delays, timeout)
+            self.assertLessEqual(elapsed, timeout)
+            self.now += elapsed
+            return []
+
+        self.selector.select.side_effect = wait
+        self.frame = NOTIFICATION_PREFIX + b'{"event":"session_start"}\x07'
+
+    def test_initial_eagain_waits_for_the_single_notification(self):
+        self.wait_delays = iter((.05,))
+        self.reader.side_effect = [BlockingIOError(), self.frame, BlockingIOError()]
+        self.assertEqual(collect_terminal_output(123, expect_notification=True), self.frame)
+        self.assertEqual(self.reader.call_count, 3)
+        self.selector.select.assert_called_once()
+
+    def test_split_frame_is_accumulated_across_eagain(self):
+        self.wait_delays = iter((.05,))
+        self.reader.side_effect = [self.frame[:12], BlockingIOError(), self.frame[12:], BlockingIOError()]
+        self.assertEqual(collect_terminal_output(123, expect_notification=True), self.frame)
+        self.selector.select.assert_called_once()
+
+    def test_truncated_frame_fails_at_deadline_with_only_a_safe_summary(self):
+        truncated = self.frame[:-1]
+        self.reader.side_effect = [truncated, BlockingIOError(), BlockingIOError()]
+        with self.assertRaises(AssertionError) as failure:
+            collect_terminal_output(123, expect_notification=True)
+        self.assertEqual(str(failure.exception), "terminal_read_deadline: " + terminal_output_summary(truncated))
+        self.assertEqual(self.now, TERMINAL_OBSERVATION_SECONDS)
+
+    def test_missing_notification_fails_after_the_full_observation_window(self):
+        self.reader.side_effect = [BlockingIOError(), BlockingIOError()]
+        with self.assertRaises(AssertionError) as failure:
+            collect_terminal_output(123, expect_notification=True)
+        self.assertEqual(str(failure.exception), "terminal_read_deadline: " + terminal_output_summary(b""))
+        self.assertEqual(self.now, TERMINAL_OBSERVATION_SECONDS)
+
+    def test_zero_output_requires_the_full_observation_window(self):
+        self.reader.side_effect = [BlockingIOError(), BlockingIOError()]
+        self.assertEqual(collect_terminal_output(123, expect_notification=False), b"")
+        self.assertEqual(self.now, TERMINAL_OBSERVATION_SECONDS)
+        self.selector.select.assert_called_once_with(timeout=TERMINAL_OBSERVATION_SECONDS)
+
+    def test_delayed_output_on_a_non_target_terminal_is_rejected(self):
+        self.wait_delays = iter((.05,))
+        self.reader.side_effect = [BlockingIOError(), self.frame]
+        with self.assertRaises(AssertionError) as failure:
+            collect_terminal_output(123, expect_notification=False)
+        self.assertEqual(str(failure.exception), "unexpected_terminal_output: " + terminal_output_summary(self.frame))
+        self.selector.select.assert_called_once()
+
+    def test_ready_output_is_rejected_even_when_scheduling_crosses_the_deadline(self):
+        def ready_at_deadline(timeout):
+            # 模拟窗口末尾已就绪，但 select 返回调用方时已跨过截止点。
+            self.now += timeout + .01
+            return [(None, selectors.EVENT_READ)]
+
+        self.selector.select.side_effect = ready_at_deadline
+        self.reader.side_effect = [BlockingIOError(), self.frame]
+        with self.assertRaises(AssertionError) as failure:
+            collect_terminal_output(123, expect_notification=False)
+        self.assertEqual(str(failure.exception), "unexpected_terminal_output: " + terminal_output_summary(self.frame))
+        self.assertEqual(self.reader.call_count, 2)
+        self.selector.select.assert_called_once_with(timeout=TERMINAL_OBSERVATION_SECONDS)
 
 
 if __name__ == "__main__":

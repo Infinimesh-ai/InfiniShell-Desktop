@@ -479,7 +479,9 @@ pub(super) fn execute(
     cwd.verify_for_spawn()?;
     let mut debugger = executable.prepare_image_debug_session()?;
     debugger.bind_cancellation(cancellation);
-    let mut process = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
+    debugger.bind_package_diagnostics(manifest.generation);
+    let spawn_started = Instant::now();
+    let spawned = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
         executable.execution_path(),
         arguments.as_ref(),
         cwd.execution_path(),
@@ -488,9 +490,16 @@ pub(super) fn execute(
         &format!("InfiniShell.Version.{}", manifest.generation),
         &readonly,
         &bootstrap,
-    )?;
+    );
+    debugger.record_package_spawn_result(spawned.as_ref().map(|_| ()), spawn_started.elapsed());
+    if let Err(failure) = &spawned {
+        debugger.record_package_probe_result(Err(failure));
+    }
+    let mut process = spawned?;
     let started = Instant::now();
     let result = run_package_probe(&mut process, &mut debugger, started);
+    // 终止与清理会继续消费原调试事件；先封存本次真实 generation 的正常阶段边界。
+    debugger.record_package_probe_result(result.as_ref().map(|code| *code));
     if let Err(failure) = &result {
         record_phase("probe_failed", started, Some(failure));
     }

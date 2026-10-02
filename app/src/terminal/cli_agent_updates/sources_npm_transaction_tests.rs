@@ -651,3 +651,10 @@ fn platform_native_probe_cannot_substitute_for_public_entry() {
         Err(Error::RecoveryRequired)
     );
 }
+
+#[cfg(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(target_os = "linux", target_arch = "x86_64")
+))]
+#[path = "sources_npm_hardlink_tests.rs"]
+mod hardlink_tests;

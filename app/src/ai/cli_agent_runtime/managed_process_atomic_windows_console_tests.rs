@@ -9,6 +9,150 @@ use windows::Win32::System::Threading::PROCESS_SYNCHRONIZE;
 use super::*;
 
 #[test]
+fn npm_debug_trace_bounds_recent_events_without_losing_totals() {
+    let generation = Uuid::new_v4();
+    let mut trace = NpmDebugTrace::new(generation, 71);
+    // 跨越环形记录上限；总计不能随最旧事件一起丢弃。
+    for process_id in 101..=118 {
+        trace.received(
+            &DEBUG_EVENT {
+                dwDebugEventCode: CREATE_THREAD_DEBUG_EVENT,
+                dwProcessId: process_id,
+                dwThreadId: 29,
+                ..Default::default()
+            },
+            7,
+            71,
+            false,
+        );
+        trace.validated(NpmDebugResult::from_io(Ok(()), Duration::ZERO, 71), "node");
+        trace.continued(
+            NpmDebugResult::from_io(Ok(()), Duration::ZERO, 71),
+            DBG_CONTINUE.0,
+        );
+    }
+
+    assert_eq!(trace.generation, generation);
+    assert_eq!(
+        (trace.received, trace.validated, trace.continued),
+        (18, 18, 18)
+    );
+    assert_eq!(trace.dropped_events, 2);
+    assert_eq!(trace.recent.len(), 16);
+    assert_eq!(trace.recent.front().unwrap().sequence, 3);
+    let last = trace.recent.back().unwrap();
+    assert_eq!(last.sequence, 18);
+    assert_eq!((last.process_id, last.thread_id), (118, 29));
+    assert_eq!(last.code, CREATE_THREAD_DEBUG_EVENT.0);
+    assert_eq!(last.received_on_thread_id, 71);
+    assert_eq!(last.mode, "normal");
+    assert_eq!(last.role, "node");
+    assert_eq!(last.continue_status, Some(DBG_CONTINUE.0));
+}
+
+#[test]
+fn npm_debug_trace_waits_preserve_hresult_without_inventing_events() {
+    let mut trace = NpmDebugTrace::new(Uuid::new_v4(), 71);
+    let timeout = HRESULT::from_win32(ERROR_SEM_TIMEOUT.0);
+    trace.wait_finished(Duration::from_millis(100), 71, Some(timeout));
+    trace.wait_finished(Duration::from_millis(90), 72, Some(timeout));
+    let denied = HRESULT::from_win32(5);
+    trace.wait_finished(Duration::from_millis(3), 72, Some(denied));
+
+    assert_eq!(trace.wait_calls, 3);
+    assert_eq!(trace.wait_timeouts, 2);
+    assert_eq!(trace.wait_elapsed_ms, 193);
+    assert_eq!(trace.longest_wait_ms, 100);
+    assert_eq!(trace.last_wait_hresult, Some(denied.0));
+    assert_eq!(trace.last_boundary, "wait_failed");
+    assert_eq!(trace.last_call_thread_id, 72);
+    assert_eq!(trace.spawn_thread_id, 71);
+    assert_eq!(
+        (trace.received, trace.validated, trace.continued),
+        (0, 0, 0)
+    );
+    assert!(trace.recent.is_empty());
+}
+
+#[test]
+fn npm_debug_summary_binds_generation_and_omits_sensitive_failure_text() {
+    let fixture = Fixture::new();
+    let lease = prepare(&fixture.expected()).unwrap();
+    let mut session = lease.prepare_image_debug_session().unwrap();
+    assert!(session.package_debug_summary(Ok(0)).is_none());
+    session.npm_diagnostics = Some(NpmProcessDiagnostics::new());
+    let generation = Uuid::new_v4();
+    session.bind_package_diagnostics(generation);
+    session.bind_package_diagnostics(Uuid::new_v4());
+    session.record_package_spawn_result(Ok(()), Duration::from_millis(9));
+    let event = DEBUG_EVENT {
+        dwDebugEventCode: LOAD_DLL_DEBUG_EVENT,
+        dwProcessId: 31,
+        dwThreadId: 32,
+        ..Default::default()
+    };
+    session.pending_event = Some((31, 32, LOAD_DLL_DEBUG_EVENT));
+    session
+        .npm_diagnostics
+        .as_mut()
+        .unwrap()
+        .trace
+        .as_mut()
+        .unwrap()
+        .received(&event, 12, 71, false);
+    let denied = HRESULT::from_win32(5);
+    let api_failure = io::Error::other(WindowsError::from_hresult(denied));
+    session.record_event_validation(Err(&api_failure), Duration::from_millis(4));
+    let failure = io::Error::other(r"C:\private\credential-and-environment-sentinel");
+
+    let fields = session.package_debug_summary(Err(&failure)).unwrap();
+    assert_eq!(fields["generation"], generation.to_string());
+    assert_eq!(fields["spawn_result"]["ok"], true);
+    assert_eq!(fields["spawn_result"]["elapsed_ms"], 9);
+    assert_eq!(fields["spawn_thread_id"], fields["spawn_return_thread_id"]);
+    assert_eq!(fields["last_call_thread_id"], fields["spawn_thread_id"]);
+    assert_eq!(
+        fields["pending_event"],
+        serde_json::json!([31, 32, LOAD_DLL_DEBUG_EVENT.0])
+    );
+    assert_eq!(fields["last_boundary"], "validation_failed");
+    assert_eq!(fields["validated"], 0);
+    assert_eq!(fields["continued"], 0);
+    assert_eq!(fields["recent"][0]["sequence"], 1);
+    assert_eq!(fields["recent"][0]["validation"]["ok"], false);
+    assert_eq!(fields["recent"][0]["validation"]["hresult"], denied.0);
+    assert_eq!(fields["recent"][0]["validation"]["elapsed_ms"], 4);
+    assert!(fields["recent"][0]["continuation"].is_null());
+    assert!(
+        !fields
+            .to_string()
+            .contains("credential-and-environment-sentinel")
+    );
+    assert!(
+        !fields
+            .to_string()
+            .contains(&fixture.directory.path().display().to_string())
+    );
+    let raw_failure = io::Error::from_raw_os_error(5);
+    let raw = session.package_debug_summary(Err(&raw_failure)).unwrap();
+    assert_eq!(raw["failure_codes"]["win32_error"], 5);
+    assert!(raw["failure_codes"]["hresult"].is_null());
+    // 原生非零退出并非 io::Error，仍须保留失败事件，不能标记成成功。
+    let native_failure = session.package_debug_summary(Ok(17)).unwrap();
+    assert_eq!(native_failure["native_exit_code"], 17);
+    assert_eq!(native_failure["failed"], true);
+    assert!(native_failure["recent"].is_array());
+    // 无失败时不输出逐事件详情，避免正常消费者更新产生大段日志。
+    assert!(
+        session
+            .package_debug_summary(Ok(0))
+            .unwrap()
+            .get("recent")
+            .is_none()
+    );
+}
+
+#[test]
 fn npm_event_roles_distinguish_remaining_console_and_reused_process_identity() {
     let mut diagnostics = NpmProcessDiagnostics::new();
     for (process_id, role) in [(11, NpmProcessRole::Root), (12, NpmProcessRole::Console)] {

@@ -290,3 +290,176 @@ fn prepared_tree_must_match_every_official_archive_member() {
             .is_err()
     );
 }
+
+fn claude_hardlink_tree(root: &Path) -> (Directory, ClaudeHardlink) {
+    let package = root.join("claude");
+    fs::create_dir_all(package.join("bin")).unwrap();
+    let native = package.join("node_modules/@anthropic-ai/claude-code-darwin-arm64/claude");
+    fs::create_dir_all(native.parent().unwrap()).unwrap();
+    fs::write(&native, b"reviewed native").unwrap();
+    fs::hard_link(&native, package.join("bin/claude.exe")).unwrap();
+    (
+        Directory::open(&package).unwrap(),
+        ClaudeHardlink::new(
+            "darwin-arm64",
+            15,
+            Sha256::digest(b"reviewed native").into(),
+        )
+        .unwrap(),
+    )
+}
+
+#[test]
+fn claude_fixed_two_names_preserve_the_existing_snapshot_schema() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    let bytes = serde_json::to_vec(&snapshot).unwrap();
+    let recovered: Snapshot = serde_json::from_slice(&bytes).unwrap();
+
+    assert_eq!(recovered, snapshot);
+    assert!(link.linked_node(&snapshot).is_some());
+    assert!(package.snapshot().is_err());
+    assert!(package.grok_snapshot().is_err());
+}
+
+#[test]
+fn claude_linked_native_requires_the_reviewed_image() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    fs::write(root.join("claude/bin/claude.exe"), b"modified native").unwrap();
+
+    assert!(package.claude_snapshot(&link).is_err());
+}
+
+#[test]
+fn claude_hardlink_rejects_an_external_third_name_before_cleanup() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    fs::hard_link(root.join("claude/bin/claude.exe"), root.join("external")).unwrap();
+
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .remove_claude_matching(OsStr::new("claude"), &snapshot, &link)
+            .is_err()
+    );
+    assert!(root.join("claude/bin/claude.exe").exists());
+    assert_eq!(fs::read(root.join("external")).unwrap(), b"reviewed native");
+}
+
+#[test]
+fn claude_single_known_name_cannot_claim_an_external_pair() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    fs::rename(
+        root.join("claude/node_modules/@anthropic-ai/claude-code-darwin-arm64/claude"),
+        root.join("external"),
+    )
+    .unwrap();
+
+    assert!(package.claude_snapshot(&link).is_err());
+}
+
+#[test]
+fn claude_other_platform_or_wrong_member_name_is_not_the_fixed_pair() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    fs::rename(
+        root.join("claude/node_modules/@anthropic-ai/claude-code-darwin-arm64"),
+        root.join("claude/node_modules/@anthropic-ai/claude-code-linux-x64"),
+    )
+    .unwrap();
+
+    assert!(package.claude_snapshot(&link).is_err());
+    assert!(ClaudeHardlink::new("darwin-x64", 15, link.sha256).is_err());
+    assert!(ClaudeHardlink::new("../darwin-arm64", 15, link.sha256).is_err());
+}
+
+#[test]
+fn claude_independent_copies_remain_distinct_snapshot_members() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    fs::remove_file(root.join("claude/bin/claude.exe")).unwrap();
+    fs::write(root.join("claude/bin/claude.exe"), b"different native").unwrap();
+
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    assert_eq!(snapshot, package.snapshot().unwrap());
+    assert!(link.linked_node(&snapshot).is_none());
+}
+
+#[test]
+fn claude_cleanup_decrements_the_owned_link_count() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+
+    Directory::open(&root)
+        .unwrap()
+        .remove_claude_matching(OsStr::new("claude"), &snapshot, &link)
+        .unwrap();
+    assert!(!root.join("claude").exists());
+}
+
+#[test]
+fn claude_cleanup_resumes_after_one_owned_name_was_deleted() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    fs::remove_file(root.join("claude/bin/claude.exe")).unwrap();
+    fs::remove_dir(root.join("claude/bin")).unwrap();
+
+    Directory::open(&root)
+        .unwrap()
+        .remove_claude_matching(OsStr::new("claude"), &snapshot, &link)
+        .unwrap();
+    assert!(!root.join("claude").exists());
+}
+
+#[test]
+fn claude_interrupted_cleanup_rejects_a_remaining_external_link() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    fs::rename(root.join("claude/bin/claude.exe"), root.join("external")).unwrap();
+
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .remove_claude_matching(OsStr::new("claude"), &snapshot, &link)
+            .is_err()
+    );
+    assert!(
+        root.join("claude/node_modules/@anthropic-ai/claude-code-darwin-arm64/claude")
+            .exists()
+    );
+    assert_eq!(fs::read(root.join("external")).unwrap(), b"reviewed native");
+}
+
+#[test]
+fn claude_cleanup_rejects_a_replaced_member() {
+    let temporary = tempfile::tempdir().unwrap();
+    let root = temporary.path().canonicalize().unwrap();
+    let (package, link) = claude_hardlink_tree(&root);
+    let snapshot = package.claude_snapshot(&link).unwrap();
+    fs::remove_file(root.join("claude/bin/claude.exe")).unwrap();
+    fs::write(root.join("claude/bin/claude.exe"), b"reviewed native").unwrap();
+
+    assert!(
+        Directory::open(&root)
+            .unwrap()
+            .remove_claude_matching(OsStr::new("claude"), &snapshot, &link)
+            .is_err()
+    );
+    assert!(root.join("claude/bin/claude.exe").exists());
+}

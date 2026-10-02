@@ -1,5 +1,31 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Claude 官方 npm 硬链接布局修复、真实升级降级与应用冷回滚
+
+新增关闭 0 项，保持 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。真实官方 npm postinstall 的两名硬链接已按固定平台／版本、完整 SHA 与长度、同 inode／owner／mode、恰好 nlink2 支持；普通快照、Codex／Grok及新候选仍要求 nlink1。旧 journal 格式不变，恢复由旧版本推导合同，已持有两名的清理支持 2→1 及中断后的未变子集；第三链接、外部链接、名称替换或改写仍拒绝。
+
+源码冻结 `g09-claude-hardlink-build-v2/source.safe.json` SHA `c7af0704da084a7fc1fa20da509941593d225cf770015b0b2b6133d564f4f847`，基线 `4e4758dcc` 加明确 diff；构建 `r-0p2zouxy` raw SHA `77e3629f40abc6fa46d97de0f00a99afa3bf1783a4099878cdf8b08096907927`，签名 GUI `r-w3vkj6p2`。未重装或改写原 npm 安装，真实 GUI 287→285 Stable、285→287 Latest 均成功，公共命令分别实际输出对应版本；独立完整 11 文件／4 目录、配置、入口及原生退出/清理核验通过。降级索引 `658b912caa296d130a56f70876b843e3666f7defd1ce766807e085f8d5dd8919`，自然升级 `8be967cbdfe5fbe887f57ba7ffb01dce0b8b023dcda3a77baaadeee470f8b0ab`。
+
+随后再次合法降级，在真实 SwapIntent 且两侧目录身份已交换、候选版本探针退出后，只向本轮原 GUI PID 13884 发一次 SIGKILL。独立现场审计确认公开 285 树等于 prepared、备份 287 树等于 original、配置尚未发布、全部原生收据闭合，SHA `bd09b3012ed022ae4aaaf5f5394e817cc0d43e18007a52b8e287a34dbfdb9c18`。同签名映像、原 PATH/TMPDIR/profile/state 正常启动 PID22561，未点击检查或更新，应用自动将全部原 287 树的身份、大小、摘要及原配置逐字节还原，清理 journal/stage；恢复树 `6e92019b416badfd4387636ce0a1a58637b700b10da60dfdaeb853b31e028a00`，新终端实际输出 287。通过 GUI 选择中文并正常重启 PID23315，失败提示完整保留；单次主动更新成功 285，failed 标记、journal/stage 清除，原生退出0及身份清理闭合，独审 `25d68cf5b3a6a1b20ba498fc99469cf866db383c13a569bf7ec5eab20ff0df73`。此为真实应用交换后冷回滚，不借用后台 worker 测试替代。
+
+无需本地化变更：原英中版本、来源、渠道、两插件、失败及重试状态文案仍适用；英文与简体中文实际布局完整无截断，双语收据 `b3586d8ee2f5c83bd17fdf993e76cb55497c6048a0e5c29334abdfd1b39f0754`，中文重试成功 `a8e9ce7572fbd0fb340f4cb11d7093d3523a2438d08f7346635f4d2d3ba7c4d5`。CUA截图只在对话原始工具输出，仓外 JSON 不冒称截图。原4e安装拒绝保留；中断辅助v1在kqueue的with语法预检TypeError、v2错误比较源文件与隔离快照执行路径，均零信号，不能算中断成功；v3才取得上述实际中断。第一代GUI被计划中断，外层exit247原样保留；后两代正常exit0。四个原生generation、全部本轮进程/launchd/打开文件核空后，小证据归档，短根/profile/state/精确Preferences已清理；两个真实安装前缀继续按登记保留。统一索引 `609f00328a0a2b225a466ece64d899d580e622e87cef24133f3702b6e1a4f023`，清理收据 `b3292c9241b8743a26352b0ad88a169ecffd7d763c7ab0b957d40ae347e5077f`。
+
+本机 `r-hk4cx3lm` check与 `r-73t5rrjc` i18n11项通过；`r-f0ii2606` 定向333项为332普通PASS＋1 LEAK，8354未选，17条新增回归均普通PASS。LEAK为 `homebrew_ancestor_exception_rejects_generic_native_authority`，未定位残留输出句柄/后代，不称全体普通PASS；本轮进程、launchd与打开文件核验后短目录已清。门禁收据 `a87e21654adc4844f81ef6af8444b65a8c04547950075f58148fa4512e9e4d3b`。同签名应用的已安装Grok通知真实测试23PASS／1fish跳过、独立诊断10PASS；PTY测试读取改为有界等待完整OSC，7项读取合同测试通过，不放宽产品时限。该变化不能仅凭Mac通过认定Linux旧失败根因已彻底解决；新精确提交两平台门禁仍待完成。G09其余消费者来源、真实Homebrew中断恢复和Windows原生npm失败仍开放。
+
+旧提交 `4e4758dcc` 的 [37031319203](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37031319203) 已终态 failure：Linux 5389普通PASS（新增34均普通PASS），唯一实际FAIL为已安装Grok通知测试；Windows作业success，5007普通PASS＋1 LEAK（新增18均普通PASS），LEAK为 `test_ai_context_menu_keeps_workflow_reference_in_ai_input`，不称已解决。i18n两端各11个唯一用例，重复门禁的22次通过不加倍计数。13份官方ZIP的摘要、大小及50条目CRC均核验，终审 `816cb9769ceeb8212104ba94ffdc4346445906514a71102d58e0619186b8beed`；新修复不回填旧轮。
+
+Windows实际事件诊断另补真实generation、派生及API调用线程、接收／验证／继续计数和耗时，失败在清理前保存最近16个固定字段事件，Wait超时仅累计；非零原生退出仍为失败，不输出路径／环境／原错误全文，不改权限、超时或控制流。新增3回归和既有Continue失败断言增强待Windows执行。最终Mac check `r-yuiu1xs8`通过，日志 `c8c11fff895a449f5b3143a07c029122b7cde5b595457e1b6d72d26ba315579f`；单次本机Windows应用交叉check `r-ysabgecz` 在aws-lc-sys C依赖缺 `windows.h` 失败，日志 `7cfa677c4c3fcd71e3ce2f6e8d8fedccff967d0cd1e693523944bcbc7050ba0b`，未达到应用类型检查，不再重复本机调用或冒充通过。两短目录均按身份清理；新Windows类型、回归及同真实npm事务由最终提交的既有工作流核验。该诊断无需本地化变更，本身不关闭G09。
+
+## 2026-10-03：Codex 真实 Homebrew GUI 链通过，Claude npm 原生布局缺口已复现
+
+新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。精确 `4e4758dcc` 构建 `r-vtn4rx14`，raw binary SHA `963e4a9f1ab0187b7967c45de8eb0bf7989111fee200adfcaf37774ce1523ecf`，对应真实 GUI `r-2l5quutv`。选定真实 Homebrew 7.0.4 私有前缀中已安装的 Codex 0.156.1，界面查询到当时 Latest 0.160.0。实际启动旧版原生 TUI 并单击空闲更新：忙碌提示期间原公共链接、映像及版本目录保持不变；正常 Ctrl-D 退出后无需二次点击，应用自动更新。实际公开入口 `--version` 输出 `codex-cli 0.160.0`，完整新包 42 文件／10 目录的大小、模式、摘要和正式 tab、三种补全匹配；7 个原生探针退出 0，身份／清理收据闭合，journal／staging 已移除。独立后置审计 SHA `9dde348b1dddb2303a9de536b5fea1ea0169d59d183f4932cb988790c571a05c`；观察开始于发布之后，不声称完整中间 journal 序列或额外内核 CID 查询。
+
+原登记 PATH/TMPDIR 的新进程重启正确显示已安装／目标均 0.160.0、Homebrew／Latest、渠道匹配及两个独立插件缺失提示；英文与简体中文实窗完整可读，既有文案无需本地化变更。重启审计 `0c00d8e8a11c6083124c74c6f6e7d948d4803cc3eaf1a732101f717b929674af`，中文 `4211221b451000ab07a0a765dcbad380a24a2bd9779a163b0a08e636a3a74844`。中间一次工具自动重启没有保持 PATH/TMPDIR、界面显示未知安装，独立负例 `1627f08cb335d70bfecfa7973ba77e7eb68477bd7c51ca57f2fecdb8287c2d92` 保留；后续原环境才通过。完成后正常重启不等于中断事务恢复。四代 GUI 及 54 个已知进程退出，root／profile／state／精确 Preferences 已清；仅 7 个本轮已归档 0500 快照目录在退出核验后通过原 fd 加 owner 写位以完成即时删除，原失败保留，不改安装权限。最终索引 `fc597fa306bb8012a07c13e153405a7dc0f8d225d9a811c32a4fe7e7c8bc8290`，清理 `68e2de778dff537240fbcc9c94c37761a75b330e234e7646f3520630f0ea943b`；真实 brew 前缀按登记保留。
+
+另使用官方 Node 22.14.0／npm 10.9.2，在 `r-u6fdf2y_` 私有前缀真实安装 Claude 2.1.287，官方 postinstall 未改写。实际公开入口版本正确，但两个官方名称 `bin/claude.exe` 和包内平台文件为同一 inode、nlink=2、SHA `6eab8333fe2121553100d8f40bfada384a3e989b94f947e18ba6677a6fcb41ea`；现有 Unix 快照及清理只接受 nlink=1，确定缺少真实安装布局支持。GUI `r-3zes6cit` 正确识别 npm／2.1.287，用户入口选择当时真实 Stable 2.1.285 并实际单击更新后，被拒为不可安全更新；原始树完整、没有 journal 或原生候选。失败收据 `8e9519938f796ef166165adc16d5276a95ef39f6e6e0f48bc34f51c6521d568b`；不将界面拒绝单独认定为唯一失败点。GUI 已退出清理，npm 安装保留供修复后直接复验；其外层安装和准备命令均退出 0、短 TMP 已清。真实合法降级仍未通过。
+
+Windows 只读审计 `ee8550643a86df8942c0c9b59219d6bde90a885ef05df2a6b7150ffe7dbdc1a5` 核对固定 Node／Codex 上游及微软合同：`lpDesktop=NULL` 的父站继承说明构成反证，不能由根 HANDLE_LIST 只有 stdio 推导后代必回旧站；e9 正常阶段尚未收到／放行 Node CREATE，原生阻塞事件仍不明。未加猜测继承、ACL 或 timeout 补丁，未重复近似原生探针。解除条件是同一真实链的完整有界调试事件阶段和原生错误证据，随后修复实际阻塞并通过 CMD／PowerShell 全事务。精确 4e 的 [37031319203](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37031319203) 两端编译已过，但 Linux 已安装 Grok hook 步骤失败；完整终态审计待补，不能以部分步骤绿计最终源码门禁。所有证据位于 `resume-20261001/g08-build-preparation` 对应版本目录，CUA 原截图在对话工具收据中，仓外 JSON 为观察记录。
+
 ## 2026-10-03：G09 当前消费合同与真实私有 Homebrew 支持，验收待完成
 
 新增关闭 0 项，仍为 **9 关闭／G03、G09 共 2 开放／3 移交**，PR #22 草稿。Mac ARM64 的 Codex 0.160.0、Claude 2.1.285/2.1.287、Grok 1.0.46 已按官方npm/cask完整树接线；Claude显式Stable的2.1.287→2.1.285使用独立意图，旧版本、旧降级意图、journal/schema及未知版本拒绝保留。Codex恢复额外将完整探针闭包绑定到账本目标版本，156/160双向误标均拒绝；更新合同不扩大托管运行或模型白名单。
