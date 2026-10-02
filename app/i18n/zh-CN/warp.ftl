@@ -5867,7 +5867,27 @@ settings-cli-updates-current = 当前安装已符合所选渠道。
 settings-cli-updates-available = 所选渠道有待应用的更新。
 settings-cli-updates-waiting = 正在等待此 CLI 的会话和任务关闭。
 settings-cli-updates-updating = 正在更新此 CLI…
-settings-cli-updates-verifying = 正在验证安装和渠道…
+settings-cli-updates-verifying = 正在验证安装、渠道和插件文件…
+settings-cli-updates-notification-integrity =
+    { $state ->
+        [verified] 通知插件文件已验证，仍需在新的 CLI 会话中验证通知。
+        [not-required] 此 CLI 无需通知插件。
+        [missing] 缺少通知插件，请在 CLI 会话中配置。
+        [disabled] 通知插件已禁用，请显式启用以恢复通知。
+        [needs-update] 通知插件需要更新，请在 CLI 会话中管理。
+        [integrity-mismatch] 通知插件文件与已验证版本不符，请在 CLI 会话中修复插件。
+       *[unverified] 通知插件文件的完整性尚未验证。
+    }
+settings-cli-updates-platform-integrity =
+    { $state ->
+        [verified] 编排插件文件已验证，托管 CLI 兼容性另行检查。
+        [not-required] 此 CLI 无需编排插件。
+        [missing] 缺少编排插件，请在 CLI 会话中配置。
+        [disabled] 编排插件已禁用，请显式启用以使用相关功能。
+        [needs-update] 编排插件需要更新，请在 CLI 会话中管理。
+        [integrity-mismatch] 编排插件文件与已验证版本不符，请在 CLI 会话中修复插件。
+       *[unverified] 编排插件文件的完整性尚未验证。
+    }
 settings-cli-updates-failed = 更新未完成。
 settings-cli-updates-manual = 暂无法自动更新此 CLI。
 settings-cli-updates-not-installed = 尚未安装此 CLI。请打开安装指南进行安装。

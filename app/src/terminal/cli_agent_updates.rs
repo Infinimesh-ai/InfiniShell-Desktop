@@ -10,6 +10,7 @@ use warpui::r#async::Timer;
 use warpui::{Entity, EntityId, ModelContext, SingletonEntity};
 
 use super::cli_agent::{CLIAgent, CLIAgentInstallModel};
+use super::cli_agent_sessions::plugin_manager::{PluginIntegrityReport, inspect_plugin_integrity};
 #[cfg(feature = "local_fs")]
 use crate::ai::cli_agent_runtime::coordinator::LocalCLITaskCoordinator;
 
@@ -82,6 +83,8 @@ pub struct CliAgentUpdateStatus {
     pub busy: bool,
     pub channel: CliAgentUpdateChannel,
     pub effective_channel: Option<CliAgentUpdateChannel>,
+    /// 与本次安装检查一同完成的磁盘完整性结果，不代表原生通知或托管协议已验证。
+    pub(crate) plugins: Option<PluginIntegrityReport>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -119,6 +122,7 @@ impl Entry {
                 busy: true,
                 channel: CliAgentUpdateChannel::FollowInstallation,
                 effective_channel: None,
+                plugins: None,
             },
             plan: None,
             operation: 0,
@@ -420,6 +424,7 @@ impl CliAgentUpdatesModel {
         entry.operation += 1;
         entry.recheck = false;
         entry.status.phase = CliAgentUpdatePhase::Checking;
+        entry.status.plugins = None;
         if entry.status.error != Some(CliAgentUpdateError::RecoveryRequired) {
             entry.status.error = None;
         }
@@ -428,8 +433,18 @@ impl CliAgentUpdatesModel {
         let client = self.client.clone();
         self.changed(agent, ctx);
         ctx.spawn(
-            async move { sources::inspect(agent, executable, channel, &client).await },
-            move |model, result, ctx| model.checked(agent, operation, channel, result, ctx),
+            async move {
+                let result = sources::inspect(agent, executable.clone(), channel, &client).await;
+                let plugins = result.as_ref().ok().and_then(|report| {
+                    executable.as_deref().and_then(|entry| {
+                        inspect_plugin_integrity(agent, entry, &report.installed_version)
+                    })
+                });
+                (result, plugins)
+            },
+            move |model, (result, plugins), ctx| {
+                model.checked(agent, operation, channel, result, plugins, ctx)
+            },
         );
     }
 
@@ -455,6 +470,7 @@ impl CliAgentUpdatesModel {
         operation: u64,
         channel: CliAgentUpdateChannel,
         result: Result<sources::CheckReport, CliAgentUpdateError>,
+        plugins: Option<PluginIntegrityReport>,
         ctx: &mut ModelContext<Self>,
     ) {
         let Some(entry) = self.entries.get_mut(&agent) else {
@@ -473,6 +489,7 @@ impl CliAgentUpdatesModel {
         entry.next_check = Instant::now() + CHECK_INTERVAL;
         match result {
             Ok(report) => {
+                entry.status.plugins = plugins;
                 entry.recovery_required = false;
                 entry.check_failures = 0;
                 entry.failed_target = report.failed_target;
@@ -501,6 +518,7 @@ impl CliAgentUpdatesModel {
                 }
             }
             Err(error) => {
+                entry.status.plugins = None;
                 let error = if entry.recovery_required
                     || entry.status.error == Some(CliAgentUpdateError::RecoveryRequired)
                 {
@@ -580,6 +598,7 @@ impl CliAgentUpdatesModel {
         entry.active = true;
         entry.operation += 1;
         entry.status.phase = CliAgentUpdatePhase::Updating;
+        entry.status.plugins = None;
         entry.status.error = None;
         entry.manual_update = false;
         let operation = entry.operation;
@@ -602,18 +621,26 @@ impl CliAgentUpdatesModel {
                 let _ = verification_continue_tx.try_send(());
             },
         );
+        let installation_entry = plan.installation_entry().to_owned();
         ctx.spawn(
             async move {
-                sources::execute(
+                let result = sources::execute(
                     plan,
                     Some(sources::VerificationProgress::new(
                         verification_started_tx,
                         verification_continue_rx,
                     )),
                 )
-                .await
+                .await;
+                // 保持当前操作与启动保护，直到只读插件复检完成；不重装插件或回滚已提交的 CLI。
+                let plugins = result.as_ref().ok().and_then(|version| {
+                    inspect_plugin_integrity(agent, &installation_entry, version)
+                });
+                (result, plugins)
             },
-            move |model, result, ctx| model.updated(agent, operation, result, ctx),
+            move |model, (result, plugins), ctx| {
+                model.updated(agent, operation, result, plugins, ctx)
+            },
         );
     }
 
@@ -622,6 +649,7 @@ impl CliAgentUpdatesModel {
         agent: CLIAgent,
         operation: u64,
         result: Result<String, CliAgentUpdateError>,
+        plugins: Option<PluginIntegrityReport>,
         ctx: &mut ModelContext<Self>,
     ) {
         let Some(entry) = self.entries.get_mut(&agent) else {
@@ -633,6 +661,7 @@ impl CliAgentUpdatesModel {
         entry.active = false;
         match result {
             Ok(version) => {
+                entry.status.plugins = plugins;
                 entry.status.installed_version = Some(version);
                 entry.status.phase = CliAgentUpdatePhase::UpToDate;
                 entry.failed_target = None;
@@ -640,6 +669,7 @@ impl CliAgentUpdatesModel {
                 ctx.emit(CliAgentUpdateEvent::InstallationChanged { agent });
             }
             Err(error) => {
+                entry.status.plugins = None;
                 if error == CliAgentUpdateError::RecoveryRequired {
                     entry.recovery_required = true;
                 }

@@ -3,9 +3,130 @@ use std::path::{Path, PathBuf};
 
 use super::{
     ClaudeCodePluginManager, CliAgentPluginManager, MINIMUM_PLATFORM_PLUGIN_VERSION,
-    check_installed, check_platform_plugin_installed, claude_code_marketplace_has_local_override,
-    installed_platform_plugin_version, installed_version,
+    PluginComponentIntegrity, check_installed, check_platform_plugin_installed,
+    claude_code_marketplace_has_local_override, installed_platform_plugin_version,
+    installed_version,
 };
+
+#[test]
+fn integrity_report_missing_claude_plugins_does_not_create_files() {
+    let home = transaction_tempdir();
+    let report = super::integrity_report_at(home.path());
+    assert_eq!(report.notification, PluginComponentIntegrity::Missing);
+    assert_eq!(report.platform, PluginComponentIntegrity::Missing);
+    assert_eq!(fs::read_dir(home.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn integrity_report_preserves_disabled_claude_plugin_with_malformed_registry() {
+    let home = transaction_tempdir();
+    transaction_installation(home.path(), "2.2.0");
+    let settings = br#"{"enabledPlugins":{"warp@claude-code-warp":false}}"#;
+    fs::write(home.path().join("settings.json"), settings).unwrap();
+    fs::write(home.path().join("plugins/installed_plugins.json"), b"{").unwrap();
+
+    assert_eq!(
+        super::integrity_report_at(home.path()).notification,
+        PluginComponentIntegrity::Disabled
+    );
+    assert_eq!(
+        fs::read(home.path().join("settings.json")).unwrap(),
+        settings
+    );
+    assert_eq!(
+        fs::read(home.path().join("plugins/installed_plugins.json")).unwrap(),
+        b"{"
+    );
+}
+
+#[test]
+fn integrity_report_known_old_claude_tree_needs_update_without_modification() {
+    let home = transaction_tempdir();
+    let cache = transaction_installation(home.path(), "2.1.0");
+    let before = fs::read(cache.join("scripts/should-use-structured.sh")).unwrap();
+    let documents = transaction_original(home.path());
+    assert_eq!(
+        super::integrity_report_at(home.path()).notification,
+        PluginComponentIntegrity::NeedsUpdate
+    );
+    assert_eq!(
+        fs::read(cache.join("scripts/should-use-structured.sh")).unwrap(),
+        before
+    );
+    assert_eq!(transaction_original(home.path()), documents);
+}
+
+#[test]
+fn integrity_report_claude_rechecks_entire_tree_without_ui_cache() {
+    let home = patched_transaction_stage();
+    assert!(super::notification_patch::is_applied(
+        home.path(),
+        super::PatchKind::Claude
+    ));
+    assert_eq!(
+        super::integrity_report_at(home.path()).notification,
+        PluginComponentIntegrity::Verified
+    );
+    let cache = home
+        .path()
+        .join("plugins/cache/claude-code-warp/warp/2.2.0");
+    fs::write(cache.join("scripts/should-use-structured.sh"), "用户修改").unwrap();
+    let documents = transaction_original(home.path());
+
+    assert_eq!(
+        super::integrity_report_at(home.path()).notification,
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(
+        fs::read_to_string(cache.join("scripts/should-use-structured.sh")).unwrap(),
+        "用户修改"
+    );
+    assert_eq!(transaction_original(home.path()), documents);
+}
+
+#[test]
+fn integrity_report_claude_platform_version_does_not_prove_full_tree() {
+    let home = patched_transaction_stage();
+    let path = home.path().join("plugins/installed_plugins.json");
+    let mut registry: serde_json::Value =
+        serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    registry["plugins"][super::PLATFORM_PLUGIN_KEY] =
+        serde_json::json!([{"version":"1.1.2","scope":"user"}]);
+    fs::write(&path, serde_json::to_vec(&registry).unwrap()).unwrap();
+    let before = fs::read(&path).unwrap();
+
+    assert_eq!(
+        super::integrity_report_at(home.path()).platform,
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn integrity_report_unknown_claude_notification_version_is_unverified() {
+    let home = transaction_tempdir();
+    let cache = transaction_installation(home.path(), "2.2.0");
+    let unknown = cache.with_file_name("9.0.0");
+    fs::rename(&cache, &unknown).unwrap();
+    let manifest_path = unknown.join(".claude-plugin/plugin.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["version"] = serde_json::json!("9.0.0");
+    fs::write(&manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    let registry_path = home.path().join("plugins/installed_plugins.json");
+    let mut registry: serde_json::Value =
+        serde_json::from_slice(&fs::read(&registry_path).unwrap()).unwrap();
+    registry["plugins"][super::PLUGIN_KEY][0]["version"] = serde_json::json!("9.0.0");
+    registry["plugins"][super::PLUGIN_KEY][0]["installPath"] = serde_json::json!(unknown);
+    fs::write(&registry_path, serde_json::to_vec(&registry).unwrap()).unwrap();
+    let before = fs::read(&registry_path).unwrap();
+
+    assert_eq!(
+        super::integrity_report_at(home.path()).notification,
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(fs::read(&registry_path).unwrap(), before);
+}
 
 fn transaction_tempdir() -> tempfile::TempDir {
     tempfile::tempdir_in(std::env::temp_dir().canonicalize().unwrap()).unwrap()

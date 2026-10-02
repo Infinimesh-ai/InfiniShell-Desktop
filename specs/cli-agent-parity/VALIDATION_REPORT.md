@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G09 插件完整性复检与窗口站前置能力，未关闭
+
+本轮关闭 0 项，累计 9 关闭／2 开放／3 移交，PR #22 继续草稿。通知与编排插件分别返回缺失、禁用、待更新、文件不符、未验证或已验证；检查及更新成功后均重读完整文件树，绕过界面缓存。Grok 桥使用本次实际入口与版本，Claude 编排插件因缺完整内容合同继续显示未验证。复检期间保留更新操作和启动保护；旧回调不发布结果，插件问题不覆盖已经成功的 CLI 更新，也不开放未知版本托管能力。
+
+Mac `r-r5la1r7o` check、`r-kcacn0wa` i18n 11项、`r-qr0x1wtu` 定向484项及 `r-5afjdbmf` GUI构建全部通过。首次 `r-7m7w3ptb` 为483过/1失败：新复检遗漏既有 Codex rev3–rev5 精确完整树合同，现复用该合同，旧树待更新、篡改仍不符；原失败保留。构建对应 `04a874d7a` 加16文件实际差异，diff SHA `fcddec5943660417ce915789ff599ac4600d8ea4ab50e07fe17e504897da5aa5`，raw binary SHA `1fe706e0d61c14e6245141cfa1af96842ef96cc8e2e75f3eef8da1970410ff63`。
+
+英文 `r-77mzjt2i` 与中文 `r-kgi_eahg` 独立实窗均关闭自动更新，保持 HOME/CODEX_HOME，GROK_HOME 为无认证私有目录。实际设置页显示两类缺失提示；英文由真实检查按钮重读禁用和损坏夹具，中文由损坏文件恢复后显示未知 Grok 1.0.46 的未验证状态。两个语言的2560×1600布局无截断、重叠，文本及检查按钮分列；窄窗拖动未改变尺寸，不计该项。私有树前后摘要一致，无安装、更新或模型请求。全部GUI和已知后代退出、launchd/lsof及目录身份核对后，包、私有夹具、小证据归档并清理短目录和独立profile。CUA原始截图留在本对话，仓外收据为观察记录，不冒充截图文件。总审计 `g08-build-preparation/g09-plugin-recheck-audit-v1.safe.json`，SHA `3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec`。英中文案及变量同步，更新后的跨平台源码门禁待完成；这些结果只证明插件复检增量，不是完整G09更新验收。
+
+[Windows 37008880591](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37008880591) 精确绑定 `04a874d7acb63d95ebfb3cff2ca86e19ec1953aa`，591普通PASS及1显式ignored原生候选PASS，无FAIL/LEAK/RETRY/FLAKY/TIMEOUT，37行warning保留。三份官方ZIP、完整日志和六份binary收据独立核对。第一段仍处原站，第二段实际新站与挂起原句柄AuthenticationId预测一致，恢复前及退出后同名查询明确不存在，新LUID退出后消失；精确Job和所有自有句柄清理确认。调用者为有效Admins=false但已提升、高完整性Session0服务身份，不能称普通非提升交互用户。原件索引 `e8039d475e9a2e73cbaddd8a49d2fe265f90f74212d5cdda9cda355db88d6534`，独立审计 `615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774`。此前C4701和全局枚举前置失败均保留；该成功尚未证明生产完整宿主、新站AppContainer授权或Node/npm链，下一步接专属bootstrap与本轮新站生命周期，保持普通lease身份及零capability隔离条件。
+
 ## 2026-10-02：G09 窗口站候选的精确不存在证明，待原生执行
 
 新增关闭 0 项。`596d439c13bb00f1b25a0945f24d9b995cfd5360` 的 [Windows 37007022817](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37007022817) 已修复 MSVC 编译，但测试在全局窗口站枚举的前置检查停止：返回失败并记录 hresult 0，没有 `first_created` 或任何六份原生收据，不能称 CreateProcessWithLogonW 失败。调用者对象不变，精确 Job 已空且关闭确认。完整日志及三份官方工件均保留于 `g08-build-preparation/596d439c1-ci`，索引 `ee0526ea72a38c335b66af523b10be0199f4777193294258ea89598659f81b91`。

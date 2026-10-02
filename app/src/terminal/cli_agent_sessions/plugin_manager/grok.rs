@@ -18,7 +18,10 @@ use {
     warpui::r#async::FutureExt as _,
 };
 
-use super::{CliAgentPluginManager, PluginInstallError, PluginInstructionStep, PluginInstructions};
+use super::{
+    CliAgentPluginManager, PluginComponentIntegrity, PluginInstallError, PluginInstructionStep,
+    PluginInstructions, PluginIntegrityReport,
+};
 #[cfg(not(target_family = "wasm"))]
 use crate::util::path::resolve_executable_in_path;
 
@@ -415,6 +418,22 @@ impl GrokPluginManager {
 
 #[async_trait]
 impl CliAgentPluginManager for GrokPluginManager {
+    fn integrity_report(&self) -> PluginIntegrityReport {
+        let notification =
+            if env::var_os("GROK_CONFIG_PATH").is_some() || env::var_os("GROK_CONFIG").is_some() {
+                PluginComponentIntegrity::Unverified
+            } else {
+                grok_home_dir().map_or(PluginComponentIntegrity::Unverified, |home| {
+                    notification_integrity(&home)
+                })
+            };
+        PluginIntegrityReport {
+            notification,
+            // Grok 没有独立的编排插件。
+            platform: PluginComponentIntegrity::NotRequired,
+        }
+    }
+
     fn minimum_plugin_version(&self) -> &'static str {
         PLUGIN_VERSION
     }
@@ -693,6 +712,83 @@ fn installed_plugin(root: &Path) -> io::Result<Option<InstalledPlugin>> {
     Ok(plugin)
 }
 
+fn notification_integrity(root: &Path) -> PluginComponentIntegrity {
+    match plugin_disabled(root) {
+        Ok(true) => return PluginComponentIntegrity::Disabled,
+        Ok(false) => {}
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    }
+    let plugin = match registered_plugin(root) {
+        Ok(Some(plugin)) => plugin,
+        Ok(None) => return PluginComponentIntegrity::Missing,
+        // 无法辨认唯一原生登记时，尚无可据以判断树损坏的合同。
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    };
+    match plugin_enabled(root) {
+        Ok(true) => {}
+        Ok(false) => return PluginComponentIntegrity::Disabled,
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    }
+    if !matches!(
+        plugin.version.as_str(),
+        "0.1.0" | "0.1.1" | "0.1.2" | "0.1.3" | "0.1.4"
+    ) && plugin.version != PLUGIN_VERSION
+    {
+        return PluginComponentIntegrity::Unverified;
+    }
+    for path in [&plugin.path, &plugin.source] {
+        match validate_expected_tree(path, &plugin.version) {
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+                return PluginComponentIntegrity::Unverified;
+            }
+            Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+        }
+    }
+    if plugin.version == PLUGIN_VERSION {
+        PluginComponentIntegrity::Verified
+    } else {
+        PluginComponentIntegrity::NeedsUpdate
+    }
+}
+
+pub(super) fn inspect_startup_bridge(executable: &Path, version: &str) -> PluginComponentIntegrity {
+    let Ok(root) = grok_home_dir() else {
+        return PluginComponentIntegrity::Unverified;
+    };
+    // Node 仅用于比对既有桥文件；这里不运行它，也不证明其身份、版本或通知可用性。
+    let node = GrokPluginManager::new(None).executable("node");
+    startup_bridge_integrity_for_runtime(&root, executable, version, node.as_deref())
+}
+
+fn startup_bridge_integrity_for_runtime(
+    root: &Path,
+    executable: &Path,
+    version: &str,
+    node: Option<&Path>,
+) -> PluginComponentIntegrity {
+    if !executable.is_absolute() {
+        return PluginComponentIntegrity::Unverified;
+    }
+    match version {
+        TESTED_GROK_VERSION => PluginComponentIntegrity::Verified,
+        "1.0.41"
+            if cfg!(any(
+                target_os = "macos",
+                target_os = "linux",
+                target_os = "windows"
+            )) =>
+        {
+            match node {
+                Some(node) => startup_bridge_integrity(root, executable, node),
+                None => PluginComponentIntegrity::Unverified,
+            }
+        }
+        // 未知版本没有启动桥合同，不能靠旧 metadata 记录免检。
+        _ => PluginComponentIntegrity::Unverified,
+    }
+}
+
 fn startup_bridge_files(
     root: &Path,
     executable: &Path,
@@ -854,6 +950,45 @@ fn startup_bridge_current(root: &Path, executable: &Path, node: &Path) -> bool {
                 .iter()
                 .all(|(path, expected)| bridge_file_matches(path, expected).unwrap_or(false))
         })
+}
+
+fn startup_bridge_integrity(
+    root: &Path,
+    executable: &Path,
+    node: &Path,
+) -> PluginComponentIntegrity {
+    match plain_directory(&root.join("hooks")) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return PluginComponentIntegrity::NeedsUpdate;
+        }
+        Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+            return PluginComponentIntegrity::Unverified;
+        }
+        Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+    }
+    let files = match startup_bridge_files(root, executable, node) {
+        Ok(files) => files,
+        Err(_) => return PluginComponentIntegrity::Unverified,
+    };
+    for (path, expected) in files {
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                return PluginComponentIntegrity::NeedsUpdate;
+            }
+            Err(_) => return PluginComponentIntegrity::Unverified,
+            Ok(_) => {}
+        }
+        match bridge_file_matches(&path, &expected) {
+            Ok(true) => {}
+            Ok(false) => return PluginComponentIntegrity::IntegrityMismatch,
+            Err(error) if error.kind() == io::ErrorKind::PermissionDenied => {
+                return PluginComponentIntegrity::Unverified;
+            }
+            Err(_) => return PluginComponentIntegrity::IntegrityMismatch,
+        }
+    }
+    PluginComponentIntegrity::Verified
 }
 
 #[derive(Serialize, Deserialize)]

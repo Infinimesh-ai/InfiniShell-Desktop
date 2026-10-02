@@ -2653,6 +2653,12 @@ impl Input {
                 }
                 AgentInputFooterEvent::PluginInstalled(agent) => {
                     ctx.emit(Event::RegisterPluginListener(*agent));
+                    #[cfg(not(target_family = "wasm"))]
+                    if ctx.has_singleton_model::<CliAgentUpdatesModel>() {
+                        CliAgentUpdatesModel::handle(ctx).update(ctx, |updates, ctx| {
+                            updates.check_now(*agent, ctx);
+                        });
+                    }
                 }
                 // InfiniShell Wave 7-3:`AgentInputFooterEvent::OpenEnvironmentManagementPane` handler
                 // 随 ambient-agent UI 子系统物理删。

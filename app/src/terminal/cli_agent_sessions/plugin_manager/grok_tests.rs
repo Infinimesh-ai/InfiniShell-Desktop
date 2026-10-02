@@ -54,6 +54,185 @@ fn install_fixture(root: &std::path::Path) -> std::path::PathBuf {
 }
 
 #[test]
+fn integrity_report_missing_grok_plugin_does_not_create_files() {
+    let directory = tempfile::tempdir().unwrap();
+    assert_eq!(
+        notification_integrity(directory.path()),
+        PluginComponentIntegrity::Missing
+    );
+    assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+}
+
+#[test]
+fn integrity_report_grok_checks_both_complete_trees_without_writing() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let installed = install_fixture(root);
+    let plugin = registered_plugin(root).unwrap().unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::Verified
+    );
+    let config = fs::read(root.join("config.toml")).unwrap();
+    let registry = fs::read(root.join("installed-plugins/registry.json")).unwrap();
+    let source = fs::read(plugin.source.join("README.md")).unwrap();
+    let original = fs::read(installed.join("README.md")).unwrap();
+    fs::write(installed.join("README.md"), "缓存修改").unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(
+        fs::read_to_string(installed.join("README.md")).unwrap(),
+        "缓存修改"
+    );
+    fs::write(installed.join("README.md"), original).unwrap();
+    fs::write(plugin.source.join("README.md"), "来源修改").unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(
+        fs::read_to_string(plugin.source.join("README.md")).unwrap(),
+        "来源修改"
+    );
+    assert_ne!(fs::read(plugin.source.join("README.md")).unwrap(), source);
+    assert_eq!(fs::read(root.join("config.toml")).unwrap(), config);
+    assert_eq!(
+        fs::read(root.join("installed-plugins/registry.json")).unwrap(),
+        registry
+    );
+}
+
+#[test]
+fn integrity_report_grok_disabled_precedes_damaged_registry() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let config = b"[plugins]\ndisabled=['infinishell-grok']\n";
+    fs::write(root.join("config.toml"), config).unwrap();
+    fs::write(root.join("installed-plugins/registry.json"), b"{").unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::Disabled
+    );
+    assert_eq!(fs::read(root.join("config.toml")).unwrap(), config);
+    assert_eq!(
+        fs::read(root.join("installed-plugins/registry.json")).unwrap(),
+        b"{"
+    );
+}
+
+#[test]
+fn integrity_report_grok_unknown_plugin_version_is_unverified() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let path = root.join("installed-plugins/registry.json");
+    let mut registry: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("9.0.0");
+    fs::write(&path, serde_json::to_vec(&registry).unwrap()).unwrap();
+    let before = fs::read(&path).unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+}
+
+#[test]
+fn integrity_report_grok_startup_bridge_preserves_missing_and_modified_files() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let executable = root.join("grok");
+    let node = root.join("node");
+    assert_eq!(
+        startup_bridge_integrity(root, &executable, &node),
+        PluginComponentIntegrity::NeedsUpdate
+    );
+    assert!(!root.join("hooks").exists());
+    install_startup_bridge(root, &executable, &node).unwrap();
+    assert_eq!(
+        startup_bridge_integrity(root, &executable, &node),
+        PluginComponentIntegrity::Verified
+    );
+    let path = root.join("hooks/infinishell-1.0.41.json");
+    fs::write(&path, b"{}").unwrap();
+    assert_eq!(
+        startup_bridge_integrity(root, &executable, &node),
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(fs::read(&path).unwrap(), b"{}");
+}
+
+#[test]
+fn integrity_report_grok_bridge_uses_bound_entry_and_version_without_metadata() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    install_fixture(root);
+    let executable = root.join("current-grok");
+    let node = root.join("node");
+    fs::write(root.join(".metadata_version"), "1.0.30").unwrap();
+    assert_eq!(
+        startup_bridge_integrity_for_runtime(root, &executable, "1.0.41", Some(&node)),
+        PluginComponentIntegrity::NeedsUpdate
+    );
+    install_startup_bridge(root, &executable, &node).unwrap();
+    assert_eq!(
+        startup_bridge_integrity_for_runtime(root, &executable, "1.0.41", Some(&node)),
+        PluginComponentIntegrity::Verified
+    );
+    assert_eq!(
+        startup_bridge_integrity_for_runtime(
+            root,
+            &root.join("different-grok"),
+            "1.0.41",
+            Some(&node)
+        ),
+        PluginComponentIntegrity::IntegrityMismatch
+    );
+    assert_eq!(
+        startup_bridge_integrity_for_runtime(root, &executable, "1.0.41", None),
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(
+        startup_bridge_integrity_for_runtime(root, &executable, "9.0.0", Some(&node)),
+        PluginComponentIntegrity::Unverified
+    );
+    assert_eq!(
+        fs::read_to_string(root.join(".metadata_version")).unwrap(),
+        "1.0.30"
+    );
+}
+
+#[test]
+fn integrity_report_grok_known_previous_tree_needs_update_without_migration() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path();
+    let installed = install_fixture(root);
+    let source = write_legacy_bundle(root);
+    for (relative, _) in BUNDLED_FILES {
+        fs::copy(source.join(relative), installed.join(relative)).unwrap();
+    }
+    let path = root.join("installed-plugins/registry.json");
+    let mut registry: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    registry["repos"]["source-one"]["kind"]["source_path"] = json!(source);
+    registry["repos"]["source-one"]["plugins"][PLUGIN_NAME]["version"] = json!("0.1.0");
+    fs::write(&path, serde_json::to_vec(&registry).unwrap()).unwrap();
+    let before = fs::read(&path).unwrap();
+    assert_eq!(
+        notification_integrity(root),
+        PluginComponentIntegrity::NeedsUpdate
+    );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    assert_eq!(
+        fs::read_to_string(installed.join("README.md")).unwrap(),
+        LEGACY_README
+    );
+}
+
+#[test]
 fn private_installer_source_scope_is_explicit_without_changing_native_defaults() {
     let mut manager = GrokPluginManager::new(None);
     assert_eq!(

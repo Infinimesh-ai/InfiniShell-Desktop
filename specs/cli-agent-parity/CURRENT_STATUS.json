@@ -7859,5 +7859,31 @@
         "boundary": "Mac工作区检查，含另行未提交的插件增量；不替代Windows原生结果"
       }
     ]
+  },
+  "g09_plugin_recheck_20261002": {
+    "status": "implemented_mac_recheck_and_bilingual_gui_passed_cross_platform_source_gate_pending",
+    "gap_closed": false,
+    "source_base": "04a874d7acb63d95ebfb3cff2ca86e19ec1953aa",
+    "source_diff_sha256": "fcddec5943660417ce915789ff599ac4600d8ea4ab50e07fe17e504897da5aa5",
+    "behavior": "检查及成功更新后只读复检通知/编排插件完整树；使用本次入口与版本，未完成复检前保留更新启动保护；插件问题独立于CLI更新结果，未知托管版本继续受限",
+    "mac_validation": "cargo check、i18n11项、定向484项及GUI构建通过；英中真实设置页验证缺失/禁用/完整性不符/未验证，私有插件文件未被复检改写；短TMPDIR和独立profile已归档清理",
+    "initial_failure": "首次484项为483过/1失败，旧Codex完整rev5缓存误报IntegrityMismatch；复用既有精确历史整树校验修正，篡改仍拒绝，保留原日志r-7m7w3ptb",
+    "localization": "新增通知及编排插件完整性英中消息，变量与7种分支同步；2560x1600实际布局无截断/重叠；窄窗拖动未生效，不计窄窗验收",
+    "audit_path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-plugin-recheck-audit-v1.safe.json",
+    "audit_sha256": "3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec",
+    "boundary": "GUI私有文件夹具验证真实只读复检，不是更新事务或原生通知/模型验收；G09其他Mac消费者条件及Windows生产链仍开放"
+  },
+  "g09_netcredentials_success_20261002": {
+    "source_commit": "04a874d7acb63d95ebfb3cff2ca86e19ec1953aa",
+    "run_id": 37008880591,
+    "conclusion": "success",
+    "gap_closed": false,
+    "scope": "非管理员有效成员资格但已提升、高完整性Session0服务身份，两段新LUID窗口站原生候选",
+    "evidence": "591普通PASS及1显式ignored候选PASS，无FAIL/LEAK/RETRY/FLAKY/TIMEOUT，37行warning保留；三份ZIP与六份原始binary已独立核验",
+    "identity_and_cleanup": "原创建句柄、创建时间、映像、同用户/Session及新AuthId、严格Job、预测站名恢复前不存在/第二段实际匹配/退出后消失、新LUID消失均通过",
+    "originals_index_sha256": "e8039d475e9a2e73cbaddd8a49d2fe265f90f74212d5cdda9cda355db88d6534",
+    "independent_audit_sha256": "615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774",
+    "remaining": "生产bootstrap/完整宿主接线、新站AppContainer SID DACL及低完整性授权、真实Node/npm双入口与全生命周期清理尚未完成；不外推普通非提升交互用户",
+    "localization": "无需本地化变更：该候选仅测试；插件用户功能本地化另列"
   }
 }

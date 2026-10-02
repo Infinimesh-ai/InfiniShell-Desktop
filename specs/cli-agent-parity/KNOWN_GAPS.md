@@ -257,6 +257,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 
 ### G09 — 包管理器安装的自动升级
 
+- **2026-10-02 插件复检实装与 Windows 原生前置通过，仍开放**：检查及成功更新后已接只读完整树复检，使用本次真实入口/版本，通知和编排插件结果分别显示，不改变未知托管版本门禁或回滚已提交的 CLI。Mac check、i18n11项、定向484项及英中实窗通过；私有夹具实际复检显示缺失、禁用、文件不符和未知版本未验证，文件未改写，审计 `3aa29a7f0c6bc80206eb1e024fc615ea81eb679ca18e4dd4093d49ce8fb19dec`。首次旧Codex树误判已按既有严格合同修复，原失败保留；更新后的Linux/Windows源码门禁待验。另 [04a874d7a Windows候选](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37008880591) 的新LUID两段站身份及退出回收已通过，独立审计 `615dbcad2d25f85eca3a1b7078d8d024ddc72844656dcb255af07cff40af8774`；尚未接生产AppContainer/Node/npm，不外推普通交互用户。真实消费者渠道、忙碌延期、合法降级、GUI更新和应用重启恢复等其余原条件不变。
+
 - **2026-10-02 完整条件复核，仍开放**：Mac 三款 npm 的既有固定后端正例不覆盖真实消费者渠道、实际忙碌延期、合法降级、GUI 更新、插件复检及应用重启恢复；跨 PID worker 冷恢复不能直接替代应用启动入口。Claude Homebrew 四场景采用人工登记和派生 cask 元数据，不证明真实 Homebrew 来源；Codex/Grok Homebrew 实际升级、回滚和冷恢复仍未见通过记录。降级拒绝和失败回滚均不能代替合法降级。11:59 UTC 只读取得 Claude 官方 Stable `2.1.285`、Latest `2.1.287`，超出当前 npm 升级 `2.1.280`／降级 `2.1.278` 审核合同；固定测试渠道不能冒充实时渠道。审查索引 `fe2aa3f9623d217e39956c5d8b4c9da1173a363496e876f6d401605dd10f9980`，公开渠道原件索引 `c4306be2c543776688c5e0f7bbaaea204834baea915415c571c6a80054932d6e`，详见验证报告。原关闭条件不变，不把 Windows 当作唯一剩余项。
 - **2026-10-02 窗口站候选前置核验修正，仍未执行两段链**：`596d439c1` 的 [Windows 37007022817](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37007022817) 已通过 helper 编译，唯一候选在 `EnumWindowStationsW` 前置检查返回失败（记录 hresult 0），未调用第一段创建，六份原生收据均不存在；调用者对象不变、精确 Job 清理确认。完整原件索引 `ee0526ea72a38c335b66af523b10be0199f4777193294258ea89598659f81b91`。官方枚举只覆盖有 WINSTA_ENUMERATE 权限的对象，本就不能证明任意目标站不存在。当前测试改为原挂起进程的新 AuthId 预测单一站名，恢复前仅接受该名字查询的 ERROR_FILE_NOT_FOUND，第二段实际对象名必须匹配，退出仍查同名及新 LUID；不把失败当空列表，不预设 AuthId 与 logon SID 恒等，不改变创建方式、权限或关闭条件。新源码原生结果待验，G09 不关闭。无需本地化变更。
 

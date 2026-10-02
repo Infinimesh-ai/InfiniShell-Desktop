@@ -1,4 +1,5 @@
 use super::*;
+use crate::terminal::cli_agent_sessions::plugin_manager::PluginComponentIntegrity;
 use warpui::App;
 
 #[cfg(feature = "local_fs")]
@@ -105,6 +106,7 @@ fn stale_check_cannot_release_current_operation() {
                     6,
                     CliAgentUpdateChannel::FollowInstallation,
                     Err(CliAgentUpdateError::Network),
+                    None,
                     ctx,
                 );
                 assert!(model.entries[&CLIAgent::Grok].active);
@@ -162,7 +164,7 @@ fn stale_verification_progress_cannot_replace_current_operation() {
 }
 
 #[test]
-fn successful_installation_keeps_unverified_managed_version_closed() {
+fn successful_installation_preserves_plugin_failure_without_opening_unverified_managed_version() {
     App::test((), |mut app| async move {
         app.add_singleton_model(CliAgentUpdatesModel::new);
         app.update(|ctx| {
@@ -174,7 +176,17 @@ fn successful_installation_keeps_unverified_managed_version_closed() {
                 entry.status.installed_version = Some("2.1.280".to_owned());
                 entry.status.latest_version = Some("2.1.267".to_owned());
 
-                model.updated(CLIAgent::Claude, 7, Ok("2.1.267".to_owned()), ctx);
+                let plugins = PluginIntegrityReport {
+                    notification: PluginComponentIntegrity::IntegrityMismatch,
+                    platform: PluginComponentIntegrity::Unverified,
+                };
+                model.updated(
+                    CLIAgent::Claude,
+                    7,
+                    Ok("2.1.267".to_owned()),
+                    Some(plugins),
+                    ctx,
+                );
 
                 let entry = &model.entries[&CLIAgent::Claude];
                 assert!(!entry.active);
@@ -182,6 +194,7 @@ fn successful_installation_keeps_unverified_managed_version_closed() {
                 assert_eq!(entry.status.installed_version.as_deref(), Some("2.1.267"));
                 assert!(entry.status.error.is_none());
                 assert!(entry.failed_target.is_none());
+                assert_eq!(entry.status.plugins, Some(plugins));
                 assert!(!crate::ai::cli_agent_runtime::claude::supported_version(
                     "2.1.267"
                 ));
@@ -202,11 +215,16 @@ fn failed_version_probe_never_becomes_up_to_date() {
                 entry.status.phase = CliAgentUpdatePhase::Verifying;
                 entry.status.installed_version = Some("2.1.267".to_owned());
                 entry.status.latest_version = Some("2.1.278".to_owned());
+                entry.status.plugins = Some(PluginIntegrityReport {
+                    notification: PluginComponentIntegrity::Verified,
+                    platform: PluginComponentIntegrity::Verified,
+                });
 
                 model.updated(
                     CLIAgent::Claude,
                     7,
                     Err(CliAgentUpdateError::ProbeFailed),
+                    None,
                     ctx,
                 );
 
@@ -216,6 +234,83 @@ fn failed_version_probe_never_becomes_up_to_date() {
                 assert_eq!(entry.status.installed_version.as_deref(), Some("2.1.267"));
                 assert_eq!(entry.status.error, Some(CliAgentUpdateError::ProbeFailed));
                 assert_eq!(entry.failed_target.as_deref(), Some("2.1.278"));
+                assert!(entry.status.plugins.is_none());
+            });
+        });
+    });
+}
+
+#[test]
+fn stale_update_cannot_publish_plugin_integrity_for_a_new_operation() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Grok).unwrap();
+                entry.operation = 8;
+                entry.active = true;
+                entry.status.phase = CliAgentUpdatePhase::Verifying;
+                entry.status.installed_version = Some("1.0.40".to_owned());
+                model.updated(
+                    CLIAgent::Grok,
+                    7,
+                    Ok("1.0.41".to_owned()),
+                    Some(PluginIntegrityReport {
+                        notification: PluginComponentIntegrity::Verified,
+                        platform: PluginComponentIntegrity::NotRequired,
+                    }),
+                    ctx,
+                );
+                let entry = &model.entries[&CLIAgent::Grok];
+                assert!(entry.active);
+                assert_eq!(entry.status.phase, CliAgentUpdatePhase::Verifying);
+                assert_eq!(entry.status.installed_version.as_deref(), Some("1.0.40"));
+                assert!(entry.status.plugins.is_none());
+                assert!(model.is_updating(CLIAgent::Grok));
+            });
+        });
+    });
+}
+
+#[test]
+fn accepted_inspection_clears_recovery_guard_and_records_disabled_plugin() {
+    App::test((), |mut app| async move {
+        app.add_singleton_model(CliAgentUpdatesModel::new);
+        app.update(|ctx| {
+            CliAgentUpdatesModel::handle(ctx).update(ctx, |model, ctx| {
+                let entry = model.entries.get_mut(&CLIAgent::Grok).unwrap();
+                entry.operation = 8;
+                entry.active = true;
+                entry.recovery_required = true;
+                let plugins = PluginIntegrityReport {
+                    notification: PluginComponentIntegrity::Disabled,
+                    platform: PluginComponentIntegrity::NotRequired,
+                };
+                model.checked(
+                    CLIAgent::Grok,
+                    8,
+                    CliAgentUpdateChannel::FollowInstallation,
+                    Ok(sources::CheckReport {
+                        failed_target: None,
+                        installed_version: "1.0.41".to_owned(),
+                        latest_version: "1.0.41".to_owned(),
+                        source: CliAgentUpdateSource::Npm,
+                        effective_channel: CliAgentUpdateChannel::Stable,
+                        up_to_date: true,
+                        error: None,
+                        plan: None,
+                    }),
+                    Some(plugins),
+                    ctx,
+                );
+                let entry = &model.entries[&CLIAgent::Grok];
+                assert_eq!(entry.status.phase, CliAgentUpdatePhase::UpToDate);
+                assert_eq!(entry.status.plugins, Some(plugins));
+                assert_eq!(entry.status.installed_version.as_deref(), Some("1.0.41"));
+                assert!(!entry.recovery_required);
+                assert!(!entry.active);
+                assert!(entry.plan.is_none());
+                assert!(!model.is_updating(CLIAgent::Grok));
             });
         });
     });
@@ -237,6 +332,7 @@ fn unresolved_recovery_keeps_launch_guard_after_failed_read_only_recheck() {
                     1,
                     CliAgentUpdateChannel::FollowInstallation,
                     Err(CliAgentUpdateError::Network),
+                    None,
                     ctx,
                 );
                 assert!(model.is_updating(CLIAgent::Grok));
@@ -308,6 +404,7 @@ fn installation_rescan_discards_old_check_before_it_can_produce_a_plan() {
                     4,
                     CliAgentUpdateChannel::FollowInstallation,
                     Ok(report),
+                    None,
                     ctx,
                 );
                 assert!(model.entries[&CLIAgent::Claude].plan.is_none());
@@ -346,6 +443,7 @@ fn isolation_unavailable_check_removes_the_previous_plan_and_blocks_dispatch() {
                         error: Some(CliAgentUpdateError::IsolationUnavailable),
                         plan: None,
                     }),
+                    None,
                     ctx,
                 );
                 let entry = &model.entries[&CLIAgent::Codex];
@@ -386,6 +484,7 @@ fn channel_mismatch_is_never_rendered_as_success_even_if_versions_match() {
                     0,
                     CliAgentUpdateChannel::FollowInstallation,
                     Ok(report),
+                    None,
                     ctx,
                 );
                 assert_eq!(
@@ -422,6 +521,7 @@ fn native_channel_sync_at_same_version_waits_for_idle_and_obeys_auto_toggle() {
                     0,
                     CliAgentUpdateChannel::Latest,
                     Ok(report),
+                    None,
                     ctx,
                 );
                 let entry = &model.entries[&CLIAgent::Claude];

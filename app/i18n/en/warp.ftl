@@ -6055,7 +6055,27 @@ settings-cli-updates-current = This installation matches the selected channel.
 settings-cli-updates-available = Updates are available for the selected channel.
 settings-cli-updates-waiting = Waiting for this CLI’s sessions and tasks to close.
 settings-cli-updates-updating = Updating this CLI…
-settings-cli-updates-verifying = Verifying the installation and channel…
+settings-cli-updates-verifying = Verifying the installation, channel, and plugin files…
+settings-cli-updates-notification-integrity =
+    { $state ->
+        [verified] Notification plugin files verified. Notifications still need verification in a new CLI session.
+        [not-required] This CLI does not require a notification plugin.
+        [missing] Notification plugin missing. Set it up in the CLI session.
+        [disabled] Notification plugin disabled. Enable it explicitly to restore notifications.
+        [needs-update] Notification plugin needs an update. Manage it in the CLI session.
+        [integrity-mismatch] Notification plugin files do not match the verified version. Repair the plugin in the CLI session.
+       *[unverified] Notification plugin file integrity has not been verified.
+    }
+settings-cli-updates-platform-integrity =
+    { $state ->
+        [verified] Orchestration plugin files verified. Managed CLI compatibility is checked separately.
+        [not-required] This CLI does not require an orchestration plugin.
+        [missing] Orchestration plugin missing. Set it up in the CLI session.
+        [disabled] Orchestration plugin disabled. Enable it explicitly to use its features.
+        [needs-update] Orchestration plugin needs an update. Manage it in the CLI session.
+        [integrity-mismatch] Orchestration plugin files do not match the verified version. Repair the plugin in the CLI session.
+       *[unverified] Orchestration plugin file integrity has not been verified.
+    }
 settings-cli-updates-failed = The update did not complete.
 settings-cli-updates-manual = Automatic updates are unavailable for this CLI.
 settings-cli-updates-not-installed = This CLI is not installed. Open the installation guide to get started.

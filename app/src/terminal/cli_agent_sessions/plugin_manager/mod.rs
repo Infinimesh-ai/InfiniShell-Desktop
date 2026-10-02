@@ -10,7 +10,7 @@ pub(crate) mod opencode;
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fmt, io};
 
 use async_trait::async_trait;
@@ -41,6 +41,34 @@ pub(crate) enum NativeAuthorizationStatus {
     /// 仅说明本机配置匹配，不能替代当前原生会话发出的通知。
     Configured,
     Unknown,
+}
+
+/// 仅描述磁盘上的插件完整性，不证明原生通知、授权或托管协议兼容。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PluginComponentIntegrity {
+    Verified,
+    NotRequired,
+    Missing,
+    Disabled,
+    NeedsUpdate,
+    IntegrityMismatch,
+    Unverified,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PluginIntegrityReport {
+    pub notification: PluginComponentIntegrity,
+    pub platform: PluginComponentIntegrity,
+}
+
+fn integrity_version(version: &str) -> Option<[u64; 3]> {
+    version
+        .split('.')
+        .map(str::parse::<u64>)
+        .collect::<Result<Vec<_>, _>>()
+        .ok()?
+        .try_into()
+        .ok()
 }
 
 /// A single step in the plugin install/update instructions pane.
@@ -160,6 +188,14 @@ pub(crate) async fn run_cli_command_logged(
 /// check installation state and perform install/update operations.
 #[async_trait]
 pub(crate) trait CliAgentPluginManager: Send + Sync {
+    /// 不运行 CLI、不写配置、不复用界面缓存；未实现的管理器不能默认通过。
+    fn integrity_report(&self) -> PluginIntegrityReport {
+        PluginIntegrityReport {
+            notification: PluginComponentIntegrity::Unverified,
+            platform: PluginComponentIntegrity::Unverified,
+        }
+    }
+
     /// The minimum plugin version required by this Zap build.
     fn minimum_plugin_version(&self) -> &'static str;
 
@@ -276,6 +312,22 @@ pub(crate) trait CliAgentPluginManager: Send + Sync {
 pub(crate) fn plugin_manager_for(agent: CLIAgent) -> Option<Box<dyn CliAgentPluginManager>> {
     plugin_manager_for_with_shell(agent, None, None, None)
 }
+
+/// 入口和版本由本次安装检查提供；文件通过不代表新 CLI 已发出原生通知。
+pub(crate) fn inspect_plugin_integrity(
+    agent: CLIAgent,
+    executable: &Path,
+    version: &str,
+) -> Option<PluginIntegrityReport> {
+    let mut report = plugin_manager_for(agent)?.integrity_report();
+    if let CLIAgent::Grok = agent
+        && report.notification == PluginComponentIntegrity::Verified
+    {
+        report.notification = grok::inspect_startup_bridge(executable, version);
+    }
+    Some(report)
+}
+
 /// Returns a plugin manager for the given CLI agent, or `None` if the agent
 /// doesn't have Zap notification plugin support.
 ///

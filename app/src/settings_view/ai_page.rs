@@ -96,6 +96,8 @@ use crate::settings::{CLIAgentUpdateChannels, CLIUpdateChannel};
 use crate::terminal::CLIAgent;
 use crate::terminal::cli_agent::{CLIAgentInstallEvent, CLIAgentInstallModel};
 #[cfg(not(target_family = "wasm"))]
+use crate::terminal::cli_agent_sessions::plugin_manager::PluginComponentIntegrity;
+#[cfg(not(target_family = "wasm"))]
 use crate::terminal::cli_agent_updates::{
     CliAgentUpdateChannel, CliAgentUpdateError, CliAgentUpdatePhase, CliAgentUpdateSource,
     CliAgentUpdatesModel,
@@ -8925,13 +8927,13 @@ impl SettingsWidget for CLIAgentUpdateWidget {
     fn search_terms(&self) -> &str {
         match self.agent {
             CLIAgent::Codex => {
-                "third party cli agent codex automatic update version upgrade channel latest alpha 自动 升级 更新 版本 渠道"
+                "third party cli agent codex automatic update version upgrade channel latest alpha plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
             }
             CLIAgent::Claude => {
-                "third party cli agent claude automatic update version upgrade channel latest stable 自动 升级 更新 版本 渠道"
+                "third party cli agent claude automatic update version upgrade channel latest stable plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
             }
             CLIAgent::Grok => {
-                "third party cli agent grok automatic update version upgrade channel stable alpha 自动 升级 更新 版本 渠道"
+                "third party cli agent grok automatic update version upgrade channel stable alpha plugin integrity 自动 升级 更新 版本 渠道 插件 完整性"
             }
             _ => "third party cli update",
         }
@@ -9025,6 +9027,24 @@ impl SettingsWidget for CLIAgentUpdateWidget {
             cli_agent_update_phase_label(&status.phase),
             app,
         ));
+        if let Some(plugins) = status.plugins {
+            column.add_child(render_ai_status_text(
+                crate::t!(
+                    "settings-cli-updates-notification-integrity",
+                    state = cli_agent_plugin_integrity_key(plugins.notification),
+                ),
+                app,
+            ));
+            if plugins.platform != PluginComponentIntegrity::NotRequired {
+                column.add_child(render_ai_status_text(
+                    crate::t!(
+                        "settings-cli-updates-platform-integrity",
+                        state = cli_agent_plugin_integrity_key(plugins.platform),
+                    ),
+                    app,
+                ));
+            }
+        }
         if let Some(error) = &status.error {
             column.add_child(render_ai_status_text(
                 cli_agent_update_error_label(error),
@@ -9095,6 +9115,19 @@ impl SettingsWidget for CLIAgentUpdateWidget {
                 .finish(),
         );
         column.finish()
+    }
+}
+
+#[cfg(not(target_family = "wasm"))]
+fn cli_agent_plugin_integrity_key(integrity: PluginComponentIntegrity) -> &'static str {
+    match integrity {
+        PluginComponentIntegrity::Verified => "verified",
+        PluginComponentIntegrity::NotRequired => "not-required",
+        PluginComponentIntegrity::Missing => "missing",
+        PluginComponentIntegrity::Disabled => "disabled",
+        PluginComponentIntegrity::NeedsUpdate => "needs-update",
+        PluginComponentIntegrity::IntegrityMismatch => "integrity-mismatch",
+        PluginComponentIntegrity::Unverified => "unverified",
     }
 }
 

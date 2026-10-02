@@ -579,6 +579,10 @@ pub(super) struct UpdatePlan {
 }
 
 impl UpdatePlan {
+    pub(super) fn installation_entry(&self) -> &Path {
+        &self.installation.entry
+    }
+
     pub(super) fn requires_native_update(&self) -> bool {
         self.installed_version != self.target_version
     }
