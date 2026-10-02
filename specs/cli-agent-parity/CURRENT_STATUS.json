@@ -7825,5 +7825,39 @@
       "cleanup": "cleaned",
       "boundary": "Mac Rust检查不编译MSVC C helper；其修复仍待精确提交Windows门禁"
     }
+  },
+  "g09_netcredentials_station_precondition_20261002": {
+    "source_commit": "596d439c13bb00f1b25a0945f24d9b995cfd5360",
+    "run_id": 37007022817,
+    "conclusion": "failure",
+    "helper_build": "passed",
+    "failure_stage": "enumerate_station_names",
+    "reported_hresult": 0,
+    "first_helper_created": false,
+    "raw_receipts_present": 0,
+    "caller_objects_unchanged": true,
+    "job_cleanup_confirmed": true,
+    "originals_index_sha256": "ee0526ea72a38c335b66af523b10be0199f4777193294258ea89598659f81b91",
+    "fix": "使用新AuthId作待验证站名预测；恢复前仅精确ERROR_FILE_NOT_FOUND，第二段实际名必须匹配，退出仍查同名；不预设AuthId恒等logonSID",
+    "native_result_for_fix": "pending",
+    "gap_closed": false,
+    "localization": "无需本地化变更",
+    "local_checks": [
+      {
+        "run": "r-93ijj0vs",
+        "command": "cargo check --offline --locked -p command --tests --target x86_64-pc-windows-msvc",
+        "result": "passed",
+        "log_sha256": "f552faf451993ce65a58f864ee43407dfa82f59dfcf4b302fe6aa87e87dbfe51",
+        "temporary_directory": "cleaned"
+      },
+      {
+        "run": "r-cjuxs_jb",
+        "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
+        "result": "passed",
+        "log_sha256": "2b84ae77fe1b0127a7eef29dd24292a7470a69c6718d813d3d66ca830ec18d27",
+        "temporary_directory": "cleaned",
+        "boundary": "Mac工作区检查，含另行未提交的插件增量；不替代Windows原生结果"
+      }
+    ]
   }
 }

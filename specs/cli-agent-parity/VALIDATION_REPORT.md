@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：G09 窗口站候选的精确不存在证明，待原生执行
+
+新增关闭 0 项。`596d439c13bb00f1b25a0945f24d9b995cfd5360` 的 [Windows 37007022817](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37007022817) 已修复 MSVC 编译，但测试在全局窗口站枚举的前置检查停止：返回失败并记录 hresult 0，没有 `first_created` 或任何六份原生收据，不能称 CreateProcessWithLogonW 失败。调用者对象不变，精确 Job 已空且关闭确认。完整日志及三份官方工件均保留于 `g08-build-preparation/596d439c1-ci`，索引 `ee0526ea72a38c335b66af523b10be0199f4777193294258ea89598659f81b91`。
+
+[Microsoft 枚举合同](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumwindowstationsa)只覆盖拥有 WINSTA_ENUMERATE 权限的站，因此旧列表不能提供全局不存在证明，也不据这次 hresult 0 推断唯一失败原因。新测试在第一段原创建句柄、映像、同会话和精确 Job 已核后、Resume 前，依据新 AuthenticationId 预测 `Service-0x高-低$`；对单一名字的 OpenWindowStationW 只接受 ERROR_FILE_NOT_FOUND。第二段实际名字必须匹配这一预测，退出查询必须仍使用同名。[官方创建说明](https://learn.microsoft.com/en-us/windows/win32/winstation/window-station-and-desktop-creation)的 logon session／logon SID 术语不被视作二者恒等保证；预测不匹配仍失败，不回退旧站或修改 ACL。第一段新 LUID、双有效非管理员、原句柄、挂起身份、非继承／不可见和有界清理条件全部保留。
+
+此次只修测试证明方式；并非生产能力已修或完整 G09 通过。此前两轮原件、失败及 Mac 消费者待验条件不变；新源码尚无目标平台原生结果。无需本地化变更。
+
 ## 2026-10-02：G09 完整条件复核与新窗口站候选，未关闭
 
 **本轮新增关闭 0 项，仍为 9 关闭／2 开放／3 移交，PR #22 保持草稿。G09 不只差 Windows。** 按原关闭条件复核，Mac 三款 npm 的固定后端事务不能替代真实来源／渠道、实际忙碌延期、合法降级、GUI 更新及插件复检、应用重启后的恢复入口。Claude npm 历史五场景包括降级拒绝，不能计为合法降级；本轮未找到其旧 Documents 索引位置，不宣称重新核验原件通过。Codex npm run-03／04、Grok npm 私有 APFS run-03 的历史范围保留，不改为同一当前提交整体验收。

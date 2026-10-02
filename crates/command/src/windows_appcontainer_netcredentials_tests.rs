@@ -14,8 +14,8 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use windows::Win32::Foundation::{
-    CloseHandle, ERROR_FILE_NOT_FOUND, ERROR_NO_TOKEN, FILETIME, HANDLE, LPARAM, LUID,
-    WAIT_OBJECT_0, WAIT_TIMEOUT,
+    CloseHandle, ERROR_FILE_NOT_FOUND, ERROR_NO_TOKEN, FILETIME, HANDLE, LUID, WAIT_OBJECT_0,
+    WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authentication::Identity::{
     LsaFreeReturnBuffer, LsaGetLogonSessionData,
@@ -41,8 +41,8 @@ use windows::Win32::System::JobObjects::{
     QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::StationsAndDesktops::{
-    CloseWindowStation, EnumWindowStationsW, GetProcessWindowStation, GetThreadDesktop,
-    GetUserObjectInformationW, OpenWindowStationW, UOI_FLAGS, UOI_NAME, USEROBJECTFLAGS,
+    CloseWindowStation, GetProcessWindowStation, GetThreadDesktop, GetUserObjectInformationW,
+    OpenWindowStationW, UOI_FLAGS, UOI_NAME, USEROBJECTFLAGS,
 };
 use windows::Win32::System::Threading::{
     CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessWithLogonW,
@@ -792,46 +792,6 @@ impl Drop for Tree {
     }
 }
 
-struct Stations {
-    names: Vec<String>,
-    invalid: bool,
-}
-
-unsafe extern "system" fn station_callback(name: PCWSTR, data: LPARAM) -> BOOL {
-    let output = unsafe { &mut *(data.0 as *mut Stations) };
-    let mut units = Vec::new();
-    for index in 0..256 {
-        let unit = unsafe { *name.0.add(index) };
-        if unit == 0 {
-            if let Ok(name) = String::from_utf16(&units) {
-                if output.names.len() < 256 {
-                    output.names.push(name);
-                    return true.into();
-                }
-            }
-            break;
-        }
-        units.push(unit);
-    }
-    output.invalid = true;
-    false.into()
-}
-
-fn station_names() -> Result<Vec<String>> {
-    let mut result = Stations {
-        names: Vec::new(),
-        invalid: false,
-    };
-    api("enumerate_station_names", unsafe {
-        EnumWindowStationsW(
-            Some(station_callback),
-            LPARAM((&mut result as *mut Stations) as isize),
-        )
-    })?;
-    require(!result.invalid, "station_names_bound")?;
-    Ok(result.names)
-}
-
 fn logon_observation(process: &Process) -> Value {
     let luid = LUID {
         LowPart: process.auth_low,
@@ -853,7 +813,7 @@ fn logon_observation(process: &Process) -> Value {
     json!({"data":observation,"free_status":freed.0 as u32,"gone":false})
 }
 
-fn station_after_exit(name: &str) -> Value {
+fn station_observation(name: &str) -> Value {
     let encoded: Vec<_> = name.encode_utf16().chain(Some(0)).collect();
     match unsafe { OpenWindowStationW(PCWSTR(encoded.as_ptr()), false, READ_CONTROL.0 | 2) } {
         Ok(handle) => {
@@ -966,8 +926,6 @@ fn execute() -> Result<Value> {
         report["caller_station"] = original.0.json()?;
         report["caller_desktop"] = original.1.json()?;
         parent_objects = Some(original.clone());
-        let old_stations = station_names()?;
-        report["station_names_before_count"] = json!(old_stations.len());
         let program = wide(helper.as_os_str())?;
         require(
             !program.contains(&(b'"' as u16)) && program.len() < 900,
@@ -1042,6 +1000,25 @@ fn execute() -> Result<Value> {
         tree.member(first)?;
         report["first_exact_job_before_resume"] = json!(true);
         report["new_logon_observation"] = logon_observation(&first_snapshot);
+        report["new_authentication_id"] = json!(!first_snapshot.same_logon(&caller));
+        require(
+            !first_snapshot.same_logon(&caller),
+            "first_new_authentication_id",
+        )?;
+        // 这是按 AuthenticationId 作出的站名预测，不假定它总等于 token 的 logon SID。
+        // 恢复前仅接受该名字确实不存在；第二段必须以实际对象名验证，不回退其他名字。
+        let auth_high = first_snapshot.auth_high;
+        let auth_low = first_snapshot.auth_low;
+        let expected_station = format!("Service-0x{auth_high:x}-{auth_low:x}$");
+        candidate_station = Some(expected_station.clone());
+        report["station_name_prediction"] = json!(expected_station);
+        report["station_before_resume"] = station_observation(&expected_station);
+        let station_absent_before = report["station_before_resume"]["gone"] == true;
+        report["station_absent_before"] = json!(station_absent_before);
+        require(
+            station_absent_before,
+            "predicted_station_absent_before_resume",
+        )?;
         require(
             process_snapshot(first)? == first_snapshot,
             "first_before_resume",
@@ -1113,7 +1090,6 @@ fn execute() -> Result<Value> {
         report["first_desktop"] = a.2.json()?;
         report["second_station"] = b.1.json()?;
         report["second_desktop"] = b.2.json()?;
-        candidate_station = Some(b.1.name.clone());
         require(
             a.0 == first_snapshot && b.0 == candidate,
             "self_and_original_handle_identity",
@@ -1128,15 +1104,13 @@ fn execute() -> Result<Value> {
             same_object(&a.1, &original.0) && same_object(&a.2, &original.1),
             "first_inherited_objects",
         )?;
-        let new_station = !old_stations
-            .iter()
-            .any(|name| name.eq_ignore_ascii_case(&b.1.name));
-        report["station_absent_before"] = json!(new_station);
-        report["new_authentication_id"] = json!(!first_snapshot.same_logon(&caller));
+        let station_name_matches = b.1.name.eq_ignore_ascii_case(&expected_station);
+        report["station_name_prediction_matched"] = json!(station_name_matches);
         report["noninteractive_noninheritable"] =
             json!(b.1.flags & 1 == 0 && b.1.inherit == 0 && b.2.inherit == 0);
         require(
-            new_station
+            station_absent_before
+                && station_name_matches
                 && !first_snapshot.same_logon(&caller)
                 && !b.1.name.eq_ignore_ascii_case(&a.1.name)
                 && b.1.flags & 1 == 0
@@ -1161,7 +1135,7 @@ fn execute() -> Result<Value> {
             let logon = logon_observation(&identity);
             let station = candidate_station
                 .as_ref()
-                .map(|name| station_after_exit(name));
+                .map(|name| station_observation(name));
             let finished = logon["gone"] == true
                 && station.as_ref().is_some_and(|value| value["gone"] == true);
             report["logon_after_exit"] = logon;
