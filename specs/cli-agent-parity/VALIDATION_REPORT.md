@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-02：命令审批提示字段修复，G10 剩余真实验收待完成
+
+生产命令审批写入 `reviewedProjectCommand`，任务面板此前检查不存在的 `appCommandContext`，导致既有专用提示未显示。本轮只修正该字段判断。英文与简体中文 `cli-task-manager-reviewed-command-approval` 已逐句复核：均说明精确程序、参数、目录、超时、单次允许及清理后重新审批，没有变量差异；无需本地化文案变更。新构建的两语言真实布局尚待验，不以源码检查替代实窗。
+
+另集成两条按需运行、默认忽略的真实验收驱动：Grok CommandsSkills 父子链包含唯一原生文件搜索、技能、命令拒绝后独立允许及越界子技能拒绝；Claude 子任务包含唯一原生搜索与真实 Node 父子进程运行取消。两驱动 no-run 类型编译、i18n 11 项、任务面板 46 项及 `cargo check -p warp` 均通过，短目录全部清理；提交前精确增量收据 SHA-256 `35888c794f4eaed296803a8164a979d5f23560603224db2ff1e05f31f843883d`。真实模型与 GUI 尚未执行，不计通过。当前新增关闭 0 项，G03/G09/G10 继续开放，PR 保持草稿。
+
+## 2026-10-02：G10 已完成父任务实际接收子命令结果
+
+本轮新增关闭 0 项，仍为 8 关闭／3 开放／3 移交。`r-1cem30qq` 使用同 `f3cbb6093` 提交新构建并独立签名的 libtest／worker，摘要分别为 `20343d6b3596c127a25d22498f3e8bcded8f641a308338d209669ca5689f3d30`／`e3dbb7e1be4aaccae0d77db4843be37169196233e7f0726d25aa49d355ee7ef8`，不存在旧 worker 等价替代。只读核对本轮两精确原生 SID，实际模型均为 `claude-opus-5-5`、CLI `2.1.280`。宿主三次命令决定为 DenyOnce／AllowOnce／AllowOnce，拒绝代没有派生记录；A、B 两命令实际退出 0 且 macOS resource coalition 清理确认，A 清理先于 B 审批。
+
+父第 1 代 `PARENT_QUEUED` 后，同 SID/runtime 第 2 代接收唯一自动结果并输出 `G10_COMMAND_PARENT_COLLECTED` 及 A/B 实际标记。父 2 输入、子 1 输入的原生 UUID／正文分别与两个 user_input 和一个 local_task_result 持久消息匹配，均 NativeProtocol ACK；自动结果保留原 recipient_generation=1，无重投。两宿主及两原生退出收据逐份匹配，原生均 stdio_closed／exit 0。独立审计 `139342271058682a9849f5d845baff24eb7334a7f3f1a3b6b53625e098af1967`，助手 `ebdf20d0f6476ab02ce01ac9c86aab511e699a10ed969c5869752e909d556a25`。
+
+libtest exit 0；外层原 exit 1 与收据 `442fa5e3a41afbf25e748aad5b752dada13809e4e562094f8b941010b797ce9f` 不改写。失败来自外层假设恰好两次 SessionReady，实际父／子／父三次中父两次五项身份字段完全相同，各自属于独立已完成回合。新离线判据要求恰好两个身份组、重复字段全等和逐轮 start→Ready→completed；四种身份漂移及同轮重复 Ready 均拒绝。原 46 事件没有过滤或重放，其余所有原 audit 断言通过；修正助手 `ceee9141c2d8ee93a84e9dc10c2d660691fdb5513e66e3f45c124dc44b23164b`，差异 `509f3464275c4b7f8f67961bdbb63e82b4d64b1bed6f89493efdd26acdad448d`。
+
+外层观察已知进程为零、打开文件为零；唯一现场与历史仍保留，cleanup_ready=false。该轮未覆盖 GUI、冷恢复、运行追加/取消或 Grok，也不自行新增每命令族与多子排列为关闭条件。既有其他真实链按原构建独立复用；G10 剩余原条件与最终源码门禁仍须完成，PR 保持草稿。本轮仅验收记录变化，无需本地化变更。
+
 ## 2026-10-02：Grok 源码包绑定修正，原生门禁仍待重验
 
 新增关闭 0 项，仍为 8 关闭／3 开放／3 移交，PR 保持草稿。精确 `f3cbb6093038dde43393b8f5cce77b477b93ec10` 的 [CI 36940578820](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/36940578820) 已终态失败：两平台 `load_source` 读取的 `cross_platform_build` 仍为旧 `8644` 三身份字段，与已更新的 `92b` 补丁不符，原生 Cargo 尚未执行；Windows 上传失败是工件目录未建立的后果。Linux 同名 artifact 只有临时目录收据，不含原生构建日志或二进制，不能据上传成功计原生通过。

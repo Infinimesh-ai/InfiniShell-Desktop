@@ -1763,7 +1763,7 @@ impl View for LocalCLITaskManagerView {
         let snapshot = self.selected_snapshot(ctx);
         if let Some(snapshot) = &snapshot {
             for approval in &snapshot.approvals {
-                if approval.details.get("appCommandContext").is_some() {
+                if approval.details.get("reviewedProjectCommand").is_some() {
                     body.add_child(self.text(
                         crate::t!("cli-task-manager-reviewed-command-approval"),
                         appearance,

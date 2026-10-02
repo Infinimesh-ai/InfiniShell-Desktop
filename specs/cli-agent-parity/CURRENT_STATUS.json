@@ -7297,5 +7297,58 @@
     },
     "localization": "无需本地化变更：仅来源元数据和验收测试变化。",
     "gap_closed": false
+  },
+  "g10_reviewed_commands_real_acceptance_20261002": {
+    "status": "minimal_real_chain_and_independent_offline_audit_passed_gap_open",
+    "source_commit": "f3cbb6093038dde43393b8f5cce77b477b93ec10",
+    "run_id": "r-1cem30qq",
+    "cli_version": "2.1.280",
+    "actual_model": "claude-opus-5-5",
+    "actual_model_verified": true,
+    "native_tasks": 2,
+    "parent_logical_generations": [
+      1,
+      2
+    ],
+    "host_command_decisions": [
+      "DenyOnce",
+      "AllowOnce",
+      "AllowOnce"
+    ],
+    "command_executions": 2,
+    "native_mailbox_acks": 3,
+    "automatic_result_ack_original_generation": 1,
+    "native_input_replay": false,
+    "libtest_exit_code": 0,
+    "original_outer_exit_code": 1,
+    "original_outer_failure": "two_ready：把同父SID/runtime的新回合Ready误算为新会话",
+    "posthoc_offline_audit": "同一原始46事件，按五身份字段两组和每轮Ready关系校验；其他原断言全部保留，四种身份漂移及单轮重复Ready负例均拒绝。",
+    "evidence_sha256": "139342271058682a9849f5d845baff24eb7334a7f3f1a3b6b53625e098af1967",
+    "signed_test_sha256": "20343d6b3596c127a25d22498f3e8bcded8f641a308338d209669ca5689f3d30",
+    "signed_worker_sha256": "e3dbb7e1be4aaccae0d77db4843be37169196233e7f0726d25aa49d355ee7ef8",
+    "native_and_command_cleanup_confirmed": true,
+    "unique_originals_retained": true,
+    "cleanup_ready": false,
+    "boundary": "该单子命令链不覆盖GUI、冷恢复、运行追加/取消或Grok；已有其他正例按原构建复用，不要求每策略和命令族全排列。",
+    "gap_closed": false
+  },
+  "g10_reviewed_command_hint_20261002": {
+    "status": "local_gates_passed_pending_real_gui_and_final_cross_platform_gates",
+    "change": "任务面板按生产 reviewedProjectCommand 字段显示既有受审命令提示；原 appCommandContext 从未由该生产链提供。",
+    "localization": "复核 cli-task-manager-reviewed-command-approval 英文和简体中文的程序、参数、目录、超时、单次审批及清理语义，无变量差异，无需本地化文案变更；新构建双语真实布局待验。",
+    "new_live_drivers": [
+      "g10_grok_commands_skills_live_tests.rs",
+      "g10_command_cancel_live_tests.rs"
+    ],
+    "live_execution": "pending",
+    "gap_closed": false,
+    "local_gates": {
+      "receipt_sha256": "35888c794f4eaed296803a8164a979d5f23560603224db2ff1e05f31f843883d",
+      "cargo_check": "passed",
+      "compiled_live_drivers": "passed_no_run",
+      "i18n": 11,
+      "task_manager": 46,
+      "temporary_directories": "all_cleaned"
+    }
   }
 }
