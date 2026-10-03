@@ -6,10 +6,13 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+import installed_grok_hook_tests as detached
 from run_installed_grok_hook import DIAGNOSTIC_LIMIT, hook_failure, verify_installed_hook, worker_diagnostics
 
 
@@ -131,6 +134,91 @@ class WorkerDiagnosticTests(unittest.TestCase):
             for descriptor in observed.values():
                 with self.assertRaises(OSError):
                     os.fstat(descriptor)
+
+
+@unittest.skipUnless(os.name == "posix", "脱离控制终端的 helper 仅适用于 Unix")
+class DetachedWorkerDiagnosticTests(unittest.TestCase):
+    def setUp(self):
+        # 只调用原测试驱动并替换派生边界，不执行 Node、worker 或创建 PTY。
+        temporary = tempfile.TemporaryDirectory(prefix="detached-diagnostic-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.case = detached.DetachedGrokHookTests()
+        self.case.root = self.root
+        self.case.node = self.root / "node"
+        self.case.worker = self.root / "worker"
+        self.case.hook = self.root / "notify.cjs"
+        self.case.env = {"HOME": str(self.root), "PATH": "/usr/bin:/bin", "TMPDIR": str(self.root)}
+        self.case.payload = b"synthetic-no-execution"
+        self.case.terminals = [(123, 124, "/dev/pts/isolated")]
+        self.case.hook_diagnostics = []
+
+    def test_detached_deadline_retains_protocol_failure_without_retry_or_raw_text(self):
+        before = dict(self.case.env)
+        descriptors = []
+        calls = [encode(row("preload"), row("protocol", elapsed_ms=500, signal="SIGKILL",
+                                           error_code="ETIMEDOUT")),
+                 encode(row("preload", private="private-sentinel"))]
+
+        def observe_call(argv, **options):
+            self.assertEqual(argv[0], str(self.case.node))
+            self.assertEqual(argv[1], "--require")
+            self.assertEqual(argv[3], "-e")
+            self.assertIn("ENXIO", argv[4])
+            self.assertEqual(argv[5], str(self.case.hook))
+            self.assertEqual(options["env"], {**before, "SSH_TTY": "/dev/pts/isolated"})
+            self.assertEqual(options["timeout"], 8)
+            self.assertTrue(options["start_new_session"])
+            self.assertTrue(options["check"])
+            self.assertTrue(options["capture_output"])
+            self.assertEqual(options["input"], self.case.payload)
+            descriptor, = options["pass_fds"]
+            self.assertTrue(stat.S_ISREG(os.fstat(descriptor).st_mode))
+            self.assertEqual(stat.S_IMODE(Path(argv[2]).stat().st_mode), 0o600)
+            self.assertIn("child.execFileSync", Path(argv[2]).read_text())
+            os.write(descriptor, calls.pop(0))
+            descriptors.append(descriptor)
+            return SimpleNamespace(stdout=b"", stderr=b"")
+
+        with patch.object(detached.subprocess, "run", side_effect=observe_call) as run:
+            self.case.run_hook({"SSH_TTY": "/dev/pts/isolated"})
+            self.assertEqual(run.call_count, 1)
+            with patch.object(detached, "collect_terminal_output", side_effect=AssertionError("terminal_read_deadline")):
+                with self.assertRaisesRegex(AssertionError, "terminal_read_deadline") as failure:
+                    self.case.output(0, expect_notification=True)
+            self.assertIn('"error_code":"ETIMEDOUT"', failure.exception.__notes__[0])
+            self.assertEqual(run.call_count, 1)
+            self.case.run_hook({"SSH_TTY": "/dev/pts/isolated"})
+            with self.assertRaises(AssertionError) as invalid_frame:
+                self.case.assert_notification(b"invalid-frame")
+            self.assertIn('"status":"invalid"', str(invalid_frame.exception))
+            self.assertIn('"error_code":"ETIMEDOUT"', str(invalid_frame.exception))
+            self.assertNotIn("private-sentinel", str(invalid_frame.exception))
+        self.assertEqual(self.case.env, before)
+        self.assertEqual(list(self.root.iterdir()), [])
+        for descriptor in descriptors:
+            with self.assertRaises(OSError):
+                os.fstat(descriptor)
+
+    def test_detached_spawn_timeout_preserves_exception_and_releases_diagnostics(self):
+        error = subprocess.TimeoutExpired("synthetic-no-execution", 8)
+        descriptors = []
+
+        def fail_spawn(argv, **options):
+            descriptor, = options["pass_fds"]
+            os.write(descriptor, encode(row("preload")))
+            descriptors.append(descriptor)
+            raise error
+
+        with patch.object(detached.subprocess, "run", side_effect=fail_spawn) as run:
+            with self.assertRaises(subprocess.TimeoutExpired) as failure:
+                self.case.run_hook({})
+            self.assertIs(failure.exception, error)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn('"stage":"preload"', error.__notes__[0])
+        self.assertEqual(list(self.root.iterdir()), [])
+        with self.assertRaises(OSError):
+            os.fstat(descriptors[0])
 
 
 if __name__ == "__main__":

@@ -150,7 +150,7 @@ const UPDATE_TIMEOUT: Duration = Duration::from_secs(300);
 const VERIFICATION_ACK_TIMEOUT: Duration = Duration::from_secs(1);
 // 真实收据会在监督二进制中直接查找这些编译输入，不能由外部报告代替同源证明。
 #[used]
-static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 87] = [
+static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 90] = [
     include_bytes!("../cli_agent_updates.rs"),
     include_bytes!("sources.rs"),
     include_bytes!("sources_claude_downgrade.rs"),
@@ -212,12 +212,15 @@ static SUPERVISOR_UPDATER_SOURCE_BINDING: [&[u8]; 87] = [
     include_bytes!("sources_winget_claude_contract.rs"),
     include_bytes!("sources_winget_claude_contract.json"),
     include_bytes!("../../../../crates/command/src/windows.rs"),
+    include_bytes!("../../../../crates/command/src/managed.rs"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer.rs"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer_witness.rs"),
     include_bytes!("../../../../crates/command/src/windows_appcontainer_desktop.rs"),
     include_bytes!("../../../../crates/command/src/windows_station_bootstrap.rs"),
+    include_bytes!("../../../../crates/command/src/windows_station_device_map.rs"),
     include_bytes!("../../../../crates/command/src/bin/infinishell-station-bootstrap.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process.rs"),
+    include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_version_probe.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_macos.rs"),
     include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_linux.rs"),

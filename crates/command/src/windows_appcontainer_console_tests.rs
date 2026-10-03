@@ -162,6 +162,8 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             grants: Vec::new(),
             job,
             process: None,
+            confirmed_exit_code: None,
+            startup_failure: None,
             thread: None,
             process_id: 0,
             cleaned: false,
@@ -170,6 +172,22 @@ fn empty_probe() -> (tempfile::TempDir, AppContainerProbe) {
             profile_directories: None,
         },
     )
+}
+
+#[test]
+fn rejected_parent_binding_cannot_be_cleared_by_retrying_resume() {
+    let (_directory, mut probe) = empty_probe();
+    probe.startup_failure = Some(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "测试拒绝原 Job 绑定",
+    ));
+
+    for _attempt in 0..2 {
+        let failure = probe.resume().unwrap_err();
+        assert_eq!(failure.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(failure.to_string(), "测试拒绝原 Job 绑定");
+    }
+    probe.cleanup().unwrap();
 }
 
 fn current_process_handle() -> OwnedHandle {

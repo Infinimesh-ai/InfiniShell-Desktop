@@ -15,7 +15,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
-from run_installed_grok_hook import plain_file, verify_installed_hook
+from run_installed_grok_hook import (DIAGNOSTIC_LIMIT, diagnostic_preload, plain_file,
+                                     verify_installed_hook, worker_diagnostics)
 
 
 NOTIFICATION_PREFIX = b"\x1b]777;notify;warp://cli-agent;"
@@ -195,24 +196,48 @@ class DetachedGrokHookTests(unittest.TestCase):
                     "GROK_SESSION_ID": "detached-terminal-test",
                     "WARP_CLI_AGENT_NOTIFY_EXECUTABLE": str(self.worker)}
         self.payload = json.dumps({"hookEventName": "session_start", "sessionId": "detached-terminal-test"}).encode()
+        self.hook_diagnostics = []
+
+    def diagnostic_summary(self):
+        return "worker_diagnostics=" + json.dumps(self.hook_diagnostics, ensure_ascii=True, separators=(",", ":"))
 
     def run_hook(self, extra, hook=None):
         # 和 Grok 的 hook 一样真正 setsid 且三条标准流都是管道；先证明 /dev/tty 报 ENXIO。
         check = ("const fs=require('node:fs');try {const fd=fs.openSync('/dev/tty','w');"
                  "fs.closeSync(fd);process.exit(90)} catch(e) {if(e.code!=='ENXIO')process.exit(91)};"
                  "require(process.argv[1]).main();")
-        result = subprocess.run([str(self.node), "-e", check, str(hook or self.hook)],
-                                input=self.payload, capture_output=True, start_new_session=True,
-                                env={**self.env, **extra}, timeout=8, check=True)
-        self.assertEqual(result.stdout, b"")
-        self.assertEqual(result.stderr, b"")
+        # 匿名诊断文件只传给原 Node；不传入 PTY，不改变 setsid、环境或原调用次数。
+        with tempfile.TemporaryFile(mode="w+b", dir=self.root) as diagnostic_file, \
+                tempfile.NamedTemporaryFile(mode="w", prefix="hook-diagnostic-", suffix=".cjs",
+                                            dir=self.root) as preload:
+            preload.write(diagnostic_preload(self.worker, diagnostic_file.fileno()))
+            preload.flush()
+            try:
+                try:
+                    result = subprocess.run([str(self.node), "--require", preload.name, "-e", check,
+                                             str(hook or self.hook)],
+                                            input=self.payload, capture_output=True, start_new_session=True,
+                                            env={**self.env, **extra}, timeout=8, check=True,
+                                            pass_fds=(diagnostic_file.fileno(),))
+                finally:
+                    raw = os.pread(diagnostic_file.fileno(), DIAGNOSTIC_LIMIT + 1, 0)
+                    self.hook_diagnostics.append(worker_diagnostics(raw))
+                self.assertEqual(result.stdout, b"")
+                self.assertEqual(result.stderr, b"")
+            except (OSError, subprocess.SubprocessError, AssertionError) as error:
+                error.add_note(self.diagnostic_summary())
+                raise
 
     def output(self, index, *, expect_notification=False):
         # 非目标终端必须完成同一观察窗口，不能把首次 EAGAIN 当作零字节证据。
-        return collect_terminal_output(self.terminals[index][0], expect_notification=expect_notification)
+        try:
+            return collect_terminal_output(self.terminals[index][0], expect_notification=expect_notification)
+        except AssertionError as error:
+            error.add_note(self.diagnostic_summary())
+            raise
 
     def assert_notification(self, output, tmux=False):
-        summary = terminal_output_summary(output, tmux=tmux)
+        summary = terminal_output_summary(output, tmux=tmux) + "; " + self.diagnostic_summary()
         if tmux:
             self.assertTrue(output.startswith(b"\x1bPtmux;"), summary)
             self.assertTrue(output.endswith(b"\x1b\\"), summary)

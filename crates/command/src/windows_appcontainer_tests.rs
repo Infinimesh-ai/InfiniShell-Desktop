@@ -174,6 +174,8 @@ fn cleanup_receipt_rejects_external_acl_change_without_overwriting_it() {
         grants: vec![Grant::new(&path, sid, false).unwrap()],
         job,
         process: None,
+        confirmed_exit_code: None,
+        startup_failure: None,
         thread: None,
         process_id: 0,
         cleaned: false,

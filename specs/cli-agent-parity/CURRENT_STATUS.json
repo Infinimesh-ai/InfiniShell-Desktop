@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03人工拖放已确认富框展开时正常，但新会话第一次拖图仅展开富框而丢失附件，首拖初始化已修复并通过本机回归，待新构建实窗和最终源码门禁，未关闭。精确d5ec5dbc9的Windows原生profile修复已越过旧CMD停滞：Node实际进入模块加载，随后lstat卷根C:\\返回EPERM，约2.5秒退出1；真实更新仍0通过/1失败，PowerShell未到达。零能力AppContainer所需受限路径元数据能力及最终源码门禁待完成，未再次运行相近候选。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03首拖初始化已修，6296新Mac窗口待真实单次拖放确认；同提交Linux首拖回归通过，但SSH通知测试PTY零字节失败，根因未定，Windows源码门禁仍执行。G09已实现独立登录会话的私有盘根映射、候选父进程/标准流绑定和原监督Job双阶段接管；本机check、35项定向、11项i18n及Windows command交叉check通过，真实CMD/PowerShell完整更新恢复和最终源码门禁仍待验。本轮新增关闭0项。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -9105,5 +9105,46 @@
     "localization": "无需本地化变更：无新增文案/键/布局；英中既有图片、非图片和失效目标文案复核一致，i18n11项通过。",
     "remaining": "精确新构建首次真实拖放及最终两平台源码门禁。",
     "gap_closed": false
+  },
+  "g09_private_device_map_20261004": {
+    "status": "implemented_pending_windows_native_acceptance",
+    "base_commit": "6296fb36a2adee2c9b670f68050f7929a014efab",
+    "local_gate_receipt_sha256": "6f6281994111e692bf5d4e963bfd2455cfea8d575e0e946780ec4068e42b845c",
+    "cargo_check": "passed",
+    "windows_command_tests_cross_check": "passed_not_native_execution",
+    "local_nextest_passed": 35,
+    "i18n_passed": 11,
+    "runner_contract_passed": 21,
+    "workflow_lint": "passed_with_existing_self_hosted_label_config",
+    "source_bindings": 42,
+    "embedded_production_sources": 90,
+    "native_execution": false,
+    "required_native_cases": [
+      "updated",
+      "old_moved",
+      "published_receipt_missing",
+      "external_change_preserved",
+      "candidate_changed_preserved"
+    ],
+    "localization": "无需本地化变更：英中既有settings-cli-updates-probe-failed语义一致，无新文案或布局。",
+    "newly_closed": []
+  },
+  "g03_first_drop_source_gate_20261004": {
+    "commit": "6296fb36a2adee2c9b670f68050f7929a014efab",
+    "run_id": 37140741806,
+    "mac_build_receipt_sha256": "8a9c6c96a656c444230efc79aad4589c60acf52d9eea57da90c9465b25d24488",
+    "new_mac_gui_first_drop": "waiting_for_user",
+    "linux": {
+      "conclusion": "failure",
+      "ordinary_nextest_passed": 5428,
+      "first_drop_regression": "ordinary_pass",
+      "failure": "DetachedGrokHookTests.test_ssh_terminal_without_bootstrap_still_uses_real_pty: terminal_read_deadline, bytes=0",
+      "root_cause": "unknown",
+      "full_log_sha256": "58e801dc534a761909271359870e40fc42aaaa525fc2b35b011d9d712a3dd8eb"
+    },
+    "windows": "in_progress",
+    "diagnostic_contract_tests_passed": 12,
+    "diagnostic_change_is_a_fix": false,
+    "newly_closed": []
   }
 }

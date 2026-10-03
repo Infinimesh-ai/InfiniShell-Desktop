@@ -2641,13 +2641,37 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
     let execution_control = accept_authorized(&child_listener, manifest)?;
     #[cfg(windows)]
     let mut execution_control = if cooperative_probe {
-        Some(execution_control)
+        Some(probe_control::SupervisorControl::new(execution_control)?)
     } else {
         drop(execution_control);
         None
     };
     #[cfg(not(windows))]
     drop(execution_control);
+    #[cfg(windows)]
+    let probe_images = if cooperative_probe {
+        // 完整清单仍由固定 npm 合同核验；控制请求不能自行选择可授权映像。
+        npm_windows_probe::validate_manifest(manifest)?;
+        let bootstrap = manifest
+            .expected_files
+            .iter()
+            .find(|file| {
+                file.path
+                    .file_name()
+                    .is_some_and(|name| name == "infinishell-station-bootstrap.exe")
+            })
+            .ok_or_else(|| io::Error::other("managed_process.probe_job_bootstrap_missing"))?;
+        let candidate = manifest
+            .expected_files
+            .iter()
+            .find(|file| file.path == manifest.executable)
+            .ok_or_else(|| io::Error::other("managed_process.probe_job_candidate_missing"))?;
+        Some((bootstrap, candidate))
+    } else {
+        None
+    };
+    #[cfg(windows)]
+    let mut probe_authorization_error = None;
     let mut child_input = tree
         .child_mut()
         .stdin
@@ -2690,6 +2714,26 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
             Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => break ExitReason::HostDisconnected,
         }
+        #[cfg(windows)]
+        if let (Some(control), Some((bootstrap, candidate))) =
+            (execution_control.as_mut(), probe_images)
+        {
+            let result = control.poll(|bytes| {
+                use command::managed::{ProbeJobOperation, ProbeJobRequest};
+                let request: ProbeJobRequest =
+                    serde_json::from_slice(bytes).map_err(io::Error::other)?;
+                let expected = match request.operation() {
+                    ProbeJobOperation::ClaimBootstrap => bootstrap,
+                    ProbeJobOperation::VerifyCandidate => candidate,
+                };
+                verify_expected_files(std::slice::from_ref(expected))?;
+                tree.authorize_probe_process(&request, &expected.canonical_path)
+            });
+            if let Err(error) = result {
+                probe_authorization_error = Some(error);
+                break ExitReason::HostDisconnected;
+            }
+        }
     };
     let graceful_timeout = graceful_exit_timeout(manifest, reason);
     #[cfg(windows)]
@@ -2697,7 +2741,7 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
         && let Some(control) = execution_control.as_mut()
     {
         // 仅此已验证探针通过原认证流请求清理；0.1s 写入 + 8s 协作 + 10s Job 确认小于外层 20s。
-        let _ = probe_control::request_stop(control);
+        let _ = control.request_stop();
         probe_control::COOPERATIVE_EXIT_TIMEOUT
     } else {
         graceful_timeout
@@ -2743,6 +2787,11 @@ fn run_process_tree_worker(path: &Path, manifest: &Manifest, bytes: &[u8]) -> io
         output_completed
             .recv_timeout(Duration::from_secs(5))
             .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "托管输出尚未转发完成"))??;
+    }
+    #[cfg(windows)]
+    if let Some(error) = probe_authorization_error {
+        // 原 Job 清理与退出收据先完成，再返回实际授权失败；不能把拒绝当作验收成功。
+        return Err(error);
     }
     Ok(())
 }
@@ -2977,12 +3026,9 @@ fn run_exec_worker(path: &Path, manifest: &Manifest, manifest_bytes: &[u8]) -> i
                 return npm_windows_probe::execute(
                     manifest,
                     directory,
-                    cancellation
-                        .as_ref()
-                        .ok_or_else(|| {
-                            io::Error::other("managed_process.npm_probe_control_missing")
-                        })?
-                        .token(),
+                    cancellation.as_ref().ok_or_else(|| {
+                        io::Error::other("managed_process.npm_probe_control_missing")
+                    })?,
                 );
                 #[cfg(not(windows))]
                 return Err(io::Error::other("Windows Codex npm 探针不能在其他平台执行"));

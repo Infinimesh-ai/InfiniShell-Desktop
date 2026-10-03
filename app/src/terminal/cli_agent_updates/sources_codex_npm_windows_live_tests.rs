@@ -224,6 +224,34 @@ struct Manifest {
 // 与运行器的完整来源集合一致；验收文件无需嵌入生产监督程序。
 const SOURCES: &[(&str, &[u8])] = &[
     (
+        "crates/command/src/managed.rs",
+        include_bytes!("../../../../crates/command/src/managed.rs"),
+    ),
+    (
+        "crates/command/src/managed_tests.rs",
+        include_bytes!("../../../../crates/command/src/managed_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_device_map.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_device_map.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_device_map_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_device_map_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_probe_control.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_probe_control_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_probe_control_tests.rs"),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_npm_probe_windows_tests.rs",
+        include_bytes!("../../ai/cli_agent_runtime/managed_process_npm_probe_windows_tests.rs"),
+    ),
+    (
         ".github/workflows/cross-platform-preflight.yml",
         include_bytes!("../../../../.github/workflows/cross-platform-preflight.yml"),
     ),

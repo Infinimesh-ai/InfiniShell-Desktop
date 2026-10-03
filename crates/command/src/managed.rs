@@ -41,6 +41,44 @@ pub enum Containment {
     UnixProcessGroup,
 }
 
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ProbeJobOperation {
+    ClaimBootstrap,
+    VerifyCandidate,
+}
+
+/// 仅在原认证控制连接传输；句柄值属于仍存活的原执行 worker，不能当作 PID 打开。
+#[cfg(windows)]
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProbeJobRequest {
+    operation: ProbeJobOperation,
+    source_handle: u64,
+    identity: probe_job::Identity,
+}
+
+#[cfg(windows)]
+impl ProbeJobRequest {
+    pub fn capture(
+        operation: ProbeJobOperation,
+        process: std::os::windows::io::BorrowedHandle<'_>,
+    ) -> io::Result<Self> {
+        use std::os::windows::io::AsRawHandle as _;
+        let raw = windows::Win32::Foundation::HANDLE(process.as_raw_handle());
+        probe_job::alive(raw)?;
+        Ok(Self {
+            operation,
+            source_handle: process.as_raw_handle() as usize as u64,
+            identity: probe_job::identity(raw)?,
+        })
+    }
+
+    pub fn operation(&self) -> ProbeJobOperation {
+        self.operation
+    }
+}
+
 /// 仅在独立监督进程中调用，避免接管主应用的其他子进程。
 pub fn prepare_supervisor() -> io::Result<()> {
     #[cfg(target_os = "linux")]
@@ -62,6 +100,8 @@ pub struct ManagedTree {
     root_status: Option<ExitStatus>,
     #[cfg(windows)]
     job: StrictJob,
+    #[cfg(windows)]
+    probe_job: probe_job::Authorization,
 }
 
 impl ManagedTree {
@@ -93,11 +133,36 @@ impl ManagedTree {
             root_status: None,
             #[cfg(windows)]
             job,
+            #[cfg(windows)]
+            probe_job: probe_job::Authorization::Initial,
         })
     }
 
     pub fn child_mut(&mut self) -> &mut Child {
         &mut self.child
+    }
+
+    /// 监督者保留唯一原 Job 句柄；失败后本代不再接受任何进程授权请求。
+    #[cfg(windows)]
+    pub fn authorize_probe_process(
+        &mut self,
+        request: &ProbeJobRequest,
+        expected_image: &std::path::Path,
+    ) -> io::Result<()> {
+        use std::os::windows::io::AsRawHandle as _;
+        use windows::Win32::Foundation::HANDLE;
+        if self.complete {
+            return Err(io::Error::other("托管 Job 已经结束"));
+        }
+        let previous = std::mem::replace(&mut self.probe_job, probe_job::Authorization::Rejected);
+        self.probe_job = probe_job::authorize(
+            previous,
+            request,
+            expected_image,
+            HANDLE(self.child.as_raw_handle()),
+            HANDLE(self.job.0.as_raw_handle()),
+        )?;
+        Ok(())
     }
 
     pub fn containment(&self) -> Containment {
@@ -396,6 +461,294 @@ impl StrictJob {
         }
         .map_err(io::Error::other)?;
         Ok(information.ActiveProcesses)
+    }
+}
+
+#[cfg(windows)]
+mod probe_job {
+    use super::{ProbeJobOperation, ProbeJobRequest};
+    use std::ffi::OsString;
+    use std::io;
+    use std::mem::size_of_val;
+    use std::os::windows::ffi::OsStringExt as _;
+    use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+    use std::path::{Path, PathBuf};
+    use windows::Win32::Foundation::{
+        DUPLICATE_HANDLE_OPTIONS, DuplicateHandle, FILETIME, HANDLE, WAIT_FAILED, WAIT_TIMEOUT,
+    };
+    use windows::Win32::Security::{
+        GetTokenInformation, TOKEN_QUERY, TOKEN_STATISTICS, TOKEN_USER, TokenIsAppContainer,
+        TokenSessionId, TokenStatistics, TokenUser,
+    };
+    use windows::Win32::System::JobObjects::{AssignProcessToJobObject, IsProcessInJob};
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, GetProcessId, GetProcessTimes, OpenProcessToken, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA, PROCESS_SYNCHRONIZE,
+        PROCESS_TERMINATE, QueryFullProcessImageNameW, WaitForSingleObject,
+    };
+    use windows::core::{BOOL, PWSTR};
+
+    #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub(super) struct Identity {
+        pid: u32,
+        created_at: u64,
+        logon_low: u32,
+        logon_high: i32,
+        session_id: u32,
+        owner: Vec<u8>,
+        image: PathBuf,
+        appcontainer: u32,
+    }
+
+    pub(super) enum Authorization {
+        Initial,
+        Bootstrap {
+            worker: Identity,
+            bootstrap: Identity,
+        },
+        Complete,
+        Rejected,
+    }
+
+    pub(super) fn alive(process: HANDLE) -> io::Result<()> {
+        let result = unsafe { WaitForSingleObject(process, 0) };
+        if result == WAIT_TIMEOUT {
+            Ok(())
+        } else if result == WAIT_FAILED {
+            Err(io::Error::last_os_error())
+        } else {
+            Err(io::Error::other("Job 授权进程已退出或无法确认"))
+        }
+    }
+
+    fn token_value<T: Default>(
+        token: HANDLE,
+        class: windows::Win32::Security::TOKEN_INFORMATION_CLASS,
+    ) -> io::Result<T> {
+        let mut value = T::default();
+        let mut size = 0;
+        unsafe {
+            GetTokenInformation(
+                token,
+                class,
+                Some((&mut value as *mut T).cast()),
+                size_of::<T>() as u32,
+                &mut size,
+            )
+        }
+        .map_err(io::Error::from)?;
+        if size as usize != size_of::<T>() {
+            return Err(io::Error::other("Job 授权令牌字段长度不匹配"));
+        }
+        Ok(value)
+    }
+
+    pub(super) fn identity(process: HANDLE) -> io::Result<Identity> {
+        let pid = unsafe { GetProcessId(process) };
+        if pid == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut creation = FILETIME::default();
+        let mut exit = FILETIME::default();
+        let mut kernel = FILETIME::default();
+        let mut user = FILETIME::default();
+        unsafe { GetProcessTimes(process, &mut creation, &mut exit, &mut kernel, &mut user) }
+            .map_err(io::Error::from)?;
+        let mut token = HANDLE::default();
+        unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }.map_err(io::Error::from)?;
+        let token = unsafe { OwnedHandle::from_raw_handle(token.0) };
+        let raw = HANDLE(token.as_raw_handle());
+        let statistics: TOKEN_STATISTICS = token_value(raw, TokenStatistics)?;
+        // 固定对齐缓冲仅读取 SID，边界检查先于任何 SID 内容访问。
+        let mut storage = [0usize; 512];
+        let mut length = 0;
+        unsafe {
+            GetTokenInformation(
+                raw,
+                TokenUser,
+                Some(storage.as_mut_ptr().cast()),
+                size_of_val(&storage) as u32,
+                &mut length,
+            )
+        }
+        .map_err(io::Error::from)?;
+        if (length as usize) < size_of::<TOKEN_USER>() || length as usize > size_of_val(&storage) {
+            return Err(io::Error::other("Job 授权用户字段长度不匹配"));
+        }
+        let user = unsafe { &*storage.as_ptr().cast::<TOKEN_USER>() };
+        let start = storage.as_ptr() as usize;
+        let end = start + length as usize;
+        let sid = user.User.Sid.0 as usize;
+        if sid < start || sid.checked_add(8).is_none_or(|value| value > end) {
+            return Err(io::Error::other("Job 授权用户 SID 边界无效"));
+        }
+        let header = unsafe { std::slice::from_raw_parts(sid as *const u8, 8) };
+        let sid_length = 8 + usize::from(header[1]) * 4;
+        if header[0] != 1
+            || header[1] > 15
+            || sid.checked_add(sid_length).is_none_or(|value| value > end)
+        {
+            return Err(io::Error::other("Job 授权用户 SID 无效"));
+        }
+        let owner = unsafe { std::slice::from_raw_parts(sid as *const u8, sid_length) }.to_vec();
+        let mut image = [0u16; 32768];
+        let mut size = image.len() as u32;
+        unsafe {
+            QueryFullProcessImageNameW(
+                process,
+                PROCESS_NAME_WIN32,
+                PWSTR(image.as_mut_ptr()),
+                &mut size,
+            )
+        }
+        .map_err(io::Error::from)?;
+        if size == 0 || size as usize >= image.len() {
+            return Err(io::Error::other("Job 授权映像路径无效"));
+        }
+        Ok(Identity {
+            pid,
+            created_at: (u64::from(creation.dwHighDateTime) << 32)
+                | u64::from(creation.dwLowDateTime),
+            logon_low: statistics.AuthenticationId.LowPart,
+            logon_high: statistics.AuthenticationId.HighPart,
+            session_id: token_value(raw, TokenSessionId)?,
+            owner,
+            image: PathBuf::from(OsString::from_wide(&image[..size as usize])).canonicalize()?,
+            appcontainer: token_value(raw, TokenIsAppContainer)?,
+        })
+    }
+
+    pub(super) fn accepts_stage(state: &Authorization, operation: ProbeJobOperation) -> bool {
+        matches!(
+            (state, operation),
+            (Authorization::Initial, ProbeJobOperation::ClaimBootstrap)
+                | (
+                    Authorization::Bootstrap { .. },
+                    ProbeJobOperation::VerifyCandidate
+                )
+        )
+    }
+
+    pub(super) fn validate_identity(
+        previous: &Authorization,
+        request: &ProbeJobRequest,
+        expected_image: &Path,
+        worker: &Identity,
+        actual: &Identity,
+    ) -> io::Result<()> {
+        if !accepts_stage(previous, request.operation)
+            || *actual != request.identity
+            || actual.pid == worker.pid
+            || actual.owner != worker.owner
+            || actual.session_id != worker.session_id
+            || actual.image != expected_image
+            || actual.created_at < worker.created_at
+        {
+            return Err(io::Error::other("Job 授权原进程身份不匹配"));
+        }
+        match previous {
+            Authorization::Initial => {
+                if actual.appcontainer != 0
+                    || (actual.logon_low, actual.logon_high)
+                        == (worker.logon_low, worker.logon_high)
+                {
+                    return Err(io::Error::other("Job 引导器未处于本次新登录身份"));
+                }
+            }
+            Authorization::Bootstrap {
+                worker: original_worker,
+                bootstrap,
+            } => {
+                if original_worker != worker
+                    || actual.appcontainer != 1
+                    || actual.pid == bootstrap.pid
+                    || actual.created_at < bootstrap.created_at
+                    || (actual.logon_low, actual.logon_high)
+                        != (bootstrap.logon_low, bootstrap.logon_high)
+                {
+                    return Err(io::Error::other("Job 候选未继承本次引导器身份"));
+                }
+            }
+            Authorization::Complete | Authorization::Rejected => {
+                return Err(io::Error::other("Job 授权已结束"));
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn authorize(
+        previous: Authorization,
+        request: &ProbeJobRequest,
+        expected_image: &Path,
+        worker: HANDLE,
+        job: HANDLE,
+    ) -> io::Result<Authorization> {
+        if !accepts_stage(&previous, request.operation)
+            || request.source_handle == 0
+            || request.source_handle > isize::MAX as u64
+        {
+            return Err(io::Error::other("Job 授权阶段或原句柄无效"));
+        }
+        alive(worker)?;
+        let worker_identity = identity(worker)?;
+        let mut desired = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE;
+        if request.operation == ProbeJobOperation::ClaimBootstrap {
+            desired |= PROCESS_SET_QUOTA | PROCESS_TERMINATE;
+        }
+        let mut copied = HANDLE::default();
+        unsafe {
+            DuplicateHandle(
+                worker,
+                HANDLE(request.source_handle as usize as *mut _),
+                GetCurrentProcess(),
+                &mut copied,
+                desired.0,
+                false,
+                DUPLICATE_HANDLE_OPTIONS(0),
+            )
+        }
+        .map_err(io::Error::from)?;
+        // 临时副本在返回 ACK 前释放，不延长新 LUID，也不向 worker 复制 Job。
+        let copied = unsafe { OwnedHandle::from_raw_handle(copied.0) };
+        let process = HANDLE(copied.as_raw_handle());
+        alive(process)?;
+        let actual = identity(process)?;
+        validate_identity(
+            &previous,
+            request,
+            expected_image,
+            &worker_identity,
+            &actual,
+        )?;
+        let next = match previous {
+            Authorization::Initial => {
+                let mut member = BOOL::default();
+                unsafe { IsProcessInJob(process, Some(job), &mut member) }
+                    .map_err(io::Error::from)?;
+                if !member.as_bool() {
+                    unsafe { AssignProcessToJobObject(job, process) }.map_err(io::Error::from)?;
+                }
+                Authorization::Bootstrap {
+                    worker: worker_identity,
+                    bootstrap: actual.clone(),
+                }
+            }
+            Authorization::Bootstrap { .. } => {
+                // 候选已加入自己的子 Job，此处绝不通过补分配掩盖父 Job 继承失败。
+                Authorization::Complete
+            }
+            Authorization::Complete | Authorization::Rejected => {
+                return Err(io::Error::other("Job 授权已结束"));
+            }
+        };
+        let mut member = BOOL::default();
+        unsafe { IsProcessInJob(process, Some(job), &mut member) }.map_err(io::Error::from)?;
+        if !member.as_bool() || identity(process)? != actual {
+            return Err(io::Error::other("候选不属于监督者原 Job 或身份已变化"));
+        }
+        alive(process)?;
+        Ok(next)
     }
 }
 

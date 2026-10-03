@@ -6,7 +6,9 @@ use std::io::{self, Read as _, Write as _};
 use std::mem::{size_of, size_of_val};
 use std::os::windows::ffi::{OsStrExt as _, OsStringExt as _};
 use std::os::windows::fs::OpenOptionsExt as _;
-use std::os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle};
+use std::os::windows::io::{
+    AsHandle as _, AsRawHandle as _, BorrowedHandle, FromRawHandle as _, OwnedHandle,
+};
 use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -60,20 +62,22 @@ use windows::Win32::System::Threading::{
     CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, CreateProcessW,
     CreateProcessWithLogonW, GetCurrentProcess, GetCurrentThread, GetExitCodeProcess, GetProcessId,
     GetProcessTimes, LOGON_NETCREDENTIALS_ONLY, OpenProcess, OpenProcessToken, OpenThreadToken,
-    PROCESS_INFORMATION, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
-    PROCESS_SYNCHRONIZE, QueryFullProcessImageNameW, ResumeThread, STARTUPINFOW, TerminateProcess,
-    WaitForSingleObject,
+    PROCESS_CREATE_PROCESS, PROCESS_DUP_HANDLE, PROCESS_INFORMATION, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, QueryFullProcessImageNameW,
+    ResumeThread, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
 };
 use windows::core::{BOOL, HRESULT, PCWSTR, PWSTR};
 
 use super::appcontainer::desktop::NewLogonDesktop;
+use crate::managed::ProbeJobOperation;
+
+#[path = "windows_station_device_map.rs"]
+mod device_map;
 
 #[cfg(feature = "native-probe-witness")]
 use windows::Win32::Foundation::DUPLICATE_SAME_ACCESS;
 #[cfg(feature = "native-probe-witness")]
 use windows::Win32::System::StationsAndDesktops::{CloseDesktop, HDESK};
-#[cfg(feature = "native-probe-witness")]
-use windows::Win32::System::Threading::PROCESS_DUP_HANDLE;
 
 #[cfg(feature = "native-probe-witness")]
 struct WitnessDesktop(Option<usize>);
@@ -198,6 +202,9 @@ impl Snapshot {
     }
     fn same_logon(&self, other: &Self) -> bool {
         (self.auth_low, self.auth_high) == (other.auth_low, other.auth_high)
+    }
+    fn same_package_logon(&self, other: &Self) -> bool {
+        self.same_logon(other) && self.user == other.user && self.session == other.session
     }
     fn station_name(&self) -> String {
         format!("Service-0x{:x}-{:x}$", self.auth_high as u32, self.auth_low)
@@ -410,6 +417,7 @@ struct Request {
     image: PathBuf,
     image_size: u64,
     image_sha256: String,
+    device_target: device_map::Target,
     #[cfg(feature = "native-probe-witness")]
     #[serde(default, skip_serializing_if = "witness_disabled")]
     witness_desktop: bool,
@@ -440,6 +448,8 @@ struct Closed {
     nonce: String,
     process: Snapshot,
     desktop_verified_and_closed: bool,
+    device_map: device_map::Binding,
+    device_map_verified_and_removed: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -448,6 +458,8 @@ struct Ready {
     process: Snapshot,
     station: String,
     desktop: String,
+    device_map: device_map::Binding,
+    device_map_verified_and_created: bool,
     #[cfg(feature = "native-probe-witness")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     witness_desktop_handle: Option<u64>,
@@ -863,6 +875,7 @@ fn diagnostic<T>(
 /// 只持有本次精确 helper 原句柄与严格 Job；不复用普通同登录会话 lease。
 pub(super) struct PrivateStation {
     root: PathLease,
+    package_root: PathLease,
     image: StationBootstrapImage,
     job: OwnedHandle,
     first: Option<OwnedHandle>,
@@ -874,6 +887,7 @@ pub(super) struct PrivateStation {
     nonce: String,
     phase: &'static str,
     startup: Vec<u16>,
+    device_map: Option<device_map::Binding>,
     closed: bool,
     reaped: bool,
     close_attempted: bool,
@@ -888,12 +902,19 @@ impl PrivateStation {
         cwd: &Path,
         profile: &str,
         sid: PSID,
+        job_operation: &mut dyn FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
     ) -> io::Result<Self> {
         no_impersonation()?;
         image.lease.verify()?;
         let image = StationBootstrapImage::capture(image.lease.path(), image.size, &image.sha256)?;
         let caller = Snapshot::capture(unsafe { GetCurrentProcess() })?;
+        require(
+            caller.user != "S-1-5-18",
+            "局部盘映射拒绝 LocalSystem 调用方",
+        )?;
         let caller_station = current_station()?;
+        let package_root = PathLease::capture(cwd)?;
+        let device_target = device_map::Target::capture(&package_root)?;
         let nonce = Uuid::new_v4().simple().to_string();
         let root = cwd.join(format!("station-{nonce}"));
         create_private_directory(&root, &caller.user)?;
@@ -908,6 +929,7 @@ impl PrivateStation {
             image: image.lease.path().to_owned(),
             image_size: image.size,
             image_sha256: image.sha256.clone(),
+            device_target,
             #[cfg(feature = "native-probe-witness")]
             witness_desktop: std::env::var("INFINISHELL_WINDOWS_NATIVE_WITNESS_GENERATION")
                 .ok()
@@ -927,6 +949,7 @@ impl PrivateStation {
         .map_err(io::Error::other)?;
         let mut result = Self {
             root,
+            package_root,
             image,
             job,
             first: None,
@@ -938,6 +961,7 @@ impl PrivateStation {
             nonce,
             phase: "prepare",
             startup: Vec::new(),
+            device_map: None,
             closed: false,
             reaped: false,
             close_attempted: false,
@@ -946,7 +970,7 @@ impl PrivateStation {
             #[cfg(feature = "native-probe-witness")]
             witness_desktop_error: None,
         };
-        let started = result.start(&request);
+        let started = result.start(&request, job_operation);
         diagnostic(
             result.root.path(),
             "start-result.json",
@@ -964,7 +988,11 @@ impl PrivateStation {
         started?;
         Ok(result)
     }
-    fn start(&mut self, request: &Request) -> io::Result<()> {
+    fn start(
+        &mut self,
+        request: &Request,
+        job_operation: &mut dyn FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
+    ) -> io::Result<()> {
         self.phase = "create_pipes";
         self.first_pipe = Some(Pipe::server(&request.nonce, "first", &request.caller.user)?);
         self.second_pipe = Some(Pipe::server(
@@ -1022,6 +1050,11 @@ impl PrivateStation {
             process_image(first)? == request.image,
             "窗口站引导首段映像不匹配",
         )?;
+        // 首段原句柄仍挂起；先由监督者接入原外层 Job，再建立本轮严格子 Job。
+        job_operation(
+            ProbeJobOperation::ClaimBootstrap,
+            self.first.as_ref().unwrap().as_handle(),
+        )?;
         unsafe { AssignProcessToJobObject(raw(&self.job), first) }.map_err(io::Error::other)?;
         self.verify_member(first)?;
         require(
@@ -1056,13 +1089,10 @@ impl PrivateStation {
         )?;
         // 报文只给首段地址空间中的源值；仅内核 DuplicateHandle 新生成的本地句柄可接管。
         let mut duplicated = HANDLE::default();
-        let access = PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE;
-        #[cfg(feature = "native-probe-witness")]
-        let access = if request.witness_desktop {
-            access | PROCESS_DUP_HANDLE
-        } else {
-            access
-        };
+        let access = PROCESS_QUERY_LIMITED_INFORMATION
+            | PROCESS_SYNCHRONIZE
+            | PROCESS_CREATE_PROCESS
+            | PROCESS_DUP_HANDLE;
         unsafe {
             DuplicateHandle(
                 first,
@@ -1102,6 +1132,7 @@ impl PrivateStation {
         self.phase = "station_authorization";
         let ready: Ready = pipe.receive(process, Instant::now() + START_TIMEOUT)?;
         validate_ready(request, &identity, &second.process, &ready)?;
+        ready.device_map.verify_hidden_from_caller()?;
         require(
             Snapshot::capture(process)? == second.process && alive(process)?,
             "窗口站授权持有者已退出",
@@ -1133,6 +1164,7 @@ impl PrivateStation {
         }
         save(self.root.path(), "ready.json", &ready)?;
         self.startup = wide(format!("{}\\{}", ready.station, ready.desktop).as_ref())?;
+        self.device_map = Some(ready.device_map);
         self.phase = "ready";
         Ok(())
     }
@@ -1173,11 +1205,17 @@ impl PrivateStation {
         Ok(HDESK(handle as *mut c_void))
     }
     pub(super) fn configure_startup(&mut self, startup: &mut STARTUPINFOW) -> io::Result<()> {
+        self.parent_process()?;
+        startup.lpDesktop = PWSTR(self.startup.as_mut_ptr());
+        Ok(())
+    }
+    pub(super) fn parent_process(&self) -> io::Result<BorrowedHandle<'_>> {
         require(
-            !self.closed && !self.startup.is_empty(),
+            !self.closed && !self.reaped && !self.startup.is_empty(),
             "窗口站所有权尚未建立或已释放",
         )?;
         self.root.verify()?;
+        self.package_root.verify()?;
         self.image.lease.verify()?;
         for (process, expected) in [
             (&self.first, &self.first_identity),
@@ -1195,8 +1233,38 @@ impl PrivateStation {
                 "窗口站持有者退出或身份变化",
             )?;
         }
-        startup.lpDesktop = PWSTR(self.startup.as_mut_ptr());
-        Ok(())
+        let second = self
+            .second
+            .as_ref()
+            .ok_or_else(|| invalid("窗口站父进程缺失"))?;
+        Ok(second.as_handle())
+    }
+    pub(super) fn mapped_root(&self) -> io::Result<&Path> {
+        self.parent_process()?;
+        let binding = self
+            .device_map
+            .as_ref()
+            .ok_or_else(|| invalid("局部盘映射授权缺失"))?;
+        binding.validate(
+            &device_map::Target::capture(&self.package_root)?,
+            self.second_identity
+                .as_ref()
+                .ok_or_else(|| invalid("局部盘映射原身份缺失"))?,
+        )?;
+        Ok(&binding.mapped_root)
+    }
+    pub(super) fn verify_package_identity(&self, process: BorrowedHandle<'_>) -> io::Result<()> {
+        self.parent_process()?;
+        let process = HANDLE(process.as_raw_handle());
+        self.verify_member(process)?;
+        let expected = self
+            .second_identity
+            .as_ref()
+            .ok_or_else(|| invalid("局部盘映射原身份缺失"))?;
+        require(
+            Snapshot::capture(process)?.same_package_logon(expected),
+            "候选进程没有继承局部盘映射的登录身份",
+        )
     }
     fn empty(&self) -> io::Result<bool> {
         let mut state = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
@@ -1297,9 +1365,12 @@ impl PrivateStation {
         require(
             closed.nonce == self.nonce
                 && Some(&closed.process) == self.second_identity.as_ref()
-                && closed.desktop_verified_and_closed,
+                && closed.desktop_verified_and_closed
+                && Some(&closed.device_map) == self.device_map.as_ref()
+                && closed.device_map_verified_and_removed,
             "窗口站原桌面关闭证明不匹配",
         )?;
+        save(self.root.path(), "closed.json", &closed)?;
         self.phase = "helper_exit_codes";
         self.wait_empty(deadline)?;
         let first = exit_code(raw(self.first.as_ref().unwrap()))?;
@@ -1307,7 +1378,7 @@ impl PrivateStation {
         save(
             self.root.path(),
             "helper-exit.json",
-            &serde_json::json!({"first_exit_code":first,"second_exit_code":second,"desktop_verified_and_closed":true,"job_empty":true}),
+            &serde_json::json!({"first_exit_code":first,"second_exit_code":second,"desktop_verified_and_closed":true,"device_map_verified_and_removed":true,"job_empty":true}),
         )?;
         require(first == 0 && second == 0, "窗口站辅助进程返回失败")?;
         self.phase = "station_and_logon_released";
@@ -1315,7 +1386,7 @@ impl PrivateStation {
         save(
             self.root.path(),
             "cleanup.json",
-            &serde_json::json!({"graceful":true,"helpers_exit_zero":true,"desktop_verified_and_closed":true,"job_empty":true,"station_absent":true,"logon_absent":true}),
+            &serde_json::json!({"graceful":true,"helpers_exit_zero":true,"desktop_verified_and_closed":true,"device_map_verified_and_removed":true,"job_empty":true,"station_absent":true,"logon_absent":true}),
         )?;
         self.closed = true;
         Ok(())
@@ -1381,12 +1452,14 @@ fn validate_ready(
     second: &Snapshot,
     ready: &Ready,
 ) -> io::Result<()> {
+    ready.device_map.validate(&request.device_target, second)?;
     require(
         ready.nonce == request.nonce
             && ready.process == *second
             && ready.station.eq_ignore_ascii_case(&first.station_name())
             && !ready.station.eq_ignore_ascii_case(&request.caller_station)
-            && ready.desktop == request.profile,
+            && ready.desktop == request.profile
+            && ready.device_map_verified_and_created,
         "窗口站授权收据不匹配",
     )
 }
@@ -1511,6 +1584,8 @@ fn helper_second(
         "窗口站第二段自身身份不匹配",
     )?;
     let parent = verify_parent(&binding.first, &request.image)?;
+    *phase = "local_device_map";
+    let mut device_map = device_map::LocalDeviceMap::create(&request.device_target, &identity)?;
     *phase = "station_acl_and_desktop";
     let mut desktop = NewLogonDesktop::create(
         &binding.first.station_name(),
@@ -1523,6 +1598,8 @@ fn helper_second(
         process: identity.clone(),
         station: binding.first.station_name(),
         desktop: request.profile.clone(),
+        device_map: device_map.binding().clone(),
+        device_map_verified_and_created: true,
         #[cfg(feature = "native-probe-witness")]
         witness_desktop_handle: request
             .witness_desktop
@@ -1547,10 +1624,15 @@ fn helper_second(
     *phase = "desktop_verify_and_close";
     desktop.verify()?;
     desktop.close()?;
+    *phase = "device_map_verify_and_remove";
+    let device_binding = device_map.binding().clone();
+    device_map.close()?;
     pipe.send(&Closed {
         nonce: request.nonce.clone(),
         process: identity,
         desktop_verified_and_closed: true,
+        device_map: device_binding,
+        device_map_verified_and_removed: true,
     })
 }
 
@@ -1605,6 +1687,10 @@ pub fn run_station_bootstrap() -> io::Result<()> {
                 && binding.first.same_local(&request.caller)
                 && !binding.first.same_logon(&request.caller),
             "窗口站引导登录绑定不匹配",
+        )?;
+        require(
+            root.path().parent() == Some(request.device_target.path.as_path()),
+            "局部盘映射目标不是本轮候选树",
         )?;
         root.verify()?;
         image.lease.verify()?;

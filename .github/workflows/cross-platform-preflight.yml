@@ -1878,7 +1878,7 @@ jobs:
         if: ${{ (github.event_name != 'workflow_dispatch' || !inputs.windows_grok_installer_only || inputs.full_workspace_tests || inputs.run_cli_atomic_updates || inputs.run_windows_codex_npm_updates || inputs.run_atomic_windows_debug) && (!cancelled() && steps.check_app.outcome == 'success') }}
         shell: pwsh
         run: |
-          $arguments = @('nextest', 'run', '--no-fail-fast', '-p', 'command', '--lib', '-E', 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::)')
+          $arguments = @('nextest', 'run', '--no-fail-fast', '-p', 'command', '--lib', '-E', 'test(managed::tests::) | test(managed_windows_image_observer::tests::) | test(managed_windows_console_probe::tests::) | test(windows::appcontainer::tests::) | test(windows::appcontainer::console_tests::) | test(windows::station_bootstrap::tests::) | test(windows::station_bootstrap::device_map::tests::)')
           if ('${{ inputs.run_windows_npm_native_witness }}' -eq 'true') { $arguments += @('--features', 'native-probe-witness') }
           cargo @arguments
 

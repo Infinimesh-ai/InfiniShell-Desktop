@@ -4,6 +4,68 @@ use super::super::AtomicDirectoryIdentity;
 use super::*;
 
 #[test]
+fn mapped_cmd_keeps_the_fixed_shim_and_private_paths_on_the_bound_drive() {
+    let root = Path::new(r"Z:\");
+    let (arguments, environment) = mapped_command("cmd", root, false).unwrap();
+    assert_eq!(
+        arguments,
+        r#"/d /v:off /s /c ""Z:\install\codex.cmd" --version""#
+    );
+    for (name, relative) in [
+        ("HOME", "home"),
+        ("USERPROFILE", "home"),
+        ("APPDATA", "config"),
+        ("CODEX_HOME", "config"),
+        ("TMP", "tmp"),
+        ("TEMP", "tmp"),
+    ] {
+        let value = &environment.iter().find(|(key, _)| key == name).unwrap().1;
+        assert_eq!(value, root.join(relative).as_os_str());
+    }
+    let path = &environment.iter().find(|(key, _)| key == "PATH").unwrap().1;
+    let paths = std::env::split_paths(path).collect::<Vec<_>>();
+    assert_eq!(paths[0], root.join("runtime"));
+    let baseline = candidate_environment("cmd", root).unwrap();
+    let baseline_path = &baseline.iter().find(|(key, _)| key == "PATH").unwrap().1;
+    assert_eq!(
+        paths[1..],
+        std::env::split_paths(baseline_path).collect::<Vec<_>>()
+    );
+    assert!(environment.iter().all(|(key, _)| key != "NODE_OPTIONS"));
+}
+
+#[test]
+fn mapped_powershell_keeps_alongside_node_selection_without_a_path_override() {
+    let root = Path::new(r"D:\");
+    let (arguments, environment) = mapped_command("powershell", root, true).unwrap();
+    assert_eq!(
+        arguments,
+        r#"-NoLogo -NoProfile -NonInteractive -File "D:\install\codex.ps1" --version"#
+    );
+    let baseline = candidate_environment("powershell", root).unwrap();
+    assert_eq!(
+        environment.iter().find(|(key, _)| key == "PATH"),
+        baseline.iter().find(|(key, _)| key == "PATH")
+    );
+}
+
+#[test]
+fn mapped_commands_reject_non_root_and_unbound_drive_representations() {
+    for root in [
+        r"C:\",
+        r"Z:",
+        r"Z:\child",
+        r"\\?\Z:\",
+        r"z:\",
+        r"\\server\share",
+        r"Z:\&",
+    ] {
+        assert!(mapped_command("cmd", Path::new(root), false).is_err());
+    }
+    assert!(mapped_command("other", Path::new(r"Z:\"), false).is_err());
+}
+
+#[test]
 fn cmd_candidate_uses_standard_heap_without_changing_shared_environment() {
     let root = Path::new("private-candidate");
     let baseline = super::super::version_probe::resolved_environment(root).unwrap();

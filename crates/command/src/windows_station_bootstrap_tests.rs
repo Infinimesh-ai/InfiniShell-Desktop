@@ -14,6 +14,27 @@ fn identity(pid: u32, auth_low: u32) -> Snapshot {
     }
 }
 
+fn device_target() -> device_map::Target {
+    serde_json::from_value(serde_json::json!({
+        "path": r"\\?\C:\private\candidate",
+        "identity": {"volume": 1, "high": 0, "low": 2},
+        "nt_path": r"\Device\HarddiskVolume1\private\candidate"
+    }))
+    .unwrap()
+}
+
+fn device_binding(owner: &Snapshot) -> device_map::Binding {
+    serde_json::from_value(serde_json::json!({
+        "target": device_target(),
+        "mapped_root": r"D:\",
+        "auth_low": owner.auth_low,
+        "auth_high": owner.auth_high,
+        "user": owner.user,
+        "session": owner.session
+    }))
+    .unwrap()
+}
+
 #[test]
 fn ready_requires_exact_process_generation_profile_and_new_station() {
     let caller = identity(10, 11);
@@ -29,6 +50,7 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         image: PathBuf::from(r"C:\bootstrap.exe"),
         image_size: 5,
         image_sha256: "b".repeat(64),
+        device_target: device_target(),
         #[cfg(feature = "native-probe-witness")]
         witness_desktop: false,
     };
@@ -37,12 +59,14 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
         process: second.clone(),
         station: first.station_name(),
         desktop: request.profile.clone(),
+        device_map: device_binding(&second),
+        device_map_verified_and_created: true,
         #[cfg(feature = "native-probe-witness")]
         witness_desktop_handle: None,
     };
     #[cfg(feature = "native-probe-witness")]
     {
-        // 取证构建未显式启用时，正常引导报文仍与旧版本逐字段兼容。
+        // 取证构建未显式启用时，正常引导报文不携带取证专属字段。
         let request_wire = serde_json::to_value(&request).unwrap();
         let ready_wire = serde_json::to_value(&ready).unwrap();
         assert!(request_wire.get("witness_desktop").is_none());
@@ -80,8 +104,50 @@ fn ready_requires_exact_process_generation_profile_and_new_station() {
             desktop: "different".to_owned(),
             ..ready.clone()
         },
+        Ready {
+            device_map: device_binding(&request.caller),
+            ..ready.clone()
+        },
+        Ready {
+            device_map_verified_and_created: false,
+            ..ready.clone()
+        },
     ] {
         assert!(validate_ready(&request, &first, &second, &changed).is_err());
+    }
+}
+
+#[test]
+fn package_logon_requires_same_authentication_user_and_session_but_allows_lower_integrity() {
+    let helper = identity(20, 21);
+    let package = Snapshot {
+        pid: 40,
+        created: 4000,
+        integrity: "S-1-16-4096".to_owned(),
+        elevated: 0,
+        ..helper.clone()
+    };
+    assert!(package.same_package_logon(&helper));
+    assert!(!package.same_local(&helper));
+    for changed in [
+        Snapshot {
+            auth_low: 22,
+            ..package.clone()
+        },
+        Snapshot {
+            auth_high: 1,
+            ..package.clone()
+        },
+        Snapshot {
+            session: 2,
+            ..package.clone()
+        },
+        Snapshot {
+            user: "S-1-5-18".to_owned(),
+            ..package.clone()
+        },
+    ] {
+        assert!(!changed.same_package_logon(&helper));
     }
 }
 
@@ -140,7 +206,7 @@ fn authenticated_pipe_rejects_unknown_authorization_fields() {
     server
         .accept(unsafe { GetCurrentProcess() }, &actual)
         .unwrap();
-    client.send(&serde_json::json!({"nonce":nonce,"process":actual,"desktop_verified_and_closed":true,"unexpected":true})).unwrap();
+    client.send(&serde_json::json!({"nonce":nonce,"process":actual,"desktop_verified_and_closed":true,"device_map":device_binding(&actual),"device_map_verified_and_removed":true,"unexpected":true})).unwrap();
     assert!(
         server
             .receive::<Closed>(

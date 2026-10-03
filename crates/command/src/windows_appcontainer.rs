@@ -1,5 +1,6 @@
 //! 无网络 capability 的一次性版本探针；所有派生留在严格 Job，句柄继承仅限标准流。
 
+use std::borrow::Cow;
 use std::ffi::{OsStr, OsString, c_void};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write as _};
@@ -12,8 +13,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use windows::Win32::Foundation::{
-    DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_NO_TOKEN, HANDLE, HLOCAL, LocalFree,
-    WAIT_OBJECT_0, WAIT_TIMEOUT,
+    DUPLICATE_CLOSE_SOURCE, DUPLICATE_SAME_ACCESS, DuplicateHandle, ERROR_NO_TOKEN, HANDLE, HLOCAL,
+    LocalFree, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows::Win32::Security::Authorization::{
     ConvertSidToStringSidW, EXPLICIT_ACCESS_W, GRANT_ACCESS, GetSecurityInfo, SE_FILE_OBJECT,
@@ -46,10 +47,10 @@ use windows::Win32::System::Threading::{
     CreateProcessW, DEBUG_PROCESS, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
     GetCurrentProcess, GetCurrentThread, GetExitCodeProcess, InitializeProcThreadAttributeList,
     LPPROC_THREAD_ATTRIBUTE_LIST, OpenProcessToken, OpenThreadToken,
-    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
-    PROCESS_CREATION_FLAGS, PROCESS_INFORMATION, ResumeThread, STARTF_USESHOWWINDOW,
-    STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
-    UpdateProcThreadAttribute, WaitForSingleObject,
+    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
+    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_CREATION_FLAGS, PROCESS_INFORMATION,
+    ResumeThread, STARTF_USESHOWWINDOW, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW,
+    TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
 };
 use windows::Win32::UI::Shell::{
     FOLDERID_LocalAppData, KF_FLAG_DONT_VERIFY, KF_FLAG_NO_PACKAGE_REDIRECTION,
@@ -58,6 +59,7 @@ use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{BOOL, GUID, HRESULT, PCWSTR, PWSTR};
 
 use super::station_bootstrap::{PrivateStation, StationBootstrapImage};
+use crate::managed::ProbeJobOperation;
 
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
     let mut bytes: Vec<_> = value.encode_wide().collect();
@@ -449,15 +451,15 @@ struct Attributes {
 }
 
 impl Attributes {
-    fn new() -> io::Result<Self> {
+    fn new(count: u32) -> io::Result<Self> {
         let mut length = 0;
-        let _ = unsafe { InitializeProcThreadAttributeList(None, 2, None, &mut length) };
+        let _ = unsafe { InitializeProcThreadAttributeList(None, count, None, &mut length) };
         if length == 0 || length > 65536 {
             return Err(io::Error::other("版本探针启动属性大小无效"));
         }
         let mut storage = vec![0_usize; length.div_ceil(size_of::<usize>())];
         let list = LPPROC_THREAD_ATTRIBUTE_LIST(storage.as_mut_ptr().cast());
-        unsafe { InitializeProcThreadAttributeList(Some(list), 2, None, &mut length) }
+        unsafe { InitializeProcThreadAttributeList(Some(list), count, None, &mut length) }
             .map_err(io::Error::other)?;
         Ok(Self { storage, list })
     }
@@ -468,6 +470,86 @@ impl Drop for Attributes {
         unsafe { DeleteProcThreadAttributeList(self.list) };
         std::hint::black_box(&self.storage);
     }
+}
+
+// 指定另一父进程后，HANDLE_LIST 使用该父进程表中的值，不能沿用创建者的值。
+struct InheritedStreams<'a> {
+    parent: Option<BorrowedHandle<'a>>,
+    handles: Vec<HANDLE>,
+}
+
+impl<'a> InheritedStreams<'a> {
+    fn new(parent: Option<BorrowedHandle<'a>>) -> io::Result<Self> {
+        let mut result = Self {
+            parent,
+            handles: Vec::new(),
+        };
+        for stream in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
+            let original = unsafe { GetStdHandle(stream) }.map_err(io::Error::other)?;
+            let mut duplicate = HANDLE::default();
+            unsafe {
+                DuplicateHandle(
+                    GetCurrentProcess(),
+                    original,
+                    result.parent_handle(),
+                    &mut duplicate,
+                    0,
+                    true,
+                    DUPLICATE_SAME_ACCESS,
+                )
+            }
+            .map_err(io::Error::other)?;
+            result.handles.push(duplicate);
+        }
+        Ok(result)
+    }
+
+    fn parent_handle(&self) -> HANDLE {
+        self.parent
+            .map(|parent| HANDLE(parent.as_raw_handle()))
+            .unwrap_or_else(|| unsafe { GetCurrentProcess() })
+    }
+
+    fn close(&mut self) -> io::Result<()> {
+        let parent = self.parent_handle();
+        let mut failure = None;
+        for source in self.handles.drain(..) {
+            let mut local = HANDLE::default();
+            // CLOSE_SOURCE 即使返回失败也会关闭源值；每个远端值只能消费一次。
+            let result = unsafe {
+                DuplicateHandle(
+                    parent,
+                    source,
+                    GetCurrentProcess(),
+                    &mut local,
+                    0,
+                    false,
+                    DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS,
+                )
+            };
+            match result {
+                Ok(()) => drop(owned(local)),
+                Err(error) => {
+                    failure.get_or_insert_with(|| io::Error::other(error));
+                }
+            }
+        }
+        failure.map_or(Ok(()), Err)
+    }
+}
+
+impl Drop for InheritedStreams<'_> {
+    fn drop(&mut self) {
+        let _ = self.close();
+    }
+}
+
+enum ProbeCommand<'a> {
+    Fixed {
+        arguments: Option<&'a OsStr>,
+        environment: &'a [(OsString, OsString)],
+    },
+    Mapped(Box<dyn FnOnce(&Path) -> io::Result<(OsString, Vec<(OsString, OsString)>)> + 'a>),
 }
 
 #[path = "windows_appcontainer_desktop.rs"]
@@ -486,6 +568,8 @@ pub struct AppContainerProbe {
     grants: Vec<Grant>,
     job: OwnedHandle,
     process: Option<OwnedHandle>,
+    confirmed_exit_code: Option<u32>,
+    startup_failure: Option<io::Error>,
     thread: Option<OwnedHandle>,
     process_id: u32,
     cleaned: bool,
@@ -497,7 +581,10 @@ pub struct AppContainerProbe {
 
 enum ProbeDesktopMode<'a> {
     Inherited,
-    NewLogon(&'a StationBootstrapImage),
+    NewLogon(
+        &'a StationBootstrapImage,
+        &'a mut dyn FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
+    ),
     #[cfg(any(test, feature = "test-util"))]
     Private,
     #[cfg(any(test, feature = "test-util"))]
@@ -532,10 +619,12 @@ impl AppContainerProbe {
     ) -> io::Result<Self> {
         Self::spawn_internal(
             program,
-            None,
+            ProbeCommand::Fixed {
+                arguments: None,
+                environment,
+            },
             cwd,
             cwd,
-            environment,
             name,
             None,
             ProbeConsoleMode::NoWindow,
@@ -612,24 +701,24 @@ impl AppContainerProbe {
     /// 新站由精确绑定的两段 helper 持有；仅向本轮 AppContainer SID 授权。
     pub fn spawn_package_suspended_with_station(
         program: &Path,
-        arguments: &std::ffi::OsStr,
         cwd: &Path,
         execution_cwd: &Path,
-        environment: &[(OsString, OsString)],
         name: &str,
         readonly: &[std::path::PathBuf],
         bootstrap: &StationBootstrapImage,
+        mut authorize: impl FnMut(ProbeJobOperation, BorrowedHandle<'_>) -> io::Result<()>,
+        prepare_command: impl FnOnce(&Path) -> io::Result<(OsString, Vec<(OsString, OsString)>)>,
     ) -> io::Result<Self> {
-        Self::spawn_package_internal(
+        Self::verify_package_paths(cwd, execution_cwd, readonly)?;
+        Self::spawn_internal(
             program,
-            arguments,
+            ProbeCommand::Mapped(Box::new(prepare_command)),
             cwd,
             execution_cwd,
-            environment,
             name,
-            readonly,
+            Some(readonly),
             ProbeConsoleMode::NoWindow,
-            ProbeDesktopMode::NewLogon(bootstrap),
+            ProbeDesktopMode::NewLogon(bootstrap, &mut authorize),
         )
     }
 
@@ -699,6 +788,27 @@ impl AppContainerProbe {
         console_mode: ProbeConsoleMode,
         desktop_mode: ProbeDesktopMode<'_>,
     ) -> io::Result<Self> {
+        Self::verify_package_paths(cwd, execution_cwd, readonly)?;
+        Self::spawn_internal(
+            program,
+            ProbeCommand::Fixed {
+                arguments: Some(arguments),
+                environment,
+            },
+            cwd,
+            execution_cwd,
+            name,
+            Some(readonly),
+            console_mode,
+            desktop_mode,
+        )
+    }
+
+    fn verify_package_paths(
+        cwd: &Path,
+        execution_cwd: &Path,
+        readonly: &[PathBuf],
+    ) -> io::Result<()> {
         if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
             return Err(io::Error::other("版本探针执行目录不匹配"));
         }
@@ -710,25 +820,14 @@ impl AppContainerProbe {
         {
             return Err(io::Error::other("包探针的只读对象范围无效"));
         }
-        Self::spawn_internal(
-            program,
-            Some(arguments),
-            cwd,
-            execution_cwd,
-            environment,
-            name,
-            Some(readonly),
-            console_mode,
-            desktop_mode,
-        )
+        Ok(())
     }
 
     fn spawn_internal(
         program: &Path,
-        arguments: Option<&std::ffi::OsStr>,
+        command: ProbeCommand<'_>,
         cwd: &Path,
         execution_cwd: &Path,
-        environment: &[(OsString, OsString)],
         name: &str,
         readonly: Option<&[std::path::PathBuf]>,
         console_mode: ProbeConsoleMode,
@@ -768,6 +867,8 @@ impl AppContainerProbe {
             grants: Vec::new(),
             job,
             process: None,
+            confirmed_exit_code: None,
+            startup_failure: None,
             thread: None,
             process_id: 0,
             cleaned: false,
@@ -778,11 +879,14 @@ impl AppContainerProbe {
         };
         // 只在 fresh profile 创建成功后查询本轮 SID，失败仍由 result 的原清理路径回收。
         result.profile_directories = Some(NativeProfileDirectories::capture(result.sid)?);
+        let mut authorize = None;
         match desktop_mode {
             ProbeDesktopMode::Inherited => {}
-            ProbeDesktopMode::NewLogon(image) => {
-                result.private_station =
-                    Some(PrivateStation::create(image, cwd, name, result.sid)?);
+            ProbeDesktopMode::NewLogon(image, bind_job) => {
+                result.private_station = Some(PrivateStation::create(
+                    image, cwd, name, result.sid, bind_job,
+                )?);
+                authorize = Some(bind_job);
             }
             #[cfg(any(test, feature = "test-util"))]
             ProbeDesktopMode::Private => {
@@ -814,6 +918,23 @@ impl AppContainerProbe {
                 }
             }
         }
+        let (arguments, environment) = match command {
+            ProbeCommand::Fixed {
+                arguments,
+                environment,
+            } => (
+                Cow::Borrowed(arguments.unwrap_or_else(|| OsStr::new("--version"))),
+                Cow::Borrowed(environment),
+            ),
+            ProbeCommand::Mapped(prepare) => {
+                let station = result
+                    .private_station
+                    .as_ref()
+                    .ok_or_else(|| io::Error::other("版本探针缺少私有路径映射"))?;
+                let (arguments, environment) = prepare(station.mapped_root()?)?;
+                (Cow::Owned(arguments), Cow::Owned(environment))
+            }
+        };
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
         unsafe {
@@ -846,7 +967,25 @@ impl AppContainerProbe {
             CapabilityCount: 0,
             Reserved: 0,
         };
-        let attributes = Attributes::new()?;
+        let mut startup = STARTUPINFOEXW::default();
+        startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        if let Some(station) = &mut result.private_station {
+            station.configure_startup(&mut startup.StartupInfo)?;
+        }
+        #[cfg(any(test, feature = "test-util"))]
+        if let Some(desktop) = &mut result.private_desktop {
+            desktop.configure_startup(&mut startup.StartupInfo)?;
+        }
+        let parent = result
+            .private_station
+            .as_ref()
+            .map(PrivateStation::parent_process)
+            .transpose()?;
+        let mut parent_handle = parent.map(|parent| HANDLE(parent.as_raw_handle()));
+        let mut streams = InheritedStreams::new(parent)?;
+        let mut handles = streams.handles.clone();
+        let attributes = Attributes::new(if parent.is_some() { 3 } else { 2 })?;
         unsafe {
             UpdateProcThreadAttribute(
                 attributes.list,
@@ -859,25 +998,20 @@ impl AppContainerProbe {
             )
         }
         .map_err(io::Error::other)?;
-        let mut streams = Vec::new();
-        for stream in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
-            let original = unsafe { GetStdHandle(stream) }.map_err(io::Error::other)?;
-            let mut duplicate = HANDLE::default();
+        if let Some(parent) = &mut parent_handle {
             unsafe {
-                DuplicateHandle(
-                    GetCurrentProcess(),
-                    original,
-                    GetCurrentProcess(),
-                    &mut duplicate,
+                UpdateProcThreadAttribute(
+                    attributes.list,
                     0,
-                    true,
-                    DUPLICATE_SAME_ACCESS,
+                    PROC_THREAD_ATTRIBUTE_PARENT_PROCESS as usize,
+                    Some((parent as *mut HANDLE).cast()),
+                    size_of::<HANDLE>(),
+                    None,
+                    None,
                 )
             }
             .map_err(io::Error::other)?;
-            streams.push(owned(duplicate));
         }
-        let mut handles: Vec<_> = streams.iter().map(handle).collect();
         unsafe {
             UpdateProcThreadAttribute(
                 attributes.list,
@@ -890,20 +1024,10 @@ impl AppContainerProbe {
             )
         }
         .map_err(io::Error::other)?;
-        let mut startup = STARTUPINFOEXW::default();
-        startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
-        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
         startup.StartupInfo.hStdInput = handles[0];
         startup.StartupInfo.hStdOutput = handles[1];
         startup.StartupInfo.hStdError = handles[2];
         startup.lpAttributeList = attributes.list;
-        if let Some(station) = &mut result.private_station {
-            station.configure_startup(&mut startup.StartupInfo)?;
-        }
-        #[cfg(any(test, feature = "test-util"))]
-        if let Some(desktop) = &mut result.private_desktop {
-            desktop.configure_startup(&mut startup.StartupInfo)?;
-        }
         let console_flags = console_mode.configure_startup(&mut startup.StartupInfo);
         let program_wide = wide(program.as_os_str())?;
         if program_wide.contains(&(b'"' as u16)) {
@@ -912,7 +1036,7 @@ impl AppContainerProbe {
         let mut command = vec![b'"' as u16];
         command.extend_from_slice(&program_wide[..program_wide.len() - 1]);
         command.extend("\" ".encode_utf16());
-        let arguments = wide(arguments.unwrap_or_else(|| std::ffi::OsStr::new("--version")))?;
+        let arguments = wide(&arguments)?;
         command.extend_from_slice(&arguments);
         // Grant 已持有规范目录的句柄；重验别名后才交给 CreateProcessW，禁止切换目录。
         if !execution_cwd.is_absolute() || execution_cwd.canonicalize()? != cwd {
@@ -924,7 +1048,7 @@ impl AppContainerProbe {
             .as_ref()
             .ok_or_else(|| io::Error::other("版本探针原生 profile 绑定缺失"))?;
         profile.verify(result.sid)?;
-        let mut environment = profile_environment(environment, profile.base.as_os_str())?;
+        let mut environment = profile_environment(&environment, profile.base.as_os_str())?;
         environment.sort_by_key(|(key, _)| key.to_string_lossy().to_ascii_uppercase());
         let mut block = Vec::new();
         for (key, value) in environment {
@@ -938,7 +1062,7 @@ impl AppContainerProbe {
         }
         block.push(0);
         let mut process = PROCESS_INFORMATION::default();
-        unsafe {
+        let spawned = unsafe {
             CreateProcessW(
                 PCWSTR(program_wide.as_ptr()),
                 Some(PWSTR(command.as_mut_ptr())),
@@ -955,21 +1079,46 @@ impl AppContainerProbe {
                 &startup.StartupInfo,
                 &mut process,
             )
-        }
-        .map_err(io::Error::other)?;
+        };
+        // 属性引用的父句柄和白名单缓冲仍有效时销毁列表，再收回远端标准流副本。
+        drop(attributes);
+        let streams_closed = streams.close();
+        drop(streams);
+        spawned.map_err(io::Error::other)?;
         result.process = Some(owned(process.hProcess));
         result.thread = Some(owned(process.hThread));
         result.process_id = process.dwProcessId;
-        // 必须已继承外层托管 Job；随后加入无 breakaway 的本次探针子 Job。
-        let mut inherited = BOOL::default();
-        unsafe { IsProcessInJob(process.hProcess, None, &mut inherited) }
-            .map_err(io::Error::other)?;
-        if !inherited.as_bool() {
-            return Err(io::Error::other("版本探针未继承托管 Job"));
+        let binding = (|| {
+            streams_closed?;
+            if let Some(station) = &result.private_station {
+                station.verify_package_identity(unsafe {
+                    BorrowedHandle::borrow_raw(process.hProcess.0)
+                })?;
+            } else {
+                let mut inherited = BOOL::default();
+                unsafe { IsProcessInJob(process.hProcess, None, &mut inherited) }
+                    .map_err(io::Error::other)?;
+                if !inherited.as_bool() {
+                    return Err(io::Error::other("版本探针未继承托管 Job"));
+                }
+            }
+            // 挂起期间加入候选子 Job，并由唯一持原外层 Job 的监督者核验真实成员关系。
+            unsafe { AssignProcessToJobObject(handle(&result.job), process.hProcess) }
+                .map_err(io::Error::other)?;
+            if let Some(authorize) = &mut authorize {
+                authorize(ProbeJobOperation::VerifyCandidate, unsafe {
+                    BorrowedHandle::borrow_raw(process.hProcess.0)
+                })?;
+            }
+            result.verify_token()
+        })();
+        if let Err(failure) = binding {
+            if result.private_station.is_none() {
+                return Err(failure);
+            }
+            // 原调试线程必须拿到进程后才能终止并排空 CREATE/EXIT；拒绝恢复但保留所有权。
+            result.startup_failure = Some(failure);
         }
-        unsafe { AssignProcessToJobObject(handle(&result.job), process.hProcess) }
-            .map_err(io::Error::other)?;
-        result.verify_token()?;
         Ok(result)
     }
 
@@ -1005,6 +1154,9 @@ impl AppContainerProbe {
     }
 
     fn verify_token_for(&self, process: HANDLE) -> io::Result<()> {
+        if let Some(station) = &self.private_station {
+            station.verify_package_identity(unsafe { BorrowedHandle::borrow_raw(process.0) })?;
+        }
         let mut token = HANDLE::default();
         unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) }.map_err(io::Error::other)?;
         let token = owned(token);
@@ -1057,6 +1209,12 @@ impl AppContainerProbe {
     }
 
     pub fn resume(&mut self) -> io::Result<()> {
+        if let Some(failure) = &self.startup_failure {
+            return Err(match failure.raw_os_error() {
+                Some(code) => io::Error::from_raw_os_error(code),
+                None => io::Error::new(failure.kind(), failure.to_string()),
+            });
+        }
         self.verify_token()?;
         let thread = self
             .thread
@@ -1069,6 +1227,9 @@ impl AppContainerProbe {
     }
 
     pub fn exit_code(&self) -> io::Result<u32> {
+        if let Some(code) = self.confirmed_exit_code {
+            return Ok(code);
+        }
         let mut code = 0;
         unsafe {
             GetExitCodeProcess(
@@ -1125,8 +1286,11 @@ impl AppContainerProbe {
             return Err(io::Error::other("版本探针进程或 Job 尚未确认退出"));
         }
         if self.process.is_some() {
-            self.exit_code()?;
+            self.confirmed_exit_code = Some(self.exit_code()?);
         }
+        // 新 LUID 的所有候选对象句柄先释放，之后才允许建站 helper 等待登录会话消失。
+        self.thread = None;
+        self.process = None;
         if let Some(station) = &mut self.private_station {
             // CLI 与其严格 Job 已退出，才允许 helper 释放本轮站与新登录会话。
             station.close()?;
@@ -1184,6 +1348,9 @@ impl Drop for AppContainerProbe {
             }
             // 正常 close 的错误仍返回调用方；析构只在业务进程确证退出后收敛辅助资源。
             if self.processes_terminated().unwrap_or(false) {
+                self.confirmed_exit_code = self.exit_code().ok();
+                self.thread = None;
+                self.process = None;
                 let station_reaped = match &mut self.private_station {
                     Some(station) => station.abort_and_reap().is_ok(),
                     None => true,
