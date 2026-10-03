@@ -370,7 +370,29 @@ fn historical_pair_and_same_version_transactions_remain_available() {
     assert_eq!(validate(None, "2.1.287", "2.1.287", &None), Ok(()));
 }
 
-#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+#[cfg(all(windows, target_arch = "x86_64"))]
+#[test]
+fn windows_consumer_support_does_not_admit_unreviewed_upgrades() {
+    assert_eq!(
+        select(
+            CLIAgent::Claude,
+            Source::Npm,
+            "2.1.280",
+            "2.1.285",
+            Channel::Stable
+        ),
+        Err(Error::InvalidRelease)
+    );
+    assert_eq!(
+        validate(None, "2.1.280", "2.1.287", &None),
+        Err(Error::RecoveryRequired)
+    );
+}
+
+#[cfg(not(any(
+    all(target_os = "macos", target_arch = "aarch64"),
+    all(windows, target_arch = "x86_64")
+)))]
 #[test]
 fn new_consumer_migrations_are_unavailable_on_other_hosts() {
     assert_eq!(

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿；G09 Mac功能链已齐备。770普通两平台源码门禁通过；fcd门禁Linux因三辅助方法平台遗漏编译失败，修复已过本机门禁、待平台复验，Windows同run仍在编译；已证原生失败与历史LEAK保留",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；873 Linux源码门禁5427普通PASS，原fcd Windows捕获旧平台拒绝断言错误，修正通过本机门禁、待Windows复验；已证原生运行失败保留",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1439,6 +1439,46 @@
       },
       "localization": "无需本地化变更；底层平台补齐，现有英中错误和恢复语义及布局保持。",
       "remaining": "保留本次编译失败；待原run自然结束后按最新修复提交验证Linux/Windows。真实Finder拖放、两项Windows原生失败仍开放，其他平台实机按授权移交。"
+    },
+    "g09_source_gate_873_linux_terminal_20261003": {
+      "commit": "873a7eb44ce754d2efd36ed859f1e970769e3d62",
+      "run_id": 37076566107,
+      "url": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37076566107",
+      "linux": "success",
+      "ordinary_pass": 5427,
+      "new_or_enhanced_named_pass": 17,
+      "rust_genai_pass": 81,
+      "i18n_executions": 22,
+      "i18n_unique": 11,
+      "fail_leak_retry_flaky_timeout": 0,
+      "official_artifacts_verified": 2,
+      "final_index_sha256": "228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583",
+      "remote_temp": "retained; cleanup_ready=false; ValueError",
+      "unselected_platforms": [
+        "windows",
+        "macos"
+      ],
+      "native_failures_superseded": false,
+      "gaps_closed": []
+    },
+    "g09_windows_consumer_test_fix_20261003": {
+      "base_commit": "873a7eb44ce754d2efd36ed859f1e970769e3d62",
+      "failed_run": 37074002886,
+      "failed_run_commit": "fcdab2b7082d7bddc63bde3b7dbc36f49f17c0bb",
+      "failed_step": 44,
+      "observed_step_pass": 3358,
+      "observed_step_fail": 1,
+      "evidence_boundary": "认证Actions可见步骤日志；官方完整日志待run自然结束终审",
+      "fix": "Windows x64继续拒绝未审核升级，预期InvalidRelease/RecoveryRequired；其余未支持主机保留UnsupportedPlatform；生产逻辑未变",
+      "local_gate_sha256": "e89f6959238c94b7ca77fa923cb80bbc77d0dde235f995f58c565fa43b4ccda3",
+      "local_check": true,
+      "local_focused_pass": 14,
+      "local_i18n_pass": 11,
+      "local_short_roots_cleaned": true,
+      "windows_target_gate": "pending",
+      "localization": "无需本地化变更",
+      "native_causal_evidence": "已有runner可取证；独立归档实现未接线或执行，不是修复或关闭证据",
+      "gaps_closed": []
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -1641,7 +1681,7 @@
   "internal_execution_policy": "2026-09-27 续作使用 SanDisk 外置盘：Cargo target 为 /Volumes/SanDisk/github/InfiniShell-Desktop/target，禁用增量及 dev/test 调试信息；联测包位于 target/parity，证据位于 /Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260927。使用独立 parity-sandisk-20260927 profile，不修改日常 profile、凭据或系统安全设置。历史内置盘策略已不代表本轮执行位置。 2026-09-28按用户要求，测试临时目录例外固定为内置盘/Users/zhishi/InfiniShell-Tests，逐轮登记、归档后即时清理，每日04:00补查；Cargo target和联测包仍在上述外置位置，长期证据按各批次保留于SanDisk外置盘；本轮证据位于/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20260928。",
   "scope_interpretation": "2026-09-30 用户明确后置其他平台实机验收；不删除 Mac 功能要求或原生能力条件，历史证据不改记为全平台通过。",
   "documentation_updated_at": "2026-10-03",
-  "documentation_source_commit": "04ac0d46f847b7c9246fbf9193f4ac2c76f6b9af",
+  "documentation_source_commit": "873a7eb44ce754d2efd36ed859f1e970769e3d62",
   "validation_report": "VALIDATION_REPORT.md",
   "historical_evidence_root": "https://github.com/Infinimesh-ai/InfiniShell-Desktop/blob/e3ef39689cd8b686dfe040b90217ed1067b4d268/specs/cli-agent-parity/validation/",
   "current_increment": {

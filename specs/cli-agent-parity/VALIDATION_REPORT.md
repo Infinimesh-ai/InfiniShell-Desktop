@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：Linux 修复复验通过，Windows 平台拒绝断言修正
+
+新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。精确 `873a7eb44ce754d2efd36ed859f1e970769e3d62` 的 [37076566107](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37076566107) Linux源码门禁成功：5427普通PASS，新增/增强17项逐名通过，另rust-genai 81项通过；无FAIL/LEAK/RETRY/FLAKY/TIMEOUT。updates275，i18n22次执行／11唯一；步骤范围与770一致。两个官方ZIP的API大小、SHA及CRC全部核验，最终索引 `228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583`，完整日志 `7b0e0e84c6a802afdd361f2c48ec9bb1b88b0505fe63d66a1372a003c8fc2acb`。Windows/macOS未选择；远端辅助临时根因ValueError仍retained、cleanup_ready=false，不称清理完成。此轮只证明源码门禁，不覆盖原生专项失败。
+
+原fcd的 [37074002886](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37074002886) Windows步骤44已失败；认证Actions界面显示3359项中3358通过、1失败，第三次尝试仍为 `new_consumer_migrations_are_unavailable_on_other_hosts`。`sources_claude_downgrade_tests.rs:376` 实际 `InvalidRelease`，旧预期 `UnsupportedPlatform`；当前Windows x64已实现限定降级，未经审核的280→285应继续拒绝为InvalidRelease，280→287的validate应拒绝为RecoveryRequired。现将Windows两条拒绝单列，其他未支持主机保留原断言；生产允许集未变，独审无阻断。原run继续自然收尾，完整官方日志及其他用例终审待齐，不以界面片段代替全量通过。
+
+本机check `r-8a38tho1`、聚焦 `r-qxb634of`14普通PASS／8705 skipped、i18n `r-ks2e0nws`11项通过，三个短根均核验清理；门禁索引 `e89f6959238c94b7ca77fa923cb80bbc77d0dde235f995f58c565fa43b4ccda3`，仓外 `g09-windows-consumer-test-fix-v1`。Mac未执行新增Windows cfg分支，修正仍待精确Windows源码复验。无需本地化变更：仅测试平台分类和错误预期，无用户行为、文案或布局变化。
+
+G03仍缺真实Finder拖放；G09仍有Windows首CMD候选停滞及固定Codex hooks未自然退出。已找到现有runner可采集取消前原生线程、实际创建调用返回和桌面对象关联的方案，归档实现尚未接线或执行；不是已修复证据，不关闭G09，也不把问题归结为缺少设备。
+
 ## 2026-10-03：精确源码门禁捕获 Linux 原子改名遗漏
 
 新增关闭0项，仍为9关闭／G03、G09共2开放／3移交，PR草稿。精确770的[37063514848](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37063514848)两平台成功：Linux5411、Windows5015普通PASS，新/增强5/4项逐名通过，updates261/157；i18n各22次执行、11唯一用例，无FAIL/LEAK/RETRY/FLAKY。3个官方ZIP按API大小/摘要和CRC全部核验，最终索引SHA `1041bba3460c38feeb735633f82cb04e88d5675525dc86b879594a8da62c71a8`。Linux Grok辅助临时根仍retained/cleanup_ready=false；只有收尾ValueError类型，无消息/栈，源码可证未进入递归删除，不能宣称远端已清理。外部原生专项按模式跳过，6726失败保留；此结果不外推后续三批降级代码。
