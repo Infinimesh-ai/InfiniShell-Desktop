@@ -5,7 +5,7 @@ use std::os::windows::io::BorrowedHandle;
 use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImageNameW};
 use windows::core::PWSTR;
 
-use super::creation_witness::{CreationWitness, Disposition, VerifiedImage};
+use super::creation_witness::{CreationWitness, Disposition, Summary, VerifiedImage};
 use super::native_snapshot::{VerifiedModule, capture, prepare_modules};
 use super::*;
 
@@ -47,6 +47,7 @@ pub(super) struct NativeWitness {
     modules: HashMap<u32, Vec<BoundModule>>,
     births: HashMap<u32, u64>,
     creation: Option<CreationWitness>,
+    completed_creation: Option<Summary>,
     creation_unavailable: Option<serde_json::Value>,
     snapshot: Option<serde_json::Value>,
     failures: Vec<serde_json::Value>,
@@ -110,6 +111,7 @@ impl WindowsImageDebugSession {
                 modules: HashMap::new(),
                 births: HashMap::new(),
                 creation: None,
+                completed_creation: None,
                 creation_unavailable: None,
                 snapshot: None,
                 failures: Vec::new(),
@@ -596,10 +598,15 @@ impl WindowsImageDebugSession {
             && !witness.exit_confirmed
             && self.root_exit_observed
         {
-            if let Some(creation) = &mut witness.creation
-                && let Err(failure) = creation.confirm_process_exit(at_ms)
-            {
-                return Err(self.native_failure("original_exit", failure));
+            if let Some(creation) = witness.creation.take() {
+                match creation.finish_after_exit(at_ms) {
+                    Ok(summary) => witness.completed_creation = Some(summary),
+                    Err((creation, failure)) => {
+                        // 确认失败保留原句柄；不能让暂取对象变成未获证的提前释放。
+                        witness.creation = Some(creation);
+                        return Err(self.native_failure("original_exit", failure));
+                    }
+                }
             }
             witness.exit_confirmed = true;
         }
@@ -608,7 +615,7 @@ impl WindowsImageDebugSession {
 
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
-            let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
+            let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
             // 仅地址、摘要、对象身份和固定错误类别；不含内存字节、路径、命令行或环境。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }

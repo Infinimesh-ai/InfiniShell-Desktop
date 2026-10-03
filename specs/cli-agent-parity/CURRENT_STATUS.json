@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；Windows取证编译发现3个方法可见性错误，已最小修正并过本机check，待目标复验；原生首CMD停滞和Codex退出失败仍开放",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；234 Windows编译与普通回归已过，原生结果待取得；另修复退出获证后的取证句柄释放并过本机门禁，目标待验；首CMD停滞和Codex退出失败仍开放",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1536,6 +1536,26 @@
       "local_short_root_cleaned": true,
       "windows_recheck": "pending",
       "localization": "无需本地化变更：仅内部方法可见范围修正，不变更运行逻辑、用户文案或布局",
+      "gaps_closed": []
+    },
+    "g09_witness_handle_lifetime_20261003": {
+      "base_commit": "234dbf7776587bd32f302e5050aed61a9a889bd2",
+      "source_index_sha256": "728f59633cff9b2263e138095d516e4af391353303054321c25c7d57d09c378d",
+      "local_gate_sha256": "19124db872c95279e4d43f6bde12cb7a748ad47971d9c573bbac9d757e3d4dbe",
+      "change": "原process/thread双句柄退出获证后释放新增取证句柄，失败仍保留原对象；完成摘要继续保留",
+      "cargo_check": true,
+      "i18n_pass": 11,
+      "windows_metadata_test_count": 22,
+      "metadata_is_execution": false,
+      "windows_glue_typechecked": false,
+      "short_roots_cleaned": true,
+      "original_failure_cause_proven": false,
+      "live_run": 37086236420,
+      "live_run_source_commit": "234dbf7776587bd32f302e5050aed61a9a889bd2",
+      "live_run_contains_this_increment": false,
+      "live_run_observed": "Windows编译、普通生命周期回归、command归属及CLI监督程序构建成功，进入限定npm原生步骤；libtest、25项取证及实际候选结果仍待取得",
+      "target_recheck": "pending",
+      "localization": "无需本地化变更：仅内部取证对象生命周期，不改变英中用户文案、错误语义或布局",
       "gaps_closed": []
     }
   },

@@ -1308,7 +1308,7 @@ impl CreationWitness {
         Ok(())
     }
     /// 仅原 Job 清理和 EXIT 继续后调用；不把退出当成寄存器恢复成功。
-    pub(super) fn confirm_process_exit(&mut self, at_ms: u128) -> Result<()> {
+    fn confirm_process_exit(&mut self, at_ms: u128) -> Result<()> {
         self.time(at_ms)?;
         for handle in [
             HANDLE(self.process.as_raw_handle()),
@@ -1332,6 +1332,17 @@ impl CreationWitness {
         }
         Ok(())
     }
+    /// 确认失败时交回原对象；仅双句柄退出成功后消费对象，释放复制句柄并保留安全摘要。
+    pub(super) fn finish_after_exit(
+        mut self,
+        at_ms: u128,
+    ) -> std::result::Result<Summary, (Self, Failure)> {
+        if let Err(failure) = self.confirm_process_exit(at_ms) {
+            return Err((self, failure));
+        }
+        Ok(self.summary)
+    }
+
     pub(super) fn requires_restore_or_original_exit(&self) -> bool {
         self.dirty
     }

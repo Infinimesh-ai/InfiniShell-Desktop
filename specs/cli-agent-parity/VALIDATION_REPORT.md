@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：退出获证后释放原生取证句柄
+
+新增关闭0项，仍9关闭／G03、G09开放／3移交，PR草稿。精确234dbf777的[37086236420](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37086236420)已通过Windows编译、普通生命周期回归、command归属及CLI监督程序构建，进入限定npm原生步骤；该步先构建libtest并执行25项取证纯测试及ce6降级组，步骤启动不代表首CMD已执行。整轮及原生结果尚未取得，不提前计通过。
+
+源码审查确认新增CreationWitness仍跨过窗口站／LSA清理持有复制进程和线程句柄。现仅在双原句柄退出获证后消费对象、保存安全Summary并释放句柄；确认失败完整交回对象，先恢复持有再报错。结果字段保持兼容，退出前的恢复责任不变。此为诊断生命周期修复，尚无证据证明它导致原来的LSA或CMD停滞，不将其记为原生故障已解决。
+
+两文件源码索引 `728f59633cff9b2263e138095d516e4af391353303054321c25c7d57d09c378d`，本机check `r-4goa1feb`、i18n 11项 `r-8c6zmdy_`通过；Windows creation/snapshot 22项仅元数据类型检查 `r-tefnba2s`通过，未执行测试、不覆盖app glue及实际句柄释放。三短根均核验清理，门禁索引 `19124db872c95279e4d43f6bde12cb7a748ad47971d9c573bbac9d757e3d4dbe`，仓外 `g09-witness-handle-lifetime-v1`。无需本地化变更：仅内部取证对象生命周期，不改变英中用户文案、错误语义或布局。当前运行不含此增量，目标复验留待下一精确提交，不中断现有取证。
+
 ## 2026-10-03：修复 Windows 取证模块可见性
 
 新增关闭0项，仍9关闭／G03、G09开放／3移交，PR草稿。精确ae9790698的[37084517646](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37084517646)已结束为failure：Windows步骤35出现3个E0624，兄弟npm_windows_probe调用的绑定、取消与结果方法仍仅对atomic_windows可见。25项Rust纯测试、ce6断言及首CMD原生均未开始，辅助脚本通过不代替这些验收。完整日志SHA `d666c46c8a2fa7bafb1c6941d18f89c3036828d00a48fadabe6f4b0d64d6a3fc`，官方唯一环境ZIP大小／SHA／CRC核验，终审索引 `39e0082e1a4ea7dcce0c7a37d8154e056590f0b9f0bf515da0ce215a5ecaf50b`。
