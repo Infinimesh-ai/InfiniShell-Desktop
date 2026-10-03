@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03首拖初始化已修，6296新Mac窗口待真实单次拖放确认；同提交Linux首拖回归通过，但SSH通知测试PTY零字节失败，根因未定，Windows源码门禁仍执行。G09已实现独立登录会话的私有盘根映射、候选父进程/标准流绑定和原监督Job双阶段接管；本机check、35项定向、11项i18n及Windows command交叉check通过，真实CMD/PowerShell完整更新恢复和最终源码门禁仍待验。本轮新增关闭0项。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。G03首拖初始化已修，新Mac窗口待真实单次拖放确认；6296源码门禁已终审为整轮failure，Linux SSH通知失败、Windows成功但菜单用例1条LEAK保留。新f576 Linux编译和生命周期通过，通知步骤37再次失败，具体诊断待官方完整日志，不假定同因。G09私有盘根、候选父进程/标准流绑定和原监督Job双阶段接管已提交，完整Windows原生更新恢复正在验收，尚无通过结论。本轮新增关闭0项。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -9145,6 +9145,56 @@
     "windows": "in_progress",
     "diagnostic_contract_tests_passed": 12,
     "diagnostic_change_is_a_fix": false,
+    "newly_closed": []
+  },
+  "g03_source_gate_terminal_20261004": {
+    "commit": "6296fb36a2adee2c9b670f68050f7929a014efab",
+    "run_id": 37140741806,
+    "conclusion": "failure",
+    "final_review_sha256": "e7718d52358061a948207c871dba9253d554c2ef7bede47e0e7c708534b3a3f4",
+    "linux": {
+      "conclusion": "failure",
+      "nextest_ordinary_pass": 5428,
+      "rust_genai_pass": 81,
+      "i18n_unique_pass": 11,
+      "first_drop": "ordinary_pass",
+      "python_notification": {
+        "pass": 21,
+        "fail": 1,
+        "skip": 2,
+        "failed_test": "DetachedGrokHookTests.test_ssh_terminal_without_bootstrap_still_uses_real_pty",
+        "diagnosis": "terminal_read_deadline bytes=0, root cause unknown"
+      }
+    },
+    "windows": {
+      "conclusion": "success",
+      "nextest_ordinary_pass": 5056,
+      "nextest_leak": 1,
+      "leak_test": "terminal::input::tests::test_ai_context_menu_preserves_lock_state",
+      "rust_genai_pass": 81,
+      "i18n_unique_pass": 11,
+      "first_drop": "not_compiled_unix_cfg",
+      "full_log_sha256": "0775121a2096c86b7b1133cad86af7272bbf7605eb269914b750ccc80b49958d"
+    },
+    "mac_first_drop_real_gui": "pending_user",
+    "newly_closed": [],
+    "documentation_gate": {
+      "cargo_check": "passed",
+      "run_id": "r-7nu0xe2o",
+      "log_sha256": "7bca83a1fcde7a0e60fa4d80ff2db19ae48d1a03245d3303576728fc42b38cf4",
+      "short_root": "cleaned",
+      "localization": "无需本地化变更；仅记录实际门禁结果，无产品或用户文案变化"
+    }
+  },
+  "f576_source_and_native_runs_20261004": {
+    "commit": "f5763d34e6ed8a1fddb5c4c23ae9fe7c7d1f8449",
+    "linux_run": 37145283547,
+    "linux_status": "in_progress_with_step_37_failure",
+    "linux_check_and_lifecycle": "passed",
+    "linux_failure_details": "pending_official_complete_log; do not assume same cause as6296",
+    "windows_run": 37145335699,
+    "windows_status": "in_progress",
+    "windows_native_acceptance": "not_yet_proven",
     "newly_closed": []
   }
 }

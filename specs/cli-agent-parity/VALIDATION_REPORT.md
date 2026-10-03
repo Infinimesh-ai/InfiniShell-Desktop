@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：6296 首拖源码门禁终审及 f576 待验边界
+
+**2026-10-04 首拖源码门禁终审，仍开放**：`6296fb36a` 的[37140741806](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37140741806)已结束，Windows success、Linux failure，整轮 failure。Linux 普通 nextest 5428 项通过，新首拖用例逐名普通PASS；原生通知 Python 24项为21通过／1失败／2跳过，SSH无bootstrap用例PTY零字节超时。Windows 普通 nextest 5056项通过，另1条 `terminal::input::tests::test_ai_context_menu_preserves_lock_state` LEAK单列保留；首拖夹具受Unix cfg限制，不能计Windows执行。两边check及各11项i18n通过，另各81项rust-genai通过；无nextest FAIL／RETRY／FLAKY不代表整轮成功。完整终审SHA `e7718d52358061a948207c871dba9253d554c2ef7bede47e0e7c708534b3a3f4`，仓外 `6296fb36a-ci/final-review.safe.json`。新 `f5763d34e` 的[Linux37145283547](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145283547)已通过编译／生命周期组，但通知步骤37再次失败；具体用例及新诊断待官方完整日志，不假定同因。其[Windows37145335699](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37145335699)完整原生更新验收已开始，尚无结果。Mac修复窗口及未操作的首拖现场保留待用户确认。**本轮新增关闭0项，9关闭／G03、G09开放／V01、V02、V05移交，PR保持草稿。**
+
+此轮只更新已结束门禁的证据和正在运行任务的状态，无产品、文案或布局变化，无需本地化变更。提交前 `cargo check -p warp` 通过（`r-7nu0xe2o`，日志SHA `7bca83a1fcde7a0e60fa4d80ff2db19ae48d1a03245d3303576728fc42b38cf4`），短根按记录核实清理。
+
 ## 2026-10-04：G09 私有盘根实现与待完成的原生验收
 
 **2026-10-04 私有盘根原生实现已补，本机门禁通过，仍开放**：固定 Node 对原卷根 `C:\` 的路径查询仍按旧实测记 EPERM；新实现在第二 helper 的独立登录会话内，将原候选目录按 FileID 绑定为局部 D–Z 盘根，以该 helper 原句柄提供候选父进程及 DeviceMap。仅三路标准句柄复制到选定父进程后进入继承白名单，创建后精确释放；物理 cwd、固定 Node／npm shim、零 capability 和时限保持原约束。监督程序保留唯一外层 Job 句柄，经有界双阶段控制协议先接管 helper、再核验候选确属原 Job；候选创建后绑定失败保留调试清理所有权并禁止恢复。退出时释放原进程／线程句柄，再完成盘符、站和登录会话清理。Mac check、35项定向回归、i18n11项、Python来源合同21项通过；Windows command及测试代码交叉check通过，但不计原生执行。来源绑定35→42、嵌入生产表87→90，新增盘映射测试已接入Windows门禁；actionlint通过。无需本地化变更：内部路径与归属修复沿用英中既有失败提示，无文案或布局改变。收据SHA `6f6281994111e692bf5d4e963bfd2455cfea8d575e0e946780ec4068e42b845c`，仓外 `g09-private-device-map-v1/local-gates-final.safe.json`，本地完成短根已按记录清理。**完整CMD/PowerShell更新、5场景恢复矩阵和原生清理仍待Windows实测，新增关闭0项。**
