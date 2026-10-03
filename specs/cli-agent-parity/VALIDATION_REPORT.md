@@ -1,5 +1,17 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G03 本次 Mac 范围关闭
+
+用户确认新会话未先打开富输入时真实首拖满足预期：`6296fb36a`／固定 Grok `.5`／`r-r6gr9mus` 首次拖入终端即可出现图片卡；人工收据 SHA `07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f`。原普通未绑定 PTY 的 PNG 粘贴／拖放、正确 SID／prompt 与一次 ACK、多图原字节及顺序、焦点／审批等待保稿和英中布局均按各原构建满足；三平台原生合同及固定工件已绑定。功能条件审计 SHA `66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3`，独立关闭审计 SHA `35d962eb93191715cc9c5cc24df8d6fb21cd09a9d8a2086dd97ff2291e296226`。不要求用户重复验收，不新增模型输入或截图声明。
+
+精确 `ce49b12c7` 的 [Windows job 111282010601](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37150103944/job/111282010601) 成功，完整日志 5085 次普通 PASS，FAIL／LEAK／RETRY／FLAKY／TIMEOUT 为 0，9 条通知／迁移和 3 条结果桥逐名一次普通 PASS；i18n 11、rust-genai 81、Node 19 通过。首拖回归受 Unix cfg 限制，不计 Windows 执行。终审 SHA `a23ea8f686c8e4a1a090df2ca8aed612f692a0bb584c5a520145ea3ee32fda37`，官方完整日志 SHA `e14674c7b5f713400f727a5b3a455857c5cbb140a492784ef5e7272f1fa15007`；13 份来源及 3 个官方 ZIP 的 API 摘要／大小、成员 CRC 已核。ce49 Linux 实际 1 FAIL 与整 run failure 保留，Windows 成功不改写它。
+
+精确 `bfb29a8eb` 的 [Linux job 111291798714](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37153388911/job/111291798714) 5444 次普通 PASS及首拖／桥／通知具名用例通过，完整终审 SHA `2b194c1de98232e39b8f570ae140c42fde52da30a522c7667e408d8da556928d`；真实 hook 23 通过／2 缺失 shell 跳过，不计应用 ACK 或冷机启动。ce49→bfb 仅结果桥测试同步及 3 文档变化，生产字节一致；8 份 G03 关键源码在 ce49／bfb／73fc／7c977 一致。此为 G03 阶段关闭，最终 Goal 仍要求 G09 稳定后同一冻结源码提交的两平台相关门禁。历史通知失败与菜单 LEAK 保留，不因本轮普通 PASS 推断根因已修。
+
+两源码观察器均正常退出，短目录按记录清理；首拖私有 GUI 已退出，唯一现场仍 `cleanup_ready=false` 保留。CAPABILITY_MATRIX 与 RELEASE_SUPPORT 的当前 G03、G08、G10、V03 及 G09 Mac 证据同步，历史轮次不改写。本轮仅关闭记录与支持说明，无需本地化变更。G09 的 [73fc 完整 Windows 原生验收](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574) 已进入源码检查；五场景／三冷恢复仍未计通过。**本轮关闭 G03；10 关闭／G09 开放／V01、V02、V05 移交，PR 继续草稿。**
+
+关闭汇总原件 `g03-preparation/g03-current-scope-closure-20261004-v1.safe.json`，SHA `1e3057074514cbb2afa28bf5fbfb1c41ae1a485db34a5b8c6f9f2eda128d6454`。提交前 `cargo check --locked -p warp --features cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed` 通过，短根 `r-4ri5418v` 核实退出并清理，日志 SHA `7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6`；既有编译警告保留。
+
 ## 2026-10-04：Linux 修复门禁通过与既有关闭证据复核
 
 `bfb29a8eb` 的 [Linux 源码门禁 37153388911](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37153388911) 成功，完整原日志、工件及 14 份源码已核验。普通 nextest 5444 通过，FAIL／LEAK／RETRY／FLAKY／TIMEOUT 均为 0；结果桥 3 项、通知协议／迁移 9 项和首次拖放回归逐名一次通过，i18n 11、rust-genai 81、Node 19、诊断 Python 14 通过。真实 hook 23 通过、fish／zsh 缺失 2 跳过；原 SSH 正例及 guarded 成功收据通过，不扩为应用 ACK 或冷机启动验收。终审 SHA `2b194c1de98232e39b8f570ae140c42fde52da30a522c7667e408d8da556928d`，完整日志 SHA `c70f4754cb34977d10268c749768779ca09982fb1b06662f616008dc49be9adf`。ce49 Linux 的原失败保留；ce49 Windows 尚待结束，不能将不同 SHA 冒记最终 Goal 同提交门禁。

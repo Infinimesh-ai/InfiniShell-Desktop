@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。用户真实首拖及G03功能/英中证据齐备，bfb Linux源码门禁37153388911成功并完成原件终审，ce49 Windows门禁尚待结束。G09目标登录helper创建/调试及首次绑定失败清理已实现，本机门禁通过，73fc完整Windows原生更新恢复37154098574等待runner。17份既有安全收据摘要匹配；G05两份旧索引位置不可达，待定位，不推断功能失败或撤销历史关闭。本轮新增关闭0项。",
+  "status_zh": "本次Mac范围新增关闭G03：现10项关闭、仅G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。真实首拖及普通PTY图片/保稿/英中条件齐备，bfb Linux5444与ce49 Windows5085普通PASS，阶段源码门禁与产品等价逐项审计完成；不冒记同SHA。G09目标登录helper创建/调试及失败清理已实现，73fc完整Windows原生更新恢复37154098574已开始。最终Goal仍待G09原生矩阵和同一冻结提交相关双平台门禁；G05两份旧索引位置待定位，历史关闭不改写。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -33,6 +33,7 @@
     "closed_items": [
       "G01",
       "G02",
+      "G03",
       "G04",
       "G05",
       "G06",
@@ -47,11 +48,10 @@
       "V05"
     ],
     "remaining_items": [
-      "G03",
       "G09"
     ],
-    "remaining_count": 2,
-    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。 G10真实父权限、命令/技能审批、越界、运行取消及清理、双向ACK、冷恢复和结果已齐备，实际宿主审批英中布局通过。04ac两平台最终源码门禁success、两新Grok回归普通PASS；Windows菜单测试1条LEAK独立保留，不称全体普通PASS或无残留，不扩展原G10条件。",
+    "remaining_count": 1,
+    "closure_basis": "G04/G05 的既有实现与 Mac 真实验收满足新范围；G02 补齐当前生产适配器三轮组合真实消费。测试或文档数量不计关闭，其他平台移交不计通过。 G06 已补齐 Grok 用户来源、固定技能真实拒绝／允许与恢复、正常退出及英中审计；625ffcb98 的 Linux/Windows 源码门禁成功，新增顺序与 EOF 回归逐名通过。Windows 桌面用例 1 条 LEAK 单列保留，不计为无异常门禁。 G01 已补齐三平台原生实现和固定工件，Mac 普通 PTY 中文长多行、审批/草稿/旧会话/重连防重及英中布局按各自原构建验收；G07 三款普通文件卡真实读取与原生拒绝、失效保稿和共用 Toast 英中布局齐备。e3d5e58a0 的最终 Linux/Windows 源码门禁逐名通过，含此前漏测的两平台账本19项。清理证据不足的现场保守保留，不另增功能关闭条件；全平台实机未改记通过。 G08 三CLI真实SSH/tmux图片、原消费者断连恢复、权限拒绝、重复提交、旧回调保稿及引用清理按原构建已验；V03通知、双向交互、重复/晚到事件、恢复和取消，以及Codex关闭透传独立双端负例齐备。Linux .4真实工件已绑定，b47精确两平台最终源码门禁逐项通过，本轮零FAIL/RETRY/FLAKY/LEAK；旧失败、LEAK和Codex模型语义失败均保留，其他平台实机仍移交。 G10真实父权限、命令/技能审批、越界、运行取消及清理、双向ACK、冷恢复和结果已齐备，实际宿主审批英中布局通过。04ac两平台最终源码门禁success、两新Grok回归普通PASS；Windows菜单测试1条LEAK独立保留，不称全体普通PASS或无残留，不扩展原G10条件。 G03普通PTY剪贴板/拖放、真实首拖、正确会话与图片字节/顺序、焦点/审批失败保稿和英中布局按各原构建齐备，三平台固定.5工件与原生合同已核。bfb Linux与产品等价ce49 Windows阶段源码门禁分别通过，必要回归逐名普通PASS；旧Linux失败与历史LEAK不改写，最终Goal同提交门禁仍待完成。",
     "g04": {
       "source_commit": "47ac3a79ea5ba738c01338eaf09a68e155637748",
       "native": "Claude 2.1.280 / claude-opus-5-5 / Inherit",
@@ -74,7 +74,7 @@
         "windows-x64"
       ]
     },
-    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。 G10实际宿主命令审批在同一任务先英文后中文实窗审计，完整说明、参数和按钮均可读；本次关闭记录无需本地化变更。",
+    "localization": "G02/G04/G05 关闭时复核英中格式、版本、静态 GIF 及图片与技能提示，相关历史范围无需本地化变更。G01 本轮改变了普通提交、文本粘贴与回退语义，英中 Fluent 已同步；r-wudipm8z 的普通 GUI、r-g91qynam 的英中粘贴及英文回退、r-ni936aln 的最终短中文回退与占位提示分别完成真实布局审计。最后一轮仅中文 FTL 变化已核对，i18n 11 项及最终本地门禁通过；旧截断保留为已修历史。 G07 的142c635412新Mac构建在Claude普通GUI完成共用文件错误Toast英文/简体中文全文、长文件名及草稿/双卡保留审计；三CLI模型链分别按原构建计证，未重复运行。 G08实际英中启动/恢复/附件及输入提示按原实窗计证，V03沿用已审状态文案；本次关闭文档无需本地化变更，不称完整中文冷启动全应用或其他平台GUI验收。 G10实际宿主命令审批在同一任务先英文后中文实窗审计，完整说明、参数和按钮均可读；本次关闭记录无需本地化变更。 G03既有英中卡片、占位及能力拒绝完整Toast按原构建已审；首拖修复无新文案/布局，Mac及两平台i18n通过。本次关闭文档无需本地化变更。",
     "source_gate": {
       "command": "cargo check --locked -p warp --features warpui/test-util,rust-embed/debug-embed",
       "result": "passed",
@@ -1772,6 +1772,17 @@
       "windows_recheck": "待精确修复提交复验；首CMD原生停滞和最终源码门禁仍开放。",
       "localization": "无需本地化变更：仅验收合同和CI筛选，无用户文案、权限、超时、退出语义或布局变化。",
       "gaps_closed": []
+    },
+    "g03": {
+      "status": "closed_in_current_mac_scope",
+      "closure_ref": "g03_closure_20261004",
+      "functional_evidence_sha256": "66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3",
+      "independent_closure_review_sha256": "35d962eb93191715cc9c5cc24df8d6fb21cd09a9d8a2086dd97ff2291e296226",
+      "phase_gate_boundary": "bfb Linux与ce49 Windows分别通过，生产源码等价；不冒记同SHA，不代替最终Goal同提交双平台门禁。",
+      "closure_receipt": {
+        "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g03-preparation/g03-current-scope-closure-20261004-v1.safe.json",
+        "sha256": "1e3057074514cbb2afa28bf5fbfb1c41ae1a485db34a5b8c6f9f2eda128d6454"
+      }
     }
   },
   "authority": "当前完成结论；范围与待办见 KNOWN_GAPS.md，平台与源码验证结论见 VALIDATION_REPORT.md。",
@@ -9328,5 +9339,93 @@
     "localization": "无需本地化变更：内部登录/调试/清理修复，复核既有settings-cli-updates-probe-failed英中语义一致，无文案或布局改变。",
     "remaining": "完整Windows应用编译；CMD/PowerShell；原定五场景/三冷恢复及Job、DeviceMap、窗口站、LSA清理。",
     "newly_closed": []
+  },
+  "g03_closure_20261004": {
+    "schema": 1,
+    "created_at": "2026-10-03T22:19:47.906210+00:00",
+    "status": "closed_in_current_mac_scope",
+    "gap_closed": true,
+    "reviewed_head": "7c977f5b1c9b559ff89f17cd186e20164866439d",
+    "counts": {
+      "closed": 10,
+      "open": 1,
+      "deferred": 3
+    },
+    "acceptance_basis": "固定.5普通PTY原生PNG合同、三平台实现/工件，Mac剪贴板、拖放、新会话首拖、正确SID/prompt及一次ACK、多图原字节与顺序、焦点/审批保稿和英中可读布局满足原条件；真实功能、人工操作、原生工件与事件回归按各自原构建计证。",
+    "functional_review": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g03-preparation/g03-closure-evidence-review-ce49-v1.safe.json",
+      "sha256": "66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3"
+    },
+    "independent_closure_review": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/ce49b12c7-ci/g03-stage-closure-review.safe.json",
+      "sha256": "35d962eb93191715cc9c5cc24df8d6fb21cd09a9d8a2086dd97ff2291e296226"
+    },
+    "user_first_drop": {
+      "host_commit": "6296fb36a",
+      "native_version": "1.0.41+infinishell.session-notifications.5",
+      "run_id": "r-r6gr9mus",
+      "receipt_sha256": "07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f",
+      "new_screenshot_or_model_ack_claimed": false
+    },
+    "phase_source_gates": {
+      "linux": {
+        "commit": "bfb29a8eb46e41a0bd4e4f835aa7ae860966fb17",
+        "run_id": 37153388911,
+        "job_id": 111291798714,
+        "conclusion": "success",
+        "ordinary_pass": 5444,
+        "i18n_pass": 11,
+        "first_drop_regression": "one ordinary PASS",
+        "bridge_and_notification_named_tests": 12,
+        "audit_sha256": "2b194c1de98232e39b8f570ae140c42fde52da30a522c7667e408d8da556928d",
+        "real_hook": "23 passed / 2 skipped (fish,zsh缺失)，不计应用ACK或冷机启动"
+      },
+      "windows": {
+        "commit": "ce49b12c7c9f690c345c6aa5b3566ddf40feaa8f",
+        "run_id": 37150103944,
+        "job_id": 111282010601,
+        "conclusion": "success",
+        "ordinary_pass": 5085,
+        "i18n_pass": 11,
+        "notification_named_tests": 9,
+        "audit_sha256": "a23ea8f686c8e4a1a090df2ca8aed612f692a0bb584c5a520145ea3ee32fda37",
+        "first_drop_regression": "Unix cfg未编译，不计Windows执行"
+      },
+      "fail_leak_retry_flaky_in_selected_successful_jobs": 0,
+      "product_equivalence": "ce49→bfb仅结果桥测试同步与3文档变化，生产逐字节一致；8条G03关键输入源码在ce49/bfb/73fc/7c977一致。G09独立Windows增量及旧各轮结果不被本项关闭覆盖。",
+      "same_commit_cross_platform_goal_gate_complete": false
+    },
+    "negative_evidence_preserved": "ce49 Linux实际1FAIL及整run failure、旧通知失败、历史菜单LEAK和各平台SKIP均保留，不回写原收据；本轮Windows菜单普通PASS不能证明历史LEAK根因已修。",
+    "localization": "无需本地化变更；英中卡片/占位/拒绝提示完整可读，首拖修复沿既有语义；本次仅关闭记录与当前支持文档同步。",
+    "cleanup": "两源码观察器均exit0并按短TMPDIR合同清理；首拖私有GUI已退出但唯一现场cleanup_ready=false保留，不新增功能关闭条件。",
+    "remaining_items": [
+      "G09"
+    ],
+    "deferred_platform_acceptance_items": [
+      "V01",
+      "V02",
+      "V05"
+    ],
+    "pr_draft": true,
+    "final_goal_boundary": "G09完整Windows原生五场景/三独立冷恢复仍待验；全部当前范围满足后仍须同一冻结源码提交的相关双平台最终门禁，不将其他平台实机移交改记通过。",
+    "documentation_gate": {
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "-p",
+        "warp",
+        "--features",
+        "cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed"
+      ],
+      "run_id": "r-4ri5418v",
+      "exit_code": 0,
+      "status": "cleaned",
+      "log": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/r-4ri5418v.log",
+      "log_sha256": "7cac323e4c1e57986f4bd96b20aff9afdb86c32a9f9a5d05bb575c284943b2a6",
+      "record": "/Users/zhishi/InfiniShell-Tests/records/r-4ri5418v.json",
+      "record_sha256": "26a6490d7636017b557688660461927db69ef1599112841abe048b1f273e196b",
+      "localization": "仅状态与支持说明变化，无需本地化变更；原 Mac 英中布局及各 i18n 门禁按原构建计证。"
+    }
   }
 }
