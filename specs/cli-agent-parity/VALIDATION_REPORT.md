@@ -1,5 +1,15 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：Linux 修复门禁通过与既有关闭证据复核
+
+`bfb29a8eb` 的 [Linux 源码门禁 37153388911](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37153388911) 成功，完整原日志、工件及 14 份源码已核验。普通 nextest 5444 通过，FAIL／LEAK／RETRY／FLAKY／TIMEOUT 均为 0；结果桥 3 项、通知协议／迁移 9 项和首次拖放回归逐名一次通过，i18n 11、rust-genai 81、Node 19、诊断 Python 14 通过。真实 hook 23 通过、fish／zsh 缺失 2 跳过；原 SSH 正例及 guarded 成功收据通过，不扩为应用 ACK 或冷机启动验收。终审 SHA `2b194c1de98232e39b8f570ae140c42fde52da30a522c7667e408d8da556928d`，完整日志 SHA `c70f4754cb34977d10268c749768779ca09982fb1b06662f616008dc49be9adf`。ce49 Linux 的原失败保留；ce49 Windows 尚待结束，不能将不同 SHA 冒记最终 Goal 同提交门禁。
+
+对 9 项既有关闭条件的只读复核确认 17 份关键安全收据／索引摘要匹配。矩阵 SHA `45a42b89670935ea58bf93874a39e26f1f17669649b1c2140eda212e4e6f662a`，仓外 `g08-build-preparation/final-merge-audit-73fc6bb3a/requirements-evidence-matrix-v1.safe.json`。G05 的 `claude-image-skill-integrated-wip-v1/index.safe.json` 与 `gui-claude-hot-skills-20260926/index.safe.json` 在旧本机归档根不可达，限定外置归档及存储迁移记录未找到新入口；保留历史 Git 中的真实验收记录和精确摘要，标记位置待定位，不推断功能失败或唯一原件丢失，不撤销既有关闭。本轮未重跑模型或冒称已查看这些原图。PLAN 和 RELEASE_SUPPORT 中的当前计数及 G07 开放旧表述同步更正，历史轮次不改写。
+
+G03 当前 HEAD 的 8 份关键源码仍匹配已验原构建，影响复核 SHA `bf39b1df3c12d1308cc750f37f616fdef5e4b10bb54e1d3b027d6980167c9f1e`。首拖私有现场独立审计 SHA `46ede650af51991202f1718acee41d6028a22b27be3be1e7a132558e6f1e1c3d`：GUI、后代及打开文件已释放，但私有记录不足以唯一界定默认原生 SID／输入范围，保持 `cleanup_ready=false` 并保留，不读取默认认证或原生历史，不新增功能关闭条件。
+
+G09 的 `73fc6bb3a` [完整 Windows 原生更新门禁 37154098574](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574) 等待 runner；CMD／PowerShell、五场景／三冷恢复及原生资源回收均未计通过。**本轮新增关闭 0 项；仍为 9 关闭／G03、G09 开放／V01、V02、V05 移交，PR 草稿。** 本轮仅更新证据与支持说明，无需本地化变更。提交前 `cargo check --locked -p warp --features cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed` 通过，短根 `r-n3xee0bv` 已核实退出并清理，日志 SHA `de901d5d0617c30ef3400a8ddd3faa44df6b01b3935a33d0e9ce9972a7514ce9`。
+
 ## 2026-10-04：G09 由目标登录 helper 实际创建并持有调试端口
 
 **2026-10-04 目标登录会话内创建与调试已接通，Windows 原生验收待验**：第二 helper 改为在同一真实线程创建候选并执行 Wait/Continue，经认证管道转交原事件句柄，原登录身份、映像/FileID、Job两阶段授权、零 capability、三标准流及绝对期限均保留。复制失败可续取原事件，在途 Continue 不重放；首次绑定失败先终止原挂起候选再终止子 Job，正常 Close 要求排空并释放共享句柄。最终独审确认私有桌面名称正确传入；曾针对中间态提出的遗漏结论已撤销。本机 cargo check、35项进程/控制回归、i18n11项、Python来源合同21项及actionlint通过；command Windows测试交叉check通过，新增10项command及5项app回归尚未原生执行。来源绑定42→46、生产嵌入90→92，原f576失败保留。收据 SHA `342b6ccc5c719f65845c281d92771cd89b53683facd0c08ecafbac6eb7abd093`，仓外 `g09-station-debugger-v1/local-gates-final.safe.json`。完整app Windows编译、CMD/PowerShell、五场景/三冷恢复和资源回收均待真实门禁，G09仍开放。无需本地化变更：既有英中失败提示语义和布局不变。

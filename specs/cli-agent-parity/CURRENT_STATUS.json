@@ -1,7 +1,30 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。用户真实首拖及G03功能/英中证据齐备，bfb结果桥等待修复已推送，Linux最终源码门禁37153388911运行中。G09已改由目标登录会话中的second helper实际创建和调试候选，并补首次绑定失败时原根清理；本机check、35回归、i18n11和来源合同21通过，command Windows交叉check通过，完整Windows应用/五场景原生更新恢复仍待验，f576失败保留。本轮新增关闭0项。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。用户真实首拖及G03功能/英中证据齐备，bfb Linux源码门禁37153388911成功并完成原件终审，ce49 Windows门禁尚待结束。G09目标登录helper创建/调试及首次绑定失败清理已实现，本机门禁通过，73fc完整Windows原生更新恢复37154098574等待runner。17份既有安全收据摘要匹配；G05两份旧索引位置不可达，待定位，不推断功能失败或撤销历史关闭。本轮新增关闭0项。",
+  "pre_merge_checkpoint_20261004": {
+    "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
+    "linux_source_gate": {
+      "commit": "bfb29a8eb46e41a0bd4e4f835aa7ae860966fb17",
+      "run_id": 37153388911,
+      "result": "success",
+      "audit_sha256": "2b194c1de98232e39b8f570ae140c42fde52da30a522c7667e408d8da556928d",
+      "scope": "普通nextest5444通过，FAIL/LEAK/RETRY/FLAKY/TIMEOUT均0；结果桥3项、通知协议/迁移9项及首拖回归逐名一次通过，i18n11通过。真实hook23通过、fish/zsh缺失2跳过，不能扩为应用ACK或冷机启动验收。"
+    },
+    "existing_closures_audit": {
+      "path": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/final-merge-audit-73fc6bb3a/requirements-evidence-matrix-v1.safe.json",
+      "sha256": "45a42b89670935ea58bf93874a39e26f1f17669649b1c2140eda212e4e6f662a",
+      "verified_receipt_count": 17,
+      "g05_old_indexes": "evidence_location_unresolved",
+      "boundary": "仅复核原关闭条件、关键安全收据摘要和当前改动范围，不把旧真实链称为当前HEAD重跑。G05两份旧索引原路径不可达，不推断唯一原件丢失、不撤销关闭；保留历史Git记录及摘要，等待迁移位置。"
+    },
+    "g03_current_source_impact_sha256": "bf39b1df3c12d1308cc750f37f616fdef5e4b10bb54e1d3b027d6980167c9f1e",
+    "g03_private_lifecycle_audit_sha256": "46ede650af51991202f1718acee41d6028a22b27be3be1e7a132558e6f1e1c3d",
+    "g03_private_lifecycle_boundary": "原GUI和所属进程已退出，私有现场不能唯一界定默认原生会话的SID/提示范围，cleanup_ready=false并保留；未读取默认认证或原生历史，不新增功能关闭条件。",
+    "final_goal_gate": "阶段门禁按各提交独立计证；最终Goal仍须同一冻结源码提交的相关双平台门禁，不能合并ce49/bfb不同SHA冒记最终通过。",
+    "newly_closed_items": [],
+    "localization": "本轮仅更新验收和当前支持说明，无需本地化变更。"
+  },
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
