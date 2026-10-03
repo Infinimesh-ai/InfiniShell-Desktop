@@ -1,5 +1,21 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：首 CMD 已进入，创建观察受延迟导入限制
+
+新增关闭0项。精确b3c8cc839的[37103876288](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37103876288)已失败：普通warp1100＋command43共1143 PASS，无普通FAIL/LEAK/RETRY/FLAKY；feature取证25＋ce6 11＋环境5共41 ok，五个新环境合同按关/开两配置逐名通过。真实ignored入口1 FAIL，execute返回ProbeFailed，已进入首CMD代次e7c9aa44-b1f2-46b3-81a6-519abca693fa。31来源、started及manifest/exit/launch摘要链与冻结提交一致。终审索引 `afb174088621343e4c3d8e0a99d1cff1440fb445a27b93b7d181e7ad884c1335`，完整日志SHA `c47122f5704466443a57a41c83b4566f249f724299ceb2388ee64bce150234a9`，仓外`b3c8cc839-ci`；两官方ZIP API大小、SHA及全CRC通过，根代理独立核验索引22件大小/摘要。
+
+原生stderr及其审计（SHA `c2fcf77348f7bf2695c58d78efb5d7695d1de897863e31f24ed3c5d5bf5ae56c`）确认：creation在new阶段报delay_import_coverage_unsupported，NotModified且未装硬件断点，不能称已观察创建API入口/返回。取消前快照15076→15232ms，CMD PID2196的三个线程原暂停计数0，Node PID28684/TID7996原暂停计数1；本轮逐次恢复原计数，Node模块为空/指令未归到已核模块，所有线程GetThreadDesktop失败且win32=0。snapshot.complete仅表示快照流程完成，不证明桌面或完整取证。主调试线程6876收/验/continue均47，pending=null；约286秒取消后才收到Node CREATE，出生FILETIME证实取消前已存在，不能将迟到事件写成迟到创建或JS已执行。CP936拒绝访问字节未归属具体API，原根因仍未知。
+
+本代exit cleanup_confirmed、严格Job清空、无能力AppContainer profile删除、两级helper exit0、desktop关闭、logon/station消失均有同代收据；整个远端fixture根删除未证。PowerShell及其余事务未据此计通过。不扩大权限、超时或条件，不重复同一原生探针；先核对尚缺的创建观察与静态映像合同。此次仅证据和审计文档，无需本地化变更。提交前cargo check `r-twlo79wt`通过，日志SHA `e60985991e6adb632bcf7ca7b9b9b2401a092e24729d68d291f9763a36b1e53f`，短根已清理；仍9关闭／G03、G09开放／3移交，PR草稿。
+
+## 2026-10-03：授权 CGEvent 的实际拖放与跨应用对照
+
+新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。用户明确授权CGEvent后，`r-wyjvrfq1`的唯一Finder内部手势实际将source.txt移入destination，原inode94728370及SHA `b2ea998f3717190298c51de7e40fdfc2f3e4b0069c0763a801afaa035f6031a8`保持。随后`r-6ufdaiwj`的新普通未绑定Grok GUI使用69c17宿主和已绑定`.5`原生工件；相关Mac图片路径与当前b3等价，不称当前HEAD整包重建。唯一目标手势`r-l1omtgbb`结束后，图片卡与PTY路径均未出现，无Return、模型输入或新ACK。原生bridge安全投影与私有数据库均无新增消费；17个登记进程身份已退出，唯一失败现场保留。23件证据索引SHA `d19190ac85f7c202229840fe43277c4e04fe8528772975109b1681c8d9d3876c`，仓外`g03-preparation/r-6ufdaiwj-ordinary-images-gui`，根代理逐件核验大小与摘要。
+
+最初“1秒yield可能与末段观察重叠”的推测被原始调用时间排除：helper外层07:36:33.328→07:36:35.046Z，首次GUI观察07:36:47.052Z。源码只读复核未发现确定可解释零图片卡的断点；原件未记录Cocoa拖放回调或Rust事件分发，不据此归因产品、坐标或观察时序。
+
+为划清交付边界，在`r-hc94lfma`的新建TextEdit富文本空文档做一次独立跨应用对照；同helper `r-5sjpv3j1`完全结束后观察，文档仍空，无实际图片插入。源454字节PNG及SHA `f886d60f893a05c913fd63b1acf5bc0a68be83ccd410bc03fd75fb306eaff711`未变，未打开用户文档或改偏好。17件索引SHA `f3187508f58ad02a439d331fb635558316507d7d917f824f010698ee7af214fc`，仓外`g03-preparation/g03-native-drag-v1/textedit-control-v1/r-hc94lfma`；根代理核验大小/摘要及空文档截图。原TextEdit进程经正常菜单退出，两个短根已cleaned/cleanup_ready=true；快捷键Quit未退出的历史保留。此对照不证明InfiniShell产品失败，43个事件/exit0也不算实际交付。不继续重复手势；仍需可交付的跨应用原生拖放或人工实测，再完成最终源码门禁。仅验收及文档，无需本地化变更。
+
 ## 2026-10-03：修复首 CMD 取证入口的环境合同
 
 新增关闭0项，仍9关闭／G03、G09开放／V01、V02、V05移交，PR草稿。精确33f8d91cc的[37098941047](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37098941047)普通1138项、feature取证25项及ce6 11项通过；runner的21份生产源码嵌入检查通过，完整31摘要匹配冻结提交。真实ignored入口随后在validate返回 `inherited_environment`：runner显式传入的固定ALLOW开关不在验收允许列表。没有started、supervisor或原生代次收据，调用顺序证明首CMD和exercise未执行；worker后续绑定与执行后复核未到达。两份官方ZIP的API大小、SHA和全CRC已核，终审索引 `28233569189db2e4802b83842419ac9d95fa01f93fd088f4d602db0085219552`，仓外 `33f8d91cc-ci`。私有npm登记是夹具准备，不是产品候选成功；远端现场保留，未证完整根目录及外部npm后代清理。

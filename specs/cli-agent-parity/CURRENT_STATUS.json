@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。33 Windows普通1138项及feature取证25项/ce6 11项通过，来源绑定前置已越过，但验收入口因漏接固定取证环境开关拒绝，首CMD未启动。现已精准修复验收合同并完成本机check、i18n、Python和原字节合同检查；Windows实际复验及最终源码门禁待完成，既有原生停滞未改记解决。",
+  "status_zh": "本次Mac范围9项关闭、G03/G09共2项开放、V01/V02/V05移交，PR #22草稿。授权CGEvent的Finder内部校准成功，普通Grok与独立TextEdit跨应用均未交付图片，不能据此归因产品路由。b3 Windows普通1143项与feature41项通过，首CMD真实启动后ProbeFailed；创建观察因delay-import覆盖限制未启用，Node暂停根因仍未知，本代原生清理有证。不重复相近手势/探针，保留原关闭条件。",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -8652,5 +8652,75 @@
     "final_index_sha256": "4b1472296b8e985c528aa878f39a448c3e61c875e649bb8418f7d1f581115dd7",
     "cleanup": "GUI/后代/原生资源/observer均退出；短根、profile、state和精确Preferences已按身份清理，真实npm安装仍为287并保留。",
     "localization": "无需本地化变更；本轮英文忙碌/自动更新/成功状态完整，既有英中语义及布局审计仍按原构建计证。"
+  },
+  "g03_native_cgevent_20261003": {
+    "status": "open_cross_application_delivery_unproven",
+    "authorized_by_user": true,
+    "source_commit": "b3c8cc8392050a98339885c4aeff78504e21fa79",
+    "host_build_commit": "69c17fce3",
+    "native_version": "1.0.41+infinishell.session-notifications.5",
+    "source_equivalence": "G03 Mac图片相关产品路径与69c17相同，不称当前HEAD整包重建。",
+    "finder_calibration": {
+      "run_id": "r-wyjvrfq1",
+      "actual_move": true,
+      "original_inode_preserved": 94728370,
+      "sha256": "b2ea998f3717190298c51de7e40fdfc2f3e4b0069c0763a801afaa035f6031a8",
+      "cleanup": "cleaned"
+    },
+    "ordinary_pty": {
+      "run_id": "r-6ufdaiwj",
+      "owned_launcher_used": false,
+      "gesture_run_id": "r-l1omtgbb",
+      "image_card_observed": false,
+      "pty_path_observed": false,
+      "model_inputs": 0,
+      "new_native_ack": 0,
+      "index_sha256": "d19190ac85f7c202229840fe43277c4e04fe8528772975109b1681c8d9d3876c",
+      "cleanup": "17个登记进程身份退出；唯一失败现场保留，cleanup_ready=false。"
+    },
+    "textedit_control": {
+      "run_id": "r-hc94lfma",
+      "gesture_run_id": "r-5sjpv3j1",
+      "new_rich_text_document": true,
+      "actual_image_inserted": false,
+      "model_inputs": 0,
+      "index_sha256": "f3187508f58ad02a439d331fb635558316507d7d917f824f010698ee7af214fc",
+      "cleanup": "原TextEdit进程正常退出，两短根cleaned/cleanup_ready=true。"
+    },
+    "timing_correction": "首GUI观察在helper结束后约12秒；原重叠推测已被实际调用时间排除。",
+    "boundary": "Finder内移动不证明跨应用交付；TextEdit也未接收，不能据此判定InfiniShell路由失败。未发现确定源码断点，不盲改或重复手势。",
+    "remaining": [
+      "可实际交付的Finder到普通未绑定Grok附件输入，或人工拖放实测",
+      "最终精确源码门禁"
+    ],
+    "localization": "仅验收及审计，无需本地化变更。",
+    "gap_closed": false,
+    "local_check": {
+      "run_id": "r-twlo79wt",
+      "result": "passed",
+      "log_sha256": "e60985991e6adb632bcf7ca7b9b9b2401a092e24729d68d291f9763a36b1e53f",
+      "temporary_directory": "cleaned"
+    }
+  },
+  "g09_b3_native_followup_20261003": {
+    "source_commit": "b3c8cc8392050a98339885c4aeff78504e21fa79",
+    "run_id": 37103876288,
+    "conclusion": "failure",
+    "ordinary_pass": 1143,
+    "feature_ok": 41,
+    "new_environment_tests_both_configurations": 5,
+    "first_cmd_started": true,
+    "native_result": "ProbeFailed",
+    "generation": "e7c9aa44-b1f2-46b3-81a6-519abca693fa",
+    "creation_witness": "delay_import_coverage_unsupported；creation=null，restoration=NotModified，未观察创建入口或返回。",
+    "snapshot": "取消前约15秒；CMD三个线程previous_count=0，Node主线程previous_count=1，各次Suspend/Resume平衡；Node模块为空，线程桌面身份未证。",
+    "debug_events": "47收取/47核验/47继续，pending=null；Node CREATE仅取消后到达，不等于届时才出生。",
+    "native_cleanup": "本代Job/AppContainer/私有窗口站清理收据通过；整个远端fixture根删除未证。",
+    "final_index_sha256": "afb174088621343e4c3d8e0a99d1cff1440fb445a27b93b7d181e7ad884c1335",
+    "native_audit_sha256": "c2fcf77348f7bf2695c58d78efb5d7695d1de897863e31f24ed3c5d5bf5ae56c",
+    "windows_log_sha256": "c47122f5704466443a57a41c83b4566f249f724299ceb2388ee64bce150234a9",
+    "originals": "两官方ZIP大小/SHA/全CRC核验；根代理独立复核终审索引22件大小/摘要。",
+    "boundary": "不得将snapshot.complete=true写作完整创建/桌面取证成功；未解决Node暂停根因，不以测试或清理通过关闭G09。",
+    "gap_closed": false
   }
 }
