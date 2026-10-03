@@ -1460,7 +1460,8 @@ fn debug_wait_cancellation_precedes_the_deadline_without_consuming_an_event() {
         Some(&mut trace),
         None,
     )
-    .unwrap_err();
+    .err()
+    .expect("取消后不应返回原生事件");
 
     assert_eq!(failure.kind(), io::ErrorKind::Interrupted);
     assert_eq!(trace.last_boundary, "wait_cancelled");
@@ -1478,7 +1479,8 @@ fn debug_wait_deadline_does_not_start_another_wait() {
         Some(&mut trace),
         None,
     )
-    .unwrap_err();
+    .err()
+    .expect("截止后不应返回原生事件");
 
     assert_eq!(failure.kind(), io::ErrorKind::TimedOut);
     assert_eq!(trace.last_boundary, "wait_deadline");

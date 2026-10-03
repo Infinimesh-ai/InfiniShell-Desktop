@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 Windows 两处测试 Debug 约束修正
+
+**2026-10-04 Windows 测试编译错误已修，本机门禁通过，仍开放**：`73fc6bb3a` 的[原 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574)生产 check 通过，但 step44 在执行用例前编译失败。IAB 原日志两处 E0277 位于 `managed_process_atomic_windows_tests.rs:1463/1481`：`unwrap_err()` 额外要求成功值 `DEBUG_EVENT` 实现 Debug。仅改两处为显式取错，保留取消／截止错误种类、trace 边界及零事件消费全部原断言；生产源码不变。本机 cargo check 和按仓库 2024 配置的定向格式检查通过，短根 `r-gpty5j95` 已清理；无需本地化变更。修复收据 SHA `e4c9dce85c33d27c13877c22ffc1a097ed31135195b8ba92e35926c21236a20c`。原 job 后续步骤按实际结果另计，不将尚未执行的 app 回归、五场景或冷恢复记通过；完整 Windows 修复门禁和最终同提交两平台源码门禁仍待完成。**新增关闭 0 项，10 关闭／G09 开放／3 移交，PR 草稿。**
+
+首失败元数据 SHA `e188daad614d76835ffb68678429d348611b26dff855952ec27d64050c13912e`；本机 check 日志 SHA `5ba1153ce2165a88f4e9123141875ebfba20e12a87fa51172ba847e5d29b5510`。首次手工指定 edition2021 的 rustfmt 检查与仓库 edition2024 不符，报告既有格式差异但未修改源码；按仓库配置修正检查后通过，不为此重排无关代码。Mac check 不证明 Windows cfg 测试已编译，仍须原生 Windows 完整 libtest 与原矩阵验收。
+
 ## 2026-10-04：G03 本次 Mac 范围关闭
 
 用户确认新会话未先打开富输入时真实首拖满足预期：`6296fb36a`／固定 Grok `.5`／`r-r6gr9mus` 首次拖入终端即可出现图片卡；人工收据 SHA `07afe5f25c1f5b1f182a9dce0827444d0b33471eaee089f44838b641224b096f`。原普通未绑定 PTY 的 PNG 粘贴／拖放、正确 SID／prompt 与一次 ACK、多图原字节及顺序、焦点／审批等待保稿和英中布局均按各原构建满足；三平台原生合同及固定工件已绑定。功能条件审计 SHA `66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3`，独立关闭审计 SHA `35d962eb93191715cc9c5cc24df8d6fb21cd09a9d8a2086dd97ff2291e296226`。不要求用户重复验收，不新增模型输入或截图声明。

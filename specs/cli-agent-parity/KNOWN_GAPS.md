@@ -24,7 +24,7 @@
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
 | G03 | Mac 范围关闭 | 固定 `.5` 普通 PTY 的 PNG 粘贴、拖放、真实首拖、多图顺序、正确会话、焦点／审批保稿及英中已验；三平台原生工件齐备，bfb Linux 与生产等价的 ce49 Windows 相关源码门禁通过；最终 Goal 同提交门禁仍保留 |
-| G09 | 开放，共 1 项 | Mac 消费者升级、合法降级、忙碌延期及应用中断恢复已验；目标登录 helper 创建／调试及失败清理已修复，73fc 完整 Windows 五场景／三冷恢复正在源码检查阶段，原失败保留 |
+| G09 | 开放，共 1 项 | Mac 消费者升级、合法降级、忙碌延期及应用中断恢复已验；73fc Windows生产check通过，但两处测试Debug约束导致libtest编译失败；测试已修、本机check通过，完整Windows五场景／三冷恢复及最终门禁待验，原失败保留 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -273,6 +273,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-04 Windows 测试编译错误已修，本机门禁通过，仍开放**：`73fc6bb3a` 的[原 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574)生产 check 通过，但 step44 在执行用例前编译失败。IAB 原日志两处 E0277 位于 `managed_process_atomic_windows_tests.rs:1463/1481`：`unwrap_err()` 额外要求成功值 `DEBUG_EVENT` 实现 Debug。仅改两处为显式取错，保留取消／截止错误种类、trace 边界及零事件消费全部原断言；生产源码不变。本机 cargo check 和按仓库 2024 配置的定向格式检查通过，短根 `r-gpty5j95` 已清理；无需本地化变更。修复收据 SHA `e4c9dce85c33d27c13877c22ffc1a097ed31135195b8ba92e35926c21236a20c`。原 job 后续步骤按实际结果另计，不将尚未执行的 app 回归、五场景或冷恢复记通过；完整 Windows 修复门禁和最终同提交两平台源码门禁仍待完成。**新增关闭 0 项，10 关闭／G09 开放／3 移交，PR 草稿。**
 
 - **2026-10-04 目标登录会话内创建与调试已接通，Windows 原生验收待验**：第二 helper 改为在同一真实线程创建候选并执行 Wait/Continue，经认证管道转交原事件句柄，原登录身份、映像/FileID、Job两阶段授权、零 capability、三标准流及绝对期限均保留。复制失败可续取原事件，在途 Continue 不重放；首次绑定失败先终止原挂起候选再终止子 Job，正常 Close 要求排空并释放共享句柄。最终独审确认私有桌面名称正确传入；曾针对中间态提出的遗漏结论已撤销。本机 cargo check、35项进程/控制回归、i18n11项、Python来源合同21项及actionlint通过；command Windows测试交叉check通过，新增10项command及5项app回归尚未原生执行。来源绑定42→46、生产嵌入90→92，原f576失败保留。收据 SHA `342b6ccc5c719f65845c281d92771cd89b53683facd0c08ecafbac6eb7abd093`，仓外 `g09-station-debugger-v1/local-gates-final.safe.json`。完整app Windows编译、CMD/PowerShell、五场景/三冷恢复和资源回收均待真实门禁，G09仍开放。无需本地化变更：既有英中失败提示语义和布局不变。
 

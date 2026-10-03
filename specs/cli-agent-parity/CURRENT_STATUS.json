@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围新增关闭G03：现10项关闭、仅G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。真实首拖及普通PTY图片/保稿/英中条件齐备，bfb Linux5444与ce49 Windows5085普通PASS，阶段源码门禁与产品等价逐项审计完成；不冒记同SHA。G09目标登录helper创建/调试及失败清理已实现，73fc完整Windows原生更新恢复37154098574已开始。最终Goal仍待G09原生矩阵和同一冻结提交相关双平台门禁；G05两份旧索引位置待定位，历史关闭不改写。",
+  "status_zh": "本次Mac范围10项关闭、仅G09开放，V01/V02/V05移交不计通过，PR #22保持草稿。73fc Windows生产check通过，但warp libtest因两处DEBUG_EVENT不实现Debug的unwrap_err编译失败；已精准修正测试取错方式，本机check通过，完整Windows原生矩阵和最终同提交相关双平台门禁仍待验。G03保持已关闭；G05两份旧索引位置待定位，历史关闭不改写。",
   "pre_merge_checkpoint_20261004": {
     "reviewed_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
     "linux_source_gate": {
@@ -9427,5 +9427,33 @@
       "record_sha256": "26a6490d7636017b557688660461927db69ef1599112841abe048b1f273e196b",
       "localization": "仅状态与支持说明变化，无需本地化变更；原 Mac 英中布局及各 i18n 门禁按原构建计证。"
     }
+  },
+  "g09_test_compile_fix_20261004": {
+    "receipt": "/Volumes/SanDisk/InfiniShell-Archives/cli-agent-parity/resume-20261001/g08-build-preparation/g09-debug-event-test-compile-fix-v1.safe.json",
+    "sha256": "e4c9dce85c33d27c13877c22ffc1a097ed31135195b8ba92e35926c21236a20c",
+    "schema": 1,
+    "status": "local_gate_passed_windows_recheck_pending",
+    "newly_closed": [],
+    "base_head": "8bea317b952451506e8469605b46d4f6826b5033",
+    "original_run": 37154098574,
+    "original_head": "73fc6bb3ad8f4d43f3ee9a4034f31ae3d6f2b8f3",
+    "original_job": 111293809561,
+    "original_failure_step": 44,
+    "failure_metadata_sha256": "e188daad614d76835ffb68678429d348611b26dff855952ec27d64050c13912e",
+    "observed_diagnostic": "IAB原job step44两处E0277：managed_process_atomic_windows_tests.rs:1463:6及1481:6；unwrap_err要求Result的Ok值DEBUG_EVENT实现Debug。warp libtest编译失败，尚无本步骤用例执行。完整官方日志待job终态另核。",
+    "fix": "两处改为err().expect(中文失败说明)；保留Interrupted/TimedOut及trace边界、wait_calls=0、received=0原断言，无生产修改。",
+    "source": "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_tests.rs",
+    "before_sha256": "87b77bb15bfe9dfa3b404a7325df97216cdc30f5c469c1b86a83eff4017739c6",
+    "after_sha256": "905d83d28be74afc267c236b8aada5c7d804d813548a761b7d4f2cd85c026fff",
+    "local_gate": {
+      "run_id": "r-gpty5j95",
+      "command": "cargo check --locked -p warp --features cli-agent-native-witness,warpui/test-util,rust-embed/debug-embed",
+      "exit_code": 0,
+      "status": "cleaned",
+      "log_sha256": "5ba1153ce2165a88f4e9123141875ebfba20e12a87fa51172ba847e5d29b5510"
+    },
+    "format": "首次手工指定edition2021与仓库2024不符而报告既有差异，未修改文件；按仓库2024及Module/StdExternalCrate、skip_children=true定向check通过。",
+    "localization": "无需本地化变更：仅测试错误取值与测试失败说明，无产品文案或行为变化。",
+    "unverified": "Mac check不编译Windows cfg测试；修复后的Windows完整libtest、原41项及五场景/三冷恢复仍待验；旧job保留其后续实际结果，不能以预计不可达代替终态。"
   }
 }
