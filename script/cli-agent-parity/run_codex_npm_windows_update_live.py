@@ -33,6 +33,7 @@ SUPERVISOR_SOURCE_FILES = (
     *["app/src/ai/cli_agent_runtime/" + name for name in (
         "managed_process.rs", "managed_process_version_probe.rs", "managed_process_atomic_windows.rs",
         "managed_process_atomic_windows_creation_witness.rs", "managed_process_atomic_windows_snapshot.rs",
+        "managed_process_atomic_windows_snapshot_temp.rs",
         "managed_process_atomic_windows_witness.rs", "managed_process_npm_probe_windows.rs")],
     "crates/command/src/windows.rs",
     "crates/command/src/windows_appcontainer.rs",
@@ -50,6 +51,7 @@ ACCEPTANCE_SOURCE_FILES = (
     *["app/src/ai/cli_agent_runtime/" + name for name in (
         "managed_process_atomic_windows_creation_witness_tests.rs",
         "managed_process_atomic_windows_snapshot_tests.rs",
+        "managed_process_atomic_windows_snapshot_temp_tests.rs",
         "managed_process_atomic_windows_witness_tests.rs")],
     "crates/command/src/windows_station_bootstrap_tests.rs",
     "script/cli-agent-parity/run_claude_npm_update_live.py",

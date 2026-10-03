@@ -3,6 +3,35 @@ use std::io::Write as _;
 use super::*;
 
 #[test]
+fn temp_environment_binds_only_the_three_case_insensitive_keys() {
+    let environment = [
+        ("tmp".into(), "t".into()),
+        ("TEMP".into(), "t".into()),
+        ("UserProfile".into(), "h".into()),
+        ("TMPDIR".into(), "ignored".into()),
+    ];
+    assert_eq!(
+        expected_temp_environment(&environment),
+        Some([vec![116], vec![116], vec![104]])
+    );
+}
+
+#[test]
+fn temp_environment_rejects_missing_duplicate_or_embedded_nul_values() {
+    assert!(expected_temp_environment(&[]).is_none());
+    let mut environment = vec![
+        ("TMP".into(), "t".into()),
+        ("TEMP".into(), "t".into()),
+        ("USERPROFILE".into(), "h".into()),
+    ];
+    environment.push(("tmp".into(), "other".into()));
+    assert!(expected_temp_environment(&environment).is_none());
+    environment.pop();
+    environment[0].1 = "t\0".into();
+    assert!(expected_temp_environment(&environment).is_none());
+}
+
+#[test]
 fn snapshots_are_due_once_at_each_fixed_boundary() {
     assert_eq!(
         snapshot_action(false, false, Duration::from_secs(14), false, false, true),

@@ -490,7 +490,7 @@ pub(super) fn execute(
     debugger.bind_cancellation(cancellation);
     debugger.bind_package_diagnostics(manifest.generation);
     #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
-    debugger.bind_native_witness(manifest.generation, input.mode());
+    debugger.bind_native_witness(manifest.generation, input.mode(), &environment)?;
     let spawn_started = Instant::now();
     let spawned = command::windows::AppContainerProbe::spawn_package_suspended_with_station(
         executable.execution_path(),

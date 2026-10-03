@@ -249,6 +249,18 @@ const SOURCES: &[(&str, &[u8])] = &[
         include_bytes!("../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot.rs"),
     ),
     (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp.rs"
+        ),
+    ),
+    (
+        "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp_tests.rs",
+        include_bytes!(
+            "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_temp_tests.rs"
+        ),
+    ),
+    (
         "app/src/ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs",
         include_bytes!(
             "../../ai/cli_agent_runtime/managed_process_atomic_windows_snapshot_tests.rs"

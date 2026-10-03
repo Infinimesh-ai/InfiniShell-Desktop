@@ -37,6 +37,9 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::{BOOL, Error as WindowsError};
 
+#[path = "managed_process_atomic_windows_snapshot_temp.rs"]
+mod temp_path;
+
 const MAX_MODULES: usize = 64;
 const MAX_IMAGE_SIZE: u32 = 1024 * 1024 * 1024;
 const MAX_EXCEPTION_BYTES: usize = 768 * 1024;
@@ -243,6 +246,7 @@ pub(super) struct Snapshot {
     context: Option<ContextAddresses>,
     frames: Vec<Frame>,
     stack_stop: Option<Failure>,
+    temp_path: Option<temp_path::Observation>,
     desktop: Option<DesktopComparison>,
     suspension: Option<Suspension>,
     failure: Option<Failure>,
@@ -594,6 +598,42 @@ struct WalkState<'a> {
     stack: u64,
     remaining: usize,
     failure: Option<Failure>,
+    stopped: &'a dyn Fn() -> bool,
+}
+
+impl WalkState<'_> {
+    // 调用方另行限定栈/映像或固定临时目录观察的地址来源；两者共用预算和取消边界。
+    fn read_bytes(&mut self, address: u64, buffer: &mut [u8]) -> Result<(), Failure> {
+        if (self.stopped)() {
+            return Err(Failure::rejected("cancelled_or_expired_before_read"));
+        }
+        if address == 0
+            || !contained(0, MAX_USER_ADDRESS, address, buffer.len() as u64)
+            || buffer.len() > MAX_READ_ONCE
+            || buffer.len() > self.remaining
+        {
+            return Err(Failure::rejected("snapshot_read_out_of_bounds"));
+        }
+        self.remaining -= buffer.len();
+        let mut actual = 0;
+        unsafe { SetLastError(WIN32_ERROR(0)) };
+        let result = unsafe {
+            read_process_memory_raw(
+                self.process,
+                address as *const c_void,
+                buffer.as_mut_ptr().cast(),
+                buffer.len(),
+                &mut actual,
+            )
+        };
+        if !result.as_bool() {
+            return Err(Failure::last("ReadProcessMemory"));
+        }
+        if actual != buffer.len() {
+            return Err(Failure::rejected("partial_snapshot_read"));
+        }
+        Ok(())
+    }
 }
 
 impl PreparedModules {
@@ -649,24 +689,17 @@ unsafe extern "system" fn read_memory(
                 .get_or_insert_with(|| Failure::rejected("stack_read_out_of_bounds"));
             return BOOL(0);
         }
-        state.remaining -= size;
-        let mut actual = 0;
-        unsafe { SetLastError(WIN32_ERROR(0)) };
-        let result = unsafe {
-            read_process_memory_raw(process, address as *const c_void, buffer, size, &mut actual)
-        };
-        let failure = (!result.as_bool()).then(|| Failure::last("ReadProcessMemory"));
-        if let Some(failure) = failure {
-            state.failure.get_or_insert(failure);
+        let bytes = unsafe { std::slice::from_raw_parts_mut(buffer.cast::<u8>(), size) };
+        match state.read_bytes(address, bytes) {
+            Ok(()) => {
+                unsafe { *read = size as u32 };
+                BOOL(1)
+            }
+            Err(failure) => {
+                state.failure.get_or_insert(failure);
+                BOOL(0)
+            }
         }
-        if actual != size {
-            state
-                .failure
-                .get_or_insert_with(|| Failure::rejected("partial_stack_read"));
-            return BOOL(0);
-        }
-        unsafe { *read = actual as u32 };
-        result
     })
 }
 
@@ -727,6 +760,8 @@ fn walk(
     context: &mut CONTEXT,
     modules: &PreparedModules,
     snapshot: &mut Snapshot,
+    expected_temp_environment: Option<&[Vec<u16>; 3]>,
+    stopped: &dyn Fn() -> bool,
 ) {
     let mut state = WalkState {
         process,
@@ -734,6 +769,7 @@ fn walk(
         stack: context.Rsp,
         remaining: MAX_READ_BYTES,
         failure: None,
+        stopped,
     };
     ACTIVE_WALK.with(|active| active.set(ptr::from_mut(&mut state).cast()));
     let active = ActiveWalk;
@@ -811,6 +847,19 @@ fn walk(
         }
     }
     drop(active);
+    // 只有原根线程调用点提供预期环境；其他线程不能进入 PEB/环境观察。
+    if let Some(expected) = expected_temp_environment
+        && let Some(identity) = snapshot.identity
+    {
+        snapshot.temp_path = Some(temp_path::observe(
+            process,
+            identity.process_id,
+            modules,
+            &snapshot.frames,
+            expected,
+            &mut |address, bytes| state.read_bytes(address, bytes),
+        ));
+    }
     if let Some(failure) = state.failure {
         snapshot.stack_stop = Some(failure);
     }
@@ -826,6 +875,7 @@ pub(super) fn capture(
     expected_desktop: Option<HDESK>,
     modules: &PreparedModules,
     expected_identity: Option<&Identity>,
+    expected_temp_environment: Option<&[Vec<u16>; 3]>,
     stopped: impl Fn() -> bool,
 ) -> Snapshot {
     let mut snapshot = Snapshot {
@@ -840,12 +890,17 @@ pub(super) fn capture(
         context: None,
         frames: Vec::new(),
         stack_stop: None,
+        temp_path: None,
         desktop: None,
         suspension: None,
         failure: None,
     };
     let process = HANDLE(process.as_raw_handle());
     let thread = HANDLE(thread.as_raw_handle());
+    if expected_temp_environment.is_some() && expected_identity.is_none() {
+        snapshot.failure = Some(Failure::rejected("temp_environment_requires_root_identity"));
+        return snapshot;
+    }
     let (identity, cpu_times) = match identity(process, thread, process_creation_filetime) {
         Ok(observation) => observation,
         Err(failure) => {
@@ -892,7 +947,15 @@ pub(super) fn capture(
             frame: contained(context.0.Rsp, MAX_STACK_SPAN, context.0.Rbp, 1)
                 .then_some(context.0.Rbp),
         });
-        walk(process, thread, &mut context.0, modules, &mut snapshot);
+        walk(
+            process,
+            thread,
+            &mut context.0,
+            modules,
+            &mut snapshot,
+            expected_temp_environment,
+            &stopped,
+        );
     } else {
         snapshot.failure = Some(Failure::last("GetThreadContext"));
     }

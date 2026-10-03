@@ -1,5 +1,6 @@
 //! 仅一次、精确 generation 的 npm CMD 因果取证；不参与普通映像授权。
 
+use std::os::windows::ffi::OsStrExt as _;
 use std::os::windows::io::BorrowedHandle;
 
 use windows::Win32::System::Threading::{PROCESS_NAME_WIN32, QueryFullProcessImageNameW};
@@ -92,6 +93,7 @@ pub(super) struct NativeWitness {
     creation_unavailable: Option<serde_json::Value>,
     snapshot: Option<serde_json::Value>,
     root_thread: Option<RootThread>,
+    expected_temp_environment: [Vec<u16>; 3],
     early_root_cpu: Option<CpuSample>,
     late_snapshot: Option<serde_json::Value>,
     failures: Vec<serde_json::Value>,
@@ -101,6 +103,22 @@ pub(super) struct NativeWitness {
 
 fn enabled(generation: Uuid, mode: &str, value: Option<&str>) -> bool {
     mode == "cmd" && value.is_some_and(|value| value == generation.to_string())
+}
+
+fn expected_temp_environment(environment: &[(OsString, OsString)]) -> Option<[Vec<u16>; 3]> {
+    let value = |key: &str| {
+        let mut matching = environment.iter().filter(|(name, _)| {
+            name.to_str()
+                .is_some_and(|name| name.eq_ignore_ascii_case(key))
+        });
+        let (_, value) = matching.next()?;
+        if matching.next().is_some() {
+            return None;
+        }
+        let value: Vec<_> = value.encode_wide().collect();
+        (!value.contains(&0)).then_some(value)
+    };
+    Some([value("TMP")?, value("TEMP")?, value("USERPROFILE")?])
 }
 
 fn safe_failure(stage: &'static str, failure: &io::Error) -> serde_json::Value {
@@ -144,12 +162,19 @@ fn mapped_image_size(file: &File) -> io::Result<u32> {
 }
 
 impl WindowsImageDebugSession {
-    pub(in super::super) fn bind_native_witness(&mut self, generation: Uuid, mode: &str) {
+    pub(in super::super) fn bind_native_witness(
+        &mut self,
+        generation: Uuid,
+        mode: &str,
+        environment: &[(OsString, OsString)],
+    ) -> io::Result<()> {
         let value = std::env::var(GENERATION_ENV).ok();
         if enabled(generation, mode, value.as_deref())
             && self.package_images.is_some()
             && self.npm_diagnostics.is_some()
         {
+            let expected_temp_environment = expected_temp_environment(environment)
+                .ok_or_else(|| error("native_witness.temp_environment_invalid"))?;
             self.native_witness = Some(NativeWitness {
                 generation,
                 modules: HashMap::new(),
@@ -159,6 +184,7 @@ impl WindowsImageDebugSession {
                 creation_unavailable: None,
                 snapshot: None,
                 root_thread: None,
+                expected_temp_environment,
                 early_root_cpu: None,
                 late_snapshot: None,
                 failures: Vec::new(),
@@ -166,6 +192,7 @@ impl WindowsImageDebugSession {
                 exit_confirmed: false,
             });
         }
+        Ok(())
     }
 
     fn native_at_ms(&self) -> u128 {
@@ -588,6 +615,7 @@ impl WindowsImageDebugSession {
                                     expected_desktop,
                                     &prepared,
                                     None,
+                                    None,
                                     || self.snapshot_stopped(deadline),
                                 );
                                 thread_count += 1;
@@ -688,6 +716,7 @@ impl WindowsImageDebugSession {
                 desktop.ok().flatten(),
                 &prepared,
                 Some(&root.identity),
+                Some(&witness.expected_temp_environment),
                 || self.snapshot_stopped(deadline),
             );
             let balanced = snapshot.suspension_balanced();
@@ -866,7 +895,7 @@ impl WindowsImageDebugSession {
     pub(in super::super) fn record_native_witness_result(&self) {
         if let Some(witness) = &self.native_witness {
             let summary = serde_json::json!({"generation":witness.generation,"snapshot":witness.snapshot,"late_snapshot":witness.late_snapshot,"creation":witness.creation.as_ref().map(CreationWitness::summary).or(witness.completed_creation.as_ref()),"creation_unavailable":witness.creation_unavailable,"failures":witness.failures,"cancelled":witness.cancelled,"exit_confirmed":witness.exit_confirmed,"requires_original_exit":witness.creation.as_ref().is_some_and(CreationWitness::requires_restore_or_original_exit)});
-            // 仅地址、摘要、对象身份和固定错误类别；不含内存字节、路径、命令行或环境。
+            // 仅身份、数值及三项环境匹配布尔；不含原始内存、路径、命令行或环境值。
             warp_core::safe_eprintln!(safe:("managed_process.windows_native_witness={summary}"),full:("managed_process.windows_native_witness={summary}"));
         }
     }

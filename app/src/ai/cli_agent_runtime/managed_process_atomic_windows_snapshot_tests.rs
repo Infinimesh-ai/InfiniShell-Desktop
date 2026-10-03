@@ -3,6 +3,7 @@ use std::io::{Seek as _, SeekFrom};
 use std::os::windows::fs::OpenOptionsExt as _;
 
 use windows::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
+use windows::Win32::System::Threading::GetCurrentProcess;
 
 use super::*;
 
@@ -325,6 +326,7 @@ fn callback_only_returns_the_exception_entry_containing_pc() {
         stack: 0x80000,
         remaining: MAX_READ_BYTES,
         failure: None,
+        stopped: &|| false,
     };
     ACTIVE_WALK.with(|active| active.set(ptr::from_mut(&mut state).cast()));
     let active = ActiveWalk;
@@ -356,6 +358,7 @@ fn rejected_memory_read_keeps_the_buffer_and_budget_untouched() {
         stack: 0x80000,
         remaining: 8,
         failure: None,
+        stopped: &|| false,
     };
     ACTIVE_WALK.with(|active| active.set(ptr::from_mut(&mut state).cast()));
     let active = ActiveWalk;
@@ -371,6 +374,64 @@ fn rejected_memory_read_keeps_the_buffer_and_budget_untouched() {
         "stack_read_out_of_bounds"
     );
     drop(active);
+}
+
+#[test]
+fn cancelled_read_keeps_the_buffer_and_shared_budget_untouched() {
+    let modules = PreparedModules {
+        modules: Vec::new(),
+    };
+    let mut state = WalkState {
+        process: HANDLE(1usize as *mut c_void),
+        modules: &modules,
+        stack: 0x80000,
+        remaining: 8,
+        failure: None,
+        stopped: &|| true,
+    };
+    let mut bytes = [0xa5; 8];
+    assert_eq!(
+        state.read_bytes(0x80000, &mut bytes).unwrap_err().reason,
+        "cancelled_or_expired_before_read"
+    );
+    assert_eq!(bytes, [0xa5; 8]);
+    assert_eq!(state.remaining, 8);
+}
+
+#[test]
+fn direct_and_stack_reads_share_one_budget() {
+    let source = [1u8, 2, 3, 4];
+    let address = source.as_ptr() as u64;
+    let modules = PreparedModules {
+        modules: Vec::new(),
+    };
+    let process = unsafe { GetCurrentProcess() };
+    let mut state = WalkState {
+        process,
+        modules: &modules,
+        stack: address,
+        remaining: 8,
+        failure: None,
+        stopped: &|| false,
+    };
+    let mut bytes = [0u8; 4];
+    state.read_bytes(address, &mut bytes).unwrap();
+    assert_eq!(bytes, [1, 2, 3, 4]);
+    assert_eq!(state.remaining, 4);
+    ACTIVE_WALK.with(|active| active.set(ptr::from_mut(&mut state).cast()));
+    let active = ActiveWalk;
+    let mut read = 0;
+    assert!(
+        unsafe { read_memory(process, address, bytes.as_mut_ptr().cast(), 4, &mut read) }.as_bool()
+    );
+    assert_eq!(read, 4);
+    assert_eq!(state.remaining, 0);
+    drop(active);
+    assert_eq!(
+        state.read_bytes(address, &mut bytes).unwrap_err().reason,
+        "snapshot_read_out_of_bounds"
+    );
+    assert_eq!(state.remaining, 0);
 }
 
 #[test]
