@@ -224,6 +224,22 @@ struct Manifest {
 // 与运行器的完整来源集合一致；验收文件无需嵌入生产监督程序。
 const SOURCES: &[(&str, &[u8])] = &[
     (
+        "crates/command/src/windows_station_debugger.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debugger.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debug_event.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debug_event.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debugger_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debugger_tests.rs"),
+    ),
+    (
+        "crates/command/src/windows_station_debug_event_tests.rs",
+        include_bytes!("../../../../crates/command/src/windows_station_debug_event_tests.rs"),
+    ),
+    (
         "crates/command/src/managed.rs",
         include_bytes!("../../../../crates/command/src/managed.rs"),
     ),

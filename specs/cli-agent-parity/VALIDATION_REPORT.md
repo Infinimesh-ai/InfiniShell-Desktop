@@ -1,5 +1,11 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 由目标登录 helper 实际创建并持有调试端口
+
+**2026-10-04 目标登录会话内创建与调试已接通，Windows 原生验收待验**：第二 helper 改为在同一真实线程创建候选并执行 Wait/Continue，经认证管道转交原事件句柄，原登录身份、映像/FileID、Job两阶段授权、零 capability、三标准流及绝对期限均保留。复制失败可续取原事件，在途 Continue 不重放；首次绑定失败先终止原挂起候选再终止子 Job，正常 Close 要求排空并释放共享句柄。最终独审确认私有桌面名称正确传入；曾针对中间态提出的遗漏结论已撤销。本机 cargo check、35项进程/控制回归、i18n11项、Python来源合同21项及actionlint通过；command Windows测试交叉check通过，新增10项command及5项app回归尚未原生执行。来源绑定42→46、生产嵌入90→92，原f576失败保留。收据 SHA `342b6ccc5c719f65845c281d92771cd89b53683facd0c08ecafbac6eb7abd093`，仓外 `g09-station-debugger-v1/local-gates-final.safe.json`。完整app Windows编译、CMD/PowerShell、五场景/三冷恢复和资源回收均待真实门禁，G09仍开放。无需本地化变更：既有英中失败提示语义和布局不变。
+
+15份实现/测试/来源/工作流文件冻结 SHA `196ae2a661c5db9a43d411cdca337f24c7db6df241c7af9ad40b8cd9d40551d5`；独审 SHA `940373da3b04d354f12c875f2df63dd583a7f1b429deda6b3c3989726432a830`。六项完成门禁的短根均核实退出、归档并清理；Mac不能证明完整Windows app类型或原生执行。G03的bfb测试同步修复已推送，Linux精确源码门禁37153388911运行中。**本轮新增关闭0项；9关闭／G03、G09开放／V01、V02、V05移交，PR仍草稿。**
+
 ## 2026-10-04：G03 最终门禁测试同步修复与 G09 原生失败终审
 
 **2026-10-04 功能验收齐备，最终源码门禁仍开放**：真实首拖用户确认和原普通 PTY 图片、焦点、审批保稿、多附件顺序及英中证据已逐项审计，收据 SHA `66fe07f96c53ec5955d708cc85375ef572b3279ac6cd9c7fa9b0dd0f61ebf7d3`，不再要求重复人工操作。`ce49b12c7` 的[源码门禁 37150103944](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37150103944) Linux 官方日志确认真实通知 23 通过、fish/zsh 缺失 2 跳过；生命周期步骤 3767 通过、结果桥重复交付测试 1 失败。失败发生于第二次等待固定轮询耗尽，未证明 CPU 或 SQLite 为根因。测试现改用生产桥完成通知和已有私有 SQLite 回执期限，本机 8 项及 cargo check 通过，生产逻辑与时限不变。修复提交的最终源码门禁待验，Windows 原轮仍运行；新增关闭 0 项。无需本地化变更。

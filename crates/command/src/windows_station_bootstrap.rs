@@ -71,8 +71,12 @@ use windows::core::{BOOL, HRESULT, PCWSTR, PWSTR};
 use super::appcontainer::desktop::NewLogonDesktop;
 use crate::managed::ProbeJobOperation;
 
+#[path = "windows_station_debugger.rs"]
+mod debugger;
 #[path = "windows_station_device_map.rs"]
 mod device_map;
+pub(super) use debugger::Spawn as StationSpawn;
+pub use debugger::StationDebugger;
 
 #[cfg(feature = "native-probe-witness")]
 use windows::Win32::Foundation::DUPLICATE_SAME_ACCESS;
@@ -319,7 +323,7 @@ fn open_path_locked(path: &Path) -> io::Result<File> {
     )?;
     Ok(file)
 }
-struct PathLease {
+pub(super) struct PathLease {
     entries: Vec<(PathBuf, File, FileIdentity)>,
 }
 impl PathLease {
@@ -349,7 +353,7 @@ impl PathLease {
     fn path(&self) -> &Path {
         &self.entries[0].0
     }
-    fn verify(&self) -> io::Result<()> {
+    pub(super) fn verify(&self) -> io::Result<()> {
         for (path, file, identity) in &self.entries {
             require(
                 file_identity(file)? == *identity
@@ -884,6 +888,7 @@ pub(super) struct PrivateStation {
     second_identity: Option<Snapshot>,
     first_pipe: Option<Pipe>,
     second_pipe: Option<Pipe>,
+    debugger: Option<StationDebugger>,
     nonce: String,
     phase: &'static str,
     startup: Vec<u16>,
@@ -958,6 +963,7 @@ impl PrivateStation {
             second_identity: None,
             first_pipe: None,
             second_pipe: None,
+            debugger: None,
             nonce,
             phase: "prepare",
             startup: Vec::new(),
@@ -1165,8 +1171,31 @@ impl PrivateStation {
         save(self.root.path(), "ready.json", &ready)?;
         self.startup = wide(format!("{}\\{}", ready.station, ready.desktop).as_ref())?;
         self.device_map = Some(ready.device_map);
+        self.debugger = Some(StationDebugger::new(
+            self.second_pipe
+                .take()
+                .ok_or_else(|| invalid("窗口站调试管道缺失"))?,
+            process,
+            second.process.clone(),
+            self.nonce.clone(),
+        )?);
         self.phase = "ready";
         Ok(())
+    }
+    pub(super) fn debugger_handle(&self) -> Option<StationDebugger> {
+        self.debugger.clone()
+    }
+    pub(super) fn resume_package(&self) -> io::Result<()> {
+        self.debugger()?.resume()
+    }
+    pub(super) fn debugger(&self) -> io::Result<StationDebugger> {
+        self.parent_process()?;
+        self.debugger
+            .clone()
+            .ok_or_else(|| invalid("窗口站调试控制缺失"))
+    }
+    pub(super) fn spawn_package(&self, request: StationSpawn) -> io::Result<PROCESS_INFORMATION> {
+        self.debugger()?.spawn(request)
     }
     fn verify_member(&self, process: HANDLE) -> io::Result<()> {
         let mut contained = BOOL::default();
@@ -1306,6 +1335,9 @@ impl PrivateStation {
             desktop.close()?;
         }
         // 进程对象本身可保留主 token；原句柄确认退出后先释放，再核 LSA 会话消失。
+        if let Some(debugger) = self.debugger.take() {
+            debugger.invalidate()?;
+        }
         self.first.take();
         self.second.take();
         self.first_pipe.take();
@@ -1352,16 +1384,15 @@ impl PrivateStation {
         }
         self.phase = "request_desktop_close";
         let deadline = Instant::now() + CLEANUP_TIMEOUT;
-        let pipe = self
-            .second_pipe
-            .as_ref()
-            .ok_or_else(|| invalid("窗口站控制管道缺失"))?;
-        pipe.send(&self.nonce)?;
         let process = raw(self
             .second
             .as_ref()
             .ok_or_else(|| invalid("窗口站第二段缺失"))?);
-        let closed: Closed = pipe.receive(process, deadline)?;
+        let closed = self
+            .debugger
+            .as_ref()
+            .ok_or_else(|| invalid("窗口站调试控制缺失"))?
+            .close(deadline)?;
         require(
             closed.nonce == self.nonce
                 && Some(&closed.process) == self.second_identity.as_ref()
@@ -1612,28 +1643,32 @@ fn helper_second(
     })?;
     *phase = "desktop_lifetime";
     let deadline = Instant::now() + LIFETIME;
-    loop {
-        if let Some(nonce) = pipe.try_receive::<String>()? {
-            require(nonce == request.nonce, "窗口站桌面关闭授权不匹配")?;
-            break;
-        }
+    let mut debugger = debugger::Server::new()?;
+    let close_sequence = loop {
         require(alive(raw(&parent))?, "窗口站原父进程已退出")?;
         desktop.verify()?;
+        if let Some(sequence) = debugger.poll(pipe, request)? {
+            break sequence;
+        }
         wait_step(deadline, caller)?;
-    }
+    };
     *phase = "desktop_verify_and_close";
     desktop.verify()?;
     desktop.close()?;
     *phase = "device_map_verify_and_remove";
     let device_binding = device_map.binding().clone();
     device_map.close()?;
-    pipe.send(&Closed {
-        nonce: request.nonce.clone(),
-        process: identity,
-        desktop_verified_and_closed: true,
-        device_map: device_binding,
-        device_map_verified_and_removed: true,
-    })
+    debugger::Server::closed(
+        pipe,
+        close_sequence,
+        Closed {
+            nonce: request.nonce.clone(),
+            process: identity,
+            desktop_verified_and_closed: true,
+            device_map: device_binding,
+            device_map_verified_and_removed: true,
+        },
+    )
 }
 
 /// 只供明确部署的轻量 binary 调用；严格的两个阶段不提供任意命令执行接口。

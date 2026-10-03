@@ -520,7 +520,9 @@ pub(super) fn execute(
     }
     let mut process = spawned?;
     let started = Instant::now();
-    let result = run_package_probe(&mut process, &mut debugger, started);
+    let result = debugger
+        .bind_station_debugger(process.station_debugger())
+        .and_then(|()| run_package_probe(&mut process, &mut debugger, started));
     // 终止与清理会继续消费原调试事件；先封存本次真实 generation 的正常阶段边界。
     debugger.record_package_probe_result(result.as_ref().map(|code| *code));
     if let Err(failure) = &result {

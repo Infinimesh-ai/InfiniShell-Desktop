@@ -42,6 +42,8 @@ SUPERVISOR_SOURCE_FILES = (
     "crates/command/src/windows_appcontainer_desktop.rs",
     "crates/command/src/windows_station_bootstrap.rs",
     "crates/command/src/windows_station_device_map.rs",
+    "crates/command/src/windows_station_debugger.rs",
+    "crates/command/src/windows_station_debug_event.rs",
     "crates/command/src/bin/infinishell-station-bootstrap.rs",
     "script/cli-agent-parity/codex_0156_package_manifest.json",
 )
@@ -60,6 +62,8 @@ ACCEPTANCE_SOURCE_FILES = (
     "crates/command/src/managed_tests.rs",
     "crates/command/src/windows_station_bootstrap_tests.rs",
     "crates/command/src/windows_station_device_map_tests.rs",
+    "crates/command/src/windows_station_debugger_tests.rs",
+    "crates/command/src/windows_station_debug_event_tests.rs",
     "crates/command/src/windows_appcontainer_tests.rs",
     "crates/command/src/windows_appcontainer_console_tests.rs",
     "script/cli-agent-parity/run_claude_npm_update_live.py",

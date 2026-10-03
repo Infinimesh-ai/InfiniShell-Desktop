@@ -833,15 +833,17 @@ impl WindowsImageDebugSession {
                 .npm_diagnostics
                 .as_mut()
                 .and_then(|value| value.trace.as_mut());
-            match wait_for_debug_event(interval.as_millis().max(1) as u32, diagnostics) {
-                Ok(event) => return Ok(event),
+            match wait_for_debug_event(
+                interval.as_millis().max(1) as u32,
+                deadline,
+                diagnostics,
+                self.station_debugger.as_ref(),
+            ) {
+                Ok(Some(event)) => return Ok(event),
+                Ok(None) => {}
                 Err(failure)
-                    if failure
-                        .get_ref()
-                        .and_then(|value| value.downcast_ref::<WindowsError>())
-                        .is_some_and(|value| {
-                            value.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0)
-                        }) => {}
+                    if debug_error_code(&failure)
+                        == Some(HRESULT::from_win32(ERROR_SEM_TIMEOUT.0)) => {}
                 Err(failure) => return Err(failure),
             }
         }

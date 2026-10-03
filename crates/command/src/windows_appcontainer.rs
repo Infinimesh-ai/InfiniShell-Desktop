@@ -47,10 +47,10 @@ use windows::Win32::System::Threading::{
     CreateProcessW, DEBUG_PROCESS, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
     GetCurrentProcess, GetCurrentThread, GetExitCodeProcess, InitializeProcThreadAttributeList,
     LPPROC_THREAD_ATTRIBUTE_LIST, OpenProcessToken, OpenThreadToken,
-    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_PARENT_PROCESS,
-    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, PROCESS_CREATION_FLAGS, PROCESS_INFORMATION,
-    ResumeThread, STARTF_USESHOWWINDOW, STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW,
-    TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+    PROCESS_CREATION_FLAGS, PROCESS_INFORMATION, ResumeThread, STARTF_USESHOWWINDOW,
+    STARTF_USESTDHANDLES, STARTUPINFOEXW, STARTUPINFOW, TerminateProcess,
+    UpdateProcThreadAttribute, WaitForSingleObject,
 };
 use windows::Win32::UI::Shell::{
     FOLDERID_LocalAppData, KF_FLAG_DONT_VERIFY, KF_FLAG_NO_PACKAGE_REDIRECTION,
@@ -58,7 +58,9 @@ use windows::Win32::UI::Shell::{
 use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
 use windows::core::{BOOL, GUID, HRESULT, PCWSTR, PWSTR};
 
-use super::station_bootstrap::{PrivateStation, StationBootstrapImage};
+use super::station_bootstrap::{
+    PrivateStation, StationBootstrapImage, StationDebugger, StationSpawn,
+};
 use crate::managed::ProbeJobOperation;
 
 fn wide(value: &std::ffi::OsStr) -> io::Result<Vec<u16>> {
@@ -445,13 +447,13 @@ impl Drop for Grant {
     }
 }
 
-struct Attributes {
+pub(super) struct Attributes {
     storage: Vec<usize>,
-    list: LPPROC_THREAD_ATTRIBUTE_LIST,
+    pub(super) list: LPPROC_THREAD_ATTRIBUTE_LIST,
 }
 
 impl Attributes {
-    fn new(count: u32) -> io::Result<Self> {
+    pub(super) fn new(count: u32) -> io::Result<Self> {
         let mut length = 0;
         let _ = unsafe { InitializeProcThreadAttributeList(None, count, None, &mut length) };
         if length == 0 || length > 65536 {
@@ -472,7 +474,7 @@ impl Drop for Attributes {
     }
 }
 
-// 指定另一父进程后，HANDLE_LIST 使用该父进程表中的值，不能沿用创建者的值。
+// 第二段负责真正创建候选；只把三个标准流副本送入其句柄表。
 struct InheritedStreams<'a> {
     parent: Option<BorrowedHandle<'a>>,
     handles: Vec<HANDLE>,
@@ -982,52 +984,11 @@ impl AppContainerProbe {
             .as_ref()
             .map(PrivateStation::parent_process)
             .transpose()?;
-        let mut parent_handle = parent.map(|parent| HANDLE(parent.as_raw_handle()));
         let mut streams = InheritedStreams::new(parent)?;
         let mut handles = streams.handles.clone();
-        let attributes = Attributes::new(if parent.is_some() { 3 } else { 2 })?;
-        unsafe {
-            UpdateProcThreadAttribute(
-                attributes.list,
-                0,
-                PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES as usize,
-                Some(&mut capabilities as *mut _ as *const c_void),
-                size_of_val(&capabilities),
-                None,
-                None,
-            )
-        }
-        .map_err(io::Error::other)?;
-        if let Some(parent) = &mut parent_handle {
-            unsafe {
-                UpdateProcThreadAttribute(
-                    attributes.list,
-                    0,
-                    PROC_THREAD_ATTRIBUTE_PARENT_PROCESS as usize,
-                    Some((parent as *mut HANDLE).cast()),
-                    size_of::<HANDLE>(),
-                    None,
-                    None,
-                )
-            }
-            .map_err(io::Error::other)?;
-        }
-        unsafe {
-            UpdateProcThreadAttribute(
-                attributes.list,
-                0,
-                PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
-                Some(handles.as_mut_ptr().cast()),
-                handles.len() * size_of::<HANDLE>(),
-                None,
-                None,
-            )
-        }
-        .map_err(io::Error::other)?;
         startup.StartupInfo.hStdInput = handles[0];
         startup.StartupInfo.hStdOutput = handles[1];
         startup.StartupInfo.hStdError = handles[2];
-        startup.lpAttributeList = attributes.list;
         let console_flags = console_mode.configure_startup(&mut startup.StartupInfo);
         let program_wide = wide(program.as_os_str())?;
         if program_wide.contains(&(b'"' as u16)) {
@@ -1061,30 +1022,70 @@ impl AppContainerProbe {
             block.extend(wide(&value)?);
         }
         block.push(0);
-        let mut process = PROCESS_INFORMATION::default();
-        let spawned = unsafe {
-            CreateProcessW(
-                PCWSTR(program_wide.as_ptr()),
-                Some(PWSTR(command.as_mut_ptr())),
-                None,
-                None,
-                true,
-                CREATE_SUSPENDED
-                    | console_flags
-                    | CREATE_UNICODE_ENVIRONMENT
-                    | EXTENDED_STARTUPINFO_PRESENT
-                    | DEBUG_PROCESS,
-                Some(block.as_ptr().cast()),
-                PCWSTR(cwd_wide.as_ptr()),
-                &startup.StartupInfo,
-                &mut process,
-            )
+        let spawned = if let Some(station) = &result.private_station {
+            let (request, image) = StationSpawn::new(
+                program,
+                command,
+                block,
+                execution_cwd,
+                [handles[0], handles[1], handles[2]],
+                console_flags == CREATE_NEW_CONSOLE,
+            )?;
+            image.verify()?;
+            station.spawn_package(request)
+        } else {
+            let attributes = Attributes::new(2)?;
+            unsafe {
+                UpdateProcThreadAttribute(
+                    attributes.list,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES as usize,
+                    Some((&mut capabilities as *mut SECURITY_CAPABILITIES).cast()),
+                    size_of_val(&capabilities),
+                    None,
+                    None,
+                )
+            }
+            .map_err(io::Error::other)?;
+            unsafe {
+                UpdateProcThreadAttribute(
+                    attributes.list,
+                    0,
+                    PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                    Some(handles.as_mut_ptr().cast()),
+                    handles.len() * size_of::<HANDLE>(),
+                    None,
+                    None,
+                )
+            }
+            .map_err(io::Error::other)?;
+            startup.lpAttributeList = attributes.list;
+            let mut process = PROCESS_INFORMATION::default();
+            unsafe {
+                CreateProcessW(
+                    PCWSTR(program_wide.as_ptr()),
+                    Some(PWSTR(command.as_mut_ptr())),
+                    None,
+                    None,
+                    true,
+                    CREATE_SUSPENDED
+                        | console_flags
+                        | CREATE_UNICODE_ENVIRONMENT
+                        | EXTENDED_STARTUPINFO_PRESENT
+                        | DEBUG_PROCESS,
+                    Some(block.as_ptr().cast()),
+                    PCWSTR(cwd_wide.as_ptr()),
+                    &startup.StartupInfo,
+                    &mut process,
+                )
+            }
+            .map_err(io::Error::other)
+            .map(|()| process)
         };
-        // 属性引用的父句柄和白名单缓冲仍有效时销毁列表，再收回远端标准流副本。
-        drop(attributes);
+        // 创建调用返回后才关闭远端标准流副本，候选仍只继承三个白名单句柄。
         let streams_closed = streams.close();
         drop(streams);
-        spawned.map_err(io::Error::other)?;
+        let process = spawned?;
         result.process = Some(owned(process.hProcess));
         result.thread = Some(owned(process.hThread));
         result.process_id = process.dwProcessId;
@@ -1204,6 +1205,12 @@ impl AppContainerProbe {
         Ok(())
     }
 
+    pub fn station_debugger(&self) -> Option<StationDebugger> {
+        self.private_station
+            .as_ref()
+            .and_then(PrivateStation::debugger_handle)
+    }
+
     pub fn id(&self) -> u32 {
         self.process_id
     }
@@ -1220,6 +1227,9 @@ impl AppContainerProbe {
             .thread
             .take()
             .ok_or_else(|| io::Error::other("版本探针已恢复"))?;
+        if let Some(station) = &self.private_station {
+            return station.resume_package();
+        }
         if unsafe { ResumeThread(handle(&thread)) } != 1 {
             return Err(io::Error::other("版本探针挂起计数不匹配"));
         }
@@ -1248,9 +1258,21 @@ impl AppContainerProbe {
         Ok(code)
     }
 
-    /// 仅请求终止本次严格 Job；调用方仍须在原调试线程继续并排空已领取的事件。
+    /// 原根可能在身份核验失败前尚未入子 Job；原句柄和严格 Job 都必须终止。
     pub fn terminate_job(&self) -> io::Result<()> {
-        unsafe { TerminateJobObject(handle(&self.job), 1) }.map_err(io::Error::other)
+        let root = if let Some(process) = &self.process {
+            match unsafe { WaitForSingleObject(handle(process), 0) } {
+                WAIT_OBJECT_0 => Ok(()),
+                WAIT_TIMEOUT => {
+                    unsafe { TerminateProcess(handle(process), 1) }.map_err(io::Error::other)
+                }
+                _ => Err(io::Error::last_os_error()),
+            }
+        } else {
+            Ok(())
+        };
+        let job = unsafe { TerminateJobObject(handle(&self.job), 1) }.map_err(io::Error::other);
+        root.and(job)
     }
 
     fn processes_terminated(&self) -> io::Result<bool> {

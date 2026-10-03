@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use command::blocking::Command;
-use command::windows::AppContainerProbe;
+use command::windows::{AppContainerProbe, StationDebugger};
 use serde::Serialize;
 use uuid::Uuid;
 use windows::Win32::Foundation::{
@@ -188,6 +188,7 @@ pub(super) struct WindowsImageDebugSession {
     held_package_processes: Vec<OwnedHandle>,
     initial_breakpoints: HashSet<u32>,
     pending_event: Option<(u32, u32, DEBUG_EVENT_CODE)>,
+    station_debugger: Option<StationDebugger>,
     root_exit_observed: bool,
     cancellation: Option<Arc<AtomicBool>>,
     npm_diagnostics: Option<NpmProcessDiagnostics>,
@@ -653,6 +654,7 @@ impl WindowsReplacementLease {
             held_package_processes: Vec::new(),
             initial_breakpoints: HashSet::new(),
             pending_event: None,
+            station_debugger: None,
             root_exit_observed: false,
             cancellation: None,
             npm_diagnostics: self
@@ -668,6 +670,23 @@ impl WindowsReplacementLease {
 }
 
 impl WindowsImageDebugSession {
+    pub(super) fn bind_station_debugger(
+        &mut self,
+        debugger: Option<StationDebugger>,
+    ) -> io::Result<()> {
+        if self.station_debugger.is_some()
+            || self.root_process_id != 0
+            || self.pending_event.is_some()
+            || !self.processes.is_empty()
+        {
+            return Err(error(
+                "managed_process.atomic_windows_debug_backend_already_bound",
+            ));
+        }
+        self.station_debugger = debugger;
+        Ok(())
+    }
+
     pub(super) fn bind_cancellation(&mut self, cancellation: Arc<AtomicBool>) {
         self.cancellation = Some(cancellation);
     }
@@ -709,6 +728,7 @@ impl WindowsImageDebugSession {
         let failed = failure.is_some() || native_exit_code.is_some_and(|code| code != 0);
         let mut summary = serde_json::json!({
             "generation": trace.generation,
+            "debug_backend": if self.station_debugger.is_some() { "station-helper" } else { "local" },
             "root_pid": self.root_process_id,
             "spawn_thread_id": trace.spawn_thread_id,
             "spawn_return_thread_id": trace.spawn_return_thread_id,
@@ -872,8 +892,14 @@ impl WindowsImageDebugSession {
                         timeout_message,
                         cancellation,
                         diagnostics,
+                        self.station_debugger.as_ref(),
                     )?,
-                    None => wait_for_debug_event_until(deadline, timeout_message, diagnostics)?,
+                    None => wait_for_debug_event_until(
+                        deadline,
+                        timeout_message,
+                        diagnostics,
+                        self.station_debugger.as_ref(),
+                    )?,
                 }
             }
         };
@@ -900,14 +926,23 @@ impl WindowsImageDebugSession {
         Ok(event)
     }
 
-    fn continue_pending(&mut self, status: windows::Win32::Foundation::NTSTATUS) -> io::Result<()> {
+    fn continue_pending(
+        &mut self,
+        status: windows::Win32::Foundation::NTSTATUS,
+        deadline: Instant,
+    ) -> io::Result<()> {
         let (process_id, thread_id, code) = self
             .pending_event
             .ok_or_else(|| error("managed_process.atomic_windows_debug_event_missing"))?;
         let started = Instant::now();
         let call_thread_id = unsafe { GetCurrentThreadId() };
-        let result =
-            unsafe { ContinueDebugEvent(process_id, thread_id, status) }.map_err(io::Error::other);
+        // helper 后端在原创建线程继续其精确待事件；失败时双方均保留事件所有权。
+        let result = match &self.station_debugger {
+            Some(debugger) => debugger.continue_event(process_id, thread_id, status, deadline),
+            None => unsafe { ContinueDebugEvent(process_id, thread_id, status) }
+                .map(|()| status)
+                .map_err(io::Error::other),
+        };
         if let Some(trace) = self
             .npm_diagnostics
             .as_mut()
@@ -919,10 +954,10 @@ impl WindowsImageDebugSession {
                     started.elapsed(),
                     call_thread_id,
                 ),
-                status.0,
+                result.as_ref().map_or(status.0, |actual| actual.0),
             );
         }
-        result?;
+        result.map(|_| ())?;
         self.pending_event = None;
         // EXIT 只有继续成功后才释放调试器持有的进程句柄并计入清理完成。
         if code == EXIT_PROCESS_DEBUG_EVENT {
@@ -989,8 +1024,9 @@ impl WindowsImageDebugSession {
         container: Option<&AppContainerProbe>,
     ) -> io::Result<()> {
         self.root_process_id = root_process_id;
+        let deadline = Instant::now() + DEBUG_INITIAL_TIMEOUT;
         let event = self.next_event(
-            Instant::now() + DEBUG_INITIAL_TIMEOUT,
+            deadline,
             "managed_process.atomic_windows_initial_debug_event_timed_out",
             #[cfg(all(feature = "cli-agent-native-witness", target_arch = "x86_64"))]
             container,
@@ -1013,7 +1049,7 @@ impl WindowsImageDebugSession {
             }
             return Err(failure);
         }
-        self.continue_pending(DBG_CONTINUE)
+        self.continue_pending(DBG_CONTINUE, deadline)
     }
 
     pub(super) fn verify_package_initial_image(&mut self, root_process_id: u32) -> io::Result<()> {
@@ -1106,7 +1142,7 @@ impl WindowsImageDebugSession {
                 self.held_package_processes
                     .push(self.processes[&event.dwProcessId].try_clone()?);
             }
-            self.continue_pending(continue_status)?;
+            self.continue_pending(continue_status, deadline)?;
             if self.root_exit_observed && self.processes.is_empty() {
                 // EXIT Continue 仅释放调试事件；仍须逐个确认已授权映像的真实进程句柄 signaled。
                 return self.wait_for_package_processes_exit(deadline);
@@ -1372,10 +1408,10 @@ impl WindowsImageDebugSession {
                 return;
             }
         }
-        if self.continue_pending(DBG_CONTINUE).is_err() {
+        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
+        if self.continue_pending(DBG_CONTINUE, deadline).is_err() {
             return;
         }
-        let deadline = Instant::now() + DEBUG_DRAIN_TIMEOUT;
         while !self.processes.is_empty() {
             let Ok(next) = self.next_event(
                 deadline,
@@ -1402,7 +1438,7 @@ impl WindowsImageDebugSession {
                     let _ = file_from_debug_handle(information.hFile);
                 }
             }
-            if self.continue_pending(DBG_CONTINUE).is_err() {
+            if self.continue_pending(DBG_CONTINUE, deadline).is_err() {
                 return;
             }
         }
@@ -1459,7 +1495,7 @@ impl WindowsImageDebugSession {
                 ));
             }
             // 验证阶段已接管并释放 hFile；这里只继续原事件，不能再次构造 File。
-            self.continue_pending(DBG_CONTINUE)?;
+            self.continue_pending(DBG_CONTINUE, deadline)?;
         }
         while !self.root_exit_observed || !self.processes.is_empty() {
             let event = self.next_event(
@@ -1499,7 +1535,7 @@ impl WindowsImageDebugSession {
                     ));
                 }
             }
-            self.continue_pending(DBG_CONTINUE)?;
+            self.continue_pending(DBG_CONTINUE, deadline)?;
         }
         self.wait_for_package_processes_exit(deadline)
     }
@@ -2284,21 +2320,43 @@ fn duplicate_process_handle(handle: HANDLE) -> io::Result<OwnedHandle> {
 
 fn wait_for_debug_event(
     timeout_ms: u32,
+    deadline: Instant,
     diagnostics: Option<&mut NpmDebugTrace>,
-) -> io::Result<DEBUG_EVENT> {
-    let mut event = DEBUG_EVENT::default();
+    station_debugger: Option<&StationDebugger>,
+) -> io::Result<Option<DEBUG_EVENT>> {
     let started = Instant::now();
     let thread_id = unsafe { GetCurrentThreadId() };
-    let result = unsafe { WaitForDebugEvent(&mut event, timeout_ms) };
+    let (result, native_error) = match station_debugger {
+        Some(debugger) => {
+            let result = debugger.wait_event(timeout_ms, deadline);
+            // 无事件也可能是已发出的有界 Wait 尚未收完；不能虚构原生超时错误码。
+            let native_error = result.as_ref().err().and_then(debug_error_code);
+            (result, native_error)
+        }
+        None => {
+            let mut event = DEBUG_EVENT::default();
+            let result = unsafe { WaitForDebugEvent(&mut event, timeout_ms) };
+            let native_error = result.as_ref().err().map(WindowsError::code);
+            let result = result.map(|()| Some(event)).map_err(io::Error::other);
+            (result, native_error)
+        }
+    };
     if let Some(trace) = diagnostics {
-        trace.wait_finished(
-            started.elapsed(),
-            thread_id,
-            result.as_ref().err().map(WindowsError::code),
-        );
+        trace.wait_finished(started.elapsed(), thread_id, native_error);
     }
-    result.map_err(io::Error::other)?;
-    Ok(event)
+    result
+}
+
+fn debug_error_code(failure: &io::Error) -> Option<HRESULT> {
+    failure
+        .get_ref()
+        .and_then(|value| value.downcast_ref::<WindowsError>())
+        .map(WindowsError::code)
+        .or_else(|| {
+            failure
+                .raw_os_error()
+                .map(|code| HRESULT::from_win32(code as u32))
+        })
 }
 
 fn wait_for_cancellable_debug_event(
@@ -2306,6 +2364,7 @@ fn wait_for_cancellable_debug_event(
     timeout_message: &'static str,
     cancellation: &AtomicBool,
     mut diagnostics: Option<&mut NpmDebugTrace>,
+    station_debugger: Option<&StationDebugger>,
 ) -> io::Result<DEBUG_EVENT> {
     loop {
         if cancellation.load(Ordering::Acquire) {
@@ -2324,23 +2383,21 @@ fn wait_for_cancellable_debug_event(
             }
             return Err(io::Error::new(io::ErrorKind::TimedOut, timeout_message));
         }
-        // Windows 调试接口必须留在创建进程的线程；控制监听只设置停止标记。
+        // 本地或 helper 调试接口都留在各自原创建线程；控制监听只设置停止标记。
         let interval = remaining.min(Duration::from_millis(100));
-        let mut event = DEBUG_EVENT::default();
-        let started = Instant::now();
-        let thread_id = unsafe { GetCurrentThreadId() };
-        let result = unsafe { WaitForDebugEvent(&mut event, interval.as_millis().max(1) as u32) };
-        if let Some(trace) = diagnostics.as_deref_mut() {
-            trace.wait_finished(
-                started.elapsed(),
-                thread_id,
-                result.as_ref().err().map(WindowsError::code),
-            );
-        }
+        let result = wait_for_debug_event(
+            interval.as_millis().max(1) as u32,
+            deadline,
+            diagnostics.as_deref_mut(),
+            station_debugger,
+        );
         match result {
-            Ok(()) => return Ok(event),
-            Err(failure) if failure.code() == HRESULT::from_win32(ERROR_SEM_TIMEOUT.0) => {}
-            Err(failure) => return Err(io::Error::other(failure)),
+            Ok(Some(event)) => return Ok(event),
+            Ok(None) => {}
+            Err(failure)
+                if debug_error_code(&failure) == Some(HRESULT::from_win32(ERROR_SEM_TIMEOUT.0)) => {
+            }
+            Err(failure) => return Err(failure),
         }
     }
 }
@@ -2349,7 +2406,18 @@ fn wait_for_debug_event_until(
     deadline: Instant,
     timeout_message: &'static str,
     diagnostics: Option<&mut NpmDebugTrace>,
+    station_debugger: Option<&StationDebugger>,
 ) -> io::Result<DEBUG_EVENT> {
+    if station_debugger.is_some() {
+        // 清理忽略协作取消，但沿用原绝对期限；helper 每次最多等待 100 ms。
+        return wait_for_cancellable_debug_event(
+            deadline,
+            timeout_message,
+            &AtomicBool::new(false),
+            diagnostics,
+            station_debugger,
+        );
+    }
     let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
         if let Some(trace) = diagnostics {
@@ -2360,13 +2428,15 @@ fn wait_for_debug_event_until(
     let timeout_ms = u32::try_from(remaining.as_millis())
         .unwrap_or(u32::MAX)
         .max(1);
-    wait_for_debug_event(timeout_ms, diagnostics).map_err(|failure| {
-        if Instant::now() >= deadline {
-            io::Error::new(io::ErrorKind::TimedOut, timeout_message)
-        } else {
-            failure
-        }
-    })
+    wait_for_debug_event(timeout_ms, deadline, diagnostics, None)
+        .map_err(|failure| {
+            if Instant::now() >= deadline {
+                io::Error::new(io::ErrorKind::TimedOut, timeout_message)
+            } else {
+                failure
+            }
+        })?
+        .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, timeout_message))
 }
 
 fn is_plain_kind(attributes: u32, directory: bool) -> bool {
