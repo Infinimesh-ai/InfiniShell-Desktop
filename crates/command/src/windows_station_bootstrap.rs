@@ -611,6 +611,29 @@ fn logon_gone(snapshot: &Snapshot) -> io::Result<bool> {
     require(status.0 == 0, "窗口站登录会话信息释放失败")?;
     Ok(false)
 }
+fn release_observation(station: &io::Result<bool>, logon: &io::Result<bool>) -> serde_json::Value {
+    let error_fields = |result: &io::Result<bool>| {
+        result.as_ref().err().map(|error| {
+            let native = error
+                .get_ref()
+                .and_then(|error| error.downcast_ref::<windows::core::Error>())
+                .map(|error| error.code().0);
+            serde_json::json!({
+                "kind": format!("{:?}", error.kind()),
+                "os_error": error.raw_os_error(),
+                "hresult": native,
+            })
+        })
+    };
+    // 查询失败必须保留未知；只归档固定错误类型与原生码，不保存错误正文。
+    serde_json::json!({
+        "schema": 1,
+        "station_absent": station.as_ref().ok(),
+        "logon_absent": logon.as_ref().ok(),
+        "station_query_error": error_fields(station),
+        "logon_query_error": error_fields(logon),
+    })
+}
 fn resume(thread: HANDLE) -> io::Result<()> {
     require(
         unsafe { ResumeThread(thread) } == 1,
@@ -1329,7 +1352,7 @@ impl PrivateStation {
         }
         Ok(())
     }
-    fn release_and_verify(&mut self, deadline: Instant) -> io::Result<()> {
+    fn release_and_verify(&mut self, deadline: Instant, receipt: &str) -> io::Result<()> {
         #[cfg(feature = "native-probe-witness")]
         if let Some(desktop) = &mut self.witness_desktop {
             desktop.close()?;
@@ -1343,8 +1366,22 @@ impl PrivateStation {
         self.first_pipe.take();
         self.second_pipe.take();
         if let Some(identity) = &self.first_identity {
-            while !station_gone(&identity.station_name())? || !logon_gone(identity)? {
-                if Instant::now() >= deadline {
+            loop {
+                // 两侧均实际查询；窗口站存在时也保留本轮 LSA 状态，避免短路掩盖剩余资源。
+                let station = station_gone(&identity.station_name());
+                let logon = logon_gone(identity);
+                let complete = matches!((&station, &logon), (Ok(true), Ok(true)));
+                let failed = station.is_err() || (matches!(station, Ok(true)) && logon.is_err());
+                if complete || failed || Instant::now() >= deadline {
+                    let _ = save(
+                        self.root.path(),
+                        receipt,
+                        &release_observation(&station, &logon),
+                    );
+                    // 保留原错误优先级：站未消失时，新增 LSA 观察不改变原等待/超时结果。
+                    if station? && logon? {
+                        break;
+                    }
                     return Err(io::Error::new(
                         io::ErrorKind::TimedOut,
                         "窗口站或新登录会话尚未消失",
@@ -1413,7 +1450,7 @@ impl PrivateStation {
         )?;
         require(first == 0 && second == 0, "窗口站辅助进程返回失败")?;
         self.phase = "station_and_logon_released";
-        self.release_and_verify(deadline)?;
+        self.release_and_verify(deadline, "release-state.json")?;
         save(
             self.root.path(),
             "cleanup.json",
@@ -1454,7 +1491,7 @@ impl PrivateStation {
                     .second
                     .as_ref()
                     .and_then(|process| exit_code(raw(process)).ok());
-                self.release_and_verify(deadline)
+                self.release_and_verify(deadline, "aborted-release-state.json")
             });
         diagnostic(
             self.root.path(),

@@ -1,5 +1,19 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-04：G09 首 CMD 正例与回收阻塞
+
+**2026-10-04 首 CMD 原生执行成功，完整回收失败，仍开放**：`087283721` 的[完整 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37160171946)已终态 failure。普通 1191 项 PASS，41 项必需测试逐名一次通过，i18n 11 通过；首 CMD→Node→Codex 实际输出 `codex-cli 0.156.1`，四个候选进程及两个 helper 均正常退出 0，203 个调试事件均继续，桌面关闭及 DeviceMap 移除已确认。但窗口站／LSA 登录会话的联合消失确认超时，正常和 abort 清理均未通过；原收据不能区分两侧。`updated` 为 RecoveryRequired，未执行 PowerShell、其余四场景或三次冷恢复，不将局部正例计为更新成功。三份官方 ZIP 已校验，唯一观察器已退出并清理，终审索引 SHA `1d0cc1eb67fd8abfbd843f26c99b683665ba6c2685b56c92f0d8cb691e6c6506`。
+
+本次仅补两侧独立查询及各自终态安全收据，查询失败仍为未知；保留原绝对期限、错误优先级、严格 Job 所有权和两侧均消失的成功条件。源码审查尚未找到可确证的句柄遗漏，不将诊断改动称为原生修复。新收据已被现有工件选择覆盖，两条新测试纳入原 Windows 筛选；实际回收仍待下一次完整原矩阵。无需本地化变更，产品文案、权限与布局不变。
+
+提交前 cargo check、command Windows 测试交叉 check、i18n 11 项和 Windows 来源合同 Python 21 项通过，相关短根均已清理；新增两条 Windows 收据测试仅完成类型检查，尚未原生执行。门禁索引 SHA `8f0eebf36e18f6da8a55f3a208e7983f0d40a8fd8b54288df9adc62d2871bde9`，仓外 `g08-build-preparation/g09-release-observation-v1/local-gates.safe.json`。
+
+## 2026-10-04：G05 最终证据复核与补验准备
+
+G05 当前移回待补验，历史通过结论保留，不认定产品功能失败。纯 PNG 零文字、同轮 PNG＋原生 Skill、新建／冷恢复和特定 GUI 重关联的旧原件链尚不可完整复核；现存 v7 分轮收据及一次插件刷新负例不能替代这些条件。审计 SHA `dda27a5f4d8974f76b888c405e925c3782c1794d2d93faef9505fd61c61c1a19`，仓外 `g08-build-preparation/g05-proof-refresh-20261004/evidence-sufficiency-review-v1.safe.json`。不再重复搜索旧索引，按原条件补齐真实证明，不降低验收范围。
+
+单技能 Mac 运行器原先仍使用 `/private/tmp`，现与双技能共用已登记的短目录及 TMPDIR/TMP/TEMP；其他平台、原模型、认证、输入、超时和收据断言不变。16 项离线回归通过，含单／双技能短根、失败原件、UTF-8 和其他平台路径；`r-94tw_4tv` 已清理，日志 SHA `21100e5d5f59ab493783a02836da103b4d3c53bd77146c6acf3253e2fd2c39bf`。无需本地化变更，仅开发验收帮助与状态记录。新模型输入尚未执行，这些检查不计功能验收或缺口关闭。**新增关闭 0 项；9 项关闭，G05 待补验、G09 开放，3 项移交，PR 草稿。**
+
 ## 2026-10-04：G09 Windows 两处测试 Debug 约束修正
 
 **2026-10-04 Windows 测试编译错误已修，本机门禁通过，仍开放**：`73fc6bb3a` 的[原 Windows 任务](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37154098574)生产 check 通过，但 step44 在执行用例前编译失败。IAB 原日志两处 E0277 位于 `managed_process_atomic_windows_tests.rs:1463/1481`：`unwrap_err()` 额外要求成功值 `DEBUG_EVENT` 实现 Debug。仅改两处为显式取错，保留取消／截止错误种类、trace 边界及零事件消费全部原断言；生产源码不变。本机 cargo check 和按仓库 2024 配置的定向格式检查通过，短根 `r-gpty5j95` 已清理；无需本地化变更。修复收据 SHA `e4c9dce85c33d27c13877c22ffc1a097ed31135195b8ba92e35926c21236a20c`。原 job 后续步骤按实际结果另计，不将尚未执行的 app 回归、五场景或冷恢复记通过；完整 Windows 修复门禁和最终同提交两平台源码门禁仍待完成。**新增关闭 0 项，10 关闭／G09 开放／3 移交，PR 草稿。**

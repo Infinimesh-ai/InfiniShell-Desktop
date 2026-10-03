@@ -43,7 +43,7 @@ import probe_claude_rich_images
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def failed_probe(self, module, missing_private_tmp=False, timed_out=False,
-                     macos_registered=False):
+                     macos_registered=False, multi=False):
         with tempfile.TemporaryDirectory(prefix="claude-image-runner-offline-") as temporary:
             root = Path(temporary)
             binary = root / "未执行的二进制"
@@ -84,13 +84,16 @@ import probe_claude_rich_images
                 self.assertEqual(kwargs.get("cwd"), module.REPOSITORY)
                 if module is rich:
                     self.assertIs(kwargs["env"], authenticated_environment[0])
-                    if macos_registered:
-                        self.assertEqual(kwargs["env"]["TMPDIR"], str(args.private_root))
-                        self.assertEqual(kwargs["env"]["TMP"], str(args.private_root))
-                        self.assertEqual(kwargs["env"]["TEMP"], str(args.private_root))
-                    for key in ("HOME", "CODEX_HOME"):
-                        if key in kwargs["env"]:
-                            self.assertEqual(kwargs["env"][key], os.environ.get(key))
+                else:
+                    self.assertEqual(command[1], skill.MULTI_TEST if multi else skill.TEST)
+                if macos_registered:
+                    self.assertEqual(kwargs["env"]["TMPDIR"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["TMP"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["TEMP"], str(args.private_root))
+                    self.assertEqual(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_ROOT"], str(args.private_root))
+                for key in ("HOME", "CODEX_HOME"):
+                    if key in kwargs["env"]:
+                        self.assertEqual(kwargs["env"][key], os.environ.get(key))
                 events = Path(kwargs["env"]["INFINISHELL_CLAUDE_LIVE_ARTIFACT"])
                 events.write_bytes((json.dumps({"event": "acceptance_failed", "reason": FAILURE_TEXT},
                                                ensure_ascii=False) + "\n").encode("utf-8"))
@@ -119,6 +122,12 @@ import probe_claude_rich_images
                     if macos_registered:
                         verified_root = stack.enter_context(patch.object(rich, "registered_macos_root",
                             return_value=args.private_root))
+                else:
+                    stack.enter_context(patch.object(skill, "current_platform",
+                        return_value="darwin-arm64" if macos_registered else "linux-x64"))
+                    if macos_registered:
+                        verified_root = stack.enter_context(patch.object(skill, "private_macos_root",
+                            return_value=args.private_root))
                 if missing_private_tmp:
                     stack.enter_context(patch.object(Path, "is_dir", lambda path:
                         False if str(path) == "/private/tmp" else REAL_IS_DIR(path)))
@@ -129,8 +138,13 @@ import probe_claude_rich_images
                     else:
                         stack.enter_context(patch.object(module, "verify_binary", return_value={}))
                         stack.enter_context(patch.object(module, "verify_version"))
-                        stack.enter_context(patch.object(sys, "argv", ["probe", "--executable", str(binary),
-                            "--test-binary", str(binary), "--supervisor", str(binary), "--output", str(output)]))
+                        arguments = ["probe", "--executable", str(binary), "--test-binary", str(binary),
+                                     "--supervisor", str(binary), "--output", str(output)]
+                        if macos_registered:
+                            arguments.extend(["--private-root", str(args.private_root)])
+                        if multi:
+                            arguments.append("--multi")
+                        stack.enter_context(patch.object(sys, "argv", arguments))
                         module.main()
                 self.assertEqual(stopped.exception.code, 1)
             self.assertEqual((output / "test-output.txt").read_bytes(), FAILURE_TEXT.encode("utf-8"))
@@ -181,6 +195,11 @@ import probe_claude_rich_images
 
     def test_production_format_uses_registered_short_macos_tmpdir(self):
         self.failed_probe(rich, macos_registered=True)
+
+    def test_production_skill_uses_registered_short_macos_tmpdir(self):
+        for multi in (False, True):
+            with self.subTest(multi=multi):
+                self.failed_probe(skill, macos_registered=True, multi=multi)
 
     def test_production_authentication_ignores_parent_private_configuration(self):
         with patch.dict(os.environ, {"CLAUDE_CONFIG_DIR": "unrelated-parent-config",

@@ -1,5 +1,34 @@
 use super::*;
 
+#[test]
+fn release_observation_distinguishes_remaining_station_from_remaining_logon() {
+    let station_remaining = release_observation(&Ok(false), &Ok(true));
+    assert_eq!(station_remaining["station_absent"], false);
+    assert_eq!(station_remaining["logon_absent"], true);
+    assert!(station_remaining["station_query_error"].is_null());
+    assert!(station_remaining["logon_query_error"].is_null());
+
+    let logon_remaining = release_observation(&Ok(true), &Ok(false));
+    assert_eq!(logon_remaining["station_absent"], true);
+    assert_eq!(logon_remaining["logon_absent"], false);
+}
+
+#[test]
+fn release_observation_keeps_query_failure_unknown_without_error_text() {
+    let station = Err(io::Error::other(windows::core::Error::from_hresult(
+        HRESULT::from_win32(5),
+    )));
+    let logon = Err(io::Error::other("PRIVATE_ERROR_TEXT"));
+    let receipt = release_observation(&station, &logon);
+    assert!(receipt["station_absent"].is_null());
+    assert!(receipt["logon_absent"].is_null());
+    assert_eq!(receipt["station_query_error"]["hresult"], -2147024891i32);
+    assert_eq!(receipt["logon_query_error"]["kind"], "Other");
+    assert!(receipt["logon_query_error"]["os_error"].is_null());
+    assert!(receipt["logon_query_error"]["hresult"].is_null());
+    assert!(!receipt.to_string().contains("PRIVATE_ERROR_TEXT"));
+}
+
 fn identity(pid: u32, auth_low: u32) -> Snapshot {
     Snapshot {
         pid,

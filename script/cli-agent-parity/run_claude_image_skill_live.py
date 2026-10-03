@@ -142,7 +142,7 @@ def verify_native_receipts(events, traces, commands=None):
 def private_macos_root(path):
     base = Path("/Users/zhishi/InfiniShell-Tests")
     if path is None or path.parent != base or not path.name.startswith("r-"):
-        raise ValueError("macOS 双技能在线验收须提供本机固定根下的新轮次目录")
+        raise ValueError("macOS 图片技能在线验收须提供本机固定根下的新轮次目录")
     users = Path("/Users")
     device = users.stat().st_dev
     for directory in (Path("/"), users, Path("/Users/zhishi"), base, path):
@@ -166,12 +166,12 @@ def main():
     parser.add_argument("--supervisor", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--multi", action="store_true", help="验收图片加两个技能的新建与冷恢复")
-    parser.add_argument("--private-root", type=Path, help="本机 macOS 双技能验收的已登记 r- 轮次目录")
+    parser.add_argument("--private-root", type=Path, help="本机 macOS 图片单/双技能验收的已登记 r- 轮次目录")
     args = parser.parse_args()
     executable = args.executable.resolve(strict=True)
     native = verify_binary(executable, current_platform(), "2.1.280")
     args.output.mkdir(parents=True, exist_ok=False)
-    if args.multi and current_platform().startswith("darwin-"):
+    if current_platform().startswith("darwin-"):
         root = private_macos_root(args.private_root)
     else:
         root = Path(tempfile.mkdtemp(prefix="infinishell-claude-image-skill-",
@@ -190,7 +190,7 @@ def main():
         "isolated production Claude image and two selected skills verification\n" if args.multi
         else "isolated production Claude image and selected skill verification\n")
     environment = authorized_default_account_environment(root)
-    if args.multi and current_platform().startswith("darwin-"):
+    if current_platform().startswith("darwin-"):
         environment.update({"TMPDIR": str(root), "TMP": str(root), "TEMP": str(root)})
     environment.update({"INFINISHELL_CLAUDE_LIVE_ROOT": str(root),
         "INFINISHELL_CLAUDE_LIVE_AUTH_MODE": "authorized_default_account",
