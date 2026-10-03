@@ -23,7 +23,7 @@
 | G08 | Mac 范围关闭 | 三 CLI 真实 SSH／tmux 图片、原消费者断连恢复、重复与旧回调保稿、权限拒绝及引用清理齐备；b47 两平台最终源码门禁通过 |
 | V03 | Mac 范围关闭 | 固定三 CLI 的真实通知、交互、重复／晚到事件、恢复与取消，以及 Codex 关闭透传双端负例齐备；b47 两平台最终源码门禁通过 |
 | G10 | Mac 范围关闭 | 父权限、命令／技能审批、越界、取消清理、双向 ACK、冷恢复及结果真实链齐备，英中实际审批已审；04ac 两平台最终源码门禁成功，Windows 菜单测试 1 条 LEAK 单列保留 |
-| G03、G09 | 开放，共 2 项 | G03 缺 Finder 真实拖放；G09 的 Mac 功能链已齐，873 Linux 源码门禁通过；234 Windows普通1138项通过，但取证feature测试编译失败、首CMD未运行；三处测试接线与诊断输出已修，本机门禁通过、目标待验；原生停滞与Codex退出失败仍开放 |
+| G03、G09 | 开放，共 2 项 | G03 缺 Finder 真实拖放；G09 的 Mac 功能链已齐，873 Linux源码门禁通过；822 Windows普通1138项及取证feature编译通过，但snapshot首组4通过/4共享冲突失败、首CMD未运行；四处测试夹具已修并过本机门禁，目标待验；原生停滞与Codex退出失败仍开放 |
 | V01、V02、V05 | 移交用户 | Linux／Windows 在线生命周期、物理输入法和原生审批双语视口，均未改记为通过 |
 
 以下逐轮“未关闭／14 项开放／4 关闭与 7 开放”保留当时判断，当前状态以本节和 `CURRENT_STATUS.json.current_goal_scope` 为准。各轮源码、平台、失败和未验边界不变。
@@ -256,6 +256,8 @@ Linux／Windows 自托管 runner 均在线，但本轮只读盘点未找到可�
 - **关闭条件**：实现明确目标主机与会话绑定的图片传输、引用和清理，在实际 SSH／tmux 中证明远端收到原始内容；覆盖断连、重连、权限拒绝、重复投递及旧会话回调。
 
 ### G09 — 包管理器安装的自动升级
+
+- **2026-10-03 取证夹具共享冲突修复，仍开放**：精确822的[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)普通1138项通过、ce6和i18n各11项，取证feature已编译；snapshot首组8项中4通过/4失败，原件为ReOpenFile Win32 32，其余17项取证、feature ce6再验与首CMD未执行。完整日志及唯一官方环境ZIP已核验，终审索引 `a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b`。锁定tempfile在Windows以share_mode(0)打开匿名文件，现仅四处测试夹具改为生产等价只读租约，保留原解析/游标/边界断言并核拒写/改名；生产共享和权限不变。源码索引 `173fb523057b9cbbed6edb9d1667d9b1e06d8b12b654a8d64e00ab84583dd738`，本机check、i18n11项与Windows22项元数据类型检查通过，三个短根清理，门禁索引 `a4847fd637c2f208979acd299fd9d163b888ff732ca2437dd82118f36b28469f`；元数据不等于测试执行，目标复验待完成。无需本地化变更；原生更新停滞及Codex关停失败未解决，**新增关闭0项**，PR草稿。
 
 - **2026-10-03 Linux 修复复验通过，Windows 旧平台断言待复验**：873门禁37076566107的Linux5427普通PASS、17新增/增强逐名PASS，另rust-genai81通过，i18n11唯一，无FAIL/LEAK/RETRY/FLAKY/TIMEOUT；两个官方ZIP核验，终审索引 `228a6a620d06bffd284f56616d3e2f08cf45817544fbf210ae605513e248e583`。远端辅助临时根仍retained，Windows未选择。原fcd门禁Windows步骤44为3358通过/1失败，旧断言误将现已支持限定降级的Windows当作不支持主机；按生产拒绝语义单列InvalidRelease/RecoveryRequired，未扩大允许集。独审、本机check、聚焦14项和i18n11项通过，短根全清，门禁索引 `e89f6959238c94b7ca77fa923cb80bbc77d0dde235f995f58c565fa43b4ccda3`；原run完整终审与修正的Windows复验待齐。既有原生CMD/Node停滞及Codex hooks失败保留，现有runner可补取因果证据，归档取证代码未执行。**新增关闭0项**；无需本地化变更，PR草稿。
 

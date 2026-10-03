@@ -1,4 +1,8 @@
-use std::io::Write as _;
+use std::fs::{self, OpenOptions};
+use std::io::{Seek as _, SeekFrom};
+use std::os::windows::fs::OpenOptionsExt as _;
+
+use windows::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
 
 use super::*;
 
@@ -62,10 +66,24 @@ fn pe_fixture() -> Vec<u8> {
     bytes
 }
 
+/// 匿名 tempfile 在 Windows 使用 share_mode(0)；这里按生产映像租约只共享读取。
+fn leased_pe(bytes: &[u8]) -> (tempfile::TempDir, File) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("image.exe");
+    fs::write(&path, bytes).unwrap();
+    let file = OpenOptions::new()
+        .access_mode(GENERIC_READ.0)
+        .share_mode(FILE_SHARE_READ.0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT.0)
+        .open(path)
+        .unwrap();
+    (directory, file)
+}
+
 #[test]
 fn exception_directory_uses_file_offsets_and_preserves_the_file_cursor() {
-    let mut file = tempfile::tempfile().unwrap();
-    file.write_all(&pe_fixture()).unwrap();
+    let (directory, mut file) = leased_pe(&pe_fixture());
+    file.seek(SeekFrom::End(0)).unwrap();
     let functions = load_functions(&file, 0x3000).unwrap();
     assert_eq!(
         functions,
@@ -82,8 +100,10 @@ fn exception_directory_uses_file_offsets_and_preserves_the_file_cursor() {
             },
         ]
     );
-    use std::io::Seek as _;
     assert_eq!(file.stream_position().unwrap(), 0x218);
+    let path = directory.path().join("image.exe");
+    assert!(OpenOptions::new().write(true).open(&path).is_err());
+    assert!(fs::rename(&path, directory.path().join("replaced.exe")).is_err());
     assert_eq!(
         load_functions(&file, 0x4000).unwrap_err().reason,
         "image_layout_mismatch"
@@ -92,8 +112,7 @@ fn exception_directory_uses_file_offsets_and_preserves_the_file_cursor() {
 
 #[test]
 fn truncated_exception_data_is_not_treated_as_a_leaf_function() {
-    let mut file = tempfile::tempfile().unwrap();
-    file.write_all(&pe_fixture()[..0x210]).unwrap();
+    let (_directory, file) = leased_pe(&pe_fixture()[..0x210]);
     assert_eq!(
         load_functions(&file, 0x3000).unwrap_err().reason,
         "truncated_leased_image"
@@ -102,8 +121,7 @@ fn truncated_exception_data_is_not_treated_as_a_leaf_function() {
 
 #[test]
 fn module_overlap_is_rejected_and_unknown_pc_is_not_attributed() {
-    let mut file = tempfile::tempfile().unwrap();
-    file.write_all(&pe_fixture()).unwrap();
+    let (_directory, file) = leased_pe(&pe_fixture());
     let sha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     let modules = prepare_modules(&[VerifiedModule {
         file: &file,
@@ -149,8 +167,7 @@ fn module_overlap_is_rejected_and_unknown_pc_is_not_attributed() {
 
 #[test]
 fn callback_only_returns_the_exception_entry_containing_pc() {
-    let mut file = tempfile::tempfile().unwrap();
-    file.write_all(&pe_fixture()).unwrap();
+    let (_directory, file) = leased_pe(&pe_fixture());
     let modules = prepare_modules(&[VerifiedModule {
         file: &file,
         base: 0x10000,

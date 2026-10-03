@@ -1,5 +1,13 @@
 # CLI 支持与能力对齐：验证结论
 
+## 2026-10-03：修复 Windows 取证测试的排他文件夹具
+
+新增关闭0项。精确82204ea4f的[37089624639](https://github.com/Infinimesh-ai/InfiniShell-Desktop/actions/runs/37089624639)已结束为failure：普通warp1095与command43共1138项PASS，ce6与i18n各11唯一项；取证feature的libtest已成功编译，snapshot首组8项实际4PASS/4FAIL。三项原始错误为ReOpenFile Win32 32/HRESULT -2147024864，截断用例也提前得到api_failed而非预期解析错误；后续creation14、glue3、feature ce6再验及首CMD均未执行。完整日志SHA `48316691936faaf3fb31c8f21d9ca4928433b4a0f98c83ff86804cafd9347f4c`，唯一官方环境ZIP的API大小、SHA与CRC核验，终审索引 `a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b`；96条可见warning保留，普通组无LEAK/RETRY/FLAKY。
+
+锁定tempfile3.23.0的Windows匿名文件使用share_mode(0)，阻止持有句柄期间再次只读打开；生产映像租约则允许共享读取。现仅四处snapshot夹具改为临时目录写完关闭writer后，以生产等价GENERIC_READ/FILE_SHARE_READ取得租约。保留原解析、截断、模块归属、回调和游标断言，首例补持租约期间拒写/改名；File先于TempDir析构。creation现有测试为内存解析，无同类改动；生产读取逻辑、权限、超时和通过条件不变。源码索引 `173fb523057b9cbbed6edb9d1667d9b1e06d8b12b654a8d64e00ab84583dd738`，独审无阻断。
+
+本机cargo check、i18n11项通过；Windows creation/snapshot22项仅元数据类型检查通过，不等于实际执行、不覆盖app glue或原生行为。三个短根均核验清理，门禁索引 `a4847fd637c2f208979acd299fd9d163b888ff732ca2437dd82118f36b28469f`，仓外 `g09-witness-fixture-sharing-fix-v1`。无需本地化变更：仅测试夹具，无用户文案、行为或布局变化。修复后目标复验待完成；G03真实Finder拖放、G09原生CMD停滞与固定Codex关停失败仍开放，PR保持草稿。
+
 ## 2026-10-03：为原有 Codex 验收保留服务端关停阶段
 
 新增关闭0项。固定b412上游源码的stdio读取结束、processor退出和outbound退出日志写入stderr，但原验收默认日志级别未启用这些阶段。现仅复制start_codex的私有app-server环境，设置warn基础级别及两个已核模块的info/debug，采用JSON格式，由既有Recorder保存；ConPTY复用case也适用。调用方环境、原生RPC、超时、自然退出条件及清理均不变；读取错误和转发失败也可能到达“EOF”日志，不能以该文字独立证明真实EOF或成功退出。

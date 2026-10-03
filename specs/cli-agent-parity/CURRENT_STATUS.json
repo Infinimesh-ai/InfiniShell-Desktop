@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "status": "mac_scope_in_progress_pr_draft",
-  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；234 Windows普通1138项通过，但取证feature测试编译失败，首CMD未执行；三处测试接线与诊断输出已修并过本机门禁，目标待验；原生停滞和Codex退出失败仍开放",
+  "status_zh": "本次Mac范围已关闭G01/G02/G04/G05/G06/G07/G08/G10/V03；9项关闭、G03/G09共2项开放、3项移交，PR #22草稿。G09 Mac功能链齐备；822 Windows普通1138项及取证feature编译通过，但snapshot首组4通过/4共享冲突失败，首CMD未执行；四处测试夹具已修并过本机门禁，目标待验；原生停滞和Codex退出失败仍开放",
   "current_goal_scope": {
     "authorized_on": "2026-09-30",
     "user_direction": "如果在Mac端验证通过的，我们这次Goal任务可以不考虑，后续我在其他平台，运行验收。你来完成原生能力缺失的部分",
@@ -1596,6 +1596,36 @@
       "active_first_cmd_run": 37089624639,
       "active_run_contains_this_increment": false,
       "localization": "无需本地化变更：内部验收日志，无用户文案、错误语义或布局变化",
+      "gaps_closed": []
+    },
+    "g09_witness_fixture_sharing_fix_20261003": {
+      "base_commit": "94a0666aee418d9e02d61b7bca6a44eb054380b2",
+      "failed_run": 37089624639,
+      "failed_commit": "82204ea4f516ab728a84cfc1c6f42b9846717b24",
+      "terminal_index_sha256": "a8b15e6dd5bb424fea6017f418634d52e698ccb3e03f449ffc8995a6a36ae01b",
+      "ordinary_pass": 1138,
+      "ordinary_ce6_pass": 11,
+      "ordinary_i18n_pass": 11,
+      "feature_libtest_compiled": true,
+      "snapshot_tests": {
+        "passed": 4,
+        "failed": 4
+      },
+      "creation_glue_and_feature_ce6_executed": false,
+      "native_candidate_executed": false,
+      "failure": "匿名tempfile 3.23.0的Windows share_mode(0)与ReOpenFile只读重开冲突；Win32 32",
+      "fix": "四处snapshot夹具先写完关闭writer，再建立生产等价的只读共享租约；保留原断言，补拒写/改名保护",
+      "production_changed": false,
+      "source_index_sha256": "173fb523057b9cbbed6edb9d1667d9b1e06d8b12b654a8d64e00ab84583dd738",
+      "local_gate_sha256": "a4847fd637c2f208979acd299fd9d163b888ff732ca2437dd82118f36b28469f",
+      "cargo_check": true,
+      "i18n_pass": 11,
+      "windows_test_metadata_count": 22,
+      "metadata_is_execution": false,
+      "short_roots_cleaned": true,
+      "windows_recheck": "pending",
+      "original_native_failures_solved": false,
+      "localization": "无需本地化变更：仅测试夹具，无用户文案、行为或布局变化",
       "gaps_closed": []
     }
   },
